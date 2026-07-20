@@ -123,7 +123,12 @@ def rocm_search_roots(
     return tuple(roots)
 
 
-def env_snapshot(device: str) -> "Environment":
+def env_snapshot(
+    device: str,
+    *,
+    clocks_locked: bool | None = None,
+    timing_protocol: str | None = None,
+) -> "Environment":
     """Collect the hardware and library information for *device*."""
 
     import torch
@@ -148,7 +153,18 @@ def env_snapshot(device: str) -> "Environment":
             libs["cuda"] = str(cuda_version)
     except Exception:
         pass
-    return Environment(hardware=hardware_from_device(device), libs=libs)
+    isolation = "unknown"
+    if os.environ.get("SOL_EXECBENCH_SANDBOXED") == "1":
+        isolation = "container"
+    elif os.environ.get("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION") == "1":
+        isolation = "unsafe_local"
+    return Environment(
+        hardware=hardware_from_device(device),
+        libs=libs,
+        execution_isolation=isolation,
+        clocks_locked=clocks_locked,
+        timing_protocol=timing_protocol,
+    )
 
 
 def hardware_from_device(device: str) -> str:

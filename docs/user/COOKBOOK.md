@@ -1,173 +1,127 @@
 # Cookbook
 
-These recipes are copy-pasteable starting points. Commands that need AMD GPU
-access require a ROCm-capable Linux host or the ROCm Docker wrapper.
+Commands that execute kernels require a ROCm host or the repository container.
+The examples below use checked-in test samples that are part of the current
+tree.
 
-## Recipe: Single-Kernel Evaluation
-
-Use this recipe for single-kernel evaluation before interpreting wider
-curated-slice or dataset results.
+## Evaluate one PyTorch solution
 
 ```bash
-uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
-  --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-  --trace-output out/cookbook/rmsnorm.trace.jsonl
+uv run sol-execbench --format json evaluate \
+  tests/sol_execbench/samples/custom_inputs_matmul \
+  --solution tests/sol_execbench/samples/custom_inputs_matmul/solution_python.json \
+  --trace-output out/custom-matmul.trace.jsonl \
+  --unsafe-local-execution
 ```
 
-Inspect:
+## Evaluate one Triton solution
 
 ```bash
-head -n 1 out/cookbook/rmsnorm.trace.jsonl
+uv run sol-execbench --format json evaluate \
+  tests/sol_execbench/samples/nemotron_rms_norm \
+  --solution tests/sol_execbench/samples/nemotron_rms_norm/solution_triton.json \
+  --trace-output out/nemotron-rmsnorm.trace.jsonl \
+  --unsafe-local-execution
 ```
 
-## Recipe: Add A HIP/C++ Solution
-
-This recipe adds a HIP/C++ solution while keeping the benchmark problem stable.
-
-1. Copy the nearest example, such as `examples/hip_cpp/rmsnorm/`.
-2. Keep `<problem_dir>/definition.json` and `<problem_dir>/workload.jsonl` stable for comparison.
-3. Put native source in the solution JSON `sources` block.
-4. Use `languages: ["hip_cpp"]` and AMD target metadata.
-5. Run:
+## Compile and evaluate HIP/C++
 
 ```bash
-uv run sol-execbench --format json evaluate examples/hip_cpp/rmsnorm \
-  --solution examples/hip_cpp/rmsnorm/solution_hip.json \
-  --trace-output out/cookbook/hip_cpp_rmsnorm.trace.jsonl
+uv run sol-execbench --format json evaluate \
+  tests/sol_execbench/samples/rmsnorm \
+  --solution tests/sol_execbench/samples/rmsnorm/solution_cuda.json \
+  --trace-output out/hip-rmsnorm.trace.jsonl \
+  --unsafe-local-execution
 ```
 
-## Recipe: Run The Curated Slice Manually
+Despite its historical filename, this solution declares `languages:
+["hip_cpp"]` and contains HIP source.
 
-Use this curated slice recipe for bounded v1.15 release-preview evidence.
-
-Run a small representative subset first:
+## Collect profile diagnostics
 
 ```bash
-mkdir -p out/curated
-
-uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
-  --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-  --trace-output out/curated/rmsnorm.trace.jsonl
-
-uv run sol-execbench --format json evaluate examples/triton/rmsnorm \
-  --solution examples/triton/rmsnorm/solution_triton.json \
-  --trace-output out/curated/triton_rmsnorm.trace.jsonl
-
-uv run sol-execbench --format json evaluate examples/hip_cpp/rmsnorm \
-  --solution examples/hip_cpp/rmsnorm/solution_hip.json \
-  --trace-output out/curated/hip_cpp_rmsnorm.trace.jsonl
+uv run sol-execbench --format json evaluate \
+  tests/sol_execbench/samples/nemotron_rms_norm \
+  --solution tests/sol_execbench/samples/nemotron_rms_norm/solution_triton.json \
+  --profile rocprofv3 \
+  --trace-output out/profiled.trace.jsonl \
+  --unsafe-local-execution
 ```
 
-Then add ROCm library examples when dependencies are installed:
+If `rocprofv3` is unavailable or fails, the profiler sidecar records the reason
+and the CLI falls back to normal evaluation. Profile evidence remains
+diagnostic.
+
+## Collect native static evidence and decisions
 
 ```bash
-uv run sol-execbench --format json evaluate examples/hipblas/gemm \
-  --solution examples/hipblas/gemm/solution_hipblas.json \
-  --trace-output out/curated/hipblas_gemm.trace.jsonl
+uv run sol-execbench --format json evaluate \
+  tests/sol_execbench/samples/rmsnorm \
+  --solution tests/sol_execbench/samples/rmsnorm/solution_cuda.json \
+  --static-evidence auto --decision auto \
+  --trace-output out/native-evidence.trace.jsonl \
+  --unsafe-local-execution
 ```
 
-## Recipe: Capture Environment Evidence
+The sidecars describe build/static resource evidence. They do not modify the
+canonical trace or prove a runtime bottleneck.
+
+## Capture environment evidence
 
 ```bash
-uv run sol-execbench --format json environment doctor > out/cookbook/doctor.json
+uv run sol-execbench --format json environment doctor > out/doctor.json
 
 SOLEXECBENCH_ENV_SNAPSHOT=1 \
-  uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
-    --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-    --trace-output out/cookbook/rmsnorm.env.trace.jsonl
+  uv run sol-execbench --format json evaluate \
+    tests/sol_execbench/samples/custom_inputs_matmul \
+    --solution tests/sol_execbench/samples/custom_inputs_matmul/solution_python.json \
+    --trace-output out/environment.trace.jsonl \
+    --unsafe-local-execution
 ```
 
-Expected sidecar:
-
-```text
-out/cookbook/rmsnorm.env.trace.jsonl.environment.json
-```
-
-## Recipe: Collect rocprofv3 Diagnostics
-
-```bash
-uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm \
-  --solution tests/sol_execbench/samples/rmsnorm/solution_triton.json \
-  --profile rocprofv3 \
-  --trace-output out/cookbook/rmsnorm.profile.trace.jsonl
-```
-
-Expected sidecars:
-
-```text
-out/cookbook/rmsnorm.profile.trace.jsonl.profile.json
-out/cookbook/rmsnorm.profile.trace.jsonl.rocprofv3/
-```
-
-If `rocprofv3` is unavailable, the profile sidecar records that status and the
-benchmark follows the normal path.
-
-## Recipe: Inspect ROCm Toolchain Routing
+## Inspect tool routing
 
 ```bash
 uv run sol-execbench --format json toolchain route \
   --evidence-level profiling \
   --artifact-type executable_run \
   --gpu-arch gfx1200
-```
 
-Inspect the selected tool, status, fallback, and reason code. A successful
-routing decision means the toolchain path is available for that evidence level;
-it does not prove correctness, performance, static kernel evidence, or
-leaderboard readiness.
-
-List the built-in tool registry:
-
-```bash
 uv run sol-execbench --format json toolchain list
 ```
 
-## Recipe: Generate AMD-Native Derived Evidence
+Routing availability is not correctness or performance evidence.
 
-Use this recipe only when generating AMD-native score evidence from local
-readiness, timing, and bound artifacts.
-
-For NVIDIA SOL-ExecBench evaluation data, first obtain the source dataset
-yourself under the applicable NVIDIA license terms. This repository does not
-redistribute original NVIDIA dataset rows, definitions, workloads, traces,
-solutions, blobs, or ROCm-migrated derivatives. Migrate the local copy into a
-local output root:
+## Materialize and audit the pinned corpus
 
 ```bash
-uv run sol-execbench dataset migrate sol \
-  /path/to/local/SOL-ExecBench \
-  data/local-sol-migrated \
-  --manifest out/local-sol-migration-manifest.json
+uv run sol-execbench dataset materialize \
+  --manifest problems/RX_9060_XT/manifest.yaml \
+  --output problems/local/RX_9060_XT
+
+uv run sol-execbench dataset audit problems/local/RX_9060_XT
 ```
 
-FlashInfer Trace inputs use their separate Apache-2.0 provenance boundary:
+For an existing download, add `--source /path/to/pinned/snapshot`. The command
+selects and verifies the exact manifest inventory; it does not run candidates.
+
+## Analyze one reference with SOLAR
 
 ```bash
-uv run sol-execbench dataset migrate flashinfer \
-  /path/to/local/flashinfer-trace \
-  data/local-flashinfer-migrated \
-  --manifest out/local-flashinfer-migration-manifest.json
+uv run sol-execbench solar analyze PROBLEM_DIR \
+  --workload WORKLOAD_UUID \
+  --output out/solar/WORKLOAD_UUID \
+  --orojenesis-home /path/to/orojenesis
 ```
 
-After local migration and readiness/ready-subset generation, run a bounded
-local ROCm slice:
+SOLAR publishes operator graph, einsum graph, conversion attestation, formal
+analysis and manifest only when all stages pass.
+
+## Inspect the ownership contract
 
 ```bash
-uv run scripts/run_dataset.py data/local-sol-migrated \
-  --ready-subset out/ready_subset.json \
-  --readiness out/readiness.json \
-  --dataset-manifest out/local-sol-migration-manifest.json \
-  --limit 5 \
-  --max-workloads 1 \
-  --amd-score-report out/cookbook/amd-score-report.json \
-  --amd-sol-bound-dir out/cookbook/amd-sol-bounds \
-  --solar-derivation out/cookbook/solar-derivation \
-  --execution-closure out/cookbook/execution_closure.json
+uv run sol-execbench --format json contract evaluator
+uv run sol-execbench --format json contract cli
 ```
 
-The execution closure records the migration manifest, checksum, license
-boundary, readiness classes, blocker reasons, skipped workloads, and requested
-evidence. Treat output as bounded AMD-native-derived evidence, not NVIDIA B200,
-upstream SOLAR, leaderboard, full paper parity, or CDNA3/CDNA4 full-suite
-hardware validation. NVFP4/Blackwell low-precision compatibility paths remain
-semantic compatibility evidence until real CDNA4 validation exists.
+Use these outputs instead of relying on retired command/import paths.

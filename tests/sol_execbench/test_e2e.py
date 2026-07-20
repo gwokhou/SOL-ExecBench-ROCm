@@ -360,6 +360,7 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
             "from sol_execbench.cli import cli; cli()",
             "evaluate",
             str(sample_dir),
+            "--unsafe-local-execution",
             "--trace-output",
             str(output_file),
         ],

@@ -31,6 +31,10 @@ import torch
 
 from sol_execbench.core.bench.reward_hack.models import (
     _CACHE_METHODS,
+    _GRAPH_CALLS,
+    _GRAPH_METHODS,
+    _INDIRECT_STREAM_ATTRS,
+    _PARALLEL_IMPORT_ROOTS,
     _PRECISION_DOWNGRADE_RULE,
     _PRECISION_ATTRS,
     _PRECISION_DTYPE_NAMES,
@@ -110,6 +114,8 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             self.aliases[local_name] = alias.name
             if root in _RISKY_IMPORT_ROOTS:
                 self._add("unauthorized_file_or_loader", node, alias.name)
+            if root in _PARALLEL_IMPORT_ROOTS:
+                self._add("parallel_execution", node, alias.name)
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
@@ -117,6 +123,8 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         root = module.split(".", maxsplit=1)[0]
         if root in _RISKY_IMPORT_ROOTS:
             self._add("unauthorized_file_or_loader", node, module)
+        if root in _PARALLEL_IMPORT_ROOTS:
+            self._add("parallel_execution", node, module)
         for alias in node.names:
             if alias.name == "*":
                 continue
@@ -148,6 +156,8 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         name = self._resolved_name(node.func)
         if self._is_hidden_stream_call(name):
             self._add("hidden_async_stream", node, name)
+        if self._is_indirect_stream_getattr(node):
+            self._add("hidden_async_stream", node, self._node_source(node))
         if self._is_cache_call(name):
             self._add("semantic_output_cache", node, name)
         if self._is_unauthorized_call(node, name):
@@ -167,11 +177,41 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _is_hidden_stream_call(self, name: str) -> bool:
-        return name in {
+        if name in {
             "torch.cuda.Stream",
             "torch.cuda.stream",
             "torch.cuda.ExternalStream",
-        } or name.endswith(".wait_stream")
+            *_GRAPH_CALLS,
+        }:
+            return True
+        return name.endswith(
+            (".wait_stream", *(f".{method}" for method in _GRAPH_METHODS))
+        )
+
+    def _is_indirect_stream_getattr(self, node: ast.Call) -> bool:
+        """Detect ``getattr(torch.cuda, "Stream")``-style indirect stream creation.
+
+        Covers the concurrency-exploit obfuscation (paper §4.4.1) where a
+        non-default stream is created or entered by attribute name to bypass the
+        direct ``torch.cuda.Stream()`` checks.
+        """
+        if self._resolved_name(node.func) != "getattr" or len(node.args) < 2:
+            return False
+        if not isinstance(node.args[1], ast.Constant) or not isinstance(
+            node.args[1].value, str
+        ):
+            return False
+        attr = node.args[1].value
+        if attr in _GRAPH_METHODS:
+            return True
+        if attr not in _INDIRECT_STREAM_ATTRS | {
+            "CUDAGraph",
+            "graph",
+            "make_graphed_callables",
+        }:
+            return False
+        base = self._resolved_name(node.args[0])
+        return base == "torch.cuda" or base.endswith(".cuda")
 
     def _is_cache_call(self, name: str) -> bool:
         return name in {

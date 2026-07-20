@@ -1,8 +1,7 @@
-# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Dataset migration commands for the SOL-ExecBench CLI."""
+"""Pinned public problem-corpus commands."""
 
 from __future__ import annotations
 
@@ -11,118 +10,99 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from ...core.dataset.migration import (
-    migrate_flashinfer_trace,
-    migrate_sol_execbench,
-    write_migration_manifest,
+from sol_execbench.cli.protocol import CliResult, artifact
+from sol_execbench.core.dataset.corpus import (
+    OFFICIAL_DATASET_ID,
+    OFFICIAL_DATASET_REVISION,
+    CorpusManifest,
 )
-from ..protocol import CliResult, artifact
 
 console = Console(stderr=True)
+DEFAULT_MANIFEST = Path("problems/RX_9060_XT/manifest.yaml")
+DEFAULT_OUTPUT = Path("problems/local/RX_9060_XT")
 
 
 @click.group("dataset", context_settings={"help_option_names": ["-h", "--help"]})
 def dataset_cli() -> None:
-    """Local dataset utilities."""
+    """Materialize and audit the pinned public problem corpus."""
 
 
-@dataset_cli.group("migrate")
-def migrate_cli() -> None:
-    """Migrate external datasets into the local benchmark layout."""
-
-
-@migrate_cli.command("sol", context_settings={"help_option_names": ["-h", "--help"]})
-@click.argument(
-    "source_root", type=click.Path(exists=True, file_okay=False, path_type=Path)
-)
-@click.argument("output_root", type=click.Path(file_okay=False, path_type=Path))
+@dataset_cli.command("materialize")
 @click.option(
-    "--category",
-    "categories",
-    multiple=True,
-    help="SOL-ExecBench category to migrate. May be passed more than once.",
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=DEFAULT_MANIFEST,
+    show_default=True,
 )
-@click.option("--source-revision", help="Source dataset revision or local commit ref.")
-@click.option("--manifest", "manifest_path", type=click.Path(path_type=Path))
-def _dataset_migrate_sol_cli(
-    source_root: Path,
-    output_root: Path,
-    categories: tuple[str, ...],
-    source_revision: str | None,
-    manifest_path: Path | None,
+@click.option(
+    "--source",
+    "source_root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Pinned dataset snapshot; downloaded when omitted.",
+)
+@click.option(
+    "--output",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=DEFAULT_OUTPUT,
+    show_default=True,
+)
+@click.option("--cache-dir", type=click.Path(file_okay=False, path_type=Path))
+def materialize_cli(
+    manifest_path: Path,
+    source_root: Path | None,
+    output: Path,
+    cache_dir: Path | None,
 ) -> CliResult:
-    """Migrate downloaded SOL-ExecBench inputs into local benchmark layout."""
-
-    manifest = migrate_sol_execbench(
-        source_root,
-        output_root,
-        categories=categories or None,
-        source_revision=source_revision,
+    """Select the exact SOLAR-ROCm workload subset without adapting it."""
+    manifest = CorpusManifest.load(manifest_path)
+    source = source_root or _download_snapshot(cache_dir)
+    result_path = manifest.materialize(source, output)
+    report = manifest.audit(result_path)
+    console.print(
+        f"[green]Materialized {report['workloads']} workloads in {result_path}[/green]"
     )
-    target = manifest_path or output_root / "migration-manifest.json"
-    _write_and_report_manifest(
-        manifest=manifest,
-        target=target,
-    )
+    record = result_path / "materialization-manifest.yaml"
     return CliResult(
-        data={"manifest": _manifest_payload(manifest)},
-        artifacts=(artifact(target, "json_file"),),
+        data={"output": str(result_path), **report},
+        artifacts=(artifact(record, "yaml_file"),),
     )
 
 
-@migrate_cli.command(
-    "flashinfer", context_settings={"help_option_names": ["-h", "--help"]}
+@dataset_cli.command("audit")
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=DEFAULT_MANIFEST,
+    show_default=True,
 )
 @click.argument(
-    "source_root", type=click.Path(exists=True, file_okay=False, path_type=Path)
+    "problem_root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=DEFAULT_OUTPUT,
 )
-@click.argument("output_root", type=click.Path(file_okay=False, path_type=Path))
-@click.option("--source-revision", help="Source dataset revision or local commit ref.")
-@click.option("--manifest", "manifest_path", type=click.Path(path_type=Path))
-def _dataset_migrate_flashinfer_cli(
-    source_root: Path,
-    output_root: Path,
-    source_revision: str | None,
-    manifest_path: Path | None,
-) -> CliResult:
-    """Migrate downloaded FlashInfer Trace inputs into local benchmark layout."""
-
-    manifest = migrate_flashinfer_trace(
-        source_root,
-        output_root,
-        source_revision=source_revision,
-    )
-    target = manifest_path or output_root / "migration-manifest.json"
-    _write_and_report_manifest(
-        manifest=manifest,
-        target=target,
-    )
-    return CliResult(
-        data={"manifest": _manifest_payload(manifest)},
-        artifacts=(artifact(target, "json_file"),),
-    )
-
-
-def _write_and_report_manifest(
-    *,
-    manifest,
-    target: Path,
-) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    write_migration_manifest(manifest, target)
-    console.print(f"[green]Wrote migration manifest to {target}[/green]")
+def audit_cli(manifest_path: Path, problem_root: Path) -> CliResult:
+    """Fail closed if local problems differ from the pinned public selection."""
+    report = CorpusManifest.load(manifest_path).audit(problem_root)
     console.print(
-        "[bold]Problems:[/bold] "
-        f"{manifest.denominators.migrated_problems}/"
-        f"{manifest.denominators.discovered_problems} migrated; "
-        f"{manifest.denominators.blockers} blocker(s)"
+        f"[green]Valid corpus: {report['workloads']} workloads, "
+        f"{report['scored']} scored[/green]"
     )
+    return CliResult(data={"problem_root": str(problem_root), **report})
 
 
-def _manifest_payload(manifest) -> object:
-    import json
+def _download_snapshot(cache_dir: Path | None) -> Path:
+    from huggingface_hub import snapshot_download
 
-    return json.loads(manifest.to_json())
+    downloaded = snapshot_download(
+        repo_id=OFFICIAL_DATASET_ID,
+        repo_type="dataset",
+        revision=OFFICIAL_DATASET_REVISION,
+        allow_patterns=["data/*.parquet"],
+        cache_dir=str(cache_dir) if cache_dir else None,
+    )
+    return Path(downloaded)
 
 
-_dataset_cli = dataset_cli
+__all__ = ["dataset_cli"]

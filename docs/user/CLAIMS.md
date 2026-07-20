@@ -94,10 +94,9 @@ For v1.25 engineering-prerelease support wording:
   28 partial profiler-backed problems, 0 rebuilt consistency findings, and a
   passing prerelease artifact bundle. It must also state that full
   profiler-backed timing coverage remains false.
-- Long RDNA4 derived or dataset jobs should run outside the Codex child process
-  tree through `scripts/run_derived_isolated.py --launch-mode systemd` or an
-  equivalent transient `systemd-run --user` unit with memory and swap caps.
-  The caller should poll status/log files, not own memory-heavy children.
+- Historical long-running evidence jobs used operator-owned external
+  orchestration. This v3 tree does not expose that retired runner as a current
+  command surface.
 - Docker/container ROCm user-space evidence is not native-host validation.
 - MI300X and MI308X are sibling GPU products under the CDNA3 architecture
   family and share the `gfx942` code path. Current CDNA3/gfx942 validation

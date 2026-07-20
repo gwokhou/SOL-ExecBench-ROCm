@@ -1,18 +1,24 @@
-# Architecture navigation for maintainers and coding agents
+# Architecture navigation for maintainers
 
-This map identifies ownership and local verification boundaries. Artifact JSON is
-untrusted at parser and compatibility adapters; domain services consume typed
-models or request views after that boundary.
+Raw JSON/YAML is validated at parser boundaries. Domain stages consume typed
+models or typed request/result objects.
 
-| Domain | Owner module | Main entry | Data flow | Key invariant | Local checks |
-| --- | --- | --- | --- | --- | --- |
-| CLI evaluation | `cli/evaluation` | `EvaluationRequest` → `run_evaluation_cli` | resolve/load → stage/compile → runtime → sidecars/result | `ProblemPackager.close()` runs on every exit path; CLI exit and JSON formats remain stable | `tests/sol_execbench/cli`, module-boundary tests |
-| Generated driver | `core/bench` | `WorkloadEvaluationRequest` → `evaluate_workloads` | integrity gate → correctness → timing → trace | injected functions live in `EvaluationDependencies`; workload data is separate | `tests/sol_execbench/core/bench`, driver tests |
-| AMD bound sanity | `core/scoring/amd_bound_sanity` | `SanityInputs` → `build_amd_bound_sanity_report` | ingest → audit → aggregate → report/checksum | raw mappings stop at input/ingest adapters; workload state is typed | AMD sanity and v1.19 evidence tests |
-| Fusion validation | `core/scoring/fusion_validation` | `fusion_validation_from_dict`, collection builders | parse → resource evidence → policy → artifact | schema parsing is strict and group ordering deterministic | fusion validation tests |
-| Official score | `core/scoring/official_score` | official/suite evidence builders | validate refs/checksums → authority blockers → aggregate | scoring formula, blocker literals and checksum semantics are stable | official score evidence/CLI tests |
-| Release baseline | `core/scoring/release_baseline` | build/verify/publication services | collect → verify authority → publish/compare | only immutable, checksum-bound evidence may gain authority | release baseline tests |
+| Domain | Owning entry | Flow | Invariant | Focused checks |
+| --- | --- | --- | --- | --- |
+| CLI evaluation | `cli/evaluation/evaluator.py` | resolve → package → run → parse → derive/report | staging closes on every path; relative metrics are outer-process work | `tests/sol_execbench/cli/evaluation` |
+| Process staging | `driver/problem_packager.py` | normalize → compile assets → stage three runtime templates | execute target is the orchestrator | `tests/sol_execbench/driver/test_problem_packager.py` |
+| Trusted reference | `core/bench/reference_service.py` | load reference/input sources → produce case/timing → safetensors response | no candidate import; failures are structured | reference protocol and driver tests |
+| Candidate execution | `core/bench/eval_workload_execution.py` | transferred case → correctness → integrity → timing → Trace | no reference load/call; timed outputs validated | `tests/sol_execbench/driver/test_eval_driver.py` |
+| Evaluation diagnostics | `core/bench/diagnostic_sidecar.py` | run-bound profile/static/feedback sidecars | diagnostic only; never correctness/timing/score authority | sidecar governance tests |
+| Runtime environment evidence | `core/evidence/runtime_evidence/` | host/tool/GPU observations → compatibility report | non-authoritative platform evidence; never a benchmark trace | `core/evidence/test_runtime_evidence.py` |
+| SOLAR public pipeline | `solar/api.py` | architecture → extraction → conversion → verification → analysis | exact stage code; no partial publish | `tests/solar/test_api.py` |
+| Graph extraction | `solar/graph/extraction.py` | callable trace → typed operator artifact | no einsum converter dependency | SOLAR boundary and API tests |
+| Einsum conversion | `solar/einsum/conversion.py` | operator artifact → strict semantic graph | exact input/output bindings | SOLAR tests and readability gate |
+| Formal analysis | `solar/analysis/graph_analyzer.py` | typed analysis job → resource proof | diagnostic results never become scores | SOLAR/Orojenesis tests |
+| Scoring formula | `core/scoring/formula.py` | audited runtimes → workload score | no clipping/substitution | `core/test_sol_score_v3.py` |
+| Official authority | `core/scoring/official_authority.py` | pinned manifest/evidence → fail-closed gate | caller-authored JSON has no authority | `core/test_corpus.py` |
+| Evaluator contract | `core/evaluator_contract.py` | code-owned constants → public machine contract | matches implemented ownership | metadata and score-contract tests |
 
-Run `scripts/check_readability.py`, `scripts/check_coupling.py`, Ruff, and `ty`
-after moving an entry point or artifact boundary. Hardware-marked tests remain
-evidence checks and must not be replaced by mocks.
+After moving an entry point or ownership boundary, run Ruff, `ty`,
+`scripts/check_coupling.py`, `scripts/check_readability.py` and the focused
+tests above.

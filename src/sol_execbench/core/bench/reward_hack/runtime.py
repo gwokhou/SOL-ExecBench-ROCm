@@ -133,3 +133,42 @@ def check_eval_integrity(snapshot: dict[str, int], namespace: dict) -> None:
             raise RewardHackDetected(
                 f"Eval driver integrity violated: '{name}' has been monkey-patched"
             )
+
+
+def _runtime_integrity_namespace(driver_namespace: dict[str, Any]) -> dict[str, Any]:
+    import importlib
+    import sys
+
+    namespace = {
+        name: value
+        for name, value in driver_namespace.items()
+        if callable(value) and not name.startswith("_")
+    }
+    modules = (
+        ("eval_correctness", "sol_execbench.core.bench.eval_correctness"),
+        ("eval_runtime", "sol_execbench.core.bench.eval_runtime"),
+        ("eval_timing", "sol_execbench.core.bench.eval_timing"),
+        ("eval_execution", "sol_execbench.core.bench.eval_workload_execution"),
+        ("timing", "sol_execbench.core.bench.timing"),
+    )
+    for prefix, module_name in modules:
+        module = sys.modules.get(module_name)
+        if module is None:
+            module = importlib.import_module(module_name)
+        for name, value in vars(module).items():
+            if callable(value) and not name.startswith("__"):
+                namespace[f"{prefix}.{name}"] = value
+    return namespace
+
+
+def snapshot_runtime_integrity(driver_namespace: dict[str, Any]) -> dict[str, int]:
+    """Snapshot driver and cross-module timing/correctness functions."""
+    namespace = _runtime_integrity_namespace(driver_namespace)
+    return snapshot_critical_functions(namespace, list(namespace))
+
+
+def check_runtime_integrity(
+    snapshot: dict[str, int], driver_namespace: dict[str, Any]
+) -> None:
+    """Detect monkey-patching across the complete evaluation call graph."""
+    check_eval_integrity(snapshot, _runtime_integrity_namespace(driver_namespace))

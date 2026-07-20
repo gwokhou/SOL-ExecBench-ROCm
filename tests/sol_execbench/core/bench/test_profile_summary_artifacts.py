@@ -8,6 +8,7 @@ from sol_execbench.core.bench.profile_summary.artifacts import (
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
 )
 
 
@@ -16,7 +17,7 @@ def _profile_result(
     artifacts: tuple[Rocprofv3ProfileArtifact, ...],
 ) -> Rocprofv3ProfileResult:
     return Rocprofv3ProfileResult(
-        status="success",
+        status=Rocprofv3ProfileStatus.SUCCESS,
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
         output_directory=tmp_path,
         output_file="profile",

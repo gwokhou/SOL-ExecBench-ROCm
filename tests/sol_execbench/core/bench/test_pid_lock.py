@@ -199,56 +199,6 @@ with acquire_pid_lock(output_dir):
             assert nested_dir.exists()
             assert (nested_dir / ".sol-execbench.lock").exists()
 
-    def test_timing_batch_mandatory_lock(self):
-        """Verify run_rdna4_profiler_timing_batch.py imports acquire_pid_lock."""
-        import subprocess
-
-        result = subprocess.run(
-            [
-                "grep",
-                "-c",
-                "from sol_execbench.core.bench.pid_lock import",
-                "scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        # Should find at least one import
-        assert int(result.stdout.strip()) >= 1
-
-        # Should contain "with acquire_pid_lock(" pattern
-        result = subprocess.run(
-            [
-                "grep",
-                "-c",
-                "with acquire_pid_lock(",
-                "scripts/internal/rdna4/run_rdna4_profiler_timing_batch.py",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        assert int(result.stdout.strip()) >= 1
-
-    def test_derived_isolated_optional_lock(self):
-        """Verify run_derived_isolated.py has --pid-lock flag and conditional lock usage."""
-        import subprocess
-
-        # Check for --pid-lock flag
-        result = subprocess.run(
-            ["grep", "-c", '"--pid-lock"', "scripts/run_derived_isolated.py"],
-            capture_output=True,
-            text=True,
-        )
-        assert int(result.stdout.strip()) >= 1, "Missing --pid-lock flag"
-
-        # Check for conditional lock usage based on args.pid_lock
-        result = subprocess.run(
-            ["grep", "-c", "if args.pid_lock:", "scripts/run_derived_isolated.py"],
-            capture_output=True,
-            text=True,
-        )
-        assert int(result.stdout.strip()) >= 1, "Missing conditional lock usage"
-
 
 class TestReadContentionMarker:
     """Test read_pid_lock_contention_marker function."""

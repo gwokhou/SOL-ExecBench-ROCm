@@ -78,13 +78,22 @@ def derive_custom_input_seed(
     workload: Workload,
     *,
     row_index: int | None = None,
+    base_seed: int | None = None,
+    round_index: int | None = None,
 ) -> int:
-    """Derive a stable per-workload seed without depending on Python hash state."""
+    """Derive a stable per-workload and per-round seed."""
     parts = [
         definition.name,
         getattr(workload, "uuid", "") or "",
         "" if row_index is None else str(row_index),
     ]
+    if base_seed is not None or round_index is not None:
+        parts.extend(
+            (
+                "" if base_seed is None else str(base_seed),
+                "" if round_index is None else str(round_index),
+            )
+        )
     digest = hashlib.sha256("\0".join(parts).encode("utf-8")).digest()
     return int.from_bytes(digest[:8], "big") & 0x7FFF_FFFF_FFFF_FFFF
 
@@ -252,8 +261,13 @@ def gen_custom_inputs(
     custom_inputs_fn: Any,
     *,
     row_index: int | None = None,
+    seed: int | None = None,
 ) -> tuple[dict[str, Any], CustomInputProvenance]:
-    seed = derive_custom_input_seed(definition, workload, row_index=row_index)
+    seed = (
+        derive_custom_input_seed(definition, workload, row_index=row_index)
+        if seed is None
+        else int(seed)
+    )
     provenance = _custom_input_provenance(
         definition,
         workload,

@@ -7,9 +7,15 @@ wheels/
 *.egg-info
 .ruff_cache
 .pytest_cache
+.coverage
+.coverage.*
+coverage.json
+htmlcov/
 
 # Virtual environments
 .venv
+.rocprof-compute-env/
+.uv-cache/
 
 # Claude files
 .claude
@@ -33,6 +39,7 @@ pytest*
 
 # datasets
 /data/*
+/problems/local/
 
 # other
 /out/

@@ -18,13 +18,16 @@ from sol_execbench.core.bench.correctness import (
     compute_error_stats,
     set_seed,
 )
-from sol_execbench.core.bench.eval_output_integrity import stable_reference_outputs
 from sol_execbench.core.bench.eval_runtime import run_reward_hack_check
+from sol_execbench.core.bench.evaluation_requests import WorkloadEvaluationRequest
 from sol_execbench.core.bench.eval_trace_helpers import WorkloadTraceEmitter
-from sol_execbench.core.bench.io import CustomInputGenerationError, gen_inputs
+from sol_execbench.core.bench.reference_protocol import (
+    ReferenceExecutionError,
+    ReferenceFailureKind,
+    ReferenceProtocolError,
+)
 from sol_execbench.core.bench.reward_hack import check_lazy_outputs
 from sol_execbench.core.bench.utils import call_and_collect_outputs
-from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import Correctness, EvaluationStatus
 from sol_execbench.core.data.workload import Workload
 
@@ -39,6 +42,19 @@ class CorrectnessRoundsResult:
 
 def set_evaluation_seed(seed: int) -> None:
     set_seed(seed)
+
+
+def _prepare_framework_thread_baseline(
+    user_fn: Callable[..., Any], device: str
+) -> None:
+    """Start trusted Torch compiler workers before sampling candidate threads."""
+    if not hasattr(user_fn, "_torchdynamo_orig_callable"):
+        return
+    try:
+        compiled_identity = torch.compile(lambda value: value + 0)
+        compiled_identity(torch.zeros(1, device=device))
+    except Exception:
+        return
 
 
 def emit_reward_hack_if_detected(
@@ -67,82 +83,58 @@ def emit_reward_hack_if_detected(
 
 def run_correctness_rounds(
     *,
-    definition: Definition,
+    request: WorkloadEvaluationRequest,
     workload: Workload,
     row_index: int,
-    device: str,
-    safe_tensors: dict[str, Any] | None,
-    custom_inputs_fn: Callable[..., Any] | None,
-    ref_fn: Callable[..., Any],
-    user_fn: Callable[..., Any],
-    destination_passing_style: bool,
-    resolved_axes: dict[str, int],
-    output_names: list[str],
-    output_dtypes_torch: dict[str, torch.dtype],
-    integrity_snapshot: dict[str, int],
-    check_integrity: Callable[[dict[str, int], dict[str, Any]], None],
-    driver_globals: dict[str, Any],
     emitter: WorkloadTraceEmitter,
 ) -> CorrectnessRoundsResult:
+    definition = request.definition
+    resolved_axes = definition.get_resolved_axes_values(workload.axes)
+    dependencies = request.dependencies
     inputs = None
-    threads_before = None
+    _prepare_framework_thread_baseline(dependencies.user_fn, request.device)
+    threads_before = threading.active_count()
     correctness = Correctness()
 
     for round_index in range(10):
         try:
-            inputs = gen_inputs(
-                definition,
-                workload,
-                device=device,
-                safe_tensors=safe_tensors or None,
-                custom_inputs_fn=custom_inputs_fn,
+            case = dependencies.reference_client.correctness_case(
+                workload_uuid=workload.uuid,
                 row_index=row_index,
+                round_index=round_index,
             )
-        except CustomInputGenerationError as exc:
+            inputs = case.inputs
+            ref_outputs = case.outputs
+        except ReferenceExecutionError as exc:
+            status = (
+                EvaluationStatus.RUNTIME_ERROR
+                if exc.kind is ReferenceFailureKind.INPUT_GENERATION
+                else EvaluationStatus.INVALID_REFERENCE
+            )
+            emitter.emit_status(
+                workload,
+                status,
+                extra_msg=str(exc),
+            )
+            return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+        except ReferenceProtocolError as exc:
             emitter.emit_status(
                 workload,
                 EvaluationStatus.RUNTIME_ERROR,
-                extra_msg=(f"{exc.failure_class}: {exc}\n{exc.provenance.log_text()}"),
-            )
-            return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
-        except Exception as exc:
-            emitter.emit_status(
-                workload,
-                EvaluationStatus.RUNTIME_ERROR,
-                extra_msg=f"gen_inputs failed: {exc}",
-            )
-            return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
-
-        try:
-            ref_outputs = call_and_collect_outputs(
-                ref_fn,
-                inputs,
-                destination_passing_style=False,
-                definition=definition,
-                resolved_axes=resolved_axes,
-                device=device,
-                output_names=output_names,
-                output_dtypes=output_dtypes_torch,
-            )
-            ref_outputs = stable_reference_outputs(ref_outputs, inputs)
-        except Exception as exc:
-            emitter.emit_status(
-                workload,
-                EvaluationStatus.INVALID_REFERENCE,
-                extra_msg=f"Reference run() failed: {exc}\n{traceback.format_exc()}",
+                extra_msg=f"Trusted reference IPC failed: {exc}",
             )
             return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
 
         try:
             user_outputs = call_and_collect_outputs(
-                user_fn,
+                dependencies.user_fn,
                 inputs,
-                destination_passing_style=destination_passing_style,
+                destination_passing_style=request.destination_passing_style,
                 definition=definition,
                 resolved_axes=resolved_axes,
-                device=device,
-                output_names=output_names,
-                output_dtypes=output_dtypes_torch,
+                device=request.device,
+                output_names=request.output_names,
+                output_dtypes=request.output_dtypes_torch,
             )
         except Exception as exc:
             emitter.emit_status(
@@ -152,19 +144,18 @@ def run_correctness_rounds(
             )
             return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
 
+        if emit_reward_hack_if_detected(
+            emitter=emitter,
+            workload=workload,
+            check_fn=dependencies.check_integrity,
+            args=(
+                dependencies.integrity_snapshot,
+                dependencies.driver_globals,
+            ),
+        ):
+            return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+
         if round_index == 0:
-            if emit_reward_hack_if_detected(
-                emitter=emitter,
-                workload=workload,
-                check_fn=check_integrity,
-                args=(integrity_snapshot, driver_globals),
-            ):
-                return CorrectnessRoundsResult(
-                    True, inputs, threads_before, correctness
-                )
-
-            threads_before = threading.active_count()
-
             if emit_reward_hack_if_detected(
                 emitter=emitter,
                 workload=workload,

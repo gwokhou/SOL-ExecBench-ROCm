@@ -2,43 +2,70 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Any
 
 import pytest
 
 from sol_execbench.cli.evaluation import runtime as evaluation_runtime
 from sol_execbench.cli.evaluation import command as cli_evaluation
-from sol_execbench.core import EvaluationStatus
-from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
-
-
-class _FakeTrace:
-    def __init__(self, status: EvaluationStatus = EvaluationStatus.PASSED) -> None:
-        self.evaluation = type("Evaluation", (), {"status": status})()
-
-    def model_dump(self, *, mode: str) -> dict[str, Any]:
-        assert mode == "json"
-        return {"evaluation": {"status": self.evaluation.status.value}}
+from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
+)
+from sol_execbench.core.data.trace import (
+    Correctness,
+    Environment,
+    Evaluation,
+    EvaluationStatus,
+    Performance,
+    Trace,
+)
+from sol_execbench.core.data.workload import ScalarInput, Workload
 
 
 class _FakePackager:
-    def __init__(self, traces: list[_FakeTrace] | None = None) -> None:
+    def __init__(self, traces: list[Trace] | None = None) -> None:
         self.traces = traces or []
         self.converted_stdout: str | None = None
 
     def execute(self) -> list[str]:
         raise AssertionError("runtime must not call execute")
 
-    def convert_stdout_to_traces(self, stdout: str) -> list[_FakeTrace]:
+    def convert_stdout_to_traces(self, stdout: str) -> list[Trace]:
         self.converted_stdout = stdout
         return self.traces
+
+
+def _trace(
+    *,
+    latency_ms: float = 0.0,
+    reference_latency_ms: float = 0.0,
+) -> Trace:
+    return Trace(
+        definition="toy",
+        solution="candidate",
+        workload=Workload(
+            uuid="w0",
+            axes={"n": 1},
+            inputs={"n": ScalarInput(value=1)},
+        ),
+        evaluation=Evaluation(
+            status=EvaluationStatus.PASSED,
+            environment=Environment(hardware="AMD gfx1200"),
+            timestamp="2026-07-19T00:00:00Z",
+            correctness=Correctness(),
+            performance=Performance(
+                latency_ms=latency_ms,
+                reference_latency_ms=reference_latency_ms,
+            ),
+        ),
+    )
 
 
 def test_run_evaluation_runtime_returns_success_for_parseable_traces(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    packager = _FakePackager(traces=[_FakeTrace()])
+    packager = _FakePackager(traces=[_trace()])
 
     def _run_command(eval_cmd, *, staging_dir, timeout):  # noqa: ANN001, ARG001
         return subprocess.CompletedProcess(
@@ -65,6 +92,41 @@ def test_run_evaluation_runtime_returns_success_for_parseable_traces(
     assert result.returncode == 0
     assert result.filtered_stderr == ""
     assert result.profile_result is None
+
+
+def test_runtime_derives_reference_speedup_after_worker_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trace = _trace(latency_ms=2.0, reference_latency_ms=5.0)
+    packager = _FakePackager(traces=[trace])
+
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_evaluation_command",
+        lambda eval_cmd, *, staging_dir, timeout: subprocess.CompletedProcess(
+            args=eval_cmd,
+            returncode=0,
+            stdout='{"trace": 1}\n',
+            stderr="",
+        ),
+    )
+
+    result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=["python", "candidate.py"],
+        staging_dir=tmp_path,
+        output_file=None,
+        timeout=7,
+        profile="none",
+    )
+
+    assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
+    evaluation = trace.evaluation
+    assert evaluation is not None
+    performance = evaluation.performance
+    assert performance is not None
+    assert performance.speedup_factor == 2.5
 
 
 def test_run_evaluation_runtime_classifies_timeout(
@@ -173,9 +235,9 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    packager = _FakePackager(traces=[_FakeTrace()])
+    packager = _FakePackager(traces=[_trace()])
     profile_result = Rocprofv3ProfileResult(
-        status="unavailable",
+        status=Rocprofv3ProfileStatus.UNAVAILABLE,
         command=("rocprofv3",),
         output_directory=tmp_path,
         output_file="profile",

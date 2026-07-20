@@ -47,8 +47,7 @@ def test_cli_contract_matches_public_tree() -> None:
         "contract",
         "toolchain",
         "dataset",
-        "baseline",
-        "hardware",
+        "solar",
         "score",
     }
 

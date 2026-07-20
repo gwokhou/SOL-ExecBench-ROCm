@@ -1,0 +1,130 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
+name: Radeon_RX_9060_XT
+vendor: AMD
+gfx_target: gfx1200
+profile_revision: rx9060xt-amd-resource-v2
+compute_units: 32
+memory_capacity_bytes: 17179869184
+memory_bandwidth_bytes_per_second: 320000000000
+l2_bytes: 4194304
+last_level_cache_bytes: 33554432
+memory_hierarchy:
+  - name: vgpr
+    scope: simd
+    capacity_bytes: null
+    source: rocminfo does not expose physical VGPR capacity
+  - name: lds
+    scope: compute_unit
+    capacity_bytes: 65536
+    source: rocminfo Agent gfx1200 Pool GROUP Size
+  - name: l1
+    scope: compute_unit
+    capacity_bytes: 32768
+    source: rocminfo Agent gfx1200 Cache Info L1
+  - name: l2
+    scope: device
+    capacity_bytes: 4194304
+    source: rocminfo Agent gfx1200 Cache Info L2
+  - name: l3
+    scope: device
+    capacity_bytes: 33554432
+    source: rocminfo Agent gfx1200 Cache Info L3
+  - name: vram
+    scope: device
+    capacity_bytes: 17179869184
+    bandwidth_bytes_per_second: 320000000000
+    source: AMD product specification
+# Maximum boost clock used to express per-cycle diagnostics. The formal SOL
+# calculation uses the published per-second throughput and bandwidth below.
+clock_hz: 3130000000
+peak_ops_per_second:
+  fp32: 25600000000000
+  fp16: 103000000000000
+  bf16: 103000000000000
+  fp8: 205000000000000
+  int8: 205000000000000
+  int4: 410000000000000
+resource_model_version: amd_resource_v1
+# MFMA rates use the published matrix throughput.  The other resources use
+# the RDNA4 packed-FP16 VOPD issue ceiling (32 CU * 512 ops/CU/cycle * 3.13
+# GHz).  That deliberately loose ceiling cannot tighten TSOL using an
+# empirical result; calibration only checks it for contradictions.
+resource_limits:
+  mfma:
+    "fp32->fp32": 25600000000000
+    "fp16->fp32": 103000000000000
+    "bf16->fp32": 103000000000000
+    "fp8->fp32": 205000000000000
+    "int8->int32": 205000000000000
+    "int4->int32": 410000000000000
+  valu:
+    generic: 51281920000000
+  sfu:
+    generic: 51281920000000
+  reduction:
+    generic: 51281920000000
+  atomic:
+    generic: 51281920000000
+  scan_sort:
+    generic: 51281920000000
+  conversion:
+    generic: 51281920000000
+resource_limit_sources:
+  mfma: https://www.amd.com/en/products/specifications/graphics.html
+  valu: https://rocm.docs.amd.com/projects/rocprofiler-compute/en/develop/conceptual/rdna/system-speed-of-light.html
+  sfu: https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/rdna4-instruction-set-architecture.pdf
+  reduction: https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/rdna4-instruction-set-architecture.pdf
+  atomic: https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/rdna4-instruction-set-architecture.pdf
+  scan_sort: https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/rdna4-instruction-set-architecture.pdf
+  conversion: https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/rdna4-instruction-set-architecture.pdf
+calibration_exempt_modes:
+  mfma:
+    "int4->int32": RDNA4 ISA defines IU4 WMMA, but ROCm 7.2 rocWMMA lists no INT4 type and PyTorch 2.11 exposes no validated gfx1200 INT4 matrix API; published peak remains source-only
+precision_support:
+  fp32:
+    hardware: native
+    software: pytorch_production
+    calibration: required
+    evidence: https://rocm.docs.amd.com/projects/radeon-ryzen/en/docs-7.2/docs/compatibility/compatibilityrad/native_linux/native_linux_compatibility.html
+  fp16:
+    hardware: native_wmma
+    software: pytorch_production
+    calibration: required
+    evidence: https://rocm.docs.amd.com/projects/radeon-ryzen/en/docs-7.2/docs/compatibility/compatibilityrad/native_linux/native_linux_compatibility.html
+  bf16:
+    hardware: native_wmma
+    software: rocwmma_supported_pytorch_empirical
+    calibration: required
+    evidence: https://rocm.docs.amd.com/projects/rocWMMA/en/docs-7.2.1/API_Reference_Guide.html
+  fp8:
+    hardware: native_wmma_input_only
+    software: rocwmma_supported_pytorch_private_api_validated
+    calibration: required
+    evidence: https://rocm.docs.amd.com/projects/rocWMMA/en/docs-7.2.1/API_Reference_Guide.html
+    formats: [float8_e4m3fn, float8_e5m2]
+  int8:
+    hardware: native_wmma
+    software: pytorch_production_dtype_private_probe
+    calibration: required
+    evidence: https://rocm.docs.amd.com/projects/radeon-ryzen/en/docs-7.2/docs/compatibility/compatibilityrad/native_linux/native_linux_compatibility.html
+  int4:
+    hardware: native_wmma
+    software: isa_only_no_validated_rocm_matrix_api
+    calibration: exempt
+    evidence: https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/rdna4-instruction-set-architecture.pdf
+    limitation: ROCm 7.2 rocWMMA exposes no INT4 type and PyTorch 2.11 has no validated gfx1200 INT4 matrix API; the published peak is source-only.
+audit_evidence:
+  status: unavailable
+  reason_code: audit_artifact_not_published
+  required_schema_version: 3
+  required_timing_profile: official
+  required_clocks_locked: true
+  gfx_target: gfx1200
+# RDNA4/gfx1200 implements the OCP E4M3 and E5M2 encodings.  FNUZ is a
+# gfx94x format and must not be scored against this profile.
+precision_aliases:
+  float8_e4m3fn: fp8
+  float8_e5m2: fp8
+source: https://www.amd.com/en/products/specifications/graphics.html

@@ -27,6 +27,8 @@ from sol_execbench.core.bench.static_kernel.evidence import (
     run_static_kernel_extractors,
 )
 from sol_execbench.core.bench.static_kernel.status import (
+    ExtractorReasonVocabulary,
+    ExtractorStatusVocabulary,
     aggregate_extractor_reason_value,
     aggregate_extractor_status_value,
 )
@@ -99,26 +101,32 @@ def _tool_run(
 def _aggregate_status(tool_runs: list[StaticKernelEvidenceToolRun]):
     return aggregate_extractor_status_value(
         tool_runs,
-        collected=StaticKernelEvidenceStatus.COLLECTED,
-        partial=StaticKernelEvidenceStatus.PARTIAL,
-        failed=StaticKernelEvidenceStatus.FAILED,
-        unavailable=StaticKernelEvidenceStatus.UNAVAILABLE,
+        ExtractorStatusVocabulary(
+            collected=StaticKernelEvidenceStatus.COLLECTED,
+            partial=StaticKernelEvidenceStatus.PARTIAL,
+            failed=StaticKernelEvidenceStatus.FAILED,
+            unavailable=StaticKernelEvidenceStatus.UNAVAILABLE,
+        ),
     )
 
 
 def _aggregate_reason(tool_runs: list[StaticKernelEvidenceToolRun]):
     return aggregate_extractor_reason_value(
         tool_runs,
-        status=_aggregate_status(tool_runs),
-        collected_status=StaticKernelEvidenceStatus.COLLECTED,
-        partial_status=StaticKernelEvidenceStatus.PARTIAL,
-        failed_status=StaticKernelEvidenceStatus.FAILED,
-        collected_reason=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
-        partial_reason=StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA,
-        partial_disassembly_reason=StaticKernelEvidenceReasonCode.PARTIAL_DISASSEMBLY_ONLY,
-        failed_reason=StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED,
-        timeout_reason=StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT,
-        unavailable_reason=StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
+        _aggregate_status(tool_runs),
+        ExtractorReasonVocabulary(
+            collected_status=StaticKernelEvidenceStatus.COLLECTED,
+            partial_status=StaticKernelEvidenceStatus.PARTIAL,
+            failed_status=StaticKernelEvidenceStatus.FAILED,
+            collected_reason=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
+            partial_reason=StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA,
+            partial_disassembly_reason=(
+                StaticKernelEvidenceReasonCode.PARTIAL_DISASSEMBLY_ONLY
+            ),
+            failed_reason=StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED,
+            timeout_reason=StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT,
+            unavailable_reason=StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
+        ),
     )
 
 

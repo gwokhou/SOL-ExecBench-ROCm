@@ -3,7 +3,6 @@
 
 """ROCm profiler timing parsing and live timing collection."""
 
-from collections.abc import Sequence
 from pathlib import Path
 
 from sol_execbench.core.bench.rocm_profiler.commands import (
@@ -12,10 +11,10 @@ from sol_execbench.core.bench.rocm_profiler.commands import (
     default_runner,
 )
 from sol_execbench.core.bench.rocm_profiler.models import (
-    ROCPROFV3_EXECUTABLE,
     DefaultTimingSelection,
     Rocprofv3CollectionRequest,
     Rocprofv3CollectionResult,
+    SourceTimingRequest,
 )
 from sol_execbench.core.bench.rocm_profiler.timing_evidence import (
     build_compact_timing_evidence,
@@ -159,40 +158,29 @@ def collect_rocprofv3_timing(
 
 
 def collect_source_timing_evidence(
+    request: SourceTimingRequest,
     *,
-    application_command: Sequence[str],
-    languages: Sequence[str],
-    output_directory: Path,
-    output_file: str,
-    tool_version: str,
-    gpu_architecture: str,
     rocprofv3_available: bool = True,
     runner: ProfilerRunner | None = None,
-    executable: str = ROCPROFV3_EXECUTABLE,
-    warmup_runs: int | None = None,
-    iterations: int | None = None,
-    min_measurement_time_seconds: float | None = None,
-    trial_count: int | None = None,
-    clock_locked: bool | None = None,
 ) -> Rocprofv3CollectionResult:
     """Select source-specific timing policy and collect evidence when supported."""
-    policy = timing_policy_for_languages(languages, profiler_available=True)
-    request = Rocprofv3CollectionRequest(
-        application_command=tuple(application_command),
-        output_directory=output_directory,
-        output_file=output_file,
+    policy = timing_policy_for_languages(request.languages, profiler_available=True)
+    collection_request = Rocprofv3CollectionRequest(
+        application_command=request.application_command,
+        output_directory=request.output_directory,
+        output_file=request.output_file,
         policy=policy,
-        tool_version=tool_version,
-        gpu_architecture=gpu_architecture,
-        executable=executable,
-        warmup_runs=warmup_runs,
-        iterations=iterations,
-        min_measurement_time_seconds=min_measurement_time_seconds,
-        trial_count=trial_count,
-        clock_locked=clock_locked,
+        tool_version=request.tool_version,
+        gpu_architecture=request.gpu_architecture,
+        executable=request.executable,
+        warmup_runs=request.warmup_runs,
+        iterations=request.iterations,
+        min_measurement_time_seconds=request.min_measurement_time_seconds,
+        trial_count=request.trial_count,
+        clock_locked=request.clock_locked,
     )
     return collect_rocprofv3_timing(
-        request,
+        collection_request,
         rocprofv3_available=rocprofv3_available,
         runner=runner,
     )

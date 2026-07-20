@@ -143,38 +143,6 @@ def test_cdna3_schema_support_is_distinct_from_hardware_validation():
     )
 
 
-def test_native_language_groups_are_rocm_only():
-    expected = '_CPP_LANGUAGES = {"hip_cpp", "hipblas", "miopen", "ck", "rocwmma"}'
-
-    examples = _read("tests/examples/test_examples.py")
-    e2e = _read("tests/sol_execbench/test_e2e.py")
-
-    assert expected in examples
-    assert expected in e2e
-
-    for content in (examples, e2e):
-        assert (
-            '_CPP_LANGUAGES = {"cuda_cpp", "cutlass", "cudnn", "cublas"}' not in content
-        )
-        assert "requires_cutile" not in content
-        assert "CUDA/C++ only" not in content
-
-
-def test_python_compatibility_examples_do_not_carry_native_markers():
-    examples = _read("tests/examples/test_examples.py")
-
-    compatibility_blocks = [
-        'test_id="jamba_attn_proj_rocm_cutile_compatibility"',
-        'test_id="gemm_ck_compatibility"',
-        'test_id="softmax_miopen_compatibility"',
-    ]
-    for marker in compatibility_blocks:
-        start = examples.index(marker)
-        end = examples.index("),", start)
-        block = examples[start:end]
-        assert "extra_markers" not in block
-
-
 def test_user_facing_compile_text_uses_hip_cpp():
     cli = _read("src/sol_execbench/cli/commands/evaluate.py")
     phases = _read("src/sol_execbench/cli/evaluation/phases.py")

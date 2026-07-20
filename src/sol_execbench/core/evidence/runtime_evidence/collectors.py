@@ -21,6 +21,24 @@ VISIBLE_DEVICE_ENV_VARS = (
     "CUDA_VISIBLE_DEVICES",
     "GPU_DEVICE_ORDINAL",
 )
+_LOCAL_RUNTIME_FIELDS = (
+    "torch_distribution_version",
+    "torch_version",
+    "torch_local_version",
+    "torch_rocm_target",
+    "torch_hip_version",
+    "torch_cuda_version",
+    "torch_device_available",
+    "torch_import_error",
+    "torchvision_distribution_version",
+    "triton_rocm_distribution_version",
+    "triton_rocm_status",
+)
+_TOOLCHAIN_OVERRIDE_FIELDS = (
+    "container_rocm_user_space_version",
+    "hipcc_version",
+    "toolchain_rocm_version",
+)
 
 
 def collect_visible_device_environment(
@@ -99,65 +117,21 @@ def build_host_evidence(
 
 
 def build_dependency_observation(
+    overrides: PytorchDependencyObservation | None = None,
     *,
-    torch_distribution_version: str | None = None,
-    torch_version: str | None = None,
-    torch_local_version: str | None = None,
-    torch_rocm_target: str | None = None,
-    torch_hip_version: str | None = None,
-    torch_cuda_version: str | None = None,
-    torch_device_available: bool | None = None,
-    torch_import_error: str | None = None,
-    torchvision_distribution_version: str | None = None,
-    triton_rocm_distribution_version: str | None = None,
-    triton_rocm_status: str | None = None,
-    container_rocm_user_space_version: str | None = None,
-    hipcc_version: str | None = None,
-    toolchain_rocm_version: str | None = None,
     collect_observation: Callable[[], PytorchDependencyObservation] | None = None,
 ) -> PytorchDependencyObservation:
     """Build dependency observations from injected values or local packages."""
+    overrides = overrides or PytorchDependencyObservation()
     if not any(
-        value is not None
-        for value in (
-            torch_distribution_version,
-            torch_version,
-            torch_local_version,
-            torch_rocm_target,
-            torch_hip_version,
-            torch_cuda_version,
-            torch_device_available,
-            torch_import_error,
-            torchvision_distribution_version,
-            triton_rocm_distribution_version,
-            triton_rocm_status,
-        )
+        getattr(overrides, field) is not None for field in _LOCAL_RUNTIME_FIELDS
     ):
         collector = collect_observation or collect_pytorch_dependency_observation
         observation = collector()
         updates = {
-            key: value
-            for key, value in {
-                "container_rocm_user_space_version": container_rocm_user_space_version,
-                "hipcc_version": hipcc_version,
-                "toolchain_rocm_version": toolchain_rocm_version,
-            }.items()
-            if value is not None
+            field: value
+            for field in _TOOLCHAIN_OVERRIDE_FIELDS
+            if (value := getattr(overrides, field)) is not None
         }
         return observation.model_copy(update=updates)
-    return PytorchDependencyObservation(
-        torch_distribution_version=torch_distribution_version,
-        torch_version=torch_version,
-        torch_local_version=torch_local_version,
-        torch_rocm_target=torch_rocm_target,
-        torch_hip_version=torch_hip_version,
-        torch_cuda_version=torch_cuda_version,
-        torch_device_available=torch_device_available,
-        torch_import_error=torch_import_error,
-        torchvision_distribution_version=torchvision_distribution_version,
-        triton_rocm_distribution_version=triton_rocm_distribution_version,
-        triton_rocm_status=triton_rocm_status,
-        container_rocm_user_space_version=container_rocm_user_space_version,
-        hipcc_version=hipcc_version,
-        toolchain_rocm_version=toolchain_rocm_version,
-    )
+    return overrides

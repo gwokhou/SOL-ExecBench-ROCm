@@ -31,10 +31,8 @@ class EvaluationRequest:
     feedback_candidate_id: str | None
     feedback_source_sha256: str | None
     feedback_sol_version: str | None
-    release_bound_sha256: str | None
-    release_hardware_model_sha256: str | None
-    release_authority_json: Path | None
     verbose: bool
+    unsafe_local_execution: bool = False
 
 
 __all__ = ["EvaluationRequest"]

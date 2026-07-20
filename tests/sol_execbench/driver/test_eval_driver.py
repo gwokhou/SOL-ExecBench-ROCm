@@ -41,6 +41,7 @@ import pytest
 import torch
 
 import sol_execbench.driver as _driver_pkg
+from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
 from sol_execbench_type_helpers import make_solution
 
 _TEMPLATES_DIR = Path(_driver_pkg.__file__).parent / "templates"
@@ -49,6 +50,15 @@ _TEMPLATES_DIR = Path(_driver_pkg.__file__).parent / "templates"
 def build_driver() -> str:
     """Return the eval_driver.py template source."""
     return (_TEMPLATES_DIR / "eval_driver.py").read_text()
+
+
+def _stage_evaluation_templates(tmp_path: Path) -> None:
+    for name in (
+        "eval_driver.py",
+        "reference_worker.py",
+        "evaluation_orchestrator.py",
+    ):
+        (tmp_path / name).write_text((_TEMPLATES_DIR / name).read_text())
 
 
 def parse_eval_result(stdout: str, stderr: str) -> list[dict]:
@@ -101,6 +111,27 @@ _SOLUTION_SPEC = {
 }
 
 
+def _stage_definitions(tmp_path: Path, definition: dict) -> None:
+    """Stage a worker-only definition and a candidate-visible redacted copy."""
+    (tmp_path / TRUSTED_DEFINITION_FILE).write_text(json.dumps(definition))
+    parameters = ", ".join(definition["inputs"])
+    reference_stub = (
+        f"def run({parameters}):\n"
+        "    raise RuntimeError('trusted reference unavailable')\n"
+    )
+    custom_inputs_entrypoint = definition.get("custom_inputs_entrypoint")
+    if custom_inputs_entrypoint:
+        reference_stub += (
+            f"\ndef {custom_inputs_entrypoint}(axes, device):\n"
+            "    raise RuntimeError('trusted input generator unavailable')\n"
+        )
+    candidate_definition = {
+        **definition,
+        "reference": reference_stub,
+    }
+    (tmp_path / "definition.json").write_text(json.dumps(candidate_definition))
+
+
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
@@ -147,10 +178,11 @@ def _run_eval_driver_process(
     definition: Optional[dict] = None,
     workload: Optional[dict] = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run eval_driver.py and return the raw subprocess result."""
-    (tmp_path / "eval_driver.py").write_text(build_driver())
-    (tmp_path / "definition.json").write_text(
-        json.dumps(definition if definition is not None else _MINIMAL_DEFINITION)
+    """Run the isolated reference/candidate workflow and return its result."""
+    _stage_evaluation_templates(tmp_path)
+    _stage_definitions(
+        tmp_path,
+        definition if definition is not None else _MINIMAL_DEFINITION,
     )
     (tmp_path / "workload.jsonl").write_text(
         json.dumps(workload if workload is not None else _MINIMAL_WORKLOAD)
@@ -181,7 +213,7 @@ def _run_eval_driver_process(
         env.update(extra_env)
 
     return subprocess.run(
-        [sys.executable, "eval_driver.py"],
+        [sys.executable, "evaluation_orchestrator.py"],
         cwd=tmp_path,
         env=env,
         capture_output=True,
@@ -199,6 +231,38 @@ def test_eval_driver_is_valid_python():
     """build_driver() must produce a syntactically valid Python script."""
     source = build_driver()
     ast.parse(source, filename="eval_driver.py")
+
+
+def test_all_generated_evaluation_templates_are_valid_python():
+    for name in (
+        "eval_driver.py",
+        "reference_worker.py",
+        "evaluation_orchestrator.py",
+    ):
+        source = (_TEMPLATES_DIR / name).read_text()
+        ast.parse(source, filename=name)
+
+
+def test_candidate_driver_never_loads_or_calls_reference_code():
+    source = build_driver()
+
+    assert "load_reference_function" not in source
+    assert "measure_reference_latency" not in source
+    assert "dependencies.ref_fn" not in source
+    assert "reference_client=" in source
+
+
+def test_reference_source_is_removed_before_candidate_execution(tmp_path):
+    result = _run_eval_driver_process(
+        tmp_path,
+        "def run(x, y):\n    return x + y\n",
+    )
+
+    assert result.returncode == 0
+    assert not (tmp_path / TRUSTED_DEFINITION_FILE).exists()
+    assert not (tmp_path / "_reference.py").exists()
+    candidate_definition = json.loads((tmp_path / "definition.json").read_text())
+    assert candidate_definition["reference"] != _MINIMAL_DEFINITION["reference"]
 
 
 def test_eval_driver_supports_profiler_graceful_exit_switch():
@@ -376,7 +440,7 @@ def test_reference_timing_failure_is_explicit_when_requested(tmp_path):
         "def run(x, y):\n"
         "    global _calls\n"
         "    _calls += 1\n"
-        "    if _calls > 10:\n"
+        "    if _calls > 11:\n"
         "        raise RuntimeError('reference timing boom')\n"
         "    return x + y\n"
     )
@@ -401,6 +465,64 @@ def test_reference_timing_failure_is_explicit_when_requested(tmp_path):
     assert "Reference timing failed: reference timing boom" in ev.get("log", "")
 
 
+def test_phase_counting_cannot_skip_timed_computation(tmp_path):
+    """Every timed result is validated, so correctness-call counting cannot pass."""
+    kernel = (
+        "import torch\n"
+        "_calls = 0\n"
+        "def run(x, y):\n"
+        "    global _calls\n"
+        "    _calls += 1\n"
+        "    if _calls <= 10:\n"
+        "        return x + y\n"
+        "    return torch.empty_like(x)\n"
+    )
+
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        bench_config={
+            "lock_clocks": False,
+            "benchmark_reference": False,
+            "warmup_runs": 1,
+            "iterations": 1,
+            "trials": 1,
+        },
+    )
+
+    assert traces[0]["evaluation"]["status"] == "REWARD_HACK"
+    assert "timed invocation" in traces[0]["evaluation"]["log"]
+
+
+def test_custom_inputs_use_a_distinct_seed_for_each_correctness_round(tmp_path):
+    """A candidate cannot reuse the first result across ten custom-input rounds."""
+    definition = _custom_inputs_definition(
+        "def generate_inputs(axes, device):\n"
+        "    value = float(torch.initial_seed() % 997 + 1)\n"
+        "    return {\n"
+        "        'a': torch.full((axes['m'], axes['k']), value, device=device),\n"
+        "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
+        "    }\n"
+    )
+    kernel = (
+        "_saved = None\n"
+        "def run(a, b):\n"
+        "    global _saved\n"
+        "    if _saved is None:\n"
+        "        _saved = a @ b\n"
+        "    return _saved\n"
+    )
+
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        definition=definition,
+        workload=_custom_inputs_workload(),
+    )
+
+    assert traces[0]["evaluation"]["status"] == "INCORRECT_NUMERICAL"
+
+
 def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     """A user in-place input update must not mutate the saved reference output."""
     definition = {
@@ -416,8 +538,8 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
         "inputs": {"x": {"type": "random"}},
         "uuid": "alias-freeze-0001",
     }
-    (tmp_path / "eval_driver.py").write_text(build_driver())
-    (tmp_path / "definition.json").write_text(json.dumps(definition))
+    _stage_evaluation_templates(tmp_path)
+    _stage_definitions(tmp_path, definition)
     (tmp_path / "workload.jsonl").write_text(json.dumps(workload))
     kernel = (
         "def run(x):\n    original = x.clone()\n    x.add_(1)\n    return original\n"
@@ -434,7 +556,7 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     )
 
     result = subprocess.run(
-        [sys.executable, "eval_driver.py"],
+        [sys.executable, "evaluation_orchestrator.py"],
         cwd=tmp_path,
         env={
             **os.environ,
@@ -520,9 +642,8 @@ def test_thread_injection_detected(tmp_path):
 def test_torch_compile_no_reward_hack(tmp_path):
     """@torch.compile must not trigger thread injection false positive.
 
-    TorchInductor spawns background threads on the first call (JIT compilation).
-    With the fix, the thread snapshot is taken AFTER the correctness call, so
-    those threads are already included in the baseline when timing runs.
+    TorchInductor's trusted compiler workers are initialized before the thread
+    baseline, while the baseline itself still precedes all candidate calls.
     """
     kernel = (
         "import torch\n"

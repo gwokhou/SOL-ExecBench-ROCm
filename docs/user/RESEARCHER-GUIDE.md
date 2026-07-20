@@ -12,7 +12,7 @@ Start from the question you are trying to answer:
 | Question | Start with | Primary artifacts |
 | --- | --- | --- |
 | Did this kernel produce correct outputs and useful speedup on my AMD host? | Run one problem through `sol-execbench`, then inspect Trace JSONL. | Trace JSONL, correctness fields, latency, reference latency, environment fields. |
-| How do I add or adapt a kernel implementation? | Read `docs/user/solution.md`, then copy the closest example under `examples/` or `tests/sol_execbench/samples/`. | Solution JSON, staged source files, compile options, HIP/Triton examples. |
+| How do I add or adapt a kernel implementation? | Read `docs/user/solution.md`, then copy the closest fixture under `tests/sol_execbench/samples/`. | Solution JSON, staged source files, compile options, HIP/Triton fixtures. |
 | How does the harness stage and execute solutions? | Inspect `src/sol_execbench/driver/` and `src/sol_execbench/driver/templates/`. | Staging directory, generated driver, native build path, reward-hack traces. |
 | How reproducible is this dataset or slice result? | Run a bounded dataset batch with readiness and execution closure sidecars. | Trace JSONL, environment sidecars, execution closure, readiness, trust summaries. |
 | Can I review a public prerelease claim? | Start with `docs/user/research_preview.md`, then inspect artifact bundle and readiness outputs. | Prerelease bundle, readiness report, `docs/user/CLAIMS.md`, known-gap records. |
@@ -34,11 +34,9 @@ uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm 
 Read the canonical trace first. It is the primary artifact. Derived reports and
 sidecars must not change trace JSONL semantics.
 
-For the v1.26 research preview, start with `docs/user/research_preview.md`. It maps
-methodology, scope, evidence surfaces, limitations, and representative commands
-to expected artifacts.
-
-Use older evidence guides when you need their specific sidecars:
+For the current v3 boundary, start with `docs/user/ARCHITECTURE.md` and
+`docs/user/research_preview.md`. Older evidence guides remain historical records
+for their specific sidecars:
 
 - `docs/user/static_kernel_evidence.md` covers diagnostic HIP/C++ build artifacts
   collected with `--static-evidence auto`.
@@ -76,8 +74,7 @@ CDNA3-family validation, including MI300X, and no CDNA4 validation.
 
 ## Adding Or Adapting A Kernel
 
-1. Start from the nearest existing example under `examples/` or
-   `tests/sol_execbench/samples/`.
+1. Start from the nearest existing fixture under `tests/sol_execbench/samples/`.
 2. Keep the canonical problem files unchanged unless you are intentionally
    defining a new benchmark problem.
 3. Update or add a solution JSON file that references your implementation.
@@ -113,7 +110,7 @@ inputs.
 Agents should treat `sol-execbench` as the only execution authority:
 
 - Generate candidate solution files.
-- Run the CLI or dataset runner.
+- Run the single-problem CLI for every candidate revision.
 - Read trace JSONL and explicit sidecars.
 - Avoid hidden state between attempts unless it is represented in the solution
   source and allowed by the schema.

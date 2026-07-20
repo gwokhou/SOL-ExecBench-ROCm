@@ -40,7 +40,9 @@ from sol_execbench.core.arguments import (
 )
 
 
-DependencyObservationBuilder = Callable[..., PytorchDependencyObservation]
+DependencyObservationBuilder = Callable[
+    [PytorchDependencyObservation], PytorchDependencyObservation
+]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -131,26 +133,30 @@ def collect_target(
     """Collect one target entry from parsed CLI arguments."""
     selection = select_docker_target(args.target, manifest_path=args.manifest)
     dependency_observation = build_dependency_observation(
-        torch_distribution_version=_none_if_requested(args.torch_distribution_version),
-        torch_version=_none_if_requested(args.torch_version),
-        torch_local_version=_none_if_requested(args.torch_local_version),
-        torch_rocm_target=_none_if_requested(args.torch_rocm_target),
-        torch_hip_version=_none_if_requested(args.torch_hip_version),
-        torch_cuda_version=_none_if_requested(args.torch_cuda_version),
-        torch_device_available=args.torch_device_available,
-        torch_import_error=_none_if_requested(args.torch_import_error),
-        torchvision_distribution_version=_none_if_requested(
-            args.torchvision_distribution_version
-        ),
-        triton_rocm_distribution_version=_none_if_requested(
-            args.triton_rocm_distribution_version
-        ),
-        triton_rocm_status=_none_if_requested(args.triton_rocm_status),
-        container_rocm_user_space_version=_none_if_requested(
-            args.container_rocm_user_space_version
-        ),
-        hipcc_version=_none_if_requested(args.hipcc_version),
-        toolchain_rocm_version=_none_if_requested(args.toolchain_rocm_version),
+        PytorchDependencyObservation(
+            torch_distribution_version=_none_if_requested(
+                args.torch_distribution_version
+            ),
+            torch_version=_none_if_requested(args.torch_version),
+            torch_local_version=_none_if_requested(args.torch_local_version),
+            torch_rocm_target=_none_if_requested(args.torch_rocm_target),
+            torch_hip_version=_none_if_requested(args.torch_hip_version),
+            torch_cuda_version=_none_if_requested(args.torch_cuda_version),
+            torch_device_available=args.torch_device_available,
+            torch_import_error=_none_if_requested(args.torch_import_error),
+            torchvision_distribution_version=_none_if_requested(
+                args.torchvision_distribution_version
+            ),
+            triton_rocm_distribution_version=_none_if_requested(
+                args.triton_rocm_distribution_version
+            ),
+            triton_rocm_status=_none_if_requested(args.triton_rocm_status),
+            container_rocm_user_space_version=_none_if_requested(
+                args.container_rocm_user_space_version
+            ),
+            hipcc_version=_none_if_requested(args.hipcc_version),
+            toolchain_rocm_version=_none_if_requested(args.toolchain_rocm_version),
+        )
     )
     return build_runtime_matrix_entry(
         target=selection.target,

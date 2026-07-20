@@ -25,6 +25,7 @@ import pytest
 
 from sol_execbench.core.bench import clock_lock as clock_lock_module
 from sol_execbench.core.bench.clock_lock import ClockLockLease
+from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
 from sol_execbench.core import (
     BenchmarkConfig,
     Definition,
@@ -142,13 +143,19 @@ def _make_packager(
 
 
 class TestInit:
-    def test_definition_json_written(
+    def test_definition_json_redacts_worker_only_reference(
         self, tmp_path, definition, workloads, python_solution, config
     ):
         pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
         path = pkg.output_dir / "definition.json"
         assert path.exists()
-        assert json.loads(path.read_text())["name"] == "test_vecadd"
+        candidate_definition = json.loads(path.read_text())
+        trusted_definition = json.loads(
+            (pkg.output_dir / TRUSTED_DEFINITION_FILE).read_text()
+        )
+        assert candidate_definition["name"] == "test_vecadd"
+        assert candidate_definition["reference"] != definition.reference
+        assert trusted_definition["reference"] == definition.reference
 
     def test_workload_jsonl_written(
         self, tmp_path, definition, workloads, python_solution, config
@@ -474,7 +481,7 @@ class TestExecute:
     ):
         pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
         cmd = pkg.execute()
-        assert cmd == [sys.executable, "eval_driver.py"]
+        assert cmd == [sys.executable, "evaluation_orchestrator.py"]
 
     def test_eval_driver_staged(
         self, tmp_path, definition, workloads, python_solution, config
@@ -484,6 +491,10 @@ class TestExecute:
         driver = pkg.output_dir / "eval_driver.py"
         assert driver.exists()
         ast.parse(driver.read_text())
+        for name in ("reference_worker.py", "evaluation_orchestrator.py"):
+            template = pkg.output_dir / name
+            assert template.exists()
+            ast.parse(template.read_text())
 
     def test_lock_clocks_is_managed_for_evaluator_lifecycle(
         self, tmp_path, definition, workloads, python_solution, monkeypatch
@@ -610,7 +621,7 @@ class TestExecute:
         # Simulate a compiled artifact.
         (pkg.output_dir / "benchmark_kernel.so").write_bytes(b"\x00")
         cmd = pkg.execute()
-        assert cmd == [sys.executable, "eval_driver.py"]
+        assert cmd == [sys.executable, "evaluation_orchestrator.py"]
 
 
 class TestLocalGfxDetection:

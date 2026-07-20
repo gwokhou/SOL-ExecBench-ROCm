@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""SOL ExecBench 2.0 command-line interface."""
+"""SOL ExecBench 3.0 command-line interface."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from .protocol import (
     response_success,
 )
 
-VERSION = "2.0.0"
+VERSION = "3.0.0"
 
 
 class LazyGroup(click.Group):
@@ -34,8 +34,7 @@ class LazyGroup(click.Group):
         "contract": ("sol_execbench.cli.commands.metadata", "contract_cli"),
         "toolchain": ("sol_execbench.cli.commands.metadata", "toolchain_cli"),
         "dataset": ("sol_execbench.cli.commands.dataset", "dataset_cli"),
-        "baseline": ("sol_execbench.cli.commands.baseline", "baseline_cli"),
-        "hardware": ("sol_execbench.cli.commands.hardware_model", "hardware_cli"),
+        "solar": ("sol_execbench.cli.commands.solar", "solar_cli"),
         "score": ("sol_execbench.cli.commands.official_score", "score_cli"),
     }
 
@@ -176,17 +175,10 @@ def _command_name(args: list[str]) -> str:
         "contract": 2,
         "toolchain": 2,
         "dataset": 3,
-        "hardware": 3,
+        "solar": 2,
         "score": 2,
     }
-    if domain == "baseline":
-        depth = (
-            3
-            if len(values) > 1 and values[1] in {"authority", "release", "publication"}
-            else 2
-        )
-    else:
-        depth = depths.get(domain, 1)
+    depth = depths.get(domain, 1)
     return " ".join(values[:depth])
 
 

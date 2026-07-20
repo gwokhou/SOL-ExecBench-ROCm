@@ -7,12 +7,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from rich.console import Console
 
 from ...core.bench.agent_feedback import (
     AgentFeedbackArtifactCitation,
+    AgentFeedbackBuildIdentity,
+    AgentFeedbackBuildRequest,
     artifact_citation_from_path,
     build_agent_feedback_sidecar,
 )
@@ -26,6 +29,49 @@ from ...core.evidence.runtime_evidence import write_json_payload
 console = Console(stderr=True)
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AgentFeedbackIdentityOverrides:
+    """Optional consumer identity for feedback freshness."""
+
+    run_id: str | None = None
+    target_id: str | None = None
+    candidate_id: str | None = None
+    source_sha256: str | None = None
+    sol_version: str | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AgentFeedbackArtifactPaths:
+    """Upstream sidecars cited by generated agent feedback."""
+
+    environment: Path | None = None
+    profile: Path | None = None
+    static_evidence: Path | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AgentFeedbackWriteRequest:
+    """Typed inputs for optional agent-feedback publication."""
+
+    output_file: Path | None
+    traces: list[Trace]
+    solution: Solution | None
+    profile_result: Rocprofv3ProfileResult | None
+    static_evidence: StaticKernelEvidenceSidecar | None
+    identity: AgentFeedbackIdentityOverrides = AgentFeedbackIdentityOverrides()
+    artifact_paths: AgentFeedbackArtifactPaths = AgentFeedbackArtifactPaths()
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedAgentFeedbackIdentity:
+    """Fully derived freshness identity used by the core builder."""
+
+    target_id: str | None
+    run_id: str | None
+    candidate_id: str | None
+    source_sha256: str | None
+
+
 def _agent_feedback_sidecar_path(output_file: Path | None) -> Path | None:
     """Return the optional agent feedback sidecar path for a trace output."""
 
@@ -35,54 +81,41 @@ def _agent_feedback_sidecar_path(output_file: Path | None) -> Path | None:
 
 
 def _write_agent_feedback_sidecar(
-    output_file: Path | None,
-    traces: list[Trace],
-    *,
-    solution: Solution | None = None,
-    profile_result: Rocprofv3ProfileResult | None,
-    static_evidence: StaticKernelEvidenceSidecar | None,
-    environment_sidecar_path: Path | None = None,
-    profile_sidecar_path: Path | None = None,
-    static_evidence_sidecar_path: Path | None = None,
-    run_id: str | None = None,
-    feedback_target_id: str | None = None,
-    feedback_candidate_id: str | None = None,
-    feedback_source_sha256: str | None = None,
-    feedback_sol_version: str | None = None,
+    request: AgentFeedbackWriteRequest,
 ) -> Path | None:
     """Write optional agent feedback metadata without changing trace JSONL."""
 
-    sidecar_path = _agent_feedback_sidecar_path(output_file)
+    sidecar_path = _agent_feedback_sidecar_path(request.output_file)
     if sidecar_path is None:
         return None
 
     try:
-        if run_id is None:
-            run_id = _agent_feedback_run_id(output_file, traces)
-        identity_fields = _agent_feedback_identity_fields(
-            output_file,
-            traces,
-            solution=solution,
-            run_id=run_id,
-            target_id=feedback_target_id,
-            candidate_id=feedback_candidate_id,
-            source_sha256=feedback_source_sha256,
-        )
+        identity = _agent_feedback_identity_fields(request)
         sidecar = build_agent_feedback_sidecar(
-            traces=traces,
-            profile_result=profile_result,
-            static_evidence=static_evidence,
-            trace_path=str(output_file) if output_file is not None else None,
-            target_id=identity_fields["target_id"],
-            run_id=identity_fields["run_id"],
-            candidate_id=identity_fields["candidate_id"],
-            source_sha256=identity_fields["source_sha256"],
-            sol_version=feedback_sol_version,
-            artifact_citations=_agent_feedback_artifact_citations(
-                output_file=output_file,
-                environment_sidecar_path=environment_sidecar_path,
-                profile_sidecar_path=profile_sidecar_path,
-                static_evidence_sidecar_path=static_evidence_sidecar_path,
+            AgentFeedbackBuildRequest(
+                traces=request.traces,
+                profile_result=request.profile_result,
+                static_evidence=request.static_evidence,
+                identity=AgentFeedbackBuildIdentity(
+                    trace_path=(
+                        str(request.output_file)
+                        if request.output_file is not None
+                        else None
+                    ),
+                    target_id=identity.target_id,
+                    run_id=identity.run_id,
+                    candidate_id=identity.candidate_id,
+                    source_sha256=identity.source_sha256,
+                    sol_version=request.identity.sol_version,
+                ),
+                artifact_citations=_agent_feedback_artifact_citations(
+                    output_file=request.output_file,
+                    environment_sidecar_path=request.artifact_paths.environment,
+                    profile_sidecar_path=request.artifact_paths.profile,
+                    static_evidence_sidecar_path=(
+                        request.artifact_paths.static_evidence
+                    ),
+                ),
             ),
         )
         write_json_payload(sidecar_path, sidecar)
@@ -94,17 +127,12 @@ def _write_agent_feedback_sidecar(
 
 
 def _agent_feedback_identity_fields(
-    output_file: Path | None,
-    traces: Sequence[Trace],
-    *,
-    solution: Solution | None = None,
-    run_id: str | None = None,
-    target_id: str | None = None,
-    candidate_id: str | None = None,
-    source_sha256: str | None = None,
-) -> dict[str, str | None]:
+    request: AgentFeedbackWriteRequest,
+) -> ResolvedAgentFeedbackIdentity:
     """Derive stable feedback freshness identity from emitted trace data."""
 
+    traces = request.traces
+    overrides = request.identity
     target_records = [
         {
             "definition": trace.definition,
@@ -116,28 +144,28 @@ def _agent_feedback_identity_fields(
         {trace.solution for trace in traces if trace.solution is not None}
     )
 
-    return {
-        "target_id": (
-            target_id
-            if target_id is not None
+    return ResolvedAgentFeedbackIdentity(
+        target_id=(
+            overrides.target_id
+            if overrides.target_id is not None
             else (stable_json_checksum(target_records) if target_records else None)
         ),
-        "run_id": (
-            run_id
-            if run_id is not None
-            else _agent_feedback_run_id(output_file, traces)
+        run_id=(
+            overrides.run_id
+            if overrides.run_id is not None
+            else _agent_feedback_run_id(request.output_file, traces)
         ),
-        "candidate_id": (
-            candidate_id
-            if candidate_id is not None
+        candidate_id=(
+            overrides.candidate_id
+            if overrides.candidate_id is not None
             else (stable_json_checksum(solution_labels) if solution_labels else None)
         ),
-        "source_sha256": (
-            source_sha256
-            if source_sha256 is not None
-            else (solution.hash() if solution is not None else None)
+        source_sha256=(
+            overrides.source_sha256
+            if overrides.source_sha256 is not None
+            else (request.solution.hash() if request.solution is not None else None)
         ),
-    }
+    )
 
 
 def _agent_feedback_run_id(

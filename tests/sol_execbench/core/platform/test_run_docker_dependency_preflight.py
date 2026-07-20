@@ -212,7 +212,7 @@ def test_dependency_override_allows_normal_dry_run_smoke_without_authority() -> 
         "--allow-mixed-version-dependencies",
         "--",
         "sol-execbench",
-        "examples/pytorch/linear_backward",
+        "problems/local/RX_9060_XT",
         **{
             **_matching_default_dependency_env(),
             "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",
@@ -223,7 +223,7 @@ def test_dependency_override_allows_normal_dry_run_smoke_without_authority() -> 
     assert completed.returncode == 0, completed.stderr
     assert "+ docker run" in completed.stdout
     assert "sol-execbench:rocm-7.1.1-complete" in completed.stdout
-    assert "sol-execbench examples/pytorch/linear_backward" in completed.stdout
+    assert "sol-execbench problems/local/RX_9060_XT" in completed.stdout
 
 
 def test_missing_required_dependency_still_blocks_normal_dry_run_smoke() -> None:
@@ -231,7 +231,7 @@ def test_missing_required_dependency_still_blocks_normal_dry_run_smoke() -> None
         "--allow-mixed-version-dependencies",
         "--",
         "sol-execbench",
-        "examples/pytorch/linear_backward",
+        "problems/local/RX_9060_XT",
         **{
             **_matching_default_dependency_env(),
             "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "none",
@@ -250,14 +250,14 @@ def test_record_container_validation_allows_matching_not_tested_dry_run() -> Non
         "--record-container-validation",
         "--",
         "sol-execbench",
-        "examples/pytorch/linear_backward",
+        "problems/local/RX_9060_XT",
         **_matching_default_dependency_env(),
     )
 
     assert completed.returncode == 0, completed.stderr
     assert "+ docker run" in completed.stdout
     assert "sol-execbench:rocm-7.2-complete" in completed.stdout
-    assert "sol-execbench examples/pytorch/linear_backward" in completed.stdout
+    assert "sol-execbench problems/local/RX_9060_XT" in completed.stdout
 
 
 def test_record_container_validation_still_blocks_mixed_dry_run() -> None:
@@ -267,7 +267,7 @@ def test_record_container_validation_still_blocks_mixed_dry_run() -> None:
         "rocm-7.1.1-ubuntu-24.04-container",
         "--",
         "sol-execbench",
-        "examples/pytorch/linear_backward",
+        "problems/local/RX_9060_XT",
         **{
             **_matching_default_dependency_env(),
             "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.1.1",

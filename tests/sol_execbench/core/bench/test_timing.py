@@ -173,6 +173,53 @@ class TestBenchTimeWithDeviceEvents:
         assert _summarize_statistics(times, "median") == 3.0
         assert _summarize_statistics(times, "all") == times
 
+    def test_synchronizes_device_after_candidate_before_end_event(self, monkeypatch):
+        calls: list[str] = []
+
+        class MockEvent:
+            created = 0
+
+            def __init__(self, enable_timing=False):
+                del enable_timing
+                self.name = "start" if MockEvent.created == 0 else "end"
+                MockEvent.created += 1
+
+            def record(self):
+                calls.append(f"{self.name}_record")
+
+            def synchronize(self):
+                calls.append(f"{self.name}_sync")
+
+            def elapsed_time(self, end):
+                del end
+                return 0.5
+
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._get_empty_cache_for_benchmark",
+            lambda device: None,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._clear_cache", lambda cache: None
+        )
+        monkeypatch.setattr(torch.cuda, "Event", MockEvent)
+        monkeypatch.setattr(
+            torch.cuda, "synchronize", lambda: calls.append("device_sync")
+        )
+
+        result = bench_time_with_device_events(
+            lambda: calls.append("candidate"), warmup=0, rep=1
+        )
+
+        assert result == [0.5]
+        measured = calls[calls.index("start_record") :]
+        assert measured == [
+            "start_record",
+            "candidate",
+            "device_sync",
+            "end_record",
+            "end_sync",
+        ]
+
 
 # ---------------------------------------------------------------------------
 # bench_time_with_device_events — GPU integration tests

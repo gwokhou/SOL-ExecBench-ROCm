@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from sol_execbench.core.bench.agent_feedback.items import trace_feedback_items
 from sol_execbench.core.bench.agent_feedback.models import (
@@ -23,27 +24,44 @@ from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,
 )
-from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
+from sol_execbench.core.evaluator_contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.timestamps import utc_timestamp
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AgentFeedbackBuildIdentity:
+    """Optional freshness identity supplied by the feedback consumer."""
+
+    trace_path: str | None = None
+    target_id: str | None = None
+    run_id: str | None = None
+    candidate_id: str | None = None
+    source_sha256: str | None = None
+    sol_version: str | None = None
+    generated_at: str | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AgentFeedbackBuildRequest:
+    """Typed inputs for deterministic agent-feedback construction."""
+
+    traces: Sequence[Trace]
+    profile_result: Rocprofv3ProfileResult | None = None
+    static_evidence: StaticKernelEvidenceSidecar | None = None
+    identity: AgentFeedbackBuildIdentity = AgentFeedbackBuildIdentity()
+    artifact_citations: Sequence[AgentFeedbackArtifactCitation] = ()
+
+
 def build_agent_feedback_sidecar(
-    *,
-    traces: Sequence[Trace],
-    profile_result: Rocprofv3ProfileResult | None = None,
-    static_evidence: StaticKernelEvidenceSidecar | None = None,
-    trace_path: str | None = None,
-    target_id: str | None = None,
-    run_id: str | None = None,
-    candidate_id: str | None = None,
-    source_sha256: str | None = None,
-    sol_version: str | None = None,
-    generated_at: str | None = None,
-    artifact_citations: Sequence[AgentFeedbackArtifactCitation] = (),
+    request: AgentFeedbackBuildRequest,
 ) -> AgentFeedbackSidecar:
     """Build a bounded diagnostic feedback sidecar from existing evaluation data."""
 
+    traces = request.traces
+    profile_result = request.profile_result
+    static_evidence = request.static_evidence
+    identity = request.identity
     evaluations = [trace.evaluation for trace in traces if trace.evaluation is not None]
     evaluated = [trace for trace in traces if trace.evaluation is not None]
     status_counter = Counter(evaluation.status for evaluation in evaluations)
@@ -62,13 +80,13 @@ def build_agent_feedback_sidecar(
         status=status,
         reason_code=reason_code,
         identity=AgentFeedbackIdentity(
-            generated_at=generated_at or utc_timestamp(),
-            sol_version=sol_version or SOL_EXECBENCH_RELEASE,
-            trace_path=compact_path(trace_path),
-            target_id=target_id,
-            run_id=run_id,
-            candidate_id=candidate_id,
-            source_sha256=source_sha256,
+            generated_at=identity.generated_at or utc_timestamp(),
+            sol_version=identity.sol_version or SOL_EXECBENCH_RELEASE,
+            trace_path=compact_path(identity.trace_path),
+            target_id=identity.target_id,
+            run_id=identity.run_id,
+            candidate_id=identity.candidate_id,
+            source_sha256=identity.source_sha256,
         ),
         summary=AgentFeedbackSummary(
             trace_count=len(traces),
@@ -86,7 +104,7 @@ def build_agent_feedback_sidecar(
         items=trace_feedback_items(status_counter),
         limitations=_limitations(traces, profile_result, static_evidence),
         source_refs=_source_refs(profile_result, static_evidence),
-        artifact_citations=list(artifact_citations),
+        artifact_citations=list(request.artifact_citations),
     )
 
 

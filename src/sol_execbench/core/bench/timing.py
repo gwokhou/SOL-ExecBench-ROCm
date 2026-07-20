@@ -24,11 +24,7 @@ import torch
 
 from sol_execbench.core.bench.io import ShiftingMemoryPoolAllocator
 
-
-def get_l2_cache_size(device) -> int:
-    """Get L2 cache size in bytes for a PyTorch GPU device."""
-    props = torch.cuda.get_device_properties(device)
-    return int(getattr(props, "L2_cache_size", 128 * 1024 * 1024))
+L2_CLEAR_BUFFER_BYTES = 256 * 1024 * 1024
 
 
 def _summarize_statistics(
@@ -46,9 +42,8 @@ def _summarize_statistics(
 
 
 def _get_empty_cache_for_benchmark(device) -> torch.Tensor:
-    """Create a buffer for clearing GPU L2 cache before benchmark runs."""
-    cache_size = max(get_l2_cache_size(device) * 2, 1)
-    return torch.empty(int(cache_size), dtype=torch.int8, device=device)
+    """Create the paper-specified 256 MiB cache-clearing buffer."""
+    return torch.empty(L2_CLEAR_BUFFER_BYTES, dtype=torch.int8, device=device)
 
 
 def _clear_cache(cache: torch.Tensor) -> None:
@@ -77,11 +72,12 @@ def clone_args(args: list[Any]) -> list[Any]:
 
 def bench_time_with_device_events(
     fn: Callable[..., Any],
-    warmup: int = 25,
-    rep: int = 100,
+    warmup: int = 10,
+    rep: int = 50,
     setup: Callable[[], Any] | None = None,
     device: str = "cuda",
-    min_measurement_time_seconds: float | None = 0.5,
+    min_measurement_time_seconds: float | None = None,
+    validator: Callable[[Any, Any], None] | None = None,
 ) -> list[float]:
     """Benchmark a GPU callable using PyTorch device events.
 
@@ -123,11 +119,13 @@ def bench_time_with_device_events(
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
         start_event.record()
-        fn(args)
+        result = fn(args)
         torch.cuda.synchronize()
         end_event.record()
-        torch.cuda.synchronize()
+        end_event.synchronize()
         times.append(start_event.elapsed_time(end_event))
+        if validator is not None:
+            validator(args, result)
         if _measurement_budget_reached(times, min_measurement_time_seconds):
             break
 
@@ -139,11 +137,12 @@ def time_runnable(
     inputs: list,
     outputs: list,
     device: str,
-    warmup: int = 25,
-    rep: int = 100,
-    min_measurement_time_seconds: float | None = 0.5,
-    return_mode: Literal["mean", "median", "all"] = "median",
+    warmup: int = 10,
+    rep: int = 50,
+    min_measurement_time_seconds: float | None = None,
+    return_mode: Literal["mean", "median", "all"] = "mean",
     methodology: Literal["events"] = "events",
+    validator: Callable[[list[Any], Any], None] | None = None,
 ) -> Union[float, list[float]]:
     """Time a callable using ROCm-compatible PyTorch device events.
 
@@ -164,6 +163,7 @@ def time_runnable(
             setup=allocator.get_unique_args,
             device=device,
             min_measurement_time_seconds=min_measurement_time_seconds,
+            validator=validator,
         )
         if not times:
             raise ValueError(f"No timing results for methodology: {methodology}")

@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -51,6 +52,7 @@ def test_dockerfile_keeps_existing_runtime_setup() -> None:
     assert "ARG HOST_UID=1000" in dockerfile
     assert "ARG HOST_GID=1000" in dockerfile
     assert "ARG HOST_USER=sol-execbench" in dockerfile
+    assert "util-linux" in dockerfile
     assert "uv sync --frozen --no-install-project --no-dev" in dockerfile
     assert "uv sync --frozen --no-editable --no-dev" in dockerfile
     assert "uv sync --frozen --no-install-project --all-groups" not in dockerfile
@@ -83,7 +85,11 @@ def test_dockerfile_installs_exact_validated_amd_smi_sudoers_rule() -> None:
 def test_entrypoint_registers_owned_lock_cleanup_before_locking() -> None:
     entrypoint = ENTRYPOINT_PATH.read_text(encoding="utf-8")
 
-    assert entrypoint.index("trap 'cleanup' EXIT") < entrypoint.index("\nlock_clocks\n")
+    cleanup_index = entrypoint.index("trap 'cleanup' EXIT")
+    gpu_lock_index = entrypoint.index("\nacquire_gpu_lock\n")
+    clock_lock_index = entrypoint.index("\nlock_clocks\n")
+    assert cleanup_index < gpu_lock_index < clock_lock_index
+    assert "SOL_EXECBENCH_GPU_LOCK_FD=9" in entrypoint
     assert "CLOCK_LOCK_ACQUIRED={int(clock_lock.acquired)}" in entrypoint
     assert "clock_lock.detach()" in entrypoint
     assert 'if [ "${SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED}" = "1" ]' in entrypoint
@@ -110,6 +116,7 @@ printf 'CLOCKS_LOCKED=1\nCLOCK_LOCK_ACQUIRED=1\n'
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "CLEANUP_LOG": str(cleanup_log),
         "FLASHINFER_TRACE_DIR": str(tmp_path),
+        "SOL_EXECBENCH_GPU_LOCK_DIR": str(tmp_path / "locks"),
     }
 
     result = subprocess.run(
@@ -122,6 +129,69 @@ printf 'CLOCKS_LOCKED=1\nCLOCK_LOCK_ACQUIRED=1\n'
 
     assert result.returncode == 23
     assert cleanup_log.read_text(encoding="utf-8") == "cleanup\n"
+
+
+def test_entrypoint_holds_gpu_lock_until_clock_cleanup_finishes(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_python = bin_dir / "python"
+    fake_python.write_text(
+        """#!/bin/bash
+if [[ ${1:-} == -c ]]; then
+  touch "${CLEANUP_STARTED}"
+  while [[ ! -e "${CLEANUP_RELEASE}" ]]; do sleep 0.01; done
+  exit 0
+fi
+printf 'CLOCKS_LOCKED=1\nCLOCK_LOCK_ACQUIRED=1\n'
+""",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+    cleanup_started = tmp_path / "cleanup.started"
+    cleanup_release = tmp_path / "cleanup.release"
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "CLEANUP_STARTED": str(cleanup_started),
+        "CLEANUP_RELEASE": str(cleanup_release),
+        "FLASHINFER_TRACE_DIR": str(tmp_path),
+        "SOL_EXECBENCH_GPU_LOCK_DIR": str(tmp_path / "locks"),
+    }
+    first = subprocess.Popen(
+        [ENTRYPOINT_PATH, "true"],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 5
+        while not cleanup_started.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert cleanup_started.exists()
+
+        second = subprocess.run(
+            [ENTRYPOINT_PATH, "true"],
+            env={**env, "SOL_EXECBENCH_GPU_LOCK_TIMEOUT_SECONDS": "0.05"},
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        assert second.returncode == 75
+        assert "GPU 0 is busy" in second.stderr
+    finally:
+        cleanup_release.touch()
+        first.communicate(timeout=5)
+    assert first.returncode == 0
+
+
+def test_container_validation_sidecar_uses_writable_output_transport() -> None:
+    script = RUN_DOCKER_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'container_entry_path="/outputs/${transport_path##*/}"' in script
+    assert 'mv "${transport_path}" "${entry_path}"' in script
+    assert 'container_repo_path "${entry_path}"' not in script
 
 
 def _run_docker_preview(*args: str) -> subprocess.CompletedProcess[str]:

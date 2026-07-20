@@ -1,0 +1,190 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""Operation classification policy for strict extended-einsum conversion."""
+
+_REAL_EINSUM = {
+    "matmul",
+    "mm",
+    "bmm",
+    "linear",
+    "conv1d",
+    "conv2d",
+    "conv3d",
+    "convtranspose1d",
+    "convtranspose2d",
+    "convtranspose3d",
+    "conv_transpose1d",
+    "conv_transpose2d",
+    "conv_transpose3d",
+    "scaled_dot_product_attention",
+    "attention",
+    "sdpa",
+    "einsum",
+}
+
+_BINARY_ELEMENTWISE = {
+    "add",
+    "sub",
+    "mul",
+    "div",
+    "pow",
+    "add_",
+    "sub_",
+    "mul_",
+    "div_",
+    "__add__",
+    "__sub__",
+    "__mul__",
+    "__truediv__",
+    "__radd__",
+    "__rsub__",
+    "__rmul__",
+    "__rtruediv__",
+    "__and__",
+    "bitwise_and",
+    "masked_fill",
+}
+
+_UNARY_ELEMENTWISE = {
+    "relu",
+    "sigmoid",
+    "tanh",
+    "gelu",
+    "selu",
+    "elu",
+    "mish",
+    "softmax",
+    "log_softmax",
+    "softplus",
+    "hardswish",
+    "hardsigmoid",
+    "abs",
+    "neg",
+    "exp",
+    "log",
+    "sqrt",
+    "rsqrt",
+    "sin",
+    "cos",
+    "clamp",
+    "clamp_",
+    "relu_",
+    "dropout",
+    "dropout_",
+    "bitwise_not",
+    "__invert__",
+}
+
+_REDUCTIONS = {
+    "sum",
+    "mean",
+    "prod",
+    "max",
+    "min",
+    "amax",
+    "amin",
+    "argmax",
+    "argmin",
+    "logsumexp",
+    "norm",
+}
+
+_NORMS = {
+    "batch_norm",
+    "batchnorm",
+    "batchnorm1d",
+    "batchnorm2d",
+    "batchnorm3d",
+    "layer_norm",
+    "layernorm",
+    "group_norm",
+    "groupnorm",
+    "instance_norm",
+    "instancenorm",
+    "normalize",
+}
+
+_POOLING = {
+    "max_pool1d",
+    "max_pool2d",
+    "max_pool3d",
+    "avg_pool1d",
+    "avg_pool2d",
+    "avg_pool3d",
+    "adaptive_max_pool1d",
+    "adaptive_max_pool2d",
+    "adaptive_max_pool3d",
+    "adaptive_avg_pool1d",
+    "adaptive_avg_pool2d",
+    "adaptive_avg_pool3d",
+}
+
+_SHAPES = {
+    "view",
+    "reshape",
+    "flatten",
+    "unflatten",
+    "squeeze",
+    "unsqueeze",
+    "expand",
+    "repeat",
+    "repeat_interleave",
+    "transpose",
+    "permute",
+    "t",
+    "contiguous",
+    "cat",
+    "concat",
+    "stack",
+    "split",
+    "chunk",
+    "__getitem__",
+    "getitem",
+    "select",
+    "index_select",
+}
+
+_TRIVIAL = {
+    "clone",
+    "detach",
+    "copy_",
+    "to",
+    "type",
+    "float",
+    "half",
+    "hidden-tensor",
+    "output-tensor",
+    "auxiliary-tensor",
+    "roll",
+    "pad",
+    "unfold",
+    "fold",
+    "index_add",
+    "index_copy",
+    "index_put",
+    "scatter",
+    "scatter_add",
+}
+
+SUPPORTABLE_OPERATIONS = frozenset().union(
+    _REAL_EINSUM,
+    _BINARY_ELEMENTWISE,
+    _UNARY_ELEMENTWISE,
+    _REDUCTIONS,
+    _NORMS,
+    _POOLING,
+    _SHAPES,
+    _TRIVIAL,
+    {"diag", "diagonal", "tril", "triu"},
+    {"cummax", "cummin", "cumprod", "cumsum"},
+    {"embedding"},
+    {"gru", "lstm", "rnn"},
+    {"multi_head_attention_forward", "multihead_attention", "flex_attention"},
+)
+
+UNSUPPORTABLE_CONTROL_FLOW = frozenset(
+    {"if", "while", "for", "return", "raise", "print", "assert", "pass"}
+)
+
+__all__ = ["SUPPORTABLE_OPERATIONS", "UNSUPPORTABLE_CONTROL_FLOW"]

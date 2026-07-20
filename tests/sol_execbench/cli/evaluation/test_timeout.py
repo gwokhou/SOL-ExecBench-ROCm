@@ -22,7 +22,7 @@ from sol_execbench.cli.evaluation import command as cli_evaluation
 from sol_execbench.cli.main import cli
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-LINEAR_BACKWARD_EXAMPLE = REPO_ROOT / "examples/pytorch/linear_backward"
+LINEAR_BACKWARD_EXAMPLE = REPO_ROOT / "tests/sol_execbench/samples/linear_backward"
 
 
 def _stage_pytorch_problem(tmp_path: Path) -> Path:
@@ -63,6 +63,7 @@ def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
             str(trace_path),
             "--timeout",
             "5",
+            "--unsafe-local-execution",
         ],
     )
 

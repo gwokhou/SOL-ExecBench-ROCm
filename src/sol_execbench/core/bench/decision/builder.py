@@ -22,7 +22,7 @@ from sol_execbench.core.bench.diagnostic_sidecar import compact_path
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
 )
-from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
+from sol_execbench.core.evaluator_contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.platform.arch_capabilities import ArchIsaBudget
 from sol_execbench.core.timestamps import utc_timestamp
 

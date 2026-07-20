@@ -10,8 +10,8 @@ trace JSONL.
 Use `--static-evidence auto` with a normal benchmark run:
 
 ```bash
-uv run sol-execbench evaluate examples/hip_cpp/rmsnorm \
-  --solution examples/hip_cpp/rmsnorm/solution_hip.json \
+uv run sol-execbench evaluate tests/sol_execbench/samples/rmsnorm \
+  --solution tests/sol_execbench/samples/rmsnorm/solution_cuda.json \
   --static-evidence auto \
   --trace-output out/rmsnorm.trace.jsonl
 ```

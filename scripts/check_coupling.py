@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check SOL ExecBench source coupling guardrails."""
+"""Check SOL ExecBench and SOLAR source coupling guardrails."""
 
 from __future__ import annotations
 
@@ -12,24 +12,31 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPO_ROOT / "src"
-PACKAGE_ROOT = SOURCE_ROOT / "sol_execbench"
+PACKAGE_ROOTS = (SOURCE_ROOT / "sol_execbench", SOURCE_ROOT / "solar")
 
 P0_LIMITS = {
     "sol_execbench.cli.evaluation.evaluator": (240, 8),
     "sol_execbench.core.bench.eval_workload_runner": (320, 8),
 }
 P1_LIMITS = {
-    "sol_execbench.core.scoring.amd_bound_graph.models": (130, 2),
-    "sol_execbench.core.scoring.amd_hardware_models": (240, 1),
-    "sol_execbench.core.scoring.solar_derivation.models": (140, 4),
-    "sol_execbench.core.scoring.amd_score.reports": (160, 7),
     "sol_execbench.driver.problem_packager": (230, 7),
     "sol_execbench.core.bench.rocm_profiler": (180, 5),
+    "sol_execbench.core.scoring.official_authority": (180, 8),
+    "sol_execbench.core.solar_bridge.analyzer": (180, 8),
+}
+SOLAR_LIMITS = {
+    "solar.api": (300, 6),
+    "solar.einsum.conversion": (240, 2),
+    "solar.graph.extraction": (180, 3),
 }
 EXACT_IMPORTS = {
     "sol_execbench.driver.templates.eval_driver": [
         "sol_execbench.driver.eval_runtime_api"
     ],
+}
+FORBIDDEN_DEPENDENCIES = {
+    "sol_execbench.core.bench": ("sol_execbench.core.reports",),
+    "sol_execbench.core.platform": ("sol_execbench.core.scoring",),
 }
 
 
@@ -51,11 +58,12 @@ def is_under(module: str, prefix: str) -> bool:
 def internal_modules() -> dict[str, Path]:
     """Return importable package modules mapped to source files."""
     modules: dict[str, Path] = {}
-    for path in sorted(PACKAGE_ROOT.rglob("*.py")):
-        module = ".".join(path.relative_to(SOURCE_ROOT).with_suffix("").parts)
-        if module.endswith(".__init__"):
-            module = module.removesuffix(".__init__")
-        modules[module] = path
+    for package_root in PACKAGE_ROOTS:
+        for path in sorted(package_root.rglob("*.py")):
+            module = ".".join(path.relative_to(SOURCE_ROOT).with_suffix("").parts)
+            if module.endswith(".__init__"):
+                module = module.removesuffix(".__init__")
+            modules[module] = path
     return modules
 
 
@@ -96,7 +104,7 @@ def resolve_imported_modules(
 
     resolved: set[str] = set()
     for name in names:
-        if not name.startswith("sol_execbench"):
+        if not name.startswith(("sol_execbench", "solar")):
             continue
         parts = name.split(".")
         for end in range(len(parts), 0, -1):
@@ -230,10 +238,39 @@ def facade_import_violations(modules: dict[str, Path]) -> list[tuple[str, str]]:
     return sorted(set(violations))
 
 
+def cross_package_violations(
+    edges: set[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    """Reject benchmark concepts in SOLAR and bypasses around the bridge."""
+    violations: list[tuple[str, str]] = []
+    for source, target in edges:
+        if source.startswith("solar") and target.startswith("sol_execbench"):
+            violations.append((source, target))
+        elif (
+            source.startswith("sol_execbench")
+            and target.startswith("solar")
+            and not is_under(source, "sol_execbench.core.solar_bridge")
+        ):
+            violations.append((source, target))
+    return sorted(violations)
+
+
+def layer_violations(edges: set[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Reject known low-level-to-high-level dependency inversions."""
+    return sorted(
+        (source, target)
+        for source, target in edges
+        for source_root, forbidden_targets in FORBIDDEN_DEPENDENCIES.items()
+        if is_under(source, source_root)
+        and any(is_under(target, target_root) for target_root in forbidden_targets)
+    )
+
+
 def check_limits(stats: dict[str, ModuleStats]) -> list[str]:
     """Return limit failures for selected module stats."""
     failures: list[str] = []
-    for module, (line_limit, fanout_limit) in {**P0_LIMITS, **P1_LIMITS}.items():
+    limits = {**P0_LIMITS, **P1_LIMITS, **SOLAR_LIMITS}
+    for module, (line_limit, fanout_limit) in limits.items():
         stat = stats[module]
         if stat.line_count > line_limit:
             failures.append(f"{module}: line_count {stat.line_count} > {line_limit}")
@@ -250,11 +287,13 @@ def payload() -> dict[str, Any]:
     """Build the coupling check payload."""
     modules = internal_modules()
     edges = internal_import_edges(modules)
-    selected_modules = {*P0_LIMITS, *P1_LIMITS, *EXACT_IMPORTS}
+    selected_modules = {*P0_LIMITS, *P1_LIMITS, *SOLAR_LIMITS, *EXACT_IMPORTS}
     stats = module_stats(modules, edges, selected_modules)
     return {
         "cycles": strongly_connected_components(modules, edges),
+        "cross_package_violations": cross_package_violations(edges),
         "facade_import_violations": facade_import_violations(modules),
+        "layer_violations": layer_violations(edges),
         "limit_failures": check_limits(stats),
         "stats": {
             module: {
@@ -279,13 +318,17 @@ def main() -> int:
     else:
         print("Coupling Guardrails")
         print(f"cycles: {result['cycles']}")
+        print(f"cross-package violations: {result['cross_package_violations']}")
         print(f"facade import violations: {result['facade_import_violations']}")
+        print(f"layer violations: {result['layer_violations']}")
         print(f"limit failures: {result['limit_failures']}")
         for module, stat in result["stats"].items():
             print(f"{module}: lines={stat['line_count']} fanout={stat['fanout']}")
     if (
         result["cycles"]
+        or result["cross_package_violations"]
         or result["facade_import_violations"]
+        or result["layer_violations"]
         or result["limit_failures"]
     ):
         return 1

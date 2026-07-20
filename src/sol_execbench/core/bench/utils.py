@@ -34,7 +34,7 @@ from sol_execbench.core.platform.runtime import env_snapshot
 from sol_execbench.core.process.stdio import flush_stdio_streams
 
 
-_MAX_EMBEDDED_LOG_BYTES = 5 * 1024 * 1024
+_MAX_EMBEDDED_LOG_BYTES = 64 * 1024
 
 
 def _read_log_file(
@@ -70,6 +70,8 @@ def make_eval(
     correctness: Optional[Correctness] = None,
     performance: Optional[Performance] = None,
     extra_msg: Optional[str] = None,
+    clocks_locked: bool | None = None,
+    timing_protocol: str | None = None,
 ) -> Evaluation:
     log_text = _read_log_file(log_path) or ""
     if extra_msg:
@@ -77,7 +79,11 @@ def make_eval(
     return Evaluation(
         status=status,
         log=log_text,
-        environment=env_snapshot(device),
+        environment=env_snapshot(
+            device,
+            clocks_locked=clocks_locked,
+            timing_protocol=timing_protocol,
+        ),
         timestamp=datetime.now().isoformat(),
         correctness=correctness,
         performance=performance,

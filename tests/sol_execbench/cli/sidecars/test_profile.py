@@ -7,6 +7,7 @@ from sol_execbench.cli.sidecars import profile as cli_profile_sidecars
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
 )
 
 
@@ -22,7 +23,7 @@ def test_profile_sidecar_is_disabled_when_no_profile_result(tmp_path: Path):
 def test_profile_sidecar_records_diagnostic_metadata(tmp_path: Path):
     output = tmp_path / "trace.jsonl"
     result = Rocprofv3ProfileResult(
-        status="unavailable",
+        status=Rocprofv3ProfileStatus.UNAVAILABLE,
         command=("rocprofv3", "--", "python", "eval_driver.py"),
         output_directory=tmp_path / "trace.jsonl.rocprofv3",
         output_file="profile",
@@ -65,7 +66,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     counter_artifact = profile_artifact_dir / "trace_counters.csv"
     counter_artifact.write_text("Metric,Value,Unit\nSQ_INSTS_VALU,12,count\n")
     result = Rocprofv3ProfileResult(
-        status="success",
+        status=Rocprofv3ProfileStatus.SUCCESS,
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
         output_directory=tmp_path / "trace.jsonl.rocprofv3",
         output_file="trace",

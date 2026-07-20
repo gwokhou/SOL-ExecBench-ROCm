@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sol-execbench"
-version = "2.0.0"
-description = "ROCm-only port of SOL ExecBench for evaluating GPU kernel solutions on AMD hardware"
+version = "3.0.0"
+description = "SOL ExecBench with paper-aligned SOLAR analysis for AMD ROCm"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
@@ -22,13 +22,44 @@ dependencies = [
     "triton-rocm==3.6.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "torch-c-dlpack-ext>=0.1.5",
     "apache-tvm-ffi>=0.1.9",
+    "graphviz>=0.20",
+    "networkx>=3.0",
+    "numpy>=2.0",
+    "openai>=1.0",
+    "pandas>=2.2",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
 sol-execbench = "sol_execbench.cli.main:cli"
 
+[tool.hatch.build]
+exclude = [
+    "/.agents/",
+    "/.claude/",
+    "/.codex/",
+    "/.omc/",
+    "/.planning/",
+    "/.pytest_cache/",
+    "/.rocprof-compute-env/",
+    "/.rocprofv3/",
+    "/.ruff_cache/",
+    "/.superpowers/",
+    "/.uv-cache/",
+    "/.venv/",
+    "/.worktrees/",
+    "/data/",
+    "/dist/",
+    "/out/",
+    "/tmp/",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sol_execbench", "src/solar"]
+
 [dependency-groups]
 dev = [
+    "coverage[toml]>=7.10",
     "pre-commit>=4.6.0",
     "pytest>=9.0.2",
     "pytest-xdist>=3.5",
@@ -61,6 +92,16 @@ markers = [
     "requires_cutile: legacy NVIDIA cuTile marker; skipped in this ROCm-only port",
 ]
 
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = ["solar"]
+omit = ["src/solar/_vendor/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
 [tool.ruff]
 # Exclude generated code from linting and formatting
 force-exclude = true
@@ -81,6 +122,7 @@ ignore = ["E741"]
 
 [tool.ty.src]
 include = ["src", "tests"]
+exclude = ["src/solar/_vendor"]
 
 [[tool.uv.index]]
 name = "pypi"

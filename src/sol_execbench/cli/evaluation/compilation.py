@@ -6,17 +6,41 @@
 from __future__ import annotations
 
 import os
-import subprocess
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Protocol, cast
 
 from ...core.bench.io import flashinfer_safetensors_env
 from ...core.bench.stderr import filter_benign_rocm_stderr
+from ...core.process.environment import sanitized_subprocess_env
+from ...core.process.subprocesses import (
+    TextSubprocessRunner,
+    run_in_process_group_bounded,
+)
 
 
-@dataclass(frozen=True)
+class CompilePackagerBase(Protocol):
+    """Common staged-package behavior needed by the compile phase."""
+
+    @property
+    def _is_cpp(self) -> bool: ...
+
+
+class NativeCompilePackager(CompilePackagerBase, Protocol):
+    def compile(self) -> tuple[list[str], str]: ...
+
+
+class CommandCompilePackager(CompilePackagerBase, Protocol):
+    """Focused test seam for a precomputed compile command."""
+
+    def _make_compile_cmd(self, output_path: Path) -> list[str]: ...
+
+
+CompilePackager = NativeCompilePackager | CommandCompilePackager
+
+
+@dataclass(frozen=True, slots=True)
 class CompilePhaseResult:
     attempted: bool
     succeeded: bool
@@ -26,24 +50,27 @@ class CompilePhaseResult:
     returncode: int
 
 
-def _compile_command(packager: Any, output_path: Path) -> tuple[list[str], Path]:
-    make_compile_cmd = getattr(packager, "_make_compile_cmd", None)
-    if make_compile_cmd is not None:
-        return make_compile_cmd(output_path), output_path
+def _compile_command(
+    packager: CompilePackager, output_path: Path
+) -> tuple[list[str], Path]:
+    if hasattr(packager, "_make_compile_cmd"):
+        command_packager = cast(CommandCompilePackager, packager)
+        return command_packager._make_compile_cmd(output_path), output_path
 
-    cmd, artifact_path = packager.compile()
+    native_packager = cast(NativeCompilePackager, packager)
+    cmd, artifact_path = native_packager.compile()
     return cmd, Path(artifact_path)
 
 
 def run_compile_phase(
-    packager: Any,
+    packager: CompilePackager,
     *,
     staging_dir: Path,
     compile_timeout: int,
     env_builder: Callable[
         [Mapping[str, str]], dict[str, str]
     ] = flashinfer_safetensors_env,
-    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    runner: TextSubprocessRunner | None = None,
 ) -> CompilePhaseResult:
     """Compile a staged HIP/C++ solution and return subprocess diagnostics."""
 
@@ -59,15 +86,22 @@ def run_compile_phase(
 
     artifact_path = staging_dir / "benchmark_kernel.so"
     cmd, artifact_path = _compile_command(packager, artifact_path)
-    env = env_builder({**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"})
-    proc = runner(
-        cmd,
-        cwd=staging_dir,
-        capture_output=True,
-        text=True,
-        timeout=compile_timeout,
-        env=env,
-    )
+    (staging_dir / ".tmp").mkdir(exist_ok=True)
+    base = sanitized_subprocess_env(os.environ, staging_dir=staging_dir)
+    env = sanitized_subprocess_env(env_builder(base), staging_dir=staging_dir)
+    if runner is None:
+        proc = run_in_process_group_bounded(
+            cmd, cwd=staging_dir, timeout=compile_timeout, env=env
+        )
+    else:
+        proc = runner(
+            cmd,
+            cwd=staging_dir,
+            capture_output=True,
+            text=True,
+            timeout=compile_timeout,
+            env=env,
+        )
 
     return CompilePhaseResult(
         attempted=True,

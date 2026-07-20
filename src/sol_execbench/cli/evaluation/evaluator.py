@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import shutil
 import tempfile
+from contextlib import ExitStack
 from pathlib import Path
 
 from rich.console import Console
@@ -34,6 +36,8 @@ PROFILE_ROCPROFV3 = cli_phases.PROFILE_ROCPROFV3
 
 def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
     """Evaluate a SOL-ExecBench solution on GPU."""
+
+    cli_phases.require_execution_isolation(request)
 
     resolved_inputs = cli_problem_io.resolve_problem_inputs(
         problem_dir=request.problem_dir,
@@ -65,14 +69,22 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
         )
 
     staging_dir = Path(tempfile.mkdtemp(prefix="sol_execbench_"))
-    with ProblemPackager(
-        definition=definition,
-        workloads=workloads,
-        solution=solution,
-        config=config,
-        output_dir=staging_dir,
-        keep_output_dir=request.keep_staging,
-    ) as packager:
+    with ExitStack() as resources:
+        if not request.keep_staging:
+            resources.callback(shutil.rmtree, staging_dir, ignore_errors=True)
+        resources.enter_context(cli_phases.evaluation_execution_boundary(request))
+        packager = resources.enter_context(
+            ProblemPackager(
+                definition=definition,
+                workloads=workloads,
+                solution=solution,
+                config=config,
+                output_dir=staging_dir,
+                # The outer resource scope owns staging cleanup so constructor
+                # and lock-acquisition failures cannot leak the directory.
+                keep_output_dir=True,
+            )
+        )
         return _run_packaged_evaluation(
             request=request,
             loaded=loaded,
@@ -95,38 +107,37 @@ def _run_packaged_evaluation(
 
     if request.verbose:
         console.print(f"[dim]Staging dir: {staging_dir}[/dim]")
-    static_evidence_result, runtime_result = _run_evaluation_phases(
+    phase_result = _run_evaluation_phases(
         request=request,
         staging_dir=staging_dir,
         packager=packager,
         workload_count=len(workloads),
     )
+    runtime_result = phase_result.runtime
     traces = runtime_result.traces
-    release_baseline_evidence = cli_outputs.load_release_baseline_evidence(
-        request.release_bound_sha256,
-        request.release_hardware_model_sha256,
-        request.release_authority_json,
-    )
     trace_run_id = cli_outputs.write_trace_output(
         output_file=request.output_file,
         traces=traces,
         console=console,
-        release_baseline_evidence=release_baseline_evidence,
     )
     cli_sidecar_writer.write_optional_sidecars(
-        output_file=request.output_file,
-        staging_dir=staging_dir,
-        traces=traces,
-        solution=solution,
-        profile_result=runtime_result.profile_result,
-        static_evidence_result=static_evidence_result,
-        decision=request.decision,
-        trace_run_id=trace_run_id,
-        feedback_run_id=request.feedback_run_id,
-        feedback_target_id=request.feedback_target_id,
-        feedback_candidate_id=request.feedback_candidate_id,
-        feedback_source_sha256=request.feedback_source_sha256,
-        feedback_sol_version=request.feedback_sol_version,
+        cli_sidecar_writer.SidecarWriteRequest(
+            output_file=request.output_file,
+            staging_dir=staging_dir,
+            traces=traces,
+            solution=solution,
+            profile_result=runtime_result.profile_result,
+            static_evidence_result=phase_result.static_evidence,
+            decision=request.decision,
+            identity=cli_sidecar_writer.SidecarIdentity(
+                trace_run_id=trace_run_id,
+                feedback_run_id=request.feedback_run_id,
+                target_id=request.feedback_target_id,
+                candidate_id=request.feedback_candidate_id,
+                source_sha256=request.feedback_source_sha256,
+                sol_version=request.feedback_sol_version,
+            ),
+        )
     )
     cli_outputs.emit_trace_output(traces=traces, json_output=request.json_output)
     passed = sum(1 for trace in traces if trace.is_successful())
@@ -155,44 +166,44 @@ def _run_evaluation_phases(
     staging_dir: Path,
     packager: ProblemPackager,
     workload_count: int,
-):
-    static_evidence_result = cli_phases.run_optional_compile_phase(
+) -> cli_phases.EvaluationPhasesResult:
+    context = cli_phases.EvaluationPhaseContext(
         packager=packager,
         staging_dir=staging_dir,
-        compile_timeout=request.compile_timeout,
         output_file=request.output_file,
+        console=console,
+    )
+    static_evidence_result = cli_phases.run_optional_compile_phase(
+        context,
+        compile_timeout=request.compile_timeout,
         static_evidence=request.static_evidence,
         verbose=request.verbose,
-        console=console,
     )
 
     eval_cmd = packager.execute()
     runtime_result = cli_phases.run_evaluation_phase(
-        packager=packager,
+        context,
         eval_cmd=eval_cmd,
-        staging_dir=staging_dir,
-        output_file=request.output_file,
         timeout=request.timeout,
         profile=request.profile,
         workload_count=workload_count,
-        console=console,
     )
 
     if isinstance(
         runtime_result, cli_evaluation_runtime.EvaluationRuntimeNoTraceFailure
     ):
         cli_phases.handle_no_trace_failure(
+            context,
             runtime_result=runtime_result,
-            output_file=request.output_file,
-            staging_dir=staging_dir,
             keep_staging=request.keep_staging,
-            packager=packager,
-            console=console,
         )
 
     if request.verbose and runtime_result.filtered_stderr:
         console.print(f"[dim]{runtime_result.filtered_stderr}[/dim]")
-    return static_evidence_result, runtime_result
+    return cli_phases.EvaluationPhasesResult(
+        static_evidence=static_evidence_result,
+        runtime=runtime_result,
+    )
 
 
 __all__ = [

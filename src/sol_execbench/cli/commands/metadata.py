@@ -11,7 +11,7 @@ from typing import Any
 
 import click
 
-from ...core.data.contract import build_evaluator_contract
+from ...core.evaluator_contract import build_evaluator_contract
 from ...core.platform.environment import build_environment_diagnostics
 from ...core.platform.toolchain import (
     ToolchainArtifactType,
@@ -58,7 +58,7 @@ def contract_cli() -> None:
 
 @contract_cli.command("evaluator")
 def evaluator_contract_cli() -> CliResult:
-    """Print the unchanged evaluator compatibility contract."""
+    """Print the current evaluator, SOLAR, corpus, and scoring boundary."""
     payload = build_evaluator_contract().model_dump(mode="json")
     _show(payload)
     return CliResult(data=payload)
@@ -66,7 +66,7 @@ def evaluator_contract_cli() -> CliResult:
 
 @contract_cli.command("cli")
 def cli_contract_cli() -> CliResult:
-    """Print the generated, machine-readable CLI 2.0 contract.
+    """Print the generated, machine-readable CLI contract.
 
     Example: ``sol-execbench --format json contract cli``
     """
@@ -180,9 +180,3 @@ def toolchain_list_cli() -> CliResult:
     payload = [item.model_dump(mode="json") for item in default_toolchain_registry()]
     _show(payload)
     return CliResult(data=payload)
-
-
-# Private compatibility names for import-level callers; they are not CLI aliases.
-_contract_cli = contract_cli
-_doctor_cli = doctor_cli
-_toolchain_cli = toolchain_cli

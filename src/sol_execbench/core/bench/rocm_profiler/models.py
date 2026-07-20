@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,7 @@ from sol_execbench.core.bench.timing_policy import (
     TimingBackend,
     TimingPolicy,
 )
-from sol_execbench.core.reports.reporting import CANONICAL_BENCHMARK_OUTPUT
+from sol_execbench.core.evidence import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench.core.text_utils import text_tail
 
 
@@ -40,6 +41,17 @@ ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE = (
     "rocprofv3 registered artifacts, but coverage is incomplete or only opaque "
     "artifacts were discovered"
 )
+
+
+class Rocprofv3ProfileStatus(StrEnum):
+    """Closed lifecycle states for optional profiler collection."""
+
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    UNAVAILABLE = "unavailable"
+
+
 _PROFILE_ARTIFACT_SUFFIXES = {
     ".csv",
     ".db",
@@ -60,7 +72,7 @@ _PROFILE_OUTPUT_DIR_NAMES = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Rocprofv3ProfileArtifact:
     """One profiler artifact registered from a `rocprofv3` output directory."""
 
@@ -77,7 +89,7 @@ class Rocprofv3ProfileArtifact:
         }
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3ProfileRequest:
     """Request to collect optional diagnostic `rocprofv3` artifacts."""
 
@@ -91,11 +103,11 @@ class Rocprofv3ProfileRequest:
     timeout_seconds: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Rocprofv3ProfileResult:
     """Result metadata for optional `rocprofv3` artifact collection."""
 
-    status: str
+    status: Rocprofv3ProfileStatus
     command: tuple[str, ...]
     output_directory: Path
     output_file: str
@@ -116,10 +128,24 @@ class Rocprofv3ProfileResult:
     output_directory_listing: tuple[str, ...] = ()
     schema_version: str = ROCPROFV3_PROFILE_SCHEMA_VERSION
 
+    def __post_init__(self) -> None:
+        """Reject contradictory status and reason combinations."""
+        if self.status is Rocprofv3ProfileStatus.SUCCESS:
+            if self.skipped_reason is not None or self.failed_reason is not None:
+                raise ValueError("successful profiling cannot include failure reasons")
+        elif self.status is Rocprofv3ProfileStatus.UNAVAILABLE:
+            if self.skipped_reason is None or self.failed_reason is not None:
+                raise ValueError("unavailable profiling requires only a skipped reason")
+        elif self.status is Rocprofv3ProfileStatus.FAILED:
+            if self.failed_reason is None or self.skipped_reason is not None:
+                raise ValueError("failed profiling requires only a failed reason")
+        elif self.skipped_reason is not None:
+            raise ValueError("partial profiling cannot include a skipped reason")
+
     @property
     def succeeded(self) -> bool:
         """Whether profiler collection completed with registered artifacts."""
-        return self.status == "success"
+        return self.status is Rocprofv3ProfileStatus.SUCCESS
 
     @property
     def has_profiler_data(self) -> bool:
@@ -163,7 +189,7 @@ class Rocprofv3ProfileResult:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Rocprofv3TimingRow:
     """One normalized timing row parsed from `rocprofv3` CSV output."""
 
@@ -195,7 +221,7 @@ class Rocprofv3TimingRow:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Rocprofv3TimingEvidence:
     """Derived profiler timing evidence for one profiled command."""
 
@@ -250,7 +276,7 @@ class Rocprofv3TimingEvidence:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DefaultTimingSelection:
     """Policy-aware decision for profiler-backed timing or fallback."""
 
@@ -269,7 +295,7 @@ class DefaultTimingSelection:
         }
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3CollectionRequest:
     """Request to collect live profiler timing evidence for one command."""
 
@@ -289,7 +315,25 @@ class Rocprofv3CollectionRequest:
     compact_rows: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SourceTimingRequest:
+    """Immutable source-level inputs used to select a timing policy."""
+
+    application_command: tuple[str, ...]
+    languages: tuple[str, ...]
+    output_directory: Path
+    output_file: str
+    tool_version: str
+    gpu_architecture: str
+    executable: str = ROCPROFV3_EXECUTABLE
+    warmup_runs: int | None = None
+    iterations: int | None = None
+    min_measurement_time_seconds: float | None = None
+    trial_count: int | None = None
+    clock_locked: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Rocprofv3CollectionResult:
     """Result of live profiler collection or explicit fallback routing."""
 
@@ -300,6 +344,15 @@ class Rocprofv3CollectionResult:
     returncode: int | None = None
     stdout: str = ""
     stderr: str = ""
+
+    def __post_init__(self) -> None:
+        """Keep evidence presence consistent with fallback routing."""
+        if self.evidence is None and not self.selection.fallback_applied:
+            raise ValueError("profiler-backed selection requires timing evidence")
+        if self.evidence is not None and (
+            self.selection.fallback_applied or not self.selection.profiler_backed
+        ):
+            raise ValueError("fallback selection cannot include profiler evidence")
 
     @property
     def profiler_collected(self) -> bool:

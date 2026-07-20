@@ -199,6 +199,22 @@ class TestStaticSourceReview:
         assert review.blocked is True
         assert {issue.rule for issue in review.issues} == {"hidden_async_stream"}
 
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "import torch\ngraph = torch.cuda.CUDAGraph()\n",
+            "import torch\nwith torch.cuda.graph(torch.cuda.CUDAGraph()):\n    pass\n",
+            "from torch.cuda import make_graphed_callables as graph_it\ngraph_it(lambda: None, ())\n",
+            "def run(graph):\n    graph.capture_begin()\n    graph.capture_end()\n    graph.replay()\n",
+            "import torch\nmake_graph = getattr(torch.cuda, 'CUDAGraph')\ngraph = make_graph()\n",
+        ],
+    )
+    def test_reports_cuda_graph_capture_patterns(self, content):
+        review = review_solution_sources(_solution_with_source(content))
+
+        assert review.blocked is True
+        assert "hidden_async_stream" in {issue.rule for issue in review.issues}
+
     def test_reports_data_pointer_cache_patterns(self):
         review = review_solution_sources(
             _solution_with_source(
@@ -229,10 +245,7 @@ class TestStaticSourceReview:
     def test_reports_os_process_execution_patterns(self):
         review = review_solution_sources(
             _solution_with_source(
-                "import os\n"
-                "def run(x):\n"
-                "    os.system('true')\n"
-                "    return x\n"
+                "import os\ndef run(x):\n    os.system('true')\n    return x\n"
             )
         )
 
@@ -242,9 +255,7 @@ class TestStaticSourceReview:
     def test_reports_dynamic_import_process_execution_patterns(self):
         review = review_solution_sources(
             _solution_with_source(
-                "def run(x):\n"
-                "    __import__('os').system('true')\n"
-                "    return x\n"
+                "def run(x):\n    __import__('os').system('true')\n    return x\n"
             )
         )
 
@@ -275,6 +286,22 @@ class TestStaticSourceReview:
 
         assert review.blocked is True
         assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+
+    def test_reports_getattr_indirect_stream_creation(self):
+        """getattr(torch.cuda, 'Stream') bypasses the direct-name stream check."""
+
+        review = review_solution_sources(
+            _solution_with_source(
+                "import torch\n"
+                "def run(x):\n"
+                "    make_stream = getattr(torch.cuda, 'Stream')\n"
+                "    with make_stream():\n"
+                "        return x + 1\n"
+            )
+        )
+
+        assert review.blocked is True
+        assert "hidden_async_stream" in {issue.rule for issue in review.issues}
 
     @pytest.mark.parametrize(
         "content",
@@ -390,9 +417,7 @@ class TestStaticSourceReview:
     def test_flags_precision_downgrade_dtype_keyword_for_float32_outputs(self):
         review = review_solution_sources(
             _solution_with_source(
-                "import torch\n"
-                "def run(x):\n"
-                "    return x.to(dtype=torch.float16)\n"
+                "import torch\ndef run(x):\n    return x.to(dtype=torch.float16)\n"
             ),
             output_dtypes={"out": torch.float32},
         )

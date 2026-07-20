@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import cast
 
@@ -7,15 +8,24 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.bench.agent_feedback import (
+    AgentFeedbackArtifactCitation,
+    AgentFeedbackBuildIdentity,
+    AgentFeedbackBuildRequest,
     AgentFeedbackGovernanceGuardrail,
     AgentFeedbackIdentity,
+    AgentFeedbackSidecar,
     artifact_citation_from_path,
-    build_agent_feedback_sidecar,
+    build_agent_feedback_sidecar as _build_agent_feedback_sidecar,
     evaluate_agent_feedback_governance,
     validate_agent_feedback_freshness,
 )
-from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
-from sol_execbench.core.reports.claim_upgrade import build_claim_upgrade_report
+from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
+)
+from sol_execbench.core.bench.static_kernel.evidence import (
+    StaticKernelEvidenceSidecar,
+)
 from sol_execbench.core.data.trace import (
     Correctness,
     Environment,
@@ -25,6 +35,40 @@ from sol_execbench.core.data.trace import (
     Trace,
 )
 from sol_execbench.core.data.workload import ScalarInput, Workload
+
+
+def build_agent_feedback_sidecar(
+    *,
+    traces: Sequence[Trace],
+    profile_result: Rocprofv3ProfileResult | None = None,
+    static_evidence: StaticKernelEvidenceSidecar | None = None,
+    trace_path: str | None = None,
+    target_id: str | None = None,
+    run_id: str | None = None,
+    candidate_id: str | None = None,
+    source_sha256: str | None = None,
+    sol_version: str | None = None,
+    generated_at: str | None = None,
+    artifact_citations: Sequence[AgentFeedbackArtifactCitation] = (),
+) -> AgentFeedbackSidecar:
+    """Keep individual builder tests focused on the field under assertion."""
+    return _build_agent_feedback_sidecar(
+        AgentFeedbackBuildRequest(
+            traces=traces,
+            profile_result=profile_result,
+            static_evidence=static_evidence,
+            identity=AgentFeedbackBuildIdentity(
+                trace_path=trace_path,
+                target_id=target_id,
+                run_id=run_id,
+                candidate_id=candidate_id,
+                source_sha256=source_sha256,
+                sol_version=sol_version,
+                generated_at=generated_at,
+            ),
+            artifact_citations=artifact_citations,
+        )
+    )
 
 
 def _trace(status: EvaluationStatus = EvaluationStatus.PASSED) -> Trace:
@@ -260,7 +304,7 @@ def test_agent_feedback_freshness_validation_classifies_identity(tmp_path: Path)
         trace_path=str(trace_path),
         target_id="problem-0",
         run_id="run-0",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
         candidate_id=None,
         source_sha256=None,
     )
@@ -298,7 +342,7 @@ def test_agent_feedback_freshness_uses_canonical_hip_identity(tmp_path: Path):
         run_id="run-0",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
     stale = validate_agent_feedback_freshness(
         sidecar,
@@ -318,7 +362,7 @@ def test_agent_feedback_freshness_uses_canonical_hip_identity(tmp_path: Path):
 
 def test_agent_feedback_sidecar_summarizes_failures_and_optional_profile():
     profile = Rocprofv3ProfileResult(
-        status="unavailable",
+        status=Rocprofv3ProfileStatus.UNAVAILABLE,
         command=("rocprofv3", "--", "python", "eval_driver.py"),
         output_directory=Path("profile"),
         output_file="profile",
@@ -357,7 +401,7 @@ def test_agent_feedback_sidecar_rejects_authority_override():
         type(sidecar).model_validate(payload)
 
 
-def test_agent_feedback_authority_freezes_claim_upgrade_boundary():
+def test_agent_feedback_authority_freezes_diagnostic_boundary():
     sidecar = build_agent_feedback_sidecar(traces=[_trace()])
     payload = sidecar.model_dump(mode="json")
 
@@ -424,24 +468,3 @@ def test_agent_feedback_governance_rejects_authority_override():
 
     with pytest.raises(ValidationError):
         AgentFeedbackGovernanceGuardrail.model_validate(payload)
-
-
-def test_agent_feedback_sidecar_states_do_not_promote_claim_upgrade():
-    sidecar = build_agent_feedback_sidecar(traces=[_trace()])
-    stale = validate_agent_feedback_freshness(sidecar, trace_path="other.jsonl")
-
-    for guardrail in (
-        evaluate_agent_feedback_governance(sidecar=sidecar),
-        evaluate_agent_feedback_governance(sidecar=sidecar, freshness=stale),
-        evaluate_agent_feedback_governance(sidecar=None),
-        evaluate_agent_feedback_governance(sidecar=None, parse_error="invalid json"),
-    ):
-        report = build_claim_upgrade_report(created_at="2026-06-16T00:00:00Z")
-
-        assert report.highest_eligible_claim == "diagnostic_only"
-        assert report.claim_boundary.score_authority is False
-        assert report.claim_boundary.leaderboard_authority is False
-        assert guardrail.score_authority is False
-        assert guardrail.evidence_tier_authority is False
-        assert guardrail.release_gate_authority is False
-        assert guardrail.cutover_authority is False

@@ -27,7 +27,7 @@ ENV ROCM_PATH=/opt/rocm \
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y \
-    curl git vim tmux gdb valgrind git-lfs wget cmake \
+    curl git vim tmux gdb valgrind git-lfs wget cmake util-linux \
     python3 python3-dev \
     build-essential libblas-dev liblapack-dev sudo && \
     hipcc --version && \
@@ -98,6 +98,7 @@ RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=$
 
 # Copy source code (changes frequently - do this last)
 COPY --chown=${HOST_UID}:${HOST_GID} src/ ./src/
+COPY --chown=${HOST_UID}:${HOST_GID} problems/ ./problems/
 
 # Install the project itself (creates the sol-execbench console script).
 RUN --mount=type=cache,target=/home/${HOST_USER}/.cache/uv,uid=${HOST_UID},gid=${HOST_GID} \

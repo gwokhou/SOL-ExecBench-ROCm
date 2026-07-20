@@ -61,7 +61,15 @@ class Definition(BaseModelWithDocstrings):
     name: NonEmptyString
     """A unique, human-readable name for the kernel definition."""
     op_type: Optional[NonEmptyString] = Field(default=None)
-    """The general compute category."""
+    """The general compute category.
+
+    The paper (§3.3) lists ``op_type`` as a required Definition field. It is
+    optional at the schema layer only because legacy upstream rows omit it; the
+    pinned-corpus materialization path (``core.dataset.corpus``) backfills and
+    enforces a non-empty ``op_type`` from the manifest's reviewed ``operation``
+    before any formal use. Hand-authored definitions must therefore set it
+    explicitly to match the paper's contract.
+    """
     axes: dict[NonEmptyString, AxisSpec]
     """Dictionary of symbolic dimensions used in tensor shapes."""
     custom_inputs_entrypoint: Optional[NonEmptyString] = Field(default=None)

@@ -13,11 +13,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..data.trace import EvaluationStatus, Trace
+from ..evidence import CANONICAL_BENCHMARK_OUTPUT
 from ..platform.diagnostics import StageDiagnostic
 
 
 DERIVED_EVIDENCE_SCHEMA_VERSION = "sol_execbench.derived_evidence.v1"
-CANONICAL_BENCHMARK_OUTPUT = "trace_jsonl"
 
 
 @dataclass(frozen=True)

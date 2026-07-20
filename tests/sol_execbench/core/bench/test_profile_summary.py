@@ -17,11 +17,14 @@ from sol_execbench.core.bench.profile_summary import (
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
 )
-from sol_execbench.core.reports.claim_upgrade import build_claim_upgrade_report
 
 
-def _profile_result(tmp_path: Path, status: str = "success") -> Rocprofv3ProfileResult:
+def _profile_result(
+    tmp_path: Path,
+    status: Rocprofv3ProfileStatus = Rocprofv3ProfileStatus.SUCCESS,
+) -> Rocprofv3ProfileResult:
     artifact = tmp_path / "profile.rocpd"
     artifact.write_text("profile artifact\n")
     artifacts = (
@@ -36,14 +39,18 @@ def _profile_result(tmp_path: Path, status: str = "success") -> Rocprofv3Profile
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
         output_directory=tmp_path,
         output_file="profile",
-        artifacts=artifacts if status == "success" else (),
-        returncode=0 if status == "success" else 1,
-        failed_reason=None if status == "success" else "rocprofv3 failed",
+        artifacts=artifacts if status is Rocprofv3ProfileStatus.SUCCESS else (),
+        returncode=0 if status is Rocprofv3ProfileStatus.SUCCESS else 1,
+        failed_reason=(
+            None if status is Rocprofv3ProfileStatus.SUCCESS else "rocprofv3 failed"
+        ),
         profiler_available=True,
-        artifact_coverage_status="complete" if status == "success" else "none",
+        artifact_coverage_status=(
+            "complete" if status is Rocprofv3ProfileStatus.SUCCESS else "none"
+        ),
         reason_codes=(
             ("rocprof_artifacts_registered",)
-            if status == "success"
+            if status is Rocprofv3ProfileStatus.SUCCESS
             else ("rocprof_command_failed",)
         ),
         timeout_seconds=60,
@@ -101,7 +108,7 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     assert payload["reason_code"] == "profile_summary_generated"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["run_id"] == "run-0"
-    assert payload["identity"]["sol_version"] == "v1.43"
+    assert payload["identity"]["sol_version"] == "v3.0.0"
     assert "sol_contract_version" not in payload["identity"]
     assert payload["authority"] == "diagnostic"
     assert payload["summary"]["profiler_status"] == "success"
@@ -142,7 +149,7 @@ def test_profile_summary_freshness_uses_canonical_sol_version(tmp_path: Path):
         sidecar,
         trace_path=str(tmp_path / "trace.jsonl"),
         run_id="run-0",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
     stale = validate_profile_summary_freshness(sidecar, sol_version="9.9")
 
@@ -158,7 +165,7 @@ def test_profile_summary_freshness_sol_version_only_is_current(tmp_path: Path):
         run_id="run-0",
     )
 
-    current = validate_profile_summary_freshness(sidecar, sol_version="v1.43")
+    current = validate_profile_summary_freshness(sidecar, sol_version="v3.0.0")
 
     assert current.status == "current"
     assert current.reason_codes == []
@@ -170,7 +177,7 @@ def test_profile_summary_sidecar_includes_structured_artifact_evidence(
     trace_csv = tmp_path / "profile_kernel_trace.csv"
     trace_csv.write_text("Domain,Name,Duration(ns)\nKERNEL_DISPATCH,kernel,1000000\n")
     profile = Rocprofv3ProfileResult(
-        status="success",
+        status=Rocprofv3ProfileStatus.SUCCESS,
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
         output_directory=tmp_path,
         output_file="profile",
@@ -221,7 +228,7 @@ def test_profile_summary_sidecar_handles_unavailable_inputs(tmp_path: Path):
         generated_at="2026-06-16T00:00:00Z",
     )
     failed = build_profile_summary_sidecar(
-        profile_result=_profile_result(tmp_path, status="failed"),
+        profile_result=_profile_result(tmp_path, status=Rocprofv3ProfileStatus.FAILED),
         trace_path="trace.jsonl",
         generated_at="2026-06-16T00:00:00Z",
     )
@@ -241,7 +248,7 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
     diagnostic = tmp_path / "profile.diagnostics.json"
     diagnostic.write_text('{"status":"no_profiler_data_artifacts"}\n')
     success_empty = Rocprofv3ProfileResult(
-        status="partial",
+        status=Rocprofv3ProfileStatus.PARTIAL,
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
         output_directory=tmp_path,
         output_file="profile",
@@ -297,7 +304,7 @@ def test_profile_summary_success_with_only_diagnostic_json_is_partial(
     diagnostic = tmp_path / "profile.diagnostics.json"
     diagnostic.write_text('{"status":"no_profiler_data_artifacts"}\n')
     profile = Rocprofv3ProfileResult(
-        status="success",
+        status=Rocprofv3ProfileStatus.SUCCESS,
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
         output_directory=tmp_path,
         output_file="profile",
@@ -392,16 +399,3 @@ def test_profile_summary_rejects_authority_override(tmp_path: Path):
 
     with pytest.raises(ValidationError):
         ProfileSummaryGovernanceGuardrail.model_validate(guardrail_payload)
-
-
-def test_profile_summary_does_not_promote_claim_upgrade(tmp_path: Path):
-    sidecar = build_profile_summary_sidecar(profile_result=_profile_result(tmp_path))
-    guardrail = evaluate_profile_summary_governance(sidecar=sidecar)
-    report = build_claim_upgrade_report(created_at="2026-06-16T00:00:00Z")
-
-    assert report.highest_eligible_claim == "diagnostic_only"
-    assert report.claim_boundary.score_authority is False
-    assert report.claim_boundary.leaderboard_authority is False
-    assert guardrail.score_authority is False
-    assert guardrail.timing_authority is False
-    assert guardrail.release_gate_authority is False

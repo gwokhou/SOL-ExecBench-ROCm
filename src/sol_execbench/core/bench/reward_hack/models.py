@@ -116,9 +116,12 @@ _STATIC_RULES = (
         SourceReviewSeverity.BLOCK,
         re.compile(
             r"\b(torch\.cuda\.Stream|torch\.cuda\.stream|wait_stream|hipStreamCreate|"
-            r"cudaStreamCreate|hipStreamSynchronize|cudaStreamSynchronize)\b"
+            r"cudaStreamCreate|hipStreamSynchronize|cudaStreamSynchronize|"
+            r"torch\.cuda\.CUDAGraph|torch\.cuda\.graph|make_graphed_callables|"
+            r"capture_begin|capture_end|replay|hipGraph[A-Za-z0-9_]*|"
+            r"cudaGraph[A-Za-z0-9_]*)\b"
         ),
-        "non-default stream or explicit stream synchronization can hide work from event timing",
+        "non-default streams or graph capture can hide work from event timing",
     ),
     _SourceRule(
         "semantic_output_cache",
@@ -129,6 +132,15 @@ _STATIC_RULES = (
         ),
         "data-pointer or content-keyed caching can reuse outputs across phases",
         suffixes=(".py",),
+    ),
+    _SourceRule(
+        "parallel_execution",
+        SourceReviewSeverity.BLOCK,
+        re.compile(
+            r"\b(threading|_thread|multiprocessing|concurrent\.futures|"
+            r"pthread_create|std::thread|hipLaunchHostFunc)\b"
+        ),
+        "submission-created workers can escape timed execution and cleanup",
     ),
     _SourceRule(
         "unauthorized_file_or_loader",
@@ -173,14 +185,28 @@ _PROCESS_PREFIXES = ("spawn", "exec")
 
 _RISKY_IMPORT_ROOTS = {
     "base64",
+    "builtins",
     "ctypes",
     "marshal",
+    "gc",
+    "inspect",
     "pickle",
     "pty",
     "requests",
     "socket",
     "subprocess",
+    "sys",
+    "sol_execbench",
+    "solar",
     "urllib",
+}
+
+
+_PARALLEL_IMPORT_ROOTS = {
+    "_thread",
+    "concurrent",
+    "multiprocessing",
+    "threading",
 }
 
 
@@ -194,6 +220,24 @@ _RISKY_METHODS = {"read_text", "write_text", "load_library", "load", "load_inlin
 
 
 _CACHE_METHODS = {"data_ptr", "tobytes"}
+
+
+# Attribute names that create or enter a non-default HIP stream when
+# fetched indirectly via ``getattr`` (paper §4.4.1 concurrency exploit).
+# Direct ``torch.cuda.Stream()`` calls are already caught by the static regex
+# and the AST stream check; this set covers the ``getattr(torch.cuda, "Stream")``
+# obfuscation that bypasses those direct-name checks.
+_INDIRECT_STREAM_ATTRS = {"Stream", "ExternalStream", "stream"}
+
+
+_GRAPH_CALLS = {
+    "torch.cuda.CUDAGraph",
+    "torch.cuda.graph",
+    "torch.cuda.make_graphed_callables",
+}
+
+
+_GRAPH_METHODS = {"capture_begin", "capture_end", "replay"}
 
 
 _PRECISION_ATTRS = {"half", "bfloat16"}

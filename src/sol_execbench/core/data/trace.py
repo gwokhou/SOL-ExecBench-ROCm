@@ -69,6 +69,18 @@ class Performance(BaseModelWithDocstrings):
     """Reference implementation latency in milliseconds for comparison."""
     speedup_factor: float = Field(default=0.0, ge=0.0)
     """Performance speedup factor compared to reference (reference_time / solution_time)."""
+    warmup_runs: int = Field(default=0, ge=0)
+    """Warmup invocations performed before each trial."""
+    timed_iterations: int = Field(default=0, ge=0)
+    """Timed invocations in each trial when uniform, otherwise zero."""
+    timed_iterations_per_trial: list[int] = Field(default_factory=list)
+    """Actual number of timed invocations performed in every trial."""
+    trials: int = Field(default=1, ge=1)
+    """Independent timing trials aggregated into the reported latency."""
+    statistic: str = Field(default="unspecified")
+    """Statistic used to aggregate timed samples and trials."""
+    timed_outputs_validated: bool = Field(default=False)
+    """Whether every timed invocation was checked against reference output."""
 
 
 class Environment(BaseModelWithDocstrings):
@@ -82,6 +94,12 @@ class Environment(BaseModelWithDocstrings):
     """AMD hardware identifier where the evaluation was performed (e.g., 'AMD Radeon Graphics gfx1200')."""
     libs: dict[str, str] = Field(default_factory=dict)
     """Dictionary of library names to version strings used during evaluation."""
+    execution_isolation: str = Field(default="unknown")
+    """Execution boundary: container, unsafe_local, or unknown."""
+    clocks_locked: bool | None = Field(default=None)
+    """Observed clock-lock state for this evaluation."""
+    timing_protocol: str | None = Field(default=None)
+    """Declared benchmark timing protocol."""
 
 
 class EvaluationStatus(str, Enum):

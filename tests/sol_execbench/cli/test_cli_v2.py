@@ -21,11 +21,10 @@ def test_root_help_and_version_are_stable() -> None:
         "contract",
         "toolchain",
         "dataset",
-        "baseline",
-        "hardware",
+        "solar",
         "score",
     }.issubset(set(no_args.output.split()))
-    assert version.output == "sol-execbench, version 2.0.0\n"
+    assert version.output == "sol-execbench, version 3.0.0\n"
 
 
 def test_unknown_command_has_suggestion_and_json_error() -> None:
@@ -146,3 +145,15 @@ def test_legacy_entry_shapes_are_removed() -> None:
     assert runner.invoke(cli, ["doctor", "--json"]).exit_code == 2
     assert runner.invoke(cli, ["baseline", "release-build"]).exit_code == 2
     assert runner.invoke(cli, ["official-score"]).exit_code == 2
+
+
+def test_score_exposes_authority_status_without_score_inputs() -> None:
+    result = CliRunner().invoke(cli, ["--format", "json", "score", "status"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["data"]["status"] == "unavailable"
+    assert payload["data"]["scorer_implemented"] is False
+    assert payload["data"]["accepts_caller_authored_inputs"] is False
+
+    assert CliRunner().invoke(cli, ["score", "official"]).exit_code == 2

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sol_execbench.core.platform.dependency_matrix import (
+    PytorchDependencyObservation,
     collect_pytorch_dependency_observation,
 )
 from sol_execbench.core.evidence.runtime_evidence.builders import (
@@ -31,10 +32,12 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
 )
 
 
-def build_dependency_observation(**kwargs):
+def build_dependency_observation(
+    overrides: PytorchDependencyObservation | None = None,
+) -> PytorchDependencyObservation:
     """Build dependency observations from injected values or local packages."""
     return _build_dependency_observation(
-        **kwargs,
+        overrides,
         collect_observation=collect_pytorch_dependency_observation,
     )
 

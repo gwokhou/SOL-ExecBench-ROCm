@@ -1,6 +1,4 @@
-"""Declared ROCm Docker Target selection and diagnostic preflight helpers."""
-
-from __future__ import annotations
+"""Host runtime preflight classification for declared ROCm Docker Targets."""
 
 from __future__ import annotations
 
