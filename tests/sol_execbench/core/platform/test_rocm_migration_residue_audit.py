@@ -265,7 +265,7 @@ def _classification(relative_path: str, line: str) -> str | None:
     if relative_path.startswith(
         "tests/sol_execbench/core/evidence/test_v1_9_validation_closure.py"
     ) and ("NVIDIA" in line):
-        return "v1.9 validation claim-boundary assertion"
+        return "current validation boundary assertion"
     if relative_path.startswith("tests/") and "REPLACEMENT" in line:
         return "test migration mapping fixture"
     if relative_path.startswith("tests/examples/test_examples.py") and (

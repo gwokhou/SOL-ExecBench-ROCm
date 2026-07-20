@@ -3,7 +3,6 @@
 
 """Adapter for the pinned Timeloop/Orojenesis mapper implementation."""
 
-# The generated Timeloop input is intentionally kept adjacent to the runner.
 # pylint: disable=missing-function-docstring,unspecified-encoding,too-many-locals,too-many-statements,too-many-branches,too-many-lines,too-many-boolean-expressions
 
 from __future__ import annotations
@@ -21,6 +20,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from solar.schema_versions import OROJENESIS_IDENTITY_SCHEMA_VERSION
 
 OROJENESIS_COMMIT = "97d52178bf9a9c209bf79be96b87c164bcd35625"
 OROJENESIS_REPOSITORY = "https://github.com/NVlabs/timeloop.git"
@@ -40,7 +41,6 @@ OROJENESIS_COMPILER_WRAPPER_SHA256 = (
 # reproducible artifact digest is reviewed and added here.
 OROJENESIS_TRUSTED_MAPPER_SHA256: frozenset[str] = frozenset()
 OROJENESIS_PROVENANCE_FILENAME = "orojenesis-provenance.json"
-OROJENESIS_IDENTITY_SCHEMA_VERSION = 1
 MULTI_EINSUM_SOLVER = "NVlabs/Orojenesis tiled-fusion"
 MULTI_EINSUM_COMPOSITION = "linear_matmul_compatible_tiles_sum_capacity_v1"
 MULTI_EINSUM_LAYOUT_COMPOSITION = "linear_matmul_axis_map_tile_shape_v2"

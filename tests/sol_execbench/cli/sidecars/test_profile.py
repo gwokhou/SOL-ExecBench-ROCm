@@ -93,18 +93,18 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
         result,
         profile_sidecar_path=profile_metadata,
         run_id="run-001",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
 
     assert written == tmp_path / "trace.jsonl.profile-summary.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == "sol_execbench.profile_summary.v2"
+    assert payload["schema_version"] == "sol_execbench.profile_summary.v3"
     assert payload["status"] == "available"
     assert payload["authority"] == "diagnostic"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["run_id"] == "run-001"
-    assert payload["identity"]["sol_version"] == "v1.43"
+    assert payload["identity"]["sol_version"] == "v3.0.0"
     assert "sol_contract_version" not in payload["identity"]
     assert payload["summary"]["profiler_status"] == "success"
     assert payload["summary"]["artifact_count"] == 2

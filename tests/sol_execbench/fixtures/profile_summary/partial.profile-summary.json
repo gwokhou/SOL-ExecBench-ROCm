@@ -13,7 +13,7 @@
   "identity": {
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": "run-current",
-    "sol_version": "v1.43",
+    "sol_version": "v3.0.0",
     "trace_path": "trace.jsonl"
   },
   "limitations": [
@@ -23,7 +23,7 @@
     "rocprofv3 profile status is failed."
   ],
   "reason_code": "profile_partial",
-  "schema_version": "sol_execbench.profile_summary.v2",
+  "schema_version": "sol_execbench.profile_summary.v3",
   "status": "partial",
   "summary": {
     "artifact_count": 0,

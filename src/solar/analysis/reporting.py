@@ -21,6 +21,7 @@ from solar.analysis.resources import RESOURCE_MODEL_VERSION
 from solar.common.types import NodeDict
 from solar.common.utils import NoAliasDumper
 from solar.rocm.architecture import ArchitectureProfile
+from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
 
 
 class PreparedAnalysisView(Protocol):
@@ -135,7 +136,7 @@ def build_analysis_result(
 ) -> NodeDict:
     """Build the canonical graph-analysis payload."""
     return {
-        "schema_version": 3 if prepared.semantic_graph else 2,
+        "schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION,
         "layers": accumulator.layers,
         "total": _analysis_totals(
             prepared,

@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-EINSUM_GRAPH_SCHEMA_VERSION = 3
+from solar.schema_versions import EINSUM_GRAPH_SCHEMA_VERSION
 
 
 class SemanticGraphError(ValueError):
@@ -343,7 +343,7 @@ def validate_semantic_graph(graph: Mapping[str, Any]) -> None:
     """Validate the latest graph contract without accepting legacy schemas."""
     if int(graph.get("schema_version", 0)) != EINSUM_GRAPH_SCHEMA_VERSION:
         raise SemanticGraphError(
-            f"einsum graph must use latest schema_version={EINSUM_GRAPH_SCHEMA_VERSION}"
+            f"einsum graph must use current schema_version={EINSUM_GRAPH_SCHEMA_VERSION}"
         )
     layers = graph.get("layers")
     if not isinstance(layers, Mapping) or not layers:

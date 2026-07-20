@@ -18,12 +18,13 @@ from sol_execbench.core.bench.timing_policy import (
     TimingPolicy,
 )
 from sol_execbench.core.evidence import CANONICAL_BENCHMARK_OUTPUT
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.text_utils import text_tail
 
 
 ROCPROFV3_EXECUTABLE = "rocprofv3"
-ROCPROFV3_EVIDENCE_SCHEMA_VERSION = "sol_execbench.rocprofv3_timing.v1"
-ROCPROFV3_PROFILE_SCHEMA_VERSION = "sol_execbench.rocprofv3_profile.v1"
+ROCPROFV3_EVIDENCE_SCHEMA_VERSION = SCHEMA_VERSIONS["rocprofv3_timing"]
+ROCPROFV3_PROFILE_SCHEMA_VERSION = SCHEMA_VERSIONS["rocprofv3_profile"]
 ROCPROF_REASON_ARTIFACTS_REGISTERED = "rocprof_artifacts_registered"
 ROCPROF_REASON_NO_REGISTERED_ARTIFACTS = "rocprof_no_registered_artifacts"
 ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED = "rocprof_diagnostic_log_registered"
@@ -126,7 +127,7 @@ class Rocprofv3ProfileResult:
     output_format: str | None = None
     profiler_data_artifacts: bool = False
     output_directory_listing: tuple[str, ...] = ()
-    schema_version: str = ROCPROFV3_PROFILE_SCHEMA_VERSION
+    schema_version: str = field(init=False, default=ROCPROFV3_PROFILE_SCHEMA_VERSION)
 
     def __post_init__(self) -> None:
         """Reject contradictory status and reason combinations."""
@@ -240,7 +241,7 @@ class Rocprofv3TimingEvidence:
     fallback_applied: bool = False
     fallback_reason: str | None = None
     profiler_overhead_ms: float | None = None
-    schema_version: str = ROCPROFV3_EVIDENCE_SCHEMA_VERSION
+    schema_version: str = field(init=False, default=ROCPROFV3_EVIDENCE_SCHEMA_VERSION)
     derived: bool = True
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
 

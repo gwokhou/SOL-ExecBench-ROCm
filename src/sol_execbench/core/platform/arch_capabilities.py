@@ -13,9 +13,10 @@ from typing import Any, Literal
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.platform.confidence import EstimateConfidence
 
-ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION = "sol_execbench.arch_capability_budget.v1"
+ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION = SCHEMA_VERSIONS["arch_capability_budget"]
 _BUILTIN_ARCH_BUDGETS = ("gfx942", "gfx1150", "gfx1200")
 
 
@@ -40,7 +41,7 @@ class ArchIsaBudget(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    schema_version: str
+    schema_version: Literal["sol_execbench.arch_capability_budget.v1"]
     """Capability budget schema version."""
     architecture: str
     """AMD gfx architecture identifier such as ``gfx942`` or ``gfx1150``."""

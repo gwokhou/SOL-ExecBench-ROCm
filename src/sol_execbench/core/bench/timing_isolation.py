@@ -28,11 +28,12 @@ from pydantic import ValidationError
 
 from sol_execbench.core.platform.amd_smi import parse_gpu_count, parse_processes
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
 logger = logging.getLogger(__name__)
 
-TIMING_ISOLATION_SNAPSHOT_SCHEMA_VERSION = "sol_execbench.timing_isolation_snapshot.v1"
-GPU_ISOLATION_SCHEMA_VERSION = "sol_execbench.gpu_device_isolation.v1"
+TIMING_ISOLATION_SNAPSHOT_SCHEMA_VERSION = SCHEMA_VERSIONS["timing_isolation_snapshot"]
+GPU_ISOLATION_SCHEMA_VERSION = SCHEMA_VERSIONS["gpu_device_isolation"]
 
 
 def _run_amd_smi_json(*arguments: str) -> str:

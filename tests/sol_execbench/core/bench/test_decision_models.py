@@ -25,7 +25,7 @@ def _sidecar(**overrides) -> DecisionSidecar:
         status=DecisionStatus.AVAILABLE,
         reason_code=DecisionReasonCode.DECISION_RENDERED,
         identity=DecisionIdentity(
-            generated_at="2026-07-10T00:00:00Z", sol_version="v1.43"
+            generated_at="2026-07-10T00:00:00Z", sol_version="v3.0.0"
         ),
         summary=DecisionSummary(hint_count=1, footprint_count=1, architecture="gfx942"),
     )
@@ -35,13 +35,13 @@ def _sidecar(**overrides) -> DecisionSidecar:
 
 
 def test_schema_version_is_v1():
-    assert DECISION_SCHEMA_VERSION == "sol_execbench.decision.v1"
+    assert DECISION_SCHEMA_VERSION == "sol_execbench.decision.v2"
 
 
 def test_sidecar_authority_is_diagnostic():
     sidecar = _sidecar()
     assert sidecar.authority == "diagnostic"
-    assert sidecar.schema_version == "sol_execbench.decision.v1"
+    assert sidecar.schema_version == "sol_execbench.decision.v2"
 
 
 def test_sidecar_round_trip():

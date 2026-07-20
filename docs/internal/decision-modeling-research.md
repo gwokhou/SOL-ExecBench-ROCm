@@ -1,17 +1,17 @@
 # Decision Sidecar Modeling Research
 
-> Research survey for the future **Decision sidecar** (`sol_execbench.decision.v1`,
-> not yet implemented). This is the companion to
+> Research survey supporting the current **Decision sidecar**
+> (`sol_execbench.decision.v2`). This is the companion to
 > `docs/user/decision_sidecar_contract.md` (the mount-point contract). It records the
 > bottleneck-taxonomy sources, the static-vs-runtime inference boundary, the
-> proposed decision model, and **source-credibility assessments** for the
+> implemented decision model, and **source-credibility assessments** for the
 > materials reviewed. It is a research artifact; it carries diagnostic guidance
 > only and never asserts benchmark authority.
 
 ## 1. Purpose and Scope
 
 The data layer (environment capability budgets + static resource footprints)
-carries raw, neutrally-named facts. The Decision sidecar will turn those facts
+carries raw, neutrally-named facts. The Decision sidecar turns those facts
 into structured, confidence-weighted optimization hints. Before modeling that
 layer, this survey answers three questions:
 
@@ -180,7 +180,7 @@ Layer R — Resource (static-inferable; backed by the current data layer)
   CACHE_LINE_MISALIGNED         # RDNA 128 B / CDNA 64 B coalescing risk
 Layer C — Compile-time (disassembly-derived; partially deferred)
   INSTRUCTION_MIX_SKEW          # low MFMA/WMMA or high scalar share
-Layer M — Runtime measured (injected from profile_summary.v2; static path never emits)
+Layer M — Runtime measured (injected from profile_summary.v3; static path never emits)
   COMPUTE_BOUND / MEMORY_BOUND / LATENCY_BOUND
 ```
 
@@ -207,12 +207,12 @@ inferred_low     # boundary-adjacent or needs runtime confirmation (AMD red zone
 ```
 
 The `inferred_*` prefix distinguishes static hints from `measured_*` runtime
-values in `profile_summary.v2`, realizing the precedence rule.
+values in `profile_summary.v3`, realizing the precedence rule.
 
 ### 8.4 Precedence
 
 ```
-runtime measured (profile_summary.v2)  >  static inferred (footprint + budget)  >  no data
+runtime measured (profile_summary.v3)  >  static inferred (footprint + budget)  >  no data
 on conflict, the static hint is demoted into limitations[] and never overrides runtime.
 ```
 
@@ -333,7 +333,7 @@ rather than silently dropped.
   task `260710-decision-sidecar`):** (a) `nW` gap — uses the roc-objdump
   `Occupancy` value directly, precise closed-form deferred; (b) `vgpr_limit`
   documented as the architected addressing limit (occupancy uses
-  `register_file_per_cu_bytes`); (c) `sol_execbench.decision.v1` schema + builder
+  `register_file_per_cu_bytes`); (c) `sol_execbench.decision.v2` schema + builder
   + `--decision auto` CLI; (d) cross-sidecar precedence via
   `apply_runtime_precedence` (runtime > static).
 

@@ -20,9 +20,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
-OFFICIAL_ROCM_TIMING_PROTOCOL = "sol_execbench.rocm_event_timing.paper_counts.v2"
-CUSTOM_ROCM_TIMING_PROTOCOL = "sol_execbench.rocm_event_timing.custom.v2"
+
+OFFICIAL_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS["rocm_event_timing_paper_counts"]
+CUSTOM_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS["rocm_event_timing_custom"]
 
 
 @dataclass

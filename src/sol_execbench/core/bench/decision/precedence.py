@@ -4,7 +4,7 @@
 """Cross-sidecar precedence: runtime measured hints supersede static inferred ones.
 
 The Decision sidecar carries static-inferred Layer R hints. When a runtime
-profile (``profile_summary.v2``) is also available, its measured bottleneck
+profile (``profile_summary.v3``) is also available, its measured bottleneck
 classifications take precedence and the static hints become supplementary
 (decision-modeling-research.md §8.4). This module annotates that relationship
 on the sidecar without ever overriding hint confidence or runtime truth.

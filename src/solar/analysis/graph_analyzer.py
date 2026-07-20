@@ -100,6 +100,11 @@ from solar.analysis.resources import (
     merge_resource_work,
 )
 from solar.analysis.reporting import build_analysis_result, write_analysis
+from solar.schema_versions import (
+    OROJENESIS_ANALYSIS_SCHEMA_VERSION,
+    SOLAR_ANALYSIS_SCHEMA_VERSION as SOLAR_ANALYSIS_SCHEMA_VERSION,
+    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION as SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+)
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
 from solar.common.constants import (
     BYTES_PER_ELEMENT,
@@ -329,13 +334,11 @@ class EinsumGraphAnalyzer:
         semantic_graph = (
             int(graph.get("schema_version", 0)) == EINSUM_GRAPH_SCHEMA_VERSION
         )
-        if strict and not semantic_graph:
-            raise ValueError(
-                "strict analysis requires executable semantics: einsum graph must "
-                f"use latest schema_version={EINSUM_GRAPH_SCHEMA_VERSION}"
-            )
         if not semantic_graph:
-            return False, False
+            raise ValueError(
+                "analysis requires executable semantics: einsum graph must use "
+                f"schema_version={EINSUM_GRAPH_SCHEMA_VERSION}"
+            )
         try:
             validate_semantic_graph(graph)
         except SemanticGraphError as exc:
@@ -1532,7 +1535,7 @@ class EinsumGraphAnalyzer:
         require_orojenesis: bool,
     ) -> _FormalAnalysis:
         orojenesis: Dict[str, Any] = {
-            "schema_version": 2,
+            "schema_version": OROJENESIS_ANALYSIS_SCHEMA_VERSION,
             "status": (
                 "not_applicable" if not prepared.semantic_graph else "not_requested"
             ),

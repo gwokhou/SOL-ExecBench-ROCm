@@ -156,7 +156,7 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
-        (lambda graph: graph.update(schema_version=2), "latest schema_version"),
+        (lambda graph: graph.update(schema_version=0), "current schema_version"),
         (lambda graph: graph.update(layers={}), "has no layers"),
         (lambda graph: graph["layers"].update(operation=[]), "is not a mapping"),
         (

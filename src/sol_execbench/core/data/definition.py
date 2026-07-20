@@ -21,7 +21,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Iterable, Optional
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 
 from .base_model import BaseModelWithDocstrings, NonEmptyString
 from .definition_axes import (
@@ -60,16 +60,8 @@ class Definition(BaseModelWithDocstrings):
 
     name: NonEmptyString
     """A unique, human-readable name for the kernel definition."""
-    op_type: Optional[NonEmptyString] = Field(default=None)
-    """The general compute category.
-
-    The paper (§3.3) lists ``op_type`` as a required Definition field. It is
-    optional at the schema layer only because legacy upstream rows omit it; the
-    pinned-corpus materialization path (``core.dataset.corpus``) backfills and
-    enforces a non-empty ``op_type`` from the manifest's reviewed ``operation``
-    before any formal use. Hand-authored definitions must therefore set it
-    explicitly to match the paper's contract.
-    """
+    op_type: NonEmptyString
+    """The required general compute category."""
     axes: dict[NonEmptyString, AxisSpec]
     """Dictionary of symbolic dimensions used in tensor shapes."""
     custom_inputs_entrypoint: Optional[NonEmptyString] = Field(default=None)
@@ -84,14 +76,6 @@ class Definition(BaseModelWithDocstrings):
     """Optional human-readable description of the kernel's purpose."""
     hf_id: Optional[NonEmptyString] = Field(default=None)
     """Optional HuggingFace model ID that the definition was sourced from."""
-
-    @field_validator("hf_id", mode="before")
-    @classmethod
-    def _normalize_empty_hf_id(cls, value: Any) -> Any:
-        """Treat empty dataset IDs as absent optional metadata."""
-        if value == "":
-            return None
-        return value
 
     @model_validator(mode="after")
     def _validate_reference_code(self) -> Definition:

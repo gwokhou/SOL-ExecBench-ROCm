@@ -39,7 +39,7 @@ device work they trigger. This matters because one PyTorch operator can dispatch
 multiple kernels or ROCm library calls.
 
 **fallback event timing** uses PyTorch ROCm's HIP-backed device event API through
-the historical `torch.cuda.Event` namespace. It remains a compatibility and
+PyTorch's `torch.cuda.Event` namespace, which is also the public HIP event API. It remains a compatibility and
 fallback path, but it must not be reported as profiler-backed kernel activity.
 
 There are two different reasons a timing sidecar can be fallback-labeled:

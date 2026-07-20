@@ -17,7 +17,9 @@ import torch
 from safetensors.torch import load as load_safetensors_bytes
 from safetensors.torch import save as save_safetensors_bytes
 
-PROTOCOL_VERSION = "sol_execbench.reference_ipc.v1"
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+
+PROTOCOL_VERSION = SCHEMA_VERSIONS["reference_ipc"]
 REFERENCE_REQUEST_FD_ENV = "SOL_EXECBENCH_REFERENCE_REQUEST_FD"
 REFERENCE_RESPONSE_FD_ENV = "SOL_EXECBENCH_REFERENCE_RESPONSE_FD"
 REFERENCE_TOKEN_ENV = "SOL_EXECBENCH_REFERENCE_TOKEN"

@@ -1,7 +1,0 @@
-{
-  "case": "confirmed-pass",
-  "description": "Valid SOL run: official score non-null, no blockers; HIP confirms pass.",
-  "diagnostic_sidecar_count": 0,
-  "expected_blockers": [],
-  "expected_score_authority": true
-}

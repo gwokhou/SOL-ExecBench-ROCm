@@ -45,20 +45,6 @@ rejected with migration guidance.
 Python languages (`pytorch`, `triton`) cannot be mixed with native C/C++
 languages in the same solution.
 
-## Unsupported Legacy Values
-
-These values are not active ROCm schema values:
-
-| Legacy value | Replacement direction |
-| --- | --- |
-| `cuda_cpp` | `hip_cpp` |
-| `cutlass` | `ck` or `rocwmma`, or a HIP/Triton implementation |
-| `cublas` | `hipblas` |
-| `cudnn`, `cudnn_frontend` | `miopen` or a HIP/Triton implementation |
-| `cute_dsl`, `cutile` | No direct runtime in this port; use HIP, Triton ROCm, CK, or rocWMMA where feasible |
-| `cuda_cflags` | `hip_cflags` |
-| `B200` | `gfx1200`, `gfx940`, `gfx941`, `gfx942`, or `LOCAL` |
-
 ## Supported Hardware Targets
 
 | Value | Hardware class | Validation status |

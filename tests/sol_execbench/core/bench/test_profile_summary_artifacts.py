@@ -107,7 +107,7 @@ def test_structured_profile_evidence_parses_trace_counter_and_metadata(
     ]
     assert [hint.category for hint in evidence.bottleneck_hints] == ["compute_bound"]
     assert evidence.parse_warnings == [
-        "profile.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v2"
+        "profile.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v3"
     ]
 
 

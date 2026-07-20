@@ -17,7 +17,11 @@ from typing import Any
 
 import yaml
 
-from solar.analysis.graph_analyzer import EinsumGraphAnalyzer
+from solar.analysis.graph_analyzer import (
+    SOLAR_ANALYSIS_SCHEMA_VERSION,
+    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+    EinsumGraphAnalyzer,
+)
 from solar.analysis.orojenesis import OrojenesisError, OrojenesisRunner
 from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import extract_operator_graph
@@ -184,6 +188,8 @@ def _run_analysis(
 
 
 def _extract_bound(analysis: Mapping[str, Any]) -> SolBound:
+    if analysis.get("schema_version") != SOLAR_ANALYSIS_SCHEMA_VERSION:
+        raise ValueError("formal analysis uses an unsupported schema")
     total = analysis.get("total") or {}
     metadata = analysis.get("metadata") or {}
     seconds = total.get("lower_bound_seconds")
@@ -223,7 +229,7 @@ def _write_manifest(
     bound: SolBound,
 ) -> None:
     manifest = {
-        "schema_version": 1,
+        "schema_version": SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
         "analysis_id": request.analysis_id,
         "architecture_sha256": architecture_sha256,
         "reference": {

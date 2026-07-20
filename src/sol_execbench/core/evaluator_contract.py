@@ -5,14 +5,17 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.data.trace import EvaluationStatus
+from sol_execbench.core.integrity.schema_versions import (
+    EVALUATOR_CONTRACT_SCHEMA_VERSION,
+)
 
-SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION = "sol_execbench.evaluator_contract.v3"
+SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION = EVALUATOR_CONTRACT_SCHEMA_VERSION
 SOL_EXECBENCH_CONTRACT_VERSION = "3.0"
 SOL_EXECBENCH_RELEASE = "v3.0.0"
 
@@ -22,9 +25,11 @@ class EvaluatorContract(BaseModelWithDocstrings):
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
 
-    schema_version: str
-    contract_version: str
-    release: str
+    schema_version: Literal["sol_execbench.evaluator_contract.v3"] = (
+        SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION
+    )
+    contract_version: Literal["3.0"] = SOL_EXECBENCH_CONTRACT_VERSION
+    release: Literal["v3.0.0"] = SOL_EXECBENCH_RELEASE
     capabilities: dict[str, str] = Field(default_factory=dict)
     evaluation_statuses: list[str]
     corpus: dict[str, Any]
@@ -37,7 +42,7 @@ class EvaluatorContract(BaseModelWithDocstrings):
 
 
 def build_evaluator_contract() -> EvaluatorContract:
-    """Build the single current public contract; v1/v2 are unsupported."""
+    """Build the single current public contract."""
     return EvaluatorContract(
         schema_version=SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION,
         contract_version=SOL_EXECBENCH_CONTRACT_VERSION,

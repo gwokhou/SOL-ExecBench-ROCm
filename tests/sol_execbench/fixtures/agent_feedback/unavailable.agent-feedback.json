@@ -5,7 +5,7 @@
     "candidate_id": null,
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": null,
-    "sol_version": "v1.43",
+    "sol_version": "v3.0.0",
     "source_sha256": null,
     "target_id": null,
     "trace_path": null
@@ -17,7 +17,7 @@
     "No evaluated trace rows were available for feedback."
   ],
   "reason_code": "no_evaluation_traces",
-  "schema_version": "sol_execbench.agent_feedback.v2",
+  "schema_version": "sol_execbench.agent_feedback.v3",
   "source_refs": [
     {
       "kind": "trace",

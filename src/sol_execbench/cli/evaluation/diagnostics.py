@@ -13,8 +13,9 @@ from rich.console import Console
 
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
 from sol_execbench.core.evidence.runtime_evidence import write_json_payload
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
-NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION = "sol_execbench.no_trace_diagnostics.v1"
+NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION = SCHEMA_VERSIONS["no_trace_diagnostics"]
 _DIAGNOSTIC_TAIL_LIMIT = 8192
 
 console = Console(stderr=True)

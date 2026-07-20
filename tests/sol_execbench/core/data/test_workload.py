@@ -75,15 +75,9 @@ class TestGetScalarInputs:
 
 
 class TestToleranceSpec:
-    def test_accepts_dataset_required_match_ratio_spelling(self):
-        wkl = Workload(
-            uuid="test-uuid",
-            axes={},
-            inputs={"x": RandomInput()},
-            tolerance=ToleranceSpec.model_validate({"required_match_ratio": 0.98}),
-        )
-
-        assert wkl.tolerance.required_matched_ratio == 0.98
+    def test_rejects_unknown_tolerance_fields(self):
+        with pytest.raises(ValidationError, match="extra_forbidden"):
+            ToleranceSpec.model_validate({"unsupported_ratio": 0.98})
 
     def test_accepts_internal_required_matched_ratio_spelling(self):
         wkl = Workload(

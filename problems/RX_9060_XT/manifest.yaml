@@ -25,43 +25,43 @@ official_scoring:
     - pinned_solar_manifests
 materialized_problems:
   - path: L1/066_masked_softmax_with_attention_dropout_backward
-    definition_sha256: 058568ac2ce8094632ff9f7a138c15d490a872b36482319a68f145c0777cf538
+    definition_sha256: 21bb26a1cd4794f591192bf15462d77bb9340f84e4e68d659e44c8ced18aa35c
     workload_sha256: 667cf4b044f3d3271d91877abbf5f4eab5be8a802c1db5ff40fdb26ef9b67fd5
   - path: L1/069_rms_norm
-    definition_sha256: 114d5b540733f36295df66cf34ef4d35f7720bc70aba8b12394fd2641080e65e
+    definition_sha256: 35c449dc5e4ab4841f6de084a08e19e480070323e92d4ea8ac4a5838a41b8d4d
     workload_sha256: 9eab68a06ddba814835ea202e6f4fd5c7e8141fc1b305f3c365d0e35da9bcf6a
   - path: L1/013_fused_residual_rms_norm_backward
-    definition_sha256: 86d25d6a656586528cbc308002a284b6269a2cb4a1727e450b97afde4a8c3abd
+    definition_sha256: bc9ba0895bea484775d15e182de6ccc5abe519f75785d58bdea8c001a0f99260
     workload_sha256: c9312217461c0371209ea4160ddd9bcde347313d8e335227e1323acf00abe081
   - path: L1/056_mamba_ssm_dt_projection_softplus_clamp_backward
-    definition_sha256: de896177c20fba0dae7a60f01623179fb92629788ea1207ac9860daf670c50f3
+    definition_sha256: 09b49eba789086279416b619b68a8185a38ea27af2303135381a14b8b6d2af0d
     workload_sha256: 120b6325a8902b26c975166b0e826d9fc1a57b6508f48b493aa639cedbe7ce54
   - path: L1/040_conv2d_residual_block
-    definition_sha256: cfceef7f1947ee45f57efaf98eb7cecad7af9642061216441b65ad1e6364575f
+    definition_sha256: c7b6eb8da45be0dbaf0438d711c5800a2f56959b95de14835490ea5bf234fa73
     workload_sha256: 43921c0c9c1b591f14eb22fe90c24b7cbda8927ed01f264cb8deafe79d00ded1
   - path: L1/083_attention_score_value_matmul
-    definition_sha256: 6a24f8caf245e35e56211b8922fa978d69b421bbfbe170002ca16666f82f4cd5
+    definition_sha256: 6e79e2b4cca76a4dc278ef360b6988befed6da0fdadd0cb3eb1578aae79ca9d7
     workload_sha256: 6ac6769070632a68db32124645ebff4726dbd603f2b3e4679b27ac9f06a8459d
   - path: L1/008_expert_output_weighted_index_add_accumulation
-    definition_sha256: 16a1d42ab563e18abe7a0df1ab3ce081829dc94c51a7c97679799b3769211af1
+    definition_sha256: 536e3e5af091a15d99cb526154e757d5743d535d59dbff19b07b12d66cd3acb6
     workload_sha256: a5e0880a4cb19b63b6421cc22b82ea240dffcd9c1c29325c200226335c741512
   - path: Quant/001_fp8_attention_output_projection
-    definition_sha256: 7f070339b505284e7b87788524695fa772ab27e4a9f499610af4c37b35177f22
+    definition_sha256: f4ea4a2f8b8487dff358b028e1564c8aed68ea98d2f4c0ef2d1d0d12aaa6762d
     workload_sha256: 18bc5e667f0aba7cdf66b68ea3b9e1946f0d2c4e43cac11288ec09a936f9729f
   - path: Quant/024_nvfp4_attention_output_projection
-    definition_sha256: 33750a300217299bc4b14aa5ece15c5b222a6816399b6014556618bbc033f352
+    definition_sha256: 0338aeb0b66ffd15534c04979391fb15d8830362137a8620cfff07da99d5de84
     workload_sha256: b67268217dce0051a0e1535f8959d00253dfb07783df2ff76e3e3319845df3ba
   - path: FlashInfer-Bench/004_gemm_n128_k2048
-    definition_sha256: 17b907ee3d5f6f9217479ae1b24586bd0142a5cd03c4e3176d6b9a02cec7598d
+    definition_sha256: f0303b917daac895c4fee057120a31c7150732acd87b10101ab7fd1f91f48f13
     workload_sha256: 7b5a8aee66ac05da19fa601598d928681e757b42fac6ac7ebe23a9bec5e897b6
   - path: L1/010_attention_value_projection_with_transpose
-    definition_sha256: 0167447715777d3f9162993461d60b56cdcd81d60bd5557502b7608a1b09b4d7
+    definition_sha256: 9318fdf0855f10cf8602981e2a4acd9f3e2e00f85c1b0bd2e27f32c4cc085759
     workload_sha256: dcc555224e1816c45e6b24f964435a02c73f6961c1ab476df8ea8aa887f6d90b
   - path: L1/050_attention_qkv_projection_with_bias_and_reshape
-    definition_sha256: 5cc9908be7e99fbfba9e2a1590c2a8e7eb3d55d8e186447ce9eed3b9839dbedf
+    definition_sha256: 41413adcc23d5a17821fa18235d4e7a4b427fd5fe2575c3e5a0c48be06f5a7c0
     workload_sha256: 8c2c16dcd227106e33d6bd4e4310ba6ad31ea334ca04f8c8032fd05a5c533971
   - path: L1/077_whisper_decoder_output_projection
-    definition_sha256: 91a76c7e62c0fa4190b15987140e6065e5b16ea5c8cbbfac0da368f847b99de1
+    definition_sha256: 0b9ce232781efa76811d7722b09c8f77644af04ffe2bbc03bf4e7e2bbc5898f2
     workload_sha256: 58797f8f2034c8d07a8336a596883bca1f97141cc16c10bc6a33794ccdc4fe0b
 formal_coverage_requirements:
   axes:

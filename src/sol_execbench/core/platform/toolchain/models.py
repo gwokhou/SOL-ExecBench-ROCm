@@ -7,14 +7,15 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import Enum
+from typing import Literal
 
 from pydantic import ConfigDict, Field
 
 from ...data.base_model import BaseModelWithDocstrings
+from ...integrity.schema_versions import TOOLCHAIN_ROUTING_SCHEMA_VERSION
 from ..environment import ProbeCompletedProcess
 
 
-TOOLCHAIN_ROUTING_SCHEMA_VERSION = "sol_execbench.toolchain_routing.v1"
 DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS = 3.0
 
 
@@ -169,7 +170,9 @@ class ToolchainRoutingReport(BaseModelWithDocstrings):
 
     model_config = ConfigDict(use_attribute_docstrings=True)
 
-    schema_version: str = TOOLCHAIN_ROUTING_SCHEMA_VERSION
+    schema_version: Literal["sol_execbench.toolchain_routing.v1"] = (
+        TOOLCHAIN_ROUTING_SCHEMA_VERSION
+    )
     """Routing schema version."""
     generated_at: str
     """UTC timestamp when the report was generated."""

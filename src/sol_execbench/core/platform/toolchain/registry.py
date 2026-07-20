@@ -124,7 +124,7 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
             expected_binaries=["readelf"],
             probe_command=["readelf", "--version"],
             source_refs=["https://sourceware.org/binutils/docs/binutils/readelf.html"],
-            notes="Planned v1.17 fallback for ELF metadata.",
+            notes="Optional fallback for ELF metadata.",
         ),
         ToolchainCapability(
             tool_id="llvm-objdump",
@@ -141,7 +141,7 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
             expected_binaries=["llvm-objdump"],
             probe_command=["llvm-objdump", "--version"],
             source_refs=["https://llvm.org/docs/CommandGuide/llvm-objdump.html"],
-            notes="Planned v1.17 object inspection route.",
+            notes="Optional object inspection route.",
         ),
         ToolchainCapability(
             tool_id="roc-objdump",
@@ -160,7 +160,7 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
             source_refs=[
                 "https://rocm.docs.amd.com/projects/HIP/en/develop/understand/compilers.html"
             ],
-            notes="Distribution-dependent candidate for v1.17 static evidence.",
+            notes="Distribution-dependent candidate for static evidence.",
         ),
         ToolchainCapability(
             tool_id="rga",
@@ -180,6 +180,6 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
                 "https://github.com/GPUOpen-Tools/radeon_gpu_analyzer",
                 "https://gpuopen.com/manuals/rga_manual/help_manual/",
             ],
-            notes="Planned v1.17 compiler-facing static evidence route.",
+            notes="Optional compiler-facing static evidence route.",
         ),
     ]

@@ -18,11 +18,6 @@ from sol_execbench.core.platform.diagnostics_libraries import (
     rocm_tool_diagnostics,
 )
 from sol_execbench.core.platform.diagnostics_models import (
-    MI300X_FP8_READINESS,
-    MI300X_REQUIRED_ARTIFACTS,
-    MI300X_VALIDATION_RESULT_CATEGORIES,
-    RDNA4_REQUIRED_ARTIFACTS,
-    RDNA4_VALIDATION_RESULT_CATEGORIES,
     ROCM_LIBRARY_SPECS,
     DiagnosticStage,
     ProfilerBackend,
@@ -31,24 +26,13 @@ from sol_execbench.core.platform.diagnostics_models import (
     RocmLibrarySpec,
     SolExecBenchError,
     StageDiagnostic,
-    ValidationReadiness,
 )
 from sol_execbench.core.platform.diagnostics_validation import (
-    can_mark_mi300x_hardware_validated,
-    can_mark_rdna4_validation_upgraded,
-    cdna3_validation_readiness,
     classify_gfx,
-    mi300x_validation_claim_blockers,
-    rdna4_validation_claim_blockers,
     select_profiler_backend,
 )
 
 __all__ = [
-    "MI300X_FP8_READINESS",
-    "MI300X_REQUIRED_ARTIFACTS",
-    "MI300X_VALIDATION_RESULT_CATEGORIES",
-    "RDNA4_REQUIRED_ARTIFACTS",
-    "RDNA4_VALIDATION_RESULT_CATEGORIES",
     "ROCM_LIBRARY_SPECS",
     "DiagnosticStage",
     "ProfilerBackend",
@@ -57,15 +41,9 @@ __all__ = [
     "RocmLibrarySpec",
     "SolExecBenchError",
     "StageDiagnostic",
-    "ValidationReadiness",
-    "can_mark_mi300x_hardware_validated",
-    "can_mark_rdna4_validation_upgraded",
-    "cdna3_validation_readiness",
     "classify_gfx",
     "detect_tool",
     "local_gfx_target",
-    "mi300x_validation_claim_blockers",
-    "rdna4_validation_claim_blockers",
     "rocm_library_diagnostics",
     "rocm_library_readiness",
     "rocm_tool_diagnostics",

@@ -70,7 +70,7 @@ def test_agent_feedback_stale_fixture_classifies_as_stale_diagnostic():
         run_id="run-current",
         candidate_id="candidate-current",
         source_sha256="source-current",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
     guardrail = evaluate_agent_feedback_governance(
         sidecar=sidecar,
@@ -80,8 +80,6 @@ def test_agent_feedback_stale_fixture_classifies_as_stale_diagnostic():
     assert freshness.status == "stale"
     assert guardrail.status == "stale_diagnostic"
     assert guardrail.score_authority is False
-    assert guardrail.release_gate_authority is False
-    assert guardrail.cutover_authority is False
 
 
 def test_agent_feedback_negative_fixtures_downgrade_to_invalid_or_missing():
@@ -114,9 +112,6 @@ def test_agent_feedback_negative_fixtures_downgrade_to_invalid_or_missing():
         missing_guardrail,
     ):
         assert guardrail.score_authority is False
-        assert guardrail.evidence_tier_authority is False
-        assert guardrail.release_gate_authority is False
-        assert guardrail.cutover_authority is False
 
 
 def test_agent_feedback_fixtures_are_prompt_safe_and_deterministic():
@@ -164,7 +159,7 @@ def test_agent_feedback_docs_explain_hip_mapping_and_fixture_semantics():
         "solution content hash",
         "compile_failure",
         "profile_summary.sidecar",
-        "sol_execbench.profile_summary.v2",
+        "sol_execbench.profile_summary.v3",
         "SOL does not duplicate those hints into",
         "unknown values must be downgraded",
         "valid.agent-feedback.json",

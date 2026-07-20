@@ -1,6 +1,6 @@
 # Profile Summary Sidecar
 
-`sol_execbench.profile_summary.v2` is an optional diagnostic sidecar written
+`sol_execbench.profile_summary.v3` is an optional diagnostic sidecar written
 next to canonical Trace JSONL using the profile-summary JSON suffix. It normalizes
 bounded `rocprofv3` profile metadata for downstream adapters while preserving
 Trace JSONL as the only authority for correctness, timing, scoring, and
@@ -8,7 +8,7 @@ evaluation status.
 
 The evaluator contract advertises this artifact through the optional
 `profile_summary.sidecar` capability key. The concrete artifact schema remains
-`sol_execbench.profile_summary.v2`.
+`sol_execbench.profile_summary.v3`.
 
 The summary sidecar does not replace the raw profile JSON sidecar. The existing
 profile metadata sidecar remains the raw diagnostic metadata record and is cited
@@ -85,7 +85,7 @@ conclusions. When counters are missing or insufficient, SOL emits
 `insufficient_counters` or `unknown` instead of speculating.
 
 Profiler-derived bottleneck hints remain in the
-`sol_execbench.profile_summary.v2` sidecar; SOL does not surface them as
+`sol_execbench.profile_summary.v3` sidecar; SOL does not surface them as
 `agent_feedback.items[]`. HIP adapters that want one prompt-facing hint list
 should merge profile-summary hints with agent-feedback items only after each
 source sidecar passes strict freshness and authority checks.

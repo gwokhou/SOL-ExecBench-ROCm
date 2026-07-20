@@ -34,7 +34,7 @@ uv run sol-execbench --format json evaluate \
   --unsafe-local-execution
 ```
 
-Despite its historical filename, this solution declares `languages:
+The current sample solution declares `languages:
 ["hip_cpp"]` and contains HIP source.
 
 ## Collect profile diagnostics

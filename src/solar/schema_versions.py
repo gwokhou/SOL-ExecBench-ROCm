@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
+"""Current numeric schema versions for SOLAR artifact families."""
+
+from typing import Final
+
+EINSUM_GRAPH_SCHEMA_VERSION: Final = 3
+SOLAR_ANALYSIS_SCHEMA_VERSION: Final = 3
+OROJENESIS_IDENTITY_SCHEMA_VERSION: Final = 1
+OROJENESIS_ANALYSIS_SCHEMA_VERSION: Final = 2
+SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION: Final = 1
+
+CURRENT_NUMERIC_SCHEMA_VERSIONS: Final[dict[str, int]] = {
+    "einsum_graph": EINSUM_GRAPH_SCHEMA_VERSION,
+    "solar_analysis": SOLAR_ANALYSIS_SCHEMA_VERSION,
+    "orojenesis_identity": OROJENESIS_IDENTITY_SCHEMA_VERSION,
+    "orojenesis_analysis": OROJENESIS_ANALYSIS_SCHEMA_VERSION,
+    "solar_request_manifest": SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+}
+
+__all__ = [
+    "CURRENT_NUMERIC_SCHEMA_VERSIONS",
+    "EINSUM_GRAPH_SCHEMA_VERSION",
+    "OROJENESIS_IDENTITY_SCHEMA_VERSION",
+    "OROJENESIS_ANALYSIS_SCHEMA_VERSION",
+    "SOLAR_ANALYSIS_SCHEMA_VERSION",
+    "SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION",
+]

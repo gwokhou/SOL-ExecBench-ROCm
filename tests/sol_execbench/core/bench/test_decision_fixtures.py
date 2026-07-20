@@ -29,7 +29,7 @@ def test_decision_fixtures_parse(name: str, expected_status: str):
     payload = json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
     sidecar = DecisionSidecar.model_validate(payload)
 
-    assert sidecar.schema_version == "sol_execbench.decision.v1"
+    assert sidecar.schema_version == "sol_execbench.decision.v2"
     assert sidecar.status.value == expected_status
     assert sidecar.authority == "diagnostic"
 

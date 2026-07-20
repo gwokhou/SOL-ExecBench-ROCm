@@ -40,7 +40,7 @@ artifacts.
 | `collected` | Build artifacts and any available routed extractor outputs were collected. |
 | `partial` | Some evidence was collected, but one or more extractors failed, were unavailable, or produced incomplete output. |
 | `unavailable` | The requested evidence could not be collected because required artifacts or tools were unavailable. |
-| `unsupported` | The solution or artifact type does not have a stable v1.17 static evidence boundary. |
+| `unsupported` | The current solution or artifact type has no static-evidence boundary. |
 | `failed` | Optional static evidence collection or extraction failed after an attempted route. |
 | `skipped` | Static evidence was not requested. |
 

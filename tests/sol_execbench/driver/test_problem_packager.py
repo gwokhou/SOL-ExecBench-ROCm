@@ -46,6 +46,7 @@ from sol_execbench_type_helpers import (
 
 _DEFINITION_DICT = {
     "name": "test_vecadd",
+    "op_type": "test_vecadd",
     "axes": {"n": {"type": "const", "value": 256}},
     "inputs": {
         "x": {"shape": ["n"], "dtype": "float32"},

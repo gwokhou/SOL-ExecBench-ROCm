@@ -8,15 +8,18 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
 from ..data.base_model import BaseModelWithDocstrings
+from ..integrity.schema_versions import (
+    ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION,
+    ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
+)
 from .arch_capabilities import ArchCapabilityBudgetStatus, ArchIsaBudget
 
 
-ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION = "sol_execbench.environment_snapshot.v2"
 DEFAULT_PROBE_TIMEOUT_SECONDS = 3.0
 
 
@@ -132,7 +135,9 @@ class EnvironmentSnapshot(BaseModelWithDocstrings):
 
     model_config = ConfigDict(use_attribute_docstrings=True)
 
-    schema_version: str = ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
+    schema_version: Literal["sol_execbench.environment_snapshot.v2"] = (
+        ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
+    )
     """Environment snapshot schema version."""
     generated_at: str
     """UTC timestamp when the snapshot was generated."""
@@ -174,7 +179,9 @@ class EnvironmentDiagnostics(BaseModelWithDocstrings):
 
     model_config = ConfigDict(use_attribute_docstrings=True)
 
-    schema_version: str = "sol_execbench.environment_diagnostics.v1"
+    schema_version: Literal["sol_execbench.environment_diagnostics.v1"] = (
+        ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION
+    )
     """Diagnostics schema version."""
     generated_at: str
     """UTC timestamp when diagnostics were generated."""

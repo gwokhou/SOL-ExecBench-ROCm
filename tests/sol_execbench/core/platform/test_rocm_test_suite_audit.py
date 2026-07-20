@@ -15,13 +15,6 @@ def _read(path: str) -> str:
     return (ROOT / path).read_text()
 
 
-def _read_current_or_archived_requirements() -> str:
-    current = ROOT / ".planning/REQUIREMENTS.md"
-    if current.exists():
-        return current.read_text()
-    return (ROOT / ".planning/milestones/v1.28-REQUIREMENTS.md").read_text()
-
-
 def _attr_path(node: ast.AST) -> str:
     if isinstance(node, ast.Name):
         return node.id
@@ -100,20 +93,12 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
 def test_hardware_markers_do_not_create_mi300x_or_cdna4_validation_shortcuts():
     pyproject = _read("pyproject.toml")
     conftest = _read("tests/conftest.py")
-    concerns = _read(".planning/codebase/CONCERNS.md")
-    requirements = _read_current_or_archived_requirements()
 
     for content in (pyproject, conftest):
         assert "requires_mi300x" not in content
         assert "requires_cdna4" not in content
         assert "MI300X validation" not in content
         assert "CDNA4 validation" not in content
-
-    assert "CDNA3" in concerns and "validation" in concerns
-    assert (
-        "CDNA3 or CDNA4 validation claim upgrade" in requirements
-        or "CDNA3" in requirements
-    )
 
 
 def test_cdna3_marker_has_concrete_hardware_gated_test_surface():
@@ -128,19 +113,9 @@ def test_cdna3_marker_has_concrete_hardware_gated_test_surface():
 
 def test_cdna3_schema_support_is_distinct_from_hardware_validation():
     solution_schema = _read("src/sol_execbench/core/data/solution_models.py")
-    requirements = _read_current_or_archived_requirements()
 
     for target in ("gfx940", "gfx941", "gfx942"):
         assert target in solution_schema
-
-    assert (
-        "CDNA3 or CDNA4 validation claim upgrade" in requirements
-        or "CDNA3" in requirements
-    )
-    assert (
-        "complete architecture-specific hardware evidence" in requirements
-        or "CDNA3" in requirements
-    )
 
 
 def test_user_facing_compile_text_uses_hip_cpp():

@@ -53,7 +53,7 @@
   "identity": {
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": "run-old",
-    "sol_version": "v1.42",
+    "sol_version": "v3.0.0-stale",
     "trace_path": "old-trace.jsonl"
   },
   "limitations": [
@@ -62,7 +62,7 @@
     "Raw rocprofv3 metadata remains in the separate profile sidecar when present."
   ],
   "reason_code": "profile_summary_generated",
-  "schema_version": "sol_execbench.profile_summary.v2",
+  "schema_version": "sol_execbench.profile_summary.v3",
   "status": "available",
   "summary": {
     "artifact_count": 4,
@@ -173,7 +173,7 @@
     ],
     "output_file": "trace",
     "parse_warnings": [
-      "trace.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v2"
+      "trace.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v3"
     ],
     "profiler_available": true,
     "profiler_status": "success",

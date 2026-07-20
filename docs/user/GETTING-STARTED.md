@@ -22,7 +22,7 @@ uv run sol-execbench --format json environment doctor
 
 On a ROCm host, `torch.version.hip` should be set and
 `torch.cuda.is_available()` should be true. PyTorch ROCm intentionally exposes
-device APIs through the historical `torch.cuda` namespace.
+device APIs through PyTorch's public `torch.cuda` namespace on HIP builds.
 
 ## First evaluation
 
@@ -72,7 +72,7 @@ uv run sol-execbench evaluate tests/sol_execbench/samples/rmsnorm \
   --unsafe-local-execution
 ```
 
-The historical filename `solution_cuda.json` contains a ROCm `hip_cpp`
+The sample file `solution_cuda.json` contains a ROCm `hip_cpp`
 solution; its validated schema is authoritative.
 
 ## Optional evidence

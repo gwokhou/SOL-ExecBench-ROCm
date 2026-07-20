@@ -33,17 +33,6 @@ def _make_spec(**overrides):
 PYTHON_LANGUAGES = ["pytorch", "triton"]
 NATIVE_LANGUAGES = ["hip_cpp", "hipblas", "miopen", "ck", "rocwmma"]
 CDNA3_TARGETS = ["gfx940", "gfx941", "gfx942"]
-LEGACY_LANGUAGE_REPLACEMENTS = [
-    ("cuda_cpp", "hip_cpp"),
-    ("cutlass", "ck or rocwmma"),
-    ("cudnn", "miopen"),
-    ("cudnn_frontend", "miopen"),
-    ("cublas", "hipblas"),
-    ("cute_dsl", "Phase 4"),
-    ("cutile", "Phase 4"),
-]
-
-
 class TestLanguageValidation:
     """BuildSpec accepts only ROCm-native language categories."""
 
@@ -82,16 +71,11 @@ class TestLanguageValidation:
         ):
             _make_spec(languages=langs, entry_point="kernel.hip::run")
 
-    @pytest.mark.parametrize(("legacy", "replacement"), LEGACY_LANGUAGE_REPLACEMENTS)
-    def test_legacy_cuda_nvidia_languages_rejected_with_guidance(
-        self, legacy, replacement
-    ):
-        with pytest.raises(ValidationError) as exc_info:
-            _make_spec(languages=[legacy], entry_point="kernel.hip::run")
-
-        message = str(exc_info.value)
-        assert legacy in message
-        assert replacement in message
+    def test_unknown_language_is_rejected_by_closed_enum(self):
+        with pytest.raises(ValidationError, match="unsupported_language"):
+            _make_spec(
+                languages=["unsupported_language"], entry_point="kernel.hip::run"
+            )
 
     @pytest.mark.parametrize("lang", [lg.value for lg in SupportedLanguages])
     def test_every_remaining_language_accepted_alone(self, lang):
@@ -186,19 +170,13 @@ class TestHardwareAndCompileOptions:
         assert opts.cflags == []
         assert opts.hip_cflags == ["-O3"]
         assert opts.ld_flags == []
-        assert not hasattr(opts, "cuda_cflags")
-
-    def test_cuda_cflags_rejected_with_hip_cflags_guidance(self):
-        with pytest.raises(ValidationError) as exc_info:
+    def test_unknown_compile_option_is_rejected(self):
+        with pytest.raises(ValidationError, match="extra_forbidden"):
             _make_spec(
                 languages=["hip_cpp"],
                 entry_point="kernel.hip::run",
-                compile_options={"cuda_cflags": ["-O3"]},
+                compile_options={"unsupported_flags": ["-O3"]},
             )
-
-        message = str(exc_info.value)
-        assert "cuda_cflags" in message
-        assert "hip_cflags" in message
 
     def test_hip_compile_options_accepted(self):
         spec = _make_spec(

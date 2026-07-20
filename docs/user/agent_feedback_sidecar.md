@@ -1,6 +1,6 @@
 # Agent Feedback Sidecar
 
-`sol_execbench.agent_feedback.v2` is an optional diagnostic sidecar written next
+`sol_execbench.agent_feedback.v3` is an optional diagnostic sidecar written next
 to canonical Trace JSONL by `_agent_feedback_sidecar_path` in
 `src/sol_execbench/cli/sidecars/agent_feedback.py`. It gives downstream agents
 bounded next-experiment guidance while preserving Trace JSONL as the only
@@ -63,7 +63,7 @@ should include only the normalized bottleneck, recommendation, limitation, and
 compact citation fields after freshness and authority checks pass.
 
 The `profile_summary.sidecar` evaluator capability key advertises the concrete
-`sol_execbench.profile_summary.v2` normalized profile-summary sidecar for
+`sol_execbench.profile_summary.v3` normalized profile-summary sidecar for
 bounded profiler metrics, conservative bottleneck hints, and artifact
 citations. Current ROCm profiler metadata remains the separate rocprofv3
 sidecar written by `_profile_sidecar_path` in

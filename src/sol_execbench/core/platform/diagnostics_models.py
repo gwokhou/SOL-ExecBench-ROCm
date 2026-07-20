@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 
 class DiagnosticStage(str, Enum):
@@ -76,31 +75,6 @@ class ProfilerReadiness:
     reason: str
     fallback_applied: bool
     effective_level: str
-
-
-@dataclass(frozen=True)
-class ValidationReadiness:
-    """Internal validation-readiness metadata for future hardware runs."""
-
-    target_family: str
-    ready: bool
-    claim: str
-    commands: tuple[str, ...]
-    evidence_required: tuple[str, ...]
-    acceptance_criteria: tuple[str, ...]
-    blockers: tuple[str, ...] = ()
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable readiness payload."""
-        return {
-            "target_family": self.target_family,
-            "ready": self.ready,
-            "claim": self.claim,
-            "commands": list(self.commands),
-            "evidence_required": list(self.evidence_required),
-            "acceptance_criteria": list(self.acceptance_criteria),
-            "blockers": list(self.blockers),
-        }
 
 
 @dataclass(frozen=True)
@@ -189,87 +163,3 @@ ROCM_LIBRARY_SPECS: dict[str, RocmLibrarySpec] = {
         hint="Install rocWMMA development headers from the ROCm distribution.",
     ),
 }
-
-
-CDNA3_VALIDATION_COMMANDS: tuple[str, ...] = (
-    "uv run pytest tests/",
-    "uv run python -c 'import torch; print(torch.__version__, torch.version.hip, torch.cuda.is_available())'",
-    "amd-smi static -a || true",
-    'rocminfo | grep -E "Name: *gfx94|Marketing Name" || true',
-)
-
-
-CDNA3_EVIDENCE_REQUIRED: tuple[str, ...] = (
-    "Exact GPU name and gfx94* architecture",
-    "ROCm/HIP/PyTorch versions",
-    "Full pytest command and final pass/skip/fail counts",
-    "Expected skips and CDNA 3-specific deviations",
-)
-
-
-CDNA3_ACCEPTANCE_CRITERIA: tuple[str, ...] = (
-    "Full adapted pytest suite completes successfully on a real CDNA 3 GPU",
-    "Recorded environment reports gfx94*",
-    "Support matrix claim is updated only after recorded evidence exists",
-)
-
-
-RDNA4_REQUIRED_ARTIFACTS: tuple[str, ...] = (
-    "environment_sidecar",
-    "execution_closure",
-    "per_problem_traces",
-    "clock_lock_evidence",
-    "timing_sidecars",
-    "profiler_backed_timing",
-    "amd_native_score_report",
-    "amd_sol_sidecars",
-    "solar_derivation_sidecars",
-    "derived_exclusion_retry",
-    "missing_trace_triage",
-    "failure_triage",
-    "claim_boundary_report",
-)
-
-
-RDNA4_VALIDATION_RESULT_CATEGORIES: tuple[str, ...] = (
-    "attempted_passed",
-    "reference_gpu_oom",
-    "input_generation_gpu_oom",
-    "execution_timeout",
-    "gpu_oom_no_trace",
-    "user_function_gpu_oom",
-    "timing_gpu_oom",
-    "incorrect_numerical",
-    "readiness_blocked",
-    "derived_sidecar_memory_blockers",
-)
-
-
-MI300X_REQUIRED_ARTIFACTS: tuple[str, ...] = (
-    "pytest_full_suite_log",
-    "run_dataset_summary",
-    "environment_report",
-    "clock_lock_evidence",
-    "per_problem_traces",
-    "rocm_timing_evidence",
-    "amd_native_score_report",
-    "fp8_validation_result",
-    "nvfp4_mxfp4_deferred_status",
-)
-
-
-MI300X_VALIDATION_RESULT_CATEGORIES: tuple[str, ...] = (
-    "expected_skips",
-    "missing_tools",
-    "functional_failures",
-    "timing_instability",
-    "missing_evidence",
-    "fp8_validation",
-    "deferred_quantization_formats",
-)
-
-
-MI300X_FP8_READINESS: tuple[str, ...] = (
-    "MI300X, as a CDNA 3 GPU, can validate FP8 behavior once hardware access exists",
-    "NVFP4/MXFP4 validation is deferred until a suitable AMD hardware and methodology path exists",
-)

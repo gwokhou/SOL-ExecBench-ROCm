@@ -1,9 +1,0 @@
-{
-  "case": "profiler-partial",
-  "description": "Official score blocked AND a partial profile_summary sidecar present; the diagnostic sidecar does NOT remove the blocker.",
-  "diagnostic_sidecar_count": 1,
-  "expected_blockers": [
-    "missing_score"
-  ],
-  "expected_score_authority": false
-}

@@ -60,14 +60,14 @@ def _profile_result(
 def test_profile_summary_identity_uses_sol_version_only() -> None:
     identity = ProfileSummaryIdentity(
         generated_at="2026-01-01T00:00:00Z",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
         trace_path="trace.jsonl",
         run_id="run-1",
     )
 
     payload = identity.model_dump(mode="json", exclude_none=True)
 
-    assert payload["sol_version"] == "v1.43"
+    assert payload["sol_version"] == "v3.0.0"
     assert "sol_contract_version" not in payload
 
 
@@ -76,8 +76,8 @@ def test_profile_summary_identity_rejects_sol_contract_version_alias() -> None:
         ProfileSummaryIdentity.model_validate(
             {
                 "generated_at": "2026-01-01T00:00:00Z",
-                "sol_version": "v1.43",
-                "sol_contract_version": "v1.43",
+                "sol_version": "v3.0.0",
+                "sol_contract_version": "v3.0.0",
                 "trace_path": "trace.jsonl",
                 "run_id": "run-1",
             }
@@ -103,7 +103,7 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     )
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == "sol_execbench.profile_summary.v2"
+    assert payload["schema_version"] == "sol_execbench.profile_summary.v3"
     assert payload["status"] == "available"
     assert payload["reason_code"] == "profile_summary_generated"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
@@ -290,7 +290,7 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["artifact_kinds"] == {"diagnostic_json": 1}
     assert payload["summary"]["parse_warnings"] == [
-        "profile.diagnostics.json: diagnostic_json artifacts are citation-only in sol_execbench.profile_summary.v2"
+        "profile.diagnostics.json: diagnostic_json artifacts are citation-only in sol_execbench.profile_summary.v3"
     ]
     assert any(
         "diagnostic logs but no profiler data artifacts" in limitation

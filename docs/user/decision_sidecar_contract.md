@@ -2,7 +2,7 @@
 
 This document records the contract for the **Decision sidecar**, which turns
 diagnostic-only data-layer facts into structured optimization guidance. The
-`sol_execbench.decision.v1` schema and run path are implemented in
+`sol_execbench.decision.v2` schema and run path are implemented in
 `src/sol_execbench/core/bench/decision/` (emits `<trace>.decision.json` via
 `--decision auto`); this file records the contract boundary and design intent.
 
@@ -29,7 +29,7 @@ The Decision sidecar consumes facts from the diagnostic data sidecars:
   `sol_execbench.arch_capability_budget.v1` budgets).
 - `StaticKernelEvidenceSidecar.footprints[]` and `kernels[].footprint` —
   per-kernel resource usage (`sol_execbench.static_kernel_evidence.v3`).
-- Optional `profile_summary.v2` runtime bottleneck hints and `agent_feedback.v2`
+- Optional `profile_summary.v3` runtime bottleneck hints and `agent_feedback.v3`
   aggregate items, after each passes its own freshness and authority checks.
 
 **Applicability.** The Decision sidecar requires

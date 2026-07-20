@@ -19,6 +19,7 @@ from urllib.request import Request, urlopen
 import zipfile
 
 from sol_execbench.core.integrity.checksums import sha256_file
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.tools.amd_isa.errors import (
     IsaDownloadError,
     IsaIntegrityError,
@@ -88,7 +89,7 @@ class IsaSpecRepository:
             .joinpath("releases.json")
             .read_text(encoding="utf-8")
         )
-        if payload.get("schema_version") != "sol_execbench.amd_isa_release_lock.v1":
+        if payload.get("schema_version") != SCHEMA_VERSIONS["amd_isa_release_lock"]:
             raise IsaIntegrityError("unsupported AMD ISA release-lock schema")
         self._releases: dict[str, dict[str, Any]] = payload["releases"]
         self._default_release = str(payload["default_release"])

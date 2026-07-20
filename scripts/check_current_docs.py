@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject retired v1/v2 paths from current user and architecture docs."""
+"""Reject removed paths from current user and architecture docs."""
 
 from __future__ import annotations
 

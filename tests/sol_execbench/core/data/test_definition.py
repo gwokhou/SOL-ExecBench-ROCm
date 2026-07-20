@@ -89,10 +89,9 @@ class TestGetResolvedAxesValues:
 
 
 class TestDefinitionValidators:
-    def test_empty_hf_id_is_treated_as_absent_optional_metadata(self):
-        d = _make(hf_id="")
-
-        assert d.hf_id is None
+    def test_empty_hf_id_is_rejected(self):
+        with pytest.raises(ValueError):
+            _make(hf_id="")
 
     def test_missing_run_function_raises(self):
         with pytest.raises(ValueError, match="run"):

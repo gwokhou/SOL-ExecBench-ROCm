@@ -1,5 +1,5 @@
 {
-  "schema_version": "sol_execbench.decision.v1",
+  "schema_version": "sol_execbench.decision.v2",
   "status": "not-a-real-status",
   "reason_code": "decision_rendered"
 }

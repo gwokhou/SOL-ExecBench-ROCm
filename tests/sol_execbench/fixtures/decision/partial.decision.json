@@ -1,10 +1,10 @@
 {
-  "schema_version": "sol_execbench.decision.v1",
+  "schema_version": "sol_execbench.decision.v2",
   "status": "partial",
   "reason_code": "partial_decision",
   "identity": {
     "generated_at": "2026-07-10T00:00:00Z",
-    "sol_version": "v1.43",
+    "sol_version": "v3.0.0",
     "trace_path": "trace.jsonl",
     "target_id": "gemm",
     "run_id": "run-1",
