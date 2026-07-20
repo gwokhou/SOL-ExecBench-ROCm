@@ -118,7 +118,9 @@ def _event_fallback_policy(
         source_type=source_type,
         backend=TimingBackend.DEVICE_EVENTS,
         activity_domain=TimingActivityDomain.FALLBACK_EVENT_TIMING,
-        aggregation_rule="median of HIP-backed PyTorch device event elapsed times",
+        aggregation_rule=(
+            "mean of 50 HIP-backed device-event samples across each of three trials"
+        ),
         interpretation=(
             "fallback event timing around the benchmark callable; this is not "
             "profiler-backed kernel activity timing"

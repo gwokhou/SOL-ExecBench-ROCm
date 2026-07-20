@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "global": {
+    "line": 70.0,
+    "branch": 55.0
+  },
+  "files": {
+    "src/solar/api.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/graph/extraction.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/graph/torchview_processor.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/graph/pytorch_processor.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/graph/backward_processor.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/einsum/conversion.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/einsum/pytorch_to_einsum.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/einsum/af_graph_builder.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/einsum/graph_expander.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/einsum/semantics.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/verification/einsum.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/analysis/graph_analyzer.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/analysis/fusion.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/analysis/resources.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/analysis/operand_provenance.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/analysis/orojenesis.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/rocm/architecture.py": {"line": 80.0, "branch": 65.0}
+  }
+}

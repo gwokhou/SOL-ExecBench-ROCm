@@ -36,6 +36,7 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
     _tail as tail,
 )
 from sol_execbench.core.text_utils import subprocess_text
@@ -58,7 +59,7 @@ def collect_rocprofv3_profile(
     )
     if not rocprofv3_available:
         return Rocprofv3ProfileResult(
-            status="unavailable",
+            status=Rocprofv3ProfileStatus.UNAVAILABLE,
             command=tuple(command),
             output_directory=request.output_directory,
             output_file=request.output_file,
@@ -94,7 +95,7 @@ def collect_rocprofv3_profile(
             )
         )
         return Rocprofv3ProfileResult(
-            status="failed",
+            status=Rocprofv3ProfileStatus.FAILED,
             command=tuple(command),
             output_directory=request.output_directory,
             output_file=request.output_file,
@@ -125,7 +126,7 @@ def collect_rocprofv3_profile(
             )
         )
         return Rocprofv3ProfileResult(
-            status="failed",
+            status=Rocprofv3ProfileStatus.FAILED,
             command=tuple(command),
             output_directory=request.output_directory,
             output_file=request.output_file,
@@ -157,7 +158,7 @@ def collect_rocprofv3_profile(
         )
         if not artifacts:
             return Rocprofv3ProfileResult(
-                status="failed",
+                status=Rocprofv3ProfileStatus.FAILED,
                 command=tuple(command),
                 output_directory=request.output_directory,
                 output_file=request.output_file,
@@ -179,16 +180,16 @@ def collect_rocprofv3_profile(
             command_succeeded=True,
         )
     )
-    status = "success"
+    status = Rocprofv3ProfileStatus.SUCCESS
     failed_reason = None
     if coverage_status == "diagnostic_logs_only":
-        status = "partial"
+        status = Rocprofv3ProfileStatus.PARTIAL
         failed_reason = (
             "rocprofv3 completed without profiler data artifacts; "
             "diagnostic log artifact registered"
         )
     elif coverage_status == "partial":
-        status = "partial"
+        status = Rocprofv3ProfileStatus.PARTIAL
     return Rocprofv3ProfileResult(
         status=status,
         command=tuple(command),

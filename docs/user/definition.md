@@ -35,7 +35,9 @@ optional Hugging Face source ID.
 | `custom_inputs_entrypoint` | string | No | Function name in `reference` that generates custom inputs — see below |
 | `hf_id` | string | No | Optional Hugging Face dataset identifier. |
 
-*`op_type` is optional in the server dataset (older entries may not have it).
+*`op_type` remains optional when reading legacy local definitions. Formal corpus
+materialization always writes a non-empty value, using the reviewed manifest
+operation for older upstream rows that omit it.
 
 ---
 

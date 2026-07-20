@@ -6,12 +6,15 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import linecache
 import os
+import statistics
 import sys
 import time
 import types
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Callable
 
 from sol_execbench.core.bench.reward_hack import RewardHackDetected
@@ -34,6 +37,7 @@ class TimingResult:
 
     latency_ms: float
     failure: str | None = None
+    timed_iterations: int = 0
 
 
 def _cpu_time_runnable(
@@ -44,21 +48,30 @@ def _cpu_time_runnable(
     warmup: int,
     rep: int,
     min_measurement_time_seconds: float | None,
-) -> float:
+    validator: Callable[[list[Any], Any], None] | None,
+) -> TimingResult:
+    from sol_execbench.core.bench.timing import clone_args
+
     for _ in range(warmup):
-        fn(*inputs, *outputs)
+        fn(*clone_args(inputs), *clone_args(outputs))
 
     samples: list[float] = []
     for _ in range(rep):
+        args = [*clone_args(inputs), *clone_args(outputs)]
         start = time.perf_counter()
-        fn(*inputs, *outputs)
+        result = fn(*args)
         samples.append(time.perf_counter() - start)
+        if validator is not None:
+            validator(args, result)
         if (
             min_measurement_time_seconds is not None
             and sum(samples) >= min_measurement_time_seconds
         ):
             break
-    return (sum(samples) / max(len(samples), 1)) * 1000.0
+    return TimingResult(
+        latency_ms=statistics.mean(samples) * 1000.0,
+        timed_iterations=len(samples),
+    )
 
 
 def measure_latency(
@@ -69,8 +82,9 @@ def measure_latency(
     *,
     warmup: int,
     rep: int,
-    min_measurement_time_seconds: float | None = 0.5,
+    min_measurement_time_seconds: float | None = None,
     time_fn: Callable[..., Any] | None = None,
+    validator: Callable[[list[Any], Any], None] | None = None,
 ) -> TimingResult:
     """Measure callable latency with an opt-in CPU fallback for subprocess tests."""
     try:
@@ -79,15 +93,14 @@ def measure_latency(
             and time_fn is None
             and os.environ.get("SOL_EXECBENCH_ALLOW_CPU_TIMING") == "1"
         ):
-            return TimingResult(
-                latency_ms=_cpu_time_runnable(
-                    fn,
-                    inputs,
-                    outputs,
-                    warmup=warmup,
-                    rep=rep,
-                    min_measurement_time_seconds=min_measurement_time_seconds,
-                )
+            return _cpu_time_runnable(
+                fn,
+                inputs,
+                outputs,
+                warmup=warmup,
+                rep=rep,
+                min_measurement_time_seconds=min_measurement_time_seconds,
+                validator=validator,
             )
 
         if time_fn is None:
@@ -95,21 +108,52 @@ def measure_latency(
 
             time_fn = time_runnable
 
-        latency_raw = time_fn(
-            fn,
-            inputs,
-            outputs,
-            device,
-            warmup=warmup,
-            rep=rep,
-            min_measurement_time_seconds=min_measurement_time_seconds,
-        )
+        if validator is not None:
+            latency_raw = time_fn(
+                fn,
+                inputs,
+                outputs,
+                device,
+                warmup=warmup,
+                rep=rep,
+                min_measurement_time_seconds=min_measurement_time_seconds,
+                return_mode="all",
+                validator=validator,
+            )
+        else:
+            latency_raw = time_fn(
+                fn,
+                inputs,
+                outputs,
+                device,
+                warmup=warmup,
+                rep=rep,
+                min_measurement_time_seconds=min_measurement_time_seconds,
+                return_mode="all",
+            )
+        if isinstance(latency_raw, (list, tuple)):
+            if not latency_raw or not all(
+                isinstance(value, (int, float)) for value in latency_raw
+            ):
+                return TimingResult(
+                    latency_ms=0.0,
+                    failure="Timing returned invalid sample sequence",
+                )
+            return TimingResult(
+                latency_ms=statistics.mean(float(value) for value in latency_raw),
+                timed_iterations=len(latency_raw),
+            )
         if not isinstance(latency_raw, (int, float)):
             return TimingResult(
                 latency_ms=0.0,
                 failure=f"Timing returned non-numeric result: {type(latency_raw).__name__}",
             )
-        return TimingResult(latency_ms=float(latency_raw))
+        known_iterations = rep if min_measurement_time_seconds is None else 0
+        return TimingResult(
+            latency_ms=float(latency_raw), timed_iterations=known_iterations
+        )
+    except RewardHackDetected:
+        raise
     except Exception as exc:
         return TimingResult(latency_ms=0.0, failure=f"Timing failed: {exc}")
 
@@ -210,16 +254,25 @@ def _register_staged_package_chain(
         sys.modules[package_name] = package
 
 
-def load_reference_function(staging_dir: Path, reference_code: str) -> tuple[Any, Any]:
-    """Write reference code to a real module file and return module plus run function."""
-    ref_file = staging_dir / "_reference.py"
-    ref_file.write_text(reference_code)
+def load_reference_function(reference_code: str) -> tuple[Any, Any]:
+    """Load trusted source from an automatically cleaned temporary module."""
     try:
-        ref_spec = importlib.util.spec_from_file_location("_reference", ref_file)
-        if ref_spec is None or ref_spec.loader is None:
-            raise RuntimeError("Unable to create module spec for reference code")
-        ref_module = importlib.util.module_from_spec(ref_spec)
-        ref_spec.loader.exec_module(ref_module)
+        with TemporaryDirectory(prefix="sol-execbench-reference-") as temp_dir:
+            ref_file = Path(temp_dir) / "reference_impl.py"
+            ref_file.write_text(reference_code)
+            # Preserve inspect/Triton source lookup in this process after the
+            # temporary source and any generated bytecode have been removed.
+            linecache.cache[str(ref_file)] = (
+                len(reference_code),
+                None,
+                reference_code.splitlines(keepends=True),
+                str(ref_file),
+            )
+            ref_spec = importlib.util.spec_from_file_location("_reference", ref_file)
+            if ref_spec is None or ref_spec.loader is None:
+                raise RuntimeError("Unable to create module spec for reference code")
+            ref_module = importlib.util.module_from_spec(ref_spec)
+            ref_spec.loader.exec_module(ref_module)
     except Exception as ref_err:
         raise RuntimeError(f"Failed to exec reference code: {ref_err}") from ref_err
 
@@ -236,7 +289,7 @@ def measure_reference_latency(
     *,
     warmup: int,
     rep: int,
-    min_measurement_time_seconds: float | None = 0.5,
+    min_measurement_time_seconds: float | None = None,
     time_fn: Callable[..., Any] | None = None,
 ) -> ReferenceTimingResult:
     """Measure reference latency and return explicit diagnostics on failure."""

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import click
@@ -51,13 +50,18 @@ from sol_execbench.cli.protocol import CliFailure, output_format
     type=click.IntRange(min=1),
     help="Compilation timeout in seconds (HIP/C++ only).",
 )
-@click.option("--timeout", default=600, show_default=True, type=click.IntRange(min=1))
+@click.option("--timeout", default=300, show_default=True, type=click.IntRange(min=1))
 @click.option(
     "--trace-output",
     type=click.Path(dir_okay=False, path_type=Path),
     help="Write canonical Trace JSONL here.",
 )
 @click.option("--lock-clocks", is_flag=True)
+@click.option(
+    "--unsafe-local-execution",
+    is_flag=True,
+    help="Allow untrusted code outside the hardened container; results are diagnostic only.",
+)
 @click.option("--keep-staging", is_flag=True)
 @click.option(
     "--profile",
@@ -87,14 +91,6 @@ from sol_execbench.cli.protocol import CliFailure, output_format
 @click.option("--feedback-candidate-id")
 @click.option("--feedback-source-sha256")
 @click.option("--feedback-sol-version")
-@click.option("--release-bound-sha256", callback=lambda c, p, v: _sha256(c, p, v))
-@click.option(
-    "--release-hardware-model-sha256", callback=lambda c, p, v: _sha256(c, p, v)
-)
-@click.option(
-    "--release-authority-json",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-)
 @click.option("--verbose", "verbose", is_flag=True)
 def evaluate_cli(
     problem_dir: Path | None,
@@ -106,6 +102,7 @@ def evaluate_cli(
     timeout: int,
     trace_output: Path | None,
     lock_clocks: bool,
+    unsafe_local_execution: bool,
     keep_staging: bool,
     profile: str,
     static_evidence: str,
@@ -115,9 +112,6 @@ def evaluate_cli(
     feedback_candidate_id: str | None,
     feedback_source_sha256: str | None,
     feedback_sol_version: str | None,
-    release_bound_sha256: str | None,
-    release_hardware_model_sha256: str | None,
-    release_authority_json: Path | None,
     verbose: bool,
 ):
     """Evaluate a solution and preserve canonical traces as a JSONL artifact.
@@ -146,17 +140,6 @@ def evaluate_cli(
             raise CliFailure(
                 "--solution is required because PROBLEM_DIR has no solution.json"
             )
-    hashes = (release_bound_sha256, release_hardware_model_sha256)
-    if release_authority_json is not None and any(hashes):
-        raise CliFailure(
-            "--release-authority-json is mutually exclusive with release SHA-256 options",
-            code="conflicting_inputs",
-        )
-    if any(hashes) and not all(hashes):
-        raise CliFailure(
-            "--release-bound-sha256 and --release-hardware-model-sha256 must be supplied together",
-            code="incomplete_input_set",
-        )
     if output_format() == "json" and trace_output is None:
         raise CliFailure(
             "evaluate in JSON mode requires --trace-output",
@@ -184,10 +167,8 @@ def evaluate_cli(
         feedback_candidate_id=feedback_candidate_id,
         feedback_source_sha256=feedback_source_sha256,
         feedback_sol_version=feedback_sol_version,
-        release_bound_sha256=release_bound_sha256,
-        release_hardware_model_sha256=release_hardware_model_sha256,
-        release_authority_json=release_authority_json,
         verbose=verbose,
+        unsafe_local_execution=unsafe_local_execution,
     )
     return run_evaluation_cli(request=request)
 
@@ -199,17 +180,5 @@ setattr(
         "PROBLEM_DIR excludes --definition and --workload",
         "without PROBLEM_DIR, --definition/--workload/--solution are all required",
         "JSON mode requires --trace-output",
-        "release authority JSON excludes the paired release SHA-256 options",
-        "--release-bound-sha256 and --release-hardware-model-sha256 are all-or-none",
     ],
 )
-
-
-def _sha256(
-    ctx: click.Context, param: click.Parameter, value: str | None
-) -> str | None:
-    if value is not None and re.fullmatch(r"[0-9a-fA-F]{64}", value) is None:
-        raise click.BadParameter(
-            "must be exactly 64 hexadecimal characters", ctx, param
-        )
-    return value.lower() if value is not None else None

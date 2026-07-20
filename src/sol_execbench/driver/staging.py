@@ -5,11 +5,39 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
+from typing import Any
 
+from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
+from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.workload import SafetensorsInput, Workload
+
+
+def _candidate_reference_stub(definition: Definition) -> str:
+    parameters = ", ".join(definition.inputs)
+    functions = [
+        f"def run({parameters}):\n",
+        "    raise RuntimeError('trusted reference is unavailable')\n",
+    ]
+    if definition.custom_inputs_entrypoint:
+        functions.extend(
+            [
+                f"\ndef {definition.custom_inputs_entrypoint}(axes, device):\n",
+                "    raise RuntimeError('trusted input generator is unavailable')\n",
+            ]
+        )
+    return "".join(functions)
+
+
+def stage_definition_files(definition: Definition, output_dir: Path) -> None:
+    """Write a worker-only definition and a candidate-visible redacted copy."""
+    (output_dir / TRUSTED_DEFINITION_FILE).write_text(definition.model_dump_json())
+    candidate_definition: dict[str, Any] = definition.model_dump(mode="json")
+    candidate_definition["reference"] = _candidate_reference_stub(definition)
+    (output_dir / "definition.json").write_text(json.dumps(candidate_definition))
 
 
 def stage_solution_sources(solution: Solution, output_dir: Path) -> None:

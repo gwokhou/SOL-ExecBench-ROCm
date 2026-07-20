@@ -13,7 +13,7 @@ from typing import Any, Literal
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.scoring.confidence import EstimateConfidence
+from sol_execbench.core.platform.confidence import EstimateConfidence
 
 ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION = "sol_execbench.arch_capability_budget.v1"
 _BUILTIN_ARCH_BUDGETS = ("gfx942", "gfx1150", "gfx1200")

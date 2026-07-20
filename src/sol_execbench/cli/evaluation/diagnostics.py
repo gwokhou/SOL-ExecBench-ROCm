@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from rich.console import Console
@@ -17,6 +18,16 @@ NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION = "sol_execbench.no_trace_diagnostics.v1"
 _DIAGNOSTIC_TAIL_LIMIT = 8192
 
 console = Console(stderr=True)
+
+
+@dataclass(frozen=True, slots=True)
+class NoTraceDiagnostics:
+    """Bounded subprocess diagnostics for one execution without traces."""
+
+    reason: str
+    returncode: int
+    stdout: str
+    stderr: str
 
 
 def _diagnostic_tail(text: str, *, limit: int = _DIAGNOSTIC_TAIL_LIMIT) -> str:
@@ -45,10 +56,7 @@ def _write_no_trace_diagnostics_sidecar(
     output_file: Path | None,
     staging_dir: Path,
     keep_staging: bool,
-    reason: str,
-    returncode: int,
-    stdout: str,
-    stderr: str,
+    diagnostics: NoTraceDiagnostics,
 ) -> Path | None:
     """Persist bounded diagnostic-only evidence for no-trace outcomes."""
     sidecar_path = _no_trace_diagnostics_sidecar_path(
@@ -56,18 +64,18 @@ def _write_no_trace_diagnostics_sidecar(
         staging_dir,
         keep_staging=keep_staging,
     )
-    filtered_stderr = filter_benign_rocm_stderr(stderr)
+    filtered_stderr = filter_benign_rocm_stderr(diagnostics.stderr)
     payload = {
         "schema_version": NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
         "diagnostic_only": True,
         "canonical_trace_jsonl": False,
-        "reason": reason,
-        "returncode": returncode,
-        "stdout_tail": _diagnostic_tail(stdout),
+        "reason": diagnostics.reason,
+        "returncode": diagnostics.returncode,
+        "stdout_tail": _diagnostic_tail(diagnostics.stdout),
         "stderr_tail": _diagnostic_tail(filtered_stderr),
-        "stdout_line_count": len(stdout.splitlines()),
+        "stdout_line_count": len(diagnostics.stdout.splitlines()),
         "stderr_line_count": len(filtered_stderr.splitlines()),
-        "stdout_truncated": len(stdout) > _DIAGNOSTIC_TAIL_LIMIT,
+        "stdout_truncated": len(diagnostics.stdout) > _DIAGNOSTIC_TAIL_LIMIT,
         "stderr_truncated": len(filtered_stderr) > _DIAGNOSTIC_TAIL_LIMIT,
     }
     try:

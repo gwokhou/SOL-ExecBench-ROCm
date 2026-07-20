@@ -24,20 +24,15 @@ def evaluate_workloads(request: WorkloadEvaluationRequest) -> None:
         solution_name=request.solution_name,
         device=request.device,
         clock_status_msg=clock_status,
+        clocks_locked=clocks_locked,
+        timing_protocol=request.bench_config.timing_protocol,
         real_stdout=request.dependencies.real_stdout,
     )
     if not _preflight_succeeds(request, emitter, clocks_locked):
         return
     set_evaluation_seed(request.bench_config.seed)
-    custom_inputs_fn = (
-        request.dependencies.ref_namespace.get(
-            request.definition.custom_inputs_entrypoint
-        )
-        if request.definition.custom_inputs_entrypoint
-        else None
-    )
     for row_index, workload in enumerate(request.workloads):
-        evaluate_one_workload(request, emitter, row_index, workload, custom_inputs_fn)
+        evaluate_one_workload(request, emitter, row_index, workload)
 
 
 def _preflight_succeeds(

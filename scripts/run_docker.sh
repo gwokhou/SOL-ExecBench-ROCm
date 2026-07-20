@@ -38,6 +38,8 @@ IMAGE_TAG="${IMAGE_TAG:-}"
 
 # Container-side paths (must match Dockerfile / entrypoint expectations)
 CONTAINER_PROJECT="/sol-execbench"
+GPU_LOCK_DIR="${SOL_EXECBENCH_GPU_LOCK_DIR:-/tmp/sol-execbench-locks}"
+OUTPUT_DIR="${SOL_EXECBENCH_OUTPUT_DIR:-${REPO_ROOT}/data/outputs}"
 DOCKER_TARGET=""
 ALLOW_UNKNOWN_TARGET=false
 ALLOW_MIXED_VERSION_DEPENDENCIES=false
@@ -522,12 +524,11 @@ if $BUILD; then
     fi
 fi
 
-LOCAL_FLASHINFER_TRACE_DIR="${REPO_ROOT}/data/flashinfer-trace"
-if [ ! -d "${LOCAL_FLASHINFER_TRACE_DIR}" ]; then
-    echo "WARNING: ${LOCAL_FLASHINFER_TRACE_DIR} does not exist"
-    echo "       Run ./scripts/download_data.sh to download the flashinfer-trace dataset to run those problems."
+LOCAL_PROBLEM_ROOT="${REPO_ROOT}/problems/local/RX_9060_XT"
+if [ ! -d "${LOCAL_PROBLEM_ROOT}" ]; then
+    echo "WARNING: ${LOCAL_PROBLEM_ROOT} does not exist"
+    echo "       Run 'uv run sol-execbench dataset materialize' before evaluating the public corpus."
 fi
-FLASHINFER_TRACE_DIR="/sol-execbench/data/flashinfer-trace"
 
 # Default to interactive shell if no command given
 if [ ${#CMD[@]} -eq 0 ]; then
@@ -539,36 +540,29 @@ if [ -t 0 ] && [ -t 1 ]; then
     TTY_ARGS=(-it)
 fi
 
+mkdir -p "${GPU_LOCK_DIR}"
+mkdir -p "${OUTPUT_DIR}"
+
 DOCKER_COMMON_ARGS=(
     docker run --rm
     --device=/dev/kfd
     --device=/dev/dri
     --group-add video
+    --network=none
+    --cap-drop=ALL
     --security-opt seccomp=unconfined
     --ipc=host
     --ulimit memlock=-1
     --ulimit stack=67108864
-    -v "${REPO_ROOT}:${CONTAINER_PROJECT}"
-    -e "FLASHINFER_TRACE_DIR=${FLASHINFER_TRACE_DIR}"
+    -v "${REPO_ROOT}:${CONTAINER_PROJECT}:ro"
+    -v "${OUTPUT_DIR}:/outputs:rw"
+    -v "${GPU_LOCK_DIR}:/run/lock/sol-execbench"
+    -e "SOL_EXECBENCH_GPU_LOCK_DIR=/run/lock/sol-execbench"
+    -e "SOLAR_OROJENESIS_HOME=${SOLAR_OROJENESIS_HOME:-}"
     -e "SOL_EXECBENCH_GPU_CLK_MHZ=${SOL_EXECBENCH_GPU_CLK_MHZ:-}"
     -e "SOL_EXECBENCH_DRAM_CLK_MHZ=${SOL_EXECBENCH_DRAM_CLK_MHZ:-}"
     "${DOCKER_ARGS[@]}"
 )
-
-container_repo_path() {
-    local path="$1"
-    case "${path}" in
-        "${REPO_ROOT}"/*)
-            echo "${CONTAINER_PROJECT}/${path#"${REPO_ROOT}/"}"
-            ;;
-        "${REPO_ROOT}")
-            echo "${CONTAINER_PROJECT}"
-            ;;
-        *)
-            echo "${path}"
-            ;;
-    esac
-}
 
 run_container_dependency_preflight_json() {
     local cmd=(
@@ -589,9 +583,11 @@ write_container_validated_sidecars() {
 
     local entry_path
     local container_entry_path
+    local transport_path
     local cmd
     entry_path="$(compatibility_entry_output_path)"
-    container_entry_path="$(container_repo_path "${entry_path}")"
+    transport_path="$(mktemp "${OUTPUT_DIR}/.container-validation.XXXXXX.json")"
+    container_entry_path="/outputs/${transport_path##*/}"
     cmd=(
         "${DOCKER_COMMON_ARGS[@]}"
         --entrypoint python
@@ -608,7 +604,12 @@ write_container_validated_sidecars() {
     if [ -n "${DOCKER_TARGET}" ]; then
         cmd+=(--target "${DOCKER_TARGET}")
     fi
-    "${cmd[@]}" >/dev/null
+    if ! "${cmd[@]}" >/dev/null; then
+        rm -f "${transport_path}"
+        return 1
+    fi
+    mkdir -p "$(dirname "${entry_path}")"
+    mv "${transport_path}" "${entry_path}"
     if [ -n "${COMPATIBILITY_MATRIX_PATH}" ]; then
         run_host_python -m sol_execbench.core.evidence.runtime_evidence aggregate \
             --output "${COMPATIBILITY_MATRIX_PATH}" "${entry_path}" >/dev/null

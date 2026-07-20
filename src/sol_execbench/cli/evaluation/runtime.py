@@ -8,22 +8,35 @@ from __future__ import annotations
 
 import subprocess
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import ClassVar, Protocol
 
 from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ...core.bench.stderr import filter_benign_rocm_stderr
+from ...core.data.trace import Trace
+from ...core.reports.relative_metrics import apply_reference_speedups
 from . import command as cli_evaluation
 from .profile_mode import PROFILE_ROCPROFV3
 
 
 class EvaluationPackager(Protocol):
-    def convert_stdout_to_traces(self, stdout: str) -> list[Any]: ...
+    """Minimal staged-package behavior needed by runtime evaluation."""
+
+    def convert_stdout_to_traces(self, stdout: str) -> list[Trace]: ...
 
 
-@dataclass(frozen=True)
+class EvaluationRuntimeFailureReason(StrEnum):
+    """Stable machine-readable reasons for executions without trace output."""
+
+    TIMEOUT = "evaluation_timeout"
+    FAILED_NO_STDOUT = "evaluation_failed_no_stdout"
+    NO_PARSEABLE_TRACES = "no_parseable_traces"
+
+
+@dataclass(frozen=True, slots=True)
 class EvaluationRuntimeSuccess:
-    traces: list[Any]
+    traces: list[Trace]
     stdout: str
     stderr: str
     filtered_stderr: str
@@ -32,13 +45,11 @@ class EvaluationRuntimeSuccess:
     profile_fallback_reason: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EvaluationRuntimeNoTraceFailure:
-    reason: Literal[
-        "evaluation_timeout",
-        "evaluation_failed_no_stdout",
-        "no_parseable_traces",
-    ]
+    """Common diagnostics for a classified execution failure."""
+
+    reason: ClassVar[EvaluationRuntimeFailureReason]
     message: str
     stdout: str
     stderr: str
@@ -48,7 +59,33 @@ class EvaluationRuntimeNoTraceFailure:
     profile_fallback_reason: str | None = None
 
 
-EvaluationRuntimeResult = EvaluationRuntimeSuccess | EvaluationRuntimeNoTraceFailure
+@dataclass(frozen=True, slots=True)
+class EvaluationRuntimeTimeout(EvaluationRuntimeNoTraceFailure):
+    reason: ClassVar[EvaluationRuntimeFailureReason] = (
+        EvaluationRuntimeFailureReason.TIMEOUT
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationRuntimeFailedNoStdout(EvaluationRuntimeNoTraceFailure):
+    reason: ClassVar[EvaluationRuntimeFailureReason] = (
+        EvaluationRuntimeFailureReason.FAILED_NO_STDOUT
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationRuntimeNoParseableTraces(EvaluationRuntimeNoTraceFailure):
+    reason: ClassVar[EvaluationRuntimeFailureReason] = (
+        EvaluationRuntimeFailureReason.NO_PARSEABLE_TRACES
+    )
+
+
+EvaluationRuntimeResult = (
+    EvaluationRuntimeSuccess
+    | EvaluationRuntimeTimeout
+    | EvaluationRuntimeFailedNoStdout
+    | EvaluationRuntimeNoParseableTraces
+)
 
 
 def _profile_fallback_reason(
@@ -106,8 +143,7 @@ def run_evaluation_runtime(
     except subprocess.TimeoutExpired as exc:
         stdout = cli_evaluation._timeout_output_text(exc.stdout)
         stderr = cli_evaluation._timeout_output_text(exc.stderr)
-        return EvaluationRuntimeNoTraceFailure(
-            reason="evaluation_timeout",
+        return EvaluationRuntimeTimeout(
             message=f"Evaluation timed out after {timeout}s",
             returncode=124,
             stdout=stdout,
@@ -119,8 +155,7 @@ def run_evaluation_runtime(
 
     filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
     if proc.returncode != 0 and not proc.stdout.strip():
-        return EvaluationRuntimeNoTraceFailure(
-            reason="evaluation_failed_no_stdout",
+        return EvaluationRuntimeFailedNoStdout(
             message="Evaluation failed",
             returncode=proc.returncode,
             stdout=proc.stdout,
@@ -132,8 +167,7 @@ def run_evaluation_runtime(
 
     traces = packager.convert_stdout_to_traces(proc.stdout)
     if not traces:
-        return EvaluationRuntimeNoTraceFailure(
-            reason="no_parseable_traces",
+        return EvaluationRuntimeNoParseableTraces(
             message="No traces produced",
             returncode=proc.returncode,
             stdout=proc.stdout,
@@ -142,6 +176,8 @@ def run_evaluation_runtime(
             profile_result=profile_result,
             profile_fallback_reason=fallback_reason,
         )
+
+    apply_reference_speedups(traces)
 
     return EvaluationRuntimeSuccess(
         traces=traces,

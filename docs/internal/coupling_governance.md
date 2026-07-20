@@ -1,95 +1,50 @@
-# Coupling Governance
+# Coupling and readability governance
 
-This project treats coupling refactors as bounded maintenance work, not an
-open-ended chase for lower import counts.
-
-## Convergence Criteria
-
-The source tree is considered converged for P0/P1 coupling when all of these
-checks pass:
+## Required checks
 
 ```bash
-uv run pytest tests/sol_execbench/cli/test_module_boundaries.py -q
 uv run python scripts/check_coupling.py
+uv run python scripts/check_readability.py
+uv run python scripts/check_current_docs.py
 uv run --with ruff ruff check .
+uv run ty check
 ```
 
-The coupling check requires:
+The coupling gate scans both `sol_execbench` and `solar`. It rejects:
 
-- no internal import strongly connected components;
-- no internal source imports from broad compatibility facades;
-- P0/P1 orchestration modules within their line-count and fanout bounds;
-- generated evaluation driver imports routed through
-  `sol_execbench.driver.eval_runtime_api`.
+- internal strongly connected import components;
+- implementation imports from broad package facades;
+- SOLAR importing benchmark code;
+- benchmark code importing SOLAR outside `core.solar_bridge`;
+- `core.platform` importing `core.scoring`;
+- `core.bench` importing `core.reports`;
+- generated candidate driver imports outside `driver.eval_runtime_api`;
+- line-count or fan-out growth at named orchestration boundaries.
 
-## Allowed High Inbound Modules
+This repository performs clean internal refactors. Retired import paths are
+removed rather than kept as thin compatibility facades. Update code, CLI,
+tests and current documentation in the same change.
 
-High inbound imports are acceptable for stable schema and domain model modules.
-These modules should stay low-level and must not depend on CLI, dataset runner,
-driver orchestration, or benchmark runtime layers.
+## Responsibility rules
 
-Examples:
+- CLI modules coordinate user interaction; they do not own benchmark math.
+- `ProblemPackager` stages assets; templates own process bootstrap only.
+- The trusted reference service owns reference code, reference outputs and
+  reference timing. Candidate modules cannot import reference runtime helpers.
+- SOLAR owns formal analysis artifacts but never benchmark/candidate/scoring
+  concepts. The bridge is the only cross-package adapter.
+- Platform evidence is lower-level than scoring. Benchmark evidence producers
+  are lower-level than report presentation.
+- Formula, aggregation and official authority remain separate scoring modules.
 
-- `sol_execbench.core.data.definition`
-- `sol_execbench.core.data.workload`
-- `sol_execbench.core.data.trace`
-- `sol_execbench.core.scoring.amd_bound_graph_models`
-- `sol_execbench.core.scoring.amd_hardware_models`
+## Readability debt
 
-Do not split these modules only because their inbound count is high. Refactor
-them only when they gain higher-layer dependencies, unrelated responsibilities,
-or repeated change conflicts.
+The standard baseline is non-increasing. SOLAR is additionally checked against
+`scripts/solar_readability_debt.json`, an exact inventory of legacy long/wide
+functions, `Any` modules and oversized modules. New debt or growth fails CI;
+removing or shrinking an item passes without editing the inventory. Vendored
+torchview code is excluded because it is not project-owned.
 
-## Facade Policy
-
-Compatibility facades are allowed for external users and old import paths.
-Internal source code should import the focused owning module instead.
-
-Rules:
-
-- `sol_execbench.core.dataset` remains a lazy compatibility facade.
-- New internal code imports from submodules such as
-  `sol_execbench.core.dataset.sharding`.
-- `sol_execbench.core` and `sol_execbench.core.data` are not internal import
-  roots for implementation code.
-- `sol_execbench.core.scoring` package re-exports are not used by internal
-  implementation modules.
-
-## Orchestration Policy
-
-Orchestration modules may coordinate multiple subsystems, but they should not
-own subsystem details.
-
-Current P0/P1 boundaries:
-
-- `sol_execbench.driver.templates.eval_driver` imports only
-  `sol_execbench.driver.eval_runtime_api`.
-- `sol_execbench.core.scoring.amd_score_reports` assembles reports; derived
-  sidecar and artifact resolution lives in
-  `sol_execbench.core.scoring.amd_score_derived_artifacts`.
-- `sol_execbench.driver.problem_packager` coordinates packaging; build flag
-  logic lives in `sol_execbench.driver.build_config`, and file staging lives in
-  `sol_execbench.driver.staging`.
-- `sol_execbench.core.bench.rocm_profiler` stays a public entrypoint; command,
-  artifact, profile, and timing details live in focused profiler modules.
-
-## When To Continue Refactoring
-
-Continue coupling refactors only when one of these happens:
-
-- `scripts/check_coupling.py` fails;
-- `tests/sol_execbench/cli/test_module_boundaries.py` fails;
-- a P0/P1 module exceeds its fanout or line-count boundary;
-- implementation code imports from a broad compatibility facade;
-- a stable model starts depending on a higher layer;
-- a new feature repeatedly requires unrelated changes across multiple modules.
-
-Otherwise, stop. Passing guardrails mean coupling is converged for the current
-scope.
-# Process readability is a separate completion condition
-
-Passing fan-out, cycle, and facade checks only proves that imports remain
-bounded. A refactor is complete only when lifecycle stages are named, mutable
-state is typed, raw artifact mappings stop at parser boundaries, and domain
-functions remain locally understandable. `scripts/check_readability.py` tracks
-these properties with a non-increasing baseline alongside this coupling check.
+Passing import checks alone is not completion. Stages must be named, raw data
+must stop at parsers, mutable orchestration state must be typed, subprocess I/O
+must be bounded, and current docs/tests must match the implementation.

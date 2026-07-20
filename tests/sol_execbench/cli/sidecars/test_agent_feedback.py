@@ -68,16 +68,20 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     trace = _trace()
 
     written = cli_agent_feedback_sidecar._write_agent_feedback_sidecar(
-        output,
-        [trace],
-        solution=solution,
-        profile_result=None,
-        static_evidence=None,
-        run_id="run-001",
-        feedback_target_id="gemm",
-        feedback_candidate_id="candidate-sha",
-        feedback_source_sha256="source-sha",
-        feedback_sol_version="custom-sol-tag",
+        cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
+            output_file=output,
+            traces=[trace],
+            solution=solution,
+            profile_result=None,
+            static_evidence=None,
+            identity=cli_agent_feedback_sidecar.AgentFeedbackIdentityOverrides(
+                run_id="run-001",
+                target_id="gemm",
+                candidate_id="candidate-sha",
+                source_sha256="source-sha",
+                sol_version="custom-sol-tag",
+            ),
+        )
     )
 
     assert written == tmp_path / "trace.jsonl.agent-feedback.json"
@@ -123,30 +127,44 @@ def test_agent_feedback_identity_uses_solution_source_hash(tmp_path: Path):
     second = _solution("def run(x):\n    return x + 1\n")
 
     first_identity = cli_agent_feedback_sidecar._agent_feedback_identity_fields(
-        output,
-        [trace],
-        solution=first,
+        cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
+            output_file=output,
+            traces=[trace],
+            solution=first,
+            profile_result=None,
+            static_evidence=None,
+        )
     )
     second_identity = cli_agent_feedback_sidecar._agent_feedback_identity_fields(
-        output,
-        [trace],
-        solution=second,
+        cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
+            output_file=output,
+            traces=[trace],
+            solution=second,
+            profile_result=None,
+            static_evidence=None,
+        )
     )
     no_solution_identity = cli_agent_feedback_sidecar._agent_feedback_identity_fields(
-        output, [trace]
+        cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
+            output_file=output,
+            traces=[trace],
+            solution=None,
+            profile_result=None,
+            static_evidence=None,
+        )
     )
 
-    assert first_identity["candidate_id"] == second_identity["candidate_id"]
-    assert first_identity["source_sha256"] == first.hash()
-    assert second_identity["source_sha256"] == second.hash()
-    assert first_identity["source_sha256"] != second_identity["source_sha256"]
-    assert no_solution_identity["source_sha256"] is None
-    assert "candidate_hash" not in first_identity
-    assert "source_hash" not in first_identity
-    assert "candidate_hash" not in second_identity
-    assert "source_hash" not in second_identity
-    assert "candidate_hash" not in no_solution_identity
-    assert "source_hash" not in no_solution_identity
+    assert first_identity.candidate_id == second_identity.candidate_id
+    assert first_identity.source_sha256 == first.hash()
+    assert second_identity.source_sha256 == second.hash()
+    assert first_identity.source_sha256 != second_identity.source_sha256
+    assert no_solution_identity.source_sha256 is None
+    assert not hasattr(first_identity, "candidate_hash")
+    assert not hasattr(first_identity, "source_hash")
+    assert not hasattr(second_identity, "candidate_hash")
+    assert not hasattr(second_identity, "source_hash")
+    assert not hasattr(no_solution_identity, "candidate_hash")
+    assert not hasattr(no_solution_identity, "source_hash")
 
 
 def test_agent_feedback_identity_accepts_consumer_identity_fields(tmp_path: Path):
@@ -155,18 +173,24 @@ def test_agent_feedback_identity_accepts_consumer_identity_fields(tmp_path: Path
     trace = _trace()
 
     identity = cli_agent_feedback_sidecar._agent_feedback_identity_fields(
-        output,
-        [trace],
-        solution=_solution(),
-        run_id="run-001",
+        cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
+            output_file=output,
+            traces=[trace],
+            solution=_solution(),
+            profile_result=None,
+            static_evidence=None,
+            identity=cli_agent_feedback_sidecar.AgentFeedbackIdentityOverrides(
+                run_id="run-001",
+                target_id="gemm",
+                candidate_id="candidate-sha",
+                source_sha256="source-sha",
+            ),
+        )
+    )
+
+    assert identity == cli_agent_feedback_sidecar.ResolvedAgentFeedbackIdentity(
         target_id="gemm",
+        run_id="run-001",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
     )
-
-    assert identity == {
-        "target_id": "gemm",
-        "run_id": "run-001",
-        "candidate_id": "candidate-sha",
-        "source_sha256": "source-sha",
-    }

@@ -53,8 +53,10 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
     Rocprofv3TimingEvidence,
     Rocprofv3TimingRow,
+    SourceTimingRequest,
 )
 from sol_execbench.core.bench.rocm_profiler.profile import (
     _prepare_profile_output_directory,
@@ -134,8 +136,10 @@ __all__ = [
     "Rocprofv3ProfileArtifact",
     "Rocprofv3ProfileRequest",
     "Rocprofv3ProfileResult",
+    "Rocprofv3ProfileStatus",
     "Rocprofv3TimingEvidence",
     "Rocprofv3TimingRow",
+    "SourceTimingRequest",
     "build_compact_timing_evidence",
     "build_rocprofv3_command",
     "build_rocprofv3_profile_command",

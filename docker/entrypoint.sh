@@ -7,6 +7,20 @@ set -e
 # in sol_execbench.core.bench.clock_lock.
 # ---------------------------------------------------------------------------
 
+acquire_gpu_lock() {
+    local lock_dir="${SOL_EXECBENCH_GPU_LOCK_DIR:-/tmp/sol-execbench-locks}"
+    local lock_path="${lock_dir}/gpu-0.lock"
+    local timeout="${SOL_EXECBENCH_GPU_LOCK_TIMEOUT_SECONDS:-60}"
+    mkdir -p "${lock_dir}"
+    exec 9>>"${lock_path}"
+    if ! flock -w "${timeout}" 9; then
+        echo "ERROR: GPU 0 is busy; lock wait exceeded ${timeout} seconds" >&2
+        return 75
+    fi
+    printf 'entrypoint_pid=%s\n' "$$" >"${lock_path}"
+    export SOL_EXECBENCH_GPU_LOCK_FD=9
+}
+
 lock_clocks() {
     local status
     status="$(python - <<'ROCPY'
@@ -55,6 +69,7 @@ print("Clocks unlocked")
 
 export SOL_EXECBENCH_CLOCKS_LOCKED=0
 export SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED=0
+export SOL_EXECBENCH_SANDBOXED=1
 trap 'cleanup' EXIT
 trap 'exit' TERM INT
 
@@ -64,6 +79,7 @@ if [ ! -d "${FLASHINFER_TRACE_DIR}" ]; then
     echo "         Continuing without flashinfer-trace; dependency smoke tests are still allowed."
 fi
 
+acquire_gpu_lock
 lock_clocks
 
 "$@"

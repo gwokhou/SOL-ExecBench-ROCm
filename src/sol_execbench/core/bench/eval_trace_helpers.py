@@ -26,6 +26,8 @@ class WorkloadTraceEmitter:
     solution_name: str
     device: str
     clock_status_msg: str | None
+    clocks_locked: bool
+    timing_protocol: str
     real_stdout: TextIO
 
     def make_evaluation(
@@ -45,6 +47,8 @@ class WorkloadTraceEmitter:
             correctness=correctness,
             performance=performance,
             extra_msg="\n".join(parts) or None,
+            clocks_locked=self.clocks_locked,
+            timing_protocol=self.timing_protocol,
         )
 
     def build_trace(

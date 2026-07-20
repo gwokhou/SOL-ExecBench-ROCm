@@ -10,6 +10,8 @@ from sol_execbench.cli import evaluation as cli_evaluation
 
 def test_run_evaluation_command_passes_flashinfer_env(tmp_path: Path, monkeypatch):
     captured_env = None
+    monkeypatch.setenv("OPENAI_API_KEY", "must-not-reach-submission")
+    monkeypatch.setenv("HTTPS_PROXY", "http://credential-bearing-proxy")
 
     def fake_env(base_env):
         env = dict(base_env)
@@ -38,6 +40,9 @@ def test_run_evaluation_command_passes_flashinfer_env(tmp_path: Path, monkeypatc
     assert captured_env is not None
     assert captured_env["PYTORCH_ALLOC_CONF"] == "expandable_segments:True"
     assert captured_env["FLASHINFER_TRACE_DIR"] == "/repo"
+    assert captured_env["HOME"] == str(tmp_path)
+    assert "OPENAI_API_KEY" not in captured_env
+    assert "HTTPS_PROXY" not in captured_env
 
 
 def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
@@ -130,10 +135,12 @@ def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(tmp_path: P
         output_file=output,
         staging_dir=staging,
         keep_staging=False,
-        reason="no_parseable_traces",
-        returncode=2,
-        stdout=stdout,
-        stderr=stderr,
+        diagnostics=cli_evaluation.NoTraceDiagnostics(
+            reason="no_parseable_traces",
+            returncode=2,
+            stdout=stdout,
+            stderr=stderr,
+        ),
     )
 
     assert written == tmp_path / "traces.jsonl.no-trace-diagnostics.json"
@@ -162,10 +169,12 @@ def test_no_trace_diagnostics_sidecar_records_empty_stdout_failure(tmp_path: Pat
         output_file=output,
         staging_dir=staging,
         keep_staging=False,
-        reason="evaluation_failed_no_stdout",
-        returncode=1,
-        stdout="",
-        stderr="Traceback: boom",
+        diagnostics=cli_evaluation.NoTraceDiagnostics(
+            reason="evaluation_failed_no_stdout",
+            returncode=1,
+            stdout="",
+            stderr="Traceback: boom",
+        ),
     )
 
     assert written is not None
@@ -185,12 +194,14 @@ def test_no_trace_diagnostics_filters_benign_amdgpu_ids_noise(tmp_path: Path):
         output_file=output,
         staging_dir=staging,
         keep_staging=False,
-        reason="no_parseable_traces",
-        returncode=1,
-        stdout="",
-        stderr=(
-            "/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory\n"
-            "real stderr\n"
+        diagnostics=cli_evaluation.NoTraceDiagnostics(
+            reason="no_parseable_traces",
+            returncode=1,
+            stdout="",
+            stderr=(
+                "/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory\n"
+                "real stderr\n"
+            ),
         ),
     )
 

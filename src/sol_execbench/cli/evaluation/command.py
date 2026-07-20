@@ -10,21 +10,29 @@ import os
 import subprocess
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Protocol
 
 from rich.console import Console
 
 from ...core.bench.io import flashinfer_safetensors_env
 from ...core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,
+    ProfileRunner,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
     collect_rocprofv3_profile,
 )
 from ...core.platform.runtime import resolve_rocm_tool
+from ...core.process.environment import sanitized_subprocess_env
+from ...core.process.subprocesses import (
+    TextSubprocessRunner,
+    run_in_process_group_bounded,
+)
 from ..sidecars.profile import _profile_output_directory
 from .diagnostics import (
     NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
     _DIAGNOSTIC_TAIL_LIMIT,
+    NoTraceDiagnostics,
     _diagnostic_tail,
     _no_trace_diagnostics_sidecar_path,
     _write_no_trace_diagnostics_sidecar,
@@ -32,6 +40,7 @@ from .diagnostics import (
 
 __all__ = [
     "NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION",
+    "NoTraceDiagnostics",
     "_DIAGNOSTIC_TAIL_LIMIT",
     "_diagnostic_tail",
     "_no_trace_diagnostics_sidecar_path",
@@ -42,6 +51,53 @@ __all__ = [
 ]
 
 console = Console(stderr=True)
+EnvironmentBuilder = Callable[[Mapping[str, str]], dict[str, str]]
+
+
+class ProfileCollector(Protocol):
+    """Exact injected collector contract for profiled evaluation."""
+
+    def __call__(
+        self,
+        request: Rocprofv3ProfileRequest,
+        *,
+        rocprofv3_available: bool = True,
+        runner: ProfileRunner | None = None,
+    ) -> Rocprofv3ProfileResult: ...
+
+
+def _evaluation_env(
+    staging_dir: Path,
+    env_builder: EnvironmentBuilder,
+    *,
+    graceful_exit: bool = False,
+) -> dict[str, str]:
+    (staging_dir / ".tmp").mkdir(exist_ok=True)
+    base = dict(os.environ)
+    if graceful_exit:
+        base["SOL_EXECBENCH_GRACEFUL_EXIT"] = "1"
+    sanitized = sanitized_subprocess_env(base, staging_dir=staging_dir)
+    return sanitized_subprocess_env(env_builder(sanitized), staging_dir=staging_dir)
+
+
+def _run_command(
+    command: list[str],
+    *,
+    cwd: Path | None,
+    timeout: int | None,
+    env: Mapping[str, str],
+    runner: TextSubprocessRunner | None,
+) -> subprocess.CompletedProcess[str]:
+    if runner is None:
+        return run_in_process_group_bounded(command, cwd=cwd, timeout=timeout, env=env)
+    return runner(
+        command,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=env,
+    )
 
 
 def _timeout_output_text(output: str | bytes | None) -> str:
@@ -59,21 +115,18 @@ def _run_evaluation_command(
     *,
     staging_dir: Path,
     timeout: int,
-    env_builder: Callable[
-        [Mapping[str, str]], dict[str, str]
-    ] = flashinfer_safetensors_env,
-    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    env_builder: EnvironmentBuilder = flashinfer_safetensors_env,
+    runner: TextSubprocessRunner | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run the staged evaluation command with the standard ROCm allocator env."""
 
-    env = env_builder({**os.environ, "PYTORCH_ALLOC_CONF": "expandable_segments:True"})
-    return runner(
+    env = _evaluation_env(staging_dir, env_builder)
+    return _run_command(
         eval_cmd,
         cwd=staging_dir,
-        capture_output=True,
-        text=True,
         timeout=timeout,
         env=env,
+        runner=runner,
     )
 
 
@@ -83,14 +136,10 @@ def _run_profiled_evaluation(
     staging_dir: Path,
     output_file: Path | None,
     timeout: int,
-    env_builder: Callable[
-        [Mapping[str, str]], dict[str, str]
-    ] = flashinfer_safetensors_env,
-    subprocess_run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    env_builder: EnvironmentBuilder = flashinfer_safetensors_env,
+    subprocess_run: TextSubprocessRunner | None = None,
     rocprofv3_available: bool | None = None,
-    profile_collector: Callable[
-        ..., Rocprofv3ProfileResult
-    ] = collect_rocprofv3_profile,
+    profile_collector: ProfileCollector = collect_rocprofv3_profile,
 ) -> tuple[subprocess.CompletedProcess[str] | None, Rocprofv3ProfileResult]:
     """Run evaluation under `rocprofv3`, returning normal execution on failure."""
 
@@ -107,19 +156,12 @@ def _run_profiled_evaluation(
     profile_result = profile_collector(
         request,
         rocprofv3_available=rocprofv3_available,
-        runner=lambda command, cwd, timeout_seconds: subprocess_run(
+        runner=lambda command, cwd, timeout_seconds: _run_command(
             list(command),
             cwd=cwd,
-            capture_output=True,
-            text=True,
             timeout=timeout_seconds,
-            env=env_builder(
-                {
-                    **os.environ,
-                    "PYTORCH_ALLOC_CONF": "expandable_segments:True",
-                    "SOL_EXECBENCH_GRACEFUL_EXIT": "1",
-                }
-            ),
+            env=_evaluation_env(staging_dir, env_builder, graceful_exit=True),
+            runner=subprocess_run,
         ),
     )
     if profile_result.succeeded:

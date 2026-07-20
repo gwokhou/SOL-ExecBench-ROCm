@@ -9,6 +9,8 @@ from sol_execbench.core.bench.agent_feedback.artifacts import (
     artifact_citation_from_path,
 )
 from sol_execbench.core.bench.agent_feedback.builder import (
+    AgentFeedbackBuildIdentity,
+    AgentFeedbackBuildRequest,
     build_agent_feedback_sidecar,
 )
 from sol_execbench.core.bench.agent_feedback.governance import (
@@ -38,6 +40,8 @@ __all__ = [
     "AGENT_FEEDBACK_SCHEMA_VERSION",
     "_MODEL_CONFIG",
     "AgentFeedbackArtifactCitation",
+    "AgentFeedbackBuildIdentity",
+    "AgentFeedbackBuildRequest",
     "AgentFeedbackBottleneck",
     "AgentFeedbackFreshnessStatus",
     "AgentFeedbackFreshnessValidation",

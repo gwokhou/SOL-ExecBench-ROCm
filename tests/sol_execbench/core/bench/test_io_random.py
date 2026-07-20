@@ -8,7 +8,46 @@ from __future__ import annotations
 import pytest
 import torch
 
-from sol_execbench.core.bench.io import _rand_tensor
+from sol_execbench.core.bench.io import _rand_tensor, gen_inputs
+from sol_execbench_type_helpers import make_definition, make_workload
+
+
+def _random_case():
+    definition = make_definition(
+        name="seeded_random",
+        op_type="test",
+        axes={"N": {"type": "var"}},
+        inputs={"a": {"shape": ["N"], "dtype": "float32"}},
+        outputs={"b": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(a): return a",
+    )
+    workload = make_workload(
+        uuid="seeded-workload",
+        axes={"N": 4},
+        inputs={"a": {"type": "random"}},
+    )
+    return definition, workload
+
+
+def test_random_input_is_deterministic_for_explicit_seed() -> None:
+    definition, workload = _random_case()
+
+    first = gen_inputs(definition, workload, "cpu", seed=1234)
+    second = gen_inputs(definition, workload, "cpu", seed=1234)
+    different = gen_inputs(definition, workload, "cpu", seed=5678)
+
+    assert torch.equal(first[0], second[0])
+    assert not torch.equal(first[0], different[0])
+
+
+def test_seeded_random_input_restores_global_rng_state() -> None:
+    definition, workload = _random_case()
+    torch.manual_seed(20260720)
+    state_before = torch.random.get_rng_state()
+
+    gen_inputs(definition, workload, "cpu", seed=1234)
+
+    assert torch.equal(torch.random.get_rng_state(), state_before)
 
 
 class TestRandTensor:

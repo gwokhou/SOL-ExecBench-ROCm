@@ -1,0 +1,439 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
+"""Normalized AMD ROCm architecture profiles used by SOL roofline calculations."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from importlib import resources
+from pathlib import Path
+from typing import Any, Mapping
+
+import yaml
+
+from solar.common.integrity import sha256_file
+
+from solar.common.constants import normalize_dtype
+
+_PRECISION_ALIASES = {
+    "float32": "fp32",
+    "float16": "fp16",
+    "half": "fp16",
+    "bfloat16": "bf16",
+    "float8": "fp8",
+}
+
+_VENDOR_SPECIFIC_DTYPES = frozenset(
+    {
+        "float8_e4m3fn",
+        "float8_e5m2",
+        "float8_e4m3fnuz",
+        "float8_e5m2fnuz",
+        "float4_e2m1",
+        "float4_e2m1fn_x2",
+    }
+)
+
+
+def _packaged_profile_path(name: str) -> Path:
+    return Path(__file__).resolve().parents[1] / "configs" / "arch" / f"{name}.yaml"
+
+
+@dataclass(frozen=True)
+class MemoryLevel:
+    """One explicitly sourced AMD memory level; unknown values stay unknown."""
+
+    name: str
+    scope: str
+    capacity_bytes: int | None
+    bandwidth_bytes_per_second: float | None = None
+    source: str | None = None
+
+    @classmethod
+    def load(cls, data: Mapping[str, Any]) -> "MemoryLevel":
+        capacity = data.get("capacity_bytes")
+        bandwidth = data.get("bandwidth_bytes_per_second")
+        return cls(
+            name=str(data.get("name", "")),
+            scope=str(data.get("scope", "")),
+            capacity_bytes=int(capacity) if capacity is not None else None,
+            bandwidth_bytes_per_second=(
+                float(bandwidth) if bandwidth is not None else None
+            ),
+            source=str(data.get("source", "")) or None,
+        )
+
+
+@dataclass(frozen=True)
+class ArchitectureProfile:
+    """Normalized AMD hardware limits used by SOL roofline calculations."""
+
+    name: str
+    vendor: str
+    gfx_target: str
+    compute_units: int
+    memory_capacity_bytes: int
+    memory_bandwidth_bytes_per_second: float
+    l2_bytes: int
+    last_level_cache_bytes: int
+    peak_ops_per_second: dict[str, float] = field(default_factory=dict)
+    resource_model_version: str = ""
+    resource_limits: dict[str, dict[str, float]] = field(default_factory=dict)
+    resource_limit_sources: dict[str, str] = field(default_factory=dict)
+    calibration_exempt_modes: dict[str, dict[str, str]] = field(default_factory=dict)
+    precision_support: dict[str, dict[str, Any]] = field(default_factory=dict)
+    profile_revision: str = ""
+    audit_evidence: dict[str, Any] = field(default_factory=dict)
+    precision_aliases: dict[str, str] = field(default_factory=dict)
+    clock_hz: float | None = None
+    source: str | None = None
+    memory_hierarchy: tuple[MemoryLevel, ...] = ()
+
+    @classmethod
+    def load(cls, value: str | Path | Mapping[str, Any]) -> "ArchitectureProfile":
+        """Load a normalized AMD ROCm architecture description."""
+        if isinstance(value, Mapping):
+            data = dict(value)
+            source = None
+        else:
+            path = Path(value)
+            if not path.exists():
+                root = Path(__file__).resolve().parents[2]
+                path = root / "configs" / "arch" / f"{value}.yaml"
+            if path.exists():
+                data = yaml.safe_load(path.read_text()) or {}
+                source = str(path)
+            else:
+                resource = resources.files("solar.configs.arch").joinpath(
+                    f"{value}.yaml"
+                )
+                if not resource.is_file():
+                    raise FileNotFoundError(f"Architecture profile not found: {value}")
+                data = yaml.safe_load(resource.read_text()) or {}
+                source = str(resource)
+        if "peak_ops_per_second" not in data:
+            raise ValueError(
+                "ROCm architecture profiles must define normalized "
+                "peak_ops_per_second fields"
+            )
+        profile = cls(
+            name=str(data["name"]),
+            vendor=str(data.get("vendor", "")),
+            gfx_target=str(data.get("gfx_target", "")),
+            compute_units=int(data.get("compute_units", 0)),
+            memory_capacity_bytes=int(data.get("memory_capacity_bytes", 0)),
+            memory_bandwidth_bytes_per_second=float(
+                data["memory_bandwidth_bytes_per_second"]
+            ),
+            l2_bytes=int(data.get("l2_bytes", 0)),
+            last_level_cache_bytes=int(data.get("last_level_cache_bytes", 0)),
+            peak_ops_per_second={
+                str(k).lower(): float(v) for k, v in data["peak_ops_per_second"].items()
+            },
+            resource_model_version=str(data.get("resource_model_version", "")),
+            resource_limits={
+                str(resource_name).lower(): {
+                    str(mode).lower(): float(rate)
+                    for mode, rate in (modes or {}).items()
+                }
+                for resource_name, modes in (data.get("resource_limits") or {}).items()
+            },
+            resource_limit_sources={
+                str(key).lower(): str(value)
+                for key, value in (data.get("resource_limit_sources") or {}).items()
+            },
+            calibration_exempt_modes={
+                str(resource_name).lower(): {
+                    str(mode).lower(): str(reason)
+                    for mode, reason in (modes or {}).items()
+                }
+                for resource_name, modes in (
+                    data.get("calibration_exempt_modes") or {}
+                ).items()
+            },
+            precision_support={
+                str(precision).lower(): dict(support or {})
+                for precision, support in (data.get("precision_support") or {}).items()
+            },
+            profile_revision=str(data.get("profile_revision", "")),
+            audit_evidence=dict(data.get("audit_evidence") or {}),
+            precision_aliases={
+                str(k).lower(): str(v).lower()
+                for k, v in (data.get("precision_aliases") or {}).items()
+            },
+            clock_hz=(float(data["clock_hz"]) if data.get("clock_hz") else None),
+            source=str(data.get("source") or source or "") or None,
+            memory_hierarchy=tuple(
+                MemoryLevel.load(item) for item in (data.get("memory_hierarchy") or [])
+            ),
+        )
+        profile.validate()
+        return profile
+
+    def validate(self) -> None:
+        if not self.name:
+            raise ValueError("architecture name is required")
+        if self.vendor.upper() != "AMD":
+            raise ValueError("SOLAR-ROCm accepts AMD architecture profiles only")
+        if self.memory_bandwidth_bytes_per_second <= 0:
+            raise ValueError("memory bandwidth must be positive")
+        if not self.peak_ops_per_second or any(
+            value <= 0 for value in self.peak_ops_per_second.values()
+        ):
+            raise ValueError("at least one positive peak throughput is required")
+        from solar.analysis.resources import RESOURCE_MODEL_VERSION
+
+        if self.resource_model_version != RESOURCE_MODEL_VERSION:
+            raise ValueError(
+                f"architecture resource_model_version must be {RESOURCE_MODEL_VERSION}"
+            )
+        required_resources = {
+            "mfma",
+            "valu",
+            "sfu",
+            "reduction",
+            "atomic",
+            "scan_sort",
+            "conversion",
+        }
+        if set(self.resource_limits) != required_resources:
+            missing = sorted(required_resources - set(self.resource_limits))
+            extra = sorted(set(self.resource_limits) - required_resources)
+            raise ValueError(
+                f"resource_limits must define the complete AMD resource set; "
+                f"missing={missing}, extra={extra}"
+            )
+        for resource_name, modes in self.resource_limits.items():
+            if not modes or any(value <= 0 for value in modes.values()):
+                raise ValueError(
+                    f"resource limit rates for {resource_name} must be positive"
+                )
+            if resource_name not in self.resource_limit_sources:
+                raise ValueError(
+                    f"resource limit source is required for {resource_name}"
+                )
+        for resource_name, exempt_modes in self.calibration_exempt_modes.items():
+            if resource_name not in self.resource_limits:
+                raise ValueError(
+                    f"calibration exemption has unknown resource {resource_name}"
+                )
+            for mode, reason in exempt_modes.items():
+                if mode not in self.resource_limits[resource_name] or not reason:
+                    raise ValueError(
+                        "calibration exemptions require a declared mode and reason"
+                    )
+        if set(self.precision_support) != set(self.peak_ops_per_second):
+            missing = sorted(
+                set(self.peak_ops_per_second) - set(self.precision_support)
+            )
+            extra = sorted(set(self.precision_support) - set(self.peak_ops_per_second))
+            raise ValueError(
+                "precision_support must describe every published peak precision; "
+                f"missing={missing}, extra={extra}"
+            )
+        for precision, support in self.precision_support.items():
+            required_fields = {"hardware", "software", "calibration", "evidence"}
+            if not required_fields.issubset(support):
+                raise ValueError(
+                    f"precision_support.{precision} must define "
+                    f"{sorted(required_fields)}"
+                )
+            if support["calibration"] not in {"required", "exempt"}:
+                raise ValueError(
+                    f"precision_support.{precision}.calibration must be required or exempt"
+                )
+            if not all(str(support[field]).strip() for field in required_fields):
+                raise ValueError(
+                    f"precision_support.{precision} fields must be non-empty"
+                )
+            if (
+                support["calibration"] == "exempt"
+                and not str(support.get("limitation", "")).strip()
+            ):
+                raise ValueError(
+                    f"precision_support.{precision} exemption requires a limitation"
+                )
+        if not self.profile_revision:
+            raise ValueError("architecture profile_revision is required")
+        evidence_status = str(self.audit_evidence.get("status", ""))
+        if evidence_status not in {"verified", "unavailable"}:
+            raise ValueError("audit_evidence.status must be verified or unavailable")
+        evidence_sha = str(self.audit_evidence.get("sha256", ""))
+        if evidence_sha and (
+            len(evidence_sha) != 64
+            or any(character not in "0123456789abcdef" for character in evidence_sha)
+        ):
+            raise ValueError("audit_evidence.sha256 must be a lowercase SHA-256")
+        if evidence_status == "verified" and not evidence_sha:
+            raise ValueError("verified audit evidence requires a SHA-256")
+        names = [level.name for level in self.memory_hierarchy]
+        if len(names) != len(set(names)):
+            raise ValueError("memory hierarchy level names must be unique")
+        for level in self.memory_hierarchy:
+            if not level.name or not level.scope:
+                raise ValueError("memory hierarchy levels require name and scope")
+            if level.capacity_bytes is not None and level.capacity_bytes <= 0:
+                raise ValueError("memory hierarchy capacities must be positive")
+            if (
+                level.bandwidth_bytes_per_second is not None
+                and level.bandwidth_bytes_per_second <= 0
+            ):
+                raise ValueError("memory hierarchy bandwidths must be positive")
+
+    def require_verified_audit_evidence(self) -> None:
+        """Reject formal use when the resource audit is not verified and present."""
+        if self.audit_evidence.get("status") != "verified":
+            reason = self.audit_evidence.get("reason_code", "not_verified")
+            raise ValueError(f"architecture audit evidence unavailable: {reason}")
+        path_value = str(self.audit_evidence.get("path", ""))
+        if not path_value:
+            raise ValueError("verified architecture audit evidence lacks a path")
+        profile_path = _packaged_profile_path(self.name)
+        evidence_path = profile_path.parents[2] / path_value
+        if not evidence_path.is_file():
+            raise ValueError(
+                f"architecture audit evidence file is missing: {evidence_path}"
+            )
+        if sha256_file(evidence_path) != self.audit_evidence.get("sha256"):
+            raise ValueError("architecture audit evidence identity mismatch")
+
+    def peak_for(self, precision: str) -> float:
+        key = self.normalize_precision(precision)
+        try:
+            return self.peak_ops_per_second[key]
+        except KeyError as exc:
+            raise ValueError(
+                f"Precision {precision!r} is not supported by {self.name}"
+            ) from exc
+
+    def normalize_precision(self, precision: str) -> str:
+        """Resolve spelling and vendor-specific format aliases."""
+        key = _PRECISION_ALIASES.get(precision.lower(), precision.lower())
+        return self.precision_aliases.get(key, key)
+
+    def tensor_precision(self, dtype: object, fallback: str | None = None) -> str:
+        """Resolve a tensor dtype without merging incompatible vendor formats."""
+        key = str(dtype or "").strip().lower()
+        if key.startswith("torch."):
+            key = key[6:]
+        if key in _VENDOR_SPECIFIC_DTYPES:
+            precision = self.normalize_precision(key)
+            if precision == key or precision not in self.peak_ops_per_second:
+                raise ValueError(
+                    f"Tensor dtype {key!r} is not supported by {self.name}"
+                )
+            return precision
+        return normalize_dtype(key, fallback)
+
+    def theoretical_seconds(
+        self, flops: float, fused_bytes: float, precision: str
+    ) -> float:
+        """Return max(compute time, memory time), the published SOL lower bound."""
+        return max(
+            float(flops) / self.peak_for(precision),
+            float(fused_bytes) / self.memory_bandwidth_bytes_per_second,
+        )
+
+    def theoretical_seconds_by_precision(
+        self, macs_by_precision: Mapping[str, float], fused_bytes: float
+    ) -> float:
+        """Return SOL using the artifact's per-operation compute precisions."""
+        compute_seconds = sum(
+            2.0 * float(macs) / self.peak_for(precision)
+            for precision, macs in macs_by_precision.items()
+        )
+        memory_seconds = float(fused_bytes) / self.memory_bandwidth_bytes_per_second
+        return max(compute_seconds, memory_seconds)
+
+    def resource_rate_for(self, resource: str, mode: str) -> float:
+        """Return the declared architectural upper rate for one resource mode."""
+        resource_name = str(resource).lower()
+        mode_name = str(mode).lower()
+        try:
+            modes = self.resource_limits[resource_name]
+        except KeyError as exc:
+            raise ValueError(
+                f"Resource {resource!r} is not supported by {self.name}"
+            ) from exc
+        if mode_name in modes:
+            return modes[mode_name]
+        if "generic" in modes:
+            return modes["generic"]
+        raise ValueError(
+            f"Resource mode {resource_name}:{mode_name} is not supported by {self.name}"
+        )
+
+    def resource_seconds(
+        self, resource_work: Mapping[str, Mapping[str, float]]
+    ) -> dict[str, float]:
+        """Reduce graph counters to per-pipeline times.
+
+        Work sharing a resource is serialized and summed.  Independent AMD
+        resources may overlap, so callers take the maximum across resources.
+        """
+        return {
+            str(resource): sum(
+                float(amount) / self.resource_rate_for(str(resource), str(mode))
+                for mode, amount in modes.items()
+            )
+            for resource, modes in resource_work.items()
+        }
+
+    def theoretical_seconds_by_resources(
+        self,
+        resource_work: Mapping[str, Mapping[str, float]],
+        fused_bytes: float,
+    ) -> float:
+        """Return the resource-aware compute/memory overlapped SOL bound."""
+        resource_times = self.resource_seconds(resource_work)
+        compute_seconds = max(resource_times.values(), default=0.0)
+        memory_seconds = float(fused_bytes) / self.memory_bandwidth_bytes_per_second
+        return max(compute_seconds, memory_seconds)
+
+    @property
+    def cache_flush_bytes(self) -> int:
+        """Return the largest declared AMD cache that cold-cache timing must evict."""
+        return max(self.l2_bytes, self.last_level_cache_bytes)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "vendor": self.vendor,
+            "gfx_target": self.gfx_target,
+            "compute_units": self.compute_units,
+            "memory_capacity_bytes": self.memory_capacity_bytes,
+            "memory_bandwidth_bytes_per_second": self.memory_bandwidth_bytes_per_second,
+            "l2_bytes": self.l2_bytes,
+            "last_level_cache_bytes": self.last_level_cache_bytes,
+            "peak_ops_per_second": dict(self.peak_ops_per_second),
+            "resource_model_version": self.resource_model_version,
+            "resource_limits": {
+                resource: dict(modes)
+                for resource, modes in self.resource_limits.items()
+            },
+            "resource_limit_sources": dict(self.resource_limit_sources),
+            "calibration_exempt_modes": {
+                resource: dict(modes)
+                for resource, modes in self.calibration_exempt_modes.items()
+            },
+            "precision_support": {
+                precision: dict(support)
+                for precision, support in self.precision_support.items()
+            },
+            "profile_revision": self.profile_revision,
+            "audit_evidence": dict(self.audit_evidence),
+            "precision_aliases": dict(self.precision_aliases),
+            "clock_hz": self.clock_hz,
+            "source": self.source,
+            "memory_hierarchy": [
+                {
+                    "name": level.name,
+                    "scope": level.scope,
+                    "capacity_bytes": level.capacity_bytes,
+                    "bandwidth_bytes_per_second": level.bandwidth_bytes_per_second,
+                    "source": level.source,
+                }
+                for level in self.memory_hierarchy
+            ],
+        }

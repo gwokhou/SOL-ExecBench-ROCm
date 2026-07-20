@@ -1,6 +1,4 @@
-"""Declared ROCm Docker Target selection and diagnostic preflight helpers."""
-
-from __future__ import annotations
+"""Pydantic models for declared ROCm Docker Targets and preflight observations."""
 
 from __future__ import annotations
 

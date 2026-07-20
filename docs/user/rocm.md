@@ -73,7 +73,7 @@ trace JSONL:
 
 ```bash
 SOLEXECBENCH_ENV_SNAPSHOT=1 \
-  uv run sol-execbench --format json evaluate examples/hip_cpp/rmsnorm --solution examples/hip_cpp/rmsnorm/solution_hip.json \
+  uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm --solution tests/sol_execbench/samples/rmsnorm/solution_cuda.json \
   --trace-output traces.jsonl
 ```
 
@@ -88,7 +88,7 @@ v1.14 adds opt-in `rocprofv3` artifact collection for diagnosing anomalous or
 hardware-sensitive benchmark runs:
 
 ```bash
-uv run sol-execbench --format json evaluate examples/hip_cpp/rmsnorm --solution examples/hip_cpp/rmsnorm/solution_hip.json \
+uv run sol-execbench --format json evaluate tests/sol_execbench/samples/rmsnorm --solution tests/sol_execbench/samples/rmsnorm/solution_cuda.json \
   --profile rocprofv3 --trace-output traces.jsonl
 ```
 
@@ -144,13 +144,12 @@ to HIP itself:
 | Library category | Headers | Link/runtime library | Notes |
 | --- | --- | --- | --- |
 | hipBLAS | `hipblas/hipblas.h` | `-lhipblas` | Supported by the existing SGEMM example. |
-| MIOpen | `miopen/miopen.h` | `-lMIOpen` | Supported by `examples/miopen/softmax/` for softmax/cuDNN-style coverage. |
-| Composable Kernel | `ck/ck.hpp` | Header-driven for the example path | Supported by `examples/ck/gemm/` for a small GEMM coverage path. |
-| rocWMMA | `rocwmma/rocwmma.hpp` | Header-driven for the example path | Supported by `examples/rocwmma/gemm/` for RDNA 4 matrix-core GEMM coverage. |
+| MIOpen | `miopen/miopen.h` | `-lMIOpen` | Dependency readiness is checked in the ROCm container; v3 does not ship a dedicated MIOpen sample. |
+| Composable Kernel | `ck/ck.hpp` | Header-driven | Dependency readiness is checked in the ROCm container; v3 does not ship a dedicated CK sample. |
+| rocWMMA | `rocwmma/rocwmma.hpp` | Header-driven | Dependency readiness is checked in the ROCm container; v3 does not ship a dedicated rocWMMA sample. |
 
 Run `uv run pytest tests/docker/dependencies/test_rocm_libraries.py` inside the
-ROCm container to check these dependencies before attempting the library
-examples.
+ROCm container before evaluating a solution that uses these libraries.
 
 ## Clock Locking
 
@@ -177,7 +176,9 @@ intentional retention is not reported as a leak.
 
 The Docker image and `scripts/setup_rocm_clock_sudoers.py` install sudoers
 coverage for the exact `amd-smi` commands used by the runtime. If clock locking
-is unavailable, run without `--lock-clocks` for functional validation.
+is unavailable, use a config with `"lock_clocks": false` only for functional
+diagnostics. Such a trace is labeled with the diagnostic timing protocol and
+cannot support an official claim.
 
 The set commands apply to every visible AMD GPU because no `-g` selector is
 used. The setup script is self-documenting; run it with `--help`. Its default

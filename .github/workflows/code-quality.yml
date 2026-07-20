@@ -27,10 +27,22 @@ jobs:
         run: uv run ruff check .
       - name: Run Ty
         run: uv run ty check
+      - name: Run architecture guardrails
+        run: |
+          uv run python scripts/check_coupling.py
+          uv run python scripts/check_readability.py
+          uv run python scripts/check_current_docs.py
       - name: Run CPU-safe tests
         run: |
           uv run pytest tests/sol_execbench \
             --ignore=tests/sol_execbench/driver/test_eval_driver.py \
             --ignore=tests/sol_execbench/test_e2e.py
+          uv run pytest tests/solar
           uv run pytest tests/tools
-          uv run pytest tests/examples/test_examples.py -k consistency
+      - name: Run Solar branch coverage
+        if: matrix.python-version == '3.12'
+        run: |
+          uv run coverage erase
+          uv run coverage run -m pytest -n 0 tests/solar
+          uv run coverage json -o coverage.json
+          uv run python scripts/check_solar_coverage.py coverage.json

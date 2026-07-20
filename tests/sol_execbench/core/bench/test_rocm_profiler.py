@@ -3,9 +3,15 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Sequence
 
+import pytest
+
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3CollectionRequest,
+    Rocprofv3CollectionResult,
     Rocprofv3ProfileRequest,
+    Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
+    SourceTimingRequest,
     build_rocprofv3_profile_command,
     build_rocprofv3_command,
     build_timing_evidence,
@@ -738,17 +744,19 @@ def test_source_collection_selects_triton_rocprofv3_and_records_run_config(tmp_p
         )
 
     result = collect_source_timing_evidence(
-        application_command=("uv", "run", "sol-execbench", "problem"),
-        languages=("triton",),
-        output_directory=tmp_path,
-        output_file="timing",
-        tool_version="rocprofv3 7.0.0",
-        gpu_architecture="gfx942",
+        SourceTimingRequest(
+            application_command=("uv", "run", "sol-execbench", "problem"),
+            languages=("triton",),
+            output_directory=tmp_path,
+            output_file="timing",
+            tool_version="rocprofv3 7.0.0",
+            gpu_architecture="gfx942",
+            warmup_runs=5,
+            iterations=50,
+            trial_count=2,
+            clock_locked=False,
+        ),
         runner=runner,
-        warmup_runs=5,
-        iterations=50,
-        trial_count=2,
-        clock_locked=False,
     )
 
     assert calls
@@ -777,12 +785,14 @@ def test_source_collection_selects_hip_native_rocprofv3(tmp_path):
         )
 
     result = collect_source_timing_evidence(
-        application_command=("uv", "run", "sol-execbench", "problem"),
-        languages=("hip_cpp",),
-        output_directory=tmp_path,
-        output_file="timing",
-        tool_version="rocprofv3 7.0.0",
-        gpu_architecture="gfx1200",
+        SourceTimingRequest(
+            application_command=("uv", "run", "sol-execbench", "problem"),
+            languages=("hip_cpp",),
+            output_directory=tmp_path,
+            output_file="timing",
+            tool_version="rocprofv3 7.0.0",
+            gpu_architecture="gfx1200",
+        ),
         runner=runner,
     )
 
@@ -800,17 +810,19 @@ def test_source_collection_routes_pytorch_to_explicit_fallback(tmp_path):
         raise AssertionError(f"runner should not be called: {command}")
 
     result = collect_source_timing_evidence(
-        application_command=("uv", "run", "sol-execbench", "problem"),
-        languages=("pytorch",),
-        output_directory=tmp_path,
-        output_file="timing",
-        tool_version="rocprofv3 7.0.0",
-        gpu_architecture="gfx942",
+        SourceTimingRequest(
+            application_command=("uv", "run", "sol-execbench", "problem"),
+            languages=("pytorch",),
+            output_directory=tmp_path,
+            output_file="timing",
+            tool_version="rocprofv3 7.0.0",
+            gpu_architecture="gfx942",
+            warmup_runs=5,
+            iterations=50,
+            trial_count=1,
+            clock_locked=True,
+        ),
         runner=runner,
-        warmup_runs=5,
-        iterations=50,
-        trial_count=1,
-        clock_locked=True,
     )
 
     assert result.profiler_collected is False
@@ -856,3 +868,24 @@ def test_profile_collection_timeout_keeps_partial_artifacts_and_reasons(tmp_path
     assert payload["artifact_coverage_status"] == "partial"
     assert payload["profiler_data_artifacts"] is True
     assert any(a["kind"] == "counter_csv" for a in payload["artifacts"])
+
+
+def test_profile_result_rejects_contradictory_success_reason(tmp_path) -> None:
+    with pytest.raises(ValueError, match="successful profiling"):
+        Rocprofv3ProfileResult(
+            status=Rocprofv3ProfileStatus.SUCCESS,
+            command=("rocprofv3",),
+            output_directory=tmp_path,
+            output_file="profile",
+            skipped_reason="profiler unavailable",
+        )
+
+
+def test_collection_result_requires_evidence_for_profiler_selection() -> None:
+    selection = select_default_timing(
+        select_timing_policy(TimingSourceType.HIP_NATIVE),
+        rocprofv3_available=True,
+    )
+
+    with pytest.raises(ValueError, match="requires timing evidence"):
+        Rocprofv3CollectionResult(evidence=None, selection=selection)

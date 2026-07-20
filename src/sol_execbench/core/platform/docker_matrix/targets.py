@@ -1,6 +1,4 @@
-"""Declared ROCm Docker Target selection and diagnostic preflight helpers."""
-
-from __future__ import annotations
+"""Declared ROCm Docker Target selection from the checked-in manifest."""
 
 from __future__ import annotations
 

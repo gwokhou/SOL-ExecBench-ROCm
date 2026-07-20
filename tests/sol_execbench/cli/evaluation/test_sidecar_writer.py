@@ -3,10 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.cli.evaluation.sidecar_writer import write_optional_sidecars
+from sol_execbench.cli.evaluation.sidecar_writer import (
+    SidecarIdentity,
+    SidecarWriteRequest,
+    write_optional_sidecars,
+)
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
 )
 from sol_execbench.core.data.solution import (
     BuildSpec,
@@ -30,21 +35,28 @@ def test_optional_sidecars_use_consumer_identity_for_profile_summary(
     output = tmp_path / "trace.jsonl"
     output.write_text('{"definition":"toy"}\n')
 
-    write_optional_sidecars(
-        output_file=output,
-        staging_dir=tmp_path,
-        traces=[_trace()],
-        solution=_solution(),
-        profile_result=_profile_result(tmp_path),
-        static_evidence_result=None,
-        decision="none",
-        trace_run_id="trace-sha-run-id",
-        feedback_run_id="consumer-run-id",
-        feedback_target_id="gemm",
-        feedback_candidate_id="candidate-sha",
-        feedback_source_sha256="source-sha",
-        feedback_sol_version="consumer-sol-version",
+    written = write_optional_sidecars(
+        SidecarWriteRequest(
+            output_file=output,
+            staging_dir=tmp_path,
+            traces=[_trace()],
+            solution=_solution(),
+            profile_result=_profile_result(tmp_path),
+            static_evidence_result=None,
+            decision="none",
+            identity=SidecarIdentity(
+                trace_run_id="trace-sha-run-id",
+                feedback_run_id="consumer-run-id",
+                target_id="gemm",
+                candidate_id="candidate-sha",
+                source_sha256="source-sha",
+                sol_version="consumer-sol-version",
+            ),
+        )
     )
+
+    assert written.profile_summary == tmp_path / "trace.jsonl.profile-summary.json"
+    assert written.agent_feedback == tmp_path / "trace.jsonl.agent-feedback.json"
 
     profile_summary = json.loads(
         (tmp_path / "trace.jsonl.profile-summary.json").read_text()
@@ -64,7 +76,7 @@ def _profile_result(tmp_path: Path) -> Rocprofv3ProfileResult:
     artifact = tmp_path / "profile.rocpd"
     artifact.write_text("profile artifact\n")
     return Rocprofv3ProfileResult(
-        status="success",
+        status=Rocprofv3ProfileStatus.SUCCESS,
         command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
         output_directory=tmp_path,
         output_file="profile",

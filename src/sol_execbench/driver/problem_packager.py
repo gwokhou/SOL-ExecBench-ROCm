@@ -28,7 +28,6 @@ import os
 import sys
 import subprocess
 from pathlib import Path
-from typing import Any
 
 from ..core.bench.config import BenchmarkConfig
 from ..core.bench.clock_lock import acquire_clock_lock
@@ -40,11 +39,15 @@ from .build_config import (
     inject_offload_arch_flags,
 )
 from .staging import (
+    Definition,
+    Solution,
+    Workload,
     resolve_stageable_safetensors,
+    stage_definition_files,
     stage_safetensors_inputs,
     stage_solution_sources,
 )
-from .trace_output import parse_trace_jsonl
+from .trace_output import Trace, parse_trace_jsonl
 from .problem_packager_lifecycle import ProblemPackagerLifecycle
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -74,9 +77,9 @@ class ProblemPackager:
 
     def __init__(
         self,
-        definition: Any,
-        workloads: list[Any],
-        solution: Any,
+        definition: Definition,
+        workloads: list[Workload],
+        solution: Solution,
         config: BenchmarkConfig,
         output_dir: Path,
         keep_output_dir: bool = False,
@@ -88,8 +91,7 @@ class ProblemPackager:
         self.workloads = workloads
         self.solution = solution
         self.config = config
-        # Write problem files to staging directory up front.
-        (self.output_dir / "definition.json").write_text(definition.model_dump_json())
+        stage_definition_files(definition, self.output_dir)
         (self.output_dir / "workload.jsonl").write_text(
             "\n".join(w.model_dump_json() for w in workloads)
         )
@@ -121,7 +123,9 @@ class ProblemPackager:
             lang in NATIVE_ROCM_LANGUAGES for lang in self.solution.spec.languages
         )
 
-    def _inject_offload_arch_flags(self, sol_dict: dict) -> dict:
+    def _inject_offload_arch_flags(
+        self, sol_dict: dict[str, object]
+    ) -> dict[str, object]:
         """Auto-inject HIP offload architecture flags when none are explicit."""
         return inject_offload_arch_flags(sol_dict, local_gfx_getter=_get_local_gfx)
 
@@ -177,10 +181,10 @@ class ProblemPackager:
     def execute(self) -> list[str]:
         """Stage execution files and return the command to run.
 
-        Writes eval_driver.py, definition.json, workload.jsonl, solution.json
-        to output_dir. For Python solutions, also writes source files. For C++
-        solutions, expects benchmark_kernel.so to already exist in output_dir
-        (produced by a prior compile() call).
+        Writes a trusted reference worker, an orchestration launcher, and the
+        candidate-only eval driver.  Reference code is loaded only by the
+        trusted worker; the candidate process receives reference cases through
+        authenticated, pickle-free IPC.
 
         The CLI should run the command in output_dir.
         Trace JSON will be emitted on stdout (one JSON object per line).
@@ -198,13 +202,16 @@ class ProblemPackager:
         if self.config.lock_clocks:
             self._lifecycle.acquire_clock_lock(acquire_clock_lock)
 
-        (self.output_dir / "eval_driver.py").write_text(
-            (_TEMPLATES_DIR / "eval_driver.py").read_text()
-        )
+        for name in (
+            "eval_driver.py",
+            "reference_worker.py",
+            "evaluation_orchestrator.py",
+        ):
+            (self.output_dir / name).write_text((_TEMPLATES_DIR / name).read_text())
 
-        return [sys.executable, "eval_driver.py"]
+        return [sys.executable, "evaluation_orchestrator.py"]
 
-    def convert_stdout_to_traces(self, stdout: str) -> list[Any]:
+    def convert_stdout_to_traces(self, stdout: str) -> list[Trace]:
         """Parse JSONL stdout from eval_driver.py into Trace objects.
 
         Each line starting with '{' is parsed as a Trace JSON object.

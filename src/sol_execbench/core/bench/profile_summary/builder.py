@@ -23,7 +23,7 @@ from sol_execbench.core.bench.profile_summary.sidecar_models import (
     ProfileSummaryStatus,
 )
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
-from sol_execbench.core.data.contract import SOL_EXECBENCH_RELEASE
+from sol_execbench.core.evaluator_contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.timestamps import utc_timestamp
 
 

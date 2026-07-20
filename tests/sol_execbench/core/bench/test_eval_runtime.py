@@ -5,11 +5,13 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import math
 import sys
 import types
 from io import StringIO
+from pathlib import Path
 from typing import cast
 
 import pytest
@@ -21,6 +23,7 @@ from sol_execbench.core.bench.eval_runtime import (
     load_reference_function,
     load_staged_problem,
     load_user_function,
+    measure_latency,
     measure_reference_latency,
     parse_entry_point,
     run_reward_hack_check,
@@ -128,17 +131,18 @@ def test_parse_entry_point_defaults_to_run():
     assert parse_entry_point("kernel") == ("kernel", "run")
 
 
-def test_load_reference_function_writes_real_module_file(tmp_path):
-    module, fn = load_reference_function(tmp_path, "def run(x):\n    return x + 1\n")
+def test_load_reference_function_cleans_source_but_preserves_inspection():
+    module, fn = load_reference_function("def run(x):\n    return x + 1\n")
 
-    assert (tmp_path / "_reference.py").exists()
+    assert not Path(module.__file__).exists()
     assert fn(2) == 3
     assert vars(module)["run"] is fn
+    assert "return x + 1" in inspect.getsource(fn)
 
 
-def test_load_reference_function_requires_run(tmp_path):
+def test_load_reference_function_requires_run():
     with pytest.raises(RuntimeError, match="does not define"):
-        load_reference_function(tmp_path, "VALUE = 1\n")
+        load_reference_function("VALUE = 1\n")
 
 
 def test_measure_reference_latency_returns_float_latency():
@@ -156,6 +160,26 @@ def test_measure_reference_latency_returns_float_latency():
 
     assert result.latency_ms == 1.25
     assert result.failure is None
+
+
+def test_measure_latency_records_actual_adaptive_sample_count():
+    def fake_time_fn(*args, **kwargs):
+        assert kwargs["return_mode"] == "all"
+        return [1.0, 1.25]
+
+    result = measure_latency(
+        lambda x: x,
+        [1],
+        [],
+        "cpu",
+        warmup=0,
+        rep=50,
+        min_measurement_time_seconds=0.001,
+        time_fn=fake_time_fn,
+    )
+
+    assert result.latency_ms == pytest.approx(1.125)
+    assert result.timed_iterations == 2
 
 
 def test_measure_reference_latency_returns_failure_message_on_exception():

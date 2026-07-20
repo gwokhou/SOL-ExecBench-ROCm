@@ -21,6 +21,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
+OFFICIAL_ROCM_TIMING_PROTOCOL = "sol_execbench.rocm_event_timing.paper_counts.v2"
+CUSTOM_ROCM_TIMING_PROTOCOL = "sol_execbench.rocm_event_timing.custom.v2"
+
+
 @dataclass
 class BenchmarkConfig:
     """Configuration for benchmark runs.
@@ -28,10 +32,11 @@ class BenchmarkConfig:
     All fields have default values to make configuration optional.
     """
 
-    warmup_runs: int = field(default=25)
-    iterations: int = field(default=100)
-    min_measurement_time_seconds: float | None = field(default=0.5)
-    lock_clocks: bool = field(default=False)
+    warmup_runs: int = field(default=10)
+    iterations: int = field(default=50)
+    trials: int = field(default=3)
+    min_measurement_time_seconds: float | None = field(default=None)
+    lock_clocks: bool = field(default=True)
     benchmark_reference: bool = field(default=True)
     seed: int = field(default=200)
 
@@ -40,8 +45,23 @@ class BenchmarkConfig:
             raise ValueError("warmup_runs must be >= 0")
         if self.iterations <= 0:
             raise ValueError("iterations must be > 0")
+        if self.trials <= 0:
+            raise ValueError("trials must be > 0")
         if (
             self.min_measurement_time_seconds is not None
             and self.min_measurement_time_seconds <= 0
         ):
             raise ValueError("min_measurement_time_seconds must be > 0 or None")
+
+    @property
+    def timing_protocol(self) -> str:
+        """Return the declared protocol, distinguishing custom diagnostic runs."""
+        if (
+            self.warmup_runs == 10
+            and self.iterations == 50
+            and self.trials == 3
+            and self.min_measurement_time_seconds is None
+            and self.lock_clocks
+        ):
+            return OFFICIAL_ROCM_TIMING_PROTOCOL
+        return CUSTOM_ROCM_TIMING_PROTOCOL

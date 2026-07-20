@@ -168,20 +168,25 @@ The ROCm port does not use CUPTI. Timing uses PyTorch's HIP-backed device event
 API through the historical `torch.cuda.Event` namespace. This is intentional:
 PyTorch exposes ROCm GPU devices through `torch.cuda` compatibility APIs.
 
-The benchmark path:
+The paper benchmark path:
 
 1. pre-allocates distinct input/output buffers for timed iterations,
 2. clears a GPU cache-sized tensor before each iteration,
 3. records HIP-backed device events around the solution call,
 4. synchronizes before reading elapsed time,
-5. emits median latency by default.
+5. validates every timed invocation against the reference output,
+6. runs 10 warmups and 50 timed invocations in each of three trials,
+7. emits the arithmetic mean and records the protocol in the trace.
 
 ## Clock Stability
 
-For benchmark-grade runs, use:
+Benchmark execution is container-only by default. For benchmark-grade runs,
+use the hardened wrapper (the repository is mounted read-only and network
+access is disabled):
 
 ```bash
-uv run sol-execbench evaluate <problem_dir> --solution <solution-file> --lock-clocks
+./scripts/run_docker.sh -- sol-execbench evaluate <problem_dir> \
+  --solution <solution-file> --trace-output /outputs/trace.jsonl
 ```
 
 Clock locking uses `amd-smi set -l STABLE_PEAK` and verifies every visible GPU

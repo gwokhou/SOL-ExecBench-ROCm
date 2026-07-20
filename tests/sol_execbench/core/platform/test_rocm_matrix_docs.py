@@ -82,7 +82,7 @@ def test_testing_docs_document_marker_gated_live_validation() -> None:
     assert "requires_rocm" in text
     assert "requires_rdna4" in text
     assert "requires_cdna3" in text
-    assert "tests/sol_execbench/test_cdna3_hardware_marker.py" in text
+    assert "tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py" in text
     assert "not full MI300X hardware-validation evidence" in text
     assert "not a `gfx94*` validation target" in text
     assert "current host ROCm 7.2.x environment" in text

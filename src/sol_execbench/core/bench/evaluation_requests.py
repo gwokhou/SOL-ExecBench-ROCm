@@ -4,14 +4,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, TextIO
 
 import torch
 
 from sol_execbench.core.bench.config import BenchmarkConfig
+from sol_execbench.core.bench.reference_protocol import ReferenceClient
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 
@@ -20,8 +20,7 @@ from sol_execbench.core.data.workload import Workload
 class EvaluationDependencies:
     """Injected functions and process state used by the evaluation loop."""
 
-    ref_namespace: dict[str, Any]
-    ref_fn: Callable[..., Any]
+    reference_client: ReferenceClient
     user_fn: Callable[..., Any]
     integrity_snapshot: dict[str, int]
     check_integrity: Callable[[dict[str, int], dict[str, Any]], None]
@@ -41,7 +40,6 @@ class WorkloadEvaluationRequest:
     output_dtypes_torch: dict[str, torch.dtype]
     bench_config: BenchmarkConfig
     destination_passing_style: bool
-    safetensors_roots: Iterable[Path]
     dependencies: EvaluationDependencies
 
 

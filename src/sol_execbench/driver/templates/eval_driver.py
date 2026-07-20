@@ -58,21 +58,20 @@ from sol_execbench.driver.eval_runtime_api import (  # noqa: E402,F401
     check_eval_integrity,
     check_lazy_outputs,
     check_monkey_patch,
+    check_runtime_integrity,
     check_thread_injection,
     compute_error_stats,
+    connect_reference_worker,
     dtype_str_to_torch_dtype,
     emit_trace_jsonl,
     evaluate_workloads,
-    gen_inputs,
-    load_reference_function,
     load_staged_problem,
     load_user_function,
     make_eval,
     measure_latency,
-    measure_reference_latency,
     review_solution_sources,
     run_reward_hack_check,
-    snapshot_critical_functions,
+    snapshot_runtime_integrity,
 )
 
 # ── Load problem ─────────────────────────────────────────────────────────────
@@ -103,6 +102,11 @@ _output_dtypes_torch = {
     k: dtype_str_to_torch_dtype(v.dtype) for k, v in definition.outputs.items()
 }
 
+# The trusted reference implementation lives in a distinct process.  Connect
+# before importing candidate code, then scrub private-pipe credentials from the
+# environment inside the client constructor.
+_reference_client = connect_reference_worker(device=_device)
+
 # ── Static source review before user-code import ────────────────────────────
 _source_review = review_solution_sources(
     _solution,
@@ -123,69 +127,43 @@ if _source_review.blocked:
             ),
         )
         emit_trace_jsonl(_trace, _real_stdout)
+    _reference_client.close()
     sys.exit(0)
-
-# ── Exec reference code ───────────────────────────────────────────────────────
-_ref_module, ref_fn = load_reference_function(STAGING_DIR, definition.reference)
-ref_namespace = vars(_ref_module)
 
 # ── Integrity snapshot (before user code import) ─────────────────────────────
 # Capture id() of every function that affects measurement or correctness.
 # Checked after user code import and after each user_fn() call.
-_CRITICAL_NAMES = [
-    "measure_latency",
-    "emit_trace_jsonl",
-    "run_reward_hack_check",
-    "compute_error_stats",
-    "check_monkey_patch",
-    "check_lazy_outputs",
-    "check_thread_injection",
-    "check_eval_integrity",
-    "call_and_collect_outputs",
-    "gen_inputs",
-    "allocate_outputs",
-    "make_eval",
-]
-_integrity_snapshot = snapshot_critical_functions(globals(), _CRITICAL_NAMES)
-# Keep a local reference so that patching the name in globals() is ineffective.
-_check_integrity = check_eval_integrity
-
-# ── Resolve user function ─────────────────────────────────────────────────────
-user_fn = load_user_function(_solution, STAGING_DIR)
-
-# ── Safetensors blob roots ────────────────────────────────────────────────────
-# Priority: 1) staging dir (client-inlined blobs), 2) configured repo/blob root.
-# FlashInfer workload paths may be repo-relative: data/flashinfer-trace/...
-_safetensors_roots = [STAGING_DIR]
-_benchmark_dir = os.environ.get("FLASHINFER_TRACE_DIR", None)
-if _benchmark_dir:
-    _safetensors_roots.append(Path(_benchmark_dir))
-
+_integrity_snapshot = snapshot_runtime_integrity(globals())
+_check_integrity = check_runtime_integrity
 
 # ── Evaluate each workload ────────────────────────────────────────────────────
 # evaluate_workloads emits traces via emit_trace_jsonl, which uses allow_nan=False.
-evaluate_workloads(
-    WorkloadEvaluationRequest(
-        definition=definition,
-        workloads=workloads,
-        solution_name=_solution_name,
-        device=_device,
-        output_names=_output_names,
-        output_dtypes_torch=_output_dtypes_torch,
-        bench_config=bench_config,
-        destination_passing_style=_dps,
-        safetensors_roots=_safetensors_roots,
-        dependencies=EvaluationDependencies(
-            ref_namespace=ref_namespace,
-            ref_fn=ref_fn,
-            user_fn=user_fn,
-            integrity_snapshot=_integrity_snapshot,
-            check_integrity=_check_integrity,
-            driver_globals=globals(),
-            real_stdout=_real_stdout,
+try:
+    # Resolve candidate code only after the trusted reference channel exists.
+    # The reference implementation itself is never imported in this process.
+    user_fn = load_user_function(_solution, STAGING_DIR)
+    evaluate_workloads(
+        WorkloadEvaluationRequest(
+            definition=definition,
+            workloads=workloads,
+            solution_name=_solution_name,
+            device=_device,
+            output_names=_output_names,
+            output_dtypes_torch=_output_dtypes_torch,
+            bench_config=bench_config,
+            destination_passing_style=_dps,
+            dependencies=EvaluationDependencies(
+                reference_client=_reference_client,
+                user_fn=user_fn,
+                integrity_snapshot=_integrity_snapshot,
+                check_integrity=_check_integrity,
+                driver_globals=globals(),
+                real_stdout=_real_stdout,
+            ),
         ),
     )
-)
+finally:
+    _reference_client.close()
 
 # TorchInductor and ROCm runtimes can leave non-daemon worker threads alive after
 # all benchmark traces have been emitted.  The driver is a one-shot subprocess,
