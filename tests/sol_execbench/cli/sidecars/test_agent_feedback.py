@@ -87,7 +87,7 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.agent-feedback.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == "sol_execbench.agent_feedback.v2"
+    assert payload["schema_version"] == "sol_execbench.agent_feedback.v3"
     assert payload["authority"] == "diagnostic"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["target_id"] == "gemm"

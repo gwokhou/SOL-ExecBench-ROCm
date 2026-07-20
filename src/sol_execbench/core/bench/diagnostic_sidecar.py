@@ -60,13 +60,8 @@ class DiagnosticSidecarAuthority(BaseModelWithDocstrings):
     performance_authority: Literal[False] = False
     timing_authority: Literal[False] = False
     score_authority: Literal[False] = False
-    evidence_tier_authority: Literal[False] = False
-    confirmed_improvement_authority: Literal[False] = False
-    release_gate_authority: Literal[False] = False
-    cutover_authority: Literal[False] = False
     paper_parity_authority: Literal[False] = False
     leaderboard_authority: Literal[False] = False
-    claim_upgrade_authority: Literal[False] = False
 
 
 def compact_path(path: str | None) -> str | None:

@@ -4,7 +4,7 @@
   "identity": {
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": "run-current",
-    "sol_version": "v1.43",
+    "sol_version": "v3.0.0",
     "trace_path": "trace.jsonl"
   },
   "limitations": [
@@ -14,7 +14,7 @@
     "No rocprofv3 profile result was supplied."
   ],
   "reason_code": "no_profile_result",
-  "schema_version": "sol_execbench.profile_summary.v2",
+  "schema_version": "sol_execbench.profile_summary.v3",
   "status": "unavailable",
   "summary": {
     "artifact_count": 0,

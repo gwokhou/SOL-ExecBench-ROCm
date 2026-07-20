@@ -432,7 +432,7 @@ def test_library_quantization_and_aten_fallback_dispatch() -> None:
 
 def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
     with pytest.raises(EinsumExecutionError, match="schema_version"):
-        EinsumGraphExecutor({"schema_version": 2, "layers": {}})
+        EinsumGraphExecutor({"schema_version": 0, "layers": {}})
     with pytest.raises(EinsumExecutionError, match="unsupported extended einsum"):
         verification._torch_equation("A(P+R)->A")
     with pytest.raises(EinsumExecutionError, match="explicit transpose dimensions"):

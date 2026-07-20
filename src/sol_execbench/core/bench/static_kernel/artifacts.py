@@ -5,12 +5,17 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
-from typing import Any, cast
+from typing import Literal
+
+from pydantic import Field
 
 from sol_execbench.core.integrity.checksums import sha256_file
+from sol_execbench.core.integrity.schema_versions import (
+    STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+)
+from sol_execbench.core.data.base_model import StrictArtifactModel
 from sol_execbench.core.bench.static_kernel.evidence_builders import (
     build_static_kernel_evidence_sidecar,
     build_static_kernel_evidence_unavailable,
@@ -32,6 +37,21 @@ _STATIC_ARTIFACT_SUFFIXES = {
     ".co": "code_object",
     ".o": "object_file",
 }
+
+
+class StaticArtifactManifestEntry(StrictArtifactModel):
+    """Structured path entry in the current static-artifact manifest."""
+
+    path: str = Field(min_length=1)
+
+
+class StaticArtifactManifest(StrictArtifactModel):
+    """Current explicit static-artifact selection manifest."""
+
+    schema_version: Literal["sol_execbench.static_artifact_manifest.v1"] = (
+        STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION
+    )
+    artifacts: list[str | StaticArtifactManifestEntry]
 
 
 def collect_static_kernel_artifacts(
@@ -148,15 +168,12 @@ def _discover_manifest_static_artifact_paths(
     evidence_root: Path,
     artifact_manifest_path: Path,
 ) -> tuple[Path, ...]:
-    payload = json.loads(artifact_manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("Static artifact manifest must be a JSON object")
-    entries = payload.get("artifacts")
-    if not isinstance(entries, list):
-        raise ValueError("Static artifact manifest must contain an artifacts list")
+    manifest = StaticArtifactManifest.model_validate_json(
+        artifact_manifest_path.read_text(encoding="utf-8")
+    )
 
     candidates: list[Path] = []
-    for index, entry in enumerate(entries):
+    for index, entry in enumerate(manifest.artifacts):
         relative_path = _artifact_manifest_entry_path(entry, index)
         if relative_path.is_absolute():
             continue
@@ -176,10 +193,8 @@ def _discover_manifest_static_artifact_paths(
 def _artifact_manifest_entry_path(entry: object, index: int) -> Path:
     if isinstance(entry, str):
         return Path(entry)
-    if isinstance(entry, dict):
-        value = cast(dict[str, Any], entry).get("path")
-        if isinstance(value, str):
-            return Path(value)
+    if isinstance(entry, StaticArtifactManifestEntry):
+        return Path(entry.path)
     raise ValueError(
         f"Static artifact manifest artifacts[{index}] must be a path string "
         "or an object with a path string"

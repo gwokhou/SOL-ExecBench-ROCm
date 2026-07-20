@@ -17,9 +17,11 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSidecarStatus,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.integrity.schema_versions import (
+    AGENT_FEEDBACK_SCHEMA_VERSION,
+    AgentFeedbackSchemaVersion,
+)
 
-
-AGENT_FEEDBACK_SCHEMA_VERSION = "sol_execbench.agent_feedback.v2"
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
 # Public compatibility names for this sidecar's contract vocabulary.
@@ -169,9 +171,7 @@ class AgentFeedbackSidecar(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    schema_version: Literal["sol_execbench.agent_feedback.v2"] = (
-        AGENT_FEEDBACK_SCHEMA_VERSION
-    )
+    schema_version: AgentFeedbackSchemaVersion = AGENT_FEEDBACK_SCHEMA_VERSION
     status: AgentFeedbackStatus
     reason_code: AgentFeedbackReasonCode
     identity: AgentFeedbackIdentity

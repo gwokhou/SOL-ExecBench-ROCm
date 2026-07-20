@@ -32,9 +32,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterator
 
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+
 logger = logging.getLogger(__name__)
 
-PID_LOCK_CONTENTION_SCHEMA = "sol_execbench.pid_lock_contention.v1"
+PID_LOCK_CONTENTION_SCHEMA = SCHEMA_VERSIONS["pid_lock_contention"]
 
 
 @contextlib.contextmanager

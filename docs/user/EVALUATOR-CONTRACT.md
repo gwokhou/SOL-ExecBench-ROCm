@@ -2,8 +2,7 @@
 
 The machine-readable contract is emitted by
 `sol_execbench.core.evaluator_contract.build_evaluator_contract`. It is the current
-ownership map; retired v1/v2 score and baseline surfaces are not authority for
-this corpus.
+ownership map for this corpus.
 
 ## Ownership
 

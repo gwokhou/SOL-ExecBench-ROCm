@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from sol_execbench.core.dataset.corpus import CorpusManifest
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
 
 def official_score_availability(corpus_manifest: str | Path) -> dict[str, Any]:
@@ -19,7 +20,7 @@ def official_score_availability(corpus_manifest: str | Path) -> dict[str, Any]:
     required = [str(item) for item in scoring.get("required_evidence") or []]
     manifest_status = str(scoring.get("status"))
     return {
-        "schema_version": "sol_execbench.official_score_availability.v1",
+        "schema_version": SCHEMA_VERSIONS["official_score_availability"],
         "status": "unavailable",
         "reason_code": reason,
         "manifest_status": manifest_status,

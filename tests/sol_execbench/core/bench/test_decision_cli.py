@@ -73,13 +73,13 @@ def test_decision_auto_writes_sidecar_with_matched_budget(tmp_path: Path) -> Non
         _static_evidence(["gfx942"]),
         env_path,
         run_id="r1",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
 
     assert path is not None
     assert path == tmp_path / "trace.jsonl.decision.json"
     decision = json.loads(path.read_text(encoding="utf-8"))
-    assert decision["schema_version"] == "sol_execbench.decision.v1"
+    assert decision["schema_version"] == "sol_execbench.decision.v2"
     assert decision["summary"]["architecture"] == "gfx942"  # matched target
     assert decision["authority"] == "diagnostic"
     assert any(h["bottleneck_class"] == "spill_detected" for h in decision["hints"])
@@ -138,7 +138,7 @@ def test_runtime_profile_demotes_pressure_and_keeps_spill(tmp_path: Path) -> Non
         env_path,
         runtime_profile_available=True,
         run_id="r1",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
     assert path is not None
     decision = json.loads(path.read_text(encoding="utf-8"))

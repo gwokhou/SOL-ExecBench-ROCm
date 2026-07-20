@@ -86,7 +86,7 @@ deletes its staging directory and publishes no partial result directory. A
 successful run writes a content-addressed manifest and atomically renames the
 complete staging directory into place.
 
-The converter's legacy implementation remains large, but its public flow is
+The converter implementation remains large, but its public flow is
 split into load, semantic conversion and artifact publication. The analyzer
 accepts a typed internal job. Existing SOLAR readability debt is inventoried in
 `scripts/solar_readability_debt.json`; it may shrink but cannot gain new items

@@ -52,6 +52,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(tmp_path, monkeypat
         Path(kwargs["output_path"]).write_text("predicate: passed\n")
 
     analysis = {
+        "schema_version": 3,
         "total": {"lower_bound_seconds": 0.001, "compute_resource": "mfma"},
         "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
     }
@@ -168,6 +169,7 @@ def test_analyze_refuses_to_overwrite_existing_output(tmp_path):
 def test_bound_and_reason_code_helpers_fail_closed():
     valid = api._extract_bound(
         {
+            "schema_version": 3,
             "total": {"lower_bound_seconds": 0, "compute_resource": None},
             "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
         }
@@ -178,6 +180,7 @@ def test_bound_and_reason_code_helpers_fail_closed():
         with pytest.raises(ValueError, match="finite lower bound"):
             api._extract_bound(
                 {
+                    "schema_version": 3,
                     "total": {"lower_bound_seconds": seconds},
                     "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
                 }
@@ -185,10 +188,13 @@ def test_bound_and_reason_code_helpers_fail_closed():
     with pytest.raises(ValueError, match="non-formal"):
         api._extract_bound(
             {
+                "schema_version": 3,
                 "total": {"lower_bound_seconds": 1},
                 "metadata": {"bound_kind": "roofline"},
             }
         )
+    with pytest.raises(ValueError, match="unsupported schema"):
+        api._extract_bound({"schema_version": 0})
     assert api._reason_code("formal_analysis", OrojenesisError("missing")) == (
         "toolchain_unavailable"
     )

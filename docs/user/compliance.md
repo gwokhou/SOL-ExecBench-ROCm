@@ -72,35 +72,11 @@ uv run scripts/check_dataset_redistribution.py --staged
 uv run scripts/check_dataset_redistribution.py --release-root out/prerelease_artifact_bundle
 ```
 
-## Unsupported NVIDIA Runtime Features
+## Runtime Boundary
 
-This port is ROCm-only and does not support:
-
-- CUDA runtime execution,
-- NVIDIA Container Toolkit requirements,
-- `nvidia-smi` clock management,
-- CUPTI timing,
-- `cuda_cpp` solution metadata,
-- `cuda_cflags` compile options,
-- B200 as an active hardware target,
-- CUTLASS, cuDNN, cuBLAS, CuTe DSL, or cuTile as active NVIDIA runtimes.
-
-Legacy dataset/example names may still contain historical directory names such
-as `cuda_cpp`, `cudnn`, or `cute_dsl`. In this port, those examples are either
-migrated to ROCm metadata/source or documented as PyTorch fallbacks.
-
-## ROCm Replacement Notes
-
-Replacement candidates documented during the port:
-
-- CUDA C++ -> HIP/C++ (`hip_cpp`)
-- cuBLAS -> hipBLAS or hipBLASLt
-- cuDNN -> MIOpen or HIP/Triton kernels
-- CUTLASS/CuTe/cuTile -> Composable Kernel, rocWMMA, HIP kernels, or Triton ROCm
-- CUB/Thrust-style primitives -> hipCUB, rocPRIM, rocThrust
-
-Library-specific replacements should be treated as candidates until compiled,
-tested, and validated on the relevant hardware class.
+This distribution supports the ROCm language, library, container, profiling,
+and hardware values enumerated by the current strict schemas. Values outside
+those closed enums are rejected without migration aliases.
 
 ## Known Gaps
 

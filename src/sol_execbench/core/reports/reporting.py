@@ -14,10 +14,11 @@ from typing import Any
 
 from ..data.trace import EvaluationStatus, Trace
 from ..evidence import CANONICAL_BENCHMARK_OUTPUT
+from ..integrity.schema_versions import SCHEMA_VERSIONS
 from ..platform.diagnostics import StageDiagnostic
 
 
-DERIVED_EVIDENCE_SCHEMA_VERSION = "sol_execbench.derived_evidence.v1"
+DERIVED_EVIDENCE_SCHEMA_VERSION = SCHEMA_VERSIONS["derived_evidence"]
 
 
 @dataclass(frozen=True)
@@ -59,7 +60,7 @@ class DerivedEvidenceReport:
 
     summary: TraceRunSummary
     diagnostics: tuple[StageDiagnostic, ...] = field(default_factory=tuple)
-    schema_version: str = DERIVED_EVIDENCE_SCHEMA_VERSION
+    schema_version: str = field(init=False, default=DERIVED_EVIDENCE_SCHEMA_VERSION)
     derived: bool = True
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
 

@@ -40,7 +40,7 @@ tests and current documentation in the same change.
 ## Readability debt
 
 The standard baseline is non-increasing. SOLAR is additionally checked against
-`scripts/solar_readability_debt.json`, an exact inventory of legacy long/wide
+`scripts/solar_readability_debt.json`, an exact inventory of pre-existing long/wide
 functions, `Any` modules and oversized modules. New debt or growth fails CI;
 removing or shrinking an item passes without editing the inventory. Vendored
 torchview code is excluded because it is not project-owned.

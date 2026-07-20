@@ -42,6 +42,7 @@ def test_call_and_collect_outputs_normalizes_return_value_outputs():
 def test_call_and_collect_outputs_supports_destination_passing_style():
     definition = make_definition(
         name="dps_demo",
+        op_type="dps_demo",
         axes={"N": {"type": "var"}},
         inputs={"x": {"shape": ["N"], "dtype": "float32"}},
         outputs={"out": {"shape": ["N"], "dtype": "float32"}},

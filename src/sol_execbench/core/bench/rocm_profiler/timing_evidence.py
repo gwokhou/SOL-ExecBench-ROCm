@@ -12,6 +12,9 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3TimingEvidence,
     Rocprofv3TimingRow,
 )
+from sol_execbench.core.bench.rocm_profiler.calibration import (
+    Rocprofv3OverheadCalibration,
+)
 from sol_execbench.core.bench.rocm_profiler.timing_parsing import (
     parse_rocprofv3_csv,
     summarize_rocprofv3_csv,
@@ -148,9 +151,10 @@ def read_overhead_calibration(
     if calibration_path is None or not calibration_path.exists():
         return None
     try:
-        payload = json.loads(calibration_path.read_text(encoding="utf-8"))
-        overhead = payload.get("overhead_ms")
-        return float(overhead) if overhead is not None else None
+        calibration = Rocprofv3OverheadCalibration.model_validate_json(
+            calibration_path.read_text(encoding="utf-8")
+        )
+        return calibration.overhead_ms
     except (json.JSONDecodeError, ValueError, OSError) as exc:
         import logging
 

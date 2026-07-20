@@ -15,9 +15,10 @@ from sol_execbench.core.platform.compatibility import (
     MatrixValidationScopeField,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
 
-ROCM_DOCKER_TARGETS_SCHEMA_VERSION = "sol_execbench.rocm_docker_targets.v1"
+ROCM_DOCKER_TARGETS_SCHEMA_VERSION = SCHEMA_VERSIONS["rocm_docker_targets"]
 
 
 DEFAULT_DOCKER_TARGET_MANIFEST = (

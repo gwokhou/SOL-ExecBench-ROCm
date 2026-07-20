@@ -1,14 +1,21 @@
 # Documentation
 
-The normative 3.0 documents are:
+The current 3.0 contract is documented here:
 
 - [SOLAR boundary](SOLAR-BOUNDARY.md)
-- [Scoring v3](SCORING-V3.md)
+- [Scoring contract](SCORING-V3.md)
+- [Schema boundaries](user/schema-boundaries.md)
 - [Definition schema](user/definition.md)
 - [Workload schema](user/workload.md)
 - [Solution schema](user/solution.md)
 - [Trace schema](user/trace.md)
+- [Evaluator contract](user/EVALUATOR-CONTRACT.md)
+- [ROCm environment and tooling](user/rocm.md)
 
-All other documents under `user/`, `internal/`, and `releases/` record pre-3.0
-behavior or engineering history. They are non-normative and do not describe the
-current CLI, problem corpus, SOL derivation, or official score authority.
+Optional agent-feedback, profile-summary, decision, static-kernel, environment,
+and compatibility artifacts are diagnostic. Their individual user guides state
+their current schema identifiers and authority limits.
+
+This tree documents only the current implementation. Superseded contracts and
+engineering history are available from Git history rather than checked-in
+archive directories.

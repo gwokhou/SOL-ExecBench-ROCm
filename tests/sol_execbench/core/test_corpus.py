@@ -220,6 +220,32 @@ def test_official_row_and_workload_selection_reject_drift():
         )
 
 
+def test_official_workload_import_normalizes_upstream_tolerance_name():
+    import pandas as pd
+
+    workload = {
+        "uuid": "workload-1",
+        "axes": {},
+        "inputs": {},
+        "tolerance": {"required_match_ratio": 0.98},
+    }
+    row = {"name": "problem", "workloads": json.dumps([workload])}
+    entry = CorpusEntry(
+        slot="slot",
+        config="config",
+        problem="problem",
+        workload_uuid="workload-1",
+        official_row_sha256=stable_json_checksum(row),
+        official_workload_sha256=stable_json_checksum(workload),
+        operation="test",
+    )
+
+    selected_row = corpus._select_official_row(pd.DataFrame([row]), entry)
+    selected = corpus._select_official_workload(selected_row, entry)
+
+    assert selected["tolerance"] == {"required_matched_ratio": 0.98}
+
+
 def test_definition_from_dataset_row_validates_serialized_contract():
     definition, _ = _sample_definition_and_workload()
     row = {
@@ -239,6 +265,7 @@ def test_definition_from_dataset_row_validates_serialized_contract():
     assert payload["name"] == definition["name"]
     assert payload["op_type"] == definition["op_type"]
     assert payload["inputs"] == definition["inputs"]
+    assert "hf_id" not in payload
 
 
 def test_definition_from_dataset_row_requires_operation_category():

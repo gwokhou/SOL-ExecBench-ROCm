@@ -56,7 +56,7 @@ and the device reports an AMD architecture such as `gfx1200`.
 
 ## Runtime Diagnostics
 
-v1.13 provides a standalone diagnostics command that does not require a problem
+The standalone diagnostics command does not require a problem
 directory or solution:
 
 ```bash
@@ -84,7 +84,7 @@ correctness or scoring.
 
 ## Optional Profiling Evidence
 
-v1.14 adds opt-in `rocprofv3` artifact collection for diagnosing anomalous or
+Opt-in `rocprofv3` artifact collection can diagnose anomalous or
 hardware-sensitive benchmark runs:
 
 ```bash
@@ -185,62 +185,9 @@ used. The setup script is self-documenting; run it with `--help`. Its default
 `check` mode is read-only, while `verify-live` explicitly exercises
 `STABLE_PEAK` and guarantees an `AUTO` cleanup attempt.
 
-## Engineering Prerelease Support Matrix
+## Hardware Scope
 
-The v1.25 engineering prerelease separates what has evidence from what is
-deferred or unavailable. These rows are support-boundary statements, not paper
-parity, upstream SOLAR parity, hosted leaderboard readiness, hard-sandbox
-authority, or new hardware-validation claims.
-Use engineering-prerelease evidence wording for these rows so container,
-RDNA 4, CDNA3, and CDNA4 statements stay bounded to the artifacts named in the
-project docs.
-
-| Support surface | Architecture or scope | Engineering prerelease status | Interpretation |
-| --- | --- | --- | --- |
-| RDNA 4 | `gfx1200` | Historical v1.35 same-source rerun recorded `derived_evidence_missing=0`, 121 replacement timing sidecars/workload manifests, 88 full profiler-backed problems, 28 partial profiler-backed problems, 0 fallback/profiler-blocked problems, 73 ready-missing timing problems, 0 rebuilt consistency findings, and `overall_status=passed`. The ignored raw output tree has been pruned. | Valid bounded RDNA4 evidence for the recorded host and historical artifacts; full profiler-backed timing coverage remains false, timing remains non-authoritative, and the result is not full 235-problem paper validation, upstream SOLAR parity, NVIDIA B200 equivalence, hosted leaderboard authority, CDNA3/MI300X validation, CDNA4 validation, or broader AMD hardware validation. |
-| Docker/container ROCm user-space | Declared ROCm container targets on recorded host driver/devices | Container user-space evidence can be recorded for selected ROCm targets. | Docker/container ROCm user-space evidence is not native-host validation and must not be used as native-host, score, paper-parity, or leaderboard authority. |
-| MI300X GPU under CDNA 3 | MI300X and MI308X are sibling GPU products under the CDNA3 architecture family and share the `gfx942` code path; `gfx940`, `gfx941`, and `gfx942` remain CDNA 3 code/schema targets. | CDNA3 validation infrastructure evidence exists on MI308X (`gfx942`): pytest passed, the full dataset run executed, Quant NVFP4/MXFP4 skips were expected, and remaining non-skip blockers are timeout shards. | This is not a completed benchmark-grade MI300X hardware-validation claim because MI308X and MI300X hardware configurations differ, despite sharing `gfx942`. |
-| CDNA4 | Future CDNA4 class hardware | CDNA4 validation is unavailable because suitable hardware is not currently accessible. | CDNA4 is not a v1.25 validation target and should be reported as unavailable, not as validated or merely skipped. |
-
-NVFP4/MXFP4 Quant benchmark ROCm adaptation is deliberately deferred while no
-CDNA4-class hardware is available. The project does not replace CUDA-only
-scaled-matrix-multiply reference semantics with a dequantized fallback for
-benchmark validation; CDNA3 runs record these problems as expected
-`cdna3_low_precision_hardware_unsupported` skips instead.
-
-## Hardware Status
-
-Validation recorded in this milestone:
-
-| Hardware class | Architecture | Status |
-| --- | --- | --- |
-| RDNA 4 | `gfx1200` | v1.35 same-source rerun evidence exists with `derived_evidence_missing=0`, 121 replacement profiler timing sidecars, 88 full profiler-backed problems, 28 partial profiler-backed problems, 0 rebuilt consistency findings, a passing prerelease artifact bundle, and an explicit `full_profiler_backed_timing_coverage=false` boundary. |
-| CDNA 3 | `gfx940`, `gfx941`, `gfx942` (`gfx94*`) | Code/schema support present. Real MI308X (`gfx942`) runs recorded a passed adapted pytest suite and an operational full-dataset validation path with known timeout blockers. Do not claim full MI300X hardware validation until those blockers and required exact-hardware MI300X evidence are resolved or explicitly bounded. |
-| CDNA 4 | future CDNA4 class targets | CDNA4 validation is unavailable because suitable hardware is not currently accessible. |
-
-The current CDNA3 evidence is bounded. A real MI308X (`gfx942`) cloud run
-passed the adapted pytest suite, and a later 235-problem dataset validation run
-showed 220 complete passing problem traces, 15 expected Quant NVFP4/MXFP4 skips
-on CDNA3, and 6 timeout shards across 4 problems. The nested timeout
-classification path was fixed and targeted verification confirmed that timed
-out shards are now recorded as `TIMEOUT` traces and summary failures.
-
-The missing benchmark-grade MI300X evidence is an exact MI300X environment
-record plus a timeout-free or explicitly bounded dataset result, clock-lock
-evidence, timing artifacts, AMD-native score artifacts, and FP8 status. MI308X
-and MI300X share the `gfx942` code path but have different hardware
-configurations, so MI308X evidence cannot complete MI300X validation. Timing
-from the tested cloud environment must remain unlocked-clock evidence until the
-host can report locked clocks. NVFP4/MXFP4 validation remains deferred on CDNA3
-and requires CDNA4-class hardware support.
-
-CDNA3 test readiness is now concrete but still bounded: the repository contains
-`tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py`, which is selected with
-`requires_cdna3` and runs only on `gfx94*` ROCm targets. The status may change
-from infrastructure evidence to MI300X hardware-validated only after the MI300X
-handoff artifacts exist for actual MI300X hardware and
-`mi300x_validation_claim_blockers()` returns no blockers.
-
-The v1.8 ROCm library ecosystem milestone uses RDNA 4 validation only.
-MI300X library validation remains future work, and CDNA4 validation is
-unavailable until suitable hardware is accessible.
+The Solution schema accepts `gfx1200`, `gfx940`, `gfx941`, `gfx942`, and
+`LOCAL`. Schema acceptance is not a hardware-validation claim. Tests requiring
+a real GPU declare `requires_rocm`, `requires_rdna4`, or `requires_cdna3`; their
+results apply only to the device and workload surface actually executed.

@@ -82,6 +82,7 @@ class EvilCase:
 # Inline problem definition for evil-case e2e tests.
 _EVIL_DEFINITION_DICT = {
     "name": "evil_test_vecadd",
+    "op_type": "evil_test_vecadd",
     "axes": {"n": {"type": "const", "value": 256}},
     "inputs": {
         "x": {"shape": ["n"], "dtype": "float32"},

@@ -1,4 +1,4 @@
 {
-  "schema_version": "sol_execbench.agent_feedback.v1",
+  "schema_version": "sol_execbench.agent_feedback.v3",
   "status": "available",
   "reason_code": "feedback_generated"

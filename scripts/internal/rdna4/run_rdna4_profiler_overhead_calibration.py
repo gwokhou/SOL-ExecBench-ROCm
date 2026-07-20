@@ -30,11 +30,15 @@ from sol_execbench.core.bench.timing_isolation import (
     validate_gpu_device_isolation,
     verify_clock_state_with_warning,
 )
+from sol_execbench.core.bench.rocm_profiler.calibration import (
+    ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
+    Rocprofv3OverheadCalibration,
+)
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 
 logger = logging.getLogger(__name__)
 
-CALIBRATION_SCHEMA_VERSION = "sol_execbench.rocprofv3_overhead_calibration.v1"
+CALIBRATION_SCHEMA_VERSION = ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION
 DEFAULT_ITERATIONS = 100
 DEFAULT_WARMUP_RUNS = 10
 DEFAULT_GPU_ARCHITECTURE = "gfx1200"
@@ -175,27 +179,29 @@ def run_calibration(
         profiler_median = median(profiler_durations)
         overhead_ms = profiler_median - baseline_median
 
-        calibration = {
-            "schema_version": CALIBRATION_SCHEMA_VERSION,
-            "generated_at": _utc_timestamp(),
-            "baseline_median_ms": round(baseline_median, 6),
-            "profiler_median_ms": round(profiler_median, 6),
-            "overhead_ms": round(overhead_ms, 6),
-            "iterations": iterations,
-            "warmup_runs": warmup_runs,
-            "element_count": element_count,
-            "gpu_architecture": gpu_architecture,
-            "profiler_executable": resolved_profiler,
-            "clock_locked": clock_ok,
-            "clock_setup": {
-                "managed": manage_clocks,
-                "lock_acquired": clock_state.lock_acquired,
-                "reset_on_exit": reset_clocks,
-            },
-            "gpu_isolation": gpu_isolation,
-            "baseline_sample_count": len(baseline_durations),
-            "profiler_sample_count": len(profiler_durations),
-        }
+        calibration = Rocprofv3OverheadCalibration.model_validate(
+            {
+                "schema_version": CALIBRATION_SCHEMA_VERSION,
+                "generated_at": _utc_timestamp(),
+                "baseline_median_ms": round(baseline_median, 6),
+                "profiler_median_ms": round(profiler_median, 6),
+                "overhead_ms": round(overhead_ms, 6),
+                "iterations": iterations,
+                "warmup_runs": warmup_runs,
+                "element_count": element_count,
+                "gpu_architecture": gpu_architecture,
+                "profiler_executable": resolved_profiler,
+                "clock_locked": clock_ok,
+                "clock_setup": {
+                    "managed": manage_clocks,
+                    "lock_acquired": clock_state.lock_acquired,
+                    "reset_on_exit": reset_clocks,
+                },
+                "gpu_isolation": gpu_isolation,
+                "baseline_sample_count": len(baseline_durations),
+                "profiler_sample_count": len(profiler_durations),
+            }
+        ).model_dump(mode="json", exclude_none=True)
         if source_revision is not None:
             calibration["source_revision"] = source_revision
 

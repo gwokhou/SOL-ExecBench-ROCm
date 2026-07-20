@@ -83,7 +83,7 @@ def structured_profile_evidence(
         }:
             parse_warnings.append(
                 f"{artifact.path.name}: {artifact.kind} artifacts are "
-                "citation-only in sol_execbench.profile_summary.v2"
+                "citation-only in sol_execbench.profile_summary.v3"
             )
         elif artifact.kind == "other":
             parse_warnings.append(

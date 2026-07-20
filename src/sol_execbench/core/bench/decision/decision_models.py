@@ -24,9 +24,11 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSidecarStatus,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.integrity.schema_versions import (
+    DECISION_SCHEMA_VERSION,
+    DecisionSchemaVersion,
+)
 
-
-DECISION_SCHEMA_VERSION = "sol_execbench.decision.v1"
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
 # Public compatibility names for this sidecar's contract vocabulary.
@@ -65,7 +67,7 @@ class DecisionConfidence(str, Enum):
     """Confidence vocabulary for inferred decision hints.
 
     The ``inferred_*`` prefix marks these as static-inferred (not measured).
-    Runtime ``measured_*`` values live in ``profile_summary.v2`` and take
+    Runtime ``measured_*`` values live in the current profile-summary schema and take
     precedence on conflict (see decision_sidecar_contract.md precedence rule).
     """
 
@@ -211,7 +213,7 @@ class DecisionSidecar(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    schema_version: Literal["sol_execbench.decision.v1"] = DECISION_SCHEMA_VERSION
+    schema_version: DecisionSchemaVersion = DECISION_SCHEMA_VERSION
     status: DecisionStatus
     reason_code: DecisionReasonCode
     identity: DecisionIdentity

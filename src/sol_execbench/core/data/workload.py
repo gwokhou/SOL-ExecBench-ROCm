@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Optional, Union
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import Field, model_validator
 
 from .base_model import BaseModelWithDocstrings, NonEmptyString, NonNegativeInt
 
@@ -92,10 +92,7 @@ class ToleranceSpec(BaseModelWithDocstrings):
     """The maximum absolute error allowed for the problem."""
     max_rtol: float = Field(default=1e-2)
     """The maximum relative error allowed for the problem."""
-    required_matched_ratio: float = Field(
-        default=0.99,
-        validation_alias=AliasChoices("required_matched_ratio", "required_match_ratio"),
-    )
+    required_matched_ratio: float = Field(default=0.99)
     """The ratio of elements that must pass the correctness bounds to be considered correct."""
     max_error_cap: Optional[float] = Field(default=None)
     """Hard ceiling on maximum absolute error. If set, correctness fails when any

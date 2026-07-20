@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+
 from sol_execbench.core.bench.rocm_profiler.artifacts import (
     PROFILE_OUTPUT_DIR_NAMES,
     discover_rocprofv3_artifacts,
@@ -266,7 +268,7 @@ def write_rocprofv3_diagnostic_artifact(
     """Persist bounded profiler execution diagnostics when rocprof writes no data."""
     path = request.output_directory / f"{request.output_file}.diagnostics.json"
     payload = {
-        "schema_version": "sol_execbench.rocprofv3_diagnostics.v1",
+        "schema_version": SCHEMA_VERSIONS["rocprofv3_diagnostics"],
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "diagnostic_only": True,
         "score_authority": False,

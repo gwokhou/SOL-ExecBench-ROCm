@@ -78,7 +78,6 @@ def test_profile_summary_stale_fixture_classifies_as_stale_diagnostic():
     assert guardrail.status == "stale_diagnostic"
     assert guardrail.timing_authority is False
     assert guardrail.score_authority is False
-    assert guardrail.release_gate_authority is False
 
 
 def test_profile_summary_negative_fixtures_downgrade_to_invalid_or_missing():
@@ -112,8 +111,6 @@ def test_profile_summary_negative_fixtures_downgrade_to_invalid_or_missing():
     ):
         assert guardrail.timing_authority is False
         assert guardrail.score_authority is False
-        assert guardrail.evidence_tier_authority is False
-        assert guardrail.release_gate_authority is False
 
 
 def test_profile_summary_fixtures_are_prompt_safe_and_deterministic():
@@ -151,7 +148,7 @@ def test_profile_summary_docs_explain_hip_mapping_and_fixture_semantics():
     for expected in (
         "HIP Consumer Mapping",
         "profile_summary.sidecar",
-        "sol_execbench.profile_summary.v2",
+        "sol_execbench.profile_summary.v3",
         "summary.profiler_status",
         "summary.metrics[]",
         "summary.workload_metrics[]",

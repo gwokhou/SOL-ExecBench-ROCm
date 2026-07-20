@@ -402,7 +402,7 @@ def test_region_roles_and_curve_composition(tmp_path):
 def test_region_validation_errors(tmp_path):
     region = orojenesis.find_multi_einsum_regions(_linear_layers(batched=True))[0]
     mutations = [
-        lambda item: item.update(schema_version=2),
+        lambda item: item.update(schema_version=0),
         lambda item: item.update(composition="wrong"),
         lambda item: item.update(schedule=list(reversed(item["schedule"]))),
         lambda item: item["nodes"][0].update(m=0),

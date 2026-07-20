@@ -52,7 +52,7 @@ decision sidecar absent.
 
 ## What The Sidecar Contains
 
-The sidecar schema is `sol_execbench.decision.v1`. It contains:
+The sidecar schema is `sol_execbench.decision.v2`. It contains:
 
 - diagnostic-only authority (`authority: "diagnostic"`)
 - aggregate `status` and `reason_code`

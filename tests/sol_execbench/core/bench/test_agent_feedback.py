@@ -103,7 +103,7 @@ def _trace(status: EvaluationStatus = EvaluationStatus.PASSED) -> Trace:
 def test_agent_feedback_identity_uses_canonical_fields_only() -> None:
     identity = AgentFeedbackIdentity(
         generated_at="2026-01-01T00:00:00Z",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
         trace_path="trace.jsonl",
         target_id="gemm",
         run_id="run-1",
@@ -113,7 +113,7 @@ def test_agent_feedback_identity_uses_canonical_fields_only() -> None:
 
     payload = identity.model_dump(mode="json", exclude_none=True)
 
-    assert payload["sol_version"] == "v1.43"
+    assert payload["sol_version"] == "v3.0.0"
     assert payload["candidate_id"] == "candidate-sha"
     assert payload["source_sha256"] == "source-sha"
     assert "sol_contract_version" not in payload
@@ -124,18 +124,18 @@ def test_agent_feedback_identity_uses_canonical_fields_only() -> None:
 @pytest.mark.parametrize(
     ("legacy_alias", "legacy_kwargs"),
     [
-        ("sol_contract_version", {"sol_contract_version": "v1.43"}),
+        ("sol_contract_version", {"sol_contract_version": "v3.0.0"}),
         (
             "candidate_hash",
             {
-                "sol_contract_version": "v1.43",
+                "sol_contract_version": "v3.0.0",
                 "candidate_hash": "candidate-sha",
             },
         ),
         (
             "source_hash",
             {
-                "sol_contract_version": "v1.43",
+                "sol_contract_version": "v3.0.0",
                 "source_hash": "source-sha",
             },
         ),
@@ -148,7 +148,7 @@ def test_agent_feedback_identity_rejects_legacy_alias_fields(
     with pytest.raises(ValidationError, match=legacy_alias):
         AgentFeedbackIdentity(
             generated_at="2026-01-01T00:00:00Z",
-            sol_version="v1.43",
+            sol_version="v3.0.0",
             trace_path="trace.jsonl",
             candidate_id="candidate-sha",
             source_sha256="source-sha",
@@ -160,7 +160,7 @@ def test_agent_feedback_sidecar_is_diagnostic_only_for_passing_trace():
     sidecar = build_agent_feedback_sidecar(traces=[_trace()])
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == "sol_execbench.agent_feedback.v2"
+    assert payload["schema_version"] == "sol_execbench.agent_feedback.v3"
     assert payload["status"] == "available"
     assert payload["reason_code"] == "feedback_generated"
     assert payload["summary"]["status_counts"] == {"PASSED": 1}
@@ -177,7 +177,7 @@ def test_agent_feedback_sidecar_builder_emits_no_legacy_identity_aliases() -> No
         run_id="run-1",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
 
     raw_identity = sidecar.to_dict()["identity"]
@@ -186,7 +186,7 @@ def test_agent_feedback_sidecar_builder_emits_no_legacy_identity_aliases() -> No
 
     assert identity["candidate_id"] == "candidate-sha"
     assert identity["source_sha256"] == "source-sha"
-    assert identity["sol_version"] == "v1.43"
+    assert identity["sol_version"] == "v3.0.0"
     assert "candidate_hash" not in identity
     assert "source_hash" not in identity
     assert "sol_contract_version" not in identity
@@ -198,7 +198,7 @@ def test_agent_feedback_freshness_rejects_missing_canonical_identity() -> None:
         trace_path="trace.jsonl",
         target_id="gemm",
         run_id="run-1",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
 
     stale = validate_agent_feedback_freshness(
@@ -208,7 +208,7 @@ def test_agent_feedback_freshness_rejects_missing_canonical_identity() -> None:
         run_id="run-1",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
 
     assert stale.status.value == "stale"
@@ -236,7 +236,7 @@ def test_agent_feedback_sidecar_records_identity_and_artifact_citations(
         run_id="run-0",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v1.36",
+        sol_version="v3.0.0",
         generated_at="2026-06-16T00:00:00Z",
         artifact_citations=[citation],
     )
@@ -246,7 +246,7 @@ def test_agent_feedback_sidecar_records_identity_and_artifact_citations(
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["target_id"] == "problem-0"
     assert payload["identity"]["run_id"] == "run-0"
-    assert payload["identity"]["sol_version"] == "v1.36"
+    assert payload["identity"]["sol_version"] == "v3.0.0"
     assert payload["identity"]["candidate_id"] == "candidate-sha"
     assert payload["identity"]["source_sha256"] == "source-sha"
     assert "sol_contract_version" not in payload["identity"]
@@ -272,7 +272,7 @@ def test_agent_feedback_sidecar_freshness_uses_canonical_sol_version() -> None:
         run_id="run-001",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v1.36",
+        sol_version="v3.0.0",
     )
 
     current = validate_agent_feedback_freshness(
@@ -281,9 +281,9 @@ def test_agent_feedback_sidecar_freshness_uses_canonical_sol_version() -> None:
         run_id="run-001",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v1.36",
+        sol_version="v3.0.0",
     )
-    stale = validate_agent_feedback_freshness(sidecar, sol_version="v1.35")
+    stale = validate_agent_feedback_freshness(sidecar, sol_version="v3.0.0-stale")
 
     assert current.status == "current"
     assert stale.status == "stale"
@@ -459,12 +459,12 @@ def test_agent_feedback_governance_guardrail_states_remain_diagnostic_only(
                 assert value is False
 
 
-def test_agent_feedback_governance_rejects_authority_override():
+def test_agent_feedback_governance_rejects_unknown_authority_field():
     guardrail = evaluate_agent_feedback_governance(
         sidecar=build_agent_feedback_sidecar(traces=[_trace()])
     )
     payload = guardrail.model_dump(mode="json")
-    payload["claim_upgrade_authority"] = True
+    payload["unsupported_authority"] = True
 
     with pytest.raises(ValidationError):
         AgentFeedbackGovernanceGuardrail.model_validate(payload)

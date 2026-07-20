@@ -16,7 +16,7 @@
 
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic import Field, field_validator, model_validator
 
@@ -231,42 +231,6 @@ class BuildSpec(BaseModelWithDocstrings):
     HIP/C++ languages. Ignored for Python and Triton languages."""
     compile_options: Optional[CompileOptions] = None
     """Optional compiler and linker flags. Only used for HIP/C++ solutions with torch binding."""
-
-    @field_validator("languages", mode="before")
-    @classmethod
-    def _reject_legacy_languages(cls, value: Any) -> Any:
-        """Reject CUDA/NVIDIA language values with ROCm migration guidance."""
-        if value is None:
-            return value
-        values = value if isinstance(value, list) else [value]
-        replacements = {
-            "cuda_cpp": "hip_cpp",
-            "cutlass": "ck or rocwmma",
-            "cudnn": "miopen",
-            "cudnn_frontend": "miopen",
-            "cublas": "hipblas",
-            "cute_dsl": "no direct Phase 2 ROCm replacement; Phase 4 owns concrete replacements",
-            "cutile": "no direct Phase 2 ROCm replacement; Phase 4 owns concrete replacements",
-        }
-        for item in values:
-            raw = item.value if isinstance(item, Enum) else item
-            if raw in replacements:
-                raise ValueError(
-                    f"Unsupported CUDA/NVIDIA language value '{raw}' in ROCm "
-                    f"schema; use {replacements[raw]} instead."
-                )
-        return value
-
-    @field_validator("compile_options", mode="before")
-    @classmethod
-    def _reject_legacy_compile_options(cls, value: Any) -> Any:
-        """Reject CUDA compile option keys before nested model validation."""
-        if isinstance(value, dict) and "cuda_cflags" in value:
-            raise ValueError(
-                "Unsupported compile option 'cuda_cflags' in ROCm schema; use "
-                "'hip_cflags' instead."
-            )
-        return value
 
     @model_validator(mode="after")
     def _validate_entry_point(self) -> "BuildSpec":

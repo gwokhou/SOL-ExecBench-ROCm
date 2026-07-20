@@ -52,9 +52,17 @@ def _operation(
     }
 
 
-def _analyze(tmp_path: Path, layers: dict[str, Any], *, strict: bool = False):
+def _analyze(
+    tmp_path: Path,
+    layers: dict[str, Any],
+    *,
+    strict: bool = False,
+    schema_version: int = 3,
+):
     graph_path = tmp_path / "einsum_graph.yaml"
-    graph_path.write_text(yaml.safe_dump({"schema_version": 2, "layers": layers}))
+    graph_path.write_text(
+        yaml.safe_dump({"schema_version": schema_version, "layers": layers})
+    )
     output_dir = tmp_path / "analysis"
     result = EinsumGraphAnalyzer().analyze_graph(
         graph_path,
@@ -89,7 +97,7 @@ def test_analysis_stages_account_simple_external_io(tmp_path: Path) -> None:
     assert result["total"]["fused_elements"] == 6
     assert result["total"]["intermediate_elements"] == 0
     assert result["total"]["resource_work"] == {"valu": {"fp32": 2}}
-    assert result["metadata"]["orojenesis"]["status"] == "not_applicable"
+    assert result["metadata"]["orojenesis"]["status"] == "not_requested"
     assert yaml.safe_load((output_dir / "analysis.yaml").read_text()) == result
 
 
@@ -132,9 +140,10 @@ def test_transparent_view_preserves_internal_io_and_shared_input_deduplication(
     assert result["total"]["intermediate_elements"] == 4
 
 
-def test_strict_analysis_rejects_legacy_schema(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="latest schema_version"):
-        _analyze(tmp_path, {"start": _start()}, strict=True)
+@pytest.mark.parametrize("strict", [False, True])
+def test_analysis_rejects_unsupported_schema(tmp_path: Path, strict: bool) -> None:
+    with pytest.raises(ValueError, match="schema_version=3"):
+        _analyze(tmp_path, {"start": _start()}, strict=strict, schema_version=0)
 
 
 def test_low_precision_dequantization_is_proven_recomputable() -> None:

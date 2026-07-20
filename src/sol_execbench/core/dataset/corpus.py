@@ -26,7 +26,7 @@ FORMAL_ARCHITECTURE_SHA256 = (
     "944aa6f9383a565bd4e636b068ee077e7415f38f15517b69cb78b6ea32c9a8dd"
 )
 OFFICIAL_CORPUS_MANIFEST_SHA256 = (
-    "530d2069f440682b1ddbfe1ffa0a0974bc7a76d4ae7f238b420ebf635e31a4a6"
+    "a89d07c1c0eb0e74275d17b1ff9e09058f97826190b2ebbbb53bab4b706248e6"
 )
 
 
@@ -241,9 +241,19 @@ def _select_official_workload(
     ]
     if len(matches) != 1:
         raise ValueError(f"official workload missing: {entry.workload_uuid}")
-    if stable_json_checksum(matches[0]) != entry.official_workload_sha256:
+    raw_workload = matches[0]
+    if stable_json_checksum(raw_workload) != entry.official_workload_sha256:
         raise ValueError(f"official workload drifted: {entry.workload_uuid}")
-    return matches[0]
+    workload = dict(raw_workload)
+    tolerance = workload.get("tolerance")
+    if isinstance(tolerance, dict) and "required_match_ratio" in tolerance:
+        normalized_tolerance = dict(tolerance)
+        normalized_tolerance["required_matched_ratio"] = normalized_tolerance.pop(
+            "required_match_ratio"
+        )
+        workload["tolerance"] = normalized_tolerance
+    Workload.model_validate(workload)
+    return workload
 
 
 def _definition_from_row(
@@ -252,11 +262,10 @@ def _definition_from_row(
     resolved_op_type = str(row.get("op_type") or op_type or "").strip()
     if not resolved_op_type:
         raise ValueError("official problem definition is missing op_type")
-    definition = {
+    definition: dict[str, Any] = {
         "name": str(row["name"]),
         "op_type": resolved_op_type,
         "description": str(row.get("description") or ""),
-        "hf_id": str(row.get("hf_id") or ""),
         "axes": json.loads(str(row["axes"])),
         "inputs": json.loads(str(row["inputs"])),
         "outputs": json.loads(str(row["outputs"])),
@@ -265,6 +274,9 @@ def _definition_from_row(
     custom = row.get("custom_inputs_entrypoint")
     if isinstance(custom, str) and custom:
         definition["custom_inputs_entrypoint"] = custom
+    hf_id = row.get("hf_id")
+    if isinstance(hf_id, str) and hf_id:
+        definition["hf_id"] = hf_id
     Definition.model_validate(definition)
     return definition
 

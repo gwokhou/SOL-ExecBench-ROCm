@@ -117,11 +117,37 @@ class TestBuildTimingEvidenceWithOverhead:
 class TestReadOverheadCalibration:
     """Test _read_overhead_calibration function."""
 
+    @staticmethod
+    def _payload(**overrides):
+        payload = {
+            "schema_version": "sol_execbench.rocprofv3_overhead_calibration.v1",
+            "generated_at": "2026-07-20T00:00:00Z",
+            "baseline_median_ms": 0.05,
+            "profiler_median_ms": 0.073,
+            "overhead_ms": 0.023,
+            "iterations": 10,
+            "warmup_runs": 2,
+            "element_count": 1024,
+            "gpu_architecture": "gfx1200",
+            "profiler_executable": "rocprofv3",
+            "clock_locked": True,
+            "clock_setup": {
+                "managed": True,
+                "lock_acquired": True,
+                "reset_on_exit": True,
+            },
+            "gpu_isolation": {},
+            "baseline_sample_count": 10,
+            "profiler_sample_count": 10,
+        }
+        payload.update(overrides)
+        return payload
+
     def test_reads_valid_calibration(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             cal_path = Path(tmpdir) / "cal.json"
             cal_path.write_text(
-                json.dumps({"overhead_ms": 0.023}) + "\n",
+                json.dumps(self._payload()) + "\n",
                 encoding="utf-8",
             )
             result = _read_overhead_calibration(cal_path)
@@ -142,11 +168,11 @@ class TestReadOverheadCalibration:
             result = _read_overhead_calibration(cal_path)
             assert result is None
 
-    def test_returns_none_for_missing_overhead_key(self):
+    def test_returns_none_for_unsupported_schema(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             cal_path = Path(tmpdir) / "cal.json"
             cal_path.write_text(
-                json.dumps({"baseline_median_ms": 0.05}) + "\n",
+                json.dumps({"schema_version": "unsupported"}) + "\n",
                 encoding="utf-8",
             )
             result = _read_overhead_calibration(cal_path)

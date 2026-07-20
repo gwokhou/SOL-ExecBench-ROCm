@@ -8,8 +8,10 @@ from typing import Any
 
 import click
 
-CLI_RESPONSE_SCHEMA_VERSION = "sol_execbench.cli_response.v1"
-CLI_CONTRACT_SCHEMA_VERSION = "sol_execbench.cli_contract.v1"
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+
+CLI_RESPONSE_SCHEMA_VERSION = SCHEMA_VERSIONS["cli_response"]
+CLI_CONTRACT_SCHEMA_VERSION = SCHEMA_VERSIONS["cli_contract"]
 
 EXIT_SUCCESS = 0
 EXIT_RESULT_FAILED = 1

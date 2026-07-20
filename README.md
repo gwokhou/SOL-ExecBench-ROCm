@@ -42,9 +42,9 @@ snapshot instead of downloading it.
 
 This repository imports and audits the pinned upstream dataset. It does not
 implement the paper's dataset extraction, curation, or baseline-generation
-pipelines. Formal materialization requires every selected definition to carry
-a non-empty `op_type`; the manifest's reviewed `operation` supplies it for the
-older upstream rows that omit the field.
+pipelines. The public Definition contract requires a non-empty `op_type`; the
+pinned importer supplies it from the manifest's reviewed `operation` before
+validating each selected upstream row.
 
 ## Evaluate and analyze
 

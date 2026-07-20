@@ -492,6 +492,30 @@ def test_static_artifact_collection_can_use_explicit_artifact_manifest(tmp_path)
     assert not (evidence_dir / "artifacts" / "unlisted" / "kernel.o").exists()
 
 
+def test_static_artifact_manifest_rejects_unsupported_schema(tmp_path):
+    build_dir = tmp_path / "staging"
+    evidence_dir = tmp_path / "evidence"
+    build_dir.mkdir()
+    (build_dir / "benchmark_kernel.so").write_bytes(b"shared")
+    manifest_path = tmp_path / "artifact-manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "unsupported",
+                "artifacts": [{"path": "benchmark_kernel.so"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        collect_static_kernel_artifacts(
+            build_directory=build_dir,
+            evidence_directory=evidence_dir,
+            artifact_manifest_path=manifest_path,
+        )
+
+
 def test_static_artifact_collection_reports_unavailable_without_primary_artifact(
     tmp_path,
 ):

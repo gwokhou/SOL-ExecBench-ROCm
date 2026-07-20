@@ -30,7 +30,11 @@ NonNegativeInt = Annotated[int, Field(ge=0)]
 class BaseModelWithDocstrings(BaseModel):
     """Base model with the attribute docstrings being extracted to the model JSON schema."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        use_attribute_docstrings=True,
+        validate_assignment=True,
+    )
 
 
 class StrictArtifactModel(BaseModel):

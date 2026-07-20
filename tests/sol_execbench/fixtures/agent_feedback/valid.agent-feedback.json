@@ -20,7 +20,7 @@
     "candidate_id": "candidate-demo",
     "generated_at": "2026-06-16T00:00:00Z",
     "run_id": "run-demo",
-    "sol_version": "v1.43",
+    "sol_version": "v3.0.0",
     "source_sha256": "source-demo",
     "target_id": "linear-demo",
     "trace_path": "trace.jsonl"
@@ -46,7 +46,7 @@
     "Canonical Trace JSONL remains the authority for correctness, timing, scoring, and status."
   ],
   "reason_code": "feedback_generated",
-  "schema_version": "sol_execbench.agent_feedback.v2",
+  "schema_version": "sol_execbench.agent_feedback.v3",
   "source_refs": [
     {
       "kind": "trace",

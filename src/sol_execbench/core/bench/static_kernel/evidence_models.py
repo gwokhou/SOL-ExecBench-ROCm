@@ -11,9 +11,11 @@ from typing import Annotated, Literal
 from pydantic import BeforeValidator, ConfigDict, Field
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.integrity.schema_versions import (
+    STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
+)
 
 
-STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION = "sol_execbench.static_kernel_evidence.v3"
 _STATIC_MODEL_CONFIG = ConfigDict(
     extra="forbid",
     frozen=True,

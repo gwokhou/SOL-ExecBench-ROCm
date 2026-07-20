@@ -24,9 +24,11 @@ from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryStructuredMetric,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.integrity.schema_versions import (
+    PROFILE_SUMMARY_SCHEMA_VERSION,
+    ProfileSummarySchemaVersion,
+)
 
-
-PROFILE_SUMMARY_SCHEMA_VERSION = "sol_execbench.profile_summary.v2"
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 _PROFILE_SUMMARY_MODEL_EXPORTS = (
     ProfileSummaryBottleneckHint,
@@ -89,9 +91,7 @@ class ProfileSummarySidecar(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    schema_version: Literal["sol_execbench.profile_summary.v2"] = (
-        PROFILE_SUMMARY_SCHEMA_VERSION
-    )
+    schema_version: ProfileSummarySchemaVersion = PROFILE_SUMMARY_SCHEMA_VERSION
     status: ProfileSummaryStatus
     reason_code: ProfileSummaryReasonCode
     identity: ProfileSummaryIdentity

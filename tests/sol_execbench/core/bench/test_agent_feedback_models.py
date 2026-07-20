@@ -95,7 +95,7 @@ def test_agent_feedback_model_names_remain_reexported_from_facade() -> None:
         AgentFeedbackArtifactCitation(kind="trace", label="trace", path="trace.jsonl"),
         AgentFeedbackIdentity(
             generated_at="2026-01-01T00:00:00Z",
-            sol_version="v1.43",
+            sol_version="v3.0.0",
         ),
         AgentFeedbackFreshnessValidation(status=AgentFeedbackFreshnessStatus.CURRENT),
         AgentFeedbackGovernanceGuardrail(
@@ -113,7 +113,7 @@ def test_agent_feedback_model_names_remain_reexported_from_facade() -> None:
             reason_code=AgentFeedbackReasonCode.NO_EVALUATION_TRACES,
             identity=AgentFeedbackIdentity(
                 generated_at="2026-01-01T00:00:00Z",
-                sol_version="v1.43",
+                sol_version="v3.0.0",
             ),
             summary=AgentFeedbackSummary(trace_count=0, evaluated_trace_count=0),
         ),
@@ -133,7 +133,7 @@ def test_agent_feedback_models_remain_strict_and_frozen(model: BaseModel) -> Non
 def test_agent_feedback_sidecar_model_defaults_remain_stable() -> None:
     identity = AgentFeedbackIdentity(
         generated_at="2026-01-01T00:00:00Z",
-        sol_version="v1.43",
+        sol_version="v3.0.0",
     )
     summary = AgentFeedbackSummary(trace_count=0, evaluated_trace_count=0)
     sidecar = AgentFeedbackSidecar(
@@ -145,7 +145,7 @@ def test_agent_feedback_sidecar_model_defaults_remain_stable() -> None:
 
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == "sol_execbench.agent_feedback.v2"
+    assert payload["schema_version"] == "sol_execbench.agent_feedback.v3"
     assert payload["authority"] == "diagnostic"
     assert payload["items"] == []
     assert payload["limitations"] == []

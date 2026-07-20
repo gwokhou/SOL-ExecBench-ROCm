@@ -85,7 +85,7 @@ def test_valid_provenance_manifest_is_returned_as_identity(tmp_path, monkeypatch
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
-        (lambda item: item.update(schema_version=2), "unsupported.*schema"),
+        (lambda item: item.update(schema_version=0), "unsupported.*schema"),
         (
             lambda item: item["source"].update(repository="wrong"),
             "repository mismatch",
