@@ -1,0 +1,66 @@
+{
+  "name": "l2n98_matmul_avgpool_gelu_scale_max",
+  "op_type": "matmul",
+  "description": "Fused linear -> avg_pool1d -> GELU -> scale -> max-reduce to a 1D per-batch output. Derived from AKA torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "IN": {
+      "type": "const",
+      "value": 8192,
+      "description": "Input features."
+    },
+    "OUT": {
+      "type": "const",
+      "value": 8192,
+      "description": "Output features."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, IN)."
+    },
+    "weight": {
+      "shape": [
+        "OUT",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Linear weight."
+    },
+    "bias": {
+      "shape": [
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "Linear bias."
+    },
+    "pool_kernel_size": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Avg-pool kernel size."
+    },
+    "scale_factor": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Output scale."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B"
+      ],
+      "dtype": "float32",
+      "description": "Reduced output (B,)."
+    }
+  },
+  "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, weight, bias, pool_kernel_size, scale_factor):\n    x = F.linear(x, weight, bias)\n    x = F.avg_pool1d(x.unsqueeze(1), int(pool_kernel_size)).squeeze(1)\n    x = F.gelu(x)\n    x = x * scale_factor\n    return torch.max(x, dim=1).values\n"
+}

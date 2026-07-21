@@ -1,0 +1,3 @@
+{"axes": {"M": 128, "N": 128}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 0.125, "max_rtol": 0.125, "required_matched_ratio": 0.99}, "uuid": "aka-fp8_cast_sentinel-w0"}
+{"axes": {"M": 256, "N": 512}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 0.125, "max_rtol": 0.125, "required_matched_ratio": 0.99}, "uuid": "aka-fp8_cast_sentinel-w1"}
+{"axes": {"M": 64, "N": 1024}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 0.125, "max_rtol": 0.125, "required_matched_ratio": 0.99}, "uuid": "aka-fp8_cast_sentinel-w2"}

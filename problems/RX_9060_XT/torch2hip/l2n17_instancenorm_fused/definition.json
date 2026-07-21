@@ -1,0 +1,91 @@
+{
+  "name": "l2n17_instancenorm_fused",
+  "op_type": "norm",
+  "description": "Fused conv2d -> instance_norm -> divide. Derived from AKA torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "C": {
+      "type": "const",
+      "value": 64,
+      "description": "Input channels."
+    },
+    "H": {
+      "type": "var",
+      "description": "Input height."
+    },
+    "W": {
+      "type": "var",
+      "description": "Input width."
+    },
+    "O": {
+      "type": "const",
+      "value": 128,
+      "description": "Output channels."
+    },
+    "K": {
+      "type": "const",
+      "value": 3,
+      "description": "Kernel size."
+    },
+    "HO": {
+      "type": "expr",
+      "expression": "H - K + 1",
+      "description": "Output height."
+    },
+    "WO": {
+      "type": "expr",
+      "expression": "W - K + 1",
+      "description": "Output width."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, C, H, W)."
+    },
+    "conv_weight": {
+      "shape": [
+        "O",
+        "C",
+        "K",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Conv filters."
+    },
+    "conv_bias": {
+      "shape": [
+        "O"
+      ],
+      "dtype": "float32",
+      "description": "Conv bias."
+    },
+    "divide_by": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Divisor scalar."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "O",
+        "HO",
+        "WO"
+      ],
+      "dtype": "float32",
+      "description": "instance_norm(conv2d(x)) / divide_by."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x, conv_weight, conv_bias, divide_by):\n    x = F.conv2d(x, conv_weight, conv_bias)\n    x = F.instance_norm(x)\n    return x / divide_by\n"
+}

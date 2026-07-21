@@ -1,0 +1,62 @@
+{
+  "name": "l2n40_matmul_scaling_residual",
+  "op_type": "matmul",
+  "description": "Fused linear -> scale -> residual add. Derived from AKA torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch rows."
+    },
+    "IN": {
+      "type": "const",
+      "value": 4096,
+      "description": "Input features."
+    },
+    "OUT": {
+      "type": "const",
+      "value": 4096,
+      "description": "Output features."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, IN)."
+    },
+    "weight": {
+      "shape": [
+        "OUT",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Linear weight (OUT, IN)."
+    },
+    "bias": {
+      "shape": [
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "Linear bias (OUT,)."
+    },
+    "scaling_factor": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Scaling factor."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "linear(x) * scaling + linear(x)."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias, scaling_factor):\n    x = F.linear(x, weight, bias)\n    return x * scaling_factor + x\n"
+}

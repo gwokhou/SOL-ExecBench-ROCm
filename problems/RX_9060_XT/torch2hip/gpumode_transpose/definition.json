@@ -1,0 +1,58 @@
+{
+  "name": "gpumode_transpose",
+  "op_type": "elementwise",
+  "description": "Transpose two dimensions and return a contiguous tensor. Derived from AKA torch2hip/gpumode/1067_Transpose module_fn (dims 1, 2).",
+  "axes": {
+    "A": {
+      "type": "var",
+      "description": "Dim 0 size."
+    },
+    "B": {
+      "type": "var",
+      "description": "Dim 1 size (swapped to dim 2)."
+    },
+    "C": {
+      "type": "var",
+      "description": "Dim 2 size (swapped to dim 1)."
+    },
+    "D": {
+      "type": "var",
+      "description": "Dim 3 size."
+    }
+  },
+  "inputs": {
+    "input": {
+      "shape": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "dtype": "float32",
+      "description": "Input (A, B, C, D)."
+    },
+    "dim1": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "First transpose dimension."
+    },
+    "dim2": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Second transpose dimension."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "A",
+        "C",
+        "B",
+        "D"
+      ],
+      "dtype": "float32",
+      "description": "input.transpose(dim1, dim2)."
+    }
+  },
+  "reference": "def run(input, dim1, dim2):\n    return input.transpose(int(dim1), int(dim2)).contiguous()\n"
+}

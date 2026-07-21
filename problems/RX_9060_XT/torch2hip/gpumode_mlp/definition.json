@@ -1,0 +1,158 @@
+{
+  "name": "gpumode_mlp",
+  "op_type": "matmul",
+  "description": "7-layer MLP (4 -> 4096 -> 2048 -> 512 -> 128 -> 64 -> 32 -> 4) with ReLU. Derived from AKA torch2hip/gpumode/1178_MLP_model module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "IN4": {
+      "type": "const",
+      "value": 4,
+      "description": "Input/output size."
+    },
+    "H1": {
+      "type": "const",
+      "value": 4096,
+      "description": "Hidden 1."
+    },
+    "H2": {
+      "type": "const",
+      "value": 2048,
+      "description": "Hidden 2."
+    },
+    "H3": {
+      "type": "const",
+      "value": 512,
+      "description": "Hidden 3."
+    },
+    "H4": {
+      "type": "const",
+      "value": 128,
+      "description": "Hidden 4."
+    },
+    "H5": {
+      "type": "const",
+      "value": 64,
+      "description": "Hidden 5."
+    },
+    "H6": {
+      "type": "const",
+      "value": 32,
+      "description": "Hidden 6."
+    }
+  },
+  "inputs": {
+    "xb": {
+      "shape": [
+        "B",
+        "IN4"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, 4)."
+    },
+    "linear1_weight": {
+      "shape": [
+        "H1",
+        "IN4"
+      ],
+      "dtype": "float32"
+    },
+    "linear1_bias": {
+      "shape": [
+        "H1"
+      ],
+      "dtype": "float32"
+    },
+    "linear2_weight": {
+      "shape": [
+        "H2",
+        "H1"
+      ],
+      "dtype": "float32"
+    },
+    "linear2_bias": {
+      "shape": [
+        "H2"
+      ],
+      "dtype": "float32"
+    },
+    "linear3_weight": {
+      "shape": [
+        "H3",
+        "H2"
+      ],
+      "dtype": "float32"
+    },
+    "linear3_bias": {
+      "shape": [
+        "H3"
+      ],
+      "dtype": "float32"
+    },
+    "linear4_weight": {
+      "shape": [
+        "H4",
+        "H3"
+      ],
+      "dtype": "float32"
+    },
+    "linear4_bias": {
+      "shape": [
+        "H4"
+      ],
+      "dtype": "float32"
+    },
+    "linear5_weight": {
+      "shape": [
+        "H5",
+        "H4"
+      ],
+      "dtype": "float32"
+    },
+    "linear5_bias": {
+      "shape": [
+        "H5"
+      ],
+      "dtype": "float32"
+    },
+    "linear6_weight": {
+      "shape": [
+        "H6",
+        "H5"
+      ],
+      "dtype": "float32"
+    },
+    "linear6_bias": {
+      "shape": [
+        "H6"
+      ],
+      "dtype": "float32"
+    },
+    "linear7_weight": {
+      "shape": [
+        "IN4",
+        "H6"
+      ],
+      "dtype": "float32"
+    },
+    "linear7_bias": {
+      "shape": [
+        "IN4"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "IN4"
+      ],
+      "dtype": "float32",
+      "description": "MLP output (B, 4)."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(xb, linear1_weight, linear1_bias, linear2_weight, linear2_bias, linear3_weight, linear3_bias, linear4_weight, linear4_bias, linear5_weight, linear5_bias, linear6_weight, linear6_bias, linear7_weight, linear7_bias):\n    xb = xb.view(xb.size(0), -1)\n    out = F.relu(F.linear(xb, linear1_weight, linear1_bias))\n    out = F.relu(F.linear(out, linear2_weight, linear2_bias))\n    out = F.relu(F.linear(out, linear3_weight, linear3_bias))\n    out = F.relu(F.linear(out, linear4_weight, linear4_bias))\n    out = F.relu(F.linear(out, linear5_weight, linear5_bias))\n    out = F.relu(F.linear(out, linear6_weight, linear6_bias))\n    return F.linear(out, linear7_weight, linear7_bias)\n"
+}

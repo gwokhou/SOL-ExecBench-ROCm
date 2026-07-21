@@ -1,0 +1,4 @@
+{"axes": {"B": 8, "C": 64, "H": 32, "W": 32}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_gelu_4d-w0"}
+{"axes": {"B": 16, "C": 128, "H": 64, "W": 64}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_gelu_4d-w1"}
+{"axes": {"B": 4, "C": 32, "H": 16, "W": 16}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_gelu_4d-w2"}
+{"axes": {"B": 32, "C": 64, "H": 48, "W": 48}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_gelu_4d-w3"}

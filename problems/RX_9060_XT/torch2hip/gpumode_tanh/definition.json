@@ -1,0 +1,46 @@
+{
+  "name": "gpumode_tanh",
+  "op_type": "elementwise",
+  "description": "Scaled tanh: tanh(a * x) * max. Derived from AKA torch2hip/gpumode/11178_TanH module_fn.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns."
+    }
+  },
+  "inputs": {
+    "v": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Input (M, N)."
+    },
+    "a": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Input scale."
+    },
+    "max": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Output scale."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "tanh(a * v) * max."
+    }
+  },
+  "reference": "import torch\n\ndef run(v, a, max):\n    return torch.tanh(a * v) * max\n"
+}

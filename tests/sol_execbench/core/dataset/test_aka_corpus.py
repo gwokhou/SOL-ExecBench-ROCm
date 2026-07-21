@@ -28,6 +28,18 @@ from sol_execbench.core.scoring.official_authority import official_score_availab
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST = REPO_ROOT / "problems" / "RX_9060_XT" / "manifest.yaml"
 
+# The three AKA suites that carry a liftable PyTorch oracle (friendliness Cat1/Cat2),
+# and the five structurally-hostile suites that are rejected outright (Cat3) — see
+# docs/internal/aka-expansion-friendliness.md.
+CONVERTIBLE_SUITES = {"torch2hip", "torch2flydsl", "instruction2triton"}
+CAT3_SUITES = {
+    "hip2hip",
+    "triton2triton",
+    "triton2flydsl",
+    "flydsl2flydsl",
+    "repository",
+}
+
 
 def test_aka_manifest_loads_and_pins_revision():
     manifest = AkaCorpusManifest.load(MANIFEST)
@@ -53,16 +65,48 @@ def test_every_entry_references_aka_task_path():
     manifest = AkaCorpusManifest.load(MANIFEST)
 
     for entry in manifest.entries:
-        assert entry.task_path.startswith("tasks/torch2"), entry.task_path
-        assert entry.suite in {"torch2hip", "torch2flydsl", "instruction2triton"}
+        assert entry.task_path.startswith("tasks/"), entry.task_path
+        assert entry.suite in CONVERTIBLE_SUITES, entry.task_path
 
 
-def test_seed_set_entries_are_unique_and_scored():
+def test_no_entry_references_a_cat3_suite():
+    """No problem may derive from a kernel-to-kernel / FlyDSL-target / repo suite."""
+    manifest = AkaCorpusManifest.load(MANIFEST)
+
+    for entry in manifest.entries:
+        assert entry.suite not in CAT3_SUITES, entry.task_path
+
+
+def test_entries_are_unique_with_fp8_sentinel_policy():
     manifest = AkaCorpusManifest.load(MANIFEST)
 
     names = [entry.problem_name for entry in manifest.entries]
     assert len(names) == len(set(names))
-    assert all(entry.role == "scored" for entry in manifest.entries)
+    # Any compatibility sentinel must be FP8; at least one scored entry remains.
+    sentinels = [
+        entry for entry in manifest.entries if entry.role == "compatibility_sentinel"
+    ]
+    assert all(entry.dtype.startswith(("fp8", "float8")) for entry in sentinels)
+    assert sum(1 for entry in manifest.entries if entry.role == "scored") >= 1
+
+
+def test_expansion_coverage_breadth():
+    """The expansion added attention, norm variants, a backward pass, and an FP8 sentinel."""
+    manifest = AkaCorpusManifest.load(MANIFEST)
+
+    operations = Counter(entry.operation for entry in manifest.entries)
+    passes = Counter(entry.pass_kind for entry in manifest.entries)
+    assert operations["attention"] >= 1
+    assert operations["norm"] >= 2
+    assert passes["backward"] >= 1
+    fp8 = [
+        entry for entry in manifest.entries if entry.dtype.startswith(("fp8", "float8"))
+    ]
+    assert len(fp8) == 1
+    assert fp8[0].role == "compatibility_sentinel"
+    # Multiple suites + source families are represented (friendliness categories).
+    assert len({entry.suite for entry in manifest.entries}) >= 2
+    assert len({entry.source_family for entry in manifest.entries}) >= 2
 
 
 def test_coverage_axes_truthfully_aggregate_entries():

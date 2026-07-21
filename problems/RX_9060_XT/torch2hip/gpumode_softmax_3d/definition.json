@@ -1,0 +1,39 @@
+{
+  "name": "gpumode_softmax_3d",
+  "op_type": "softmax",
+  "description": "Softmax over the last axis of a 3D cube. Derived from AKA torch2hip/gpumode/10082_SoftmaxModule module_fn (axis=2).",
+  "axes": {
+    "N": {
+      "type": "var",
+      "description": "Cube edge (all three dims equal)."
+    }
+  },
+  "inputs": {
+    "v": {
+      "shape": [
+        "N",
+        "N",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Input cube (N, N, N)."
+    },
+    "axis": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Softmax axis."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "N",
+        "N",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "softmax(v, dim=axis)."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(v, axis):\n    return F.softmax(v, dim=int(axis))\n"
+}

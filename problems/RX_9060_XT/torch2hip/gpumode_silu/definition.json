@@ -1,0 +1,36 @@
+{
+  "name": "gpumode_silu",
+  "op_type": "elementwise",
+  "description": "SiLU activation x * sigmoid(x). Derived from AKA torch2hip/gpumode/16636_SiLU module_fn (silu_fn).",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Input (M, N)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "x * sigmoid(x)."
+    }
+  },
+  "reference": "import torch\n\ndef run(x):\n    return x * torch.sigmoid(x)\n"
+}

@@ -1,0 +1,48 @@
+{
+  "name": "gpumode_gelu_4d",
+  "op_type": "elementwise",
+  "description": "GELU pinned to 4D [B, C, H, W]. Rank-split from the variable-rank (1D-4D) AKA torch2hip/gpumode/14539_GELU module_fn; the 2D case is l1n26_gelu. The schema pins rank per Definition, so each rank becomes its own problem.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "C": {
+      "type": "var",
+      "description": "Channels."
+    },
+    "H": {
+      "type": "var",
+      "description": "Height."
+    },
+    "W": {
+      "type": "var",
+      "description": "Width."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, C, H, W)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "F.gelu(x)."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x):\n    return F.gelu(x)\n"
+}

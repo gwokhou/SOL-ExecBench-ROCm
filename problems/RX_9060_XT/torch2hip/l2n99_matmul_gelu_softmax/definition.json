@@ -1,0 +1,57 @@
+{
+  "name": "l2n99_matmul_gelu_softmax",
+  "op_type": "matmul",
+  "description": "Fused linear -> GELU -> softmax(dim=1). Derived from AKA torch2hip/kernelbench/level2/l2n99_Matmul_GELU_Softmax module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch rows."
+    },
+    "IN": {
+      "type": "const",
+      "value": 8192,
+      "description": "Input features."
+    },
+    "OUT": {
+      "type": "const",
+      "value": 8192,
+      "description": "Output features."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, IN)."
+    },
+    "weight": {
+      "shape": [
+        "OUT",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Linear weight (OUT, IN)."
+    },
+    "bias": {
+      "shape": [
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "Linear bias (OUT,)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "softmax(gelu(linear(x)))."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias):\n    x = F.linear(x, weight, bias)\n    x = F.gelu(x)\n    return F.softmax(x, dim=1)\n"
+}

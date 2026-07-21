@@ -1,0 +1,60 @@
+{
+  "name": "sdp_attention",
+  "op_type": "attention",
+  "description": "Scaled-dot-product attention core (single-head): softmax(Q @ K^T / sqrt(d)) @ V. Representative of AKA's attention tasks; provenance-bound to torch2hip/gpumode/10456_MultiHeadAttention (whose module_fn embeds this Q*K^T -> softmax -> *V core).",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "S": {
+      "type": "var",
+      "description": "Sequence length."
+    },
+    "D": {
+      "type": "var",
+      "description": "Head dimension."
+    }
+  },
+  "inputs": {
+    "q": {
+      "shape": [
+        "B",
+        "S",
+        "D"
+      ],
+      "dtype": "float32",
+      "description": "Queries (B, S, D)."
+    },
+    "k": {
+      "shape": [
+        "B",
+        "S",
+        "D"
+      ],
+      "dtype": "float32",
+      "description": "Keys (B, S, D)."
+    },
+    "v": {
+      "shape": [
+        "B",
+        "S",
+        "D"
+      ],
+      "dtype": "float32",
+      "description": "Values (B, S, D)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "S",
+        "D"
+      ],
+      "dtype": "float32",
+      "description": "Attention output (B, S, D)."
+    }
+  },
+  "reference": "import math\nimport torch\nimport torch.nn.functional as F\n\ndef run(q, k, v):\n    scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(q.shape[-1])\n    return torch.matmul(F.softmax(scores, dim=-1), v)\n"
+}

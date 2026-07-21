@@ -1,0 +1,97 @@
+{
+  "name": "gpumode_positionwise_ffn",
+  "op_type": "matmul",
+  "description": "Position-wise feedforward block: linear -> ReLU -> linear -> dropout(eval) -> residual -> layer_norm. Derived from AKA torch2hip/gpumode/14044_PositionWiseFeedForward module_fn (eval mode, deterministic).",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "S": {
+      "type": "var",
+      "description": "Sequence length."
+    },
+    "C": {
+      "type": "const",
+      "value": 4,
+      "description": "Model dimension."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "S",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, S, C)."
+    },
+    "W_1_weight": {
+      "shape": [
+        "C",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "First linear weight."
+    },
+    "W_1_bias": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "First linear bias."
+    },
+    "W_2_weight": {
+      "shape": [
+        "C",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Second linear weight."
+    },
+    "W_2_bias": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Second linear bias."
+    },
+    "layer_norm_weight": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "LayerNorm gain."
+    },
+    "layer_norm_bias": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "LayerNorm bias."
+    },
+    "dropout_p": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Dropout probability."
+    },
+    "training": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Dropout training flag (false for determinism)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "S",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "FFN block output (B, S, C)."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x, W_1_weight, W_1_bias, W_2_weight, W_2_bias, layer_norm_weight, layer_norm_bias, dropout_p, training):\n    out = F.linear(x, W_1_weight, W_1_bias)\n    out = F.relu(out)\n    out = F.linear(out, W_2_weight, W_2_bias)\n    out = F.dropout(out, p=dropout_p, training=bool(training))\n    out = out + x\n    return F.layer_norm(out, out.shape[-1:], layer_norm_weight, layer_norm_bias)\n"
+}

@@ -1,0 +1,4 @@
+{"axes": {"N": 16}, "inputs": {"axis": {"type": "scalar", "value": 2}, "v": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_softmax_3d-w0"}
+{"axes": {"N": 64}, "inputs": {"axis": {"type": "scalar", "value": 2}, "v": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_softmax_3d-w1"}
+{"axes": {"N": 128}, "inputs": {"axis": {"type": "scalar", "value": 2}, "v": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_softmax_3d-w2"}
+{"axes": {"N": 91}, "inputs": {"axis": {"type": "scalar", "value": 2}, "v": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_softmax_3d-w3"}
