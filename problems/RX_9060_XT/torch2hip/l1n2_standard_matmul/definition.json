@@ -1,0 +1,48 @@
+{
+  "name": "l1n2_standard_matmul",
+  "op_type": "matmul",
+  "description": "General (non-square) BF16 matrix multiply C = A @ B. Derived from AKA torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows of A."
+    },
+    "K": {
+      "type": "var",
+      "description": "Inner dimension."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns of B."
+    }
+  },
+  "inputs": {
+    "A": {
+      "shape": [
+        "M",
+        "K"
+      ],
+      "dtype": "bfloat16",
+      "description": "Left BF16 matrix (M, K)."
+    },
+    "B": {
+      "shape": [
+        "K",
+        "N"
+      ],
+      "dtype": "bfloat16",
+      "description": "Right BF16 matrix (K, N)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "bfloat16",
+      "description": "A @ B."
+    }
+  },
+  "reference": "import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n"
+}

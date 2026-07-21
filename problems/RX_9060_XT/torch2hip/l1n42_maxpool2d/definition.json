@@ -1,0 +1,58 @@
+{
+  "name": "l1n42_maxpool2d",
+  "op_type": "elementwise",
+  "description": "2x2 stride-2 max pooling. Derived from AKA torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "C": {
+      "type": "var",
+      "description": "Channels."
+    },
+    "H": {
+      "type": "var",
+      "description": "Input height (even)."
+    },
+    "W": {
+      "type": "var",
+      "description": "Input width (even)."
+    },
+    "H_out": {
+      "type": "expr",
+      "expression": "H // 2",
+      "description": "Output height."
+    },
+    "W_out": {
+      "type": "expr",
+      "expression": "W // 2",
+      "description": "Output width."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, C, H, W)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "C",
+        "H_out",
+        "W_out"
+      ],
+      "dtype": "float32",
+      "description": "Pooled output."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x):\n    return F.max_pool2d(x, kernel_size=2, stride=2)\n"
+}

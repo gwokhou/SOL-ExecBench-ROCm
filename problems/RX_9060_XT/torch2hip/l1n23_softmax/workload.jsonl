@@ -1,0 +1,4 @@
+{"axes": {"M": 128, "N": 128}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n23_softmax-w0"}
+{"axes": {"M": 1, "N": 131072}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n23_softmax-w1"}
+{"axes": {"M": 1823, "N": 781}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n23_softmax-w2"}
+{"axes": {"M": 4096, "N": 8192}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n23_softmax-w3"}

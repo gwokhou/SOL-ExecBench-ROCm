@@ -3,8 +3,8 @@
 
 version = 1
 policy_doc = "docs/user/provenance.md"
-upstream_repository = "https://github.com/NVIDIA/SOL-ExecBench"
-upstream_ref = "upstream/main"
+upstream_repository = "https://github.com/AMD-AGI/AgentKernelArena"
+upstream_ref = "main"
 project_attribution = "Copyright (c) 2026 contributors to SOL ExecBench ROCm Port"
 
 active_roots = [
@@ -20,11 +20,10 @@ active_roots = [
 
 [classes]
 upstream_retained = [
-  "Files copied verbatim or nearly verbatim from upstream SOL-ExecBench.",
+  "Files copied verbatim or nearly verbatim from upstream AMD AgentKernelArena (Apache-2.0).",
 ]
 derivative_modified = [
-  "Files retaining substantial upstream expression after ROCm adaptation.",
-  "Current exact-path upstream matches listed under nvidia_notice.allowed are treated as derivative-modified candidates until Phase 124 refines individual files.",
+  "Files retaining substantial upstream expression after adaptation from AMD AgentKernelArena.",
 ]
 independent_rocm_work = [
   "New ROCm/AMD evidence, scoring, release, Docker dependency, documentation, and test files absent from the same upstream path.",
@@ -48,27 +47,24 @@ guardrail = "scripts/check_dataset_redistribution.py"
 default_boundary = "Dataset source and migrated payloads are local inputs unless this manifest explicitly classifies them as publishable."
 
 [[dataset_policy.sources]]
-id = "nvidia_sol_execbench"
-name = "NVIDIA SOL-ExecBench evaluation dataset"
-origin_repository = "https://github.com/NVIDIA/SOL-ExecBench"
-license = "NVIDIA Evaluation Dataset License"
-provenance_class = "restricted_upstream_dataset"
-redistribution_class = "excluded"
-repository_redistribution = false
-release_bundle_redistribution = false
-attribution = "NVIDIA SOL-ExecBench; obtain from upstream under NVIDIA Evaluation Dataset License terms."
+id = "amd_agent_kernel_arena"
+name = "AMD AgentKernelArena"
+origin_repository = "https://github.com/AMD-AGI/AgentKernelArena"
+license = "Apache-2.0"
+provenance_class = "ecosystem_grounded"
+redistribution_class = "publishable"
+repository_redistribution = true
+release_bundle_redistribution = true
+attribution = "AMD AgentKernelArena by AMD-AGI under Apache-2.0; retain required notices when redistributing."
 path_globs = [
-  "data/SOL-ExecBench/**",
-  "data/sol-execbench/**",
-  "data/nvidia/SOL-ExecBench/**",
-  "data/migrated/SOL-ExecBench/**",
-  "data/migrated/nvidia-sol-execbench/**",
-  "out/**/SOL-ExecBench/**",
-  "out/**/nvidia-sol-execbench/**",
+  "data/AgentKernelArena/**",
+  "problems/RX_9060_XT/manifest.yaml",
+  "problems/RX_9060_XT/**",
+  "tests/sol_execbench/fixtures/aka/**",
 ]
-forbidden_content = [
-  "Original NVIDIA SOL-ExecBench rows, definitions, workloads, traces, solutions, and blobs.",
-  "ROCm-migrated dataset artifacts derived from NVIDIA SOL-ExecBench source rows or payloads.",
+required_notices = [
+  "Apache-2.0 license text or reference",
+  "AMD-AGI/AgentKernelArena attribution",
 ]
 
 [[dataset_policy.sources]]
@@ -130,95 +126,10 @@ path_globs = [
 ]
 
 [header_policy]
-upstream_retained = "Keep applicable NVIDIA SPDX-FileCopyrightText and Apache-2.0 SPDX-License-Identifier."
-derivative_modified = "Keep applicable NVIDIA SPDX-FileCopyrightText, add project SPDX-FileCopyrightText when modified, and keep Apache-2.0 SPDX-License-Identifier."
-independent_rocm_work = "Use project SPDX-FileCopyrightText and Apache-2.0 SPDX-License-Identifier; do not use NVIDIA-only file copyright attribution."
+upstream_retained = "Keep applicable AMD-AGI/AgentKernelArena SPDX-FileCopyrightText and Apache-2.0 SPDX-License-Identifier."
+derivative_modified = "Keep applicable AMD-AGI/AgentKernelArena SPDX-FileCopyrightText, add project SPDX-FileCopyrightText when modified, and keep Apache-2.0 SPDX-License-Identifier."
+independent_rocm_work = "Use project SPDX-FileCopyrightText and Apache-2.0 SPDX-License-Identifier."
 generated_or_planning = "Use project attribution only when source-style headers are appropriate; otherwise document provenance at the directory or artifact level."
-
-[nvidia_notice]
-allowed = [
-  "scripts/run_dataset.py",
-  "src/sol_execbench/__init__.py",
-  "src/sol_execbench/cli/__init__.py",
-  "src/sol_execbench/cli/commands/dataset.py",
-  "src/sol_execbench/cli/commands/environment.py",
-  "src/sol_execbench/cli/commands/metadata.py",
-  "src/sol_execbench/cli/evaluation/command.py",
-  "src/sol_execbench/cli/evaluation/evaluator.py",
-  "src/sol_execbench/cli/evaluation/phases.py",
-  "src/sol_execbench/cli/evaluation/problem_io.py",
-  "src/sol_execbench/cli/evaluation/reporting.py",
-  "src/sol_execbench/cli/evaluation/runtime.py",
-  "src/sol_execbench/cli/main.py",
-  "src/sol_execbench/cli/sidecars/agent_feedback.py",
-  "src/sol_execbench/cli/sidecars/common.py",
-  "src/sol_execbench/cli/sidecars/profile.py",
-  "src/sol_execbench/cli/sidecars/static_evidence.py",
-  "src/sol_execbench/core/__init__.py",
-  "src/sol_execbench/core/bench/__init__.py",
-  "src/sol_execbench/core/bench/clock_lock.py",
-  "src/sol_execbench/core/bench/config/__init__.py",
-  "src/sol_execbench/core/bench/config/benchmark_config.py",
-  "src/sol_execbench/core/bench/correctness.py",
-  "src/sol_execbench/core/bench/custom_inputs.py",
-  "src/sol_execbench/core/bench/input_generation.py",
-  "src/sol_execbench/core/bench/input_heuristics.py",
-  "src/sol_execbench/core/bench/io.py",
-  "src/sol_execbench/core/bench/memory_pool.py",
-  "src/sol_execbench/core/bench/output_allocation.py",
-  "src/sol_execbench/core/bench/reward_hack/__init__.py",
-  "src/sol_execbench/core/bench/reward_hack/models.py",
-  "src/sol_execbench/core/bench/reward_hack/runtime.py",
-  "src/sol_execbench/core/bench/reward_hack/static_review.py",
-  "src/sol_execbench/core/bench/safetensors_io.py",
-  "src/sol_execbench/core/bench/timing.py",
-  "src/sol_execbench/core/bench/utils.py",
-  "src/sol_execbench/core/data/__init__.py",
-  "src/sol_execbench/core/data/base_model.py",
-  "src/sol_execbench/core/data/definition.py",
-  "src/sol_execbench/core/data/definition_axes.py",
-  "src/sol_execbench/core/data/definition_models.py",
-  "src/sol_execbench/core/data/definition_reference.py",
-  "src/sol_execbench/core/data/dtypes.py",
-  "src/sol_execbench/core/data/json_utils.py",
-  "src/sol_execbench/core/data/shapes.py",
-  "src/sol_execbench/core/data/solution.py",
-  "src/sol_execbench/core/data/solution_instance.py",
-  "src/sol_execbench/core/data/solution_models.py",
-  "src/sol_execbench/core/data/trace.py",
-  "src/sol_execbench/core/data/workload.py",
-  "src/sol_execbench/core/platform/runtime.py",
-  "src/sol_execbench/driver/__init__.py",
-  "src/sol_execbench/driver/problem_packager.py",
-  "src/sol_execbench/driver/templates/build_ext.py",
-  "src/sol_execbench/driver/templates/eval_driver.py",
-  "tests/conftest.py",
-  "tests/examples/test_examples.py",
-  "tests/sol_execbench/cli/evaluation/test_reporting.py",
-  "tests/sol_execbench/core/__init__.py",
-  "tests/sol_execbench/core/bench/__init__.py",
-  "tests/sol_execbench/core/bench/test_clock_lock.py",
-  "tests/sol_execbench/core/bench/test_correctness.py",
-  "tests/sol_execbench/core/bench/test_io.py",
-  "tests/sol_execbench/core/bench/test_make_eval_clock_warn.py",
-  "tests/sol_execbench/core/bench/test_reward_hack.py",
-  "tests/sol_execbench/core/bench/test_timing.py",
-  "tests/sol_execbench/core/bench/test_utils.py",
-  "tests/sol_execbench/core/data/__init__.py",
-  "tests/sol_execbench/core/data/test_definition.py",
-  "tests/sol_execbench/core/data/test_dtypes.py",
-  "tests/sol_execbench/core/data/test_solution.py",
-  "tests/sol_execbench/core/data/test_workload.py",
-  "tests/sol_execbench/driver/test_build_ext.py",
-  "tests/sol_execbench/driver/test_eval_driver.py",
-  "tests/sol_execbench/driver/test_problem_packager.py",
-  "tests/sol_execbench/samples/evil_lazy_output/kernel.py",
-  "tests/sol_execbench/samples/evil_monkey_patch/kernel.py",
-  "tests/sol_execbench/samples/evil_thread_inject/kernel.py",
-  "tests/sol_execbench/test_e2e.py",
-]
-
-cleanup_candidates = []
 
 [notes]
 phase_123_scope = "Classification only."

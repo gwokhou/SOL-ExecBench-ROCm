@@ -1,0 +1,36 @@
+{
+  "name": "l1n26_gelu",
+  "op_type": "elementwise",
+  "description": "GELU activation. Derived from AKA torch2hip/kernelbench/level1/l1n26_GELU_ module_fn (F.gelu).",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float16",
+      "description": "Input (M, N)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float16",
+      "description": "F.gelu(x)."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x):\n    return F.gelu(x)\n"
+}

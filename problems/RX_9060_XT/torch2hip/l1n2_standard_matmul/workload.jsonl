@@ -1,0 +1,3 @@
+{"axes": {"K": 256, "M": 128, "N": 64}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-l1n2_standard_matmul-w0"}
+{"axes": {"K": 128, "M": 256, "N": 512}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-l1n2_standard_matmul-w1"}
+{"axes": {"K": 512, "M": 64, "N": 128}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-l1n2_standard_matmul-w2"}

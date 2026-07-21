@@ -1,0 +1,55 @@
+{
+  "name": "l1n40_layernorm",
+  "op_type": "norm",
+  "description": "Layer normalization over the last dimension with affine weight/bias. Derived from AKA torch2hip/kernelbench/level1/l1n40_LayerNorm.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch rows."
+    },
+    "N": {
+      "type": "var",
+      "description": "Feature dimension (normalized)."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, N)."
+    },
+    "weight": {
+      "shape": [
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Affine gain (N,)."
+    },
+    "bias": {
+      "shape": [
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Affine bias (N,)."
+    },
+    "eps": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Numerical stability epsilon."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "layer_norm(x)."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias, eps):\n    return F.layer_norm(x, (x.shape[-1],), weight, bias, eps)\n"
+}

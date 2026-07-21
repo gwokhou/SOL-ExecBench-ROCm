@@ -31,15 +31,11 @@ def test_rejects_unregistered_schema_identifier():
     assert findings == [f"example.json: unsupported schema identifier {retired}"]
 
 
-def test_upstream_tolerance_name_is_limited_to_import_boundary():
+def test_upstream_tolerance_name_is_rejected_everywhere():
     upstream_name = "required_" + "match_ratio"
 
     findings, _ = audit_text(Path("public.json"), upstream_name)
-    allowed, _ = audit_text(
-        Path("src/sol_execbench/core/dataset/corpus.py"), upstream_name
-    )
 
     assert findings == [
         "public.json: upstream tolerance name escaped the import boundary"
     ]
-    assert allowed == []

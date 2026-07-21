@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Pinned public corpus support."""
+"""AKA-derived problem-corpus support."""
 
-from .corpus import CorpusEntry, CorpusManifest
+from .aka_corpus import AkaCorpusEntry, AkaCorpusManifest
 
-__all__ = ["CorpusEntry", "CorpusManifest"]
+__all__ = ["AkaCorpusEntry", "AkaCorpusManifest"]

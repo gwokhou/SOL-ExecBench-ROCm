@@ -1,0 +1,4 @@
+{"axes": {"K": 64, "M": 64, "N": 64}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n1_square_matmul-w0"}
+{"axes": {"K": 128, "M": 128, "N": 128}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n1_square_matmul-w1"}
+{"axes": {"K": 256, "M": 256, "N": 256}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n1_square_matmul-w2"}
+{"axes": {"K": 512, "M": 512, "N": 512}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n1_square_matmul-w3"}
