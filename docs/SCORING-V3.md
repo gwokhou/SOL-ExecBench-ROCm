@@ -12,15 +12,15 @@ For correct candidates, all runtimes must be positive and finite,
 the implementation raises an error and does not clip, substitute, or silently
 degrade the score. Incorrect candidates receive zero.
 
-The public corpus contains 14 scored workloads and one NVFP4 compatibility
-sentinel. Workload scores belonging to the same problem are averaged first.
-Those per-problem means are then averaged with equal problem weight. The
-sentinel never enters either denominator.
+The public corpus is an AKA-derived seed set of scored problems. Workload
+scores belonging to the same problem are averaged first. Those per-problem
+means are then averaged with equal problem weight. Problems flagged as
+compatibility sentinels never enter either denominator.
 
 The checked-in v3 corpus explicitly marks official scoring unavailable because
 no release baseline, independent rerun, trusted candidate execution
-attestation, or pinned SOLAR manifest set has been published for these 14
-workloads. The command fails closed instead of treating caller-authored JSON as
+attestation, or pinned SOLAR manifest set has been published for these
+problems. The command fails closed instead of treating caller-authored JSON as
 authority. A future release must pin and verify all four evidence classes plus
 the public corpus and architecture identities before enabling official output.
 

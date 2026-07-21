@@ -1,0 +1,84 @@
+{
+  "name": "l1n63_conv2d",
+  "op_type": "conv",
+  "description": "Standard 2D convolution (stride 1, no padding, 3x3 kernel). Derived from AKA torch2hip/kernelbench/level1/l1n63_conv_standard_2D.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "C": {
+      "type": "var",
+      "description": "Input channels."
+    },
+    "H": {
+      "type": "var",
+      "description": "Input height."
+    },
+    "W": {
+      "type": "var",
+      "description": "Input width."
+    },
+    "O": {
+      "type": "var",
+      "description": "Output channels."
+    },
+    "K": {
+      "type": "const",
+      "value": 3,
+      "description": "Square kernel size."
+    },
+    "H_out": {
+      "type": "expr",
+      "expression": "H - K + 1",
+      "description": "Output height."
+    },
+    "W_out": {
+      "type": "expr",
+      "expression": "W - K + 1",
+      "description": "Output width."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, C, H, W)."
+    },
+    "weight": {
+      "shape": [
+        "O",
+        "C",
+        "K",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Filters (O, C, K, K)."
+    },
+    "bias": {
+      "shape": [
+        "O"
+      ],
+      "dtype": "float32",
+      "description": "Bias (O,)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "O",
+        "H_out",
+        "W_out"
+      ],
+      "dtype": "float32",
+      "description": "Convolution output."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias):\n    return F.conv2d(x, weight, bias, stride=1, padding=0, dilation=1, groups=1)\n"
+}

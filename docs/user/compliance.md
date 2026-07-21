@@ -4,14 +4,17 @@
 
 This repository is distributed under Apache-2.0. See `LICENSE`.
 
-This repository is a ROCm port of NVIDIA SOL-ExecBench. The port retains files
-derived from the original implementation and preserves NVIDIA copyright notices
-where they apply to upstream-retained or derivative material. Independent ROCm
-work uses project attribution. See `docs/user/provenance.md` and
-`provenance.toml` for the active provenance policy.
+This repository is a ROCm GPU-kernel benchmark whose problem corpus is derived
+from AMD AgentKernelArena (AKA, Apache-2.0). The SOL-ExecBench paper is cited
+as methodology context for the construction and evaluation framework; the
+benchmark problems themselves are AKA-native AMD operators. Files derived from
+AKA preserve AMD-AGI copyright notices where they apply to upstream-retained or
+derivative material. Independent ROCm work uses project attribution. See
+`docs/user/provenance.md` and `provenance.toml` for the active provenance
+policy.
 
-NVIDIA notices identify retained upstream material. They do not imply NVIDIA
-endorsement, NVIDIA runtime support, or NVIDIA ownership of independent ROCm
+Upstream AKA notices identify retained upstream material. They do not imply
+AMD-AGI endorsement, AMD runtime support, or AMD ownership of independent ROCm
 work added in this port. AMD product and ROCm references describe the target
 runtime ecosystem and do not imply AMD endorsement.
 
@@ -51,17 +54,18 @@ for ordinary metadata cleanup unless a separate legal review requires it.
 
 ## Dataset Redistribution
 
-NVIDIA SOL-ExecBench evaluation dataset content is not redistributed by this
-project. Original NVIDIA rows, definitions, workloads, traces, solutions, blobs,
-and ROCm-migrated derivatives must be obtained and generated locally by users
-with applicable rights under the NVIDIA Evaluation Dataset License. They must
-not be committed to the repository or included in release/prerelease bundles.
+The problem corpus is derived from AMD AgentKernelArena under Apache-2.0 and is
+redistributable: authored definitions, workloads, and references under
+`problems/RX_9060_XT/**` may be committed and included in release bundles
+provided the Apache-2.0 license text and AMD-AGI/AgentKernelArena attribution
+are preserved. The local AKA source clone under `data/AgentKernelArena/` is a
+gitignored build input (covered by the `/data/*` ignore rule) and is not
+committed.
 
 FlashInfer Trace content is tracked separately as Apache-2.0 material from
 `flashinfer-ai/flashinfer-trace`. Redistribution of FlashInfer Trace material
-requires preserving Apache-2.0 license and attribution notices, and migration
-metadata must not collapse FlashInfer Trace provenance into the NVIDIA
-Evaluation Dataset License boundary.
+requires preserving Apache-2.0 license and attribution notices, and its
+provenance must not be collapsed into any other source boundary.
 
 The enforceable source and redistribution matrix lives in `provenance.toml`.
 Run the CPU-safe guardrail before publishing or after staging dataset-related

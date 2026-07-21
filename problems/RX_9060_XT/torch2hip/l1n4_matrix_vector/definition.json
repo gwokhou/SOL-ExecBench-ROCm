@@ -1,0 +1,44 @@
+{
+  "name": "l1n4_matrix_vector",
+  "op_type": "matmul",
+  "description": "Matrix-vector product y = A @ B with B a column vector. Derived from AKA torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows of A."
+    },
+    "K": {
+      "type": "var",
+      "description": "Inner dimension."
+    }
+  },
+  "inputs": {
+    "A": {
+      "shape": [
+        "M",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Matrix (M, K)."
+    },
+    "B": {
+      "shape": [
+        "K",
+        "1"
+      ],
+      "dtype": "float32",
+      "description": "Column vector (K, 1)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "1"
+      ],
+      "dtype": "float32",
+      "description": "A @ B of shape (M, 1)."
+    }
+  },
+  "reference": "import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n"
+}

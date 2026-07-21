@@ -1,0 +1,80 @@
+{
+  "name": "l1n82_conv_depthwise",
+  "op_type": "conv",
+  "description": "Depthwise 2D convolution (groups = channels, 3x3 kernel, stride 1, no padding). Derived from AKA torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "C": {
+      "type": "var",
+      "description": "Channels (input = output, depthwise)."
+    },
+    "H": {
+      "type": "var",
+      "description": "Input height."
+    },
+    "W": {
+      "type": "var",
+      "description": "Input width."
+    },
+    "K": {
+      "type": "const",
+      "value": 3,
+      "description": "Square kernel size."
+    },
+    "H_out": {
+      "type": "expr",
+      "expression": "H - K + 1",
+      "description": "Output height."
+    },
+    "W_out": {
+      "type": "expr",
+      "expression": "W - K + 1",
+      "description": "Output width."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, C, H, W)."
+    },
+    "weight": {
+      "shape": [
+        "C",
+        "1",
+        "K",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Depthwise filters (C, 1, K, K)."
+    },
+    "bias": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Bias (C,)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "C",
+        "H_out",
+        "W_out"
+      ],
+      "dtype": "float32",
+      "description": "Depthwise conv output."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias):\n    return F.conv2d(x, weight, bias, stride=1, padding=0, dilation=1, groups=x.shape[1])\n"
+}

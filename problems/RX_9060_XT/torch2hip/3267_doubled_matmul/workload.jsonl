@@ -1,0 +1,4 @@
+{"axes": {"K": 4, "M": 4, "N": 4}, "inputs": {"a": {"type": "random"}, "b": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-3267_doubled_matmul-w0"}
+{"axes": {"K": 32, "M": 16, "N": 16}, "inputs": {"a": {"type": "random"}, "b": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-3267_doubled_matmul-w1"}
+{"axes": {"K": 128, "M": 128, "N": 128}, "inputs": {"a": {"type": "random"}, "b": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-3267_doubled_matmul-w2"}
+{"axes": {"K": 512, "M": 1, "N": 256}, "inputs": {"a": {"type": "random"}, "b": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-3267_doubled_matmul-w3"}

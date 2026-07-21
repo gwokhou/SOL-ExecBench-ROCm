@@ -16,7 +16,7 @@ models or typed request/result objects.
 | Einsum conversion | `solar/einsum/conversion.py` | operator artifact → strict semantic graph | exact input/output bindings | SOLAR tests and readability gate |
 | Formal analysis | `solar/analysis/graph_analyzer.py` | typed analysis job → resource proof | diagnostic results never become scores | SOLAR/Orojenesis tests |
 | Scoring formula | `core/scoring/formula.py` | audited runtimes → workload score | no clipping/substitution | `core/test_sol_score_v3.py` |
-| Official authority | `core/scoring/official_authority.py` | pinned manifest/evidence → fail-closed gate | caller-authored JSON has no authority | `core/test_corpus.py` |
+| Official authority | `core/scoring/official_authority.py` | pinned manifest/evidence → fail-closed gate | caller-authored JSON has no authority | `core/dataset/test_aka_corpus.py` |
 | Evaluator contract | `core/evaluator_contract.py` | code-owned constants → public machine contract | matches implemented ownership | metadata and score-contract tests |
 
 After moving an entry point or ownership boundary, run Ruff, `ty`,

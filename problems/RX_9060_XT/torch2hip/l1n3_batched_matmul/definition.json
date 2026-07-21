@@ -1,0 +1,55 @@
+{
+  "name": "l1n3_batched_matmul",
+  "op_type": "matmul",
+  "description": "Batched BF16 matrix multiply via torch.bmm. Derived from AKA torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication.",
+  "axes": {
+    "Batch": {
+      "type": "var",
+      "description": "Batch dimension."
+    },
+    "M": {
+      "type": "var",
+      "description": "Rows of A."
+    },
+    "K": {
+      "type": "var",
+      "description": "Inner dimension."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns of B."
+    }
+  },
+  "inputs": {
+    "A": {
+      "shape": [
+        "Batch",
+        "M",
+        "K"
+      ],
+      "dtype": "bfloat16",
+      "description": "Batched LHS (Batch, M, K)."
+    },
+    "B": {
+      "shape": [
+        "Batch",
+        "K",
+        "N"
+      ],
+      "dtype": "bfloat16",
+      "description": "Batched RHS (Batch, K, N)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "Batch",
+        "M",
+        "N"
+      ],
+      "dtype": "bfloat16",
+      "description": "torch.bmm(A, B)."
+    }
+  },
+  "reference": "import torch\n\ndef run(A, B):\n    return torch.bmm(A, B)\n"
+}

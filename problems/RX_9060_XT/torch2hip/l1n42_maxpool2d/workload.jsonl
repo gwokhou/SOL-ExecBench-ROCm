@@ -1,0 +1,3 @@
+{"axes": {"B": 4, "C": 16, "H": 64, "W": 64}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n42_maxpool2d-w0"}
+{"axes": {"B": 8, "C": 32, "H": 128, "W": 128}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n42_maxpool2d-w1"}
+{"axes": {"B": 2, "C": 64, "H": 256, "W": 256}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n42_maxpool2d-w2"}

@@ -1,0 +1,36 @@
+{
+  "name": "l1n23_softmax",
+  "op_type": "softmax",
+  "description": "Row-wise softmax over the last dimension. Derived from AKA torch2hip/kernelbench/level1/l1n23_Softmax module_fn (dim=1).",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns (softmax dimension)."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Input (M, N)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Row-wise softmax."
+    }
+  },
+  "reference": "import torch\n\ndef run(x):\n    return torch.softmax(x, dim=-1)\n"
+}

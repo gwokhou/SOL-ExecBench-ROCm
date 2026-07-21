@@ -1,0 +1,41 @@
+{
+  "name": "l1n36_rmsnorm",
+  "op_type": "norm",
+  "description": "Root-mean-square normalization over the last dimension. Derived from AKA torch2hip/kernelbench/level1/l1n36_RMSNorm_ module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch rows."
+    },
+    "F": {
+      "type": "var",
+      "description": "Feature dimension (normalized)."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "F"
+      ],
+      "dtype": "bfloat16",
+      "description": "Input (B, F)."
+    },
+    "eps": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Numerical stability epsilon."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "F"
+      ],
+      "dtype": "bfloat16",
+      "description": "x / rms(x)."
+    }
+  },
+  "reference": "import torch\n\ndef run(x, eps):\n    rms = torch.sqrt(torch.mean(x ** 2, dim=1, keepdim=True) + eps)\n    return x / rms\n"
+}

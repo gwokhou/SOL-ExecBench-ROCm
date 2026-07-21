@@ -1,0 +1,48 @@
+{
+  "name": "l1n8_matmul_irregular",
+  "op_type": "matmul",
+  "description": "FP16 matrix multiply over irregular (non power-of-two) shapes. Derived from AKA torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows of A."
+    },
+    "K": {
+      "type": "var",
+      "description": "Inner dimension."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns of B."
+    }
+  },
+  "inputs": {
+    "A": {
+      "shape": [
+        "M",
+        "K"
+      ],
+      "dtype": "float16",
+      "description": "Left FP16 matrix (M, K)."
+    },
+    "B": {
+      "shape": [
+        "K",
+        "N"
+      ],
+      "dtype": "float16",
+      "description": "Right FP16 matrix (K, N)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float16",
+      "description": "A @ B."
+    }
+  },
+  "reference": "import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n"
+}

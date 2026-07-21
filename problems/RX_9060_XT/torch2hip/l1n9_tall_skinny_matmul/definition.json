@@ -1,0 +1,48 @@
+{
+  "name": "l1n9_tall_skinny_matmul",
+  "op_type": "matmul",
+  "description": "Tall-skinny matrix multiply (M >> K). Derived from AKA torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows of A (large)."
+    },
+    "K": {
+      "type": "var",
+      "description": "Inner dimension (small)."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns of B."
+    }
+  },
+  "inputs": {
+    "A": {
+      "shape": [
+        "M",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Tall matrix (M, K)."
+    },
+    "B": {
+      "shape": [
+        "K",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Right matrix (K, N)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "A @ B."
+    }
+  },
+  "reference": "import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n"
+}

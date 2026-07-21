@@ -25,26 +25,29 @@ stack declared in `pyproject.toml`.
 ## Public problem corpus
 
 The reviewed selection is tracked at
-`problems/RX_9060_XT/manifest.yaml`. It pins the official dataset revision,
-parquet hashes, and 15 exact workloads. Fourteen workloads are score-eligible;
-the official NVFP4 workload is retained only as an AMD compatibility sentinel.
+`problems/RX_9060_XT/manifest.yaml`. Problems are derived from AMD
+AgentKernelArena (AKA, Apache-2.0) under the SOL-ExecBench paper §3
+construction methodology: each problem's PyTorch reference is the AKA task's
+own correctness oracle (`module_fn`), lifted into a standalone `def run(...)`.
+The manifest pins the exact AKA commit and records per-task file checksums so
+the generated problems are bound to that source revision. The current seed set
+covers matmul, softmax, norm, elementwise, and conv operations across FP32 /
+BF16 / FP16.
 
-Materialized definitions and workloads are public project data, not Python
-package resources, and remain untracked under `problems/local/`:
+Authored definitions and workloads are committed under
+`problems/RX_9060_XT/<suite>/<name>/`; materialized copies remain untracked
+under `problems/local/`:
 
 ```bash
+bash scripts/fetch_aka_source.sh
 uv run sol-execbench dataset materialize
 uv run sol-execbench dataset audit problems/local/RX_9060_XT
 ```
 
-Pass `--source PATH` to materialize from an existing pinned Hugging Face
-snapshot instead of downloading it.
-
-This repository imports and audits the pinned upstream dataset. It does not
-implement the paper's dataset extraction, curation, or baseline-generation
-pipelines. The public Definition contract requires a non-empty `op_type`; the
-pinned importer supplies it from the manifest's reviewed `operation` before
-validating each selected upstream row.
+`dataset audit` also verifies the local AKA clone is pinned to the manifest
+revision and that every problem's per-task checksums match (the
+problems-bound-to-commit binding). The public Definition contract requires a
+non-empty `op_type`; the AKA importer records it per problem.
 
 ## Evaluate and analyze
 
@@ -52,9 +55,9 @@ Candidate evaluation remains an outer-project operation:
 
 ```bash
 ./scripts/run_docker.sh -- sol-execbench evaluate \
-  problems/local/RX_9060_XT/L1/069_rms_norm \
+  problems/local/RX_9060_XT/torch2hip/l1n1_square_matmul \
   --solution /sol-execbench/path/to/solution.json \
-  --trace-output /outputs/rms-norm.trace.jsonl
+  --trace-output /outputs/matmul.trace.jsonl
 ```
 
 The intended formal SOLAR target is RX 9060 XT `gfx1200`. This port's formal
@@ -67,8 +70,8 @@ digest is only self-declared by its local provenance manifest is rejected:
 
 ```bash
 uv run sol-execbench solar analyze \
-  problems/local/RX_9060_XT/L1/069_rms_norm \
-  --workload b6b63196-7f11-5b0d-969e-33e44f70975f \
+  problems/local/RX_9060_XT/torch2hip/l1n36_rmsnorm \
+  --workload aka-l1n36_rmsnorm-w0 \
   --orojenesis-home /path/to/pinned/timeloop \
   --output out/solar/norm_forward_bf16
 ```
@@ -101,8 +104,7 @@ baseline inputs; caller-authored JSON cannot be promoted to an official score.
 
 Once those release artifacts are published and pinned, correct candidates must
 satisfy `T_b > T_SOL` and `T_k >= T_SOL`; workloads are averaged within each
-problem and then across problems with equal weight. The NVFP4 sentinel remains
-excluded.
+problem and then across problems with equal weight.
 
 ## Development
 

@@ -1,0 +1,3 @@
+{"axes": {"B": 128, "F": 256}, "inputs": {"eps": {"type": "scalar", "value": 1e-05}, "x": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-l1n36_rmsnorm-w0"}
+{"axes": {"B": 64, "F": 1024}, "inputs": {"eps": {"type": "scalar", "value": 1e-05}, "x": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-l1n36_rmsnorm-w1"}
+{"axes": {"B": 512, "F": 128}, "inputs": {"eps": {"type": "scalar", "value": 1e-05}, "x": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-l1n36_rmsnorm-w2"}

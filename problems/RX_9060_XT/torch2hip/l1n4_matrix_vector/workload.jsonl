@@ -1,0 +1,3 @@
+{"axes": {"K": 1024, "M": 1024}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n4_matrix_vector-w0"}
+{"axes": {"K": 512, "M": 2048}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n4_matrix_vector-w1"}
+{"axes": {"K": 4096, "M": 512}, "inputs": {"A": {"type": "random"}, "B": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-l1n4_matrix_vector-w2"}

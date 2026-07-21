@@ -1,0 +1,48 @@
+{
+  "name": "3267_doubled_matmul",
+  "op_type": "matmul",
+  "description": "Matrix multiply of a with (b + b): output = a @ (b + b). Derived from AKA torch2hip/gpumode/3267_SimpleMatmulModule module_fn.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows of a and the output."
+    },
+    "K": {
+      "type": "var",
+      "description": "Inner dimension; columns of a and rows of b."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns of b and the output."
+    }
+  },
+  "inputs": {
+    "a": {
+      "shape": [
+        "M",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Left-hand matrix (M, K)."
+    },
+    "b": {
+      "shape": [
+        "K",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Right-hand matrix (K, N), added to itself."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "a @ (b + b)."
+    }
+  },
+  "reference": "import torch\n\ndef run(a, b):\n    return torch.matmul(a, b + b)\n"
+}

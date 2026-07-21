@@ -1,16 +1,10 @@
-# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
-# SPDX-License-Identifier: Apache-2.0
-
-schema_version: 2
+schema_version: 3
 source:
-  dataset_id: nvidia/SOL-ExecBench
-  revision: 63699402f003496acc3af4eb534a5304a8ac1ea9
-  schema_commit: a9fa0804c793d438e70850c33fe34426e66d53dd
-  parquet_sha256:
-    FlashInfer-Bench: 89d1feacf02b6f8c07ec8d67a9dbb2c531652251095a7f762f2bc296f6a1fe74
-    L1: dbaf8476812194920e405118cc5f4abc65035b79a4307b5ee88fb07666ceed48
-    L2: 4a55a4bfbe9a6f9b2ad4c5c5c680977e66926175643739530bf5a8ca3e87cd54
-    Quant: aa30e9a66ac2292499eacb1cc73ad789ddc7c5f5808ddb10d9dc211e94560036
+  repository: https://github.com/AMD-AGI/AgentKernelArena
+  revision: 869228138e07e773b61dd7fc1d8cdc0435c7b405
+  license: Apache-2.0
+  provenance_class: ecosystem_grounded
+  aka_commit_sha256: 869228138e07e773b61dd7fc1d8cdc0435c7b405
 target:
   architecture_profile: solar:RX_9060_XT
   formal_gfx_target: gfx1200
@@ -19,337 +13,389 @@ official_scoring:
   status: unavailable
   reason_code: release_authority_not_published
   required_evidence:
-    - content_addressed_release_baseline
-    - independent_rerun_verification
-    - trusted_candidate_execution_attestation
-    - pinned_solar_manifests
-materialized_problems:
-  - path: L1/066_masked_softmax_with_attention_dropout_backward
-    definition_sha256: 21bb26a1cd4794f591192bf15462d77bb9340f84e4e68d659e44c8ced18aa35c
-    workload_sha256: 667cf4b044f3d3271d91877abbf5f4eab5be8a802c1db5ff40fdb26ef9b67fd5
-  - path: L1/069_rms_norm
-    definition_sha256: 35c449dc5e4ab4841f6de084a08e19e480070323e92d4ea8ac4a5838a41b8d4d
-    workload_sha256: 9eab68a06ddba814835ea202e6f4fd5c7e8141fc1b305f3c365d0e35da9bcf6a
-  - path: L1/013_fused_residual_rms_norm_backward
-    definition_sha256: bc9ba0895bea484775d15e182de6ccc5abe519f75785d58bdea8c001a0f99260
-    workload_sha256: c9312217461c0371209ea4160ddd9bcde347313d8e335227e1323acf00abe081
-  - path: L1/056_mamba_ssm_dt_projection_softplus_clamp_backward
-    definition_sha256: 09b49eba789086279416b619b68a8185a38ea27af2303135381a14b8b6d2af0d
-    workload_sha256: 120b6325a8902b26c975166b0e826d9fc1a57b6508f48b493aa639cedbe7ce54
-  - path: L1/040_conv2d_residual_block
-    definition_sha256: c7b6eb8da45be0dbaf0438d711c5800a2f56959b95de14835490ea5bf234fa73
-    workload_sha256: 43921c0c9c1b591f14eb22fe90c24b7cbda8927ed01f264cb8deafe79d00ded1
-  - path: L1/083_attention_score_value_matmul
-    definition_sha256: 6e79e2b4cca76a4dc278ef360b6988befed6da0fdadd0cb3eb1578aae79ca9d7
-    workload_sha256: 6ac6769070632a68db32124645ebff4726dbd603f2b3e4679b27ac9f06a8459d
-  - path: L1/008_expert_output_weighted_index_add_accumulation
-    definition_sha256: 536e3e5af091a15d99cb526154e757d5743d535d59dbff19b07b12d66cd3acb6
-    workload_sha256: a5e0880a4cb19b63b6421cc22b82ea240dffcd9c1c29325c200226335c741512
-  - path: Quant/001_fp8_attention_output_projection
-    definition_sha256: f4ea4a2f8b8487dff358b028e1564c8aed68ea98d2f4c0ef2d1d0d12aaa6762d
-    workload_sha256: 18bc5e667f0aba7cdf66b68ea3b9e1946f0d2c4e43cac11288ec09a936f9729f
-  - path: Quant/024_nvfp4_attention_output_projection
-    definition_sha256: 0338aeb0b66ffd15534c04979391fb15d8830362137a8620cfff07da99d5de84
-    workload_sha256: b67268217dce0051a0e1535f8959d00253dfb07783df2ff76e3e3319845df3ba
-  - path: FlashInfer-Bench/004_gemm_n128_k2048
-    definition_sha256: f0303b917daac895c4fee057120a31c7150732acd87b10101ab7fd1f91f48f13
-    workload_sha256: 7b5a8aee66ac05da19fa601598d928681e757b42fac6ac7ebe23a9bec5e897b6
-  - path: L1/010_attention_value_projection_with_transpose
-    definition_sha256: 9318fdf0855f10cf8602981e2a4acd9f3e2e00f85c1b0bd2e27f32c4cc085759
-    workload_sha256: dcc555224e1816c45e6b24f964435a02c73f6961c1ab476df8ea8aa887f6d90b
-  - path: L1/050_attention_qkv_projection_with_bias_and_reshape
-    definition_sha256: 41413adcc23d5a17821fa18235d4e7a4b427fd5fe2575c3e5a0c48be06f5a7c0
-    workload_sha256: 8c2c16dcd227106e33d6bd4e4310ba6ad31ea334ca04f8c8032fd05a5c533971
-  - path: L1/077_whisper_decoder_output_projection
-    definition_sha256: 0b9ce232781efa76811d7722b09c8f77644af04ffe2bbc03bf4e7e2bbc5898f2
-    workload_sha256: 58797f8f2034c8d07a8336a596883bca1f97141cc16c10bc6a33794ccdc4fe0b
+  - content_addressed_release_baseline
+  - independent_rerun_verification
+  - trusted_candidate_execution_attestation
+  - pinned_solar_manifests
 formal_coverage_requirements:
   axes:
-    operation: {attention: 5, norm: 2, moe: 1, ssm: 1, conv: 2, matmul: 3}
-    dtype: {fp32: 3, bf16: 7, fp8: 1, fp16: 3}
-    pass_kind: {forward: 11, backward: 3}
-    dynamic_path: {static_instance: 10, dynamic_shape_small: 2, dynamic_shape_next: 2}
-    input_kind: {random_scalar: 3, random: 10, custom: 1}
+    operation:
+      conv: 2
+      elementwise: 3
+      matmul: 7
+      norm: 2
+      softmax: 1
+    dtype:
+      bfloat16: 3
+      float16: 2
+      float32: 10
+    pass_kind:
+      forward: 15
+    fusion_depth:
+      fused: 1
+      single: 14
+    source_family:
+      gpumode: 1
+      kernelbench: 14
+    suite:
+      torch2hip: 15
   combinations:
-    - {operation: attention, dtype: fp8, pass: forward, min_count: 1}
-    - {operation: attention, dtype: fp32, pass: backward, min_count: 1}
-    - {operation: norm, dtype: bf16, pass: forward, min_count: 1}
-    - {operation: norm, dtype: bf16, pass: backward, min_count: 1}
-    - {operation: matmul, dtype: fp16, pass: forward, min_count: 3}
-  footprint_classes: {fits_l2: 6, l2_to_llc: 3, exceeds_llc: 2}
-  shape_pairs:
-    - name: fp16_gemm_m_scale
-      slots: [fp16_gemm_m1, fp16_gemm_m8828]
+  - operation: matmul
+    dtype: float32
+    pass: forward
+    min_count: 1
+  - operation: matmul
+    dtype: bfloat16
+    pass: forward
+    min_count: 1
+  - operation: softmax
+    dtype: float32
+    pass: forward
+    min_count: 1
+  - operation: norm
+    dtype: bfloat16
+    pass: forward
+    min_count: 1
+  - operation: conv
+    dtype: float32
+    pass: forward
+    min_count: 1
+  - operation: elementwise
+    dtype: float16
+    pass: forward
+    min_count: 1
+materialized_problems:
+- path: torch2hip/3267_doubled_matmul
+  task_path: tasks/torch2hip/gpumode/3267_SimpleMatmulModule
+  definition_sha256: 958394a918d486a0dd66e442de9b3cd860430575809af52d8f1280b3c85d8605
+  workload_sha256: 8224ffb301cb1ba59c4aa37d0bbc4d1b829a3641ba5feae417860fdc7c0fa9a9
+- path: torch2hip/l1n1_square_matmul
+  task_path: tasks/torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_
+  definition_sha256: 47633e03252fe4f9dfef0014801b4b169db5b0bcfcee9d660b9a035aaa7961d8
+  workload_sha256: 02fa887458e341c4677f40ace8dfef24a7ada0ec7bebce5c4746b4df150a8e1a
+- path: torch2hip/l1n2_standard_matmul
+  task_path: tasks/torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_
+  definition_sha256: b80372bed35607e1c6f57beb03af5a7e15d3caca7feb55f990f9bcb074c61eaf
+  workload_sha256: af38ca371f9c07ae834e1e98207c4b8c96b1c71f6005d9f23db52b395e4ba246
+- path: torch2hip/l1n3_batched_matmul
+  task_path: tasks/torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication
+  definition_sha256: 25c8da0548f86958ebba34419c40c30dc75fdb8b8aa60fa421a5d6ca8b8de59b
+  workload_sha256: f6ca3af9797f2181649ea1737fd5493219a477eb8f883cddcf78419ab0835a8b
+- path: torch2hip/l1n4_matrix_vector
+  task_path: tasks/torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_
+  definition_sha256: 6c32c8d5fc87d1023ed19f9203678db36862f0f848b18d05ff1acfbc1ea6292c
+  workload_sha256: bc962cf3212c5a57b603b6671fa1a480c3c109333f4befa13439afb9a1d18c7e
+- path: torch2hip/l1n8_matmul_irregular
+  task_path: tasks/torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_
+  definition_sha256: 5a5964e3b8770e70f801d01d983d634c7bf7c8839655a7ff022cc7a5d68949b5
+  workload_sha256: b519cc65b43b8e181536f2c9df56b60a0c4c952ab67941a47f8d3f5d60c3db7f
+- path: torch2hip/l1n9_tall_skinny_matmul
+  task_path: tasks/torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_
+  definition_sha256: 3e28dedda77a227f79871438bb70b8283efacea93ac30bfa4d5d2b043b6abfb0
+  workload_sha256: fe70509e8ba7b2f8a65f2cbf1cdbfc103acb5298721fe40e9f4ff48ab65b4a6f
+- path: torch2hip/l1n23_softmax
+  task_path: tasks/torch2hip/kernelbench/level1/l1n23_Softmax
+  definition_sha256: ca5106f7347ab76feca355e71286de611279905b8be67ead7c22c9f7e393dca3
+  workload_sha256: 0529ab6af1dc99a6a44c462a93399a232bcd638e1fe1c602d937cc8b3c2eec86
+- path: torch2hip/l1n26_gelu
+  task_path: tasks/torch2hip/kernelbench/level1/l1n26_GELU_
+  definition_sha256: 98b7bc5856e424b731a72993e27494b434e9ef169a29cee9646b0a62f63b843e
+  workload_sha256: d44940f4975f1e5e97d5eed93da2887079e499fe436984e9e0e380afc3a5194a
+- path: torch2hip/l1n36_rmsnorm
+  task_path: tasks/torch2hip/kernelbench/level1/l1n36_RMSNorm_
+  definition_sha256: 58b62afa43f36b68fc1743f2bb6f789f925d95b77d1b85b3e952b037ba14ab10
+  workload_sha256: 51b528fa12b0bac1a6230392b049525819f14fa9ee6d23bf429e0d12043a1bb7
+- path: torch2hip/l1n40_layernorm
+  task_path: tasks/torch2hip/kernelbench/level1/l1n40_LayerNorm
+  definition_sha256: e862674a893c84a43eb2415034e2610188b51c86b70dfa6852983b47d33c5536
+  workload_sha256: 660041bdb41363eade2e39d18982df017455ad3e732c018c06072b169901801b
+- path: torch2hip/l1n47_sum_reduction
+  task_path: tasks/torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension
+  definition_sha256: 5db46cd46e9be44d91de499dc2bab6c33ddbf7796d0e2b2a89f5c17e13fced14
+  workload_sha256: ed274a56627e36ae39a9ca60ab6f39777a028da1491f12e6493e9d4466f684aa
+- path: torch2hip/l1n42_maxpool2d
+  task_path: tasks/torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D
+  definition_sha256: 01671d38813ec5d849910fd9d1c907144e5afe00dd744d87ca319b4f58c389ae
+  workload_sha256: 795a85073c43acc874d0226d71a62239bf02893b607d383bd72e88f7c90c9461
+- path: torch2hip/l1n63_conv2d
+  task_path: tasks/torch2hip/kernelbench/level1/l1n63_conv_standard_2D__square_input__square_kernel
+  definition_sha256: eea88d78861087e49eca41e22f0baa39769573f5adea183e161b7ded86f9603d
+  workload_sha256: af99148fc415ca98f3d56c47f6a238cab928c58c4323d21bded8cbd52a881cd7
+- path: torch2hip/l1n82_conv_depthwise
+  task_path: tasks/torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D_square_input_square_kernel
+  definition_sha256: 8cdb0b8afef66ca2c8c3f05b29057004962bae06b115488e5c6a63f8c35d2163
+  workload_sha256: 77d5c589b39720fd914ebbfc095690d348caaa89b5f702193a8647e5e6d1cda9
 entries:
-  # Entries are score-eligible unless explicitly marked as a compatibility sentinel.
-  - slot: attention_backward_fp32
-    config: L1
-    problem: 066_masked_softmax_with_attention_dropout_backward
-    workload_uuid: ff15d496-108e-5529-bd40-3f27afe7cf19
-    official_row_sha256: d9c59088d644ea2ea5cefbfb07b24a02f3e616a14a31f4438d8f443d8a6d0474
-    official_workload_sha256: 87eb31f9d9908c67a00cf94bd636625741704d18e1db9e2432c1319c6efbdfce
-    operation: attention
-    dtype: fp32
-    pass: backward
-    dynamic_path: static_instance
-    input_kind: random_scalar
-    golden:
-      external_bytes: 6946816
-      flops: 0
-      resource_work:
-        conversion: {bool->fp32: 524288}
-        reduction: {fp32: 522240}
-        valu: {bool: 131072, fp32: 3145728}
-      derivation: "For N=2*4*256*256 and G=2*4*256: conversion=N, reduction=N-G, FP32 VALU=6*N; mask inversion visits 2*1*256*256 booleans."
-  - slot: norm_forward_bf16
-    config: L1
-    problem: 069_rms_norm
-    workload_uuid: b6b63196-7f11-5b0d-969e-33e44f70975f
-    official_row_sha256: f62fdd64b7c01ef53c9184a3f9e1faee0dbf89cbbe33acc2bbd64a18cd9ea346
-    official_workload_sha256: 387473a4c90d0b399dc0afcbd54bfdf9050648a6c81a236102fcfe9c626c5220
-    operation: norm
-    dtype: bf16
-    pass: forward
-    dynamic_path: static_instance
-    input_kind: random_scalar
-    golden:
-      external_bytes: 6455296
-      flops: 0
-      resource_work:
-        conversion: {bf16->fp32: 1073152, fp32->bf16: 1073152}
-        reduction: {fp32: 1073021}
-        sfu: {fp32: 1073283}
-        valu: {bf16: 2146304, fp32: 1073414}
-      derivation: "For N=1*131*8192 and G=1*131 groups: the reference explicitly casts N BF16 values to FP32 and N values back; FP32 reduction=N-G, SFU=N+G, and VALU=N+2*G, while BF16 residual/weight multiplies visit 2*N elements. Bytes are the definition tensor widths only."
-  - slot: norm_backward_bf16
-    config: L1
-    problem: 013_fused_residual_rms_norm_backward
-    workload_uuid: cf9bd8ed-f80a-54eb-9fc2-9f3d5970f8c1
-    official_row_sha256: 7c181166c5ea8b4c8041ea24815437cf31f208e22304373e0bcdcacbceda5179
-    official_workload_sha256: 31dce140dc2926a7cbafcfdf451cf0928f535458f27a87c253a091b2e118a043
-    operation: norm
-    dtype: bf16
-    pass: backward
-    dynamic_path: static_instance
-    input_kind: random
-    golden:
-      external_bytes: 3297792
-      flops: 0
-      resource_work:
-        conversion: {bf16->fp32: 327680, fp32->bf16: 327680}
-        reduction: {fp32: 652672}
-        valu: {fp32: 1966208}
-      derivation: "For N=1*128*2560, G=128 and H=2560: conversions=N each, reductions=(N-H)+(N-G), VALU=6*N+G; unused official input x is not accessed or counted."
-  - slot: ssm_backward_bf16
-    config: L1
-    problem: 056_mamba_ssm_dt_projection_softplus_clamp_backward
-    workload_uuid: a2e57e4a-476a-5b71-a8f5-e6726ddba86b
-    official_row_sha256: 220caffe752bb481fde19ffcab9e3e46fff874c713ed004cd4ed7c7b49fd6cf5
-    official_workload_sha256: f27d89dd29169bbdce6a76ae1476dd9903754031aadb5b8d4709d3b18e8ee899
-    operation: ssm
-    dtype: bf16
-    pass: backward
-    dynamic_path: static_instance
-    input_kind: random_scalar
-    golden:
-      external_bytes: 42000
-      flops: 0
-      resource_work:
-        conversion: {bf16->fp32: 15720, bool->fp32: 5240, fp32->bf16: 5280}
-        reduction: {fp32: 5200}
-        sfu: {fp32: 5240}
-        valu: {bool: 5240, fp32: 31440}
-      derivation: "For N=1*131*40 and H=40: conversions=3*N,N,N+H; reduction=N-H; SFU=N; FP32 VALU=6*N and boolean VALU=N."
-  - slot: conv_forward_fp32
-    config: L1
-    problem: 040_conv2d_residual_block
-    workload_uuid: ca8527b4-8811-5614-9515-e5ba498f168d
-    official_row_sha256: d3d8f76252a7c6105a3e57f189277d894f8a4f8f5427f4f5dcd8cb0886e528d4
-    official_workload_sha256: 4c9ddaedcb455970dcd4b88ac41dbed253022171cb7539e810b186e4c90a9cee
-    operation: conv
-    dtype: fp32
-    pass: forward
-    dynamic_path: dynamic_shape_small
-    input_kind: random
-    golden:
-      external_bytes: 105356
-      flops: 14155776
-      resource_work:
-        mfma: {fp32->fp32: 14155776}
-        valu: {fp32: 12288}
-      derivation: "MFMA=2*B*H*W*K*K*(3*32+32*3) and VALU=B*3*H*W for residual add; bytes are explicit definition tensors."
-  - slot: conv_forward_dynamic_next_fp32
-    config: L1
-    problem: 040_conv2d_residual_block
-    workload_uuid: 426a537c-9a07-578e-bf40-b45746f82335
-    official_row_sha256: d3d8f76252a7c6105a3e57f189277d894f8a4f8f5427f4f5dcd8cb0886e528d4
-    official_workload_sha256: b39f9ec7e43050f733b83ec5763320d6e7e5d12eaaba74140ab0190503f75453
-    operation: conv
-    dtype: fp32
-    pass: forward
-    dynamic_path: dynamic_shape_next
-    input_kind: random
-    golden:
-      external_bytes: 203660
-      flops: 28311552
-      resource_work:
-        mfma: {fp32->fp32: 28311552}
-        valu: {fp32: 24576}
-      derivation: "At B=2, MFMA=2*B*H*W*K*K*(3*32+32*3) and VALU=B*3*H*W; bytes are explicit definition tensors."
-  - slot: attention_forward_bf16
-    config: L1
-    problem: 083_attention_score_value_matmul
-    workload_uuid: 9ea9d093-cc9d-5e29-a18b-899d0f60238b
-    official_row_sha256: 9c55b40762a7f0a30f784b76b37e0f1029af6fadfd39b2a1ecec06c463190218
-    official_workload_sha256: f2bbc394a3c80410f1a3e9f87cb84804b93e3edf96f1a455093d6b9134335286
-    operation: attention
-    dtype: bf16
-    pass: forward
-    dynamic_path: static_instance
-    input_kind: random
-    golden:
-      external_bytes: 491520
-      flops: 10485760
-      resource_work:
-        mfma: {bf16->fp32: 10485760}
-      derivation: "Single score-value contraction: 2*B*H*Q*K*D at B=1,H=20,Q=K=D=64; bytes are definition tensors."
-  - slot: moe_forward_bf16
-    config: L1
-    problem: 008_expert_output_weighted_index_add_accumulation
-    workload_uuid: 0bda2a65-30fb-51ee-a53d-4506adc7bf9c
-    official_row_sha256: e670b948e7a76d452b1d3915beba104851d70e556ae9a0eeb023713fc1b52c0d
-    official_workload_sha256: f47a0416da4bac6a23a1927611bf7c807bd5608917c1e4af9cfec1a9c520ab2e
-    operation: moe
-    dtype: bf16
-    pass: forward
-    dynamic_path: static_instance
-    input_kind: custom
-    golden:
-      external_bytes: 8057024
-      flops: 0
-      resource_work:
-        atomic: {bf16: 3219456}
-      derivation: "At B=1,S=131,H=3072,K=8: bytes=2*(B*S*H*2)+(B*S*K*H*2)+(B*S*K*8); atomic work is derived independently from B*S*K*H updates."
-  - slot: fp8_block_scale
-    config: Quant
-    problem: 001_fp8_attention_output_projection
-    workload_uuid: 907370b8-2db6-5fde-aa89-a00ee3e73c1a
-    official_row_sha256: 9f792015a94bce783366dcaa5030799f12dfce6df41694da0f51a25d44609b7f
-    official_workload_sha256: 4991f6e1240eb2e3234b21be040529c2e06bed667138026dd1154a0bad3b91fc
-    operation: attention
-    dtype: fp8
-    pass: forward
-    dynamic_path: static_instance
-    input_kind: random
-    golden:
-      external_bytes: 125844480
-      flops: 30198988800
-      resource_work:
-        conversion: {bf16->fp32: 60948480, fp32->bf16: 1966080, fp32->fp8: 60948480, fp8->fp32: 60948480}
-        mfma: {fp8->fp32: 30198988800}
-        reduction: {fp32: 60929520}
-        valu: {fp32: 245797920}
-      derivation: "2*M*K*N OCP-FP8 projection FLOPs plus exact block-scale reduction, VALU, and conversion counters."
-  - slot: nvfp4_projection
-    role: compatibility_sentinel
-    config: Quant
-    problem: 024_nvfp4_attention_output_projection
-    workload_uuid: 2c3eef24-5c2e-5a61-b7f1-237d5adf1972
-    official_row_sha256: 0a18cb4d3a7e16cfc0cec87537d3e3be9bd36836e163c247f099b2d5830804f6
-    official_workload_sha256: 8b0ce3cc2a73601c0e78a5e47b0707f9d25f5d06aa58c89ab8a14ef698522ec6
-    operation: attention
-    dtype: nvfp4
-    pass: forward
-    dynamic_path: static_instance
-    input_kind: custom
-    golden:
-      external_bytes: 7143428
-      flops: 2818572288
-      resource_work: {}
-      derivation: "2*(B*L)*K*M projection FLOPs; official NVFP4 widths determine storage."
-  - slot: fp16_gemm_m1
-    config: FlashInfer-Bench
-    problem: 004_gemm_n128_k2048
-    workload_uuid: 91e43228-c0a7-457e-9424-1d3461621362
-    official_row_sha256: 17e01ecdee57ee9e92fa43de50e274e3ec3a2eb2a7243d7e7ad13f7f74462a19
-    official_workload_sha256: 9a11e3f3a78133817d8d8b15fae2b62b10d5487034a9146af0cbcc8f76520ebc
-    operation: matmul
-    dtype: fp16
-    pass: forward
-    dynamic_path: dynamic_shape_small
-    input_kind: random
-    golden:
-      external_bytes: 528640
-      flops: 524288
-      resource_work:
-        mfma: {fp16->fp32: 524288}
-      derivation: "For M=1,K=2048,N=128: MFMA/FLOPs=2*M*K*N and bytes=2*(M*K+N*K+M*N)."
-  - slot: fp16_gemm_m8828
-    config: FlashInfer-Bench
-    problem: 004_gemm_n128_k2048
-    workload_uuid: e3fced00-f851-471a-b2a3-d3b1fb632c5b
-    official_row_sha256: 17e01ecdee57ee9e92fa43de50e274e3ec3a2eb2a7243d7e7ad13f7f74462a19
-    official_workload_sha256: b2083e86178099a9d97d0d5ce491d2ea70214a2c74ed839f32277da3624714fc
-    operation: matmul
-    dtype: fp16
-    pass: forward
-    dynamic_path: dynamic_shape_next
-    input_kind: random
-    golden:
-      external_bytes: 38943744
-      flops: 4628414464
-      resource_work:
-        mfma: {fp16->fp32: 4628414464}
-      derivation: "For M=8828,K=2048,N=128: MFMA/FLOPs=2*M*K*N and bytes=2*(M*K+N*K+M*N)."
-  - slot: attention_value_transpose_bf16
-    config: L1
-    problem: 010_attention_value_projection_with_transpose
-    workload_uuid: 67c51f93-ea69-5b99-9614-b9ae0a149f6a
-    official_row_sha256: 502ddb94c48a05526892bba19b113ea7e639ef986acfcc9b307ee1ee919070c3
-    official_workload_sha256: 92a1642efc64dccbc8312bc315610a99cbbc9bee51096de853f049d96d05acf3
-    operation: attention
-    dtype: bf16
-    pass: forward
-    dynamic_path: static_instance
-    input_kind: random
-    golden:
-      external_bytes: 12058624
-      flops: 1342177280
-      resource_work:
-        mfma: {bf16->fp32: 1342177280}
-      derivation: "At B=1,S=128,K=5120,N=8*128: MFMA/FLOPs=2*B*S*K*N; bytes=2*(B*S*K+N*K+B*S*N). The following view/transpose changes layout only."
-  - slot: attention_qkv_reshape_bf16
-    config: L1
-    problem: 050_attention_qkv_projection_with_bias_and_reshape
-    workload_uuid: 2a89c694-cc4f-590b-a3ac-58a2fa977c68
-    official_row_sha256: 9381f1e482ee00acf9f368c6951c9d11b8fbda9e28c46cc9a340006c96e586bd
-    official_workload_sha256: d7b3c8d75bf788b63c5cbb1365188eaf0a57011709696a72ecd168aef786da50
-    operation: attention
-    dtype: bf16
-    pass: forward
-    dynamic_path: static_instance
-    input_kind: random
-    golden:
-      external_bytes: 2539264
-      flops: 257556480
-      resource_work:
-        mfma: {bf16->fp32: 257556480}
-        valu: {bf16: 201216}
-      derivation: "At B=1,S=131,K=640 and Q/K/V widths 1024/256/256: MFMA/FLOPs=2*B*S*K*(1024+256+256), BF16 bias VALU=B*S*(1024+256+256), and bytes include the input, three weights/biases, and three outputs. Views are zero-copy."
-  - slot: whisper_projection_fp16
-    config: L1
-    problem: 077_whisper_decoder_output_projection
-    workload_uuid: f16caebe-a2e8-5550-b7ed-6efb043e1600
-    official_row_sha256: a2c6a68efb4d9283c9c4cf57f34b2469af39c3020333723470bc1c64633daf7c
-    official_workload_sha256: 680fd3b0bca9a26eec5476a767e81e332be840d709645bed34be48039710801d
-    operation: matmul
-    dtype: fp16
-    pass: forward
-    dynamic_path: static_instance
-    input_kind: random
-    golden:
-      external_bytes: 132883252
-      flops: 132776960
-      resource_work:
-        mfma: {fp16->fp32: 132776960}
-      derivation: "At B=S=1,K=1280,N=51866: MFMA/FLOPs=2*B*S*K*N and bytes=2*(B*S*K+N*K+B*S*N)."
+- slot: 3267_doubled_matmul
+  task_path: tasks/torch2hip/gpumode/3267_SimpleMatmulModule
+  problem_name: 3267_doubled_matmul
+  operation: matmul
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: fused
+  source_family: gpumode
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-3267_doubled_matmul-w0
+  - aka-3267_doubled_matmul-w1
+  - aka-3267_doubled_matmul-w2
+  - aka-3267_doubled_matmul-w3
+  aka_config_sha256: d7af662143e7f96b8dab4e7eab268c62d30ffb2774a3092552060f57720eaa96
+  aka_source_sha256: 6e1a9c00a70f5a602759383511a1edb84098c031a0d82282d8e007b8f1ddeb15
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n1_square_matmul
+  task_path: tasks/torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_
+  problem_name: l1n1_square_matmul
+  operation: matmul
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n1_square_matmul-w0
+  - aka-l1n1_square_matmul-w1
+  - aka-l1n1_square_matmul-w2
+  - aka-l1n1_square_matmul-w3
+  aka_config_sha256: db2acd2bf9bcb9745efe2ae74bb8c998511a48f60ca0a678bac8b1951b706cf7
+  aka_source_sha256: dabe119b28671c5f0fdbd7257aef181fb6654baa244e5dedd54219a9b5643404
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n2_standard_matmul
+  task_path: tasks/torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_
+  problem_name: l1n2_standard_matmul
+  operation: matmul
+  dtype: bfloat16
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n2_standard_matmul-w0
+  - aka-l1n2_standard_matmul-w1
+  - aka-l1n2_standard_matmul-w2
+  aka_config_sha256: 8be6d41ddeb0a7cce64d3d80189daaddeef3b1f0623328380bcf0b8ee8548360
+  aka_source_sha256: 02f8def4363040c511938afddf3a3fe01f2940182a66792e1c563fba9f59fa95
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n3_batched_matmul
+  task_path: tasks/torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication
+  problem_name: l1n3_batched_matmul
+  operation: matmul
+  dtype: bfloat16
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n3_batched_matmul-w0
+  - aka-l1n3_batched_matmul-w1
+  - aka-l1n3_batched_matmul-w2
+  aka_config_sha256: 868ba66f2028e83169a33d94f0aa7043e0ba1d59ec13afdf7f95a9eee79f86b6
+  aka_source_sha256: 7bca869bd3d111a3f03bd9f79b327d0d32742563b5c45e8d750f095bcf4603cf
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n4_matrix_vector
+  task_path: tasks/torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_
+  problem_name: l1n4_matrix_vector
+  operation: matmul
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n4_matrix_vector-w0
+  - aka-l1n4_matrix_vector-w1
+  - aka-l1n4_matrix_vector-w2
+  aka_config_sha256: c823131b46f5c9278621730727f303095b6ca5654b928ed239d8e71540ad593a
+  aka_source_sha256: f0fe674356d5ecb9c71b0478dbef40c2a01864814d2219311f943651f2980583
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n8_matmul_irregular
+  task_path: tasks/torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_
+  problem_name: l1n8_matmul_irregular
+  operation: matmul
+  dtype: float16
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n8_matmul_irregular-w0
+  - aka-l1n8_matmul_irregular-w1
+  - aka-l1n8_matmul_irregular-w2
+  aka_config_sha256: 5ad52f6b6205452923c47e7b1a7b68eb2a4c98f3e1f79c43be5b8a3657e603a3
+  aka_source_sha256: 4f7cff806c9bc0055d5d6e9420475c50354312ccb9028e03624eb3a218b3bc29
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n9_tall_skinny_matmul
+  task_path: tasks/torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_
+  problem_name: l1n9_tall_skinny_matmul
+  operation: matmul
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n9_tall_skinny_matmul-w0
+  - aka-l1n9_tall_skinny_matmul-w1
+  - aka-l1n9_tall_skinny_matmul-w2
+  aka_config_sha256: 555f5120d73c8aabd48d6fbc57507ede298717d5086c8e55e80437575438cca7
+  aka_source_sha256: e3030849d1df6f85ed4656299e0266e0b45313741b0a3046f2a3fed9657bf779
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n23_softmax
+  task_path: tasks/torch2hip/kernelbench/level1/l1n23_Softmax
+  problem_name: l1n23_softmax
+  operation: softmax
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n23_softmax-w0
+  - aka-l1n23_softmax-w1
+  - aka-l1n23_softmax-w2
+  - aka-l1n23_softmax-w3
+  aka_config_sha256: 62d858d694da517af19f69892ae1565b36f1ac3d06dbf5d1e63ce9ba7f142f74
+  aka_source_sha256: c3ef4af1b69cdf973bfd2901b2631c458b6b4d178d60661bece3e93fe592f636
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n26_gelu
+  task_path: tasks/torch2hip/kernelbench/level1/l1n26_GELU_
+  problem_name: l1n26_gelu
+  operation: elementwise
+  dtype: float16
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n26_gelu-w0
+  - aka-l1n26_gelu-w1
+  - aka-l1n26_gelu-w2
+  aka_config_sha256: d8a0f0fe1c58e6a59e9704579993b63a2498ae52dea145d25747d7978700e07a
+  aka_source_sha256: 646ca30f98c7701b4594085660b46edc092946e99fe9c15144cef9f833bb60b6
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n36_rmsnorm
+  task_path: tasks/torch2hip/kernelbench/level1/l1n36_RMSNorm_
+  problem_name: l1n36_rmsnorm
+  operation: norm
+  dtype: bfloat16
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n36_rmsnorm-w0
+  - aka-l1n36_rmsnorm-w1
+  - aka-l1n36_rmsnorm-w2
+  aka_config_sha256: c2c26934b99e046620ed24ae7e143a43713aecb46f76dfcef16e679bae63d21e
+  aka_source_sha256: 2c0b56fc71f7b93cd9142cf9b4fee7a7264bfad87600ecfcc58a585080bcc1e5
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n40_layernorm
+  task_path: tasks/torch2hip/kernelbench/level1/l1n40_LayerNorm
+  problem_name: l1n40_layernorm
+  operation: norm
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n40_layernorm-w0
+  - aka-l1n40_layernorm-w1
+  - aka-l1n40_layernorm-w2
+  aka_config_sha256: 58baa47085f5e57f58e20b99c5028bcc18472f959243afc385585bc4980c9f33
+  aka_source_sha256: 9e31e73b25b1994285f7bc894a3cf077a81d1e4d5556bf157fe7d13f22a871d6
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n47_sum_reduction
+  task_path: tasks/torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension
+  problem_name: l1n47_sum_reduction
+  operation: elementwise
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n47_sum_reduction-w0
+  - aka-l1n47_sum_reduction-w1
+  - aka-l1n47_sum_reduction-w2
+  aka_config_sha256: 90c05e7c46959a35194ea26c3fb305ad2ed1822183e93189290fbb85c9f4b7fd
+  aka_source_sha256: 796fb8ee1e8a9b2bf84b6e93a0d971cf48cf45f21ff793e598cabaab2fe8e29d
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n42_maxpool2d
+  task_path: tasks/torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D
+  problem_name: l1n42_maxpool2d
+  operation: elementwise
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n42_maxpool2d-w0
+  - aka-l1n42_maxpool2d-w1
+  - aka-l1n42_maxpool2d-w2
+  aka_config_sha256: e40c83814c11de7dd096cf625e42d8a744fbfb7a4c1ae15331d9e309a07f98e9
+  aka_source_sha256: 4c4945a00d2944d428b797d0aea85dc2b34807d6963ab5a2897f7056afc07c12
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n63_conv2d
+  task_path: tasks/torch2hip/kernelbench/level1/l1n63_conv_standard_2D__square_input__square_kernel
+  problem_name: l1n63_conv2d
+  operation: conv
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n63_conv2d-w0
+  - aka-l1n63_conv2d-w1
+  - aka-l1n63_conv2d-w2
+  aka_config_sha256: affb6657d95b6b9d12549a10a5ce8c6cbce48c8ddcb0bc56b5def17b4f4a3ecd
+  aka_source_sha256: db7c6c18eb67a60308d6ea9d942fb5e2aaa249479f2eb9cda1a681475f2a429f
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}
+- slot: l1n82_conv_depthwise
+  task_path: tasks/torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D_square_input_square_kernel
+  problem_name: l1n82_conv_depthwise
+  operation: conv
+  dtype: float32
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n82_conv_depthwise-w0
+  - aka-l1n82_conv_depthwise-w1
+  - aka-l1n82_conv_depthwise-w2
+  aka_config_sha256: eee87400dbe95cccdab219654de48b16a72aed374f86f54338d8b61c15a90e90
+  aka_source_sha256: 8c80366ecaa00e037eaef053b6142faa20bc55ac807c3ea13b05087ae5640e90
+  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  golden: {}

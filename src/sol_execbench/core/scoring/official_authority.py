@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.dataset.corpus import CorpusManifest
+from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest as CorpusManifest
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
 

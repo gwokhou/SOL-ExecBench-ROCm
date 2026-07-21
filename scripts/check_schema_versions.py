@@ -15,10 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_ID_RE = re.compile(r"sol_execbench(?:\.[a-z0-9_]+)+\.v\d+")
 VERSION_SUFFIX_RE = re.compile(r"\.v\d+$")
 UPSTREAM_TOLERANCE_FIELD = "required_" + "match_ratio"
-UPSTREAM_FIELD_ALLOWLIST = {
-    Path("src/sol_execbench/core/dataset/corpus.py"),
-    Path("tests/sol_execbench/core/test_corpus.py"),
-}
+UPSTREAM_FIELD_ALLOWLIST: set[Path] = set()
 EXCLUDED_PARTS = {
     ".git",
     ".venv",

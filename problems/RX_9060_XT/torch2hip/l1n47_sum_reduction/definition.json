@@ -1,0 +1,36 @@
+{
+  "name": "l1n47_sum_reduction",
+  "op_type": "elementwise",
+  "description": "Sum reduction over the last dimension with keepdim. Derived from AKA torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns (reduced)."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Input (M, N)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "1"
+      ],
+      "dtype": "float32",
+      "description": "Row sums (M, 1)."
+    }
+  },
+  "reference": "import torch\n\ndef run(x):\n    return torch.sum(x, dim=-1, keepdim=True)\n"
+}
