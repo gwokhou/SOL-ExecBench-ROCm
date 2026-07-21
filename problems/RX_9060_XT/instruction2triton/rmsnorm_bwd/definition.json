@@ -1,0 +1,60 @@
+{
+  "name": "rmsnorm_bwd",
+  "op_type": "norm",
+  "description": "RMSNorm backward (gradient w.r.t. input and weight) via autograd. Derived from AKA instruction2triton/rocmbench/rmsnorm_bwd; provenance-weakened (no module_fn cross-check; correctness rests on the lifted reference).",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows."
+    },
+    "N": {
+      "type": "var",
+      "description": "Feature dimension."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float16",
+      "description": "Forward input (M, N)."
+    },
+    "g": {
+      "shape": [
+        "1",
+        "N"
+      ],
+      "dtype": "float16",
+      "description": "RMSNorm gain (1, N)."
+    },
+    "grad_output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float16",
+      "description": "Upstream gradient (M, N)."
+    }
+  },
+  "outputs": {
+    "grad_x": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float16",
+      "description": "Gradient w.r.t. x (M, N)."
+    },
+    "grad_g": {
+      "shape": [
+        "1",
+        "N"
+      ],
+      "dtype": "float16",
+      "description": "Gradient w.r.t. g (1, N)."
+    }
+  },
+  "reference": "import torch\n\ndef run(x, g, grad_output):\n    xr = x.clone().detach().requires_grad_()\n    gr = g.clone().detach().requires_grad_()\n    rms = torch.sqrt(torch.sum(xr.float() ** 2, dim=-1, keepdim=True) * (1.0 / xr.shape[-1]))\n    y = (xr.float() / rms * gr.float()).to(x.dtype)\n    y.backward(grad_output)\n    return xr.grad.to(x.dtype), gr.grad.to(x.dtype)\n"
+}

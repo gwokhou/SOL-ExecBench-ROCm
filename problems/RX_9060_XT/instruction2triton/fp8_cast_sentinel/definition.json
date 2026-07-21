@@ -1,0 +1,36 @@
+{
+  "name": "fp8_cast_sentinel",
+  "op_type": "elementwise",
+  "description": "FP8 compatibility sentinel: per-tensor cast to float8_e4m3fn. Probes the harness's ability to materialize, compare, and time an FP8 output tensor end-to-end. Provenance-bound to AKA instruction2triton/rocmbench/test_chained_dot_fp8 (a portable pure-torch cast stands in for the arch-coupled FP8 chained-dot reference so it executes on gfx1200). Not scored for SOL.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows."
+    },
+    "N": {
+      "type": "var",
+      "description": "Columns."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "FP32 input (M, N)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float8_e4m3fn",
+      "description": "x cast to float8_e4m3fn."
+    }
+  },
+  "reference": "import torch\n\ndef run(x):\n    return x.to(torch.float8_e4m3fn)\n"
+}

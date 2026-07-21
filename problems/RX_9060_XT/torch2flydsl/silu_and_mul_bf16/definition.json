@@ -1,0 +1,41 @@
+{
+  "name": "silu_and_mul_bf16",
+  "op_type": "elementwise",
+  "description": "Fused SiLU-and-multiply (SwIGLU): silu(x) * y over the two halves of the last dimension, computed in FP32 then cast to BF16. Derived from AKA torch2flydsl/silu_and_mul_kernel Model.forward (the suite's FlyDSL target is irrelevant here; we lift the PyTorch oracle).",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows."
+    },
+    "D": {
+      "type": "var",
+      "description": "Last dimension (even)."
+    },
+    "d": {
+      "type": "expr",
+      "expression": "D // 2",
+      "description": "Half of the last dimension."
+    }
+  },
+  "inputs": {
+    "input": {
+      "shape": [
+        "M",
+        "D"
+      ],
+      "dtype": "bfloat16",
+      "description": "Input (M, D), D even."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "d"
+      ],
+      "dtype": "bfloat16",
+      "description": "silu(x) * y (M, d)."
+    }
+  },
+  "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(input):\n    d = input.shape[-1] // 2\n    x, y = input.split([d, d], dim=-1)\n    return (F.silu(x.float()) * y.float()).to(torch.bfloat16)\n"
+}

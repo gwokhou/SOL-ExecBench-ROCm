@@ -1,0 +1,83 @@
+{
+  "name": "l2n37_groupnorm_fused",
+  "op_type": "norm",
+  "description": "Fused linear -> swish -> add -> group_norm. Derived from AKA torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch rows."
+    },
+    "IN": {
+      "type": "const",
+      "value": 1024,
+      "description": "Input features."
+    },
+    "OUT": {
+      "type": "const",
+      "value": 4096,
+      "description": "Output features (group_norm channels)."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, IN)."
+    },
+    "weight": {
+      "shape": [
+        "OUT",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Linear weight."
+    },
+    "bias": {
+      "shape": [
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "Linear bias."
+    },
+    "extra_bias": {
+      "shape": [
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "Additive bias."
+    },
+    "gn_weight": {
+      "shape": [
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "GroupNorm gain."
+    },
+    "gn_bias": {
+      "shape": [
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "GroupNorm bias."
+    },
+    "num_groups": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "GroupNorm group count."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "group_norm(swish(linear(x)) + extra_bias)."
+    }
+  },
+  "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, weight, bias, extra_bias, gn_weight, gn_bias, num_groups):\n    x = F.linear(x, weight, bias)\n    x = torch.sigmoid(x) * x\n    x = x + extra_bias\n    return F.group_norm(x, int(num_groups), gn_weight, gn_bias)\n"
+}

@@ -1,0 +1,166 @@
+{
+  "name": "l3n44_mingpt_block",
+  "op_type": "attention",
+  "description": "Full MiniGPT transformer block: layernorm -> causal self-attention -> residual -> layernorm -> MLP(new-GELU) -> residual. Derived from AKA torch2hip/kernelbench/level3/l3n44_MiniGPTBlock module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "S": {
+      "type": "var",
+      "description": "Sequence length (<= 1024)."
+    },
+    "C": {
+      "type": "const",
+      "value": 768,
+      "description": "Model dimension."
+    },
+    "C3": {
+      "type": "expr",
+      "expression": "3 * C",
+      "description": "QKV projection output (3*C)."
+    },
+    "C4": {
+      "type": "expr",
+      "expression": "4 * C",
+      "description": "MLP hidden (4*C)."
+    },
+    "MT": {
+      "type": "const",
+      "value": 1024,
+      "description": "Max sequence length (causal-mask buffer edge)."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "S",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, S, C)."
+    },
+    "ln1_w": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "LayerNorm 1 gain."
+    },
+    "ln1_b": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "LayerNorm 1 bias."
+    },
+    "attn_c_attn_w": {
+      "shape": [
+        "C3",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "QKV projection weight."
+    },
+    "attn_c_attn_b": {
+      "shape": [
+        "C3"
+      ],
+      "dtype": "float32",
+      "description": "QKV projection bias."
+    },
+    "attn_c_proj_w": {
+      "shape": [
+        "C",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Attention output projection weight."
+    },
+    "attn_c_proj_b": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Attention output projection bias."
+    },
+    "attn_bias": {
+      "shape": [
+        "1",
+        "1",
+        "MT",
+        "MT"
+      ],
+      "dtype": "float32",
+      "description": "Causal mask buffer (1, 1, MT, MT)."
+    },
+    "n_head": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Attention head count."
+    },
+    "ln2_w": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "LayerNorm 2 gain."
+    },
+    "ln2_b": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "LayerNorm 2 bias."
+    },
+    "mlp_cfc_w": {
+      "shape": [
+        "C4",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "MLP fc weight."
+    },
+    "mlp_cfc_b": {
+      "shape": [
+        "C4"
+      ],
+      "dtype": "float32",
+      "description": "MLP fc bias."
+    },
+    "mlp_cproj_w": {
+      "shape": [
+        "C",
+        "C4"
+      ],
+      "dtype": "float32",
+      "description": "MLP proj weight."
+    },
+    "mlp_cproj_b": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "MLP proj bias."
+    },
+    "n_embd": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Model dimension (== C)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "S",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Block output (B, S, C)."
+    }
+  },
+  "reference": "import math\nimport torch\nimport torch.nn.functional as F\n\ndef _new_gelu(z):\n    return 0.5 * z * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (z + 0.044715 * torch.pow(z, 3.0))))\n\ndef run(x, ln1_w, ln1_b, attn_c_attn_w, attn_c_attn_b, attn_c_proj_w, attn_c_proj_b, attn_bias, n_head, ln2_w, ln2_b, mlp_cfc_w, mlp_cfc_b, mlp_cproj_w, mlp_cproj_b, n_embd):\n    a = F.layer_norm(x, (int(n_embd),), ln1_w, ln1_b)\n    B, T, C = a.size()\n    nh = int(n_head)\n    qkv = F.linear(a, attn_c_attn_w, attn_c_attn_b)\n    q, k, v = qkv.split(C, dim=2)\n    k = k.view(B, T, nh, C // nh).transpose(1, 2)\n    q = q.view(B, T, nh, C // nh).transpose(1, 2)\n    v = v.view(B, T, nh, C // nh).transpose(1, 2)\n    att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))\n    att = att.masked_fill(attn_bias[:, :, :T, :T] == 0, float('-inf'))\n    att = F.softmax(att, dim=-1)\n    y = att @ v\n    y = y.transpose(1, 2).contiguous().view(B, T, C)\n    x = x + F.linear(y, attn_c_proj_w, attn_c_proj_b)\n    m = F.layer_norm(x, (int(n_embd),), ln2_w, ln2_b)\n    h = F.linear(m, mlp_cfc_w, mlp_cfc_b)\n    h = _new_gelu(h)\n    h = F.linear(h, mlp_cproj_w, mlp_cproj_b)\n    return x + h\n"
+}

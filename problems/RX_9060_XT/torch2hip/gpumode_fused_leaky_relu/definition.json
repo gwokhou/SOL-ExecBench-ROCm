@@ -1,0 +1,65 @@
+{
+  "name": "gpumode_fused_leaky_relu",
+  "op_type": "elementwise",
+  "description": "Fused bias-add -> leaky_relu -> scale. Derived from AKA torch2hip/gpumode/10190_FusedLeakyReLU module_fn (fused_leaky_relu_fn).",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "C": {
+      "type": "var",
+      "description": "Channels."
+    },
+    "H": {
+      "type": "var",
+      "description": "Height."
+    },
+    "W": {
+      "type": "var",
+      "description": "Width."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, C, H, W)."
+    },
+    "bias": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Channel bias (>= C, sliced to x's channels)."
+    },
+    "negative_slope": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Leaky-ReLU negative slope."
+    },
+    "scale": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Output scale."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "scale * leaky_relu(x + bias)."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x, bias, negative_slope, scale):\n    x = x + bias.reshape(1, -1, 1, 1)[:, : x.shape[1]]\n    x = F.leaky_relu(x, negative_slope=negative_slope)\n    return x * scale\n"
+}

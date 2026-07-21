@@ -1,0 +1,4 @@
+{"axes": {"D": 8192, "M": 512}, "inputs": {"input": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-silu_and_mul_bf16-w0"}
+{"axes": {"D": 4096, "M": 1}, "inputs": {"input": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-silu_and_mul_bf16-w1"}
+{"axes": {"D": 8192, "M": 2048}, "inputs": {"input": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-silu_and_mul_bf16-w2"}
+{"axes": {"D": 16384, "M": 256}, "inputs": {"input": {"type": "random"}}, "tolerance": {"max_atol": 0.0125, "max_rtol": 0.0125, "required_matched_ratio": 0.99}, "uuid": "aka-silu_and_mul_bf16-w3"}

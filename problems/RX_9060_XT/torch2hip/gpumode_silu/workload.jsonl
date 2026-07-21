@@ -1,0 +1,4 @@
+{"axes": {"M": 1024, "N": 1024}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_silu-w0"}
+{"axes": {"M": 1, "N": 65536}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_silu-w1"}
+{"axes": {"M": 1823, "N": 781}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_silu-w2"}
+{"axes": {"M": 256, "N": 8192}, "inputs": {"x": {"type": "random"}}, "tolerance": {"max_atol": 1.25e-05, "max_rtol": 1.25e-05, "required_matched_ratio": 0.99}, "uuid": "aka-gpumode_silu-w3"}

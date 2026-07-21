@@ -1,0 +1,85 @@
+{
+  "name": "gpumode_feedforward",
+  "op_type": "matmul",
+  "description": "Fused two-input feedforward: vstack(x,y) -> linear -> ReLU -> linear -> sigmoid. Derived from AKA torch2hip/gpumode/10024_Feedforward module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Per-input batch (output batch is 2*B)."
+    },
+    "C": {
+      "type": "const",
+      "value": 4,
+      "description": "Input features."
+    },
+    "H": {
+      "type": "const",
+      "value": 100,
+      "description": "Hidden features."
+    },
+    "OB": {
+      "type": "expr",
+      "expression": "2 * B",
+      "description": "Output batch (vstack doubles the batch)."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "First input (B, C)."
+    },
+    "y": {
+      "shape": [
+        "B",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Second input (B, C)."
+    },
+    "fc1_weight": {
+      "shape": [
+        "H",
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "First linear weight (H, C)."
+    },
+    "fc1_bias": {
+      "shape": [
+        "H"
+      ],
+      "dtype": "float32",
+      "description": "First linear bias (H,)."
+    },
+    "fc2_weight": {
+      "shape": [
+        "1",
+        "H"
+      ],
+      "dtype": "float32",
+      "description": "Second linear weight (1, H)."
+    },
+    "fc2_bias": {
+      "shape": [
+        "1"
+      ],
+      "dtype": "float32",
+      "description": "Second linear bias (1,)."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "OB",
+        "1"
+      ],
+      "dtype": "float32",
+      "description": "sigmoid(linear2(relu(linear1(vstack(x,y)))))."
+    }
+  },
+  "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, y, fc1_weight, fc1_bias, fc2_weight, fc2_bias):\n    inp = torch.vstack([x, y])\n    hidden = F.linear(inp, fc1_weight, fc1_bias)\n    relu = F.relu(hidden)\n    output = F.linear(relu, fc2_weight, fc2_bias)\n    return torch.sigmoid(output)\n"
+}

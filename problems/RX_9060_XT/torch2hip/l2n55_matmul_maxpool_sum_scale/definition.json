@@ -1,0 +1,66 @@
+{
+  "name": "l2n55_matmul_maxpool_sum_scale",
+  "op_type": "matmul",
+  "description": "Fused linear -> max_pool1d -> sum -> scale, reducing to a 1D per-batch output. Derived from AKA torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "IN": {
+      "type": "const",
+      "value": 32768,
+      "description": "Input features."
+    },
+    "OUT": {
+      "type": "const",
+      "value": 32768,
+      "description": "Output features."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, IN)."
+    },
+    "weight": {
+      "shape": [
+        "OUT",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Linear weight."
+    },
+    "bias": {
+      "shape": [
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "Linear bias."
+    },
+    "kernel_size": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Max-pool kernel size."
+    },
+    "scale_factor": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Output scale."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B"
+      ],
+      "dtype": "float32",
+      "description": "Reduced output (B,)."
+    }
+  },
+  "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, weight, bias, kernel_size, scale_factor):\n    x = F.linear(x, weight, bias)\n    x = F.max_pool1d(x.unsqueeze(1), int(kernel_size)).squeeze(1)\n    x = torch.sum(x, dim=1)\n    return x * scale_factor\n"
+}

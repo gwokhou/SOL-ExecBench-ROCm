@@ -1,0 +1,62 @@
+{
+  "name": "l2n86_matmul_divide_gelu",
+  "op_type": "matmul",
+  "description": "Fused linear -> divide -> GELU. Derived from AKA torch2hip/kernelbench/level2/l2n86_Matmul_Divide_GELU module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch rows."
+    },
+    "IN": {
+      "type": "const",
+      "value": 8192,
+      "description": "Input features."
+    },
+    "OUT": {
+      "type": "const",
+      "value": 8192,
+      "description": "Output features."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Input (B, IN)."
+    },
+    "weight": {
+      "shape": [
+        "OUT",
+        "IN"
+      ],
+      "dtype": "float32",
+      "description": "Linear weight (OUT, IN)."
+    },
+    "bias": {
+      "shape": [
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "Linear bias (OUT,)."
+    },
+    "divisor": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Divisor scalar."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "OUT"
+      ],
+      "dtype": "float32",
+      "description": "gelu(linear(x) / divisor)."
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias, divisor):\n    x = F.linear(x, weight, bias)\n    x = x / divisor\n    return F.gelu(x)\n"
+}

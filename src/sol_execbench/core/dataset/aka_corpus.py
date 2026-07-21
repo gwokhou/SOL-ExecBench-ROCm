@@ -45,9 +45,12 @@ FORMAL_ARCHITECTURE_SHA256 = (
     "944aa6f9383a565bd4e636b068ee077e7415f38f15517b69cb78b6ea32c9a8dd"
 )
 
-# Seed-set bounds (replace the NVIDIA 15-workload / 14-scored + 1-sentinel pin).
+# Corpus-size bounds. The initial seed landed at 15 problems; the friendliness
+# expansion (docs/internal/aka-expansion-friendliness.md) grows it toward the
+# 38-42 range across the three handling categories. The upper bound keeps headroom
+# for further growth while still bounding the manifest validator's check.
 SEED_SET_MIN_PROBLEMS = 15
-SEED_SET_MAX_PROBLEMS = 25
+SEED_SET_MAX_PROBLEMS = 48
 
 _AUTHORED_PROBLEM_FILES = ("definition.json", "workload.jsonl")
 
@@ -283,7 +286,11 @@ def _validate_entries(
     if not all(entry.task_path.startswith("tasks/") for entry in entries):
         raise ValueError("AKA corpus entries must reference tasks/ paths")
     sentinels = [entry for entry in entries if entry.role == "compatibility_sentinel"]
-    if sentinels and not all(entry.dtype.startswith("fp8") for entry in sentinels):
+    # The DType enum names OCP FP8 as "float8_e4m3fn" / "float8_e5m2", so accept
+    # either the "fp8" or "float8" prefix when checking the sentinel is an FP8 task.
+    if sentinels and not all(
+        entry.dtype.startswith(("fp8", "float8")) for entry in sentinels
+    ):
         raise ValueError("compatibility sentinels must be FP8 AKA tasks")
     if sum(entry.role == "scored" for entry in entries) == 0:
         raise ValueError("AKA corpus must contain at least one scored entry")

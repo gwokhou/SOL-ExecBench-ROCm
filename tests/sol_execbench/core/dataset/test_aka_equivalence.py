@@ -43,4 +43,7 @@ def test_aka_equivalence_check_passes_for_the_corpus():
     assert result.returncode == 0, (
         f"equivalence check failed:\n{result.stdout}\n{result.stderr}"
     )
-    assert "15/15 problems passed sanity" in result.stdout
+    # Robust to corpus-size changes: every problem must pass sanity with no FAIL
+    # line and zero numerical cross-check failures.
+    assert "[FAIL]" not in result.stdout, result.stdout
+    assert "0 failed" in result.stdout, result.stdout
