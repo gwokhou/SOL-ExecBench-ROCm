@@ -20,10 +20,9 @@ import sol_execbench.cli.evaluation.phases as cli_phases
 import sol_execbench.cli.evaluation.problem_io as cli_problem_io
 import sol_execbench.cli.evaluation.runtime as cli_evaluation_runtime
 import sol_execbench.cli.evaluation.sidecar_writer as cli_sidecar_writer
-from sol_execbench.driver.problem_packager import ProblemPackager
-from sol_execbench.cli.protocol import CliResult, artifact
-from sol_execbench.cli.protocol import CliFailure
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
+from sol_execbench.cli.protocol import CliFailure, CliResult, artifact
+from sol_execbench.driver.problem_packager import ProblemPackager
 
 
 console = Console(stderr=True)
@@ -38,6 +37,9 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
     """Evaluate a SOL-ExecBench solution on GPU."""
 
     cli_phases.require_execution_isolation(request)
+    cli_problem_io.require_materialized_target_match(
+        request.problem_dir, request.device
+    )
 
     resolved_inputs = cli_problem_io.resolve_problem_inputs(
         problem_dir=request.problem_dir,

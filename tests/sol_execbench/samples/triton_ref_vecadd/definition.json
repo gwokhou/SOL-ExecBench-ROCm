@@ -1,5 +1,6 @@
 {
   "name": "triton_ref_vecadd",
+  "op_type": "elementwise",
   "description": "Simple vector addition with a @triton.jit reference implementation. Regression test for eval_driver reference loading: decorators that call inspect.getsourcelines() (such as @triton.jit) require the reference code to live in a real file.",
   "axes": {
     "n": {

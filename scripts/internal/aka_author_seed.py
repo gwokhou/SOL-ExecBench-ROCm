@@ -9,7 +9,7 @@ AgentKernelArena (AKA). Each problem's PyTorch reference is AKA's own
 correctness oracle (``module_fn``) lifted into a standalone ``def run(...)``;
 axes, workloads, and dtypes are chosen per problem under the SOL-ExecBench
 paper (arXiv 2603.19173) §3 methodology. Running this script regenerates the
-committed problems under ``problems/RX_9060_XT/`` and the manifest, recording
+committed problems under ``problems/AMD_AKA/`` and the manifest, recording
 AKA per-task checksums when the AKA clone is present.
 
 Usage:
@@ -37,12 +37,13 @@ from sol_execbench.core.dataset.aka_corpus import (
     FORMAL_ARCHITECTURE_SHA256,
     FORMAL_GFX_TARGET,
 )
+from sol_execbench.core.dataset.aka_compatibility import AKA_EXECUTION_TARGET_SPECS
 from sol_execbench.core.dataset.aka_tolerance import dtype_default_tolerance
 from sol_execbench.core.integrity import sha256_file
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MANIFEST_PATH = REPO_ROOT / "problems" / "RX_9060_XT" / "manifest.yaml"
-PROBLEMS_ROOT = REPO_ROOT / "problems" / "RX_9060_XT"
+MANIFEST_PATH = REPO_ROOT / "problems" / "AMD_AKA" / "manifest.yaml"
+PROBLEMS_ROOT = REPO_ROOT / "problems" / "AMD_AKA"
 
 
 @dataclass(frozen=True)
@@ -2705,7 +2706,7 @@ def _write_manifest(
         entries.append(entry)
 
     payload = {
-        "schema_version": 3,
+        "schema_version": 4,
         "source": {
             "repository": AKA_REPOSITORY,
             "revision": AKA_REVISION,
@@ -2713,7 +2714,14 @@ def _write_manifest(
             "provenance_class": AKA_PROVENANCE_CLASS,
             "aka_commit_sha256": aka_commit,
         },
-        "target": {
+        "execution_targets": {
+            gfx_target: {
+                "generation": spec["generation"],
+                "supported_tensor_dtypes": list(spec["supported_tensor_dtypes"]),
+            }
+            for gfx_target, spec in AKA_EXECUTION_TARGET_SPECS.items()
+        },
+        "formal_analysis": {
             "architecture_profile": FORMAL_ARCHITECTURE,
             "formal_gfx_target": FORMAL_GFX_TARGET,
             "architecture_profile_sha256": FORMAL_ARCHITECTURE_SHA256,

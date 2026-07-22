@@ -22,11 +22,42 @@ from sol_execbench.core.dataset.aka_corpus import (
     SEED_SET_MAX_PROBLEMS,
     SEED_SET_MIN_PROBLEMS,
 )
-from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.dataset.aka_compatibility import (
+    AkaWorkloadDecision,
+    materialization_target,
+)
+from sol_execbench.core.platform.runtime import RocmDeviceInfo
 from sol_execbench.core.scoring.official_authority import official_score_availability
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-MANIFEST = REPO_ROOT / "problems" / "RX_9060_XT" / "manifest.yaml"
+MANIFEST = REPO_ROOT / "problems" / "AMD_AKA" / "manifest.yaml"
+TEST_TARGET = materialization_target(
+    RocmDeviceInfo(
+        device="cuda:0",
+        index=0,
+        name="test gfx1200",
+        gfx_target="gfx1200",
+        total_memory_bytes=16 * 1024**3,
+        l2_cache_bytes=4 * 1024**2,
+        torch_version="test",
+        hip_version="test",
+    )
+)
+
+
+def _passing_probe(problem_dir, _row_index, workload, _target, _timeout):
+    return AkaWorkloadDecision(
+        problem_path=f"{problem_dir.parent.name}/{problem_dir.name}",
+        workload_uuid=workload.uuid,
+        included=True,
+        stage="live_probe",
+        reason_code="probe_passed",
+    )
+
+
+def _materialize_for_test(manifest, output):
+    return manifest.materialize(output, target=TEST_TARGET, probe=_passing_probe)
+
 
 # The three AKA suites that carry a liftable PyTorch oracle (friendliness Cat1/Cat2),
 # and the five structurally-hostile suites that are rejected outright (Cat3) — see
@@ -50,6 +81,8 @@ def test_aka_manifest_loads_and_pins_revision():
     assert manifest.source["aka_commit_sha256"] == AKA_REVISION
     assert SEED_SET_MIN_PROBLEMS <= len(manifest.entries) <= SEED_SET_MAX_PROBLEMS
     assert manifest.official_scoring["status"] == "unavailable"
+    assert set(manifest.execution_targets) == {"gfx942", "gfx1150", "gfx1200"}
+    assert manifest.formal_analysis["formal_gfx_target"] == "gfx1200"
 
 
 def test_corpus_architecture_identity_matches_packaged_solar_profile():
@@ -129,7 +162,7 @@ def test_round_trip_every_authored_problem_through_the_schema():
     manifest = AkaCorpusManifest.load(MANIFEST)
 
     for entry in manifest.entries:
-        root = REPO_ROOT / "problems" / "RX_9060_XT" / entry.relative_problem_dir
+        root = REPO_ROOT / "problems" / "AMD_AKA" / entry.relative_problem_dir
         Definition.model_validate_json((root / "definition.json").read_text())
         for line in (root / "workload.jsonl").read_text().splitlines():
             if line.strip():
@@ -148,38 +181,59 @@ def test_official_score_reports_unavailable_without_accepting_inputs():
 
 def test_audit_rejects_incomplete_local_problem_inventory(tmp_path):
     manifest = AkaCorpusManifest.load(MANIFEST)
-    expected = sorted(
-        {entry.relative_problem_dir.as_posix() for entry in manifest.entries}
-    )
-    record = {
-        "aka_manifest_sha256": sha256_file(manifest.path),
-        "source": {"revision": AKA_REVISION},
-        "problems": [{"path": path} for path in expected[1:]],
-    }
-    (tmp_path / "materialization-manifest.yaml").write_text(
-        yaml.safe_dump(record, sort_keys=False)
-    )
+    output = _materialize_for_test(manifest, tmp_path / "materialized")
+    path = output / "materialization-manifest.yaml"
+    record = yaml.safe_load(path.read_text())
+    record["problems"] = record["problems"][1:]
+    path.write_text(yaml.safe_dump(record, sort_keys=False))
 
-    with pytest.raises(ValueError, match="problem inventory mismatch"):
-        manifest.audit(tmp_path)
+    with pytest.raises(ValueError, match="do not match included decisions"):
+        manifest.audit(output)
 
 
 def test_audit_rejects_wrong_pinned_revision(tmp_path):
     manifest = AkaCorpusManifest.load(MANIFEST)
-    record = {
-        "aka_manifest_sha256": sha256_file(manifest.path),
-        "source": {"revision": "deadbeef" * 5},
-        "problems": [
-            {"path": entry.relative_problem_dir.as_posix()}
-            for entry in manifest.entries
-        ],
-    }
-    (tmp_path / "materialization-manifest.yaml").write_text(
-        yaml.safe_dump(record, sort_keys=False)
-    )
+    output = _materialize_for_test(manifest, tmp_path / "materialized")
+    path = output / "materialization-manifest.yaml"
+    record = yaml.safe_load(path.read_text())
+    record["source"]["revision"] = "deadbeef" * 5
+    path.write_text(yaml.safe_dump(record, sort_keys=False))
 
     with pytest.raises(ValueError, match="different AKA revision"):
-        manifest.audit(tmp_path)
+        manifest.audit(output)
+
+
+def test_materialization_records_and_audits_excluded_workload(tmp_path):
+    manifest = AkaCorpusManifest.load(MANIFEST)
+    excluded_uuid = manifest.entries[0].workload_uuids[0]
+
+    def selective_probe(problem_dir, _row_index, workload, _target, _timeout):
+        included = workload.uuid != excluded_uuid
+        return AkaWorkloadDecision(
+            problem_path=f"{problem_dir.parent.name}/{problem_dir.name}",
+            workload_uuid=workload.uuid,
+            included=included,
+            stage="live_probe",
+            reason_code="probe_passed" if included else "probe_oom",
+        )
+
+    output = manifest.materialize(
+        tmp_path / "materialized", target=TEST_TARGET, probe=selective_probe
+    )
+    report = manifest.audit(output)
+    record = yaml.safe_load((output / "materialization-manifest.yaml").read_text())
+    decision = next(
+        item
+        for item in record["workload_decisions"]
+        if item["workload_uuid"] == excluded_uuid
+    )
+
+    assert report["excluded_workloads"] == 1
+    assert decision["included"] is False
+    assert decision["reason_code"] == "probe_oom"
+    assert all(
+        excluded_uuid not in item["workload_uuids"] for item in record["problems"]
+    )
 
 
 def test_materialize_is_atomic_and_records_selected_problems(tmp_path, monkeypatch):
@@ -187,21 +241,23 @@ def test_materialize_is_atomic_and_records_selected_problems(tmp_path, monkeypat
     output = tmp_path / "materialized"
     observed: dict[str, object] = {}
 
-    def fake_mirror(authored_root, staging, entries):
+    def fake_mirror(authored_root, staging, selection):
         observed["authored_root"] = authored_root
         (staging / "selected.txt").write_text("complete")
         return [
             {
-                "path": entry.relative_problem_dir.as_posix(),
-                "task_path": entry.task_path,
+                "path": problem.entry.relative_problem_dir.as_posix(),
+                "task_path": problem.entry.task_path,
                 "definition_sha256": "a" * 64,
+                "source_workload_sha256": "b" * 64,
                 "workload_sha256": "b" * 64,
+                "workload_uuids": [item.uuid for item in problem.workloads],
             }
-            for entry in entries
+            for problem in selection.problems
         ]
 
-    monkeypatch.setattr(aka_corpus, "_mirror_entries", fake_mirror)
-    result = manifest.materialize(output)
+    monkeypatch.setattr(aka_corpus, "_mirror_selection", fake_mirror)
+    result = manifest.materialize(output, target=TEST_TARGET, probe=_passing_probe)
 
     assert result == output.resolve()
     assert (output / "selected.txt").read_text() == "complete"
@@ -217,10 +273,10 @@ def test_materialize_cleans_staging_after_failure(tmp_path, monkeypatch):
     def fail(*args):
         raise RuntimeError("selection failed")
 
-    monkeypatch.setattr(aka_corpus, "_mirror_entries", fail)
+    monkeypatch.setattr(aka_corpus, "_mirror_selection", fail)
 
     with pytest.raises(RuntimeError, match="selection failed"):
-        manifest.materialize(output)
+        manifest.materialize(output, target=TEST_TARGET, probe=_passing_probe)
 
     assert not output.exists()
     assert list(tmp_path.glob(".materialized.*")) == []

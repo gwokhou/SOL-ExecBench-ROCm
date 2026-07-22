@@ -524,7 +524,7 @@ if $BUILD; then
     fi
 fi
 
-LOCAL_PROBLEM_ROOT="${REPO_ROOT}/problems/local/RX_9060_XT"
+LOCAL_PROBLEM_ROOT="${REPO_ROOT}/problems/local/AMD_AKA"
 if [ ! -d "${LOCAL_PROBLEM_ROOT}" ]; then
     echo "WARNING: ${LOCAL_PROBLEM_ROOT} does not exist"
     echo "       Run 'uv run sol-execbench dataset materialize' before evaluating the public corpus."

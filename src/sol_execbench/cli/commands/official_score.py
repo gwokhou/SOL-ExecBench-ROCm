@@ -26,7 +26,7 @@ def score_cli() -> None:
     "--manifest",
     "manifest_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    default=Path("problems/RX_9060_XT/manifest.yaml"),
+    default=Path("problems/AMD_AKA/manifest.yaml"),
     show_default=True,
 )
 def official_score_status_cli(manifest_path: Path) -> CliResult:

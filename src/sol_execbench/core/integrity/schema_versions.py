@@ -59,8 +59,8 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "static_kernel_evidence": STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
     "timing_isolation_snapshot": "sol_execbench.timing_isolation_snapshot.v1",
     "toolchain_routing": TOOLCHAIN_ROUTING_SCHEMA_VERSION,
-    "rocm_event_timing_custom": "sol_execbench.rocm_event_timing.custom.v2",
-    "rocm_event_timing_paper_counts": "sol_execbench.rocm_event_timing.paper_counts.v2",
+    "rocm_event_timing_custom": "sol_execbench.rocm_event_timing.custom.v3",
+    "rocm_event_timing_paper_counts": "sol_execbench.rocm_event_timing.paper_counts.v3",
 }
 
 AgentFeedbackSchemaVersion: TypeAlias = Literal["sol_execbench.agent_feedback.v3"]

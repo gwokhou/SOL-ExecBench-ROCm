@@ -41,7 +41,7 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
     monkeypatch.delenv("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION", raising=False)
     request = cast(
         EvaluationRequest,
-        SimpleNamespace(unsafe_local_execution=True, timeout=5),
+        SimpleNamespace(unsafe_local_execution=True, timeout=5, device="cuda:1"),
     )
     first_inside = threading.Event()
     second_attempted = threading.Event()
@@ -76,3 +76,4 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
 
     assert observed == ["1", "1"]
     assert "SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION" not in os.environ
+    assert "SOL_EXECBENCH_DEVICE" not in os.environ

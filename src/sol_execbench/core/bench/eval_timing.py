@@ -21,6 +21,10 @@ from sol_execbench.core.bench.evaluation_requests import WorkloadEvaluationReque
 from sol_execbench.core.bench.io import allocate_outputs, normalize_outputs
 from sol_execbench.core.bench.reward_hack import RewardHackDetected
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.platform.runtime import (
+    CacheClearPolicy,
+    cache_clear_policy_for_device,
+)
 
 
 @dataclass(frozen=True)
@@ -29,6 +33,7 @@ class SolutionTimingResult:
 
     latency_ms: float
     timed_iterations_per_trial: tuple[int, ...]
+    cache_clear_policy: CacheClearPolicy | None = None
 
     @property
     def uniform_timed_iterations(self) -> int:
@@ -52,13 +57,19 @@ def measure_solution_latency(
         inputs=inputs,
         expected=expected_outputs,
     )
+    cache_policy = (
+        cache_clear_policy_for_device(request.device)
+        if request.device.split(":", maxsplit=1)[0] == "cuda"
+        else None
+    )
     trials = [
-        _measure_solution_trial(request, resolved_axes, inputs, validator)
+        _measure_solution_trial(request, resolved_axes, inputs, validator, cache_policy)
         for _ in range(request.bench_config.trials)
     ]
     return SolutionTimingResult(
         latency_ms=statistics.mean(trial.latency_ms for trial in trials),
         timed_iterations_per_trial=tuple(trial.timed_iterations for trial in trials),
+        cache_clear_policy=cache_policy,
     )
 
 
@@ -67,6 +78,7 @@ def _measure_solution_trial(
     resolved_axes: dict[str, int],
     inputs: list[Any],
     validator: Callable[[list[Any], Any], None],
+    cache_clear_policy: CacheClearPolicy | None = None,
 ) -> TimingResult:
     outputs = (
         allocate_outputs(request.definition, resolved_axes, request.device)
@@ -83,6 +95,7 @@ def _measure_solution_trial(
         rep=config.iterations,
         min_measurement_time_seconds=config.min_measurement_time_seconds,
         validator=validator,
+        cache_clear_policy=cache_clear_policy,
     )
     if timing.failure is not None:
         raise RuntimeError(timing.failure)

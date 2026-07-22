@@ -26,7 +26,8 @@ REFERENCE_TOKEN_ENV = "SOL_EXECBENCH_REFERENCE_TOKEN"
 REFERENCE_PID_ENV = "SOL_EXECBENCH_REFERENCE_PID"
 TRUSTED_DEFINITION_FILE = "reference_definition.json"
 _MAX_HEADER_BYTES = 1 << 20
-_MAX_PAYLOAD_BYTES = 1 << 30
+MAX_REFERENCE_PAYLOAD_BYTES = 1 << 30
+MAX_REFERENCE_TENSOR_STORAGE_BYTES = MAX_REFERENCE_PAYLOAD_BYTES - _MAX_HEADER_BYTES
 
 
 class ReferenceProtocolError(RuntimeError):
@@ -105,6 +106,24 @@ def _storage_span(tensor: torch.Tensor) -> int:
     )
 
 
+def reference_values_storage_bytes(values: Iterable[Any]) -> int:
+    """Return the physical tensor-storage bytes carried by reference IPC."""
+
+    return sum(
+        _storage_span(value) * value.element_size()
+        for value in values
+        if isinstance(value, torch.Tensor)
+    )
+
+
+def reference_case_storage_bytes(case: ReferenceCase) -> int:
+    """Return the physical input/output bytes carried by one reference case."""
+
+    return reference_values_storage_bytes(case.inputs) + reference_values_storage_bytes(
+        case.outputs
+    )
+
+
 def _encode_values(
     values: Iterable[Any], prefix: str
 ) -> tuple[list[dict[str, Any]], dict[str, torch.Tensor]]:
@@ -180,7 +199,7 @@ def send_case(
     input_metadata, input_tensors = _encode_values(case.inputs, "input")
     output_metadata, output_tensors = _encode_values(case.outputs, "output")
     payload = save_safetensors_bytes({**input_tensors, **output_tensors})
-    if len(payload) > _MAX_PAYLOAD_BYTES:
+    if len(payload) > MAX_REFERENCE_PAYLOAD_BYTES:
         raise ReferenceProtocolError("reference IPC tensor payload is too large")
     send_json(
         connection,
@@ -217,11 +236,11 @@ def receive_case(connection: Connection, *, device: str) -> ReferenceTimingCase:
     if not isinstance(expected_size, int) or expected_size < 0:
         raise ReferenceProtocolError("reference IPC payload length is invalid")
     try:
-        payload = connection.recv_bytes(maxlength=_MAX_PAYLOAD_BYTES)
+        payload = connection.recv_bytes(maxlength=MAX_REFERENCE_PAYLOAD_BYTES)
     except (EOFError, OSError) as exc:
         message = (
             "reference IPC tensor payload is too large"
-            if expected_size > _MAX_PAYLOAD_BYTES
+            if expected_size > MAX_REFERENCE_PAYLOAD_BYTES
             else "reference IPC tensor channel closed"
         )
         raise ReferenceProtocolError(message) from exc

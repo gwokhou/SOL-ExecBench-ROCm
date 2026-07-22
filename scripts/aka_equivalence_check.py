@@ -23,7 +23,7 @@ equals that oracle. Requires the AKA clone for the cross-check; without it, only
 the reference-sanity pass runs.
 
 Usage:
-    uv run python scripts/aka_equivalence_check.py [--manifest problems/RX_9060_XT/manifest.yaml]
+    uv run python scripts/aka_equivalence_check.py [--manifest problems/AMD_AKA/manifest.yaml]
                                                    [--aka-root data/AgentKernelArena]
                                                    [--workloads-per-problem 2]
 """
@@ -221,13 +221,13 @@ def main() -> int:
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=REPO_ROOT / "problems" / "RX_9060_XT" / "manifest.yaml",
+        default=REPO_ROOT / "problems" / "AMD_AKA" / "manifest.yaml",
     )
     parser.add_argument(
         "--aka-root", type=Path, default=REPO_ROOT / "data" / "AgentKernelArena"
     )
     parser.add_argument(
-        "--problems-root", type=Path, default=REPO_ROOT / "problems" / "RX_9060_XT"
+        "--problems-root", type=Path, default=REPO_ROOT / "problems" / "AMD_AKA"
     )
     parser.add_argument("--workloads-per-problem", type=int, default=2)
     args = parser.parse_args()

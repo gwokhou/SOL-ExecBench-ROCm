@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, cast
 
 
 @dataclass(frozen=True)
@@ -65,14 +65,22 @@ def select_seed_set(
             str(mapping.get(k)) == str(v) for k, v in combo.items() if k != "min_count"
         )
 
-    for combo in coverage.get("combinations") or []:
-        need = int(combo.get("min_count", 0))
+    raw_combinations = coverage.get("combinations")
+    combinations = raw_combinations if isinstance(raw_combinations, list) else []
+    for combo in combinations:
+        if not isinstance(combo, Mapping):
+            continue
+        typed_combo = cast(Mapping[str, object], combo)
+        raw_min_count = typed_combo.get("min_count", 0)
+        if not isinstance(raw_min_count, (int, str)):
+            continue
+        need = int(raw_min_count)
         for candidate in pool:
             if need <= 0:
                 break
             if candidate.task_path in chosen_paths:
                 continue
-            if _matches(candidate, combo):
+            if _matches(candidate, typed_combo):
                 selected.append(candidate)
                 chosen_paths.add(candidate.task_path)
                 need -= 1

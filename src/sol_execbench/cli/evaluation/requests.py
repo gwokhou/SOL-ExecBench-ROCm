@@ -32,6 +32,7 @@ class EvaluationRequest:
     feedback_source_sha256: str | None
     feedback_sol_version: str | None
     verbose: bool
+    device: str = "cuda:0"
     unsafe_local_execution: bool = False
 
 

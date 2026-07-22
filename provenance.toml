@@ -58,8 +58,8 @@ release_bundle_redistribution = true
 attribution = "AMD AgentKernelArena by AMD-AGI under Apache-2.0; retain required notices when redistributing."
 path_globs = [
   "data/AgentKernelArena/**",
-  "problems/RX_9060_XT/manifest.yaml",
-  "problems/RX_9060_XT/**",
+  "problems/AMD_AKA/manifest.yaml",
+  "problems/AMD_AKA/**",
   "tests/sol_execbench/fixtures/aka/**",
 ]
 required_notices = [

@@ -28,7 +28,11 @@ from sol_execbench.core.bench.reward_hack import (
     check_monkey_patch,
     check_thread_injection,
 )
-from sol_execbench.core.data.trace import EvaluationStatus, Performance
+from sol_execbench.core.data.trace import (
+    CacheClearEvidence,
+    EvaluationStatus,
+    Performance,
+)
 from sol_execbench.core.data.workload import Workload
 
 
@@ -141,6 +145,7 @@ def _measure_and_emit(
     ):
         return
     sol_latency_ms = solution_timing.latency_ms
+    cache_policy = solution_timing.cache_clear_policy
     emitter.emit_status(
         workload,
         EvaluationStatus.PASSED,
@@ -155,6 +160,16 @@ def _measure_and_emit(
             trials=request.bench_config.trials,
             statistic="mean",
             timed_outputs_validated=True,
+            cache_clear=(
+                CacheClearEvidence(
+                    detected_l2_bytes=cache_policy.detected_l2_bytes,
+                    clear_buffer_bytes=cache_policy.clear_buffer_bytes,
+                    source=cache_policy.source,
+                    fallback_reason=cache_policy.fallback_reason,
+                )
+                if cache_policy is not None
+                else None
+            ),
         ),
         extra_msg=timing_case.timing_failure,
     )

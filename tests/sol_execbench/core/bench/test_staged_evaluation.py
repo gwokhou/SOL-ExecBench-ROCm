@@ -14,6 +14,7 @@ from sol_execbench.core.bench import (
 )
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.bench.eval_timing import SolutionTimingResult
+from sol_execbench.core.platform.runtime import CacheClearPolicy
 from sol_execbench.core.bench.eval_trace_helpers import WorkloadTraceEmitter
 from sol_execbench.core.bench.evaluation_requests import WorkloadEvaluationRequest
 from sol_execbench.core.bench.reference_protocol import (
@@ -328,7 +329,15 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
     monkeypatch.setattr(
         eval_workload_execution,
         "measure_solution_latency",
-        lambda **kwargs: SolutionTimingResult(1.25, (4,)),
+        lambda **kwargs: SolutionTimingResult(
+            1.25,
+            (4,),
+            CacheClearPolicy(
+                detected_l2_bytes=4 * 1024**2,
+                clear_buffer_bytes=8 * 1024**2,
+                source="torch_device_properties",
+            ),
+        ),
     )
     monkeypatch.setattr(eval_workload_execution, "_release_device_cache", lambda: None)
     monkeypatch.setattr(
@@ -349,6 +358,10 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
     assert status is EvaluationStatus.PASSED
     assert details["performance"].latency_ms == 1.25
     assert details["performance"].timed_iterations == 4
+    cache_clear = details["performance"].cache_clear
+    assert cache_clear is not None
+    assert cache_clear.detected_l2_bytes == 4 * 1024**2
+    assert cache_clear.clear_buffer_bytes == 8 * 1024**2
     assert details["extra_msg"] == "reference diagnostic"
 
 

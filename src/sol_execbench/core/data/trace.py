@@ -56,6 +56,19 @@ class Correctness(BaseModelWithDocstrings):
         return v
 
 
+class CacheClearEvidence(BaseModelWithDocstrings):
+    """Target-derived cache-clear policy used for device-event timing."""
+
+    detected_l2_bytes: int | None = Field(default=None, ge=1)
+    """Detected target L2 capacity, or None when runtime discovery failed."""
+    clear_buffer_bytes: int = Field(ge=1)
+    """Actual int8 eviction-buffer size written before every invocation."""
+    source: str
+    """Stable policy source such as torch_device_properties or fallback_default."""
+    fallback_reason: str | None = None
+    """Stable reason code when the historical 256 MiB fallback was used."""
+
+
 class Performance(BaseModelWithDocstrings):
     """Performance metrics from timing evaluation.
 
@@ -81,6 +94,8 @@ class Performance(BaseModelWithDocstrings):
     """Statistic used to aggregate timed samples and trials."""
     timed_outputs_validated: bool = Field(default=False)
     """Whether every timed invocation was checked against reference output."""
+    cache_clear: CacheClearEvidence | None = None
+    """Cache-clear policy actually used by device-event timing."""
 
 
 class Environment(BaseModelWithDocstrings):

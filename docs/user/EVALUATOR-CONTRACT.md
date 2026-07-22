@@ -37,10 +37,11 @@ counts:
 - serialized access to the selected GPU.
 
 The standard ROCm protocol is labeled
-`sol_execbench.rocm_event_timing.paper_counts.v2`; it uses a fixed 256 MiB
-cache-clear buffer and a 300-second whole-evaluation timeout. Custom counts,
+`sol_execbench.rocm_event_timing.paper_counts.v3`; it uses a cache-clear buffer
+equal to twice the detected L2 size (256 MiB only when L2 detection is unavailable)
+and a 300-second whole-evaluation timeout. Custom counts,
 adaptive duration, or unlocked clocks use
-`sol_execbench.rocm_event_timing.custom.v2`. Direct host execution is rejected
+`sol_execbench.rocm_event_timing.custom.v3`. Direct host execution is rejected
 unless `--unsafe-local-execution` is explicitly supplied, and such traces are
 diagnostic. Performance metadata records the actual adaptive sample count for
 every trial in `timed_iterations_per_trial`; `timed_iterations` is populated

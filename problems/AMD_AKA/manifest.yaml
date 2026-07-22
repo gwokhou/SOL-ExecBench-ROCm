@@ -1,11 +1,32 @@
-schema_version: 3
+schema_version: 4
 source:
   repository: https://github.com/AMD-AGI/AgentKernelArena
   revision: 869228138e07e773b61dd7fc1d8cdc0435c7b405
   license: Apache-2.0
   provenance_class: ecosystem_grounded
   aka_commit_sha256: 869228138e07e773b61dd7fc1d8cdc0435c7b405
-target:
+execution_targets:
+  gfx942:
+    generation: cdna3
+    supported_tensor_dtypes:
+    - bfloat16
+    - float16
+    - float32
+  gfx1150:
+    generation: rdna3_5
+    supported_tensor_dtypes:
+    - bfloat16
+    - float16
+    - float32
+    - float8_e4m3fn
+  gfx1200:
+    generation: rdna4
+    supported_tensor_dtypes:
+    - bfloat16
+    - float16
+    - float32
+    - float8_e4m3fn
+formal_analysis:
   architecture_profile: solar:RX_9060_XT
   formal_gfx_target: gfx1200
   architecture_profile_sha256: 944aa6f9383a565bd4e636b068ee077e7415f38f15517b69cb78b6ea32c9a8dd

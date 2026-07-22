@@ -52,6 +52,12 @@ from sol_execbench.cli.protocol import CliFailure, output_format
 )
 @click.option("--timeout", default=300, show_default=True, type=click.IntRange(min=1))
 @click.option(
+    "--device",
+    default="cuda:0",
+    show_default=True,
+    help="ROCm PyTorch device used for evaluation.",
+)
+@click.option(
     "--trace-output",
     type=click.Path(dir_okay=False, path_type=Path),
     help="Write canonical Trace JSONL here.",
@@ -100,6 +106,7 @@ def evaluate_cli(
     config_file: Path | None,
     compile_timeout: int,
     timeout: int,
+    device: str,
     trace_output: Path | None,
     lock_clocks: bool,
     unsafe_local_execution: bool,
@@ -168,6 +175,7 @@ def evaluate_cli(
         feedback_source_sha256=feedback_source_sha256,
         feedback_sol_version=feedback_sol_version,
         verbose=verbose,
+        device=device,
         unsafe_local_execution=unsafe_local_execution,
     )
     return run_evaluation_cli(request=request)

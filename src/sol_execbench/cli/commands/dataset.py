@@ -5,8 +5,8 @@
 
 Materialize and audit the problem set derived from AMD AgentKernelArena (AKA).
 The benchmark problems are authored artifacts committed under
-``problems/RX_9060_XT/<suite>/<name>/``; ``materialize`` mirrors them into a
-local tree and ``audit`` verifies them against the pinned manifest.
+``problems/AMD_AKA/<suite>/<name>/``. ``materialize`` selects workloads for an
+observed GPU and ``audit`` verifies the target-specific result.
 """
 
 from __future__ import annotations
@@ -17,15 +17,22 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from sol_execbench.cli.protocol import CliResult, artifact
+from sol_execbench.cli.protocol import EXIT_UNAVAILABLE, CliFailure, CliResult, artifact
 from sol_execbench.core.dataset.aka_corpus import (
     AKA_REVISION,
     AkaCorpusManifest,
 )
+from sol_execbench.core.dataset.aka_compatibility import (
+    DEFAULT_PROBE_TIMEOUT_SECONDS,
+    SUPPORTED_AKA_GFX_TARGETS,
+    AkaProbeInfrastructureError,
+    materialization_target,
+)
+from sol_execbench.core.platform.runtime import detect_rocm_device
 
 console = Console(stderr=True)
-DEFAULT_MANIFEST = Path("problems/RX_9060_XT/manifest.yaml")
-DEFAULT_OUTPUT = Path("problems/local/RX_9060_XT")
+DEFAULT_MANIFEST = Path("problems/AMD_AKA/manifest.yaml")
+DEFAULT_OUTPUT_ROOT = Path("problems/local/AMD_AKA")
 DEFAULT_AKA_ROOT = Path("data/AgentKernelArena")
 DEFAULT_FETCH_SCRIPT = Path("scripts/fetch_aka_source.sh")
 
@@ -53,8 +60,26 @@ def dataset_cli() -> None:
 @click.option(
     "--output",
     type=click.Path(file_okay=False, path_type=Path),
-    default=DEFAULT_OUTPUT,
+    help="Output tree; defaults to problems/local/AMD_AKA/<detected-gfx>.",
+)
+@click.option(
+    "--device",
+    default="cuda:0",
     show_default=True,
+    help="ROCm PyTorch device used for target detection and live probes.",
+)
+@click.option(
+    "--target-arch",
+    type=click.Choice(SUPPORTED_AKA_GFX_TARGETS),
+    help="Expected exact gfx target; fail if it differs from the detected device.",
+)
+@click.option(
+    "--probe-timeout",
+    "probe_timeout_seconds",
+    type=click.FloatRange(min=1.0),
+    default=DEFAULT_PROBE_TIMEOUT_SECONDS,
+    show_default=True,
+    help="Per-workload live-probe timeout in seconds.",
 )
 @click.option(
     "--skip-aka-fetch",
@@ -65,18 +90,59 @@ def dataset_cli() -> None:
 def materialize_cli(
     manifest_path: Path,
     aka_root: Path,
-    output: Path,
+    output: Path | None,
+    device: str,
+    target_arch: str | None,
+    probe_timeout_seconds: float,
     skip_aka_fetch: bool,
 ) -> CliResult:
-    """Mirror the AKA-derived problems into a local tree and verify them."""
-    manifest = AkaCorpusManifest.load(manifest_path)
+    """Select executable AKA workloads for one exact AMD GPU target."""
+    manifest = _load_manifest(manifest_path)
+    try:
+        device_info = detect_rocm_device(device)
+        target = materialization_target(device_info)
+    except (RuntimeError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="aka_target_unavailable",
+            exit_code=EXIT_UNAVAILABLE,
+            hint="Use a ROCm device whose exact target is gfx942, gfx1150, or gfx1200.",
+        ) from exc
+    if target_arch is not None and device_info.gfx_target != target_arch:
+        raise CliFailure(
+            f"detected {device_info.gfx_target} on {device}, expected {target_arch}",
+            code="aka_target_mismatch",
+            hint="Remove --target-arch or select the matching GPU with --device.",
+        )
     if not skip_aka_fetch:
         _ensure_aka_clone(aka_root)
-    result_path = manifest.materialize(output)
+    output = output or DEFAULT_OUTPUT_ROOT / device_info.gfx_target
+    try:
+        result_path = manifest.materialize(
+            output,
+            target=target,
+            probe_timeout_seconds=probe_timeout_seconds,
+        )
+    except AkaProbeInfrastructureError as exc:
+        raise CliFailure(
+            str(exc),
+            code="aka_probe_infrastructure_error",
+            exit_code=EXIT_UNAVAILABLE,
+            hint="Check ROCm visibility and retry the reported workload probe.",
+        ) from exc
+    except FileExistsError as exc:
+        raise CliFailure(
+            str(exc),
+            code="aka_materialization_output_exists",
+            hint="Choose a new --output path or remove the old tree after auditing it.",
+        ) from exc
+    except ValueError as exc:
+        raise CliFailure(str(exc), code="aka_materialization_invalid") from exc
     report = manifest.audit(result_path)
     console.print(
-        f"[green]Materialized {report['problems']} problems in {result_path} "
-        f"({report['scored']} scored, {report['compatibility_sentinels']} sentinel)"
+        f"[green]Materialized {report['problems']} problems / "
+        f"{report['workloads']} workloads for {report['gfx_target']} in {result_path} "
+        f"({report['excluded_workloads']} workloads excluded)"
         f"[/green]"
     )
     record = result_path / "materialization-manifest.yaml"
@@ -105,12 +171,15 @@ def materialize_cli(
 @click.argument(
     "problem_root",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=DEFAULT_OUTPUT,
+    required=True,
 )
 def audit_cli(manifest_path: Path, aka_root: Path, problem_root: Path) -> CliResult:
     """Fail closed if local problems differ from the pinned AKA selection."""
-    manifest = AkaCorpusManifest.load(manifest_path)
-    report = manifest.audit(problem_root)
+    manifest = _load_manifest(manifest_path)
+    try:
+        report = manifest.audit(problem_root)
+    except (OSError, ValueError) as exc:
+        raise CliFailure(str(exc), code="aka_audit_failed") from exc
     if aka_root.is_dir():
         report["aka_provenance"] = manifest.audit_aka_provenance(aka_root)
         console.print(
@@ -122,6 +191,13 @@ def audit_cli(manifest_path: Path, aka_root: Path, problem_root: Path) -> CliRes
         f"{report['scored']} scored[/green]"
     )
     return CliResult(data={"problem_root": str(problem_root), **report})
+
+
+def _load_manifest(path: Path) -> AkaCorpusManifest:
+    try:
+        return AkaCorpusManifest.load(path)
+    except (OSError, ValueError) as exc:
+        raise CliFailure(str(exc), code="invalid_aka_manifest") from exc
 
 
 def _ensure_aka_clone(aka_root: Path) -> None:

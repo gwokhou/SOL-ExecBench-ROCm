@@ -79,16 +79,19 @@ Only the pinned public corpus operations are exposed:
 
 ```bash
 uv run sol-execbench dataset materialize \
-  --manifest problems/RX_9060_XT/manifest.yaml \
-  --output problems/local/RX_9060_XT
+  --manifest problems/AMD_AKA/manifest.yaml \
+  --device cuda:0
 
-uv run sol-execbench dataset audit problems/local/RX_9060_XT
+uv run sol-execbench dataset audit problems/local/AMD_AKA/gfx1200
 ```
 
-`materialize --source DIR` uses an already downloaded pinned snapshot. Without
-`--source`, it downloads the pinned Hugging Face revision. `--cache-dir` selects
-the Hugging Face cache. This revision has no dataset batch-runner command;
-evaluate materialized problems individually or use external orchestration.
+`--device` selects the ROCm GPU used for exact gfx detection and workload
+probes. `--target-arch` optionally asserts `gfx942`, `gfx1150`, or `gfx1200`;
+unknown and mismatched targets fail closed. `--probe-timeout` defaults to 120
+seconds per workload. Without `--output`, the destination is
+`problems/local/AMD_AKA/<gfx-target>`. This revision has no dataset batch-runner
+command; evaluate materialized problems individually or use external
+orchestration.
 
 ## SOLAR
 
@@ -112,7 +115,7 @@ matching source SHA-256 metadata.
 
 ```bash
 uv run sol-execbench --format json score status \
-  --manifest problems/RX_9060_XT/manifest.yaml
+  --manifest problems/AMD_AKA/manifest.yaml
 ```
 
 The checked-in manifest declares official authority unavailable, and the
