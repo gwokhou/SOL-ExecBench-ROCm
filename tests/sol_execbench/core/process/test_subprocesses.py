@@ -72,7 +72,7 @@ def test_run_in_process_group_reports_timeout_after_cleanup(tmp_path):
     assert raised.value.timeout == 0.01
 
 
-def test_timeout_cleans_descendant_processes(tmp_path):
+def test_timeout_cleans_descendant_processes(tmp_path, monkeypatch):
     child_pid_path = tmp_path / "child.pid"
     program = (
         "import pathlib, subprocess, sys, time; "
@@ -80,6 +80,22 @@ def test_timeout_cleans_descendant_processes(tmp_path):
         f"pathlib.Path({str(child_pid_path)!r}).write_text(str(child.pid)); "
         "time.sleep(60)"
     )
+    real_popen = subprocess.Popen
+
+    def wait_for_descendant_start(*args, **kwargs):
+        process = real_popen(*args, **kwargs)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            try:
+                int(child_pid_path.read_text())
+            except (FileNotFoundError, ValueError):
+                time.sleep(0.01)
+            else:
+                return process
+        subprocesses._terminate_process_group(process)
+        pytest.fail("descendant process did not start within 5 seconds")
+
+    monkeypatch.setattr(subprocesses.subprocess, "Popen", wait_for_descendant_start)
 
     with pytest.raises(subprocess.TimeoutExpired):
         run_in_process_group((sys.executable, "-c", program), cwd=tmp_path, timeout=0.1)
