@@ -62,7 +62,7 @@ def test_dockerfile_keeps_existing_runtime_setup() -> None:
     assert '"torchvision==${PYTORCH_TORCHVISION_VERSION}"' in dockerfile
     assert '"triton-rocm==${TRITON_ROCM_VERSION}"' in dockerfile
     assert (
-        "COPY --from=ghcr.io/astral-sh/uv:0.11.18 /uv /usr/local/bin/uv" in dockerfile
+        "COPY --from=ghcr.io/astral-sh/uv:0.11.31 /uv /usr/local/bin/uv" in dockerfile
     )
     assert "COPY docker/entrypoint.sh /entrypoint.sh" in dockerfile
     assert 'ENTRYPOINT ["/entrypoint.sh"]' in dockerfile

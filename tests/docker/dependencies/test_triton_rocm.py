@@ -23,5 +23,7 @@ def test_triton_rocm_import_and_backend():
     assert triton is not None
     assert tl is not None
     assert hasattr(triton, "__version__")
-    assert torch.version.hip is not None, "PyTorch ROCm backend is required for Triton ROCm coverage"
+    assert torch.version.hip is not None, (
+        "PyTorch ROCm backend is required for Triton ROCm coverage"
+    )
     assert torch.cuda.is_available(), "No ROCm GPU visible through PyTorch"

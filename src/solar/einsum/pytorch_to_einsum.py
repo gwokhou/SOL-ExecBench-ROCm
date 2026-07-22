@@ -147,6 +147,7 @@ class PyTorchToEinsum:
         self._cache_dir = cache_dir
         self._strict = strict
         self._einsum_analyzer = EinsumAnalyzer(debug=debug)
+        self._tensor_to_producer_op: Dict[str, str] = {}
 
     @property
     def debug(self) -> bool:
@@ -495,7 +496,7 @@ class PyTorchToEinsum:
         1:1 matches are applied for (A) and (B); ambiguous candidates are
         left untouched.
         """
-        self._tensor_to_producer_op = {}
+        self._tensor_to_producer_op.clear()
         op_id_set = set(op_ids)
 
         # torchview may omit module parameters from the bipartite graph even
@@ -1828,7 +1829,7 @@ class PyTorchToEinsum:
         # `_convert_operation`). Fall back to op_graph.predecessors only when
         # exactly enough unmatched predecessors remain to fill all deferred
         # slots — raise on ambiguity rather than silently positional-guess.
-        tensor_to_producer = getattr(self, "_tensor_to_producer_op", {})
+        tensor_to_producer = self._tensor_to_producer_op
         op_predecessors = list(op_graph.predecessors(node_id))
         input_connections: List[Optional[str]] = []
         assigned_preds: set = set()
@@ -3556,7 +3557,7 @@ class PyTorchToEinsum:
         raw_connections: List[str],
         start_node_id_map: Dict[str, str],
     ) -> List[str]:
-        tensor_to_producer = getattr(self, "_tensor_to_producer_op", {})
+        tensor_to_producer = self._tensor_to_producer_op
         input_types = list(node_data.get("input_types") or [])
         connections: List[Optional[str]] = []
         assigned_predecessors: Set[str] = set()
@@ -3571,12 +3572,14 @@ class PyTorchToEinsum:
             elif mapped in start_node_id_map.values() or mapped in op_graph.nodes:
                 connections.append(mapped)
                 assigned_predecessors.add(mapped)
-            elif (producer := tensor_to_producer.get(connection_id)) in op_graph.nodes:
-                connections.append(producer)
-                assigned_predecessors.add(producer)
             else:
-                connections.append(None)
-                deferred_indices.append(index)
+                producer = tensor_to_producer.get(connection_id)
+                if producer is not None and producer in op_graph.nodes:
+                    connections.append(producer)
+                    assigned_predecessors.add(producer)
+                else:
+                    connections.append(None)
+                    deferred_indices.append(index)
         if deferred_indices:
             unmatched = [
                 predecessor

@@ -17,6 +17,7 @@ import click
 
 from .protocol import (
     EXIT_EXECUTION,
+    CliFailure,
     CliResult,
     response_failure,
     response_success,
@@ -61,7 +62,9 @@ class LazyGroup(click.Group):
                     args[0], self.list_commands(ctx), n=1
                 )
                 if matches:
-                    exc.message += f"\nDid you mean '{matches[0]}'?"
+                    raise click.UsageError(
+                        f"{exc.message}\nDid you mean '{matches[0]}'?", ctx=exc.ctx
+                    ) from exc
             raise
 
 
@@ -124,6 +127,8 @@ class RootGroup(LazyGroup):
         except (click.ClickException, Exception) as exc:
             if isinstance(exc, click.UsageError):
                 exit_code = 2
+            elif isinstance(exc, CliFailure):
+                exit_code = exc.cli_exit_code
             elif isinstance(exc, click.ClickException):
                 exit_code = getattr(exc, "exit_code", 2)
                 if type(exc) is click.ClickException:

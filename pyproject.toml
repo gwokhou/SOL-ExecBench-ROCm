@@ -7,7 +7,7 @@ name = "sol-execbench"
 version = "3.0.0"
 description = "SOL ExecBench with paper-aligned SOLAR analysis for AMD ROCm"
 readme = "README.md"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "torch==2.10.0; sys_platform != 'linux' or platform_machine != 'x86_64'",
     "torch==2.11.0+rocm7.2; sys_platform == 'linux' and platform_machine == 'x86_64'",

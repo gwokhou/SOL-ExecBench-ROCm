@@ -27,16 +27,22 @@ uv run ty check
 uv run pytest tests/
 ```
 
-The CI workflow uses the locked dependency set and a CPU-safe test subset:
+The CI workflow splits static quality, CPU-safe package tests, and Solar tests
+with branch coverage into three parallel jobs. Each job uses the locked
+dependency set and the shared uv cache:
 
 ```bash
-uv sync --locked --all-groups --python <3.12-or-3.13>
-uv run ruff check .
-uv run ty check
-uv run pytest tests/sol_execbench \
+uv sync --locked --all-groups
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync ty check
+uv run --no-sync pytest tests/sol_execbench \
   --ignore=tests/sol_execbench/driver/test_eval_driver.py \
   --ignore=tests/sol_execbench/test_e2e.py
-uv run pytest tests/examples/test_examples.py -k consistency
+uv run --no-sync pytest tests/tools
+uv run --no-sync coverage run -m pytest -n 0 tests/solar
+uv run --no-sync coverage json -o coverage.json
+uv run --no-sync python scripts/check_solar_coverage.py coverage.json
 ```
 
 For ROCm GPU evaluation, use a ROCm-capable AMD host or the Docker helper:
@@ -50,7 +56,7 @@ and [Testing](docs/user/TESTING.md) for more detail.
 
 ## Coding Standards
 
-- Use Python `>=3.12,<3.14`; `.python-version` pins local development to
+- Use Python `>=3.12,<3.13`; `.python-version` pins local development to
   Python 3.12.
 - Follow Ruff formatting and linting from `pyproject.toml`.
 - Run Ty type checks over `src` and `tests`.
@@ -74,8 +80,9 @@ Type check:
 uv run ty check
 ```
 
-The `Python Quality` GitHub Actions workflow enforces Ruff, Ty, CPU-safe package
-tests, and example consistency tests on Python 3.12 and 3.13.
+The `Python Quality` GitHub Actions workflow runs three parallel jobs on Python
+3.12: static quality, CPU-safe package tests, and Solar tests with branch
+coverage.
 
 Default pre-commit setup installs Ruff hooks, the commit-message DCO check,
 and the pre-push Ty check:
@@ -207,9 +214,10 @@ PRs should include:
 No repository PR template is currently present under `.github/`, so include
 these details directly in the pull request description.
 
-The `Python Quality` GitHub Actions workflow runs `uv sync --locked
---all-groups --python <matrix-version>`, Ruff, Ty, CPU-safe package tests, and
-example consistency tests on Python 3.12 and 3.13.
+The `Python Quality` GitHub Actions workflow runs three parallel Python 3.12
+jobs for static quality, CPU-safe package tests, and Solar branch coverage.
+Every job uses `uv sync --locked --all-groups`, the shared uv cache, and bounded
+job timeouts.
 
 ## Issue Reporting
 

@@ -13,8 +13,12 @@ from sol_execbench.core.data.solution import SupportedLanguages
 
 
 def test_supported_languages_map_to_timing_source_types():
-    assert classify_timing_source([SupportedLanguages.PYTORCH]) == TimingSourceType.PYTORCH
-    assert classify_timing_source([SupportedLanguages.TRITON]) == TimingSourceType.TRITON
+    assert (
+        classify_timing_source([SupportedLanguages.PYTORCH]) == TimingSourceType.PYTORCH
+    )
+    assert (
+        classify_timing_source([SupportedLanguages.TRITON]) == TimingSourceType.TRITON
+    )
 
     for language in (
         SupportedLanguages.HIP_CPP,
@@ -53,13 +57,16 @@ def test_policy_table_has_distinct_source_specific_interpretations():
         policies[TimingSourceType.HIP_NATIVE].activity_domain
         == TimingActivityDomain.KERNEL_ACTIVITY
     )
-    assert len(
-        {
-            policies[TimingSourceType.PYTORCH].interpretation,
-            policies[TimingSourceType.TRITON].interpretation,
-            policies[TimingSourceType.HIP_NATIVE].interpretation,
-        }
-    ) == 3
+    assert (
+        len(
+            {
+                policies[TimingSourceType.PYTORCH].interpretation,
+                policies[TimingSourceType.TRITON].interpretation,
+                policies[TimingSourceType.HIP_NATIVE].interpretation,
+            }
+        )
+        == 3
+    )
 
 
 def test_every_policy_exposes_auditable_metadata():
