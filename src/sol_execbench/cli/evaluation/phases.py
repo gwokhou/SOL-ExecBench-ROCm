@@ -72,23 +72,30 @@ def require_execution_isolation(request: EvaluationRequest) -> None:
 @contextmanager
 def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
     """Mark unsafe runs and serialize access to the selected GPU."""
-    name = "SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"
+    unsafe_name = "SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"
+    device_name = "SOL_EXECBENCH_DEVICE"
     try:
         with acquire_gpu_lock(timeout_seconds=min(float(request.timeout), 60.0)):
             with _EXECUTION_ENV_LOCK:
-                previous = os.environ.get(name)
+                previous_unsafe = os.environ.get(unsafe_name)
+                previous_device = os.environ.get(device_name)
+                os.environ[device_name] = request.device
                 if (
                     request.unsafe_local_execution
                     and os.environ.get("SOL_EXECBENCH_SANDBOXED") != "1"
                 ):
-                    os.environ[name] = "1"
+                    os.environ[unsafe_name] = "1"
                 try:
                     yield
                 finally:
-                    if previous is None:
-                        os.environ.pop(name, None)
+                    if previous_unsafe is None:
+                        os.environ.pop(unsafe_name, None)
                     else:
-                        os.environ[name] = previous
+                        os.environ[unsafe_name] = previous_unsafe
+                    if previous_device is None:
+                        os.environ.pop(device_name, None)
+                    else:
+                        os.environ[device_name] = previous_device
     except TimeoutError as exc:
         raise CliFailure(
             str(exc),

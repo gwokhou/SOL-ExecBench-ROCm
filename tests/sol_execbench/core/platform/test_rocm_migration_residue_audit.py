@@ -85,7 +85,12 @@ def _classification(relative_path: str, line: str) -> str | None:
         return "PyTorch extension API keyword used for HIP compiler flags"
     if "#include <ATen/cuda/CUDAContext.h>" in line:
         return "PyTorch ROCm compatibility header for current stream access"
-    if "torch.version.cuda" in line or '"cuda"' in line or 'device="cuda"' in line:
+    if (
+        "torch.version.cuda" in line
+        or '"cuda"' in line
+        or '"cuda:' in line
+        or 'device="cuda"' in line
+    ):
         return "PyTorch ROCm compatibility device/version namespace"
     if "cuda_cflags" in line or "cuda_cpp" in line:
         return "legacy schema rejection or migration guidance"

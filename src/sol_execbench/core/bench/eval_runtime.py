@@ -9,6 +9,7 @@ import json
 import linecache
 import os
 import statistics
+from functools import partial
 import sys
 import time
 import types
@@ -21,6 +22,7 @@ from sol_execbench.core.bench.reward_hack import RewardHackDetected
 from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES
 from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import Trace
+from sol_execbench.core.platform.runtime import CacheClearPolicy
 
 
 @dataclass(frozen=True)
@@ -85,6 +87,7 @@ def measure_latency(
     min_measurement_time_seconds: float | None = None,
     time_fn: Callable[..., Any] | None = None,
     validator: Callable[[list[Any], Any], None] | None = None,
+    cache_clear_policy: CacheClearPolicy | None = None,
 ) -> TimingResult:
     """Measure callable latency with an opt-in CPU fallback for subprocess tests."""
     try:
@@ -106,7 +109,10 @@ def measure_latency(
         if time_fn is None:
             from sol_execbench.core.bench.timing import time_runnable
 
-            time_fn = time_runnable
+            time_fn = partial(
+                time_runnable,
+                cache_clear_policy=cache_clear_policy,
+            )
 
         if validator is not None:
             latency_raw = time_fn(

@@ -59,12 +59,17 @@ class InputGenerationFailure(RuntimeError):
 class ReferenceService:
     """Own trusted reference code, input generation, output, and timing state."""
 
-    def __init__(self, staging_dir: Path, *, device: str) -> None:
+    def __init__(
+        self,
+        staging_dir: Path,
+        *,
+        device: str,
+        definition_path: Path | None = None,
+    ) -> None:
         self.staging_dir = staging_dir
         self.device = device
-        self.definition = Definition.model_validate_json(
-            (staging_dir / TRUSTED_DEFINITION_FILE).read_text()
-        )
+        trusted_definition = definition_path or staging_dir / TRUSTED_DEFINITION_FILE
+        self.definition = Definition.model_validate_json(trusted_definition.read_text())
         self.workloads = [
             Workload.model_validate_json(line)
             for line in (staging_dir / "workload.jsonl").read_text().splitlines()
@@ -114,7 +119,7 @@ class ReferenceService:
         if workload_uuid != workload.uuid:
             raise ReferenceRequestError("reference workload identity mismatch")
         try:
-            inputs = self._inputs(workload, row_index, round_index)
+            inputs = self.prepare_inputs(workload, row_index, round_index)
         except CustomInputGenerationError as exc:
             raise InputGenerationFailure(
                 f"{exc}\n{exc.provenance.log_text()}",
@@ -146,9 +151,11 @@ class ReferenceService:
             failure,
         )
 
-    def _inputs(
+    def prepare_inputs(
         self, workload: Workload, row_index: int, round_index: int
     ) -> list[Any]:
+        """Generate one trusted, deterministically seeded workload input set."""
+
         safe_tensors = self._safetensors_for(workload)
         seed = derive_custom_input_seed(
             self.definition,

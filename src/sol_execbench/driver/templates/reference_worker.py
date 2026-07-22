@@ -22,7 +22,9 @@ from sol_execbench.driver.reference_runtime_api import (
 from sol_execbench.driver.reference_worker_api import serve_reference_worker
 
 STAGING_DIR = Path(__file__).parent.resolve()
-_device = "cuda:0" if torch.cuda.is_available() else "cpu"
+_device = os.environ.get(
+    "SOL_EXECBENCH_DEVICE", "cuda:0" if torch.cuda.is_available() else "cpu"
+)
 _token = os.environ[REFERENCE_TOKEN_ENV]
 _request_stream = Connection(
     int(os.environ[REFERENCE_REQUEST_FD_ENV]), readable=True, writable=False

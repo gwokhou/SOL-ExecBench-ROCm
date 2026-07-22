@@ -67,6 +67,8 @@ class SupportedHardware(str, Enum):
 
     GFX1200 = "gfx1200"
     """AMD gfx1200."""
+    GFX1150 = "gfx1150"
+    """AMD RDNA 3.5 gfx1150."""
     GFX940 = "gfx940"
     """AMD CDNA 3 gfx940."""
     GFX941 = "gfx941"

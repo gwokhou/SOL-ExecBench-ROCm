@@ -25,7 +25,7 @@ stack declared in `pyproject.toml`.
 ## Public problem corpus
 
 The reviewed selection is tracked at
-`problems/RX_9060_XT/manifest.yaml`. Problems are derived from AMD
+`problems/AMD_AKA/manifest.yaml`. Problems are derived from AMD
 AgentKernelArena (AKA, Apache-2.0) under the SOL-ExecBench paper §3
 construction methodology: each problem's PyTorch reference is the AKA task's
 own correctness oracle (`module_fn`), lifted into a standalone `def run(...)`.
@@ -35,13 +35,15 @@ covers matmul, softmax, norm, elementwise, and conv operations across FP32 /
 BF16 / FP16.
 
 Authored definitions and workloads are committed under
-`problems/RX_9060_XT/<suite>/<name>/`; materialized copies remain untracked
-under `problems/local/`:
+`problems/AMD_AKA/<suite>/<name>/`. Materialization detects the selected ROCm
+device, filters incompatible workloads with static target rules plus a trusted
+reference/harness probe, and writes an auditable target tree under
+`problems/local/AMD_AKA/<gfx-target>/`:
 
 ```bash
 bash scripts/fetch_aka_source.sh
 uv run sol-execbench dataset materialize
-uv run sol-execbench dataset audit problems/local/RX_9060_XT
+uv run sol-execbench dataset audit problems/local/AMD_AKA/gfx1200
 ```
 
 `dataset audit` also verifies the local AKA clone is pinned to the manifest
@@ -55,7 +57,7 @@ Candidate evaluation remains an outer-project operation:
 
 ```bash
 ./scripts/run_docker.sh -- sol-execbench evaluate \
-  problems/local/RX_9060_XT/torch2hip/l1n1_square_matmul \
+  problems/local/AMD_AKA/gfx1200/torch2hip/l1n1_square_matmul \
   --solution /sol-execbench/path/to/solution.json \
   --trace-output /outputs/matmul.trace.jsonl
 ```
@@ -70,7 +72,7 @@ digest is only self-declared by its local provenance manifest is rejected:
 
 ```bash
 uv run sol-execbench solar analyze \
-  problems/local/RX_9060_XT/torch2hip/l1n36_rmsnorm \
+  problems/local/AMD_AKA/gfx1200/torch2hip/l1n36_rmsnorm \
   --workload aka-l1n36_rmsnorm-w0 \
   --orojenesis-home /path/to/pinned/timeloop \
   --output out/solar/norm_forward_bf16

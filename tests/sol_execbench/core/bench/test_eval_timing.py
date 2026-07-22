@@ -60,7 +60,7 @@ def _workload() -> Workload:
 def test_solution_timing_records_actual_iterations_for_each_trial(monkeypatch):
     request = cast(
         WorkloadEvaluationRequest,
-        SimpleNamespace(bench_config=SimpleNamespace(trials=3)),
+        SimpleNamespace(device="cpu", bench_config=SimpleNamespace(trials=3)),
     )
     workload = cast(Workload, object())
     trial_results = iter(
@@ -93,7 +93,7 @@ def test_solution_timing_records_actual_iterations_for_each_trial(monkeypatch):
 def test_solution_timing_reports_uniform_actual_iteration_count(monkeypatch):
     request = cast(
         WorkloadEvaluationRequest,
-        SimpleNamespace(bench_config=SimpleNamespace(trials=2)),
+        SimpleNamespace(device="cpu", bench_config=SimpleNamespace(trials=2)),
     )
     workload = cast(Workload, object())
     monkeypatch.setattr(

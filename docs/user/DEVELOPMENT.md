@@ -23,7 +23,7 @@ uv run sol-execbench --format json contract evaluator
 uv run sol-execbench --format json contract cli
 uv run sol-execbench --format json environment doctor
 uv run sol-execbench --format json toolchain list
-uv run sol-execbench dataset audit problems/local/RX_9060_XT
+uv run sol-execbench dataset audit problems/local/AMD_AKA/gfx1200
 ```
 
 One evaluation:

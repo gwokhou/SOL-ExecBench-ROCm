@@ -9,15 +9,107 @@ from __future__ import annotations
 import os
 import platform
 import shutil
+from dataclasses import dataclass
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
 if TYPE_CHECKING:
     from sol_execbench.core.data.trace import Environment
 
 
 Which = Callable[[str], str | None]
+
+FALLBACK_CACHE_CLEAR_BYTES = 256 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class RocmDeviceInfo:
+    """Runtime properties for one visible PyTorch ROCm device."""
+
+    device: str
+    index: int
+    name: str
+    gfx_target: str
+    total_memory_bytes: int
+    l2_cache_bytes: int | None
+    torch_version: str
+    hip_version: str
+
+
+@dataclass(frozen=True)
+class CacheClearPolicy:
+    """Resolved L2 eviction-buffer policy for one benchmark device."""
+
+    detected_l2_bytes: int | None
+    clear_buffer_bytes: int
+    source: str
+    fallback_reason: str | None = None
+
+
+def derive_cache_clear_policy(l2_cache_bytes: int | None) -> CacheClearPolicy:
+    """Use twice the detected L2, falling back to the historical 256 MiB."""
+
+    if l2_cache_bytes is not None and l2_cache_bytes > 0:
+        return CacheClearPolicy(
+            detected_l2_bytes=l2_cache_bytes,
+            clear_buffer_bytes=2 * l2_cache_bytes,
+            source="torch_device_properties",
+        )
+    return CacheClearPolicy(
+        detected_l2_bytes=None,
+        clear_buffer_bytes=FALLBACK_CACHE_CLEAR_BYTES,
+        source="fallback_default",
+        fallback_reason="l2_cache_size_unavailable",
+    )
+
+
+def detect_rocm_device(
+    device: str = "cuda:0", *, torch_module: Any | None = None
+) -> RocmDeviceInfo:
+    """Detect one concrete PyTorch ROCm device and its execution capacities."""
+
+    if torch_module is None:
+        import torch as torch_module  # noqa: PLC0415
+
+    parsed = torch_module.device(device)
+    if parsed.type != "cuda":
+        raise ValueError(f"ROCm target device must use the cuda namespace: {device}")
+    hip_version = getattr(getattr(torch_module, "version", None), "hip", None)
+    if hip_version is None or not torch_module.cuda.is_available():
+        raise RuntimeError("PyTorch ROCm device is unavailable")
+    index = (
+        parsed.index if parsed.index is not None else torch_module.cuda.current_device()
+    )
+    if index < 0 or index >= torch_module.cuda.device_count():
+        raise ValueError(f"ROCm device index is out of range: {index}")
+    properties = torch_module.cuda.get_device_properties(index)
+    raw_gfx = getattr(properties, "gcnArchName", "") or getattr(
+        properties, "gfx_arch_name", ""
+    )
+    gfx_target = str(raw_gfx).split(":", maxsplit=1)[0].strip().lower()
+    if not gfx_target.startswith("gfx"):
+        raise RuntimeError(
+            f"ROCm device did not expose a concrete gfx target: {raw_gfx!r}"
+        )
+    raw_l2 = getattr(properties, "L2_cache_size", None)
+    l2_cache_bytes = int(raw_l2) if raw_l2 is not None and int(raw_l2) > 0 else None
+    return RocmDeviceInfo(
+        device=f"cuda:{index}",
+        index=index,
+        name=str(properties.name),
+        gfx_target=gfx_target,
+        total_memory_bytes=int(properties.total_memory),
+        l2_cache_bytes=l2_cache_bytes,
+        torch_version=str(getattr(torch_module, "__version__", "")),
+        hip_version=str(hip_version),
+    )
+
+
+def cache_clear_policy_for_device(device: str) -> CacheClearPolicy:
+    """Detect the device L2 and resolve its benchmark cache-clear policy."""
+
+    return derive_cache_clear_policy(detect_rocm_device(device).l2_cache_bytes)
 
 
 def resolve_tool_path(tool: str, *, which: Which = shutil.which) -> Path | None:

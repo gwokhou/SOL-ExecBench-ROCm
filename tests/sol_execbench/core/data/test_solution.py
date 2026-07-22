@@ -128,12 +128,15 @@ class TestHardwareAndCompileOptions:
     def test_supported_hardware_contains_rdna4_cdna3_and_local(self):
         assert SupportedHardware.LOCAL.value == "LOCAL"
         assert SupportedHardware.GFX1200.value == "gfx1200"
+        assert SupportedHardware.GFX1150.value == "gfx1150"
         assert SupportedHardware.GFX940.value == "gfx940"
         assert SupportedHardware.GFX941.value == "gfx941"
         assert SupportedHardware.GFX942.value == "gfx942"
         assert not hasattr(SupportedHardware, "B200")
 
-    @pytest.mark.parametrize("target", ["LOCAL", "gfx1200", *CDNA3_TARGETS])
+    @pytest.mark.parametrize(
+        "target", ["LOCAL", "gfx1150", "gfx1200", *CDNA3_TARGETS]
+    )
     def test_rocm_hardware_targets_accepted(self, target):
         spec = _make_spec(target_hardware=[target])
         assert spec.target_hardware == [SupportedHardware(target)]

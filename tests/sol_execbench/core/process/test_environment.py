@@ -11,6 +11,7 @@ def test_preserves_explicit_rocm_and_thread_runtime_configuration(tmp_path: Path
         "OMP_NUM_THREADS": "3",
         "MIOPEN_USER_DB_PATH": "/var/cache/miopen",
         "DEVICE_LIB_PATH": "/opt/rocm/amdgcn/bitcode",
+        "SOL_EXECBENCH_DEVICE": "cuda:1",
         "OPENAI_API_KEY": "secret",
     }
 
@@ -20,4 +21,5 @@ def test_preserves_explicit_rocm_and_thread_runtime_configuration(tmp_path: Path
     assert result["OMP_NUM_THREADS"] == "3"
     assert result["MIOPEN_USER_DB_PATH"] == "/var/cache/miopen"
     assert result["DEVICE_LIB_PATH"] == "/opt/rocm/amdgcn/bitcode"
+    assert result["SOL_EXECBENCH_DEVICE"] == "cuda:1"
     assert "OPENAI_API_KEY" not in result

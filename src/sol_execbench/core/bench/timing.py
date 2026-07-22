@@ -23,8 +23,10 @@ from typing import Any, Literal, Union
 import torch
 
 from sol_execbench.core.bench.io import ShiftingMemoryPoolAllocator
-
-L2_CLEAR_BUFFER_BYTES = 256 * 1024 * 1024
+from sol_execbench.core.platform.runtime import (
+    CacheClearPolicy,
+    cache_clear_policy_for_device,
+)
 
 
 def _summarize_statistics(
@@ -41,9 +43,12 @@ def _summarize_statistics(
     raise ValueError(f"Unknown return_mode: {return_mode}")
 
 
-def _get_empty_cache_for_benchmark(device) -> torch.Tensor:
-    """Create the paper-specified 256 MiB cache-clearing buffer."""
-    return torch.empty(L2_CLEAR_BUFFER_BYTES, dtype=torch.int8, device=device)
+def _get_empty_cache_for_benchmark(
+    device: str, policy: CacheClearPolicy | None = None
+) -> torch.Tensor:
+    """Create the target-derived L2 cache-clearing buffer."""
+    effective = policy or cache_clear_policy_for_device(device)
+    return torch.empty(effective.clear_buffer_bytes, dtype=torch.int8, device=device)
 
 
 def _clear_cache(cache: torch.Tensor) -> None:
@@ -78,6 +83,7 @@ def bench_time_with_device_events(
     device: str = "cuda",
     min_measurement_time_seconds: float | None = None,
     validator: Callable[[Any, Any], None] | None = None,
+    cache_clear_policy: CacheClearPolicy | None = None,
 ) -> list[float]:
     """Benchmark a GPU callable using PyTorch device events.
 
@@ -93,7 +99,7 @@ def bench_time_with_device_events(
         raise ValueError("warmup must be >= 0 and rep must be > 0")
     if min_measurement_time_seconds is not None and min_measurement_time_seconds <= 0:
         raise ValueError("min_measurement_time_seconds must be > 0 or None")
-    cache = _get_empty_cache_for_benchmark(device)
+    cache = _get_empty_cache_for_benchmark(device, cache_clear_policy)
     torch.cuda.synchronize()
 
     if setup is None:
@@ -143,6 +149,7 @@ def time_runnable(
     return_mode: Literal["mean", "median", "all"] = "mean",
     methodology: Literal["events"] = "events",
     validator: Callable[[list[Any], Any], None] | None = None,
+    cache_clear_policy: CacheClearPolicy | None = None,
 ) -> Union[float, list[float]]:
     """Time a callable using ROCm-compatible PyTorch device events.
 
@@ -164,6 +171,7 @@ def time_runnable(
             device=device,
             min_measurement_time_seconds=min_measurement_time_seconds,
             validator=validator,
+            cache_clear_policy=cache_clear_policy,
         )
         if not times:
             raise ValueError(f"No timing results for methodology: {methodology}")

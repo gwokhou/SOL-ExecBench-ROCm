@@ -96,15 +96,18 @@ Materialize the exact public selection:
 
 ```bash
 uv run sol-execbench dataset materialize \
-  --manifest problems/RX_9060_XT/manifest.yaml \
-  --output problems/local/RX_9060_XT
+  --manifest problems/AMD_AKA/manifest.yaml \
+  --device cuda:0
 
-uv run sol-execbench dataset audit problems/local/RX_9060_XT
+uv run sol-execbench dataset audit problems/local/AMD_AKA/gfx1200
 ```
 
-Use `--source /path/to/pinned/snapshot` to avoid downloading. This revision
-does not ship a batch runner; choose a materialized problem and invoke
-`sol-execbench evaluate` explicitly.
+The default output suffix is the exact detected architecture (`gfx942`,
+`gfx1150`, or `gfx1200`). Use `--target-arch` to assert the expected target and
+`--output` to override the destination. Each workload receives a bounded live
+probe; excluded workloads and coverage gaps remain in the materialization
+manifest. This revision does not ship a batch runner; choose a materialized
+problem and invoke `sol-execbench evaluate --device ...` explicitly.
 
 ## SOLAR analysis
 

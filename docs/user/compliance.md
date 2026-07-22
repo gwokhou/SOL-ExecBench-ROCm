@@ -56,7 +56,7 @@ for ordinary metadata cleanup unless a separate legal review requires it.
 
 The problem corpus is derived from AMD AgentKernelArena under Apache-2.0 and is
 redistributable: authored definitions, workloads, and references under
-`problems/RX_9060_XT/**` may be committed and included in release bundles
+`problems/AMD_AKA/**` may be committed and included in release bundles
 provided the Apache-2.0 license text and AMD-AGI/AgentKernelArena attribution
 are preserved. The local AKA source clone under `data/AgentKernelArena/` is a
 gitignored build input (covered by the `/data/*` ignore rule) and is not

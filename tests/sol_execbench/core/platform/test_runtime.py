@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from sol_execbench.core.platform.runtime import (
+    FALLBACK_CACHE_CLEAR_BYTES,
+    detect_rocm_device,
+    derive_cache_clear_policy,
     discover_rocm_root,
     hardware_from_device,
     resolve_rocm_tool,
@@ -8,6 +13,52 @@ from sol_execbench.core.platform.runtime import (
     resolve_tool_path,
     rocm_search_roots,
 )
+
+
+def test_cache_clear_policy_uses_twice_detected_l2() -> None:
+    policy = derive_cache_clear_policy(4 * 1024**2)
+
+    assert policy.detected_l2_bytes == 4 * 1024**2
+    assert policy.clear_buffer_bytes == 8 * 1024**2
+    assert policy.source == "torch_device_properties"
+    assert policy.fallback_reason is None
+
+
+def test_cache_clear_policy_falls_back_when_l2_is_unavailable() -> None:
+    policy = derive_cache_clear_policy(None)
+
+    assert policy.detected_l2_bytes is None
+    assert policy.clear_buffer_bytes == FALLBACK_CACHE_CLEAR_BYTES
+    assert policy.source == "fallback_default"
+    assert policy.fallback_reason == "l2_cache_size_unavailable"
+
+
+def test_detect_rocm_device_reads_exact_arch_and_l2_properties() -> None:
+    properties = SimpleNamespace(
+        name="AMD test GPU",
+        gcnArchName="gfx1150:xnack-",
+        total_memory=32 * 1024**3,
+        L2_cache_size=16 * 1024**2,
+    )
+    rocm_device_api = SimpleNamespace(
+        is_available=lambda: True,
+        current_device=lambda: 0,
+        device_count=lambda: 2,
+        get_device_properties=lambda index: properties,
+    )
+    fake_torch = SimpleNamespace(
+        __version__="2.9-test",
+        version=SimpleNamespace(hip="7.2-test"),
+        **{"cuda": rocm_device_api},
+        device=lambda value: SimpleNamespace(type="cuda", index=int(value[-1])),
+    )
+
+    result = detect_rocm_device("cuda:1", torch_module=fake_torch)
+
+    assert result.device == "cuda:1"
+    assert result.index == 1
+    assert result.gfx_target == "gfx1150"
+    assert result.l2_cache_bytes == 16 * 1024**2
 
 
 def test_hardware_from_device_supports_cpu() -> None:

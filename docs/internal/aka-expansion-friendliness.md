@@ -36,7 +36,7 @@ evaluation_orchestrator,reference_worker}.py` and `core/bench/`: a single
 self-contained kernel compiled via `torch.utils.cpp_extension.load` (`hipcc`) for
 HIP/C++ or Triton JIT, executed as `fn(*inputs)` / `fn(*inputs,*outputs)` on the
 **default stream** under PyTorch's **eager allocator**, timed with HIP events
-(10 warmup / 50 iters × 3 trials), 256 MiB L2-clear + shifting-`data_ptr`
+(10 warmup / 50 iters × 3 trials), target-derived 2×L2 clear (256 MiB fallback) + shifting-`data_ptr`
 allocator before each iteration, STABLE_PEAK clocks, reference materialized in a
 **trusted IPC worker**, correctness = `(atol, rtol, matched_ratio,
 max_error_cap)`. Static + dynamic **reward-hack defenses** reject streams,

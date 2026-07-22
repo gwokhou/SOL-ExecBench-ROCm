@@ -96,14 +96,15 @@ Routing availability is not correctness or performance evidence.
 
 ```bash
 uv run sol-execbench dataset materialize \
-  --manifest problems/RX_9060_XT/manifest.yaml \
-  --output problems/local/RX_9060_XT
+  --manifest problems/AMD_AKA/manifest.yaml \
+  --device cuda:0 --target-arch gfx1200
 
-uv run sol-execbench dataset audit problems/local/RX_9060_XT
+uv run sol-execbench dataset audit problems/local/AMD_AKA/gfx1200
 ```
 
-For an existing download, add `--source /path/to/pinned/snapshot`. The command
-selects and verifies the exact manifest inventory; it does not run candidates.
+The command performs static target filtering and a bounded trusted-reference /
+harness probe for every workload. It writes all include/exclude decisions and
+the filtered coverage report, and does not run candidate solutions.
 
 ## Analyze one reference with SOLAR
 

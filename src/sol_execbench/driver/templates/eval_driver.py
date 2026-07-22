@@ -96,7 +96,9 @@ _entry_point = _solution.spec.entry_point
 _dps = _solution.spec.destination_passing_style
 
 # ── Device and output metadata ───────────────────────────────────────────────
-_device = "cuda:0" if torch.cuda.is_available() else "cpu"
+_device = os.environ.get(
+    "SOL_EXECBENCH_DEVICE", "cuda:0" if torch.cuda.is_available() else "cpu"
+)
 _output_names = list(definition.outputs.keys())
 _output_dtypes_torch = {
     k: dtype_str_to_torch_dtype(v.dtype) for k, v in definition.outputs.items()

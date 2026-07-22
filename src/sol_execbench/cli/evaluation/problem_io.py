@@ -11,12 +11,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import click
+import yaml
 
 from ...core.bench.config import BenchmarkConfig
 from ...core.data.definition import Definition
 from ...core.data.json_utils import load_json_file, load_jsonl_file
 from ...core.data.solution import Solution
 from ...core.data.workload import Workload
+from ...core.platform.runtime import detect_rocm_device
+from ..protocol import EXIT_UNAVAILABLE, CliFailure
 
 
 @dataclass(frozen=True)
@@ -76,8 +79,48 @@ __all__ = [
     "LoadedProblemInputs",
     "ResolvedProblemInputs",
     "load_problem_inputs",
+    "require_materialized_target_match",
     "resolve_problem_inputs",
 ]
+
+
+def require_materialized_target_match(problem_dir: Path | None, device: str) -> None:
+    """Reject a target-specific problem tree on a different exact GPU."""
+    if problem_dir is None:
+        return
+    resolved = problem_dir.resolve()
+    record_path = next(
+        (
+            root / "materialization-manifest.yaml"
+            for root in (resolved, *resolved.parents)
+            if (root / "materialization-manifest.yaml").is_file()
+        ),
+        None,
+    )
+    if record_path is None:
+        return
+    try:
+        record = yaml.safe_load(record_path.read_text(encoding="utf-8")) or {}
+        expected = str(record["target"]["gfx_target"])
+    except (OSError, TypeError, KeyError, yaml.YAMLError) as exc:
+        raise CliFailure(
+            f"invalid target-specific materialization record: {record_path}",
+            code="invalid_materialization_record",
+        ) from exc
+    try:
+        observed = detect_rocm_device(device).gfx_target
+    except (RuntimeError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="evaluation_target_unavailable",
+            exit_code=EXIT_UNAVAILABLE,
+        ) from exc
+    if observed != expected:
+        raise CliFailure(
+            f"problem tree targets {expected}, but {device} is {observed}",
+            code="evaluation_target_mismatch",
+            hint="Select a matching --device or materialize the corpus for this GPU.",
+        )
 
 
 def _resolve_problem_dir(

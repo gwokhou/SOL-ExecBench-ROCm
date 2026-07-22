@@ -87,7 +87,7 @@ def test_send_json_wraps_closed_pipe_as_protocol_error() -> None:
 
 
 def test_receive_case_rejects_oversized_payload_before_allocation(monkeypatch) -> None:
-    monkeypatch.setattr(reference_protocol, "_MAX_PAYLOAD_BYTES", 4)
+    monkeypatch.setattr(reference_protocol, "MAX_REFERENCE_PAYLOAD_BYTES", 4)
     with _one_way_connection() as (sender, receiver):
         send_json(
             sender,
