@@ -1266,7 +1266,7 @@ def find_multi_einsum_regions(
     valid_nodes: set[str] = set(descriptors)
     for consumer_id, descriptor in descriptors.items():
         producer_id, bridges, _source_tensor = trace_back(str(descriptor["input"]))
-        if producer_id in descriptors:
+        if producer_id is not None and producer_id in descriptors:
             axis_map = _region_axis_map(
                 descriptors[producer_id], descriptor, bridges, views
             )

@@ -25,13 +25,26 @@ from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
 
 
 class PreparedAnalysisView(Protocol):
-    source: Path
-    semantic_graph: bool
-    requested_precision: str
-    fallback_precision: str
-    element_size: float
-    profile: ArchitectureProfile | None
-    strict: bool
+    @property
+    def source(self) -> Path: ...
+
+    @property
+    def semantic_graph(self) -> bool: ...
+
+    @property
+    def requested_precision(self) -> str: ...
+
+    @property
+    def fallback_precision(self) -> str: ...
+
+    @property
+    def element_size(self) -> float: ...
+
+    @property
+    def profile(self) -> ArchitectureProfile | None: ...
+
+    @property
+    def strict(self) -> bool: ...
 
 
 def _orojenesis_elements(orojenesis: NodeDict, element_size: float) -> float | None:

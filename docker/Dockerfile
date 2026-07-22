@@ -43,7 +43,7 @@ ENV HOME=/home/${HOST_USER} \
     UV_CACHE_DIR=/home/${HOST_USER}/.cache/uv
 
 # Copy uv binary early (changes rarely)
-COPY --from=ghcr.io/astral-sh/uv:0.11.18 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.31 /uv /usr/local/bin/uv
 
 # Create user and setup directories. ROCm base images may already contain UID
 # 1000, so reuse existing users/groups instead of assuming the host IDs are free.

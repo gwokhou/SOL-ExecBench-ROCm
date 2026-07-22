@@ -6,8 +6,7 @@ from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
 
 def test_filter_benign_rocm_stderr_removes_amdgpu_ids_fixture_line():
     text = (
-        "/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory\n"
-        "real error\n"
+        "/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory\nreal error\n"
     )
 
     assert filter_benign_rocm_stderr(text) == "real error\n"

@@ -1129,10 +1129,11 @@ class EinsumGraphAnalyzer:
             for level in profile.memory_hierarchy
             if level.capacity_bytes is not None and level.name != "vram"
         ]
+        if not known:
+            return None
         return max(
             known,
             key=lambda level: int(level.capacity_bytes or 0),
-            default=None,
         )
 
     @staticmethod

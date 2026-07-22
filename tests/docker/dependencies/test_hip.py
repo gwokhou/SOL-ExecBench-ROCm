@@ -40,7 +40,9 @@ def test_hipcc_compile_and_run():
         with open(src, "w", encoding="utf-8") as f:
             f.write(HIP_SRC)
 
-        result = subprocess.run(["hipcc", src, "-o", exe], capture_output=True, text=True, timeout=120)
+        result = subprocess.run(
+            ["hipcc", src, "-o", exe], capture_output=True, text=True, timeout=120
+        )
         assert result.returncode == 0, (
             f"hipcc compile failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
         )

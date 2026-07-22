@@ -32,7 +32,9 @@ def tensor_aliases_any(value: Any, candidates: list[Any]) -> bool:
     return any(storage_id == tensor_storage_id(candidate) for candidate in candidates)
 
 
-def stable_reference_outputs(outputs: list[torch.Tensor], inputs: list[Any]) -> list[torch.Tensor]:
+def stable_reference_outputs(
+    outputs: list[torch.Tensor], inputs: list[Any]
+) -> list[torch.Tensor]:
     """Clone reference outputs that alias inputs so user code cannot mutate them."""
     stable = []
     for output in outputs:

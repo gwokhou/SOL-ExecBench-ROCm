@@ -35,7 +35,7 @@ commits.
 
 ## Coding Style & Naming Conventions
 
-Target Python 3.12+ and follow Ruff's formatting. Use four-space indentation,
+Target Python 3.12 and follow Ruff's formatting. Use four-space indentation,
 `snake_case` for modules, functions, and variables, and `PascalCase` for classes
 and Pydantic models. Keep focused changes local to the affected subsystem; avoid
 unrelated refactors. Name tests descriptively, for example

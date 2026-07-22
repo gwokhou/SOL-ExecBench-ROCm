@@ -42,7 +42,7 @@ class CliFailure(click.ClickException):
     ) -> None:
         super().__init__(message)
         self.code = code
-        self.exit_code = exit_code
+        self.cli_exit_code = exit_code
         self.details = {} if details is None else details
         self.hint = hint
 

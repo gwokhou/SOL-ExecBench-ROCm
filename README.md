@@ -19,8 +19,8 @@ The paper is the source of truth when imported implementations disagree:
 uv sync --all-groups
 ```
 
-Python 3.12–3.13 is supported. Linux x86-64 resolves the ROCm 7.2 PyTorch
-stack declared in `pyproject.toml`.
+Only Python 3.12 is supported. Linux x86-64 resolves the ROCm 7.2 PyTorch stack
+declared in `pyproject.toml`.
 
 ## Public problem corpus
 

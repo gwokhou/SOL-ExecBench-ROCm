@@ -202,8 +202,8 @@ class RocmCompatibilityMatrixReport(BaseModelWithDocstrings):
     """UTC timestamp when the report was generated."""
     entries: list[MatrixEntry] = Field(default_factory=list)
     """Compatibility Matrix Entry objects."""
-    status_counts: dict[MatrixCompatibilityStatusField, int] = (
-        Field(default_factory=dict)
+    status_counts: dict[MatrixCompatibilityStatusField, int] = Field(
+        default_factory=dict
     )
     """Aggregate counts by bounded compatibility status."""
 

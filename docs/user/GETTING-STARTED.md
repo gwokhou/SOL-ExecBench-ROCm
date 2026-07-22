@@ -2,9 +2,9 @@
 
 ## Install
 
-Requirements are Python 3.12 or 3.13 and `uv`. Live evaluation additionally
-requires a ROCm-capable AMD GPU, a ROCm PyTorch build and access to `/dev/kfd`
-and `/dev/dri`.
+Requirements are Python 3.12 and `uv`. Live evaluation additionally requires a
+ROCm-capable AMD GPU, a ROCm PyTorch build and access to `/dev/kfd` and
+`/dev/dri`.
 
 ```bash
 git clone https://github.com/gwokhou/SOL-ExecBench-ROCm.git

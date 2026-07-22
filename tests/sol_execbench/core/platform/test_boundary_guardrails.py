@@ -25,11 +25,7 @@ HIP_AGENT_SEMANTICS = [
 
 
 def _source_files() -> list[Path]:
-    return [
-        path
-        for path in SRC_ROOT.rglob("*.py")
-        if "__pycache__" not in path.parts
-    ]
+    return [path for path in SRC_ROOT.rglob("*.py") if "__pycache__" not in path.parts]
 
 
 def _imports_hip_agent(path: Path) -> bool:
