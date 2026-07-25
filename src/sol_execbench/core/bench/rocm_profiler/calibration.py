@@ -24,7 +24,7 @@ class CalibrationClockSetup(StrictArtifactModel):
 class Rocprofv3OverheadCalibration(StrictArtifactModel):
     """One current profiler-overhead calibration artifact."""
 
-    schema_version: Literal["sol_execbench.rocprofv3_overhead_calibration.v1"] = (
+    schema_version: Literal["sol_execbench.rocprofv3_overhead_calibration.v2"] = (
         ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION
     )
     generated_at: str
@@ -36,6 +36,7 @@ class Rocprofv3OverheadCalibration(StrictArtifactModel):
     element_count: int = Field(gt=0)
     gpu_architecture: str
     profiler_executable: str
+    profiler_executable_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     clock_locked: bool
     clock_setup: CalibrationClockSetup
     gpu_isolation: dict[str, Any]

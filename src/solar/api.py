@@ -19,16 +19,18 @@ import yaml
 
 from solar.analysis.graph_analyzer import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
-    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
     EinsumGraphAnalyzer,
+    OrojenesisError,
+    OrojenesisRunner,
 )
-from solar.analysis.orojenesis import OrojenesisError, OrojenesisRunner
+from solar.analysis.request_manifest import write_request_manifest
 from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import extract_operator_graph
 from solar.rocm.architecture import ArchitectureProfile
 from solar.verification import VerificationError, verify_callable_conversion
 
 InputFactory = Callable[[int], Sequence[Any]]
+FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
 
 
 @dataclass(frozen=True)
@@ -98,6 +100,11 @@ class AnalysisResult:
     artifacts: tuple[ArtifactRef, ...]
     bound: SolBound
 
+    @property
+    def publication_eligible(self) -> bool:
+        """Whether this result satisfies the port's formal-bound policy."""
+        return self.bound.kind == FORMAL_BOUND_KIND
+
 
 @dataclass(frozen=True)
 class AnalysisFailure:
@@ -154,7 +161,14 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         analysis = _run_analysis(request, profile, staging)
         bound = _extract_bound(analysis, request.require_orojenesis)
         artifacts = _finish_artifacts(staging, analysis)
-        _write_manifest(request, staging, architecture_sha256, artifacts, bound)
+        write_request_manifest(
+            request,
+            staging,
+            architecture_sha256,
+            artifacts,
+            bound,
+            formal_bound_kind=FORMAL_BOUND_KIND,
+        )
         staging.replace(output)
         return AnalysisResult(
             status="analyzed",
@@ -172,7 +186,11 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
 def _run_analysis(
     request: AnalysisRequest, profile: ArchitectureProfile, staging: Path
 ) -> dict[str, Any]:
-    runner = OrojenesisRunner(request.orojenesis_home)
+    runner = (
+        OrojenesisRunner(request.orojenesis_home)
+        if request.require_orojenesis or request.orojenesis_home is not None
+        else None
+    )
     result = EinsumGraphAnalyzer().analyze_graph(
         staging / "einsum_graph.yaml",
         staging,
@@ -199,11 +217,10 @@ def _extract_bound(
     kind = str(metadata.get("bound_kind", ""))
     if seconds is None or not math.isfinite(float(seconds)) or float(seconds) < 0:
         raise ValueError("formal analysis lacks a finite lower bound")
-    formal_kind = "capacity_constrained_tile_aware_v1"
     if require_orojenesis:
-        if kind != formal_kind:
+        if kind != FORMAL_BOUND_KIND:
             raise ValueError(f"formal analysis returned non-formal bound kind {kind!r}")
-    elif kind not in (formal_kind, "diagnostic"):
+    elif kind not in (FORMAL_BOUND_KIND, "diagnostic"):
         raise ValueError(f"analysis returned unsupported bound kind {kind!r}")
     resource = total.get("compute_resource")
     return SolBound(float(seconds), kind, str(resource) if resource else None)
@@ -226,37 +243,6 @@ def _finish_artifacts(
         "solar-analysis.yaml",
     )
     return tuple(ArtifactRef(name, _sha256(staging / name)) for name in names)
-
-
-def _write_manifest(
-    request: AnalysisRequest,
-    staging: Path,
-    architecture_sha256: str,
-    artifacts: Sequence[ArtifactRef],
-    bound: SolBound,
-) -> None:
-    manifest = {
-        "schema_version": SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
-        "analysis_id": request.analysis_id,
-        "architecture_sha256": architecture_sha256,
-        "reference": {
-            "name": request.reference_name,
-            "sha256": request.reference_sha256,
-        },
-        "analysis_contract": {
-            "precision": request.precision,
-            "trace_seed": request.trace_seed,
-            "verification_seeds": list(request.verification_seeds),
-            "atol": request.atol,
-            "rtol": request.rtol,
-            "required_matched_ratio": request.required_matched_ratio,
-            "max_error_cap": request.max_error_cap,
-            "allow_negative_inf": request.allow_negative_inf,
-        },
-        "artifacts": [artifact.__dict__ for artifact in artifacts],
-        "bound": bound.__dict__,
-    }
-    (staging / "manifest.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False))
 
 
 def _profile_hash(profile: ArchitectureProfile) -> str:
@@ -295,6 +281,7 @@ __all__ = [
     "AnalysisRequest",
     "AnalysisResult",
     "ArtifactRef",
+    "FORMAL_BOUND_KIND",
     "SolBound",
     "analyze",
 ]

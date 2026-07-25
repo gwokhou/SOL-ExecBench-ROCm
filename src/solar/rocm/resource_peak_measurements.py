@@ -18,11 +18,23 @@ from solar.rocm.audit_validation import (
 
 _NOMINAL_TOLERANCE = 1.001
 _BOOTSTRAP_METHOD = "percentile bootstrap over process-batch medians"
+_THROTTLE_STATUSES = frozenset({"THROTTLED", "UNTHROTTLED"})
+_TELEMETRY_NUMERIC_FIELDS = (
+    "gfx_clock_mhz",
+    "gfx_max_clock_mhz",
+    "memory_clock_mhz",
+    "edge_temperature_c",
+    "hotspot_temperature_c",
+    "memory_temperature_c",
+    "socket_power_w",
+)
 
 
 def verify_resource_peak_measurements(
     protocol_value: object,
     measurements_value: object,
+    *,
+    require_unthrottled: bool = True,
 ) -> tuple[set[str], set[str], dict[str, Mapping[str, object]]]:
     """Validate the experimental protocol and all raw measurement evidence."""
 
@@ -40,6 +52,7 @@ def verify_resource_peak_measurements(
         expected_samples_per_batch=samples_per_batch,
         expected_bootstrap_replicates=bootstrap_replicates,
         expected_bootstrap_seed=bootstrap_seed,
+        require_unthrottled=require_unthrottled,
     )
     _verify_execution_order(
         protocol_value,
@@ -143,6 +156,7 @@ def _verify_measurements(
     expected_samples_per_batch: int,
     expected_bootstrap_replicates: int,
     expected_bootstrap_seed: int,
+    require_unthrottled: bool,
 ) -> tuple[set[str], set[str], dict[str, Mapping[str, object]]]:
     if not isinstance(value, list) or not value:
         raise ValueError("architecture audit evidence has no measurements")
@@ -170,6 +184,7 @@ def _verify_measurements(
             expected_samples_per_batch=expected_samples_per_batch,
             expected_bootstrap_replicates=expected_bootstrap_replicates,
             expected_bootstrap_seed=expected_bootstrap_seed,
+            require_unthrottled=require_unthrottled,
         )
     return covered_precisions, covered_resources, measurements
 
@@ -182,6 +197,7 @@ def _verify_one_measurement(
     expected_samples_per_batch: int,
     expected_bootstrap_replicates: int,
     expected_bootstrap_seed: int,
+    require_unthrottled: bool,
 ) -> None:
     if measurement.get("runtime_probe_passed") is not True:
         raise ValueError("architecture audit runtime probe did not pass")
@@ -191,6 +207,7 @@ def _verify_one_measurement(
         expected_samples_per_batch=expected_samples_per_batch,
         expected_bootstrap_replicates=expected_bootstrap_replicates,
         expected_bootstrap_seed=expected_bootstrap_seed,
+        require_unthrottled=require_unthrottled,
     )
     _verify_measurement_tuning(
         measurement,
@@ -214,18 +231,21 @@ def _verify_held_out_measurement(
     expected_samples_per_batch: int,
     expected_bootstrap_replicates: int,
     expected_bootstrap_seed: int,
+    require_unthrottled: bool,
 ) -> None:
     if (
         measurement.get("measurement_phase") != "held_out_after_configuration_freeze"
         or measurement.get("primary_statistic") != "median_of_process_batch_medians"
     ):
         raise ValueError("architecture audit measurement is not held out")
-    batches, samples = _raw_batches(
+    batches, samples, telemetry = _raw_batches(
         measurement.get("raw_process_batches"),
         expected_batches=expected_batches,
         expected_samples_per_batch=expected_samples_per_batch,
         require_telemetry=True,
+        require_unthrottled=require_unthrottled,
     )
+    _verify_telemetry_summary(measurement.get("telemetry_summary"), telemetry)
     if (
         measurement.get("process_batch_count") != expected_batches
         or measurement.get("samples_per_process_batch") != expected_samples_per_batch
@@ -289,10 +309,16 @@ def _raw_batches(
     expected_batches: int,
     expected_samples_per_batch: int,
     require_telemetry: bool,
-) -> tuple[tuple[tuple[float, ...], ...], tuple[float, ...]]:
+    require_unthrottled: bool = False,
+) -> tuple[
+    tuple[tuple[float, ...], ...],
+    tuple[float, ...],
+    tuple[Mapping[str, object], ...],
+]:
     if not isinstance(value, list) or len(value) != expected_batches:
         raise ValueError("architecture audit raw process batches mismatch")
     batches: list[tuple[float, ...]] = []
+    telemetry: list[Mapping[str, object]] = []
     for expected_index, raw in enumerate(value):
         batch = _audit_mapping(raw, "raw process batch")
         if batch.get("process_batch") != expected_index:
@@ -302,36 +328,45 @@ def _raw_batches(
             raise ValueError("architecture audit samples-per-batch mismatch")
         _close(batch.get("median"), statistics.median(samples), "batch median")
         if require_telemetry:
-            _verify_telemetry(batch.get("telemetry_before"))
-            _verify_telemetry(batch.get("telemetry_after"))
+            telemetry.append(
+                _verify_telemetry(
+                    batch.get("telemetry_before"),
+                    require_unthrottled=require_unthrottled,
+                )
+            )
+            telemetry.append(
+                _verify_telemetry(
+                    batch.get("telemetry_after"),
+                    require_unthrottled=require_unthrottled,
+                )
+            )
         batches.append(samples)
     frozen_batches = tuple(batches)
     flattened = tuple(sample for batch in frozen_batches for sample in batch)
-    return frozen_batches, flattened
+    return frozen_batches, flattened, tuple(telemetry)
 
 
-def _verify_telemetry(value: object) -> None:
+def _verify_telemetry(
+    value: object,
+    *,
+    require_unthrottled: bool,
+) -> Mapping[str, object]:
     snapshot = _audit_mapping(value, "telemetry snapshot")
     if not str(snapshot.get("captured_at", "")).strip():
         raise ValueError("architecture audit telemetry timestamp is missing")
-    for field_name in (
-        "gfx_clock_mhz",
-        "gfx_max_clock_mhz",
-        "memory_clock_mhz",
-        "edge_temperature_c",
-        "hotspot_temperature_c",
-        "memory_temperature_c",
-        "socket_power_w",
-    ):
+    for field_name in _TELEMETRY_NUMERIC_FIELDS:
         _positive_number(snapshot.get(field_name), f"telemetry {field_name}")
     deep_sleep = str(snapshot.get("deep_sleep", ""))
     performance_level = str(snapshot.get("performance_level", ""))
+    throttle_status = str(snapshot.get("throttle_status", ""))
     if (
         deep_sleep != "DISABLED"
         or "STABLE_PEAK" not in performance_level
-        or not str(snapshot.get("throttle_status", "")).strip()
+        or throttle_status not in _THROTTLE_STATUSES
     ):
         raise ValueError("architecture audit telemetry state is incomplete")
+    if require_unthrottled and throttle_status != "UNTHROTTLED":
+        raise ValueError("architecture audit telemetry reports throttling")
     current_clock = _positive_number(
         snapshot.get("gfx_clock_mhz"), "telemetry gfx clock"
     )
@@ -340,6 +375,41 @@ def _verify_telemetry(value: object) -> None:
     )
     if current_clock < maximum_clock * 0.95:
         raise ValueError("architecture audit telemetry clock is below locked range")
+    return snapshot
+
+
+def _verify_telemetry_summary(
+    value: object,
+    snapshots: tuple[Mapping[str, object], ...],
+) -> None:
+    summary = _audit_mapping(value, "telemetry_summary")
+    if summary.get("snapshot_count") != len(snapshots):
+        raise ValueError("architecture audit telemetry summary count mismatch")
+    expected_sets = {
+        "deep_sleep_states": {str(item["deep_sleep"]) for item in snapshots},
+        "throttle_statuses": {str(item["throttle_status"]) for item in snapshots},
+        "performance_levels": {str(item["performance_level"]) for item in snapshots},
+    }
+    for field_name, expected in expected_sets.items():
+        observed = _audit_string_set(summary.get(field_name), field_name)
+        if observed != expected:
+            raise ValueError("architecture audit telemetry summary state mismatch")
+    numeric = _audit_mapping(summary.get("numeric"), "telemetry numeric summary")
+    for field_name in _TELEMETRY_NUMERIC_FIELDS:
+        statistics_payload = _audit_mapping(
+            numeric.get(field_name), f"telemetry {field_name} summary"
+        )
+        values = [
+            _positive_number(snapshot.get(field_name), f"telemetry {field_name}")
+            for snapshot in snapshots
+        ]
+        _close(statistics_payload.get("minimum"), min(values), "telemetry minimum")
+        _close(
+            statistics_payload.get("median"),
+            statistics.median(values),
+            "telemetry median",
+        )
+        _close(statistics_payload.get("maximum"), max(values), "telemetry maximum")
 
 
 def _verify_statistics(
@@ -502,7 +572,7 @@ def _verify_tuning_candidate(
     candidate_value = _positive_int(
         configuration.get(parameter), "tuning candidate value"
     )
-    batches, samples = _raw_batches(
+    batches, samples, _ = _raw_batches(
         candidate.get("raw_process_batches"),
         expected_batches=expected_tuning_batches,
         expected_samples_per_batch=expected_samples_per_batch,

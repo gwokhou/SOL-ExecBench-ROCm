@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -44,6 +43,10 @@ def test_self_declared_mapper_digest_is_not_a_trust_anchor(tmp_path):
 
     with pytest.raises(orojenesis.OrojenesisError, match="artifact is not trusted"):
         orojenesis.OrojenesisRunner(home)
+
+
+def test_current_release_has_no_trusted_mapper_artifact():
+    assert orojenesis.OROJENESIS_TRUSTED_MAPPER_SHA256 == frozenset()
 
 
 def test_provenance_must_match_pinned_source_archive(tmp_path, monkeypatch):
@@ -151,33 +154,15 @@ def test_provenance_manifest_must_be_an_object(tmp_path, monkeypatch, content):
         orojenesis.OrojenesisRunner(home)
 
 
-def test_git_checkout_identity_fallback(tmp_path, monkeypatch):
+def test_missing_provenance_cannot_fall_back_to_git_checkout(tmp_path, monkeypatch):
     mapper = tmp_path / "bin" / "timeloop-mapper"
     mapper.parent.mkdir()
     mapper.write_bytes(b"mapper")
     mapper.chmod(0o755)
     mapper_sha256 = hashlib.sha256(mapper.read_bytes()).hexdigest()
-    archive = b"canonical archive"
     monkeypatch.setattr(
         orojenesis, "OROJENESIS_TRUSTED_MAPPER_SHA256", frozenset({mapper_sha256})
     )
-    monkeypatch.setattr(
-        orojenesis,
-        "OROJENESIS_SOURCE_ARCHIVE_SHA256",
-        hashlib.sha256(archive).hexdigest(),
-    )
 
-    def fake_run(args, **kwargs):
-        del kwargs
-        if "archive" in args:
-            return SimpleNamespace(stdout=archive)
-        if args[-1] == "HEAD":
-            return SimpleNamespace(stdout=orojenesis.OROJENESIS_COMMIT + "\n")
-        if args[-1] == "HEAD^{tree}":
-            return SimpleNamespace(stdout=orojenesis.OROJENESIS_TREE_OID + "\n")
-        raise AssertionError(args)
-
-    monkeypatch.setattr(orojenesis.subprocess, "run", fake_run)
-    identity = orojenesis.OrojenesisRunner(tmp_path).toolchain_identity
-    assert identity["verification_mode"] == "git_checkout"
-    assert identity["artifact"]["sha256"] == mapper_sha256
+    with pytest.raises(orojenesis.OrojenesisError, match="provenance manifest"):
+        orojenesis.OrojenesisRunner(tmp_path)

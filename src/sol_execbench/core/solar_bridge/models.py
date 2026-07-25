@@ -6,7 +6,19 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import math
+from pathlib import Path
 from typing import Any, Mapping
+
+FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
+FORMAL_ARTIFACT_PATHS = frozenset(
+    {
+        "operator_graph.yaml",
+        "einsum_graph.yaml",
+        "conversion-attestation.yaml",
+        "solar-analysis.yaml",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -46,6 +58,7 @@ class SolarAnalysisOutcome:
     stage: str | None = None
     reason_code: str | None = None
     message: str | None = None
+    publication_eligible: bool = False
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "SolarAnalysisOutcome":
@@ -57,6 +70,39 @@ class SolarAnalysisOutcome:
         data = asdict(self)
         data["artifacts"] = list(self.artifacts)
         return data
+
+    @property
+    def is_formal_publication(self) -> bool:
+        """Whether an analyzed worker response satisfies the formal contract."""
+        if (
+            self.status != "analyzed"
+            or self.publication_eligible is not True
+            or self.bound_kind != FORMAL_BOUND_KIND
+            or self.output_dir is None
+            or self.architecture_sha256 is None
+            or len(self.architecture_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.architecture_sha256
+            )
+            or self.lower_bound_seconds is None
+            or not math.isfinite(self.lower_bound_seconds)
+            or self.lower_bound_seconds <= 0
+        ):
+            return False
+        paths: set[str] = set()
+        for artifact in self.artifacts:
+            path = Path(str(artifact.get("path", "")))
+            sha256 = str(artifact.get("sha256", ""))
+            if (
+                path.is_absolute()
+                or ".." in path.parts
+                or len(sha256) != 64
+                or any(character not in "0123456789abcdef" for character in sha256)
+            ):
+                return False
+            paths.add(str(path))
+        return paths == FORMAL_ARTIFACT_PATHS
 
 
 def formal_precision_for_definition(definition: Any) -> str:
@@ -79,5 +125,7 @@ def formal_precision_for_definition(definition: Any) -> str:
 __all__ = [
     "SolarAnalysisOutcome",
     "SolarWorkerRequest",
+    "FORMAL_ARTIFACT_PATHS",
+    "FORMAL_BOUND_KIND",
     "formal_precision_for_definition",
 ]

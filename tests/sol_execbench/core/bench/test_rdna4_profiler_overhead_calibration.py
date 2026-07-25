@@ -10,8 +10,9 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, cast
+
+import pytest
 
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3TimingEvidence,
@@ -24,6 +25,7 @@ from sol_execbench.core.bench.timing_policy import (
     TimingPolicy,
     TimingSourceType,
 )
+from sol_execbench.core.integrity import sha256_file
 
 
 def _make_policy(**overrides) -> TimingPolicy:
@@ -120,7 +122,7 @@ class TestReadOverheadCalibration:
     @staticmethod
     def _payload(**overrides):
         payload = {
-            "schema_version": "sol_execbench.rocprofv3_overhead_calibration.v1",
+            "schema_version": "sol_execbench.rocprofv3_overhead_calibration.v2",
             "generated_at": "2026-07-20T00:00:00Z",
             "baseline_median_ms": 0.05,
             "profiler_median_ms": 0.073,
@@ -130,6 +132,7 @@ class TestReadOverheadCalibration:
             "element_count": 1024,
             "gpu_architecture": "gfx1200",
             "profiler_executable": "rocprofv3",
+            "profiler_executable_sha256": "a" * 64,
             "clock_locked": True,
             "clock_setup": {
                 "managed": True,
@@ -177,6 +180,72 @@ class TestReadOverheadCalibration:
             )
             result = _read_overhead_calibration(cal_path)
             assert result is None
+
+    def test_rejects_architecture_mismatch(self, tmp_path):
+        cal_path = tmp_path / "cal.json"
+        cal_path.write_text(json.dumps(self._payload()) + "\n", encoding="utf-8")
+
+        result = _read_overhead_calibration(
+            cal_path,
+            expected_gpu_architecture="gfx942",
+        )
+
+        assert result is None
+
+    def test_rejects_unknown_clock_state(self, tmp_path):
+        cal_path = tmp_path / "cal.json"
+        cal_path.write_text(json.dumps(self._payload()) + "\n", encoding="utf-8")
+
+        result = _read_overhead_calibration(
+            cal_path,
+            expected_clock_locked=None,
+        )
+
+        assert result is None
+
+    def test_accepts_matching_executable_digest_and_context(self, tmp_path):
+        profiler = tmp_path / "rocprofv3"
+        profiler.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        profiler.chmod(0o755)
+        payload = self._payload(
+            profiler_executable=str(profiler),
+            profiler_executable_sha256=sha256_file(profiler),
+        )
+        cal_path = tmp_path / "cal.json"
+        cal_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+        result = _read_overhead_calibration(
+            cal_path,
+            expected_gpu_architecture="gfx1200:sramecc-",
+            expected_profiler_executable=str(profiler),
+            expected_clock_locked=True,
+        )
+
+        assert result == 0.023
+
+    def test_rejects_changed_profiler_executable(self, tmp_path):
+        profiler = tmp_path / "rocprofv3"
+        profiler.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        profiler.chmod(0o755)
+        cal_path = tmp_path / "cal.json"
+        cal_path.write_text(
+            json.dumps(
+                self._payload(
+                    profiler_executable=str(profiler),
+                    profiler_executable_sha256=sha256_file(profiler),
+                )
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        profiler.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+
+        result = _read_overhead_calibration(
+            cal_path,
+            expected_profiler_executable=str(profiler),
+        )
+
+        assert result is None
 
 
 class TestCalibrationScriptArgs:
@@ -266,7 +335,7 @@ class TestCalibrationJsonSchema:
         spec.loader.exec_module(mod)
         assert (
             mod.CALIBRATION_SCHEMA_VERSION
-            == "sol_execbench.rocprofv3_overhead_calibration.v1"
+            == "sol_execbench.rocprofv3_overhead_calibration.v2"
         )
 
 
@@ -372,18 +441,25 @@ class TestCalibrationClockSetup:
         def fake_run(command, **kwargs):
             captured["run_command"] = command
             captured["run_kwargs"] = kwargs
+            build_kwargs = cast(dict[str, Any], captured["kwargs"])
+            output_directory = Path(cast(str, build_kwargs["output_directory"]))
+            (
+                output_directory / "rocprofv3-overhead-calibration_kernel_trace.csv"
+            ).write_text(
+                "Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)\n"
+                "KERNEL_DISPATCH,vector_add,0,10,10\n",
+                encoding="utf-8",
+            )
             return subprocess.CompletedProcess(command, 0, stdout="[1.25, 1.5]\n")
 
         monkeypatch.setattr(rocm_profiler, "build_rocprofv3_command", fake_build)
-        monkeypatch.setattr(subprocess, "run", fake_run)
+        monkeypatch.setattr(mod, "run_in_process_group_bounded", fake_run)
 
-        tensor = SimpleNamespace(shape=(4,))
         temp_dir = tmp_path / "tmp" / "rdna4-overhead-calibration"
         durations = mod._run_with_rocprofv3(
-            tensor,
-            tensor,
-            tensor,
+            element_count=4,
             iterations=2,
+            warmup_runs=1,
             temp_dir=temp_dir,
             profiler_executable="/tmp/rocprofv3-gfx1200-patched",
         )
@@ -394,3 +470,47 @@ class TestCalibrationClockSetup:
         assert kwargs["executable"] == "/tmp/rocprofv3-gfx1200-patched"
         output_directory = Path(kwargs["output_directory"])
         assert output_directory.is_relative_to(temp_dir)
+
+    def test_run_with_rocprofv3_rejects_nonzero_exit(self, monkeypatch, tmp_path):
+        mod = self._load_script()
+
+        monkeypatch.setattr(
+            mod,
+            "run_in_process_group_bounded",
+            lambda command, **kwargs: subprocess.CompletedProcess(
+                command,
+                17,
+                stdout="[1.25]\n",
+                stderr="profiler failed",
+            ),
+        )
+
+        with pytest.raises(RuntimeError, match="exit code 17"):
+            mod._run_with_rocprofv3(
+                element_count=4,
+                iterations=1,
+                warmup_runs=0,
+                temp_dir=tmp_path,
+            )
+
+    def test_run_with_rocprofv3_requires_kernel_trace(self, monkeypatch, tmp_path):
+        mod = self._load_script()
+
+        monkeypatch.setattr(
+            mod,
+            "run_in_process_group_bounded",
+            lambda command, **kwargs: subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="[1.25]\n",
+                stderr="",
+            ),
+        )
+
+        with pytest.raises(RuntimeError, match="kernel-trace CSV"):
+            mod._run_with_rocprofv3(
+                element_count=4,
+                iterations=1,
+                warmup_runs=0,
+                temp_dir=tmp_path,
+            )

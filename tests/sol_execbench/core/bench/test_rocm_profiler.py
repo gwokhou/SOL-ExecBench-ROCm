@@ -219,7 +219,8 @@ def test_default_profile_collection_requests_graceful_eval_driver_exit(
         )
 
     monkeypatch.setattr(
-        "sol_execbench.core.bench.rocm_profiler.commands.subprocess.run", fake_run
+        "sol_execbench.core.bench.rocm_profiler.commands.run_in_process_group_bounded",
+        fake_run,
     )
     request = Rocprofv3ProfileRequest(
         application_command=("python", "eval_driver.py"),
@@ -573,7 +574,8 @@ def test_default_live_collection_requests_graceful_eval_driver_exit(
         )
 
     monkeypatch.setattr(
-        "sol_execbench.core.bench.rocm_profiler.commands.subprocess.run", fake_run
+        "sol_execbench.core.bench.rocm_profiler.commands.run_in_process_group_bounded",
+        fake_run,
     )
     request = Rocprofv3CollectionRequest(
         application_command=("uv", "run", "sol-execbench", "problem"),
@@ -588,6 +590,69 @@ def test_default_live_collection_requests_graceful_eval_driver_exit(
 
     assert result.profiler_collected is True
     assert captured_env["SOL_EXECBENCH_GRACEFUL_EXIT"] == "1"
+
+
+def test_default_live_collection_passes_timeout_to_bounded_runner(
+    tmp_path, monkeypatch
+):
+    captured_timeout: list[float | None] = []
+
+    def fake_run(command, **kwargs):
+        captured_timeout.append(kwargs.get("timeout"))
+        (tmp_path / "timing_kernel_trace.csv").write_text(ROCPROFV3_CSV)
+        return subprocess.CompletedProcess(
+            args=list(command),
+            returncode=0,
+            stdout="profiled",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "sol_execbench.core.bench.rocm_profiler.commands.run_in_process_group_bounded",
+        fake_run,
+    )
+    request = Rocprofv3CollectionRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="timing",
+        policy=select_timing_policy(TimingSourceType.HIP_NATIVE),
+        tool_version="rocprofv3 7.2.0",
+        gpu_architecture="gfx1200",
+        timeout_seconds=17.5,
+    )
+
+    result = collect_rocprofv3_timing(request)
+
+    assert result.profiler_collected is True
+    assert captured_timeout == [17.5]
+
+
+def test_live_collection_labels_profiler_timeout_as_fallback(tmp_path):
+    def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(
+            command,
+            12.5,
+            output="partial stdout",
+            stderr="partial stderr",
+        )
+
+    request = Rocprofv3CollectionRequest(
+        application_command=("python", "eval_driver.py"),
+        output_directory=tmp_path,
+        output_file="timing",
+        policy=select_timing_policy(TimingSourceType.HIP_NATIVE),
+        tool_version="rocprofv3 7.2.0",
+        gpu_architecture="gfx1200",
+        timeout_seconds=12.5,
+    )
+
+    result = collect_rocprofv3_timing(request, runner=runner)
+
+    assert result.profiler_collected is False
+    assert result.returncode is None
+    assert result.stdout == "partial stdout"
+    assert result.stderr == "partial stderr"
+    assert "timed out after 12.5 seconds" in result.selection.reason
 
 
 def test_live_collection_prefers_kernel_trace_csv(tmp_path):
@@ -755,6 +820,7 @@ def test_source_collection_selects_triton_rocprofv3_and_records_run_config(tmp_p
             iterations=50,
             trial_count=2,
             clock_locked=False,
+            timeout_seconds=41.0,
         ),
         runner=runner,
     )

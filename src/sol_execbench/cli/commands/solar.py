@@ -67,6 +67,14 @@ def analyze_cli(
             reason_code="worker_execution_failed",
             message=str(exc)[:4096],
         )
+    if outcome.status == "analyzed" and not outcome.is_formal_publication:
+        outcome = SolarAnalysisOutcome(
+            status="failed",
+            analysis_id=outcome.analysis_id,
+            stage="formal_acceptance",
+            reason_code="non_formal_bound",
+            message="SOLAR CLI rejected a non-publication result",
+        )
     data = outcome.to_dict()
     if outcome.status != "analyzed":
         console.print(f"[red]SOLAR failed at {outcome.stage}: {outcome.message}[/red]")

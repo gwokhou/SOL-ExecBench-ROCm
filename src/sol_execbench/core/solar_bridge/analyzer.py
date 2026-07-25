@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 from typing import Any, Callable
 
 from sol_execbench.core.bench.eval_runtime import load_reference_function
@@ -89,6 +90,7 @@ def _invoke_solar(
         output_dir=output_dir,
         device=device,
         precision=formal_precision_for_definition(definition),
+        require_orojenesis=True,
         orojenesis_home=orojenesis_home,
         atol=tolerance.max_atol,
         rtol=tolerance.max_rtol,
@@ -105,7 +107,7 @@ def _invoke_solar(
             reason_code=result.reason_code,
             message=result.message,
         )
-    return SolarAnalysisOutcome(
+    outcome = SolarAnalysisOutcome(
         status=result.status,
         analysis_id=result.analysis_id,
         output_dir=str(result.output_dir),
@@ -114,7 +116,18 @@ def _invoke_solar(
         bound_kind=result.bound.kind,
         limiting_resource=result.bound.limiting_resource,
         artifacts=tuple(artifact.__dict__ for artifact in result.artifacts),
+        publication_eligible=result.publication_eligible,
     )
+    if not outcome.is_formal_publication:
+        shutil.rmtree(result.output_dir, ignore_errors=True)
+        return SolarAnalysisOutcome(
+            status="failed",
+            analysis_id=result.analysis_id,
+            stage="formal_acceptance",
+            reason_code="non_formal_bound",
+            message="SOLAR formal bridge rejected a non-publication result",
+        )
+    return outcome
 
 
 def _load_workloads(path: Path) -> list[Workload]:

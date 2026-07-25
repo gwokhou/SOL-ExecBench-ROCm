@@ -1,0 +1,27 @@
+{
+  "name": "rdna4_vecadd_f32",
+  "op_type": "vecadd",
+  "axes": {
+    "n": {
+      "type": "const",
+      "value": 4096
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": ["n"],
+      "dtype": "float32"
+    },
+    "y": {
+      "shape": ["n"],
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "z": {
+      "shape": ["n"],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch\n\ndef run(x, y):\n    return x + y\n"
+}

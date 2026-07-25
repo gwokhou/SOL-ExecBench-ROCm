@@ -98,6 +98,24 @@ def test_cdna3_architecture_detection_is_gfx94_family(
     assert conftest._is_cdna3(gfx_arch) is expected
 
 
+@pytest.mark.parametrize(
+    ("gfx_arch", "expected"),
+    [
+        ("gfx1200", True),
+        ("gfx1201", False),
+        ("gfx12", False),
+        ("gfx942", False),
+        ("", False),
+    ],
+)
+def test_rdna4_validation_marker_is_exactly_gfx1200(
+    gfx_arch: str, expected: bool
+) -> None:
+    conftest = _test_conftest()
+
+    assert conftest._is_rdna4(gfx_arch) is expected
+
+
 def test_cdna3_marker_skips_rdna4_with_detected_architecture(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

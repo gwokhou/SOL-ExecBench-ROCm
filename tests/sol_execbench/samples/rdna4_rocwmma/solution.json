@@ -1,0 +1,22 @@
+{
+  "name": "rdna4_rocwmma_matmul",
+  "definition": "rdna4_rocwmma_matmul_f16",
+  "author": "test",
+  "spec": {
+    "languages": ["rocwmma"],
+    "target_hardware": ["gfx1200"],
+    "entry_point": "kernel.hip::run",
+    "dependencies": ["rocWMMA"],
+    "compile_options": {
+      "hip_cflags": ["-O3", "-std=c++17"]
+    },
+    "destination_passing_style": false,
+    "binding": "torch"
+  },
+  "sources": [
+    {
+      "path": "kernel.hip",
+      "content": "#include <torch/extension.h>\n#include <c10/hip/HIPStream.h>\n#include <hip/hip_runtime.h>\n#include <rocwmma/rocwmma.hpp>\n\n__global__ void rocwmma_matmul_kernel(const rocwmma::float16_t* a, const rocwmma::float16_t* b, float* output) {\n    using FragmentA = rocwmma::fragment<rocwmma::matrix_a, 16, 16, 16, rocwmma::float16_t, rocwmma::row_major>;\n    using FragmentB = rocwmma::fragment<rocwmma::matrix_b, 16, 16, 16, rocwmma::float16_t, rocwmma::row_major>;\n    using FragmentC = rocwmma::fragment<rocwmma::accumulator, 16, 16, 16, float>;\n    FragmentA fragment_a;\n    FragmentB fragment_b;\n    FragmentC fragment_c;\n    FragmentC fragment_d;\n    rocwmma::load_matrix_sync(fragment_a, a, 16);\n    rocwmma::load_matrix_sync(fragment_b, b, 16);\n    rocwmma::fill_fragment(fragment_c, 0.0f);\n    rocwmma::mma_sync(fragment_d, fragment_a, fragment_b, fragment_c);\n    rocwmma::store_matrix_sync(output, fragment_d, 16, rocwmma::mem_row_major);\n}\n\ntorch::Tensor run(const torch::Tensor& a, const torch::Tensor& b) {\n    TORCH_CHECK(a.is_cuda() && b.is_cuda(), \"inputs must be HIP tensors\");\n    TORCH_CHECK(a.scalar_type() == torch::kFloat16 && b.scalar_type() == torch::kFloat16, \"inputs must be float16\");\n    TORCH_CHECK(a.is_contiguous() && b.is_contiguous(), \"inputs must be contiguous\");\n    TORCH_CHECK(a.sizes() == torch::IntArrayRef({16, 16}) && b.sizes() == torch::IntArrayRef({16, 16}), \"inputs must be 16x16\");\n    auto output = torch::empty({16, 16}, a.options().dtype(torch::kFloat32));\n    rocwmma_matmul_kernel<<<1, 32, 0, c10::hip::getCurrentHIPStream()>>>(\n        reinterpret_cast<const rocwmma::float16_t*>(a.data_ptr<at::Half>()),\n        reinterpret_cast<const rocwmma::float16_t*>(b.data_ptr<at::Half>()),\n        output.data_ptr<float>());\n    TORCH_CHECK(hipGetLastError() == hipSuccess, \"rocWMMA matmul launch failed\");\n    return output;\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, module) {\n    module.def(\"run\", &run, \"gfx1200 rocWMMA 16x16 matmul\");\n}\n"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -73,9 +73,12 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(tmp_path, monkeypat
         "manifest.yaml",
     }
     manifest = yaml.safe_load((output / "manifest.yaml").read_text())
+    assert manifest["schema_version"] == 2
     assert "candidate_runtime" not in manifest
     assert "score" not in manifest
     assert manifest["analysis_contract"]["precision"] == "fp16"
+    assert manifest["analysis_contract"]["require_orojenesis"] is False
+    assert manifest["publication_eligible"] is True
 
 
 def test_analyze_failure_leaves_no_partial_output(tmp_path, monkeypatch):
@@ -214,6 +217,34 @@ def test_analysis_request_defaults_to_eq1_roofline_bound():
     """Eq.1 roofline is the default bound policy (paper-aligned); Orojenesis is opt-in."""
     request = _request(Path("/tmp/solar-default"))
     assert request.require_orojenesis is False
+
+
+def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
+    tmp_path, monkeypatch
+):
+    observed: dict[str, object] = {}
+
+    class FakeAnalyzer:
+        def analyze_graph(self, *args, **kwargs):
+            observed.update(kwargs)
+            return {"schema_version": 3}
+
+    monkeypatch.setattr(
+        api,
+        "OrojenesisRunner",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("runner must not be constructed")
+        ),
+    )
+    monkeypatch.setattr(api, "EinsumGraphAnalyzer", FakeAnalyzer)
+
+    result = api._run_analysis(
+        _request(tmp_path / "result"), cast(Any, _Profile()), tmp_path
+    )
+
+    assert result == {"schema_version": 3}
+    assert observed["orojenesis_runner"] is None
+    assert observed["require_orojenesis"] is False
 
 
 def test_extract_bound_accepts_diagnostic_eq1_when_orojenesis_not_required():

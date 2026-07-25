@@ -1,0 +1,22 @@
+{
+  "name": "rdna4_vecadd_hip",
+  "definition": "rdna4_vecadd_f32",
+  "author": "test",
+  "spec": {
+    "languages": ["hip_cpp"],
+    "target_hardware": ["gfx1200"],
+    "entry_point": "kernel.hip::run",
+    "dependencies": [],
+    "compile_options": {
+      "hip_cflags": ["-O3", "-std=c++17"]
+    },
+    "destination_passing_style": false,
+    "binding": "torch"
+  },
+  "sources": [
+    {
+      "path": "kernel.hip",
+      "content": "#include <torch/extension.h>\n#include <c10/hip/HIPStream.h>\n#include <hip/hip_runtime.h>\n\n__global__ void vecadd_kernel(const float* x, const float* y, float* output, int64_t n) {\n    const int64_t index = static_cast<int64_t>(blockIdx.x) * blockDim.x + threadIdx.x;\n    if (index < n) output[index] = x[index] + y[index];\n}\n\ntorch::Tensor run(const torch::Tensor& x, const torch::Tensor& y) {\n    TORCH_CHECK(x.is_cuda() && y.is_cuda(), \"inputs must be HIP tensors\");\n    TORCH_CHECK(x.scalar_type() == torch::kFloat32 && y.scalar_type() == torch::kFloat32, \"inputs must be float32\");\n    TORCH_CHECK(x.is_contiguous() && y.is_contiguous(), \"inputs must be contiguous\");\n    TORCH_CHECK(x.sizes() == y.sizes(), \"input shapes must match\");\n    auto output = torch::empty_like(x);\n    const int threads = 256;\n    const int64_t n = x.numel();\n    const hipStream_t stream = c10::hip::getCurrentHIPStream();\n    vecadd_kernel<<<(n + threads - 1) / threads, threads, 0, stream>>>(\n        x.data_ptr<float>(), y.data_ptr<float>(), output.data_ptr<float>(), n);\n    TORCH_CHECK(hipGetLastError() == hipSuccess, \"HIP vecadd launch failed\");\n    return output;\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, module) {\n    module.def(\"run\", &run, \"gfx1200 HIP vector addition\");\n}\n"
+    }
+  ]
+}

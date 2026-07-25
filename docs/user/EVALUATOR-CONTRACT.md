@@ -73,6 +73,10 @@ This repository imports a pinned upstream corpus; it does not implement the
 paper's dataset extraction/curation pipeline. Candidate static review uses
 deterministic AST rules, not the paper's LLM judge. The ROCm formal profile also
 requires pinned Orojenesis evidence as a port-specific publication policy.
+The formal CLI sets that requirement unconditionally, and the worker, bridge,
+and CLI reject diagnostic bounds independently. A reviewed mapper binary and
+its pinned provenance/build manifest are both required; the current empty
+binary allowlist keeps publication unavailable.
 
 The implemented formula is:
 

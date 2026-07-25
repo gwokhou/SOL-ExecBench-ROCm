@@ -4,14 +4,18 @@
 """ROCm profiler timing parsing and live timing collection."""
 
 import json
+import logging
 from dataclasses import replace
 from pathlib import Path
+from typing import Final
 
 from sol_execbench.core.bench.rocm_profiler.models import (
     DefaultTimingSelection,
     Rocprofv3TimingEvidence,
     Rocprofv3TimingRow,
 )
+from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.bench.rocm_profiler.calibration import (
     Rocprofv3OverheadCalibration,
 )
@@ -140,8 +144,15 @@ def build_timing_evidence(
     )
 
 
+_UNSET_CLOCK: Final = object()
+
+
 def read_overhead_calibration(
     calibration_path: Path | None,
+    *,
+    expected_gpu_architecture: str | None = None,
+    expected_profiler_executable: str | None = None,
+    expected_clock_locked: bool | None | object = _UNSET_CLOCK,
 ) -> float | None:
     """Read profiler overhead calibration value from a JSON sidecar.
 
@@ -154,14 +165,60 @@ def read_overhead_calibration(
         calibration = Rocprofv3OverheadCalibration.model_validate_json(
             calibration_path.read_text(encoding="utf-8")
         )
+        mismatch = _calibration_identity_mismatch(
+            calibration,
+            expected_gpu_architecture=expected_gpu_architecture,
+            expected_profiler_executable=expected_profiler_executable,
+            expected_clock_locked=expected_clock_locked,
+        )
+        if mismatch is not None:
+            logging.getLogger(__name__).warning(
+                "Ignoring overhead calibration from %s: %s",
+                calibration_path,
+                mismatch,
+            )
+            return None
         return calibration.overhead_ms
     except (json.JSONDecodeError, ValueError, OSError) as exc:
-        import logging
-
         logging.getLogger(__name__).warning(
             "Failed to read overhead calibration from %s: %s", calibration_path, exc
         )
         return None
+
+
+def _calibration_identity_mismatch(
+    calibration: Rocprofv3OverheadCalibration,
+    *,
+    expected_gpu_architecture: str | None,
+    expected_profiler_executable: str | None,
+    expected_clock_locked: bool | None | object,
+) -> str | None:
+    if expected_gpu_architecture is not None:
+        expected_arch = expected_gpu_architecture.split(":", maxsplit=1)[0].lower()
+        calibration_arch = calibration.gpu_architecture.split(":", maxsplit=1)[
+            0
+        ].lower()
+        if calibration_arch != expected_arch:
+            return f"GPU architecture is {calibration_arch}, expected {expected_arch}"
+    if expected_profiler_executable is not None:
+        resolved = resolve_rocm_tool(expected_profiler_executable)
+        if resolved is None:
+            return (
+                "current profiler executable could not be resolved: "
+                f"{expected_profiler_executable}"
+            )
+        current_sha256 = sha256_file(resolved)
+        if current_sha256 != calibration.profiler_executable_sha256:
+            return "profiler executable SHA-256 does not match"
+    if (
+        expected_clock_locked is not _UNSET_CLOCK
+        and calibration.clock_locked != expected_clock_locked
+    ):
+        return (
+            f"clock_locked is {calibration.clock_locked}, "
+            f"expected {expected_clock_locked}"
+        )
+    return None
 
 
 _read_overhead_calibration = read_overhead_calibration

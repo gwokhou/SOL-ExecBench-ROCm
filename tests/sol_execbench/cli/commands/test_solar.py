@@ -10,6 +10,27 @@ from sol_execbench.cli.main import cli
 from sol_execbench.core.solar_bridge.models import SolarAnalysisOutcome
 
 
+def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
+    return SolarAnalysisOutcome(
+        status="analyzed",
+        analysis_id=analysis_id,
+        output_dir=output_dir,
+        architecture_sha256="a" * 64,
+        lower_bound_seconds=0.001,
+        bound_kind="capacity_constrained_tile_aware_v1",
+        artifacts=tuple(
+            {"path": path, "sha256": "b" * 64}
+            for path in (
+                "operator_graph.yaml",
+                "einsum_graph.yaml",
+                "conversion-attestation.yaml",
+                "solar-analysis.yaml",
+            )
+        ),
+        publication_eligible=True,
+    )
+
+
 def test_solar_analyze_cli_returns_bound_and_artifacts(tmp_path, monkeypatch) -> None:
     problem = tmp_path / "problem"
     problem.mkdir()
@@ -17,12 +38,8 @@ def test_solar_analyze_cli_returns_bound_and_artifacts(tmp_path, monkeypatch) ->
     monkeypatch.setattr(
         solar_commands,
         "run_solar_worker",
-        lambda request, **kwargs: SolarAnalysisOutcome(
-            status="analyzed",
-            analysis_id=request.workload_uuid,
-            output_dir=request.output_dir,
-            lower_bound_seconds=0.001,
-            artifacts=({"path": "manifest.yaml", "sha256": "a" * 64},),
+        lambda request, **kwargs: _formal_outcome(
+            request.workload_uuid, request.output_dir
         ),
     )
 
@@ -46,9 +63,47 @@ def test_solar_analyze_cli_returns_bound_and_artifacts(tmp_path, monkeypatch) ->
     payload = json.loads(result.output)
     assert result.exit_code == 0
     assert payload["data"]["status"] == "analyzed"
-    assert payload["artifacts"] == [
-        {"path": str(output / "manifest.yaml"), "type": "solar_artifact"}
-    ]
+    assert {item["path"] for item in payload["artifacts"]} == {
+        str(output / path)
+        for path in (
+            "operator_graph.yaml",
+            "einsum_graph.yaml",
+            "conversion-attestation.yaml",
+            "solar-analysis.yaml",
+        )
+    }
+
+
+def test_solar_analyze_cli_rejects_non_formal_success(tmp_path, monkeypatch) -> None:
+    problem = tmp_path / "problem"
+    problem.mkdir()
+    output = tmp_path / "analysis"
+    invalid = _formal_outcome("workload-1", str(output))
+    object.__setattr__(invalid, "publication_eligible", False)
+    monkeypatch.setattr(
+        solar_commands,
+        "run_solar_worker",
+        lambda request, **kwargs: invalid,
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "solar",
+            "analyze",
+            str(problem),
+            "--workload",
+            "workload-1",
+            "--output",
+            str(output),
+        ],
+    )
+
+    payload = json.loads(result.output)
+    assert result.exit_code == 1
+    assert payload["data"]["reason_code"] == "non_formal_bound"
 
 
 def test_solar_analyze_cli_preserves_failed_stage(tmp_path, monkeypatch) -> None:

@@ -47,7 +47,7 @@ provide:
 - `requires_rocm` / `requires_rocm_gpu` for a visible ROCm device;
 - `requires_rocm_dev` and `cpp` for native development headers/toolchain;
 - `requires_triton_rocm` for Triton ROCm;
-- `requires_rdna4` for gfx1200-class evidence;
+- `requires_rdna4` for the exact validated `gfx1200` target;
 - `requires_cdna3` for gfx94x-class evidence;
 - `docker_dependency` for the declared container dependency stack.
 
@@ -61,6 +61,21 @@ uv run pytest tests/ -m 'requires_rdna4 and cpp' -n 0
 Do not replace unavailable hardware with a broad `xfail`, mock or skip.
 Hardware claims require the exact device/toolchain and should skip only on a
 precisely tested missing prerequisite.
+
+GitHub-hosted runners do not provide the recorded RDNA4 GPU. Use the manual
+`.github/workflows/rdna4-hardware.yml` only with an administered self-hosted
+runner labeled `linux`, `x64`, `rocm`, and `gfx1200`, or run:
+
+```bash
+uv run python scripts/internal/rdna4/run_rdna4_validation.py \
+  --output-dir out/rdna4-local
+uv run python scripts/internal/rdna4/run_rdna4_validation.py \
+  --verify out/rdna4-local
+```
+
+The exact RX 9060 XT/ROCm/PyTorch/HIP scope and the non-release authority of
+these content-addressed bundles are documented in
+[RDNA4 Validation Scope](RDNA4-VALIDATION.md).
 
 ## Process-boundary expectations
 

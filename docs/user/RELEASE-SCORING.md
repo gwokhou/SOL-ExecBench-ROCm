@@ -17,6 +17,12 @@ resource-audit artifact. It closes the architecture-evidence gate but does not
 supply the independent scoring authority listed below, so diagnostic candidate
 evaluation still cannot upgrade itself to an official score.
 
+The content-addressed RX 9060 XT hardware bundle is also local engineering
+evidence only. `sol_execbench.rdna4_validation.v2` is deliberately incapable of
+self-promoting to release authority: direct and manual self-hosted runs record
+`release_eligible=false` and `trusted_execution=false`, and the verifier rejects
+caller-edited authority fields even when its checksum is recomputed.
+
 ## Evidence required for a future release
 
 A release may enable official scoring only after pinning all of the following

@@ -8,6 +8,28 @@ from sol_execbench.core.solar_bridge import learn_runner, runner
 from sol_execbench.core.solar_bridge.models import SolarWorkerRequest
 
 
+def _formal_payload() -> dict:
+    return {
+        "status": "analyzed",
+        "analysis_id": "workload-1",
+        "output_dir": "/tmp/formal-output",
+        "architecture_sha256": "a" * 64,
+        "lower_bound_seconds": 0.001,
+        "bound_kind": "capacity_constrained_tile_aware_v1",
+        "limiting_resource": "memory",
+        "artifacts": [
+            {"path": path, "sha256": "b" * 64}
+            for path in (
+                "operator_graph.yaml",
+                "einsum_graph.yaml",
+                "conversion-attestation.yaml",
+                "solar-analysis.yaml",
+            )
+        ],
+        "publication_eligible": True,
+    }
+
+
 def _request(tmp_path: Path) -> SolarWorkerRequest:
     return SolarWorkerRequest(
         problem_dir=str(tmp_path / "problem"),
@@ -24,9 +46,7 @@ def test_run_solar_worker_returns_structured_response(tmp_path, monkeypatch) -> 
     def fake_run(command, stdout_path, stderr_path, **kwargs):
         observed["request"] = json.loads(Path(command[-2]).read_text())
         observed["timeout"] = kwargs["timeout"]
-        Path(command[-1]).write_text(
-            json.dumps({"status": "analyzed", "analysis_id": "workload-1"})
-        )
+        Path(command[-1]).write_text(json.dumps(_formal_payload()))
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(runner, "run_in_process_group_to_files", fake_run)
@@ -38,6 +58,24 @@ def test_run_solar_worker_returns_structured_response(tmp_path, monkeypatch) -> 
         "request": _request(tmp_path).to_dict(),
         "timeout": 12.5,
     }
+
+
+def test_run_solar_worker_rejects_non_formal_analyzed_response(
+    tmp_path, monkeypatch
+) -> None:
+    def fake_run(command, stdout_path, stderr_path, **kwargs):
+        del stdout_path, stderr_path, kwargs
+        payload = _formal_payload()
+        payload["publication_eligible"] = False
+        Path(command[-1]).write_text(json.dumps(payload))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner, "run_in_process_group_to_files", fake_run)
+
+    outcome = runner.run_solar_worker(_request(tmp_path))
+
+    assert outcome.status == "failed"
+    assert outcome.reason_code == "worker_response_invalid"
 
 
 def test_run_solar_worker_reports_bounded_worker_error(tmp_path, monkeypatch) -> None:

@@ -116,7 +116,9 @@ uv run sol-execbench solar analyze PROBLEM_DIR \
 ```
 
 SOLAR publishes operator graph, einsum graph, conversion attestation, formal
-analysis and manifest only when all stages pass.
+analysis and manifest only when all stages pass. The CLI accepts only the
+publication-eligible capacity-constrained Orojenesis bound; the current empty
+reviewed-mapper allowlist intentionally blocks formal publication.
 
 ## Inspect the ownership contract
 

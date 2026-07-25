@@ -30,8 +30,39 @@ def _telemetry() -> dict:
         "memory_temperature_c": 70.0,
         "socket_power_w": 100.0,
         "deep_sleep": "DISABLED",
-        "throttle_status": "NOT_THROTTLED",
+        "throttle_status": "UNTHROTTLED",
         "performance_level": "STABLE_PEAK",
+    }
+
+
+def _telemetry_summary(raw_batches: list[dict]) -> dict:
+    snapshots = [
+        batch[field_name]
+        for batch in raw_batches
+        for field_name in ("telemetry_before", "telemetry_after")
+    ]
+    numeric_fields = (
+        "gfx_clock_mhz",
+        "gfx_max_clock_mhz",
+        "memory_clock_mhz",
+        "edge_temperature_c",
+        "hotspot_temperature_c",
+        "memory_temperature_c",
+        "socket_power_w",
+    )
+    return {
+        "snapshot_count": len(snapshots),
+        "deep_sleep_states": sorted({item["deep_sleep"] for item in snapshots}),
+        "throttle_statuses": sorted({item["throttle_status"] for item in snapshots}),
+        "performance_levels": sorted({item["performance_level"] for item in snapshots}),
+        "numeric": {
+            field_name: {
+                "minimum": min(item[field_name] for item in snapshots),
+                "median": statistics.median(item[field_name] for item in snapshots),
+                "maximum": max(item[field_name] for item in snapshots),
+            }
+            for field_name in numeric_fields
+        },
     }
 
 
@@ -79,6 +110,7 @@ def _measurement_evidence() -> dict:
         "process_batch_count": len(raw_batches),
         "samples_per_process_batch": 2,
         "raw_process_batches": raw_batches,
+        "telemetry_summary": _telemetry_summary(raw_batches),
         "statistics": {
             "primary_statistic": "median_of_process_batch_medians",
             "primary_result": statistics.median(batch_medians),
@@ -259,13 +291,19 @@ def _write(path: Path, payload: dict, *, resign: bool = True) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _verify(path: Path, digest: str) -> dict:
+def _verify(
+    path: Path,
+    digest: str,
+    *,
+    expected_unthrottled: bool = True,
+) -> dict:
     return verify_resource_peak_audit(
         path,
         expected_sha256=digest,
         expected_schema_version=RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
         expected_timing_profile=RESOURCE_PEAK_TIMING_PROFILE,
         expected_clocks_locked=True,
+        expected_unthrottled=expected_unthrottled,
         expected_gfx_target="gfx1200",
         expected_precisions=_EXPECTED_PRECISIONS,
         expected_resource_modes=_EXPECTED_RESOURCE_MODES,
@@ -280,6 +318,25 @@ def test_verifies_content_addressed_locked_clock_audit(tmp_path: Path):
     verified = _verify(path, digest)
 
     assert verified["instruction_validation"]["status"] == "passed"
+
+
+def test_limited_scope_accepts_explicitly_reported_throttling(tmp_path: Path):
+    path = tmp_path / "audit.json"
+    payload = _payload()
+    measurement = payload["measurements"][0]
+    for batch in measurement["raw_process_batches"]:
+        batch["telemetry_before"]["throttle_status"] = "THROTTLED"
+        batch["telemetry_after"]["throttle_status"] = "THROTTLED"
+    measurement["telemetry_summary"]["throttle_statuses"] = ["THROTTLED"]
+    digest = _write(path, payload)
+
+    verified = _verify(path, digest, expected_unthrottled=False)
+
+    assert verified["measurements"][0]["telemetry_summary"]["throttle_statuses"] == [
+        "THROTTLED"
+    ]
+    with pytest.raises(ValueError, match="telemetry reports throttling"):
+        _verify(path, digest)
 
 
 def test_rejects_file_and_payload_identity_mismatches(tmp_path: Path):
@@ -373,6 +430,18 @@ def test_verifies_tuning_selection_is_separate_and_recomputable(tmp_path: Path):
                 "telemetry_before"
             ].update(deep_sleep="ENABLED"),
             "telemetry state is incomplete",
+        ),
+        (
+            lambda item: item["measurements"][0]["raw_process_batches"][0][
+                "telemetry_before"
+            ].update(throttle_status="THROTTLED"),
+            "telemetry reports throttling",
+        ),
+        (
+            lambda item: item["measurements"][0]["telemetry_summary"].update(
+                snapshot_count=1
+            ),
+            "telemetry summary count mismatch",
         ),
     ],
 )

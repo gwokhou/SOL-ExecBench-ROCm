@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import csv
 import subprocess
+import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -88,7 +90,7 @@ def test_run_layer_emits_auditable_evidence(tmp_path, monkeypatch):
         )
         return SimpleNamespace(returncode=0, stdout="stdout", stderr="stderr")
 
-    monkeypatch.setattr(orojenesis.subprocess, "run", fake_run)
+    monkeypatch.setattr(orojenesis, "_default_mapper_runner", fake_run)
     result = runner.run_layer(
         _matmul("x", "w", "y", m=2, k=3, n=4),
         tmp_path / "layer",
@@ -115,7 +117,7 @@ def test_run_layer_reports_process_failures(tmp_path, monkeypatch, failure):
             raise OSError("cannot execute")
         return SimpleNamespace(returncode=7, stdout="", stderr="failed")
 
-    monkeypatch.setattr(orojenesis.subprocess, "run", fake_run)
+    monkeypatch.setattr(orojenesis, "_default_mapper_runner", fake_run)
     message = "execution failed" if failure == "raise" else "status 7"
     with pytest.raises(orojenesis.OrojenesisError, match=message):
         runner.run_layer(
@@ -127,7 +129,7 @@ def test_run_layer_reports_process_failures(tmp_path, monkeypatch, failure):
 
 def test_run_multi_chain_composes_sweeps(tmp_path, monkeypatch):
     runner = _runner(tmp_path)
-    monkeypatch.setattr(orojenesis.subprocess, "run", _mapping_subprocess)
+    monkeypatch.setattr(orojenesis, "_default_mapper_runner", _mapping_subprocess)
     chain = [
         ("mm0", _matmul("x", "w0", "hidden", m=2, k=3, n=4)),
         ("mm1", _matmul("hidden", "w1", "result", m=2, k=4, n=5)),
@@ -155,8 +157,8 @@ def test_run_multi_chain_validates_width_and_process(tmp_path, monkeypatch):
         runner.run_multi_chain(chain, tmp_path / "width", word_bits=7)
 
     monkeypatch.setattr(
-        orojenesis.subprocess,
-        "run",
+        orojenesis,
+        "_default_mapper_runner",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=9, stdout="", stderr="failure"
         ),
@@ -194,7 +196,7 @@ def _batched_region() -> dict:
 
 def test_run_multi_region_composes_sweeps(tmp_path, monkeypatch):
     runner = _runner(tmp_path)
-    monkeypatch.setattr(orojenesis.subprocess, "run", _mapping_subprocess)
+    monkeypatch.setattr(orojenesis, "_default_mapper_runner", _mapping_subprocess)
     result = runner.run_multi_region(
         _batched_region(), tmp_path / "region", word_bits=16
     )
@@ -218,6 +220,41 @@ def test_run_multi_region_reports_process_failures(tmp_path, monkeypatch):
         del args, kwargs
         raise subprocess.SubprocessError("failed")
 
-    monkeypatch.setattr(orojenesis.subprocess, "run", fake_run)
+    monkeypatch.setattr(orojenesis, "_default_mapper_runner", fake_run)
     with pytest.raises(orojenesis.OrojenesisError, match="execution failed"):
         runner.run_multi_region(_batched_region(), tmp_path / "failed", word_bits=16)
+
+
+@pytest.mark.requires_linux
+def test_default_mapper_runner_kills_timed_out_process_group(tmp_path):
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import subprocess,sys,time; "
+            "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']); "
+            "print(child.pid,flush=True); "
+            "time.sleep(30)"
+        ),
+    ]
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        orojenesis._default_mapper_runner(
+            command,
+            cwd=tmp_path,
+            timeout=0.2,
+        )
+
+    child_pid = int((tmp_path / "stdout.log").read_text().strip())
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and _process_is_running(child_pid):
+        time.sleep(0.05)
+    assert not _process_is_running(child_pid)
+
+
+def _process_is_running(pid: int) -> bool:
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text().split()[2]
+    except (FileNotFoundError, ProcessLookupError):
+        return False
+    return state != "Z"

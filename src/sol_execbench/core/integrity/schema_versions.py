@@ -21,8 +21,9 @@ EVALUATOR_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.evaluator_contract.v3"
 ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION: Final = (
     "sol_execbench.rocm_compatibility_matrix.v1"
 )
+RDNA4_VALIDATION_SCHEMA_VERSION: Final = "sol_execbench.rdna4_validation.v2"
 ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION: Final = (
-    "sol_execbench.rocprofv3_overhead_calibration.v1"
+    "sol_execbench.rocprofv3_overhead_calibration.v2"
 )
 STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION: Final = (
     "sol_execbench.static_artifact_manifest.v1"
@@ -50,6 +51,7 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "pid_lock_contention": "sol_execbench.pid_lock_contention.v1",
     "reference_ipc": "sol_execbench.reference_ipc.v1",
     "rocm_compatibility_matrix": ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
+    "rdna4_validation": RDNA4_VALIDATION_SCHEMA_VERSION,
     "rocm_docker_targets": "sol_execbench.rocm_docker_targets.v1",
     "rocprofv3_diagnostics": "sol_execbench.rocprofv3_diagnostics.v1",
     "rocprofv3_overhead_calibration": ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
@@ -78,6 +80,7 @@ __all__ = [
     "EVALUATOR_CONTRACT_SCHEMA_VERSION",
     "PROFILE_SUMMARY_SCHEMA_VERSION",
     "ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION",
+    "RDNA4_VALIDATION_SCHEMA_VERSION",
     "ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION",
     "SCHEMA_VERSIONS",
     "STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION",

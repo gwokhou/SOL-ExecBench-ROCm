@@ -1,0 +1,52 @@
+name: RDNA4 Hardware
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rdna4-gfx1200
+  cancel-in-progress: false
+
+env:
+  UV_NO_PROGRESS: "1"
+  HIP_VISIBLE_DEVICES: "0"
+  ROCR_VISIBLE_DEVICES: "0"
+
+jobs:
+  gfx1200-validation:
+    name: RX 9060 XT gfx1200 validation
+    runs-on: [self-hosted, linux, x64, rocm, gfx1200]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install locked environment
+        run: uv sync --locked --all-groups
+      - name: Run content-addressed RDNA4 validation
+        run: |
+          uv run --no-sync python \
+            scripts/internal/rdna4/run_rdna4_validation.py \
+            --output-dir out/rdna4-ci
+      - name: Verify RDNA4 evidence against checkout
+        run: |
+          uv run --no-sync python \
+            scripts/internal/rdna4/run_rdna4_validation.py \
+            --verify out/rdna4-ci \
+            --expected-source-revision "${GITHUB_SHA}"
+      - name: Upload RDNA4 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdna4-gfx1200-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/rdna4-ci
+          if-no-files-found: error
+          retention-days: 30

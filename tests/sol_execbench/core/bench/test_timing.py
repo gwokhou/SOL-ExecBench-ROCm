@@ -31,9 +31,6 @@ from sol_execbench.core.bench.timing import (
     time_runnable,
 )
 
-# Skipped by default
-pytestmark = pytest.mark.timing_serial
-
 
 def _scalar_ms(value: int | float | list[int | float]) -> float:
     assert isinstance(value, (int, float))
@@ -196,7 +193,7 @@ class TestBenchTimeWithDeviceEvents:
 
         monkeypatch.setattr(
             "sol_execbench.core.bench.timing._get_empty_cache_for_benchmark",
-            lambda device: None,
+            lambda device, policy: None,
         )
         monkeypatch.setattr(
             "sol_execbench.core.bench.timing._clear_cache", lambda cache: None
@@ -226,6 +223,8 @@ class TestBenchTimeWithDeviceEvents:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.requires_rocm_gpu
+@pytest.mark.requires_rdna4
 class TestBenchTimeWithDeviceEventsGPU:
     """GPU integration tests for do_bench timing accuracy.
 
@@ -496,6 +495,8 @@ class TestBenchTimeWithDeviceEventsGPU:
         assert all(t > 0 for t in times)
 
 
+@pytest.mark.requires_rocm_gpu
+@pytest.mark.requires_rdna4
 class TestTimeRunnable:
     # -- Timing variance -----------------------------------------------------
     @pytest.mark.parametrize(
@@ -580,6 +581,8 @@ class TestTimeRunnable:
         )
 
 
+@pytest.mark.requires_rocm_gpu
+@pytest.mark.requires_rdna4
 class TestStreamHidingDetection:
     """Device-event timing keeps stream work visible through explicit synchronization.
 

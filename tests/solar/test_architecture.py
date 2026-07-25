@@ -40,8 +40,39 @@ def _audit_telemetry() -> dict:
         "memory_temperature_c": 70.0,
         "socket_power_w": 100.0,
         "deep_sleep": "DISABLED",
-        "throttle_status": "NOT_THROTTLED",
+        "throttle_status": "UNTHROTTLED",
         "performance_level": "STABLE_PEAK",
+    }
+
+
+def _audit_telemetry_summary(raw_batches: list[dict]) -> dict:
+    snapshots = [
+        batch[field_name]
+        for batch in raw_batches
+        for field_name in ("telemetry_before", "telemetry_after")
+    ]
+    numeric_fields = (
+        "gfx_clock_mhz",
+        "gfx_max_clock_mhz",
+        "memory_clock_mhz",
+        "edge_temperature_c",
+        "hotspot_temperature_c",
+        "memory_temperature_c",
+        "socket_power_w",
+    )
+    return {
+        "snapshot_count": len(snapshots),
+        "deep_sleep_states": sorted({item["deep_sleep"] for item in snapshots}),
+        "throttle_statuses": sorted({item["throttle_status"] for item in snapshots}),
+        "performance_levels": sorted({item["performance_level"] for item in snapshots}),
+        "numeric": {
+            field_name: {
+                "minimum": min(item[field_name] for item in snapshots),
+                "median": statistics.median(item[field_name] for item in snapshots),
+                "maximum": max(item[field_name] for item in snapshots),
+            }
+            for field_name in numeric_fields
+        },
     }
 
 
@@ -89,6 +120,7 @@ def _held_out_audit_measurement() -> dict:
         "process_batch_count": len(raw_batches),
         "samples_per_process_batch": 2,
         "raw_process_batches": raw_batches,
+        "telemetry_summary": _audit_telemetry_summary(raw_batches),
         "statistics": {
             "primary_statistic": "median_of_process_batch_medians",
             "primary_result": statistics.median(batch_medians),
@@ -503,6 +535,8 @@ def test_verified_audit_evidence_is_content_addressed(tmp_path: Path, monkeypatc
         "required_schema_version": architecture.RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
         "required_timing_profile": "official",
         "required_clocks_locked": True,
+        "required_unthrottled": True,
+        "evidence_scope": architecture.UNTHROTTLED_RESOURCE_PEAK_SCOPE,
         "gfx_target": "gfx1200",
         "required_instruction_checks": ["fp16_check"],
     }

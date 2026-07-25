@@ -49,7 +49,7 @@ languages in the same solution.
 
 | Value | Hardware class | Validation status |
 | --- | --- | --- |
-| `gfx1200` | RDNA 4 | Full adapted suite passed locally. |
+| `gfx1200` | RDNA 4 | Exact RX 9060 XT/ROCm 7.2 local hardware gate passed; engineering evidence only, not an RDNA4-family or release-authority claim. |
 | `gfx940` | CDNA 3 | Code/schema support; no recorded hardware-validation pass on this exact target. |
 | `gfx941` | CDNA 3 | Code/schema support; no recorded hardware-validation pass on this exact target. |
 | `gfx942` | CDNA 3 | MI308X validation infrastructure evidence exists, including a passed pytest suite and a full dataset run with known timeout blockers; not a full MI300X hardware-validation pass. |
@@ -61,6 +61,10 @@ itself. The recorded MI308X (`gfx942`) cloud runs show that CDNA3 validation
 infrastructure is operational, but the remaining dataset timeout blockers and
 exact-hardware MI300X evidence requirements prevent a full MI300X validation
 claim under the CDNA 3 family.
+
+The `gfx1200` scope is likewise exact. Other `gfx12*` products and different
+ROCm/PyTorch stacks require new evidence; see
+[RDNA4 Validation Scope](RDNA4-VALIDATION.md).
 
 NVFP4/MXFP4 Quant benchmark ROCm adaptation is deferred until CDNA4-class
 hardware is available. CDNA3 validation should skip those problems with the

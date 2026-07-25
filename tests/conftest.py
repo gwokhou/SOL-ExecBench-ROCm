@@ -101,7 +101,7 @@ def _has_python_module(module: str) -> bool:
 
 
 def _is_rdna4(gfx_arch: str) -> bool:
-    return gfx_arch.startswith("gfx12")
+    return gfx_arch == "gfx1200"
 
 
 def _is_cdna3(gfx_arch: str) -> bool:
@@ -169,7 +169,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "requires_miopen: test requires MIOpen headers")
     config.addinivalue_line(
         "markers",
-        "requires_rdna4: test requires an AMD RDNA 4 GPU, such as gfx1200",
+        "requires_rdna4: test requires the validated AMD gfx1200 RDNA 4 target",
     )
     config.addinivalue_line(
         "markers",
@@ -222,7 +222,7 @@ def pytest_collection_modifyitems(
     skip_no_rocwmma = pytest.mark.skip(reason="rocWMMA headers unavailable")
     skip_no_miopen = pytest.mark.skip(reason="MIOpen headers unavailable")
     skip_rdna4 = pytest.mark.skip(
-        reason=f"requires AMD RDNA 4 ROCm GPU (detected {detected})"
+        reason=f"requires exact AMD gfx1200 RDNA 4 target (detected {detected})"
     )
     skip_cdna3 = pytest.mark.skip(
         reason=f"requires AMD CDNA 3 ROCm GPU (detected {detected})"

@@ -21,6 +21,9 @@ from typing import Any
 
 import yaml
 
+from solar.analysis.orojenesis_process import (
+    run_mapper_process as _default_mapper_runner,
+)
 from solar.schema_versions import OROJENESIS_IDENTITY_SCHEMA_VERSION
 
 OROJENESIS_COMMIT = "97d52178bf9a9c209bf79be96b87c164bcd35625"
@@ -69,8 +72,33 @@ class OrojenesisRunner:
             )
         self.home = Path(configured).resolve()
         self.timeout_seconds = int(timeout_seconds)
+        if self.timeout_seconds <= 0:
+            raise OrojenesisError("Orojenesis timeout must be positive")
         self.mapper = self.home / "bin" / "timeloop-mapper"
         self.toolchain_identity = self._validate_toolchain()
+
+    def _run_mapper(
+        self,
+        command: Sequence[str],
+        *,
+        cwd: Path,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        runner = getattr(self, "_process_runner", _default_mapper_runner)
+        completed = runner(
+            command,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=self.timeout_seconds,
+            check=False,
+            env=env,
+        )
+        if completed.stdout is not None:
+            (cwd / "stdout.log").write_text(str(completed.stdout), encoding="utf-8")
+        if completed.stderr is not None:
+            (cwd / "stderr.log").write_text(str(completed.stderr), encoding="utf-8")
+        return completed
 
     def _validate_toolchain(self) -> dict[str, Any]:
         if not self.mapper.is_file() or not os.access(self.mapper, os.X_OK):
@@ -81,111 +109,59 @@ class OrojenesisRunner:
                 "Orojenesis mapper artifact is not trusted by this SOLAR release"
             )
         provenance_path = self.home / OROJENESIS_PROVENANCE_FILENAME
-        if provenance_path.is_file():
-            try:
-                provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as exc:
-                raise OrojenesisError("cannot parse Orojenesis provenance") from exc
-            if not isinstance(provenance, dict):
-                raise OrojenesisError("Orojenesis provenance must be an object")
-            if (
-                int(provenance.get("schema_version", 0))
-                != OROJENESIS_IDENTITY_SCHEMA_VERSION
-            ):
-                raise OrojenesisError("unsupported Orojenesis provenance schema")
-            source = provenance.get("source") or {}
-            artifact = provenance.get("artifact") or {}
-            build = provenance.get("build") or {}
-            if source.get("repository") != OROJENESIS_REPOSITORY:
-                raise OrojenesisError("Orojenesis provenance repository mismatch")
-            if source.get("commit") != OROJENESIS_COMMIT:
-                raise OrojenesisError(
-                    "Orojenesis provenance revision mismatch: expected "
-                    f"{OROJENESIS_COMMIT}, got {source.get('commit')}"
-                )
-            tree_oid = str(source.get("tree_git_oid", ""))
-            if tree_oid != OROJENESIS_TREE_OID:
-                raise OrojenesisError("Orojenesis provenance source tree mismatch")
-            if (
-                str(source.get("archive_sha256", ""))
-                != OROJENESIS_SOURCE_ARCHIVE_SHA256
-            ):
-                raise OrojenesisError("Orojenesis provenance source archive mismatch")
-            artifact_path = Path(str(artifact.get("path", "")))
-            if (
-                artifact_path.is_absolute()
-                or ".." in artifact_path.parts
-                or (self.home / artifact_path).resolve() != self.mapper
-            ):
-                raise OrojenesisError("Orojenesis provenance artifact path mismatch")
-            recorded_binary = str(artifact.get("sha256", ""))
-            if not _SHA256.fullmatch(recorded_binary):
-                raise OrojenesisError("Orojenesis provenance lacks a binary SHA-256")
-            if recorded_binary != binary_sha256:
-                raise OrojenesisError("Orojenesis mapper binary hash mismatch")
-            wrapper_sha256 = str(build.get("compiler_wrapper_sha256", ""))
-            if wrapper_sha256 != OROJENESIS_COMPILER_WRAPPER_SHA256:
-                raise OrojenesisError("Orojenesis provenance compiler-wrapper mismatch")
-            if build.get("builder_image") != OROJENESIS_BUILDER_IMAGE:
-                raise OrojenesisError("Orojenesis provenance builder image mismatch")
-            if not str(build.get("compiler", "")):
-                raise OrojenesisError("Orojenesis provenance lacks build identity")
-            return {
-                **provenance,
-                "verification_mode": "provenance_manifest",
-                "provenance_sha256": _sha256(provenance_path),
-            }
-        try:
-            head = subprocess.run(
-                ["git", "-C", str(self.home), "rev-parse", "HEAD"],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            ).stdout.strip()
-        except (OSError, subprocess.SubprocessError) as exc:
-            raise OrojenesisError("cannot verify Orojenesis git revision") from exc
-        if head != OROJENESIS_COMMIT:
+        if not provenance_path.is_file():
             raise OrojenesisError(
-                f"Orojenesis revision mismatch: expected {OROJENESIS_COMMIT}, got {head}"
+                "Orojenesis provenance manifest is required for formal analysis"
             )
         try:
-            tree_oid = subprocess.run(
-                ["git", "-C", str(self.home), "rev-parse", "HEAD^{tree}"],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            ).stdout.strip()
-        except (OSError, subprocess.SubprocessError) as exc:
-            raise OrojenesisError("cannot verify Orojenesis source tree") from exc
+            provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise OrojenesisError("cannot parse Orojenesis provenance") from exc
+        if not isinstance(provenance, dict):
+            raise OrojenesisError("Orojenesis provenance must be an object")
+        if (
+            int(provenance.get("schema_version", 0))
+            != OROJENESIS_IDENTITY_SCHEMA_VERSION
+        ):
+            raise OrojenesisError("unsupported Orojenesis provenance schema")
+        source = provenance.get("source") or {}
+        artifact = provenance.get("artifact") or {}
+        build = provenance.get("build") or {}
+        if source.get("repository") != OROJENESIS_REPOSITORY:
+            raise OrojenesisError("Orojenesis provenance repository mismatch")
+        if source.get("commit") != OROJENESIS_COMMIT:
+            raise OrojenesisError(
+                "Orojenesis provenance revision mismatch: expected "
+                f"{OROJENESIS_COMMIT}, got {source.get('commit')}"
+            )
+        tree_oid = str(source.get("tree_git_oid", ""))
         if tree_oid != OROJENESIS_TREE_OID:
-            raise OrojenesisError("Orojenesis source tree identity mismatch")
-        try:
-            archive = subprocess.run(
-                ["git", "-C", str(self.home), "archive", "--format=tar", "HEAD"],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            ).stdout
-        except (OSError, subprocess.SubprocessError) as exc:
-            raise OrojenesisError("cannot hash Orojenesis source archive") from exc
-        archive_sha256 = hashlib.sha256(archive).hexdigest()
-        if archive_sha256 != OROJENESIS_SOURCE_ARCHIVE_SHA256:
-            raise OrojenesisError("Orojenesis source archive identity mismatch")
+            raise OrojenesisError("Orojenesis provenance source tree mismatch")
+        if str(source.get("archive_sha256", "")) != OROJENESIS_SOURCE_ARCHIVE_SHA256:
+            raise OrojenesisError("Orojenesis provenance source archive mismatch")
+        artifact_path = Path(str(artifact.get("path", "")))
+        if (
+            artifact_path.is_absolute()
+            or ".." in artifact_path.parts
+            or (self.home / artifact_path).resolve() != self.mapper
+        ):
+            raise OrojenesisError("Orojenesis provenance artifact path mismatch")
+        recorded_binary = str(artifact.get("sha256", ""))
+        if not _SHA256.fullmatch(recorded_binary):
+            raise OrojenesisError("Orojenesis provenance lacks a binary SHA-256")
+        if recorded_binary != binary_sha256:
+            raise OrojenesisError("Orojenesis mapper binary hash mismatch")
+        wrapper_sha256 = str(build.get("compiler_wrapper_sha256", ""))
+        if wrapper_sha256 != OROJENESIS_COMPILER_WRAPPER_SHA256:
+            raise OrojenesisError("Orojenesis provenance compiler-wrapper mismatch")
+        if build.get("builder_image") != OROJENESIS_BUILDER_IMAGE:
+            raise OrojenesisError("Orojenesis provenance builder image mismatch")
+        if not str(build.get("compiler", "")):
+            raise OrojenesisError("Orojenesis provenance lacks build identity")
         return {
-            "schema_version": OROJENESIS_IDENTITY_SCHEMA_VERSION,
-            "verification_mode": "git_checkout",
-            "source": {
-                "repository": OROJENESIS_REPOSITORY,
-                "commit": head,
-                "tree_git_oid": tree_oid,
-                "archive_sha256": archive_sha256,
-            },
-            "artifact": {
-                "path": "bin/timeloop-mapper",
-                "sha256": binary_sha256,
-            },
+            **provenance,
+            "verification_mode": "provenance_manifest",
+            "provenance_sha256": _sha256(provenance_path),
         }
 
     @staticmethod
@@ -504,7 +480,7 @@ class OrojenesisRunner:
             path.write_text(yaml.safe_dump(data, sort_keys=False))
             paths[name] = path
         try:
-            completed = subprocess.run(
+            completed = self._run_mapper(
                 [
                     str(self.mapper),
                     str(paths["architecture.yaml"]),
@@ -514,15 +490,9 @@ class OrojenesisRunner:
                     str(output),
                 ],
                 cwd=output,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_seconds,
-                check=False,
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise OrojenesisError("Orojenesis execution failed") from exc
-        (output / "stdout.log").write_text(completed.stdout)
-        (output / "stderr.log").write_text(completed.stderr)
         if completed.returncode != 0:
             raise OrojenesisError(
                 f"Orojenesis exited with status {completed.returncode}"
@@ -604,7 +574,7 @@ class OrojenesisRunner:
                 )
                 local_problem_path.write_text(yaml.safe_dump(problem, sort_keys=False))
                 try:
-                    completed = subprocess.run(
+                    completed = self._run_mapper(
                         [
                             str(self.mapper),
                             str(architecture_path),
@@ -614,18 +584,12 @@ class OrojenesisRunner:
                             str(sweep_dir),
                         ],
                         cwd=sweep_dir,
-                        capture_output=True,
-                        text=True,
-                        timeout=self.timeout_seconds,
-                        check=False,
                         env={**os.environ, **environment},
                     )
                 except (OSError, subprocess.SubprocessError) as exc:
                     raise OrojenesisError(
                         "multi-einsum Orojenesis execution failed"
                     ) from exc
-                (sweep_dir / "stdout.log").write_text(completed.stdout)
-                (sweep_dir / "stderr.log").write_text(completed.stderr)
                 if completed.returncode != 0:
                     raise OrojenesisError(
                         "multi-einsum Orojenesis exited with status "
@@ -739,7 +703,7 @@ class OrojenesisRunner:
                 )
                 local_problem_path.write_text(yaml.safe_dump(problem, sort_keys=False))
                 try:
-                    completed = subprocess.run(
+                    completed = self._run_mapper(
                         [
                             str(self.mapper),
                             str(architecture_path),
@@ -749,18 +713,12 @@ class OrojenesisRunner:
                             str(sweep_dir),
                         ],
                         cwd=sweep_dir,
-                        capture_output=True,
-                        text=True,
-                        timeout=self.timeout_seconds,
-                        check=False,
                         env={**os.environ, **environment},
                     )
                 except (OSError, subprocess.SubprocessError) as exc:
                     raise OrojenesisError(
                         "multi-einsum region Orojenesis execution failed"
                     ) from exc
-                (sweep_dir / "stdout.log").write_text(completed.stdout)
-                (sweep_dir / "stderr.log").write_text(completed.stderr)
                 if completed.returncode != 0:
                     raise OrojenesisError(
                         "multi-einsum region Orojenesis exited with status "
