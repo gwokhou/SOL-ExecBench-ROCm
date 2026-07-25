@@ -36,14 +36,27 @@ handlers only from `src/solar/handlers/`. The learning command writes candidates
 elsewhere and cannot activate them automatically. Formal lookup accepts only
 records with passed verification, `formal_review: approved`, matching metadata
 and source SHA-256 values, and a safe package-relative source path.
+Graph extraction also fails closed before conversion when any tensor dispatch
+loses torchview `RecorderTensor` lineage. This covers both fully empty traces
+and partial graphs in which only some operations remain visible; SOLAR never
+publishes a lower bound from the surviving subset.
 
-The ROCm formal-publication profile requires a pinned Orojenesis mapper. This is
-a stricter release-evidence policy of this port, not an expansion of SOLAR into
-benchmark evaluation or a claim of universal paper parity.
+The ROCm formal-publication profile uses a pinned Orojenesis mapper when the
+stricter capacity-constrained bound is requested
+(`AnalysisRequest.require_orojenesis=True`). The default bound policy follows
+the paper and accepts the Eq. 1 roofline. Either way this is a release-evidence
+policy of this port, not an expansion of SOLAR into benchmark evaluation or a
+claim of universal paper parity.
 
 The only intended formal target is the packaged `RX_9060_XT` profile and an
 observed ROCm `gfx1200` device. Its referenced locked-clock resource-audit file
-is not present in this revision, so the profile is explicitly marked
-`unavailable` and formal SOLAR publication fails at the architecture stage.
-Generic candidate evaluation remains diagnostic; it cannot publish formal
-SOLAR artifacts or official scores.
+is content-addressed and validated before graph extraction. Its sole supported
+v3 contract must exactly match every non-exempt precision and resource mode in
+the profile, and requires frozen tuning plus independent held-out raw samples.
+FP32/FP16 VALU and FP16/BF16/FP8/INT8 WMMA claims each require machine-readable
+ISA presence, compiler-emitted code-object instructions, and successful runtime
+probes. Packed-BF16 VALU is separately proven absent with an emitted FP32
+fallback. Passing this architecture gate
+allows SOLAR analysis to proceed; it does not publish the independent baseline,
+rerun, execution-attestation, or release-authority evidence required for an
+official SOL ExecBench score. Generic candidate evaluation remains diagnostic.

@@ -5,6 +5,7 @@ import pytest
 from sol_execbench.core.scoring.aggregation import (
     WorkloadScore,
     aggregate_suite_scores,
+    diagnostic_workload_score,
 )
 from sol_execbench.core.evaluator_contract import build_evaluator_contract
 from sol_execbench.core.scoring.formula import SolScoreAuditError, sol_score
@@ -41,6 +42,43 @@ def test_suite_aggregation_weights_problems_equally_and_excludes_sentinel():
     assert result.problem_scores == {"problem-a": 0.5, "problem-b": 1.0}
     assert result.score == 0.75
     assert result.scored_workloads == 3
+
+
+def test_diagnostic_workload_score_wraps_formula_and_aggregates():
+    # T_k == T_SOL -> S = 1.0 (paper anchor)
+    top = diagnostic_workload_score(
+        problem="p",
+        workload_uuid="w1",
+        candidate_runtime=1.0,
+        baseline_runtime=2.0,
+        sol_runtime=1.0,
+    )
+    # T_k == T_b -> S = 0.5 (paper anchor)
+    mid = diagnostic_workload_score(
+        problem="p",
+        workload_uuid="w2",
+        candidate_runtime=2.0,
+        baseline_runtime=2.0,
+        sol_runtime=1.0,
+    )
+    assert top.score == 1.0
+    assert mid.score == 0.5
+    assert top.role == "scored"
+
+    result = aggregate_suite_scores([top, mid])
+    assert result.score == pytest.approx(0.75)
+
+
+def test_diagnostic_workload_score_propagates_audit_errors():
+    # Candidate faster than SOL is a reward-hack/bound-review precondition.
+    with pytest.raises(SolScoreAuditError):
+        diagnostic_workload_score(
+            problem="p",
+            workload_uuid="w",
+            candidate_runtime=0.5,
+            baseline_runtime=2.0,
+            sol_runtime=1.0,
+        )
 
 
 def test_machine_readable_contract_publishes_the_implemented_formula():

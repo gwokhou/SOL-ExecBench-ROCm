@@ -24,6 +24,8 @@ detected.
 
 from __future__ import annotations
 
+import _thread
+import threading
 from typing import Any, List
 
 import torch
@@ -79,6 +81,144 @@ def check_thread_injection(threads_before: int, threads_after: int) -> None:
         raise RewardHackDetected(
             f"Thread injection detected: "
             f"{threads_after} threads after call vs {threads_before} before"
+        )
+
+
+class ThreadInjectionMonitor:
+    """Detect Python thread starts and sample native/Python thread count.
+
+    Paper §4.4.1 "Thread Injection": a worker hides work on a Python thread
+    during the timed region. A single before/after ``active_count()`` delta
+    (:func:`check_thread_injection`) misses workers that exit before the
+    post-call check. Standard ``threading`` and ``_thread`` entry points are
+    guarded synchronously, so even a worker that starts and exits between two
+    samples is recorded. A daemon sampler remains as defense in depth for
+    longer-lived threads created through an already-captured entry point.
+
+    The daemon sleeps between samples (releasing the GIL) to avoid perturbing
+    GPU timing, and excludes itself from the sampled count so it does not
+    inflate the baseline.
+    """
+
+    def __init__(self, interval_s: float = 0.001) -> None:
+        if interval_s <= 0:
+            raise ValueError("thread sampling interval must be positive")
+        self._interval = interval_s
+        self._stop = threading.Event()
+        self._ready = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._baseline = 0
+        self._peak = 0
+        self._starts_observed = 0
+        self._original_thread_start: Any = None
+        self._original_raw_start: Any = None
+        self._original_threading_raw_start: Any = None
+        self._thread_start_wrapper: Any = None
+
+    def __enter__(self) -> "ThreadInjectionMonitor":
+        # Baseline is captured before the monitor thread starts, so it does not
+        # include the monitor itself.
+        self._baseline = threading.active_count()
+        self._peak = self._baseline
+        self._starts_observed = 0
+        self._stop.clear()
+        self._ready.clear()
+        self._thread = threading.Thread(target=self._sample, daemon=True)
+        self._thread.start()
+        if not self._ready.wait(timeout=max(self._interval * 10, 0.05)):
+            self._stop.set()
+            self._thread.join(timeout=0.05)
+            raise RuntimeError("thread injection monitor failed to start")
+        self._install_start_guards()
+        return self
+
+    def _install_start_guards(self) -> None:
+        self._original_thread_start = threading.Thread.start
+        self._original_raw_start = _thread.start_new_thread
+        self._original_threading_raw_start = getattr(
+            threading, "_start_new_thread", None
+        )
+        monitor = self
+
+        def guarded_thread_start(
+            thread: threading.Thread, *args: Any, **kwargs: Any
+        ) -> Any:
+            return monitor._guard_thread_start(thread, *args, **kwargs)
+
+        self._thread_start_wrapper = guarded_thread_start
+        setattr(threading.Thread, "start", guarded_thread_start)
+        setattr(_thread, "start_new_thread", self._guard_raw_start)
+        if self._original_threading_raw_start is not None:
+            setattr(threading, "_start_new_thread", self._guard_raw_start)
+
+    def _restore_start_guards(self) -> None:
+        if self._original_thread_start is not None:
+            setattr(threading.Thread, "start", self._original_thread_start)
+        if self._original_raw_start is not None:
+            setattr(_thread, "start_new_thread", self._original_raw_start)
+        if self._original_threading_raw_start is not None:
+            setattr(threading, "_start_new_thread", self._original_threading_raw_start)
+
+    def _guard_thread_start(
+        self, thread: threading.Thread, *args: Any, **kwargs: Any
+    ) -> Any:
+        self._starts_observed += 1
+        return self._original_thread_start(thread, *args, **kwargs)
+
+    def _guard_raw_start(
+        self, function: Any, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None
+    ) -> Any:
+        self._starts_observed += 1
+        return self._original_raw_start(function, args, kwargs or {})
+
+    def _sample(self) -> None:
+        while not self._stop.is_set():
+            # Exclude this monitor thread from the count.
+            current = threading.active_count() - 1
+            if current > self._peak:
+                self._peak = current
+            self._ready.set()
+            if self._stop.wait(self._interval):
+                break
+
+    def __exit__(self, *exc: object) -> bool:
+        self._restore_start_guards()
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=max(self._interval * 10, 0.05))
+        return False
+
+    @property
+    def baseline(self) -> int:
+        return self._baseline
+
+    @property
+    def peak(self) -> int:
+        return self._peak
+
+    @property
+    def starts_observed(self) -> int:
+        return self._starts_observed
+
+
+def check_thread_injection_from_monitor(monitor: ThreadInjectionMonitor) -> None:
+    """Raise if the monitor observed more threads than its baseline.
+
+    Companion to :class:`ThreadInjectionMonitor`: compares the baseline
+    captured at monitor entry against the peak sampled during the timed region.
+
+    Raises:
+        RewardHackDetected: If the peak thread count exceeded the baseline.
+    """
+    if monitor.starts_observed > 0:
+        raise RewardHackDetected(
+            "Thread injection detected: "
+            f"{monitor.starts_observed} thread start event(s) during timed execution"
+        )
+    if monitor.peak > monitor.baseline:
+        raise RewardHackDetected(
+            f"Thread injection detected: peak {monitor.peak} threads during "
+            f"timed execution vs {monitor.baseline} at baseline"
         )
 
 

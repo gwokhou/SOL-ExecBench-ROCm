@@ -6,15 +6,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 from importlib import resources
+import json
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 import yaml
 
-from solar.common.integrity import sha256_file
-
 from solar.common.constants import normalize_dtype
+from solar.common.integrity import sha256_file
+from solar.rocm.audit_validation import (
+    audit_mapping as _audit_mapping,
+    audit_nonnegative_int as _audit_nonnegative_int,
+    audit_sha256 as _audit_sha256,
+    audit_string_set as _audit_string_set,
+)
+
+RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION = "solar.resource_peak_calibration.v3"
+RESOURCE_PEAK_TIMING_PROFILE = "official"
+_MAX_AUDIT_BYTES = 2 * 1024 * 1024
 
 _PRECISION_ALIASES = {
     "float32": "fp32",
@@ -38,6 +49,304 @@ _VENDOR_SPECIFIC_DTYPES = frozenset(
 
 def _packaged_profile_path(name: str) -> Path:
     return Path(__file__).resolve().parents[1] / "configs" / "arch" / f"{name}.yaml"
+
+
+def resource_peak_payload_sha256(payload: Mapping[str, Any]) -> str:
+    """Return the resource-audit digest with ``payload_sha256`` omitted."""
+
+    unsigned = dict(payload)
+    unsigned.pop("payload_sha256", None)
+    encoded = json.dumps(
+        unsigned,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def verify_resource_peak_audit(
+    path: Path,
+    *,
+    expected_sha256: str,
+    expected_schema_version: str,
+    expected_timing_profile: str,
+    expected_clocks_locked: bool,
+    expected_gfx_target: str,
+    expected_precisions: tuple[str, ...],
+    expected_resource_modes: tuple[str, ...],
+    expected_instruction_checks: tuple[str, ...],
+) -> dict[str, Any]:
+    """Load and validate one content-addressed resource-peak audit artifact."""
+
+    if not path.is_file():
+        raise ValueError(f"architecture audit evidence file is missing: {path}")
+    if path.stat().st_size > _MAX_AUDIT_BYTES:
+        raise ValueError("architecture audit evidence exceeds the size limit")
+    if sha256_file(path) != expected_sha256:
+        raise ValueError("architecture audit evidence identity mismatch")
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("architecture audit evidence is not valid JSON") from exc
+    if not isinstance(raw, dict):
+        raise ValueError("architecture audit evidence must be a JSON object")
+    payload = cast(dict[str, Any], raw)
+    if payload.get("payload_sha256") != resource_peak_payload_sha256(payload):
+        raise ValueError("architecture audit evidence payload checksum mismatch")
+    _verify_audit_contract(
+        payload,
+        expected_schema_version=expected_schema_version,
+        expected_timing_profile=expected_timing_profile,
+        expected_clocks_locked=expected_clocks_locked,
+        expected_gfx_target=expected_gfx_target,
+    )
+    from solar.rocm.resource_peak_measurements import (
+        verify_resource_peak_measurements,
+    )
+
+    covered_precisions, covered_resources, raw_measurements = (
+        verify_resource_peak_measurements(
+            payload.get("experiment_protocol"),
+            payload.get("measurements"),
+        )
+    )
+    measurements = cast(dict[str, Mapping[str, Any]], raw_measurements)
+    instruction_presence, isa_spec_sha256 = _verify_audit_isa_spec(
+        payload.get("isa_spec_evidence"), expected_gfx_target=expected_gfx_target
+    )
+    _verify_audit_coverage(
+        payload.get("calibration_coverage"),
+        expected_precisions=expected_precisions,
+        expected_resource_modes=expected_resource_modes,
+        covered_precisions=covered_precisions,
+        covered_resource_modes=covered_resources,
+    )
+    _verify_audit_instruction_checks(
+        payload.get("instruction_validation"),
+        expected_checks=expected_instruction_checks,
+        measurements=measurements,
+        instruction_presence=instruction_presence,
+        isa_spec_sha256=isa_spec_sha256,
+    )
+    return payload
+
+
+def _verify_audit_contract(
+    payload: Mapping[str, Any],
+    *,
+    expected_schema_version: str,
+    expected_timing_profile: str,
+    expected_clocks_locked: bool,
+    expected_gfx_target: str,
+) -> None:
+    if payload.get("schema_version") != expected_schema_version:
+        raise ValueError("architecture audit evidence schema mismatch")
+    if payload.get("timing_profile") != expected_timing_profile:
+        raise ValueError("architecture audit evidence timing profile mismatch")
+    device = _audit_mapping(payload.get("device"), "device")
+    if device.get("gfx_target") != expected_gfx_target:
+        raise ValueError("architecture audit evidence gfx target mismatch")
+    if not str(device.get("device_name", "")).strip():
+        raise ValueError("architecture audit evidence lacks a GPU identity")
+    clock_setup = _audit_mapping(payload.get("clock_setup"), "clock_setup")
+    if bool(clock_setup.get("clock_locked_verified")) != expected_clocks_locked:
+        raise ValueError("architecture audit evidence clock-lock state mismatch")
+
+
+def _verify_audit_isa_spec(
+    value: object, *, expected_gfx_target: str
+) -> tuple[Mapping[str, bool], str]:
+    evidence = _audit_mapping(value, "isa_spec_evidence")
+    if evidence.get("architecture") != expected_gfx_target:
+        raise ValueError("architecture audit ISA evidence target mismatch")
+    provenance = _audit_mapping(evidence.get("provenance"), "ISA provenance")
+    spec_sha256 = str(provenance.get("spec_sha256", ""))
+    if (
+        provenance.get("architecture") != expected_gfx_target
+        or not spec_sha256.strip()
+        or not str(provenance.get("release", "")).strip()
+    ):
+        raise ValueError("architecture audit ISA provenance is incomplete")
+    raw_presence = _audit_mapping(
+        evidence.get("instruction_presence"), "instruction presence"
+    )
+    if not raw_presence or any(
+        not isinstance(value, bool) for value in raw_presence.values()
+    ):
+        raise ValueError("architecture audit instruction presence must be boolean")
+    return cast(Mapping[str, bool], raw_presence), spec_sha256
+
+
+def _verify_audit_coverage(
+    value: object,
+    *,
+    expected_precisions: tuple[str, ...],
+    expected_resource_modes: tuple[str, ...],
+    covered_precisions: set[str],
+    covered_resource_modes: set[str],
+) -> None:
+    coverage = _audit_mapping(value, "calibration_coverage")
+    if coverage.get("status") != "passed":
+        raise ValueError("architecture audit calibration coverage did not pass")
+    comparisons = (
+        ("required_precisions", set(expected_precisions)),
+        ("covered_precisions", covered_precisions),
+        ("required_resource_modes", set(expected_resource_modes)),
+        ("covered_resource_modes", covered_resource_modes),
+    )
+    for field_name, expected in comparisons:
+        if _audit_string_set(coverage.get(field_name), field_name) != expected:
+            raise ValueError(f"architecture audit {field_name} mismatch")
+    if covered_precisions != set(expected_precisions):
+        raise ValueError("architecture audit precision calibration coverage mismatch")
+    if covered_resource_modes != set(expected_resource_modes):
+        raise ValueError("architecture audit resource calibration coverage mismatch")
+
+
+def _verify_audit_instruction_checks(
+    value: object,
+    *,
+    expected_checks: tuple[str, ...],
+    measurements: Mapping[str, Mapping[str, Any]],
+    instruction_presence: Mapping[str, bool],
+    isa_spec_sha256: str,
+) -> None:
+    validation = _audit_mapping(value, "instruction_validation")
+    if validation.get("status") != "passed":
+        raise ValueError("architecture audit instruction validation did not pass")
+    required = _audit_string_set(
+        validation.get("required_checks"), "instruction required_checks"
+    )
+    if required != set(expected_checks):
+        raise ValueError("architecture audit required instruction checks mismatch")
+    checks = _audit_mapping(validation.get("checks"), "instruction checks")
+    if set(checks) != required:
+        raise ValueError("architecture audit instruction check set mismatch")
+    for name in sorted(required):
+        _verify_audit_instruction_check(
+            _audit_mapping(checks[name], f"instruction check {name}"),
+            measurements=measurements,
+            instruction_presence=instruction_presence,
+            isa_spec_sha256=isa_spec_sha256,
+        )
+
+
+def _verify_audit_instruction_check(
+    check: Mapping[str, Any],
+    *,
+    measurements: Mapping[str, Mapping[str, Any]],
+    instruction_presence: Mapping[str, bool],
+    isa_spec_sha256: str,
+) -> None:
+    if check.get("status") != "passed" or check.get("runtime_probe_passed") is not True:
+        raise ValueError("architecture audit instruction check did not pass")
+    probe = str(check.get("probe", ""))
+    measurement = measurements.get(probe)
+    if measurement is None:
+        raise ValueError(
+            "architecture audit instruction check references unknown probe"
+        )
+    compiler_isa = _audit_mapping(
+        measurement.get("compiler_isa"), "measurement compiler_isa"
+    )
+    compiler_provenance = _audit_mapping(
+        compiler_isa.get("spec_provenance"), "compiler ISA provenance"
+    )
+    if compiler_provenance.get("spec_sha256") != isa_spec_sha256:
+        raise ValueError("architecture audit compiler ISA specification mismatch")
+    counts = _audit_mapping(
+        compiler_isa.get("matched_instruction_counts"), "matched instruction counts"
+    )
+    instructions = _audit_string_set(check.get("instructions"), "instructions")
+    if not instructions.issubset(instruction_presence):
+        raise ValueError("architecture audit instruction is absent from ISA evidence")
+    declared = any(instruction_presence[name] for name in instructions)
+    if declared is not check.get("isa_declared"):
+        raise ValueError("architecture audit ISA declaration mismatch")
+    emitted = sum(
+        _audit_nonnegative_int(counts.get(name), "instruction count")
+        for name in instructions
+    )
+    claimed_emitted = _audit_nonnegative_int(
+        check.get("compiler_emitted_count"), "compiler emitted count"
+    )
+    if emitted != claimed_emitted:
+        raise ValueError("architecture audit compiler instruction count mismatch")
+    expectation = check.get("expectation")
+    if expectation == "native":
+        if (
+            check.get("isa_declared") is not True
+            or emitted <= 0
+            or check.get("native_instruction_usable") is not True
+        ):
+            raise ValueError("architecture audit native instruction evidence mismatch")
+        return
+    if expectation != "fallback":
+        raise ValueError("architecture audit instruction expectation is invalid")
+    fallback_names = _audit_string_set(
+        check.get("fallback_instructions"), "fallback instructions"
+    )
+    if not fallback_names.issubset(instruction_presence) or not any(
+        instruction_presence[name] for name in fallback_names
+    ):
+        raise ValueError("architecture audit fallback is absent from ISA evidence")
+    fallback_count = sum(
+        _audit_nonnegative_int(counts.get(name), "fallback instruction count")
+        for name in fallback_names
+    )
+    if (
+        check.get("isa_declared") is not False
+        or emitted != 0
+        or fallback_count <= 0
+        or fallback_count
+        != _audit_nonnegative_int(
+            check.get("fallback_emitted_count"), "fallback emitted count"
+        )
+        or check.get("native_instruction_usable") is not False
+    ):
+        raise ValueError("architecture audit fallback instruction evidence mismatch")
+
+
+def _validate_audit_evidence_config(evidence: Mapping[str, Any]) -> None:
+    status = str(evidence.get("status", ""))
+    if status not in {"verified", "unavailable"}:
+        raise ValueError("audit_evidence.status must be verified or unavailable")
+    evidence_sha = str(evidence.get("sha256", ""))
+    if evidence_sha:
+        try:
+            _audit_sha256(evidence_sha, "audit_evidence.sha256")
+        except ValueError as exc:
+            raise ValueError(
+                "audit_evidence.sha256 must be a lowercase SHA-256"
+            ) from exc
+    if status != "verified":
+        return
+    if not evidence_sha:
+        raise ValueError("verified audit evidence requires a SHA-256")
+    required_fields = {
+        "path",
+        "required_schema_version",
+        "required_timing_profile",
+        "required_clocks_locked",
+        "gfx_target",
+        "required_instruction_checks",
+    }
+    missing_fields = sorted(required_fields - set(evidence))
+    if missing_fields:
+        raise ValueError(
+            f"verified audit evidence lacks required fields: {missing_fields}"
+        )
+    checks = evidence.get("required_instruction_checks")
+    if (
+        not isinstance(checks, list)
+        or not checks
+        or any(not isinstance(item, str) or not item.strip() for item in checks)
+        or len(set(checks)) != len(checks)
+    ):
+        raise ValueError(
+            "verified audit evidence requires unique instruction check names"
+        )
 
 
 @dataclass(frozen=True)
@@ -256,17 +565,7 @@ class ArchitectureProfile:
                 )
         if not self.profile_revision:
             raise ValueError("architecture profile_revision is required")
-        evidence_status = str(self.audit_evidence.get("status", ""))
-        if evidence_status not in {"verified", "unavailable"}:
-            raise ValueError("audit_evidence.status must be verified or unavailable")
-        evidence_sha = str(self.audit_evidence.get("sha256", ""))
-        if evidence_sha and (
-            len(evidence_sha) != 64
-            or any(character not in "0123456789abcdef" for character in evidence_sha)
-        ):
-            raise ValueError("audit_evidence.sha256 must be a lowercase SHA-256")
-        if evidence_status == "verified" and not evidence_sha:
-            raise ValueError("verified audit evidence requires a SHA-256")
+        _validate_audit_evidence_config(self.audit_evidence)
         names = [level.name for level in self.memory_hierarchy]
         if len(names) != len(set(names)):
             raise ValueError("memory hierarchy level names must be unique")
@@ -291,12 +590,43 @@ class ArchitectureProfile:
             raise ValueError("verified architecture audit evidence lacks a path")
         profile_path = _packaged_profile_path(self.name)
         evidence_path = profile_path.parents[2] / path_value
-        if not evidence_path.is_file():
-            raise ValueError(
-                f"architecture audit evidence file is missing: {evidence_path}"
+        verify_resource_peak_audit(
+            evidence_path,
+            expected_sha256=str(self.audit_evidence["sha256"]),
+            expected_schema_version=str(self.audit_evidence["required_schema_version"]),
+            expected_timing_profile=str(self.audit_evidence["required_timing_profile"]),
+            expected_clocks_locked=bool(self.audit_evidence["required_clocks_locked"]),
+            expected_gfx_target=str(self.audit_evidence["gfx_target"]),
+            expected_precisions=self.required_calibration_precisions(),
+            expected_resource_modes=self.required_calibration_resource_modes(),
+            expected_instruction_checks=tuple(
+                sorted(
+                    str(item)
+                    for item in self.audit_evidence["required_instruction_checks"]
+                )
+            ),
+        )
+
+    def required_calibration_precisions(self) -> tuple[str, ...]:
+        """Return every published precision that requires runtime calibration."""
+        return tuple(
+            sorted(
+                precision
+                for precision, support in self.precision_support.items()
+                if support["calibration"] == "required"
             )
-        if sha256_file(evidence_path) != self.audit_evidence.get("sha256"):
-            raise ValueError("architecture audit evidence identity mismatch")
+        )
+
+    def required_calibration_resource_modes(self) -> tuple[str, ...]:
+        """Return every resource mode not covered by an explicit exemption."""
+        return tuple(
+            sorted(
+                f"{resource}/{mode}"
+                for resource, modes in self.resource_limits.items()
+                for mode in modes
+                if mode not in self.calibration_exempt_modes.get(resource, {})
+            )
+        )
 
     def peak_for(self, precision: str) -> float:
         key = self.normalize_precision(precision)

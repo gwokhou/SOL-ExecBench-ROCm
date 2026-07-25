@@ -44,6 +44,7 @@ class AnalysisRequest:
     output_dir: Path
     device: str = "cpu"
     precision: str = "fp16"
+    require_orojenesis: bool = False
     orojenesis_home: str | Path | None = None
     trace_seed: int = 200
     verification_seeds: tuple[int, ...] = (11, 29, 47)
@@ -151,7 +152,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         )
         stage = "formal_analysis"
         analysis = _run_analysis(request, profile, staging)
-        bound = _extract_bound(analysis)
+        bound = _extract_bound(analysis, request.require_orojenesis)
         artifacts = _finish_artifacts(staging, analysis)
         _write_manifest(request, staging, architecture_sha256, artifacts, bound)
         staging.replace(output)
@@ -180,14 +181,16 @@ def _run_analysis(
         strict=True,
         architecture=profile,
         orojenesis_runner=runner,
-        require_orojenesis=True,
+        require_orojenesis=request.require_orojenesis,
     )
     if result is None:
         raise RuntimeError("strict graph analysis produced no artifact")
     return result
 
 
-def _extract_bound(analysis: Mapping[str, Any]) -> SolBound:
+def _extract_bound(
+    analysis: Mapping[str, Any], require_orojenesis: bool = True
+) -> SolBound:
     if analysis.get("schema_version") != SOLAR_ANALYSIS_SCHEMA_VERSION:
         raise ValueError("formal analysis uses an unsupported schema")
     total = analysis.get("total") or {}
@@ -196,8 +199,12 @@ def _extract_bound(analysis: Mapping[str, Any]) -> SolBound:
     kind = str(metadata.get("bound_kind", ""))
     if seconds is None or not math.isfinite(float(seconds)) or float(seconds) < 0:
         raise ValueError("formal analysis lacks a finite lower bound")
-    if kind != "capacity_constrained_tile_aware_v1":
-        raise ValueError(f"formal analysis returned non-formal bound kind {kind!r}")
+    formal_kind = "capacity_constrained_tile_aware_v1"
+    if require_orojenesis:
+        if kind != formal_kind:
+            raise ValueError(f"formal analysis returned non-formal bound kind {kind!r}")
+    elif kind not in (formal_kind, "diagnostic"):
+        raise ValueError(f"analysis returned unsupported bound kind {kind!r}")
     resource = total.get("compute_resource")
     return SolBound(float(seconds), kind, str(resource) if resource else None)
 

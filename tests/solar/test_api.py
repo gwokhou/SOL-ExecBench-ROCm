@@ -120,13 +120,17 @@ def test_conversion_failure_has_its_own_stable_stage(tmp_path, monkeypatch):
     assert not output.exists()
 
 
-def test_packaged_profile_blocks_formal_analysis_without_audit_artifact(tmp_path):
+def test_packaged_profile_audit_artifact_unblocks_architecture_stage(tmp_path):
+    # The packaged RX_9060_XT profile ships a verified locked-clock audit
+    # artifact (audits/rx9060xt_resource_peaks_v3.json), so the architecture
+    # stage's require_verified_audit_evidence gate passes and analysis proceeds
+    # further. The dummy reference fails downstream (graph_extraction), not at
+    # the audit gate.
     result = api.analyze(_request(tmp_path / "result"))
 
     assert isinstance(result, AnalysisFailure)
-    assert result.stage == "architecture"
-    assert result.reason_code == "architecture_failed"
-    assert "audit evidence unavailable" in result.message
+    assert result.stage != "architecture"
+    assert "audit evidence unavailable" not in result.message
 
 
 @pytest.mark.parametrize(
@@ -204,3 +208,47 @@ def test_bound_and_reason_code_helpers_fail_closed():
     assert api._reason_code("graph_extraction", RuntimeError()) == (
         "graph_extraction_failed"
     )
+
+
+def test_analysis_request_defaults_to_eq1_roofline_bound():
+    """Eq.1 roofline is the default bound policy (paper-aligned); Orojenesis is opt-in."""
+    request = _request(Path("/tmp/solar-default"))
+    assert request.require_orojenesis is False
+
+
+def test_extract_bound_accepts_diagnostic_eq1_when_orojenesis_not_required():
+    bound = api._extract_bound(
+        {
+            "schema_version": 3,
+            "total": {"lower_bound_seconds": 1.5, "compute_resource": "mfma"},
+            "metadata": {"bound_kind": "diagnostic"},
+        },
+        require_orojenesis=False,
+    )
+    assert bound.seconds == 1.5
+    assert bound.kind == "diagnostic"
+    assert bound.limiting_resource == "mfma"
+
+
+def test_extract_bound_rejects_diagnostic_when_orojenesis_required():
+    with pytest.raises(ValueError, match="non-formal"):
+        api._extract_bound(
+            {
+                "schema_version": 3,
+                "total": {"lower_bound_seconds": 1.5},
+                "metadata": {"bound_kind": "diagnostic"},
+            },
+            require_orojenesis=True,
+        )
+
+
+def test_extract_bound_rejects_unknown_kind_even_when_orojenesis_not_required():
+    with pytest.raises(ValueError, match="unsupported bound kind"):
+        api._extract_bound(
+            {
+                "schema_version": 3,
+                "total": {"lower_bound_seconds": 1.5},
+                "metadata": {"bound_kind": "roofline"},
+            },
+            require_orojenesis=False,
+        )

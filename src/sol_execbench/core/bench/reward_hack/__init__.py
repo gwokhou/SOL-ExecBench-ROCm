@@ -37,8 +37,10 @@ from sol_execbench.core.bench.reward_hack.runtime import (
     check_monkey_patch,
     check_runtime_integrity,
     check_thread_injection,
+    check_thread_injection_from_monitor,
     snapshot_critical_functions,
     snapshot_runtime_integrity,
+    ThreadInjectionMonitor,
 )
 from sol_execbench.core.bench.reward_hack.static_review import review_solution_sources
 
@@ -47,12 +49,14 @@ __all__ = [
     "SourceReview",
     "SourceReviewIssue",
     "SourceReviewSeverity",
+    "ThreadInjectionMonitor",
     "_ELAPSED_TIME_ADDR",
     "check_eval_integrity",
     "check_lazy_outputs",
     "check_monkey_patch",
     "check_runtime_integrity",
     "check_thread_injection",
+    "check_thread_injection_from_monitor",
     "review_solution_sources",
     "snapshot_critical_functions",
     "snapshot_runtime_integrity",

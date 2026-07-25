@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import threading
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -36,7 +35,6 @@ from sol_execbench.core.data.workload import Workload
 class CorrectnessRoundsResult:
     failed: bool
     inputs: list[Any] | None
-    threads_before: int | None
     correctness: Correctness
 
 
@@ -93,7 +91,6 @@ def run_correctness_rounds(
     dependencies = request.dependencies
     inputs = None
     _prepare_framework_thread_baseline(dependencies.user_fn, request.device)
-    threads_before = threading.active_count()
     correctness = Correctness()
 
     for round_index in range(10):
@@ -116,14 +113,14 @@ def run_correctness_rounds(
                 status,
                 extra_msg=str(exc),
             )
-            return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+            return CorrectnessRoundsResult(True, inputs, correctness)
         except ReferenceProtocolError as exc:
             emitter.emit_status(
                 workload,
                 EvaluationStatus.RUNTIME_ERROR,
                 extra_msg=f"Trusted reference IPC failed: {exc}",
             )
-            return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+            return CorrectnessRoundsResult(True, inputs, correctness)
 
         try:
             user_outputs = call_and_collect_outputs(
@@ -142,7 +139,7 @@ def run_correctness_rounds(
                 EvaluationStatus.RUNTIME_ERROR,
                 extra_msg=f"User function failed: {exc}\n{traceback.format_exc()}",
             )
-            return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+            return CorrectnessRoundsResult(True, inputs, correctness)
 
         if emit_reward_hack_if_detected(
             emitter=emitter,
@@ -153,7 +150,7 @@ def run_correctness_rounds(
                 dependencies.driver_globals,
             ),
         ):
-            return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+            return CorrectnessRoundsResult(True, inputs, correctness)
 
         if round_index == 0:
             if emit_reward_hack_if_detected(
@@ -162,16 +159,12 @@ def run_correctness_rounds(
                 check_fn=check_lazy_outputs,
                 args=(user_outputs,),
             ):
-                return CorrectnessRoundsResult(
-                    True, inputs, threads_before, correctness
-                )
+                return CorrectnessRoundsResult(True, inputs, correctness)
 
             shape_dtype_issue = check_output_shape_dtype(ref_outputs, user_outputs)
             if shape_dtype_issue is not None:
                 emitter.emit_status(workload, shape_dtype_issue)
-                return CorrectnessRoundsResult(
-                    True, inputs, threads_before, correctness
-                )
+                return CorrectnessRoundsResult(True, inputs, correctness)
 
         numerically_wrong = False
         for ref_out, usr_out in zip(ref_outputs, user_outputs):
@@ -192,6 +185,6 @@ def run_correctness_rounds(
                 EvaluationStatus.INCORRECT_NUMERICAL,
                 correctness=correctness,
             )
-            return CorrectnessRoundsResult(True, inputs, threads_before, correctness)
+            return CorrectnessRoundsResult(True, inputs, correctness)
 
-    return CorrectnessRoundsResult(False, inputs, threads_before, correctness)
+    return CorrectnessRoundsResult(False, inputs, correctness)

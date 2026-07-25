@@ -8,6 +8,8 @@ from enum import Enum
 from collections import defaultdict
 from collections.abc import Iterable
 
+from sol_execbench.core.scoring.formula import sol_score
+
 OFFICIAL_AGGREGATION_POLICY = "workload_mean_within_problem_then_equal_problem_mean_v1"
 
 
@@ -61,6 +63,41 @@ class AggregateBoundStatus(str, Enum):
     UNSCORED = "unscored"
 
 
+def diagnostic_workload_score(
+    *,
+    problem: str,
+    workload_uuid: str,
+    candidate_runtime: float,
+    baseline_runtime: float,
+    sol_runtime: float,
+    correct: bool = True,
+) -> WorkloadScore:
+    """Build an aggregate-able WorkloadScore from explicit runtimes.
+
+    DIAGNOSTIC, non-official: the official scorer is intentionally not wired
+    (the paper's T_b baseline and release authority are not published).
+    This helper lets a caller that has measured a candidate time, derived a SOL
+    bound from SOLAR, and supplied an explicit baseline produce a workload score
+    for diagnostic display. It is never a publication-grade score.
+
+    Raises:
+        SolScoreAuditError: if the runtimes violate a paper precondition
+            (e.g. candidate faster than SOL, or baseline not slower than SOL).
+    """
+    score = sol_score(
+        candidate_runtime,
+        baseline_runtime,
+        sol_runtime,
+        correct=correct,
+    )
+    return WorkloadScore(
+        problem=problem,
+        workload_uuid=workload_uuid,
+        score=score,
+        role="scored",
+    )
+
+
 AGGREGATE_BOUND_STATUSES = frozenset(status.value for status in AggregateBoundStatus)
 
 __all__ = [
@@ -70,4 +107,5 @@ __all__ = [
     "SuiteScore",
     "WorkloadScore",
     "aggregate_suite_scores",
+    "diagnostic_workload_score",
 ]

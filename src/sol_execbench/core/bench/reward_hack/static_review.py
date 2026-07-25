@@ -34,6 +34,7 @@ from sol_execbench.core.bench.reward_hack.models import (
     _GRAPH_CALLS,
     _GRAPH_METHODS,
     _INDIRECT_STREAM_ATTRS,
+    _JIT_FORK_CALLS,
     _PARALLEL_IMPORT_ROOTS,
     _PRECISION_DOWNGRADE_RULE,
     _PRECISION_ATTRS,
@@ -158,6 +159,8 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             self._add("hidden_async_stream", node, name)
         if self._is_indirect_stream_getattr(node):
             self._add("hidden_async_stream", node, self._node_source(node))
+        if self._is_jit_fork_call(name):
+            self._add("parallel_execution", node, name)
         if self._is_cache_call(name):
             self._add("semantic_output_cache", node, name)
         if self._is_unauthorized_call(node, name):
@@ -186,6 +189,20 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             return True
         return name.endswith(
             (".wait_stream", *(f".{method}" for method in _GRAPH_METHODS))
+        )
+
+    def _is_jit_fork_call(self, name: str) -> bool:
+        """Detect ``torch.jit.fork`` (paper §4.4.1 "JIT Forking").
+
+        A sibling of the thread/stream concurrency vectors. ``torch.jit.fork``
+        runs the callable on a C++ TorchScript thread that the runtime
+        ``threading.active_count()`` guard cannot observe, so it is blocked
+        statically. Import aliases are resolved by ``_resolved_name``:
+        ``import torch as t`` / ``import torch.jit as jit`` /
+        ``from torch.jit import fork`` all canonicalize to ``torch.jit.fork``.
+        """
+        return (
+            name in _JIT_FORK_CALLS or name.endswith(".jit.fork") or name == "jit.fork"
         )
 
     def _is_indirect_stream_getattr(self, node: ast.Call) -> bool:

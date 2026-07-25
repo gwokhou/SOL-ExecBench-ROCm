@@ -77,6 +77,112 @@ class TestCheckThreadInjection:
         assert "7" in msg and "2" in msg
 
 
+# ── ThreadInjectionMonitor (concurrent thread-count sampling) ──────────────
+
+
+class TestThreadInjectionMonitor:
+    def test_rejects_nonpositive_sampling_interval(self):
+        from sol_execbench.core.bench.reward_hack import ThreadInjectionMonitor
+
+        with pytest.raises(ValueError, match="interval must be positive"):
+            ThreadInjectionMonitor(interval_s=0)
+
+    def test_no_flag_when_peak_equals_baseline(self):
+        from sol_execbench.core.bench.reward_hack import (
+            ThreadInjectionMonitor,
+            check_thread_injection_from_monitor,
+        )
+
+        monitor = ThreadInjectionMonitor()
+        monitor._baseline = 4
+        monitor._peak = 4
+        check_thread_injection_from_monitor(monitor)  # must not raise
+
+    def test_flags_when_peak_exceeds_baseline(self):
+        from sol_execbench.core.bench.reward_hack import (
+            ThreadInjectionMonitor,
+            check_thread_injection_from_monitor,
+        )
+
+        monitor = ThreadInjectionMonitor()
+        monitor._baseline = 4
+        monitor._peak = 7
+        with pytest.raises(RewardHackDetected, match="peak 7"):
+            check_thread_injection_from_monitor(monitor)
+
+    def test_detects_a_real_transient_worker(self):
+        """A worker thread alive only during the timed region is caught by the
+        concurrent sampler, which a single before/after delta would miss."""
+        import threading
+        import time
+
+        from sol_execbench.core.bench.reward_hack import ThreadInjectionMonitor
+
+        monitor = ThreadInjectionMonitor(interval_s=0.002)
+        with monitor:
+            stop = threading.Event()
+
+            def worker() -> None:
+                stop.wait(0.2)
+
+            workers = [threading.Thread(target=worker, daemon=True) for _ in range(2)]
+            for w in workers:
+                w.start()
+            time.sleep(0.05)
+            stop.set()
+
+        assert monitor.peak > monitor.baseline
+
+    def test_event_guard_catches_worker_shorter_than_sampling_interval(self):
+        """Thread starts are recorded synchronously, without a sampling gap."""
+        import threading
+
+        from sol_execbench.core.bench.reward_hack import (
+            ThreadInjectionMonitor,
+            check_thread_injection_from_monitor,
+        )
+
+        monitor = ThreadInjectionMonitor(interval_s=1.0)
+        with monitor:
+            worker = threading.Thread(target=lambda: None)
+            worker.start()
+            worker.join()
+
+        assert monitor.peak == monitor.baseline
+        assert monitor.starts_observed > 0
+        with pytest.raises(RewardHackDetected, match="thread start event"):
+            check_thread_injection_from_monitor(monitor)
+
+    def test_event_guard_catches_low_level_thread_start(self):
+        import _thread
+        import threading
+
+        from sol_execbench.core.bench.reward_hack import ThreadInjectionMonitor
+
+        finished = threading.Event()
+        monitor = ThreadInjectionMonitor(interval_s=1.0)
+        with monitor:
+            _thread.start_new_thread(finished.set, ())
+            assert finished.wait(timeout=1.0)
+
+        assert monitor.starts_observed > 0
+
+    def test_event_guards_are_restored_after_timed_exception(self):
+        import _thread
+        import threading
+
+        from sol_execbench.core.bench.reward_hack import ThreadInjectionMonitor
+
+        original_thread_start = threading.Thread.start
+        original_raw_start = _thread.start_new_thread
+        with pytest.raises(RuntimeError, match="timing failed"):
+            with ThreadInjectionMonitor():
+                raise RuntimeError("timing failed")
+
+        assert threading.Thread.start is original_thread_start
+        assert _thread.start_new_thread is original_raw_start
+
+
 # ── check_lazy_outputs ────────────────────────────────────────────────────────
 
 
@@ -214,6 +320,40 @@ class TestStaticSourceReview:
 
         assert review.blocked is True
         assert "hidden_async_stream" in {issue.rule for issue in review.issues}
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "import torch\ndef run(x):\n    torch.jit.fork(torch.relu, x)\n    return x\n",
+            "import torch as t\ndef run(x):\n    t.jit.fork(torch.relu, x)\n    return x\n",
+            "import torch.jit as jit\ndef run(x):\n    jit.fork(torch.relu, x)\n    return x\n",
+            "from torch.jit import fork\ndef run(x):\n    fork(torch.relu, x)\n    return x\n",
+        ],
+    )
+    def test_reports_jit_forking_concurrency_exploit(self, content):
+        """torch.jit.fork (paper §4.4.1 JIT Forking) runs work on a C++ TorchScript
+        thread that the runtime threading.active_count() guard cannot observe, so it
+        is blocked statically under parallel_execution like its thread/stream siblings.
+        Covers direct call plus import-alias obfuscations."""
+        review = review_solution_sources(_solution_with_source(content))
+
+        assert review.blocked is True
+        assert "parallel_execution" in {issue.rule for issue in review.issues}
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "import threading\nthreading.Thread(target=lambda: None).start()\n",
+            "from _thread import start_new_thread\nstart_new_thread(lambda: None, ())\n",
+            "from concurrent.futures import ThreadPoolExecutor\nThreadPoolExecutor()\n",
+            "import multiprocessing\nmultiprocessing.Process(target=lambda: None)\n",
+        ],
+    )
+    def test_blocks_python_thread_creation_sources(self, content):
+        review = review_solution_sources(_solution_with_source(content))
+
+        assert review.blocked is True
+        assert "parallel_execution" in {issue.rule for issue in review.issues}
 
     def test_reports_data_pointer_cache_patterns(self):
         review = review_solution_sources(

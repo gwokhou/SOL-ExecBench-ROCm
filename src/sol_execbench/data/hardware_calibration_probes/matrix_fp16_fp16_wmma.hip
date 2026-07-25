@@ -4,6 +4,10 @@
 #include <cstdio>
 #include <vector>
 
+#ifndef SOL_WMMA_WAVES_PER_WGP
+#define SOL_WMMA_WAVES_PER_WGP 64
+#endif
+
 // HIP provides the __hip_bfloat16 type used by this matrix probe.
 using bf16x8 = unsigned short __attribute__((ext_vector_type(8)));
 using float8v = float __attribute__((ext_vector_type(8)));
@@ -33,11 +37,13 @@ __global__ void matrix_probe_kernel(float* out) {
 int main() {
   hipDeviceProp_t properties{};
   if (hipGetDeviceProperties(&properties, 0) != hipSuccess || properties.multiProcessorCount <= 0) return 2;
-  // One wave cannot measure device throughput.  Launch several independent
-  // waves per CU so the scheduler has enough work to hide matrix-instruction
-  // latency and the FLOP accounting covers every launched block.
-  const int blocks_per_cu = 8;
-  const int grid_blocks = properties.multiProcessorCount * blocks_per_cu;
+  // gfx12 reports WGPs through multiProcessorCount (one WGP contains two CUs).
+  // Queue enough one-wave blocks per reported WGP to hide the loop-carried
+  // matrix latency and saturate all CU schedulers.
+  const int waves_per_reported_wgp = SOL_WMMA_WAVES_PER_WGP;
+  if (waves_per_reported_wgp <= 0) return 2;
+  const int grid_blocks =
+      properties.multiProcessorCount * waves_per_reported_wgp;
   const size_t output_count = static_cast<size_t>(grid_blocks) * matrix_m * matrix_n;
   std::vector<float> output(output_count);
   float* device_output = nullptr;

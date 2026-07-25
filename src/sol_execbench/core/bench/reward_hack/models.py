@@ -138,7 +138,8 @@ _STATIC_RULES = (
         SourceReviewSeverity.BLOCK,
         re.compile(
             r"\b(threading|_thread|multiprocessing|concurrent\.futures|"
-            r"pthread_create|std::thread|hipLaunchHostFunc)\b"
+            r"pthread_create|std::thread|hipLaunchHostFunc|"
+            r"torch\.jit\.fork|jit\.fork)\b"
         ),
         "submission-created workers can escape timed execution and cleanup",
     ),
@@ -238,6 +239,14 @@ _GRAPH_CALLS = {
 
 
 _GRAPH_METHODS = {"capture_begin", "capture_end", "replay"}
+
+
+# Resolved call targets that fork parallel TorchScript execution
+# (paper §4.4.1 "JIT Forking" concurrency exploit). Sibling to the
+# thread/stream vectors: the runtime thread-count guard cannot observe the
+# C++ TorchScript thread that ``torch.jit.fork`` spawns, so the exploit is
+# blocked statically rather than detected by ``check_thread_injection``.
+_JIT_FORK_CALLS = {"torch.jit.fork"}
 
 
 _PRECISION_ATTRS = {"half", "bfloat16"}
