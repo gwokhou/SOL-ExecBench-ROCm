@@ -15,9 +15,10 @@ analysis. Current einsum graphs and analysis artifacts use schema 3. Formal ROCm
 bounds fail closed unless the configured architecture and pinned Orojenesis
 evidence satisfy the current contract.
 
-The repository exposes machine-readable official-score availability, but does
-not publish an official scorer or release-authority score bundle. Local formula
-experiments are not official scores.
+The repository exposes a fail-closed official scorer and machine-readable
+availability. The checked-in corpus does not yet publish release-authority keys
+or a signed score bundle, so local formula experiments and unsigned evidence
+are not official scores.
 
 Hardware-specific tests and observations establish only the behavior they
 directly execute. A marker, compatibility entry, or diagnostic sidecar is not a

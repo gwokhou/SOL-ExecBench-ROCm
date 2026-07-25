@@ -43,6 +43,7 @@ def test_cli_contract_matches_public_tree() -> None:
     assert contract["schema_version"] == "sol_execbench.cli_contract.v1"
     assert {item["name"] for item in contract["command_tree"]["commands"]} == {
         "evaluate",
+        "baseline",
         "environment",
         "contract",
         "toolchain",

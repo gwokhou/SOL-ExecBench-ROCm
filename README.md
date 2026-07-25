@@ -102,9 +102,15 @@ and matching source SHA-256.
 The score formula is implemented without clipping, but this v3 corpus does not
 yet publish the release baseline, independent rerun, trusted candidate
 execution attestation, or pinned SOLAR manifest set needed for an official
-claim. No official scorer command is exposed. `sol-execbench score status`
-reports the immutable authority blockers without accepting measurement or
-baseline inputs; caller-authored JSON cannot be promoted to an official score.
+claim. The fail-closed scorer accepts only a four-authority signed bundle:
+
+```bash
+uv run sol-execbench score official RELEASE/release-bundle.json
+```
+
+`sol-execbench score status` reports whether the corpus manifest has published
+the authority roots. Caller-authored measurements, baselines, or SOLAR JSON
+cannot cross the signature and content-addressing boundary.
 
 Once those release artifacts are published and pinned, correct candidates must
 satisfy `T_b > T_SOL` and `T_k >= T_SOL`; workloads are averaged within each

@@ -10,6 +10,8 @@ import math
 from pathlib import Path
 from typing import Any, Mapping
 
+from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
+
 FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
 FORMAL_ARTIFACT_PATHS = frozenset(
     {
@@ -127,5 +129,6 @@ __all__ = [
     "SolarWorkerRequest",
     "FORMAL_ARTIFACT_PATHS",
     "FORMAL_BOUND_KIND",
+    "SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION",
     "formal_precision_for_definition",
 ]

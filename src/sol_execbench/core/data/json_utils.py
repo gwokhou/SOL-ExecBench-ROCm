@@ -49,6 +49,36 @@ def atomic_write_json_value(path: Union[str, Path], value: Any) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def atomic_write_jsonl_values(
+    path: Union[str, Path],
+    values: list[Any],
+) -> None:
+    """Atomically write deterministic JSON Lines in the destination directory."""
+
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            for value in values:
+                payload = (
+                    value.model_dump(mode="json")
+                    if isinstance(value, BaseModel)
+                    else value
+                )
+                handle.write(
+                    json.dumps(payload, sort_keys=True, allow_nan=False) + "\n"
+                )
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def save_json_file(object: BaseModel, path: Union[str, Path]) -> None:
     """
     Save a Pydantic BaseModel object to a JSON file.

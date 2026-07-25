@@ -60,6 +60,39 @@ def test_gfx942_static_filter_excludes_fp8_without_live_probe() -> None:
     assert all(item.stage == "static" for item in selection.decisions)
 
 
+def test_static_storage_filter_excludes_oversized_reference_without_probe() -> None:
+    manifest = AkaCorpusManifest.load(MANIFEST)
+    entry = next(
+        item
+        for item in manifest.entries
+        if item.problem_name == "l2n55_matmul_maxpool_sum_scale"
+    )
+
+    def unexpected_probe(*_args):
+        raise AssertionError("static-incompatible workload reached the live probe")
+
+    selection = select_corpus_for_target(
+        authored_root=manifest.authored_root,
+        entries=[entry],
+        execution_target=manifest.execution_targets["gfx1200"],
+        target=materialization_target(_device("gfx1200")),
+        probe=unexpected_probe,
+    )
+
+    assert selection.problems == ()
+    assert len(selection.decisions) == 3
+    assert {item.reason_code for item in selection.decisions} == {
+        "reference_ipc_payload_limit"
+    }
+    assert all(item.stage == "static" for item in selection.decisions)
+    assert all(
+        item.metrics["reference_case_bytes"] > item.metrics["ipc_limit_bytes"]
+        for item in selection.decisions
+    )
+    assert selection.decisions[0].metrics["input_storage_bytes"] == 4_299_292_672
+    assert selection.decisions[0].metrics["reference_case_bytes"] == 4_299_292_800
+
+
 def test_live_probe_decisions_partition_workloads() -> None:
     manifest = AkaCorpusManifest.load(MANIFEST)
     entry = manifest.entries[0]

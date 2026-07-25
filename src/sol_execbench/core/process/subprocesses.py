@@ -9,6 +9,7 @@ import os
 import select
 import signal
 import subprocess
+import sys
 import threading
 import time
 from collections import deque
@@ -109,6 +110,52 @@ def run_in_process_group_to_files(
         _wait_for_process_group_members(process.pid, _PROCESS_GROUP_GRACE_SECONDS)
         _cleanup_unreaped_process_group(process, ())
         return_code = process.wait()
+    return subprocess.CompletedProcess(list(command), return_code, None, None)
+
+
+def run_attached_process_group(
+    command: Sequence[str],
+    *,
+    cwd: str | os.PathLike[str] | None = None,
+    env: Mapping[str, str] | None = None,
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run a process group with inherited streams and descendant cleanup.
+
+    Interactive children remain in the caller's terminal process group so job
+    control continues to work. Non-interactive children receive an isolated
+    session that can be cleaned up as a unit.
+    """
+    interactive = any(
+        stream is not None and stream.isatty()
+        for stream in (sys.stdin, sys.stdout, sys.stderr)
+    )
+    process = subprocess.Popen(
+        list(command),
+        cwd=cwd,
+        env=env,
+        start_new_session=not interactive,
+    )
+    try:
+        if interactive:
+            return_code = process.wait(timeout=timeout)
+        else:
+            _wait_for_exit_without_reaping(process, timeout)
+            _wait_for_process_group_members(process.pid, _PROCESS_GROUP_GRACE_SECONDS)
+            _cleanup_unreaped_process_group(process, ())
+            return_code = process.wait()
+    except subprocess.TimeoutExpired as exc:
+        if interactive:
+            _terminate_attached_process(process)
+        else:
+            _terminate_unreaped_process_group(process)
+        raise subprocess.TimeoutExpired(command, timeout or 0) from exc
+    except BaseException:
+        if interactive:
+            _terminate_attached_process(process)
+        else:
+            _terminate_unreaped_process_group(process)
+        raise
     return subprocess.CompletedProcess(list(command), return_code, None, None)
 
 
@@ -304,7 +351,7 @@ def _process_group_has_live_members(process_group_id: int) -> bool:
             raw = (entry / "stat").read_text()
             fields = raw[raw.rfind(")") + 2 :].split()
             state, process_group, session = fields[0], int(fields[2]), int(fields[3])
-        except (FileNotFoundError, IndexError, PermissionError, ValueError):
+        except (OSError, IndexError, ValueError):
             continue
         if (
             state != "Z"
@@ -340,3 +387,15 @@ def _terminate_process_group(
             process.communicate()
         else:
             process.wait()
+
+
+def _terminate_attached_process(
+    process: subprocess.Popen[str] | subprocess.Popen[bytes],
+) -> None:
+    """Terminate an interactive child without signaling the caller's group."""
+    process.terminate()
+    try:
+        process.wait(timeout=_PROCESS_GROUP_GRACE_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()

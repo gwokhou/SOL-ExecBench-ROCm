@@ -36,8 +36,10 @@ OROJENESIS_BUILDER_IMAGE = (
     "ubuntu:24.04@sha256:"
     "4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90"
 )
+OROJENESIS_UBUNTU_SNAPSHOT = "20260718T000000Z"
+OROJENESIS_SOURCE_DATE_EPOCH = 1753058729
 OROJENESIS_COMPILER_WRAPPER_SHA256 = (
-    "a68dd5baf6ca67674b7d94c2413d1fe34c06bddafb84d41a9fb18e9699abc75e"
+    "1b56b3bf407a5f5124674168468bcd12d788f9eb280b0e43e93c81c174405e97"
 )
 # No reviewed mapper artifact has been published for this release. Keeping the
 # repository-owned allowlist empty makes formal bounds fail closed until a
@@ -156,6 +158,10 @@ class OrojenesisRunner:
             raise OrojenesisError("Orojenesis provenance compiler-wrapper mismatch")
         if build.get("builder_image") != OROJENESIS_BUILDER_IMAGE:
             raise OrojenesisError("Orojenesis provenance builder image mismatch")
+        if build.get("ubuntu_snapshot") != OROJENESIS_UBUNTU_SNAPSHOT:
+            raise OrojenesisError("Orojenesis provenance Ubuntu snapshot mismatch")
+        if build.get("source_date_epoch") != OROJENESIS_SOURCE_DATE_EPOCH:
+            raise OrojenesisError("Orojenesis provenance source epoch mismatch")
         if not str(build.get("compiler", "")):
             raise OrojenesisError("Orojenesis provenance lacks build identity")
         return {
@@ -1983,6 +1989,8 @@ __all__ = [
     "OROJENESIS_SOURCE_ARCHIVE_SHA256",
     "OROJENESIS_TREE_OID",
     "OROJENESIS_TRUSTED_MAPPER_SHA256",
+    "OROJENESIS_SOURCE_DATE_EPOCH",
+    "OROJENESIS_UBUNTU_SNAPSHOT",
     "OrojenesisError",
     "OrojenesisRunner",
     "compose_multi_einsum_curve",

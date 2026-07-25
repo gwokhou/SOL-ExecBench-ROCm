@@ -9,11 +9,16 @@ import json
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from math import prod
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, TypedDict
 
+from sol_execbench.core.bench.reference_protocol import (
+    MAX_REFERENCE_TENSOR_STORAGE_BYTES,
+)
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.definition_models import DType
+from sol_execbench.core.data.dtypes import dtype_storage_bits
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.runtime import (
     CacheClearPolicy,
@@ -144,6 +149,14 @@ class AkaCorpusSelection:
         return tuple(decision for decision in self.decisions if not decision.included)
 
 
+@dataclass(frozen=True)
+class StaticReferenceStorage:
+    """Minimum contiguous storage required by one reference IPC case."""
+
+    input_storage_bytes: int
+    reference_case_bytes: int
+
+
 Probe = Callable[
     [Path, int, Workload, AkaMaterializationTarget, float], AkaWorkloadDecision
 ]
@@ -208,10 +221,35 @@ def definition_tensor_dtypes(definition: Definition) -> frozenset[str]:
     return frozenset(tensor.dtype.value for tensor in tensors)
 
 
+def static_reference_storage(
+    definition: Definition, workload: Workload
+) -> StaticReferenceStorage:
+    """Compute reference IPC storage from schema shapes without allocating tensors."""
+
+    input_shapes = definition.get_input_shapes(workload.axes)
+    output_shapes = definition.get_output_shapes(workload.axes)
+    input_bytes = _shaped_tensor_storage_bytes(definition.inputs, input_shapes)
+    output_bytes = _shaped_tensor_storage_bytes(definition.outputs, output_shapes)
+    return StaticReferenceStorage(
+        input_storage_bytes=input_bytes,
+        reference_case_bytes=input_bytes + output_bytes,
+    )
+
+
+def _shaped_tensor_storage_bytes(
+    specs: Mapping[str, Any],
+    shapes: Mapping[str, tuple[int, ...] | None],
+) -> int:
+    return sum(
+        (prod(shape) * dtype_storage_bits(specs[name].dtype.value) + 7) // 8
+        for name, shape in shapes.items()
+        if shape is not None
+    )
+
+
 def _static_exclusion(
-    definition: Definition,
-    target: AkaExecutionTarget,
-) -> tuple[str, str] | None:
+    definition: Definition, workload: Workload, target: AkaExecutionTarget
+) -> tuple[str, str, dict[str, int]] | None:
     unsupported = sorted(
         definition_tensor_dtypes(definition) - target.supported_tensor_dtypes
     )
@@ -219,6 +257,18 @@ def _static_exclusion(
         return (
             "unsupported_target_dtype",
             f"{target.gfx_target} does not support corpus dtype(s): {', '.join(unsupported)}",
+            {},
+        )
+    storage = static_reference_storage(definition, workload)
+    if storage.reference_case_bytes > MAX_REFERENCE_TENSOR_STORAGE_BYTES:
+        return (
+            "reference_ipc_payload_limit",
+            "schema-derived reference case exceeds the trusted reference IPC limit",
+            {
+                "input_storage_bytes": storage.input_storage_bytes,
+                "reference_case_bytes": storage.reference_case_bytes,
+                "ipc_limit_bytes": MAX_REFERENCE_TENSOR_STORAGE_BYTES,
+            },
         )
     return None
 
@@ -253,11 +303,11 @@ def select_corpus_for_target(
             .splitlines()
             if line.strip()
         )
-        static_exclusion = _static_exclusion(definition, execution_target)
         selected: list[Workload] = []
         for row_index, workload in enumerate(workloads):
+            static_exclusion = _static_exclusion(definition, workload, execution_target)
             if static_exclusion is not None:
-                reason_code, detail = static_exclusion
+                reason_code, detail, metrics = static_exclusion
                 decision = AkaWorkloadDecision(
                     problem_path=entry.relative_problem_dir.as_posix(),
                     workload_uuid=workload.uuid,
@@ -265,6 +315,7 @@ def select_corpus_for_target(
                     stage="static",
                     reason_code=reason_code,
                     detail=detail,
+                    metrics=metrics,
                 )
             else:
                 decision = effective_probe(
@@ -405,9 +456,11 @@ __all__ = [
     "AkaExecutionTarget",
     "AkaMaterializationTarget",
     "AkaProbeInfrastructureError",
+    "StaticReferenceStorage",
     "AkaWorkloadDecision",
     "load_execution_targets",
     "materialization_target",
     "probe_workload",
     "select_corpus_for_target",
+    "static_reference_storage",
 ]

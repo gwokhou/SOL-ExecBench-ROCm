@@ -10,8 +10,14 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from sol_execbench.cli.protocol import EXIT_RESULT_FAILED, CliResult, artifact
+from sol_execbench.cli.protocol import (
+    EXIT_RESULT_FAILED,
+    CliFailure,
+    CliResult,
+    artifact,
+)
 from sol_execbench.core.solar_bridge.learn_runner import run_handler_learning
+from sol_execbench.core.solar_bridge.release import build_release_solar_manifests
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarWorkerRequest,
@@ -87,6 +93,71 @@ def analyze_cli(
         for item in outcome.artifacts
     )
     return CliResult(data=data, artifacts=artifacts)
+
+
+@solar_cli.command("release-build")
+@click.argument(
+    "workspace",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("problems/AMD_AKA/manifest.yaml"),
+    show_default=True,
+)
+@click.option(
+    "--orojenesis-home",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    envvar="SOLAR_OROJENESIS_HOME",
+)
+@click.option("--device", default="cuda:0", show_default=True)
+@click.option("--timeout", "timeout_seconds", default=14_400.0, show_default=True)
+@click.option("--resume", is_flag=True)
+def release_build_cli(
+    workspace: Path,
+    manifest_path: Path,
+    orojenesis_home: Path,
+    device: str,
+    timeout_seconds: float,
+    resume: bool,
+) -> CliResult:
+    """Generate the exact signed-release SOLAR denominator."""
+    try:
+        result = build_release_solar_manifests(
+            workspace,
+            corpus_manifest_path=manifest_path,
+            orojenesis_home=orojenesis_home,
+            timeout_seconds=timeout_seconds,
+            resume=resume,
+            device=device,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="solar_release_build_failed",
+            exit_code=EXIT_RESULT_FAILED,
+            hint=(
+                "Use the clean declared source revision and reviewed "
+                "Orojenesis artifact."
+            ),
+        ) from exc
+    report = {
+        "problems": result.problems,
+        "workloads": result.workloads,
+        "generated": result.generated,
+        "resumed": result.resumed,
+        "index": str(result.index_path),
+    }
+    console.print(
+        f"[green]Formal SOLAR release: {result.workloads} workloads indexed.[/green]"
+    )
+    return CliResult(
+        data=report,
+        artifacts=(artifact(result.index_path, "json_file"),),
+    )
 
 
 @solar_cli.command("learn-handler")

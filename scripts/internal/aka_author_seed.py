@@ -62,6 +62,7 @@ class Spec:
     reference: str
     workloads: list[dict[str, Any]]
     role: str = "scored"
+    exclusion_reason_code: str = ""
     description: str = ""
 
 
@@ -2189,8 +2190,13 @@ SPECS: list[Spec] = [
         pass_kind="forward",
         fusion_depth="fused",
         source_family="kernelbench",
+        role="target_incompatible",
+        exclusion_reason_code="reference_ipc_payload_limit",
         description="Fused linear -> max_pool1d -> sum -> scale, reducing to a 1D "
-        "per-batch output. Derived from AKA torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale.",
+        "per-batch output. Derived from AKA torch2hip/kernelbench/level2/"
+        "l2n55_Matmul_MaxPool_Sum_Scale. Retained for provenance but excluded "
+        "from the gfx1200 scoring denominator because its 32768x32768 FP32 "
+        "weight alone exceeds the bounded trusted-reference IPC payload.",
         axes={
             "B": _ax_var("Batch."),
             "IN": _ax_const(32768, "Input features."),
@@ -2703,6 +2709,8 @@ def _write_manifest(
             **aka_checksums[spec.task_path],
             "golden": {},
         }
+        if spec.exclusion_reason_code:
+            entry["exclusion_reason_code"] = spec.exclusion_reason_code
         entries.append(entry)
 
     payload = {

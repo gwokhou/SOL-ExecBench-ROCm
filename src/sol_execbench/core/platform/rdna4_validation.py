@@ -19,10 +19,12 @@ from sol_execbench.core.integrity.schema_versions import (
 )
 
 RDNA4_VALIDATION_GFX_TARGET = "gfx1200"
-RDNA4_VALIDATION_DEVICE_NAME = "AMD Radeon RX 9060 XT"
+RDNA4_VALIDATION_PCI_VENDOR_ID = "0x1002"
+RDNA4_VALIDATION_PCI_DEVICE_ID = "0x7590"
 RDNA4_VALIDATION_ROCM_VERSION = "7.2.0"
 RDNA4_VALIDATION_TORCH_VERSION = "2.11.0+rocm7.2"
 RDNA4_VALIDATION_HIP_VERSION = "7.2.26015"
+RDNA4_VALIDATION_TRITON_VERSION = "3.6.0"
 _REQUIRED_ARTIFACTS = frozenset(
     {
         "environment-doctor.json",
@@ -45,6 +47,8 @@ class Rdna4EnvironmentIdentity:
     rocm_version: str
     torch_version: str
     hip_version: str
+    pci_vendor_id: str
+    pci_device_id: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -54,6 +58,8 @@ class Rdna4EnvironmentIdentity:
             "rocm_version": self.rocm_version,
             "torch_version": self.torch_version,
             "hip_version": self.hip_version,
+            "pci_vendor_id": self.pci_vendor_id,
+            "pci_device_id": self.pci_device_id,
         }
 
 
@@ -89,7 +95,6 @@ def validate_environment_payload(payload: object) -> Rdna4EnvironmentIdentity:
         or len(gpus) != 1
         or not isinstance(gpus[0], dict)
         or gpus[0].get("gfx_target") != RDNA4_VALIDATION_GFX_TARGET
-        or gpus[0].get("name") != RDNA4_VALIDATION_DEVICE_NAME
     )
     if invalid_device:
         raise ValueError("RDNA4 validation requires exactly one RX 9060 XT gfx1200 GPU")
@@ -98,7 +103,8 @@ def validate_environment_payload(payload: object) -> Rdna4EnvironmentIdentity:
         raise ValueError("RDNA4 validation requires an available PyTorch ROCm runtime")
     if (
         pytorch.get("device_count") != 1
-        or pytorch.get("device_name") != RDNA4_VALIDATION_DEVICE_NAME
+        or not isinstance(pytorch.get("device_name"), str)
+        or not str(pytorch.get("device_name")).strip()
         or pytorch.get("gfx_target") != RDNA4_VALIDATION_GFX_TARGET
     ):
         raise ValueError("RDNA4 PyTorch device identity does not match the GPU probe")
@@ -111,17 +117,31 @@ def validate_environment_payload(payload: object) -> Rdna4EnvironmentIdentity:
     rocm_version = _rocm_version(snapshot_data)
     if rocm_version != RDNA4_VALIDATION_ROCM_VERSION:
         raise ValueError("RDNA4 validation ROCm version is outside the locked scope")
+    _verify_pci_identity(snapshot_data)
     device_index = gpus[0].get("index")
     if device_index is not None and type(device_index) is not int:
         raise ValueError("RDNA4 validation GPU index is invalid")
     return Rdna4EnvironmentIdentity(
         gfx_target=RDNA4_VALIDATION_GFX_TARGET,
-        device_name=RDNA4_VALIDATION_DEVICE_NAME,
+        device_name=str(pytorch.get("device_name", "")),
         device_index=device_index,
         rocm_version=rocm_version,
         torch_version=torch_version,
         hip_version=hip_version,
+        pci_vendor_id=RDNA4_VALIDATION_PCI_VENDOR_ID,
+        pci_device_id=RDNA4_VALIDATION_PCI_DEVICE_ID,
     )
+
+
+def _verify_pci_identity(snapshot: dict[str, Any]) -> None:
+    tools = snapshot.get("tools")
+    amd_smi = tools.get("amd-smi") if isinstance(tools, dict) else None
+    parsed = amd_smi.get("parsed") if isinstance(amd_smi, dict) else None
+    if not isinstance(parsed, dict) or (
+        parsed.get("pci_vendor_ids") != [RDNA4_VALIDATION_PCI_VENDOR_ID]
+        or parsed.get("pci_device_ids") != [RDNA4_VALIDATION_PCI_DEVICE_ID]
+    ):
+        raise ValueError("RDNA4 validation PCI identity does not match the RX 9060 XT")
 
 
 def _rocm_version(snapshot: dict[str, Any]) -> str:

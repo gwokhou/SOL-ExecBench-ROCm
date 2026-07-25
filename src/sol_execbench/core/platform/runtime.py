@@ -147,6 +147,31 @@ def discover_rocm_root(
     return conventional.resolve() if is_dir(conventional) else None
 
 
+def detect_rocm_version(
+    *,
+    root: Path | None = None,
+    environ: Mapping[str, str] | None = None,
+    which: Which = shutil.which,
+    is_dir: Callable[[Path], bool] = Path.is_dir,
+) -> str | None:
+    """Return the installed ROCm user-space version from canonical files."""
+    rocm_root = root or discover_rocm_root(
+        environ=environ,
+        which=which,
+        is_dir=is_dir,
+    )
+    if rocm_root is None:
+        return None
+    for path in (rocm_root / ".info/version", rocm_root / ".info/version-dev"):
+        try:
+            version = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if version:
+            return version
+    return None
+
+
 def resolve_rocm_tool(
     tool: str,
     *,
@@ -240,11 +265,12 @@ def env_snapshot(
 
         if hip_version := getattr(tv, "hip", None):
             libs["hip"] = str(hip_version)
-            libs["rocm"] = str(hip_version)
         elif cuda_version := getattr(tv, "cuda", None):
             libs["cuda"] = str(cuda_version)
     except Exception:
         pass
+    if rocm_version := detect_rocm_version():
+        libs["rocm"] = rocm_version
     isolation = "unknown"
     if os.environ.get("SOL_EXECBENCH_SANDBOXED") == "1":
         isolation = "container"
@@ -266,6 +292,8 @@ def hardware_from_device(device: str) -> str:
 
     parsed_device = torch.device(device)
     if parsed_device.type == "cuda":
+        if getattr(getattr(torch, "version", None), "hip", None) is not None:
+            return detect_rocm_device(device, torch_module=torch).gfx_target
         return torch.cuda.get_device_name(parsed_device.index)
     if parsed_device.type == "cpu":
         try:

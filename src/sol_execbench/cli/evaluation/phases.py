@@ -18,7 +18,10 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from sol_execbench.core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
-from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
+from sol_execbench.core.bench.gpu_lock import (
+    GpuLockVerificationError,
+    acquire_evaluation_gpu_lock,
+)
 from sol_execbench.driver import ProblemPackager
 
 from . import command as cli_evaluation
@@ -75,7 +78,9 @@ def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
     unsafe_name = "SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"
     device_name = "SOL_EXECBENCH_DEVICE"
     try:
-        with acquire_gpu_lock(timeout_seconds=min(float(request.timeout), 60.0)):
+        with acquire_evaluation_gpu_lock(
+            timeout_seconds=min(float(request.timeout), 60.0)
+        ):
             with _EXECUTION_ENV_LOCK:
                 previous_unsafe = os.environ.get(unsafe_name)
                 previous_device = os.environ.get(device_name)
@@ -101,6 +106,12 @@ def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
             str(exc),
             code="gpu_lock_timeout",
             hint="Wait for the active benchmark to finish, then retry.",
+        ) from exc
+    except GpuLockVerificationError as exc:
+        raise CliFailure(
+            str(exc),
+            code="gpu_lock_unverified",
+            hint="Launch evaluation through ./scripts/run_docker.sh.",
         ) from exc
 
 

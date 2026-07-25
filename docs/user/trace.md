@@ -75,7 +75,7 @@ Timing uses PyTorch's HIP-backed device event API. See
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `hardware` | string | AMD GPU/device identifier, such as `AMD Radeon Graphics gfx1200`. |
+| `hardware` | string | Stable AMD ISA target, such as `gfx1200`. |
 | `libs` | object | Library/tool versions, such as `torch`, `hip`, `rocm`, or `triton`. |
 
 PyTorch ROCm still exposes devices through `torch.cuda` compatibility APIs, but
@@ -141,10 +141,11 @@ current evaluator contract capability `runtime.evidence`.
       "speedup_factor": 2.375
     },
     "environment": {
-      "hardware": "AMD Radeon Graphics gfx1200",
+      "hardware": "gfx1200",
       "libs": {
         "torch": "2.11.0+rocm7.2",
         "hip": "7.2.26015",
+        "rocm": "7.2.0",
         "triton": "3.6.0"
       }
     },

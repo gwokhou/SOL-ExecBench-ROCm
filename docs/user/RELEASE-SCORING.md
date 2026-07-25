@@ -1,55 +1,154 @@
 # Release and Official Score Workflow
 
-Canonical Trace JSONL is the evaluation artifact. A numeric formula result is
-not an official score unless every input crosses an independently verifiable
-release authority boundary.
+Canonical Trace JSONL is the execution artifact. A numeric formula result is
+official only after every input crosses an independently verifiable release
+authority boundary.
 
 ## Current v3 status
 
-Official scoring is unavailable for the checked-in 14-workload RX 9060 XT
-corpus. The corpus manifest records
-`reason_code: release_authority_not_published`. The current CLI exposes only
-`score status`; no official scorer is implemented. Caller-authored measurement,
-baseline, or SOLAR JSON is not accepted as authority.
+The fixed RX 9060 XT denominator contains 35 scored problems and 122 scored
+workloads. The FP8 compatibility sentinel and the provenance-retained
+`l2n55_matmul_maxpool_sum_scale` target-incompatible problem are excluded. The
+upstream problem's `32768 x 32768` FP32 weight alone exceeds the bounded trusted
+reference IPC payload, so the release does not silently resize it or weaken the
+IPC limit. Corpus selection derives contiguous input/output storage directly
+from Definition shapes, workload axes, and dtype widths. A schema-derived case
+above the IPC limit is rejected at the static stage with
+`reference_ipc_payload_limit` and byte-count metrics; no reference worker, GPU
+allocation, or live probe is started. Cases not proven incompatible remain
+subject to the live probe.
 
-The packaged architecture profile includes a content-addressed locked-clock v3
-resource-audit artifact. It closes the architecture-evidence gate but does not
-supply the independent scoring authority listed below, so diagnostic candidate
-evaluation still cannot upgrade itself to an official score.
+The checked-in corpus still records `official_scoring.status: unavailable` and
+`reason_code: release_authority_not_published`.
 
-The content-addressed RX 9060 XT hardware bundle is also local engineering
-evidence only. `sol_execbench.rdna4_validation.v2` is deliberately incapable of
-self-promoting to release authority: direct and manual self-hosted runs record
-`release_eligible=false` and `trusted_execution=false`, and the verifier rejects
-caller-edited authority fields even when its checksum is recomputed.
+The implementation is no longer the blocker: the repository provides a
+deterministic baseline planner/runner, full-corpus SOLAR release builder,
+detached Ed25519 statement verification, exact bundle verification, and the
+official scorer. The current release remains unavailable because no four-role
+public-key policy or signed evidence set has been published. Caller-authored
+measurement, baseline, or SOLAR JSON cannot become authority.
 
-## Evidence required for a future release
+## Reproduce the formal mapper
 
-A release may enable official scoring only after pinning all of the following
-to the immutable corpus identity:
+Before generating formal manifests, build the pinned mapper twice from the
+digest-pinned builder and Ubuntu snapshot:
 
-1. A content-addressed release baseline with exact 14-workload coverage,
-   solution identity, environment identity, locked clocks, and the paper timing
-   protocol.
-2. A passing independent rerun that verifies every baseline workload and its
-   canonical trace.
-3. A trusted candidate execution attestation bound to canonical traces,
-   solution content, the same environment, isolation policy, and timing
-   protocol. A self-declared JSON field is not an attestation.
-4. One reviewed SOLAR manifest per scored workload, with exact manifest and
-   artifact digests, reference identity, architecture identity, conversion
-   proof, analysis contract, and formal bound.
-5. The verified architecture resource-audit file cited by the packaged
-   profile, including its content digest and locked-clock provenance.
+```bash
+scripts/internal/orojenesis/verify_reproducible_build.sh \
+  out/orojenesis-reproducible
+```
 
-The release verifier must reject missing workloads, sentinels in the score
-denominator, duplicate UUIDs, non-finite latency, mismatched identities,
-unlocked clocks, diagnostic timing, unsafe local execution, failed reruns, and
-candidate runtimes below the formal bound.
+The command uses two clean builds and publishes the first artifact only when
+the mapper and provenance are byte-identical. A reviewer must independently
+inspect the printed digest and provenance before adding that digest to the
+repository-owned `OROJENESIS_TRUSTED_MAPPER_SHA256` allowlist. A locally
+self-declared provenance file is never sufficient.
 
-## Local analysis
+## Release workspace
 
-`sol_execbench.core.scoring.formula.sol_score` is the formula helper for audited local
-inputs. Its output must be described as local or diagnostic while official
-authority is unavailable. Incorrect candidates score zero; correct candidates
-must satisfy `T_b > T_SOL` and `T_k >= T_SOL`.
+First publish the four independently administered Ed25519 public keys in the
+corpus manifest. Private keys must never enter the repository or release
+workspace. Then create the content-addressed trusted-reference baseline:
+
+```bash
+uv run sol-execbench baseline release-build out/release \
+  --baseline-id rx9060xt-gfx1200-v1 \
+  --source-revision SOURCE_GIT_SHA
+```
+
+The release-defined v1 baseline executes the exact corpus-pinned eager PyTorch
+reference. This keeps correctness and provenance invariant across all 122
+workloads; compiler rewrites are candidate implementations, not hidden changes
+to the scoring anchor. This is not a claim that an unpublished agent-frontier
+solution set exists. `SOURCE_GIT_SHA` must be the current clean commit: the
+release runner and SOLAR builder inspect all release-relevant tracked and
+untracked source paths and fail if the mounted tree differs.
+
+Run both plans inside the hardened container on the exact pinned GPU:
+
+```bash
+./scripts/run_docker.sh -- sol-execbench baseline release-run \
+  /outputs/release/baseline/plan.json
+./scripts/run_docker.sh -- sol-execbench baseline release-run \
+  /outputs/release/rerun/plan.json
+```
+
+The wrapper resolves the immutable local Docker image ID and passes it into the
+container. Each run records that `sha256:` ID together with the clean source
+revision in its signed environment artifact. Baseline, rerun, and candidate
+must use the same image identity. The verifier also rejects a rerun that reuses
+any baseline trace artifact verbatim.
+
+Candidate inputs use one `solution.json` under every scored problem path:
+
+```bash
+uv run sol-execbench baseline candidate-build out/release CANDIDATE_ROOT \
+  --candidate-id CANDIDATE_ID \
+  --source-revision SOURCE_GIT_SHA
+./scripts/run_docker.sh -- sol-execbench baseline release-run \
+  /outputs/release/candidate/plan.json
+```
+
+Build and verify the formal 122-workload denominator:
+
+```bash
+uv run sol-execbench solar release-build out/release \
+  --orojenesis-home /path/to/reviewed/orojenesis
+```
+
+Each output contains the operator graph, einsum graph, conversion attestation,
+formal analysis, and request manifest. The index builder rejects missing or
+duplicate workloads, diagnostic bounds, wrong reference/architecture identity,
+untrusted Orojenesis policy, and artifact hash drift.
+
+## Statements, signatures, and bundle
+
+Create unsigned run statements only after their complete traces verify:
+
+```bash
+uv run sol-execbench score build-statement out/release/baseline/plan.json
+uv run sol-execbench score build-statement out/release/rerun/plan.json
+uv run sol-execbench score build-statement out/release/candidate/plan.json
+```
+
+The SOLAR release builder writes `statements/solar.json`. Each independent
+authority signs exactly its role payload with Ed25519, producing:
+
+```text
+signatures/baseline.sig
+signatures/rerun.sig
+signatures/candidate.sig
+signatures/solar.sig
+```
+
+Release administration may use OpenSSL, for example:
+
+```bash
+openssl pkeyutl -sign -inkey ROLE_PRIVATE_KEY.pem -rawin \
+  -in out/release/statements/ROLE.json \
+  -out out/release/signatures/ROLE.sig
+```
+
+Assemble and score only after all four signatures verify against the
+repository-pinned public keys:
+
+```bash
+uv run sol-execbench score assemble-bundle out/release
+uv run sol-execbench score official out/release/release-bundle.json
+```
+
+The verifier requires four distinct keys, the exact immutable corpus, a
+corpus-pinned baseline ID, one source revision, identical validated runtime
+environment identities (including immutable container image and committed
+source), passing baseline/rerun coverage, distinct rerun traces, exact
+implementation reuse in the rerun, acceptable rerun drift, trusted candidate
+traces, and all formal SOLAR artifacts.
+
+## Score semantics
+
+For each workload, the baseline runtime is the arithmetic mean of the original
+and independent-rerun measurements. Incorrect candidates score zero. Correct
+candidates must satisfy finite positive runtimes, `T_b > T_SOL`, and
+`T_k >= T_SOL`; violations are audit failures rather than values to clip.
+Workloads are averaged within each problem, then the 35 problem means receive
+equal weight.
