@@ -67,7 +67,9 @@ clock state, and nominal ceilings.
 Diagnostic workload scoring
 (`sol_execbench.core.scoring.diagnostic_workload_score`) wraps the paper formula
 into an aggregate-able workload score from caller-supplied `T_k`, `T_b`, and
-`T_SOL`. It is non-official: the official scorer stays unwired because the
-paper's `T_b` baseline and release authority are not published. Passing the
-architecture audit gate does not supply those missing evidence classes. See
+`T_SOL`. It is non-official. The official scorer is separately wired to accept
+only the exact corpus plus independently signed baseline, rerun, candidate, and
+SOLAR statements. The checked-in manifest has not yet published those trust
+roots, so it still reports unavailable. Passing the architecture audit gate
+does not supply the missing evidence classes. See
 [SOLAR boundary](SOLAR-BOUNDARY.md) for the cross-package seam.

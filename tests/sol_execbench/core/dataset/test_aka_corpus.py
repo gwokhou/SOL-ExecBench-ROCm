@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,7 @@ from sol_execbench.core.dataset.aka_corpus import (
 )
 from sol_execbench.core.dataset.aka_compatibility import (
     AkaWorkloadDecision,
+    StaticReferenceStorage,
     materialization_target,
 )
 from sol_execbench.core.platform.runtime import RocmDeviceInfo
@@ -137,6 +139,14 @@ def test_expansion_coverage_breadth():
     ]
     assert len(fp8) == 1
     assert fp8[0].role == "compatibility_sentinel"
+
+    incompatible = [
+        entry for entry in manifest.entries if entry.role == "target_incompatible"
+    ]
+    assert [entry.problem_name for entry in incompatible] == [
+        "l2n55_matmul_maxpool_sum_scale"
+    ]
+    assert incompatible[0].exclusion_reason_code == "reference_ipc_payload_limit"
     # Multiple suites + source families are represented (friendliness categories).
     assert len({entry.suite for entry in manifest.entries}) >= 2
     assert len({entry.source_family for entry in manifest.entries}) >= 2
@@ -169,12 +179,59 @@ def test_round_trip_every_authored_problem_through_the_schema():
                 Workload.model_validate_json(line)
 
 
+def test_static_oversized_problem_cannot_be_restored_to_scored_role():
+    manifest = AkaCorpusManifest.load(MANIFEST)
+    entry = next(
+        item
+        for item in manifest.entries
+        if item.problem_name == "l2n55_matmul_maxpool_sum_scale"
+    )
+    path = entry.relative_problem_dir.as_posix()
+
+    with pytest.raises(
+        ValueError, match="scored AKA problem exceeds the static trusted-reference IPC"
+    ):
+        aka_corpus._validate_authored_problems(
+            manifest.authored_root,
+            (replace(entry, role="scored", exclusion_reason_code=""),),
+            {path: manifest.materialized_problem_sha256[path]},
+        )
+
+
+def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = AkaCorpusManifest.load(MANIFEST)
+    entry = next(
+        item
+        for item in manifest.entries
+        if item.problem_name == "l2n55_matmul_maxpool_sum_scale"
+    )
+    path = entry.relative_problem_dir.as_posix()
+    limit = aka_corpus.MAX_REFERENCE_TENSOR_STORAGE_BYTES
+    sizes = iter((limit + 1, limit, limit + 1))
+    monkeypatch.setattr(
+        aka_corpus,
+        "static_reference_storage",
+        lambda _definition, _workload: StaticReferenceStorage(0, next(sizes)),
+    )
+
+    with pytest.raises(
+        ValueError, match="every workload in a target-incompatible AKA problem"
+    ):
+        aka_corpus._validate_authored_problems(
+            manifest.authored_root,
+            (entry,),
+            {path: manifest.materialized_problem_sha256[path]},
+        )
+
+
 def test_official_score_reports_unavailable_without_accepting_inputs():
     report = official_score_availability(MANIFEST)
 
     assert report["status"] == "unavailable"
     assert report["manifest_status"] == "unavailable"
-    assert report["scorer_implemented"] is False
+    assert report["scorer_implemented"] is True
     assert report["accepts_caller_authored_inputs"] is False
     assert "content_addressed_release_baseline" in report["required_evidence"]
 
@@ -228,7 +285,8 @@ def test_materialization_records_and_audits_excluded_workload(tmp_path):
         if item["workload_uuid"] == excluded_uuid
     )
 
-    assert report["excluded_workloads"] == 1
+    assert report["excluded_workloads"] == 4
+    assert report["target_incompatible"] == 1
     assert decision["included"] is False
     assert decision["reason_code"] == "probe_oom"
     assert all(
@@ -263,7 +321,9 @@ def test_materialize_is_atomic_and_records_selected_problems(tmp_path, monkeypat
     assert (output / "selected.txt").read_text() == "complete"
     record = yaml.safe_load((output / "materialization-manifest.yaml").read_text())
     assert record["source"]["revision"] == AKA_REVISION
-    assert len(record["problems"]) == len(manifest.entries)
+    assert len(record["problems"]) == sum(
+        entry.role != "target_incompatible" for entry in manifest.entries
+    )
 
 
 def test_materialize_cleans_staging_after_failure(tmp_path, monkeypatch):

@@ -10,8 +10,17 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from sol_execbench.cli.protocol import CliResult
+from sol_execbench.cli.protocol import EXIT_RESULT_FAILED, CliFailure, CliResult
+from sol_execbench.cli.protocol import artifact
+from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.scoring.release_assembly import (
+    assemble_release_bundle,
+    build_run_statement,
+)
+from sol_execbench.core.scoring.release_builders import load_execution_plan
+from sol_execbench.core.scoring.release_models import AuthorityRole
 from sol_execbench.core.scoring.official_authority import official_score_availability
+from sol_execbench.core.scoring.release_verifier import verify_and_score_release
 
 console = Console(stderr=True)
 
@@ -30,13 +39,134 @@ def score_cli() -> None:
     show_default=True,
 )
 def official_score_status_cli(manifest_path: Path) -> CliResult:
-    """Report why this release cannot publish an official score."""
+    """Report whether this corpus has pinned official-score authority."""
     report = official_score_availability(manifest_path)
-    console.print(
-        "[yellow]Official scoring unavailable: "
-        f"{report['reason_code']} (scorer not implemented).[/yellow]"
-    )
+    if report["status"] == "available":
+        console.print("[green]Official scoring authority is available.[/green]")
+    else:
+        console.print(
+            f"[yellow]Official scoring unavailable: {report['reason_code']}.[/yellow]"
+        )
     return CliResult(data=report)
+
+
+@score_cli.command("official")
+@click.argument(
+    "bundle",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("problems/AMD_AKA/manifest.yaml"),
+    show_default=True,
+)
+def official_score_cli(bundle: Path, manifest_path: Path) -> CliResult:
+    """Verify a four-authority release bundle and emit its official score."""
+    try:
+        result = verify_and_score_release(
+            bundle,
+            corpus_manifest_path=manifest_path,
+        )
+    except Exception as exc:
+        raise CliFailure(
+            str(exc),
+            code="official_release_verification_failed",
+            exit_code=EXIT_RESULT_FAILED,
+            hint="Verify every signed release artifact and pinned authority identity.",
+        ) from exc
+    report = result.to_dict()
+    console.print(f"[green]Official SOL score: {result.suite.score:.9g}[/green]")
+    return CliResult(data=report)
+
+
+@score_cli.command("build-statement")
+@click.argument(
+    "plan",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("problems/AMD_AKA/manifest.yaml"),
+    show_default=True,
+)
+def build_statement_cli(plan: Path, manifest_path: Path) -> CliResult:
+    """Verify one completed release plan and write its unsigned payload."""
+    loaded = load_execution_plan(plan)
+    workspace = plan.resolve().parents[1]
+    output = workspace / "statements" / f"{loaded.role.value}.json"
+    baseline_digest = None
+    if loaded.role == AuthorityRole.RERUN:
+        baseline = workspace / "statements" / "baseline.json"
+        if not baseline.is_file():
+            raise CliFailure(
+                "build the baseline statement before the independent rerun",
+                code="release_baseline_statement_missing",
+            )
+        baseline_digest = sha256_file(baseline)
+    try:
+        path = build_run_statement(
+            plan,
+            corpus_manifest_path=manifest_path,
+            output_path=output,
+            baseline_payload_sha256=baseline_digest,
+        )
+    except (OSError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="release_statement_build_failed",
+            hint="Verify the full plan, environment, implementations, and traces.",
+        ) from exc
+    console.print(f"[green]Unsigned {loaded.role.value} statement: {path}[/green]")
+    return CliResult(
+        data={"role": loaded.role.value, "statement": str(path)},
+        artifacts=(artifact(path, "json_file"),),
+    )
+
+
+@score_cli.command("assemble-bundle")
+@click.argument(
+    "workspace",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("problems/AMD_AKA/manifest.yaml"),
+    show_default=True,
+)
+def assemble_bundle_cli(workspace: Path, manifest_path: Path) -> CliResult:
+    """Verify four detached authority signatures and assemble the bundle."""
+    root = workspace.resolve()
+    statements = {
+        role: root / "statements" / f"{role.value}.json" for role in AuthorityRole
+    }
+    signatures = {
+        role: root / "signatures" / f"{role.value}.sig" for role in AuthorityRole
+    }
+    try:
+        path = assemble_release_bundle(
+            root,
+            corpus_manifest_path=manifest_path,
+            statement_paths=statements,
+            signature_paths=signatures,
+            output_path=root / "release-bundle.json",
+        )
+    except (OSError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="release_bundle_assembly_failed",
+            hint="Sign each statement with its independently pinned Ed25519 key.",
+        ) from exc
+    console.print(f"[green]Signed release bundle: {path}[/green]")
+    return CliResult(
+        data={"bundle": str(path)},
+        artifacts=(artifact(path, "json_file"),),
+    )
 
 
 __all__ = ["score_cli"]

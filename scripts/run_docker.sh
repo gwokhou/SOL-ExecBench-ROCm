@@ -524,6 +524,18 @@ if $BUILD; then
     fi
 fi
 
+CONTAINER_IMAGE_ID=""
+if [ "${DRY_RUN}" != "1" ]; then
+    if ! CONTAINER_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "${IMAGE}")"; then
+        echo "ERROR: could not resolve immutable image ID for ${IMAGE}" >&2
+        exit 1
+    fi
+    if [[ ! "${CONTAINER_IMAGE_ID}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+        echo "ERROR: Docker returned an invalid image ID for ${IMAGE}" >&2
+        exit 1
+    fi
+fi
+
 LOCAL_PROBLEM_ROOT="${REPO_ROOT}/problems/local/AMD_AKA"
 if [ ! -d "${LOCAL_PROBLEM_ROOT}" ]; then
     echo "WARNING: ${LOCAL_PROBLEM_ROOT} does not exist"
@@ -561,6 +573,10 @@ DOCKER_COMMON_ARGS=(
     -e "SOLAR_OROJENESIS_HOME=${SOLAR_OROJENESIS_HOME:-}"
     -e "SOL_EXECBENCH_GPU_CLK_MHZ=${SOL_EXECBENCH_GPU_CLK_MHZ:-}"
     -e "SOL_EXECBENCH_DRAM_CLK_MHZ=${SOL_EXECBENCH_DRAM_CLK_MHZ:-}"
+    -e SOL_EXECBENCH_CLOCKS_LOCKED
+    -e SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST
+    -e SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST
+    -e "SOL_EXECBENCH_CONTAINER_IMAGE_ID=${CONTAINER_IMAGE_ID}"
     "${DOCKER_ARGS[@]}"
 )
 
@@ -639,7 +655,7 @@ if [ "${DRY_RUN}" = "1" ]; then
     exit 0
 fi
 set +e
-"${DOCKER_CMD[@]}"
+run_host_python -m sol_execbench.core.bench.host_clock_guard -- "${DOCKER_CMD[@]}"
 status="$?"
 set -e
 if [ "${status}" -eq 0 ]; then

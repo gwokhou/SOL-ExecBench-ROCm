@@ -89,6 +89,29 @@ def dtype_str_to_torch_dtype(dtype_str: str) -> torch.dtype:
     return _resolve_dtype(dtype_str, _get_dtype_str_to_torch_dtype())
 
 
+def dtype_storage_bits(dtype_str: str) -> int:
+    """Return the physical bit width of one logical tensor element."""
+
+    return _resolve_dtype(
+        dtype_str,
+        {
+            "float64": 64,
+            "float32": 32,
+            "float16": 16,
+            "bfloat16": 16,
+            "float8_e4m3fn": 8,
+            "float8_e5m2": 8,
+            "float4_e2m1": 4,
+            "float4_e2m1fn_x2": 4,
+            "int64": 64,
+            "int32": 32,
+            "int16": 16,
+            "int8": 8,
+            "bool": 8,
+        },
+    )
+
+
 @cache
 def _get_integer_dtypes() -> frozenset[torch.dtype]:
     """Get frozenset of integer and boolean dtypes (cached)."""

@@ -13,10 +13,23 @@ import pytest
 
 from sol_execbench.core.process import subprocesses
 from sol_execbench.core.process.subprocesses import (
+    run_attached_process_group,
     run_in_process_group,
     run_in_process_group_bounded,
     run_in_process_group_to_files,
 )
+
+
+def test_attached_process_group_returns_child_status(tmp_path):
+    result = run_attached_process_group(
+        (sys.executable, "-c", "raise SystemExit(19)"),
+        cwd=tmp_path,
+        timeout=5,
+    )
+
+    assert result.returncode == 19
+    assert result.stdout is None
+    assert result.stderr is None
 
 
 def test_run_in_process_group_returns_captured_output(tmp_path):
@@ -186,6 +199,19 @@ def test_group_signal_is_disabled_after_leader_is_reaped(monkeypatch):
         )
         is False
     )
+
+
+def test_process_group_scan_tolerates_proc_entry_exit_race(monkeypatch):
+    real_read_text = Path.read_text
+
+    def raced_read_text(path, *args, **kwargs):
+        if path.name == "stat" and path.parent.name.isdigit():
+            raise ProcessLookupError("process exited during /proc scan")
+        return real_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", raced_read_text)
+
+    assert subprocesses._process_group_has_live_members(-1) is False
 
 
 def _wait_for_process_exit(pid: int) -> bool:

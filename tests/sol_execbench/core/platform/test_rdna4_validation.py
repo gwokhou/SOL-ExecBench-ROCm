@@ -17,6 +17,14 @@ def _environment() -> dict:
     return {
         "status": "available",
         "snapshot": {
+            "tools": {
+                "amd-smi": {
+                    "parsed": {
+                        "pci_vendor_ids": ["0x1002"],
+                        "pci_device_ids": ["0x7590"],
+                    }
+                }
+            },
             "gpus": [
                 {
                     "index": 0,
@@ -138,11 +146,11 @@ def test_rejects_non_gfx1200_environment():
         validate_environment_payload(payload)
 
 
-def test_rejects_other_gfx1200_device_name():
+def test_rejects_other_gfx1200_pci_device():
     payload = _environment()
-    payload["snapshot"]["gpus"][0]["name"] = "Other RDNA 4 GPU"
+    payload["snapshot"]["tools"]["amd-smi"]["parsed"]["pci_device_ids"] = ["0x7550"]
 
-    with pytest.raises(ValueError, match="exactly one RX 9060 XT gfx1200"):
+    with pytest.raises(ValueError, match="PCI identity"):
         validate_environment_payload(payload)
 
 

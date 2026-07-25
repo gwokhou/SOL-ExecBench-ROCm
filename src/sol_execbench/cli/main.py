@@ -31,6 +31,7 @@ class LazyGroup(click.Group):
 
     _loaders = {
         "evaluate": ("sol_execbench.cli.commands.evaluate", "evaluate_cli"),
+        "baseline": ("sol_execbench.cli.commands.baseline", "baseline_cli"),
         "environment": ("sol_execbench.cli.commands.metadata", "environment_cli"),
         "contract": ("sol_execbench.cli.commands.metadata", "contract_cli"),
         "toolchain": ("sol_execbench.cli.commands.metadata", "toolchain_cli"),
@@ -176,6 +177,7 @@ def _command_name(args: list[str]) -> str:
     domain = values[0]
     depths = {
         "evaluate": 1,
+        "baseline": 2,
         "environment": 2,
         "contract": 2,
         "toolchain": 2,

@@ -54,7 +54,7 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
             second_attempted.set()
         yield
 
-    monkeypatch.setattr(phases, "acquire_gpu_lock", fake_gpu_lock)
+    monkeypatch.setattr(phases, "acquire_evaluation_gpu_lock", fake_gpu_lock)
 
     def evaluate_first():
         with phases.evaluation_execution_boundary(request):

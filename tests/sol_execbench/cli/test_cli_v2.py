@@ -17,6 +17,7 @@ def test_root_help_and_version_are_stable() -> None:
     assert no_args.exit_code == 0
     assert {
         "evaluate",
+        "baseline",
         "environment",
         "contract",
         "toolchain",
@@ -153,7 +154,7 @@ def test_score_exposes_authority_status_without_score_inputs() -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["data"]["status"] == "unavailable"
-    assert payload["data"]["scorer_implemented"] is False
+    assert payload["data"]["scorer_implemented"] is True
     assert payload["data"]["accepts_caller_authored_inputs"] is False
 
     assert CliRunner().invoke(cli, ["score", "official"]).exit_code == 2

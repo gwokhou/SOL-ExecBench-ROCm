@@ -27,6 +27,8 @@ def _write_toolchain(tmp_path: Path, *, archive_sha256: str) -> tuple[Path, str]
         "build": {
             "compiler_wrapper_sha256": (orojenesis.OROJENESIS_COMPILER_WRAPPER_SHA256),
             "builder_image": orojenesis.OROJENESIS_BUILDER_IMAGE,
+            "ubuntu_snapshot": orojenesis.OROJENESIS_UBUNTU_SNAPSHOT,
+            "source_date_epoch": orojenesis.OROJENESIS_SOURCE_DATE_EPOCH,
             "compiler": "test compiler",
         },
     }
@@ -117,6 +119,14 @@ def test_valid_provenance_manifest_is_returned_as_identity(tmp_path, monkeypatch
         (
             lambda item: item["build"].update(builder_image="wrong"),
             "builder image mismatch",
+        ),
+        (
+            lambda item: item["build"].update(ubuntu_snapshot="wrong"),
+            "Ubuntu snapshot mismatch",
+        ),
+        (
+            lambda item: item["build"].update(source_date_epoch=0),
+            "source epoch mismatch",
         ),
         (lambda item: item["build"].update(compiler=""), "lacks build identity"),
     ],

@@ -55,6 +55,28 @@ ROCPY
     printf '%s\n' "$status"
 }
 
+verify_host_managed_clocks() {
+    if [ "${HOST_CLOCKS_DECLARED}" != "1" ]; then
+        echo "WARNING: Host clock guard did not acquire STABLE_PEAK — continuing unlocked"
+        export SOL_EXECBENCH_CLOCKS_LOCKED=0
+        return
+    fi
+    if python - <<'ROCPY'
+from sol_execbench.core.bench.clock_lock import verify_clocks
+
+if not verify_clocks():
+    raise SystemExit(1)
+ROCPY
+    then
+        echo "CLOCKS_LOCKED=1"
+        export SOL_EXECBENCH_CLOCKS_LOCKED=1
+        return
+    fi
+    echo "WARNING: Host-declared STABLE_PEAK state failed container verification"
+    echo "CLOCKS_LOCKED=0"
+    export SOL_EXECBENCH_CLOCKS_LOCKED=0
+}
+
 cleanup() {
     if [ "${SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED}" = "1" ]; then
         python -c '
@@ -67,6 +89,7 @@ print("Clocks unlocked")
     fi
 }
 
+HOST_CLOCKS_DECLARED="${SOL_EXECBENCH_CLOCKS_LOCKED:-0}"
 export SOL_EXECBENCH_CLOCKS_LOCKED=0
 export SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED=0
 export SOL_EXECBENCH_SANDBOXED=1
@@ -79,7 +102,13 @@ if [ ! -d "${FLASHINFER_TRACE_DIR}" ]; then
     echo "         Continuing without flashinfer-trace; dependency smoke tests are still allowed."
 fi
 
-acquire_gpu_lock
-lock_clocks
+if [ "${SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST:-0}" != "1" ]; then
+    acquire_gpu_lock
+fi
+if [ "${SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST:-0}" = "1" ]; then
+    verify_host_managed_clocks
+else
+    lock_clocks
+fi
 
 "$@"

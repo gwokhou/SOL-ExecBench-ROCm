@@ -21,10 +21,26 @@ import torch
 import pytest
 
 from sol_execbench.core.data.dtypes import (
+    dtype_storage_bits,
     dtype_str_to_python_dtype,
     dtype_str_to_torch_dtype,
     is_dtype_integer,
 )
+
+
+@pytest.mark.parametrize(
+    ("dtype_str", "expected"),
+    [
+        ("float64", 64),
+        ("float32", 32),
+        ("bfloat16", 16),
+        ("float8_e4m3fn", 8),
+        ("float4_e2m1fn_x2", 4),
+        ("bool", 8),
+    ],
+)
+def test_dtype_storage_bits(dtype_str, expected):
+    assert dtype_storage_bits(dtype_str) == expected
 
 
 class TestDtypeStrToTorchDtype:
@@ -108,4 +124,3 @@ class TestIsDtypeInteger:
     )
     def test_float_dtypes(self, dtype):
         assert is_dtype_integer(dtype) is False
-

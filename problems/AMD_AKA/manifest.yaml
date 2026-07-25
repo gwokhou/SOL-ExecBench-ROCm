@@ -244,7 +244,7 @@ materialized_problems:
   workload_sha256: 2da2759a9a4b9f6d827f06fae85e757df8ad633dbbadf718844fe01cfc2f21df
 - path: torch2hip/l2n55_matmul_maxpool_sum_scale
   task_path: tasks/torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale
-  definition_sha256: 8e8b949a1b7827f5a9e3fa5aa470083565ce88145ba27504354fe3a4a6e674d4
+  definition_sha256: 521659f4d18cd9e8ae98f3ae670e8bb2fa8b15797e4f2c68210a688a85397743
   workload_sha256: a5aacdf9fbeb1eeadf8a62a6d5898bce0bbc9cf7d94706aae81c195dddb719e0
 - path: torch2hip/l2n98_matmul_avgpool_gelu_scale_max
   task_path: tasks/torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max
@@ -892,7 +892,7 @@ entries:
   fusion_depth: fused
   source_family: kernelbench
   suite: torch2hip
-  role: scored
+  role: target_incompatible
   workload_uuids:
   - aka-l2n55_matmul_maxpool_sum_scale-w0
   - aka-l2n55_matmul_maxpool_sum_scale-w1
@@ -901,6 +901,7 @@ entries:
   aka_source_sha256: 3aacb8624be9b3810b8bf416528e8ee024c4aba2240e406a85c330ede487f5ab
   aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
   golden: {}
+  exclusion_reason_code: reference_ipc_payload_limit
 - slot: l2n98_matmul_avgpool_gelu_scale_max
   task_path: tasks/torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max
   problem_name: l2n98_matmul_avgpool_gelu_scale_max

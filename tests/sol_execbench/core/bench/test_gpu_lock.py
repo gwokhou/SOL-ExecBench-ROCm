@@ -5,7 +5,12 @@ import os
 
 import pytest
 
-from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock, gpu_lock_directory
+from sol_execbench.core.bench.gpu_lock import (
+    GpuLockVerificationError,
+    acquire_evaluation_gpu_lock,
+    acquire_gpu_lock,
+    gpu_lock_directory,
+)
 
 
 def test_gpu_lock_uses_configured_shared_directory(tmp_path, monkeypatch):
@@ -37,3 +42,21 @@ def test_gpu_lock_reuses_verified_entrypoint_file_descriptor(tmp_path, monkeypat
             assert lock_path.exists()
     finally:
         os.close(descriptor)
+
+
+def test_evaluation_reuses_observable_host_managed_lock(tmp_path, monkeypatch):
+    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST", "1")
+
+    with acquire_gpu_lock(timeout_seconds=0.1):
+        with acquire_evaluation_gpu_lock(timeout_seconds=0.01):
+            pass
+
+
+def test_evaluation_rejects_unheld_host_managed_lock(tmp_path, monkeypatch):
+    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST", "1")
+
+    with pytest.raises(GpuLockVerificationError, match="is not held"):
+        with acquire_evaluation_gpu_lock(timeout_seconds=0.01):
+            pass

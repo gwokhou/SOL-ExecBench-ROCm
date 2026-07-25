@@ -106,7 +106,7 @@ class Environment(BaseModelWithDocstrings):
     """
 
     hardware: NonEmptyString
-    """AMD hardware identifier where the evaluation was performed (e.g., 'AMD Radeon Graphics gfx1200')."""
+    """Stable AMD ISA target where evaluation ran (for example, ``gfx1200``)."""
     libs: dict[str, str] = Field(default_factory=dict)
     """Dictionary of library names to version strings used during evaluation."""
     execution_isolation: str = Field(default="unknown")

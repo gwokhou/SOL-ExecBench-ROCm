@@ -167,4 +167,19 @@ def parse_probe_output(output: str) -> dict[str, Any]:
                 marketing_names.append(value)
     if marketing_names:
         parsed["names"] = marketing_names[:8]
+    for field, key in (
+        ("VENDOR_ID", "pci_vendor_ids"),
+        ("DEVICE_ID", "pci_device_ids"),
+    ):
+        values = sorted(
+            {
+                match.lower()
+                for match in re.findall(
+                    rf"(?m)^\s*{field}:\s*(0x[0-9a-fA-F]+)\s*$",
+                    output,
+                )
+            }
+        )
+        if values:
+            parsed[key] = values
     return parsed

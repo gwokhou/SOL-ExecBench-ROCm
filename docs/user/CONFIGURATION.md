@@ -123,8 +123,13 @@ uv run sol-execbench --format json score status \
 ```
 
 The checked-in manifest declares official authority unavailable, and the
-official scorer is not implemented. The status command accepts no measurement
-or baseline file and cannot promote caller-authored evidence.
+official scorer therefore rejects release bundles for this corpus. The status
+command accepts no measurement or baseline file. Once authority roots are
+published, the scorer accepts only a content-addressed four-role Ed25519 bundle:
+
+```bash
+uv run sol-execbench --format json score official RELEASE/release-bundle.json
+```
 
 ## Environment
 
@@ -144,6 +149,12 @@ or baseline file and cannot promote caller-authored evidence.
 | `SOL_EXECBENCH_AMD_ISA_CACHE` | static ISA tool/spec cache |
 | `SOL_EXECBENCH_AMD_ISA_OFFLINE` | forbid static ISA downloads when `1` |
 | `HIP_VISIBLE_DEVICES`, `ROCR_VISIBLE_DEVICES` | ROCm device visibility |
+
+`SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST` and
+`SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST` are private wrapper-to-container
+signals. Do not set them manually. The entrypoint independently verifies a
+host-declared clock state, and the evaluator verifies that the shared GPU lock
+file is held by an external process before it skips its local lock acquisition.
 
 The reference pipe descriptors, token and worker PID use private
 `SOL_EXECBENCH_REFERENCE_*` variables. They are created by the staged

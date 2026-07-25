@@ -118,6 +118,15 @@ def test_parse_probe_output_ignores_rocm_generic_isa_labels() -> None:
     assert parsed["gfx_targets"] == ["gfx1200"]
 
 
+def test_parse_probe_output_records_exact_amd_pci_identity() -> None:
+    parsed = parse_probe_output(
+        "VENDOR_ID: 0x1002\nDEVICE_ID: 0x7590\nSUBSYSTEM_ID: 0x2438\n"
+    )
+
+    assert parsed["pci_vendor_ids"] == ["0x1002"]
+    assert parsed["pci_device_ids"] == ["0x7590"]
+
+
 def test_summarize_gpus_deduplicates_single_pytorch_device_from_tools():
     tools = {
         "rocminfo": ToolProbeResult(

@@ -10,7 +10,11 @@ from .logs import (
     run_command_to_files,
     temporary_stream_path,
 )
-from .subprocesses import run_in_process_group, run_in_process_group_to_files
+from .subprocesses import (
+    run_attached_process_group,
+    run_in_process_group,
+    run_in_process_group_to_files,
+)
 from .stdio import flush_stdio_streams
 
 __all__ = [
@@ -18,6 +22,7 @@ __all__ = [
     "flush_stdio_streams",
     "redacted_file_tail",
     "redacted_text_tail",
+    "run_attached_process_group",
     "run_command_to_files",
     "run_in_process_group",
     "run_in_process_group_to_files",

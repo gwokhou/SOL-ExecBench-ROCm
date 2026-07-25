@@ -86,13 +86,59 @@ def test_entrypoint_registers_owned_lock_cleanup_before_locking() -> None:
     entrypoint = ENTRYPOINT_PATH.read_text(encoding="utf-8")
 
     cleanup_index = entrypoint.index("trap 'cleanup' EXIT")
-    gpu_lock_index = entrypoint.index("\nacquire_gpu_lock\n")
-    clock_lock_index = entrypoint.index("\nlock_clocks\n")
+    gpu_lock_index = entrypoint.index(
+        '\nif [ "${SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST:-0}" != "1" ]'
+    )
+    clock_lock_index = entrypoint.index(
+        '\nif [ "${SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST:-0}" = "1" ]'
+    )
     assert cleanup_index < gpu_lock_index < clock_lock_index
     assert "SOL_EXECBENCH_GPU_LOCK_FD=9" in entrypoint
     assert "CLOCK_LOCK_ACQUIRED={int(clock_lock.acquired)}" in entrypoint
     assert "clock_lock.detach()" in entrypoint
     assert 'if [ "${SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED}" = "1" ]' in entrypoint
+
+
+def test_entrypoint_verifies_host_managed_clock_state_without_container_sudo() -> None:
+    entrypoint = ENTRYPOINT_PATH.read_text(encoding="utf-8")
+
+    assert "SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST" in entrypoint
+    assert "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST" in entrypoint
+    assert "verify_host_managed_clocks" in entrypoint
+    assert "from sol_execbench.core.bench.clock_lock import verify_clocks" in entrypoint
+    assert "HOST_CLOCKS_DECLARED" in entrypoint
+
+
+def test_entrypoint_rejects_false_host_clock_claim(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_python = bin_dir / "python"
+    fake_python.write_text("#!/bin/bash\nexit 1\n", encoding="utf-8")
+    fake_python.chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "FLASHINFER_TRACE_DIR": str(tmp_path),
+        "SOL_EXECBENCH_CLOCKS_LOCKED": "1",
+        "SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST": "1",
+        "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST": "1",
+    }
+
+    result = subprocess.run(
+        [
+            ENTRYPOINT_PATH,
+            "bash",
+            "-c",
+            'test "${SOL_EXECBENCH_CLOCKS_LOCKED}" = "0"',
+        ],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "failed container verification" in result.stdout
 
 
 def test_entrypoint_releases_owned_lock_after_workload_failure(tmp_path: Path) -> None:
@@ -249,6 +295,17 @@ def test_run_docker_host_helpers_use_uv_managed_python() -> None:
     assert "SOL_EXECBENCH_HOST_PYTHON" in script
     assert not re.search(r"^\s*python\s+-m\s+sol_execbench", script, re.MULTILINE)
     assert not re.search(r"^\s*python\s+-c\b", script, re.MULTILINE)
+
+
+def test_run_docker_holds_host_clock_guard_around_container() -> None:
+    script = RUN_DOCKER_SCRIPT.read_text()
+
+    assert "sol_execbench.core.bench.host_clock_guard" in script
+    assert "-e SOL_EXECBENCH_CLOCKS_LOCKED" in script
+    assert "-e SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST" in script
+    assert "-e SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST" in script
+    assert "docker image inspect --format '{{.Id}}'" in script
+    assert "SOL_EXECBENCH_CONTAINER_IMAGE_ID" in script
 
 
 @pytest.mark.requires_linux

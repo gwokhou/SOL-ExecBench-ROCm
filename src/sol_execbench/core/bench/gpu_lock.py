@@ -12,6 +12,12 @@ import time
 from collections.abc import Iterator
 from pathlib import Path
 
+_HOST_MANAGED_ENV = "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST"
+
+
+class GpuLockVerificationError(RuntimeError):
+    """Raised when a claimed external GPU lock cannot be observed."""
+
 
 def gpu_lock_directory() -> Path:
     """Return the shared lock directory configured by the container wrapper."""
@@ -54,6 +60,34 @@ def acquire_gpu_lock(
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
+@contextlib.contextmanager
+def acquire_evaluation_gpu_lock(
+    device_index: int = 0, *, timeout_seconds: float = 60.0
+) -> Iterator[None]:
+    """Acquire locally or verify a host-held lock around container evaluation."""
+    if os.environ.get(_HOST_MANAGED_ENV) != "1":
+        with acquire_gpu_lock(device_index, timeout_seconds=timeout_seconds):
+            yield
+        return
+    if not _external_gpu_lock_is_held(device_index):
+        raise GpuLockVerificationError(
+            f"host-managed GPU {device_index} lock is not held"
+        )
+    yield
+
+
+def _external_gpu_lock_is_held(device_index: int) -> bool:
+    lock_path = gpu_lock_directory() / f"gpu-{device_index}.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(handle, fcntl.LOCK_UN)
+        return False
+
+
 def _reuse_inherited_lock(lock_path: Path) -> bool:
     """Verify and reuse the entrypoint's open-file-description lock."""
     value = os.environ.get("SOL_EXECBENCH_GPU_LOCK_FD")
@@ -74,4 +108,9 @@ def _reuse_inherited_lock(lock_path: Path) -> bool:
     return True
 
 
-__all__ = ["acquire_gpu_lock", "gpu_lock_directory"]
+__all__ = [
+    "GpuLockVerificationError",
+    "acquire_evaluation_gpu_lock",
+    "acquire_gpu_lock",
+    "gpu_lock_directory",
+]

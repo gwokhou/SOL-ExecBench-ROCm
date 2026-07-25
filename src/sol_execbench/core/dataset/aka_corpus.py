@@ -30,6 +30,9 @@ from typing import Any, Mapping
 
 import yaml
 
+from sol_execbench.core.bench.reference_protocol import (
+    MAX_REFERENCE_TENSOR_STORAGE_BYTES,
+)
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_compatibility import (
@@ -40,6 +43,7 @@ from sol_execbench.core.dataset.aka_compatibility import (
     Probe,
     load_execution_targets,
     select_corpus_for_target,
+    static_reference_storage,
 )
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.platform.runtime import derive_cache_clear_policy
@@ -61,6 +65,9 @@ FORMAL_ARCHITECTURE_SHA256 = (
 # for further growth while still bounding the manifest validator's check.
 SEED_SET_MIN_PROBLEMS = 15
 SEED_SET_MAX_PROBLEMS = 48
+CORPUS_ENTRY_ROLES = frozenset(
+    {"scored", "compatibility_sentinel", "target_incompatible"}
+)
 
 
 @dataclass(frozen=True)
@@ -77,6 +84,7 @@ class AkaCorpusEntry:
     source_family: str
     suite: str
     role: str = "scored"
+    exclusion_reason_code: str = ""
     workload_uuids: tuple[str, ...] = ()
     aka_config_sha256: str = ""
     aka_source_sha256: str = ""
@@ -227,6 +235,9 @@ class AkaCorpusManifest:
             "compatibility_sentinels": sum(
                 entry.role == "compatibility_sentinel" for entry in selected_entries
             ),
+            "target_incompatible": sum(
+                entry.role == "target_incompatible" for entry in self.entries
+            ),
             "gfx_target": target,
             "coverage": coverage,
             "source_repository": self.source.get("repository"),
@@ -323,6 +334,7 @@ def _load_entry(data: Mapping[str, Any]) -> AkaCorpusEntry:
         source_family=str(data["source_family"]),
         suite=str(data["suite"]),
         role=str(data.get("role", "scored")),
+        exclusion_reason_code=str(data.get("exclusion_reason_code", "")),
         workload_uuids=tuple(str(u) for u in (data.get("workload_uuids") or ())),
         aka_config_sha256=str(data.get("aka_config_sha256", "")),
         aka_source_sha256=str(data.get("aka_source_sha256", "")),
@@ -348,6 +360,19 @@ def _validate_entries(
         raise ValueError("AKA corpus task paths must be unique")
     if not all(entry.task_path.startswith("tasks/") for entry in entries):
         raise ValueError("AKA corpus entries must reference tasks/ paths")
+    unknown_roles = sorted({entry.role for entry in entries} - CORPUS_ENTRY_ROLES)
+    if unknown_roles:
+        raise ValueError(f"AKA corpus entries use unknown roles: {unknown_roles}")
+    for entry in entries:
+        if entry.role == "target_incompatible":
+            if not entry.exclusion_reason_code:
+                raise ValueError(
+                    "target-incompatible corpus entries require an exclusion reason"
+                )
+        elif entry.exclusion_reason_code:
+            raise ValueError(
+                "only target-incompatible corpus entries may declare an exclusion reason"
+            )
     sentinels = [entry for entry in entries if entry.role == "compatibility_sentinel"]
     # The DType enum names OCP FP8 as "float8_e4m3fn" / "float8_e5m2", so accept
     # either the "fp8" or "float8" prefix when checking the sentinel is an FP8 task.
@@ -543,10 +568,32 @@ def _validate_authored_problems(
             raise ValueError(
                 f"authored workload checksum mismatch: {entry.relative_problem_dir}"
             )
-        Definition.model_validate_json(definition_path.read_text())
-        for line in workload_path.read_text().splitlines():
-            if line.strip():
-                Workload.model_validate_json(line)
+        definition = Definition.model_validate_json(definition_path.read_text())
+        workloads = [
+            Workload.model_validate_json(line)
+            for line in workload_path.read_text().splitlines()
+            if line.strip()
+        ]
+        payload_incompatibility = tuple(
+            static_reference_storage(definition, workload).reference_case_bytes
+            > MAX_REFERENCE_TENSOR_STORAGE_BYTES
+            for workload in workloads
+        )
+        if any(payload_incompatibility) and entry.role == "scored":
+            raise ValueError(
+                "scored AKA problem exceeds the static trusted-reference IPC "
+                f"limit: {entry.relative_problem_dir}"
+            )
+        if (
+            entry.role == "target_incompatible"
+            and entry.exclusion_reason_code == "reference_ipc_payload_limit"
+            and (not payload_incompatibility or not all(payload_incompatibility))
+        ):
+            raise ValueError(
+                "every workload in a target-incompatible AKA problem must exceed "
+                "the static trusted-reference IPC limit: "
+                f"{entry.relative_problem_dir}"
+            )
         for uuid in entry.workload_uuids:
             _verify_workload_uuid_present(workload_path, uuid)
 

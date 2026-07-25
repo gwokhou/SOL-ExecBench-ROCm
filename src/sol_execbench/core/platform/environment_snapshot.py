@@ -27,6 +27,7 @@ from .environment_models import (
     Which,
 )
 from .environment_probes import collect_pytorch_rocm_summary, probe_tool, run_probe
+from .runtime import detect_rocm_version
 
 
 def collect_environment_snapshot(
@@ -76,6 +77,7 @@ def collect_environment_snapshot(
         gpus=gpus,
         capability_budgets=capability_budgets,
         rocm=RocmEnvironmentSummary(
+            version=detect_rocm_version(),
             hip_visible_devices=visible_devices.get("HIP_VISIBLE_DEVICES"),
             rocr_visible_devices=visible_devices.get("ROCR_VISIBLE_DEVICES"),
             hsa_override_gfx_version=visible_devices.get("HSA_OVERRIDE_GFX_VERSION"),
