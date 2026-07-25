@@ -72,6 +72,11 @@ class TorchviewProcessor:
         # Mapping from original node object id to clean node_id
         self._original_to_clean_id: Dict[str, str] = {}
         self._cached_default_dtype: Optional[str] = None
+        # Graph-wide evidence that some tensor used a non-float32 dtype.
+        # When set, an otherwise-uncapturable intermediate refuses the float32
+        # fallback (fail-closed against mixed-precision mislabeling) instead of
+        # silently guessing.
+        self._saw_non_float32_dtype: bool = False
 
     def process_graph(
         self,
@@ -96,6 +101,9 @@ class TorchviewProcessor:
 
         # Reset state for new graph
         self._reset_state()
+        self._saw_non_float32_dtype = self._graph_has_non_float32_dtype(
+            computation_graph
+        )
 
         # Extract layer nodes
         layer_nodes = self._extract_layer_nodes(computation_graph, original_model)
@@ -120,6 +128,8 @@ class TorchviewProcessor:
         self._matched_modules.clear()
         self._node_counter.clear()
         self._original_to_clean_id.clear()
+        self._cached_default_dtype = None
+        self._saw_non_float32_dtype = False
         # Reset module index tracker for hierarchical naming
         self._module_index_tracker: Dict[Tuple[str, str], Dict[int, int]] = {}
         self._module_has_duplicates: set = set()
@@ -322,6 +332,61 @@ class TorchviewProcessor:
             return [tensor_dtype], []
         return [tensor_dtype], [tensor_dtype]
 
+    @classmethod
+    def _graph_has_non_float32_dtype(cls, computation_graph: Any) -> bool:
+        """Return whether any edge-list node exposes a non-float32 dtype."""
+
+        edges = getattr(computation_graph, "edge_list", ()) or ()
+        nodes = {
+            id(node): node
+            for edge in edges
+            if isinstance(edge, (tuple, list))
+            for node in edge
+        }
+        for node in nodes.values():
+            candidates = [
+                node,
+                *(getattr(node, "inputs", ()) or ()),
+                *(getattr(node, "outputs", ()) or ()),
+            ]
+            observed = [
+                dtype
+                for candidate in candidates
+                if (dtype := cls._dtype_of(candidate)) is not None
+            ]
+            for attribute in ("input_dtype", "output_dtype"):
+                value = getattr(node, attribute, None)
+                if isinstance(value, (tuple, list)):
+                    observed.extend(str(item) for item in value)
+                elif value is not None:
+                    observed.append(str(value))
+            if any(cls._is_non_float32_dtype(dtype) for dtype in observed):
+                return True
+        return False
+
+    @staticmethod
+    def _is_non_float32_dtype(dtype: str) -> bool:
+        return dtype.strip().lower() not in {"torch.float32", "float32", "fp32"}
+
+    @staticmethod
+    def _dtype_of(obj: Any) -> Optional[str]:
+        """Extract a dtype string from one tensor-like torchview object."""
+
+        if obj is None:
+            return None
+        tensor_dtype = getattr(obj, "tensor_dtype", None)
+        if tensor_dtype is not None:
+            return str(tensor_dtype)
+        dtype = getattr(obj, "dtype", None)
+        if isinstance(dtype, (torch.dtype, str)):
+            return str(dtype)
+        tensor = getattr(obj, "tensor", None)
+        if tensor is not None and getattr(tensor, "dtype", None) is not None:
+            return str(tensor.dtype)
+        if isinstance(obj, torch.Tensor):
+            return str(obj.dtype)
+        return None
+
     def _extract_dtypes(
         self,
         node: Any,
@@ -343,40 +408,6 @@ class TorchviewProcessor:
         output_dtypes = []
         node_class = type(node).__name__
 
-        # Helper function to extract dtype from a tensor-like object
-        def get_dtype(obj: Any) -> Optional[str]:
-            """Extract dtype string from a tensor-like object."""
-            if obj is None:
-                return None
-
-            # Check for tensor_dtype attribute (torchview convention)
-            if hasattr(obj, "tensor_dtype") and obj.tensor_dtype is not None:
-                dtype = obj.tensor_dtype
-                if isinstance(dtype, torch.dtype):
-                    return str(dtype)
-                elif dtype is not None:
-                    return str(dtype)
-
-            # Check for dtype attribute directly
-            if hasattr(obj, "dtype"):
-                dtype = obj.dtype
-                if isinstance(dtype, torch.dtype):
-                    return str(dtype)
-                elif isinstance(dtype, str):
-                    return dtype
-
-            # Check for tensor attribute that might have dtype
-            if hasattr(obj, "tensor") and obj.tensor is not None:
-                tensor_obj = obj.tensor
-                if hasattr(tensor_obj, "dtype"):
-                    return str(tensor_obj.dtype)
-
-            # Check if it's a torch.Tensor directly
-            if isinstance(obj, torch.Tensor):
-                return str(obj.dtype)
-
-            return None
-
         # Special handling for TensorNode - mirror shape extraction logic
         if node_class == "TensorNode":
             tensor_dtype = None
@@ -394,7 +425,7 @@ class TorchviewProcessor:
             # Try getting from inputs/outputs if available
             elif hasattr(node, "outputs") and node.outputs:
                 for out in node.outputs:
-                    dtype = get_dtype(out)
+                    dtype = self._dtype_of(out)
                     if dtype:
                         tensor_dtype = dtype
                         break
@@ -406,27 +437,27 @@ class TorchviewProcessor:
         # Extract input dtypes from inputs attribute (mirroring shape extraction)
         if hasattr(node, "inputs") and node.inputs:
             for inp in node.inputs:
-                dtype = get_dtype(inp)
+                dtype = self._dtype_of(inp)
                 if dtype:
                     input_dtypes.append(dtype)
                 else:
                     # If we can't get dtype from the input object, try to infer from shape
                     # by checking if it has tensor_shape and we can get dtype from that
                     if hasattr(inp, "tensor_shape") and hasattr(inp, "tensor_dtype"):
-                        dtype = get_dtype(inp)
+                        dtype = self._dtype_of(inp)
                         if dtype:
                             input_dtypes.append(dtype)
 
         # Extract output dtypes from outputs attribute (mirroring shape extraction)
         if hasattr(node, "outputs") and node.outputs:
             for out in node.outputs:
-                dtype = get_dtype(out)
+                dtype = self._dtype_of(out)
                 if dtype:
                     output_dtypes.append(dtype)
                 else:
                     # Try to get dtype from tensor_shape's source
                     if hasattr(out, "tensor_shape") and hasattr(out, "tensor_dtype"):
-                        dtype = get_dtype(out)
+                        dtype = self._dtype_of(out)
                         if dtype:
                             output_dtypes.append(dtype)
 
@@ -452,14 +483,42 @@ class TorchviewProcessor:
 
         if original_model is not None:
             if self._cached_default_dtype is None:
+                derived: Optional[str] = None
                 for param in original_model.parameters():
                     if param.dtype is not None:
-                        self._cached_default_dtype = str(param.dtype)
+                        derived = str(param.dtype)
                         break
-                if self._cached_default_dtype is None:
-                    self._cached_default_dtype = "torch.float32"
+                # ``None`` records that the reference module exposed no
+                # parameters (e.g. the parameter-free ReferenceModule wrapper
+                # used on the SOLAR extraction boundary).
+                self._cached_default_dtype = derived
 
             default_dtype = self._cached_default_dtype
+            # A parameter-free reference module (e.g. the SOLAR boundary's
+            # ReferenceModule wrapper) yields no model dtype. Prefer a dtype
+            # actually observed on this node. If none was captured, refuse to
+            # silently default to float32 *when the graph is known to use mixed
+            # precision* (some other tensor was observed at a non-float32
+            # dtype), since that would mislabel the intermediate and bias the
+            # SOL memory bound. For graphs that are observed to be float32 (or
+            # where no dtype is observable at all), the float32 fallback is safe.
+            for observed_dtype in (*input_dtypes, *output_dtypes):
+                if observed_dtype and self._is_non_float32_dtype(observed_dtype):
+                    self._saw_non_float32_dtype = True
+            if default_dtype is None:
+                observed = [d for d in (*input_dtypes, *output_dtypes) if d]
+                if observed:
+                    default_dtype = observed[0]
+                elif self._saw_non_float32_dtype:
+                    raise RuntimeError(
+                        "Unable to determine a tensor dtype for a graph node "
+                        "in a mixed-precision graph: the reference module has "
+                        "no parameters and no dtype was observed on the node. "
+                        "Refusing to fall back to float32 because another "
+                        "tensor was observed at a non-float32 dtype."
+                    )
+                else:
+                    default_dtype = "torch.float32"
 
             while len(input_dtypes) < len(input_shapes):
                 input_dtypes.append(default_dtype)

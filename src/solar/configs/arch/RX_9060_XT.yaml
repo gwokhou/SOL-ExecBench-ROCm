@@ -4,7 +4,7 @@
 name: Radeon_RX_9060_XT
 vendor: AMD
 gfx_target: gfx1200
-profile_revision: rx9060xt-amd-resource-v2
+profile_revision: rx9060xt-amd-resource-v4
 compute_units: 32
 memory_capacity_bytes: 17179869184
 memory_bandwidth_bytes_per_second: 320000000000
@@ -47,10 +47,17 @@ peak_ops_per_second:
   int8: 205000000000000
   int4: 410000000000000
 resource_model_version: amd_resource_v1
-# MFMA rates use the published matrix throughput.  The other resources use
-# the RDNA4 packed-FP16 VOPD issue ceiling (32 CU * 512 ops/CU/cycle * 3.13
-# GHz).  That deliberately loose ceiling cannot tighten TSOL using an
-# empirical result; calibration only checks it for contradictions.
+# MFMA rates use the published FP16/FP8/INT8 matrix throughput; BF16 uses the
+# matching gfx12 FP16/BF16 WMMA issue shape because AMD publishes no RX 9060 XT
+# BF16 figure.  VALU fp32/fp16 use the published Vector peaks (25.6 TFLOPs
+# each). gfx1200 has no packed-bf16 VALU FMA, so its BF16 VALU rate keeps the
+# fp32-equivalent conservative ceiling.
+# Other resources (sfu/reduction/atomic/
+# scan_sort/conversion) and integer VALU keep the packed-FP16 VOPD ceiling as a
+# conservative bound pending per-resource publication.  Empirical locked-clock
+# measurement (audits/rx9060xt_resource_peaks_v3.json) is audit evidence only
+# (it verifies the hardware is real and sustained <= nominal); it never
+# replaces a nominal theoretical peak in the SOL bound.
 resource_limits:
   mfma:
     "fp32->fp32": 25600000000000
@@ -60,6 +67,12 @@ resource_limits:
     "int8->int32": 205000000000000
     "int4->int32": 410000000000000
   valu:
+    "fp32": 25600000000000
+    "fp16": 25600000000000
+    # gfx1200 VALU has no native packed bf16 FMA (no v_pk_fma_bf16); bf16 scalar
+    # ops promote to fp32, so the bf16 VALU peak equals fp32. The bf16 fast path
+    # is WMMA (mfma."bf16->fp32" above), not the scalar VALU.
+    "bf16": 25600000000000
     generic: 51281920000000
   sfu:
     generic: 51281920000000
@@ -81,7 +94,16 @@ resource_limit_sources:
   conversion: https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/rdna4-instruction-set-architecture.pdf
 calibration_exempt_modes:
   mfma:
+    "fp32->fp32": RDNA4 exposes no native FP32-input WMMA instruction; this conservative mode shares the published FP32 vector ceiling
     "int4->int32": RDNA4 ISA defines IU4 WMMA, but ROCm 7.2 rocWMMA lists no INT4 type and PyTorch 2.11 exposes no validated gfx1200 INT4 matrix API; published peak remains source-only
+  valu:
+    generic: Generic VALU is a conservative cross-operation ceiling rather than one calibratable instruction mode; typed FP32, FP16, and BF16 paths are audited separately
+  atomic:
+    generic: No architecture-wide atomic throughput is published and a single contention pattern cannot calibrate a universal ceiling; the conservative packed-FP16 ceiling remains source-derived
+  scan_sort:
+    generic: Scan and sort decompose into workload-dependent multi-stage algorithms rather than one calibratable hardware instruction; the conservative ceiling remains source-derived
+  conversion:
+    generic: Conversion throughput depends on the source/destination dtype pair and no universal architecture rate is published; the conservative ceiling remains source-derived
 precision_support:
   fp32:
     hardware: native
@@ -116,12 +138,21 @@ precision_support:
     evidence: https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/rdna4-instruction-set-architecture.pdf
     limitation: ROCm 7.2 rocWMMA exposes no INT4 type and PyTorch 2.11 has no validated gfx1200 INT4 matrix API; the published peak is source-only.
 audit_evidence:
-  status: unavailable
-  reason_code: audit_artifact_not_published
-  required_schema_version: 3
+  status: verified
+  path: audits/rx9060xt_resource_peaks_v3.json
+  sha256: ef74e9b8be3561897c0b24458b6e8f7bbb0910a0137acdcd638034ac81ef5317
+  required_schema_version: solar.resource_peak_calibration.v3
   required_timing_profile: official
   required_clocks_locked: true
   gfx_target: gfx1200
+  required_instruction_checks:
+    - bf16_valu_fallback
+    - bf16_wmma
+    - fp16_packed_valu_fma
+    - fp16_wmma
+    - fp32_valu_fma
+    - fp8_wmma
+    - int8_wmma
 # RDNA4/gfx1200 implements the OCP E4M3 and E5M2 encodings.  FNUZ is a
 # gfx94x format and must not be scored against this profile.
 precision_aliases:

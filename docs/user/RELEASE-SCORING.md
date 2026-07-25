@@ -12,10 +12,10 @@ corpus. The corpus manifest records
 `score status`; no official scorer is implemented. Caller-authored measurement,
 baseline, or SOLAR JSON is not accepted as authority.
 
-The packaged architecture profile also records that its claimed locked-clock
-resource-audit artifact was not published. Formal SOLAR analysis therefore
-fails at the architecture stage; diagnostic candidate evaluation does not
-upgrade this state.
+The packaged architecture profile includes a content-addressed locked-clock v3
+resource-audit artifact. It closes the architecture-evidence gate but does not
+supply the independent scoring authority listed below, so diagnostic candidate
+evaluation still cannot upgrade itself to an official score.
 
 ## Evidence required for a future release
 

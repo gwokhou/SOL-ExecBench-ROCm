@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextvars import ContextVar
 from typing import Any, Iterable, Mapping, TypeVar
 from collections.abc import Callable
 
@@ -15,6 +16,24 @@ from .utils import OrderedSet, stringify_attributes
 
 # Needed for module wrapper and resetting
 _orig_module_forward = torch.nn.Module.__call__
+_recorder_operation_depth: ContextVar[int] = ContextVar(
+    "torchview_recorder_operation_depth", default=0
+)
+
+
+def recorder_operation_active() -> bool:
+    """Return whether dispatch is nested inside a recorded torch operation."""
+    return _recorder_operation_depth.get() > 0
+
+
+def _has_untracked_tensor(value: Any) -> bool:
+    if isinstance(value, torch.Tensor):
+        return not isinstance(value, (RecorderTensor, nn.Parameter))
+    if isinstance(value, Mapping):
+        return any(_has_untracked_tensor(item) for item in value.values())
+    if isinstance(value, (tuple, list)):
+        return any(_has_untracked_tensor(item) for item in value)
+    return False
 
 
 # Functions below are torch.tensor creation operations
@@ -255,13 +274,20 @@ class RecorderTensor(torch.Tensor):
             [args, kwargs], collect_tensor_node, NodeContainer()
         )
 
-        # This is necessary for torch version < 1.10
-        if func in [F.linear, F.embedding]:
-            out = nn.parameter.Parameter.__torch_function__(
-                func, types, args, kwargs
-            ).as_subclass(RecorderTensor)
-        else:
-            out = super().__torch_function__(func, types, args, kwargs)
+        depth_increment = 0 if _has_untracked_tensor((args, kwargs)) else 1
+        token = _recorder_operation_depth.set(
+            _recorder_operation_depth.get() + depth_increment
+        )
+        try:
+            # This is necessary for torch version < 1.10
+            if func in [F.linear, F.embedding]:
+                out = nn.parameter.Parameter.__torch_function__(
+                    func, types, args, kwargs
+                ).as_subclass(RecorderTensor)
+            else:
+                out = super().__torch_function__(func, types, args, kwargs)
+        finally:
+            _recorder_operation_depth.reset(token)
 
         # if no RecorderTensor is found in input or output
         # dont create any node, give the result only

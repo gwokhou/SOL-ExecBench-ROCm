@@ -3,7 +3,12 @@
 
 """Paper-defined scoring outside the SOLAR analysis boundary."""
 
-from .aggregation import SuiteScore, WorkloadScore, aggregate_suite_scores
+from .aggregation import (
+    SuiteScore,
+    WorkloadScore,
+    aggregate_suite_scores,
+    diagnostic_workload_score,
+)
 from .formula import SolScoreAuditError, sol_score
 from .official_authority import official_score_availability
 
@@ -12,6 +17,7 @@ __all__ = [
     "WorkloadScore",
     "SolScoreAuditError",
     "aggregate_suite_scores",
+    "diagnostic_workload_score",
     "official_score_availability",
     "sol_score",
 ]

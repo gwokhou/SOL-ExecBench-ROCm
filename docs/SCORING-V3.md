@@ -24,17 +24,33 @@ problems. The command fails closed instead of treating caller-authored JSON as
 authority. A future release must pin and verify all four evidence classes plus
 the public corpus and architecture identities before enabling official output.
 
-## SOLAR formal bound policy (stricter than the paper)
+## SOLAR bound policy
 
 The paper (§4.2) treats Orojenesis as an optional tighter-bound path that
 lives inside the SOL Analyzer; the Eq. 1 roofline bound alone is the SOL
-Analyzer's default formal output. This port's formal publication path is
-deliberately stricter: `solar.api.analyze` requires Orojenesis
-(`require_orojenesis=True` in `_run_analysis`) and rejects any non-Orojenesis
-result as non-formal (`bound_kind` must be `capacity_constrained_tile_aware_v1`).
-The Eq. 1-only roofline seconds are still computed and exposed as
-`lower_bound_components` diagnostic data, so the formula is implemented
-faithfully — but the port never publishes an Eq. 1-only `T_SOL` as a formal
-bound. This is a release-evidence policy of the ROCm port, not a defect in the
-bound derivation and not an expansion of SOLAR into scoring. See
-[SOLAR boundary](SOLAR-BOUNDARY.md) for the cross-package seam that enforces it.
+Analyzer's default formal output. This port follows the paper by default:
+`AnalysisRequest.require_orojenesis` defaults to `False`, so `solar.api.analyze`
+accepts the Eq. 1 roofline (`bound_kind == "diagnostic"`,
+`T_SOL = max(compute, fused_bytes / bandwidth)`) as the bound. Setting
+`require_orojenesis=True` restores the port's stricter release-evidence policy,
+which requires the capacity-constrained / Orojenesis tile-aware bound
+(`bound_kind == "capacity_constrained_tile_aware_v1"`).
+
+Regardless of this flag, formal publication is *additionally* gated by verified
+architecture audit evidence (`ArchitectureProfile.require_verified_audit_evidence`),
+an independent guard the flag does not bypass. The packaged RX_9060_XT profile
+references a content-addressed locked-clock v3 audit. Loading the profile
+requires exact coverage of all non-exempt precision and resource calibration
+targets, then cross-checks FP32/FP16 VALU and FP16/BF16/FP8/INT8 WMMA claims
+against the machine-readable gfx1200 ISA, emitted HIP code objects, and runtime
+probes. It also verifies the two-phase tuning/held-out protocol, frozen
+configuration, raw samples, telemetry, schema, payload checksum, GPU identity,
+clock state, and nominal ceilings.
+
+Diagnostic workload scoring
+(`sol_execbench.core.scoring.diagnostic_workload_score`) wraps the paper formula
+into an aggregate-able workload score from caller-supplied `T_k`, `T_b`, and
+`T_SOL`. It is non-official: the official scorer stays unwired because the
+paper's `T_b` baseline and release authority are not published. Passing the
+architecture audit gate does not supply those missing evidence classes. See
+[SOLAR boundary](SOLAR-BOUNDARY.md) for the cross-package seam.

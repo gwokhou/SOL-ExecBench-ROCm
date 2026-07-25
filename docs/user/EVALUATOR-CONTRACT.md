@@ -47,11 +47,20 @@ diagnostic. Performance metadata records the actual adaptive sample count for
 every trial in `timed_iterations_per_trial`; `timed_iterations` is populated
 only when that count is identical across all trials.
 
+During the timed region, standard Python thread-start entry points are guarded
+synchronously, so a worker that starts and exits between count samples is still
+rejected. Concurrent thread-count sampling remains defense in depth for
+alternate entry points, while static review blocks direct `threading`,
+`_thread`, multiprocessing, concurrent-executor, non-default stream, graph
+capture, and TorchScript-fork sources.
+
 ## Formal and score availability
 
-The packaged RX 9060 XT profile references a locked-clock resource audit that
-is absent from this revision. It is marked `unavailable`; formal SOLAR analysis
-fails at the architecture stage.
+The packaged RX 9060 XT profile references a content-addressed locked-clock v3
+resource audit. Formal SOLAR analysis verifies its exact non-exempt
+precision/resource coverage and all required ISA/code-object/runtime instruction
+checks, together with its frozen tuning and held-out measurement evidence,
+before graph extraction.
 
 The fixed corpus likewise records
 `official_scoring.status: unavailable`. No release baseline, independent

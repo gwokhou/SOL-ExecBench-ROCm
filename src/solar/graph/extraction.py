@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+from solar.graph.dispatch_coverage import draw_graph_with_verified_coverage
 from solar.graph.torchview_processor import TorchviewProcessor
 
 
@@ -86,8 +87,6 @@ def _trace_reference(
     import torch.nn as nn
     from torch.utils._python_dispatch import TorchDispatchMode
 
-    from solar._vendor import torchview
-
     tensor_inputs = {
         index: value
         for index, value in enumerate(inputs)
@@ -128,19 +127,7 @@ def _trace_reference(
         observed = reference(*inputs)
     observe(observed)
     module = ReferenceModule().eval()
-    graph = torchview.draw_graph(
-        module,
-        input_data=list(inputs),
-        device=device,
-        save_graph=False,
-        expand_nested=True,
-        depth=float("inf"),
-        hide_module_functions=False,
-        hide_inner_tensors=False,
-        roll=False,
-        strict=True,
-        collect_attributes=True,
-    )
+    graph = draw_graph_with_verified_coverage(module, inputs, device=device)
     TorchviewProcessor().process_graph(graph, str(output), name, module)
     return observed, tensor_inputs, used_indices
 

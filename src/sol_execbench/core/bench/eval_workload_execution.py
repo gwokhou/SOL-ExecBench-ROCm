@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import gc
-import threading
 from typing import Any
 
 import torch
@@ -25,8 +24,9 @@ from sol_execbench.core.bench.reference_protocol import (
 )
 from sol_execbench.core.bench.reward_hack import (
     RewardHackDetected,
+    ThreadInjectionMonitor,
     check_monkey_patch,
-    check_thread_injection,
+    check_thread_injection_from_monitor,
 )
 from sol_execbench.core.data.trace import (
     CacheClearEvidence,
@@ -55,7 +55,6 @@ def evaluate_one_workload(
         emitter=emitter, workload=workload, check_fn=check_monkey_patch
     ):
         return
-    assert correctness_result.threads_before is not None
     timing_case = _load_timing_case(request, emitter, workload, row_index)
     if timing_case is None:
         return
@@ -65,7 +64,6 @@ def evaluate_one_workload(
         workload,
         resolved_axes,
         timing_case,
-        correctness_result.threads_before,
         correctness_result.correctness,
     )
 
@@ -108,27 +106,35 @@ def _measure_and_emit(
     workload: Workload,
     resolved_axes: dict[str, int],
     timing_case: ReferenceTimingCase,
-    threads_before: int,
     correctness: Any,
 ) -> None:
     _release_device_cache()
     inputs = timing_case.inputs
-    try:
-        solution_timing = measure_solution_latency(
-            request=request,
-            workload=workload,
-            resolved_axes=resolved_axes,
-            inputs=inputs,
-            expected_outputs=timing_case.outputs,
-        )
-    except RewardHackDetected as exc:
-        emitter.emit_status(workload, EvaluationStatus.REWARD_HACK, extra_msg=str(exc))
-        return
-    except Exception as exc:
-        emitter.emit_status(
-            workload, EvaluationStatus.RUNTIME_ERROR, extra_msg=f"Timing failed: {exc}"
-        )
-        return
+    # Event guards catch every standard Python thread start during timing,
+    # including workers shorter than the sampling interval. Concurrent count
+    # sampling remains defense in depth for alternate entry points.
+    thread_monitor = ThreadInjectionMonitor()
+    with thread_monitor:
+        try:
+            solution_timing = measure_solution_latency(
+                request=request,
+                workload=workload,
+                resolved_axes=resolved_axes,
+                inputs=inputs,
+                expected_outputs=timing_case.outputs,
+            )
+        except RewardHackDetected as exc:
+            emitter.emit_status(
+                workload, EvaluationStatus.REWARD_HACK, extra_msg=str(exc)
+            )
+            return
+        except Exception as exc:
+            emitter.emit_status(
+                workload,
+                EvaluationStatus.RUNTIME_ERROR,
+                extra_msg=f"Timing failed: {exc}",
+            )
+            return
     try:
         request.dependencies.check_integrity(
             request.dependencies.integrity_snapshot,
@@ -140,8 +146,8 @@ def _measure_and_emit(
     if emit_reward_hack_if_detected(
         emitter=emitter,
         workload=workload,
-        check_fn=check_thread_injection,
-        args=(threads_before, threading.active_count()),
+        check_fn=check_thread_injection_from_monitor,
+        args=(thread_monitor,),
     ):
         return
     sol_latency_ms = solution_timing.latency_ms

@@ -220,12 +220,11 @@ def test_correctness_rounds_execute_all_ten_cases(monkeypatch) -> None:
     )
 
     assert result.failed is False
-    assert result.threads_before is not None
     assert client.correctness_calls == 10
     assert recording.events == []
 
 
-def test_correctness_thread_baseline_precedes_first_candidate_call(monkeypatch) -> None:
+def test_framework_thread_warmup_precedes_first_candidate_call(monkeypatch) -> None:
     tensor = torch.ones(2)
     client = ReferenceClientStub(correctness=ReferenceCase([tensor], [tensor]))
     request = _request(client)
@@ -240,11 +239,15 @@ def test_correctness_thread_baseline_precedes_first_candidate_call(monkeypatch) 
         call_order.append("candidate")
         return [tensor]
 
-    def active_count():
-        call_order.append("baseline")
-        return 7
+    def warm_framework_threads(*args, **kwargs):
+        del args, kwargs
+        call_order.append("framework_warmup")
 
-    monkeypatch.setattr(eval_correctness.threading, "active_count", active_count)
+    monkeypatch.setattr(
+        eval_correctness,
+        "_prepare_framework_thread_baseline",
+        warm_framework_threads,
+    )
     monkeypatch.setattr(eval_correctness, "call_and_collect_outputs", call_candidate)
 
     result = eval_correctness.run_correctness_rounds(
@@ -255,8 +258,8 @@ def test_correctness_thread_baseline_precedes_first_candidate_call(monkeypatch) 
     )
 
     assert candidate_calls == 10
-    assert result.threads_before == 7
-    assert call_order == ["baseline", *("candidate" for _ in range(10))]
+    assert result.failed is False
+    assert call_order == ["framework_warmup", *("candidate" for _ in range(10))]
 
 
 @pytest.mark.parametrize(
@@ -315,7 +318,6 @@ def test_measure_and_emit_classifies_timing_errors(
         request.workloads[0],
         {},
         ReferenceTimingCase([tensor], [tensor], 2.0),
-        1,
         Correctness(),
     )
 
@@ -350,7 +352,6 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
         request.workloads[0],
         {},
         ReferenceTimingCase([tensor], [tensor], 2.0, "reference diagnostic"),
-        1,
         Correctness(),
     )
 

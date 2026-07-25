@@ -175,6 +175,37 @@ def test_generic_shape_and_dtype_fallbacks():
     )
 
 
+def test_mixed_precision_dtype_prepass_is_order_independent_and_fail_closed():
+    processor = TorchviewProcessor()
+    missing = _node("FunctionNode", name="missing", parents=[])
+    observed_fp16 = _tensor_node("hidden-tensor", "later-fp16", (2, 3), torch.float16)
+    graph = SimpleNamespace(edge_list=[(missing, observed_fp16)])
+
+    processor._reset_state()
+    processor._saw_non_float32_dtype = processor._graph_has_non_float32_dtype(graph)
+
+    assert processor._saw_non_float32_dtype is True
+    with pytest.raises(RuntimeError, match="mixed-precision graph"):
+        processor._extract_dtypes(
+            missing,
+            "missing",
+            nn.Identity(),
+            [[2, 3]],
+            [[2, 3]],
+        )
+
+
+def test_graph_state_reset_clears_cached_dtype_evidence():
+    processor = TorchviewProcessor()
+    processor._cached_default_dtype = "torch.float16"
+    processor._saw_non_float32_dtype = True
+
+    processor._reset_state()
+
+    assert processor._cached_default_dtype is None
+    assert processor._saw_non_float32_dtype is False
+
+
 def test_module_extraction_prefers_live_module_then_attribute_fallback():
     processor = TorchviewProcessor()
     live = _node("ModuleNode", name="linear", module=nn.Linear(3, 4, bias=False))
