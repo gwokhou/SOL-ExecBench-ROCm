@@ -1,7 +1,28 @@
 # syntax=docker/dockerfile:1.7
 
 ARG OROJENESIS_BUILDER_IMAGE=ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
-FROM ${OROJENESIS_BUILDER_IMAGE} AS builder
+FROM ${OROJENESIS_BUILDER_IMAGE} AS snapshot-base
+
+ARG UBUNTU_SNAPSHOT=20260718T000000Z
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN test "$(dpkg --print-architecture)" = "amd64"
+ADD --checksum=sha256:9c79333ab21bce0fb8dd92304cd76b3b1c427b0f2fedc897257fb5cced37c39e \
+    https://snapshot.ubuntu.com/ubuntu/20260718T000000Z/pool/main/o/openssl/openssl_3.0.13-0ubuntu3_amd64.deb \
+    /tmp/openssl-bootstrap.deb
+ADD --checksum=sha256:641de77d8f142cfd62a1a6f964ba67b20754d3337c480efb529d086075a06c9a \
+    https://snapshot.ubuntu.com/ubuntu/20260718T000000Z/pool/main/c/ca-certificates/ca-certificates_20240203_all.deb \
+    /tmp/ca-certificates-bootstrap.deb
+RUN dpkg -i /tmp/openssl-bootstrap.deb /tmp/ca-certificates-bootstrap.deb \
+    && rm /tmp/openssl-bootstrap.deb /tmp/ca-certificates-bootstrap.deb \
+    && sed -i \
+      -e "s|http://archive.ubuntu.com/ubuntu/|https://snapshot.ubuntu.com/ubuntu/${UBUNTU_SNAPSHOT}/|g" \
+      -e "s|http://security.ubuntu.com/ubuntu/|https://snapshot.ubuntu.com/ubuntu/${UBUNTU_SNAPSHOT}/|g" \
+      /etc/apt/sources.list.d/ubuntu.sources \
+    && ! grep -Eq 'archive\.ubuntu\.com|security\.ubuntu\.com' \
+      /etc/apt/sources.list.d/ubuntu.sources
+
+FROM snapshot-base AS builder
 
 ARG OROJENESIS_COMMIT=97d52178bf9a9c209bf79be96b87c164bcd35625
 ARG OROJENESIS_TREE_OID=05b05ec5a2a2979b1fe92046b937556d9ad99847
@@ -9,11 +30,9 @@ ARG OROJENESIS_SOURCE_ARCHIVE_SHA256=3a254ab201d92b7eba993d3c7dcf0bb148a31dc9e57
 ARG OROJENESIS_SOURCE_DATE_EPOCH=1753058729
 ARG UBUNTU_SNAPSHOT=20260718T000000Z
 ARG OROJENESIS_BUILDER_IMAGE
-ENV DEBIAN_FRONTEND=noninteractive
 
-RUN test "$(dpkg --print-architecture)" = "amd64"
-RUN apt-get --snapshot "${UBUNTU_SNAPSHOT}" update \
-    && apt-get --snapshot "${UBUNTU_SNAPSHOT}" install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
       build-essential ca-certificates cmake git ninja-build python3 scons \
       libconfig++-dev libboost-dev libboost-iostreams-dev \
       libboost-serialization-dev libyaml-cpp-dev libncurses-dev \
@@ -41,15 +60,16 @@ RUN git clone https://github.com/NVlabs/timeloop.git /opt/orojenesis \
          --expected-archive-sha256 "${OROJENESIS_SOURCE_ARCHIVE_SHA256}" \
          --builder-image "${OROJENESIS_BUILDER_IMAGE}" \
          --ubuntu-snapshot "${UBUNTU_SNAPSHOT}" \
+         --openssl-bootstrap-sha256 9c79333ab21bce0fb8dd92304cd76b3b1c427b0f2fedc897257fb5cced37c39e \
+         --ca-certificates-bootstrap-sha256 641de77d8f142cfd62a1a6f964ba67b20754d3337c480efb529d086075a06c9a \
          --source-date-epoch "${OROJENESIS_SOURCE_DATE_EPOCH}" \
          --compiler-wrapper /tmp/orojenesis-compiler/g++ \
          --output /opt/orojenesis/orojenesis-provenance.json
 
-FROM ${OROJENESIS_BUILDER_IMAGE} AS artifact
+FROM snapshot-base AS artifact
 
-ARG UBUNTU_SNAPSHOT=20260718T000000Z
-RUN apt-get --snapshot "${UBUNTU_SNAPSHOT}" update \
-    && apt-get --snapshot "${UBUNTU_SNAPSHOT}" install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
       libboost-iostreams1.83.0 libboost-serialization1.83.0 \
       libconfig++9v5 libgmp10 libyaml-cpp0.8 \
     && rm -rf /var/lib/apt/lists/*

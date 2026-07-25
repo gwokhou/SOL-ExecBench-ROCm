@@ -37,9 +37,15 @@ OROJENESIS_BUILDER_IMAGE = (
     "4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90"
 )
 OROJENESIS_UBUNTU_SNAPSHOT = "20260718T000000Z"
+OROJENESIS_OPENSSL_BOOTSTRAP_SHA256 = (
+    "9c79333ab21bce0fb8dd92304cd76b3b1c427b0f2fedc897257fb5cced37c39e"
+)
+OROJENESIS_CA_CERTIFICATES_BOOTSTRAP_SHA256 = (
+    "641de77d8f142cfd62a1a6f964ba67b20754d3337c480efb529d086075a06c9a"
+)
 OROJENESIS_SOURCE_DATE_EPOCH = 1753058729
 OROJENESIS_COMPILER_WRAPPER_SHA256 = (
-    "1b56b3bf407a5f5124674168468bcd12d788f9eb280b0e43e93c81c174405e97"
+    "04363ce239f76a4763490c049de1d69e2265d59578d51bed753f688c6f75278d"
 )
 # No reviewed mapper artifact has been published for this release. Keeping the
 # repository-owned allowlist empty makes formal bounds fail closed until a
@@ -160,6 +166,15 @@ class OrojenesisRunner:
             raise OrojenesisError("Orojenesis provenance builder image mismatch")
         if build.get("ubuntu_snapshot") != OROJENESIS_UBUNTU_SNAPSHOT:
             raise OrojenesisError("Orojenesis provenance Ubuntu snapshot mismatch")
+        bootstrap_packages = build.get("bootstrap_packages") or {}
+        if (
+            bootstrap_packages.get("openssl") != OROJENESIS_OPENSSL_BOOTSTRAP_SHA256
+            or bootstrap_packages.get("ca-certificates")
+            != OROJENESIS_CA_CERTIFICATES_BOOTSTRAP_SHA256
+        ):
+            raise OrojenesisError("Orojenesis provenance bootstrap package mismatch")
+        if build.get("package_source_mode") != "snapshot_only":
+            raise OrojenesisError("Orojenesis provenance package source mismatch")
         if build.get("source_date_epoch") != OROJENESIS_SOURCE_DATE_EPOCH:
             raise OrojenesisError("Orojenesis provenance source epoch mismatch")
         if not str(build.get("compiler", "")):
@@ -1982,8 +1997,10 @@ __all__ = [
     "MULTI_EINSUM_SOLVER",
     "OROJENESIS_COMMIT",
     "OROJENESIS_BUILDER_IMAGE",
+    "OROJENESIS_CA_CERTIFICATES_BOOTSTRAP_SHA256",
     "OROJENESIS_COMPILER_WRAPPER_SHA256",
     "OROJENESIS_IDENTITY_SCHEMA_VERSION",
+    "OROJENESIS_OPENSSL_BOOTSTRAP_SHA256",
     "OROJENESIS_PROVENANCE_FILENAME",
     "OROJENESIS_REPOSITORY",
     "OROJENESIS_SOURCE_ARCHIVE_SHA256",

@@ -8,6 +8,8 @@ import pytest
 
 from solar.analysis import orojenesis
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
 
 def _write_toolchain(tmp_path: Path, *, archive_sha256: str) -> tuple[Path, str]:
     mapper = tmp_path / "bin" / "timeloop-mapper"
@@ -25,8 +27,15 @@ def _write_toolchain(tmp_path: Path, *, archive_sha256: str) -> tuple[Path, str]
         },
         "artifact": {"path": "bin/timeloop-mapper", "sha256": mapper_sha256},
         "build": {
+            "bootstrap_packages": {
+                "ca-certificates": (
+                    orojenesis.OROJENESIS_CA_CERTIFICATES_BOOTSTRAP_SHA256
+                ),
+                "openssl": orojenesis.OROJENESIS_OPENSSL_BOOTSTRAP_SHA256,
+            },
             "compiler_wrapper_sha256": (orojenesis.OROJENESIS_COMPILER_WRAPPER_SHA256),
             "builder_image": orojenesis.OROJENESIS_BUILDER_IMAGE,
+            "package_source_mode": "snapshot_only",
             "ubuntu_snapshot": orojenesis.OROJENESIS_UBUNTU_SNAPSHOT,
             "source_date_epoch": orojenesis.OROJENESIS_SOURCE_DATE_EPOCH,
             "compiler": "test compiler",
@@ -49,6 +58,13 @@ def test_self_declared_mapper_digest_is_not_a_trust_anchor(tmp_path):
 
 def test_current_release_has_no_trusted_mapper_artifact():
     assert orojenesis.OROJENESIS_TRUSTED_MAPPER_SHA256 == frozenset()
+
+
+def test_compiler_wrapper_digest_matches_repository_file():
+    wrapper = REPOSITORY_ROOT / "docker" / "orojenesis" / "g++-cstdint"
+    assert hashlib.sha256(wrapper.read_bytes()).hexdigest() == (
+        orojenesis.OROJENESIS_COMPILER_WRAPPER_SHA256
+    )
 
 
 def test_provenance_must_match_pinned_source_archive(tmp_path, monkeypatch):
@@ -123,6 +139,14 @@ def test_valid_provenance_manifest_is_returned_as_identity(tmp_path, monkeypatch
         (
             lambda item: item["build"].update(ubuntu_snapshot="wrong"),
             "Ubuntu snapshot mismatch",
+        ),
+        (
+            lambda item: item["build"]["bootstrap_packages"].update(openssl="wrong"),
+            "bootstrap package mismatch",
+        ),
+        (
+            lambda item: item["build"].update(package_source_mode="mixed"),
+            "package source mismatch",
         ),
         (
             lambda item: item["build"].update(source_date_epoch=0),
