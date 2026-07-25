@@ -60,6 +60,8 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--expected-archive-sha256", required=True)
     parser.add_argument("--builder-image", required=True)
     parser.add_argument("--ubuntu-snapshot", required=True)
+    parser.add_argument("--openssl-bootstrap-sha256", required=True)
+    parser.add_argument("--ca-certificates-bootstrap-sha256", required=True)
     parser.add_argument("--source-date-epoch", required=True, type=int)
     parser.add_argument("--compiler-wrapper", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
@@ -95,7 +97,12 @@ def main() -> int:
             "sha256": _sha256(mapper),
         },
         "build": {
+            "bootstrap_packages": {
+                "ca-certificates": args.ca_certificates_bootstrap_sha256,
+                "openssl": args.openssl_bootstrap_sha256,
+            },
             "builder_image": args.builder_image,
+            "package_source_mode": "snapshot_only",
             "ubuntu_snapshot": args.ubuntu_snapshot,
             "source_date_epoch": args.source_date_epoch,
             "compiler": _compiler_identity(args.compiler_wrapper),
