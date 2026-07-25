@@ -36,6 +36,23 @@ accepts the Eq. 1 roofline (`bound_kind == "diagnostic"`,
 which requires the capacity-constrained / Orojenesis tile-aware bound
 (`bound_kind == "capacity_constrained_tile_aware_v1"`).
 
+The outer `sol-execbench solar analyze` command is the formal publication
+surface and always sets `require_orojenesis=True`. Its worker IPC, bridge, and
+CLI independently reject an analyzed response unless it carries the exact
+capacity-constrained bound, a positive finite lower bound, the complete
+content-addressed artifact set, and `publication_eligible=true`. A diagnostic
+Eq. 1 result remains available through the benchmark-agnostic Python API, but
+cannot cross the formal bridge.
+
+`solar_request_manifest` schema 2 records both `require_orojenesis` and
+`publication_eligible`. Formal Orojenesis acceptance requires the
+repository-allowlisted mapper binary plus the pinned provenance manifest,
+source archive/tree, builder image, compiler-wrapper digest, and compiler
+identity. A git checkout without the provenance manifest is not accepted.
+There is no git-checkout fallback.
+The current mapper allowlist is empty, so the formal CLI fails closed until a
+reviewed reproducible artifact is published.
+
 Regardless of this flag, formal publication is *additionally* gated by verified
 architecture audit evidence (`ArchitectureProfile.require_verified_audit_evidence`),
 an independent guard the flag does not bypass. The packaged RX_9060_XT profile

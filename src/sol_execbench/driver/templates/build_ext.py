@@ -48,6 +48,16 @@ def _rebase_rocm_flag(flag: str) -> str:
 
 # set flags
 hip_cflags = list(compile_options.hip_cflags) if compile_options else []
+native_languages = {language.value for language in solution.spec.languages}
+if native_languages & {"ck", "rocwmma"}:
+    # PyTorch defines these for its own HIP extension headers, but CK and
+    # rocWMMA require the standard HIP half conversions and operators.
+    for flag in (
+        "-U__HIP_NO_HALF_OPERATORS__",
+        "-U__HIP_NO_HALF_CONVERSIONS__",
+    ):
+        if flag not in hip_cflags:
+            hip_cflags.append(flag)
 cflags = (
     [_rebase_rocm_flag(flag) for flag in compile_options.cflags]
     if compile_options

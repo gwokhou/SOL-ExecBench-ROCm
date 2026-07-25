@@ -1236,6 +1236,18 @@ def _write_artifact(args: argparse.Namespace, artifact: dict[str, Any]) -> None:
             file=sys.stderr,
         )
         return
+    throttle_statuses = {
+        str(snapshot["throttle_status"])
+        for measurement in artifact["measurements"]
+        for batch in measurement["raw_process_batches"]
+        for snapshot in (batch["telemetry_before"], batch["telemetry_after"])
+    }
+    required_unthrottled = throttle_statuses == {"UNTHROTTLED"}
+    evidence_scope = (
+        "unthrottled_resource_peak"
+        if required_unthrottled
+        else "instruction_and_runtime_corroboration_only"
+    )
     print(
         "\n# ---- patch for src/solar/configs/arch/RX_9060_XT.yaml ----",
         file=sys.stderr,
@@ -1248,6 +1260,8 @@ def _write_artifact(args: argparse.Namespace, artifact: dict[str, Any]) -> None:
         f"  required_schema_version: {SCHEMA_VERSION}\n"
         f"  required_timing_profile: {TIMING_PROFILE}\n"
         "  required_clocks_locked: true\n"
+        f"  required_unthrottled: {str(required_unthrottled).lower()}\n"
+        f"  evidence_scope: {evidence_scope}\n"
         f"  gfx_target: {args.gfx}",
         file=sys.stderr,
     )

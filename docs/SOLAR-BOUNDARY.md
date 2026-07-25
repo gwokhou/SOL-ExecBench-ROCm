@@ -48,6 +48,14 @@ the paper and accepts the Eq. 1 roofline. Either way this is a release-evidence
 policy of this port, not an expansion of SOLAR into benchmark evaluation or a
 claim of universal paper parity.
 
+The benchmark-agnostic Python API retains that diagnostic default. The outer
+`sol-execbench solar analyze` bridge is stricter: it always requires
+Orojenesis and rejects any worker response that is not an explicitly
+publication-eligible `capacity_constrained_tile_aware_v1` result with the
+complete artifact set. The request manifest records the policy and result.
+Formal toolchain verification requires a reviewed binary allowlist entry and
+the pinned provenance/build identity; there is no git-checkout fallback.
+
 The only intended formal target is the packaged `RX_9060_XT` profile and an
 observed ROCm `gfx1200` device. Its referenced locked-clock resource-audit file
 is content-addressed and validated before graph extraction. Its sole supported

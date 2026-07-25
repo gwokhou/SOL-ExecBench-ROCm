@@ -1,0 +1,18 @@
+{
+  "name": "rdna4_vecadd_triton",
+  "definition": "rdna4_vecadd_f32",
+  "author": "test",
+  "spec": {
+    "languages": ["triton"],
+    "target_hardware": ["gfx1200"],
+    "entry_point": "kernel.py::run",
+    "dependencies": [],
+    "destination_passing_style": false
+  },
+  "sources": [
+    {
+      "path": "kernel.py",
+      "content": "import torch\nimport triton\nimport triton.language as tl\n\n@triton.jit\ndef _vecadd(x, y, output, n: tl.constexpr, BLOCK_SIZE: tl.constexpr):\n    offsets = tl.program_id(0) * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)\n    mask = offsets < n\n    tl.store(output + offsets, tl.load(x + offsets, mask=mask) + tl.load(y + offsets, mask=mask), mask=mask)\n\ndef run(x, y):\n    output = torch.empty_like(x)\n    n = x.numel()\n    _vecadd[(triton.cdiv(n, 256),)](x, y, output, n=n, BLOCK_SIZE=256)\n    return output\n"
+    }
+  ]
+}

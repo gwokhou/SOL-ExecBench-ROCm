@@ -11,6 +11,27 @@ from sol_execbench.core.solar_bridge import learn_worker, worker
 from sol_execbench.core.solar_bridge.models import SolarAnalysisOutcome
 
 
+def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
+    return SolarAnalysisOutcome(
+        status="analyzed",
+        analysis_id=analysis_id,
+        output_dir=output_dir,
+        architecture_sha256="a" * 64,
+        lower_bound_seconds=0.001,
+        bound_kind="capacity_constrained_tile_aware_v1",
+        artifacts=tuple(
+            {"path": path, "sha256": "b" * 64}
+            for path in (
+                "operator_graph.yaml",
+                "einsum_graph.yaml",
+                "conversion-attestation.yaml",
+                "solar-analysis.yaml",
+            )
+        ),
+        publication_eligible=True,
+    )
+
+
 def _write_request(tmp_path: Path) -> tuple[Path, Path]:
     request = tmp_path / "request.json"
     response = tmp_path / "response.json"
@@ -33,11 +54,7 @@ def test_analysis_worker_serializes_success(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         worker,
         "analyze_workload",
-        lambda **kwargs: SolarAnalysisOutcome(
-            status="analyzed",
-            analysis_id=kwargs["workload_uuid"],
-            output_dir=kwargs["output_dir"],
-        ),
+        lambda **kwargs: _formal_outcome(kwargs["workload_uuid"], kwargs["output_dir"]),
     )
     monkeypatch.setattr(sys, "argv", ["worker", str(request), str(response)])
 
@@ -71,6 +88,7 @@ def test_analysis_worker_converts_exception_to_stable_failure(
         "lower_bound_seconds": None,
         "message": "analysis exploded",
         "output_dir": None,
+        "publication_eligible": False,
         "reason_code": "bridge_failed",
         "stage": "outer_bridge",
         "status": "failed",

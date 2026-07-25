@@ -65,10 +65,12 @@ Candidate evaluation remains an outer-project operation:
 The intended formal SOLAR target is RX 9060 XT `gfx1200`. This port's formal
 publication policy requires the pinned Orojenesis toolchain; that is an
 explicit ROCm release constraint, not a claim that the paper mandates this
-tool for every SOLAR use. This revision deliberately blocks publication
-because its locked-clock architecture audit artifact and reviewed Orojenesis
-mapper artifact digest have not been published. An Orojenesis executable whose
-digest is only self-declared by its local provenance manifest is rejected:
+tool for every SOLAR use. The architecture audit is packaged and
+content-addressed, with its throttled resource measurements explicitly limited
+to instruction/runtime corroboration. Formal publication remains deliberately
+blocked because no reviewed Orojenesis mapper artifact digest has been added to
+the release allowlist. An executable whose digest is only self-declared by its
+local provenance manifest is rejected:
 
 ```bash
 uv run sol-execbench solar analyze \
@@ -120,7 +122,11 @@ GPU tests declare their ROCm and architecture prerequisites. Build the optional
 container with `./scripts/run_docker.sh --build`.
 
 See [SOLAR boundary](docs/SOLAR-BOUNDARY.md) and
-[scoring contract](docs/SCORING-V3.md) for the normative v3 architecture.
+[scoring contract](docs/SCORING-V3.md) for the normative v3 architecture. The
+recorded GPU engineering evidence is limited to RX 9060 XT `gfx1200` on the
+locked ROCm 7.2 stack; see
+[RDNA4 validation scope](docs/user/RDNA4-VALIDATION.md) for the exact test,
+toolchain, self-hosted-runner, and release-authority boundaries.
 
 ## License
 

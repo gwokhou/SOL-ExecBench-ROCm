@@ -24,8 +24,10 @@ all workloads pass.
 Coverage (language-specific examples are in test_examples.py):
   1. Custom inputs                   — custom_inputs_matmul (custom_inputs_entrypoint)
   2. Triton @jit reference           — triton_ref_vecadd   (importlib reference loading)
-  3. Reward-hack detection           — evil_* samples
-  4. CLI e2e                         — gqa_paged_decode
+  3. RDNA4 HIP candidate             — rdna4_vecadd
+  4. RDNA4 Triton candidate          — rdna4_vecadd
+  5. Reward-hack detection           — evil_* samples
+  6. CLI e2e                         — gqa_paged_decode
 """
 
 from __future__ import annotations
@@ -123,6 +125,80 @@ _CASES = [
         sample="triton_ref_vecadd",
         solution_file="solution_python.json",
         expected_count=3,
+    ),
+    Sample(
+        test_id="rdna4_vecadd_hip",
+        sample="rdna4_vecadd",
+        solution_file="solution_hip.json",
+        expected_count=1,
+        extra_markers=[
+            "cpp",
+            "requires_rocm_dev",
+            "requires_rocm_gpu",
+            "requires_rdna4",
+        ],
+    ),
+    Sample(
+        test_id="rdna4_vecadd_triton",
+        sample="rdna4_vecadd",
+        solution_file="solution_triton.json",
+        expected_count=1,
+        extra_markers=[
+            "requires_rocm_gpu",
+            "requires_rdna4",
+            "requires_triton_rocm",
+        ],
+    ),
+    Sample(
+        test_id="rdna4_vecadd_hipblas",
+        sample="rdna4_vecadd",
+        solution_file="solution_hipblas.json",
+        expected_count=1,
+        extra_markers=[
+            "cpp",
+            "requires_rocm_dev",
+            "requires_rocm_gpu",
+            "requires_rdna4",
+        ],
+    ),
+    Sample(
+        test_id="rdna4_vecadd_miopen",
+        sample="rdna4_vecadd",
+        solution_file="solution_miopen.json",
+        expected_count=1,
+        extra_markers=[
+            "cpp",
+            "requires_miopen",
+            "requires_rocm_dev",
+            "requires_rocm_gpu",
+            "requires_rdna4",
+        ],
+    ),
+    Sample(
+        test_id="rdna4_vecadd_ck",
+        sample="rdna4_vecadd",
+        solution_file="solution_ck.json",
+        expected_count=1,
+        extra_markers=[
+            "cpp",
+            "requires_ck",
+            "requires_rocm_dev",
+            "requires_rocm_gpu",
+            "requires_rdna4",
+        ],
+    ),
+    Sample(
+        test_id="rdna4_rocwmma_matmul",
+        sample="rdna4_rocwmma",
+        solution_file="solution.json",
+        expected_count=1,
+        extra_markers=[
+            "cpp",
+            "requires_rocwmma",
+            "requires_rocm_dev",
+            "requires_rocm_gpu",
+            "requires_rdna4",
+        ],
     ),
 ]
 

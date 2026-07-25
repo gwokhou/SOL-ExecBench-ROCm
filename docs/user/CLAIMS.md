@@ -23,6 +23,14 @@ Hardware-specific tests and observations establish only the behavior they
 directly execute. A marker, compatibility entry, or diagnostic sidecar is not a
 family-wide hardware-validation claim.
 
+The recorded RDNA4 gate is exact to AMD Radeon RX 9060 XT `gfx1200`, ROCm
+7.2.0, PyTorch `2.11.0+rocm7.2`, and its recorded HIP runtime. It does not
+validate every `gfx12*` product or ROCm release. Local and manual self-hosted
+GitHub bundles use `sol_execbench.rdna4_validation.v2`; they are
+content-addressed engineering evidence, not signed release attestations, and
+are always rejected when release eligibility is required. See
+[RDNA4 Validation Scope](RDNA4-VALIDATION.md).
+
 ## ROCm Compatibility Matrix
 
 Each Matrix Entry separates two kinds of data:

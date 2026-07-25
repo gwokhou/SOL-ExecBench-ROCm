@@ -25,15 +25,20 @@ def _attr_path(node: ast.AST) -> str:
     return ""
 
 
-def _has_direct_cdna3_marked_test(path: Path) -> bool:
+def _has_direct_hardware_marked_test(path: Path, marker: str) -> bool:
     tree = ast.parse(path.read_text())
     for node in ast.walk(tree):
-        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
             continue
-        if not node.name.startswith("test_"):
+        is_test = (
+            node.name.startswith("Test")
+            if isinstance(node, ast.ClassDef)
+            else node.name.startswith("test_")
+        )
+        if not is_test:
             continue
         if any(
-            _attr_path(decorator) == "pytest.mark.requires_cdna3"
+            _attr_path(decorator) == f"pytest.mark.{marker}"
             for decorator in node.decorator_list
         ):
             return True
@@ -56,7 +61,7 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
         "subprocess_uv: test launches uv-managed subprocesses",
         "native_extension: test loads native extension modules",
         "native_extension_serial: native extension test skipped by default",
-        "requires_rdna4: test requires an AMD RDNA 4 GPU",
+        "requires_rdna4: test requires the validated AMD gfx1200 RDNA 4 target",
         "requires_cdna3: test requires an AMD CDNA 3 GPU",
         "legacy NVIDIA cuTile marker; skipped in this ROCm-only port",
     ]
@@ -73,7 +78,7 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
         "safetensors.torch support unavailable",
         "docker_dependency tests skipped by default",
         "native_extension_serial tests skipped by default",
-        "requires AMD RDNA 4 ROCm GPU",
+        "requires exact AMD gfx1200 RDNA 4 target",
         "requires AMD CDNA 3 ROCm GPU",
         "unsupported AMD GPU architecture for ROCm test",
         "legacy cuTile tests are NVIDIA-only",
@@ -108,7 +113,42 @@ def test_cdna3_marker_has_concrete_hardware_gated_test_surface():
         if path.name != "test_rocm_test_suite_audit.py"
     ]
 
-    assert any(_has_direct_cdna3_marked_test(path) for path in candidates)
+    assert any(
+        _has_direct_hardware_marked_test(path, "requires_cdna3") for path in candidates
+    )
+
+
+def test_rdna4_marker_has_concrete_hardware_gated_test_surface():
+    candidates = [
+        path
+        for path in (ROOT / "tests").rglob("test_*.py")
+        if path.name != "test_rocm_test_suite_audit.py"
+    ]
+
+    assert any(
+        _has_direct_hardware_marked_test(path, "requires_rdna4") for path in candidates
+    )
+
+
+def test_rdna4_hardware_workflow_is_exact_and_publishes_evidence():
+    workflow = _read(".github/workflows/rdna4-hardware.yml")
+
+    required = [
+        "runs-on: [self-hosted, linux, x64, rocm, gfx1200]",
+        'HIP_VISIBLE_DEVICES: "0"',
+        'ROCR_VISIBLE_DEVICES: "0"',
+        "workflow_dispatch:",
+        "scripts/internal/rdna4/run_rdna4_validation.py",
+        "--output-dir out/rdna4-ci",
+        '--expected-source-revision "${GITHUB_SHA}"',
+        "actions/upload-artifact@v4",
+        "if-no-files-found: error",
+    ]
+    for phrase in required:
+        assert phrase in workflow
+    assert "pull_request:" not in workflow
+    assert "schedule:" not in workflow
+    assert "push:" not in workflow
 
 
 def test_cdna3_schema_support_is_distinct_from_hardware_validation():

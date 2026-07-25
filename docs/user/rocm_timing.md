@@ -162,3 +162,15 @@ fallbacks are labeled in the collection result. Compile, autotune, warmup, or
 unrelated kernel activity must be excluded by the caller's benchmark command or
 explicitly labeled in the resulting evidence; it must not silently become the
 reported measured latency.
+
+The default live collector applies a 300-second timeout, retains bounded output,
+and terminates the profiler process group on timeout. An injected test runner
+does not bypass the explicit timeout fallback classification.
+
+An optional profiler-overhead calibration uses
+`sol_execbench.rocprofv3_overhead_calibration.v2`. The collector ignores it
+unless its gfx architecture, profiler executable SHA-256, and clock-lock state
+match the current request. An unspecified current clock state does not match a
+locked or unlocked calibration. This calibration annotates derived profiler
+evidence only; it does not replace canonical HIP device-event latency or grant
+score authority.

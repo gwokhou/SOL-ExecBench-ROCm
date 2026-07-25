@@ -18,7 +18,6 @@ import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
 from sol_execbench.core.bench.clock_lock import (
     ClockLockLease,
@@ -34,7 +33,12 @@ from sol_execbench.core.bench.rocm_profiler.calibration import (
     ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
     Rocprofv3OverheadCalibration,
 )
-from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
+from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.platform.runtime import (
+    detect_rocm_device,
+    resolve_rocm_tool_command,
+)
+from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +47,7 @@ DEFAULT_ITERATIONS = 100
 DEFAULT_WARMUP_RUNS = 10
 DEFAULT_GPU_ARCHITECTURE = "gfx1200"
 DEFAULT_ELEMENT_COUNT = 1_000_000
-DEFAULT_TEMP_ROOT = Path("tmp/rdna4-overhead-calibration")
+DEFAULT_TEMP_ROOT = Path("/tmp/sol-execbench-rdna4-overhead-calibration")
 
 
 class CalibrationClockState:
@@ -78,12 +82,26 @@ def run_calibration(
     source_revision: str | None = None,
 ) -> int:
     """Run rocprofv3 overhead calibration and write result to output_path."""
+    if iterations <= 0:
+        raise ValueError("iterations must be positive")
+    if warmup_runs < 0:
+        raise ValueError("warmup runs must not be negative")
+    if element_count <= 0:
+        raise ValueError("element count must be positive")
     if (
         source_revision is not None
         and re.fullmatch(r"[0-9a-f]{40}", source_revision) is None
     ):
         raise ValueError("source revision must be a full lowercase Git object id")
     resolved_profiler = profiler_executable or resolve_rocm_tool_command("rocprofv3")
+    profiler_executable_path = Path(resolved_profiler).resolve(strict=True)
+    gpu_isolation = validate_gpu_device_isolation(gpu_device=gpu_device)
+    if strict_isolation and not gpu_isolation["isolated"]:
+        logger.error(
+            "STRICT ISOLATION: GPU device isolation check failed, aborting: %s",
+            gpu_isolation["warnings"],
+        )
+        return 1
     clock_state = _setup_calibration_clocks(
         manage_clocks=manage_clocks,
         strict_isolation=strict_isolation,
@@ -93,6 +111,29 @@ def run_calibration(
 
     try:
         import torch
+
+        try:
+            visible_device_count = torch.cuda.device_count()
+            device_info = detect_rocm_device("cuda:0", torch_module=torch)
+        except (RuntimeError, ValueError) as exc:
+            logger.error("ROCm device detection failed: %s", exc)
+            return 1
+        expected_architecture = gpu_architecture.split(":", maxsplit=1)[0].lower()
+        if visible_device_count != 1:
+            logger.error(
+                "Calibration requires exactly one visible ROCm GPU, detected %d",
+                visible_device_count,
+            )
+            return 1
+        if device_info.gfx_target != expected_architecture:
+            logger.error(
+                "GPU architecture mismatch: detected %s, expected %s",
+                device_info.gfx_target,
+                expected_architecture,
+            )
+            return 1
+        gpu_isolation["visible_gpu_architecture"] = device_info.gfx_target
+        gpu_isolation["visible_gpu_name"] = device_info.name
 
         # Pre-flight isolation audit
         logger.info("Running timing isolation pre-flight audit...")
@@ -120,16 +161,8 @@ def run_calibration(
                 return 1
             logger.warning("Clock state verification failed at calibration start")
 
-        gpu_isolation = validate_gpu_device_isolation(gpu_device=gpu_device)
-        if not gpu_isolation["isolated"]:
-            if strict_isolation:
-                logger.error(
-                    "STRICT ISOLATION: GPU device isolation check failed, aborting: %s",
-                    gpu_isolation["warnings"],
-                )
-                return 1
-            for warn in gpu_isolation["warnings"]:
-                logger.warning("GPU device isolation: %s", warn)
+        for warn in gpu_isolation["warnings"]:
+            logger.warning("GPU device isolation: %s", warn)
 
         # Build minimal HIP kernel (vector add)
         a = torch.randn(element_count, device="cuda", dtype=torch.float32)
@@ -156,10 +189,9 @@ def run_calibration(
         profiler_durations: list[float] = []
         try:
             profiler_result = _run_with_rocprofv3(
-                a,
-                b,
-                c,
+                element_count=element_count,
                 iterations=iterations,
+                warmup_runs=warmup_runs,
                 temp_dir=DEFAULT_TEMP_ROOT,
                 profiler_executable=resolved_profiler,
             )
@@ -189,8 +221,9 @@ def run_calibration(
                 "iterations": iterations,
                 "warmup_runs": warmup_runs,
                 "element_count": element_count,
-                "gpu_architecture": gpu_architecture,
+                "gpu_architecture": device_info.gfx_target,
                 "profiler_executable": resolved_profiler,
+                "profiler_executable_sha256": sha256_file(profiler_executable_path),
                 "clock_locked": clock_ok,
                 "clock_setup": {
                     "managed": manage_clocks,
@@ -295,11 +328,10 @@ def _teardown_calibration_clocks(
 
 
 def _run_with_rocprofv3(
-    a: Any,
-    b: Any,
-    c: Any,
     *,
+    element_count: int,
     iterations: int,
+    warmup_runs: int,
     temp_dir: Path | None = None,
     profiler_executable: str = "rocprofv3",
 ) -> list[float]:
@@ -307,10 +339,13 @@ def _run_with_rocprofv3(
 
     Uses the same rocprofv3 infrastructure as the batch script for consistency.
     """
-    import subprocess
     import tempfile
 
-    from sol_execbench.core.bench.rocm_profiler import build_rocprofv3_command
+    from sol_execbench.core.bench.rocm_profiler import (
+        build_rocprofv3_command,
+        find_rocprofv3_csv,
+        summarize_rocprofv3_csv,
+    )
 
     # Create a minimal Python script that runs vector add under rocprofv3
     inner_script = (
@@ -318,11 +353,11 @@ def _run_with_rocprofv3(
         "import json\n"
         "import sys\n"
         "dev = 'cuda' if torch.cuda.is_available() else 'cpu'\n"
-        f"a = torch.randn({a.shape[0]}, device=dev, dtype=torch.float32)\n"
+        f"a = torch.randn({element_count}, device=dev, dtype=torch.float32)\n"
         "b = torch.randn(a.shape[0], device=dev, dtype=torch.float32)\n"
         "c = torch.empty_like(a)\n"
         "durations = []\n"
-        "for _ in range(10):\n"
+        f"for _ in range({warmup_runs}):\n"
         "    torch.add(a, b, out=c)\n"
         "    torch.cuda.synchronize()\n"
         f"for _ in range({iterations}):\n"
@@ -352,19 +387,26 @@ def _run_with_rocprofv3(
             executable=profiler_executable,
         )
 
-        result = subprocess.run(
+        result = run_in_process_group_bounded(
             command,
-            capture_output=True,
-            text=True,
             timeout=300,
         )
 
         if result.returncode != 0:
-            logger.warning("rocprofv3 inner script failed: %s", result.stderr)
-            # Fallback: parse stdout for durations even on non-zero exit
-            # rocprofv3 sometimes returns non-zero but still produces output
+            raise RuntimeError(
+                "rocprofv3 inner script failed with exit code "
+                f"{result.returncode}: {(result.stderr or '')[-4096:]}"
+            )
+        csv_path = find_rocprofv3_csv(
+            output_dir,
+            "rocprofv3-overhead-calibration",
+        )
+        if csv_path is None:
+            raise RuntimeError("rocprofv3 did not produce a kernel-trace CSV")
+        kernel_rows, _ = summarize_rocprofv3_csv(csv_path)
+        if kernel_rows <= 0:
+            raise RuntimeError("rocprofv3 kernel-trace CSV contained no kernel rows")
 
-        # Try to parse durations from stdout
         for line in (result.stdout or "").splitlines():
             line = line.strip()
             if line.startswith("["):
@@ -377,7 +419,7 @@ def _run_with_rocprofv3(
                 except json.JSONDecodeError:
                     continue
 
-    return []
+    raise RuntimeError("profiled child did not emit device-event durations")
 
 
 def _utc_timestamp() -> str:

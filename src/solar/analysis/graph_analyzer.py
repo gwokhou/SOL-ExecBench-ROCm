@@ -89,6 +89,7 @@ from solar.analysis.graph_models import (
     ResourceAccounting as _ResourceAccounting,
 )
 from solar.analysis.orojenesis import (
+    OrojenesisError as OrojenesisError,
     OrojenesisRunner,
     find_multi_einsum_chains,
     find_multi_einsum_regions,

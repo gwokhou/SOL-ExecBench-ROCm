@@ -16,6 +16,16 @@ from sol_execbench.core.solar_bridge.models import (
 )
 from solar.api import AnalysisFailure, AnalysisResult, ArtifactRef, SolBound
 
+_FORMAL_ARTIFACTS = tuple(
+    ArtifactRef(path, "b" * 64)
+    for path in (
+        "operator_graph.yaml",
+        "einsum_graph.yaml",
+        "conversion-attestation.yaml",
+        "solar-analysis.yaml",
+    )
+)
+
 
 def _definition(dtype: str = "torch.float16") -> Definition:
     tensor = SimpleNamespace(dtype=dtype)
@@ -136,17 +146,19 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
     monkeypatch.setattr(
         analyzer, "formal_precision_for_definition", lambda value: "fp16"
     )
-    monkeypatch.setattr(
-        "solar.api.analyze",
-        lambda request: AnalysisResult(
+
+    def fake_analyze(request):
+        assert request.require_orojenesis is True
+        return AnalysisResult(
             status="analyzed",
             analysis_id=request.analysis_id,
             output_dir=result_dir,
             architecture_sha256="a" * 64,
-            artifacts=(ArtifactRef("manifest.yaml", "b" * 64),),
-            bound=SolBound(0.001, "roofline", "memory"),
-        ),
-    )
+            artifacts=_FORMAL_ARTIFACTS,
+            bound=SolBound(0.001, "capacity_constrained_tile_aware_v1", "memory"),
+        )
+
+    monkeypatch.setattr("solar.api.analyze", fake_analyze)
 
     outcome = analyzer._invoke_solar(
         definition=_definition(),
@@ -161,7 +173,44 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
     assert outcome.status == "analyzed"
     assert outcome.lower_bound_seconds == 0.001
     assert outcome.limiting_resource == "memory"
-    assert outcome.artifacts == ({"path": "manifest.yaml", "sha256": "b" * 64},)
+    assert outcome.publication_eligible is True
+    assert {artifact["path"] for artifact in outcome.artifacts} == {
+        artifact.path for artifact in _FORMAL_ARTIFACTS
+    }
+
+
+def test_invoke_solar_rejects_non_formal_result(tmp_path, monkeypatch) -> None:
+    result_dir = tmp_path / "result"
+    result_dir.mkdir()
+    monkeypatch.setattr(
+        analyzer, "formal_precision_for_definition", lambda value: "fp16"
+    )
+    monkeypatch.setattr(
+        "solar.api.analyze",
+        lambda request: AnalysisResult(
+            status="analyzed",
+            analysis_id=request.analysis_id,
+            output_dir=result_dir,
+            architecture_sha256="a" * 64,
+            artifacts=_FORMAL_ARTIFACTS,
+            bound=SolBound(0.001, "diagnostic", "memory"),
+        ),
+    )
+
+    outcome = analyzer._invoke_solar(
+        definition=_definition(),
+        workload=_workload(),
+        reference=lambda value: value,
+        input_factory=lambda seed: (seed,),
+        output_dir=result_dir,
+        device="hip:0",
+        orojenesis_home=None,
+    )
+
+    assert outcome.status == "failed"
+    assert outcome.stage == "formal_acceptance"
+    assert outcome.reason_code == "non_formal_bound"
+    assert not result_dir.exists()
 
 
 def test_select_workload_requires_exact_uuid_match() -> None:

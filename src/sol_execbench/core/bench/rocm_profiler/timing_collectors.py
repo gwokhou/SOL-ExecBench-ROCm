@@ -3,6 +3,7 @@
 
 """ROCm profiler timing parsing and live timing collection."""
 
+import subprocess
 from pathlib import Path
 
 from sol_execbench.core.bench.rocm_profiler.commands import (
@@ -27,6 +28,7 @@ from sol_execbench.core.bench.timing_policy import (
     select_timing_policy,
     timing_policy_for_languages,
 )
+from sol_execbench.core.text_utils import subprocess_text
 
 
 def collect_rocprofv3_timing(
@@ -57,8 +59,34 @@ def collect_rocprofv3_timing(
         executable=request.executable,
         include_hip_runtime=request.include_hip_runtime,
     )
-    run = runner or default_runner
-    completed = run(command)
+    try:
+        if runner is None:
+            completed = default_runner(
+                command,
+                timeout_seconds=request.timeout_seconds,
+            )
+        else:
+            completed = runner(command)
+    except subprocess.TimeoutExpired as exc:
+        csv_path = find_rocprofv3_csv(request.output_directory, request.output_file)
+        fallback = DefaultTimingSelection(
+            policy=select_timing_policy(
+                request.policy.source_type, profiler_available=False
+            ),
+            profiler_backed=False,
+            fallback_applied=True,
+            reason=(
+                f"rocprofv3 command timed out after {request.timeout_seconds:g} seconds"
+            ),
+        )
+        return Rocprofv3CollectionResult(
+            evidence=None,
+            selection=fallback,
+            command=tuple(command),
+            csv_path=csv_path,
+            stdout=subprocess_text(exc.stdout),
+            stderr=subprocess_text(exc.stderr),
+        )
     csv_path = find_rocprofv3_csv(request.output_directory, request.output_file)
     if completed.returncode != 0:
         fallback = DefaultTimingSelection(
@@ -96,7 +124,12 @@ def collect_rocprofv3_timing(
             stderr=completed.stderr or "",
         )
 
-    profiler_overhead_ms = read_overhead_calibration(calibration_path)
+    profiler_overhead_ms = read_overhead_calibration(
+        calibration_path,
+        expected_gpu_architecture=request.gpu_architecture,
+        expected_profiler_executable=request.executable,
+        expected_clock_locked=request.clock_locked,
+    )
     compacted_kernel_rows: int | None = None
     if request.compact_rows:
         evidence, compacted_kernel_rows = build_compact_timing_evidence(
@@ -178,6 +211,7 @@ def collect_source_timing_evidence(
         min_measurement_time_seconds=request.min_measurement_time_seconds,
         trial_count=request.trial_count,
         clock_locked=request.clock_locked,
+        timeout_seconds=request.timeout_seconds,
     )
     return collect_rocprofv3_timing(
         collection_request,

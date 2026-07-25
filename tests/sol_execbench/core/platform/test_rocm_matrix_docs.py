@@ -7,6 +7,7 @@ import re
 REPO_ROOT = Path(__file__).resolve().parents[4]
 CLAIMS = REPO_ROOT / "docs" / "user" / "CLAIMS.md"
 TESTING = REPO_ROOT / "docs" / "user" / "TESTING.md"
+RDNA4_VALIDATION = REPO_ROOT / "docs" / "user" / "RDNA4-VALIDATION.md"
 
 
 def _text(path: Path) -> str:
@@ -121,3 +122,26 @@ def test_testing_docs_include_compatibility_matrix_summary_table() -> None:
     assert "rocm-7.2-linear-wrapper-smoke.compatibility.json" in text
     assert "sol-execbench:rocm-7.0.2-complete" in text
     assert "sol-execbench:rocm-7.2-complete" in text
+
+
+def test_rdna4_docs_bind_exact_hardware_toolchain_and_authority() -> None:
+    text = _text(RDNA4_VALIDATION)
+
+    for phrase in (
+        "AMD Radeon RX 9060 XT",
+        "`gfx1200`",
+        "`7.2.0`",
+        "`2.11.0+rocm7.2`",
+        "`7.2.26015`",
+        "This is not an RDNA4-family claim",
+        "GitHub-hosted runners do not provide this GPU",
+        "manual-only",
+        "release_eligible=false",
+        "trusted_execution=false",
+        "content checksum proves internal consistency",
+        "Canonical benchmark latency remains HIP device-event timing",
+    ):
+        assert phrase in text
+
+    assert re.search(r"not\s+unthrottled resource-peak\s+evidence", text)
+    assert "gfx1200-class evidence" not in _text(TESTING)

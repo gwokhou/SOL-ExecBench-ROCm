@@ -314,6 +314,7 @@ class Rocprofv3CollectionRequest:
     trial_count: int | None = None
     clock_locked: bool | None = None
     compact_rows: bool = False
+    timeout_seconds: float = 300.0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -332,6 +333,7 @@ class SourceTimingRequest:
     min_measurement_time_seconds: float | None = None
     trial_count: int | None = None
     clock_locked: bool | None = None
+    timeout_seconds: float = 300.0
 
 
 @dataclass(frozen=True, slots=True)

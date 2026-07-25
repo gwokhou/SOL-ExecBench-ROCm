@@ -44,14 +44,18 @@ _TEMPLATE_PATH = (
 )
 
 
-def _make_solution_json(compile_options: dict | None = None) -> str:
+def _make_solution_json(
+    compile_options: dict | None = None,
+    *,
+    language: str = "hip_cpp",
+) -> str:
     """Create a minimal valid solution JSON string with given compile_options."""
     solution = {
         "name": "test_solution",
         "definition": "test_def",
         "author": "test",
         "spec": {
-            "languages": ["hip_cpp"],
+            "languages": [language],
             "target_hardware": ["LOCAL"],
             "entry_point": "main.hip::run",
             "destination_passing_style": True,
@@ -65,13 +69,17 @@ def _make_solution_json(compile_options: dict | None = None) -> str:
 def _exec_build_ext(
     cwd: Path,
     compile_options: dict | None = None,
+    *,
+    language: str = "hip_cpp",
 ) -> MagicMock:
     """Write solution.json and execute the build_ext template in *cwd* with ext.load mocked.
 
     Returns the ``ext.load`` mock so callers can inspect how it was called.
     """
     # Write solution.json
-    (cwd / "solution.json").write_text(_make_solution_json(compile_options))
+    (cwd / "solution.json").write_text(
+        _make_solution_json(compile_options, language=language)
+    )
 
     script = _TEMPLATE_PATH.read_text()
 
@@ -200,6 +208,19 @@ class TestCompileOptions:
         mock = _exec_build_ext(tmp_path, {"hip_cflags": ["--offload-arch=gfx1200"]})
         hip_cflags = mock.load.call_args.kwargs["extra_cuda_cflags"]
         assert hip_cflags == ["--offload-arch=gfx1200"]
+
+    @pytest.mark.parametrize("language", ["ck", "rocwmma"])
+    def test_matrix_libraries_restore_hip_half_support(self, tmp_path, language):
+        (tmp_path / "k.hip").write_text("")
+        (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
+
+        mock = _exec_build_ext(tmp_path, {}, language=language)
+
+        assert mock.load.call_args.kwargs["extra_cuda_cflags"] == [
+            "-O3",
+            "-U__HIP_NO_HALF_OPERATORS__",
+            "-U__HIP_NO_HALF_CONVERSIONS__",
+        ]
 
     def test_cflags_default_empty(self, tmp_path):
         (tmp_path / "k.hip").write_text("")

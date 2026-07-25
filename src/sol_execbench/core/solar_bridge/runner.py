@@ -58,7 +58,12 @@ def run_solar_worker(
             return _failed_outcome(request, "worker_execution_failed", str(exc))
         if response_path.is_file():
             try:
-                return SolarAnalysisOutcome.from_dict(load_json_value(response_path))
+                outcome = SolarAnalysisOutcome.from_dict(load_json_value(response_path))
+                if outcome.status == "analyzed" and not outcome.is_formal_publication:
+                    raise ValueError(
+                        "SOLAR worker returned a non-formal analyzed response"
+                    )
+                return outcome
             except Exception as exc:
                 return _failed_outcome(request, "worker_response_invalid", str(exc))
         stderr = redacted_file_tail(stderr_path)

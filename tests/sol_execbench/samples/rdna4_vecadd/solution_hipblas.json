@@ -1,0 +1,23 @@
+{
+  "name": "rdna4_vecadd_hipblas",
+  "definition": "rdna4_vecadd_f32",
+  "author": "test",
+  "spec": {
+    "languages": ["hipblas"],
+    "target_hardware": ["gfx1200"],
+    "entry_point": "kernel.hip::run",
+    "dependencies": ["hipBLAS"],
+    "compile_options": {
+      "hip_cflags": ["-O3", "-std=c++17"],
+      "ld_flags": ["-L/opt/rocm/lib", "-lhipblas"]
+    },
+    "destination_passing_style": false,
+    "binding": "torch"
+  },
+  "sources": [
+    {
+      "path": "kernel.hip",
+      "content": "#include <torch/extension.h>\n#include <c10/hip/HIPStream.h>\n#include <hipblas/hipblas.h>\n\nvoid check_hipblas(hipblasStatus_t status, const char* operation) {\n    TORCH_CHECK(status == HIPBLAS_STATUS_SUCCESS, operation, \" failed with hipBLAS status \", static_cast<int>(status));\n}\n\ntorch::Tensor run(const torch::Tensor& x, const torch::Tensor& y) {\n    TORCH_CHECK(x.is_cuda() && y.is_cuda(), \"inputs must be HIP tensors\");\n    TORCH_CHECK(x.scalar_type() == torch::kFloat32 && y.scalar_type() == torch::kFloat32, \"inputs must be float32\");\n    TORCH_CHECK(x.is_contiguous() && y.is_contiguous() && x.sizes() == y.sizes(), \"inputs must be contiguous and shape-compatible\");\n    auto output = y.clone();\n    hipblasHandle_t handle = nullptr;\n    check_hipblas(hipblasCreate(&handle), \"hipblasCreate\");\n    check_hipblas(hipblasSetStream(handle, c10::hip::getCurrentHIPStream()), \"hipblasSetStream\");\n    const float alpha = 1.0f;\n    check_hipblas(hipblasSaxpy(handle, x.numel(), &alpha, x.data_ptr<float>(), 1, output.data_ptr<float>(), 1), \"hipblasSaxpy\");\n    check_hipblas(hipblasDestroy(handle), \"hipblasDestroy\");\n    return output;\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, module) {\n    module.def(\"run\", &run, \"gfx1200 hipBLAS vector addition\");\n}\n"
+    }
+  ]
+}

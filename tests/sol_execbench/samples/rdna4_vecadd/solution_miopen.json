@@ -1,0 +1,23 @@
+{
+  "name": "rdna4_vecadd_miopen",
+  "definition": "rdna4_vecadd_f32",
+  "author": "test",
+  "spec": {
+    "languages": ["miopen"],
+    "target_hardware": ["gfx1200"],
+    "entry_point": "kernel.hip::run",
+    "dependencies": ["MIOpen"],
+    "compile_options": {
+      "hip_cflags": ["-O3", "-std=c++17"],
+      "ld_flags": ["-L/opt/rocm/lib", "-lMIOpen"]
+    },
+    "destination_passing_style": false,
+    "binding": "torch"
+  },
+  "sources": [
+    {
+      "path": "kernel.hip",
+      "content": "#include <torch/extension.h>\n#include <c10/hip/HIPStream.h>\n#include <miopen/miopen.h>\n\nvoid check_miopen(miopenStatus_t status, const char* operation) {\n    TORCH_CHECK(status == miopenStatusSuccess, operation, \" failed: \", miopenGetErrorString(status));\n}\n\ntorch::Tensor run(const torch::Tensor& x, const torch::Tensor& y) {\n    TORCH_CHECK(x.is_cuda() && y.is_cuda(), \"inputs must be HIP tensors\");\n    TORCH_CHECK(x.scalar_type() == torch::kFloat32 && y.scalar_type() == torch::kFloat32, \"inputs must be float32\");\n    TORCH_CHECK(x.is_contiguous() && y.is_contiguous() && x.sizes() == y.sizes(), \"inputs must be contiguous and shape-compatible\");\n    auto output = torch::empty_like(x);\n    miopenHandle_t handle = nullptr;\n    miopenTensorDescriptor_t descriptor = nullptr;\n    check_miopen(miopenCreate(&handle), \"miopenCreate\");\n    check_miopen(miopenSetStream(handle, c10::hip::getCurrentHIPStream()), \"miopenSetStream\");\n    check_miopen(miopenCreateTensorDescriptor(&descriptor), \"miopenCreateTensorDescriptor\");\n    check_miopen(miopenSet4dTensorDescriptor(descriptor, miopenFloat, 1, 1, 1, x.numel()), \"miopenSet4dTensorDescriptor\");\n    const float alpha = 1.0f;\n    const float beta = 0.0f;\n    check_miopen(miopenOpTensor(handle, miopenTensorOpAdd, &alpha, descriptor, x.data_ptr<float>(), &alpha, descriptor, y.data_ptr<float>(), &beta, descriptor, output.data_ptr<float>()), \"miopenOpTensor\");\n    check_miopen(miopenDestroyTensorDescriptor(descriptor), \"miopenDestroyTensorDescriptor\");\n    check_miopen(miopenDestroy(handle), \"miopenDestroy\");\n    return output;\n}\n\nPYBIND11_MODULE(TORCH_EXTENSION_NAME, module) {\n    module.def(\"run\", &run, \"gfx1200 MIOpen tensor addition\");\n}\n"
+    }
+  ]
+}

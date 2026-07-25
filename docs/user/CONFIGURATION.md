@@ -103,8 +103,12 @@ uv run sol-execbench solar analyze PROBLEM_DIR \
 ```
 
 Options are `--device` (default `cuda:0`), `--timeout` (default 14400 seconds)
-and `--orojenesis-home`. Formal analysis is currently constrained by the pinned
-gfx1200 architecture audit and fails closed when required evidence is absent.
+and `--orojenesis-home`. The CLI always requires the formal
+capacity-constrained Orojenesis bound. It rejects diagnostic Eq. 1 results at
+the worker, bridge, and CLI boundaries. Formal analysis is currently
+constrained by the pinned gfx1200 architecture audit and the repository-owned
+Orojenesis binary allowlist; the allowlist is empty until a reviewed
+reproducible mapper artifact is published.
 
 `solar learn-handler` is an offline candidate-generation workflow. Its output
 is forbidden in formal analysis until reviewed and committed under

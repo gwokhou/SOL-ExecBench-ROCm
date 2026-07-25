@@ -25,6 +25,8 @@ from solar.rocm.audit_validation import (
 
 RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION = "solar.resource_peak_calibration.v3"
 RESOURCE_PEAK_TIMING_PROFILE = "official"
+UNTHROTTLED_RESOURCE_PEAK_SCOPE = "unthrottled_resource_peak"
+INSTRUCTION_RUNTIME_AUDIT_SCOPE = "instruction_and_runtime_corroboration_only"
 _MAX_AUDIT_BYTES = 2 * 1024 * 1024
 
 _PRECISION_ALIASES = {
@@ -72,6 +74,7 @@ def verify_resource_peak_audit(
     expected_schema_version: str,
     expected_timing_profile: str,
     expected_clocks_locked: bool,
+    expected_unthrottled: bool,
     expected_gfx_target: str,
     expected_precisions: tuple[str, ...],
     expected_resource_modes: tuple[str, ...],
@@ -109,6 +112,7 @@ def verify_resource_peak_audit(
         verify_resource_peak_measurements(
             payload.get("experiment_protocol"),
             payload.get("measurements"),
+            require_unthrottled=expected_unthrottled,
         )
     )
     measurements = cast(dict[str, Mapping[str, Any]], raw_measurements)
@@ -329,6 +333,8 @@ def _validate_audit_evidence_config(evidence: Mapping[str, Any]) -> None:
         "required_schema_version",
         "required_timing_profile",
         "required_clocks_locked",
+        "required_unthrottled",
+        "evidence_scope",
         "gfx_target",
         "required_instruction_checks",
     }
@@ -337,6 +343,17 @@ def _validate_audit_evidence_config(evidence: Mapping[str, Any]) -> None:
         raise ValueError(
             f"verified audit evidence lacks required fields: {missing_fields}"
         )
+    required_unthrottled = evidence.get("required_unthrottled")
+    evidence_scope = evidence.get("evidence_scope")
+    if not isinstance(required_unthrottled, bool):
+        raise ValueError("verified audit evidence requires a boolean throttle policy")
+    expected_scope = (
+        UNTHROTTLED_RESOURCE_PEAK_SCOPE
+        if required_unthrottled
+        else INSTRUCTION_RUNTIME_AUDIT_SCOPE
+    )
+    if evidence_scope != expected_scope:
+        raise ValueError("verified audit evidence scope contradicts throttle policy")
     checks = evidence.get("required_instruction_checks")
     if (
         not isinstance(checks, list)
@@ -596,6 +613,7 @@ class ArchitectureProfile:
             expected_schema_version=str(self.audit_evidence["required_schema_version"]),
             expected_timing_profile=str(self.audit_evidence["required_timing_profile"]),
             expected_clocks_locked=bool(self.audit_evidence["required_clocks_locked"]),
+            expected_unthrottled=bool(self.audit_evidence["required_unthrottled"]),
             expected_gfx_target=str(self.audit_evidence["gfx_target"]),
             expected_precisions=self.required_calibration_precisions(),
             expected_resource_modes=self.required_calibration_resource_modes(),

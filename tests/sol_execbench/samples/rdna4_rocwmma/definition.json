@@ -1,0 +1,35 @@
+{
+  "name": "rdna4_rocwmma_matmul_f16",
+  "op_type": "matmul",
+  "axes": {
+    "m": {
+      "type": "const",
+      "value": 16
+    },
+    "n": {
+      "type": "const",
+      "value": 16
+    },
+    "k": {
+      "type": "const",
+      "value": 16
+    }
+  },
+  "inputs": {
+    "a": {
+      "shape": ["m", "k"],
+      "dtype": "float16"
+    },
+    "b": {
+      "shape": ["k", "n"],
+      "dtype": "float16"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": ["m", "n"],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch\n\ndef run(a, b):\n    return torch.matmul(a.to(torch.float32), b.to(torch.float32))\n"
+}
