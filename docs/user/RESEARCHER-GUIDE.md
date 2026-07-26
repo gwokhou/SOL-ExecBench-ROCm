@@ -21,7 +21,10 @@ unsupported version identifiers are errors. The pinned upstream corpus importer
 is the only layer that translates reviewed upstream field names into the current
 Definition and Workload shapes.
 
-Run `uv run sol-execbench contract --format json` to inspect the current
-machine-readable evaluator boundary and `uv run pytest tests/` for the complete
-test suite. ROCm hardware tests retain their explicit markers and skip when the
-required device or toolchain is unavailable.
+Run `uv run sol-execbench --format json contract evaluator` to inspect the
+current machine-readable evaluator boundary and
+`uv run sol-execbench --format json contract cli` to inspect the command
+surface. Root options such as `--format` must precede the subcommand. Run
+`uv run pytest tests/` for the complete test suite. ROCm hardware tests retain
+their explicit markers and skip when the required device or toolchain is
+unavailable.

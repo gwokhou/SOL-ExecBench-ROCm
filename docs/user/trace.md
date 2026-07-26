@@ -69,7 +69,7 @@ When outputs contain non-finite values, max error fields are set to `0.0` and
 | `speedup_factor` | float | `reference_latency_ms / latency_ms`. |
 
 Timing uses PyTorch's HIP-backed device event API. See
-[Analysis](../internal/analysis.md).
+[ROCm timing and profiling](rocm_timing.md).
 
 ## Environment
 

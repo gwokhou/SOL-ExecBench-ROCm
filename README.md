@@ -85,6 +85,20 @@ The isolated worker publishes an atomic directory containing only:
 `conversion-attestation.yaml`, `solar-analysis.yaml`, and `manifest.yaml`.
 It never receives candidate runtimes or computes scores.
 
+Audit extraction, strict conversion, and replay over every scored workload
+without running the formal bound:
+
+```bash
+uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
+  --device cuda:0 \
+  --timeout 14400
+```
+
+The audit derives its 35-problem / 122-workload denominator from the pinned
+manifest and writes a content-addressed `matrix.jsonl` plus `summary.json`.
+Failures remain in the matrix with stable stage and reason codes; `--resume`
+continues only when all recorded identities and artifact hashes still match.
+
 Unknown operations fail closed during formal analysis. Offline learning writes
 a verified but untrusted candidate outside the formal lookup table:
 
@@ -111,6 +125,13 @@ uv run sol-execbench score official RELEASE/release-bundle.json
 `sol-execbench score status` reports whether the corpus manifest has published
 the authority roots. Caller-authored measurements, baselines, or SOLAR JSON
 cannot cross the signature and content-addressing boundary.
+
+The release implementation includes `baseline release-build`,
+`baseline candidate-build`, `baseline release-run`, `solar release-build`,
+`score build-statement`, and `score assemble-bundle`. These commands do not
+make the checked-in corpus official by themselves: four independently signed
+role statements and repository-pinned authority keys are still required. See
+the [release and official-score workflow](docs/user/RELEASE-SCORING.md).
 
 Once those release artifacts are published and pinned, correct candidates must
 satisfy `T_b > T_SOL` and `T_k >= T_SOL`; workloads are averaged within each
