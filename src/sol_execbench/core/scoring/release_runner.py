@@ -38,14 +38,14 @@ from .release_environment import (
     release_execution_identity_from_payload,
     verify_release_source_state,
 )
-from .release_models import AuthorityRole, ExecutionPlanProblem, ReleaseExecutionPlan
+from .release_models import ExecutionPlanProblem, ReleaseExecutionPlan, ReleaseRunKind
 
 
 @dataclass(frozen=True, slots=True)
 class ReleaseRunResult:
     """Summary of one completed full-corpus release execution."""
 
-    role: AuthorityRole
+    role: ReleaseRunKind
     run_id: str
     problems: int
     workloads: int
@@ -81,9 +81,8 @@ def execute_release_plan(
         )
         workloads += len(result)
         passed += sum(trace.is_successful() for trace in result)
-    if plan.role in {AuthorityRole.BASELINE, AuthorityRole.RERUN}:
-        if passed != workloads:
-            raise ValueError("release baseline or rerun did not pass every workload")
+    if plan.role is ReleaseRunKind.BASELINE and passed != workloads:
+        raise ValueError("release baseline did not pass every workload")
     return ReleaseRunResult(
         plan.role, plan.run_id, len(plan.problems), workloads, passed
     )
@@ -184,7 +183,7 @@ def _execute_problem(
             )
         )
     except CliFailure as exc:
-        if plan.role != AuthorityRole.CANDIDATE:
+        if plan.role is not ReleaseRunKind.CANDIDATE:
             raise
         _write_candidate_failure(
             trace_path,
@@ -277,7 +276,7 @@ def _validate_existing_trace(
     trace_path: Path,
     problem_dir: Path,
     solution: Solution,
-    role: AuthorityRole,
+    role: ReleaseRunKind,
 ) -> list[Trace]:
     traces = load_jsonl_file(Trace, trace_path)
     workloads = load_jsonl_file(Workload, problem_dir / "workload.jsonl")
@@ -289,7 +288,7 @@ def _validate_existing_trace(
         or any(item.solution != solution.name for item in traces)
     ):
         raise ValueError(f"release trace identity mismatch: {trace_path}")
-    if role in {AuthorityRole.BASELINE, AuthorityRole.RERUN} and not all(
+    if role is ReleaseRunKind.BASELINE and not all(
         item.is_successful() for item in traces
     ):
         raise ValueError(f"release baseline trace did not pass: {trace_path}")

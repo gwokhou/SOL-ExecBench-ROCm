@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Deterministic builders for release baselines and signed evidence payloads."""
+"""Deterministic builders for release baseline and candidate evidence."""
 
 from __future__ import annotations
 
@@ -24,9 +24,9 @@ from sol_execbench.core.timestamps import utc_timestamp
 
 from .release_models import (
     ArtifactReference,
-    AuthorityRole,
     ExecutionPlanProblem,
     ReleaseExecutionPlan,
+    ReleaseRunKind,
     release_model_payload,
 )
 
@@ -38,7 +38,7 @@ def materialize_release_baseline(
     baseline_id: str,
     source_revision: str,
 ) -> Path:
-    """Create immutable trusted-reference baseline and rerun execution plans."""
+    """Create an immutable trusted-reference baseline execution plan."""
     corpus = AkaCorpusManifest.load(manifest_path)
     output = output_root.resolve()
     if output.exists():
@@ -48,7 +48,7 @@ def materialize_release_baseline(
     try:
         corpus_ref = _copy_corpus_manifest(corpus, staging)
         problems = _materialize_baseline_solutions(corpus, staging)
-        _write_execution_plans(
+        _write_execution_plan(
             staging,
             corpus_ref=corpus_ref,
             problems=problems,
@@ -89,7 +89,7 @@ def materialize_release_candidate(
             generated_at=utc_timestamp(),
             source_revision=source_revision,
             run_id=candidate_id,
-            role=AuthorityRole.CANDIDATE,
+            role=ReleaseRunKind.CANDIDATE,
             corpus_manifest=artifact_reference(
                 workspace, workspace / "corpus" / "manifest.yaml"
             ),
@@ -230,7 +230,7 @@ def _materialize_baseline_solutions(
         )
         atomic_write_json_value(
             destination,
-            _reference_baseline_solution(definition).model_dump(mode="json"),
+            reference_baseline_solution(definition).model_dump(mode="json"),
         )
         problems.append(
             ExecutionPlanProblem(
@@ -246,7 +246,8 @@ def _materialize_baseline_solutions(
     return tuple(problems)
 
 
-def _reference_baseline_solution(definition: Definition) -> Solution:
+def reference_baseline_solution(definition: Definition) -> Solution:
+    """Build the canonical eager reference solution for one definition."""
     return Solution(
         name=f"release_trusted_reference_{definition.name}",
         definition=definition.name,
@@ -266,7 +267,7 @@ def _reference_baseline_solution(definition: Definition) -> Solution:
     )
 
 
-def _write_execution_plans(
+def _write_execution_plan(
     workspace: Path,
     *,
     corpus_ref: ArtifactReference,
@@ -279,33 +280,14 @@ def _write_execution_plans(
         generated_at=generated_at,
         source_revision=source_revision,
         run_id=baseline_id,
-        role=AuthorityRole.BASELINE,
+        role=ReleaseRunKind.BASELINE,
         corpus_manifest=corpus_ref,
         environment_path="baseline/environment.json",
         problems=problems,
     )
-    rerun = baseline.model_copy(
-        update={
-            "role": AuthorityRole.RERUN,
-            "run_id": f"{baseline_id}-independent-rerun",
-            "environment_path": "rerun/environment.json",
-            "problems": tuple(
-                item.model_copy(
-                    update={
-                        "trace_path": (f"rerun/traces/{item.problem_path}/trace.jsonl")
-                    }
-                )
-                for item in problems
-            ),
-        }
-    )
     atomic_write_json_value(
         workspace / "baseline" / "plan.json",
         release_model_payload(baseline),
-    )
-    atomic_write_json_value(
-        workspace / "rerun" / "plan.json",
-        release_model_payload(rerun),
     )
 
 
@@ -314,4 +296,5 @@ __all__ = [
     "load_execution_plan",
     "materialize_release_baseline",
     "materialize_release_candidate",
+    "reference_baseline_solution",
 ]

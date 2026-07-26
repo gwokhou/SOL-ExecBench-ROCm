@@ -81,5 +81,5 @@
       "description": "sigmoid(linear2(relu(linear1(vstack(x,y)))))."
     }
   },
-  "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, y, fc1_weight, fc1_bias, fc2_weight, fc2_bias):\n    inp = torch.vstack([x, y])\n    hidden = F.linear(inp, fc1_weight, fc1_bias)\n    relu = F.relu(hidden)\n    output = F.linear(relu, fc2_weight, fc2_bias)\n    return torch.sigmoid(output)\n"
+  "reference": "import torch\nimport torch.nn.functional as F\n\n\ndef run(x, y, fc1_weight, fc1_bias, fc2_weight, fc2_bias):\n    inp = torch.vstack([x, y])\n    hidden = F.linear(inp, fc1_weight, fc1_bias)\n    relu = F.relu(hidden)\n    output = F.linear(relu, fc2_weight, fc2_bias)\n    return torch.sigmoid(output)\n"
 }

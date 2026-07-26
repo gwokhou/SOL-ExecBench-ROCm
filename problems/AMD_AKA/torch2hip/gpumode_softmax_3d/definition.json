@@ -35,5 +35,5 @@
       "description": "softmax(v, dim=axis)."
     }
   },
-  "reference": "import torch.nn.functional as F\n\ndef run(v, axis):\n    return F.softmax(v, dim=int(axis))\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(v, axis):\n    return F.softmax(v, dim=int(axis))\n"
 }

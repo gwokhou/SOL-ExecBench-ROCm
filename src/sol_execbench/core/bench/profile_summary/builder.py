@@ -22,7 +22,10 @@ from sol_execbench.core.bench.profile_summary.sidecar_models import (
     ProfileSummarySidecar,
     ProfileSummaryStatus,
 )
-from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
+from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
+)
 from sol_execbench.core.evaluator_contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.timestamps import utc_timestamp
 
@@ -60,13 +63,22 @@ def _status_for_profile_result(
 ) -> ProfileSummaryStatus:
     if profile_result is None:
         return ProfileSummaryStatus.UNAVAILABLE
-    if profile_result.status == "success" and profile_result.has_profiler_data:
+    if (
+        profile_result.status is Rocprofv3ProfileStatus.SUCCESS
+        and profile_result.has_profiler_data
+    ):
         return ProfileSummaryStatus.AVAILABLE
-    if profile_result.status in {"success", "partial"}:
+    if profile_result.status in {
+        Rocprofv3ProfileStatus.SUCCESS,
+        Rocprofv3ProfileStatus.PARTIAL,
+    }:
         # Successful process execution without profiler data is partial diagnostics,
         # not missing and not full profile availability.
         return ProfileSummaryStatus.PARTIAL
-    if profile_result.status in {"failed", "unavailable"}:
+    if profile_result.status in {
+        Rocprofv3ProfileStatus.FAILED,
+        Rocprofv3ProfileStatus.UNAVAILABLE,
+    }:
         return ProfileSummaryStatus.PARTIAL
     return ProfileSummaryStatus.UNAVAILABLE
 

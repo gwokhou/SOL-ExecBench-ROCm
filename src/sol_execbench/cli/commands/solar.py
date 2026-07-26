@@ -127,7 +127,7 @@ def release_build_cli(
     timeout_seconds: float,
     resume: bool,
 ) -> CliResult:
-    """Generate the exact signed-release SOLAR denominator."""
+    """Generate the exact content-addressed release SOLAR denominator."""
     try:
         result = build_release_solar_manifests(
             workspace,

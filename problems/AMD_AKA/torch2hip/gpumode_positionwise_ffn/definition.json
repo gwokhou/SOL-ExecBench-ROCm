@@ -93,5 +93,5 @@
       "description": "FFN block output (B, S, C)."
     }
   },
-  "reference": "import torch.nn.functional as F\n\ndef run(x, W_1_weight, W_1_bias, W_2_weight, W_2_bias, layer_norm_weight, layer_norm_bias, dropout_p, training):\n    out = F.linear(x, W_1_weight, W_1_bias)\n    out = F.relu(out)\n    out = F.linear(out, W_2_weight, W_2_bias)\n    out = F.dropout(out, p=dropout_p, training=bool(training))\n    out = out + x\n    return F.layer_norm(out, out.shape[-1:], layer_norm_weight, layer_norm_bias)\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(\n    x,\n    W_1_weight,\n    W_1_bias,\n    W_2_weight,\n    W_2_bias,\n    layer_norm_weight,\n    layer_norm_bias,\n    dropout_p,\n    training,\n):\n    out = F.linear(x, W_1_weight, W_1_bias)\n    out = F.relu(out)\n    out = F.linear(out, W_2_weight, W_2_bias)\n    out = F.dropout(out, p=dropout_p, training=bool(training))\n    out = out + x\n    return F.layer_norm(out, out.shape[-1:], layer_norm_weight, layer_norm_bias)\n"
 }

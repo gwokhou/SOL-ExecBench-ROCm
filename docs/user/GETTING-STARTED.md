@@ -144,5 +144,5 @@ passthrough. Run `./scripts/run_docker.sh --help` for current target options.
 | GPU unavailable | `/dev/kfd`, `/dev/dri`, visibility variables and group permissions |
 | native compile fails | ROCm headers, `hipcc`, target architecture and dependencies |
 | no trace is parsed | inspect the bounded no-trace diagnostics sidecar |
-| official score fails | current manifest intentionally has no published release-authority keys or signed evidence |
+| official score fails | provide the publisher release bundle whose hashes bind the canonical baseline, candidate traces, corpus, and SOLAR manifests |
 | SOLAR fails at architecture | required pinned architecture audit is unavailable |

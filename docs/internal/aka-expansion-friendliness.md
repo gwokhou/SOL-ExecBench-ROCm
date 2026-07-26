@@ -93,9 +93,10 @@ suites:
 
 - **Cat1-friendly — C1–C4:** single random tensor; +scalars; +weight/bias
   tensors; multiple random tensors → single tensor. All harness strengths
-  preserved: symbolic shape generalization, dtype-aware tolerance
-  (`aka_tolerance.py`), deterministic `module_fn` oracle cross-check
-  (`aka_equivalence_check.py`), harness-controlled adversarial workload sampling.
+  preserved: symbolic shape generalization, per-workload repeated-reference
+  tolerance calibration (`aka_calibrate_tolerances.py`), deterministic
+  all-workload/all-output oracle cross-check (`aka_equivalence_check.py`), and
+  harness-controlled adversarial workload sampling.
 - **Cat2-fragile — C5–C8, C11, C13:**
   - C5 index/mask tensors → `RandomInput` cannot express index range;
     adversarial sampling broken (would need `CustomInput`).
@@ -104,8 +105,9 @@ suites:
   - C7 multi-output tuples → single `ToleranceSpec` mis-calibrates mixed dtypes.
   - C8 FP8/int8 quant → paper's specialized quant-evaluator not instantiated.
   - C11 scalar/0-d output → degenerate-output guard can trip.
-  - C13 pytest-parametrized (instruction2triton) → liftable, but no `module_fn`
-    cross-check; correctness rests on the lifted reference.
+  - C13 pytest-parametrized (instruction2triton) → liftable through a
+    task-specific adapter because the source oracle lives in the correctness
+    test rather than a `module_fn`.
 - **Cat3-illegal — C9/C10, C12:**
   - C9/C10 variable-rank within one Definition → `_validate_tensor_axis_references`
     pins rank; must **split into rank-pinned problems** (each becomes Cat1).
@@ -118,17 +120,23 @@ suites:
 | Category | Verdict | Handling in this repo |
 |---|---|---|
 | **Cat1** legal + structural advantage | keep every harness strength | `role: scored`, full conversion. Primary expansion surface |
-| **Cat2** legal + structural disadvantage | convert, mark the disadvantage, no schema/runtime change | mechanical inclusion: rank-split (C9/C10 → Cat1), FP8 as `compatibility_sentinel` (C8), backward pass via instruction2triton with provenance-weakened marker (C13), clean torch2flydsl elementwise (bf16). The disadvantage is structurally visible: `suite: instruction2triton` ⇒ the equivalence cross-check skips it; FP8 ⇒ loose tolerance + sentinel role; rank-split ⇒ a separate rank-pinned problem |
+| **Cat2** legal + structural disadvantage | convert and make the disadvantage explicit | mechanical inclusion: rank-split (C9/C10 → Cat1), FP8 as `compatibility_sentinel` (C8), backward pass via an instruction2triton source-oracle adapter (C13), and clean torch2flydsl elementwise (bf16). Every scored task is source-cross-checked; only the deliberately non-equivalent FP8 compatibility sentinel is `not_applicable`. |
 | **Cat3** illegal | cannot represent | **rejected**, recorded below with a `reason_code`. No manifest entry references a Cat3 suite |
 
 ### Provenance binding note (Cat2)
 
-Every entry's `aka_config_sha256` pins its AKA `config.yaml` at the pinned
-commit (`aka_corpus.py::audit_aka_provenance`). For `torch2hip` entries the
-`aka_source_sha256`/`aka_runner_sha256` additionally bind the `module_fn` oracle
-and `correctness_check.py`. For `instruction2triton`/`torch2flydsl` entries those
-two are empty (no `pytorch_code_functional/` tree) and the auditor skips them —
-binding is config-only, which is the intended Cat2 "provenance-weakened" state.
+Manifest schema v5 gives every entry exactly three typed, content-addressed
+`aka_artifacts`: `config`, `semantic_reference`, and `correctness_runner`.
+`audit_aka_provenance` resolves and verifies all three roles at the pinned AKA
+revision for torch2hip, instruction2triton, and torch2flydsl alike. The latter
+two suites bind their actual test-file/model oracle instead of pretending that a
+`pytorch_code_functional/` path exists.
+
+The manifest also binds `tolerance-calibration.json`. Its 128 workload records
+pin the semantic Definition/Workload contract, formal `gfx1200` device identity,
+repeated-run observations, output dtypes, sample count, safety margin, and final
+`ToleranceSpec`. Loading the corpus fails if coverage, hashes, exclusion reasons,
+or authored tolerances drift.
 
 ---
 
@@ -161,12 +169,12 @@ custom-input mixing rule, or extends the author to emit `CustomInput` workloads.
 
 ---
 
-## 6. How this drove the expansion (commit reference)
+## 6. How this drove the expansion
 
-The expansion grows the corpus from 15 → ~40 problems by drawing **only** from
+The expansion grows the corpus from 15 → 37 problems by drawing **only** from
 the Cat1 and mechanical-Cat2 buckets above. See `scripts/internal/aka_author_seed.py`
 `SPECS` and the manifest's `formal_coverage_requirements.combinations` for the
 realized selection; the floor constraints there encode this policy (attention,
-loss, ≥2 norm, a backward pass, an FP8 sentinel, a fused depth). A test in
+≥2 norm, a backward pass, an FP8 sentinel, and fused depth). A test in
 `tests/sol_execbench/core/dataset/test_aka_corpus.py` asserts that no entry
 references a Cat3 suite.

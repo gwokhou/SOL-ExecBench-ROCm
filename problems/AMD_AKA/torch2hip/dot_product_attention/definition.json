@@ -1,0 +1,127 @@
+{
+  "name": "dot_product_attention",
+  "op_type": "attention",
+  "description": "Dot-product non-local attention with ELU-normalized query/key energy, query/key/value 1x1 projections, and an output projection. Lifted exactly from AKA torch2hip/gpumode/1001_NormalAttention_dot module_fn.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch."
+    },
+    "C": {
+      "type": "const",
+      "value": 4,
+      "description": "Channels fixed by the AKA task initializer."
+    },
+    "Q": {
+      "type": "const",
+      "value": 1,
+      "description": "Reduced query/key channels (C // 4)."
+    },
+    "H": {
+      "type": "var",
+      "description": "Spatial height."
+    },
+    "W": {
+      "type": "var",
+      "description": "Spatial width."
+    },
+    "K": {
+      "type": "const",
+      "value": 1,
+      "description": "Projection kernel size."
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "Input feature map."
+    },
+    "query_weight": {
+      "shape": [
+        "Q",
+        "C",
+        "K",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Query 1x1 convolution weight."
+    },
+    "query_bias": {
+      "shape": [
+        "Q"
+      ],
+      "dtype": "float32",
+      "description": "Query convolution bias."
+    },
+    "key_weight": {
+      "shape": [
+        "Q",
+        "C",
+        "K",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Key 1x1 convolution weight."
+    },
+    "key_bias": {
+      "shape": [
+        "Q"
+      ],
+      "dtype": "float32",
+      "description": "Key convolution bias."
+    },
+    "value_weight": {
+      "shape": [
+        "C",
+        "C",
+        "K",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Value 1x1 convolution weight."
+    },
+    "value_bias": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Value convolution bias."
+    },
+    "gamma_weight": {
+      "shape": [
+        "C",
+        "C",
+        "K",
+        "K"
+      ],
+      "dtype": "float32",
+      "description": "Output 1x1 convolution weight."
+    },
+    "gamma_bias": {
+      "shape": [
+        "C"
+      ],
+      "dtype": "float32",
+      "description": "Output convolution bias."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32",
+      "description": "Attention output feature map."
+    }
+  },
+  "reference": "import torch\nimport torch.nn.functional as F\n\n\ndef run(\n    x,\n    query_weight,\n    query_bias,\n    key_weight,\n    key_bias,\n    value_weight,\n    value_bias,\n    gamma_weight,\n    gamma_bias,\n):\n    b, c, h, w = x.shape\n    query = F.conv2d(x, query_weight, query_bias)\n    query = query.view(b, -1, h * w).permute(0, 2, 1)\n    key = F.conv2d(x, key_weight, key_bias).view(b, -1, h * w)\n    energy = torch.bmm(query, key)\n    energy = F.elu(energy) / (h * w)\n    value = F.conv2d(x, value_weight, value_bias).view(b, c, h * w)\n    out = torch.bmm(value, energy).view(b, c, h, w)\n    return F.conv2d(out, gamma_weight, gamma_bias)\n"
+}

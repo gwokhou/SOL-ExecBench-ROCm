@@ -37,5 +37,5 @@
       "description": "x / rms(x)."
     }
   },
-  "reference": "import torch\n\ndef run(x, eps):\n    rms = torch.sqrt(torch.mean(x ** 2, dim=1, keepdim=True) + eps)\n    return x / rms\n"
+  "reference": "import torch\n\n\ndef run(x, eps):\n    rms = torch.sqrt(torch.mean(x**2, dim=1, keepdim=True) + eps)\n    return x / rms\n"
 }

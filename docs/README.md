@@ -18,7 +18,7 @@ requirements.
   formal analysis.
 - [Scoring contract](SCORING-V3.md) and
   [Release scoring](user/RELEASE-SCORING.md) distinguish diagnostic formula
-  results from the signed official-score workflow.
+  results from the publisher-authored, content-addressed official-score workflow.
 - [Current claim boundaries](user/CLAIMS.md) state exactly what checked-in and
   generated evidence can establish.
 

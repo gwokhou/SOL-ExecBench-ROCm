@@ -87,5 +87,5 @@
       "description": "instance_norm(conv2d(x)) / divide_by."
     }
   },
-  "reference": "import torch.nn.functional as F\n\ndef run(x, conv_weight, conv_bias, divide_by):\n    x = F.conv2d(x, conv_weight, conv_bias)\n    x = F.instance_norm(x)\n    return x / divide_by\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(x, conv_weight, conv_bias, divide_by):\n    x = F.conv2d(x, conv_weight, conv_bias)\n    x = F.instance_norm(x)\n    return x / divide_by\n"
 }

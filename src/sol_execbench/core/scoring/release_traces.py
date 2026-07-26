@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Canonical trace verification for signed release executions."""
+"""Canonical trace verification for content-addressed release executions."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from sol_execbench.core.bench.config.benchmark_config import (
     OFFICIAL_ROCM_TIMING_PROTOCOL,
 )
 from sol_execbench.core.data.solution_instance import Solution
+from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import load_json_value
 from sol_execbench.core.data.trace import Environment, EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
@@ -29,6 +30,7 @@ from sol_execbench.core.platform.rdna4_validation import (
 )
 
 from .release_models import ArtifactReference, ProblemRunEvidence, ReleaseRunStatement
+from .release_builders import reference_baseline_solution
 from .release_environment import (
     ReleaseExecutionIdentity,
     release_execution_identity_from_payload,
@@ -57,7 +59,7 @@ class ReleaseRunEnvironmentIdentity:
 
 @dataclass(frozen=True, slots=True)
 class VerifiedRun:
-    """Every scored workload derived from a signed run statement."""
+    """Every scored workload derived from a release run statement."""
 
     source_revision: str
     environment: ReleaseRunEnvironmentIdentity
@@ -71,6 +73,7 @@ def verify_release_run(
     bundle_root: Path,
     corpus: AkaCorpusManifest,
     require_passed: bool,
+    require_reference_baseline: bool = False,
 ) -> VerifiedRun:
     """Verify exact scored-corpus coverage and canonical trace contents."""
     environment = _verify_corpus_and_environment(statement, bundle_root, corpus)
@@ -83,6 +86,8 @@ def verify_release_run(
     for problem_path, entry in expected.items():
         evidence = observed[problem_path]
         _verify_problem_identity(evidence, entry, corpus)
+        if require_reference_baseline:
+            _verify_reference_baseline(evidence, bundle_root, corpus)
         implementations[problem_path] = evidence.implementation.sha256
         workloads.update(
             _verify_problem_trace(
@@ -145,6 +150,25 @@ def _verify_problem_identity(
         raise ValueError(f"release problem identity mismatch: {evidence.problem_path}")
     if not entry.workload_uuids:
         raise ValueError(f"scored problem has no workloads: {evidence.problem_path}")
+
+
+def _verify_reference_baseline(
+    evidence: ProblemRunEvidence,
+    bundle_root: Path,
+    corpus: AkaCorpusManifest,
+) -> None:
+    solution_path = _artifact_path(evidence.implementation, bundle_root)
+    observed = Solution.model_validate_json(solution_path.read_text(encoding="utf-8"))
+    definition = Definition.model_validate_json(
+        (corpus.authored_root / evidence.problem_path / "definition.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    expected = reference_baseline_solution(definition)
+    if observed.model_dump(mode="json") != expected.model_dump(mode="json"):
+        raise ValueError(
+            f"release baseline is not the canonical reference: {evidence.problem_path}"
+        )
 
 
 def _verify_problem_trace(
@@ -259,7 +283,7 @@ def _verify_trace(
         require_timing=passed,
     )
     if require_passed and not passed:
-        raise ValueError("baseline and rerun traces must pass every workload")
+        raise ValueError("baseline traces must pass every workload")
     latency = _verified_latency(trace) if passed else None
     return VerifiedWorkloadRun(problem_path, trace.workload.uuid, latency, passed)
 

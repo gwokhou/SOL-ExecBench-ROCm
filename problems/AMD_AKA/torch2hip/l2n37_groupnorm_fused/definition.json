@@ -79,5 +79,5 @@
       "description": "group_norm(swish(linear(x)) + extra_bias)."
     }
   },
-  "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, weight, bias, extra_bias, gn_weight, gn_bias, num_groups):\n    x = F.linear(x, weight, bias)\n    x = torch.sigmoid(x) * x\n    x = x + extra_bias\n    return F.group_norm(x, int(num_groups), gn_weight, gn_bias)\n"
+  "reference": "import torch\nimport torch.nn.functional as F\n\n\ndef run(x, weight, bias, extra_bias, gn_weight, gn_bias, num_groups):\n    x = F.linear(x, weight, bias)\n    x = torch.sigmoid(x) * x\n    x = x + extra_bias\n    return F.group_norm(x, int(num_groups), gn_weight, gn_bias)\n"
 }

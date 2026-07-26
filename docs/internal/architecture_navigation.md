@@ -17,8 +17,8 @@ models or typed request/result objects.
 | Einsum conversion | `src/solar/einsum/conversion.py` | operator artifact → strict semantic graph | exact input/output bindings | SOLAR tests and readability gate |
 | Formal analysis | `src/solar/analysis/graph_analyzer.py` | typed analysis job → resource proof | diagnostic results never become scores | SOLAR/Orojenesis tests |
 | Scoring formula | `src/sol_execbench/core/scoring/formula.py` | audited runtimes → workload score | no clipping/substitution | `tests/sol_execbench/core/test_sol_score_v3.py` |
-| Release planning/execution | `src/sol_execbench/core/scoring/release_builders.py`, `release_runner.py` | pinned corpus → baseline/rerun/candidate plans → complete traces | clean source and one immutable environment identity | `tests/sol_execbench/core/scoring/test_release_builders.py` |
-| Official verification | `src/sol_execbench/core/scoring/release_verifier.py` | four signed statements → verified evidence → suite score | caller-authored JSON has no authority | `tests/sol_execbench/core/scoring/test_release_verifier.py` |
+| Release planning/execution | `src/sol_execbench/core/scoring/release_builders.py`, `release_runner.py` | pinned corpus → baseline/candidate plans → complete traces | clean source and one immutable environment identity | `tests/sol_execbench/core/scoring/test_release_builders.py` |
+| Official verification | `src/sol_execbench/core/scoring/release_verifier.py` | publisher bundle → hash-verified evidence → suite score | raw caller-authored timing JSON is not accepted | `tests/sol_execbench/core/scoring/test_release_verifier.py` |
 | Evaluator contract | `src/sol_execbench/core/evaluator_contract.py` | code-owned constants → public machine contract | matches implemented ownership | metadata and score-contract tests |
 
 After moving an entry point or ownership boundary, run Ruff, `ty`,

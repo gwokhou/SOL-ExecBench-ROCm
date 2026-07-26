@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +28,8 @@ from typing import Any
 import yaml
 
 from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.definition_models import DType
+from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_corpus import (
     AKA_LICENSE,
@@ -38,30 +41,58 @@ from sol_execbench.core.dataset.aka_corpus import (
     FORMAL_GFX_TARGET,
 )
 from sol_execbench.core.dataset.aka_compatibility import AKA_EXECUTION_TARGET_SPECS
-from sol_execbench.core.dataset.aka_tolerance import dtype_default_tolerance
+from sol_execbench.core.dataset.aka_contract import (
+    AKA_MANIFEST_SCHEMA_VERSION,
+    AKA_OFFICIAL_BASELINE_ID,
+    AKA_REQUIRED_RELEASE_EVIDENCE,
+    AKA_TOLERANCE_CALIBRATION_FILENAME,
+    AkaArtifactRole,
+    AkaCorpusRole,
+    AkaFusionDepth,
+    AkaOfficialScoringStatus,
+    AkaOperation,
+    AkaPassKind,
+    AkaReleasePolicy,
+    AkaSourceFamily,
+    AkaSuite,
+)
+from sol_execbench.core.dataset.aka_task import (
+    correctness_runner_path,
+    functional_reference_path,
+    read_task,
+)
+from sol_execbench.core.dataset.aka_tolerance import (
+    calibration_tolerances,
+    dtype_default_tolerance,
+    load_tolerance_calibration,
+    workload_contract_sha256,
+)
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.platform.runtime import resolve_tool_path
+from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = REPO_ROOT / "problems" / "AMD_AKA" / "manifest.yaml"
 PROBLEMS_ROOT = REPO_ROOT / "problems" / "AMD_AKA"
+CALIBRATION_PATH = PROBLEMS_ROOT / AKA_TOLERANCE_CALIBRATION_FILENAME
 
 
 @dataclass(frozen=True)
 class Spec:
     name: str
-    suite: str
+    suite: AkaSuite
     task_path: str
-    op_type: str
-    dtype: str
-    pass_kind: str
-    fusion_depth: str
-    source_family: str
+    op_type: AkaOperation
+    dtype: DType
+    pass_kind: AkaPassKind
+    fusion_depth: AkaFusionDepth
+    source_family: AkaSourceFamily
     axes: dict[str, dict[str, Any]]
     inputs: dict[str, dict[str, Any]]
     outputs: dict[str, dict[str, Any]]
     reference: str
     workloads: list[dict[str, Any]]
-    role: str = "scored"
+    role: AkaCorpusRole = AkaCorpusRole.SCORED
     exclusion_reason_code: str = ""
     description: str = ""
 
@@ -85,13 +116,13 @@ def _wl(axes: dict[str, int], inputs: dict[str, Any]) -> dict[str, Any]:
 SPECS: list[Spec] = [
     Spec(
         name="3267_doubled_matmul",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/3267_SimpleMatmulModule",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="gpumode",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.GPUMODE,
         description="Matrix multiply of a with (b + b): output = a @ (b + b). "
         "Derived from AKA torch2hip/gpumode/3267_SimpleMatmulModule module_fn.",
         axes={
@@ -128,13 +159,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n1_square_matmul",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Square matrix multiply C = A @ B. Derived from AKA "
         "torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_ module_fn.",
         axes={
@@ -167,13 +198,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n2_standard_matmul",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_",
-        op_type="matmul",
-        dtype="bfloat16",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.BFLOAT16,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="General (non-square) BF16 matrix multiply C = A @ B. Derived "
         "from AKA torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_.",
         axes={
@@ -209,13 +240,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n3_batched_matmul",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication",
-        op_type="matmul",
-        dtype="bfloat16",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.BFLOAT16,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Batched BF16 matrix multiply via torch.bmm. Derived from AKA "
         "torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication.",
         axes={
@@ -260,13 +291,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n4_matrix_vector",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Matrix-vector product y = A @ B with B a column vector. "
         "Derived from AKA torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_.",
         axes={"M": _ax_var("Rows of A."), "K": _ax_var("Inner dimension.")},
@@ -298,13 +329,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n8_matmul_irregular",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_",
-        op_type="matmul",
-        dtype="float16",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT16,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="FP16 matrix multiply over irregular (non power-of-two) shapes. "
         "Derived from AKA torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_.",
         axes={
@@ -336,13 +367,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n9_tall_skinny_matmul",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Tall-skinny matrix multiply (M >> K). Derived from AKA "
         "torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_.",
         axes={
@@ -374,13 +405,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n23_softmax",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n23_Softmax",
-        op_type="softmax",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.SOFTMAX,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Row-wise softmax over the last dimension. Derived from AKA "
         "torch2hip/kernelbench/level1/l1n23_Softmax module_fn (dim=1).",
         axes={"M": _ax_var("Rows."), "N": _ax_var("Columns (softmax dimension).")},
@@ -408,13 +439,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n26_gelu",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n26_GELU_",
-        op_type="elementwise",
-        dtype="float16",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT16,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="GELU activation. Derived from AKA torch2hip/kernelbench/level1/l1n26_GELU_ "
         "module_fn (F.gelu).",
         axes={"M": _ax_var("Rows."), "N": _ax_var("Columns.")},
@@ -441,13 +472,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n36_rmsnorm",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n36_RMSNorm_",
-        op_type="norm",
-        dtype="bfloat16",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.NORM,
+        dtype=DType.BFLOAT16,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Root-mean-square normalization over the last dimension. Derived "
         "from AKA torch2hip/kernelbench/level1/l1n36_RMSNorm_ module_fn.",
         axes={
@@ -486,13 +517,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n40_layernorm",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n40_LayerNorm",
-        op_type="norm",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.NORM,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Layer normalization over the last dimension with affine "
         "weight/bias. Derived from AKA torch2hip/kernelbench/level1/l1n40_LayerNorm.",
         axes={
@@ -565,13 +596,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n47_sum_reduction",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension",
-        op_type="elementwise",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Sum reduction over the last dimension with keepdim. Derived from "
         "AKA torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension.",
         axes={"M": _ax_var("Rows."), "N": _ax_var("Columns (reduced).")},
@@ -598,13 +629,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n42_maxpool2d",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D",
-        op_type="elementwise",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="2x2 stride-2 max pooling. Derived from AKA "
         "torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D module_fn.",
         axes={
@@ -641,13 +672,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n63_conv2d",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n63_conv_standard_2D__square_input__square_kernel",
-        op_type="conv",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.CONV,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Standard 2D convolution (stride 1, no padding, 3x3 kernel). "
         "Derived from AKA torch2hip/kernelbench/level1/l1n63_conv_standard_2D.",
         axes={
@@ -702,13 +733,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l1n82_conv_depthwise",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D_square_input_square_kernel",
-        op_type="conv",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="kernelbench",
+        op_type=AkaOperation.CONV,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Depthwise 2D convolution (groups = channels, 3x3 kernel, stride 1, "
         "no padding). Derived from AKA torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D.",
         axes={
@@ -768,13 +799,13 @@ SPECS: list[Spec] = [
     # --- Cat1: pointwise activation variants (gpumode) ---
     Spec(
         name="gpumode_silu",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/16636_SiLU",
-        op_type="elementwise",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="gpumode",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.GPUMODE,
         description="SiLU activation x * sigmoid(x). Derived from AKA "
         "torch2hip/gpumode/16636_SiLU module_fn (silu_fn).",
         axes={"M": _ax_var("Rows."), "N": _ax_var("Columns.")},
@@ -802,13 +833,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="gpumode_sigmoid",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/11184_Sigmoid",
-        op_type="elementwise",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="gpumode",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.GPUMODE,
         description="Scaled sigmoid: sigmoid(a * x) * max. Derived from AKA "
         "torch2hip/gpumode/11184_Sigmoid module_fn.",
         axes={"M": _ax_var("Rows."), "N": _ax_var("Columns.")},
@@ -858,13 +889,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="gpumode_tanh",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/11178_TanH",
-        op_type="elementwise",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="gpumode",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.GPUMODE,
         description="Scaled tanh: tanh(a * x) * max. Derived from AKA "
         "torch2hip/gpumode/11178_TanH module_fn.",
         axes={"M": _ax_var("Rows."), "N": _ax_var("Columns.")},
@@ -915,13 +946,13 @@ SPECS: list[Spec] = [
     # --- Cat1: fused matmul chains (kernelbench level2) ---
     Spec(
         name="l2n99_matmul_gelu_softmax",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level2/l2n99_Matmul_GELU_Softmax",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Fused linear -> GELU -> softmax(dim=1). Derived from AKA "
         "torch2hip/kernelbench/level2/l2n99_Matmul_GELU_Softmax module_fn.",
         axes={
@@ -968,13 +999,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l2n86_matmul_divide_gelu",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level2/l2n86_Matmul_Divide_GELU",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Fused linear -> divide -> GELU. Derived from AKA "
         "torch2hip/kernelbench/level2/l2n86_Matmul_Divide_GELU module_fn.",
         axes={
@@ -1050,13 +1081,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l2n40_matmul_scaling_residual",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Fused linear -> scale -> residual add. Derived from AKA "
         "torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd module_fn.",
         axes={
@@ -1132,13 +1163,13 @@ SPECS: list[Spec] = [
     # --- Cat1: norm variants (group/batch/instance) via fused chains ---
     Spec(
         name="l2n37_groupnorm_fused",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm",
-        op_type="norm",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="kernelbench",
+        op_type=AkaOperation.NORM,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Fused linear -> swish -> add -> group_norm. Derived from AKA "
         "torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm module_fn.",
         axes={
@@ -1239,13 +1270,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l2n17_instancenorm_fused",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide",
-        op_type="norm",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="kernelbench",
+        op_type=AkaOperation.NORM,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Fused conv2d -> instance_norm -> divide. Derived from AKA "
         "torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide module_fn.",
         axes={
@@ -1324,84 +1355,166 @@ SPECS: list[Spec] = [
             ),
         ],
     ),
-    # --- Cat1: attention (scaled-dot-product core) ---
+    # --- Cat1: attention (exact AKA functional oracle) ---
     Spec(
-        name="sdp_attention",
-        suite="torch2hip",
-        task_path="tasks/torch2hip/gpumode/10456_MultiHeadAttention",
-        op_type="attention",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="gpumode",
-        description="Scaled-dot-product attention core (single-head): "
-        "softmax(Q @ K^T / sqrt(d)) @ V. Representative of AKA's attention tasks; "
-        "provenance-bound to torch2hip/gpumode/10456_MultiHeadAttention (whose "
-        "module_fn embeds this Q*K^T -> softmax -> *V core).",
+        name="dot_product_attention",
+        suite=AkaSuite.TORCH2HIP,
+        task_path="tasks/torch2hip/gpumode/1001_NormalAttention_dot",
+        op_type=AkaOperation.ATTENTION,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.GPUMODE,
+        description=(
+            "Dot-product non-local attention with ELU-normalized query/key energy, "
+            "query/key/value 1x1 projections, and an output projection. Lifted "
+            "exactly from AKA torch2hip/gpumode/1001_NormalAttention_dot module_fn."
+        ),
         axes={
             "B": _ax_var("Batch."),
-            "S": _ax_var("Sequence length."),
-            "D": _ax_var("Head dimension."),
+            "C": _ax_const(4, "Channels fixed by the AKA task initializer."),
+            "Q": _ax_const(1, "Reduced query/key channels (C // 4)."),
+            "H": _ax_var("Spatial height."),
+            "W": _ax_var("Spatial width."),
+            "K": _ax_const(1, "Projection kernel size."),
         },
         inputs={
-            "q": {
-                "shape": ["B", "S", "D"],
+            "x": {
+                "shape": ["B", "C", "H", "W"],
                 "dtype": "float32",
-                "description": "Queries (B, S, D).",
+                "description": "Input feature map.",
             },
-            "k": {
-                "shape": ["B", "S", "D"],
+            "query_weight": {
+                "shape": ["Q", "C", "K", "K"],
                 "dtype": "float32",
-                "description": "Keys (B, S, D).",
+                "description": "Query 1x1 convolution weight.",
             },
-            "v": {
-                "shape": ["B", "S", "D"],
+            "query_bias": {
+                "shape": ["Q"],
                 "dtype": "float32",
-                "description": "Values (B, S, D).",
+                "description": "Query convolution bias.",
+            },
+            "key_weight": {
+                "shape": ["Q", "C", "K", "K"],
+                "dtype": "float32",
+                "description": "Key 1x1 convolution weight.",
+            },
+            "key_bias": {
+                "shape": ["Q"],
+                "dtype": "float32",
+                "description": "Key convolution bias.",
+            },
+            "value_weight": {
+                "shape": ["C", "C", "K", "K"],
+                "dtype": "float32",
+                "description": "Value 1x1 convolution weight.",
+            },
+            "value_bias": {
+                "shape": ["C"],
+                "dtype": "float32",
+                "description": "Value convolution bias.",
+            },
+            "gamma_weight": {
+                "shape": ["C", "C", "K", "K"],
+                "dtype": "float32",
+                "description": "Output 1x1 convolution weight.",
+            },
+            "gamma_bias": {
+                "shape": ["C"],
+                "dtype": "float32",
+                "description": "Output convolution bias.",
             },
         },
         outputs={
             "output": {
-                "shape": ["B", "S", "D"],
+                "shape": ["B", "C", "H", "W"],
                 "dtype": "float32",
-                "description": "Attention output (B, S, D).",
+                "description": "Attention output feature map.",
             }
         },
         reference=(
-            "import math\nimport torch\nimport torch.nn.functional as F\n\n"
-            "def run(q, k, v):\n"
-            "    scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(q.shape[-1])\n"
-            "    return torch.matmul(F.softmax(scores, dim=-1), v)\n"
+            "import torch\nimport torch.nn.functional as F\n\n"
+            "def run(x, query_weight, query_bias, key_weight, key_bias, "
+            "value_weight, value_bias, gamma_weight, gamma_bias):\n"
+            "    b, c, h, w = x.shape\n"
+            "    query = F.conv2d(x, query_weight, query_bias)\n"
+            "    query = query.view(b, -1, h * w).permute(0, 2, 1)\n"
+            "    key = F.conv2d(x, key_weight, key_bias).view(b, -1, h * w)\n"
+            "    energy = torch.bmm(query, key)\n"
+            "    energy = F.elu(energy) / (h * w)\n"
+            "    value = F.conv2d(x, value_weight, value_bias).view(b, c, h * w)\n"
+            "    out = torch.bmm(value, energy).view(b, c, h, w)\n"
+            "    return F.conv2d(out, gamma_weight, gamma_bias)\n"
         ),
         workloads=[
             _wl(
-                {"B": 2, "S": 256, "D": 64},
-                {"q": "random", "k": "random", "v": "random"},
+                {"B": 2, "H": 4, "W": 4},
+                {
+                    "x": "random",
+                    "query_weight": "random",
+                    "query_bias": "random",
+                    "key_weight": "random",
+                    "key_bias": "random",
+                    "value_weight": "random",
+                    "value_bias": "random",
+                    "gamma_weight": "random",
+                    "gamma_bias": "random",
+                },
             ),
             _wl(
-                {"B": 4, "S": 512, "D": 64},
-                {"q": "random", "k": "random", "v": "random"},
+                {"B": 4, "H": 8, "W": 8},
+                {
+                    "x": "random",
+                    "query_weight": "random",
+                    "query_bias": "random",
+                    "key_weight": "random",
+                    "key_bias": "random",
+                    "value_weight": "random",
+                    "value_bias": "random",
+                    "gamma_weight": "random",
+                    "gamma_bias": "random",
+                },
             ),
             _wl(
-                {"B": 2, "S": 1024, "D": 128},
-                {"q": "random", "k": "random", "v": "random"},
+                {"B": 2, "H": 16, "W": 16},
+                {
+                    "x": "random",
+                    "query_weight": "random",
+                    "query_bias": "random",
+                    "key_weight": "random",
+                    "key_bias": "random",
+                    "value_weight": "random",
+                    "value_bias": "random",
+                    "gamma_weight": "random",
+                    "gamma_bias": "random",
+                },
             ),
             _wl(
-                {"B": 8, "S": 256, "D": 64},
-                {"q": "random", "k": "random", "v": "random"},
+                {"B": 1, "H": 32, "W": 32},
+                {
+                    "x": "random",
+                    "query_weight": "random",
+                    "query_bias": "random",
+                    "key_weight": "random",
+                    "key_bias": "random",
+                    "value_weight": "random",
+                    "value_bias": "random",
+                    "gamma_weight": "random",
+                    "gamma_bias": "random",
+                },
             ),
         ],
     ),
     # --- Cat2 (mechanical): rank-split of a variable-rank task (C9/C10 -> Cat1) ---
     Spec(
         name="gpumode_gelu_4d",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/14539_GELU",
-        op_type="elementwise",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="gpumode",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.GPUMODE,
         description="GELU pinned to 4D [B, C, H, W]. Rank-split from the variable-rank "
         "(1D-4D) AKA torch2hip/gpumode/14539_GELU module_fn; the 2D case is l1n26_gelu. "
         "The schema pins rank per Definition, so each rank becomes its own problem.",
@@ -1436,14 +1549,14 @@ SPECS: list[Spec] = [
     # --- Cat2 (mechanical): FP8 compatibility sentinel (C8) ---
     Spec(
         name="fp8_cast_sentinel",
-        suite="instruction2triton",
+        suite=AkaSuite.INSTRUCTION2TRITON,
         task_path="tasks/instruction2triton/rocmbench/test_chained_dot_fp8",
-        op_type="elementwise",
-        dtype="float8_e4m3fn",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="rocmbench",
-        role="compatibility_sentinel",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT8_E4M3FN,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.ROCMBENCH,
+        role=AkaCorpusRole.COMPATIBILITY_SENTINEL,
         description="FP8 compatibility sentinel: per-tensor cast to float8_e4m3fn. "
         "Probes the harness's ability to materialize, compare, and time an FP8 output "
         "tensor end-to-end. Provenance-bound to AKA instruction2triton/rocmbench/"
@@ -1474,16 +1587,16 @@ SPECS: list[Spec] = [
     # --- Cat2 (mechanical): backward pass via instruction2triton (C13) ---
     Spec(
         name="rmsnorm_bwd",
-        suite="instruction2triton",
+        suite=AkaSuite.INSTRUCTION2TRITON,
         task_path="tasks/instruction2triton/rocmbench/rmsnorm_bwd",
-        op_type="norm",
-        dtype="float16",
-        pass_kind="backward",
-        fusion_depth="single",
-        source_family="rocmbench",
+        op_type=AkaOperation.NORM,
+        dtype=DType.FLOAT16,
+        pass_kind=AkaPassKind.BACKWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.ROCMBENCH,
         description="RMSNorm backward (gradient w.r.t. input and weight) via autograd. "
-        "Derived from AKA instruction2triton/rocmbench/rmsnorm_bwd; provenance-weakened "
-        "(no module_fn cross-check; correctness rests on the lifted reference).",
+        "Derived from and cross-checked against the PyTorch oracle in AKA "
+        "instruction2triton/rocmbench/rmsnorm_bwd.",
         axes={"M": _ax_var("Rows."), "N": _ax_var("Feature dimension.")},
         inputs={
             "x": {
@@ -1546,13 +1659,13 @@ SPECS: list[Spec] = [
     # --- Cat2 (mechanical): clean torch2flydsl elementwise (bf16) ---
     Spec(
         name="silu_and_mul_bf16",
-        suite="torch2flydsl",
+        suite=AkaSuite.TORCH2FLYDSL,
         task_path="tasks/torch2flydsl/silu_and_mul_kernel",
-        op_type="elementwise",
-        dtype="bfloat16",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="flydsl",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.BFLOAT16,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.FLYDSL,
         description="Fused SiLU-and-multiply (SwIGLU): silu(x) * y over the two halves "
         "of the last dimension, computed in FP32 then cast to BF16. Derived from AKA "
         "torch2flydsl/silu_and_mul_kernel Model.forward (the suite's FlyDSL target is "
@@ -1593,13 +1706,13 @@ SPECS: list[Spec] = [
     # --- Cat1 (batch 2): more gpumode pointwise / fused blocks ---
     Spec(
         name="gpumode_fused_leaky_relu",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/10190_FusedLeakyReLU",
-        op_type="elementwise",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="gpumode",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.GPUMODE,
         description="Fused bias-add -> leaky_relu -> scale. Derived from AKA "
         "torch2hip/gpumode/10190_FusedLeakyReLU module_fn (fused_leaky_relu_fn).",
         axes={
@@ -1685,13 +1798,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="gpumode_transpose",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/1067_Transpose",
-        op_type="elementwise",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="gpumode",
+        op_type=AkaOperation.ELEMENTWISE,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.GPUMODE,
         description="Transpose two dimensions and return a contiguous tensor. Derived "
         "from AKA torch2hip/gpumode/1067_Transpose module_fn (dims 1, 2).",
         axes={
@@ -1749,13 +1862,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="gpumode_softmax_3d",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/10082_SoftmaxModule",
-        op_type="softmax",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="single",
-        source_family="gpumode",
+        op_type=AkaOperation.SOFTMAX,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.SINGLE,
+        source_family=AkaSourceFamily.GPUMODE,
         description="Softmax over the last axis of a 3D cube. Derived from AKA "
         "torch2hip/gpumode/10082_SoftmaxModule module_fn (axis=2).",
         axes={"N": _ax_var("Cube edge (all three dims equal).")},
@@ -1787,13 +1900,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="gpumode_feedforward",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/10024_Feedforward",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="gpumode",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.GPUMODE,
         description="Fused two-input feedforward: vstack(x,y) -> linear -> ReLU -> "
         "linear -> sigmoid. Derived from AKA torch2hip/gpumode/10024_Feedforward module_fn.",
         axes={
@@ -1899,13 +2012,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="gpumode_positionwise_ffn",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/14044_PositionWiseFeedForward",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="gpumode",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.GPUMODE,
         description="Position-wise feedforward block: linear -> ReLU -> linear -> "
         "dropout(eval) -> residual -> layer_norm. Derived from AKA torch2hip/gpumode/"
         "14044_PositionWiseFeedForward module_fn (eval mode, deterministic).",
@@ -2039,13 +2152,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="gpumode_mlp",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/gpumode/1178_MLP_model",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="gpumode",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.GPUMODE,
         description="7-layer MLP (4 -> 4096 -> 2048 -> 512 -> 128 -> 64 -> 32 -> 4) "
         "with ReLU. Derived from AKA torch2hip/gpumode/1178_MLP_model module_fn.",
         axes={
@@ -2183,14 +2296,14 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l2n55_matmul_maxpool_sum_scale",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="kernelbench",
-        role="target_incompatible",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.KERNELBENCH,
+        role=AkaCorpusRole.TARGET_INCOMPATIBLE,
         exclusion_reason_code="reference_ipc_payload_limit",
         description="Fused linear -> max_pool1d -> sum -> scale, reducing to a 1D "
         "per-batch output. Derived from AKA torch2hip/kernelbench/level2/"
@@ -2279,13 +2392,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l2n98_matmul_avgpool_gelu_scale_max",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max",
-        op_type="matmul",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="kernelbench",
+        op_type=AkaOperation.MATMUL,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Fused linear -> avg_pool1d -> GELU -> scale -> max-reduce to a "
         "1D per-batch output. Derived from AKA torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max.",
         axes={
@@ -2371,13 +2484,13 @@ SPECS: list[Spec] = [
     ),
     Spec(
         name="l3n44_mingpt_block",
-        suite="torch2hip",
+        suite=AkaSuite.TORCH2HIP,
         task_path="tasks/torch2hip/kernelbench/level3/l3n44_MiniGPTBlock",
-        op_type="attention",
-        dtype="float32",
-        pass_kind="forward",
-        fusion_depth="fused",
-        source_family="kernelbench",
+        op_type=AkaOperation.ATTENTION,
+        dtype=DType.FLOAT32,
+        pass_kind=AkaPassKind.FORWARD,
+        fusion_depth=AkaFusionDepth.FUSED,
+        source_family=AkaSourceFamily.KERNELBENCH,
         description="Full MiniGPT transformer block: layernorm -> causal self-attention "
         "-> residual -> layernorm -> MLP(new-GELU) -> residual. Derived from AKA "
         "torch2hip/kernelbench/level3/l3n44_MiniGPTBlock module_fn.",
@@ -2593,36 +2706,66 @@ SPECS: list[Spec] = [
 ]
 
 
-def _aka_checksums(aka_root: Path | None, task_path: str) -> dict[str, str]:
-    if aka_root is None or not aka_root.is_dir():
-        return {
-            "aka_config_sha256": "",
-            "aka_source_sha256": "",
-            "aka_runner_sha256": "",
-        }
-    root = aka_root / task_path
-    config = root / "config.yaml"
-    func_dir = root / "pytorch_code_functional"
-    func_files = sorted(func_dir.glob("*.py")) if func_dir.is_dir() else []
-    runner = root / "eval_tools" / "correctness_check.py"
+def _artifact_record(
+    task_root: Path,
+    role: AkaArtifactRole,
+    path: Path,
+) -> dict[str, str]:
     return {
-        "aka_config_sha256": sha256_file(config) if config.is_file() else "",
-        "aka_source_sha256": sha256_file(func_files[0]) if func_files else "",
-        "aka_runner_sha256": sha256_file(runner) if runner.is_file() else "",
+        "role": role.value,
+        "path": path.relative_to(task_root).as_posix(),
+        "sha256": sha256_file(path),
     }
 
 
-def _write_problem(spec: Spec) -> dict[str, str]:
-    problem_dir = PROBLEMS_ROOT / spec.suite / spec.name
+def _aka_artifacts(aka_root: Path, spec: Spec) -> list[dict[str, str]]:
+    task = read_task(aka_root, spec.task_path)
+    runner = correctness_runner_path(task)
+    if spec.suite is AkaSuite.TORCH2HIP:
+        semantic_reference = functional_reference_path(task)
+    elif spec.suite is AkaSuite.TORCH2FLYDSL:
+        semantic_reference = task.root / "model.py"
+    elif spec.suite is AkaSuite.INSTRUCTION2TRITON:
+        semantic_reference = runner
+    else:
+        raise ValueError(f"unsupported AKA suite for provenance: {spec.suite}")
+    return [
+        _artifact_record(
+            task.root,
+            AkaArtifactRole.CONFIG,
+            task.root / "config.yaml",
+        ),
+        _artifact_record(
+            task.root,
+            AkaArtifactRole.SEMANTIC_REFERENCE,
+            semantic_reference,
+        ),
+        _artifact_record(
+            task.root,
+            AkaArtifactRole.CORRECTNESS_RUNNER,
+            runner,
+        ),
+    ]
+
+
+def _write_problem(
+    spec: Spec,
+    calibrated: dict[str, Any] | None,
+    *,
+    problems_root: Path = PROBLEMS_ROOT,
+) -> dict[str, str]:
+    problem_dir = problems_root / spec.suite / spec.name
     problem_dir.mkdir(parents=True, exist_ok=True)
-    tolerance = dtype_default_tolerance(spec.dtype)
-    tolerance_payload = {
-        "max_atol": tolerance.max_atol,
-        "max_rtol": tolerance.max_rtol,
-        "required_matched_ratio": tolerance.required_matched_ratio,
-    }
     workload_records = []
     for idx, wl in enumerate(spec.workloads):
+        uuid = f"aka-{spec.name}-w{idx}"
+        if calibrated is None or spec.role is AkaCorpusRole.TARGET_INCOMPATIBLE:
+            tolerance = dtype_default_tolerance(spec.dtype.value)
+        else:
+            try:
+                tolerance = calibrated[uuid]
+            except KeyError as exc:
+                raise ValueError(f"missing calibrated tolerance for {uuid}") from exc
         inputs_payload: dict[str, Any] = {}
         for name, meta in wl["inputs"].items():
             if isinstance(meta, dict) and "scalar" in meta:
@@ -2632,15 +2775,15 @@ def _write_problem(spec: Spec) -> dict[str, str]:
         record = {
             "axes": wl["axes"],
             "inputs": inputs_payload,
-            "tolerance": tolerance_payload,
-            "uuid": f"aka-{spec.name}-w{idx}",
+            "tolerance": tolerance.model_dump(mode="json"),
+            "uuid": uuid,
         }
         Workload.model_validate(record)
         workload_records.append(record)
 
     definition_payload = {
         "name": spec.name,
-        "op_type": spec.op_type,
+        "op_type": spec.op_type.value,
         "description": spec.description,
         "axes": spec.axes,
         "inputs": spec.inputs,
@@ -2667,11 +2810,95 @@ def _write_problem(spec: Spec) -> dict[str, str]:
     }
 
 
+def _format_authored_references(
+    specs: list[Spec],
+    records: list[dict[str, str]],
+    *,
+    problems_root: Path,
+) -> None:
+    """Ruff-format debug mirrors and bind the same source into Definitions."""
+    ruff = resolve_tool_path("ruff")
+    if ruff is None:
+        raise RuntimeError("Ruff is required to author canonical AKA references")
+    reference_paths = [
+        problems_root / spec.suite / spec.name / "reference.py" for spec in specs
+    ]
+    completed = run_in_process_group_bounded(
+        [str(ruff), "format", *map(str, reference_paths)],
+        cwd=REPO_ROOT,
+        timeout=120,
+        max_capture_bytes=16 * 1024,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "Ruff failed").strip()
+        raise RuntimeError(f"could not format AKA references: {detail}")
+    for spec, record, reference_path in zip(
+        specs, records, reference_paths, strict=True
+    ):
+        header = f'"""Standalone PyTorch reference for {spec.name} (debug mirror)."""'
+        mirror = reference_path.read_text(encoding="utf-8")
+        if not mirror.startswith(header):
+            raise ValueError(f"formatted AKA reference lost its header: {spec.name}")
+        reference = mirror[len(header) :].lstrip("\n")
+        if ast.dump(ast.parse(reference)) != ast.dump(ast.parse(spec.reference)):
+            raise ValueError(f"Ruff changed AKA reference semantics: {spec.name}")
+        definition_path = reference_path.with_name("definition.json")
+        payload = json.loads(definition_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError(f"AKA definition must be an object: {spec.name}")
+        payload["reference"] = reference
+        Definition.model_validate(payload)
+        definition_path.write_text(json.dumps(payload, indent=2) + "\n")
+        record["definition_sha256"] = sha256_file(definition_path)
+
+
+def _rebind_format_only_calibration(
+    calibration_path: Path,
+    *,
+    problems_root: Path,
+) -> None:
+    """Rebind calibration contracts after AST-equivalent reference formatting."""
+    payload = load_tolerance_calibration(calibration_path)
+    raw_records = payload["records"]
+    assert isinstance(raw_records, list)
+    records = {
+        str(record["workload_uuid"]): record
+        for record in raw_records
+        if isinstance(record, dict)
+    }
+    if len(records) != len(raw_records):
+        raise ValueError("calibration records must be unique objects")
+    observed: set[str] = set()
+    for spec in SPECS:
+        problem_dir = problems_root / spec.suite / spec.name
+        definition = Definition.model_validate_json(
+            (problem_dir / "definition.json").read_text(encoding="utf-8")
+        )
+        workloads = [
+            Workload.model_validate_json(line)
+            for line in (problem_dir / "workload.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line
+        ]
+        for workload in workloads:
+            record = records.get(workload.uuid)
+            if record is None:
+                raise ValueError(f"missing calibration record: {workload.uuid}")
+            record["contract_sha256"] = workload_contract_sha256(definition, workload)
+            observed.add(workload.uuid)
+    if observed != set(records):
+        raise ValueError("calibration contains records outside the AKA corpus")
+    atomic_write_json_value(calibration_path, payload)
+
+
 def _coverage_axes(specs: list[Spec]) -> dict[str, dict[str, int]]:
     def _count(field: str) -> dict[str, int]:
         out: dict[str, int] = {}
         for s in specs:
-            out[getattr(s, field)] = out.get(getattr(s, field), 0) + 1
+            raw_value = getattr(s, field)
+            value = str(getattr(raw_value, "value", raw_value))
+            out[value] = out.get(value, 0) + 1
         return dict(sorted(out.items()))
 
     return {
@@ -2687,8 +2914,12 @@ def _coverage_axes(specs: list[Spec]) -> dict[str, dict[str, int]]:
 def _write_manifest(
     specs: list[Spec],
     records: list[dict[str, str]],
-    aka_checksums: dict[str, dict[str, str]],
+    aka_artifacts: dict[str, list[dict[str, str]]],
     aka_commit: str,
+    *,
+    problems_root: Path = PROBLEMS_ROOT,
+    manifest_path: Path = MANIFEST_PATH,
+    calibration_path: Path = CALIBRATION_PATH,
 ) -> None:
     entries = []
     for spec, record in zip(specs, records, strict=True):
@@ -2696,17 +2927,17 @@ def _write_manifest(
             "slot": spec.name,
             "task_path": spec.task_path,
             "problem_name": spec.name,
-            "operation": spec.op_type,
-            "dtype": spec.dtype,
-            "pass_kind": spec.pass_kind,
-            "fusion_depth": spec.fusion_depth,
-            "source_family": spec.source_family,
-            "suite": spec.suite,
-            "role": spec.role,
+            "operation": spec.op_type.value,
+            "dtype": spec.dtype.value,
+            "pass_kind": spec.pass_kind.value,
+            "fusion_depth": spec.fusion_depth.value,
+            "source_family": spec.source_family.value,
+            "suite": spec.suite.value,
+            "role": spec.role.value,
             "workload_uuids": [
                 f"aka-{spec.name}-w{i}" for i in range(len(spec.workloads))
             ],
-            **aka_checksums[spec.task_path],
+            "aka_artifacts": aka_artifacts[spec.task_path],
             "golden": {},
         }
         if spec.exclusion_reason_code:
@@ -2714,7 +2945,7 @@ def _write_manifest(
         entries.append(entry)
 
     payload = {
-        "schema_version": 4,
+        "schema_version": AKA_MANIFEST_SCHEMA_VERSION,
         "source": {
             "repository": AKA_REPOSITORY,
             "revision": AKA_REVISION,
@@ -2734,79 +2965,81 @@ def _write_manifest(
             "formal_gfx_target": FORMAL_GFX_TARGET,
             "architecture_profile_sha256": FORMAL_ARCHITECTURE_SHA256,
         },
+        "tolerance_calibration": {
+            "path": calibration_path.relative_to(problems_root).as_posix(),
+            "sha256": sha256_file(calibration_path),
+        },
         "official_scoring": {
-            "status": "unavailable",
-            "reason_code": "release_authority_not_published",
+            "status": AkaOfficialScoringStatus.AVAILABLE.value,
+            "release_policy": AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1.value,
+            "baseline_id": AKA_OFFICIAL_BASELINE_ID,
             "required_evidence": [
-                "content_addressed_release_baseline",
-                "independent_rerun_verification",
-                "trusted_candidate_execution_attestation",
-                "pinned_solar_manifests",
+                evidence.value for evidence in AKA_REQUIRED_RELEASE_EVIDENCE
             ],
         },
         "formal_coverage_requirements": {
             "axes": _coverage_axes(specs),
             "combinations": [
                 {
-                    "operation": "matmul",
-                    "dtype": "float32",
-                    "pass": "forward",
+                    "operation": AkaOperation.MATMUL.value,
+                    "dtype": DType.FLOAT32.value,
+                    "pass": AkaPassKind.FORWARD.value,
                     "min_count": 1,
                 },
                 {
-                    "operation": "matmul",
-                    "dtype": "bfloat16",
-                    "pass": "forward",
+                    "operation": AkaOperation.MATMUL.value,
+                    "dtype": DType.BFLOAT16.value,
+                    "pass": AkaPassKind.FORWARD.value,
                     "min_count": 1,
                 },
                 {
-                    "operation": "softmax",
-                    "dtype": "float32",
-                    "pass": "forward",
+                    "operation": AkaOperation.SOFTMAX.value,
+                    "dtype": DType.FLOAT32.value,
+                    "pass": AkaPassKind.FORWARD.value,
                     "min_count": 1,
                 },
                 {
-                    "operation": "norm",
-                    "dtype": "bfloat16",
-                    "pass": "forward",
+                    "operation": AkaOperation.NORM.value,
+                    "dtype": DType.BFLOAT16.value,
+                    "pass": AkaPassKind.FORWARD.value,
                     "min_count": 1,
                 },
                 {
-                    "operation": "conv",
-                    "dtype": "float32",
-                    "pass": "forward",
+                    "operation": AkaOperation.CONV.value,
+                    "dtype": DType.FLOAT32.value,
+                    "pass": AkaPassKind.FORWARD.value,
                     "min_count": 1,
                 },
                 {
-                    "operation": "elementwise",
-                    "dtype": "float16",
-                    "pass": "forward",
+                    "operation": AkaOperation.ELEMENTWISE.value,
+                    "dtype": DType.FLOAT16.value,
+                    "pass": AkaPassKind.FORWARD.value,
                     "min_count": 1,
                 },
                 # --- Expansion floor constraints (friendliness categories) ---
                 # Cat1 coverage breadth: the attention op family is present.
                 {
-                    "operation": "attention",
-                    "pass": "forward",
+                    "operation": AkaOperation.ATTENTION.value,
+                    "pass": AkaPassKind.FORWARD.value,
                     "min_count": 1,
                 },
                 # At least two norm problems so a norm variant (group/batch/instance)
                 # is represented alongside the baseline layernorm/rmsnorm.
                 {
-                    "operation": "norm",
-                    "pass": "forward",
+                    "operation": AkaOperation.NORM.value,
+                    "pass": AkaPassKind.FORWARD.value,
                     "min_count": 2,
                 },
                 # Cat2 backward pass (instruction2triton rmsnorm_bwd).
-                {"pass": "backward", "min_count": 1},
+                {"pass": AkaPassKind.BACKWARD.value, "min_count": 1},
                 # Cat2 FP8 compatibility sentinel (float8_e4m3fn).
                 {
-                    "dtype": "float8_e4m3fn",
-                    "pass": "forward",
+                    "dtype": DType.FLOAT8_E4M3FN.value,
+                    "pass": AkaPassKind.FORWARD.value,
                     "min_count": 1,
                 },
                 # Fused-op depth is represented.
-                {"fusion_depth": "fused", "min_count": 1},
+                {"fusion_depth": AkaFusionDepth.FUSED.value, "min_count": 1},
             ],
         },
         "materialized_problems": [
@@ -2820,7 +3053,7 @@ def _write_manifest(
         ],
         "entries": entries,
     }
-    MANIFEST_PATH.write_text(yaml.safe_dump(payload, sort_keys=False))
+    manifest_path.write_text(yaml.safe_dump(payload, sort_keys=False))
 
 
 def main() -> None:
@@ -2828,23 +3061,73 @@ def main() -> None:
     parser.add_argument(
         "--aka-root", type=Path, default=REPO_ROOT / "data" / "AgentKernelArena"
     )
+    parser.add_argument(
+        "--problems-root",
+        type=Path,
+        default=PROBLEMS_ROOT,
+        help="destination root for authored problems and manifest",
+    )
+    parser.add_argument(
+        "--bootstrap-calibration",
+        action="store_true",
+        help="write provisional problems for the runtime probe, but not the manifest",
+    )
+    parser.add_argument(
+        "--rebind-format-only-calibration",
+        action="store_true",
+        help=(
+            "migrate calibration contract hashes after AST-equivalent Ruff "
+            "formatting; preserves all measured values"
+        ),
+    )
     args = parser.parse_args()
-    aka_root = args.aka_root if args.aka_root.is_dir() else None
+    aka_root = args.aka_root.resolve()
+    problems_root = args.problems_root.resolve()
+    manifest_path = problems_root / "manifest.yaml"
+    calibration_path = problems_root / AKA_TOLERANCE_CALIBRATION_FILENAME
+    if not aka_root.is_dir():
+        raise FileNotFoundError(
+            "the pinned AKA clone is required to author provenance bindings: "
+            f"{aka_root}"
+        )
+
+    if args.bootstrap_calibration:
+        calibrated = None
+    else:
+        if not calibration_path.is_file():
+            raise FileNotFoundError(
+                "run scripts/internal/aka_calibrate_tolerances.py first"
+            )
+        calibrated = calibration_tolerances(calibration_path)
 
     records = []
-    aka_checksums: dict[str, dict[str, str]] = {}
+    aka_artifacts: dict[str, list[dict[str, str]]] = {}
     for spec in SPECS:
-        record = _write_problem(spec)
+        record = _write_problem(spec, calibrated, problems_root=problems_root)
         records.append(record)
-        aka_checksums[spec.task_path] = _aka_checksums(aka_root, spec.task_path)
-        print(f"authored {record['path']} ({spec.op_type}/{spec.dtype})")
-    aka_commit = ""
-    if aka_root is not None:
-        head_file = aka_root / ".aka-head"
-        if head_file.is_file():
-            aka_commit = head_file.read_text().strip()
-    _write_manifest(SPECS, records, aka_checksums, aka_commit)
-    print(f"wrote {MANIFEST_PATH.relative_to(REPO_ROOT)} ({len(SPECS)} problems)")
+        aka_artifacts[spec.task_path] = _aka_artifacts(aka_root, spec)
+        print(f"authored {record['path']} ({spec.op_type.value}/{spec.dtype.value})")
+    _format_authored_references(SPECS, records, problems_root=problems_root)
+    if args.bootstrap_calibration:
+        print("bootstrap complete; manifest intentionally left unchanged")
+        return
+    if args.rebind_format_only_calibration:
+        _rebind_format_only_calibration(
+            calibration_path,
+            problems_root=problems_root,
+        )
+    head_file = aka_root / ".aka-head"
+    aka_commit = head_file.read_text().strip() if head_file.is_file() else ""
+    _write_manifest(
+        SPECS,
+        records,
+        aka_artifacts,
+        aka_commit,
+        problems_root=problems_root,
+        manifest_path=manifest_path,
+        calibration_path=calibration_path,
+    )
+    print(f"wrote {manifest_path} ({len(SPECS)} problems)")
 
 
 if __name__ == "__main__":

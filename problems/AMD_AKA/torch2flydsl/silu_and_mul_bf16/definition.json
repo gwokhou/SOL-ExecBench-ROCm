@@ -37,5 +37,5 @@
       "description": "silu(x) * y (M, d)."
     }
   },
-  "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(input):\n    d = input.shape[-1] // 2\n    x, y = input.split([d, d], dim=-1)\n    return (F.silu(x.float()) * y.float()).to(torch.bfloat16)\n"
+  "reference": "import torch\nimport torch.nn.functional as F\n\n\ndef run(input):\n    d = input.shape[-1] // 2\n    x, y = input.split([d, d], dim=-1)\n    return (F.silu(x.float()) * y.float()).to(torch.bfloat16)\n"
 }

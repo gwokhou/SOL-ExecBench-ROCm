@@ -74,7 +74,7 @@ def _capabilities() -> dict[str, str]:
         "corpus.selection": "sol_execbench",
         "corpus.materialization": "sol_execbench",
         "baseline.generation": "trusted_reference_eager_release_plan_v1",
-        "official_score": "manifest_gated_four_authority_bundle_verifier",
+        "official_score": "manifest_gated_content_addressed_bundle_verifier",
     }
 
 
@@ -96,7 +96,7 @@ def _scoring_contract() -> dict[str, Any]:
     """Return the formula, prerequisites, and prohibited scoring behavior."""
     return {
         "formula": "1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))",
-        "official_authority": "manifest_gated_signed_release_bundle",
+        "official_publication": "manifest_gated_content_addressed_release_bundle",
         "scorer_implemented": True,
         "baseline_strategy": "trusted_reference_eager_v1",
         "incorrect_candidate": 0,
@@ -107,8 +107,8 @@ def _scoring_contract() -> dict[str, Any]:
             "exact_scored_corpus_coverage",
             "one_architecture_identity",
             "verified_solar_artifact_hashes",
-            "trusted_candidate_execution_attestation",
-            "independent_release_baseline_rerun",
+            "publisher_candidate_execution",
+            "canonical_release_baseline",
         ],
         "forbids": ["clipping", "bound_substitution", "sentinel_aggregation"],
     }

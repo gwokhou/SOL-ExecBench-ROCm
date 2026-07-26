@@ -67,9 +67,8 @@ records workflow/run provenance, but that metadata is not a trusted execution
 attestation. A content checksum proves internal consistency, not who controlled
 the runner.
 
-The verifier therefore cannot promote this schema into release authority,
+The verifier therefore cannot promote this schema into a publisher score bundle,
 including when a caller edits the booleans and recomputes the manifest
-checksum. A future release needs a separate signed/externally verified
-attestation contract, a clean immutable source revision, and the independent
-baseline, rerun, candidate-execution, and SOLAR evidence described in
+checksum. Official scoring separately requires a clean immutable source
+revision and the baseline, candidate-execution, and SOLAR evidence described in
 [Release and Official Score Workflow](RELEASE-SCORING.md).

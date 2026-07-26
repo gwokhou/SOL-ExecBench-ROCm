@@ -16,23 +16,47 @@ import hashlib
 from dataclasses import dataclass
 from typing import Iterable, Mapping, cast
 
+from sol_execbench.core.data.definition_models import DType
+from sol_execbench.core.dataset.aka_contract import (
+    AkaFusionDepth,
+    AkaOperation,
+    AkaPassKind,
+    AkaSourceFamily,
+    AkaSuite,
+)
+
 
 @dataclass(frozen=True)
 class AkaCandidate:
     """A characterized AKA task considered for the seed set."""
 
     task_path: str
-    suite: str
-    operation: str
-    dtype: str
-    pass_kind: str = "forward"
-    fusion_depth: str = "single"
-    source_family: str = ""
+    suite: AkaSuite
+    operation: AkaOperation
+    dtype: DType
+    pass_kind: AkaPassKind = AkaPassKind.FORWARD
+    fusion_depth: AkaFusionDepth = AkaFusionDepth.SINGLE
+    source_family: AkaSourceFamily | None = None
+
+    def __post_init__(self) -> None:
+        """Normalize caller-provided strings into the closed corpus vocabulary."""
+        object.__setattr__(self, "suite", AkaSuite(self.suite))
+        object.__setattr__(self, "operation", AkaOperation(self.operation))
+        object.__setattr__(self, "dtype", DType(self.dtype))
+        object.__setattr__(self, "pass_kind", AkaPassKind(self.pass_kind))
+        object.__setattr__(self, "fusion_depth", AkaFusionDepth(self.fusion_depth))
+        if self.source_family is not None:
+            object.__setattr__(
+                self, "source_family", AkaSourceFamily(self.source_family)
+            )
 
 
 def _det_key(candidate: AkaCandidate) -> str:
     digest = hashlib.sha256(candidate.task_path.encode("utf-8")).hexdigest()[:16]
-    return f"{candidate.operation}:{candidate.dtype}:{candidate.pass_kind}:{digest}"
+    return (
+        f"{candidate.operation.value}:{candidate.dtype.value}:"
+        f"{candidate.pass_kind.value}:{digest}"
+    )
 
 
 def select_seed_set(
@@ -53,13 +77,17 @@ def select_seed_set(
 
     def _matches(candidate: AkaCandidate, combo: Mapping[str, object]) -> bool:
         mapping = {
-            "operation": candidate.operation,
-            "dtype": candidate.dtype,
-            "pass_kind": candidate.pass_kind,
-            "pass": candidate.pass_kind,
-            "fusion_depth": candidate.fusion_depth,
-            "source_family": candidate.source_family,
-            "suite": candidate.suite,
+            "operation": candidate.operation.value,
+            "dtype": candidate.dtype.value,
+            "pass_kind": candidate.pass_kind.value,
+            "pass": candidate.pass_kind.value,
+            "fusion_depth": candidate.fusion_depth.value,
+            "source_family": (
+                candidate.source_family.value
+                if candidate.source_family is not None
+                else None
+            ),
+            "suite": candidate.suite.value,
         }
         return all(
             str(mapping.get(k)) == str(v) for k, v in combo.items() if k != "min_count"

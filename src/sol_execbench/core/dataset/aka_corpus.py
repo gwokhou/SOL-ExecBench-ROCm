@@ -25,6 +25,7 @@ import json
 import shutil
 import tempfile
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -34,6 +35,7 @@ from sol_execbench.core.bench.reference_protocol import (
     MAX_REFERENCE_TENSOR_STORAGE_BYTES,
 )
 from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_compatibility import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
@@ -45,7 +47,26 @@ from sol_execbench.core.dataset.aka_compatibility import (
     select_corpus_for_target,
     static_reference_storage,
 )
-from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.dataset.aka_contract import (
+    AKA_MANIFEST_SCHEMA_VERSION,
+    AKA_OFFICIAL_BASELINE_ID,
+    AKA_REQUIRED_RELEASE_EVIDENCE,
+    AkaArtifactRole,
+    AkaCorpusRole,
+    AkaFusionDepth,
+    AkaOfficialScoringStatus,
+    AkaOperation,
+    AkaPassKind,
+    AkaReleasePolicy,
+    AkaSourceFamily,
+    AkaSuite,
+)
+from sol_execbench.core.dataset.aka_tolerance import validate_calibration_binding
+from sol_execbench.core.integrity import (
+    sha256_file,
+    validate_relative_artifact_path,
+    validate_sha256,
+)
 from sol_execbench.core.platform.runtime import derive_cache_clear_policy
 
 AKA_REPOSITORY = "https://github.com/AMD-AGI/AgentKernelArena"
@@ -60,14 +81,20 @@ FORMAL_ARCHITECTURE_SHA256 = (
 )
 
 # Corpus-size bounds. The initial seed landed at 15 problems; the friendliness
-# expansion (docs/internal/aka-expansion-friendliness.md) grows it toward the
-# 38-42 range across the three handling categories. The upper bound keeps headroom
-# for further growth while still bounding the manifest validator's check.
+# expansion (docs/internal/aka-expansion-friendliness.md) grows it to 37 across
+# the three handling categories. The upper bound keeps headroom for further growth
+# while still bounding the manifest validator's check.
 SEED_SET_MIN_PROBLEMS = 15
 SEED_SET_MAX_PROBLEMS = 48
-CORPUS_ENTRY_ROLES = frozenset(
-    {"scored", "compatibility_sentinel", "target_incompatible"}
-)
+
+
+@dataclass(frozen=True)
+class AkaArtifactBinding:
+    """One content-addressed file within an AKA task."""
+
+    role: AkaArtifactRole
+    path: str
+    sha256: str
 
 
 @dataclass(frozen=True)
@@ -77,18 +104,16 @@ class AkaCorpusEntry:
     slot: str
     task_path: str
     problem_name: str
-    operation: str
-    dtype: str
-    pass_kind: str
-    fusion_depth: str
-    source_family: str
-    suite: str
-    role: str = "scored"
+    operation: AkaOperation
+    dtype: DType
+    pass_kind: AkaPassKind
+    fusion_depth: AkaFusionDepth
+    source_family: AkaSourceFamily
+    suite: AkaSuite
+    role: AkaCorpusRole = AkaCorpusRole.SCORED
     exclusion_reason_code: str = ""
     workload_uuids: tuple[str, ...] = ()
-    aka_config_sha256: str = ""
-    aka_source_sha256: str = ""
-    aka_runner_sha256: str = ""
+    aka_artifacts: tuple[AkaArtifactBinding, ...] = ()
     golden: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -108,6 +133,7 @@ class AkaCorpusManifest:
     materialized_problem_sha256: dict[str, dict[str, str]]
     formal_coverage_requirements: dict[str, Any]
     official_scoring: dict[str, Any]
+    tolerance_calibration: dict[str, Any] = field(default_factory=dict)
 
     @property
     def authored_root(self) -> Path:
@@ -133,6 +159,16 @@ class AkaCorpusManifest:
         _validate_authored_problems(
             manifest_path.parent, entries, materialized_problem_sha256
         )
+        calibration = dict(data.get("tolerance_calibration") or {})
+        validate_calibration_binding(
+            authored_root=manifest_path.parent,
+            binding=calibration,
+            entries=entries,
+            source_revision=str((data.get("source") or {}).get("revision") or ""),
+            formal_gfx_target=str(
+                (data.get("formal_analysis") or {}).get("formal_gfx_target") or ""
+            ),
+        )
         return cls(
             manifest_path,
             dict(data.get("source") or {}),
@@ -142,6 +178,7 @@ class AkaCorpusManifest:
             materialized_problem_sha256,
             coverage,
             dict(data.get("official_scoring") or {}),
+            calibration,
         )
 
     def materialize(
@@ -231,12 +268,16 @@ class AkaCorpusManifest:
             "excluded_workloads": sum(
                 not bool(item.get("included")) for item in decisions
             ),
-            "scored": sum(entry.role == "scored" for entry in selected_entries),
+            "scored": sum(
+                entry.role == AkaCorpusRole.SCORED for entry in selected_entries
+            ),
             "compatibility_sentinels": sum(
-                entry.role == "compatibility_sentinel" for entry in selected_entries
+                entry.role == AkaCorpusRole.COMPATIBILITY_SENTINEL
+                for entry in selected_entries
             ),
             "target_incompatible": sum(
-                entry.role == "target_incompatible" for entry in self.entries
+                entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE
+                for entry in self.entries
             ),
             "gfx_target": target,
             "coverage": coverage,
@@ -248,8 +289,8 @@ class AkaCorpusManifest:
         """Bind the generated problems to the pinned AKA commit.
 
         Verifies the local AKA clone is checked out at the pinned revision and
-        that every corpus entry's per-task file checksums (config / source /
-        runner) match the files at that commit. This makes the
+        that every corpus entry's content-addressed config, semantic reference,
+        and correctness runner match the files at that commit. This makes the
         manifest-recorded binding between the generated problems and the
         original AKA source tree verifiable end-to-end.
         """
@@ -267,26 +308,13 @@ class AkaCorpusManifest:
             )
         checked = 0
         for entry in self.entries:
-            for attr, relative in (
-                ("aka_config_sha256", "config.yaml"),
-                ("aka_runner_sha256", "eval_tools/correctness_check.py"),
-            ):
-                expected = getattr(entry, attr)
-                if not expected:
-                    continue
-                path = root / entry.task_path / relative
-                if not path.is_file() or sha256_file(path) != expected:
+            task_root = root / entry.task_path
+            for artifact in entry.aka_artifacts:
+                path = task_root / artifact.path
+                if not path.is_file() or sha256_file(path) != artifact.sha256:
                     raise ValueError(
-                        f"AKA {attr} mismatch for {entry.task_path} at {head[:12]}"
-                    )
-                checked += 1
-            source_sha = entry.aka_source_sha256
-            if source_sha:
-                func_dir = root / entry.task_path / "pytorch_code_functional"
-                files = sorted(func_dir.glob("*.py")) if func_dir.is_dir() else []
-                if len(files) != 1 or sha256_file(files[0]) != source_sha:
-                    raise ValueError(
-                        f"AKA source mismatch for {entry.task_path} at {head[:12]}"
+                        f"AKA {artifact.role} mismatch for {entry.task_path} "
+                        f"at {head[:12]}"
                     )
                 checked += 1
         return {
@@ -298,8 +326,10 @@ class AkaCorpusManifest:
 
 
 def _validate_manifest_header(data: Mapping[str, Any]) -> None:
-    if int(data.get("schema_version", 0)) != 4:
-        raise ValueError("AKA corpus manifest must use schema_version 4")
+    if int(data.get("schema_version", 0)) != AKA_MANIFEST_SCHEMA_VERSION:
+        raise ValueError(
+            f"AKA corpus manifest must use schema_version {AKA_MANIFEST_SCHEMA_VERSION}"
+        )
     source = data.get("source") or {}
     if source.get("repository") != AKA_REPOSITORY:
         raise ValueError("corpus must derive from the AMD AgentKernelArena repository")
@@ -318,27 +348,48 @@ def _validate_manifest_header(data: Mapping[str, Any]) -> None:
     if formal.get("architecture_profile_sha256") != FORMAL_ARCHITECTURE_SHA256:
         raise ValueError("formal architecture profile identity changed")
     scoring = data.get("official_scoring") or {}
-    if scoring.get("status") not in {"available", "unavailable"}:
-        raise ValueError("official scoring availability must be explicit")
+    try:
+        status = AkaOfficialScoringStatus(str(scoring.get("status")))
+    except ValueError:
+        raise ValueError("official scoring availability must be explicit") from None
+    if status is AkaOfficialScoringStatus.AVAILABLE:
+        try:
+            policy = AkaReleasePolicy(str(scoring.get("release_policy")))
+        except ValueError:
+            raise ValueError("official scoring release policy is invalid") from None
+        if policy is not AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1:
+            raise ValueError("official scoring release policy is unsupported")
+        if scoring.get("baseline_id") != AKA_OFFICIAL_BASELINE_ID:
+            raise ValueError("official scoring baseline identity is not canonical")
+        required = tuple(str(item) for item in scoring.get("required_evidence") or ())
+        expected = tuple(item.value for item in AKA_REQUIRED_RELEASE_EVIDENCE)
+        if required != expected:
+            raise ValueError("official scoring evidence denominator is invalid")
 
 
 def _load_entry(data: Mapping[str, Any]) -> AkaCorpusEntry:
+    artifacts = tuple(
+        AkaArtifactBinding(
+            role=AkaArtifactRole(str(item["role"])),
+            path=str(item["path"]),
+            sha256=str(item["sha256"]),
+        )
+        for item in (data.get("aka_artifacts") or ())
+    )
     return AkaCorpusEntry(
         slot=str(data["slot"]),
         task_path=str(data["task_path"]),
         problem_name=str(data["problem_name"]),
-        operation=str(data["operation"]),
-        dtype=str(data["dtype"]),
-        pass_kind=str(data["pass_kind"]),
-        fusion_depth=str(data["fusion_depth"]),
-        source_family=str(data["source_family"]),
-        suite=str(data["suite"]),
-        role=str(data.get("role", "scored")),
+        operation=AkaOperation(str(data["operation"])),
+        dtype=DType(str(data["dtype"])),
+        pass_kind=AkaPassKind(str(data["pass_kind"])),
+        fusion_depth=AkaFusionDepth(str(data["fusion_depth"])),
+        source_family=AkaSourceFamily(str(data["source_family"])),
+        suite=AkaSuite(str(data["suite"])),
+        role=AkaCorpusRole(str(data.get("role", AkaCorpusRole.SCORED))),
         exclusion_reason_code=str(data.get("exclusion_reason_code", "")),
         workload_uuids=tuple(str(u) for u in (data.get("workload_uuids") or ())),
-        aka_config_sha256=str(data.get("aka_config_sha256", "")),
-        aka_source_sha256=str(data.get("aka_source_sha256", "")),
-        aka_runner_sha256=str(data.get("aka_runner_sha256", "")),
+        aka_artifacts=artifacts,
         golden=dict(data.get("golden") or {}),
     )
 
@@ -360,11 +411,16 @@ def _validate_entries(
         raise ValueError("AKA corpus task paths must be unique")
     if not all(entry.task_path.startswith("tasks/") for entry in entries):
         raise ValueError("AKA corpus entries must reference tasks/ paths")
-    unknown_roles = sorted({entry.role for entry in entries} - CORPUS_ENTRY_ROLES)
+    for entry in entries:
+        validate_relative_artifact_path(entry.task_path, "AKA task path")
+        _validate_artifact_bindings(entry)
+    unknown_roles = sorted(
+        {str(entry.role) for entry in entries} - {role.value for role in AkaCorpusRole}
+    )
     if unknown_roles:
         raise ValueError(f"AKA corpus entries use unknown roles: {unknown_roles}")
     for entry in entries:
-        if entry.role == "target_incompatible":
+        if entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE:
             if not entry.exclusion_reason_code:
                 raise ValueError(
                     "target-incompatible corpus entries require an exclusion reason"
@@ -373,16 +429,34 @@ def _validate_entries(
             raise ValueError(
                 "only target-incompatible corpus entries may declare an exclusion reason"
             )
-    sentinels = [entry for entry in entries if entry.role == "compatibility_sentinel"]
+    sentinels = [
+        entry for entry in entries if entry.role == AkaCorpusRole.COMPATIBILITY_SENTINEL
+    ]
     # The DType enum names OCP FP8 as "float8_e4m3fn" / "float8_e5m2", so accept
     # either the "fp8" or "float8" prefix when checking the sentinel is an FP8 task.
     if sentinels and not all(
         entry.dtype.startswith(("fp8", "float8")) for entry in sentinels
     ):
         raise ValueError("compatibility sentinels must be FP8 AKA tasks")
-    if sum(entry.role == "scored" for entry in entries) == 0:
+    if sum(entry.role == AkaCorpusRole.SCORED for entry in entries) == 0:
         raise ValueError("AKA corpus must contain at least one scored entry")
     _validate_coverage_truth(entries, coverage)
+
+
+def _validate_artifact_bindings(entry: AkaCorpusEntry) -> None:
+    roles = [artifact.role for artifact in entry.aka_artifacts]
+    required_roles = set(AkaArtifactRole)
+    if set(roles) != required_roles or len(roles) != len(required_roles):
+        raise ValueError(
+            f"AKA entry {entry.problem_name} must bind exactly one artifact for "
+            f"each role: {sorted(role.value for role in required_roles)}"
+        )
+    for artifact in entry.aka_artifacts:
+        validate_relative_artifact_path(artifact.path, "AKA artifact path")
+        validate_sha256(
+            artifact.sha256,
+            f"AKA artifact checksum for {entry.problem_name}/{artifact.role}",
+        )
 
 
 def _validate_coverage_truth(
@@ -404,7 +478,7 @@ def _validate_coverage_truth(
             continue
         actual: dict[str, int] = {}
         for entry in entries:
-            value = getattr(entry, entry_attr)
+            value = _manifest_value(getattr(entry, entry_attr))
             actual[value] = actual.get(value, 0) + 1
         if actual != {k: int(v) for k, v in declared.items()}:
             raise ValueError(
@@ -424,17 +498,21 @@ def _validate_coverage_truth(
 
 def _entry_matches_combo(entry: AkaCorpusEntry, combo: Mapping[str, Any]) -> bool:
     mapping = {
-        "operation": entry.operation,
-        "dtype": entry.dtype,
-        "pass_kind": entry.pass_kind,
-        "pass": entry.pass_kind,
-        "fusion_depth": entry.fusion_depth,
-        "source_family": entry.source_family,
-        "suite": entry.suite,
+        "operation": entry.operation.value,
+        "dtype": entry.dtype.value,
+        "pass_kind": entry.pass_kind.value,
+        "pass": entry.pass_kind.value,
+        "fusion_depth": entry.fusion_depth.value,
+        "source_family": entry.source_family.value,
+        "suite": entry.suite.value,
     }
     return all(
         str(mapping.get(k)) == str(v) for k, v in combo.items() if k != "min_count"
     )
+
+
+def _manifest_value(value: object) -> str:
+    return str(value.value) if isinstance(value, Enum) else str(value)
 
 
 def _canonical_workload_lines(path: Path) -> tuple[list[str], dict[str, str]]:
@@ -579,13 +657,13 @@ def _validate_authored_problems(
             > MAX_REFERENCE_TENSOR_STORAGE_BYTES
             for workload in workloads
         )
-        if any(payload_incompatibility) and entry.role == "scored":
+        if any(payload_incompatibility) and entry.role == AkaCorpusRole.SCORED:
             raise ValueError(
                 "scored AKA problem exceeds the static trusted-reference IPC "
                 f"limit: {entry.relative_problem_dir}"
             )
         if (
-            entry.role == "target_incompatible"
+            entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE
             and entry.exclusion_reason_code == "reference_ipc_payload_limit"
             and (not payload_incompatibility or not all(payload_incompatibility))
         ):

@@ -130,6 +130,13 @@ def test_rdna4_marker_has_concrete_hardware_gated_test_surface():
     )
 
 
+def test_aka_equivalence_uses_real_gpu_serial_group_markers() -> None:
+    path = ROOT / "tests/sol_execbench/core/dataset/test_aka_equivalence.py"
+
+    assert _has_direct_hardware_marked_test(path, "requires_rocm_gpu")
+    assert _has_direct_hardware_marked_test(path, "requires_rdna4")
+
+
 def test_rdna4_hardware_workflow_is_exact_and_publishes_evidence():
     workflow = _read(".github/workflows/rdna4-hardware.yml")
 

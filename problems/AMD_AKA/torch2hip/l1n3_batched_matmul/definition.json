@@ -51,5 +51,5 @@
       "description": "torch.bmm(A, B)."
     }
   },
-  "reference": "import torch\n\ndef run(A, B):\n    return torch.bmm(A, B)\n"
+  "reference": "import torch\n\n\ndef run(A, B):\n    return torch.bmm(A, B)\n"
 }

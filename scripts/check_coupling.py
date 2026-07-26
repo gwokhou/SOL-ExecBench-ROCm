@@ -21,7 +21,7 @@ P0_LIMITS = {
 P1_LIMITS = {
     "sol_execbench.driver.problem_packager": (230, 7),
     "sol_execbench.core.bench.rocm_profiler": (180, 5),
-    "sol_execbench.core.scoring.official_authority": (180, 8),
+    "sol_execbench.core.scoring.official_scoring": (180, 8),
     "sol_execbench.core.solar_bridge.analyzer": (180, 8),
 }
 SOLAR_LIMITS = {

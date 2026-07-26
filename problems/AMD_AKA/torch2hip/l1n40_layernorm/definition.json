@@ -51,5 +51,5 @@
       "description": "layer_norm(x)."
     }
   },
-  "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias, eps):\n    return F.layer_norm(x, (x.shape[-1],), weight, bias, eps)\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(x, weight, bias, eps):\n    return F.layer_norm(x, (x.shape[-1],), weight, bias, eps)\n"
 }
