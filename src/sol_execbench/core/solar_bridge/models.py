@@ -10,6 +10,12 @@ import math
 from pathlib import Path
 from typing import Any, Mapping
 
+from solar.contracts import (
+    SolarAnalysisStatus,
+    SolarReadinessStatus,
+    SolarStage,
+    SolarStageStatus,
+)
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
@@ -22,9 +28,9 @@ FORMAL_ARTIFACT_PATHS = frozenset(
     }
 )
 READINESS_STAGE_ARTIFACTS = {
-    "graph_extraction": "operator_graph.yaml",
-    "einsum_conversion": "einsum_graph.yaml",
-    "conversion_verification": "conversion-attestation.yaml",
+    SolarStage.GRAPH_EXTRACTION: "operator_graph.yaml",
+    SolarStage.EINSUM_CONVERSION: "einsum_graph.yaml",
+    SolarStage.CONVERSION_VERIFICATION: "conversion-attestation.yaml",
 }
 READINESS_STAGES = tuple(READINESS_STAGE_ARTIFACTS)
 
@@ -77,7 +83,7 @@ class SolarStageAuditRequest:
 
 @dataclass(frozen=True)
 class SolarAnalysisOutcome:
-    status: str
+    status: SolarAnalysisStatus
     analysis_id: str
     output_dir: str | None = None
     architecture_sha256: str | None = None
@@ -85,10 +91,16 @@ class SolarAnalysisOutcome:
     bound_kind: str | None = None
     limiting_resource: str | None = None
     artifacts: tuple[dict[str, str], ...] = field(default_factory=tuple)
-    stage: str | None = None
+    stage: SolarStage | None = None
     reason_code: str | None = None
     message: str | None = None
     publication_eligible: bool = False
+
+    def __post_init__(self) -> None:
+        """Normalize worker payload values and reject unknown states."""
+        object.__setattr__(self, "status", SolarAnalysisStatus(self.status))
+        if self.stage is not None:
+            object.__setattr__(self, "stage", SolarStage(self.stage))
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "SolarAnalysisOutcome":
@@ -98,6 +110,8 @@ class SolarAnalysisOutcome:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
+        data["status"] = self.status
+        data["stage"] = self.stage
         data["artifacts"] = list(self.artifacts)
         return data
 
@@ -105,7 +119,7 @@ class SolarAnalysisOutcome:
     def is_formal_publication(self) -> bool:
         """Whether an analyzed worker response satisfies the formal contract."""
         if (
-            self.status != "analyzed"
+            self.status is not SolarAnalysisStatus.ANALYZED
             or self.publication_eligible is not True
             or self.bound_kind != FORMAL_BOUND_KIND
             or self.output_dir is None
@@ -139,15 +153,25 @@ class SolarAnalysisOutcome:
 class SolarStageAuditOutcome:
     """Outer-package copy of one benchmark-agnostic readiness result."""
 
-    status: str
+    status: SolarReadinessStatus
     analysis_id: str
     output_dir: str | None = None
     architecture_sha256: str | None = None
     stages: tuple[dict[str, Any], ...] = field(default_factory=tuple)
     artifacts: tuple[dict[str, str], ...] = field(default_factory=tuple)
-    failure_stage: str | None = None
+    failure_stage: SolarStage | None = None
     reason_code: str | None = None
     message: str | None = None
+
+    def __post_init__(self) -> None:
+        """Normalize worker payload values and reject unknown states."""
+        object.__setattr__(self, "status", SolarReadinessStatus(self.status))
+        if self.failure_stage is not None:
+            object.__setattr__(
+                self,
+                "failure_stage",
+                SolarStage(self.failure_stage),
+            )
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "SolarStageAuditOutcome":
@@ -158,6 +182,8 @@ class SolarStageAuditOutcome:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
+        data["status"] = self.status
+        data["failure_stage"] = self.failure_stage
         data["stages"] = list(self.stages)
         data["artifacts"] = list(self.artifacts)
         return data
@@ -166,7 +192,7 @@ class SolarStageAuditOutcome:
     def ready(self) -> bool:
         """Whether all three stages passed with exact content-addressed evidence."""
         if (
-            self.status != "ready"
+            self.status is not SolarReadinessStatus.READY
             or self.output_dir is None
             or self.architecture_sha256 is None
             or len(self.architecture_sha256) != 64
@@ -176,13 +202,16 @@ class SolarStageAuditOutcome:
             )
         ):
             return False
-        stages = {str(item.get("stage")): item for item in self.stages}
+        try:
+            stages = {SolarStage(str(item.get("stage"))): item for item in self.stages}
+        except ValueError:
+            return False
         if set(stages) != set(READINESS_STAGES):
             return False
         for stage, path in READINESS_STAGE_ARTIFACTS.items():
             artifact = stages[stage].get("artifact") or {}
             if (
-                stages[stage].get("status") != "passed"
+                stages[stage].get("status") != SolarStageStatus.PASSED
                 or artifact.get("path") != path
                 or not _valid_sha256(str(artifact.get("sha256", "")))
             ):
@@ -223,5 +252,9 @@ __all__ = [
     "READINESS_STAGE_ARTIFACTS",
     "READINESS_STAGES",
     "SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION",
+    "SolarAnalysisStatus",
+    "SolarReadinessStatus",
+    "SolarStage",
+    "SolarStageStatus",
     "formal_precision_for_definition",
 ]

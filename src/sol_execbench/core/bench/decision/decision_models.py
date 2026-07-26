@@ -12,7 +12,7 @@ authority. See ``docs/user/decision_sidecar_contract.md`` and
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import ConfigDict, Field
@@ -37,7 +37,7 @@ DecisionFreshnessStatus = DiagnosticFreshnessStatus
 DecisionGovernanceStatus = DiagnosticGovernanceStatus
 
 
-class DecisionReasonCode(str, Enum):
+class DecisionReasonCode(StrEnum):
     """Stable reason-code vocabulary for decision rendering."""
 
     DECISION_RENDERED = "decision_rendered"
@@ -46,7 +46,7 @@ class DecisionReasonCode(str, Enum):
     DECISION_UNAVAILABLE = "decision_unavailable"
 
 
-class DecisionBottleneckClass(str, Enum):
+class DecisionBottleneckClass(StrEnum):
     """Closed Layer R (static-inferable resource) bottleneck vocabulary.
 
     Static derivation emits Layer R only. Compute-bound / memory-bound /
@@ -63,7 +63,7 @@ class DecisionBottleneckClass(str, Enum):
     CACHE_LINE_MISALIGNED = "cache_line_misaligned"
 
 
-class DecisionConfidence(str, Enum):
+class DecisionConfidence(StrEnum):
     """Confidence vocabulary for inferred decision hints.
 
     The ``inferred_*`` prefix marks these as static-inferred (not measured).

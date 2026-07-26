@@ -25,7 +25,6 @@ import json
 import shutil
 import tempfile
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -362,7 +361,7 @@ def _validate_manifest_header(data: Mapping[str, Any]) -> None:
         if scoring.get("baseline_id") != AKA_OFFICIAL_BASELINE_ID:
             raise ValueError("official scoring baseline identity is not canonical")
         required = tuple(str(item) for item in scoring.get("required_evidence") or ())
-        expected = tuple(item.value for item in AKA_REQUIRED_RELEASE_EVIDENCE)
+        expected = tuple(AKA_REQUIRED_RELEASE_EVIDENCE)
         if required != expected:
             raise ValueError("official scoring evidence denominator is invalid")
 
@@ -414,9 +413,7 @@ def _validate_entries(
     for entry in entries:
         validate_relative_artifact_path(entry.task_path, "AKA task path")
         _validate_artifact_bindings(entry)
-    unknown_roles = sorted(
-        {str(entry.role) for entry in entries} - {role.value for role in AkaCorpusRole}
-    )
+    unknown_roles = sorted({str(entry.role) for entry in entries} - set(AkaCorpusRole))
     if unknown_roles:
         raise ValueError(f"AKA corpus entries use unknown roles: {unknown_roles}")
     for entry in entries:
@@ -449,7 +446,7 @@ def _validate_artifact_bindings(entry: AkaCorpusEntry) -> None:
     if set(roles) != required_roles or len(roles) != len(required_roles):
         raise ValueError(
             f"AKA entry {entry.problem_name} must bind exactly one artifact for "
-            f"each role: {sorted(role.value for role in required_roles)}"
+            f"each role: {sorted(required_roles)}"
         )
     for artifact in entry.aka_artifacts:
         validate_relative_artifact_path(artifact.path, "AKA artifact path")
@@ -498,13 +495,13 @@ def _validate_coverage_truth(
 
 def _entry_matches_combo(entry: AkaCorpusEntry, combo: Mapping[str, Any]) -> bool:
     mapping = {
-        "operation": entry.operation.value,
-        "dtype": entry.dtype.value,
-        "pass_kind": entry.pass_kind.value,
-        "pass": entry.pass_kind.value,
-        "fusion_depth": entry.fusion_depth.value,
-        "source_family": entry.source_family.value,
-        "suite": entry.suite.value,
+        "operation": entry.operation,
+        "dtype": entry.dtype,
+        "pass_kind": entry.pass_kind,
+        "pass": entry.pass_kind,
+        "fusion_depth": entry.fusion_depth,
+        "source_family": entry.source_family,
+        "suite": entry.suite,
     }
     return all(
         str(mapping.get(k)) == str(v) for k, v in combo.items() if k != "min_count"
@@ -512,7 +509,7 @@ def _entry_matches_combo(entry: AkaCorpusEntry, combo: Mapping[str, Any]) -> boo
 
 
 def _manifest_value(value: object) -> str:
-    return str(value.value) if isinstance(value, Enum) else str(value)
+    return str(value)
 
 
 def _canonical_workload_lines(path: Path) -> tuple[list[str], dict[str, str]]:

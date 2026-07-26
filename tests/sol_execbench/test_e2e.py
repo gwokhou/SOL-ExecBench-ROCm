@@ -303,7 +303,7 @@ def test_e2e(tmp_path: Path, case: Sample):
     )
 
     # Phase 1 (HIP/C++ only): compile
-    languages = {lang.value for lang in solution.spec.languages}
+    languages = set(solution.spec.languages)
     if languages & _CPP_LANGUAGES:
         cmd, artifact_path = pkg.compile()
         result = _run_subprocess(cmd, cwd=pkg.output_dir)
@@ -332,7 +332,7 @@ def test_e2e(tmp_path: Path, case: Sample):
     assert not failed, (
         f"{case.test_id}: {len(failed)}/{case.expected_count} workloads did not pass:\n"
         + "\n".join(
-            f"  [{t.evaluation.status.value if t.evaluation else '<missing>'}] "
+            f"  [{t.evaluation.status if t.evaluation else '<missing>'}] "
             f"uuid={t.workload.uuid}  log={t.evaluation.log if t.evaluation else ''}"
             for t in failed
         )
@@ -400,8 +400,8 @@ def test_reward_hack_e2e(tmp_path: Path, case: EvilCase):
     for t in traces:
         ev = t.evaluation
         assert ev is not None, f"{case.test_id}: trace missing evaluation"
-        assert ev.status.value == "REWARD_HACK", (
-            f"{case.test_id}: expected REWARD_HACK, got {ev.status.value}; "
+        assert ev.status is EvaluationStatus.REWARD_HACK, (
+            f"{case.test_id}: expected REWARD_HACK, got {ev.status}; "
             f"uuid={t.workload.uuid}  log={ev.log}"
         )
         assert case.expected_log_fragment in ev.log, (
@@ -463,5 +463,5 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
         assert ev is not None, f"Workload {trace.workload.uuid} missing evaluation"
         assert ev.status == EvaluationStatus.PASSED, (
             f"Workload {trace.workload.uuid} did not pass: "
-            f"status={ev.status.value} log={ev.log}"
+            f"status={ev.status} log={ev.log}"
         )

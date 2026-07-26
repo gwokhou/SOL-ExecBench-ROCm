@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -45,7 +45,7 @@ class AxisExpr(BaseModel):
     """An optional human-readable description explaining the purpose of this axis."""
 
 
-class DType(str, Enum):
+class DType(StrEnum):
     """Supported data types for tensors."""
 
     FLOAT64 = "float64"

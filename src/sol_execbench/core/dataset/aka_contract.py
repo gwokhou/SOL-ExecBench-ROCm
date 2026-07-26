@@ -85,6 +85,29 @@ class AkaReleasePolicy(StrEnum):
     CONTENT_ADDRESSED_PUBLISHER_V1 = "content_addressed_publisher_v1"
 
 
+class AkaCompatibilityStage(StrEnum):
+    """Stages that may include or exclude one AKA workload."""
+
+    STATIC = "static"
+    LIVE_PROBE = "live_probe"
+
+
+class AkaProbeStatus(StrEnum):
+    """Closed worker response states for a live compatibility probe."""
+
+    COMPATIBLE = "compatible"
+    INCOMPATIBLE = "incompatible"
+    INFRASTRUCTURE_ERROR = "infrastructure_error"
+
+
+class AkaTargetGeneration(StrEnum):
+    """GPU generations admitted by the authored AKA target catalog."""
+
+    CDNA3 = "cdna3"
+    RDNA3_5 = "rdna3_5"
+    RDNA4 = "rdna4"
+
+
 AKA_MANIFEST_SCHEMA_VERSION = 5
 AKA_TOLERANCE_CALIBRATION_FILENAME = "tolerance-calibration.json"
 AKA_OFFICIAL_BASELINE_ID = "rx9060xt-gfx1200-reference-v1"
@@ -96,13 +119,16 @@ __all__ = [
     "AKA_REQUIRED_RELEASE_EVIDENCE",
     "AKA_TOLERANCE_CALIBRATION_FILENAME",
     "AkaArtifactRole",
+    "AkaCompatibilityStage",
     "AkaCorpusRole",
     "AkaFusionDepth",
     "AkaOfficialScoringStatus",
     "AkaOperation",
     "AkaPassKind",
+    "AkaProbeStatus",
     "AkaRequiredEvidenceKind",
     "AkaReleasePolicy",
     "AkaSourceFamily",
     "AkaSuite",
+    "AkaTargetGeneration",
 ]

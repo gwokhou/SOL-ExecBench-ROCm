@@ -19,6 +19,8 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     _NON_DATA_ARTIFACT_KINDS,
     _PROFILE_ARTIFACT_SUFFIXES,
     _PROFILE_OUTPUT_DIR_NAMES,
+    Rocprofv3ArtifactCoverageStatus,
+    Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     has_profiler_data_artifact,
 )
@@ -135,21 +137,25 @@ def profile_artifact_coverage_metadata(
     artifacts: Sequence[Rocprofv3ProfileArtifact],
     *,
     command_succeeded: bool,
-) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+) -> tuple[Rocprofv3ArtifactCoverageStatus, tuple[str, ...], tuple[str, ...]]:
     if not artifacts:
-        return "none", (), ()
+        return Rocprofv3ArtifactCoverageStatus.NONE, (), ()
 
     has_profiler_data_artifact = any(
         is_profiler_data_artifact(artifact) for artifact in artifacts
     )
     if command_succeeded and has_profiler_data_artifact:
-        return "complete", (ROCPROF_REASON_ARTIFACTS_REGISTERED,), ()
+        return (
+            Rocprofv3ArtifactCoverageStatus.COMPLETE,
+            (ROCPROF_REASON_ARTIFACTS_REGISTERED,),
+            (),
+        )
 
     if command_succeeded and any(
-        artifact.kind == "diagnostic_json" for artifact in artifacts
+        artifact.kind is Rocprofv3ArtifactKind.DIAGNOSTIC_JSON for artifact in artifacts
     ):
         return (
-            "diagnostic_logs_only",
+            Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY,
             (
                 ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
                 ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
@@ -158,7 +164,7 @@ def profile_artifact_coverage_metadata(
         )
 
     return (
-        "partial",
+        Rocprofv3ArtifactCoverageStatus.PARTIAL,
         (ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE,),
         (ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE,),
     )
@@ -168,26 +174,26 @@ def is_profiler_data_artifact(artifact: Rocprofv3ProfileArtifact) -> bool:
     return artifact.kind not in _NON_DATA_ARTIFACT_KINDS
 
 
-def classify_profile_artifact(path: Path) -> str:
+def classify_profile_artifact(path: Path) -> Rocprofv3ArtifactKind:
     name = path.name.lower()
     suffix = path.suffix.lower()
     if suffix in {".db", ".sqlite", ".sqlite3", ".rocpd"}:
-        return "rocpd"
+        return Rocprofv3ArtifactKind.ROCPD
     if suffix == ".csv":
         if "agent" in name:
-            return "agent_info_csv"
+            return Rocprofv3ArtifactKind.AGENT_INFO_CSV
         if "counter" in name:
-            return "counter_csv"
-        return "trace_csv"
+            return Rocprofv3ArtifactKind.COUNTER_CSV
+        return Rocprofv3ArtifactKind.TRACE_CSV
     if suffix == ".json":
         if "diagnostic" in name:
-            return "diagnostic_json"
-        return "metadata_json"
+            return Rocprofv3ArtifactKind.DIAGNOSTIC_JSON
+        return Rocprofv3ArtifactKind.METADATA_JSON
     if suffix == ".pftrace" or ("perfetto" in name and suffix == ".trace"):
-        return "perfetto_trace"
+        return Rocprofv3ArtifactKind.PERFETTO_TRACE
     if suffix == ".otf2":
-        return "otf2_trace"
-    return "other"
+        return Rocprofv3ArtifactKind.OTF2_TRACE
+    return Rocprofv3ArtifactKind.OTHER
 
 
 def profile_output_directory_listing(output_directory: Path) -> tuple[str, ...]:

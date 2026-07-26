@@ -48,7 +48,7 @@ def _rebase_rocm_flag(flag: str) -> str:
 
 # set flags
 hip_cflags = list(compile_options.hip_cflags) if compile_options else []
-native_languages = {language.value for language in solution.spec.languages}
+native_languages = set(solution.spec.languages)
 if native_languages & {"ck", "rocwmma"}:
     # PyTorch defines these for its own HIP extension headers, but CK and
     # rocWMMA require the standard HIP half conversions and operators.
@@ -70,9 +70,7 @@ ld_flags = (
 )
 
 rocm_arches = [
-    target.value
-    for target in solution.spec.target_hardware
-    if target.value.startswith("gfx")
+    target for target in solution.spec.target_hardware if target.startswith("gfx")
 ]
 if rocm_arches and "PYTORCH_ROCM_ARCH" not in ENVIRON:
     ENVIRON["PYTORCH_ROCM_ARCH"] = ";".join(dict.fromkeys(rocm_arches))

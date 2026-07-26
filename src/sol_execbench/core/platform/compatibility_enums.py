@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import BeforeValidator, ConfigDict
@@ -31,7 +31,7 @@ MATRIX_MODEL_CONFIG = ConfigDict(
 )
 
 
-class MatrixCompatibilityStatus(str, Enum):
+class MatrixCompatibilityStatus(StrEnum):
     """Bounded compatibility status vocabulary for Matrix Entries."""
 
     HOST_VALIDATED = "host_validated"
@@ -42,7 +42,7 @@ class MatrixCompatibilityStatus(str, Enum):
     NOT_TESTED = "not_tested"
 
 
-class MatrixCompatibilityReasonCode(str, Enum):
+class MatrixCompatibilityReasonCode(StrEnum):
     """Stable reason-code vocabulary for compatibility Matrix Entries."""
 
     HOST_NATIVE_VALIDATED = "host_native_validated"
@@ -53,7 +53,7 @@ class MatrixCompatibilityReasonCode(str, Enum):
     TARGET_NOT_TESTED = "target_not_tested"
 
 
-class MatrixValidationScope(str, Enum):
+class MatrixValidationScope(StrEnum):
     """Requested validation scope for a Matrix Target."""
 
     NATIVE_HOST = "native_host"

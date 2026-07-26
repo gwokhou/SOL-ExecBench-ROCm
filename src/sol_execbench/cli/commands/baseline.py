@@ -158,14 +158,14 @@ def release_run_cli(
             hint="Run the plan inside the hardened container on the pinned GPU.",
         ) from exc
     report = {
-        "role": result.role.value,
+        "role": result.role,
         "run_id": result.run_id,
         "problems": result.problems,
         "workloads": result.workloads,
         "passed": result.passed,
     }
     console.print(
-        f"[green]Release {result.role.value}: "
+        f"[green]Release {result.role}: "
         f"{result.passed}/{result.workloads} workloads passed.[/green]"
     )
     return CliResult(data=report)

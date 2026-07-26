@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import ConfigDict, Field
@@ -42,7 +42,7 @@ ProfileSummaryFreshnessStatus = DiagnosticFreshnessStatus
 ProfileSummaryGovernanceStatus = DiagnosticGovernanceStatus
 
 
-class ProfileSummaryReasonCode(str, Enum):
+class ProfileSummaryReasonCode(StrEnum):
     """Stable reason-code vocabulary for profile summary generation."""
 
     PROFILE_SUMMARY_GENERATED = "profile_summary_generated"

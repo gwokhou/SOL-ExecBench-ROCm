@@ -73,7 +73,7 @@ class DerivedEvidenceReport:
             "summary": self.summary.to_dict(),
             "diagnostics": [
                 {
-                    "stage": diagnostic.stage.value,
+                    "stage": diagnostic.stage,
                     "status": diagnostic.status,
                     "message": diagnostic.message,
                     "hint": diagnostic.hint,
@@ -93,7 +93,7 @@ def summarize_traces(traces: list[Trace]) -> TraceRunSummary:
         if trace.evaluation is None:
             statuses["NO_EVALUATION"] = statuses.get("NO_EVALUATION", 0) + 1
             continue
-        status = trace.evaluation.status.value
+        status = trace.evaluation.status
         statuses[status] = statuses.get(status, 0) + 1
         if trace.evaluation.status == EvaluationStatus.PASSED:
             passed += 1

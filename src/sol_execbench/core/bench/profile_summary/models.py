@@ -6,9 +6,14 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import ConfigDict, Field
 
+from sol_execbench.core.bench.rocm_profiler.models import (
+    Rocprofv3ArtifactCoverageStatus,
+    Rocprofv3ProfileStatus,
+)
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
@@ -75,7 +80,7 @@ class ProfileSummaryStructuredMetric(BaseModelWithDocstrings):
     """Optional workload identity."""
     artifact: str | None = None
     """Compact source artifact label."""
-    parse_status: str = "available"
+    parse_status: Literal["available"] = "available"
     """Bounded parse status for the source metric."""
 
 
@@ -96,7 +101,7 @@ class ProfileSummaryKernelMetric(BaseModelWithDocstrings):
     """Metric source label."""
     artifact: str | None = None
     """Compact source artifact label."""
-    parse_status: str = "available"
+    parse_status: Literal["available"] = "available"
     """Bounded parse status for the source metric."""
 
 
@@ -143,11 +148,11 @@ class ProfileSummaryContent(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    profiler_status: str | None = None
+    profiler_status: Rocprofv3ProfileStatus | None = None
     """Raw profiler result status when available."""
     profiler_available: bool | None = None
     """Whether rocprofv3 was available to the producer."""
-    artifact_coverage_status: str | None = None
+    artifact_coverage_status: Rocprofv3ArtifactCoverageStatus | None = None
     """Bounded profiler artifact coverage status."""
     reason_codes: list[str] = Field(default_factory=list)
     """Stable profiler result reason codes."""

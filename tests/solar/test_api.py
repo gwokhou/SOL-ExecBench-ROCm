@@ -8,6 +8,7 @@ import yaml
 
 import solar.api as api
 from solar.api import AnalysisFailure, AnalysisRequest, AnalysisResult
+from solar.contracts import SolarStage
 from solar.einsum.conversion import EinsumGraphArtifact
 from solar.graph.extraction import OperatorGraphArtifact
 from solar.analysis.orojenesis import OrojenesisError
@@ -202,13 +203,14 @@ def test_bound_and_reason_code_helpers_fail_closed():
         )
     with pytest.raises(ValueError, match="unsupported schema"):
         api._extract_bound({"schema_version": 0})
-    assert api._reason_code("formal_analysis", OrojenesisError("missing")) == (
+    assert api._reason_code(SolarStage.FORMAL_ANALYSIS, OrojenesisError("missing")) == (
         "toolchain_unavailable"
     )
-    assert api._reason_code("conversion_verification", VerificationError("bad")) == (
-        "conversion_not_proven"
+    assert (
+        api._reason_code(SolarStage.CONVERSION_VERIFICATION, VerificationError("bad"))
+        == "conversion_not_proven"
     )
-    assert api._reason_code("graph_extraction", RuntimeError()) == (
+    assert api._reason_code(SolarStage.GRAPH_EXTRACTION, RuntimeError()) == (
         "graph_extraction_failed"
     )
 

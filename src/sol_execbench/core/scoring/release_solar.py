@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.integrity import (
     sha256_bytes,
@@ -70,7 +71,7 @@ def _expected_workloads(corpus: AkaCorpusManifest) -> set[tuple[str, str]]:
     return {
         (entry.relative_problem_dir.as_posix(), workload_uuid)
         for entry in corpus.entries
-        if entry.role == "scored"
+        if entry.role is AkaCorpusRole.SCORED
         for workload_uuid in entry.workload_uuids
     }
 

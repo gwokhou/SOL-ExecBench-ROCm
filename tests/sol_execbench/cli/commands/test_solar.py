@@ -7,13 +7,20 @@ from click.testing import CliRunner
 
 from sol_execbench.cli.commands import solar as solar_commands
 from sol_execbench.cli.main import cli
-from sol_execbench.core.solar_bridge.corpus_readiness import CorpusStageAuditResult
-from sol_execbench.core.solar_bridge.models import SolarAnalysisOutcome
+from sol_execbench.core.solar_bridge.corpus_readiness import (
+    CorpusReadinessStatus,
+    CorpusStageAuditResult,
+)
+from sol_execbench.core.solar_bridge.models import (
+    SolarAnalysisOutcome,
+    SolarAnalysisStatus,
+    SolarStage,
+)
 
 
 def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
     return SolarAnalysisOutcome(
-        status="analyzed",
+        status=SolarAnalysisStatus.ANALYZED,
         analysis_id=analysis_id,
         output_dir=output_dir,
         architecture_sha256="a" * 64,
@@ -114,9 +121,9 @@ def test_solar_analyze_cli_preserves_failed_stage(tmp_path, monkeypatch) -> None
         solar_commands,
         "run_solar_worker",
         lambda request, **kwargs: SolarAnalysisOutcome(
-            status="failed",
+            status=SolarAnalysisStatus.FAILED,
             analysis_id=request.workload_uuid,
-            stage="conversion_verification",
+            stage=SolarStage.CONVERSION_VERIFICATION,
             reason_code="verification_failed",
             message="mismatch",
         ),
@@ -181,7 +188,7 @@ def test_solar_corpus_audit_returns_incomplete_matrix(tmp_path, monkeypatch) -> 
         solar_commands,
         "audit_corpus_stage_readiness",
         lambda *args, **kwargs: CorpusStageAuditResult(
-            status="incomplete",
+            status=CorpusReadinessStatus.INCOMPLETE,
             problems=35,
             workloads=122,
             extraction_passed=118,

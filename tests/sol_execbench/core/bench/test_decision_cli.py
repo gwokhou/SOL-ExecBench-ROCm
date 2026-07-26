@@ -26,6 +26,8 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
 )
 from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ArtifactCoverageStatus,
+    Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
@@ -143,12 +145,12 @@ def _profile_result_with_counter(
         artifacts=(
             Rocprofv3ProfileArtifact(
                 path=counter,
-                kind="counter_csv",
+                kind=Rocprofv3ArtifactKind.COUNTER_CSV,
                 size_bytes=counter.stat().st_size,
             ),
         ),
         profiler_available=True,
-        artifact_coverage_status="complete",
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.COMPLETE,
     )
 
 

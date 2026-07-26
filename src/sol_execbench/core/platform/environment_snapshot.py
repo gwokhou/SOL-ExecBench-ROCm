@@ -191,7 +191,7 @@ def snapshot_warnings(
     warnings: list[str] = []
     for name, result in tools.items():
         if result.status != EnvironmentEvidenceStatus.AVAILABLE:
-            warnings.append(f"{name}:{result.status.value}")
+            warnings.append(f"{name}:{result.status}")
     if pytorch and not pytorch.available:
         warnings.append("pytorch_rocm:unavailable")
     return warnings

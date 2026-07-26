@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import ConfigDict, Field
@@ -15,6 +15,10 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticGovernanceStatus,
     DiagnosticSidecarAuthority,
     DiagnosticSidecarStatus,
+)
+from sol_execbench.core.bench.rocm_profiler.models import Rocprofv3ProfileStatus
+from sol_execbench.core.bench.static_kernel.evidence_models import (
+    StaticKernelEvidenceStatus,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import (
@@ -30,7 +34,7 @@ AgentFeedbackFreshnessStatus = DiagnosticFreshnessStatus
 AgentFeedbackGovernanceStatus = DiagnosticGovernanceStatus
 
 
-class AgentFeedbackReasonCode(str, Enum):
+class AgentFeedbackReasonCode(StrEnum):
     """Stable reason-code vocabulary for feedback generation."""
 
     FEEDBACK_GENERATED = "feedback_generated"
@@ -38,7 +42,7 @@ class AgentFeedbackReasonCode(str, Enum):
     NO_EVALUATION_TRACES = "no_evaluation_traces"
 
 
-class AgentFeedbackSeverity(str, Enum):
+class AgentFeedbackSeverity(StrEnum):
     """Prompt-safe severity vocabulary."""
 
     INFO = "info"
@@ -46,7 +50,7 @@ class AgentFeedbackSeverity(str, Enum):
     ACTION = "action"
 
 
-class AgentFeedbackBottleneck(str, Enum):
+class AgentFeedbackBottleneck(StrEnum):
     """Closed bottleneck vocabulary emitted by SOL feedback sidecars."""
 
     UNKNOWN = "unknown"
@@ -160,9 +164,9 @@ class AgentFeedbackSummary(BaseModelWithDocstrings):
     """Number of traces with evaluation payloads."""
     status_counts: dict[str, int] = Field(default_factory=dict)
     """Evaluation status counts."""
-    profile_status: str | None = None
+    profile_status: Rocprofv3ProfileStatus | None = None
     """Optional rocprofv3 profile sidecar status."""
-    static_evidence_status: str | None = None
+    static_evidence_status: StaticKernelEvidenceStatus | None = None
     """Optional static evidence sidecar status."""
 
 

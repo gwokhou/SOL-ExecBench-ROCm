@@ -118,7 +118,7 @@ def _build_timed_output_validator(
         issue = check_output_shape_dtype(expected, actual)
         if issue is not None:
             raise RewardHackDetected(
-                f"timed invocation returned invalid output shape or dtype: {issue.value}"
+                f"timed invocation returned invalid output shape or dtype: {issue}"
             )
         for reference, candidate in zip(expected, actual, strict=True):
             _, exceeds = compute_error_stats(candidate, reference, workload.tolerance)

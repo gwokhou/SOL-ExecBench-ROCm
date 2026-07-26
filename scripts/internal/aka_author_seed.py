@@ -2712,7 +2712,7 @@ def _artifact_record(
     path: Path,
 ) -> dict[str, str]:
     return {
-        "role": role.value,
+        "role": str(role),
         "path": path.relative_to(task_root).as_posix(),
         "sha256": sha256_file(path),
     }
@@ -2760,7 +2760,7 @@ def _write_problem(
     for idx, wl in enumerate(spec.workloads):
         uuid = f"aka-{spec.name}-w{idx}"
         if calibrated is None or spec.role is AkaCorpusRole.TARGET_INCOMPATIBLE:
-            tolerance = dtype_default_tolerance(spec.dtype.value)
+            tolerance = dtype_default_tolerance(spec.dtype)
         else:
             try:
                 tolerance = calibrated[uuid]
@@ -2783,7 +2783,7 @@ def _write_problem(
 
     definition_payload = {
         "name": spec.name,
-        "op_type": spec.op_type.value,
+        "op_type": spec.op_type,
         "description": spec.description,
         "axes": spec.axes,
         "inputs": spec.inputs,
@@ -2896,8 +2896,7 @@ def _coverage_axes(specs: list[Spec]) -> dict[str, dict[str, int]]:
     def _count(field: str) -> dict[str, int]:
         out: dict[str, int] = {}
         for s in specs:
-            raw_value = getattr(s, field)
-            value = str(getattr(raw_value, "value", raw_value))
+            value = str(getattr(s, field))
             out[value] = out.get(value, 0) + 1
         return dict(sorted(out.items()))
 
@@ -2927,13 +2926,13 @@ def _write_manifest(
             "slot": spec.name,
             "task_path": spec.task_path,
             "problem_name": spec.name,
-            "operation": spec.op_type.value,
-            "dtype": spec.dtype.value,
-            "pass_kind": spec.pass_kind.value,
-            "fusion_depth": spec.fusion_depth.value,
-            "source_family": spec.source_family.value,
-            "suite": spec.suite.value,
-            "role": spec.role.value,
+            "operation": str(spec.op_type),
+            "dtype": str(spec.dtype),
+            "pass_kind": str(spec.pass_kind),
+            "fusion_depth": str(spec.fusion_depth),
+            "source_family": str(spec.source_family),
+            "suite": str(spec.suite),
+            "role": str(spec.role),
             "workload_uuids": [
                 f"aka-{spec.name}-w{i}" for i in range(len(spec.workloads))
             ],
@@ -2955,8 +2954,10 @@ def _write_manifest(
         },
         "execution_targets": {
             gfx_target: {
-                "generation": spec["generation"],
-                "supported_tensor_dtypes": list(spec["supported_tensor_dtypes"]),
+                "generation": str(spec["generation"]),
+                "supported_tensor_dtypes": [
+                    str(dtype) for dtype in spec["supported_tensor_dtypes"]
+                ],
             }
             for gfx_target, spec in AKA_EXECUTION_TARGET_SPECS.items()
         },
@@ -2970,76 +2971,76 @@ def _write_manifest(
             "sha256": sha256_file(calibration_path),
         },
         "official_scoring": {
-            "status": AkaOfficialScoringStatus.AVAILABLE.value,
-            "release_policy": AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1.value,
+            "status": str(AkaOfficialScoringStatus.AVAILABLE),
+            "release_policy": str(AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1),
             "baseline_id": AKA_OFFICIAL_BASELINE_ID,
             "required_evidence": [
-                evidence.value for evidence in AKA_REQUIRED_RELEASE_EVIDENCE
+                str(evidence) for evidence in AKA_REQUIRED_RELEASE_EVIDENCE
             ],
         },
         "formal_coverage_requirements": {
             "axes": _coverage_axes(specs),
             "combinations": [
                 {
-                    "operation": AkaOperation.MATMUL.value,
-                    "dtype": DType.FLOAT32.value,
-                    "pass": AkaPassKind.FORWARD.value,
+                    "operation": str(AkaOperation.MATMUL),
+                    "dtype": str(DType.FLOAT32),
+                    "pass": str(AkaPassKind.FORWARD),
                     "min_count": 1,
                 },
                 {
-                    "operation": AkaOperation.MATMUL.value,
-                    "dtype": DType.BFLOAT16.value,
-                    "pass": AkaPassKind.FORWARD.value,
+                    "operation": str(AkaOperation.MATMUL),
+                    "dtype": str(DType.BFLOAT16),
+                    "pass": str(AkaPassKind.FORWARD),
                     "min_count": 1,
                 },
                 {
-                    "operation": AkaOperation.SOFTMAX.value,
-                    "dtype": DType.FLOAT32.value,
-                    "pass": AkaPassKind.FORWARD.value,
+                    "operation": str(AkaOperation.SOFTMAX),
+                    "dtype": str(DType.FLOAT32),
+                    "pass": str(AkaPassKind.FORWARD),
                     "min_count": 1,
                 },
                 {
-                    "operation": AkaOperation.NORM.value,
-                    "dtype": DType.BFLOAT16.value,
-                    "pass": AkaPassKind.FORWARD.value,
+                    "operation": str(AkaOperation.NORM),
+                    "dtype": str(DType.BFLOAT16),
+                    "pass": str(AkaPassKind.FORWARD),
                     "min_count": 1,
                 },
                 {
-                    "operation": AkaOperation.CONV.value,
-                    "dtype": DType.FLOAT32.value,
-                    "pass": AkaPassKind.FORWARD.value,
+                    "operation": str(AkaOperation.CONV),
+                    "dtype": str(DType.FLOAT32),
+                    "pass": str(AkaPassKind.FORWARD),
                     "min_count": 1,
                 },
                 {
-                    "operation": AkaOperation.ELEMENTWISE.value,
-                    "dtype": DType.FLOAT16.value,
-                    "pass": AkaPassKind.FORWARD.value,
+                    "operation": str(AkaOperation.ELEMENTWISE),
+                    "dtype": str(DType.FLOAT16),
+                    "pass": str(AkaPassKind.FORWARD),
                     "min_count": 1,
                 },
                 # --- Expansion floor constraints (friendliness categories) ---
                 # Cat1 coverage breadth: the attention op family is present.
                 {
-                    "operation": AkaOperation.ATTENTION.value,
-                    "pass": AkaPassKind.FORWARD.value,
+                    "operation": str(AkaOperation.ATTENTION),
+                    "pass": str(AkaPassKind.FORWARD),
                     "min_count": 1,
                 },
                 # At least two norm problems so a norm variant (group/batch/instance)
                 # is represented alongside the baseline layernorm/rmsnorm.
                 {
-                    "operation": AkaOperation.NORM.value,
-                    "pass": AkaPassKind.FORWARD.value,
+                    "operation": str(AkaOperation.NORM),
+                    "pass": str(AkaPassKind.FORWARD),
                     "min_count": 2,
                 },
                 # Cat2 backward pass (instruction2triton rmsnorm_bwd).
-                {"pass": AkaPassKind.BACKWARD.value, "min_count": 1},
+                {"pass": str(AkaPassKind.BACKWARD), "min_count": 1},
                 # Cat2 FP8 compatibility sentinel (float8_e4m3fn).
                 {
-                    "dtype": DType.FLOAT8_E4M3FN.value,
-                    "pass": AkaPassKind.FORWARD.value,
+                    "dtype": str(DType.FLOAT8_E4M3FN),
+                    "pass": str(AkaPassKind.FORWARD),
                     "min_count": 1,
                 },
                 # Fused-op depth is represented.
-                {"fusion_depth": AkaFusionDepth.FUSED.value, "min_count": 1},
+                {"fusion_depth": str(AkaFusionDepth.FUSED), "min_count": 1},
             ],
         },
         "materialized_problems": [
@@ -3106,7 +3107,7 @@ def main() -> None:
         record = _write_problem(spec, calibrated, problems_root=problems_root)
         records.append(record)
         aka_artifacts[spec.task_path] = _aka_artifacts(aka_root, spec)
-        print(f"authored {record['path']} ({spec.op_type.value}/{spec.dtype.value})")
+        print(f"authored {record['path']} ({spec.op_type}/{spec.dtype})")
     _format_authored_references(SPECS, records, problems_root=problems_root)
     if args.bootstrap_calibration:
         print("bootstrap complete; manifest intentionally left unchanged")

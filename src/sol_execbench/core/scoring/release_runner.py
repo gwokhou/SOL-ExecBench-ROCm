@@ -25,6 +25,7 @@ from sol_execbench.core.data.json_utils import (
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 from sol_execbench.core.platform.environment_diagnostics import (
@@ -104,7 +105,7 @@ def _verify_plan_contract(
     expected = {
         entry.relative_problem_dir.as_posix(): entry
         for entry in corpus.entries
-        if entry.role == "scored"
+        if entry.role is AkaCorpusRole.SCORED
     }
     observed = {item.problem_path: item for item in plan.problems}
     if set(observed) != set(expected):

@@ -18,7 +18,10 @@ from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryKernelMetric,
     ProfileSummaryStructuredMetric,
 )
-from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
+from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ArtifactKind,
+    Rocprofv3ProfileResult,
+)
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
@@ -57,18 +60,18 @@ def structured_profile_evidence(
     parse_warnings: list[str] = []
 
     for artifact in profile_result.artifacts:
-        if artifact.kind == "trace_csv":
+        if artifact.kind is Rocprofv3ArtifactKind.TRACE_CSV:
             parsed_metrics, warnings = _parse_trace_csv_artifact(artifact.path)
             kernel_metrics.extend(parsed_metrics)
             parse_warnings.extend(warnings)
-        elif artifact.kind == "counter_csv":
+        elif artifact.kind is Rocprofv3ArtifactKind.COUNTER_CSV:
             parsed_metrics, warnings = _parse_counter_csv_artifact(artifact.path)
             kernel_metrics.extend(parsed_metrics)
             parse_warnings.extend(warnings)
-        elif artifact.kind == "agent_info_csv":
+        elif artifact.kind is Rocprofv3ArtifactKind.AGENT_INFO_CSV:
             _, warnings = _parse_limited_csv(artifact.path)
             parse_warnings.extend(warnings)
-        elif artifact.kind == "metadata_json":
+        elif artifact.kind is Rocprofv3ArtifactKind.METADATA_JSON:
             parsed_metrics, warnings = _parse_metadata_json_artifact(
                 artifact.path,
                 workload_id=workload_id,
@@ -76,16 +79,16 @@ def structured_profile_evidence(
             workload_metrics.extend(parsed_metrics)
             parse_warnings.extend(warnings)
         elif artifact.kind in {
-            "diagnostic_json",
-            "rocpd",
-            "perfetto_trace",
-            "otf2_trace",
+            Rocprofv3ArtifactKind.DIAGNOSTIC_JSON,
+            Rocprofv3ArtifactKind.ROCPD,
+            Rocprofv3ArtifactKind.PERFETTO_TRACE,
+            Rocprofv3ArtifactKind.OTF2_TRACE,
         }:
             parse_warnings.append(
                 f"{artifact.path.name}: {artifact.kind} artifacts are "
                 "citation-only in sol_execbench.profile_summary.v3"
             )
-        elif artifact.kind == "other":
+        elif artifact.kind is Rocprofv3ArtifactKind.OTHER:
             parse_warnings.append(
                 f"{artifact.path.name}: unsupported profiler artifact kind other"
             )
@@ -100,7 +103,10 @@ def structured_profile_evidence(
 
 def _metadata_workload_id(profile_result: Rocprofv3ProfileResult) -> str | None:
     for artifact in profile_result.artifacts:
-        if artifact.kind != "metadata_json" or not artifact.path.is_file():
+        if (
+            artifact.kind is not Rocprofv3ArtifactKind.METADATA_JSON
+            or not artifact.path.is_file()
+        ):
             continue
         try:
             if artifact.path.stat().st_size > _PROFILE_SUMMARY_MAX_PARSE_BYTES:

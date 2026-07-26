@@ -135,7 +135,7 @@ def test_extractor_collects_footprint_without_downgrading_base_status(tmp_path):
         which=lambda binary: f"/usr/bin/{binary}",
     )
 
-    assert sidecar.status.value == "collected"
+    assert sidecar.status == "collected"
     assert {run.tool_id for run in sidecar.tool_runs} == {"llvm-objdump", "readelf"}
     assert len(sidecar.footprints) == 1
     footprint = sidecar.footprints[0]
@@ -182,7 +182,7 @@ def test_extractor_skips_footprint_when_roc_objdump_missing(tmp_path):
         which=which,
     )
 
-    assert sidecar.status.value == "collected"
+    assert sidecar.status == "collected"
     assert sidecar.footprints == []
 
 

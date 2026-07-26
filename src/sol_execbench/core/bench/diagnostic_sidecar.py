@@ -11,7 +11,7 @@ circular imports.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
@@ -20,7 +20,7 @@ from pydantic import ConfigDict
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
-class DiagnosticSidecarStatus(str, Enum):
+class DiagnosticSidecarStatus(StrEnum):
     """Availability vocabulary shared by diagnostic-only sidecars."""
 
     AVAILABLE = "available"
@@ -28,7 +28,7 @@ class DiagnosticSidecarStatus(str, Enum):
     UNAVAILABLE = "unavailable"
 
 
-class DiagnosticFreshnessStatus(str, Enum):
+class DiagnosticFreshnessStatus(StrEnum):
     """Freshness vocabulary shared by diagnostic-only sidecars."""
 
     CURRENT = "current"
@@ -36,7 +36,7 @@ class DiagnosticFreshnessStatus(str, Enum):
     UNKNOWN = "unknown"
 
 
-class DiagnosticGovernanceStatus(str, Enum):
+class DiagnosticGovernanceStatus(StrEnum):
     """Governance vocabulary shared by diagnostic-only sidecars."""
 
     USABLE_DIAGNOSTIC = "usable_diagnostic"

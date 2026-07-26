@@ -14,6 +14,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from solar.common.types import DynamicValue
+from solar.contracts import SolarReadinessStatus, SolarStage, SolarStageStatus
 from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import extract_operator_graph
 from solar.rocm.architecture import ArchitectureProfile
@@ -25,9 +26,9 @@ from solar.verification import (
 
 InputFactory = Callable[[int], Sequence[DynamicValue]]
 READINESS_STAGES = (
-    "graph_extraction",
-    "einsum_conversion",
-    "conversion_verification",
+    SolarStage.GRAPH_EXTRACTION,
+    SolarStage.EINSUM_CONVERSION,
+    SolarStage.CONVERSION_VERIFICATION,
 )
 
 
@@ -73,14 +74,21 @@ class ReadinessArtifact:
 class ReadinessStage:
     """Stable status and optional evidence for one ordered readiness stage."""
 
-    stage: str
-    status: str
+    stage: SolarStage
+    status: SolarStageStatus
     reason_code: str | None = None
     message: str | None = None
     artifact: ReadinessArtifact | None = None
 
+    def __post_init__(self) -> None:
+        """Normalize boundary input and reject unknown stage states."""
+        object.__setattr__(self, "stage", SolarStage(self.stage))
+        object.__setattr__(self, "status", SolarStageStatus(self.status))
+
     def to_dict(self) -> dict[str, DynamicValue]:
         value = asdict(self)
+        value["stage"] = self.stage
+        value["status"] = self.status
         if self.artifact is not None:
             value["artifact"] = self.artifact.to_dict()
         return value
@@ -90,19 +98,29 @@ class ReadinessStage:
 class ConversionReadinessResult:
     """Complete fail-closed result for one executable-conversion audit."""
 
-    status: str
+    status: SolarReadinessStatus
     analysis_id: str
     output_dir: str
     architecture_sha256: str | None
     stages: tuple[ReadinessStage, ...]
-    failure_stage: str | None = None
+    failure_stage: SolarStage | None = None
     reason_code: str | None = None
     message: str | None = None
 
+    def __post_init__(self) -> None:
+        """Normalize boundary input and reject unknown result states."""
+        object.__setattr__(self, "status", SolarReadinessStatus(self.status))
+        if self.failure_stage is not None:
+            object.__setattr__(
+                self,
+                "failure_stage",
+                SolarStage(self.failure_stage),
+            )
+
     @property
     def ready(self) -> bool:
-        return self.status == "ready" and all(
-            item.status == "passed" for item in self.stages
+        return self.status is SolarReadinessStatus.READY and all(
+            item.status is SolarStageStatus.PASSED for item in self.stages
         )
 
     @property
@@ -111,6 +129,8 @@ class ConversionReadinessResult:
 
     def to_dict(self) -> dict[str, DynamicValue]:
         value = asdict(self)
+        value["status"] = self.status
+        value["failure_stage"] = self.failure_stage
         value["stages"] = [item.to_dict() for item in self.stages]
         value["artifacts"] = [item.to_dict() for item in self.artifacts]
         return value
@@ -127,14 +147,14 @@ def audit_conversion(
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
     passed: list[ReadinessStage] = []
     architecture_sha256: str | None = None
-    stage = "architecture"
+    stage = SolarStage.ARCHITECTURE
     failure: Exception | None = None
     try:
         profile = ArchitectureProfile.load(request.architecture)
         if isinstance(profile, ArchitectureProfile):
             profile.require_verified_audit_evidence()
         architecture_sha256 = _profile_hash(profile)
-        stage = "graph_extraction"
+        stage = SolarStage.GRAPH_EXTRACTION
         operator = extract_operator_graph(
             request.reference,
             tuple(request.input_factory(request.trace_seed)),
@@ -143,10 +163,10 @@ def audit_conversion(
             name=request.analysis_id,
         )
         passed.append(_passed_stage(stage, operator.path))
-        stage = "einsum_conversion"
+        stage = SolarStage.EINSUM_CONVERSION
         einsum = convert_operator_graph(operator, output_dir=staging)
         passed.append(_passed_stage(stage, einsum.path))
-        stage = "conversion_verification"
+        stage = SolarStage.CONVERSION_VERIFICATION
         attestation = staging / "conversion-attestation.yaml"
         _verify(request, einsum.path, attestation)
         passed.append(_passed_stage(stage, attestation))
@@ -188,10 +208,10 @@ def _verify(
     )
 
 
-def _passed_stage(stage: str, path: Path) -> ReadinessStage:
+def _passed_stage(stage: SolarStage, path: Path) -> ReadinessStage:
     return ReadinessStage(
         stage=stage,
-        status="passed",
+        status=SolarStageStatus.PASSED,
         artifact=ReadinessArtifact(path.name, _sha256(path)),
     )
 
@@ -202,12 +222,12 @@ def _result(
     architecture_sha256: str | None,
     passed: list[ReadinessStage],
     *,
-    stage: str,
+    stage: SolarStage,
     failure: Exception | None,
 ) -> ConversionReadinessResult:
     if failure is None:
         return ConversionReadinessResult(
-            status="ready",
+            status=SolarReadinessStatus.READY,
             analysis_id=request.analysis_id,
             output_dir=str(output),
             architecture_sha256=architecture_sha256,
@@ -215,13 +235,13 @@ def _result(
         )
     failed = ReadinessStage(
         stage=stage,
-        status="failed",
+        status=SolarStageStatus.FAILED,
         reason_code=readiness_reason_code(stage, failure),
         message=str(failure)[:4096],
     )
     completed_names = {item.stage for item in passed}
     remaining = tuple(
-        ReadinessStage(candidate, "not_run")
+        ReadinessStage(candidate, SolarStageStatus.NOT_RUN)
         for candidate in READINESS_STAGES
         if candidate not in completed_names and candidate != stage
     )
@@ -229,7 +249,7 @@ def _result(
         ((failed,) + remaining) if stage in READINESS_STAGES else remaining
     )
     return ConversionReadinessResult(
-        status="failed",
+        status=SolarReadinessStatus.FAILED,
         analysis_id=request.analysis_id,
         output_dir=str(output),
         architecture_sha256=architecture_sha256,
@@ -240,16 +260,16 @@ def _result(
     )
 
 
-def readiness_reason_code(stage: str, exc: Exception) -> str:
+def readiness_reason_code(stage: SolarStage, exc: Exception) -> str:
     """Map implementation details to stable corpus-readiness reason codes."""
     message = str(exc).lower()
-    if stage == "architecture":
+    if stage is SolarStage.ARCHITECTURE:
         return "architecture_profile_invalid"
-    if stage == "graph_extraction":
+    if stage is SolarStage.GRAPH_EXTRACTION:
         if "solar_graph_untracked_dispatch" in message:
             return "tensor_dispatch_lineage_lost"
         return "graph_extraction_failed"
-    if stage == "einsum_conversion":
+    if stage is SolarStage.EINSUM_CONVERSION:
         if any(token in message for token in ("source-to-graph", "graph input")):
             return "source_input_binding_failed"
         if "reference output" in message or "traced graph output" in message:
@@ -257,7 +277,7 @@ def readiness_reason_code(stage: str, exc: Exception) -> str:
         if any(token in message for token in ("unsupported", "no handler", "vstack")):
             return "exact_operation_unsupported"
         return "strict_conversion_failed"
-    if stage == "conversion_verification":
+    if stage is SolarStage.CONVERSION_VERIFICATION:
         if isinstance(exc, EinsumExecutionError):
             return "exact_replay_failed"
         if isinstance(exc, VerificationError) and "numerical mismatch" in message:

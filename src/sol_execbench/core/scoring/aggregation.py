@@ -3,11 +3,11 @@
 
 """Paper-aligned two-level suite aggregation."""
 
-from dataclasses import dataclass
-from enum import Enum
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import dataclass
 
+from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.scoring.formula import sol_score
 
 OFFICIAL_AGGREGATION_POLICY = "workload_mean_within_problem_then_equal_problem_mean_v1"
@@ -20,7 +20,11 @@ class WorkloadScore:
     problem: str
     workload_uuid: str
     score: float
-    role: str = "scored"
+    role: AkaCorpusRole = AkaCorpusRole.SCORED
+
+    def __post_init__(self) -> None:
+        """Normalize public constructor input and reject unknown corpus roles."""
+        object.__setattr__(self, "role", AkaCorpusRole(self.role))
 
 
 @dataclass(frozen=True)
@@ -36,9 +40,9 @@ def aggregate_suite_scores(values: Iterable[WorkloadScore]) -> SuiteScore:
     """Average workloads within each problem, then problems equally."""
     grouped: dict[str, list[float]] = defaultdict(list)
     for value in values:
-        if value.role == "compatibility_sentinel":
+        if value.role is AkaCorpusRole.COMPATIBILITY_SENTINEL:
             continue
-        if value.role != "scored":
+        if value.role is not AkaCorpusRole.SCORED:
             raise ValueError(f"unknown corpus role: {value.role}")
         if not 0 <= value.score <= 1:
             raise ValueError("workload SOL scores must lie in [0, 1]")
@@ -53,14 +57,6 @@ def aggregate_suite_scores(values: Iterable[WorkloadScore]) -> SuiteScore:
         problem_scores=dict(sorted(problem_scores.items())),
         scored_workloads=sum(len(scores) for scores in grouped.values()),
     )
-
-
-class AggregateBoundStatus(str, Enum):
-    """Shared score-eligibility state for derived aggregate bounds."""
-
-    SCORED = "scored"
-    DEGRADED = "degraded"
-    UNSCORED = "unscored"
 
 
 def diagnostic_workload_score(
@@ -94,15 +90,11 @@ def diagnostic_workload_score(
         problem=problem,
         workload_uuid=workload_uuid,
         score=score,
-        role="scored",
+        role=AkaCorpusRole.SCORED,
     )
 
 
-AGGREGATE_BOUND_STATUSES = frozenset(status.value for status in AggregateBoundStatus)
-
 __all__ = [
-    "AGGREGATE_BOUND_STATUSES",
-    "AggregateBoundStatus",
     "OFFICIAL_AGGREGATION_POLICY",
     "SuiteScore",
     "WorkloadScore",

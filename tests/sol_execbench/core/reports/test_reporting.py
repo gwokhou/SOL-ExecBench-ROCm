@@ -9,6 +9,7 @@ from sol_execbench.core.data.trace import (
 )
 from sol_execbench.core.platform.diagnostics import (
     DiagnosticStage,
+    DiagnosticStatus,
     StageDiagnostic,
 )
 from sol_execbench.core.reports.reporting import (
@@ -75,7 +76,7 @@ def test_evidence_report_serializes_diagnostic_without_changing_traces() -> None
     before = trace.model_dump(mode="json")
     diagnostic = StageDiagnostic(
         stage=DiagnosticStage.RUNTIME,
-        status="warning",
+        status=DiagnosticStatus.WARNING,
         message="clock lock unavailable",
         hint="run diagnostic timing only",
     )

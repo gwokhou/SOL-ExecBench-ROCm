@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import TypeVar
 
 from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.dataset.aka_contract import (
+    AkaCorpusRole,
+    AkaOfficialScoringStatus,
+)
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.integrity import verify_artifact_file
 from sol_execbench.core.timestamps import utc_timestamp
@@ -102,7 +106,7 @@ def build_solar_index(
             ),
         )
         for entry in corpus.entries
-        if entry.role == "scored"
+        if entry.role is AkaCorpusRole.SCORED
         for workload_uuid in entry.workload_uuids
     )
     index = SolarIndexStatement(
@@ -172,7 +176,7 @@ def assemble_release_bundle(
         raise ValueError("release runs use different environment identities")
     scoring = corpus.official_scoring
     if (
-        scoring.get("status") != "available"
+        scoring.get("status") != AkaOfficialScoringStatus.AVAILABLE
         or scoring.get("baseline_id") != baseline.baseline_id
     ):
         raise ValueError("release baseline is not authorized by the corpus")

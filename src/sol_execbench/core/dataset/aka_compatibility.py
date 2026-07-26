@@ -20,6 +20,11 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.data.dtypes import dtype_storage_bits
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.dataset.aka_contract import (
+    AkaCompatibilityStage,
+    AkaProbeStatus,
+    AkaTargetGeneration,
+)
 from sol_execbench.core.platform.runtime import (
     CacheClearPolicy,
     RocmDeviceInfo,
@@ -32,31 +37,35 @@ from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 class AkaExecutionTargetSpec(TypedDict):
     """Static schema policy for one supported AKA execution target."""
 
-    generation: str
-    supported_tensor_dtypes: tuple[str, ...]
+    generation: AkaTargetGeneration
+    supported_tensor_dtypes: tuple[DType, ...]
 
 
 AKA_EXECUTION_TARGET_SPECS: dict[str, AkaExecutionTargetSpec] = {
     "gfx942": {
-        "generation": "cdna3",
-        "supported_tensor_dtypes": ("bfloat16", "float16", "float32"),
+        "generation": AkaTargetGeneration.CDNA3,
+        "supported_tensor_dtypes": (
+            DType.BFLOAT16,
+            DType.FLOAT16,
+            DType.FLOAT32,
+        ),
     },
     "gfx1150": {
-        "generation": "rdna3_5",
+        "generation": AkaTargetGeneration.RDNA3_5,
         "supported_tensor_dtypes": (
-            "bfloat16",
-            "float16",
-            "float32",
-            "float8_e4m3fn",
+            DType.BFLOAT16,
+            DType.FLOAT16,
+            DType.FLOAT32,
+            DType.FLOAT8_E4M3FN,
         ),
     },
     "gfx1200": {
-        "generation": "rdna4",
+        "generation": AkaTargetGeneration.RDNA4,
         "supported_tensor_dtypes": (
-            "bfloat16",
-            "float16",
-            "float32",
-            "float8_e4m3fn",
+            DType.BFLOAT16,
+            DType.FLOAT16,
+            DType.FLOAT32,
+            DType.FLOAT8_E4M3FN,
         ),
     },
 }
@@ -75,8 +84,17 @@ class AkaExecutionTarget:
     """Manifest-declared execution policy for one exact gfx target."""
 
     gfx_target: str
-    generation: str
-    supported_tensor_dtypes: frozenset[str]
+    generation: AkaTargetGeneration
+    supported_tensor_dtypes: frozenset[DType]
+
+    def __post_init__(self) -> None:
+        """Normalize manifest boundary values and reject unknown members."""
+        object.__setattr__(self, "generation", AkaTargetGeneration(self.generation))
+        object.__setattr__(
+            self,
+            "supported_tensor_dtypes",
+            frozenset(DType(dtype) for dtype in self.supported_tensor_dtypes),
+        )
 
 
 @dataclass(frozen=True)
@@ -112,17 +130,22 @@ class AkaWorkloadDecision:
     problem_path: str
     workload_uuid: str
     included: bool
-    stage: str
+    stage: AkaCompatibilityStage
     reason_code: str
     detail: str = ""
     metrics: dict[str, int] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Normalize caller input and reject unknown compatibility stages."""
+        object.__setattr__(self, "stage", AkaCompatibilityStage(self.stage))
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "path": self.problem_path,
             "workload_uuid": self.workload_uuid,
             "included": self.included,
-            "stage": self.stage,
+            # PyYAML's safe dumper requires an exact built-in string here.
+            "stage": str(self.stage),
             "reason_code": self.reason_code,
             "detail": self.detail,
             "metrics": dict(self.metrics),
@@ -173,24 +196,28 @@ def load_execution_targets(
             + ", ".join(SUPPORTED_AKA_GFX_TARGETS)
         )
     targets: dict[str, AkaExecutionTarget] = {}
-    known_dtypes = {dtype.value for dtype in DType}
     for gfx_target, raw in payload.items():
         if not isinstance(raw, Mapping):
             raise ValueError(f"AKA execution target {gfx_target} must be an object")
-        dtypes = frozenset(
-            str(value) for value in raw.get("supported_tensor_dtypes") or ()
-        )
+        raw_dtypes = raw.get("supported_tensor_dtypes") or ()
+        try:
+            dtypes = frozenset(DType(str(value)) for value in raw_dtypes)
+        except ValueError as exc:
+            raise ValueError(
+                f"AKA execution target {gfx_target} has unknown dtypes: "
+                f"{sorted(map(str, raw_dtypes))}"
+            ) from exc
         if not dtypes:
             raise ValueError(
                 f"AKA execution target {gfx_target} lacks supported dtypes"
             )
-        if not dtypes <= known_dtypes:
-            raise ValueError(
-                f"AKA execution target {gfx_target} has unknown dtypes: "
-                f"{sorted(dtypes - known_dtypes)}"
-            )
         expected = AKA_EXECUTION_TARGET_SPECS[gfx_target]
-        generation = str(raw.get("generation") or "")
+        try:
+            generation = AkaTargetGeneration(str(raw.get("generation") or ""))
+        except ValueError as exc:
+            raise ValueError(
+                f"AKA execution target {gfx_target} generation changed"
+            ) from exc
         if generation != expected["generation"]:
             raise ValueError(f"AKA execution target {gfx_target} generation changed")
         if dtypes != frozenset(expected["supported_tensor_dtypes"]):
@@ -214,11 +241,11 @@ def materialization_target(device: RocmDeviceInfo) -> AkaMaterializationTarget:
     )
 
 
-def definition_tensor_dtypes(definition: Definition) -> frozenset[str]:
+def definition_tensor_dtypes(definition: Definition) -> frozenset[DType]:
     """Return every input/output tensor dtype required by a Definition."""
 
     tensors = [*definition.inputs.values(), *definition.outputs.values()]
-    return frozenset(tensor.dtype.value for tensor in tensors)
+    return frozenset(tensor.dtype for tensor in tensors)
 
 
 def static_reference_storage(
@@ -241,7 +268,7 @@ def _shaped_tensor_storage_bytes(
     shapes: Mapping[str, tuple[int, ...] | None],
 ) -> int:
     return sum(
-        (prod(shape) * dtype_storage_bits(specs[name].dtype.value) + 7) // 8
+        (prod(shape) * dtype_storage_bits(specs[name].dtype) + 7) // 8
         for name, shape in shapes.items()
         if shape is not None
     )
@@ -312,7 +339,7 @@ def select_corpus_for_target(
                     problem_path=entry.relative_problem_dir.as_posix(),
                     workload_uuid=workload.uuid,
                     included=False,
-                    stage="static",
+                    stage=AkaCompatibilityStage.STATIC,
                     reason_code=reason_code,
                     detail=detail,
                     metrics=metrics,
@@ -380,12 +407,14 @@ def _parse_probe_output(
         raise AkaProbeInfrastructureError(
             f"probe worker returned invalid JSON for {workload_uuid}"
         ) from exc
-    if payload.get("status") == "infrastructure_error":
-        raise AkaProbeInfrastructureError(str(payload.get("detail") or "probe failed"))
-    if payload.get("status") not in {"compatible", "incompatible"}:
+    try:
+        status = AkaProbeStatus(str(payload.get("status") or ""))
+    except ValueError as exc:
         raise AkaProbeInfrastructureError(
             f"probe worker returned invalid status for {workload_uuid}"
-        )
+        ) from exc
+    if status is AkaProbeStatus.INFRASTRUCTURE_ERROR:
+        raise AkaProbeInfrastructureError(str(payload.get("detail") or "probe failed"))
     metrics = payload.get("metrics") or {}
     if not isinstance(metrics, dict) or any(
         not isinstance(value, int) for value in metrics.values()
@@ -393,12 +422,12 @@ def _parse_probe_output(
         raise AkaProbeInfrastructureError(
             f"probe worker returned invalid metrics for {workload_uuid}"
         )
-    included = payload["status"] == "compatible"
+    included = status is AkaProbeStatus.COMPATIBLE
     return AkaWorkloadDecision(
         problem_path=problem_path,
         workload_uuid=workload_uuid,
         included=included,
-        stage="live_probe",
+        stage=AkaCompatibilityStage.LIVE_PROBE,
         reason_code=str(
             payload.get("reason_code")
             or ("probe_passed" if included else "probe_failed")
@@ -430,7 +459,7 @@ def probe_workload(
             problem_path=problem_dir.relative_to(problem_dir.parents[1]).as_posix(),
             workload_uuid=workload.uuid,
             included=False,
-            stage="live_probe",
+            stage=AkaCompatibilityStage.LIVE_PROBE,
             reason_code="probe_timeout",
             detail=f"probe exceeded {timeout_seconds:g} seconds",
         )

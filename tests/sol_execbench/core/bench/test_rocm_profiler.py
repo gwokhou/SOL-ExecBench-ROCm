@@ -867,8 +867,8 @@ def test_source_collection_selects_hip_native_rocprofv3(tmp_path):
     assert result.selection.profiler_backed is True
     assert result.selection.policy.backend == TimingBackend.ROCPROFV3
     assert result.evidence is not None
-    assert result.evidence.activity_domain.value == "kernel_activity"
-    assert result.evidence.backend.value == "rocprofv3"
+    assert result.evidence.activity_domain == "kernel_activity"
+    assert result.evidence.backend == "rocprofv3"
 
 
 def test_source_collection_routes_pytorch_to_explicit_fallback(tmp_path):

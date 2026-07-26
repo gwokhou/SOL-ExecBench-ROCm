@@ -38,7 +38,7 @@ def official_score_availability(corpus_manifest: str | Path) -> dict[str, Any]:
     required = [str(item) for item in scoring.get("required_evidence") or []]
     observed_manifest_sha256 = sha256_file(corpus.path)
     if observed_manifest_sha256 != OFFICIAL_CORPUS_MANIFEST_SHA256:
-        status = AkaOfficialScoringStatus.UNAVAILABLE.value
+        status = AkaOfficialScoringStatus.UNAVAILABLE
         reason = "corpus_manifest_not_repository_pinned"
     return {
         "schema_version": SCHEMA_VERSIONS["official_score_availability"],

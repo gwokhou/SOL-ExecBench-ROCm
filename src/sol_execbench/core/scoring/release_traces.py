@@ -13,10 +13,12 @@ from sol_execbench.core.bench.config.benchmark_config import (
     OFFICIAL_ROCM_TIMING_PROTOCOL,
 )
 from sol_execbench.core.data.solution_instance import Solution
+from sol_execbench.core.data.solution_models import SupportedHardware
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import load_json_value
 from sol_execbench.core.data.trace import Environment, EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusEntry, AkaCorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 from sol_execbench.core.platform.rdna4_validation import (
@@ -130,7 +132,7 @@ def _scored_entries(corpus: AkaCorpusManifest) -> dict[str, AkaCorpusEntry]:
     entries = {
         item.relative_problem_dir.as_posix(): item
         for item in corpus.entries
-        if item.role == "scored"
+        if item.role is AkaCorpusRole.SCORED
     }
     if not entries:
         raise ValueError("release corpus contains no scored problems")
@@ -255,7 +257,7 @@ def _definition_name(path: Path) -> str:
 def _verify_solution(solution: Solution, definition_name: str) -> None:
     if solution.definition != definition_name:
         raise ValueError("release implementation targets the wrong definition")
-    if "gfx1200" not in solution.spec.target_hardware:
+    if SupportedHardware.GFX1200 not in solution.spec.target_hardware:
         raise ValueError("release implementation does not target gfx1200")
 
 

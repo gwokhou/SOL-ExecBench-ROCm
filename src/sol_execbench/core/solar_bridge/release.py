@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.scoring.release_assembly import build_solar_index
 from sol_execbench.core.scoring.release_builders import load_execution_plan
@@ -53,7 +54,7 @@ def build_release_solar_manifests(
     generated = resumed = workloads = 0
     problems = 0
     for entry in corpus.entries:
-        if entry.role != "scored":
+        if entry.role is not AkaCorpusRole.SCORED:
             continue
         problems += 1
         for workload_uuid in entry.workload_uuids:

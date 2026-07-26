@@ -6,7 +6,11 @@ from pathlib import Path
 
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.solar_bridge import corpus_readiness
-from sol_execbench.core.solar_bridge.models import SolarStageAuditOutcome
+from sol_execbench.core.solar_bridge.models import (
+    SolarReadinessStatus,
+    SolarStage,
+    SolarStageAuditOutcome,
+)
 
 ROOT = Path(__file__).resolve().parents[4]
 MANIFEST = ROOT / "problems" / "AMD_AKA" / "manifest.yaml"
@@ -34,7 +38,7 @@ def _ready_outcome(request) -> SolarStageAuditOutcome:
             }
         )
     return SolarStageAuditOutcome(
-        status="ready",
+        status=SolarReadinessStatus.READY,
         analysis_id=request.workload_uuid,
         output_dir=str(output),
         architecture_sha256=corpus_readiness.formal_architecture_profile_hash(),
@@ -95,9 +99,9 @@ def test_corpus_audit_keeps_failed_workload_in_the_matrix(
         if request.workload_uuid != failed_uuid:
             return _ready_outcome(request)
         return SolarStageAuditOutcome(
-            status="failed",
+            status=SolarReadinessStatus.FAILED,
             analysis_id=request.workload_uuid,
-            failure_stage="einsum_conversion",
+            failure_stage=SolarStage.EINSUM_CONVERSION,
             reason_code="source_input_binding_failed",
             message="binding mismatch",
             stages=(
@@ -178,9 +182,9 @@ def test_corpus_audit_requires_every_stage_even_if_verification_passed(
         }
         return replace(
             outcome,
-            status="failed",
+            status=SolarReadinessStatus.FAILED,
             stages=tuple(stages),
-            failure_stage="graph_extraction",
+            failure_stage=SolarStage.GRAPH_EXTRACTION,
             reason_code="graph_extraction_failed",
         )
 

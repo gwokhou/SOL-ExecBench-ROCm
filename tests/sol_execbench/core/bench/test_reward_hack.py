@@ -552,7 +552,7 @@ class TestStaticSourceReview:
 
         assert review.blocked is False
         assert [issue.rule for issue in review.issues] == ["precision_downgrade"]
-        assert {issue.severity.value for issue in review.issues} == {"flag"}
+        assert {issue.severity for issue in review.issues} == {"flag"}
 
     def test_flags_precision_downgrade_dtype_keyword_for_float32_outputs(self):
         review = review_solution_sources(

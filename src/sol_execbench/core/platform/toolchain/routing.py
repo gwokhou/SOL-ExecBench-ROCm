@@ -66,8 +66,8 @@ def build_toolchain_routing_report(
                 reason_code="no_registry_entry",
                 reason=(
                     "No registry entry supports the requested evidence level "
-                    f"{request.evidence_level.value} and artifact "
-                    f"{request.artifact_type.value}."
+                    f"{request.evidence_level} and artifact "
+                    f"{request.artifact_type}."
                 ),
             )
         )
@@ -98,7 +98,7 @@ def decision_for_capability(
             reason_code="unsupported_artifact",
             reason=(
                 f"{capability.tool_id} does not support artifact type "
-                f"{request.artifact_type.value} for {request.evidence_level.value}."
+                f"{request.artifact_type} for {request.evidence_level}."
             ),
             source_refs=capability.source_refs,
         )
@@ -148,9 +148,9 @@ def decision_for_capability(
         tool_id=capability.tool_id,
         lifecycle=capability.lifecycle,
         status=probe.status,
-        reason_code=f"probe_{probe.status.value}",
+        reason_code=f"probe_{probe.status}",
         reason=(
-            f"{capability.tool_id} probe {probe.status.value}."
+            f"{capability.tool_id} probe {probe.status}."
             if probe.status != ToolchainStatus.UNAVAILABLE
             else f"{binary} is not available on PATH."
         ),
@@ -172,7 +172,7 @@ def lifecycle_decision(
     capability: ToolchainCapability,
     status: ToolchainStatus,
 ) -> ToolchainRoutingDecision:
-    reason_code = f"tool_{status.value}"
+    reason_code = f"tool_{status}"
     replacement = (
         f" Use {capability.replacement_tool_id} instead."
         if capability.replacement_tool_id
@@ -183,7 +183,7 @@ def lifecycle_decision(
         lifecycle=capability.lifecycle,
         status=status,
         reason_code=reason_code,
-        reason=f"{capability.tool_id} lifecycle is {status.value}.{replacement}",
+        reason=f"{capability.tool_id} lifecycle is {status}.{replacement}",
         fallback_tool_id=capability.replacement_tool_id,
         source_refs=capability.source_refs,
     )

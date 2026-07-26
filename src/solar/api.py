@@ -10,8 +10,7 @@ import json
 import math
 import shutil
 import tempfile
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +23,17 @@ from solar.analysis.graph_analyzer import (
     OrojenesisError,
     OrojenesisRunner,
 )
-from solar.analysis.request_manifest import write_request_manifest
+from solar.contracts import (
+    FORMAL_BOUND_KIND,
+    AnalysisFailure,
+    AnalysisRequest,
+    AnalysisResult,
+    ArtifactRef,
+    SolBound,
+    SolarAnalysisStatus,
+    SolarStage,
+    write_request_manifest,
+)
 from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import extract_operator_graph
 from solar.readiness import (
@@ -36,108 +45,26 @@ from solar.readiness import (
 )
 from solar.verification import VerificationError, verify_callable_conversion
 
-InputFactory = Callable[[int], Sequence[Any]]
-FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
-
-
-@dataclass(frozen=True)
-class AnalysisRequest:
-    """All inputs required by SOLAR, without benchmark or scoring concepts."""
-
-    analysis_id: str
-    reference: Callable[..., Any]
-    input_factory: InputFactory
-    reference_name: str
-    reference_sha256: str
-    architecture: str | Path | Mapping[str, Any]
-    output_dir: Path
-    device: str = "cpu"
-    precision: str = "fp16"
-    require_orojenesis: bool = False
-    orojenesis_home: str | Path | None = None
-    trace_seed: int = 200
-    verification_seeds: tuple[int, ...] = (11, 29, 47)
-    atol: float = 1e-2
-    rtol: float = 1e-2
-    required_matched_ratio: float = 1.0
-    max_error_cap: float | None = None
-    allow_negative_inf: bool = False
-
-    def __post_init__(self) -> None:
-        if not self.analysis_id.strip() or not self.reference_name.strip():
-            raise ValueError("analysis_id and reference_name must be non-empty")
-        if len(self.reference_sha256) != 64 or any(
-            character not in "0123456789abcdef" for character in self.reference_sha256
-        ):
-            raise ValueError("reference_sha256 must be a lowercase SHA-256")
-        values = [self.atol, self.rtol, self.required_matched_ratio]
-        if self.max_error_cap is not None:
-            values.append(self.max_error_cap)
-        if not all(math.isfinite(value) and value >= 0 for value in values):
-            raise ValueError("verification tolerances must be finite and non-negative")
-        if self.required_matched_ratio > 1:
-            raise ValueError("required_matched_ratio cannot exceed one")
-
-
-@dataclass(frozen=True)
-class ArtifactRef:
-    """A content-addressed file relative to the result directory."""
-
-    path: str
-    sha256: str
-
-
-@dataclass(frozen=True)
-class SolBound:
-    """The formal lower bound emitted by SOLAR, never a benchmark score."""
-
-    seconds: float
-    kind: str
-    limiting_resource: str | None
-
-
-@dataclass(frozen=True)
-class AnalysisResult:
-    """Successful immutable result of the SOLAR pipeline."""
-
-    status: str
-    analysis_id: str
-    output_dir: Path
-    architecture_sha256: str
-    artifacts: tuple[ArtifactRef, ...]
-    bound: SolBound
-
-    @property
-    def publication_eligible(self) -> bool:
-        """Whether this result satisfies the port's formal-bound policy."""
-        return self.bound.kind == FORMAL_BOUND_KIND
-
-
-@dataclass(frozen=True)
-class AnalysisFailure:
-    """Fail-closed result; a failed run publishes no partial directory."""
-
-    status: str
-    analysis_id: str
-    stage: str
-    reason_code: str
-    message: str
-
 
 def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
     """Run the complete SOLAR responsibility boundary atomically."""
     output = Path(request.output_dir).resolve()
     if output.exists():
-        return _failure(request, "prepare", "output_exists", f"exists: {output}")
+        return _failure(
+            request,
+            SolarStage.PREPARE,
+            "output_exists",
+            f"exists: {output}",
+        )
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
-    stage = "architecture"
+    stage = SolarStage.ARCHITECTURE
     try:
         profile = ArchitectureProfile.load(request.architecture)
         if isinstance(profile, ArchitectureProfile):
             profile.require_verified_audit_evidence()
         architecture_sha256 = _profile_hash(profile)
-        stage = "graph_extraction"
+        stage = SolarStage.GRAPH_EXTRACTION
         inputs = tuple(request.input_factory(request.trace_seed))
         operator = extract_operator_graph(
             request.reference,
@@ -146,9 +73,9 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             output_dir=staging,
             name=request.analysis_id,
         )
-        stage = "einsum_conversion"
+        stage = SolarStage.EINSUM_CONVERSION
         einsum = convert_operator_graph(operator, output_dir=staging)
-        stage = "conversion_verification"
+        stage = SolarStage.CONVERSION_VERIFICATION
         verify_callable_conversion(
             reference=request.reference,
             input_factory=request.input_factory,
@@ -164,7 +91,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             seeds=request.verification_seeds,
             device=request.device,
         )
-        stage = "formal_analysis"
+        stage = SolarStage.FORMAL_ANALYSIS
         analysis = _run_analysis(request, profile, staging)
         bound = _extract_bound(analysis, request.require_orojenesis)
         artifacts = _finish_artifacts(staging, analysis)
@@ -178,7 +105,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         )
         staging.replace(output)
         return AnalysisResult(
-            status="analyzed",
+            status=SolarAnalysisStatus.ANALYZED,
             analysis_id=request.analysis_id,
             output_dir=output,
             architecture_sha256=architecture_sha256,
@@ -263,7 +190,7 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _reason_code(stage: str, exc: Exception) -> str:
+def _reason_code(stage: SolarStage, exc: Exception) -> str:
     if isinstance(exc, OrojenesisError):
         return "toolchain_unavailable"
     if isinstance(exc, VerificationError):
@@ -272,10 +199,13 @@ def _reason_code(stage: str, exc: Exception) -> str:
 
 
 def _failure(
-    request: AnalysisRequest, stage: str, reason_code: str, message: str
+    request: AnalysisRequest,
+    stage: SolarStage,
+    reason_code: str,
+    message: str,
 ) -> AnalysisFailure:
     return AnalysisFailure(
-        status="failed",
+        status=SolarAnalysisStatus.FAILED,
         analysis_id=request.analysis_id,
         stage=stage,
         reason_code=reason_code,
@@ -293,6 +223,8 @@ __all__ = [
     "FORMAL_BOUND_KIND",
     "ReadinessArtifact",
     "ReadinessStage",
+    "SolarAnalysisStatus",
+    "SolarStage",
     "SolBound",
     "analyze",
     "audit_conversion",

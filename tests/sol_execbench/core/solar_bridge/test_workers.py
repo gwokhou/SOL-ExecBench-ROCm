@@ -8,12 +8,15 @@ from typing import cast
 import pytest
 
 from sol_execbench.core.solar_bridge import learn_worker, worker
-from sol_execbench.core.solar_bridge.models import SolarAnalysisOutcome
+from sol_execbench.core.solar_bridge.models import (
+    SolarAnalysisOutcome,
+    SolarAnalysisStatus,
+)
 
 
 def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
     return SolarAnalysisOutcome(
-        status="analyzed",
+        status=SolarAnalysisStatus.ANALYZED,
         analysis_id=analysis_id,
         output_dir=output_dir,
         architecture_sha256="a" * 64,
@@ -103,7 +106,7 @@ def test_analysis_worker_replaces_unserializable_outcome_with_failure(
         worker,
         "analyze_workload",
         lambda **kwargs: SolarAnalysisOutcome(
-            status="analyzed",
+            status=SolarAnalysisStatus.ANALYZED,
             analysis_id=kwargs["workload_uuid"],
             artifacts=(cast(dict[str, str], {"path": b"not-json"}),),
         ),

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
@@ -23,7 +23,7 @@ from .arch_capabilities import ArchCapabilityBudgetStatus, ArchIsaBudget
 DEFAULT_PROBE_TIMEOUT_SECONDS = 3.0
 
 
-class EnvironmentEvidenceStatus(str, Enum):
+class EnvironmentEvidenceStatus(StrEnum):
     """Status vocabulary for optional environment evidence collection."""
 
     AVAILABLE = "available"

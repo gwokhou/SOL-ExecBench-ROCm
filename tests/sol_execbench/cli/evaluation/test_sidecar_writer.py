@@ -9,6 +9,8 @@ from sol_execbench.cli.evaluation.sidecar_writer import (
     write_optional_sidecars,
 )
 from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ArtifactCoverageStatus,
+    Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
@@ -83,13 +85,13 @@ def _profile_result(tmp_path: Path) -> Rocprofv3ProfileResult:
         artifacts=(
             Rocprofv3ProfileArtifact(
                 path=artifact,
-                kind="rocpd",
+                kind=Rocprofv3ArtifactKind.ROCPD,
                 size_bytes=artifact.stat().st_size,
             ),
         ),
         returncode=0,
         profiler_available=True,
-        artifact_coverage_status="complete",
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.COMPLETE,
         reason_codes=("rocprof_artifacts_registered",),
         timeout_seconds=60,
     )

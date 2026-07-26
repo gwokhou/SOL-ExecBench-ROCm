@@ -15,6 +15,8 @@ from sol_execbench.core.bench.profile_summary import (
     validate_profile_summary_freshness,
 )
 from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ArtifactCoverageStatus,
+    Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
@@ -30,7 +32,7 @@ def _profile_result(
     artifacts = (
         Rocprofv3ProfileArtifact(
             path=artifact,
-            kind="rocpd",
+            kind=Rocprofv3ArtifactKind.ROCPD,
             size_bytes=artifact.stat().st_size,
         ),
     )
@@ -46,7 +48,9 @@ def _profile_result(
         ),
         profiler_available=True,
         artifact_coverage_status=(
-            "complete" if status is Rocprofv3ProfileStatus.SUCCESS else "none"
+            Rocprofv3ArtifactCoverageStatus.COMPLETE
+            if status is Rocprofv3ProfileStatus.SUCCESS
+            else Rocprofv3ArtifactCoverageStatus.NONE
         ),
         reason_codes=(
             ("rocprof_artifacts_registered",)
@@ -184,13 +188,13 @@ def test_profile_summary_sidecar_includes_structured_artifact_evidence(
         artifacts=(
             Rocprofv3ProfileArtifact(
                 path=trace_csv,
-                kind="trace_csv",
+                kind=Rocprofv3ArtifactKind.TRACE_CSV,
                 size_bytes=trace_csv.stat().st_size,
             ),
         ),
         returncode=0,
         profiler_available=True,
-        artifact_coverage_status="complete",
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.COMPLETE,
         reason_codes=("rocprof_artifacts_registered",),
     )
 
@@ -255,14 +259,14 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
         artifacts=(
             Rocprofv3ProfileArtifact(
                 path=diagnostic,
-                kind="diagnostic_json",
+                kind=Rocprofv3ArtifactKind.DIAGNOSTIC_JSON,
                 size_bytes=diagnostic.stat().st_size,
             ),
         ),
         returncode=0,
         profiler_available=True,
         timeout_seconds=60,
-        artifact_coverage_status="diagnostic_logs_only",
+        artifact_coverage_status=(Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY),
         reason_codes=(
             "rocprof_no_registered_artifacts",
             "rocprof_diagnostic_log_registered",
@@ -311,13 +315,13 @@ def test_profile_summary_success_with_only_diagnostic_json_is_partial(
         artifacts=(
             Rocprofv3ProfileArtifact(
                 path=diagnostic,
-                kind="diagnostic_json",
+                kind=Rocprofv3ArtifactKind.DIAGNOSTIC_JSON,
                 size_bytes=diagnostic.stat().st_size,
             ),
         ),
         returncode=0,
         profiler_available=True,
-        artifact_coverage_status="diagnostic_logs_only",
+        artifact_coverage_status=(Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY),
         reason_codes=(
             "rocprof_no_registered_artifacts",
             "rocprof_diagnostic_log_registered",

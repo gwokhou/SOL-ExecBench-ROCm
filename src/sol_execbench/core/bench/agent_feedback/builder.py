@@ -20,9 +20,13 @@ from sol_execbench.core.bench.agent_feedback.models import (
     AgentFeedbackSummary,
 )
 from sol_execbench.core.bench.diagnostic_sidecar import compact_path
-from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
+from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
+)
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,
+    StaticKernelEvidenceStatus,
 )
 from sol_execbench.core.evaluator_contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.data.trace import Trace
@@ -92,13 +96,11 @@ def build_agent_feedback_sidecar(
             trace_count=len(traces),
             evaluated_trace_count=len(evaluated),
             status_counts=dict(
-                sorted(
-                    (status.value, count) for status, count in status_counter.items()
-                )
+                sorted((status, count) for status, count in status_counter.items())
             ),
             profile_status=profile_result.status if profile_result else None,
             static_evidence_status=(
-                static_evidence.status.value if static_evidence else None
+                static_evidence.status if static_evidence else None
             ),
         ),
         items=trace_feedback_items(status_counter),
@@ -116,10 +118,15 @@ def _aggregate_status(
     if not traces:
         return AgentFeedbackStatus.UNAVAILABLE
     optional_unavailable = (
-        profile_result is not None and profile_result.status != "success"
+        profile_result is not None
+        and profile_result.status is not Rocprofv3ProfileStatus.SUCCESS
     ) or (
         static_evidence is not None
-        and static_evidence.status.value not in {"collected", "partial"}
+        and static_evidence.status
+        not in {
+            StaticKernelEvidenceStatus.COLLECTED,
+            StaticKernelEvidenceStatus.PARTIAL,
+        }
     )
     if optional_unavailable:
         return AgentFeedbackStatus.PARTIAL
@@ -144,7 +151,7 @@ def _source_refs(
             AgentFeedbackSourceRef(
                 kind="static_evidence",
                 label="static_kernel_evidence",
-                status=static_evidence.status.value,
+                status=static_evidence.status,
             )
         )
     return refs
@@ -163,10 +170,13 @@ def _limitations(
         limitations.append("No evaluated trace rows were available for feedback.")
     if profile_result is None:
         limitations.append("No rocprofv3 profile sidecar was supplied.")
-    elif profile_result.status != "success":
+    elif profile_result.status is not Rocprofv3ProfileStatus.SUCCESS:
         limitations.append(f"rocprofv3 profile status is {profile_result.status}.")
     if static_evidence is None:
         limitations.append("No static kernel evidence sidecar was supplied.")
-    elif static_evidence.status.value not in {"collected", "partial"}:
-        limitations.append(f"Static evidence status is {static_evidence.status.value}.")
+    elif static_evidence.status not in {
+        StaticKernelEvidenceStatus.COLLECTED,
+        StaticKernelEvidenceStatus.PARTIAL,
+    }:
+        limitations.append(f"Static evidence status is {static_evidence.status}.")
     return limitations

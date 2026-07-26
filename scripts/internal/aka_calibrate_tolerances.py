@@ -118,7 +118,7 @@ def _calibrate_workload(
         margin=margin,
     )
     return {
-        "status": CalibrationStatus.CALIBRATED.value,
+        "status": CalibrationStatus.CALIBRATED,
         "observed_max_atol": observed_abs,
         "observed_max_rtol": observed_rel,
         "output_dtypes": output_dtypes,
@@ -144,7 +144,7 @@ def _records(args: argparse.Namespace) -> list[dict[str, Any]]:
             }
             if spec.role is AkaCorpusRole.TARGET_INCOMPATIBLE:
                 result = {
-                    "status": CalibrationStatus.EXCLUDED.value,
+                    "status": CalibrationStatus.EXCLUDED,
                     "reason_code": spec.exclusion_reason_code,
                 }
             else:

@@ -37,10 +37,18 @@ from __future__ import annotations
 import argparse
 import sys
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 import yaml
+
+
+class ValidationSeverity(StrEnum):
+    """Closed severity vocabulary emitted by graph validation."""
+
+    ERROR = "error"
+    WARNING = "warning"
 
 
 @dataclass
@@ -50,7 +58,11 @@ class ValidationError:
     layer_id: str
     error_type: str
     message: str
-    severity: str = "error"  # error, warning
+    severity: ValidationSeverity = ValidationSeverity.ERROR
+
+    def __post_init__(self) -> None:
+        """Normalize caller input and reject unknown severities."""
+        self.severity = ValidationSeverity(self.severity)
 
     def __str__(self) -> str:
         return f"[{self.severity.upper()}] {self.layer_id}: {self.error_type} - {self.message}"
@@ -75,7 +87,7 @@ class ValidationResult:
 
     def add_error(self, error: ValidationError) -> None:
         """Add a validation error."""
-        if error.severity == "warning":
+        if error.severity is ValidationSeverity.WARNING:
             self.warnings.append(error)
         else:
             self.errors.append(error)
@@ -335,7 +347,7 @@ class EinsumGraphChecker:
                             f"'{source_layer_id}'.tensor_names.outputs,\n"
                             f"         or update '{source_layer_id}'.tensor_names.outputs to include '{input_name}'"
                         ),
-                        severity="warning",
+                        severity=ValidationSeverity.WARNING,
                     )
                 )
 
@@ -379,7 +391,7 @@ class EinsumGraphChecker:
                             f"    FIX: Update successor's tensor_names.inputs to include '{output_name}',\n"
                             f"         or update '{layer_id}'.tensor_names.outputs to match successor expectations"
                         ),
-                        severity="warning",
+                        severity=ValidationSeverity.WARNING,
                     )
                 )
 

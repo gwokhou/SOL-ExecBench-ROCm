@@ -63,7 +63,7 @@ def test_demoted_classes_lower_hint_confidence():
     # Precondition: register_pressure_high is present above inferred_low.
     assert any(
         h.bottleneck_class == DecisionBottleneckClass.REGISTER_PRESSURE_HIGH
-        and h.confidence.value != "inferred_low"
+        and h.confidence != "inferred_low"
         for h in sidecar.hints
     )
 
@@ -78,7 +78,7 @@ def test_demoted_classes_lower_hint_confidence():
         for h in annotated.hints
         if h.bottleneck_class == DecisionBottleneckClass.REGISTER_PRESSURE_HIGH
     )
-    assert reg.confidence.value == "inferred_low"
+    assert reg.confidence == "inferred_low"
     assert any("Demoted" in lim for lim in reg.limitations)
 
     # Spill is not in demoted_classes -> confidence unchanged.
@@ -87,4 +87,4 @@ def test_demoted_classes_lower_hint_confidence():
         for h in annotated.hints
         if h.bottleneck_class == DecisionBottleneckClass.SPILL_DETECTED
     )
-    assert spill.confidence.value == "inferred_high"
+    assert spill.confidence == "inferred_high"

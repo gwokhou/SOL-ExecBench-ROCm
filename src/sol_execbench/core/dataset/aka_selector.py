@@ -53,10 +53,7 @@ class AkaCandidate:
 
 def _det_key(candidate: AkaCandidate) -> str:
     digest = hashlib.sha256(candidate.task_path.encode("utf-8")).hexdigest()[:16]
-    return (
-        f"{candidate.operation.value}:{candidate.dtype.value}:"
-        f"{candidate.pass_kind.value}:{digest}"
-    )
+    return f"{candidate.operation}:{candidate.dtype}:{candidate.pass_kind}:{digest}"
 
 
 def select_seed_set(
@@ -77,17 +74,15 @@ def select_seed_set(
 
     def _matches(candidate: AkaCandidate, combo: Mapping[str, object]) -> bool:
         mapping = {
-            "operation": candidate.operation.value,
-            "dtype": candidate.dtype.value,
-            "pass_kind": candidate.pass_kind.value,
-            "pass": candidate.pass_kind.value,
-            "fusion_depth": candidate.fusion_depth.value,
+            "operation": candidate.operation,
+            "dtype": candidate.dtype,
+            "pass_kind": candidate.pass_kind,
+            "pass": candidate.pass_kind,
+            "fusion_depth": candidate.fusion_depth,
             "source_family": (
-                candidate.source_family.value
-                if candidate.source_family is not None
-                else None
+                candidate.source_family if candidate.source_family is not None else None
             ),
-            "suite": candidate.suite.value,
+            "suite": candidate.suite,
         }
         return all(
             str(mapping.get(k)) == str(v) for k, v in combo.items() if k != "min_count"

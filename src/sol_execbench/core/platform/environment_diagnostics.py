@@ -180,7 +180,7 @@ def tool_checks(snapshot: EnvironmentSnapshot) -> list[EnvironmentCheckResult]:
                 message=(
                     f"{name} not found on PATH"
                     if unavailable
-                    else f"{name} probe {result.status.value}"
+                    else f"{name} probe {result.status}"
                 ),
                 remediation=(
                     "Install ROCm tools or ensure /opt/rocm/bin is on PATH."

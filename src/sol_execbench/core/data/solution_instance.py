@@ -17,7 +17,6 @@
 """Strong-typed data definitions for solution implementations."""
 
 import hashlib
-from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
@@ -122,10 +121,10 @@ class Solution(BaseModelWithDocstrings):
         for s in (
             self.name,
             self.definition,
-            *[lang.value for lang in self.spec.languages],
-            *[hw.value for hw in self.spec.target_hardware],
+            *self.spec.languages,
+            *self.spec.target_hardware,
             self.spec.entry_point,
-            self.spec.binding.value if self.spec.binding else "",
+            self.spec.binding or "",
             str(self.spec.destination_passing_style),
             self.spec.compile_options.model_dump_json()
             if self.spec.compile_options

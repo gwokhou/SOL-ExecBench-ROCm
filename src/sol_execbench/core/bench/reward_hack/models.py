@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
@@ -35,7 +35,7 @@ class RewardHackDetected(RuntimeError):
     """Raised when a reward-hacking pattern is detected in a submission."""
 
 
-class SourceReviewSeverity(str, Enum):
+class SourceReviewSeverity(StrEnum):
     """Severity for static source review findings."""
 
     FLAG = "flag"
@@ -57,7 +57,7 @@ class SourceReviewIssue:
         return {
             "path": self.path,
             "rule": self.rule,
-            "severity": self.severity.value,
+            "severity": self.severity,
             "message": self.message,
             "evidence": self.evidence,
         }
