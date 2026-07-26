@@ -200,6 +200,38 @@ def test_repair_reconnects_dropped_and_split_tensor_edges():
     assert converter._tensor_to_producer_op["orphan"] == "producer"
 
 
+def test_repair_prunes_only_unconsumed_tuple_outputs():
+    converter = PyTorchToEinsum()
+    operation = _operation(
+        "max",
+        inputs=["x"],
+        outputs=["values", "indices"],
+        input_shapes=[[2, 3]],
+        input_dtypes=["torch.float32"],
+        output_shapes=[[2], [2]],
+        output_dtypes=["torch.float32", "torch.int64"],
+    )
+    operation["output_types"] = ["output", "output"]
+    layers = {
+        "x": _tensor([2, 3], "torch.float32", outputs=["max"]),
+        "max": operation,
+        "values": _tensor(
+            [2],
+            "torch.float32",
+            inputs=["max"],
+            node_type="output-tensor",
+        ),
+        "indices": _tensor([2], "torch.int64", inputs=["max"]),
+    }
+
+    converter._prune_unused_operation_outputs(layers, ["max"])
+
+    assert operation["connections"]["outputs"] == ["values"]
+    assert operation["output_shapes"] == [[2]]
+    assert operation["output_dtypes"] == ["torch.float32"]
+    assert operation["output_types"] == ["output"]
+
+
 @pytest.mark.parametrize(
     ("node_type", "input_dtypes", "module_args", "expected"),
     [

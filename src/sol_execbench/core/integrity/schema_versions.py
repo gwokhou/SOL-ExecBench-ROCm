@@ -21,6 +21,12 @@ EVALUATOR_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.evaluator_contract.v3"
 ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION: Final = (
     "sol_execbench.rocm_compatibility_matrix.v1"
 )
+CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION: Final = (
+    "sol_execbench.corpus_stage_readiness_record.v1"
+)
+CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION: Final = (
+    "sol_execbench.corpus_stage_readiness_summary.v1"
+)
 RDNA4_VALIDATION_SCHEMA_VERSION: Final = "sol_execbench.rdna4_validation.v2"
 RELEASE_BASELINE_SCHEMA_VERSION: Final = "sol_execbench.release_baseline.v1"
 RELEASE_BUNDLE_SCHEMA_VERSION: Final = "sol_execbench.release_bundle.v1"
@@ -46,6 +52,8 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "arch_capability_budget": "sol_execbench.arch_capability_budget.v1",
     "cli_contract": "sol_execbench.cli_contract.v1",
     "cli_response": "sol_execbench.cli_response.v1",
+    "corpus_stage_readiness_record": CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION,
+    "corpus_stage_readiness_summary": CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION,
     "dataset_provenance_policy": "sol_execbench.dataset_provenance_policy.v1",
     "dataset_redistribution_check": "sol_execbench.dataset_redistribution_check.v1",
     "derived_evidence": "sol_execbench.derived_evidence.v1",
@@ -87,6 +95,8 @@ CURRENT_SCHEMA_VERSIONS: Final[frozenset[str]] = frozenset(SCHEMA_VERSIONS.value
 
 __all__ = [
     "AGENT_FEEDBACK_SCHEMA_VERSION",
+    "CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION",
+    "CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION",
     "CURRENT_SCHEMA_VERSIONS",
     "DECISION_SCHEMA_VERSION",
     "ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION",

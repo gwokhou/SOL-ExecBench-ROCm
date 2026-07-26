@@ -19,6 +19,7 @@ import yaml
 
 from solar.analysis.graph_analyzer import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
+    ArchitectureProfile,
     EinsumGraphAnalyzer,
     OrojenesisError,
     OrojenesisRunner,
@@ -26,7 +27,13 @@ from solar.analysis.graph_analyzer import (
 from solar.analysis.request_manifest import write_request_manifest
 from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import extract_operator_graph
-from solar.rocm.architecture import ArchitectureProfile
+from solar.readiness import (
+    ConversionReadinessRequest,
+    ConversionReadinessResult,
+    ReadinessArtifact,
+    ReadinessStage,
+    audit_conversion,
+)
 from solar.verification import VerificationError, verify_callable_conversion
 
 InputFactory = Callable[[int], Sequence[Any]]
@@ -281,7 +288,12 @@ __all__ = [
     "AnalysisRequest",
     "AnalysisResult",
     "ArtifactRef",
+    "ConversionReadinessRequest",
+    "ConversionReadinessResult",
     "FORMAL_BOUND_KIND",
+    "ReadinessArtifact",
+    "ReadinessStage",
     "SolBound",
     "analyze",
+    "audit_conversion",
 ]

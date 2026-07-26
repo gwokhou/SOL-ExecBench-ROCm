@@ -84,6 +84,7 @@ class TensorManipulationHandler(EinsumOpHandler):
         "cat",
         "concat",
         "stack",
+        "vstack",
         "split",
         "chunk",
         "__getitem__",

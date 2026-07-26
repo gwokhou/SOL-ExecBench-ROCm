@@ -320,6 +320,17 @@ def test_attribute_eval_preserves_nested_values_dtype_slice_and_ellipsis():
     assert processor._parse_torchview_attributes("", "add") == {}
 
 
+def test_attribute_eval_preserves_non_finite_scalar_arguments():
+    processor = TorchviewProcessor()
+    args, kwargs = processor._eval_attributes_string(
+        "[[Tensor(shape=(2,), dtype=torch.float32), -inf, nan], {}]"
+    )
+    assert args is not None
+    assert args[1] == float("-inf")
+    assert args[2] != args[2]
+    assert kwargs == {}
+
+
 def test_function_info_adds_scalar_kwargs_but_not_tensor_kwargs():
     node = _node(
         "FunctionNode",

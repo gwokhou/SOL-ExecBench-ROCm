@@ -10,6 +10,7 @@ from .logs import (
     run_command_to_files,
     temporary_stream_path,
 )
+from .locks import exclusive_file_lock
 from .subprocesses import (
     run_attached_process_group,
     run_in_process_group,
@@ -19,6 +20,7 @@ from .stdio import flush_stdio_streams
 
 __all__ = [
     "DEFAULT_LOG_TAIL_CHARS",
+    "exclusive_file_lock",
     "flush_stdio_streams",
     "redacted_file_tail",
     "redacted_text_tail",

@@ -7,16 +7,16 @@ from __future__ import annotations
 
 from pathlib import Path
 import shutil
-from typing import Any, Callable
 
-from sol_execbench.core.bench.eval_runtime import load_reference_function
-from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.integrity import sha256_bytes
-from sol_execbench.core.solar_bridge.input_factory import build_input_factory
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
+    SolarStageAuditOutcome,
     formal_precision_for_definition,
+)
+from sol_execbench.core.solar_bridge.workload_context import (
+    SolarWorkloadContext,
+    load_solar_workload_context,
 )
 
 FORMAL_ARCHITECTURE, FORMAL_GFX_TARGET = "RX_9060_XT", "gfx1200"
@@ -46,44 +46,63 @@ def analyze_workload(
 ) -> SolarAnalysisOutcome:
     """Adapt one workload and invoke SOLAR's benchmark-agnostic API."""
     _require_formal_device(device)
-    problem = Path(problem_dir).resolve()
-    definition = Definition.model_validate_json(
-        (problem / "definition.json").read_text()
-    )
-    workloads = _load_workloads(problem / "workload.jsonl")
-    row_index, workload = _select_workload(workloads, workload_uuid)
-    module, reference = load_reference_function(definition.reference)
-    factory = build_input_factory(
-        definition, workload, row_index, module, problem, device
-    )
+    context = load_solar_workload_context(problem_dir, workload_uuid, device)
     return _invoke_solar(
-        definition=definition,
-        workload=workload,
-        reference=reference,
-        input_factory=factory,
+        context=context,
         output_dir=Path(output_dir),
         device=device,
         orojenesis_home=orojenesis_home,
     )
 
 
+def audit_workload_stages(
+    *,
+    problem_dir: str | Path,
+    workload_uuid: str,
+    output_dir: str | Path,
+    device: str,
+) -> SolarStageAuditOutcome:
+    """Run the exact extraction/conversion/replay gate for one corpus workload."""
+    from solar.api import ConversionReadinessRequest, audit_conversion
+
+    _require_formal_device(device)
+    context = load_solar_workload_context(problem_dir, workload_uuid, device)
+    definition, workload = context.definition, context.workload
+    result = audit_conversion(
+        ConversionReadinessRequest(
+            analysis_id=f"{definition.name}:{workload.uuid}",
+            reference=context.reference,
+            input_factory=context.input_factory,
+            reference_name=f"{definition.name}/definition.json#reference",
+            reference_sha256=sha256_bytes(definition.reference.encode()),
+            architecture=FORMAL_ARCHITECTURE,
+            output_dir=Path(output_dir),
+            device=device,
+            atol=workload.tolerance.max_atol,
+            rtol=workload.tolerance.max_rtol,
+            required_matched_ratio=workload.tolerance.required_matched_ratio,
+            max_error_cap=workload.tolerance.max_error_cap,
+            allow_negative_inf=workload.tolerance.allow_negative_inf,
+        )
+    )
+    return SolarStageAuditOutcome.from_dict(result.to_dict())
+
+
 def _invoke_solar(
     *,
-    definition: Definition,
-    workload: Workload,
-    reference: Callable[..., Any],
-    input_factory: Callable[[int], tuple[Any, ...]],
+    context: SolarWorkloadContext,
     output_dir: Path,
     device: str,
     orojenesis_home: str | Path | None,
 ) -> SolarAnalysisOutcome:
     from solar.api import AnalysisFailure, AnalysisRequest, analyze
 
+    definition, workload = context.definition, context.workload
     tolerance = workload.tolerance
     request = AnalysisRequest(
         analysis_id=f"{definition.name}:{workload.uuid}",
-        reference=reference,
-        input_factory=input_factory,
+        reference=context.reference,
+        input_factory=context.input_factory,
         reference_name=f"{definition.name}/definition.json#reference",
         reference_sha256=sha256_bytes(definition.reference.encode()),
         architecture=FORMAL_ARCHITECTURE,
@@ -128,27 +147,6 @@ def _invoke_solar(
             message="SOLAR formal bridge rejected a non-publication result",
         )
     return outcome
-
-
-def _load_workloads(path: Path) -> list[Workload]:
-    return [
-        Workload.model_validate_json(line)
-        for line in path.read_text().splitlines()
-        if line.strip()
-    ]
-
-
-def _select_workload(
-    workloads: list[Workload], workload_uuid: str
-) -> tuple[int, Workload]:
-    matches = [
-        (index, workload)
-        for index, workload in enumerate(workloads)
-        if workload.uuid == workload_uuid
-    ]
-    if len(matches) != 1:
-        raise ValueError(f"workload UUID must match exactly once: {workload_uuid}")
-    return matches[0]
 
 
 def _require_formal_device(device: str) -> None:

@@ -121,6 +121,7 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "type_as",
         "unsqueeze",
         "view",
+        "vstack",
         "where",
         "zeros_like",
     }
@@ -269,6 +270,7 @@ def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
                     "hierarchical_name",
                     "raw_attributes",
                     "training",
+                    "weights",
                 } and not isinstance(recorded_kwargs, Mapping):
                     kwargs[str(key)] = _plain_value(value)
     if "dims" in kwargs and "dim" not in kwargs:
@@ -276,7 +278,6 @@ def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
     if target in {"view", "reshape"} and len(arguments) == 1 and "shape" not in kwargs:
         output_shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
         if len(output_shapes) == 1:
-            # A fixed traced output shape completely specifies view/reshape.
             kwargs["shape"] = _plain_value(output_shapes[0])
     if target in {"softmax", "log_softmax"} and "dim" not in kwargs:
         raise SemanticGraphError(f"{target} requires an explicit dim")

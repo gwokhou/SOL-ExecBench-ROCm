@@ -110,6 +110,23 @@ constrained by the pinned gfx1200 architecture audit and the repository-owned
 Orojenesis binary allowlist; the allowlist is empty until a reviewed
 reproducible mapper artifact is published.
 
+Audit the complete scored corpus through extraction, strict conversion, and
+multi-seed replay on the formal target with:
+
+```bash
+uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
+  --device cuda:0 \
+  --timeout 14400
+```
+
+The command derives the denominator from the corpus manifest, records the
+stable target name `gfx1200`, and emits a content-addressed `matrix.jsonl` plus
+`summary.json`. Each workload has stable stage statuses and reason codes,
+source-content identities, three seeds, and random/zero/boundary verification
+patterns. A failed or interrupted run can be checked and continued with
+`--resume`; existing identities and artifact hashes must still match. Concurrent
+writers to the same audit root are rejected before GPU work starts.
+
 `solar learn-handler` is an offline candidate-generation workflow. Its output
 is forbidden in formal analysis until reviewed and committed under
 `src/solar/handlers` with `verification: passed`, `formal_review: approved`, and

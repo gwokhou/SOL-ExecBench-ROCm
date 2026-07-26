@@ -134,6 +134,20 @@ def test_unary_dispatch(target, function) -> None:
     torch.testing.assert_close(_execute(target, (value,), expected=expected), expected)
 
 
+def test_leaky_relu_replays_functional_inplace_parameter() -> None:
+    value = torch.tensor([-2.0, 1.0])
+    expected = functional.leaky_relu(value, negative_slope=0.2, inplace=False)
+    torch.testing.assert_close(
+        _execute(
+            "leaky_relu",
+            (value,),
+            kwargs={"negative_slope": 0.2, "inplace": False},
+            expected=expected,
+        ),
+        expected,
+    )
+
+
 def test_einsum_and_matrix_dispatch() -> None:
     left = torch.arange(6.0).reshape(2, 3)
     right = torch.arange(12.0).reshape(3, 4)
@@ -213,6 +227,16 @@ def test_mutation_mask_identity_and_dtype_dispatch() -> None:
     assert _execute("type_as", (left, half), expected=left.type_as(half)).dtype == (
         torch.float16
     )
+    copied = torch.ops.aten._to_copy.default(left, layout=torch.strided)
+    torch.testing.assert_close(
+        _execute(
+            "_to_copy",
+            (left,),
+            kwargs={"layout": {"layout": "strided"}},
+            expected=copied,
+        ),
+        copied,
+    )
     assert (
         _execute("clone", (left,), expected=left.clone()).data_ptr() != left.data_ptr()
     )
@@ -239,7 +263,8 @@ def test_reduction_softmax_and_cumulative_dispatch() -> None:
         actual = _execute(
             target,
             (value,),
-            arguments=[{"tensor": 0}, {"value": 1}],
+            arguments=[{"tensor": 0}],
+            kwargs={"dim": 1, "_stacklevel": 3, "dtype": None},
             expected=expected,
         )
         torch.testing.assert_close(actual, expected)
@@ -327,6 +352,16 @@ def test_concat_split_and_indexing_dispatch() -> None:
         ),
         stacked,
     )
+    vstacked = torch.vstack((left, right))
+    torch.testing.assert_close(
+        _execute(
+            "vstack",
+            (left, right),
+            arguments=[[{"tensor": 0}, {"tensor": 1}]],
+            expected=vstacked,
+        ),
+        vstacked,
+    )
     split = torch.split(cat, 1, dim=1)
     result = _execute(
         "split",
@@ -360,8 +395,8 @@ def test_concat_split_and_indexing_dispatch() -> None:
     )
     sliced = cat[:, :1]
     index_argument = [
-        {"slice": [None, None, None]},
-        {"slice": [None, 1, None]},
+        {"slice": [{"value": None}, {"value": None}, {"value": None}]},
+        {"slice": [{"value": None}, {"value": 1}, {"value": None}]},
     ]
     torch.testing.assert_close(
         _execute(
@@ -407,6 +442,68 @@ def test_library_quantization_and_aten_fallback_dispatch() -> None:
             expected=normalized,
         ),
         normalized,
+    )
+    instance_normalized = functional.instance_norm(
+        image,
+        running_mean=None,
+        running_var=None,
+        weight=None,
+        bias=None,
+        use_input_stats=True,
+        momentum=0.1,
+        eps=1e-5,
+    )
+    torch.testing.assert_close(
+        _execute(
+            "instance_norm",
+            (image,),
+            kwargs={
+                "running_mean": None,
+                "running_var": None,
+                "weight": None,
+                "bias": None,
+                "use_input_stats": True,
+                "momentum": 0.1,
+                "eps": 1e-5,
+            },
+            expected=instance_normalized,
+        ),
+        instance_normalized,
+    )
+    pooled = functional.max_pool2d(
+        image,
+        2,
+        stride=2,
+        padding=0,
+        dilation=1,
+        ceil_mode=False,
+        return_indices=False,
+    )
+    torch.testing.assert_close(
+        _execute(
+            "max_pool2d",
+            (image,),
+            arguments=[{"tensor": 0}, {"value": 2}],
+            kwargs={
+                "stride": 2,
+                "padding": 0,
+                "dilation": 1,
+                "ceil_mode": False,
+                "return_indices": False,
+            },
+            expected=pooled,
+        ),
+        pooled,
+    )
+    dropped = functional.dropout(value, p=0.5, training=False, inplace=False)
+    torch.testing.assert_close(
+        _execute(
+            "dropout",
+            (value,),
+            kwargs={"p": 0.5, "training": False, "inplace": False},
+            expected=dropped,
+        ),
+        dropped,
     )
     indices = torch.tensor([0, 1])
     table = torch.arange(12.0).reshape(3, 4)

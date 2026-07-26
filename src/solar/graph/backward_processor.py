@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import operator
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Callable
 
 import torch
@@ -127,6 +128,53 @@ class BackwardProcessor:
         )
         return serialized_graph
 
+    def serialize_fx_reference(
+        self, graph_module: Any, model_name: str
+    ) -> Dict[str, Any]:
+        """Serialize a make_fx-captured reference, including explicit backward ops."""
+        import torch.fx
+
+        nodes = list(graph_module.graph.nodes)
+        output_values = self._graph_output_values(nodes)
+        output_names = [
+            node.name for node in output_values if isinstance(node, torch.fx.Node)
+        ]
+        if len(output_names) != len(output_values):
+            raise RuntimeError("make_fx reference outputs must all be tensors")
+        user_inputs = [node.name for node in nodes if node.op == "placeholder"]
+        backward = SimpleNamespace(
+            gradients_to_parameters={},
+            gradients_to_user_inputs={},
+            loss_output=None,
+        )
+        signature = SimpleNamespace(
+            backward_signature=backward,
+            parameters=(),
+            buffers=(),
+            user_inputs=user_inputs,
+            user_outputs=output_names,
+            buffers_to_mutate={},
+            parameters_to_mutate={},
+            user_inputs_to_mutate={},
+        )
+        result = self._serialize_aot_joint_graph(graph_module, signature, model_name)
+        result["extraction_kind"] = "make_fx_reference_v1"
+        result["joint_graph"] = False
+        for layer in result["layers"].values():
+            if layer.get("phase") in {"forward", "backward"}:
+                layer["phase"] = "reference"
+        return result
+
+    @staticmethod
+    def _graph_output_values(nodes: list[Any]) -> list[Any]:
+        output_node = next(node for node in nodes if node.op == "output")
+        raw_outputs = output_node.args[0]
+        return (
+            list(raw_outputs)
+            if isinstance(raw_outputs, (tuple, list))
+            else [raw_outputs]
+        )
+
     @staticmethod
     def _serialize_argument(value: Any, inputs: list[Any]) -> Any:
         import torch.fx
@@ -141,6 +189,8 @@ class BackwardProcessor:
             return {"dtype": str(value).replace("torch.", "")}
         if isinstance(value, torch.device):
             return {"device": str(value)}
+        if isinstance(value, torch.layout):
+            return {"layout": str(value).removeprefix("torch.")}
         if value is torch.preserve_format:
             return "preserve_format"
         if value is torch.contiguous_format:
@@ -240,8 +290,7 @@ class BackwardProcessor:
         import torch.fx
 
         nodes = list(graph_module.graph.nodes)
-        output_node = next(node for node in nodes if node.op == "output")
-        output_values = list(output_node.args[0])
+        output_values = self._graph_output_values(nodes)
         output_names = [
             node.name for node in output_values if isinstance(node, torch.fx.Node)
         ]

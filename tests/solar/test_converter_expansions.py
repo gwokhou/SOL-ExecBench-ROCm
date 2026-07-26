@@ -206,6 +206,35 @@ def test_linear_bias_predicate_split_and_alignment():
     assert add["einsum_equation"] == "AB,B->AB"
     assert add["tensor_names"]["inputs"][-1] == "bias.Output"
 
+    functional = {
+        **node,
+        "input_types": ["input", "input", "input"],
+        "connections": {
+            "inputs": ["raw_x", "raw_weight", "raw_bias"],
+            "outputs": ["sink"],
+        },
+    }
+    matmul, add = converter._split_linear_with_bias(
+        "linear",
+        functional,
+        _op_graph("linear", []),
+        [
+            {"original_id": "raw_x", "consumers": ["linear"]},
+            {"original_id": "raw_weight", "consumers": ["linear"]},
+            {"original_id": "raw_bias", "consumers": ["linear"]},
+        ],
+        {
+            "raw_x": "start",
+            "raw_weight": "start_1",
+            "raw_bias": "start_2",
+        },
+    )
+    assert matmul["tensor_names"]["inputs"] == [
+        "start.Output",
+        "start_1.Output",
+    ]
+    assert add["tensor_names"]["inputs"][-1] == "start_2.Output"
+
     padded = {"type": "add", "input_shapes": [[2], [2]], "input_types": ["input"]}
     converter._validate_input_types_alignment("add", padded)
     assert padded["input_types"] == ["input", "input"]

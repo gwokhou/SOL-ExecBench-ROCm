@@ -247,6 +247,14 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
         )["matched_ratio"]
         == 1.0
     )
+    matching_nan = verification._assert_close(
+        torch.tensor([torch.nan]),
+        torch.tensor([torch.nan]),
+        0,
+        0,
+        allow_matching_nan=True,
+    )
+    assert matching_nan["matching_nan_count"] == 1.0
     assert (
         verification._assert_close((torch.ones(1),), (torch.ones(1),), 0, 0)[
             "max_abs_error"
@@ -284,6 +292,36 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
             0,
             max_error_cap=0.01,
         )
+
+
+def test_pure_contraction_roundoff_requires_both_results_within_gamma_bound() -> None:
+    graph = {
+        "layers": {
+            "contract": {
+                "type": "matmul",
+                "semantic_op": {
+                    "kind": "einsum",
+                    "equation": "MK,KN->MN",
+                },
+            }
+        }
+    }
+    left = torch.ones(2, 16)
+    right = torch.ones(16, 1)
+    expected = torch.matmul(left, right)
+
+    assert verification._einsum_roundoff_equivalent(
+        graph,
+        (left, right),
+        expected + 1e-5,
+        expected,
+    )
+    assert not verification._einsum_roundoff_equivalent(
+        graph,
+        (left, right),
+        expected + 0.1,
+        expected,
+    )
 
 
 @pytest.fixture
