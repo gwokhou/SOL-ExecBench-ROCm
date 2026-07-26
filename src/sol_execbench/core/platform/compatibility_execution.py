@@ -58,82 +58,11 @@ def classify_matrix_entry_for_execution(
     claims = entry.claim_boundary
 
     if status is MatrixCompatibilityStatus.MIXED_VERSION:
-        if allow_mixed_version_debug:
-            return MatrixExecutionDecision(
-                status=status,
-                reason_code=reason_code,
-                benchmark_allowed=False,
-                probes_allowed=True,
-                smoke_allowed=True,
-                reason=(
-                    "Mixed-version Target is running under explicit debug override; "
-                    "diagnostic probes or smoke execution may continue, but clean "
-                    "validation and benchmark claims remain blocked."
-                ),
-                container_user_space_validated=False,
-                native_host_validated=False,
-            )
-        return MatrixExecutionDecision(
-            status=status,
-            reason_code=reason_code,
-            benchmark_allowed=False,
-            probes_allowed=False,
-            smoke_allowed=False,
-            reason=(
-                "Mixed-version Target is blocked before benchmark execution by "
-                "default; rerun only with an explicit debug override for probes "
-                "or smoke execution."
-            ),
-            container_user_space_validated=False,
-            native_host_validated=False,
-        )
+        return _mixed_version_decision(entry, allow_mixed_version_debug)
 
-    if status is MatrixCompatibilityStatus.PYTORCH_WHEEL_UNAVAILABLE:
-        return MatrixExecutionDecision(
-            status=status,
-            reason_code=reason_code,
-            benchmark_allowed=False,
-            probes_allowed=True,
-            smoke_allowed=False,
-            reason=(
-                "Requested dependency stack is unavailable for this Target; this "
-                "is a compatibility classification, not a benchmark correctness "
-                "failure."
-            ),
-            container_user_space_validated=False,
-            native_host_validated=False,
-        )
-
-    if status is MatrixCompatibilityStatus.RUNTIME_UNAVAILABLE:
-        return MatrixExecutionDecision(
-            status=status,
-            reason_code=reason_code,
-            benchmark_allowed=False,
-            probes_allowed=True,
-            smoke_allowed=False,
-            reason=(
-                "Required ROCm runtime or device access is unavailable; this is a "
-                "runtime compatibility classification, not a benchmark correctness "
-                "failure."
-            ),
-            container_user_space_validated=False,
-            native_host_validated=False,
-        )
-
-    if status is MatrixCompatibilityStatus.NOT_TESTED:
-        return MatrixExecutionDecision(
-            status=status,
-            reason_code=reason_code,
-            benchmark_allowed=False,
-            probes_allowed=True,
-            smoke_allowed=False,
-            reason=(
-                "Target is not tested and remains non-authoritative; benchmark "
-                "eligibility is not implied."
-            ),
-            container_user_space_validated=False,
-            native_host_validated=False,
-        )
+    blocked_reason = _blocked_execution_reason(status)
+    if blocked_reason is not None:
+        return _blocked_decision(entry, blocked_reason)
 
     return MatrixExecutionDecision(
         status=status,
@@ -144,4 +73,65 @@ def classify_matrix_entry_for_execution(
         reason=entry.reason,
         container_user_space_validated=claims.container_user_space_validated,
         native_host_validated=claims.native_host_validated,
+    )
+
+
+def _mixed_version_decision(
+    entry: MatrixEntry,
+    allow_mixed_version_debug: bool,
+) -> MatrixExecutionDecision:
+    if allow_mixed_version_debug:
+        return _blocked_decision(
+            entry,
+            (
+                "Mixed-version Target is running under explicit debug override; "
+                "diagnostic probes or smoke execution may continue, but clean "
+                "validation and benchmark claims remain blocked."
+            ),
+            smoke_allowed=True,
+        )
+    return _blocked_decision(
+        entry,
+        (
+            "Mixed-version Target is blocked before benchmark execution by default; "
+            "rerun only with an explicit debug override for probes or smoke execution."
+        ),
+        probes_allowed=False,
+    )
+
+
+def _blocked_execution_reason(status: MatrixCompatibilityStatus) -> str | None:
+    reasons = {
+        MatrixCompatibilityStatus.PYTORCH_WHEEL_UNAVAILABLE: (
+            "Requested dependency stack is unavailable for this Target; this is a "
+            "compatibility classification, not a benchmark correctness failure."
+        ),
+        MatrixCompatibilityStatus.RUNTIME_UNAVAILABLE: (
+            "Required ROCm runtime or device access is unavailable; this is a runtime "
+            "compatibility classification, not a benchmark correctness failure."
+        ),
+        MatrixCompatibilityStatus.NOT_TESTED: (
+            "Target is not tested and remains non-authoritative; benchmark eligibility "
+            "is not implied."
+        ),
+    }
+    return reasons.get(status)
+
+
+def _blocked_decision(
+    entry: MatrixEntry,
+    reason: str,
+    *,
+    probes_allowed: bool = True,
+    smoke_allowed: bool = False,
+) -> MatrixExecutionDecision:
+    return MatrixExecutionDecision(
+        status=entry.status,
+        reason_code=entry.reason_code,
+        benchmark_allowed=False,
+        probes_allowed=probes_allowed,
+        smoke_allowed=smoke_allowed,
+        reason=reason,
+        container_user_space_validated=False,
+        native_host_validated=False,
     )

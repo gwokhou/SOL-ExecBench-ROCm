@@ -23,7 +23,10 @@ from ...core.bench.rocm_profiler import (
     collect_rocprofv3_profile,
 )
 from ...core.platform.runtime import resolve_rocm_tool
-from ...core.process.environment import sanitized_subprocess_env
+from ...core.process.environment import (
+    ENV_SOL_EXECBENCH_GRACEFUL_EXIT,
+    sanitized_subprocess_env,
+)
 from ...core.process.subprocesses import (
     TextSubprocessRunner,
     run_in_process_group_bounded,
@@ -75,7 +78,7 @@ def _evaluation_env(
     (staging_dir / ".tmp").mkdir(exist_ok=True)
     base = dict(os.environ)
     if graceful_exit:
-        base["SOL_EXECBENCH_GRACEFUL_EXIT"] = "1"
+        base[ENV_SOL_EXECBENCH_GRACEFUL_EXIT] = "1"
     sanitized = sanitized_subprocess_env(base, staging_dir=staging_dir)
     return sanitized_subprocess_env(env_builder(sanitized), staging_dir=staging_dir)
 

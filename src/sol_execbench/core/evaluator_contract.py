@@ -47,87 +47,107 @@ def build_evaluator_contract() -> EvaluatorContract:
         schema_version=SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION,
         contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
         release=SOL_EXECBENCH_RELEASE,
-        capabilities={
-            "evaluation.reference_preparation": "trusted_reference_worker",
-            "evaluation.candidate_execution": "untrusted_candidate_worker",
-            "evaluation.relative_metrics": "sol_execbench_outer_runtime",
-            "evaluation.static_review": "deterministic_ast_rules_not_paper_llm_judge",
-            "evidence.canonical_execution": "trace_jsonl",
-            "evidence.evaluation_sidecars": "diagnostic_non_authoritative",
-            "evidence.runtime_environment": "platform_observation_non_authoritative",
-            "solar.graph_extraction": "solar.graph",
-            "solar.einsum_conversion": "solar.einsum",
-            "solar.conversion_verification": "solar.verification",
-            "solar.formal_bound": "solar.analysis",
-            "solar.bound_policy": "rocm_formal_requires_pinned_orojenesis",
-            "corpus.construction": "aka_derived_authored_problem_set",
-            "corpus.selection": "sol_execbench",
-            "corpus.materialization": "sol_execbench",
-            "baseline.generation": "trusted_reference_eager_release_plan_v1",
-            "official_score": "manifest_gated_four_authority_bundle_verifier",
-        },
+        capabilities=_capabilities(),
         evaluation_statuses=[status.value for status in EvaluationStatus],
-        corpus={
-            "manifest": "problems/AMD_AKA/manifest.yaml",
-            "source": "AMD-AGI/AgentKernelArena",
-            "execution_targets": ["gfx942", "gfx1150", "gfx1200"],
-            "formal_target": "gfx1200",
-            "scored_problems": 35,
-            "scored_workloads": 122,
-            "selection": "static_dtype_filter_then_trusted_live_probe",
-            "local_output": "problems/local/AMD_AKA/<gfx-target>/",
-        },
-        scoring={
-            "formula": "1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))",
-            "official_authority": "manifest_gated_signed_release_bundle",
-            "scorer_implemented": True,
-            "baseline_strategy": "trusted_reference_eager_v1",
-            "incorrect_candidate": 0,
-            "aggregation": ("workload_mean_within_problem_then_equal_problem_mean_v1"),
-            "requires": [
-                "T_b > T_SOL",
-                "T_k >= T_SOL",
-                "exact_scored_corpus_coverage",
-                "one_architecture_identity",
-                "verified_solar_artifact_hashes",
-                "trusted_candidate_execution_attestation",
-                "independent_release_baseline_rerun",
-            ],
-            "forbids": ["clipping", "bound_substitution", "sentinel_aggregation"],
-        },
-        boundaries=[
-            {
-                "owner": "solar",
-                "scope": [
-                    "operator_graph",
-                    "einsum_graph",
-                    "conversion_attestation",
-                    "formal_sol_bound",
-                ],
-                "forbidden_inputs": [
-                    "candidate_solution",
-                    "candidate_runtime",
-                    "baseline_runtime",
-                    "score",
-                    "corpus_selection",
-                ],
-            },
-            {
-                "owner": "sol_execbench",
-                "scope": [
-                    "problem_schema",
-                    "input_generation",
-                    "reference_preparation",
-                    "candidate_evaluation",
-                    "relative_metrics",
-                    "public_corpus",
-                    "baseline_identity",
-                    "official_score",
-                ],
-                "solar_import_path": "sol_execbench.core.solar_bridge",
-            },
-        ],
+        corpus=_corpus_contract(),
+        scoring=_scoring_contract(),
+        boundaries=_ownership_boundaries(),
     )
+
+
+def _capabilities() -> dict[str, str]:
+    """Return the owner of each evaluator capability."""
+    return {
+        "evaluation.reference_preparation": "trusted_reference_worker",
+        "evaluation.candidate_execution": "untrusted_candidate_worker",
+        "evaluation.relative_metrics": "sol_execbench_outer_runtime",
+        "evaluation.static_review": "deterministic_ast_rules_not_paper_llm_judge",
+        "evidence.canonical_execution": "trace_jsonl",
+        "evidence.evaluation_sidecars": "diagnostic_non_authoritative",
+        "evidence.runtime_environment": "platform_observation_non_authoritative",
+        "solar.graph_extraction": "solar.graph",
+        "solar.einsum_conversion": "solar.einsum",
+        "solar.conversion_verification": "solar.verification",
+        "solar.formal_bound": "solar.analysis",
+        "solar.bound_policy": "rocm_formal_requires_pinned_orojenesis",
+        "corpus.construction": "aka_derived_authored_problem_set",
+        "corpus.selection": "sol_execbench",
+        "corpus.materialization": "sol_execbench",
+        "baseline.generation": "trusted_reference_eager_release_plan_v1",
+        "official_score": "manifest_gated_four_authority_bundle_verifier",
+    }
+
+
+def _corpus_contract() -> dict[str, Any]:
+    """Return corpus identity and coverage facts in the public contract."""
+    return {
+        "manifest": "problems/AMD_AKA/manifest.yaml",
+        "source": "AMD-AGI/AgentKernelArena",
+        "execution_targets": ["gfx942", "gfx1150", "gfx1200"],
+        "formal_target": "gfx1200",
+        "scored_problems": 35,
+        "scored_workloads": 122,
+        "selection": "static_dtype_filter_then_trusted_live_probe",
+        "local_output": "problems/local/AMD_AKA/<gfx-target>/",
+    }
+
+
+def _scoring_contract() -> dict[str, Any]:
+    """Return the formula, prerequisites, and prohibited scoring behavior."""
+    return {
+        "formula": "1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))",
+        "official_authority": "manifest_gated_signed_release_bundle",
+        "scorer_implemented": True,
+        "baseline_strategy": "trusted_reference_eager_v1",
+        "incorrect_candidate": 0,
+        "aggregation": "workload_mean_within_problem_then_equal_problem_mean_v1",
+        "requires": [
+            "T_b > T_SOL",
+            "T_k >= T_SOL",
+            "exact_scored_corpus_coverage",
+            "one_architecture_identity",
+            "verified_solar_artifact_hashes",
+            "trusted_candidate_execution_attestation",
+            "independent_release_baseline_rerun",
+        ],
+        "forbids": ["clipping", "bound_substitution", "sentinel_aggregation"],
+    }
+
+
+def _ownership_boundaries() -> list[dict[str, Any]]:
+    """Return the explicit SOLAR and evaluator responsibility boundary."""
+    return [
+        {
+            "owner": "solar",
+            "scope": [
+                "operator_graph",
+                "einsum_graph",
+                "conversion_attestation",
+                "formal_sol_bound",
+            ],
+            "forbidden_inputs": [
+                "candidate_solution",
+                "candidate_runtime",
+                "baseline_runtime",
+                "score",
+                "corpus_selection",
+            ],
+        },
+        {
+            "owner": "sol_execbench",
+            "scope": [
+                "problem_schema",
+                "input_generation",
+                "reference_preparation",
+                "candidate_evaluation",
+                "relative_metrics",
+                "public_corpus",
+                "baseline_identity",
+                "official_score",
+            ],
+            "solar_import_path": "sol_execbench.core.solar_bridge",
+        },
+    ]
 
 
 __all__ = [

@@ -50,84 +50,104 @@ def run_pytorch_smoke_checks() -> list[EnvironmentCheckResult]:
     try:
         import torch
     except ImportError as exc:
-        return [
-            EnvironmentCheckResult(
-                name="pytorch_rocm_import",
-                status=EnvironmentEvidenceStatus.UNAVAILABLE,
-                message=f"PyTorch unavailable: {exc}",
-                remediation="Install the PyTorch ROCm wheel for this environment.",
-            )
-        ]
+        return [_pytorch_unavailable_check(exc)]
 
     hip_version = getattr(getattr(torch, "version", None), "hip", None)
     try:
         available = bool(torch.cuda.is_available()) and hip_version is not None
     except RuntimeError as exc:
-        return [
-            EnvironmentCheckResult(
-                name="pytorch_rocm_runtime",
-                status=EnvironmentEvidenceStatus.FAILED,
-                message=f"PyTorch ROCm runtime failed: {exc}",
-            )
-        ]
+        return [_runtime_failure_check(exc)]
 
     if not available:
-        return [
-            EnvironmentCheckResult(
-                name="pytorch_rocm_runtime",
-                status=EnvironmentEvidenceStatus.UNAVAILABLE,
-                message="PyTorch ROCm device is not available",
-                remediation=(
-                    "Check ROCm installation, device permissions, and "
-                    "HIP_VISIBLE_DEVICES."
-                ),
-            ),
-            EnvironmentCheckResult(
-                name="device_memory_copy",
-                status=EnvironmentEvidenceStatus.SKIPPED,
-                message="Skipped because PyTorch ROCm runtime is unavailable",
-            ),
-            EnvironmentCheckResult(
-                name="event_timing",
-                status=EnvironmentEvidenceStatus.SKIPPED,
-                message="Skipped because PyTorch ROCm runtime is unavailable",
-            ),
-        ]
+        return _runtime_unavailable_checks()
 
-    checks = [
+    return [
         EnvironmentCheckResult(
             name="pytorch_rocm_runtime",
             status=EnvironmentEvidenceStatus.AVAILABLE,
             message="PyTorch ROCm runtime is available",
-        )
+        ),
+        _device_memory_copy_check(),
+        _event_timing_check(),
     ]
+
+
+def _pytorch_unavailable_check(error: ImportError) -> EnvironmentCheckResult:
+    return EnvironmentCheckResult(
+        name="pytorch_rocm_import",
+        status=EnvironmentEvidenceStatus.UNAVAILABLE,
+        message=f"PyTorch unavailable: {error}",
+        remediation="Install the PyTorch ROCm wheel for this environment.",
+    )
+
+
+def _runtime_failure_check(error: RuntimeError) -> EnvironmentCheckResult:
+    return EnvironmentCheckResult(
+        name="pytorch_rocm_runtime",
+        status=EnvironmentEvidenceStatus.FAILED,
+        message=f"PyTorch ROCm runtime failed: {error}",
+    )
+
+
+def _runtime_unavailable_checks() -> list[EnvironmentCheckResult]:
+    return [
+        EnvironmentCheckResult(
+            name="pytorch_rocm_runtime",
+            status=EnvironmentEvidenceStatus.UNAVAILABLE,
+            message="PyTorch ROCm device is not available",
+            remediation=(
+                "Check ROCm installation, device permissions, and HIP_VISIBLE_DEVICES."
+            ),
+        ),
+        *_skipped_gpu_checks(),
+    ]
+
+
+def _skipped_gpu_checks() -> list[EnvironmentCheckResult]:
+    message = "Skipped because PyTorch ROCm runtime is unavailable"
+    return [
+        EnvironmentCheckResult(
+            name="device_memory_copy",
+            status=EnvironmentEvidenceStatus.SKIPPED,
+            message=message,
+        ),
+        EnvironmentCheckResult(
+            name="event_timing",
+            status=EnvironmentEvidenceStatus.SKIPPED,
+            message=message,
+        ),
+    ]
+
+
+def _device_memory_copy_check() -> EnvironmentCheckResult:
+    """Verify one ROCm allocation can make a round trip to host memory."""
+    import torch
+
     try:
         tensor = torch.ones((1,), device="cuda")
         copied = tensor.to("cpu")
         if float(copied.item()) == 1.0:
-            checks.append(
-                EnvironmentCheckResult(
-                    name="device_memory_copy",
-                    status=EnvironmentEvidenceStatus.AVAILABLE,
-                    message="Device memory copy succeeded",
-                )
-            )
-        else:
-            checks.append(
-                EnvironmentCheckResult(
-                    name="device_memory_copy",
-                    status=EnvironmentEvidenceStatus.FAILED,
-                    message="Device memory copy returned an unexpected value",
-                )
-            )
-    except Exception as exc:
-        checks.append(
-            EnvironmentCheckResult(
+            return EnvironmentCheckResult(
                 name="device_memory_copy",
-                status=EnvironmentEvidenceStatus.FAILED,
-                message=f"Device memory copy failed: {exc}",
+                status=EnvironmentEvidenceStatus.AVAILABLE,
+                message="Device memory copy succeeded",
             )
+        return EnvironmentCheckResult(
+            name="device_memory_copy",
+            status=EnvironmentEvidenceStatus.FAILED,
+            message="Device memory copy returned an unexpected value",
         )
+    except Exception as exc:
+        return EnvironmentCheckResult(
+            name="device_memory_copy",
+            status=EnvironmentEvidenceStatus.FAILED,
+            message=f"Device memory copy failed: {exc}",
+        )
+
+
+def _event_timing_check() -> EnvironmentCheckResult:
+    """Verify HIP-backed PyTorch event timing is usable on the active device."""
+    import torch
 
     try:
         start = torch.cuda.Event(enable_timing=True)
@@ -136,22 +156,17 @@ def run_pytorch_smoke_checks() -> list[EnvironmentCheckResult]:
         end.record()
         torch.cuda.synchronize()
         _ = start.elapsed_time(end)
-        checks.append(
-            EnvironmentCheckResult(
-                name="event_timing",
-                status=EnvironmentEvidenceStatus.AVAILABLE,
-                message="HIP-backed PyTorch event timing succeeded",
-            )
+        return EnvironmentCheckResult(
+            name="event_timing",
+            status=EnvironmentEvidenceStatus.AVAILABLE,
+            message="HIP-backed PyTorch event timing succeeded",
         )
     except Exception as exc:
-        checks.append(
-            EnvironmentCheckResult(
-                name="event_timing",
-                status=EnvironmentEvidenceStatus.FAILED,
-                message=f"Event timing failed: {exc}",
-            )
+        return EnvironmentCheckResult(
+            name="event_timing",
+            status=EnvironmentEvidenceStatus.FAILED,
+            message=f"Event timing failed: {exc}",
         )
-    return checks
 
 
 def tool_checks(snapshot: EnvironmentSnapshot) -> list[EnvironmentCheckResult]:

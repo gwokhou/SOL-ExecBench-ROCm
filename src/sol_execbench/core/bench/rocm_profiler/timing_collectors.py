@@ -15,6 +15,7 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     DefaultTimingSelection,
     Rocprofv3CollectionRequest,
     Rocprofv3CollectionResult,
+    Rocprofv3TimingEvidence,
     SourceTimingRequest,
 )
 from sol_execbench.core.bench.rocm_profiler.timing_evidence import (
@@ -60,120 +61,62 @@ def collect_rocprofv3_timing(
         include_hip_runtime=request.include_hip_runtime,
     )
     try:
-        if runner is None:
-            completed = default_runner(
-                command,
-                timeout_seconds=request.timeout_seconds,
-            )
-        else:
-            completed = runner(command)
+        completed = _run_profiler_command(request, command, runner)
     except subprocess.TimeoutExpired as exc:
-        csv_path = find_rocprofv3_csv(request.output_directory, request.output_file)
-        fallback = DefaultTimingSelection(
-            policy=select_timing_policy(
-                request.policy.source_type, profiler_available=False
-            ),
-            profiler_backed=False,
-            fallback_applied=True,
-            reason=(
-                f"rocprofv3 command timed out after {request.timeout_seconds:g} seconds"
-            ),
-        )
-        return Rocprofv3CollectionResult(
-            evidence=None,
-            selection=fallback,
-            command=tuple(command),
-            csv_path=csv_path,
+        return _fallback_result(
+            request,
+            f"rocprofv3 command timed out after {request.timeout_seconds:g} seconds",
+            command=command,
+            csv_path=find_rocprofv3_csv(request.output_directory, request.output_file),
             stdout=subprocess_text(exc.stdout),
             stderr=subprocess_text(exc.stderr),
         )
+    return _result_from_completed_run(
+        request,
+        selection,
+        command,
+        completed,
+        calibration_path,
+    )
+
+
+def _result_from_completed_run(
+    request: Rocprofv3CollectionRequest,
+    selection: DefaultTimingSelection,
+    command: list[str],
+    completed: subprocess.CompletedProcess[str],
+    calibration_path: Path | None,
+) -> Rocprofv3CollectionResult:
+    """Turn one completed profiler process into evidence or explicit fallback."""
     csv_path = find_rocprofv3_csv(request.output_directory, request.output_file)
     if completed.returncode != 0:
-        fallback = DefaultTimingSelection(
-            policy=select_timing_policy(
-                request.policy.source_type, profiler_available=False
-            ),
-            profiler_backed=False,
-            fallback_applied=True,
-            reason=f"rocprofv3 command failed with exit code {completed.returncode}",
-        )
-        return Rocprofv3CollectionResult(
-            evidence=None,
-            selection=fallback,
-            command=tuple(command),
+        return _fallback_result(
+            request,
+            f"rocprofv3 command failed with exit code {completed.returncode}",
+            command=command,
             csv_path=csv_path,
             returncode=completed.returncode,
             stdout=completed.stdout or "",
             stderr=completed.stderr or "",
         )
     if csv_path is None:
-        fallback = DefaultTimingSelection(
-            policy=select_timing_policy(
-                request.policy.source_type, profiler_available=False
-            ),
-            profiler_backed=False,
-            fallback_applied=True,
-            reason="rocprofv3 did not produce a CSV timing output",
-        )
-        return Rocprofv3CollectionResult(
-            evidence=None,
-            selection=fallback,
-            command=tuple(command),
+        return _fallback_result(
+            request,
+            "rocprofv3 did not produce a CSV timing output",
+            command=command,
             returncode=completed.returncode,
             stdout=completed.stdout or "",
             stderr=completed.stderr or "",
         )
 
-    profiler_overhead_ms = read_overhead_calibration(
-        calibration_path,
-        expected_gpu_architecture=request.gpu_architecture,
-        expected_profiler_executable=request.executable,
-        expected_clock_locked=request.clock_locked,
+    evidence, compacted_kernel_rows = _build_collection_evidence(
+        request, csv_path, calibration_path
     )
-    compacted_kernel_rows: int | None = None
-    if request.compact_rows:
-        evidence, compacted_kernel_rows = build_compact_timing_evidence(
-            policy=request.policy,
-            csv_path=csv_path,
-            tool_version=request.tool_version,
-            gpu_architecture=request.gpu_architecture,
-            warmup_runs=request.warmup_runs,
-            iterations=request.iterations,
-            min_measurement_time_seconds=request.min_measurement_time_seconds,
-            trial_count=request.trial_count,
-            clock_locked=request.clock_locked,
-            profiler_overhead_ms=profiler_overhead_ms,
-        )
-    else:
-        evidence = build_timing_evidence(
-            policy=request.policy,
-            csv_content=csv_path.read_text(),
-            tool_version=request.tool_version,
-            gpu_architecture=request.gpu_architecture,
-            warmup_runs=request.warmup_runs,
-            iterations=request.iterations,
-            min_measurement_time_seconds=request.min_measurement_time_seconds,
-            trial_count=request.trial_count,
-            clock_locked=request.clock_locked,
-            profiler_overhead_ms=profiler_overhead_ms,
-        )
-    if (
-        request.policy.activity_domain == TimingActivityDomain.KERNEL_ACTIVITY
-        and (compacted_kernel_rows or 0) <= 0
-        and not any(row.is_kernel_activity for row in evidence.parsed_rows)
-    ):
-        fallback = DefaultTimingSelection(
-            policy=select_timing_policy(
-                request.policy.source_type, profiler_available=False
-            ),
-            profiler_backed=False,
-            fallback_applied=True,
-            reason="rocprofv3 did not produce kernel activity rows",
-        )
-        return Rocprofv3CollectionResult(
-            evidence=None,
-            selection=fallback,
-            command=tuple(command),
+    if _requires_kernel_activity(request, evidence, compacted_kernel_rows):
+        return _fallback_result(
+            request,
+            "rocprofv3 did not produce kernel activity rows",
+            command=command,
             csv_path=csv_path,
             returncode=completed.returncode,
             stdout=completed.stdout or "",
@@ -188,6 +131,97 @@ def collect_rocprofv3_timing(
         stdout=completed.stdout or "",
         stderr=completed.stderr or "",
     )
+
+
+def _run_profiler_command(
+    request: Rocprofv3CollectionRequest,
+    command: list[str],
+    runner: ProfilerRunner | None,
+) -> subprocess.CompletedProcess[str]:
+    if runner is not None:
+        return runner(command)
+    return default_runner(command, timeout_seconds=request.timeout_seconds)
+
+
+def _fallback_result(
+    request: Rocprofv3CollectionRequest,
+    reason: str,
+    *,
+    command: list[str],
+    csv_path: Path | None = None,
+    returncode: int | None = None,
+    stdout: str = "",
+    stderr: str = "",
+) -> Rocprofv3CollectionResult:
+    """Return a consistently labelled non-profiler timing result."""
+    selection = DefaultTimingSelection(
+        policy=select_timing_policy(
+            request.policy.source_type, profiler_available=False
+        ),
+        profiler_backed=False,
+        fallback_applied=True,
+        reason=reason,
+    )
+    return Rocprofv3CollectionResult(
+        evidence=None,
+        selection=selection,
+        command=tuple(command),
+        csv_path=csv_path,
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+
+def _build_collection_evidence(
+    request: Rocprofv3CollectionRequest,
+    csv_path: Path,
+    calibration_path: Path | None,
+) -> tuple[Rocprofv3TimingEvidence, int | None]:
+    """Parse the profiler output in its requested compact or full form."""
+    profiler_overhead_ms = read_overhead_calibration(
+        calibration_path,
+        expected_gpu_architecture=request.gpu_architecture,
+        expected_profiler_executable=request.executable,
+        expected_clock_locked=request.clock_locked,
+    )
+    if request.compact_rows:
+        return build_compact_timing_evidence(
+            csv_path=csv_path,
+            policy=request.policy,
+            tool_version=request.tool_version,
+            gpu_architecture=request.gpu_architecture,
+            warmup_runs=request.warmup_runs,
+            iterations=request.iterations,
+            min_measurement_time_seconds=request.min_measurement_time_seconds,
+            trial_count=request.trial_count,
+            clock_locked=request.clock_locked,
+            profiler_overhead_ms=profiler_overhead_ms,
+        )
+    return build_timing_evidence(
+        csv_content=csv_path.read_text(),
+        policy=request.policy,
+        tool_version=request.tool_version,
+        gpu_architecture=request.gpu_architecture,
+        warmup_runs=request.warmup_runs,
+        iterations=request.iterations,
+        min_measurement_time_seconds=request.min_measurement_time_seconds,
+        trial_count=request.trial_count,
+        clock_locked=request.clock_locked,
+        profiler_overhead_ms=profiler_overhead_ms,
+    ), None
+
+
+def _requires_kernel_activity(
+    request: Rocprofv3CollectionRequest,
+    evidence: Rocprofv3TimingEvidence,
+    compacted_kernel_rows: int | None,
+) -> bool:
+    if request.policy.activity_domain != TimingActivityDomain.KERNEL_ACTIVITY:
+        return False
+    if (compacted_kernel_rows or 0) > 0:
+        return False
+    return not any(row.is_kernel_activity for row in evidence.parsed_rows)
 
 
 def collect_source_timing_evidence(

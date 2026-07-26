@@ -146,63 +146,74 @@ def select_timing_policy(
             reason="profiler-backed timing is unavailable",
         )
 
-    if source_type == TimingSourceType.HIP_NATIVE:
-        return TimingPolicy(
-            source_type=source_type,
-            backend=TimingBackend.ROCPROFV3,
-            activity_domain=TimingActivityDomain.KERNEL_ACTIVITY,
-            aggregation_rule=(
-                "aggregate ROCm kernel activity rows launched by the measured "
-                "solution call"
-            ),
-            interpretation=(
-                "kernel activity duration for native HIP or ROCm library work "
-                "inside the benchmark timing region"
-            ),
-            fallback_applied=False,
-            reason="HIP native source is best measured from ROCm kernel activity",
-        )
-
-    if source_type == TimingSourceType.TRITON:
-        return TimingPolicy(
-            source_type=source_type,
-            backend=TimingBackend.ROCPROFV3,
-            activity_domain=TimingActivityDomain.KERNEL_ACTIVITY,
-            aggregation_rule=(
-                "aggregate post-warmup ROCm kernel activity rows for generated "
-                "Triton kernels launched by the measured solution call"
-            ),
-            interpretation=(
-                "kernel activity duration for Triton-generated kernels, "
-                "excluding compile and autotune warmup unless explicitly labeled"
-            ),
-            fallback_applied=False,
-            reason="Triton source requires generated-kernel activity semantics",
-        )
-
-    if source_type == TimingSourceType.PYTORCH:
-        return TimingPolicy(
-            source_type=source_type,
-            backend=TimingBackend.PYTORCH_PROFILER,
-            activity_domain=TimingActivityDomain.PYTORCH_OPERATOR_ATTRIBUTION,
-            aggregation_rule=(
-                "attribute PyTorch operator regions and cross-check associated "
-                "device activity"
-            ),
-            interpretation=(
-                "PyTorch operator attribution for ROCm device work; operator "
-                "regions can dispatch multiple HIP or library kernels"
-            ),
-            fallback_applied=False,
-            reason="PyTorch source needs operator attribution in addition to device work",
-        )
-
     if source_type == TimingSourceType.MIXED:
         return _event_fallback_policy(
             source_type,
             reason="mixed source timing requires runtime evidence before profiler selection",
         )
+    policy_builders = {
+        TimingSourceType.HIP_NATIVE: _native_kernel_policy,
+        TimingSourceType.TRITON: _triton_kernel_policy,
+        TimingSourceType.PYTORCH: _pytorch_operator_policy,
+    }
+    builder = policy_builders.get(source_type)
+    if builder is not None:
+        return builder()
+    return _unknown_source_policy(source_type)
 
+
+def _native_kernel_policy() -> TimingPolicy:
+    return TimingPolicy(
+        source_type=TimingSourceType.HIP_NATIVE,
+        backend=TimingBackend.ROCPROFV3,
+        activity_domain=TimingActivityDomain.KERNEL_ACTIVITY,
+        aggregation_rule="aggregate ROCm kernel activity rows launched by the measured solution call",
+        interpretation=(
+            "kernel activity duration for native HIP or ROCm library work inside "
+            "the benchmark timing region"
+        ),
+        fallback_applied=False,
+        reason="HIP native source is best measured from ROCm kernel activity",
+    )
+
+
+def _triton_kernel_policy() -> TimingPolicy:
+    return TimingPolicy(
+        source_type=TimingSourceType.TRITON,
+        backend=TimingBackend.ROCPROFV3,
+        activity_domain=TimingActivityDomain.KERNEL_ACTIVITY,
+        aggregation_rule=(
+            "aggregate post-warmup ROCm kernel activity rows for generated Triton "
+            "kernels launched by the measured solution call"
+        ),
+        interpretation=(
+            "kernel activity duration for Triton-generated kernels, excluding "
+            "compile and autotune warmup unless explicitly labeled"
+        ),
+        fallback_applied=False,
+        reason="Triton source requires generated-kernel activity semantics",
+    )
+
+
+def _pytorch_operator_policy() -> TimingPolicy:
+    return TimingPolicy(
+        source_type=TimingSourceType.PYTORCH,
+        backend=TimingBackend.PYTORCH_PROFILER,
+        activity_domain=TimingActivityDomain.PYTORCH_OPERATOR_ATTRIBUTION,
+        aggregation_rule=(
+            "attribute PyTorch operator regions and cross-check associated device "
+            "activity"
+        ),
+        interpretation=(
+            "PyTorch operator attribution for ROCm device work; operator regions "
+            "can dispatch multiple HIP or library kernels"
+        ),
+        fallback_applied=False,
+        reason="PyTorch source needs operator attribution in addition to device work",
+    )
+
+
+def _unknown_source_policy(source_type: TimingSourceType) -> TimingPolicy:
     return TimingPolicy(
         source_type=source_type,
         backend=TimingBackend.UNSUPPORTED,

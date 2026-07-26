@@ -22,6 +22,11 @@ from sol_execbench.core.bench.gpu_lock import (
     GpuLockVerificationError,
     acquire_evaluation_gpu_lock,
 )
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_DEVICE,
+    ENV_SOL_EXECBENCH_SANDBOXED,
+    ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION,
+)
 from sol_execbench.driver import ProblemPackager
 
 from . import command as cli_evaluation
@@ -58,7 +63,7 @@ class EvaluationPhasesResult:
 def require_execution_isolation(request: EvaluationRequest) -> None:
     """Reject direct execution unless the user explicitly chooses diagnostics."""
     if (
-        os.environ.get("SOL_EXECBENCH_SANDBOXED") == "1"
+        os.environ.get(ENV_SOL_EXECBENCH_SANDBOXED) == "1"
         or request.unsafe_local_execution
     ):
         return
@@ -75,8 +80,8 @@ def require_execution_isolation(request: EvaluationRequest) -> None:
 @contextmanager
 def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
     """Mark unsafe runs and serialize access to the selected GPU."""
-    unsafe_name = "SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"
-    device_name = "SOL_EXECBENCH_DEVICE"
+    unsafe_name = ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION
+    device_name = ENV_SOL_EXECBENCH_DEVICE
     try:
         with acquire_evaluation_gpu_lock(
             timeout_seconds=min(float(request.timeout), 60.0)
@@ -87,7 +92,7 @@ def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
                 os.environ[device_name] = request.device
                 if (
                     request.unsafe_local_execution
-                    and os.environ.get("SOL_EXECBENCH_SANDBOXED") != "1"
+                    and os.environ.get(ENV_SOL_EXECBENCH_SANDBOXED) != "1"
                 ):
                     os.environ[unsafe_name] = "1"
                 try:

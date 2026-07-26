@@ -21,6 +21,12 @@ FORMAL_ARTIFACT_PATHS = frozenset(
         "solar-analysis.yaml",
     }
 )
+READINESS_STAGE_ARTIFACTS = {
+    "graph_extraction": "operator_graph.yaml",
+    "einsum_conversion": "einsum_graph.yaml",
+    "conversion_verification": "conversion-attestation.yaml",
+}
+READINESS_STAGES = tuple(READINESS_STAGE_ARTIFACTS)
 
 
 @dataclass(frozen=True)
@@ -159,11 +165,6 @@ class SolarStageAuditOutcome:
     @property
     def ready(self) -> bool:
         """Whether all three stages passed with exact content-addressed evidence."""
-        expected = {
-            "graph_extraction": "operator_graph.yaml",
-            "einsum_conversion": "einsum_graph.yaml",
-            "conversion_verification": "conversion-attestation.yaml",
-        }
         if (
             self.status != "ready"
             or self.output_dir is None
@@ -176,9 +177,9 @@ class SolarStageAuditOutcome:
         ):
             return False
         stages = {str(item.get("stage")): item for item in self.stages}
-        if set(stages) != set(expected):
+        if set(stages) != set(READINESS_STAGES):
             return False
-        for stage, path in expected.items():
+        for stage, path in READINESS_STAGE_ARTIFACTS.items():
             artifact = stages[stage].get("artifact") or {}
             if (
                 stages[stage].get("status") != "passed"
@@ -219,6 +220,8 @@ __all__ = [
     "SolarWorkerRequest",
     "FORMAL_ARTIFACT_PATHS",
     "FORMAL_BOUND_KIND",
+    "READINESS_STAGE_ARTIFACTS",
+    "READINESS_STAGES",
     "SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION",
     "formal_precision_for_definition",
 ]

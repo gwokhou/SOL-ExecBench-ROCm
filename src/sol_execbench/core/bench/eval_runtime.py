@@ -106,62 +106,84 @@ def measure_latency(
                 validator=validator,
             )
 
-        if time_fn is None:
-            from sol_execbench.core.bench.timing import time_runnable
-
-            time_fn = partial(
-                time_runnable,
-                cache_clear_policy=cache_clear_policy,
-            )
-
-        if validator is not None:
-            latency_raw = time_fn(
-                fn,
-                inputs,
-                outputs,
-                device,
-                warmup=warmup,
-                rep=rep,
-                min_measurement_time_seconds=min_measurement_time_seconds,
-                return_mode="all",
-                validator=validator,
-            )
-        else:
-            latency_raw = time_fn(
-                fn,
-                inputs,
-                outputs,
-                device,
-                warmup=warmup,
-                rep=rep,
-                min_measurement_time_seconds=min_measurement_time_seconds,
-                return_mode="all",
-            )
-        if isinstance(latency_raw, (list, tuple)):
-            if not latency_raw or not all(
-                isinstance(value, (int, float)) for value in latency_raw
-            ):
-                return TimingResult(
-                    latency_ms=0.0,
-                    failure="Timing returned invalid sample sequence",
-                )
-            return TimingResult(
-                latency_ms=statistics.mean(float(value) for value in latency_raw),
-                timed_iterations=len(latency_raw),
-            )
-        if not isinstance(latency_raw, (int, float)):
-            return TimingResult(
-                latency_ms=0.0,
-                failure=f"Timing returned non-numeric result: {type(latency_raw).__name__}",
-            )
-        known_iterations = rep if min_measurement_time_seconds is None else 0
-        return TimingResult(
-            latency_ms=float(latency_raw), timed_iterations=known_iterations
+        timer = _resolve_timer(time_fn, cache_clear_policy)
+        latency_raw = _run_timer(
+            timer,
+            fn,
+            inputs,
+            outputs,
+            device,
+            warmup=warmup,
+            rep=rep,
+            min_measurement_time_seconds=min_measurement_time_seconds,
+            validator=validator,
         )
+        return _timing_result(latency_raw, rep, min_measurement_time_seconds)
     except RewardHackDetected:
         raise
     except Exception as exc:
         return TimingResult(latency_ms=0.0, failure=f"Timing failed: {exc}")
+
+
+def _resolve_timer(
+    time_fn: Callable[..., Any] | None,
+    cache_clear_policy: CacheClearPolicy | None,
+) -> Callable[..., Any]:
+    if time_fn is not None:
+        return time_fn
+    from sol_execbench.core.bench.timing import time_runnable
+
+    return partial(time_runnable, cache_clear_policy=cache_clear_policy)
+
+
+def _run_timer(
+    timer: Callable[..., Any],
+    fn: Callable[..., Any],
+    inputs: list[Any],
+    outputs: list[Any],
+    device: str,
+    *,
+    warmup: int,
+    rep: int,
+    min_measurement_time_seconds: float | None,
+    validator: Callable[[list[Any], Any], None] | None,
+) -> Any:
+    options: dict[str, Any] = {
+        "warmup": warmup,
+        "rep": rep,
+        "min_measurement_time_seconds": min_measurement_time_seconds,
+        "return_mode": "all",
+    }
+    if validator is not None:
+        options["validator"] = validator
+    return timer(fn, inputs, outputs, device, **options)
+
+
+def _timing_result(
+    value: Any,
+    rep: int,
+    min_measurement_time_seconds: float | None,
+) -> TimingResult:
+    """Normalize the timing helper's scalar or per-iteration return contract."""
+    if isinstance(value, (list, tuple)):
+        if not value or not all(isinstance(item, (int, float)) for item in value):
+            return TimingResult(
+                latency_ms=0.0,
+                failure="Timing returned invalid sample sequence",
+            )
+        return TimingResult(
+            latency_ms=statistics.mean(float(item) for item in value),
+            timed_iterations=len(value),
+        )
+    if not isinstance(value, (int, float)):
+        return TimingResult(
+            latency_ms=0.0,
+            failure=f"Timing returned non-numeric result: {type(value).__name__}",
+        )
+    return TimingResult(
+        latency_ms=float(value),
+        timed_iterations=rep if min_measurement_time_seconds is None else 0,
+    )
 
 
 def load_staged_problem(

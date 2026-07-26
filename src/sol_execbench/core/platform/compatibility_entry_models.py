@@ -76,86 +76,96 @@ class MatrixEntry(BaseModelWithDocstrings):
 
     @model_validator(mode="after")
     def _validate_claim_boundaries(self) -> MatrixEntry:
-        target = self.target
-        claims = self.claim_boundary
-
-        if target.validation_scope is MatrixValidationScope.CONTAINER_USER_SPACE:
-            if self.status is MatrixCompatibilityStatus.HOST_VALIDATED:
-                raise ValueError(
-                    "Docker/container scoped Matrix Entries cannot use "
-                    "status=host_validated; use container_validated for "
-                    "container ROCm user-space validation."
-                )
-            if claims.native_host_validated:
-                raise ValueError(
-                    "Docker/container scoped Matrix Entries cannot set "
-                    "native_host_validated=true."
-                )
-            if (
-                self.status is MatrixCompatibilityStatus.CONTAINER_VALIDATED
-                and not claims.container_user_space_validated
-            ):
-                raise ValueError(
-                    "container_validated Docker/container scoped Matrix Entries "
-                    "must set container_user_space_validated=true."
-                )
-
-        if self.status is MatrixCompatibilityStatus.CONTAINER_VALIDATED:
-            if (
-                target.validation_scope
-                is not MatrixValidationScope.CONTAINER_USER_SPACE
-            ):
-                raise ValueError(
-                    "container_validated requires container_user_space "
-                    "validation scope."
-                )
-            if self.observed.container is None:
-                raise ValueError(
-                    "container_validated requires observed container evidence."
-                )
-            if not claims.container_user_space_validated:
-                raise ValueError(
-                    "container_validated requires container_user_space_validated=true."
-                )
-            if claims.native_host_validated:
-                raise ValueError(
-                    "container_validated cannot set native_host_validated=true."
-                )
-
-        if self.status is MatrixCompatibilityStatus.HOST_VALIDATED:
-            host = self.observed.host
-            has_direct_host_evidence = host is not None and bool(
-                host.rocm_version or host.driver_version
-            )
-            if target.validation_scope is not MatrixValidationScope.NATIVE_HOST:
-                raise ValueError(
-                    "host_validated requires native_host validation scope."
-                )
-            if not claims.native_host_validated:
-                raise ValueError("host_validated requires native_host_validated=true.")
-            if not has_direct_host_evidence:
-                raise ValueError(
-                    "host_validated requires direct native-host evidence with "
-                    "a ROCm or driver version."
-                )
-            if self.observed.container is not None:
-                raise ValueError(
-                    "host_validated requires direct native-host evidence, not "
-                    "Docker/container validation evidence."
-                )
-            if claims.container_user_space_validated:
-                raise ValueError(
-                    "host_validated cannot set container_user_space_validated=true."
-                )
-
-        if claims.container_user_space_validated and self.observed.container is None:
-            raise ValueError(
-                "container_user_space_validated requires observed container evidence."
-            )
-        if claims.native_host_validated and self.observed.host is None:
-            raise ValueError("native_host_validated requires observed host evidence.")
-
+        _validate_container_scope(self)
+        _validate_container_validation(self)
+        _validate_host_validation(self)
+        _validate_claim_evidence(self)
         return self
+
+
+def _validate_container_scope(entry: MatrixEntry) -> None:
+    """Reject host claims that contradict a container-only validation scope."""
+    if entry.target.validation_scope is not MatrixValidationScope.CONTAINER_USER_SPACE:
+        return
+    claims = entry.claim_boundary
+    if entry.status is MatrixCompatibilityStatus.HOST_VALIDATED:
+        raise ValueError(
+            "Docker/container scoped Matrix Entries cannot use "
+            "status=host_validated; use container_validated for container ROCm "
+            "user-space validation."
+        )
+    if claims.native_host_validated:
+        raise ValueError(
+            "Docker/container scoped Matrix Entries cannot set "
+            "native_host_validated=true."
+        )
+    if (
+        entry.status is MatrixCompatibilityStatus.CONTAINER_VALIDATED
+        and not claims.container_user_space_validated
+    ):
+        raise ValueError(
+            "container_validated Docker/container scoped Matrix Entries must set "
+            "container_user_space_validated=true."
+        )
+
+
+def _validate_container_validation(entry: MatrixEntry) -> None:
+    """Require all evidence and claim flags for a container-validated entry."""
+    if entry.status is not MatrixCompatibilityStatus.CONTAINER_VALIDATED:
+        return
+    claims = entry.claim_boundary
+    if entry.target.validation_scope is not MatrixValidationScope.CONTAINER_USER_SPACE:
+        raise ValueError(
+            "container_validated requires container_user_space validation scope."
+        )
+    if entry.observed.container is None:
+        raise ValueError("container_validated requires observed container evidence.")
+    if not claims.container_user_space_validated:
+        raise ValueError(
+            "container_validated requires container_user_space_validated=true."
+        )
+    if claims.native_host_validated:
+        raise ValueError("container_validated cannot set native_host_validated=true.")
+
+
+def _validate_host_validation(entry: MatrixEntry) -> None:
+    """Require direct native-host evidence for a host-validated entry."""
+    if entry.status is not MatrixCompatibilityStatus.HOST_VALIDATED:
+        return
+    claims = entry.claim_boundary
+    host = entry.observed.host
+    has_direct_host_evidence = host is not None and bool(
+        host.rocm_version or host.driver_version
+    )
+    if entry.target.validation_scope is not MatrixValidationScope.NATIVE_HOST:
+        raise ValueError("host_validated requires native_host validation scope.")
+    if not claims.native_host_validated:
+        raise ValueError("host_validated requires native_host_validated=true.")
+    if not has_direct_host_evidence:
+        raise ValueError(
+            "host_validated requires direct native-host evidence with a ROCm or "
+            "driver version."
+        )
+    if entry.observed.container is not None:
+        raise ValueError(
+            "host_validated requires direct native-host evidence, not Docker/container "
+            "validation evidence."
+        )
+    if claims.container_user_space_validated:
+        raise ValueError(
+            "host_validated cannot set container_user_space_validated=true."
+        )
+
+
+def _validate_claim_evidence(entry: MatrixEntry) -> None:
+    """Ensure positive evidence claim flags have their matching observations."""
+    claims = entry.claim_boundary
+    if claims.container_user_space_validated and entry.observed.container is None:
+        raise ValueError(
+            "container_user_space_validated requires observed container evidence."
+        )
+    if claims.native_host_validated and entry.observed.host is None:
+        raise ValueError("native_host_validated requires observed host evidence.")
 
 
 class MatrixExecutionDecision(BaseModelWithDocstrings):
