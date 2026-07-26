@@ -22,7 +22,9 @@ from sol_execbench.core.solar_bridge.corpus_readiness import (
 )
 from sol_execbench.core.solar_bridge.release import build_release_solar_manifests
 from sol_execbench.core.solar_bridge.models import (
+    SolarAnalysisStatus,
     SolarAnalysisOutcome,
+    SolarStage,
     SolarWorkerRequest,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
@@ -70,22 +72,25 @@ def analyze_cli(
         outcome = run_solar_worker(request, timeout_seconds=timeout_seconds)
     except Exception as exc:
         outcome = SolarAnalysisOutcome(
-            status="failed",
+            status=SolarAnalysisStatus.FAILED,
             analysis_id=workload_uuid,
-            stage="outer_bridge",
+            stage=SolarStage.OUTER_BRIDGE,
             reason_code="worker_execution_failed",
             message=str(exc)[:4096],
         )
-    if outcome.status == "analyzed" and not outcome.is_formal_publication:
+    if (
+        outcome.status is SolarAnalysisStatus.ANALYZED
+        and not outcome.is_formal_publication
+    ):
         outcome = SolarAnalysisOutcome(
-            status="failed",
+            status=SolarAnalysisStatus.FAILED,
             analysis_id=outcome.analysis_id,
-            stage="formal_acceptance",
+            stage=SolarStage.FORMAL_ACCEPTANCE,
             reason_code="non_formal_bound",
             message="SOLAR CLI rejected a non-publication result",
         )
     data = outcome.to_dict()
-    if outcome.status != "analyzed":
+    if outcome.status is not SolarAnalysisStatus.ANALYZED:
         console.print(f"[red]SOLAR failed at {outcome.stage}: {outcome.message}[/red]")
         return CliResult(data=data, exit_code=EXIT_RESULT_FAILED)
     console.print(

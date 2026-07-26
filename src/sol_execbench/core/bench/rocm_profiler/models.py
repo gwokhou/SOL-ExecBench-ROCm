@@ -32,9 +32,6 @@ ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE = "rocprof_partial_artifact_coverage"
 ROCPROF_REASON_COMMAND_FAILED = "rocprof_command_failed"
 ROCPROF_REASON_COMMAND_TIMEOUT = "rocprof_command_timeout"
 ROCPROF_REASON_UNAVAILABLE = "rocprof_unavailable"
-# Artifact kinds that are diagnostic/opaque only and never count as profiler data.
-# Single source of truth; profile_summary.py reuses this for status/limitations.
-_NON_DATA_ARTIFACT_KINDS = frozenset({"diagnostic_json", "other"})
 ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS = (
     "rocprofv3 returned success but produced no profiler data artifacts"
 )
@@ -51,6 +48,40 @@ class Rocprofv3ProfileStatus(StrEnum):
     PARTIAL = "partial"
     FAILED = "failed"
     UNAVAILABLE = "unavailable"
+
+
+class Rocprofv3ArtifactKind(StrEnum):
+    """Closed classifier for registered rocprofv3 artifacts."""
+
+    ROCPD = "rocpd"
+    AGENT_INFO_CSV = "agent_info_csv"
+    COUNTER_CSV = "counter_csv"
+    TRACE_CSV = "trace_csv"
+    DIAGNOSTIC_JSON = "diagnostic_json"
+    METADATA_JSON = "metadata_json"
+    PERFETTO_TRACE = "perfetto_trace"
+    OTF2_TRACE = "otf2_trace"
+    OTHER = "other"
+
+
+class Rocprofv3ArtifactCoverageStatus(StrEnum):
+    """Closed coverage states for one profiler collection attempt."""
+
+    UNAVAILABLE = "unavailable"
+    NONE = "none"
+    PARTIAL = "partial"
+    DIAGNOSTIC_LOGS_ONLY = "diagnostic_logs_only"
+    COMPLETE = "complete"
+
+
+# Artifact kinds that are diagnostic/opaque only and never count as profiler data.
+# Single source of truth; profile_summary.py reuses this for status/limitations.
+_NON_DATA_ARTIFACT_KINDS = frozenset(
+    {
+        Rocprofv3ArtifactKind.DIAGNOSTIC_JSON,
+        Rocprofv3ArtifactKind.OTHER,
+    }
+)
 
 
 _PROFILE_ARTIFACT_SUFFIXES = {
@@ -78,8 +109,12 @@ class Rocprofv3ProfileArtifact:
     """One profiler artifact registered from a `rocprofv3` output directory."""
 
     path: Path
-    kind: str
+    kind: Rocprofv3ArtifactKind
     size_bytes: int
+
+    def __post_init__(self) -> None:
+        """Normalize boundary input and reject unknown artifact kinds."""
+        object.__setattr__(self, "kind", Rocprofv3ArtifactKind(self.kind))
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable artifact payload."""
@@ -121,7 +156,7 @@ class Rocprofv3ProfileResult:
     working_directory: Path | None = None
     timeout_seconds: int | None = None
     profiler_available: bool | None = None
-    artifact_coverage_status: str | None = None
+    artifact_coverage_status: Rocprofv3ArtifactCoverageStatus | None = None
     reason_codes: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     output_format: str | None = None
@@ -131,6 +166,13 @@ class Rocprofv3ProfileResult:
 
     def __post_init__(self) -> None:
         """Reject contradictory status and reason combinations."""
+        object.__setattr__(self, "status", Rocprofv3ProfileStatus(self.status))
+        if self.artifact_coverage_status is not None:
+            object.__setattr__(
+                self,
+                "artifact_coverage_status",
+                Rocprofv3ArtifactCoverageStatus(self.artifact_coverage_status),
+            )
         if self.status is Rocprofv3ProfileStatus.SUCCESS:
             if self.skipped_reason is not None or self.failed_reason is not None:
                 raise ValueError("successful profiling cannot include failure reasons")
@@ -260,9 +302,9 @@ class Rocprofv3TimingEvidence:
             "canonical_output": self.canonical_output,
             "tool_version": self.tool_version,
             "gpu_architecture": self.gpu_architecture,
-            "activity_domain": self.activity_domain.value,
+            "activity_domain": self.activity_domain,
             "aggregation_rule": self.aggregation_rule,
-            "backend": self.backend.value,
+            "backend": self.backend,
             "interpretation": self.interpretation,
             "warmup_runs": self.warmup_runs,
             "iterations": self.iterations,

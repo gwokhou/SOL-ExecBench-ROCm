@@ -35,6 +35,7 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
     ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
     ROCPROF_REASON_UNAVAILABLE,
+    Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
@@ -87,7 +88,7 @@ def _unavailable_result(
         working_directory=request.working_directory,
         timeout_seconds=request.timeout_seconds,
         profiler_available=False,
-        artifact_coverage_status="unavailable",
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.UNAVAILABLE,
         reason_codes=(ROCPROF_REASON_UNAVAILABLE,),
         **profile_result_metadata(request),
     )
@@ -203,7 +204,7 @@ def _no_artifacts_result(
         working_directory=request.working_directory,
         timeout_seconds=request.timeout_seconds,
         profiler_available=True,
-        artifact_coverage_status="none",
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.NONE,
         reason_codes=(ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,),
         **profile_result_metadata(request),
     )
@@ -221,9 +222,9 @@ def _successful_profile_result(
     )
     status = Rocprofv3ProfileStatus.PARTIAL
     failed_reason: str | None = None
-    if coverage == "complete":
+    if coverage is Rocprofv3ArtifactCoverageStatus.COMPLETE:
         status = Rocprofv3ProfileStatus.SUCCESS
-    elif coverage == "diagnostic_logs_only":
+    elif coverage is Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY:
         failed_reason = (
             "rocprofv3 completed without profiler data artifacts; "
             "diagnostic log artifact registered"

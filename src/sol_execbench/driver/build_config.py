@@ -86,11 +86,10 @@ def inject_offload_arch_flags(
     target_hw = set(spec.get("target_hardware", []))
 
     for hardware in SupportedHardware:
-        value = hardware.value
-        if value != SupportedHardware.LOCAL.value and value in target_hw:
-            offload_arches.append(value)
+        if hardware is not SupportedHardware.LOCAL and hardware in target_hw:
+            offload_arches.append(hardware)
 
-    if SupportedHardware.LOCAL.value in target_hw:
+    if SupportedHardware.LOCAL in target_hw:
         local_gfx = local_gfx_getter()
         if local_gfx:
             offload_arches.append(local_gfx)

@@ -5,6 +5,10 @@
 
 from __future__ import annotations
 
+from sol_execbench.core.bench.decision.decision_models import (
+    DecisionBottleneckClass,
+    DecisionConfidence,
+)
 from sol_execbench.core.bench.decision.derivation import derive_decision_hints
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
@@ -24,33 +28,36 @@ def _fp(**kw):
     return StaticResourceFootprint(**kw)
 
 
-def _cls(hints, value):
-    return [h for h in hints if h.bottleneck_class.value == value]
+def _cls(hints, value: DecisionBottleneckClass):
+    return [h for h in hints if h.bottleneck_class is value]
 
 
 def test_spill_detected_is_inferred_high():
     hints = derive_decision_hints(
         [_fp(scratch_bytes=1024, spill_detected=True, identity=IDENTITY)], GFX942
     )
-    spill = _cls(hints, "spill_detected")
-    assert spill and spill[0].confidence.value == "inferred_high"
+    spill = _cls(hints, DecisionBottleneckClass.SPILL_DETECTED)
+    assert spill and spill[0].confidence is DecisionConfidence.INFERRED_HIGH
     assert spill[0].identity.artifact_id == "k0"
 
 
 def test_register_pressure_medium_under_ratio():
     hints = derive_decision_hints([_fp(vgpr_used=250, scratch_bytes=0)], GFX942)
-    reg = _cls(hints, "register_pressure_high")
-    assert reg and reg[0].confidence.value == "inferred_medium"
+    reg = _cls(hints, DecisionBottleneckClass.REGISTER_PRESSURE_HIGH)
+    assert reg and reg[0].confidence is DecisionConfidence.INFERRED_MEDIUM
 
 
 def test_register_pressure_high_at_limit():
     hints = derive_decision_hints([_fp(vgpr_used=256)], GFX942)
-    assert _cls(hints, "register_pressure_high")[0].confidence.value == "inferred_high"
+    assert (
+        _cls(hints, DecisionBottleneckClass.REGISTER_PRESSURE_HIGH)[0].confidence
+        is DecisionConfidence.INFERRED_HIGH
+    )
 
 
 def test_lds_pressure():
     hints = derive_decision_hints([_fp(lds_bytes=60000)], GFX942)
-    assert _cls(hints, "lds_pressure_high")
+    assert _cls(hints, DecisionBottleneckClass.LDS_PRESSURE_HIGH)
 
 
 def test_no_pressure_emits_nothing():
@@ -67,7 +74,7 @@ def test_budget_none_emits_only_spill():
         [_fp(vgpr_used=250, scratch_bytes=512, spill_detected=True)], None
     )
     assert len(hints) == 1
-    assert hints[0].bottleneck_class.value == "spill_detected"
+    assert hints[0].bottleneck_class is DecisionBottleneckClass.SPILL_DETECTED
 
 
 def test_dynamic_budget_emits_no_layer_r_hints():
@@ -108,11 +115,11 @@ def test_dynamic_budget_still_emits_spill():
     hints = derive_decision_hints(
         [_fp(vgpr_used=250, scratch_bytes=1024, spill_detected=True)], dynamic
     )
-    spill = _cls(hints, "spill_detected")
-    assert spill and spill[0].confidence.value == "inferred_high"
+    spill = _cls(hints, DecisionBottleneckClass.SPILL_DETECTED)
+    assert spill and spill[0].confidence is DecisionConfidence.INFERRED_HIGH
     # register pressure is suppressed on dynamic budgets even though vgpr(250)
     # would otherwise cross the ratio threshold.
-    assert _cls(hints, "register_pressure_high") == []
+    assert _cls(hints, DecisionBottleneckClass.REGISTER_PRESSURE_HIGH) == []
 
 
 def test_dynamic_budget_suppresses_pressure_without_spill():

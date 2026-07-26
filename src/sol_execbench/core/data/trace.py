@@ -16,7 +16,7 @@
 
 """Strong-typed data definitions for traces and evaluations."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Optional
 
 from pydantic import Field, field_validator, model_validator
@@ -117,7 +117,7 @@ class Environment(BaseModelWithDocstrings):
     """Declared benchmark timing protocol."""
 
 
-class EvaluationStatus(str, Enum):
+class EvaluationStatus(StrEnum):
     """Status codes for evaluation results.
 
     Enumeration of all possible outcomes when evaluating a solution

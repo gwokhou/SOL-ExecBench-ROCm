@@ -12,6 +12,7 @@ from rich.console import Console
 
 from sol_execbench.cli.protocol import EXIT_RESULT_FAILED, CliFailure, CliResult
 from sol_execbench.cli.protocol import artifact
+from sol_execbench.core.dataset.aka_contract import AkaOfficialScoringStatus
 from sol_execbench.core.scoring.release_assembly import (
     assemble_release_bundle,
     build_run_statement,
@@ -40,7 +41,7 @@ def score_cli() -> None:
 def official_score_status_cli(manifest_path: Path) -> CliResult:
     """Report whether this corpus has a pinned official-scoring contract."""
     report = official_score_availability(manifest_path)
-    if report["status"] == "available":
+    if report["status"] == AkaOfficialScoringStatus.AVAILABLE:
         console.print("[green]Official scoring is available.[/green]")
     else:
         console.print(
@@ -96,7 +97,7 @@ def build_statement_cli(plan: Path, manifest_path: Path) -> CliResult:
     """Verify one completed release plan and write its statement."""
     loaded = load_execution_plan(plan)
     workspace = plan.resolve().parents[1]
-    output = workspace / "statements" / f"{loaded.role.value}.json"
+    output = workspace / "statements" / f"{loaded.role}.json"
     try:
         path = build_run_statement(
             plan,
@@ -109,9 +110,9 @@ def build_statement_cli(plan: Path, manifest_path: Path) -> CliResult:
             code="release_statement_build_failed",
             hint="Verify the full plan, environment, implementations, and traces.",
         ) from exc
-    console.print(f"[green]{loaded.role.value.title()} statement: {path}[/green]")
+    console.print(f"[green]{loaded.role.title()} statement: {path}[/green]")
     return CliResult(
-        data={"role": loaded.role.value, "statement": str(path)},
+        data={"role": loaded.role, "statement": str(path)},
         artifacts=(artifact(path, "json_file"),),
     )
 
@@ -132,7 +133,7 @@ def assemble_bundle_cli(workspace: Path, manifest_path: Path) -> CliResult:
     """Verify publisher statements and assemble the release bundle."""
     root = workspace.resolve()
     statements = {
-        kind: root / "statements" / f"{kind.value}.json" for kind in ReleaseArtifactKind
+        kind: root / "statements" / f"{kind}.json" for kind in ReleaseArtifactKind
     }
     try:
         path = assemble_release_bundle(

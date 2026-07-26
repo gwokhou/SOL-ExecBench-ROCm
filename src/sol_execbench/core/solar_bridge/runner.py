@@ -18,7 +18,10 @@ from sol_execbench.core.process import (
     run_in_process_group_to_files,
 )
 from sol_execbench.core.solar_bridge.models import (
+    SolarAnalysisStatus,
     SolarAnalysisOutcome,
+    SolarReadinessStatus,
+    SolarStage,
     SolarStageAuditOutcome,
     SolarStageAuditRequest,
     SolarWorkerRequest,
@@ -38,7 +41,10 @@ def run_solar_worker(
         return _failed_outcome(request, *failure)
     try:
         outcome = SolarAnalysisOutcome.from_dict(payload or {})
-        if outcome.status == "analyzed" and not outcome.is_formal_publication:
+        if (
+            outcome.status is SolarAnalysisStatus.ANALYZED
+            and not outcome.is_formal_publication
+        ):
             raise ValueError("SOLAR worker returned a non-formal analyzed response")
         return outcome
     except Exception as exc:
@@ -58,7 +64,7 @@ def run_solar_stage_worker(
         return _failed_stage_outcome(request, *failure)
     try:
         outcome = SolarStageAuditOutcome.from_dict(payload or {})
-        if outcome.status == "ready" and not outcome.ready:
+        if outcome.status is SolarReadinessStatus.READY and not outcome.ready:
             raise ValueError("SOLAR stage worker returned invalid ready evidence")
         return outcome
     except Exception as exc:
@@ -118,9 +124,9 @@ def _failed_outcome(
     request: SolarWorkerRequest, reason_code: str, message: str
 ) -> SolarAnalysisOutcome:
     return SolarAnalysisOutcome(
-        status="failed",
+        status=SolarAnalysisStatus.FAILED,
         analysis_id=request.workload_uuid,
-        stage="outer_bridge",
+        stage=SolarStage.OUTER_BRIDGE,
         reason_code=reason_code,
         message=message[:4096],
     )
@@ -130,9 +136,9 @@ def _failed_stage_outcome(
     request: SolarStageAuditRequest, reason_code: str, message: str
 ) -> SolarStageAuditOutcome:
     return SolarStageAuditOutcome(
-        status="failed",
+        status=SolarReadinessStatus.FAILED,
         analysis_id=request.workload_uuid,
-        failure_stage="outer_bridge",
+        failure_stage=SolarStage.OUTER_BRIDGE,
         reason_code=reason_code,
         message=message[:4096],
     )

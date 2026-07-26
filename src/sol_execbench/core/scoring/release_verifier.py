@@ -12,7 +12,10 @@ from typing import Any, TypeVar
 
 from pydantic import ValidationError
 
-from sol_execbench.core.dataset.aka_contract import AkaReleasePolicy
+from sol_execbench.core.dataset.aka_contract import (
+    AkaOfficialScoringStatus,
+    AkaReleasePolicy,
+)
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 
@@ -144,7 +147,7 @@ def _verify_release_pins(
     solar: SolarIndexStatement,
 ) -> None:
     scoring = corpus.official_scoring
-    if scoring.get("status") != "available":
+    if scoring.get("status") != AkaOfficialScoringStatus.AVAILABLE:
         raise ValueError("corpus manifest does not authorize official scoring")
     if scoring.get("release_policy") != AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1:
         raise ValueError("corpus manifest uses an unsupported release policy")

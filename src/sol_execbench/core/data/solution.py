@@ -17,7 +17,6 @@
 """Strong-typed data definitions for solution implementations."""
 
 import hashlib
-from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 

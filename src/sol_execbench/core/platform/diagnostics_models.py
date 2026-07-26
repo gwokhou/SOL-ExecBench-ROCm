@@ -11,10 +11,10 @@ consistent while preserving existing public contracts.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class DiagnosticStage(str, Enum):
+class DiagnosticStage(StrEnum):
     """High-level evaluation stages used in actionable failure messages."""
 
     PARSE = "parse"
@@ -26,18 +26,32 @@ class DiagnosticStage(str, Enum):
     ENVIRONMENT = "environment"
 
 
+class DiagnosticStatus(StrEnum):
+    """Closed readiness and reporting states for stage diagnostics."""
+
+    FAILED = "failed"
+    AVAILABLE = "available"
+    MISSING = "missing"
+    WARNING = "warning"
+
+
 @dataclass(frozen=True)
 class StageDiagnostic:
     """Actionable diagnostic information for one stage or tool."""
 
     stage: DiagnosticStage
-    status: str
+    status: DiagnosticStatus
     message: str
     hint: str | None = None
 
+    def __post_init__(self) -> None:
+        """Normalize public constructor values and reject unknown states."""
+        object.__setattr__(self, "stage", DiagnosticStage(self.stage))
+        object.__setattr__(self, "status", DiagnosticStatus(self.status))
+
     def format(self) -> str:
         """Return a compact human-readable diagnostic message."""
-        prefix = f"{self.stage.value}: {self.status}: {self.message}"
+        prefix = f"{self.stage}: {self.status}: {self.message}"
         if self.hint:
             return f"{prefix}\n  Fix: {self.hint}"
         return prefix
@@ -53,12 +67,14 @@ class SolExecBenchError(RuntimeError):
         *,
         hint: str | None = None,
     ) -> None:
-        super().__init__(StageDiagnostic(stage, "failed", message, hint).format())
+        super().__init__(
+            StageDiagnostic(stage, DiagnosticStatus.FAILED, message, hint).format()
+        )
         self.stage = stage
         self.hint = hint
 
 
-class ProfilerBackend(str, Enum):
+class ProfilerBackend(StrEnum):
     """Internal profiling-readiness backend classification."""
 
     ROCPROFV3 = "rocprofv3"
@@ -104,16 +120,16 @@ class RocmLibraryReadiness:
         return not self.missing_headers and not self.missing_libraries
 
     @property
-    def status(self) -> str:
+    def status(self) -> DiagnosticStatus:
         """Short readiness label."""
-        return "available" if self.ready else "missing"
+        return DiagnosticStatus.AVAILABLE if self.ready else DiagnosticStatus.MISSING
 
     def to_diagnostic(self) -> StageDiagnostic:
         """Return a stage diagnostic with actionable missing dependency detail."""
         if self.ready:
             return StageDiagnostic(
                 stage=DiagnosticStage.ENVIRONMENT,
-                status="available",
+                status=DiagnosticStatus.AVAILABLE,
                 message=f"{self.spec.name} library dependencies found",
             )
 
@@ -124,7 +140,7 @@ class RocmLibraryReadiness:
             missing.append("libraries: " + ", ".join(self.missing_libraries))
         return StageDiagnostic(
             stage=DiagnosticStage.ENVIRONMENT,
-            status="missing",
+            status=DiagnosticStatus.MISSING,
             message=f"{self.spec.name} missing " + "; ".join(missing),
             hint=self.spec.hint,
         )

@@ -35,7 +35,7 @@ class RuntimeFailureEvidence(BaseModelWithDocstrings):
 
     category: RuntimeFailureCategory
     """Diagnostic evidence category."""
-    status: str
-    """Category-specific status value."""
+    status: Literal["recorded"]
+    """Fixed status for a recorded diagnostic category."""
     message: str | None = None
     """Optional human-readable diagnostic message."""

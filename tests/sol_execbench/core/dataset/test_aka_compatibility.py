@@ -3,12 +3,21 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
+import yaml
 
+from sol_execbench.core.dataset.aka_contract import (
+    AkaCompatibilityStage,
+    AkaProbeStatus,
+)
 from sol_execbench.core.dataset.aka_compatibility import (
+    PROBE_RESULT_PREFIX,
+    AkaProbeInfrastructureError,
     AkaWorkloadDecision,
+    _parse_probe_output,
     materialization_target,
     select_corpus_for_target,
 )
@@ -35,6 +44,63 @@ def _device(gfx_target: str) -> RocmDeviceInfo:
 def test_unknown_gfx_target_fails_closed() -> None:
     with pytest.raises(ValueError, match="unsupported AKA execution target"):
         materialization_target(_device("gfx9999"))
+
+
+def test_workload_decision_payload_is_yaml_safe() -> None:
+    decision = AkaWorkloadDecision(
+        problem_path="torch2hip/example",
+        workload_uuid="workload-1",
+        included=True,
+        stage=AkaCompatibilityStage.LIVE_PROBE,
+        reason_code="probe_passed",
+    )
+
+    assert "stage: live_probe" in yaml.safe_dump(decision.to_dict())
+
+
+@pytest.mark.parametrize(
+    ("status", "included"),
+    [
+        (AkaProbeStatus.COMPATIBLE, True),
+        (AkaProbeStatus.INCOMPATIBLE, False),
+    ],
+)
+def test_probe_statuses_map_to_closed_decisions(
+    status: AkaProbeStatus,
+    included: bool,
+) -> None:
+    stdout = PROBE_RESULT_PREFIX + json.dumps(
+        {
+            "status": status,
+            "reason_code": "probe_result",
+            "metrics": {"reference_case_bytes": 128},
+        }
+    )
+
+    decision = _parse_probe_output(
+        stdout,
+        problem_path="torch2hip/example",
+        workload_uuid="workload-1",
+    )
+
+    assert decision.included is included
+    assert decision.stage is AkaCompatibilityStage.LIVE_PROBE
+
+
+def test_probe_infrastructure_status_fails_closed() -> None:
+    stdout = PROBE_RESULT_PREFIX + json.dumps(
+        {
+            "status": AkaProbeStatus.INFRASTRUCTURE_ERROR,
+            "detail": "worker setup failed",
+        }
+    )
+
+    with pytest.raises(AkaProbeInfrastructureError, match="worker setup failed"):
+        _parse_probe_output(
+            stdout,
+            problem_path="torch2hip/example",
+            workload_uuid="workload-1",
+        )
 
 
 def test_gfx942_static_filter_excludes_fp8_without_live_probe() -> None:
@@ -105,7 +171,7 @@ def test_live_probe_decisions_partition_workloads() -> None:
             problem_path=f"{problem_dir.parent.name}/{problem_dir.name}",
             workload_uuid=workload.uuid,
             included=included,
-            stage="live_probe",
+            stage=AkaCompatibilityStage.LIVE_PROBE,
             reason_code="probe_passed" if included else "probe_oom",
         )
 

@@ -19,6 +19,7 @@ from typing import Callable, Mapping
 from sol_execbench.core.platform.diagnostics_models import (
     ROCM_LIBRARY_SPECS,
     DiagnosticStage,
+    DiagnosticStatus,
     RocmLibraryReadiness,
     SolExecBenchError,
     StageDiagnostic,
@@ -50,7 +51,11 @@ def rocm_tool_diagnostics(
         diagnostics.append(
             StageDiagnostic(
                 stage=DiagnosticStage.ENVIRONMENT,
-                status="available" if available else "missing",
+                status=(
+                    DiagnosticStatus.AVAILABLE
+                    if available
+                    else DiagnosticStatus.MISSING
+                ),
                 message=f"{tool} {'found' if available else 'not found'}",
                 hint=None if available else hint,
             )

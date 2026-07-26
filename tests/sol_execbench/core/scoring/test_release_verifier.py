@@ -388,7 +388,7 @@ def _release_fixture(tmp_path: Path) -> tuple[AkaCorpusManifest, Path]:
         formal_coverage_requirements={},
         official_scoring={
             "status": "available",
-            "release_policy": (AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1.value),
+            "release_policy": str(AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1),
             "baseline_id": _BASELINE_ID,
         },
     )
@@ -401,7 +401,7 @@ def _write_corpus_manifest(authored: Path, problem: Path) -> Path:
     payload = {
         "official_scoring": {
             "status": "available",
-            "release_policy": AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1.value,
+            "release_policy": str(AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1),
             "baseline_id": _BASELINE_ID,
         },
         "definition_sha256": sha256_file(problem / "definition.json"),
@@ -660,15 +660,11 @@ def _run_statement(
         workload_sha256=identity["workload_sha256"],
         implementation=artifact_reference(
             workspace,
-            workspace
-            / kind.value
-            / "implementations"
-            / _PROBLEM_PATH
-            / "solution.json",
+            workspace / kind / "implementations" / _PROBLEM_PATH / "solution.json",
         ),
         trace=artifact_reference(
             workspace,
-            workspace / kind.value / "traces" / _PROBLEM_PATH / "trace.jsonl",
+            workspace / kind / "traces" / _PROBLEM_PATH / "trace.jsonl",
         ),
     )
     fields: dict[str, Any] = {
@@ -676,7 +672,7 @@ def _run_statement(
         "source_revision": source_revision,
         "corpus_manifest": corpus_ref,
         "environment": artifact_reference(
-            workspace, workspace / kind.value / "environment.json"
+            workspace, workspace / kind / "environment.json"
         ),
         "problems": (evidence,),
     }
@@ -720,6 +716,6 @@ def _write_payload(
     kind: ReleaseArtifactKind,
     model: BaselineStatement | CandidateStatement | SolarIndexStatement,
 ) -> Path:
-    path = workspace / "statements" / f"{kind.value}.json"
+    path = workspace / "statements" / f"{kind}.json"
     atomic_write_json_value(path, release_model_payload(model))
     return path

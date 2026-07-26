@@ -49,7 +49,7 @@ def build_decision_sidecar(
     hints = derive_decision_hints(footprints, budget)
     status, reason_code = _aggregate(footprints, budget)
     architecture = budget.architecture if budget is not None else None
-    bottleneck_counts = Counter(h.bottleneck_class.value for h in hints)
+    bottleneck_counts = Counter(h.bottleneck_class for h in hints)
 
     return DecisionSidecar(
         status=status,

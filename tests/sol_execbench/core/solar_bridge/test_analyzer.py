@@ -11,6 +11,8 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.solar_bridge import analyzer
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
+    SolarAnalysisStatus,
+    SolarStage,
     SolarWorkerRequest,
     formal_precision_for_definition,
 )
@@ -77,7 +79,10 @@ def test_analyze_workload_adapts_outer_models_to_solar(tmp_path, monkeypatch) ->
     def input_factory(seed):
         return (seed,)
 
-    expected = SolarAnalysisOutcome(status="analyzed", analysis_id="problem:workload-1")
+    expected = SolarAnalysisOutcome(
+        status=SolarAnalysisStatus.ANALYZED,
+        analysis_id="problem:workload-1",
+    )
     observed: dict[str, object] = {}
 
     monkeypatch.setattr(analyzer, "_require_formal_device", lambda device: None)
@@ -115,9 +120,9 @@ def test_invoke_solar_maps_failure_without_claiming_bound(
     monkeypatch.setattr(
         "solar.api.analyze",
         lambda request: AnalysisFailure(
-            status="failed",
+            status=SolarAnalysisStatus.FAILED,
             analysis_id=request.analysis_id,
-            stage="formal_analysis",
+            stage=SolarStage.FORMAL_ANALYSIS,
             reason_code="bound_failed",
             message="unsupported",
         ),
@@ -146,7 +151,7 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
     def fake_analyze(request):
         assert request.require_orojenesis is True
         return AnalysisResult(
-            status="analyzed",
+            status=SolarAnalysisStatus.ANALYZED,
             analysis_id=request.analysis_id,
             output_dir=result_dir,
             architecture_sha256="a" * 64,
@@ -181,7 +186,7 @@ def test_invoke_solar_rejects_non_formal_result(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         "solar.api.analyze",
         lambda request: AnalysisResult(
-            status="analyzed",
+            status=SolarAnalysisStatus.ANALYZED,
             analysis_id=request.analysis_id,
             output_dir=result_dir,
             architecture_sha256="a" * 64,

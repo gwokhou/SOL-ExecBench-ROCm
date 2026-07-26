@@ -83,8 +83,8 @@ def test_runtime_unavailable_overrides_dependency_classification() -> None:
         container_validated=True,
     )
 
-    assert entry.status.value == "runtime_unavailable"
-    assert entry.reason_code.value == "rocm_runtime_unavailable"
+    assert entry.status == "runtime_unavailable"
+    assert entry.reason_code == "rocm_runtime_unavailable"
     assert entry.claim_boundary.container_user_space_validated is False
 
 

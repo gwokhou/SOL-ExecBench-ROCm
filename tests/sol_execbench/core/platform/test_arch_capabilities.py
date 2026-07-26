@@ -35,7 +35,7 @@ def test_gfx942_budget_values():
     assert budget.lds_per_workgroup_bytes == 65536
     assert budget.register_file_per_cu_bytes == 524288
     assert budget.waves_per_cu_max == 40
-    assert budget.confidence.value == "inexact"
+    assert budget.confidence == "inexact"
     assert budget.matrix_unit == "mfma"
     assert budget.register_allocation_model == "static"
     assert budget.compute_unit_grouping == "cu"
@@ -57,7 +57,7 @@ def test_gfx1150_budget_values():
     assert budget.wave_slots_per_simd == 16
     assert budget.cache_line_bytes == 128
     assert budget.waves_per_cu_max == 32
-    assert budget.confidence.value == "inexact"
+    assert budget.confidence == "inexact"
     assert "RDNA 3.5" in budget.source
 
 
@@ -70,7 +70,7 @@ def test_gfx1200_budget_values():
     assert budget.compute_unit_grouping == "wgp"
     assert budget.waves_per_cu_max is None
     assert budget.register_file_per_cu_bytes is None
-    assert budget.confidence.value == "inexact"
+    assert budget.confidence == "inexact"
     assert "RDNA 4" in budget.source
 
 

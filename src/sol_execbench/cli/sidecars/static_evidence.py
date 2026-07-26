@@ -14,6 +14,7 @@ from ...core.bench.static_kernel.evidence import (
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceSidecar,
     StaticKernelEvidenceSourceReference,
+    StaticKernelEvidenceStatus,
     StaticKernelEvidenceWarning,
     build_static_kernel_evidence_failed,
     build_static_kernel_evidence_unsupported,
@@ -60,9 +61,15 @@ def _static_evidence_summary(
         "disassembly_present": classification.disassembly_present,
         "detected_architectures": classification.detected_architectures,
         "unsupported_count": sum(
-            1 for run in sidecar.tool_runs if run.status == "unsupported"
+            1
+            for run in sidecar.tool_runs
+            if run.status is StaticKernelEvidenceStatus.UNSUPPORTED
         ),
-        "failed_count": sum(1 for run in sidecar.tool_runs if run.status == "failed"),
+        "failed_count": sum(
+            1
+            for run in sidecar.tool_runs
+            if run.status is StaticKernelEvidenceStatus.FAILED
+        ),
         "claim_boundaries": {
             "diagnostic_only": sidecar.diagnostic_only,
             "correctness_authority": sidecar.correctness_authority,
@@ -100,7 +107,7 @@ def _write_static_evidence_sidecar(
         write_json_payload(sidecar_path, _static_evidence_payload(sidecar))
         console.print(
             "[green]Static evidence "
-            f"{sidecar.status.value}; saved metadata to {sidecar_path}[/green]"
+            f"{sidecar.status}; saved metadata to {sidecar_path}[/green]"
         )
         return sidecar_path
     except Exception as exc:

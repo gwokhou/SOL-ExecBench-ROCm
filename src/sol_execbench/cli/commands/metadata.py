@@ -13,6 +13,7 @@ import click
 
 from ...core.evaluator_contract import build_evaluator_contract
 from ...core.platform.environment import build_environment_diagnostics
+from ...core.platform.environment_models import EnvironmentEvidenceStatus
 from ...core.platform.toolchain import (
     ToolchainArtifactType,
     ToolchainEvidenceLevel,
@@ -47,7 +48,7 @@ def doctor_cli() -> CliResult:
     """
     payload = build_environment_diagnostics().model_dump(mode="json")
     _show(payload)
-    unavailable = payload.get("status") == "unavailable"
+    unavailable = payload.get("status") == EnvironmentEvidenceStatus.UNAVAILABLE
     return CliResult(data=payload, exit_code=EXIT_UNAVAILABLE if unavailable else 0)
 
 
@@ -141,14 +142,14 @@ def toolchain_cli() -> None:
 @toolchain_cli.command("route")
 @click.option(
     "--evidence-level",
-    type=click.Choice([v.value for v in ToolchainEvidenceLevel]),
-    default=ToolchainEvidenceLevel.PROFILING.value,
+    type=click.Choice([str(value) for value in ToolchainEvidenceLevel]),
+    default=str(ToolchainEvidenceLevel.PROFILING),
     show_default=True,
 )
 @click.option(
     "--artifact-type",
-    type=click.Choice([v.value for v in ToolchainArtifactType]),
-    default=ToolchainArtifactType.EXECUTABLE_RUN.value,
+    type=click.Choice([str(value) for value in ToolchainArtifactType]),
+    default=str(ToolchainArtifactType.EXECUTABLE_RUN),
     show_default=True,
 )
 @click.option("--gpu-arch", "gpu_architecture")

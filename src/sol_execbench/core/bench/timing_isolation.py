@@ -234,7 +234,7 @@ def collect_timing_environment_snapshot() -> dict[str, Any]:
     # Build tools_available map from base snapshot
     tools_available = {}
     for tool_name, tool_result in base_snapshot.tools.items():
-        tools_available[tool_name] = tool_result.status.value
+        tools_available[tool_name] = tool_result.status
 
     # Collect warnings
     warnings = list(base_snapshot.warnings)

@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import ConfigDict, Field
@@ -19,7 +19,7 @@ from ..environment import ProbeCompletedProcess
 DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS = 3.0
 
 
-class ToolLifecycle(str, Enum):
+class ToolLifecycle(StrEnum):
     """Lifecycle state for a ROCm-related tool entry."""
 
     ACTIVE = "active"
@@ -30,7 +30,7 @@ class ToolLifecycle(str, Enum):
     CANDIDATE = "candidate"
 
 
-class ToolchainEvidenceLevel(str, Enum):
+class ToolchainEvidenceLevel(StrEnum):
     """Evidence level a tool may support."""
 
     RUNTIME = "runtime"
@@ -39,7 +39,7 @@ class ToolchainEvidenceLevel(str, Enum):
     DERIVED_SCORE = "derived_score"
 
 
-class ToolchainArtifactType(str, Enum):
+class ToolchainArtifactType(StrEnum):
     """Artifact or workload class used for routing."""
 
     EXECUTABLE_RUN = "executable_run"
@@ -51,7 +51,7 @@ class ToolchainArtifactType(str, Enum):
     NONE = "none"
 
 
-class ToolchainStatus(str, Enum):
+class ToolchainStatus(StrEnum):
     """Status vocabulary for routing decisions."""
 
     AVAILABLE = "available"

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BeforeValidator, ConfigDict, Field
@@ -24,7 +24,7 @@ _STATIC_MODEL_CONFIG = ConfigDict(
 )
 
 
-class StaticKernelEvidenceStatus(str, Enum):
+class StaticKernelEvidenceStatus(StrEnum):
     """Aggregate and per-artifact status vocabulary."""
 
     COLLECTED = "collected"
@@ -35,7 +35,7 @@ class StaticKernelEvidenceStatus(str, Enum):
     SKIPPED = "skipped"
 
 
-class StaticKernelEvidenceReasonCode(str, Enum):
+class StaticKernelEvidenceReasonCode(StrEnum):
     """Stable reason-code vocabulary for static evidence outcomes."""
 
     STATIC_EVIDENCE_NOT_REQUESTED = "static_evidence_not_requested"

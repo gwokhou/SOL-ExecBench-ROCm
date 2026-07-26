@@ -46,7 +46,7 @@ def select_default_timing(
 
     if policy.backend != TimingBackend.ROCPROFV3:
         reason = (
-            f"selected policy backend is {policy.backend.value}, not rocprofv3 "
+            f"selected policy backend is {policy.backend}, not rocprofv3 "
             "kernel activity timing"
         )
     else:

@@ -23,6 +23,7 @@ from sol_execbench.core.bench.profile_summary.sidecar_models import (
     ProfileSummaryStatus,
 )
 from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
 )
@@ -152,14 +153,20 @@ def _limitations(profile_result: Rocprofv3ProfileResult | None) -> list[str]:
     if profile_result is None:
         limitations.append("No rocprofv3 profile result was supplied.")
         return limitations
-    if profile_result.status != "success":
+    if profile_result.status is not Rocprofv3ProfileStatus.SUCCESS:
         limitations.append(f"rocprofv3 profile status is {profile_result.status}.")
     elif not profile_result.has_profiler_data:
-        if profile_result.artifact_coverage_status != "diagnostic_logs_only":
+        if (
+            profile_result.artifact_coverage_status
+            is not Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY
+        ):
             limitations.append(
                 "rocprofv3 profile completed without profiler data artifacts."
             )
-    if profile_result.artifact_coverage_status == "diagnostic_logs_only":
+    if (
+        profile_result.artifact_coverage_status
+        is Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY
+    ):
         limitations.append(
             "rocprofv3 produced diagnostic logs but no profiler data artifacts."
         )

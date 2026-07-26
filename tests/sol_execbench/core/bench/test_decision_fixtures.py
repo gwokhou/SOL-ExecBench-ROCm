@@ -30,7 +30,7 @@ def test_decision_fixtures_parse(name: str, expected_status: str):
     sidecar = DecisionSidecar.model_validate(payload)
 
     assert sidecar.schema_version == "sol_execbench.decision.v2"
-    assert sidecar.status.value == expected_status
+    assert sidecar.status == expected_status
     assert sidecar.authority == "diagnostic"
 
 
@@ -42,7 +42,7 @@ def test_valid_fixture_carries_hints():
 
     assert sidecar.summary.hint_count == 2
     assert sidecar.summary.architecture == "gfx942"
-    assert any(h.bottleneck_class.value == "spill_detected" for h in sidecar.hints)
+    assert any(h.bottleneck_class == "spill_detected" for h in sidecar.hints)
 
 
 def test_malformed_fixture_rejected():

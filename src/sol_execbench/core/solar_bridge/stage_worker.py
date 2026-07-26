@@ -11,6 +11,8 @@ from pathlib import Path
 from sol_execbench.core.data.json_utils import load_json_value
 from sol_execbench.core.solar_bridge.analyzer import audit_workload_stages
 from sol_execbench.core.solar_bridge.models import (
+    SolarReadinessStatus,
+    SolarStage,
     SolarStageAuditOutcome,
     SolarStageAuditRequest,
 )
@@ -32,16 +34,16 @@ def main() -> None:
         )
     except Exception as exc:
         outcome = SolarStageAuditOutcome(
-            status="failed",
+            status=SolarReadinessStatus.FAILED,
             analysis_id=request.workload_uuid,
-            failure_stage="outer_bridge",
+            failure_stage=SolarStage.OUTER_BRIDGE,
             reason_code="bridge_failed",
             message=str(exc)[:4096],
         )
     fallback = SolarStageAuditOutcome(
-        status="failed",
+        status=SolarReadinessStatus.FAILED,
         analysis_id=request.workload_uuid,
-        failure_stage="outer_bridge",
+        failure_stage=SolarStage.OUTER_BRIDGE,
         reason_code="worker_response_failed",
         message="worker response serialization failed",
     )

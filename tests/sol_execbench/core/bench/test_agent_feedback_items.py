@@ -48,9 +48,7 @@ def test_trace_feedback_items_reports_compile_runtime_timeout_and_policy_failure
         )
     )
 
-    assert [
-        (item.code, item.severity.value, item.bottleneck.value) for item in items
-    ] == [
+    assert [(item.code, item.severity, item.bottleneck) for item in items] == [
         ("compile_error", "action", "compile_failure"),
         ("reward_hack", "action", "policy_violation"),
         ("runtime_error", "action", "runtime_failure"),
@@ -71,9 +69,7 @@ def test_trace_feedback_items_reports_correctness_and_reference_failures() -> No
         )
     )
 
-    assert [
-        (item.code, item.severity.value, item.bottleneck.value) for item in items
-    ] == [
+    assert [(item.code, item.severity, item.bottleneck) for item in items] == [
         ("incorrect_dtype", "action", "interface_correctness"),
         ("incorrect_numerical", "action", "numerical_correctness"),
         ("incorrect_shape", "action", "interface_correctness"),

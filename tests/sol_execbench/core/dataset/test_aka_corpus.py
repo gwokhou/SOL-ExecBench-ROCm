@@ -17,6 +17,7 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset import aka_corpus
 from sol_execbench.core.dataset.aka_contract import (
     AkaArtifactRole,
+    AkaCompatibilityStage,
     AkaCorpusRole,
     AkaOfficialScoringStatus,
     AkaOperation,
@@ -61,7 +62,7 @@ def _passing_probe(problem_dir, _row_index, workload, _target, _timeout):
         problem_path=f"{problem_dir.parent.name}/{problem_dir.name}",
         workload_uuid=workload.uuid,
         included=True,
-        stage="live_probe",
+        stage=AkaCompatibilityStage.LIVE_PROBE,
         reason_code="probe_passed",
     )
 
@@ -91,9 +92,7 @@ def test_aka_manifest_loads_and_pins_revision():
     assert manifest.source["provenance_class"] == AKA_PROVENANCE_CLASS
     assert manifest.source["aka_commit_sha256"] == AKA_REVISION
     assert SEED_SET_MIN_PROBLEMS <= len(manifest.entries) <= SEED_SET_MAX_PROBLEMS
-    assert (
-        manifest.official_scoring["status"] == AkaOfficialScoringStatus.AVAILABLE.value
-    )
+    assert manifest.official_scoring["status"] == AkaOfficialScoringStatus.AVAILABLE
     assert set(manifest.execution_targets) == {"gfx942", "gfx1150", "gfx1200"}
     assert manifest.formal_analysis["formal_gfx_target"] == "gfx1200"
     assert manifest.tolerance_calibration["path"] == "tolerance-calibration.json"
@@ -260,13 +259,13 @@ def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
 def test_official_score_reports_published_policy_without_accepting_raw_inputs():
     report = official_score_availability(MANIFEST)
 
-    assert report["status"] == AkaOfficialScoringStatus.AVAILABLE.value
-    assert report["manifest_status"] == AkaOfficialScoringStatus.AVAILABLE.value
+    assert report["status"] == AkaOfficialScoringStatus.AVAILABLE
+    assert report["manifest_status"] == AkaOfficialScoringStatus.AVAILABLE
     assert report["scorer_implemented"] is True
     assert report["accepts_caller_authored_inputs"] is False
     assert report["requires_signatures"] is False
     assert report["accepts_content_addressed_release_bundle"] is True
-    assert AkaRequiredEvidenceKind.RELEASE_BASELINE.value in report["required_evidence"]
+    assert AkaRequiredEvidenceKind.RELEASE_BASELINE in report["required_evidence"]
 
 
 def test_audit_rejects_incomplete_local_problem_inventory(tmp_path):
@@ -303,7 +302,7 @@ def test_materialization_records_and_audits_excluded_workload(tmp_path):
             problem_path=f"{problem_dir.parent.name}/{problem_dir.name}",
             workload_uuid=workload.uuid,
             included=included,
-            stage="live_probe",
+            stage=AkaCompatibilityStage.LIVE_PROBE,
             reason_code="probe_passed" if included else "probe_oom",
         )
 

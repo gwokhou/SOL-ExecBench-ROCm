@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,7 @@ from sol_execbench.core.data.json_utils import (
     load_json_value,
 )
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusEntry, AkaCorpusManifest
 from sol_execbench.core.integrity import (
     sha256_bytes,
@@ -36,6 +38,9 @@ from sol_execbench.core.solar_bridge.analyzer import (
 )
 from sol_execbench.core.solar_bridge.models import (
     READINESS_STAGES,
+    SolarReadinessStatus,
+    SolarStage,
+    SolarStageStatus,
     SolarStageAuditOutcome,
     SolarStageAuditRequest,
 )
@@ -47,11 +52,18 @@ _MATRIX_FILENAME = "matrix.jsonl"
 _SUMMARY_FILENAME = "summary.json"
 
 
+class CorpusReadinessStatus(StrEnum):
+    """Terminal states for a complete corpus readiness audit."""
+
+    READY = "ready"
+    INCOMPLETE = "incomplete"
+
+
 @dataclass(frozen=True, slots=True)
 class CorpusStageAuditResult:
     """Paths and denominator counts for one complete corpus audit attempt."""
 
-    status: str
+    status: CorpusReadinessStatus
     problems: int
     workloads: int
     extraction_passed: int
@@ -61,12 +73,17 @@ class CorpusStageAuditResult:
     matrix_path: Path
     summary_path: Path
 
+    def __post_init__(self) -> None:
+        """Normalize constructor input and reject unknown corpus states."""
+        object.__setattr__(self, "status", CorpusReadinessStatus(self.status))
+
     @property
     def ready(self) -> bool:
-        return self.status == "ready"
+        return self.status is CorpusReadinessStatus.READY
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
+        value["status"] = self.status
         value["matrix_path"] = str(self.matrix_path)
         value["summary_path"] = str(self.summary_path)
         return value
@@ -129,7 +146,7 @@ def _audit_corpus_stage_readiness_locked(
     )
     records: list[dict[str, Any]] = []
     for entry in corpus.entries:
-        if entry.role != "scored":
+        if entry.role is not AkaCorpusRole.SCORED:
             continue
         records.extend(_audit_entry(context, entry))
     return _finish_audit(context, records)
@@ -245,7 +262,9 @@ def _record(
     record = {
         "schema_version": CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION,
         **identity,
-        "status": "ready" if ready else "failed",
+        "status": (
+            SolarReadinessStatus.READY if ready else SolarReadinessStatus.FAILED
+        ),
         "failure_stage": outcome.failure_stage,
         "reason_code": outcome.reason_code,
         "message": outcome.message,
@@ -280,7 +299,7 @@ def _load_resumed_record(
         raise ValueError("resumed readiness record identity mismatch")
     _verify_record_artifacts(record, output)
     if _record_ready(record):
-        record["status"] = "ready"
+        record["status"] = SolarReadinessStatus.READY
         record["failure_stage"] = None
         record["reason_code"] = None
         record["message"] = None
@@ -303,11 +322,17 @@ def _verify_record_artifacts(record: dict[str, Any], output: Path) -> None:
 
 
 def _record_ready(record: dict[str, Any]) -> bool:
-    stages = {str(item.get("stage")): item for item in record.get("stages") or []}
+    try:
+        stages = {
+            SolarStage(str(item.get("stage"))): item
+            for item in record.get("stages") or []
+        }
+    except ValueError:
+        return False
     if set(stages) != set(READINESS_STAGES):
         return False
     return all(
-        item.get("status") == "passed"
+        item.get("status") == SolarStageStatus.PASSED
         and isinstance(item.get("artifact"), dict)
         and len(str(item["artifact"].get("sha256", ""))) == 64
         for item in stages.values()
@@ -320,7 +345,9 @@ def _finish_audit(
 ) -> CorpusStageAuditResult:
     corpus = context.corpus
     expected = sum(
-        len(entry.workload_uuids) for entry in corpus.entries if entry.role == "scored"
+        len(entry.workload_uuids)
+        for entry in corpus.entries
+        if entry.role is AkaCorpusRole.SCORED
     )
     if not records or len(records) != expected:
         raise ValueError("corpus readiness workload denominator mismatch")
@@ -331,7 +358,7 @@ def _finish_audit(
     atomic_write_json_value(summary_path, summary)
     counts = summary["stage_counts"]
     return CorpusStageAuditResult(
-        status=str(summary["status"]),
+        status=CorpusReadinessStatus(str(summary["status"])),
         problems=int(summary["problem_count"]),
         workloads=int(summary["workload_count"]),
         extraction_passed=int(counts["graph_extraction"]),
@@ -351,7 +378,8 @@ def _summary(
     stage_counts = {
         stage: sum(
             any(
-                item.get("stage") == stage and item.get("status") == "passed"
+                item.get("stage") == stage
+                and item.get("status") == SolarStageStatus.PASSED
                 for item in record.get("stages") or []
             )
             for record in records
@@ -360,12 +388,16 @@ def _summary(
     }
     by_problem: dict[str, list[bool]] = defaultdict(list)
     for record in records:
-        by_problem[str(record["problem_path"])].append(record["status"] == "ready")
+        by_problem[str(record["problem_path"])].append(
+            record["status"] == SolarReadinessStatus.READY
+        )
     ready = all(_record_ready(record) for record in records)
     return {
         "schema_version": CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION,
         "generated_at": utc_timestamp(),
-        "status": "ready" if ready else "incomplete",
+        "status": (
+            CorpusReadinessStatus.READY if ready else CorpusReadinessStatus.INCOMPLETE
+        ),
         "corpus_manifest_sha256": context.manifest_sha256,
         "gfx_target": FORMAL_GFX_TARGET,
         "problem_count": len(by_problem),
@@ -377,7 +409,7 @@ def _summary(
                 Counter(
                     str(record.get("reason_code") or "unknown")
                     for record in records
-                    if record["status"] != "ready"
+                    if record["status"] != SolarReadinessStatus.READY
                 ).items()
             )
         ),

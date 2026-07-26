@@ -10,7 +10,9 @@ import shutil
 
 from sol_execbench.core.integrity import sha256_bytes
 from sol_execbench.core.solar_bridge.models import (
+    SolarAnalysisStatus,
     SolarAnalysisOutcome,
+    SolarStage,
     SolarStageAuditOutcome,
     formal_precision_for_definition,
 )
@@ -140,9 +142,9 @@ def _invoke_solar(
     if not outcome.is_formal_publication:
         shutil.rmtree(result.output_dir, ignore_errors=True)
         return SolarAnalysisOutcome(
-            status="failed",
+            status=SolarAnalysisStatus.FAILED,
             analysis_id=result.analysis_id,
-            stage="formal_acceptance",
+            stage=SolarStage.FORMAL_ACCEPTANCE,
             reason_code="non_formal_bound",
             message="SOLAR formal bridge rejected a non-publication result",
         )

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Optional
 
@@ -23,7 +23,7 @@ from pydantic import Field, field_validator, model_validator
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings, NonEmptyString
 
 
-class SupportedLanguages(str, Enum):
+class SupportedLanguages(StrEnum):
     """Supported programming languages for solution implementations.
 
     Enumeration of programming languages that can be used to implement
@@ -59,7 +59,7 @@ NATIVE_ROCM_LANGUAGES = frozenset(
 )
 
 
-class SupportedHardware(str, Enum):
+class SupportedHardware(StrEnum):
     """Supported hardware targets for solution implementations.
 
     Enumeration of hardware platforms that solutions can target.
@@ -79,7 +79,7 @@ class SupportedHardware(str, Enum):
     """Local AMD GPU."""
 
 
-class SupportedBindings(str, Enum):
+class SupportedBindings(StrEnum):
     """Supported bindings for HIP/C++ solution implementations.
 
     Enumeration of binding types that can be used to interface compiled

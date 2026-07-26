@@ -11,7 +11,9 @@ from pathlib import Path
 from sol_execbench.core.data.json_utils import load_json_value
 from sol_execbench.core.solar_bridge.analyzer import analyze_workload
 from sol_execbench.core.solar_bridge.models import (
+    SolarAnalysisStatus,
     SolarAnalysisOutcome,
+    SolarStage,
     SolarWorkerRequest,
 )
 from sol_execbench.core.solar_bridge.worker_io import write_worker_response
@@ -34,23 +36,25 @@ def main() -> None:
         )
     except Exception as exc:
         outcome = SolarAnalysisOutcome(
-            status="failed",
+            status=SolarAnalysisStatus.FAILED,
             analysis_id=request.workload_uuid,
-            stage="outer_bridge",
+            stage=SolarStage.OUTER_BRIDGE,
             reason_code="bridge_failed",
             message=str(exc),
         )
     fallback = SolarAnalysisOutcome(
-        status="failed",
+        status=SolarAnalysisStatus.FAILED,
         analysis_id=request.workload_uuid,
-        stage="outer_bridge",
+        stage=SolarStage.OUTER_BRIDGE,
         reason_code="worker_response_failed",
         message="worker response serialization failed",
     )
     response_written = write_worker_response(
         args.response, outcome.to_dict(), fallback.to_dict()
     )
-    raise SystemExit(0 if outcome.status == "analyzed" and response_written else 1)
+    raise SystemExit(
+        0 if outcome.status is SolarAnalysisStatus.ANALYZED and response_written else 1
+    )
 
 
 if __name__ == "__main__":

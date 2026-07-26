@@ -20,6 +20,7 @@ from sol_execbench.core.platform.diagnostics_libraries import (
 from sol_execbench.core.platform.diagnostics_models import (
     ROCM_LIBRARY_SPECS,
     DiagnosticStage,
+    DiagnosticStatus,
     ProfilerBackend,
     ProfilerReadiness,
     RocmLibraryReadiness,
@@ -35,6 +36,7 @@ from sol_execbench.core.platform.diagnostics_validation import (
 __all__ = [
     "ROCM_LIBRARY_SPECS",
     "DiagnosticStage",
+    "DiagnosticStatus",
     "ProfilerBackend",
     "ProfilerReadiness",
     "RocmLibraryReadiness",

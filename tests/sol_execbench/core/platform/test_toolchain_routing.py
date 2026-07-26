@@ -65,7 +65,7 @@ def test_routing_selects_available_tool_and_preserves_authority_boundaries():
     assert payload["performance_authority"] is False
     assert payload["leaderboard_authority"] is False
     selected = [decision for decision in payload["decisions"] if decision["selected"]]
-    assert selected[0]["status"] == ToolchainStatus.AVAILABLE.value
+    assert selected[0]["status"] == ToolchainStatus.AVAILABLE
 
 
 def test_routing_reports_migrated_legacy_tool_and_fallback():

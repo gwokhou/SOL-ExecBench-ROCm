@@ -5,6 +5,8 @@ from pathlib import Path
 
 from sol_execbench.cli.sidecars import profile as cli_profile_sidecars
 from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ArtifactCoverageStatus,
+    Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
@@ -73,18 +75,18 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
         artifacts=(
             Rocprofv3ProfileArtifact(
                 path=profile_artifact,
-                kind="rocpd",
+                kind=Rocprofv3ArtifactKind.ROCPD,
                 size_bytes=profile_artifact.stat().st_size,
             ),
             Rocprofv3ProfileArtifact(
                 path=counter_artifact,
-                kind="counter_csv",
+                kind=Rocprofv3ArtifactKind.COUNTER_CSV,
                 size_bytes=counter_artifact.stat().st_size,
             ),
         ),
         returncode=0,
         profiler_available=True,
-        artifact_coverage_status="complete",
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.COMPLETE,
         reason_codes=("rocprof_artifacts_registered",),
     )
 

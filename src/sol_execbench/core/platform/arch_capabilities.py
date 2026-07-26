@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import json
-from enum import Enum
+from enum import StrEnum
 from importlib import resources
 from typing import Any, Literal
 
@@ -20,7 +20,7 @@ ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION = SCHEMA_VERSIONS["arch_capability_budget"
 _BUILTIN_ARCH_BUDGETS = ("gfx942", "gfx1150", "gfx1200")
 
 
-class ArchCapabilityBudgetStatus(str, Enum):
+class ArchCapabilityBudgetStatus(StrEnum):
     """Availability status for a derived arch capability budget."""
 
     AVAILABLE = "available"
@@ -152,7 +152,7 @@ def arch_capability_budget_from_dict(
             str(payload.get("lds_confidence", payload["confidence"]))
         )
     except ValueError as exc:
-        valid = ", ".join(value.value for value in EstimateConfidence)
+        valid = ", ".join(EstimateConfidence)
         raise ValueError(
             f"{source or 'arch capability budget'} has invalid confidence "
             f"'{payload['confidence']}', expected one of: {valid}"

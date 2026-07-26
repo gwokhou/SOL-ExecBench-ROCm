@@ -207,7 +207,7 @@ def preview_docker_target_selection(
     build_args = docker_build_args_for_target(selection.target)
     return {
         "target_id": selection.target_id,
-        "validation_scope": selection.target.validation_scope.value,
+        "validation_scope": selection.target.validation_scope,
         "image_repository": selection.target.docker_image_repository,
         "image_tag": selection.target.docker_image_tag,
         "image_digest": image_digest,

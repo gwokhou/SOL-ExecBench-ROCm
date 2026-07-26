@@ -18,6 +18,7 @@ from sol_execbench.core.data.solution_models import (
     SupportedHardware,
     SupportedLanguages,
 )
+from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 from sol_execbench.core.timestamps import utc_timestamp
@@ -176,7 +177,7 @@ def _copy_candidate_solutions(
 ) -> tuple[ExecutionPlanProblem, ...]:
     problems: list[ExecutionPlanProblem] = []
     for entry in corpus.entries:
-        if entry.role != "scored":
+        if entry.role is not AkaCorpusRole.SCORED:
             continue
         problem_path = entry.relative_problem_dir.as_posix()
         source = candidate_root / problem_path / "solution.json"
@@ -216,7 +217,7 @@ def _materialize_baseline_solutions(
 ) -> tuple[ExecutionPlanProblem, ...]:
     problems: list[ExecutionPlanProblem] = []
     for entry in corpus.entries:
-        if entry.role != "scored":
+        if entry.role is not AkaCorpusRole.SCORED:
             continue
         problem_path = entry.relative_problem_dir.as_posix()
         identity = corpus.materialized_problem_sha256[problem_path]

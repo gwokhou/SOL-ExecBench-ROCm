@@ -15,6 +15,7 @@ from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryHintCategory,
 )
 from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
@@ -34,7 +35,7 @@ def _result(
         artifacts = (
             Rocprofv3ProfileArtifact(
                 path=counter,
-                kind="counter_csv",
+                kind=Rocprofv3ArtifactKind.COUNTER_CSV,
                 size_bytes=counter.stat().st_size,
             ),
         )
@@ -70,7 +71,7 @@ def test_data_without_classification_has_no_precedence(tmp_path: Path) -> None:
         artifacts=(
             Rocprofv3ProfileArtifact(
                 path=trace,
-                kind="trace_csv",
+                kind=Rocprofv3ArtifactKind.TRACE_CSV,
                 size_bytes=trace.stat().st_size,
             ),
         ),

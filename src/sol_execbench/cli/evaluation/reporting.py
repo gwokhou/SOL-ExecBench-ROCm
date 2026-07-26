@@ -34,7 +34,7 @@ def print_traces_table(traces: list[Trace], *, console: Console = console) -> No
             table.add_row(str(i), "[dim]no evaluation[/dim]", "", "", "", "", "")
             continue
 
-        status = ev.status.value
+        status = ev.status
         if ev.status == EvaluationStatus.PASSED:
             status_str = f"[green]{status}[/green]"
             passed += 1
@@ -82,7 +82,7 @@ def print_traces_table(traces: list[Trace], *, console: Console = console) -> No
             not in (EvaluationStatus.PASSED, EvaluationStatus.INCORRECT_NUMERICAL)
             and ev.log
         ):
-            error_logs.append((i, ev.status.value, ev.log))
+            error_logs.append((i, ev.status, ev.log))
 
     if error_logs:
         console.print(f"\n[bold red]Runtime logs ({len(error_logs)}):[/bold red]")

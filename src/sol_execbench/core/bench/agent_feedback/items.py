@@ -20,7 +20,7 @@ def trace_feedback_items(
     status_counter: Counter[EvaluationStatus],
 ) -> list[AgentFeedbackItem]:
     items: list[AgentFeedbackItem] = []
-    for status, count in sorted(status_counter.items(), key=lambda item: item[0].value):
+    for status, count in sorted(status_counter.items(), key=lambda item: item[0]):
         item = _item_for_status(status, count)
         if item is not None:
             items.append(item)
@@ -92,7 +92,7 @@ def _item_for_status(
         )
     if status in {EvaluationStatus.INCORRECT_SHAPE, EvaluationStatus.INCORRECT_DTYPE}:
         return _action_item(
-            code=status.value.lower(),
+            code=status.lower(),
             bottleneck=AgentFeedbackBottleneck.INTERFACE_CORRECTNESS,
             message=f"{count} workload(s) failed output interface validation.",
             recommendation="Match output shape and dtype contracts before optimization.",

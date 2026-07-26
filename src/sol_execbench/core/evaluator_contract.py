@@ -48,7 +48,7 @@ def build_evaluator_contract() -> EvaluatorContract:
         contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
         release=SOL_EXECBENCH_RELEASE,
         capabilities=_capabilities(),
-        evaluation_statuses=[status.value for status in EvaluationStatus],
+        evaluation_statuses=list(EvaluationStatus),
         corpus=_corpus_contract(),
         scoring=_scoring_contract(),
         boundaries=_ownership_boundaries(),

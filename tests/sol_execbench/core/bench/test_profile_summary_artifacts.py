@@ -2,14 +2,45 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from sol_execbench.core.bench.profile_summary.artifacts import (
     structured_profile_evidence,
 )
 from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ArtifactCoverageStatus,
+    Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
+    classify_profile_artifact,
 )
+
+_ARTIFACT_KIND_CASES = (
+    ("profile.rocpd", Rocprofv3ArtifactKind.ROCPD),
+    ("profile_agent_info.csv", Rocprofv3ArtifactKind.AGENT_INFO_CSV),
+    ("profile_counters.csv", Rocprofv3ArtifactKind.COUNTER_CSV),
+    ("profile_kernel_trace.csv", Rocprofv3ArtifactKind.TRACE_CSV),
+    ("profile_diagnostic.json", Rocprofv3ArtifactKind.DIAGNOSTIC_JSON),
+    ("profile_metadata.json", Rocprofv3ArtifactKind.METADATA_JSON),
+    ("profile.pftrace", Rocprofv3ArtifactKind.PERFETTO_TRACE),
+    ("profile.otf2", Rocprofv3ArtifactKind.OTF2_TRACE),
+    ("profile.bin", Rocprofv3ArtifactKind.OTHER),
+)
+
+
+@pytest.mark.parametrize(("filename", "expected"), _ARTIFACT_KIND_CASES)
+def test_profile_artifact_classifier_covers_kind(
+    filename: str,
+    expected: Rocprofv3ArtifactKind,
+) -> None:
+    assert classify_profile_artifact(Path(filename)) is expected
+
+
+def test_profile_artifact_classifier_cases_cover_every_kind() -> None:
+    assert {expected for _, expected in _ARTIFACT_KIND_CASES} == set(
+        Rocprofv3ArtifactKind
+    )
 
 
 def _profile_result(
@@ -24,7 +55,7 @@ def _profile_result(
         artifacts=artifacts,
         returncode=0,
         profiler_available=True,
-        artifact_coverage_status="complete",
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.COMPLETE,
         reason_codes=("rocprof_artifacts_registered",),
     )
 
@@ -49,22 +80,22 @@ def test_structured_profile_evidence_parses_trace_counter_and_metadata(
         (
             Rocprofv3ProfileArtifact(
                 path=trace_csv,
-                kind="trace_csv",
+                kind=Rocprofv3ArtifactKind.TRACE_CSV,
                 size_bytes=trace_csv.stat().st_size,
             ),
             Rocprofv3ProfileArtifact(
                 path=counter_csv,
-                kind="counter_csv",
+                kind=Rocprofv3ArtifactKind.COUNTER_CSV,
                 size_bytes=counter_csv.stat().st_size,
             ),
             Rocprofv3ProfileArtifact(
                 path=metadata_json,
-                kind="metadata_json",
+                kind=Rocprofv3ArtifactKind.METADATA_JSON,
                 size_bytes=metadata_json.stat().st_size,
             ),
             Rocprofv3ProfileArtifact(
                 path=rocpd,
-                kind="rocpd",
+                kind=Rocprofv3ArtifactKind.ROCPD,
                 size_bytes=rocpd.stat().st_size,
             ),
         ),
@@ -121,7 +152,7 @@ def test_structured_profile_evidence_rejects_bool_and_nan_dispatch_count(
         (
             Rocprofv3ProfileArtifact(
                 path=metadata_json,
-                kind="metadata_json",
+                kind=Rocprofv3ArtifactKind.METADATA_JSON,
                 size_bytes=metadata_json.stat().st_size,
             ),
         ),
@@ -147,17 +178,17 @@ def test_structured_profile_evidence_reports_missing_artifacts(
         (
             Rocprofv3ProfileArtifact(
                 path=missing_trace_csv,
-                kind="trace_csv",
+                kind=Rocprofv3ArtifactKind.TRACE_CSV,
                 size_bytes=0,
             ),
             Rocprofv3ProfileArtifact(
                 path=missing_counter_csv,
-                kind="counter_csv",
+                kind=Rocprofv3ArtifactKind.COUNTER_CSV,
                 size_bytes=0,
             ),
             Rocprofv3ProfileArtifact(
                 path=missing_metadata_json,
-                kind="metadata_json",
+                kind=Rocprofv3ArtifactKind.METADATA_JSON,
                 size_bytes=0,
             ),
         ),

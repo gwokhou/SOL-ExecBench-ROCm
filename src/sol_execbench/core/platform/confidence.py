@@ -5,10 +5,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class EstimateConfidence(str, Enum):
+class EstimateConfidence(StrEnum):
     """Confidence level for hardware, graph, and bound estimates."""
 
     SUPPORTED = "supported"

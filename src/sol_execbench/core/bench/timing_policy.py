@@ -12,13 +12,13 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES, SupportedLanguages
 
 
-class TimingSourceType(str, Enum):
+class TimingSourceType(StrEnum):
     """Internal source categories that determine timing interpretation."""
 
     PYTORCH = "pytorch"
@@ -28,7 +28,7 @@ class TimingSourceType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class TimingBackend(str, Enum):
+class TimingBackend(StrEnum):
     """Timer backend selected for a timing source."""
 
     ROCPROFV3 = "rocprofv3"
@@ -37,7 +37,7 @@ class TimingBackend(str, Enum):
     UNSUPPORTED = "unsupported"
 
 
-class TimingActivityDomain(str, Enum):
+class TimingActivityDomain(StrEnum):
     """What layer of work the selected timing backend measures."""
 
     KERNEL_ACTIVITY = "kernel_activity"
@@ -62,9 +62,9 @@ class TimingPolicy:
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable policy payload."""
         return {
-            "source_type": self.source_type.value,
-            "backend": self.backend.value,
-            "activity_domain": self.activity_domain.value,
+            "source_type": self.source_type,
+            "backend": self.backend,
+            "activity_domain": self.activity_domain,
             "aggregation_rule": self.aggregation_rule,
             "interpretation": self.interpretation,
             "fallback_applied": self.fallback_applied,

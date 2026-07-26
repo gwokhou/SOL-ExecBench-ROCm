@@ -211,7 +211,7 @@ def test_agent_feedback_freshness_rejects_missing_canonical_identity() -> None:
         sol_version="v3.0.0",
     )
 
-    assert stale.status.value == "stale"
+    assert stale.status == "stale"
     assert stale.reason_codes == [
         "candidate_id_missing",
         "source_sha256_missing",
