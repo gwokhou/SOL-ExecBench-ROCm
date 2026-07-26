@@ -18,13 +18,15 @@ layer, this survey answers three questions:
 1. What bottleneck taxonomy does AMD publish, and which parts of it can be
    inferred from **static** artifacts (the data we actually collect) vs. which
    require **runtime** profiling?
-2. How do the two covered architectures — CDNA3 (`gfx942`) and RDNA 3.5
-   (`gfx1150`) — diverge in ways that force the decision model to branch?
+2. How do the three covered architectures — CDNA3 (`gfx942`), RDNA 3.5
+   (`gfx1150`), and RDNA 4 (`gfx1200`) — diverge in ways that force the
+   decision model to branch?
 3. Which external sources are trustworthy enough to cite, and which must be
    rejected or down-weighted?
 
-**Out of scope**: implementing the decision schema or run path. Those belong to
-a later `/gsd-plan-phase` workflow that consumes this document.
+**Implementation status**: the schema and run path now live under
+`src/sol_execbench/core/bench/decision/`. This survey remains the rationale for
+their static/runtime boundary and precedence behavior.
 
 ## 2. Source Credibility Hierarchy
 
@@ -64,7 +66,7 @@ Two AMD conventions feed directly into the decision model:
 The two covered architectures diverge on every axis the occupancy formula
 depends on. The official reference is the HIP _Hardware Implementation_ chapter.
 
-| Axis | CDNA3 (`gfx942`) | RDNA 3.5 (`gfx1150`) | RDNA 4 (`gfx1200`, not yet covered) |
+| Axis | CDNA3 (`gfx942`) | RDNA 3.5 (`gfx1150`) | RDNA 4 (`gfx1200`) |
 | --- | --- | --- | --- |
 | Wavefront | 64 (wave64) | 32 (wave64 optional) | 32 |
 | Base unit | CU | **WGP** (2 CUs) | WGP |
@@ -230,17 +232,17 @@ carries 18 keys, organized by the invariant/dialect/divergence split:
 
 Current populated values:
 
-| Field | gfx942 (CDNA3) | gfx1150 (RDNA 3.5) |
-| --- | --- | --- |
-| `matrix_unit` | `mfma` | `wmma` |
-| `register_allocation_model` | `static` | `static` |
-| `compute_unit_grouping` | `cu` | `wgp` |
-| `simd_per_cu` | 4 | 2 |
-| `wave_slots_per_simd` | 10 | 16 |
-| `waves_per_cu_max` | 40 | 32 |
-| `cache_line_bytes` | `null` (no clear primary source) | 128 |
-| `register_file_per_cu_bytes` | 524288 (VGPR+AGPR combined) | `null` (no reliable primary source) |
-| `lds_per_workgroup_bytes` | 65536 | `null` (RDNA3.5 LDS/L1 split unconfirmed) |
+| Field | gfx942 (CDNA3) | gfx1150 (RDNA 3.5) | gfx1200 (RDNA 4) |
+| --- | --- | --- | --- |
+| `matrix_unit` | `mfma` | `wmma` | `wmma` |
+| `register_allocation_model` | `static` | `static` | `dynamic` |
+| `compute_unit_grouping` | `cu` | `wgp` | `wgp` |
+| `simd_per_cu` | 4 | 2 | 2 |
+| `wave_slots_per_simd` | 10 | 16 | 16 |
+| `waves_per_cu_max` | 40 | 32 | `null` (dynamic allocation) |
+| `cache_line_bytes` | `null` (no clear primary source) | 128 | 128 |
+| `register_file_per_cu_bytes` | 524288 (VGPR+AGPR combined) | `null` (no reliable primary source) | `null` (dynamic allocation) |
+| `lds_per_workgroup_bytes` | 65536 | `null` (RDNA3.5 LDS/L1 split unconfirmed) | 65536 |
 
 **Known gap (deferred to the decision modeling workflow)**: the closed-form
 occupancy formula needs `nW` (waves per workgroup = block size / wavefront
@@ -335,7 +337,10 @@ rather than silently dropped.
   documented as the architected addressing limit (occupancy uses
   `register_file_per_cu_bytes`); (c) `sol_execbench.decision.v2` schema + builder
   + `--decision auto` CLI; (d) cross-sidecar precedence via
-  `apply_runtime_precedence` (runtime > static).
+  `apply_runtime_precedence` (runtime > static). Runtime precedence activates
+  only for a successful profiler result with parsed profiler data and a
+  classified hint; missing, failed, partial, data-free, `unknown`, and
+  `insufficient_counters` results preserve the static fallback.
 
 ## References
 

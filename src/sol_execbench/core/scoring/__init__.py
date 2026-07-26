@@ -10,7 +10,7 @@ from .aggregation import (
     diagnostic_workload_score,
 )
 from .formula import SolScoreAuditError, sol_score
-from .official_authority import official_score_availability
+from .official_scoring import official_score_availability
 from .release_verifier import OfficialScoreResult, verify_and_score_release
 
 __all__ = [

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Verification of the signed formal-SOLAR workload denominator."""
+"""Verification of the content-addressed formal-SOLAR workload denominator."""
 
 from __future__ import annotations
 

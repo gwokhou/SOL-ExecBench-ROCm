@@ -142,11 +142,11 @@ uv run sol-execbench --format json score status \
   --manifest problems/AMD_AKA/manifest.yaml
 ```
 
-The checked-in manifest currently reports that release authority is
-unavailable. Building local baseline, candidate, or SOLAR artifacts cannot
-change that status. See the
+The checked-in manifest reports the content-addressed publisher policy,
+canonical baseline, and required evidence classes. Building raw timing JSON
+does not create a release bundle. See the
 [release and official-score workflow](RELEASE-SCORING.md) for the complete
-four-role signed process.
+publisher workflow.
 
 ## Inspect the ownership contract
 

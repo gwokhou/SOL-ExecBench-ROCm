@@ -10,6 +10,9 @@ from collections.abc import Sequence
 
 from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryBottleneckHint,
+    ProfileSummaryHintCategory,
+    ProfileSummaryHintConfidence,
+    ProfileSummaryHintSeverity,
     ProfileSummaryKernelMetric,
 )
 
@@ -25,9 +28,9 @@ def derive_bottleneck_hints(
     if not counter_metrics:
         return [
             ProfileSummaryBottleneckHint(
-                category="insufficient_counters",
-                severity="low",
-                confidence="high",
+                category=ProfileSummaryHintCategory.INSUFFICIENT_COUNTERS,
+                severity=ProfileSummaryHintSeverity.LOW,
+                confidence=ProfileSummaryHintConfidence.HIGH,
                 message="No bounded counter artifact was available for bottleneck classification.",
             )
         ]
@@ -42,9 +45,9 @@ def derive_bottleneck_hints(
         if low_l2:
             hints.append(
                 ProfileSummaryBottleneckHint(
-                    category="memory_l2_bound",
-                    severity="medium",
-                    confidence="low",
+                    category=ProfileSummaryHintCategory.MEMORY_L2_BOUND,
+                    severity=ProfileSummaryHintSeverity.MEDIUM,
+                    confidence=ProfileSummaryHintConfidence.LOW,
                     message="Low L2 hit-rate counter suggests memory/L2 pressure.",
                     source_metrics=[metric.name for metric in low_l2],
                     evidence_artifacts=_metric_artifacts(low_l2),
@@ -56,9 +59,9 @@ def derive_bottleneck_hints(
     ):
         hints.append(
             ProfileSummaryBottleneckHint(
-                category="lds_bound",
-                severity="low",
-                confidence="low",
+                category=ProfileSummaryHintCategory.LDS_BOUND,
+                severity=ProfileSummaryHintSeverity.LOW,
+                confidence=ProfileSummaryHintConfidence.LOW,
                 message="LDS bank conflict counter is present and non-zero.",
                 source_metrics=[metric.name for metric in lds_metrics],
                 evidence_artifacts=_metric_artifacts(lds_metrics),
@@ -68,9 +71,9 @@ def derive_bottleneck_hints(
     if valu_metrics:
         hints.append(
             ProfileSummaryBottleneckHint(
-                category="compute_bound",
-                severity="low",
-                confidence="low",
+                category=ProfileSummaryHintCategory.COMPUTE_BOUND,
+                severity=ProfileSummaryHintSeverity.LOW,
+                confidence=ProfileSummaryHintConfidence.LOW,
                 message="VALU instruction counter is present without stronger memory or launch evidence.",
                 source_metrics=[metric.name for metric in valu_metrics],
                 evidence_artifacts=_metric_artifacts(valu_metrics),
@@ -80,9 +83,9 @@ def derive_bottleneck_hints(
         return hints
     return [
         ProfileSummaryBottleneckHint(
-            category="unknown",
-            severity="unknown",
-            confidence="low",
+            category=ProfileSummaryHintCategory.UNKNOWN,
+            severity=ProfileSummaryHintSeverity.UNKNOWN,
+            confidence=ProfileSummaryHintConfidence.LOW,
             message="Counter artifact was parsed, but no conservative bottleneck rule matched.",
             source_metrics=[metric.name for metric in counter_metrics],
             evidence_artifacts=_metric_artifacts(counter_metrics),

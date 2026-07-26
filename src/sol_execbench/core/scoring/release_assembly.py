@@ -1,33 +1,31 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Assembly of verified release statements, SOLAR indexes, and signed bundles."""
+"""Assembly of verified statements, SOLAR indexes, and release bundles."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TypeVar
 
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.integrity import verify_artifact_file
 from sol_execbench.core.timestamps import utc_timestamp
 
-from .release_authority import (
-    ReleaseAuthority,
-    load_release_authority,
-    verify_signed_statement,
-)
 from .release_builders import artifact_reference, load_execution_plan
 from .release_models import (
     ArtifactReference,
-    AuthorityRole,
     BaselineStatement,
     CandidateStatement,
+    MAX_RELEASE_STATEMENT_BYTES,
     ProblemRunEvidence,
+    ReleaseArtifactKind,
     ReleaseBundle,
     ReleaseExecutionPlan,
+    ReleaseModel,
+    ReleaseRunKind,
     ReleaseRunStatement,
-    RerunStatement,
-    SignedStatement,
     SolarIndexStatement,
     SolarManifestEvidence,
     release_model_payload,
@@ -35,15 +33,16 @@ from .release_models import (
 from .release_solar import verify_solar_index
 from .release_traces import verify_release_run
 
+_ReleaseArtifact = TypeVar("_ReleaseArtifact", bound=ReleaseModel)
+
 
 def build_run_statement(
     plan_path: Path,
     *,
     corpus_manifest_path: Path,
     output_path: Path,
-    baseline_payload_sha256: str | None = None,
 ) -> Path:
-    """Verify one completed plan and write its unsigned authority payload."""
+    """Verify one completed plan and write its content-addressed statement."""
     output = output_path.resolve()
     _require_missing(output)
     workspace = plan_path.resolve().parents[1]
@@ -64,13 +63,13 @@ def build_run_statement(
         corpus_manifest=plan.corpus_manifest,
         environment=artifact_reference(workspace, workspace / plan.environment_path),
         problems=evidence,
-        baseline_payload_sha256=baseline_payload_sha256,
     )
     verify_release_run(
         statement,
         bundle_root=workspace,
         corpus=corpus,
-        require_passed=plan.role != AuthorityRole.CANDIDATE,
+        require_passed=plan.role is ReleaseRunKind.BASELINE,
+        require_reference_baseline=plan.role is ReleaseRunKind.BASELINE,
     )
     atomic_write_json_value(output, release_model_payload(statement))
     return output
@@ -123,41 +122,67 @@ def assemble_release_bundle(
     workspace_root: Path,
     *,
     corpus_manifest_path: Path,
-    statement_paths: dict[AuthorityRole, Path],
-    signature_paths: dict[AuthorityRole, Path],
+    statement_paths: dict[ReleaseArtifactKind, Path],
     output_path: Path,
 ) -> Path:
-    """Verify all four detached signatures and assemble the final bundle."""
+    """Verify publisher artifacts and assemble the content-addressed bundle."""
     workspace = workspace_root.resolve()
     output = output_path.resolve()
     _require_missing(output)
     corpus = AkaCorpusManifest.load(corpus_manifest_path)
-    authority = load_release_authority(corpus.path)
-    signed = {
-        role: _signed_statement(
-            role,
-            workspace=workspace,
-            authority=authority,
-            payload_path=statement_paths[role],
-            signature_path=signature_paths[role],
-        )
-        for role in AuthorityRole
+    references = {
+        kind: artifact_reference(workspace, statement_paths[kind])
+        for kind in ReleaseArtifactKind
     }
-    for statement in signed.values():
-        verify_signed_statement(
-            statement,
-            bundle_root=workspace,
-            corpus_root=corpus.authored_root,
-            authority=authority,
-        )
+    baseline = _load_statement(
+        workspace,
+        references[ReleaseArtifactKind.BASELINE],
+        BaselineStatement,
+    )
+    candidate = _load_statement(
+        workspace,
+        references[ReleaseArtifactKind.CANDIDATE],
+        CandidateStatement,
+    )
+    solar = _load_statement(
+        workspace,
+        references[ReleaseArtifactKind.SOLAR],
+        SolarIndexStatement,
+    )
+    baseline_run = verify_release_run(
+        baseline,
+        bundle_root=workspace,
+        corpus=corpus,
+        require_passed=True,
+        require_reference_baseline=True,
+    )
+    candidate_run = verify_release_run(
+        candidate,
+        bundle_root=workspace,
+        corpus=corpus,
+        require_passed=False,
+    )
+    verify_solar_index(solar, bundle_root=workspace, corpus=corpus)
+    if (
+        baseline.source_revision != candidate.source_revision
+        or baseline.source_revision != solar.source_revision
+    ):
+        raise ValueError("release evidence source revisions do not match")
+    if baseline_run.environment != candidate_run.environment:
+        raise ValueError("release runs use different environment identities")
+    scoring = corpus.official_scoring
+    if (
+        scoring.get("status") != "available"
+        or scoring.get("baseline_id") != baseline.baseline_id
+    ):
+        raise ValueError("release baseline is not authorized by the corpus")
     bundle = ReleaseBundle(
         corpus_manifest=artifact_reference(
             workspace, workspace / "corpus" / "manifest.yaml"
         ),
-        baseline=signed[AuthorityRole.BASELINE],
-        rerun=signed[AuthorityRole.RERUN],
-        candidate=signed[AuthorityRole.CANDIDATE],
-        solar=signed[AuthorityRole.SOLAR],
+        baseline=references[ReleaseArtifactKind.BASELINE],
+        candidate=references[ReleaseArtifactKind.CANDIDATE],
+        solar=references[ReleaseArtifactKind.SOLAR],
     )
     atomic_write_json_value(output, release_model_payload(bundle))
     return output
@@ -169,10 +194,9 @@ def _run_statement(
     corpus_manifest: ArtifactReference,
     environment: ArtifactReference,
     problems: tuple[ProblemRunEvidence, ...],
-    baseline_payload_sha256: str | None,
 ) -> ReleaseRunStatement:
     generated_at = utc_timestamp()
-    if plan.role == AuthorityRole.BASELINE:
+    if plan.role is ReleaseRunKind.BASELINE:
         return BaselineStatement(
             generated_at=generated_at,
             source_revision=plan.source_revision,
@@ -181,18 +205,7 @@ def _run_statement(
             problems=problems,
             baseline_id=plan.run_id,
         )
-    if plan.role == AuthorityRole.RERUN:
-        if baseline_payload_sha256 is None:
-            raise ValueError("rerun statement requires the baseline payload digest")
-        return RerunStatement(
-            generated_at=generated_at,
-            source_revision=plan.source_revision,
-            corpus_manifest=corpus_manifest,
-            environment=environment,
-            problems=problems,
-            baseline_payload_sha256=baseline_payload_sha256,
-        )
-    if plan.role == AuthorityRole.CANDIDATE:
+    if plan.role is ReleaseRunKind.CANDIDATE:
         return CandidateStatement(
             generated_at=generated_at,
             source_revision=plan.source_revision,
@@ -201,24 +214,23 @@ def _run_statement(
             problems=problems,
             candidate_id=plan.run_id,
         )
-    raise ValueError("SOLAR does not use a release execution plan")
+    raise ValueError("unknown release execution-plan kind")
 
 
-def _signed_statement(
-    role: AuthorityRole,
-    *,
-    workspace: Path,
-    authority: ReleaseAuthority,
-    payload_path: Path,
-    signature_path: Path,
-) -> SignedStatement:
-    key = next(item for item in authority.keys if item.role == role)
-    return SignedStatement(
-        payload=artifact_reference(workspace, payload_path),
-        signature=artifact_reference(workspace, signature_path),
-        key_id=key.key_id,
-        role=role,
+def _load_statement(
+    root: Path,
+    reference: ArtifactReference,
+    model: type[_ReleaseArtifact],
+) -> _ReleaseArtifact:
+    if reference.size_bytes > MAX_RELEASE_STATEMENT_BYTES:
+        raise ValueError("release statement exceeds the size limit")
+    path = verify_artifact_file(
+        root,
+        reference.path,
+        expected_sha256=reference.sha256,
+        expected_size_bytes=reference.size_bytes,
     )
+    return model.model_validate_json(path.read_text(encoding="utf-8"))
 
 
 def _require_missing(path: Path) -> None:

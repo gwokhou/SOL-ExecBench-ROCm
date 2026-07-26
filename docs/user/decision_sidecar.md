@@ -68,6 +68,14 @@ The static path emits Layer R (resource) signals only. Compute-bound /
 memory-bound / latency-bound verdicts require runtime profiling and are never
 produced from static facts.
 
+When the same evaluation also produces a successful, data-bearing
+profile-summary classification, runtime evidence takes precedence over a
+conflicting static risk signal. `lds_bound` demotes a static
+`lds_pressure_high` hint; `launch_overhead` demotes static register- and
+LDS-pressure hints. The demoted hints remain visible in `limitations[]`.
+Missing, failed, partial, data-free, `unknown`, or `insufficient_counters`
+profiles leave the static Decision output unchanged.
+
 ## Claim Boundaries
 
 The Decision sidecar is diagnostic-only static-inferred guidance, using the

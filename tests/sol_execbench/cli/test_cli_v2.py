@@ -148,13 +148,14 @@ def test_legacy_entry_shapes_are_removed() -> None:
     assert runner.invoke(cli, ["official-score"]).exit_code == 2
 
 
-def test_score_exposes_authority_status_without_score_inputs() -> None:
+def test_score_exposes_publisher_policy_without_score_inputs() -> None:
     result = CliRunner().invoke(cli, ["--format", "json", "score", "status"])
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["data"]["status"] == "unavailable"
+    assert payload["data"]["status"] == "available"
     assert payload["data"]["scorer_implemented"] is True
     assert payload["data"]["accepts_caller_authored_inputs"] is False
+    assert payload["data"]["requires_signatures"] is False
 
     assert CliRunner().invoke(cli, ["score", "official"]).exit_code == 2

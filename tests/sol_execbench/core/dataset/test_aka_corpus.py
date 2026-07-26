@@ -15,6 +15,15 @@ import yaml
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset import aka_corpus
+from sol_execbench.core.dataset.aka_contract import (
+    AkaArtifactRole,
+    AkaCorpusRole,
+    AkaOfficialScoringStatus,
+    AkaOperation,
+    AkaPassKind,
+    AkaRequiredEvidenceKind,
+    AkaSuite,
+)
 from sol_execbench.core.dataset.aka_corpus import (
     AKA_LICENSE,
     AKA_PROVENANCE_CLASS,
@@ -29,7 +38,7 @@ from sol_execbench.core.dataset.aka_compatibility import (
     materialization_target,
 )
 from sol_execbench.core.platform.runtime import RocmDeviceInfo
-from sol_execbench.core.scoring.official_authority import official_score_availability
+from sol_execbench.core.scoring.official_scoring import official_score_availability
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST = REPO_ROOT / "problems" / "AMD_AKA" / "manifest.yaml"
@@ -64,7 +73,7 @@ def _materialize_for_test(manifest, output):
 # The three AKA suites that carry a liftable PyTorch oracle (friendliness Cat1/Cat2),
 # and the five structurally-hostile suites that are rejected outright (Cat3) — see
 # docs/internal/aka-expansion-friendliness.md.
-CONVERTIBLE_SUITES = {"torch2hip", "torch2flydsl", "instruction2triton"}
+CONVERTIBLE_SUITES = set(AkaSuite)
 CAT3_SUITES = {
     "hip2hip",
     "triton2triton",
@@ -82,9 +91,12 @@ def test_aka_manifest_loads_and_pins_revision():
     assert manifest.source["provenance_class"] == AKA_PROVENANCE_CLASS
     assert manifest.source["aka_commit_sha256"] == AKA_REVISION
     assert SEED_SET_MIN_PROBLEMS <= len(manifest.entries) <= SEED_SET_MAX_PROBLEMS
-    assert manifest.official_scoring["status"] == "unavailable"
+    assert (
+        manifest.official_scoring["status"] == AkaOfficialScoringStatus.AVAILABLE.value
+    )
     assert set(manifest.execution_targets) == {"gfx942", "gfx1150", "gfx1200"}
     assert manifest.formal_analysis["formal_gfx_target"] == "gfx1200"
+    assert manifest.tolerance_calibration["path"] == "tolerance-calibration.json"
 
 
 def test_corpus_architecture_identity_matches_packaged_solar_profile():
@@ -104,6 +116,16 @@ def test_every_entry_references_aka_task_path():
         assert entry.suite in CONVERTIBLE_SUITES, entry.task_path
 
 
+def test_every_entry_binds_all_aka_provenance_roles():
+    manifest = AkaCorpusManifest.load(MANIFEST)
+
+    for entry in manifest.entries:
+        assert {artifact.role for artifact in entry.aka_artifacts} == set(
+            AkaArtifactRole
+        )
+        assert len(entry.aka_artifacts) == len(AkaArtifactRole)
+
+
 def test_no_entry_references_a_cat3_suite():
     """No problem may derive from a kernel-to-kernel / FlyDSL-target / repo suite."""
     manifest = AkaCorpusManifest.load(MANIFEST)
@@ -119,10 +141,14 @@ def test_entries_are_unique_with_fp8_sentinel_policy():
     assert len(names) == len(set(names))
     # Any compatibility sentinel must be FP8; at least one scored entry remains.
     sentinels = [
-        entry for entry in manifest.entries if entry.role == "compatibility_sentinel"
+        entry
+        for entry in manifest.entries
+        if entry.role is AkaCorpusRole.COMPATIBILITY_SENTINEL
     ]
     assert all(entry.dtype.startswith(("fp8", "float8")) for entry in sentinels)
-    assert sum(1 for entry in manifest.entries if entry.role == "scored") >= 1
+    assert (
+        sum(1 for entry in manifest.entries if entry.role is AkaCorpusRole.SCORED) >= 1
+    )
 
 
 def test_expansion_coverage_breadth():
@@ -131,17 +157,19 @@ def test_expansion_coverage_breadth():
 
     operations = Counter(entry.operation for entry in manifest.entries)
     passes = Counter(entry.pass_kind for entry in manifest.entries)
-    assert operations["attention"] >= 1
-    assert operations["norm"] >= 2
-    assert passes["backward"] >= 1
+    assert operations[AkaOperation.ATTENTION] >= 1
+    assert operations[AkaOperation.NORM] >= 2
+    assert passes[AkaPassKind.BACKWARD] >= 1
     fp8 = [
         entry for entry in manifest.entries if entry.dtype.startswith(("fp8", "float8"))
     ]
     assert len(fp8) == 1
-    assert fp8[0].role == "compatibility_sentinel"
+    assert fp8[0].role is AkaCorpusRole.COMPATIBILITY_SENTINEL
 
     incompatible = [
-        entry for entry in manifest.entries if entry.role == "target_incompatible"
+        entry
+        for entry in manifest.entries
+        if entry.role is AkaCorpusRole.TARGET_INCOMPATIBLE
     ]
     assert [entry.problem_name for entry in incompatible] == [
         "l2n55_matmul_maxpool_sum_scale"
@@ -164,7 +192,10 @@ def test_coverage_axes_truthfully_aggregate_entries():
         "source_family",
         "suite",
     ):
-        actual = Counter(getattr(entry, field) for entry in manifest.entries)
+        actual = Counter(
+            getattr(getattr(entry, field), "value", getattr(entry, field))
+            for entry in manifest.entries
+        )
         assert dict(actual) == axes[field], f"coverage axis {field!r} mismatch"
 
 
@@ -193,7 +224,7 @@ def test_static_oversized_problem_cannot_be_restored_to_scored_role():
     ):
         aka_corpus._validate_authored_problems(
             manifest.authored_root,
-            (replace(entry, role="scored", exclusion_reason_code=""),),
+            (replace(entry, role=AkaCorpusRole.SCORED, exclusion_reason_code=""),),
             {path: manifest.materialized_problem_sha256[path]},
         )
 
@@ -226,14 +257,16 @@ def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
         )
 
 
-def test_official_score_reports_unavailable_without_accepting_inputs():
+def test_official_score_reports_published_policy_without_accepting_raw_inputs():
     report = official_score_availability(MANIFEST)
 
-    assert report["status"] == "unavailable"
-    assert report["manifest_status"] == "unavailable"
+    assert report["status"] == AkaOfficialScoringStatus.AVAILABLE.value
+    assert report["manifest_status"] == AkaOfficialScoringStatus.AVAILABLE.value
     assert report["scorer_implemented"] is True
     assert report["accepts_caller_authored_inputs"] is False
-    assert "content_addressed_release_baseline" in report["required_evidence"]
+    assert report["requires_signatures"] is False
+    assert report["accepts_content_addressed_release_bundle"] is True
+    assert AkaRequiredEvidenceKind.RELEASE_BASELINE.value in report["required_evidence"]
 
 
 def test_audit_rejects_incomplete_local_problem_inventory(tmp_path):
@@ -322,7 +355,8 @@ def test_materialize_is_atomic_and_records_selected_problems(tmp_path, monkeypat
     record = yaml.safe_load((output / "materialization-manifest.yaml").read_text())
     assert record["source"]["revision"] == AKA_REVISION
     assert len(record["problems"]) == sum(
-        entry.role != "target_incompatible" for entry in manifest.entries
+        entry.role is not AkaCorpusRole.TARGET_INCOMPATIBLE
+        for entry in manifest.entries
     )
 
 

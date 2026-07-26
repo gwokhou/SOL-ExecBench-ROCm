@@ -62,5 +62,5 @@
       "description": "Reduced output (B,)."
     }
   },
-  "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, weight, bias, pool_kernel_size, scale_factor):\n    x = F.linear(x, weight, bias)\n    x = F.avg_pool1d(x.unsqueeze(1), int(pool_kernel_size)).squeeze(1)\n    x = F.gelu(x)\n    x = x * scale_factor\n    return torch.max(x, dim=1).values\n"
+  "reference": "import torch\nimport torch.nn.functional as F\n\n\ndef run(x, weight, bias, pool_kernel_size, scale_factor):\n    x = F.linear(x, weight, bias)\n    x = F.avg_pool1d(x.unsqueeze(1), int(pool_kernel_size)).squeeze(1)\n    x = F.gelu(x)\n    x = x * scale_factor\n    return torch.max(x, dim=1).values\n"
 }

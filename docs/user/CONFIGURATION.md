@@ -141,10 +141,10 @@ uv run sol-execbench --format json score status \
   --manifest problems/AMD_AKA/manifest.yaml
 ```
 
-The checked-in manifest declares official authority unavailable, and the
-official scorer therefore rejects release bundles for this corpus. The status
-command accepts no measurement or baseline file. Once authority roots are
-published, the scorer accepts only a content-addressed four-role Ed25519 bundle:
+The checked-in manifest declares the content-addressed publisher policy and
+canonical baseline available. The status command accepts no measurement or
+baseline file. The scorer accepts only a publisher release bundle that binds
+the baseline, candidate, corpus, and SOLAR statements:
 
 ```bash
 uv run sol-execbench --format json score official RELEASE/release-bundle.json

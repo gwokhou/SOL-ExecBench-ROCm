@@ -11,8 +11,9 @@ from pathlib import Path
 from rich.console import Console
 
 from ...core.bench.decision.builder import build_decision_sidecar
-from ...core.bench.decision.decision_models import DecisionBottleneckClass
 from ...core.bench.decision.precedence import apply_runtime_precedence
+from ...core.bench.decision.runtime import runtime_decision_precedence
+from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ...core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
 from ...core.evidence.runtime_evidence import write_json_payload
 from ...core.platform.arch_capabilities import (
@@ -70,7 +71,7 @@ def _write_decision_sidecar(
     static_evidence_result: StaticKernelEvidenceSidecar | None,
     environment_sidecar_path: Path | None,
     *,
-    runtime_profile_available: bool = False,
+    profile_result: Rocprofv3ProfileResult | None = None,
     run_id: str | None = None,
     target_id: str | None = None,
     candidate_id: str | None = None,
@@ -106,18 +107,15 @@ def _write_decision_sidecar(
         source_sha256=source_sha256,
         sol_version=sol_version,
     )
-    # Runtime profiling takes precedence over static-inferred pressure hints
-    # (decision-modeling-research.md §8.4): a measured bottleneck classification
-    # supersedes the inferred register/LDS pressure. Deterministic spill stays
-    # (it is a code-object fact, not a runtime-only observation).
-    if runtime_profile_available:
+    # Runtime profiling takes precedence only after a successful profiler result
+    # yields a known classification. File presence, partial diagnostics, and
+    # unknown/insufficient-counter summaries carry no precedence.
+    runtime_precedence = runtime_decision_precedence(profile_result)
+    if runtime_precedence.available:
         sidecar = apply_runtime_precedence(
             sidecar,
             runtime_profile_available=True,
-            demoted_classes={
-                DecisionBottleneckClass.REGISTER_PRESSURE_HIGH,
-                DecisionBottleneckClass.LDS_PRESSURE_HIGH,
-            },
+            demoted_classes=set(runtime_precedence.demoted_classes),
         )
     sidecar_path = output_file.with_name(f"{output_file.name}.decision.json")
     try:

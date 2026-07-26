@@ -49,7 +49,7 @@ languages in the same solution.
 
 | Value | Hardware class | Validation status |
 | --- | --- | --- |
-| `gfx1200` | RDNA 4 | Exact RX 9060 XT/ROCm 7.2 local hardware gate passed; engineering evidence only, not an RDNA4-family or release-authority claim. |
+| `gfx1200` | RDNA 4 | Exact RX 9060 XT/ROCm 7.2 local hardware gate passed; engineering evidence only, not an RDNA4-family or publisher-release claim. |
 | `gfx940` | CDNA 3 | Code/schema support; no recorded hardware-validation pass on this exact target. |
 | `gfx941` | CDNA 3 | Code/schema support; no recorded hardware-validation pass on this exact target. |
 | `gfx942` | CDNA 3 | MI308X validation infrastructure evidence exists, including a passed pytest suite and a full dataset run with known timeout blockers; not a full MI300X hardware-validation pass. |

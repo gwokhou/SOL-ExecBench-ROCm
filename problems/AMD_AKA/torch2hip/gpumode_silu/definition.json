@@ -32,5 +32,5 @@
       "description": "x * sigmoid(x)."
     }
   },
-  "reference": "import torch\n\ndef run(x):\n    return x * torch.sigmoid(x)\n"
+  "reference": "import torch\n\n\ndef run(x):\n    return x * torch.sigmoid(x)\n"
 }

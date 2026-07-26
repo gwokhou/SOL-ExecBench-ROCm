@@ -16,9 +16,10 @@ bounds fail closed unless the configured architecture and pinned Orojenesis
 evidence satisfy the current contract.
 
 The repository exposes a fail-closed official scorer and machine-readable
-availability. The checked-in corpus does not yet publish release-authority keys
-or a signed score bundle, so local formula experiments and unsigned evidence
-are not official scores.
+availability. The checked-in corpus publishes a content-addressed release
+policy and canonical baseline identity. Local formula experiments and raw
+evidence are not official scores; the scorer requires a publisher bundle that
+binds every scoring input.
 
 Hardware-specific tests and observations establish only the behavior they
 directly execute. A marker, compatibility entry, or diagnostic sidecar is not a
@@ -28,8 +29,8 @@ The recorded RDNA4 gate is exact to AMD Radeon RX 9060 XT `gfx1200`, ROCm
 7.2.0, PyTorch `2.11.0+rocm7.2`, and its recorded HIP runtime. It does not
 validate every `gfx12*` product or ROCm release. Local and manual self-hosted
 GitHub bundles use `sol_execbench.rdna4_validation.v2`; they are
-content-addressed engineering evidence, not signed release attestations, and
-are always rejected when release eligibility is required. See
+content-addressed engineering evidence, not publisher score bundles, and are
+always rejected when release eligibility is required. See
 [RDNA4 Validation Scope](RDNA4-VALIDATION.md).
 
 ## ROCm Compatibility Matrix

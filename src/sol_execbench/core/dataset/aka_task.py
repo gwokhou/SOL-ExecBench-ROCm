@@ -59,6 +59,11 @@ def functional_reference_text(task: AkaTask) -> str:
     argument when present, falling back to the single file under
     ``pytorch_code_functional/``.
     """
+    return functional_reference_path(task).read_text(encoding="utf-8")
+
+
+def functional_reference_path(task: AkaTask) -> Path:
+    """Resolve the functional PyTorch reference for a torch2hip task."""
     candidate = _py_func_file_from_config(task)
     if candidate is None:
         func_dir = task.root / "pytorch_code_functional"
@@ -68,8 +73,28 @@ def functional_reference_text(task: AkaTask) -> str:
                 f"could not resolve a unique functional reference for {task.task_path}"
             )
         candidate = files[0]
-    path = candidate if candidate.is_absolute() else (task.root / candidate)
-    return path.read_text(encoding="utf-8")
+    return candidate if candidate.is_absolute() else (task.root / candidate)
+
+
+def correctness_runner_path(task: AkaTask) -> Path:
+    """Resolve the Python file named by a task's correctness command."""
+    commands = task.config.get("correctness_command") or []
+    for command in commands:
+        try:
+            tokens = shlex.split(str(command))
+        except ValueError:
+            continue
+        candidates = [
+            task.root / token
+            for token in tokens
+            if token.endswith(".py") and not token.startswith("-")
+        ]
+        files = [path for path in candidates if path.is_file()]
+        if files:
+            return files[-1]
+    raise FileNotFoundError(
+        f"could not resolve correctness runner for {task.task_path}"
+    )
 
 
 def _py_func_file_from_config(task: AkaTask) -> Path | None:
@@ -145,7 +170,9 @@ def iter_suite_tasks(
 __all__ = [
     "AkaTask",
     "extract_function_source",
+    "correctness_runner_path",
     "function_arg_names",
+    "functional_reference_path",
     "functional_reference_text",
     "iter_suite_tasks",
     "materialize_get_inputs",

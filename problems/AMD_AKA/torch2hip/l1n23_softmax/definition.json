@@ -32,5 +32,5 @@
       "description": "Row-wise softmax."
     }
   },
-  "reference": "import torch\n\ndef run(x):\n    return torch.softmax(x, dim=-1)\n"
+  "reference": "import torch\n\n\ndef run(x):\n    return torch.softmax(x, dim=-1)\n"
 }

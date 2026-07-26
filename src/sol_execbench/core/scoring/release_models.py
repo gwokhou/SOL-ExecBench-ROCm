@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import re
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
@@ -21,26 +21,31 @@ from sol_execbench.core.integrity.schema_versions import (
     RELEASE_BUNDLE_SCHEMA_VERSION,
     RELEASE_CANDIDATE_SCHEMA_VERSION,
     RELEASE_EXECUTION_PLAN_SCHEMA_VERSION,
-    RELEASE_RERUN_SCHEMA_VERSION,
     RELEASE_SOLAR_INDEX_SCHEMA_VERSION,
 )
 from sol_execbench.core.timestamps import validate_utc_timestamp
 
 _REVISION = re.compile(r"[0-9a-f]{40}")
-MAX_SIGNED_STATEMENT_BYTES = 8 * 1024 * 1024
+MAX_RELEASE_STATEMENT_BYTES = 8 * 1024 * 1024
 
 
 class ReleaseModel(StrictArtifactModel):
-    """Immutable base for signed release statements."""
+    """Immutable base for content-addressed release artifacts."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class AuthorityRole(str, Enum):
-    """Independent release-authority responsibilities."""
+class ReleaseRunKind(StrEnum):
+    """Executable run kinds in a release workspace."""
 
     BASELINE = "baseline"
-    RERUN = "rerun"
+    CANDIDATE = "candidate"
+
+
+class ReleaseArtifactKind(StrEnum):
+    """Top-level statement kinds in a release bundle."""
+
+    BASELINE = "baseline"
     CANDIDATE = "candidate"
     SOLAR = "solar"
 
@@ -61,36 +66,6 @@ class ArtifactReference(ReleaseModel):
     @classmethod
     def _digest(cls, value: str) -> str:
         return validate_sha256(value, "artifact SHA-256")
-
-
-class SignedStatement(ReleaseModel):
-    """Detached Ed25519 signature and payload identities."""
-
-    payload: ArtifactReference
-    signature: ArtifactReference
-    key_id: str
-    role: AuthorityRole
-    algorithm: str = "ed25519"
-
-    @field_validator("key_id")
-    @classmethod
-    def _key_id(cls, value: str) -> str:
-        return validate_sha256(value, "authority key id")
-
-    @field_validator("algorithm")
-    @classmethod
-    def _algorithm(cls, value: str) -> str:
-        if value != "ed25519":
-            raise ValueError("release signatures must use Ed25519")
-        return value
-
-    @model_validator(mode="after")
-    def _sizes(self) -> "SignedStatement":
-        if self.payload.size_bytes > MAX_SIGNED_STATEMENT_BYTES:
-            raise ValueError("signed release payload exceeds the size limit")
-        if self.signature.size_bytes != 64:
-            raise ValueError("Ed25519 release signature must be exactly 64 bytes")
-        return self
 
 
 class ProblemRunEvidence(ReleaseModel):
@@ -140,7 +115,7 @@ class ReleaseExecutionPlan(ReleaseModel):
     generated_at: str
     source_revision: str
     run_id: str = Field(min_length=1)
-    role: AuthorityRole
+    role: ReleaseRunKind
     corpus_manifest: ArtifactReference
     environment_path: str
     problems: tuple[ExecutionPlanProblem, ...] = Field(min_length=1)
@@ -173,7 +148,7 @@ class ReleaseExecutionPlan(ReleaseModel):
 
 
 class ReleaseRunStatement(ReleaseModel):
-    """Fields shared by baseline, rerun, and candidate executions."""
+    """Fields shared by baseline and candidate executions."""
 
     schema_version: str
     generated_at: str
@@ -212,24 +187,6 @@ class BaselineStatement(ReleaseRunStatement):
     def _schema(self) -> "BaselineStatement":
         if self.schema_version != RELEASE_BASELINE_SCHEMA_VERSION:
             raise ValueError("release baseline schema mismatch")
-        return self
-
-
-class RerunStatement(ReleaseRunStatement):
-    """Independent execution of every fixed baseline implementation."""
-
-    schema_version: str = RELEASE_RERUN_SCHEMA_VERSION
-    baseline_payload_sha256: str
-
-    @field_validator("baseline_payload_sha256")
-    @classmethod
-    def _baseline_digest(cls, value: str) -> str:
-        return validate_sha256(value, "baseline payload SHA-256")
-
-    @model_validator(mode="after")
-    def _schema(self) -> "RerunStatement":
-        if self.schema_version != RELEASE_RERUN_SCHEMA_VERSION:
-            raise ValueError("release rerun schema mismatch")
         return self
 
 
@@ -291,38 +248,23 @@ class SolarIndexStatement(ReleaseModel):
 
 
 class ReleaseBundle(ReleaseModel):
-    """Four independently signed evidence classes required for one score."""
+    """Publisher-authored content-addressed evidence for one official score."""
 
     schema_version: str = RELEASE_BUNDLE_SCHEMA_VERSION
     corpus_manifest: ArtifactReference
-    baseline: SignedStatement
-    rerun: SignedStatement
-    candidate: SignedStatement
-    solar: SignedStatement
+    baseline: ArtifactReference
+    candidate: ArtifactReference
+    solar: ArtifactReference
 
     @model_validator(mode="after")
-    def _roles(self) -> "ReleaseBundle":
+    def _contract(self) -> "ReleaseBundle":
         if self.schema_version != RELEASE_BUNDLE_SCHEMA_VERSION:
             raise ValueError("release bundle schema mismatch")
-        if (
-            self.baseline.role != AuthorityRole.BASELINE
-            or self.rerun.role != AuthorityRole.RERUN
-            or self.candidate.role != AuthorityRole.CANDIDATE
-            or self.solar.role != AuthorityRole.SOLAR
-        ):
-            raise ValueError("release bundle authority role is assigned incorrectly")
-        if (
-            len(
-                {
-                    self.baseline.key_id,
-                    self.rerun.key_id,
-                    self.candidate.key_id,
-                    self.solar.key_id,
-                }
-            )
-            != 4
-        ):
-            raise ValueError("release authority roles must use distinct keys")
+        statements = (self.baseline, self.candidate, self.solar)
+        if any(item.size_bytes > MAX_RELEASE_STATEMENT_BYTES for item in statements):
+            raise ValueError("release statement exceeds the size limit")
+        if len({item.path for item in statements}) != len(statements):
+            raise ValueError("release statements must use distinct artifact paths")
         return self
 
 
@@ -333,17 +275,16 @@ def release_model_payload(model: ReleaseModel) -> dict[str, Any]:
 
 __all__ = [
     "ArtifactReference",
-    "AuthorityRole",
     "BaselineStatement",
     "CandidateStatement",
     "ExecutionPlanProblem",
-    "MAX_SIGNED_STATEMENT_BYTES",
+    "MAX_RELEASE_STATEMENT_BYTES",
     "ProblemRunEvidence",
+    "ReleaseArtifactKind",
     "ReleaseBundle",
     "ReleaseExecutionPlan",
     "ReleaseModel",
-    "RerunStatement",
-    "SignedStatement",
+    "ReleaseRunKind",
     "SolarIndexStatement",
     "SolarManifestEvidence",
     "release_model_payload",

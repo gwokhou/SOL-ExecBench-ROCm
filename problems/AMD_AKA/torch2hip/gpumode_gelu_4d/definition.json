@@ -44,5 +44,5 @@
       "description": "F.gelu(x)."
     }
   },
-  "reference": "import torch.nn.functional as F\n\ndef run(x):\n    return F.gelu(x)\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(x):\n    return F.gelu(x)\n"
 }

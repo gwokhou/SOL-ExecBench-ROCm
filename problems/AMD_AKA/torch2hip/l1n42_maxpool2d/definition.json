@@ -54,5 +54,5 @@
       "description": "Pooled output."
     }
   },
-  "reference": "import torch.nn.functional as F\n\ndef run(x):\n    return F.max_pool2d(x, kernel_size=2, stride=2)\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(x):\n    return F.max_pool2d(x, kernel_size=2, stride=2)\n"
 }

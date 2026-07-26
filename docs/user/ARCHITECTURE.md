@@ -98,7 +98,7 @@ or larger functions/modules.
 
 - `formula.py`: strict workload formula and audit preconditions;
 - `aggregation.py`: workload-within-problem then equal-problem aggregation;
-- `official_authority.py`: release-evidence authority gate.
+- `official_scoring.py`: repository-pinned publication policy and availability.
 
 There are no legacy scoring import facades. The workload formula is:
 

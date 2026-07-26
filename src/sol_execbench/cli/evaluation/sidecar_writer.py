@@ -88,7 +88,7 @@ def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
         request.decision,
         request.static_evidence_result,
         environment_sidecar_path,
-        runtime_profile_available=profile_summary_sidecar_path is not None,
+        profile_result=request.profile_result,
         run_id=request.identity.run_id,
         target_id=request.identity.target_id,
         candidate_id=request.identity.candidate_id,

@@ -17,12 +17,11 @@ scores belonging to the same problem are averaged first. Those per-problem
 means are then averaged with equal problem weight. Problems flagged as
 compatibility sentinels never enter either denominator.
 
-The checked-in v3 corpus explicitly marks official scoring unavailable because
-no release baseline, independent rerun, trusted candidate execution
-attestation, or pinned SOLAR manifest set has been published for these
-problems. The command fails closed instead of treating caller-authored JSON as
-authority. A future release must pin and verify all four evidence classes plus
-the public corpus and architecture identities before enabling official output.
+The checked-in schema v5 corpus publishes a content-addressed official-scoring
+policy and canonical baseline identity. The official command accepts only a
+publisher release bundle that binds the canonical baseline run, candidate run,
+per-workload SOLAR manifests, public corpus, and architecture identities. It
+does not accept caller-supplied runtime JSON.
 
 ## SOLAR bound policy
 
@@ -68,8 +67,7 @@ Diagnostic workload scoring
 (`sol_execbench.core.scoring.diagnostic_workload_score`) wraps the paper formula
 into an aggregate-able workload score from caller-supplied `T_k`, `T_b`, and
 `T_SOL`. It is non-official. The official scorer is separately wired to accept
-only the exact corpus plus independently signed baseline, rerun, candidate, and
-SOLAR statements. The checked-in manifest has not yet published those trust
-roots, so it still reports unavailable. Passing the architecture audit gate
-does not supply the missing evidence classes. See
+only the exact corpus plus content-addressed baseline, candidate, and SOLAR
+statements from a publisher bundle. Passing the architecture audit gate does
+not supply those release evidence classes. See
 [SOLAR boundary](SOLAR-BOUNDARY.md) for the cross-package seam.

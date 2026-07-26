@@ -14,7 +14,7 @@ from sol_execbench.core.scoring.release_builders import (
     materialize_release_baseline,
     materialize_release_candidate,
 )
-from sol_execbench.core.scoring.release_models import AuthorityRole
+from sol_execbench.core.scoring.release_models import ReleaseRunKind
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST = REPO_ROOT / "problems" / "AMD_AKA" / "manifest.yaml"
@@ -30,7 +30,6 @@ def test_release_baseline_materializes_exact_scored_corpus(tmp_path: Path) -> No
     )
     corpus = AkaCorpusManifest.load(MANIFEST)
     baseline = load_execution_plan(workspace / "baseline" / "plan.json")
-    rerun = load_execution_plan(workspace / "rerun" / "plan.json")
 
     expected = {
         entry.relative_problem_dir.as_posix()
@@ -47,15 +46,8 @@ def test_release_baseline_materializes_exact_scored_corpus(tmp_path: Path) -> No
         == 122
     )
     assert {item.problem_path for item in baseline.problems} == expected
-    assert baseline.role == AuthorityRole.BASELINE
-    assert rerun.role == AuthorityRole.RERUN
-    assert [item.implementation for item in rerun.problems] == [
-        item.implementation for item in baseline.problems
-    ]
-    assert all(
-        left.trace_path != right.trace_path
-        for left, right in zip(baseline.problems, rerun.problems, strict=True)
-    )
+    assert baseline.role == ReleaseRunKind.BASELINE
+    assert not (workspace / "rerun").exists()
     assert sha256_file(workspace / "corpus" / "manifest.yaml") == sha256_file(MANIFEST)
     solution = Solution.model_validate_json(
         (workspace / baseline.problems[0].implementation.path).read_text(
@@ -116,6 +108,6 @@ def test_candidate_plan_requires_exact_full_corpus_solution_set(
     )
     candidate = load_execution_plan(plan_path)
 
-    assert candidate.role == AuthorityRole.CANDIDATE
+    assert candidate.role == ReleaseRunKind.CANDIDATE
     assert candidate.run_id == "candidate-test"
     assert len(candidate.problems) == 35

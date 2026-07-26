@@ -62,16 +62,15 @@ precision/resource coverage and all required ISA/code-object/runtime instruction
 checks, together with its frozen tuning and held-out measurement evidence,
 before graph extraction.
 
-The fixed corpus likewise records
-`official_scoring.status: unavailable`. No release baseline, independent
-rerun, trusted candidate execution attestation, or pinned per-workload SOLAR
-manifest set has been published. The CLI implements a deterministic
-trusted-reference baseline generator and a four-authority signed-bundle verifier,
-but neither can self-publish trust roots or upgrade unsigned local evidence.
-Formula-helper results and diagnostic speedups are not official scores.
-Release execution additionally requires a clean source tree at the declared Git
-revision, records the immutable Docker image ID, and rejects byte-for-byte reuse
-of baseline traces as an independent rerun.
+The fixed corpus records `official_scoring.status: available`, the
+`content_addressed_publisher_v1` policy, and the canonical
+`rx9060xt-gfx1200-reference-v1` baseline. The CLI implements the deterministic
+trusted-reference baseline generator and content-addressed publisher-bundle
+verifier. Formula-helper results, diagnostic speedups, and raw caller timing
+JSON are not official scores. Release execution additionally requires a clean
+source tree at the declared Git revision, records the immutable Docker image
+ID, and requires baseline and candidate evidence to use the same environment
+identity.
 
 This repository imports a pinned upstream corpus; it does not implement the
 paper's dataset extraction/curation pipeline. Candidate static review uses

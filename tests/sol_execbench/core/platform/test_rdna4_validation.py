@@ -88,7 +88,7 @@ def test_verifies_content_addressed_local_rdna4_bundle(tmp_path: Path):
     assert verified["target"]["torch_version"] == "2.11.0+rocm7.2"
 
 
-def test_local_unsigned_bundle_cannot_become_release_authority(tmp_path: Path):
+def test_local_validation_bundle_cannot_become_publisher_release(tmp_path: Path):
     directory = tmp_path / "bundle"
     _write_bundle(directory)
 

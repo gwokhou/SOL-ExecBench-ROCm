@@ -25,6 +25,9 @@ from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryArtifactCitation,
     ProfileSummaryBottleneckHint,
     ProfileSummaryContent,
+    ProfileSummaryHintCategory,
+    ProfileSummaryHintConfidence,
+    ProfileSummaryHintSeverity,
     ProfileSummaryKernelMetric,
     ProfileSummaryMetric,
     ProfileSummaryStructuredMetric,
@@ -130,3 +133,27 @@ def test_profile_summary_content_accepts_empty_artifact_summary() -> None:
     assert content.kernel_metrics == []
     assert content.bottleneck_hints == []
     assert content.parse_warnings == []
+
+
+def test_profile_summary_hint_uses_closed_enums() -> None:
+    hint = ProfileSummaryBottleneckHint(
+        category=ProfileSummaryHintCategory.COMPUTE_BOUND,
+        severity=ProfileSummaryHintSeverity.MEDIUM,
+        confidence=ProfileSummaryHintConfidence.HIGH,
+        message="runtime evidence",
+    )
+
+    assert hint.model_dump(mode="json") == {
+        "category": "compute_bound",
+        "severity": "medium",
+        "confidence": "high",
+        "message": "runtime evidence",
+        "source_metrics": [],
+        "evidence_artifacts": [],
+    }
+
+    with pytest.raises(ValidationError):
+        ProfileSummaryBottleneckHint(
+            category="future_unregistered_category",
+            message="invalid",
+        )

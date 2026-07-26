@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from pydantic import ConfigDict, Field
 
@@ -13,6 +13,34 @@ from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
+
+
+class ProfileSummaryHintCategory(StrEnum):
+    """Closed runtime bottleneck categories emitted by the profile summary."""
+
+    COMPUTE_BOUND = "compute_bound"
+    MEMORY_L2_BOUND = "memory_l2_bound"
+    LDS_BOUND = "lds_bound"
+    LAUNCH_OVERHEAD = "launch_overhead"
+    INSUFFICIENT_COUNTERS = "insufficient_counters"
+    UNKNOWN = "unknown"
+
+
+class ProfileSummaryHintSeverity(StrEnum):
+    """Closed severity scale for a runtime bottleneck hint."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    UNKNOWN = "unknown"
+
+
+class ProfileSummaryHintConfidence(StrEnum):
+    """Closed confidence scale for a runtime bottleneck hint."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 class ProfileSummaryMetric(BaseModelWithDocstrings):
@@ -77,18 +105,11 @@ class ProfileSummaryBottleneckHint(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    category: Literal[
-        "compute_bound",
-        "memory_l2_bound",
-        "lds_bound",
-        "launch_overhead",
-        "insufficient_counters",
-        "unknown",
-    ]
+    category: ProfileSummaryHintCategory
     """Closed diagnostic hint category."""
-    severity: Literal["low", "medium", "high", "unknown"] = "low"
+    severity: ProfileSummaryHintSeverity = ProfileSummaryHintSeverity.LOW
     """Conservative severity label."""
-    confidence: Literal["low", "medium", "high"] = "low"
+    confidence: ProfileSummaryHintConfidence = ProfileSummaryHintConfidence.LOW
     """Confidence in this diagnostic hint."""
     message: str
     """Bounded human-readable diagnostic message."""

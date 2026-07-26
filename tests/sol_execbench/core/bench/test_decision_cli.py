@@ -25,6 +25,11 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceStatus,
     StaticResourceFootprint,
 )
+from sol_execbench.core.bench.rocm_profiler import (
+    Rocprofv3ProfileArtifact,
+    Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
+)
 from sol_execbench.core.platform.arch_capabilities import (
     load_packaged_arch_capability_budget,
 )
@@ -125,7 +130,29 @@ def test_decision_auto_without_environment_budget_falls_back_to_partial(
     assert any(h["bottleneck_class"] == "spill_detected" for h in decision["hints"])
 
 
-def test_runtime_profile_demotes_pressure_and_keeps_spill(tmp_path: Path) -> None:
+def _profile_result_with_counter(
+    tmp_path: Path, metric: str, value: int
+) -> Rocprofv3ProfileResult:
+    counter = tmp_path / "counters.csv"
+    counter.write_text(f"Metric,Value,Unit\n{metric},{value},count\n")
+    return Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.SUCCESS,
+        command=("rocprofv3",),
+        output_directory=tmp_path,
+        output_file="profile",
+        artifacts=(
+            Rocprofv3ProfileArtifact(
+                path=counter,
+                kind="counter_csv",
+                size_bytes=counter.stat().st_size,
+            ),
+        ),
+        profiler_available=True,
+        artifact_coverage_status="complete",
+    )
+
+
+def test_runtime_profile_uses_explicit_class_mapping(tmp_path: Path) -> None:
     output = tmp_path / "trace.jsonl"
     output.write_text("{}\n")
     env_path = tmp_path / "trace.jsonl.environment.json"
@@ -136,24 +163,61 @@ def test_runtime_profile_demotes_pressure_and_keeps_spill(tmp_path: Path) -> Non
         DECISION_AUTO,
         _static_evidence(["gfx942"]),
         env_path,
-        runtime_profile_available=True,
+        profile_result=_profile_result_with_counter(tmp_path, "LDS_BANK_CONFLICT", 1),
         run_id="r1",
         sol_version="v3.0.0",
     )
     assert path is not None
     decision = json.loads(path.read_text(encoding="utf-8"))
-    # Inferred register pressure is demoted to inferred_low under runtime
-    # precedence; deterministic spill stays at inferred_high.
+    # An LDS runtime classification does not conflict with register pressure,
+    # so register and deterministic spill confidence remain unchanged.
     reg = next(
         h
         for h in decision["hints"]
         if h["bottleneck_class"] == "register_pressure_high"
     )
-    assert reg["confidence"] == "inferred_low"
+    assert reg["confidence"] == "inferred_medium"
     spill = next(
         h for h in decision["hints"] if h["bottleneck_class"] == "spill_detected"
     )
     assert spill["confidence"] == "inferred_high"
     assert any(
         "Runtime profile takes precedence" in lim for lim in decision["limitations"]
+    )
+
+
+def test_unavailable_profile_does_not_apply_runtime_precedence(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "trace.jsonl"
+    output.write_text("{}\n")
+    env_path = tmp_path / "trace.jsonl.environment.json"
+    _environment_sidecar(env_path, ["gfx942"])
+    profile = Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.UNAVAILABLE,
+        command=("rocprofv3",),
+        output_directory=tmp_path,
+        output_file="profile",
+        skipped_reason="not installed",
+        profiler_available=False,
+    )
+
+    path = _write_decision_sidecar(
+        output,
+        DECISION_AUTO,
+        _static_evidence(["gfx942"]),
+        env_path,
+        profile_result=profile,
+    )
+
+    assert path is not None
+    decision = json.loads(path.read_text(encoding="utf-8"))
+    reg = next(
+        hint
+        for hint in decision["hints"]
+        if hint["bottleneck_class"] == "register_pressure_high"
+    )
+    assert reg["confidence"] == "inferred_medium"
+    assert not any(
+        "Runtime profile takes precedence" in item for item in decision["limitations"]
     )

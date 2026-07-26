@@ -113,29 +113,30 @@ and matching source SHA-256.
 
 ## Official score
 
-The score formula is implemented without clipping, but this v3 corpus does not
-yet publish the release baseline, independent rerun, trusted candidate
-execution attestation, or pinned SOLAR manifest set needed for an official
-claim. The fail-closed scorer accepts only a four-authority signed bundle:
+The schema v5 corpus publishes the
+`content_addressed_publisher_v1` scoring policy and its canonical
+`rx9060xt-gfx1200-reference-v1` baseline identity. The fail-closed scorer
+accepts a publisher-authored release bundle whose SHA-256 references bind the
+corpus, baseline, candidate execution, and pinned SOLAR manifests:
 
 ```bash
 uv run sol-execbench score official RELEASE/release-bundle.json
 ```
 
-`sol-execbench score status` reports whether the corpus manifest has published
-the authority roots. Caller-authored measurements, baselines, or SOLAR JSON
-cannot cross the signature and content-addressing boundary.
+`sol-execbench score status` reports the repository-pinned policy and baseline.
+Raw caller-authored measurements, baselines, or SOLAR JSON are not scorer
+inputs. Bundle hashes provide artifact integrity; publisher authenticity comes
+from the repository or release channel that distributes the bundle.
 
-The release implementation includes `baseline release-build`,
+The release workflow includes `baseline release-build`,
 `baseline candidate-build`, `baseline release-run`, `solar release-build`,
-`score build-statement`, and `score assemble-bundle`. These commands do not
-make the checked-in corpus official by themselves: four independently signed
-role statements and repository-pinned authority keys are still required. See
+`score build-statement`, and `score assemble-bundle`. It has one baseline run
+and one candidate run; it does not require role signatures or an independent
+rerun. See
 the [release and official-score workflow](docs/user/RELEASE-SCORING.md).
 
-Once those release artifacts are published and pinned, correct candidates must
-satisfy `T_b > T_SOL` and `T_k >= T_SOL`; workloads are averaged within each
-problem and then across problems with equal weight.
+Correct candidates must satisfy `T_b > T_SOL` and `T_k >= T_SOL`; workloads are
+averaged within each problem and then across problems with equal weight.
 
 ## Development
 
@@ -153,7 +154,7 @@ See [SOLAR boundary](docs/SOLAR-BOUNDARY.md) and
 recorded GPU engineering evidence is limited to RX 9060 XT `gfx1200` on the
 locked ROCm 7.2 stack; see
 [RDNA4 validation scope](docs/user/RDNA4-VALIDATION.md) for the exact test,
-toolchain, self-hosted-runner, and release-authority boundaries.
+toolchain, self-hosted-runner, and publisher-release boundaries.
 
 ## License
 

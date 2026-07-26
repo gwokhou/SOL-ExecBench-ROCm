@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Fail-closed verifier and scorer for signed release evidence bundles."""
+"""Fail-closed verifier and scorer for publisher release bundles."""
 
 from __future__ import annotations
 
@@ -12,24 +12,19 @@ from typing import Any, TypeVar
 
 from pydantic import ValidationError
 
+from sol_execbench.core.dataset.aka_contract import AkaReleasePolicy
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 
 from .aggregation import SuiteScore, WorkloadScore, aggregate_suite_scores
 from .formula import sol_score
-from .official_authority import OFFICIAL_CORPUS_MANIFEST_SHA256
-from .release_authority import (
-    ReleaseAuthority,
-    load_release_authority,
-    verify_signed_statement,
-)
+from .official_scoring import OFFICIAL_CORPUS_MANIFEST_SHA256
 from .release_models import (
     BaselineStatement,
     CandidateStatement,
-    MAX_SIGNED_STATEMENT_BYTES,
+    MAX_RELEASE_STATEMENT_BYTES,
     ReleaseBundle,
     ReleaseModel,
-    RerunStatement,
     SolarIndexStatement,
 )
 from .release_solar import verify_solar_index
@@ -66,7 +61,7 @@ def verify_and_score_release(
     *,
     corpus_manifest_path: Path,
 ) -> OfficialScoreResult:
-    """Verify every authority boundary and compute the official suite score."""
+    """Verify every content boundary and compute the official suite score."""
     bundle_file = bundle_path.resolve()
     bundle_root = bundle_file.parent
     bundle = _load_model(bundle_file, ReleaseBundle)
@@ -74,25 +69,20 @@ def verify_and_score_release(
     if sha256_file(corpus.path) != OFFICIAL_CORPUS_MANIFEST_SHA256:
         raise ValueError("official corpus manifest is not repository-pinned")
     _verify_bundle_corpus(bundle, bundle_root, corpus)
-    authority = load_release_authority(corpus.path)
-    statements = _load_signed_statements(bundle, bundle_root, corpus, authority)
-    baseline, rerun, candidate, solar = statements
-    _verify_release_pins(corpus, bundle, baseline, rerun, solar)
+    baseline, candidate, solar = _load_statements(bundle, bundle_root)
+    _verify_release_pins(corpus, baseline, candidate, solar)
     verified = _verify_runs(
         baseline,
-        rerun,
         candidate,
         bundle_root=bundle_root,
         corpus=corpus,
     )
-    baseline_run, rerun_run, candidate_run = verified
+    baseline_run, candidate_run = verified
     bounds = verify_solar_index(solar, bundle_root=bundle_root, corpus=corpus)
     suite = _score_verified_runs(
         baseline_run,
-        rerun_run,
         candidate_run,
         bounds,
-        max_rerun_delta=authority.max_rerun_relative_delta,
     )
     return OfficialScoreResult(
         candidate_id=candidate.candidate_id,
@@ -118,91 +108,68 @@ def _verify_bundle_corpus(
         raise ValueError("release bundle corpus identity mismatch")
 
 
-def _load_signed_statements(
+def _load_statements(
     bundle: ReleaseBundle,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
-    authority: ReleaseAuthority,
 ) -> tuple[
     BaselineStatement,
-    RerunStatement,
     CandidateStatement,
     SolarIndexStatement,
 ]:
     models = (
         (bundle.baseline, BaselineStatement),
-        (bundle.rerun, RerunStatement),
         (bundle.candidate, CandidateStatement),
         (bundle.solar, SolarIndexStatement),
     )
     loaded: list[ReleaseModel] = []
-    for signed, model in models:
-        path = verify_signed_statement(
-            signed,
-            bundle_root=bundle_root,
-            corpus_root=corpus.authored_root,
-            authority=authority,
+    for reference, model in models:
+        path = verify_artifact_file(
+            bundle_root,
+            reference.path,
+            expected_sha256=reference.sha256,
+            expected_size_bytes=reference.size_bytes,
         )
         loaded.append(_load_model(path, model))
-    baseline, rerun, candidate, solar = loaded
+    baseline, candidate, solar = loaded
     assert isinstance(baseline, BaselineStatement)
-    assert isinstance(rerun, RerunStatement)
     assert isinstance(candidate, CandidateStatement)
     assert isinstance(solar, SolarIndexStatement)
-    return baseline, rerun, candidate, solar
+    return baseline, candidate, solar
 
 
 def _verify_release_pins(
     corpus: AkaCorpusManifest,
-    bundle: ReleaseBundle,
     baseline: BaselineStatement,
-    rerun: RerunStatement,
+    candidate: CandidateStatement,
     solar: SolarIndexStatement,
 ) -> None:
     scoring = corpus.official_scoring
     if scoring.get("status") != "available":
         raise ValueError("corpus manifest does not authorize official scoring")
+    if scoring.get("release_policy") != AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1:
+        raise ValueError("corpus manifest uses an unsupported release policy")
     if scoring.get("baseline_id") != baseline.baseline_id:
         raise ValueError("official scoring baseline_id is not corpus-pinned")
-    if rerun.baseline_payload_sha256 != bundle.baseline.payload.sha256 or not (
-        baseline.source_revision == rerun.source_revision == solar.source_revision
+    if not (
+        baseline.source_revision == candidate.source_revision == solar.source_revision
     ):
         raise ValueError("release evidence source revisions do not match")
-    baseline_traces = {
-        problem.problem_path: problem.trace.sha256 for problem in baseline.problems
-    }
-    rerun_traces = {
-        problem.problem_path: problem.trace.sha256 for problem in rerun.problems
-    }
-    if any(
-        rerun_traces.get(problem_path) == trace_sha256
-        for problem_path, trace_sha256 in baseline_traces.items()
-    ):
-        raise ValueError("independent rerun reuses a baseline trace artifact")
 
 
 def _verify_runs(
     baseline: BaselineStatement,
-    rerun: RerunStatement,
     candidate: CandidateStatement,
     *,
     bundle_root: Path,
     corpus: AkaCorpusManifest,
-) -> tuple[VerifiedRun, VerifiedRun, VerifiedRun]:
-    if candidate.source_revision != baseline.source_revision:
-        raise ValueError("candidate source revision is outside the release")
+) -> tuple[VerifiedRun, VerifiedRun]:
     verified = (
         verify_release_run(
             baseline,
             bundle_root=bundle_root,
             corpus=corpus,
             require_passed=True,
-        ),
-        verify_release_run(
-            rerun,
-            bundle_root=bundle_root,
-            corpus=corpus,
-            require_passed=True,
+            require_reference_baseline=True,
         ),
         verify_release_run(
             candidate,
@@ -218,28 +185,21 @@ def _verify_runs(
 
 def _score_verified_runs(
     baseline: VerifiedRun,
-    rerun: VerifiedRun,
     candidate: VerifiedRun,
     bounds: dict[tuple[str, str], float],
-    *,
-    max_rerun_delta: float,
 ) -> SuiteScore:
     if (
-        baseline.workloads.keys() != rerun.workloads.keys()
-        or baseline.workloads.keys() != candidate.workloads.keys()
+        baseline.workloads.keys() != candidate.workloads.keys()
         or baseline.workloads.keys() != bounds.keys()
-        or baseline.implementation_sha256 != rerun.implementation_sha256
     ):
-        raise ValueError("release evidence denominators or baseline identities differ")
+        raise ValueError("release evidence denominators differ")
     scores = [
         _score_workload(
             identity,
             baseline.workloads[identity].latency_ms,
-            rerun.workloads[identity].latency_ms,
             candidate.workloads[identity].latency_ms,
             candidate.workloads[identity].passed,
             bounds[identity],
-            max_rerun_delta=max_rerun_delta,
         )
         for identity in sorted(bounds)
     ]
@@ -249,28 +209,21 @@ def _score_verified_runs(
 def _score_workload(
     identity: tuple[str, str],
     baseline_latency: float | None,
-    rerun_latency: float | None,
     candidate_latency: float | None,
     candidate_passed: bool,
     sol_latency: float,
-    *,
-    max_rerun_delta: float,
 ) -> WorkloadScore:
-    assert baseline_latency is not None and rerun_latency is not None
-    relative_delta = abs(baseline_latency - rerun_latency) / baseline_latency
-    if relative_delta > max_rerun_delta:
-        raise ValueError(f"independent baseline rerun drifted for {identity}")
-    baseline_runtime = (baseline_latency + rerun_latency) / 2.0
+    assert baseline_latency is not None
     if not candidate_passed:
         return WorkloadScore(identity[0], identity[1], 0.0)
     if candidate_latency is None:
         raise ValueError(f"passing candidate has no latency for {identity}")
-    score = sol_score(candidate_latency, baseline_runtime, sol_latency)
+    score = sol_score(candidate_latency, baseline_latency, sol_latency)
     return WorkloadScore(identity[0], identity[1], score)
 
 
 def _load_model(path: Path, model: type[_Statement]) -> _Statement:
-    if not path.is_file() or path.stat().st_size > MAX_SIGNED_STATEMENT_BYTES:
+    if not path.is_file() or path.stat().st_size > MAX_RELEASE_STATEMENT_BYTES:
         raise ValueError("release statement is missing or exceeds the size limit")
     try:
         return model.model_validate_json(path.read_text(encoding="utf-8"))

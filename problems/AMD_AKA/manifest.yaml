@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 source:
   repository: https://github.com/AMD-AGI/AgentKernelArena
   revision: 869228138e07e773b61dd7fc1d8cdc0435c7b405
@@ -30,13 +30,16 @@ formal_analysis:
   architecture_profile: solar:RX_9060_XT
   formal_gfx_target: gfx1200
   architecture_profile_sha256: dd280604eef72a13d3e1510feb0a35842b976326a1b3cb9c2153ac1b0139a055
+tolerance_calibration:
+  path: tolerance-calibration.json
+  sha256: d0cb5cebb1c4af5e54a338cf9225826ac01a4bdfa3124a929fee1ea21ce7fb2d
 official_scoring:
-  status: unavailable
-  reason_code: release_authority_not_published
+  status: available
+  release_policy: content_addressed_publisher_v1
+  baseline_id: rx9060xt-gfx1200-reference-v1
   required_evidence:
   - content_addressed_release_baseline
-  - independent_rerun_verification
-  - trusted_candidate_execution_attestation
+  - content_addressed_candidate_execution
   - pinned_solar_manifests
 formal_coverage_requirements:
   axes:
@@ -108,152 +111,152 @@ formal_coverage_requirements:
 materialized_problems:
 - path: torch2hip/3267_doubled_matmul
   task_path: tasks/torch2hip/gpumode/3267_SimpleMatmulModule
-  definition_sha256: 958394a918d486a0dd66e442de9b3cd860430575809af52d8f1280b3c85d8605
-  workload_sha256: 8224ffb301cb1ba59c4aa37d0bbc4d1b829a3641ba5feae417860fdc7c0fa9a9
+  definition_sha256: bbd7ac2c99af5066be8dae63a15cdbfbde5c403dd77779e09600a9942d4958b8
+  workload_sha256: c1c6d4675ad3565f69f573715b26ca2b77c891de42a7372c9c4841d7d4d9accb
 - path: torch2hip/l1n1_square_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_
-  definition_sha256: 47633e03252fe4f9dfef0014801b4b169db5b0bcfcee9d660b9a035aaa7961d8
-  workload_sha256: 02fa887458e341c4677f40ace8dfef24a7ada0ec7bebce5c4746b4df150a8e1a
+  definition_sha256: 90cf2e517322ce5c038a2cc8807fc12f72175a85ebd3344c344a7a73d1c5df3f
+  workload_sha256: 610f6fb60bafbbafabc5860d3d058d42f1943ea2be5a6e90eb6441a52393e4fb
 - path: torch2hip/l1n2_standard_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_
-  definition_sha256: b80372bed35607e1c6f57beb03af5a7e15d3caca7feb55f990f9bcb074c61eaf
-  workload_sha256: af38ca371f9c07ae834e1e98207c4b8c96b1c71f6005d9f23db52b395e4ba246
+  definition_sha256: 10cdcf07386c5ae6c639a60d78eef5e159af2c4d7594941f03b0f93ce26630ea
+  workload_sha256: 6726372fa3c978b30c153d2e1b6de6fb3b1300eae14c2006364c1f5c44b15d1f
 - path: torch2hip/l1n3_batched_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication
-  definition_sha256: 25c8da0548f86958ebba34419c40c30dc75fdb8b8aa60fa421a5d6ca8b8de59b
-  workload_sha256: f6ca3af9797f2181649ea1737fd5493219a477eb8f883cddcf78419ab0835a8b
+  definition_sha256: 0a68338de3f133fd9042d9bdf12dd7cb82cdbb9b8f028a9046fa7208ef765c4f
+  workload_sha256: 2c1a8c8b6f5586015ecfc1634402a7f780cc1831e5946ddaf0e187819825e1d0
 - path: torch2hip/l1n4_matrix_vector
   task_path: tasks/torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_
-  definition_sha256: 6c32c8d5fc87d1023ed19f9203678db36862f0f848b18d05ff1acfbc1ea6292c
-  workload_sha256: bc962cf3212c5a57b603b6671fa1a480c3c109333f4befa13439afb9a1d18c7e
+  definition_sha256: 81b19335e7a655abe58d8a9c33b6858dc75d7ffd9e78fdce2e8b5f442279cd9b
+  workload_sha256: 84db5e434340a2d31b2cba1f96941e96a21b8bbf511a72c1f3b6d0c9e595111c
 - path: torch2hip/l1n8_matmul_irregular
   task_path: tasks/torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_
-  definition_sha256: 5a5964e3b8770e70f801d01d983d634c7bf7c8839655a7ff022cc7a5d68949b5
-  workload_sha256: b519cc65b43b8e181536f2c9df56b60a0c4c952ab67941a47f8d3f5d60c3db7f
+  definition_sha256: 9f974692863dc369df33c9204e8d6ff87ecd86a8c9129e4a65557833edf2af94
+  workload_sha256: 2c1715ff091d407b693a02c541751390acb41448c7a0d3e21218331aa6670f50
 - path: torch2hip/l1n9_tall_skinny_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_
-  definition_sha256: 3e28dedda77a227f79871438bb70b8283efacea93ac30bfa4d5d2b043b6abfb0
-  workload_sha256: fe70509e8ba7b2f8a65f2cbf1cdbfc103acb5298721fe40e9f4ff48ab65b4a6f
+  definition_sha256: d019b053b4a4051151fe79f492c781fa773829c291902092337f59de5e63e547
+  workload_sha256: f651aa17e019e84e84fa1c0b65f5ec7e4ff62968c56f2a28f1570e3c93191e89
 - path: torch2hip/l1n23_softmax
   task_path: tasks/torch2hip/kernelbench/level1/l1n23_Softmax
-  definition_sha256: ca5106f7347ab76feca355e71286de611279905b8be67ead7c22c9f7e393dca3
-  workload_sha256: 0529ab6af1dc99a6a44c462a93399a232bcd638e1fe1c602d937cc8b3c2eec86
+  definition_sha256: 0798a2e90123fef4ffc4b79482b96eaaf423ae8a2a223e54eb9aaffad7beee25
+  workload_sha256: 4bdad85bb4301a0ca2923692f34af048c810d0952144628a64bfe1f2e016351b
 - path: torch2hip/l1n26_gelu
   task_path: tasks/torch2hip/kernelbench/level1/l1n26_GELU_
-  definition_sha256: 98b7bc5856e424b731a72993e27494b434e9ef169a29cee9646b0a62f63b843e
-  workload_sha256: d44940f4975f1e5e97d5eed93da2887079e499fe436984e9e0e380afc3a5194a
+  definition_sha256: fe09ede0f08d60ea9ee0fccc1a0240ac22f8a0a3a64f9b999c4ded65fa358260
+  workload_sha256: 6bfa8a8a6f3a78fd43f1eede4ae2ebf34afd9c02c34acad0b702b79c0a06f83a
 - path: torch2hip/l1n36_rmsnorm
   task_path: tasks/torch2hip/kernelbench/level1/l1n36_RMSNorm_
-  definition_sha256: 58b62afa43f36b68fc1743f2bb6f789f925d95b77d1b85b3e952b037ba14ab10
-  workload_sha256: 51b528fa12b0bac1a6230392b049525819f14fa9ee6d23bf429e0d12043a1bb7
+  definition_sha256: e60d1511a3ed878ec98ec8adeb66a76bb28b7060b602bbdd6f897e47d8096ab2
+  workload_sha256: fe86807ed46ad6943d6fabe0cf6ac838660149f9ef476f361c1c056f61f33fe1
 - path: torch2hip/l1n40_layernorm
   task_path: tasks/torch2hip/kernelbench/level1/l1n40_LayerNorm
-  definition_sha256: e862674a893c84a43eb2415034e2610188b51c86b70dfa6852983b47d33c5536
-  workload_sha256: 660041bdb41363eade2e39d18982df017455ad3e732c018c06072b169901801b
+  definition_sha256: 4696aa91d750dc60522805e5e35689dc755e5e81f81c8dbe3abd818066317ad8
+  workload_sha256: c3998d1bcb3984a254bd55a0fac3b2d267e1c884b48b0c7d9d614cbcbaa77924
 - path: torch2hip/l1n47_sum_reduction
   task_path: tasks/torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension
-  definition_sha256: 5db46cd46e9be44d91de499dc2bab6c33ddbf7796d0e2b2a89f5c17e13fced14
-  workload_sha256: ed274a56627e36ae39a9ca60ab6f39777a028da1491f12e6493e9d4466f684aa
+  definition_sha256: a280d87ba9663e3f245e80a676e299b6a9440b5e1dab54c163c5b6131c767d39
+  workload_sha256: 3bf3c420f038d8d08a453600b0e168d24e727066ca00b37f01259076b637ff13
 - path: torch2hip/l1n42_maxpool2d
   task_path: tasks/torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D
-  definition_sha256: 01671d38813ec5d849910fd9d1c907144e5afe00dd744d87ca319b4f58c389ae
-  workload_sha256: 795a85073c43acc874d0226d71a62239bf02893b607d383bd72e88f7c90c9461
+  definition_sha256: 0a214b6b89bf4bf154d662e7e664974114a1f47d007036ba5b5fdc04e2f7f46a
+  workload_sha256: fe9134fcca0a98e870138342543e09a017c4137aa1505b5f3596341c3ab8beff
 - path: torch2hip/l1n63_conv2d
   task_path: tasks/torch2hip/kernelbench/level1/l1n63_conv_standard_2D__square_input__square_kernel
-  definition_sha256: eea88d78861087e49eca41e22f0baa39769573f5adea183e161b7ded86f9603d
-  workload_sha256: af99148fc415ca98f3d56c47f6a238cab928c58c4323d21bded8cbd52a881cd7
+  definition_sha256: 40cf7967846546fb4c05382c252aa11aba7fbb994448f127d43add7e5b9fb5c9
+  workload_sha256: 62de391320791803eab81a0fc795d452f64f9ee63ddcf75c92cdfb67e40e5ac5
 - path: torch2hip/l1n82_conv_depthwise
   task_path: tasks/torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D_square_input_square_kernel
-  definition_sha256: 8cdb0b8afef66ca2c8c3f05b29057004962bae06b115488e5c6a63f8c35d2163
-  workload_sha256: 77d5c589b39720fd914ebbfc095690d348caaa89b5f702193a8647e5e6d1cda9
+  definition_sha256: 22004c30e14da779698cadc755665526bcd588b916876cf50b1951ad7daf8f48
+  workload_sha256: e8efe513827fc856eb1e0a45bf6fb168bc738bf440e8ab9bfcf55767bd71d647
 - path: torch2hip/gpumode_silu
   task_path: tasks/torch2hip/gpumode/16636_SiLU
-  definition_sha256: 21b5bf78ac685122241dc96fa371f2c7bbbd972ee19b1b2542812b6a05f7e6a5
-  workload_sha256: 22c18d89bd97d69a6271cbcd001c8de6d511b3363eb3226809fc81c58fb0ab68
+  definition_sha256: df2cfb5589b8bc39c74aab1ddff96c260885d49881be7237df1a85f7b05fa779
+  workload_sha256: 38fb1ecf232515420bb055697f7636ae2ea11acc73cc928e388a1bab7c79fc5a
 - path: torch2hip/gpumode_sigmoid
   task_path: tasks/torch2hip/gpumode/11184_Sigmoid
-  definition_sha256: 6d907557b4c72c67b554035368599c82e381a2292786bb1c8529b3e6472c8c58
-  workload_sha256: cad5a4a96c122cc5aa5a02b8ef902a7468b91d87522530a342cc5d7fcbf32b0a
+  definition_sha256: 663b310c0a497c9a73f44f24d465cd8a4f9a227b4b4de2a1119ac5c03d6f5c1d
+  workload_sha256: 7b13e204216723e4a7bc68f493e22e55e705837dad40f1e5d45bfb60af2c4546
 - path: torch2hip/gpumode_tanh
   task_path: tasks/torch2hip/gpumode/11178_TanH
-  definition_sha256: 996e6d85aca301c1d02c228336eb9ddb376792190e3b3c463cbf70207fb021a7
-  workload_sha256: 6cdddb49815da6d3cd8f17a8dc71704f19918cbdaf30280dc124f7973117a02c
+  definition_sha256: 0668d86d74b5e5b8fdbac3b7eb114a1b657e6380baba0cdcfd4f08c68bacbb40
+  workload_sha256: f81f7ab51b9005303ce9fe9de627a89b19ca5d778bc1477b34af7a54429c20a9
 - path: torch2hip/l2n99_matmul_gelu_softmax
   task_path: tasks/torch2hip/kernelbench/level2/l2n99_Matmul_GELU_Softmax
-  definition_sha256: a07e9488b85301ea2cd2c00dd6f26486d9e57c922f9497acbb79fd495282ea5f
-  workload_sha256: d938209f7a49ec6cc9c0b4f849cd03256a6aacad1633ddf721b197c596c6d89d
+  definition_sha256: 45f718e6be459c7e67f960193b56ea45f1a96d2deb429190b8e7dbb1daf5c4c5
+  workload_sha256: 13ac1dad2582b2d25cd348c058e6ece0946705d26f903d73836e7c8fea5aa13e
 - path: torch2hip/l2n86_matmul_divide_gelu
   task_path: tasks/torch2hip/kernelbench/level2/l2n86_Matmul_Divide_GELU
-  definition_sha256: 78bcc0180f7eb5658de8e3e6ab42461bdc776418d3c3995a3a698f70ca07deaf
-  workload_sha256: 248fa4de1764cf166cf4626767c6f9553d47da36fa8cb40c86fb2913afd0035c
+  definition_sha256: d19cf0ba4740fc72dbef849aacaad159557cb2f4354d21eb2ded703bda5a708f
+  workload_sha256: b3bac161e4e0ddcba5e3bcc17ea94cb4438282efdb86dc87bf07d70d9f1b00e1
 - path: torch2hip/l2n40_matmul_scaling_residual
   task_path: tasks/torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd
-  definition_sha256: 4a5e785d630352dc80f60476a7f13b72535dedea90eecd26e80dff76d44de209
-  workload_sha256: 81844908275a6693582f273dd220da0c857859fbd9155e5b379524d513c6c55a
+  definition_sha256: 6a7fadca0cf45eb8d8edd78ac8709b92e0903435b14f157b1ede9d5ce91c6328
+  workload_sha256: 1701c7f10e1aa63ccb6e77c801702550af4d435e16a139c7f6bfc2c057693452
 - path: torch2hip/l2n37_groupnorm_fused
   task_path: tasks/torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm
-  definition_sha256: bb86bb01c51acb073b2ba4e5fdf62d91e3208b539aae66240e7c4f51d09564c8
-  workload_sha256: b93d64fafb3c0863b8c55e87216c0f6ace2157d4e7ebf1ec69c3af06964f8058
+  definition_sha256: 57a1fd57346fe898edfd1fe4f17f8d4515b4ea1127878cff1f700f6fb0d096f1
+  workload_sha256: 6321d757ca7d28b90d19014b1d4703645e5e16a0b5fddf4d13b2855ed16a7c28
 - path: torch2hip/l2n17_instancenorm_fused
   task_path: tasks/torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide
-  definition_sha256: 36b9e7445042570b14ce2c57f212df1aea5451ae94b2d6942e1d59106d242ae6
-  workload_sha256: 3938793c168e893ca5041b489c32cd30d38466ffc9b97e774e02013dadd2e7f5
-- path: torch2hip/sdp_attention
-  task_path: tasks/torch2hip/gpumode/10456_MultiHeadAttention
-  definition_sha256: 434ff0789d07adfef87fed499b582d8b3228c57757e4075649bdaa357e029bee
-  workload_sha256: 9cf5c5170ceb00596f310092e8bb468583caa1ce9c557546d9dc805f0e7e978f
+  definition_sha256: 83808a7a0c4551aaf3656cbc7a5915cd4f5d0ed6765fa0594d72c323dbdb9da7
+  workload_sha256: 309216d237cef3549e7c5a52a2e9478fda49bbe8346114653ba0268c350084c6
+- path: torch2hip/dot_product_attention
+  task_path: tasks/torch2hip/gpumode/1001_NormalAttention_dot
+  definition_sha256: cd8d7bfc39348f98564f68fdd11423d536db10609bcd32867989c318b0bcbc56
+  workload_sha256: 07f0c029e126eea576f34407fe8cc7ba716906d47eb952b840f151ae55d6ba66
 - path: torch2hip/gpumode_gelu_4d
   task_path: tasks/torch2hip/gpumode/14539_GELU
-  definition_sha256: 3a573b24195d57f59e6988232fd532bd8271ae68838dbcf2ce5ebe37176ed1d0
-  workload_sha256: bd12a7fac33d362c5bd96e7044d6658fafa181b7af191a618f00a8bf0fac45d9
+  definition_sha256: 9308907e9c7c16820f7312eedcb6c4b96adf1229bacd1adee8c6af908918d639
+  workload_sha256: a2058d09d76d1cb368222986b81c90f5f218f191b0a68ccac9f8b72778723ca6
 - path: instruction2triton/fp8_cast_sentinel
   task_path: tasks/instruction2triton/rocmbench/test_chained_dot_fp8
-  definition_sha256: 4edf4c356773127eba4b53c108de42a667f333c7e44f639d5c9bca2fb582f07e
-  workload_sha256: 2f50b10891b802858d40204b4335fb22d1f077873655eedce5c9d633532b5f8b
+  definition_sha256: 45168f8644744877d84d622991a56a8c7ba69cd385452cfcea544d8d94d61d30
+  workload_sha256: 05515f530bd79291c37b5a260e48721584886cf39336c2f2a9824fbad3261714
 - path: instruction2triton/rmsnorm_bwd
   task_path: tasks/instruction2triton/rocmbench/rmsnorm_bwd
-  definition_sha256: 129d1894684b5ee64bc552b3446cc5978c50c9a2c2b4f077959dc6d40a2f2b32
-  workload_sha256: 95024fd92dc7f0a18f99f7ab4ba822a6f13d86141ee15dd74cc2eb5d14a1d62e
+  definition_sha256: 496c30fba45c80f92e8d87410edb322d89f11ab86c5b3d98bcb9e58ca4f56262
+  workload_sha256: 5c0969ddc0710eed0c7c88b927c9dc96620f714e0dc23f639307a4d6d10049d4
 - path: torch2flydsl/silu_and_mul_bf16
   task_path: tasks/torch2flydsl/silu_and_mul_kernel
-  definition_sha256: f7bb9264d0a7141ce5a1531db8def8eb08ba48ccac49a5316309285a616cec64
-  workload_sha256: bb2b211442b5cb5e0bd054d09b6c17f4460fc3fc7e61cbff15cc74b3abfb508e
+  definition_sha256: ba65c68964c311837f20d19193120dc5a210ee7d4ce60d185fb85e8c35ea96fe
+  workload_sha256: cae695ba60a4e6862db8357d2e6fd413cf27a2805cfead163056d6244ecebb4c
 - path: torch2hip/gpumode_fused_leaky_relu
   task_path: tasks/torch2hip/gpumode/10190_FusedLeakyReLU
-  definition_sha256: ccbca427ba2bdcc326ef0d9602626a9906218bbc5d97a07769a0e3941d6ae8c1
-  workload_sha256: b4d54beea22d29a781b7741206c18d2d35c8aa52ea458ff89429d52882f762e8
+  definition_sha256: 6c7eadaf02a2b05dbb52f67a0dbdac42a747616f3b44a01e11376b34853aff42
+  workload_sha256: f8dc725b2d9f036fe18ff8b3255523d706be32c97cfe5ba02b0b37bf1138a377
 - path: torch2hip/gpumode_transpose
   task_path: tasks/torch2hip/gpumode/1067_Transpose
   definition_sha256: 9650cff97057fbb5fa6856137783087786b1958b628688b6e989b8520d9f11af
-  workload_sha256: 7a734a869d9f7ee6e38976d3199d85f904dd2bc8dc4a6f8f8a8eaad00bdcbc57
+  workload_sha256: c4bbccf8e23ea3b7a66d58c3d473b1abaa23f2a9c430544053dae41417abbe6c
 - path: torch2hip/gpumode_softmax_3d
   task_path: tasks/torch2hip/gpumode/10082_SoftmaxModule
-  definition_sha256: 8657eef514e3bedae57cc583f5e6c92208424f21c95e83043cb121b96f7c4a77
-  workload_sha256: aa604cd97732e3a3f1ae10b25a9e2031d44e5dfbfde260fe4c1a10ef7db54f86
+  definition_sha256: 5307645ecc67128f8d98ff9576dc1c252372711720cc723867fa40e18e078c42
+  workload_sha256: 09e18c58df400a7a577241e3e88f1fe9bfddd450665105faaebcb176c2bd2c45
 - path: torch2hip/gpumode_feedforward
   task_path: tasks/torch2hip/gpumode/10024_Feedforward
-  definition_sha256: d7b9d96ea01c807e6b9ae14def05ffaaf7fe36932528a13199d96015a3184d53
-  workload_sha256: 4c4419973eb5e0c6444f21b6b3f1bfafab7a4ee84265821e1166fa00313e5dca
+  definition_sha256: 20d95477478b23cd0f89b46647435d2280d7632b149e086db33b34273b9a1945
+  workload_sha256: 83249866758c93982c3ef1fcf2a53912b9bc2033d237e174346bdbcca5fd890b
 - path: torch2hip/gpumode_positionwise_ffn
   task_path: tasks/torch2hip/gpumode/14044_PositionWiseFeedForward
-  definition_sha256: a06dc9faa8b7155818fb09a1d9878186a3611dfb0258f70f8b28614fa65548fd
-  workload_sha256: 7c519de26bb32b449a324ba82d80271697073ff52d596b70e8aaf0d3df115dc8
+  definition_sha256: 16c9fbb5e117f7f4700763495f2dfbf0f03ec2ddfc63f71b9f83c419d5f9163a
+  workload_sha256: 581dd12b024e54409b38b18ebcbfac72f8ccb3f5b1d3fd20ec6d40f1c09aa95d
 - path: torch2hip/gpumode_mlp
   task_path: tasks/torch2hip/gpumode/1178_MLP_model
-  definition_sha256: dd2f2e4ef14bd89b03def0747593aa08f8d3fda293b4bb48f136b42af77e1a08
-  workload_sha256: 2da2759a9a4b9f6d827f06fae85e757df8ad633dbbadf718844fe01cfc2f21df
+  definition_sha256: ebf785bea81eda4d8b1e607f3f498b6e37d59c30fe4be5c36d28c6dbf990d28c
+  workload_sha256: 29311140fa6ee4ed07dd5016569b283a4a8a5a93cbf5beadd597f722205be693
 - path: torch2hip/l2n55_matmul_maxpool_sum_scale
   task_path: tasks/torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale
-  definition_sha256: 521659f4d18cd9e8ae98f3ae670e8bb2fa8b15797e4f2c68210a688a85397743
-  workload_sha256: a5aacdf9fbeb1eeadf8a62a6d5898bce0bbc9cf7d94706aae81c195dddb719e0
+  definition_sha256: 230eebd644d6755c508a43025781448a3376b83b027cbc12203c9817844bfcb2
+  workload_sha256: 50d45faa179b9d21455243f12b06a78d9213d75aa14852c2500cc3414655440d
 - path: torch2hip/l2n98_matmul_avgpool_gelu_scale_max
   task_path: tasks/torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max
-  definition_sha256: 05ecf47f62997bc5928ca29a937b3d4e347e8382a00fdd01cab74af3199c488b
-  workload_sha256: b22bdcca7e332249570bdedc34315287f1c2b6160bc330f50a1381913e54f3e7
+  definition_sha256: ec45ac357fa5305bf7b441b83f9e72993457f2903a6f2b5cf98954d35fcbc5ce
+  workload_sha256: 00867dbf37d38b781ae3e341a6a10a22b745649ce4be4d3bb816c2b747acd39e
 - path: torch2hip/l3n44_mingpt_block
   task_path: tasks/torch2hip/kernelbench/level3/l3n44_MiniGPTBlock
-  definition_sha256: d65b18f692b838e9d8e2a96e89e3972e7478b2b30dd1f054759e0ed1e864e1f8
-  workload_sha256: 5b474a14749dcfa9493a5c8bfec573a42fd7cfd665580cbe74f025a400b6845b
+  definition_sha256: 71ef00f783c5ebb8e78b01e51820304101c3cc7cb59f291674eaa522787848e1
+  workload_sha256: f68df6c8c466c534215c346c86eb364a3c15e8cc7b711a03ff9f7b9e4c1ace1f
 entries:
 - slot: 3267_doubled_matmul
   task_path: tasks/torch2hip/gpumode/3267_SimpleMatmulModule
@@ -270,9 +273,16 @@ entries:
   - aka-3267_doubled_matmul-w1
   - aka-3267_doubled_matmul-w2
   - aka-3267_doubled_matmul-w3
-  aka_config_sha256: d7af662143e7f96b8dab4e7eab268c62d30ffb2774a3092552060f57720eaa96
-  aka_source_sha256: 6e1a9c00a70f5a602759383511a1edb84098c031a0d82282d8e007b8f1ddeb15
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: d7af662143e7f96b8dab4e7eab268c62d30ffb2774a3092552060f57720eaa96
+  - role: semantic_reference
+    path: pytorch_code_functional/py_3267_SimpleMatmulModule_func.py
+    sha256: 6e1a9c00a70f5a602759383511a1edb84098c031a0d82282d8e007b8f1ddeb15
+  - role: correctness_runner
+    path: pytorch_code_functional/py_3267_SimpleMatmulModule_func.py
+    sha256: 6e1a9c00a70f5a602759383511a1edb84098c031a0d82282d8e007b8f1ddeb15
   golden: {}
 - slot: l1n1_square_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_
@@ -289,9 +299,16 @@ entries:
   - aka-l1n1_square_matmul-w1
   - aka-l1n1_square_matmul-w2
   - aka-l1n1_square_matmul-w3
-  aka_config_sha256: db2acd2bf9bcb9745efe2ae74bb8c998511a48f60ca0a678bac8b1951b706cf7
-  aka_source_sha256: dabe119b28671c5f0fdbd7257aef181fb6654baa244e5dedd54219a9b5643404
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: db2acd2bf9bcb9745efe2ae74bb8c998511a48f60ca0a678bac8b1951b706cf7
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n1_Square_matrix_multiplication__func.py
+    sha256: dabe119b28671c5f0fdbd7257aef181fb6654baa244e5dedd54219a9b5643404
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n1_Square_matrix_multiplication__func.py
+    sha256: dabe119b28671c5f0fdbd7257aef181fb6654baa244e5dedd54219a9b5643404
   golden: {}
 - slot: l1n2_standard_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_
@@ -307,9 +324,16 @@ entries:
   - aka-l1n2_standard_matmul-w0
   - aka-l1n2_standard_matmul-w1
   - aka-l1n2_standard_matmul-w2
-  aka_config_sha256: 8be6d41ddeb0a7cce64d3d80189daaddeef3b1f0623328380bcf0b8ee8548360
-  aka_source_sha256: 02f8def4363040c511938afddf3a3fe01f2940182a66792e1c563fba9f59fa95
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 8be6d41ddeb0a7cce64d3d80189daaddeef3b1f0623328380bcf0b8ee8548360
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n2_Standard_matrix_multiplication__func.py
+    sha256: 02f8def4363040c511938afddf3a3fe01f2940182a66792e1c563fba9f59fa95
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n2_Standard_matrix_multiplication__func.py
+    sha256: 02f8def4363040c511938afddf3a3fe01f2940182a66792e1c563fba9f59fa95
   golden: {}
 - slot: l1n3_batched_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication
@@ -325,9 +349,16 @@ entries:
   - aka-l1n3_batched_matmul-w0
   - aka-l1n3_batched_matmul-w1
   - aka-l1n3_batched_matmul-w2
-  aka_config_sha256: 868ba66f2028e83169a33d94f0aa7043e0ba1d59ec13afdf7f95a9eee79f86b6
-  aka_source_sha256: 7bca869bd3d111a3f03bd9f79b327d0d32742563b5c45e8d750f095bcf4603cf
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 868ba66f2028e83169a33d94f0aa7043e0ba1d59ec13afdf7f95a9eee79f86b6
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n3_Batched_matrix_multiplication_func.py
+    sha256: 7bca869bd3d111a3f03bd9f79b327d0d32742563b5c45e8d750f095bcf4603cf
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n3_Batched_matrix_multiplication_func.py
+    sha256: 7bca869bd3d111a3f03bd9f79b327d0d32742563b5c45e8d750f095bcf4603cf
   golden: {}
 - slot: l1n4_matrix_vector
   task_path: tasks/torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_
@@ -343,9 +374,16 @@ entries:
   - aka-l1n4_matrix_vector-w0
   - aka-l1n4_matrix_vector-w1
   - aka-l1n4_matrix_vector-w2
-  aka_config_sha256: c823131b46f5c9278621730727f303095b6ca5654b928ed239d8e71540ad593a
-  aka_source_sha256: f0fe674356d5ecb9c71b0478dbef40c2a01864814d2219311f943651f2980583
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: c823131b46f5c9278621730727f303095b6ca5654b928ed239d8e71540ad593a
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n4_Matrix_vector_multiplication__func.py
+    sha256: f0fe674356d5ecb9c71b0478dbef40c2a01864814d2219311f943651f2980583
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n4_Matrix_vector_multiplication__func.py
+    sha256: f0fe674356d5ecb9c71b0478dbef40c2a01864814d2219311f943651f2980583
   golden: {}
 - slot: l1n8_matmul_irregular
   task_path: tasks/torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_
@@ -361,9 +399,16 @@ entries:
   - aka-l1n8_matmul_irregular-w0
   - aka-l1n8_matmul_irregular-w1
   - aka-l1n8_matmul_irregular-w2
-  aka_config_sha256: 5ad52f6b6205452923c47e7b1a7b68eb2a4c98f3e1f79c43be5b8a3657e603a3
-  aka_source_sha256: 4f7cff806c9bc0055d5d6e9420475c50354312ccb9028e03624eb3a218b3bc29
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 5ad52f6b6205452923c47e7b1a7b68eb2a4c98f3e1f79c43be5b8a3657e603a3
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n8_Matmul_with_irregular_shapes__func.py
+    sha256: 4f7cff806c9bc0055d5d6e9420475c50354312ccb9028e03624eb3a218b3bc29
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n8_Matmul_with_irregular_shapes__func.py
+    sha256: 4f7cff806c9bc0055d5d6e9420475c50354312ccb9028e03624eb3a218b3bc29
   golden: {}
 - slot: l1n9_tall_skinny_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_
@@ -379,9 +424,16 @@ entries:
   - aka-l1n9_tall_skinny_matmul-w0
   - aka-l1n9_tall_skinny_matmul-w1
   - aka-l1n9_tall_skinny_matmul-w2
-  aka_config_sha256: 555f5120d73c8aabd48d6fbc57507ede298717d5086c8e55e80437575438cca7
-  aka_source_sha256: e3030849d1df6f85ed4656299e0266e0b45313741b0a3046f2a3fed9657bf779
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 555f5120d73c8aabd48d6fbc57507ede298717d5086c8e55e80437575438cca7
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n9_Tall_skinny_matrix_multiplication__func.py
+    sha256: e3030849d1df6f85ed4656299e0266e0b45313741b0a3046f2a3fed9657bf779
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n9_Tall_skinny_matrix_multiplication__func.py
+    sha256: e3030849d1df6f85ed4656299e0266e0b45313741b0a3046f2a3fed9657bf779
   golden: {}
 - slot: l1n23_softmax
   task_path: tasks/torch2hip/kernelbench/level1/l1n23_Softmax
@@ -398,9 +450,16 @@ entries:
   - aka-l1n23_softmax-w1
   - aka-l1n23_softmax-w2
   - aka-l1n23_softmax-w3
-  aka_config_sha256: 62d858d694da517af19f69892ae1565b36f1ac3d06dbf5d1e63ce9ba7f142f74
-  aka_source_sha256: c3ef4af1b69cdf973bfd2901b2631c458b6b4d178d60661bece3e93fe592f636
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 62d858d694da517af19f69892ae1565b36f1ac3d06dbf5d1e63ce9ba7f142f74
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n23_Softmax_func.py
+    sha256: c3ef4af1b69cdf973bfd2901b2631c458b6b4d178d60661bece3e93fe592f636
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n23_Softmax_func.py
+    sha256: c3ef4af1b69cdf973bfd2901b2631c458b6b4d178d60661bece3e93fe592f636
   golden: {}
 - slot: l1n26_gelu
   task_path: tasks/torch2hip/kernelbench/level1/l1n26_GELU_
@@ -416,9 +475,16 @@ entries:
   - aka-l1n26_gelu-w0
   - aka-l1n26_gelu-w1
   - aka-l1n26_gelu-w2
-  aka_config_sha256: d8a0f0fe1c58e6a59e9704579993b63a2498ae52dea145d25747d7978700e07a
-  aka_source_sha256: 646ca30f98c7701b4594085660b46edc092946e99fe9c15144cef9f833bb60b6
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: d8a0f0fe1c58e6a59e9704579993b63a2498ae52dea145d25747d7978700e07a
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n26_GELU__func.py
+    sha256: 646ca30f98c7701b4594085660b46edc092946e99fe9c15144cef9f833bb60b6
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n26_GELU__func.py
+    sha256: 646ca30f98c7701b4594085660b46edc092946e99fe9c15144cef9f833bb60b6
   golden: {}
 - slot: l1n36_rmsnorm
   task_path: tasks/torch2hip/kernelbench/level1/l1n36_RMSNorm_
@@ -434,9 +500,16 @@ entries:
   - aka-l1n36_rmsnorm-w0
   - aka-l1n36_rmsnorm-w1
   - aka-l1n36_rmsnorm-w2
-  aka_config_sha256: c2c26934b99e046620ed24ae7e143a43713aecb46f76dfcef16e679bae63d21e
-  aka_source_sha256: 2c0b56fc71f7b93cd9142cf9b4fee7a7264bfad87600ecfcc58a585080bcc1e5
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: c2c26934b99e046620ed24ae7e143a43713aecb46f76dfcef16e679bae63d21e
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n36_RMSNorm__func.py
+    sha256: 2c0b56fc71f7b93cd9142cf9b4fee7a7264bfad87600ecfcc58a585080bcc1e5
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n36_RMSNorm__func.py
+    sha256: 2c0b56fc71f7b93cd9142cf9b4fee7a7264bfad87600ecfcc58a585080bcc1e5
   golden: {}
 - slot: l1n40_layernorm
   task_path: tasks/torch2hip/kernelbench/level1/l1n40_LayerNorm
@@ -452,9 +525,16 @@ entries:
   - aka-l1n40_layernorm-w0
   - aka-l1n40_layernorm-w1
   - aka-l1n40_layernorm-w2
-  aka_config_sha256: 58baa47085f5e57f58e20b99c5028bcc18472f959243afc385585bc4980c9f33
-  aka_source_sha256: 9e31e73b25b1994285f7bc894a3cf077a81d1e4d5556bf157fe7d13f22a871d6
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 58baa47085f5e57f58e20b99c5028bcc18472f959243afc385585bc4980c9f33
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n40_LayerNorm_func.py
+    sha256: 9e31e73b25b1994285f7bc894a3cf077a81d1e4d5556bf157fe7d13f22a871d6
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n40_LayerNorm_func.py
+    sha256: 9e31e73b25b1994285f7bc894a3cf077a81d1e4d5556bf157fe7d13f22a871d6
   golden: {}
 - slot: l1n47_sum_reduction
   task_path: tasks/torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension
@@ -470,9 +550,16 @@ entries:
   - aka-l1n47_sum_reduction-w0
   - aka-l1n47_sum_reduction-w1
   - aka-l1n47_sum_reduction-w2
-  aka_config_sha256: 90c05e7c46959a35194ea26c3fb305ad2ed1822183e93189290fbb85c9f4b7fd
-  aka_source_sha256: 796fb8ee1e8a9b2bf84b6e93a0d971cf48cf45f21ff793e598cabaab2fe8e29d
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 90c05e7c46959a35194ea26c3fb305ad2ed1822183e93189290fbb85c9f4b7fd
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n47_Sum_reduction_over_a_dimension_func.py
+    sha256: 796fb8ee1e8a9b2bf84b6e93a0d971cf48cf45f21ff793e598cabaab2fe8e29d
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n47_Sum_reduction_over_a_dimension_func.py
+    sha256: 796fb8ee1e8a9b2bf84b6e93a0d971cf48cf45f21ff793e598cabaab2fe8e29d
   golden: {}
 - slot: l1n42_maxpool2d
   task_path: tasks/torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D
@@ -488,9 +575,16 @@ entries:
   - aka-l1n42_maxpool2d-w0
   - aka-l1n42_maxpool2d-w1
   - aka-l1n42_maxpool2d-w2
-  aka_config_sha256: e40c83814c11de7dd096cf625e42d8a744fbfb7a4c1ae15331d9e309a07f98e9
-  aka_source_sha256: 4c4945a00d2944d428b797d0aea85dc2b34807d6963ab5a2897f7056afc07c12
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: e40c83814c11de7dd096cf625e42d8a744fbfb7a4c1ae15331d9e309a07f98e9
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n42_Max_Pooling_2D_func.py
+    sha256: 4c4945a00d2944d428b797d0aea85dc2b34807d6963ab5a2897f7056afc07c12
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n42_Max_Pooling_2D_func.py
+    sha256: 4c4945a00d2944d428b797d0aea85dc2b34807d6963ab5a2897f7056afc07c12
   golden: {}
 - slot: l1n63_conv2d
   task_path: tasks/torch2hip/kernelbench/level1/l1n63_conv_standard_2D__square_input__square_kernel
@@ -506,9 +600,16 @@ entries:
   - aka-l1n63_conv2d-w0
   - aka-l1n63_conv2d-w1
   - aka-l1n63_conv2d-w2
-  aka_config_sha256: affb6657d95b6b9d12549a10a5ce8c6cbce48c8ddcb0bc56b5def17b4f4a3ecd
-  aka_source_sha256: db7c6c18eb67a60308d6ea9d942fb5e2aaa249479f2eb9cda1a681475f2a429f
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: affb6657d95b6b9d12549a10a5ce8c6cbce48c8ddcb0bc56b5def17b4f4a3ecd
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n63_conv_standard_2D__square_input__square_kernel_func.py
+    sha256: db7c6c18eb67a60308d6ea9d942fb5e2aaa249479f2eb9cda1a681475f2a429f
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n63_conv_standard_2D__square_input__square_kernel_func.py
+    sha256: db7c6c18eb67a60308d6ea9d942fb5e2aaa249479f2eb9cda1a681475f2a429f
   golden: {}
 - slot: l1n82_conv_depthwise
   task_path: tasks/torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D_square_input_square_kernel
@@ -524,9 +625,16 @@ entries:
   - aka-l1n82_conv_depthwise-w0
   - aka-l1n82_conv_depthwise-w1
   - aka-l1n82_conv_depthwise-w2
-  aka_config_sha256: eee87400dbe95cccdab219654de48b16a72aed374f86f54338d8b61c15a90e90
-  aka_source_sha256: 8c80366ecaa00e037eaef053b6142faa20bc55ac807c3ea13b05087ae5640e90
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: eee87400dbe95cccdab219654de48b16a72aed374f86f54338d8b61c15a90e90
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n82_conv_depthwise_2D_square_input_square_kernel_func.py
+    sha256: 8c80366ecaa00e037eaef053b6142faa20bc55ac807c3ea13b05087ae5640e90
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n82_conv_depthwise_2D_square_input_square_kernel_func.py
+    sha256: 8c80366ecaa00e037eaef053b6142faa20bc55ac807c3ea13b05087ae5640e90
   golden: {}
 - slot: gpumode_silu
   task_path: tasks/torch2hip/gpumode/16636_SiLU
@@ -543,9 +651,16 @@ entries:
   - aka-gpumode_silu-w1
   - aka-gpumode_silu-w2
   - aka-gpumode_silu-w3
-  aka_config_sha256: b769d2bcac20032c28b2dc808b0f4a0936a714aa9d2966352d0701c36753947c
-  aka_source_sha256: b789e6f1d60527a0e046388286d9cf15692c6f5c86d6a5df688ea399b0cc7c85
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: b769d2bcac20032c28b2dc808b0f4a0936a714aa9d2966352d0701c36753947c
+  - role: semantic_reference
+    path: pytorch_code_functional/py_16636_SiLU_func.py
+    sha256: b789e6f1d60527a0e046388286d9cf15692c6f5c86d6a5df688ea399b0cc7c85
+  - role: correctness_runner
+    path: pytorch_code_functional/py_16636_SiLU_func.py
+    sha256: b789e6f1d60527a0e046388286d9cf15692c6f5c86d6a5df688ea399b0cc7c85
   golden: {}
 - slot: gpumode_sigmoid
   task_path: tasks/torch2hip/gpumode/11184_Sigmoid
@@ -562,9 +677,16 @@ entries:
   - aka-gpumode_sigmoid-w1
   - aka-gpumode_sigmoid-w2
   - aka-gpumode_sigmoid-w3
-  aka_config_sha256: c05e7cdb91a1c38a5806133cd25b563326bbfac3b7f9fc63ba03f9f635818d02
-  aka_source_sha256: 4cf53bd6fb6225217593ca1ee9dcd4eb3719f877934c662ef9444e28363425e1
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: c05e7cdb91a1c38a5806133cd25b563326bbfac3b7f9fc63ba03f9f635818d02
+  - role: semantic_reference
+    path: pytorch_code_functional/py_11184_Sigmoid_func.py
+    sha256: 4cf53bd6fb6225217593ca1ee9dcd4eb3719f877934c662ef9444e28363425e1
+  - role: correctness_runner
+    path: pytorch_code_functional/py_11184_Sigmoid_func.py
+    sha256: 4cf53bd6fb6225217593ca1ee9dcd4eb3719f877934c662ef9444e28363425e1
   golden: {}
 - slot: gpumode_tanh
   task_path: tasks/torch2hip/gpumode/11178_TanH
@@ -581,9 +703,16 @@ entries:
   - aka-gpumode_tanh-w1
   - aka-gpumode_tanh-w2
   - aka-gpumode_tanh-w3
-  aka_config_sha256: 68f1805e33bceb74bb888ccde0c9bfefa63c28fd7d4688ceaafb7739743b3f6c
-  aka_source_sha256: 64a56d78b65a4d54da5191dea794d4083aca6655ea6893dd0016d734ff1c13dc
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 68f1805e33bceb74bb888ccde0c9bfefa63c28fd7d4688ceaafb7739743b3f6c
+  - role: semantic_reference
+    path: pytorch_code_functional/py_11178_TanH_func.py
+    sha256: 64a56d78b65a4d54da5191dea794d4083aca6655ea6893dd0016d734ff1c13dc
+  - role: correctness_runner
+    path: pytorch_code_functional/py_11178_TanH_func.py
+    sha256: 64a56d78b65a4d54da5191dea794d4083aca6655ea6893dd0016d734ff1c13dc
   golden: {}
 - slot: l2n99_matmul_gelu_softmax
   task_path: tasks/torch2hip/kernelbench/level2/l2n99_Matmul_GELU_Softmax
@@ -599,9 +728,16 @@ entries:
   - aka-l2n99_matmul_gelu_softmax-w0
   - aka-l2n99_matmul_gelu_softmax-w1
   - aka-l2n99_matmul_gelu_softmax-w2
-  aka_config_sha256: 07c9cc0fcc07a0e11236c85569b30e9329ed7e62627ad0f2b06e540d354d9da8
-  aka_source_sha256: 887a7f0114240b876dc13929a887428a8c2027a275b963537a453bcdb07bac2d
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 07c9cc0fcc07a0e11236c85569b30e9329ed7e62627ad0f2b06e540d354d9da8
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l2n99_Matmul_GELU_Softmax_func.py
+    sha256: 887a7f0114240b876dc13929a887428a8c2027a275b963537a453bcdb07bac2d
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l2n99_Matmul_GELU_Softmax_func.py
+    sha256: 887a7f0114240b876dc13929a887428a8c2027a275b963537a453bcdb07bac2d
   golden: {}
 - slot: l2n86_matmul_divide_gelu
   task_path: tasks/torch2hip/kernelbench/level2/l2n86_Matmul_Divide_GELU
@@ -617,9 +753,16 @@ entries:
   - aka-l2n86_matmul_divide_gelu-w0
   - aka-l2n86_matmul_divide_gelu-w1
   - aka-l2n86_matmul_divide_gelu-w2
-  aka_config_sha256: 04df75e349c9c316bfa4ef429a334f157090220dd342f1e440cdb3ffdea015c4
-  aka_source_sha256: e4c93223e9973efa9ef1070b9f56ead57c61c1634334e68d1519db69e6b77115
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 04df75e349c9c316bfa4ef429a334f157090220dd342f1e440cdb3ffdea015c4
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l2n86_Matmul_Divide_GELU_func.py
+    sha256: e4c93223e9973efa9ef1070b9f56ead57c61c1634334e68d1519db69e6b77115
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l2n86_Matmul_Divide_GELU_func.py
+    sha256: e4c93223e9973efa9ef1070b9f56ead57c61c1634334e68d1519db69e6b77115
   golden: {}
 - slot: l2n40_matmul_scaling_residual
   task_path: tasks/torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd
@@ -635,9 +778,16 @@ entries:
   - aka-l2n40_matmul_scaling_residual-w0
   - aka-l2n40_matmul_scaling_residual-w1
   - aka-l2n40_matmul_scaling_residual-w2
-  aka_config_sha256: fd57706e615c902d6285f576dff523a9866022d0fd0ba097e1f09ea7e368d348
-  aka_source_sha256: d4804cac4ecfc2ae837d830710c50e87ad22127a5b06bcbfa2d64ccbeb4173f9
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: fd57706e615c902d6285f576dff523a9866022d0fd0ba097e1f09ea7e368d348
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l2n40_Matmul_Scaling_ResidualAdd_func.py
+    sha256: d4804cac4ecfc2ae837d830710c50e87ad22127a5b06bcbfa2d64ccbeb4173f9
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l2n40_Matmul_Scaling_ResidualAdd_func.py
+    sha256: d4804cac4ecfc2ae837d830710c50e87ad22127a5b06bcbfa2d64ccbeb4173f9
   golden: {}
 - slot: l2n37_groupnorm_fused
   task_path: tasks/torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm
@@ -653,9 +803,16 @@ entries:
   - aka-l2n37_groupnorm_fused-w0
   - aka-l2n37_groupnorm_fused-w1
   - aka-l2n37_groupnorm_fused-w2
-  aka_config_sha256: 3efe916ee4a6298f446ea36d63677585d2ce8a968bba5f8b5064412a8382233c
-  aka_source_sha256: 68f447b8d6d765a30a8c375ec24f1b00ab2c2fcf765db3a4108b77cd734abe0e
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 3efe916ee4a6298f446ea36d63677585d2ce8a968bba5f8b5064412a8382233c
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l2n37_Matmul_Swish_Sum_GroupNorm_func.py
+    sha256: 68f447b8d6d765a30a8c375ec24f1b00ab2c2fcf765db3a4108b77cd734abe0e
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l2n37_Matmul_Swish_Sum_GroupNorm_func.py
+    sha256: 68f447b8d6d765a30a8c375ec24f1b00ab2c2fcf765db3a4108b77cd734abe0e
   golden: {}
 - slot: l2n17_instancenorm_fused
   task_path: tasks/torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide
@@ -671,13 +828,20 @@ entries:
   - aka-l2n17_instancenorm_fused-w0
   - aka-l2n17_instancenorm_fused-w1
   - aka-l2n17_instancenorm_fused-w2
-  aka_config_sha256: 31bc2e12c4adffafcd3800156c00c06ce9364cba3b52c9f26ed79cf8b3817f33
-  aka_source_sha256: 11d9514d906ed293b271ef70493bb3214ff85c05c794acddba747b2f916ebc1f
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 31bc2e12c4adffafcd3800156c00c06ce9364cba3b52c9f26ed79cf8b3817f33
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l2n17_Conv2d_InstanceNorm_Divide_func.py
+    sha256: 11d9514d906ed293b271ef70493bb3214ff85c05c794acddba747b2f916ebc1f
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l2n17_Conv2d_InstanceNorm_Divide_func.py
+    sha256: 11d9514d906ed293b271ef70493bb3214ff85c05c794acddba747b2f916ebc1f
   golden: {}
-- slot: sdp_attention
-  task_path: tasks/torch2hip/gpumode/10456_MultiHeadAttention
-  problem_name: sdp_attention
+- slot: dot_product_attention
+  task_path: tasks/torch2hip/gpumode/1001_NormalAttention_dot
+  problem_name: dot_product_attention
   operation: attention
   dtype: float32
   pass_kind: forward
@@ -686,13 +850,20 @@ entries:
   suite: torch2hip
   role: scored
   workload_uuids:
-  - aka-sdp_attention-w0
-  - aka-sdp_attention-w1
-  - aka-sdp_attention-w2
-  - aka-sdp_attention-w3
-  aka_config_sha256: 63370aec16a3ea5f6ea3abbba9e4fe7e4f41010ac632649e288f05792274f4f8
-  aka_source_sha256: c76ad5b5debe3fdfac43b1b254d23cfef45fa3be96e225dec2eb9e812ae71c93
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  - aka-dot_product_attention-w0
+  - aka-dot_product_attention-w1
+  - aka-dot_product_attention-w2
+  - aka-dot_product_attention-w3
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: de1ad02db47ee64aa0f1bf57e1fad4df48a1761d73daba125e1203196eac6045
+  - role: semantic_reference
+    path: pytorch_code_functional/py_1001_NormalAttention_dot_func.py
+    sha256: 483b8f770471ae143cd6b0f94b041c3c0d83e5fc2e352d4df75e0f50bd1ed798
+  - role: correctness_runner
+    path: pytorch_code_functional/py_1001_NormalAttention_dot_func.py
+    sha256: 483b8f770471ae143cd6b0f94b041c3c0d83e5fc2e352d4df75e0f50bd1ed798
   golden: {}
 - slot: gpumode_gelu_4d
   task_path: tasks/torch2hip/gpumode/14539_GELU
@@ -709,9 +880,16 @@ entries:
   - aka-gpumode_gelu_4d-w1
   - aka-gpumode_gelu_4d-w2
   - aka-gpumode_gelu_4d-w3
-  aka_config_sha256: 94e93fe8c5fb251a6c83f30fdbfb902adf0395c90366426277adb34efd45ea68
-  aka_source_sha256: a5d0d6fe246417c1c4d031b10cde12374c2bef8e5c80fa3f217ef1e2bc07619b
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 94e93fe8c5fb251a6c83f30fdbfb902adf0395c90366426277adb34efd45ea68
+  - role: semantic_reference
+    path: pytorch_code_functional/py_14539_GELU_func.py
+    sha256: a5d0d6fe246417c1c4d031b10cde12374c2bef8e5c80fa3f217ef1e2bc07619b
+  - role: correctness_runner
+    path: pytorch_code_functional/py_14539_GELU_func.py
+    sha256: a5d0d6fe246417c1c4d031b10cde12374c2bef8e5c80fa3f217ef1e2bc07619b
   golden: {}
 - slot: fp8_cast_sentinel
   task_path: tasks/instruction2triton/rocmbench/test_chained_dot_fp8
@@ -727,9 +905,16 @@ entries:
   - aka-fp8_cast_sentinel-w0
   - aka-fp8_cast_sentinel-w1
   - aka-fp8_cast_sentinel-w2
-  aka_config_sha256: e3a1bd4be15863053ddd40bcf90a8f66643f0d3604bf4704ac8ea13a5b1682bc
-  aka_source_sha256: ''
-  aka_runner_sha256: ''
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: e3a1bd4be15863053ddd40bcf90a8f66643f0d3604bf4704ac8ea13a5b1682bc
+  - role: semantic_reference
+    path: test_chained_dot_fp8.py
+    sha256: 56c71b1b10f514727fbd7f04081ce60e0c3aa847975c675da5e4b48d510ceefb
+  - role: correctness_runner
+    path: test_chained_dot_fp8.py
+    sha256: 56c71b1b10f514727fbd7f04081ce60e0c3aa847975c675da5e4b48d510ceefb
   golden: {}
 - slot: rmsnorm_bwd
   task_path: tasks/instruction2triton/rocmbench/rmsnorm_bwd
@@ -746,9 +931,16 @@ entries:
   - aka-rmsnorm_bwd-w1
   - aka-rmsnorm_bwd-w2
   - aka-rmsnorm_bwd-w3
-  aka_config_sha256: e6fd604e6c56eab52410adbf3d83de6aad06b83449291bce6d3946eb967a028c
-  aka_source_sha256: ''
-  aka_runner_sha256: ''
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: e6fd604e6c56eab52410adbf3d83de6aad06b83449291bce6d3946eb967a028c
+  - role: semantic_reference
+    path: rmsnorm_bwd.py
+    sha256: a93608ce8be6300578a1787bd70410bfb8a0c93ed5f4b1bfeb775b29d019aa18
+  - role: correctness_runner
+    path: rmsnorm_bwd.py
+    sha256: a93608ce8be6300578a1787bd70410bfb8a0c93ed5f4b1bfeb775b29d019aa18
   golden: {}
 - slot: silu_and_mul_bf16
   task_path: tasks/torch2flydsl/silu_and_mul_kernel
@@ -765,9 +957,16 @@ entries:
   - aka-silu_and_mul_bf16-w1
   - aka-silu_and_mul_bf16-w2
   - aka-silu_and_mul_bf16-w3
-  aka_config_sha256: ea5fb0fa95645b4273f95377d8bd0fc4f7ddc81de92486fc765815a2d3d3a47b
-  aka_source_sha256: ''
-  aka_runner_sha256: ''
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: ea5fb0fa95645b4273f95377d8bd0fc4f7ddc81de92486fc765815a2d3d3a47b
+  - role: semantic_reference
+    path: model.py
+    sha256: c2326fe7af8aa09d4b34eec6f31635569c510c727ed69bb6c45049604e0d7475
+  - role: correctness_runner
+    path: test_kernel_harness.py
+    sha256: 22acbea7e97ff10dbe9982365984ff18fad2631029354d6de71de9fc05dad443
   golden: {}
 - slot: gpumode_fused_leaky_relu
   task_path: tasks/torch2hip/gpumode/10190_FusedLeakyReLU
@@ -784,9 +983,16 @@ entries:
   - aka-gpumode_fused_leaky_relu-w1
   - aka-gpumode_fused_leaky_relu-w2
   - aka-gpumode_fused_leaky_relu-w3
-  aka_config_sha256: 1114134d54abad28fd13059cc891e5239cf23c768372c49d80edc6b3706f752b
-  aka_source_sha256: 4cc2c22582c8bae3282e1dee6fd81376c15507babf3c8ebbce9d735cefab5032
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 1114134d54abad28fd13059cc891e5239cf23c768372c49d80edc6b3706f752b
+  - role: semantic_reference
+    path: pytorch_code_functional/py_10190_FusedLeakyReLU_func.py
+    sha256: 4cc2c22582c8bae3282e1dee6fd81376c15507babf3c8ebbce9d735cefab5032
+  - role: correctness_runner
+    path: pytorch_code_functional/py_10190_FusedLeakyReLU_func.py
+    sha256: 4cc2c22582c8bae3282e1dee6fd81376c15507babf3c8ebbce9d735cefab5032
   golden: {}
 - slot: gpumode_transpose
   task_path: tasks/torch2hip/gpumode/1067_Transpose
@@ -803,9 +1009,16 @@ entries:
   - aka-gpumode_transpose-w1
   - aka-gpumode_transpose-w2
   - aka-gpumode_transpose-w3
-  aka_config_sha256: f7d044d79eb53ab2261c48adc33d5d3d3e577aa7585b10bf7a2a4b2ea879c267
-  aka_source_sha256: 07e7208d18223f116ff944cc18d928eb0106b3bba2f1a03e58f28bd44d49e584
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: f7d044d79eb53ab2261c48adc33d5d3d3e577aa7585b10bf7a2a4b2ea879c267
+  - role: semantic_reference
+    path: pytorch_code_functional/py_1067_Transpose_func.py
+    sha256: 07e7208d18223f116ff944cc18d928eb0106b3bba2f1a03e58f28bd44d49e584
+  - role: correctness_runner
+    path: pytorch_code_functional/py_1067_Transpose_func.py
+    sha256: 07e7208d18223f116ff944cc18d928eb0106b3bba2f1a03e58f28bd44d49e584
   golden: {}
 - slot: gpumode_softmax_3d
   task_path: tasks/torch2hip/gpumode/10082_SoftmaxModule
@@ -822,9 +1035,16 @@ entries:
   - aka-gpumode_softmax_3d-w1
   - aka-gpumode_softmax_3d-w2
   - aka-gpumode_softmax_3d-w3
-  aka_config_sha256: b10fec756df99cdf958979c3d55375b8795b35a14bf90faa0c41b5966dba72a8
-  aka_source_sha256: 7547c7ee6718dedf38012d6bee5ae42be3ed08200a23697a6388c7ee5bbec993
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: b10fec756df99cdf958979c3d55375b8795b35a14bf90faa0c41b5966dba72a8
+  - role: semantic_reference
+    path: pytorch_code_functional/py_10082_SoftmaxModule_func.py
+    sha256: 7547c7ee6718dedf38012d6bee5ae42be3ed08200a23697a6388c7ee5bbec993
+  - role: correctness_runner
+    path: pytorch_code_functional/py_10082_SoftmaxModule_func.py
+    sha256: 7547c7ee6718dedf38012d6bee5ae42be3ed08200a23697a6388c7ee5bbec993
   golden: {}
 - slot: gpumode_feedforward
   task_path: tasks/torch2hip/gpumode/10024_Feedforward
@@ -841,9 +1061,16 @@ entries:
   - aka-gpumode_feedforward-w1
   - aka-gpumode_feedforward-w2
   - aka-gpumode_feedforward-w3
-  aka_config_sha256: dfd8d74f453b7e0996b0e87512f055dd9ebda4be2a2d95fe1f1cd84c0918135f
-  aka_source_sha256: 128adb19b4405ce2e812a1912e43eaec9cf22cc2fe0069a6e64208aafa58f87b
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: dfd8d74f453b7e0996b0e87512f055dd9ebda4be2a2d95fe1f1cd84c0918135f
+  - role: semantic_reference
+    path: pytorch_code_functional/py_10024_Feedforward_func.py
+    sha256: 128adb19b4405ce2e812a1912e43eaec9cf22cc2fe0069a6e64208aafa58f87b
+  - role: correctness_runner
+    path: pytorch_code_functional/py_10024_Feedforward_func.py
+    sha256: 128adb19b4405ce2e812a1912e43eaec9cf22cc2fe0069a6e64208aafa58f87b
   golden: {}
 - slot: gpumode_positionwise_ffn
   task_path: tasks/torch2hip/gpumode/14044_PositionWiseFeedForward
@@ -860,9 +1087,16 @@ entries:
   - aka-gpumode_positionwise_ffn-w1
   - aka-gpumode_positionwise_ffn-w2
   - aka-gpumode_positionwise_ffn-w3
-  aka_config_sha256: fa0e46ba82f96d843b3f85ef80f84cb04d756a5f32b61aaec0e0ad5fb7dbb12f
-  aka_source_sha256: e0a90615dcf21d97ebe87e3b8a4c9a6db337c31bb08b0e83f4bb8122fe5cb0f8
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: fa0e46ba82f96d843b3f85ef80f84cb04d756a5f32b61aaec0e0ad5fb7dbb12f
+  - role: semantic_reference
+    path: pytorch_code_functional/py_14044_PositionWiseFeedForward_func.py
+    sha256: e0a90615dcf21d97ebe87e3b8a4c9a6db337c31bb08b0e83f4bb8122fe5cb0f8
+  - role: correctness_runner
+    path: pytorch_code_functional/py_14044_PositionWiseFeedForward_func.py
+    sha256: e0a90615dcf21d97ebe87e3b8a4c9a6db337c31bb08b0e83f4bb8122fe5cb0f8
   golden: {}
 - slot: gpumode_mlp
   task_path: tasks/torch2hip/gpumode/1178_MLP_model
@@ -879,9 +1113,16 @@ entries:
   - aka-gpumode_mlp-w1
   - aka-gpumode_mlp-w2
   - aka-gpumode_mlp-w3
-  aka_config_sha256: b19237c619769c6a0c1f62f200d06379951e054aa2bcd0b90566a18141cdf0a9
-  aka_source_sha256: 0383fd73aa5ddb076c84d2c1a59fd135757acb1345b51e8663bb803ef28edd51
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: b19237c619769c6a0c1f62f200d06379951e054aa2bcd0b90566a18141cdf0a9
+  - role: semantic_reference
+    path: pytorch_code_functional/py_1178_MLP_model_func.py
+    sha256: 0383fd73aa5ddb076c84d2c1a59fd135757acb1345b51e8663bb803ef28edd51
+  - role: correctness_runner
+    path: pytorch_code_functional/py_1178_MLP_model_func.py
+    sha256: 0383fd73aa5ddb076c84d2c1a59fd135757acb1345b51e8663bb803ef28edd51
   golden: {}
 - slot: l2n55_matmul_maxpool_sum_scale
   task_path: tasks/torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale
@@ -897,9 +1138,16 @@ entries:
   - aka-l2n55_matmul_maxpool_sum_scale-w0
   - aka-l2n55_matmul_maxpool_sum_scale-w1
   - aka-l2n55_matmul_maxpool_sum_scale-w2
-  aka_config_sha256: 063b455c929d11a7a09361af9f22bd919cf332fae8f50f5784e5bade54a816b7
-  aka_source_sha256: 3aacb8624be9b3810b8bf416528e8ee024c4aba2240e406a85c330ede487f5ab
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 063b455c929d11a7a09361af9f22bd919cf332fae8f50f5784e5bade54a816b7
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l2n55_Matmul_MaxPool_Sum_Scale_func.py
+    sha256: 3aacb8624be9b3810b8bf416528e8ee024c4aba2240e406a85c330ede487f5ab
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l2n55_Matmul_MaxPool_Sum_Scale_func.py
+    sha256: 3aacb8624be9b3810b8bf416528e8ee024c4aba2240e406a85c330ede487f5ab
   golden: {}
   exclusion_reason_code: reference_ipc_payload_limit
 - slot: l2n98_matmul_avgpool_gelu_scale_max
@@ -916,9 +1164,16 @@ entries:
   - aka-l2n98_matmul_avgpool_gelu_scale_max-w0
   - aka-l2n98_matmul_avgpool_gelu_scale_max-w1
   - aka-l2n98_matmul_avgpool_gelu_scale_max-w2
-  aka_config_sha256: 9bef12cdac33e0ff50b9af741f2b2bf63d2047d277cbb776f7d1cee537c2d244
-  aka_source_sha256: 96f0c8eee6fbe0b4549be7d69cb70ae50f2b645887d3d34cb7796fc800bc37e4
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 9bef12cdac33e0ff50b9af741f2b2bf63d2047d277cbb776f7d1cee537c2d244
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l2n98_Matmul_AvgPool_GELU_Scale_Max_func.py
+    sha256: 96f0c8eee6fbe0b4549be7d69cb70ae50f2b645887d3d34cb7796fc800bc37e4
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l2n98_Matmul_AvgPool_GELU_Scale_Max_func.py
+    sha256: 96f0c8eee6fbe0b4549be7d69cb70ae50f2b645887d3d34cb7796fc800bc37e4
   golden: {}
 - slot: l3n44_mingpt_block
   task_path: tasks/torch2hip/kernelbench/level3/l3n44_MiniGPTBlock
@@ -935,7 +1190,14 @@ entries:
   - aka-l3n44_mingpt_block-w1
   - aka-l3n44_mingpt_block-w2
   - aka-l3n44_mingpt_block-w3
-  aka_config_sha256: 47a59f2f9e847b16f2e0c15857b930afde09c2ead6e8f2766c99efc0a010b70e
-  aka_source_sha256: fc5d35e941966715e6f8296f7e1443933f8b78713e512923c0588cf1c8dae2a5
-  aka_runner_sha256: 0c51fbfbc7c869e5b803525043b7f7089146ff95260d6d3d082ac6bedae749a8
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 47a59f2f9e847b16f2e0c15857b930afde09c2ead6e8f2766c99efc0a010b70e
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l3n44_MiniGPTBlock_func.py
+    sha256: fc5d35e941966715e6f8296f7e1443933f8b78713e512923c0588cf1c8dae2a5
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l3n44_MiniGPTBlock_func.py
+    sha256: fc5d35e941966715e6f8296f7e1443933f8b78713e512923c0588cf1c8dae2a5
   golden: {}

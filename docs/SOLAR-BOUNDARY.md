@@ -65,6 +65,6 @@ FP32/FP16 VALU and FP16/BF16/FP8/INT8 WMMA claims each require machine-readable
 ISA presence, compiler-emitted code-object instructions, and successful runtime
 probes. Packed-BF16 VALU is separately proven absent with an emitted FP32
 fallback. Passing this architecture gate
-allows SOLAR analysis to proceed; it does not publish the independent baseline,
-rerun, execution-attestation, or release-authority evidence required for an
-official SOL ExecBench score. Generic candidate evaluation remains diagnostic.
+allows SOLAR analysis to proceed; it does not publish the canonical baseline,
+candidate execution, or per-workload SOLAR evidence required for an official
+SOL ExecBench score. Generic candidate evaluation remains diagnostic.

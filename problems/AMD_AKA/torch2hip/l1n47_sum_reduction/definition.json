@@ -32,5 +32,5 @@
       "description": "Row sums (M, 1)."
     }
   },
-  "reference": "import torch\n\ndef run(x):\n    return torch.sum(x, dim=-1, keepdim=True)\n"
+  "reference": "import torch\n\n\ndef run(x):\n    return torch.sum(x, dim=-1, keepdim=True)\n"
 }

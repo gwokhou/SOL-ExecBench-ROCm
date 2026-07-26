@@ -61,5 +61,5 @@
       "description": "scale * leaky_relu(x + bias)."
     }
   },
-  "reference": "import torch.nn.functional as F\n\ndef run(x, bias, negative_slope, scale):\n    x = x + bias.reshape(1, -1, 1, 1)[:, : x.shape[1]]\n    x = F.leaky_relu(x, negative_slope=negative_slope)\n    return x * scale\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(x, bias, negative_slope, scale):\n    x = x + bias.reshape(1, -1, 1, 1)[:, : x.shape[1]]\n    x = F.leaky_relu(x, negative_slope=negative_slope)\n    return x * scale\n"
 }

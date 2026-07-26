@@ -53,5 +53,5 @@
       "description": "softmax(gelu(linear(x)))."
     }
   },
-  "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias):\n    x = F.linear(x, weight, bias)\n    x = F.gelu(x)\n    return F.softmax(x, dim=1)\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(x, weight, bias):\n    x = F.linear(x, weight, bias)\n    x = F.gelu(x)\n    return F.softmax(x, dim=1)\n"
 }

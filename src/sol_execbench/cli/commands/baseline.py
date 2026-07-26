@@ -45,7 +45,7 @@ def release_build_cli(
     baseline_id: str,
     source_revision: str,
 ) -> CliResult:
-    """Materialize the trusted-reference baseline plus independent rerun."""
+    """Materialize the release-defined trusted-reference baseline."""
     try:
         workspace = materialize_release_baseline(
             manifest_path,
@@ -141,7 +141,7 @@ def release_run_cli(
     device: str,
     resume: bool,
 ) -> CliResult:
-    """Execute a baseline, rerun, or candidate plan in the hardened container."""
+    """Execute a baseline or candidate plan in the hardened container."""
     try:
         result = execute_release_plan(
             plan,

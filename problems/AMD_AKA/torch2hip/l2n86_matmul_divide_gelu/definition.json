@@ -58,5 +58,5 @@
       "description": "gelu(linear(x) / divisor)."
     }
   },
-  "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias, divisor):\n    x = F.linear(x, weight, bias)\n    x = x / divisor\n    return F.gelu(x)\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(x, weight, bias, divisor):\n    x = F.linear(x, weight, bias)\n    x = x / divisor\n    return F.gelu(x)\n"
 }
