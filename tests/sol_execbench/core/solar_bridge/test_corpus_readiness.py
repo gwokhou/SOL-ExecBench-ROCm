@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 
@@ -36,7 +37,7 @@ def _ready_outcome(request) -> SolarStageAuditOutcome:
         status="ready",
         analysis_id=request.workload_uuid,
         output_dir=str(output),
-        architecture_sha256="a" * 64,
+        architecture_sha256=corpus_readiness.formal_architecture_profile_hash(),
         stages=tuple(stages),
     )
 
@@ -68,6 +69,12 @@ def test_corpus_audit_derives_and_addresses_the_full_scored_denominator(
     ]
     assert len(records) == 122
     assert all(record["gfx_target"] == "gfx1200" for record in records)
+    assert all(
+        len(record["trace_identity_sha256"]) == 64
+        and len(record["architecture_sha256"]) == 64
+        for record in records
+    )
+    assert len({record["trace_identity_sha256"] for record in records}) == 122
     assert not any("l2n55" in record["problem_path"] for record in records)
     assert all(
         len(record["verification_seeds"]) == 3
@@ -124,3 +131,71 @@ def test_corpus_audit_keeps_failed_workload_in_the_matrix(
     failed = [record for record in records if record["workload_uuid"] == failed_uuid]
     assert len(failed) == 1
     assert failed[0]["reason_code"] == "source_input_binding_failed"
+    assert len(failed[0]["trace_identity_sha256"]) == 64
+    assert len(failed[0]["architecture_sha256"]) == 64
+
+
+def test_corpus_audit_rejects_worker_architecture_identity_drift(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def wrong_architecture(request, **_kwargs):
+        outcome = _ready_outcome(request)
+        return replace(outcome, architecture_sha256="f" * 64)
+
+    monkeypatch.setattr(
+        corpus_readiness,
+        "run_solar_stage_worker",
+        wrong_architecture,
+    )
+
+    try:
+        corpus_readiness.audit_corpus_stage_readiness(
+            MANIFEST,
+            tmp_path / "audit",
+        )
+    except ValueError as exc:
+        assert str(exc) == "readiness worker architecture identity mismatch"
+    else:
+        raise AssertionError("architecture identity drift was accepted")
+
+
+def test_corpus_audit_requires_every_stage_even_if_verification_passed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    failed_uuid = "aka-3267_doubled_matmul-w0"
+
+    def inconsistent_stages(request, **_kwargs):
+        outcome = _ready_outcome(request)
+        if request.workload_uuid != failed_uuid:
+            return outcome
+        stages = list(outcome.stages)
+        stages[0] = {
+            **stages[0],
+            "status": "failed",
+            "reason_code": "graph_extraction_failed",
+        }
+        return replace(
+            outcome,
+            status="failed",
+            stages=tuple(stages),
+            failure_stage="graph_extraction",
+            reason_code="graph_extraction_failed",
+        )
+
+    monkeypatch.setattr(
+        corpus_readiness,
+        "run_solar_stage_worker",
+        inconsistent_stages,
+    )
+
+    result = corpus_readiness.audit_corpus_stage_readiness(
+        MANIFEST,
+        tmp_path / "audit",
+    )
+
+    assert not result.ready
+    assert result.verification_passed == 122
+    summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
+    assert summary["status"] == "incomplete"

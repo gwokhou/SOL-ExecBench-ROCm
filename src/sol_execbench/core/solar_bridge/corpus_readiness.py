@@ -19,13 +19,21 @@ from sol_execbench.core.data.json_utils import (
 )
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusEntry, AkaCorpusManifest
-from sol_execbench.core.integrity import sha256_bytes, sha256_file
+from sol_execbench.core.integrity import (
+    sha256_bytes,
+    sha256_file,
+    stable_json_checksum,
+)
 from sol_execbench.core.integrity.schema_versions import (
     CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION,
     CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION,
+    CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION,
 )
 from sol_execbench.core.process import exclusive_file_lock
-from sol_execbench.core.solar_bridge.analyzer import FORMAL_GFX_TARGET
+from sol_execbench.core.solar_bridge.analyzer import (
+    FORMAL_GFX_TARGET,
+    formal_architecture_profile_hash,
+)
 from sol_execbench.core.solar_bridge.models import (
     SolarStageAuditOutcome,
     SolarStageAuditRequest,
@@ -97,6 +105,7 @@ def _audit_corpus_stage_readiness_locked(
         raise FileExistsError(f"corpus readiness output already exists: {output}")
     output.mkdir(parents=True, exist_ok=True)
     manifest_sha256 = sha256_file(corpus.path)
+    architecture_sha256 = formal_architecture_profile_hash()
     records: list[dict[str, Any]] = []
     for entry in corpus.entries:
         if entry.role != "scored":
@@ -107,6 +116,7 @@ def _audit_corpus_stage_readiness_locked(
                 entry,
                 output,
                 manifest_sha256=manifest_sha256,
+                architecture_sha256=architecture_sha256,
                 device=device,
                 timeout_seconds=timeout_seconds,
                 resume=resume,
@@ -121,6 +131,7 @@ def _audit_entry(
     output: Path,
     *,
     manifest_sha256: str,
+    architecture_sha256: str,
     device: str,
     timeout_seconds: float,
     resume: bool,
@@ -144,6 +155,7 @@ def _audit_entry(
             definition,
             workload,
             manifest_sha256=manifest_sha256,
+            architecture_sha256=architecture_sha256,
         )
         if resume and result_path.is_file():
             record = _load_resumed_record(result_path, output, identity)
@@ -171,6 +183,7 @@ def _identity(
     workload: Workload,
     *,
     manifest_sha256: str,
+    architecture_sha256: str,
 ) -> dict[str, Any]:
     problem_hashes = corpus.materialized_problem_sha256[problem_path]
     workload_payload = json.dumps(
@@ -178,7 +191,7 @@ def _identity(
         sort_keys=True,
         separators=(",", ":"),
     ).encode()
-    return {
+    identity = {
         "problem_path": problem_path,
         "workload_uuid": workload.uuid,
         "corpus_manifest_sha256": manifest_sha256,
@@ -187,9 +200,30 @@ def _identity(
         "workload_sha256": sha256_bytes(workload_payload),
         "reference_sha256": sha256_bytes(definition.reference.encode()),
         "gfx_target": FORMAL_GFX_TARGET,
+        "architecture_sha256": architecture_sha256,
         "trace_seed": 200,
         "verification_seeds": [11, 29, 47],
         "verification_patterns": ["random", "zeros", "boundary"],
+    }
+    trace_contract = {
+        "schema_version": CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION,
+        **{
+            key: identity[key]
+            for key in (
+                "corpus_manifest_sha256",
+                "definition_sha256",
+                "workload_file_sha256",
+                "workload_sha256",
+                "reference_sha256",
+                "gfx_target",
+                "architecture_sha256",
+                "trace_seed",
+            )
+        },
+    }
+    return {
+        **identity,
+        "trace_identity_sha256": stable_json_checksum(trace_contract),
     }
 
 
@@ -198,6 +232,11 @@ def _record(
     outcome: SolarStageAuditOutcome,
     output: Path,
 ) -> dict[str, Any]:
+    if (
+        outcome.architecture_sha256 is not None
+        and outcome.architecture_sha256 != identity["architecture_sha256"]
+    ):
+        raise ValueError("readiness worker architecture identity mismatch")
     ready = outcome.ready
     stages = [
         _rebase_stage(dict(stage), Path(outcome.output_dir or ""), output)
@@ -207,7 +246,6 @@ def _record(
         "schema_version": CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION,
         **identity,
         "status": "ready" if ready else "failed",
-        "architecture_sha256": outcome.architecture_sha256,
         "failure_stage": outcome.failure_stage,
         "reason_code": outcome.reason_code,
         "message": outcome.message,
@@ -334,7 +372,7 @@ def _summary(
     by_problem: dict[str, list[bool]] = defaultdict(list)
     for record in records:
         by_problem[str(record["problem_path"])].append(record["status"] == "ready")
-    ready = stage_counts["conversion_verification"] == len(records)
+    ready = all(_record_ready(record) for record in records)
     return {
         "schema_version": CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION,
         "generated_at": utc_timestamp(),
