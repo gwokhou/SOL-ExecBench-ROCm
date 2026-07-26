@@ -17,6 +17,9 @@ from sol_execbench.cli.protocol import (
     artifact,
 )
 from sol_execbench.core.solar_bridge.learn_runner import run_handler_learning
+from sol_execbench.core.solar_bridge.corpus_readiness import (
+    audit_corpus_stage_readiness,
+)
 from sol_execbench.core.solar_bridge.release import build_release_solar_manifests
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
@@ -157,6 +160,60 @@ def release_build_cli(
     return CliResult(
         data=report,
         artifacts=(artifact(result.index_path, "json_file"),),
+    )
+
+
+@solar_cli.command("corpus-audit")
+@click.argument(
+    "output",
+    type=click.Path(file_okay=False, path_type=Path),
+)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("problems/AMD_AKA/manifest.yaml"),
+    show_default=True,
+)
+@click.option("--device", default="cuda:0", show_default=True)
+@click.option("--timeout", "timeout_seconds", default=14_400.0, show_default=True)
+@click.option("--resume", is_flag=True)
+def corpus_audit_cli(
+    output: Path,
+    manifest_path: Path,
+    device: str,
+    timeout_seconds: float,
+    resume: bool,
+) -> CliResult:
+    """Audit extraction, strict conversion, and replay for every scored workload."""
+    try:
+        result = audit_corpus_stage_readiness(
+            manifest_path,
+            output,
+            device=device,
+            timeout_seconds=timeout_seconds,
+            resume=resume,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="solar_corpus_audit_failed",
+            exit_code=EXIT_RESULT_FAILED,
+            hint="Inspect the failed workload matrix and rerun on gfx1200.",
+        ) from exc
+    color = "green" if result.ready else "yellow"
+    console.print(
+        f"[{color}]SOLAR corpus readiness: "
+        f"{result.verification_passed}/{result.workloads} workloads verified."
+        f"[/{color}]"
+    )
+    return CliResult(
+        data=result.to_dict(),
+        artifacts=(
+            artifact(result.matrix_path, "jsonl_file"),
+            artifact(result.summary_path, "json_file"),
+        ),
+        exit_code=0 if result.ready else EXIT_RESULT_FAILED,
     )
 
 

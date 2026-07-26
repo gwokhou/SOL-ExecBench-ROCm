@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as functional
 import yaml
 
+from solar.graph import extraction
 from solar.analysis.graph_analyzer import EinsumGraphAnalyzer
 from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import extract_operator_graph
@@ -39,6 +40,10 @@ def _stack(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
     return torch.stack((left, right), dim=0)
 
 
+def _vstack(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
+    return torch.vstack((left, right))
+
+
 def _cumsum(value: torch.Tensor) -> torch.Tensor:
     return torch.cumsum(value, dim=1)
 
@@ -63,6 +68,27 @@ def _sdpa(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> torch.
     return functional.scaled_dot_product_attention(query, key, value)
 
 
+def _linear(
+    value: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
+) -> torch.Tensor:
+    return functional.linear(value, weight, bias)
+
+
+def _layer_norm(
+    value: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
+) -> torch.Tensor:
+    return functional.layer_norm(value, (3,), weight, bias, 1e-5)
+
+
+def _max_values(value: torch.Tensor) -> torch.Tensor:
+    return torch.max(value, dim=1).values
+
+
+def _split_recombine(value: torch.Tensor) -> torch.Tensor:
+    first, second, third = torch.split(value, 2, dim=1)
+    return first + second + third
+
+
 def _cases() -> list[tuple[str, Callable[..., torch.Tensor], tuple[Any, ...]]]:
     return [
         ("add_relu", _add_relu, (torch.ones(2, 3), torch.full((2, 3), 2.0))),
@@ -75,6 +101,7 @@ def _cases() -> list[tuple[str, Callable[..., torch.Tensor], tuple[Any, ...]]]:
         ("view_transpose", _view_transpose, (torch.arange(6.0),)),
         ("cat", _cat, (torch.ones(2, 2), torch.zeros(2, 1))),
         ("stack", _stack, (torch.ones(2, 2), torch.zeros(2, 2))),
+        ("vstack", _vstack, (torch.ones(1, 2), torch.zeros(1, 2))),
         ("cumsum", _cumsum, (torch.arange(6.0).reshape(2, 3),)),
         (
             "masked_fill",
@@ -112,6 +139,34 @@ def _cases() -> list[tuple[str, Callable[..., torch.Tensor], tuple[Any, ...]]]:
                 torch.arange(30.0).reshape(1, 2, 3, 5) / 30,
             ),
         ),
+        (
+            "linear",
+            _linear,
+            (
+                torch.arange(6.0).reshape(2, 3),
+                torch.arange(12.0).reshape(4, 3),
+                torch.arange(4.0),
+            ),
+        ),
+        (
+            "layer_norm",
+            _layer_norm,
+            (
+                torch.arange(6.0).reshape(2, 3),
+                torch.ones(3),
+                torch.zeros(3),
+            ),
+        ),
+        (
+            "max_values",
+            _max_values,
+            (torch.arange(6.0).reshape(2, 3),),
+        ),
+        (
+            "split_recombine",
+            _split_recombine,
+            (torch.arange(12.0).reshape(2, 6),),
+        ),
     ]
 
 
@@ -136,7 +191,7 @@ def test_cpu_pipeline_preserves_reference_semantics(
     actual = EinsumGraphExecutor(graph)(*inputs)
 
     torch.testing.assert_close(actual, reference(*inputs), equal_nan=True)
-    assert graph["source_input_indices"] == list(operator.used_source_indices)
+    assert sorted(graph["source_input_indices"]) == sorted(operator.used_source_indices)
     assert graph["outputs"]
     assert (output / "af_einsum_graph.yaml").is_file()
     analysis = EinsumGraphAnalyzer().analyze_graph(
@@ -169,6 +224,23 @@ def test_extraction_tracks_only_tensor_inputs_used_by_reference(tmp_path: Path) 
     assert len(artifact.reference_outputs) == 2
 
 
+def test_extraction_preserves_source_positions_when_use_order_differs(
+    tmp_path: Path,
+) -> None:
+    def reference(first: torch.Tensor, second: torch.Tensor) -> torch.Tensor:
+        return torch.sub(second, first)
+
+    artifact = extract_operator_graph(
+        reference,
+        (torch.ones(2), torch.full((2,), 3.0)),
+        device="cpu",
+        output_dir=tmp_path,
+        name="first-use-order",
+    )
+
+    assert artifact.used_source_indices == (0, 1)
+
+
 def test_extraction_rejects_non_tensor_reference_output(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="tensor reference inputs and outputs"):
         extract_operator_graph(
@@ -178,3 +250,32 @@ def test_extraction_rejects_non_tensor_reference_output(tmp_path: Path) -> None:
             output_dir=tmp_path,
             name="invalid",
         )
+
+
+def test_make_fx_fallback_preserves_explicit_backward_reference(
+    tmp_path: Path, monkeypatch
+) -> None:
+    def fail_torchview(*_args, **_kwargs):
+        raise RuntimeError("torchview cannot trace backward")
+
+    def reference(value: torch.Tensor, grad_output: torch.Tensor):
+        tracked = value.clone().detach().requires_grad_()
+        (tracked.square()).backward(grad_output)
+        return tracked.grad
+
+    monkeypatch.setattr(extraction, "draw_graph_with_verified_coverage", fail_torchview)
+    inputs = (torch.arange(4.0), torch.ones(4))
+    operator = extract_operator_graph(
+        reference,
+        inputs,
+        device="cpu",
+        output_dir=tmp_path,
+        name="backward-fallback",
+    )
+    converted = convert_operator_graph(operator, output_dir=tmp_path)
+    graph = yaml.safe_load(converted.path.read_text())
+
+    assert graph["joint_graph"] is False
+    assert any(layer.get("phase") == "reference" for layer in graph["layers"].values())
+    actual = EinsumGraphExecutor(graph)(*inputs)
+    torch.testing.assert_close(actual, reference(*inputs))

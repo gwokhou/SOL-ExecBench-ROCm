@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from sol_execbench.cli.commands import solar as solar_commands
 from sol_execbench.cli.main import cli
+from sol_execbench.core.solar_bridge.corpus_readiness import CorpusStageAuditResult
 from sol_execbench.core.solar_bridge.models import SolarAnalysisOutcome
 
 
@@ -170,6 +171,47 @@ def test_solar_analyze_cli_structures_runner_timeout(tmp_path, monkeypatch) -> N
     assert payload["data"]["status"] == "failed"
     assert payload["data"]["stage"] == "outer_bridge"
     assert payload["data"]["reason_code"] == "worker_execution_failed"
+
+
+def test_solar_corpus_audit_returns_incomplete_matrix(tmp_path, monkeypatch) -> None:
+    output = tmp_path / "audit"
+    matrix = output / "matrix.jsonl"
+    summary = output / "summary.json"
+    monkeypatch.setattr(
+        solar_commands,
+        "audit_corpus_stage_readiness",
+        lambda *args, **kwargs: CorpusStageAuditResult(
+            status="incomplete",
+            problems=35,
+            workloads=122,
+            extraction_passed=118,
+            conversion_passed=84,
+            verification_passed=61,
+            fully_ready_problems=17,
+            matrix_path=matrix,
+            summary_path=summary,
+        ),
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "solar",
+            "corpus-audit",
+            str(output),
+        ],
+    )
+
+    payload = json.loads(result.output)
+    assert result.exit_code == 1
+    assert payload["data"]["workloads"] == 122
+    assert payload["data"]["verification_passed"] == 61
+    assert {item["path"] for item in payload["artifacts"]} == {
+        str(matrix),
+        str(summary),
+    }
 
 
 def test_solar_learn_handler_cli_reports_generated_candidate(

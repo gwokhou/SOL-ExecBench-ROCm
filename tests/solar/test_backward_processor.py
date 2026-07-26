@@ -78,6 +78,22 @@ def test_extract_backward_graph_emits_replayable_joint_program(
     assert replay is not None
 
 
+def test_make_fx_reference_records_strict_conversion_provenance() -> None:
+    from torch.fx.experimental.proxy_tensor import make_fx
+
+    graph = make_fx(lambda value: torch.sin(value))(torch.ones(2))
+    result = BackwardProcessor().serialize_fx_reference(graph, "reference")
+
+    assert result["schema_version"] == 3
+    assert result["extraction_kind"] == "make_fx_reference_v1"
+    assert result["joint_graph"] is False
+    assert any(layer.get("phase") == "reference" for layer in result["layers"].values())
+    assert all(
+        layer.get("phase") in {"input", "reference"}
+        for layer in result["layers"].values()
+    )
+
+
 def test_backward_requires_pinned_torch_version(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(torch, "__version__", "2.10.0")
 
@@ -109,10 +125,18 @@ def test_argument_and_tensor_metadata_serialization() -> None:
 
     assert BackwardProcessor._serialize_argument(node, inputs) == {"tensor": 0}
     assert BackwardProcessor._serialize_argument(
-        (torch.float16, torch.device("cpu"), None, [2, "x"]), inputs
+        (
+            torch.float16,
+            torch.device("cpu"),
+            torch.strided,
+            None,
+            [2, "x"],
+        ),
+        inputs,
     ) == [
         {"dtype": "float16"},
         {"device": "cpu"},
+        {"layout": "strided"},
         {"value": None},
         [{"value": 2}, {"value": "x"}],
     ]

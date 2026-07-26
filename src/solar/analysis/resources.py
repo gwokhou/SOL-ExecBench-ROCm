@@ -51,6 +51,7 @@ _MEMORY_ONLY_OPS = frozenset(
         "split",
         "stack",
         "tensor_split",
+        "vstack",
     }
 )
 _MFMA_OPS = frozenset(

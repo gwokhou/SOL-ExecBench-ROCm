@@ -300,7 +300,9 @@ class RecorderTensor(torch.Tensor):
         input_context = next(iter(recorder_nodes)).context
         collect_attributes = next(iter(recorder_nodes)).collect_attributes
 
-        # Build ordered_input_nodes in positional arg order.
+        # Build ordered_input_nodes in positional argument order followed by
+        # keyword insertion order. Tensor-valued functional kwargs (for
+        # example layer_norm weight/bias) are graph inputs, not metadata.
         # For each tensor arg:
         #   - RecorderTensor -> use its existing TensorNode
         #   - plain torch.Tensor (nn.Parameter) -> create a parameter-tensor TensorNode
@@ -309,7 +311,7 @@ class RecorderTensor(torch.Tensor):
         all_input_shapes: list[tuple[int, ...]] = []
         _seen_param_ids: set[int] = set()
 
-        for arg in _flatten_args(args):
+        for arg in _flatten_args((args, kwargs)):
             if (
                 not isinstance(arg, torch.Tensor)
                 or not hasattr(arg, "shape")
@@ -385,6 +387,9 @@ def _flatten_args(args: Any) -> list[Any]:
     result: list[Any] = []
     if isinstance(args, (tuple, list)):
         for item in args:
+            result.extend(_flatten_args(item))
+    elif isinstance(args, dict):
+        for item in args.values():
             result.extend(_flatten_args(item))
     else:
         result.append(args)

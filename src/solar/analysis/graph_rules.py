@@ -104,6 +104,7 @@ ZERO_COMPUTE_OPS = frozenset(
         "cat",
         "concat",
         "stack",
+        "vstack",
         "chunk",
         "split",
         "tensor_split",

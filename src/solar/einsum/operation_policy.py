@@ -137,6 +137,7 @@ _SHAPES = {
     "cat",
     "concat",
     "stack",
+    "vstack",
     "split",
     "chunk",
     "__getitem__",

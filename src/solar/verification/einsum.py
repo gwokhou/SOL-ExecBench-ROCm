@@ -27,14 +27,13 @@ from solar.einsum.semantics import (
     annotate_semantics,
     validate_semantic_graph,
 )
-
-
-class VerificationError(ValueError):
-    """The reference and einsum graph could not be proven equivalent."""
-
-
-class EinsumExecutionError(VerificationError):
-    """An einsum graph cannot be executed exactly by the built-in verifier."""
+from solar.verification.errors import EinsumExecutionError, VerificationError
+from solar.verification.numerics import (
+    alias_relation as _alias_relation,
+    assert_close as _assert_close,
+    clone as _clone,
+    pattern_inputs as _pattern_inputs,
+)
 
 
 def _canonical_hash(value: Mapping[str, Any]) -> str:
@@ -46,163 +45,6 @@ def _canonical_hash(value: Mapping[str, Any]) -> str:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _clone(value: Any) -> Any:
-    import torch
-
-    if isinstance(value, torch.Tensor):
-        return value.clone()
-    if isinstance(value, tuple):
-        return tuple(_clone(item) for item in value)
-    if isinstance(value, list):
-        return [_clone(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _clone(item) for key, item in value.items()}
-    return value
-
-
-def _tensor_leaves(value: Any) -> list[Any]:
-    import torch
-
-    if isinstance(value, torch.Tensor):
-        return [value]
-    if isinstance(value, (tuple, list)):
-        return [leaf for item in value for leaf in _tensor_leaves(item)]
-    if isinstance(value, dict):
-        return [leaf for key in value for leaf in _tensor_leaves(value[key])]
-    return []
-
-
-def _same_storage(left: Any, right: Any) -> bool:
-    """Return whether two tensor leaves observably alias the same storage."""
-    import torch
-
-    if not isinstance(left, torch.Tensor) or not isinstance(right, torch.Tensor):
-        return False
-    if left is right:
-        return True
-    try:
-        return left.untyped_storage()._cdata == right.untyped_storage()._cdata
-    except RuntimeError:
-        return False
-
-
-def _alias_relation(outputs: Any, inputs: Any) -> tuple[tuple[bool, ...], ...]:
-    leaves = [*_tensor_leaves(inputs), *_tensor_leaves(outputs)]
-    return tuple(
-        tuple(_same_storage(left, right) for right in leaves) for left in leaves
-    )
-
-
-def _assert_close(
-    actual: Any,
-    expected: Any,
-    atol: float,
-    rtol: float,
-    *,
-    required_matched_ratio: float = 1.0,
-    max_error_cap: float | None = None,
-    allow_negative_inf: bool = False,
-) -> dict[str, float]:
-    import torch
-
-    if isinstance(actual, torch.Tensor) and isinstance(expected, torch.Tensor):
-        if actual.shape != expected.shape:
-            raise VerificationError(
-                f"output shape mismatch: einsum={tuple(actual.shape)}, "
-                f"reference={tuple(expected.shape)}"
-            )
-        if actual.dtype != expected.dtype:
-            raise VerificationError(
-                f"output dtype mismatch: einsum={actual.dtype}, reference={expected.dtype}"
-            )
-        if not (actual.is_floating_point() or actual.is_complex()):
-            if not torch.equal(actual, expected):
-                raise VerificationError("integer/bool tensor values differ")
-            return {"max_abs_error": 0.0}
-        calculation_dtype = torch.complex64 if actual.is_complex() else torch.float32
-        output = actual.to(calculation_dtype)
-        reference = expected.to(calculation_dtype)
-        matching_negative_inf = torch.zeros_like(output, dtype=torch.bool)
-        if allow_negative_inf:
-            matching_negative_inf = torch.isneginf(output) & torch.isneginf(reference)
-        if bool(
-            ((~torch.isfinite(output)) & ~matching_negative_inf).any()
-            or ((~torch.isfinite(reference)) & ~matching_negative_inf).any()
-        ):
-            raise VerificationError("non-finite tensor values are not allowed")
-        if (
-            torch.linalg.vector_norm(reference).item() > 0
-            and torch.linalg.vector_norm(output).item() == 0
-        ):
-            raise VerificationError("all-zero output disagrees with reference")
-        if allow_negative_inf:
-            finite_mask = ~matching_negative_inf
-            output = output[finite_mask]
-            reference = reference[finite_mask]
-        difference = (output - reference).abs()
-        matched = difference <= atol + rtol * reference.abs()
-        matched_ratio = float(matched.float().mean().item()) if matched.numel() else 1.0
-        max_abs = float(difference.max().item()) if difference.numel() else 0.0
-        if matched_ratio < required_matched_ratio:
-            raise VerificationError(
-                f"numerical mismatch: matched_ratio={matched_ratio:.6g}, "
-                f"required={required_matched_ratio:.6g}, max_abs={max_abs:.6g}"
-            )
-        if max_error_cap is not None:
-            if max_abs > max_error_cap:
-                raise VerificationError(
-                    f"maximum error {max_abs:.6g} exceeds cap {max_error_cap:.6g}"
-                )
-        return {"max_abs_error": max_abs, "matched_ratio": matched_ratio}
-    if isinstance(actual, (tuple, list)) and isinstance(expected, (tuple, list)):
-        if len(actual) != len(expected):
-            raise VerificationError("output arity mismatch")
-        stats = [
-            _assert_close(
-                a,
-                e,
-                atol,
-                rtol,
-                required_matched_ratio=required_matched_ratio,
-                max_error_cap=max_error_cap,
-                allow_negative_inf=allow_negative_inf,
-            )
-            for a, e in zip(actual, expected)
-        ]
-        return {
-            "max_abs_error": max((s["max_abs_error"] for s in stats), default=0.0),
-            "matched_ratio": min(
-                (s.get("matched_ratio", 1.0) for s in stats), default=1.0
-            ),
-        }
-    if isinstance(actual, dict) and isinstance(expected, dict):
-        if actual.keys() != expected.keys():
-            raise VerificationError("output mapping keys differ")
-        stats = [
-            _assert_close(
-                actual[key],
-                expected[key],
-                atol,
-                rtol,
-                required_matched_ratio=required_matched_ratio,
-                max_error_cap=max_error_cap,
-                allow_negative_inf=allow_negative_inf,
-            )
-            for key in actual
-        ]
-        return {
-            "max_abs_error": max((s["max_abs_error"] for s in stats), default=0.0),
-            "matched_ratio": min(
-                (s.get("matched_ratio", 1.0) for s in stats), default=1.0
-            ),
-        }
-    if actual != expected:
-        raise VerificationError(
-            f"non-tensor output mismatch: {actual!r} != {expected!r}"
-        )
-    return {"max_abs_error": 0.0, "matched_ratio": 1.0}
 
 
 _TOKEN = re.compile(r"[A-Za-z][0-9]*")
@@ -229,6 +71,66 @@ def _torch_equation(equation: str) -> str:
 def _shapes(layer: Mapping[str, Any]) -> list[tuple[int, ...]]:
     outputs = (layer.get("tensor_shapes") or {}).get("outputs") or []
     return [tuple(int(dim) for dim in shape) for shape in outputs]
+
+
+def _decode_semantic_argument(
+    argument: Any, operands: Sequence[Any], layer_id: str
+) -> Any:
+    import torch
+
+    if argument == "preserve_format":
+        return torch.preserve_format
+    if argument == "contiguous_format":
+        return torch.contiguous_format
+    if isinstance(argument, list):
+        return [
+            _decode_semantic_argument(item, operands, layer_id) for item in argument
+        ]
+    if isinstance(argument, tuple):
+        return tuple(
+            _decode_semantic_argument(item, operands, layer_id) for item in argument
+        )
+    if not isinstance(argument, Mapping):
+        return argument
+    if "tensor" in argument:
+        index = int(argument["tensor"])
+        if index < 0 or index >= len(operands):
+            raise EinsumExecutionError(
+                f"layer {layer_id} references missing tensor argument {index}"
+            )
+        return operands[index]
+    if "dtype" in argument:
+        dtype = getattr(torch, str(argument["dtype"]), None)
+        if not isinstance(dtype, torch.dtype):
+            raise EinsumExecutionError(
+                f"layer {layer_id} references invalid dtype {argument['dtype']!r}"
+            )
+        return dtype
+    if "device" in argument:
+        return torch.device(str(argument["device"]))
+    if "layout" in argument:
+        layout = getattr(torch, str(argument["layout"]), None)
+        if not isinstance(layout, torch.layout):
+            raise EinsumExecutionError(
+                f"layer {layer_id} references invalid layout {argument['layout']!r}"
+            )
+        return layout
+    if "value" in argument:
+        value = argument["value"]
+        if value == "__ellipsis__":
+            return Ellipsis
+        if value == "preserve_format":
+            return torch.preserve_format
+        if value == "contiguous_format":
+            return torch.contiguous_format
+        return value
+    if "slice" in argument:
+        values = [
+            _decode_semantic_argument(item, operands, layer_id)
+            for item in argument["slice"]
+        ]
+        return slice(*values)
+    raise EinsumExecutionError(f"layer {layer_id} has an invalid semantic argument")
 
 
 class EinsumGraphExecutor:
@@ -412,52 +314,12 @@ class EinsumGraphExecutor:
         if semantic["kind"] == "einsum":
             return torch.einsum(_torch_equation(str(semantic["equation"])), *operands)
 
-        def decode(argument: Any) -> Any:
-            if argument == "preserve_format":
-                return torch.preserve_format
-            if argument == "contiguous_format":
-                return torch.contiguous_format
-            if isinstance(argument, list):
-                return [decode(item) for item in argument]
-            if isinstance(argument, tuple):
-                return tuple(decode(item) for item in argument)
-            if not isinstance(argument, Mapping):
-                return argument
-            if "tensor" in argument:
-                index = int(argument["tensor"])
-                if index < 0 or index >= len(operands):
-                    raise EinsumExecutionError(
-                        f"layer {layer_id} references missing tensor argument {index}"
-                    )
-                return operands[index]
-            if "dtype" in argument:
-                dtype = getattr(torch, str(argument["dtype"]), None)
-                if not isinstance(dtype, torch.dtype):
-                    raise EinsumExecutionError(
-                        f"layer {layer_id} references invalid dtype {argument['dtype']!r}"
-                    )
-                return dtype
-            if "device" in argument:
-                return torch.device(str(argument["device"]))
-            if "value" in argument:
-                value = argument["value"]
-                if value == "__ellipsis__":
-                    return Ellipsis
-                if value == "preserve_format":
-                    return torch.preserve_format
-                if value == "contiguous_format":
-                    return torch.contiguous_format
-                return value
-            if "slice" in argument:
-                values = [decode({"value": item}) for item in argument["slice"]]
-                return slice(*values)
-            raise EinsumExecutionError(
-                f"layer {layer_id} has an invalid semantic argument"
-            )
-
-        arguments = [decode(item) for item in semantic.get("arguments") or []]
+        arguments = [
+            _decode_semantic_argument(item, operands, layer_id)
+            for item in semantic.get("arguments") or []
+        ]
         kwargs = {
-            str(key): decode(value)
+            str(key): _decode_semantic_argument(value, operands, layer_id)
             for key, value in (semantic.get("kwargs") or {}).items()
         }
         target = str(semantic.get("target", ""))
@@ -501,6 +363,7 @@ class EinsumGraphExecutor:
             "gelu": functional.gelu,
             "hardsigmoid": functional.hardsigmoid,
             "hardswish": functional.hardswish,
+            "leaky_relu": functional.leaky_relu,
             "log": torch.log,
             "mish": functional.mish,
             "neg": torch.neg,
@@ -536,8 +399,7 @@ class EinsumGraphExecutor:
         if target == "detach":
             return arguments[0].detach()
         if target in {"softmax", "log_softmax"}:
-            function = torch.softmax if target == "softmax" else torch.log_softmax
-            return function(*arguments, **kwargs)
+            return getattr(functional, target)(*arguments, **kwargs)
         if target in {
             "sum",
             "mean",
@@ -579,6 +441,8 @@ class EinsumGraphExecutor:
             if arguments and isinstance(arguments[0], (list, tuple)):
                 return getattr(torch, target)(*arguments, **kwargs)
             return getattr(torch, target)(arguments, **kwargs)
+        if target == "vstack":
+            return torch.vstack(*arguments, **kwargs)
         if target in {"chunk", "split"}:
             return getattr(torch, target)(*arguments, **kwargs)
         if target in {"gather", "scatter", "index_select", "select", "narrow"}:
@@ -608,9 +472,12 @@ class EinsumGraphExecutor:
         if target in {
             "batch_norm",
             "group_norm",
+            "instance_norm",
             "layer_norm",
             "embedding",
             "embedding_bag",
+            "dropout",
+            "max_pool2d",
         }:
             return getattr(functional, target)(*arguments, **kwargs)
         if target == "scaled_dot_product_attention":
@@ -642,33 +509,6 @@ class EinsumGraphExecutor:
         )
 
 
-def _pattern_inputs(inputs: tuple[Any, ...], pattern: str) -> tuple[Any, ...]:
-    import torch
-
-    def transform(value: Any) -> Any:
-        if not isinstance(value, torch.Tensor):
-            return value
-        if pattern == "random":
-            return value
-        if pattern == "zeros":
-            return torch.zeros_like(value)
-        if pattern == "boundary":
-            if value.is_floating_point():
-                flat = torch.arange(value.numel(), device=value.device).reshape(
-                    value.shape
-                )
-                return ((flat % 3) - 1).to(value.dtype)
-            if value.dtype == torch.bool:
-                flat = torch.arange(value.numel(), device=value.device).reshape(
-                    value.shape
-                )
-                return (flat % 2).bool()
-            return torch.zeros_like(value)
-        raise VerificationError(f"unknown verification input pattern: {pattern}")
-
-    return tuple(transform(item) for item in inputs)
-
-
 def _load_module(path: Path) -> Any:
     name = f"_solar_verify_{_sha256(path)[:16]}"
     spec = importlib.util.spec_from_file_location(name, path)
@@ -678,6 +518,113 @@ def _load_module(path: Path) -> Any:
     sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
+
+
+_PreparedCase = tuple[
+    dict[str, Any],
+    int,
+    str,
+    tuple[Any, ...],
+    tuple[Any, ...],
+    tuple[Any, ...],
+]
+_ComparisonPolicy = tuple[float, float, float, float | None, bool]
+
+
+def _prepare_case(
+    input_factory: Callable[..., Any],
+    graph: Mapping[str, Any],
+    case: Mapping[str, Any],
+    device: str,
+) -> _PreparedCase:
+    import torch
+
+    parameters = dict(case.get("parameters") or {})
+    seed, pattern = int(case["seed"]), str(case["pattern"])
+    generated = input_factory({**parameters, "seed": seed}, device)
+    inputs = tuple(generated) if isinstance(generated, (tuple, list)) else (generated,)
+    reference_inputs = _clone(_pattern_inputs(inputs, pattern))
+    source_indices = graph.get("source_input_indices")
+    if source_indices is None:
+        reference_tensor_inputs = tuple(
+            value for value in reference_inputs if isinstance(value, torch.Tensor)
+        )
+    else:
+        try:
+            reference_tensor_inputs = tuple(
+                reference_inputs[int(index)] for index in source_indices
+            )
+        except (IndexError, TypeError, ValueError) as exc:
+            raise VerificationError("graph has invalid source_input_indices") from exc
+        if not all(
+            isinstance(value, torch.Tensor) for value in reference_tensor_inputs
+        ):
+            raise VerificationError(
+                "graph source_input_indices must select tensor arguments"
+            )
+    return (
+        parameters,
+        seed,
+        pattern,
+        reference_inputs,
+        reference_tensor_inputs,
+        _clone(reference_tensor_inputs),
+    )
+
+
+def _verify_case(
+    reference: Callable[..., Any],
+    executor: EinsumGraphExecutor,
+    graph: Mapping[str, Any],
+    prepared: _PreparedCase,
+    policy: _ComparisonPolicy,
+) -> dict[str, float]:
+    import torch
+
+    _, _, pattern, reference_inputs, reference_tensor_inputs, executor_inputs = prepared
+    atol, rtol, required_ratio, error_cap, allow_negative_inf = policy
+    with torch.enable_grad():
+        expected = reference(*reference_inputs)
+    with torch.inference_mode():
+        actual = executor(*executor_inputs)
+        try:
+            stats = _assert_close(
+                actual,
+                expected,
+                atol,
+                rtol,
+                required_matched_ratio=required_ratio,
+                max_error_cap=error_cap,
+                allow_negative_inf=allow_negative_inf,
+                allow_matching_nan=pattern in {"zeros", "boundary"},
+            )
+        except VerificationError as error:
+            if (
+                error_cap is not None
+                or not str(error).startswith("numerical mismatch:")
+                or not _einsum_roundoff_equivalent(
+                    graph, executor_inputs, actual, expected
+                )
+            ):
+                raise
+            stats = _assert_close(
+                actual,
+                expected,
+                atol,
+                rtol,
+                required_matched_ratio=0.0,
+                allow_negative_inf=allow_negative_inf,
+                allow_matching_nan=pattern in {"zeros", "boundary"},
+            )
+            stats["roundoff_bound_verified"] = 1.0
+        _assert_close(executor_inputs, reference_tensor_inputs, atol, rtol)
+        if _alias_relation(actual, executor_inputs) != _alias_relation(
+            expected, reference_tensor_inputs
+        ):
+            raise VerificationError(
+                "output/input alias relationships differ from the reference"
+            )
+    return stats
 
 
 def _run_cases(
@@ -694,62 +641,15 @@ def _run_cases(
     device: str,
     check_shapes: bool,
 ) -> list[dict[str, Any]]:
+    import torch
+
     executor = EinsumGraphExecutor(graph, check_shapes=check_shapes)
+    policy = (atol, rtol, required_matched_ratio, max_error_cap, allow_negative_inf)
     results: list[dict[str, Any]] = []
     for case in cases:
-        parameters = dict(case.get("parameters") or {})
-        seed = int(case["seed"])
-        pattern = str(case["pattern"])
-        generated = input_factory({**parameters, "seed": seed}, device)
-        inputs = (
-            tuple(generated) if isinstance(generated, (tuple, list)) else (generated,)
-        )
-        inputs = _pattern_inputs(inputs, pattern)
-        reference_inputs = _clone(inputs)
-        # Executable einsum graphs carry Python scalar arguments in semantic
-        # kwargs rather than as tensor start nodes.  Preserve every argument
-        # for the reference, but replay only tensor inputs through the graph.
-        import torch
-
-        source_input_indices = graph.get("source_input_indices")
-        if source_input_indices is None:
-            reference_tensor_inputs = tuple(
-                value for value in reference_inputs if isinstance(value, torch.Tensor)
-            )
-        else:
-            try:
-                reference_tensor_inputs = tuple(
-                    reference_inputs[int(index)] for index in source_input_indices
-                )
-            except (IndexError, TypeError, ValueError) as exc:
-                raise VerificationError(
-                    "graph has invalid source_input_indices"
-                ) from exc
-            if not all(
-                isinstance(value, torch.Tensor) for value in reference_tensor_inputs
-            ):
-                raise VerificationError(
-                    "graph source_input_indices must select tensor arguments"
-                )
-        executor_inputs = _clone(reference_tensor_inputs)
-        expected = reference(*reference_inputs)
-        actual = executor(*executor_inputs)
-        stats = _assert_close(
-            actual,
-            expected,
-            atol,
-            rtol,
-            required_matched_ratio=required_matched_ratio,
-            max_error_cap=max_error_cap,
-            allow_negative_inf=allow_negative_inf,
-        )
-        _assert_close(executor_inputs, reference_tensor_inputs, atol, rtol)
-        if _alias_relation(actual, executor_inputs) != _alias_relation(
-            expected, reference_tensor_inputs
-        ):
-            raise VerificationError(
-                "output/input alias relationships differ from the reference"
-            )
+        prepared = _prepare_case(input_factory, graph, case, device)
+        parameters, seed, pattern, *_ = prepared
+        stats = _verify_case(reference, executor, graph, prepared, policy)
         results.append(
             {
                 "seed": seed,
@@ -758,7 +658,87 @@ def _run_cases(
                 **stats,
             }
         )
+        del prepared
+        if torch.cuda.is_available() and str(device).startswith(("cuda", "rocm")):
+            torch.cuda.empty_cache()
     return results
+
+
+def _einsum_roundoff_equivalent(
+    graph: Mapping[str, Any],
+    operands: Sequence[Any],
+    actual: Any,
+    expected: Any,
+) -> bool:
+    """Prove a pure float32 contraction against the standard γₙ error bound."""
+    import torch
+
+    operations = [
+        layer
+        for layer in (graph.get("layers") or {}).values()
+        if str(layer.get("type", "")).lower() != "start"
+    ]
+    if (
+        len(operations) != 1
+        or not isinstance(actual, torch.Tensor)
+        or not isinstance(expected, torch.Tensor)
+        or actual.dtype != torch.float32
+        or expected.dtype != torch.float32
+        or any(
+            not isinstance(value, torch.Tensor) or value.dtype != torch.float32
+            for value in operands
+        )
+    ):
+        return False
+    semantic = operations[0].get("semantic_op") or {}
+    if semantic.get("kind") != "einsum":
+        return False
+    equation = str(semantic.get("equation", ""))
+    reduction_size = _einsum_reduction_size(equation, operands)
+    unit_roundoff = 2.0**-24
+    if reduction_size is None or reduction_size * unit_roundoff >= 1.0:
+        return False
+    try:
+        torch_equation = _torch_equation(equation)
+        precise = [value.double() for value in operands]
+        oracle = torch.einsum(torch_equation, *precise)
+        absolute_sum = torch.einsum(torch_equation, *(value.abs() for value in precise))
+    except (RuntimeError, EinsumExecutionError):
+        return False
+    gamma = reduction_size * unit_roundoff / (1.0 - reduction_size * unit_roundoff)
+    bound = gamma * absolute_sum + unit_roundoff * oracle.abs()
+    slack = torch.finfo(torch.float64).eps * torch.maximum(
+        torch.ones_like(bound), oracle.abs()
+    )
+    limit = bound + slack
+    return bool(
+        ((actual.double() - oracle).abs() <= limit).all()
+        and ((expected.double() - oracle).abs() <= limit).all()
+    )
+
+
+def _einsum_reduction_size(equation: str, operands: Sequence[Any]) -> int | None:
+    if "->" not in equation:
+        return None
+    inputs, output = equation.split("->", maxsplit=1)
+    terms = inputs.split(",")
+    if len(terms) != len(operands):
+        return None
+    dimensions: dict[str, int] = {}
+    input_tokens: set[str] = set()
+    for term, operand in zip(terms, operands):
+        tokens = _TOKEN.findall(term)
+        if len(tokens) != operand.ndim:
+            return None
+        for token, size in zip(tokens, operand.shape):
+            if token in dimensions and dimensions[token] != int(size):
+                return None
+            dimensions[token] = int(size)
+            input_tokens.add(token)
+    reduced = input_tokens - set(_TOKEN.findall(output))
+    if not reduced:
+        return None
+    return math.prod(dimensions[token] for token in reduced)
 
 
 def create_verification_artifact(

@@ -23,7 +23,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Type aliases for better readability
-GraphValue = Any
+DynamicValue = Any
+GraphValue = DynamicValue
 TensorShape = List[int]
 NodeDict = Dict[str, Any]
 EdgeList = List[Tuple[str, str]]

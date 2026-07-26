@@ -73,6 +73,16 @@ uv run python scripts/internal/rdna4/run_rdna4_validation.py \
   --verify out/rdna4-local
 ```
 
+The same self-hosted workflow also runs the complete SOLAR three-stage corpus
+audit and uploads its content-addressed `gfx1200` readiness matrix. For a local
+equivalent:
+
+```bash
+uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
+  --device cuda:0 \
+  --timeout 14400
+```
+
 The exact RX 9060 XT/ROCm/PyTorch/HIP scope and the non-release authority of
 these content-addressed bundles are documented in
 [RDNA4 Validation Scope](RDNA4-VALIDATION.md).

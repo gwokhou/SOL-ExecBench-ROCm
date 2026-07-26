@@ -42,19 +42,46 @@ def extract_operator_graph(
     """Trace ``reference`` without performing any einsum conversion."""
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
-    observed, tensor_inputs, used_indices = _trace_reference(
-        reference, tuple(inputs), device=device, output=output, name=name
-    )
+    source_inputs = tuple(inputs)
+    try:
+        observed, tensor_inputs, used_indices = _trace_reference(
+            reference, source_inputs, device=device, output=output, name=name
+        )
+    except RuntimeError as torchview_error:
+        from solar.graph.make_fx_extraction import trace_make_fx_reference
+
+        observed, tensor_inputs, operator_path = trace_make_fx_reference(
+            reference,
+            source_inputs,
+            output=output,
+            name=name,
+            torchview_error=torchview_error,
+        )
+        return _artifact(
+            operator_path,
+            observed,
+            tensor_inputs,
+            sorted(tensor_inputs),
+        )
     traced_path = output / "pytorch_graph.yaml"
     operator_path = output / "operator_graph.yaml"
     traced_path.replace(operator_path)
+    return _artifact(operator_path, observed, tensor_inputs, used_indices)
+
+
+def _artifact(
+    operator_path: Path,
+    observed: Any,
+    tensor_inputs: dict[int, Any],
+    used_indices: Sequence[int],
+) -> OperatorGraphArtifact:
     return OperatorGraphArtifact(
         path=operator_path,
         source_inputs=tuple(
             (index, _tensor_signature(value))
             for index, value in sorted(tensor_inputs.items())
         ),
-        used_source_indices=tuple(sorted(used_indices)),
+        used_source_indices=tuple(used_indices),
         reference_outputs=tuple(
             _tensor_signature(value) for value in _outputs(observed)
         ),
@@ -82,7 +109,7 @@ def _trace_reference(
     device: str,
     output: Path,
     name: str,
-) -> tuple[Any, dict[int, Any], set[int]]:
+) -> tuple[Any, dict[int, Any], list[int]]:
     import torch
     import torch.nn as nn
     from torch.utils._python_dispatch import TorchDispatchMode
@@ -128,8 +155,20 @@ def _trace_reference(
     observe(observed)
     module = ReferenceModule().eval()
     graph = draw_graph_with_verified_coverage(module, inputs, device=device)
+    _annotate_source_inputs(graph, tensor_inputs)
     TorchviewProcessor().process_graph(graph, str(output), name, module)
-    return observed, tensor_inputs, used_indices
+    return observed, tensor_inputs, sorted(used_indices)
+
+
+def _annotate_source_inputs(graph: Any, tensor_inputs: dict[int, Any]) -> None:
+    roots = list(getattr(graph, "root_container", ()) or ())
+    ordered_inputs = sorted(tensor_inputs.items())
+    if len(roots) != len(ordered_inputs):
+        raise RuntimeError("torchview root inputs do not match reference tensor inputs")
+    for root, (source_index, tensor) in zip(roots, ordered_inputs):
+        if tuple(getattr(root, "tensor_shape", ())) != tuple(tensor.shape):
+            raise RuntimeError("torchview root input metadata does not match reference")
+        root.source_input_index = source_index
 
 
 __all__ = [

@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
+"""Subprocess entry point for one isolated SOLAR corpus-stage audit."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from sol_execbench.core.data.json_utils import load_json_value
+from sol_execbench.core.solar_bridge.analyzer import audit_workload_stages
+from sol_execbench.core.solar_bridge.models import (
+    SolarStageAuditOutcome,
+    SolarStageAuditRequest,
+)
+from sol_execbench.core.solar_bridge.worker_io import write_worker_response
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("request", type=Path)
+    parser.add_argument("response", type=Path)
+    args = parser.parse_args()
+    request = SolarStageAuditRequest.from_dict(load_json_value(args.request))
+    try:
+        outcome = audit_workload_stages(
+            problem_dir=request.problem_dir,
+            workload_uuid=request.workload_uuid,
+            output_dir=request.output_dir,
+            device=request.device,
+        )
+    except Exception as exc:
+        outcome = SolarStageAuditOutcome(
+            status="failed",
+            analysis_id=request.workload_uuid,
+            failure_stage="outer_bridge",
+            reason_code="bridge_failed",
+            message=str(exc)[:4096],
+        )
+    fallback = SolarStageAuditOutcome(
+        status="failed",
+        analysis_id=request.workload_uuid,
+        failure_stage="outer_bridge",
+        reason_code="worker_response_failed",
+        message="worker response serialization failed",
+    )
+    written = write_worker_response(
+        args.response, outcome.to_dict(), fallback.to_dict()
+    )
+    raise SystemExit(0 if written else 1)
+
+
+if __name__ == "__main__":
+    main()

@@ -42,11 +42,25 @@ jobs:
             scripts/internal/rdna4/run_rdna4_validation.py \
             --verify out/rdna4-ci \
             --expected-source-revision "${GITHUB_SHA}"
+      - name: Audit all scored SOLAR workloads
+        run: |
+          uv run --no-sync sol-execbench solar corpus-audit \
+            "${RUNNER_TEMP}/solar-corpus-readiness-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --device cuda:0 \
+            --timeout 14400
       - name: Upload RDNA4 evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: rdna4-gfx1200-${{ github.run_id }}-${{ github.run_attempt }}
           path: out/rdna4-ci
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload SOLAR corpus readiness
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solar-corpus-readiness-gfx1200-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/solar-corpus-readiness-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
           retention-days: 30

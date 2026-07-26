@@ -112,6 +112,61 @@ def _product(shape: List[int]) -> int:
     return int(result)
 
 
+def _tensor_output_is_live(tensor: Dict[str, Any]) -> bool:
+    return str(tensor.get("type", "")).lower() == "output-tensor" or bool(
+        (tensor.get("connections") or {}).get("outputs")
+    )
+
+
+_LinearInput = Tuple[int, str, Any, str]
+
+
+def _classify_linear_inputs(
+    typed_inputs: List[_LinearInput],
+) -> Tuple[
+    Optional[_LinearInput],
+    Optional[_LinearInput],
+    Optional[_LinearInput],
+]:
+    """Return activation, weight, and bias entries in exact call order."""
+    activation: Optional[_LinearInput] = None
+    weights: List[_LinearInput] = []
+    for entry in typed_inputs:
+        _, connection, _, input_type = entry
+        if input_type == "weight" or "parameter-tensor" in connection:
+            weights.append(entry)
+        elif activation is None:
+            activation = entry
+    if activation is None and typed_inputs:
+        activation = typed_inputs[0]
+    if not weights and len(typed_inputs) >= 2:
+        activation, weights = typed_inputs[0], typed_inputs[1:]
+    bias = next(
+        (
+            entry
+            for entry in weights
+            if isinstance(entry[2], list) and len(entry[2]) == 1
+        ),
+        weights[-1] if len(weights) >= 2 else None,
+    )
+    weight = next(
+        (
+            entry
+            for entry in weights
+            if (bias is None or entry[1] != bias[1])
+            and isinstance(entry[2], list)
+            and len(entry[2]) >= 2
+        ),
+        None,
+    )
+    if weight is None:
+        weight = next(
+            (entry for entry in weights if bias is None or entry[1] != bias[1]),
+            None,
+        )
+    return activation, weight, bias
+
+
 class PyTorchToEinsum:
     """Convert PyTorch computation graphs to einsum representation.
 
@@ -148,6 +203,7 @@ class PyTorchToEinsum:
         self._strict = strict
         self._einsum_analyzer = EinsumAnalyzer(debug=debug)
         self._tensor_to_producer_op: Dict[str, str] = {}
+        self._tensor_to_producer_output: Dict[str, Tuple[str, int]] = {}
 
     @property
     def debug(self) -> bool:
@@ -373,6 +429,7 @@ class PyTorchToEinsum:
         "cat",
         "concat",
         "stack",
+        "vstack",
         "split",
         "chunk",
         "__getitem__",
@@ -459,11 +516,8 @@ class PyTorchToEinsum:
     ) -> None:
         """Single pass repairing every known torchview tracing quirk.
 
-        torchview is great at recording shapes and types but consistently
-        drops a small number of well-known patterns. Three repairs run
-        here in dependency order so every downstream pass — per-op
-        handlers, op-graph build, AF emission — sees a clean ``layers``
-        dict and never has to second-guess torchview:
+        Torchview drops a few well-known shape/type patterns. These repairs run
+        in dependency order so every downstream pass sees a clean ``layers``:
 
         **(A) Dropped scalar-tensor edges** (FrobeniusNorm pattern).
         torchview can omit a tensor edge entirely when one operand is a
@@ -491,12 +545,10 @@ class PyTorchToEinsum:
         and the consumer ops' ``input_dtypes``. Shape ops pass through the
         first input's dtype.
 
-        Mutates ``layers`` in place. Initializes
-        ``self._tensor_to_producer_op``. Conservative: only unambiguous
-        1:1 matches are applied for (A) and (B); ambiguous candidates are
-        left untouched.
+        Mutates ``layers`` in place and only applies unambiguous 1:1 repairs.
         """
         self._tensor_to_producer_op.clear()
+        self._tensor_to_producer_output.clear()
         op_id_set = set(op_ids)
 
         # torchview may omit module parameters from the bipartite graph even
@@ -713,6 +765,8 @@ class PyTorchToEinsum:
             if producer_op not in ocon_in:
                 ocon_in.append(producer_op)
 
+        self._prune_unused_operation_outputs(layers, op_ids)
+
         # --- (C) Output-dtype correction ----------------------------------
         # Seed the corrected-dtype map from every NON-OP node's declared
         # dtype: regular tensor nodes (intermediates), auxiliary-tensor
@@ -814,6 +868,30 @@ class PyTorchToEinsum:
                     n = len(tdata.get("output_dtypes") or []) or 1
                     tdata["output_dtypes"] = [widest] * n
                 corrected_dtype[tid] = widest
+
+    @staticmethod
+    def _prune_unused_operation_outputs(
+        layers: Dict[str, Any], op_ids: List[str]
+    ) -> None:
+        """Drop tuple outputs that are neither returned nor consumed."""
+        for op_id in op_ids:
+            operation = layers.get(op_id) or {}
+            connections = (operation.get("connections") or {}).get("outputs") or []
+            shapes = operation.get("output_shapes") or []
+            if len(connections) <= 1 or len(connections) != len(shapes):
+                continue
+            keep = [
+                index
+                for index, tensor_id in enumerate(connections)
+                if _tensor_output_is_live(layers.get(tensor_id) or {})
+            ]
+            if not keep or len(keep) == len(connections):
+                continue
+            operation["connections"]["outputs"] = [connections[index] for index in keep]
+            for field in ("output_shapes", "output_dtypes", "output_types"):
+                values = operation.get(field) or []
+                if len(values) == len(connections):
+                    operation[field] = [values[index] for index in keep]
 
     def _validate_tensor_shape_consistency(
         self,
@@ -1135,7 +1213,21 @@ class PyTorchToEinsum:
             consumers = list(conns.get("outputs") or [])
 
             if len(producers) == 1 and producers[0] in op_ids:
-                self._tensor_to_producer_op[tensor_id] = producers[0]
+                producer_id = producers[0]
+                self._tensor_to_producer_op[tensor_id] = producer_id
+                producer = layers.get(producer_id) or {}
+                producer_outputs = list(
+                    (producer.get("connections") or {}).get("outputs") or []
+                )
+                if len(producer.get("output_shapes") or []) > 1:
+                    if tensor_id not in producer_outputs:
+                        raise ConversionError(
+                            f"cannot preserve output slot for {tensor_id}"
+                        )
+                    self._tensor_to_producer_output[tensor_id] = (
+                        producer_id,
+                        producer_outputs.index(tensor_id),
+                    )
 
             for producer in producers:
                 for consumer in consumers:
@@ -1218,6 +1310,9 @@ class PyTorchToEinsum:
                     "consumers": valid_consumers,
                     "recovered_from": (aux_data.get("module_args") or {}).get(
                         "recovered_from"
+                    ),
+                    "source_input_index": (aux_data.get("module_args") or {}).get(
+                        "source_input_index"
                     ),
                 }
             )
@@ -2887,7 +2982,10 @@ class PyTorchToEinsum:
 
         # Keep original input order from PyTorch graph; don't sort.
         node_connections = (node_data.get("connections") or {}).get("inputs") or []
-        input_connections = list(node_connections)
+        input_connections = [
+            start_node_id_map.get(connection, connection)
+            for connection in node_connections
+        ]
         for pred in op_graph.predecessors(node_id):
             if pred not in input_connections:
                 input_connections.append(pred)
@@ -2923,51 +3021,14 @@ class PyTorchToEinsum:
         )
         out_dtype = output_dtypes[0] if output_dtypes else act_dtype
 
-        # Infer x/weight/bias from ordered inputs + input_shapes.
-        typed_inputs: List[Tuple[int, str, Any, str]] = []
+        typed_inputs: List[_LinearInput] = []
         for idx, conn in enumerate(input_connections):
             ishape = input_shapes[idx] if idx < len(input_shapes) else None
             itype = input_types[idx] if idx < len(input_types) else "input"
             typed_inputs.append((idx, conn, ishape, str(itype)))
-
-        activation_entry: Optional[Tuple[int, str, Any, str]] = None
-        weight_entries: List[Tuple[int, str, Any, str]] = []
-        for entry in typed_inputs:
-            _, conn, _, itype = entry
-            if itype == "weight" or "parameter-tensor" in conn:
-                weight_entries.append(entry)
-            elif activation_entry is None:
-                activation_entry = entry
-
-        if activation_entry is None and typed_inputs:
-            activation_entry = typed_inputs[0]
-
-        # Bias is normally rank-1 among weight inputs.
-        bias_entry: Optional[Tuple[int, str, Any, str]] = None
-        for entry in weight_entries:
-            ishape = entry[2]
-            if isinstance(ishape, list) and len(ishape) == 1:
-                bias_entry = entry
-                break
-
-        # Fallback when rank-based inference fails: last weight is bias.
-        if bias_entry is None and len(weight_entries) >= 2:
-            bias_entry = weight_entries[-1]
-
-        # Weight matrix is a non-bias weight, preferring rank-2.
-        weight_entry: Optional[Tuple[int, str, Any, str]] = None
-        for entry in weight_entries:
-            if bias_entry is not None and entry[1] == bias_entry[1]:
-                continue
-            ishape = entry[2]
-            if isinstance(ishape, list) and len(ishape) >= 2:
-                weight_entry = entry
-                break
-        if weight_entry is None:
-            for entry in weight_entries:
-                if bias_entry is None or entry[1] != bias_entry[1]:
-                    weight_entry = entry
-                    break
+        activation_entry, weight_entry, bias_entry = _classify_linear_inputs(
+            typed_inputs
+        )
 
         weight_shape = (
             list(weight_entry[2])
@@ -3328,6 +3389,7 @@ class PyTorchToEinsum:
             layer_dict: Dict[str, Any] = {
                 "type": "start",
                 "source_tensor_id": original_id,
+                "source_input_index": info.get("source_input_index"),
                 "source_binding": (
                     "recovered_keyword_tensor"
                     if info.get("recovered_from") == "exact_call_signature"
@@ -3754,6 +3816,7 @@ class PyTorchToEinsum:
         input_names: List[str] = []
         output_names: List[str] = []
         input_types = node_data.get("input_types") or []
+        raw_inputs = list((node_data.get("connections") or {}).get("inputs") or [])
 
         weight_idx = 0
         for i, pred_id in enumerate(input_connections):
@@ -3767,7 +3830,13 @@ class PyTorchToEinsum:
                 input_names.append(name)
                 weight_idx += 1
             else:
-                input_names.append(f"{pred_id}.Output")
+                output_index = None
+                if i < len(raw_inputs):
+                    producer_output = self._tensor_to_producer_output.get(raw_inputs[i])
+                    if producer_output is not None:
+                        output_index = producer_output[1]
+                suffix = "" if output_index in {None, 0} else f"_{output_index}"
+                input_names.append(f"{pred_id}.Output{suffix}")
 
         # Output tensors
         output_names.append(f"{node_id}.Output")

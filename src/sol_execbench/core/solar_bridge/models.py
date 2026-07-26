@@ -48,6 +48,28 @@ class SolarWorkerRequest:
 
 
 @dataclass(frozen=True)
+class SolarStageAuditRequest:
+    """One corpus workload request for the isolated three-stage audit."""
+
+    problem_dir: str
+    workload_uuid: str
+    output_dir: str
+    device: str
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "SolarStageAuditRequest":
+        return cls(
+            problem_dir=str(value["problem_dir"]),
+            workload_uuid=str(value["workload_uuid"]),
+            output_dir=str(value["output_dir"]),
+            device=str(value["device"]),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class SolarAnalysisOutcome:
     status: str
     analysis_id: str
@@ -107,6 +129,72 @@ class SolarAnalysisOutcome:
         return paths == FORMAL_ARTIFACT_PATHS
 
 
+@dataclass(frozen=True)
+class SolarStageAuditOutcome:
+    """Outer-package copy of one benchmark-agnostic readiness result."""
+
+    status: str
+    analysis_id: str
+    output_dir: str | None = None
+    architecture_sha256: str | None = None
+    stages: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+    artifacts: tuple[dict[str, str], ...] = field(default_factory=tuple)
+    failure_stage: str | None = None
+    reason_code: str | None = None
+    message: str | None = None
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "SolarStageAuditOutcome":
+        data = dict(value)
+        data["stages"] = tuple(dict(item) for item in data.get("stages") or [])
+        data["artifacts"] = tuple(dict(item) for item in data.get("artifacts") or [])
+        return cls(**data)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["stages"] = list(self.stages)
+        data["artifacts"] = list(self.artifacts)
+        return data
+
+    @property
+    def ready(self) -> bool:
+        """Whether all three stages passed with exact content-addressed evidence."""
+        expected = {
+            "graph_extraction": "operator_graph.yaml",
+            "einsum_conversion": "einsum_graph.yaml",
+            "conversion_verification": "conversion-attestation.yaml",
+        }
+        if (
+            self.status != "ready"
+            or self.output_dir is None
+            or self.architecture_sha256 is None
+            or len(self.architecture_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.architecture_sha256
+            )
+        ):
+            return False
+        stages = {str(item.get("stage")): item for item in self.stages}
+        if set(stages) != set(expected):
+            return False
+        for stage, path in expected.items():
+            artifact = stages[stage].get("artifact") or {}
+            if (
+                stages[stage].get("status") != "passed"
+                or artifact.get("path") != path
+                or not _valid_sha256(str(artifact.get("sha256", "")))
+            ):
+                return False
+        return True
+
+
+def _valid_sha256(value: str) -> bool:
+    return len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
 def formal_precision_for_definition(definition: Any) -> str:
     """Select SOLAR's fallback precision from an outer tensor contract."""
     dtypes = {
@@ -126,6 +214,8 @@ def formal_precision_for_definition(definition: Any) -> str:
 
 __all__ = [
     "SolarAnalysisOutcome",
+    "SolarStageAuditOutcome",
+    "SolarStageAuditRequest",
     "SolarWorkerRequest",
     "FORMAL_ARTIFACT_PATHS",
     "FORMAL_BOUND_KIND",

@@ -215,6 +215,13 @@ class TorchviewProcessor:
 
         # Extract module args (no longer extracting weight_nodes/weight_shapes)
         module_info = self._extract_module_info(node)
+        source_input_index = getattr(node, "source_input_index", None)
+        if source_input_index is None:
+            source_input_index = getattr(
+                getattr(node, "main_node", None), "source_input_index", None
+            )
+        if source_input_index is not None:
+            module_info["module_args"]["source_input_index"] = int(source_input_index)
 
         return NodeInfo(
             node_id=node_id,
@@ -958,7 +965,9 @@ class TorchviewProcessor:
                 {
                     "slice": lambda start=None, stop=None, step=None: {
                         "slice": [start, stop, step]
-                    }
+                    },
+                    "inf": float("inf"),
+                    "nan": float("nan"),
                 },
             )
 
