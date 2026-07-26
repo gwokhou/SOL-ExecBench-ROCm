@@ -122,10 +122,12 @@ uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
 The command derives the denominator from the corpus manifest, records the
 stable target name `gfx1200`, and emits a content-addressed `matrix.jsonl` plus
 `summary.json`. Each workload has stable stage statuses and reason codes,
-source-content identities, three seeds, and random/zero/boundary verification
-patterns. A failed or interrupted run can be checked and continued with
-`--resume`; existing identities and artifact hashes must still match. Concurrent
-writers to the same audit root are rejected before GPU work starts.
+source-content identities, a canonical `trace_identity_sha256`, three seeds, and
+random/zero/boundary verification patterns. The trace identity binds the corpus,
+definition, workload, reference, architecture profile, `gfx1200` target, and
+trace seed. A failed or interrupted run can be checked and continued with
+`--resume`; existing identities and artifact hashes must still match.
+Concurrent writers to the same audit root are rejected before GPU work starts.
 
 `solar learn-handler` is an offline candidate-generation workflow. Its output
 is forbidden in formal analysis until reviewed and committed under
