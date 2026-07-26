@@ -17,6 +17,16 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
     """Return the built-in ROCm toolchain capability registry."""
 
     return [
+        *_profiling_capabilities(),
+        *_repository_capabilities(),
+        *_runtime_capabilities(),
+        *_static_analysis_capabilities(),
+    ]
+
+
+def _profiling_capabilities() -> list[ToolchainCapability]:
+    """Return executable profiler and profiler-configuration capabilities."""
+    return [
         ToolchainCapability(
             tool_id="rocprofv3",
             display_name="ROCprofiler SDK rocprofv3",
@@ -51,6 +61,12 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
             ],
             notes="Counter/configuration discovery companion to rocprofv3.",
         ),
+    ]
+
+
+def _repository_capabilities() -> list[ToolchainCapability]:
+    """Return repository-level toolchain provenance signals."""
+    return [
         ToolchainCapability(
             tool_id="rocprofiler-systems",
             display_name="ROCm Systems Profiler legacy repository",
@@ -83,6 +99,12 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
             source_refs=["https://github.com/ROCm/rocm-systems"],
             notes="Repository source-of-truth signal, not a directly executed tool.",
         ),
+    ]
+
+
+def _runtime_capabilities() -> list[ToolchainCapability]:
+    """Return runtime and device-discovery capabilities."""
+    return [
         ToolchainCapability(
             tool_id="rocminfo",
             display_name="rocminfo",
@@ -109,6 +131,13 @@ def default_toolchain_registry() -> list[ToolchainCapability]:
             source_refs=["https://github.com/ROCm/rocm-systems"],
             notes="Architecture discovery helper.",
         ),
+    ]
+
+
+def _static_analysis_capabilities() -> list[ToolchainCapability]:
+    """Return static code-object inspection and compiler-analysis capabilities."""
+
+    return [
         ToolchainCapability(
             tool_id="readelf",
             display_name="readelf",

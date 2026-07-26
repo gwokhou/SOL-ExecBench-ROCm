@@ -32,6 +32,7 @@ from pydantic import ValidationError
 
 from sol_execbench.core.platform.amd_smi import parse_performance_levels
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
+from sol_execbench.core.process.environment import ENV_SOL_EXECBENCH_CLOCKS_LOCKED
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +110,8 @@ class ClockLockLease:
         """Publish verified state while retaining the previous environment."""
         if self._environment_published:
             return
-        self._previous_environment = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED")
-        os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = "1" if self.locked else "0"
+        self._previous_environment = os.environ.get(ENV_SOL_EXECBENCH_CLOCKS_LOCKED)
+        os.environ[ENV_SOL_EXECBENCH_CLOCKS_LOCKED] = "1" if self.locked else "0"
         self._environment_published = True
 
     def restore_environment(self) -> None:
@@ -118,9 +119,9 @@ class ClockLockLease:
         if not self._environment_published:
             return
         if self._previous_environment is None:
-            os.environ.pop("SOL_EXECBENCH_CLOCKS_LOCKED", None)
+            os.environ.pop(ENV_SOL_EXECBENCH_CLOCKS_LOCKED, None)
         else:
-            os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = self._previous_environment
+            os.environ[ENV_SOL_EXECBENCH_CLOCKS_LOCKED] = self._previous_environment
         self._environment_published = False
 
     def __exit__(
@@ -336,4 +337,4 @@ def unlock_clocks() -> bool:
 
 def are_clocks_locked() -> bool:
     """Check whether clocks were locked successfully before evaluation."""
-    return os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
+    return os.environ.get(ENV_SOL_EXECBENCH_CLOCKS_LOCKED, "0") == "1"

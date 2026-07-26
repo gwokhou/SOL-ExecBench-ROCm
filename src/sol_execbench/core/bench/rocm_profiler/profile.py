@@ -60,19 +60,7 @@ def collect_rocprofv3_profile(
         output_format=request.output_format,
     )
     if not rocprofv3_available:
-        return Rocprofv3ProfileResult(
-            status=Rocprofv3ProfileStatus.UNAVAILABLE,
-            command=tuple(command),
-            output_directory=request.output_directory,
-            output_file=request.output_file,
-            skipped_reason=f"{request.executable} is not available on PATH",
-            working_directory=request.working_directory,
-            timeout_seconds=request.timeout_seconds,
-            profiler_available=False,
-            artifact_coverage_status="unavailable",
-            reason_codes=(ROCPROF_REASON_UNAVAILABLE,),
-            **profile_result_metadata(request),
-        )
+        return _unavailable_result(request, command)
 
     prepare_profile_output_directory(request.output_directory, request.output_file)
     run = runner or default_profile_runner
@@ -83,121 +71,169 @@ def collect_rocprofv3_profile(
             request.timeout_seconds,
         )
     except subprocess.TimeoutExpired as exc:
-        # rocprofv3 may have flushed partial artifacts before being killed;
-        # discover them so they are not silently lost, and report a timeout
-        # (not command_failed) reason code.
-        timeout_artifacts = discover_rocprofv3_artifacts(
-            request.output_directory,
-            request.output_file,
-        )
-        timeout_coverage, timeout_reasons, timeout_warnings = (
-            profile_artifact_coverage_metadata(
-                timeout_artifacts,
-                command_succeeded=False,
-            )
-        )
-        return Rocprofv3ProfileResult(
-            status=Rocprofv3ProfileStatus.FAILED,
-            command=tuple(command),
-            output_directory=request.output_directory,
-            output_file=request.output_file,
-            artifacts=timeout_artifacts,
-            stdout=subprocess_text(exc.stdout),
-            stderr=subprocess_text(exc.stderr),
-            failed_reason=(
-                f"rocprofv3 command timed out after {request.timeout_seconds} seconds"
-            ),
-            working_directory=request.working_directory,
-            timeout_seconds=request.timeout_seconds,
-            profiler_available=True,
-            artifact_coverage_status=timeout_coverage,
-            reason_codes=(ROCPROF_REASON_COMMAND_TIMEOUT, *timeout_reasons),
-            warnings=timeout_warnings,
-            **profile_result_metadata(request, timeout_artifacts),
-        )
+        return _timeout_result(request, command, exc)
+    return _completed_profile_result(request, command, completed)
 
+
+def _unavailable_result(
+    request: Rocprofv3ProfileRequest, command: Sequence[str]
+) -> Rocprofv3ProfileResult:
+    return Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.UNAVAILABLE,
+        command=tuple(command),
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        skipped_reason=f"{request.executable} is not available on PATH",
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=False,
+        artifact_coverage_status="unavailable",
+        reason_codes=(ROCPROF_REASON_UNAVAILABLE,),
+        **profile_result_metadata(request),
+    )
+
+
+def _timeout_result(
+    request: Rocprofv3ProfileRequest,
+    command: Sequence[str],
+    error: subprocess.TimeoutExpired,
+) -> Rocprofv3ProfileResult:
+    """Preserve partial artifacts when a bounded profiler process times out."""
+    artifacts = discover_rocprofv3_artifacts(
+        request.output_directory,
+        request.output_file,
+    )
+    coverage, reasons, warnings = profile_artifact_coverage_metadata(
+        artifacts,
+        command_succeeded=False,
+    )
+    return Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.FAILED,
+        command=tuple(command),
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        artifacts=artifacts,
+        stdout=subprocess_text(error.stdout),
+        stderr=subprocess_text(error.stderr),
+        failed_reason=f"rocprofv3 command timed out after {request.timeout_seconds} seconds",
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=True,
+        artifact_coverage_status=coverage,
+        reason_codes=(ROCPROF_REASON_COMMAND_TIMEOUT, *reasons),
+        warnings=warnings,
+        **profile_result_metadata(request, artifacts),
+    )
+
+
+def _completed_profile_result(
+    request: Rocprofv3ProfileRequest,
+    command: Sequence[str],
+    completed: subprocess.CompletedProcess[str],
+) -> Rocprofv3ProfileResult:
+    """Classify a completed ROCm profiler process and its registered artifacts."""
     artifacts = discover_rocprofv3_artifacts(
         request.output_directory,
         request.output_file,
     )
     if completed.returncode != 0:
-        coverage_status, coverage_reasons, coverage_warnings = (
-            profile_artifact_coverage_metadata(
-                artifacts,
-                command_succeeded=False,
-            )
-        )
-        return Rocprofv3ProfileResult(
-            status=Rocprofv3ProfileStatus.FAILED,
-            command=tuple(command),
-            output_directory=request.output_directory,
-            output_file=request.output_file,
-            artifacts=artifacts,
-            returncode=completed.returncode,
-            stdout=completed.stdout or "",
-            stderr=completed.stderr or "",
-            failed_reason=f"rocprofv3 command failed with exit code {completed.returncode}",
-            working_directory=request.working_directory,
-            timeout_seconds=request.timeout_seconds,
-            profiler_available=True,
-            artifact_coverage_status=coverage_status,
-            reason_codes=(ROCPROF_REASON_COMMAND_FAILED, *coverage_reasons),
-            warnings=coverage_warnings,
-            **profile_result_metadata(request, artifacts),
-        )
+        return _failed_command_result(request, command, completed, artifacts)
+    artifacts = _diagnostic_artifacts_when_empty(request, completed, command, artifacts)
     if not artifacts:
-        # rocprof wrote nothing on disk. Persist a diagnostic log so the run is
-        # not silent, then re-check. If a diagnostic artifact landed, fall
-        # through to the unified tail below, which classifies it as
-        # ``diagnostic_logs_only`` (status=partial) -- the same outcome that an
-        # explicit early return here would produce. Only the genuinely-empty
-        # case needs its own failed return, because the tail treats empty
-        # coverage as success.
-        write_rocprofv3_diagnostic_artifact(request, completed, command)
-        artifacts = discover_rocprofv3_artifacts(
-            request.output_directory,
-            request.output_file,
-        )
-        if not artifacts:
-            return Rocprofv3ProfileResult(
-                status=Rocprofv3ProfileStatus.FAILED,
-                command=tuple(command),
-                output_directory=request.output_directory,
-                output_file=request.output_file,
-                returncode=completed.returncode,
-                stdout=completed.stdout or "",
-                stderr=completed.stderr or "",
-                failed_reason="rocprofv3 completed without registered artifacts",
-                working_directory=request.working_directory,
-                timeout_seconds=request.timeout_seconds,
-                profiler_available=True,
-                artifact_coverage_status="none",
-                reason_codes=(ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,),
-                **profile_result_metadata(request),
-            )
+        return _no_artifacts_result(request, command, completed)
+    return _successful_profile_result(request, command, completed, artifacts)
 
-    coverage_status, coverage_reasons, coverage_warnings = (
-        profile_artifact_coverage_metadata(
-            artifacts,
-            command_succeeded=True,
-        )
+
+def _failed_command_result(
+    request: Rocprofv3ProfileRequest,
+    command: Sequence[str],
+    completed: subprocess.CompletedProcess[str],
+    artifacts: Sequence[Rocprofv3ProfileArtifact],
+) -> Rocprofv3ProfileResult:
+    coverage, reasons, warnings = profile_artifact_coverage_metadata(
+        artifacts,
+        command_succeeded=False,
     )
-    status = Rocprofv3ProfileStatus.SUCCESS
-    failed_reason = None
-    if coverage_status == "diagnostic_logs_only":
-        status = Rocprofv3ProfileStatus.PARTIAL
+    return Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.FAILED,
+        command=tuple(command),
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        artifacts=tuple(artifacts),
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+        failed_reason=f"rocprofv3 command failed with exit code {completed.returncode}",
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=True,
+        artifact_coverage_status=coverage,
+        reason_codes=(ROCPROF_REASON_COMMAND_FAILED, *reasons),
+        warnings=warnings,
+        **profile_result_metadata(request, artifacts),
+    )
+
+
+def _diagnostic_artifacts_when_empty(
+    request: Rocprofv3ProfileRequest,
+    completed: subprocess.CompletedProcess[str],
+    command: Sequence[str],
+    artifacts: Sequence[Rocprofv3ProfileArtifact],
+) -> tuple[Rocprofv3ProfileArtifact, ...]:
+    if artifacts:
+        return tuple(artifacts)
+    write_rocprofv3_diagnostic_artifact(request, completed, command)
+    return discover_rocprofv3_artifacts(request.output_directory, request.output_file)
+
+
+def _no_artifacts_result(
+    request: Rocprofv3ProfileRequest,
+    command: Sequence[str],
+    completed: subprocess.CompletedProcess[str],
+) -> Rocprofv3ProfileResult:
+    return Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.FAILED,
+        command=tuple(command),
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+        failed_reason="rocprofv3 completed without registered artifacts",
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=True,
+        artifact_coverage_status="none",
+        reason_codes=(ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,),
+        **profile_result_metadata(request),
+    )
+
+
+def _successful_profile_result(
+    request: Rocprofv3ProfileRequest,
+    command: Sequence[str],
+    completed: subprocess.CompletedProcess[str],
+    artifacts: Sequence[Rocprofv3ProfileArtifact],
+) -> Rocprofv3ProfileResult:
+    coverage, reasons, warnings = profile_artifact_coverage_metadata(
+        artifacts,
+        command_succeeded=True,
+    )
+    status = Rocprofv3ProfileStatus.PARTIAL
+    failed_reason: str | None = None
+    if coverage == "complete":
+        status = Rocprofv3ProfileStatus.SUCCESS
+    elif coverage == "diagnostic_logs_only":
         failed_reason = (
             "rocprofv3 completed without profiler data artifacts; "
             "diagnostic log artifact registered"
         )
-    elif coverage_status == "partial":
-        status = Rocprofv3ProfileStatus.PARTIAL
     return Rocprofv3ProfileResult(
         status=status,
         command=tuple(command),
         output_directory=request.output_directory,
         output_file=request.output_file,
-        artifacts=artifacts,
+        artifacts=tuple(artifacts),
         returncode=completed.returncode,
         stdout=completed.stdout or "",
         stderr=completed.stderr or "",
@@ -205,9 +241,9 @@ def collect_rocprofv3_profile(
         working_directory=request.working_directory,
         timeout_seconds=request.timeout_seconds,
         profiler_available=True,
-        artifact_coverage_status=coverage_status,
-        reason_codes=coverage_reasons,
-        warnings=coverage_warnings,
+        artifact_coverage_status=coverage,
+        reason_codes=reasons,
+        warnings=warnings,
         **profile_result_metadata(request, artifacts),
     )
 

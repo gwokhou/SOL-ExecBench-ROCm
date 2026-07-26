@@ -50,72 +50,59 @@ def _item_for_status(
     status: EvaluationStatus,
     count: int,
 ) -> AgentFeedbackItem | None:
-    source_refs = [AgentFeedbackSourceRef(kind="trace", label="canonical_trace_jsonl")]
     if status == EvaluationStatus.PASSED:
         return None
     if status == EvaluationStatus.COMPILE_ERROR:
-        return AgentFeedbackItem(
+        return _action_item(
             code="compile_error",
-            severity=AgentFeedbackSeverity.ACTION,
             bottleneck=AgentFeedbackBottleneck.COMPILE_FAILURE,
             message=f"{count} workload(s) failed during compilation.",
             recommendation=(
                 "Inspect bounded compile diagnostics before changing optimization "
                 "strategy."
             ),
-            source_refs=source_refs,
         )
     if status == EvaluationStatus.RUNTIME_ERROR:
-        return AgentFeedbackItem(
+        return _action_item(
             code="runtime_error",
-            severity=AgentFeedbackSeverity.ACTION,
             bottleneck=AgentFeedbackBottleneck.RUNTIME_FAILURE,
             message=f"{count} workload(s) failed during runtime execution.",
             recommendation=(
                 "Prioritize launch, memory, and synchronization correctness before "
                 "tuning."
             ),
-            source_refs=source_refs,
         )
     if status == EvaluationStatus.TIMEOUT:
-        return AgentFeedbackItem(
+        return _action_item(
             code="timeout",
-            severity=AgentFeedbackSeverity.ACTION,
             bottleneck=AgentFeedbackBottleneck.TIMEOUT,
             message=f"{count} workload(s) timed out.",
             recommendation=(
                 "Reduce search-space risk and verify kernel termination behavior."
             ),
-            source_refs=source_refs,
         )
     if status == EvaluationStatus.INCORRECT_NUMERICAL:
-        return AgentFeedbackItem(
+        return _action_item(
             code="incorrect_numerical",
-            severity=AgentFeedbackSeverity.ACTION,
             bottleneck=AgentFeedbackBottleneck.NUMERICAL_CORRECTNESS,
             message=f"{count} workload(s) produced numerically incorrect outputs.",
             recommendation=(
                 "Fix numerical correctness before interpreting performance feedback."
             ),
-            source_refs=source_refs,
         )
     if status in {EvaluationStatus.INCORRECT_SHAPE, EvaluationStatus.INCORRECT_DTYPE}:
-        return AgentFeedbackItem(
+        return _action_item(
             code=status.value.lower(),
-            severity=AgentFeedbackSeverity.ACTION,
             bottleneck=AgentFeedbackBottleneck.INTERFACE_CORRECTNESS,
             message=f"{count} workload(s) failed output interface validation.",
             recommendation="Match output shape and dtype contracts before optimization.",
-            source_refs=source_refs,
         )
     if status == EvaluationStatus.REWARD_HACK:
-        return AgentFeedbackItem(
+        return _action_item(
             code="reward_hack",
-            severity=AgentFeedbackSeverity.ACTION,
             bottleneck=AgentFeedbackBottleneck.POLICY_VIOLATION,
             message=f"{count} workload(s) violated benchmark policy checks.",
             recommendation="Remove policy-violating behavior before further evaluation.",
-            source_refs=source_refs,
         )
     if status == EvaluationStatus.INVALID_REFERENCE:
         return AgentFeedbackItem(
@@ -124,6 +111,28 @@ def _item_for_status(
             bottleneck=AgentFeedbackBottleneck.REFERENCE_FAILURE,
             message=f"{count} workload(s) could not be compared to a valid reference.",
             recommendation="Resolve reference execution before using candidate feedback.",
-            source_refs=source_refs,
+            source_refs=_trace_source_refs(),
         )
     return None
+
+
+def _action_item(
+    *,
+    code: str,
+    bottleneck: AgentFeedbackBottleneck,
+    message: str,
+    recommendation: str,
+) -> AgentFeedbackItem:
+    """Build a remediation item that originates from canonical trace data."""
+    return AgentFeedbackItem(
+        code=code,
+        severity=AgentFeedbackSeverity.ACTION,
+        bottleneck=bottleneck,
+        message=message,
+        recommendation=recommendation,
+        source_refs=_trace_source_refs(),
+    )
+
+
+def _trace_source_refs() -> list[AgentFeedbackSourceRef]:
+    return [AgentFeedbackSourceRef(kind="trace", label="canonical_trace_jsonl")]

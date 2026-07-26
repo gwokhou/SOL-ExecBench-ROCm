@@ -18,6 +18,9 @@ from sol_execbench.core.platform.compatibility import (
     RocmCompatibilityMatrixReport,
     build_matrix_entry,
 )
+from sol_execbench.core.platform.compatibility_evidence_models import (
+    MatrixPythonDependencyEvidence,
+)
 from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
     classify_dependency_preflight,
@@ -51,53 +54,21 @@ def build_runtime_matrix_entry(
         observation=dependency_observation,
         allow_mixed_version_debug=allow_mixed_version_debug,
     )
-    if runtime_unavailable_reason is not None:
-        status = MatrixCompatibilityStatus.RUNTIME_UNAVAILABLE
-        reason_code = MatrixCompatibilityReasonCode.ROCM_RUNTIME_UNAVAILABLE
-        reason = runtime_unavailable_reason
-    elif container_validated and (
-        dependency_result.entry.status is MatrixCompatibilityStatus.NOT_TESTED
-    ):
-        status = MatrixCompatibilityStatus.CONTAINER_VALIDATED
-        reason_code = MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED
-        reason = (
-            "Target-specific Docker wrapper benchmark completed successfully with "
-            "matching container dependency and ROCm user-space evidence."
-        )
-    else:
-        status = dependency_result.entry.status
-        reason_code = dependency_result.entry.reason_code
-        reason = dependency_result.entry.reason
-
-    observed_dependency = dependency_result.entry.observed.python_dependency
-    observed_policy = dependency_policy_evidence_for_target(target)
-    observed_container = container or MatrixContainerEvidence(
-        rocm_user_space_version=dependency_observation.container_rocm_user_space_version,
-        image_repository=target.docker_image_repository,
-        image_tag=target.docker_image_tag,
+    status, reason_code, reason = _matrix_status(
+        dependency_result.entry,
+        runtime_unavailable_reason,
+        container_validated,
     )
-    observed_toolchain = toolchain or MatrixToolchainEvidence(
-        hipcc_version=dependency_observation.hipcc_version,
-        toolchain_rocm_version=dependency_observation.toolchain_rocm_version,
-    )
-    artifacts = [
-        MatrixArtifactReference(
-            artifact_id=f"failure-{index + 1}",
-            kind=f"runtime_evidence_{failure.category}",
-            uri=f"diagnostic://runtime-evidence/{failure.category}/{index + 1}",
-            description=failure.message or failure.status,
-        )
-        for index, failure in enumerate(failure_evidence or [])
-    ]
 
     return build_matrix_entry(
         target=to_matrix_target(target),
-        observed=MatrixObservedEvidence(
+        observed=_observed_evidence(
+            target,
+            dependency_observation,
+            dependency_result.entry.observed.python_dependency,
             host=host,
-            container=observed_container,
-            python_dependency=observed_dependency,
-            dependency_policy=observed_policy,
-            toolchain=observed_toolchain,
+            container=container,
+            toolchain=toolchain,
             gpu=gpu,
         ),
         status=status,
@@ -110,8 +81,74 @@ def build_runtime_matrix_entry(
             native_host_validated=False,
             hardware_validated=False,
         ),
-        artifacts=artifacts,
+        artifacts=_failure_artifacts(failure_evidence),
     )
+
+
+def _matrix_status(
+    entry: MatrixEntry,
+    runtime_unavailable_reason: str | None,
+    container_validated: bool,
+) -> tuple[MatrixCompatibilityStatus, MatrixCompatibilityReasonCode, str]:
+    if runtime_unavailable_reason is not None:
+        return (
+            MatrixCompatibilityStatus.RUNTIME_UNAVAILABLE,
+            MatrixCompatibilityReasonCode.ROCM_RUNTIME_UNAVAILABLE,
+            runtime_unavailable_reason,
+        )
+    if container_validated and entry.status is MatrixCompatibilityStatus.NOT_TESTED:
+        return (
+            MatrixCompatibilityStatus.CONTAINER_VALIDATED,
+            MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED,
+            (
+                "Target-specific Docker wrapper benchmark completed successfully with "
+                "matching container dependency and ROCm user-space evidence."
+            ),
+        )
+    return entry.status, entry.reason_code, entry.reason
+
+
+def _observed_evidence(
+    target: DockerTargetManifestEntry,
+    observation: PytorchDependencyObservation,
+    python_dependency: MatrixPythonDependencyEvidence | None,
+    *,
+    host: MatrixHostEvidence | None,
+    container: MatrixContainerEvidence | None,
+    toolchain: MatrixToolchainEvidence | None,
+    gpu: MatrixGpuEvidence | None,
+) -> MatrixObservedEvidence:
+    return MatrixObservedEvidence(
+        host=host,
+        container=container
+        or MatrixContainerEvidence(
+            rocm_user_space_version=observation.container_rocm_user_space_version,
+            image_repository=target.docker_image_repository,
+            image_tag=target.docker_image_tag,
+        ),
+        python_dependency=python_dependency,
+        dependency_policy=dependency_policy_evidence_for_target(target),
+        toolchain=toolchain
+        or MatrixToolchainEvidence(
+            hipcc_version=observation.hipcc_version,
+            toolchain_rocm_version=observation.toolchain_rocm_version,
+        ),
+        gpu=gpu,
+    )
+
+
+def _failure_artifacts(
+    failures: list[RuntimeFailureEvidence] | None,
+) -> list[MatrixArtifactReference]:
+    return [
+        MatrixArtifactReference(
+            artifact_id=f"failure-{index + 1}",
+            kind=f"runtime_evidence_{failure.category}",
+            uri=f"diagnostic://runtime-evidence/{failure.category}/{index + 1}",
+            description=failure.message or failure.status,
+        )
+        for index, failure in enumerate(failures or [])
+    ]
 
 
 def build_aggregate_report(

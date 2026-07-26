@@ -35,6 +35,7 @@ from sol_execbench.core.solar_bridge.analyzer import (
     formal_architecture_profile_hash,
 )
 from sol_execbench.core.solar_bridge.models import (
+    READINESS_STAGES,
     SolarStageAuditOutcome,
     SolarStageAuditRequest,
 )
@@ -71,6 +72,19 @@ class CorpusStageAuditResult:
         return value
 
 
+@dataclass(frozen=True, slots=True)
+class _CorpusAuditContext:
+    """Immutable inputs shared by every workload in one corpus audit."""
+
+    corpus: AkaCorpusManifest
+    output: Path
+    manifest_sha256: str
+    architecture_sha256: str
+    device: str
+    timeout_seconds: float
+    resume: bool
+
+
 def audit_corpus_stage_readiness(
     manifest_path: Path,
     output_root: Path,
@@ -104,38 +118,28 @@ def _audit_corpus_stage_readiness_locked(
     if output.exists() and not resume:
         raise FileExistsError(f"corpus readiness output already exists: {output}")
     output.mkdir(parents=True, exist_ok=True)
-    manifest_sha256 = sha256_file(corpus.path)
-    architecture_sha256 = formal_architecture_profile_hash()
+    context = _CorpusAuditContext(
+        corpus=corpus,
+        output=output,
+        manifest_sha256=sha256_file(corpus.path),
+        architecture_sha256=formal_architecture_profile_hash(),
+        device=device,
+        timeout_seconds=timeout_seconds,
+        resume=resume,
+    )
     records: list[dict[str, Any]] = []
     for entry in corpus.entries:
         if entry.role != "scored":
             continue
-        records.extend(
-            _audit_entry(
-                corpus,
-                entry,
-                output,
-                manifest_sha256=manifest_sha256,
-                architecture_sha256=architecture_sha256,
-                device=device,
-                timeout_seconds=timeout_seconds,
-                resume=resume,
-            )
-        )
-    return _finish_audit(corpus, output, records, manifest_sha256)
+        records.extend(_audit_entry(context, entry))
+    return _finish_audit(context, records)
 
 
 def _audit_entry(
-    corpus: AkaCorpusManifest,
+    context: _CorpusAuditContext,
     entry: AkaCorpusEntry,
-    output: Path,
-    *,
-    manifest_sha256: str,
-    architecture_sha256: str,
-    device: str,
-    timeout_seconds: float,
-    resume: bool,
 ) -> list[dict[str, Any]]:
+    corpus = context.corpus
     problem_path = entry.relative_problem_dir.as_posix()
     problem_dir = corpus.authored_root / entry.relative_problem_dir
     definition = Definition.model_validate_json(
@@ -146,19 +150,17 @@ def _audit_entry(
     for workload_uuid in entry.workload_uuids:
         workload = workloads[workload_uuid]
         workload_output = (
-            output / "workloads" / entry.relative_problem_dir / workload_uuid
+            context.output / "workloads" / entry.relative_problem_dir / workload_uuid
         )
         result_path = workload_output / _RESULT_FILENAME
         identity = _identity(
-            corpus,
+            context,
             problem_path,
             definition,
             workload,
-            manifest_sha256=manifest_sha256,
-            architecture_sha256=architecture_sha256,
         )
-        if resume and result_path.is_file():
-            record = _load_resumed_record(result_path, output, identity)
+        if context.resume and result_path.is_file():
+            record = _load_resumed_record(result_path, context.output, identity)
             atomic_write_json_value(result_path, record)
         else:
             outcome = run_solar_stage_worker(
@@ -166,25 +168,23 @@ def _audit_entry(
                     problem_dir=str(problem_dir.resolve()),
                     workload_uuid=workload_uuid,
                     output_dir=str(workload_output),
-                    device=device,
+                    device=context.device,
                 ),
-                timeout_seconds=timeout_seconds,
+                timeout_seconds=context.timeout_seconds,
             )
-            record = _record(identity, outcome, output)
+            record = _record(identity, outcome, context.output)
             atomic_write_json_value(result_path, record)
         records.append(record)
     return records
 
 
 def _identity(
-    corpus: AkaCorpusManifest,
+    context: _CorpusAuditContext,
     problem_path: str,
     definition: Definition,
     workload: Workload,
-    *,
-    manifest_sha256: str,
-    architecture_sha256: str,
 ) -> dict[str, Any]:
+    corpus = context.corpus
     problem_hashes = corpus.materialized_problem_sha256[problem_path]
     workload_payload = json.dumps(
         workload.model_dump(mode="json"),
@@ -194,13 +194,13 @@ def _identity(
     identity = {
         "problem_path": problem_path,
         "workload_uuid": workload.uuid,
-        "corpus_manifest_sha256": manifest_sha256,
+        "corpus_manifest_sha256": context.manifest_sha256,
         "definition_sha256": problem_hashes["definition_sha256"],
         "workload_file_sha256": problem_hashes["workload_sha256"],
         "workload_sha256": sha256_bytes(workload_payload),
         "reference_sha256": sha256_bytes(definition.reference.encode()),
         "gfx_target": FORMAL_GFX_TARGET,
-        "architecture_sha256": architecture_sha256,
+        "architecture_sha256": context.architecture_sha256,
         "trace_seed": 200,
         "verification_seeds": [11, 29, 47],
         "verification_patterns": ["random", "zeros", "boundary"],
@@ -303,13 +303,8 @@ def _verify_record_artifacts(record: dict[str, Any], output: Path) -> None:
 
 
 def _record_ready(record: dict[str, Any]) -> bool:
-    expected = {
-        "graph_extraction",
-        "einsum_conversion",
-        "conversion_verification",
-    }
     stages = {str(item.get("stage")): item for item in record.get("stages") or []}
-    if set(stages) != expected:
+    if set(stages) != set(READINESS_STAGES):
         return False
     return all(
         item.get("status") == "passed"
@@ -320,20 +315,19 @@ def _record_ready(record: dict[str, Any]) -> bool:
 
 
 def _finish_audit(
-    corpus: AkaCorpusManifest,
-    output: Path,
+    context: _CorpusAuditContext,
     records: list[dict[str, Any]],
-    manifest_sha256: str,
 ) -> CorpusStageAuditResult:
+    corpus = context.corpus
     expected = sum(
         len(entry.workload_uuids) for entry in corpus.entries if entry.role == "scored"
     )
     if not records or len(records) != expected:
         raise ValueError("corpus readiness workload denominator mismatch")
-    matrix_path = output / _MATRIX_FILENAME
+    matrix_path = context.output / _MATRIX_FILENAME
     atomic_write_jsonl_values(matrix_path, records)
-    summary = _summary(corpus, records, manifest_sha256, matrix_path)
-    summary_path = output / _SUMMARY_FILENAME
+    summary = _summary(context, records, matrix_path)
+    summary_path = context.output / _SUMMARY_FILENAME
     atomic_write_json_value(summary_path, summary)
     counts = summary["stage_counts"]
     return CorpusStageAuditResult(
@@ -350,9 +344,8 @@ def _finish_audit(
 
 
 def _summary(
-    corpus: AkaCorpusManifest,
+    context: _CorpusAuditContext,
     records: list[dict[str, Any]],
-    manifest_sha256: str,
     matrix_path: Path,
 ) -> dict[str, Any]:
     stage_counts = {
@@ -363,11 +356,7 @@ def _summary(
             )
             for record in records
         )
-        for stage in (
-            "graph_extraction",
-            "einsum_conversion",
-            "conversion_verification",
-        )
+        for stage in READINESS_STAGES
     }
     by_problem: dict[str, list[bool]] = defaultdict(list)
     for record in records:
@@ -377,7 +366,7 @@ def _summary(
         "schema_version": CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION,
         "generated_at": utc_timestamp(),
         "status": "ready" if ready else "incomplete",
-        "corpus_manifest_sha256": manifest_sha256,
+        "corpus_manifest_sha256": context.manifest_sha256,
         "gfx_target": FORMAL_GFX_TARGET,
         "problem_count": len(by_problem),
         "workload_count": len(records),

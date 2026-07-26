@@ -40,49 +40,111 @@ def run_static_extractor(
     try:
         completed = effective_runner(command, timeout_seconds)
     except subprocess.TimeoutExpired as exc:
-        raw_artifact = write_raw_extractor_output(
-            tool_id=tool_id,
-            artifact_id=artifact.artifact_id,
-            evidence_root=evidence_root,
-            sidecar_base=sidecar_base,
-            stdout=decode_output(exc.stdout),
-            stderr=decode_output(exc.stderr),
-        )
-        return (
-            StaticKernelEvidenceToolRun(
-                tool_id=tool_id,
-                command=command,
-                status=StaticKernelEvidenceStatus.FAILED,
-                reason_code=StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT,
-                stdout_tail=tail_text(exc.stdout),
-                stderr_tail=tail_text(exc.stderr),
-                timeout_seconds=timeout_seconds,
-                raw_output_path=raw_artifact.persisted_path,
-            ),
-            raw_artifact,
+        return _timeout_result(
+            tool_id,
+            command,
+            artifact,
+            evidence_root,
+            sidecar_base,
+            timeout_seconds,
+            exc,
         )
     except OSError as exc:
-        raw_artifact = write_raw_extractor_output(
-            tool_id=tool_id,
-            artifact_id=artifact.artifact_id,
-            evidence_root=evidence_root,
-            sidecar_base=sidecar_base,
-            stdout="",
-            stderr=str(exc),
+        return _os_error_result(
+            tool_id,
+            command,
+            artifact,
+            evidence_root,
+            sidecar_base,
+            timeout_seconds,
+            exc,
         )
-        return (
-            StaticKernelEvidenceToolRun(
-                tool_id=tool_id,
-                command=command,
-                status=StaticKernelEvidenceStatus.FAILED,
-                reason_code=StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED,
-                stderr_tail=tail_text(str(exc)),
-                timeout_seconds=timeout_seconds,
-                raw_output_path=raw_artifact.persisted_path,
-            ),
-            raw_artifact,
-        )
+    return _completed_result(
+        tool_id,
+        command,
+        artifact,
+        evidence_root,
+        sidecar_base,
+        timeout_seconds,
+        completed,
+    )
 
+
+def _timeout_result(
+    tool_id: str,
+    command: list[str],
+    artifact: StaticKernelEvidenceArtifact,
+    evidence_root: Path,
+    sidecar_base: Path,
+    timeout_seconds: float,
+    error: subprocess.TimeoutExpired,
+) -> tuple[StaticKernelEvidenceToolRun, StaticKernelEvidenceArtifact]:
+    """Persist timeout output and return its stable failure record."""
+    raw_artifact = write_raw_extractor_output(
+        tool_id=tool_id,
+        artifact_id=artifact.artifact_id,
+        evidence_root=evidence_root,
+        sidecar_base=sidecar_base,
+        stdout=decode_output(error.stdout),
+        stderr=decode_output(error.stderr),
+    )
+    return (
+        StaticKernelEvidenceToolRun(
+            tool_id=tool_id,
+            command=command,
+            status=StaticKernelEvidenceStatus.FAILED,
+            reason_code=StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT,
+            stdout_tail=tail_text(error.stdout),
+            stderr_tail=tail_text(error.stderr),
+            timeout_seconds=timeout_seconds,
+            raw_output_path=raw_artifact.persisted_path,
+        ),
+        raw_artifact,
+    )
+
+
+def _os_error_result(
+    tool_id: str,
+    command: list[str],
+    artifact: StaticKernelEvidenceArtifact,
+    evidence_root: Path,
+    sidecar_base: Path,
+    timeout_seconds: float,
+    error: OSError,
+) -> tuple[StaticKernelEvidenceToolRun, StaticKernelEvidenceArtifact]:
+    """Persist process-start failures in the same raw-output form as runs."""
+    raw_artifact = write_raw_extractor_output(
+        tool_id=tool_id,
+        artifact_id=artifact.artifact_id,
+        evidence_root=evidence_root,
+        sidecar_base=sidecar_base,
+        stdout="",
+        stderr=str(error),
+    )
+    return (
+        StaticKernelEvidenceToolRun(
+            tool_id=tool_id,
+            command=command,
+            status=StaticKernelEvidenceStatus.FAILED,
+            reason_code=StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED,
+            stderr_tail=tail_text(str(error)),
+            timeout_seconds=timeout_seconds,
+            raw_output_path=raw_artifact.persisted_path,
+        ),
+        raw_artifact,
+    )
+
+
+def _completed_result(
+    tool_id: str,
+    command: list[str],
+    artifact: StaticKernelEvidenceArtifact,
+    evidence_root: Path,
+    sidecar_base: Path,
+    timeout_seconds: float,
+    completed: ProbeCompletedProcess,
+) -> tuple[StaticKernelEvidenceToolRun, StaticKernelEvidenceArtifact]:
+    """Persist a completed extractor process and classify its return code."""
     raw_artifact = write_raw_extractor_output(
         tool_id=tool_id,
         artifact_id=artifact.artifact_id,

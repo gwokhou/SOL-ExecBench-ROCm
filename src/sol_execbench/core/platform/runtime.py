@@ -14,6 +14,11 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict
 
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_SANDBOXED,
+    ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION,
+)
+
 if TYPE_CHECKING:
     from sol_execbench.core.data.trace import Environment
 
@@ -272,9 +277,9 @@ def env_snapshot(
     if rocm_version := detect_rocm_version():
         libs["rocm"] = rocm_version
     isolation = "unknown"
-    if os.environ.get("SOL_EXECBENCH_SANDBOXED") == "1":
+    if os.environ.get(ENV_SOL_EXECBENCH_SANDBOXED) == "1":
         isolation = "container"
-    elif os.environ.get("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION") == "1":
+    elif os.environ.get(ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION) == "1":
         isolation = "unsafe_local"
     return Environment(
         hardware=hardware_from_device(device),

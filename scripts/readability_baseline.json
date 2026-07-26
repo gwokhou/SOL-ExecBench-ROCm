@@ -1,7 +1,7 @@
 {
-  "long_functions": 47,
+  "long_functions": 3,
   "oversized_test_modules": 0,
-  "production_any_modules": 144,
-  "wide_functions": 23,
+  "production_any_modules": 65,
+  "wide_functions": 2,
   "wildcard_imports": 0
 }

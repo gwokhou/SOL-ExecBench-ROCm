@@ -13,6 +13,7 @@ from collections.abc import Callable, Mapping, Sequence
 
 from sol_execbench.core.bench.clock_lock import acquire_clock_lock
 from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
+from sol_execbench.core.process.environment import ENV_SOL_EXECBENCH_CLOCKS_LOCKED
 from sol_execbench.core.process import run_attached_process_group
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def run_with_host_clock_guard(
                 child_environment = {
                     **base_environment,
                     **_HOST_MANAGED_ENV,
-                    "SOL_EXECBENCH_CLOCKS_LOCKED": "1" if clock_lease.locked else "0",
+                    ENV_SOL_EXECBENCH_CLOCKS_LOCKED: "1" if clock_lease.locked else "0",
                 }
                 if not clock_lease.locked:
                     logger.warning(

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import shutil
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.evidence_builders import (
@@ -50,6 +51,7 @@ from sol_execbench.core.bench.static_kernel.isa_analysis import (
 from sol_execbench.core.platform.environment import ProbeCompletedProcess
 from sol_execbench.core.platform.toolchain import (
     ProbeRunner,
+    ToolchainArtifactType,
     ToolchainCapability,
     ToolchainStatus,
     Which,
@@ -58,6 +60,19 @@ from sol_execbench.core.platform.toolchain.probes import run_probe
 
 
 _FOOTPRINT_EXTRACTOR_TOOL_IDS = ("roc-objdump",)
+
+
+@dataclass(frozen=True, slots=True)
+class _ExtractorContext:
+    """Shared paths, tool routing, and execution settings for one collection."""
+
+    evidence_root: Path
+    sidecar_base: Path
+    timeout_seconds: float
+    runner: ExtractorRunner | None
+    probe_runner: ProbeRunner
+    which: Which
+    registry: Sequence[ToolchainCapability] | None
 
 
 def _memoize_which(which: Which) -> Which:
@@ -105,124 +120,26 @@ def run_static_kernel_extractors(
     analyze_isa: bool = False,
 ) -> StaticKernelEvidenceSidecar:
     """Run routed bounded static extractors for persisted artifacts."""
-
     evidence_root = evidence_directory.resolve()
     sidecar_base = (
         sidecar_base_directory.resolve()
         if sidecar_base_directory is not None
         else evidence_root
     )
-    effective_registry = list(registry) if registry is not None else None
-    # Probe results (tool paths + version probes) are invariant across artifacts
-    # in one run; memoize so the per-artifact loops do not re-probe each tool.
-    effective_which = _memoize_which(which)
-    effective_probe = _memoize_probe_runner(probe_runner)
-    tool_runs: list[StaticKernelEvidenceToolRun] = []
-    warnings: list[StaticKernelEvidenceWarning] = []
-    output_artifacts: list[StaticKernelEvidenceArtifact] = []
-
-    for artifact in artifacts:
-        artifact_type = toolchain_artifact_type_for_static_artifact(artifact)
-        if artifact_type is None:
-            tool_runs.append(
-                StaticKernelEvidenceToolRun(
-                    tool_id="static-extractor",
-                    command=[],
-                    status=StaticKernelEvidenceStatus.UNSUPPORTED,
-                    reason_code=(
-                        StaticKernelEvidenceReasonCode.UNSUPPORTED_ARTIFACT_TYPE
-                    ),
-                    stderr_tail=(
-                        f"{artifact.artifact_type} is not supported by "
-                        "llvm-objdump/readelf extraction."
-                    ),
-                    timeout_seconds=timeout_seconds,
-                )
-            )
-            continue
-
-        artifact_path = _artifact_persisted_path(artifact, sidecar_base)
-        if artifact_path is None or not artifact_path.is_file():
-            tool_runs.append(
-                StaticKernelEvidenceToolRun(
-                    tool_id="static-extractor",
-                    command=[],
-                    status=StaticKernelEvidenceStatus.UNAVAILABLE,
-                    reason_code=StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE,
-                    stderr_tail=f"{artifact.artifact_id} persisted artifact is missing.",
-                    timeout_seconds=timeout_seconds,
-                )
-            )
-            continue
-
-        for tool_id in static_extractor_tool_ids():
-            route_decision = _route_static_tool(
-                tool_id=tool_id,
-                artifact_type=artifact_type,
-                registry=effective_registry,
-                runner=effective_probe,
-                which=effective_which,
-                timeout_seconds=timeout_seconds,
-            )
-            if route_decision is None:
-                tool_runs.append(
-                    _tool_run_from_route_decision(
-                        tool_id=tool_id,
-                        command=[],
-                        decision_status=ToolchainStatus.UNAVAILABLE,
-                        reason_code=StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
-                        reason="No route decision was produced.",
-                        timeout_seconds=timeout_seconds,
-                    )
-                )
-                continue
-            command = _extractor_command(tool_id, artifact_path)
-            if route_decision.status != ToolchainStatus.AVAILABLE:
-                tool_runs.append(
-                    _tool_run_from_route_decision(
-                        tool_id=tool_id,
-                        command=command,
-                        decision_status=route_decision.status,
-                        reason_code=_reason_for_route_status(route_decision.status),
-                        reason=route_decision.reason,
-                        timeout_seconds=timeout_seconds,
-                    )
-                )
-                warnings.append(
-                    StaticKernelEvidenceWarning(
-                        code=f"{tool_id}_not_executed",
-                        message=route_decision.reason,
-                        source_reference=StaticKernelEvidenceSourceReference(
-                            kind="toolchain_route",
-                            value=tool_id,
-                            description=route_decision.reason_code,
-                        ),
-                    )
-                )
-                continue
-
-            tool_run, raw_artifact = _run_static_extractor(
-                tool_id=tool_id,
-                command=command,
-                artifact=artifact,
-                evidence_root=evidence_root,
-                sidecar_base=sidecar_base,
-                timeout_seconds=timeout_seconds,
-                runner=runner,
-            )
-            tool_runs.append(tool_run)
-            if raw_artifact is not None:
-                output_artifacts.append(raw_artifact)
+    context = _ExtractorContext(
+        evidence_root=evidence_root,
+        sidecar_base=sidecar_base,
+        timeout_seconds=timeout_seconds,
+        runner=runner,
+        probe_runner=_memoize_probe_runner(probe_runner),
+        which=_memoize_which(which),
+        registry=list(registry) if registry is not None else None,
+    )
+    tool_runs, warnings, output_artifacts = _run_routed_extractors(artifacts, context)
 
     footprints, amdgpu_runs = _collect_resource_footprints(
         artifacts=artifacts,
-        sidecar_base=sidecar_base,
-        evidence_root=evidence_root,
-        probe_runner=effective_probe,
-        which=effective_which,
-        registry=effective_registry,
-        runner=runner,
-        timeout_seconds=timeout_seconds,
+        context=context,
         output_artifacts=output_artifacts,
     )
     tool_runs.extend(amdgpu_runs)
@@ -249,16 +166,157 @@ def run_static_kernel_extractors(
     )
 
 
+def _run_routed_extractors(
+    artifacts: Sequence[StaticKernelEvidenceArtifact],
+    context: _ExtractorContext,
+) -> tuple[
+    list[StaticKernelEvidenceToolRun],
+    list[StaticKernelEvidenceWarning],
+    list[StaticKernelEvidenceArtifact],
+]:
+    """Run standard disassembly extractors for every valid persisted artifact."""
+    tool_runs: list[StaticKernelEvidenceToolRun] = []
+    warnings: list[StaticKernelEvidenceWarning] = []
+    output_artifacts: list[StaticKernelEvidenceArtifact] = []
+    for artifact in artifacts:
+        runs, artifact_warnings, produced = _run_extractors_for_artifact(
+            artifact, context
+        )
+        tool_runs.extend(runs)
+        warnings.extend(artifact_warnings)
+        output_artifacts.extend(produced)
+    return tool_runs, warnings, output_artifacts
+
+
+def _run_extractors_for_artifact(
+    artifact: StaticKernelEvidenceArtifact,
+    context: _ExtractorContext,
+) -> tuple[
+    list[StaticKernelEvidenceToolRun],
+    list[StaticKernelEvidenceWarning],
+    list[StaticKernelEvidenceArtifact],
+]:
+    artifact_type = toolchain_artifact_type_for_static_artifact(artifact)
+    if artifact_type is None:
+        return [_unsupported_artifact_run(artifact, context)], [], []
+    artifact_path = _artifact_persisted_path(artifact, context.sidecar_base)
+    if artifact_path is None or not artifact_path.is_file():
+        return [_missing_artifact_run(artifact, context)], [], []
+
+    tool_runs: list[StaticKernelEvidenceToolRun] = []
+    warnings: list[StaticKernelEvidenceWarning] = []
+    output_artifacts: list[StaticKernelEvidenceArtifact] = []
+    for tool_id in static_extractor_tool_ids():
+        tool_run, warning, raw_artifact = _run_routed_tool(
+            tool_id, artifact, artifact_type, artifact_path, context
+        )
+        tool_runs.append(tool_run)
+        if warning is not None:
+            warnings.append(warning)
+        if raw_artifact is not None:
+            output_artifacts.append(raw_artifact)
+    return tool_runs, warnings, output_artifacts
+
+
+def _unsupported_artifact_run(
+    artifact: StaticKernelEvidenceArtifact, context: _ExtractorContext
+) -> StaticKernelEvidenceToolRun:
+    return StaticKernelEvidenceToolRun(
+        tool_id="static-extractor",
+        command=[],
+        status=StaticKernelEvidenceStatus.UNSUPPORTED,
+        reason_code=StaticKernelEvidenceReasonCode.UNSUPPORTED_ARTIFACT_TYPE,
+        stderr_tail=(
+            f"{artifact.artifact_type} is not supported by llvm-objdump/readelf extraction."
+        ),
+        timeout_seconds=context.timeout_seconds,
+    )
+
+
+def _missing_artifact_run(
+    artifact: StaticKernelEvidenceArtifact, context: _ExtractorContext
+) -> StaticKernelEvidenceToolRun:
+    return StaticKernelEvidenceToolRun(
+        tool_id="static-extractor",
+        command=[],
+        status=StaticKernelEvidenceStatus.UNAVAILABLE,
+        reason_code=StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE,
+        stderr_tail=f"{artifact.artifact_id} persisted artifact is missing.",
+        timeout_seconds=context.timeout_seconds,
+    )
+
+
+def _run_routed_tool(
+    tool_id: str,
+    artifact: StaticKernelEvidenceArtifact,
+    artifact_type: ToolchainArtifactType,
+    artifact_path: Path,
+    context: _ExtractorContext,
+) -> tuple[
+    StaticKernelEvidenceToolRun,
+    StaticKernelEvidenceWarning | None,
+    StaticKernelEvidenceArtifact | None,
+]:
+    route_decision = _route_static_tool(
+        tool_id=tool_id,
+        artifact_type=artifact_type,
+        registry=context.registry,
+        runner=context.probe_runner,
+        which=context.which,
+        timeout_seconds=context.timeout_seconds,
+    )
+    if route_decision is None:
+        return (
+            _tool_run_from_route_decision(
+                tool_id=tool_id,
+                command=[],
+                decision_status=ToolchainStatus.UNAVAILABLE,
+                reason_code=StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
+                reason="No route decision was produced.",
+                timeout_seconds=context.timeout_seconds,
+            ),
+            None,
+            None,
+        )
+    command = _extractor_command(tool_id, artifact_path)
+    if route_decision.status == ToolchainStatus.AVAILABLE:
+        tool_run, raw_artifact = _run_static_extractor(
+            tool_id=tool_id,
+            command=command,
+            artifact=artifact,
+            evidence_root=context.evidence_root,
+            sidecar_base=context.sidecar_base,
+            timeout_seconds=context.timeout_seconds,
+            runner=context.runner,
+        )
+        return tool_run, None, raw_artifact
+    warning = StaticKernelEvidenceWarning(
+        code=f"{tool_id}_not_executed",
+        message=route_decision.reason,
+        source_reference=StaticKernelEvidenceSourceReference(
+            kind="toolchain_route",
+            value=tool_id,
+            description=route_decision.reason_code,
+        ),
+    )
+    return (
+        _tool_run_from_route_decision(
+            tool_id=tool_id,
+            command=command,
+            decision_status=route_decision.status,
+            reason_code=_reason_for_route_status(route_decision.status),
+            reason=route_decision.reason,
+            timeout_seconds=context.timeout_seconds,
+        ),
+        warning,
+        None,
+    )
+
+
 def _collect_resource_footprints(
     *,
     artifacts: Sequence[StaticKernelEvidenceArtifact],
-    sidecar_base: Path,
-    evidence_root: Path,
-    probe_runner: ProbeRunner | None,
-    which: Which,
-    registry: Sequence[ToolchainCapability] | None,
-    runner: ExtractorRunner | None,
-    timeout_seconds: float,
+    context: _ExtractorContext,
     output_artifacts: list[StaticKernelEvidenceArtifact],
 ) -> tuple[list[StaticResourceFootprint], list[StaticKernelEvidenceToolRun]]:
     """Run footprint extractors (``roc-objdump`` then native AMDGPU metadata).
@@ -276,79 +334,113 @@ def _collect_resource_footprints(
         artifact_type = toolchain_artifact_type_for_static_artifact(artifact)
         if artifact_type is None:
             continue
-        artifact_path = _artifact_persisted_path(artifact, sidecar_base)
+        artifact_path = _artifact_persisted_path(artifact, context.sidecar_base)
         if artifact_path is None or not artifact_path.is_file():
             continue
-        covered_footprint = False
-        for tool_id in _FOOTPRINT_EXTRACTOR_TOOL_IDS:
-            route_decision = _route_static_tool(
-                tool_id=tool_id,
-                artifact_type=artifact_type,
-                registry=registry,
-                runner=probe_runner,
-                which=which,
-                timeout_seconds=timeout_seconds,
-            )
-            if (
-                route_decision is None
-                or route_decision.status != ToolchainStatus.AVAILABLE
-            ):
-                continue
-            command = _extractor_command(tool_id, artifact_path)
-            tool_run, raw_artifact = _run_static_extractor(
-                tool_id=tool_id,
-                command=command,
-                artifact=artifact,
-                evidence_root=evidence_root,
-                sidecar_base=sidecar_base,
-                timeout_seconds=timeout_seconds,
-                runner=runner,
-            )
-            if raw_artifact is not None:
-                output_artifacts.append(raw_artifact)
-            if (
-                tool_run.status == StaticKernelEvidenceStatus.COLLECTED
-                and raw_artifact is not None
-            ):
-                raw_path = _artifact_persisted_path(raw_artifact, sidecar_base)
-                if raw_path is not None and raw_path.is_file():
-                    text = raw_path.read_text(encoding="utf-8", errors="replace")
-                    footprint = parse_roc_objdump_resource_usage(
-                        text,
-                        artifact_id=artifact.artifact_id,
-                        source_sha256=raw_artifact.sha256,
-                    )
-                    if footprint is not None:
-                        footprints.append(footprint)
-                        covered_footprint = True
-        if not covered_footprint:
-            # ROCm 7.x fallback: read AMDGPU code-object metadata directly
-            # (roc-objdump is absent). Covers CDNA + RDNA (amdgcn ABI).
-            amdgpu_count = 0
-            try:
-                native = extract_amdgpu_footprints(
-                    artifact_path.read_bytes(),
-                    artifact_id=artifact.artifact_id,
-                    source_sha256=artifact.sha256,
-                    target_architecture=artifact.target_architecture,
-                )
-                footprints.extend(native)
-                amdgpu_count = len(native)
-            except OSError:
-                pass
-            if amdgpu_count:
-                amdgpu_runs.append(
-                    StaticKernelEvidenceToolRun(
-                        tool_id="amdgpu-metadata",
-                        command=["amdgpu-metadata", str(artifact_path)],
-                        status=StaticKernelEvidenceStatus.COLLECTED,
-                        reason_code=(
-                            StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED
-                        ),
-                        stdout_tail=(
-                            f"native AMDGPU metadata: {amdgpu_count} footprint(s)"
-                        ),
-                        timeout_seconds=timeout_seconds,
-                    )
-                )
+        routed_footprints, raw_artifacts = _collect_routed_footprints(
+            artifact,
+            artifact_type,
+            artifact_path,
+            context,
+        )
+        footprints.extend(routed_footprints)
+        output_artifacts.extend(raw_artifacts)
+        if routed_footprints:
+            continue
+        native_footprints, native_run = _collect_native_amdgpu_footprints(
+            artifact,
+            artifact_path,
+            context,
+        )
+        footprints.extend(native_footprints)
+        if native_run is not None:
+            amdgpu_runs.append(native_run)
     return footprints, amdgpu_runs
+
+
+def _collect_routed_footprints(
+    artifact: StaticKernelEvidenceArtifact,
+    artifact_type: ToolchainArtifactType,
+    artifact_path: Path,
+    context: _ExtractorContext,
+) -> tuple[list[StaticResourceFootprint], list[StaticKernelEvidenceArtifact]]:
+    """Collect resource footprints from routed text extractors when available."""
+    footprints: list[StaticResourceFootprint] = []
+    raw_artifacts: list[StaticKernelEvidenceArtifact] = []
+    for tool_id in _FOOTPRINT_EXTRACTOR_TOOL_IDS:
+        route_decision = _route_static_tool(
+            tool_id=tool_id,
+            artifact_type=artifact_type,
+            registry=context.registry,
+            runner=context.probe_runner,
+            which=context.which,
+            timeout_seconds=context.timeout_seconds,
+        )
+        if route_decision is None or route_decision.status != ToolchainStatus.AVAILABLE:
+            continue
+        tool_run, raw_artifact = _run_static_extractor(
+            tool_id=tool_id,
+            command=_extractor_command(tool_id, artifact_path),
+            artifact=artifact,
+            evidence_root=context.evidence_root,
+            sidecar_base=context.sidecar_base,
+            timeout_seconds=context.timeout_seconds,
+            runner=context.runner,
+        )
+        if raw_artifact is not None:
+            raw_artifacts.append(raw_artifact)
+        footprint = _footprint_from_collected_output(
+            artifact,
+            tool_run,
+            raw_artifact,
+            context.sidecar_base,
+        )
+        if footprint is not None:
+            footprints.append(footprint)
+    return footprints, raw_artifacts
+
+
+def _footprint_from_collected_output(
+    artifact: StaticKernelEvidenceArtifact,
+    tool_run: StaticKernelEvidenceToolRun,
+    raw_artifact: StaticKernelEvidenceArtifact | None,
+    sidecar_base: Path,
+) -> StaticResourceFootprint | None:
+    if tool_run.status != StaticKernelEvidenceStatus.COLLECTED or raw_artifact is None:
+        return None
+    raw_path = _artifact_persisted_path(raw_artifact, sidecar_base)
+    if raw_path is None or not raw_path.is_file():
+        return None
+    return parse_roc_objdump_resource_usage(
+        raw_path.read_text(encoding="utf-8", errors="replace"),
+        artifact_id=artifact.artifact_id,
+        source_sha256=raw_artifact.sha256,
+    )
+
+
+def _collect_native_amdgpu_footprints(
+    artifact: StaticKernelEvidenceArtifact,
+    artifact_path: Path,
+    context: _ExtractorContext,
+) -> tuple[list[StaticResourceFootprint], StaticKernelEvidenceToolRun | None]:
+    """Read AMDGPU code-object metadata when no routed footprint is available."""
+    try:
+        footprints = extract_amdgpu_footprints(
+            artifact_path.read_bytes(),
+            artifact_id=artifact.artifact_id,
+            source_sha256=artifact.sha256,
+            target_architecture=artifact.target_architecture,
+        )
+    except OSError:
+        return [], None
+    if not footprints:
+        return [], None
+    tool_run = StaticKernelEvidenceToolRun(
+        tool_id="amdgpu-metadata",
+        command=["amdgpu-metadata", str(artifact_path)],
+        status=StaticKernelEvidenceStatus.COLLECTED,
+        reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
+        stdout_tail=f"native AMDGPU metadata: {len(footprints)} footprint(s)",
+        timeout_seconds=context.timeout_seconds,
+    )
+    return footprints, tool_run

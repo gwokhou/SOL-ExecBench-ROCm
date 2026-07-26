@@ -11,6 +11,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from sol_execbench.core.bench.rocm_profiler.models import ROCPROFV3_EXECUTABLE
+from sol_execbench.core.process.environment import ENV_SOL_EXECBENCH_GRACEFUL_EXIT
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 
@@ -72,7 +73,7 @@ def _default_runner(
     *,
     timeout_seconds: float = 300.0,
 ) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "SOL_EXECBENCH_GRACEFUL_EXIT": "1"}
+    env = {**os.environ, ENV_SOL_EXECBENCH_GRACEFUL_EXIT: "1"}
     return run_in_process_group_bounded(
         command,
         timeout=timeout_seconds,
@@ -85,7 +86,7 @@ def _default_profile_runner(
     working_directory: Path | None,
     timeout_seconds: int | None,
 ) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "SOL_EXECBENCH_GRACEFUL_EXIT": "1"}
+    env = {**os.environ, ENV_SOL_EXECBENCH_GRACEFUL_EXIT: "1"}
     return run_in_process_group_bounded(
         command,
         cwd=working_directory,

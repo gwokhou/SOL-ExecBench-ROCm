@@ -118,22 +118,9 @@ def _derive_for_footprint(
     arch = budget.architecture if budget is not None else None
     occ_low = _occupancy_low(footprint, budget) if budget is not None else False
 
-    # SPILL_DETECTED -- deterministic, highest confidence (research §8.3).
-    # Arch-agnostic: emitted even on dynamic-allocation budgets, since it does
-    # not depend on the occupancy budget.
-    scratch = footprint.scratch_bytes
-    if footprint.spill_detected is True or (scratch is not None and scratch > 0):
-        size = f"{scratch} B" if scratch is not None else "unknown size"
-        hints.append(
-            _make_hint(
-                bottleneck_class=DecisionBottleneckClass.SPILL_DETECTED,
-                confidence=DecisionConfidence.INFERRED_HIGH,
-                message=f"register spill to scratch memory detected ({size})",
-                architecture=arch,
-                footprint=footprint,
-                evidence_refs=["footprint.scratch_bytes"],
-            )
-        )
+    spill_hint = _spill_hint(footprint, arch)
+    if spill_hint is not None:
+        hints.append(spill_hint)
 
     if budget is None or not pressure_derivable:
         return hints
@@ -189,6 +176,25 @@ def _derive_for_footprint(
         )
 
     return hints
+
+
+def _spill_hint(
+    footprint: StaticResourceFootprint,
+    architecture: str | None,
+) -> DecisionHint | None:
+    """Derive the architecture-independent deterministic spill signal."""
+    scratch = footprint.scratch_bytes
+    if footprint.spill_detected is not True and (scratch is None or scratch <= 0):
+        return None
+    size = f"{scratch} B" if scratch is not None else "unknown size"
+    return _make_hint(
+        bottleneck_class=DecisionBottleneckClass.SPILL_DETECTED,
+        confidence=DecisionConfidence.INFERRED_HIGH,
+        message=f"register spill to scratch memory detected ({size})",
+        architecture=architecture,
+        footprint=footprint,
+        evidence_refs=["footprint.scratch_bytes"],
+    )
 
 
 def derive_decision_hints(
