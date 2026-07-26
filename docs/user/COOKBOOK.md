@@ -120,6 +120,34 @@ analysis and manifest only when all stages pass. The CLI accepts only the
 publication-eligible capacity-constrained Orojenesis bound; the current empty
 reviewed-mapper allowlist intentionally blocks formal publication.
 
+## Audit corpus-wide SOLAR readiness
+
+```bash
+uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
+  --device cuda:0 \
+  --timeout 14400
+```
+
+This command derives the scored denominator from the manifest (currently 122
+workloads), then audits extraction, strict conversion, and multi-seed replay
+without running Orojenesis. It keeps every workload in the content-addressed
+matrix, including failed stages and stable reason codes. Use `--resume` only to
+continue an audit whose recorded input identities and artifact hashes still
+match.
+
+## Inspect official-score availability
+
+```bash
+uv run sol-execbench --format json score status \
+  --manifest problems/AMD_AKA/manifest.yaml
+```
+
+The checked-in manifest currently reports that release authority is
+unavailable. Building local baseline, candidate, or SOLAR artifacts cannot
+change that status. See the
+[release and official-score workflow](RELEASE-SCORING.md) for the complete
+four-role signed process.
+
 ## Inspect the ownership contract
 
 ```bash
