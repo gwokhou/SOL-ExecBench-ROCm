@@ -22,6 +22,8 @@ from typing import Any
 
 import torch
 
+from solar.schema_versions import EINSUM_GRAPH_SCHEMA_VERSION
+
 
 class ReferenceGraphSerializer:
     """Serialize the canonical make_fx graph, including explicit backward ops."""
@@ -479,7 +481,7 @@ class ReferenceGraphSerializer:
             node_output_names[node] = output_tensor_names
             layers[node.name] = layer
         result = {
-            "schema_version": 3,
+            "schema_version": EINSUM_GRAPH_SCHEMA_VERSION,
             "model_name": model_name,
             "extraction_kind": "make_fx_reference_v1",
             "joint_graph": False,

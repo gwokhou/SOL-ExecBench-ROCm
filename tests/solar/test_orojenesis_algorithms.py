@@ -160,7 +160,6 @@ def test_problem_architecture_mapper_and_capacity_helpers():
         ][0]["permutation"]
         == "AB"
     )
-    assert orojenesis.multi_einsum_row_tiles(12) == [1, 2, 3, 4, 6, 12]
     assert orojenesis.select_capacity_point(
         [
             {"buffer_bytes": 4, "dram_bytes": 20},
@@ -210,7 +209,7 @@ def test_problem_for_layer_rejects_invalid_metadata(mutation, message):
 
 def test_mapper_and_divisor_validation():
     with pytest.raises(orojenesis.OrojenesisError, match="positive"):
-        orojenesis.multi_einsum_row_tiles(0)
+        orojenesis._divisors(0)
     with pytest.raises(orojenesis.OrojenesisError, match="chain position"):
         orojenesis.multi_einsum_mapper_role(0, 1)
     with pytest.raises(orojenesis.OrojenesisError, match="row tile"):

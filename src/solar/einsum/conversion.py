@@ -31,8 +31,6 @@ def convert_operator_graph(
     """Validate one canonical operator graph as executable semantic IR."""
     output = Path(output_dir)
     traced = yaml.safe_load(operator.path.read_text()) or {}
-    if int(traced.get("schema_version", 0)) != 3:
-        raise RuntimeError("operator graph schema is not supported")
     if traced.get("extraction_kind") != _MAKE_FX_REFERENCE_KIND:
         raise RuntimeError("semantic operator graph provenance is not trusted")
     return EinsumGraphArtifact(

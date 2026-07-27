@@ -10,10 +10,16 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from sol_execbench.core.integrity.schema_versions import CURRENT_SCHEMA_VERSIONS
+from solar.schema_versions import CURRENT_STRING_SCHEMA_VERSIONS
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_ID_RE = re.compile(r"sol_execbench(?:\.[a-z0-9_]+)+\.v\d+")
+SCHEMA_ID_RE = re.compile(
+    r"(?:sol_execbench|solar)(?:\.[a-z0-9_]+)+\.v\d+",
+)
 VERSION_SUFFIX_RE = re.compile(r"\.v\d+$")
+CURRENT_SCHEMA_IDENTIFIERS = (
+    CURRENT_SCHEMA_VERSIONS | CURRENT_STRING_SCHEMA_VERSIONS
+)
 UPSTREAM_TOLERANCE_FIELD = "required_" + "match_ratio"
 UPSTREAM_FIELD_ALLOWLIST: set[Path] = set()
 EXCLUDED_PARTS = {
@@ -21,11 +27,11 @@ EXCLUDED_PARTS = {
     ".venv",
     ".uv-cache",
     "__pycache__",
-    "data",
-    "dist",
-    "out",
 }
 EXCLUDED_PREFIXES = {
+    Path("data"),
+    Path("dist"),
+    Path("out"),
     Path("src/sol_execbench/_vendor"),
     Path("src/solar/_vendor"),
 }
@@ -54,7 +60,7 @@ def audit_text(
     for schema_id in SCHEMA_ID_RE.findall(content):
         family = VERSION_SUFFIX_RE.sub("", schema_id)
         families[family].add(schema_id)
-        if schema_id not in CURRENT_SCHEMA_VERSIONS:
+        if schema_id not in CURRENT_SCHEMA_IDENTIFIERS:
             findings.append(
                 f"{path}: unsupported schema identifier {schema_id}",
             )

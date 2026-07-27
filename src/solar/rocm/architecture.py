@@ -28,8 +28,10 @@ from solar.rocm.audit_validation import (
 from solar.rocm.audit_validation import (
     audit_string_set as _audit_string_set,
 )
+from solar.schema_versions import (
+    RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION as RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
+)
 
-RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION = "solar.resource_peak_calibration.v3"
 RESOURCE_PEAK_TIMING_PROFILE = "official"
 UNTHROTTLED_RESOURCE_PEAK_SCOPE = "unthrottled_resource_peak"
 INSTRUCTION_RUNTIME_AUDIT_SCOPE = "instruction_and_runtime_corroboration_only"
@@ -783,16 +785,6 @@ class ArchitectureProfile:
             ),
         )
 
-    def peak_for(self, precision: str) -> float:
-        """Return peak operations per second for a normalized precision."""
-        key = self.normalize_precision(precision)
-        try:
-            return self.peak_ops_per_second[key]
-        except KeyError as exc:
-            raise ValueError(
-                f"Precision {precision!r} is not supported by {self.name}",
-            ) from exc
-
     def normalize_precision(self, precision: str) -> str:
         """Resolve spelling and vendor-specific format aliases."""
         key = _PRECISION_ALIASES.get(precision.lower(), precision.lower())
@@ -815,33 +807,6 @@ class ArchitectureProfile:
                 )
             return precision
         return normalize_dtype(key, fallback)
-
-    def theoretical_seconds(
-        self,
-        flops: float,
-        fused_bytes: float,
-        precision: str,
-    ) -> float:
-        """Return max(compute time, memory time), the published SOL lower bound."""
-        return max(
-            float(flops) / self.peak_for(precision),
-            float(fused_bytes) / self.memory_bandwidth_bytes_per_second,
-        )
-
-    def theoretical_seconds_by_precision(
-        self,
-        macs_by_precision: Mapping[str, float],
-        fused_bytes: float,
-    ) -> float:
-        """Return SOL using the artifact's per-operation compute precisions."""
-        compute_seconds = sum(
-            2.0 * float(macs) / self.peak_for(precision)
-            for precision, macs in macs_by_precision.items()
-        )
-        memory_seconds = (
-            float(fused_bytes) / self.memory_bandwidth_bytes_per_second
-        )
-        return max(compute_seconds, memory_seconds)
 
     def resource_rate_for(self, resource: str, mode: str) -> float:
         """Return the declared architectural upper rate for one resource mode."""
@@ -877,24 +842,6 @@ class ArchitectureProfile:
             )
             for resource, modes in resource_work.items()
         }
-
-    def theoretical_seconds_by_resources(
-        self,
-        resource_work: Mapping[str, Mapping[str, float]],
-        fused_bytes: float,
-    ) -> float:
-        """Return the resource-aware compute/memory overlapped SOL bound."""
-        resource_times = self.resource_seconds(resource_work)
-        compute_seconds = max(resource_times.values(), default=0.0)
-        memory_seconds = (
-            float(fused_bytes) / self.memory_bandwidth_bytes_per_second
-        )
-        return max(compute_seconds, memory_seconds)
-
-    @property
-    def cache_flush_bytes(self) -> int:
-        """Return the largest declared AMD cache that cold-cache timing must evict."""
-        return max(self.l2_bytes, self.last_level_cache_bytes)
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible architecture profile."""

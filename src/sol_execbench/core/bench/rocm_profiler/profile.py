@@ -14,9 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from sol_execbench.core.bench.rocm_profiler.artifacts import (
-    PROFILE_OUTPUT_DIR_NAMES,
     discover_rocprofv3_artifacts,
-    has_profiler_data_artifact,
     is_profile_artifact_candidate,
     normalize_profile_artifact_token,
     profile_artifact_coverage_metadata,
@@ -28,6 +26,7 @@ from sol_execbench.core.bench.rocm_profiler.commands import (
     default_profile_runner,
 )
 from sol_execbench.core.bench.rocm_profiler.models import (
+    PROFILE_OUTPUT_DIR_NAMES,
     ROCPROF_REASON_COMMAND_FAILED,
     ROCPROF_REASON_COMMAND_TIMEOUT,
     ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
@@ -38,6 +37,7 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
+    has_profiler_data_artifact,
 )
 from sol_execbench.core.bench.rocm_profiler.models import (
     _tail as tail,
@@ -358,11 +358,3 @@ def write_rocprofv3_diagnostic_artifact(
     except OSError:
         return None
     return path
-
-
-# Compatibility aliases for the old monolithic module's private helper names.
-_subprocess_text = subprocess_text
-_profile_result_metadata = profile_result_metadata
-_prepare_profile_output_directory = prepare_profile_output_directory
-_write_rocprofv3_diagnostic_artifact = write_rocprofv3_diagnostic_artifact
-_tail = tail

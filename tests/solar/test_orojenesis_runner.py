@@ -10,6 +10,9 @@ from types import SimpleNamespace
 import pytest
 
 from solar.analysis import orojenesis
+from solar.schema_versions import (
+    OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
+)
 
 
 def _matmul(
@@ -181,7 +184,7 @@ def _batched_region() -> dict:
     first = orojenesis._region_matmul_descriptor("mm0", first_layer)
     second = orojenesis._region_matmul_descriptor("mm1", second_layer)
     return {
-        "schema_version": 1,
+        "schema_version": OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
         "kind": "broadcast_batch_linear_matmul",
         "composition": orojenesis.MULTI_EINSUM_BATCH_COMPOSITION,
         "nodes": [first, second],

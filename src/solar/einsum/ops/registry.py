@@ -159,28 +159,6 @@ class EinsumOpRegistry:
 
         return handler.generate_einsum(op_name, shapes, **kwargs)
 
-    def list_supported_ops(self) -> list[str]:
-        """List all supported operation names.
-
-        Returns:
-            List of operation names.
-
-        """
-        return sorted(self._op_to_handler.keys())
-
-    def get_statistics(self) -> dict[str, Any]:
-        """Get statistics about the registry.
-
-        Returns:
-            Dictionary with registry statistics.
-
-        """
-        return {
-            "total_handlers": len(self._handler_classes),
-            "total_ops": len(self._op_to_handler),
-            "ops": self.list_supported_ops(),
-        }
-
 
 class _RegistryState:
     """Hold the import-time registry state behind the public accessor."""

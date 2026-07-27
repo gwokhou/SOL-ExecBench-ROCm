@@ -25,11 +25,6 @@ _RUNTIME_PRECEDENCE_NOTE = (
 )
 
 
-def runtime_precedence_limitation() -> str:
-    """Return the stable runtime-precedence limitation string."""
-    return _RUNTIME_PRECEDENCE_NOTE
-
-
 _DEMOTED_LIMITATION = (
     "Demoted to inferred_low: a runtime profile supersedes this static hint."
 )

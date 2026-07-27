@@ -16,7 +16,6 @@
 
 """Unified JSON encoding/decoding utilities for JSON and Pydantic models."""
 
-import hashlib
 import json
 import os
 import tempfile
@@ -100,40 +99,10 @@ def save_json_file(object: BaseModel, path: Union[str, Path]) -> None:
         f.write(object.model_dump_json(indent=2, exclude_unset=True))
 
 
-def stable_model_json(model: BaseModel) -> str:
-    """Serialize a Pydantic model with deterministic key ordering."""
-    return (
-        json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True)
-        + "\n"
-    )
-
-
-def stable_model_checksum(model: BaseModel, checksum_field: str) -> str:
-    """Return a stable checksum for *model* with *checksum_field* nulled."""
-    payload = model.model_dump(mode="json")
-    payload[checksum_field] = None
-    encoded = json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
-
-
 def load_json_value(path: Union[str, Path]) -> Any:
     """Load any JSON value from *path*."""
     path = Path(path)
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def load_json_dict(path: Union[str, Path]) -> dict:
-    """Load a JSON object from *path*."""
-    path = Path(path)
-    payload = load_json_value(path)
-    if not isinstance(payload, dict):
-        raise ValueError(f"Expected JSON object at {path}")
-    return payload
 
 
 def load_json_file(model_cls: type[T], path: Union[str, Path]) -> T:

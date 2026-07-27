@@ -13,6 +13,7 @@ SPEC.loader.exec_module(reachability)
 
 def test_repository_has_no_unreachable_production_modules() -> None:
     assert reachability.unreachable_modules() == []
+    assert reachability.private_public_aliases() == []
 
 
 def test_edges_detect_relative_and_literal_dynamic_imports(
@@ -48,3 +49,24 @@ def test_vendor_modules_are_not_implicitly_exempt(
     monkeypatch.setattr(reachability, "DYNAMIC_PACKAGE_ROOTS", set())
 
     assert reachability.unreachable_modules() == ["example._vendor.stale"]
+
+
+def test_private_public_aliases_reject_compatibility_seams(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    source_root = tmp_path / "src"
+    package = source_root / "example"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "module.py").write_text(
+        "def _legacy():\n    return None\n\ncurrent = _legacy\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(reachability, "SOURCE_ROOT", source_root)
+    monkeypatch.setattr(reachability, "PACKAGE_ROOTS", ("example",))
+    monkeypatch.setattr(reachability, "PRIVATE_PUBLIC_ALIAS_ALLOWLIST", set())
+
+    assert reachability.private_public_aliases() == [
+        "example.module:4: current aliases _legacy",
+    ]

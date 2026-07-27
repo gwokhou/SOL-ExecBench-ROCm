@@ -223,6 +223,3 @@ def _calibration_identity_mismatch(
             f"expected {expected_clock_locked}"
         )
     return None
-
-
-_read_overhead_calibration = read_overhead_calibration

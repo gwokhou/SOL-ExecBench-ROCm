@@ -90,42 +90,6 @@ def test_load_config_reads_json(tmp_path: Path) -> None:
     assert config.iterations == 7
 
 
-def test_resolve_problem_dir_finds_optional_config_and_solution(
-    tmp_path: Path,
-) -> None:
-    problem_dir = tmp_path / "problem"
-    problem_dir.mkdir()
-    for name in (
-        "definition.json",
-        "workload.jsonl",
-        "config.json",
-        "solution.json",
-    ):
-        (problem_dir / name).write_text("{}")
-
-    definition, workload, config, solution = problem_io._resolve_problem_dir(
-        problem_dir,
-    )
-
-    assert definition == problem_dir / "definition.json"
-    assert workload == problem_dir / "workload.jsonl"
-    assert config == problem_dir / "config.json"
-    assert solution == problem_dir / "solution.json"
-
-
-def test_resolve_problem_dir_rejects_missing_definition(tmp_path: Path) -> None:
-    problem_dir = tmp_path / "problem"
-    problem_dir.mkdir()
-    (problem_dir / "workload.jsonl").write_text("")
-
-    try:
-        problem_io._resolve_problem_dir(problem_dir)
-    except click.ClickException as exc:
-        assert "definition.json not found" in str(exc)
-    else:
-        raise AssertionError("expected ClickException")
-
-
 def test_resolve_problem_inputs_uses_problem_dir_defaults(
     tmp_path: Path,
 ) -> None:

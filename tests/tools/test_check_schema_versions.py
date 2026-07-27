@@ -37,6 +37,39 @@ def test_rejects_unregistered_schema_identifier():
     ]
 
 
+def test_accepts_current_solar_schema_identifier():
+    findings, families = audit_text(
+        Path("audit.json"),
+        '{"schema_version": "solar.resource_peak_calibration.v3"}',
+    )
+
+    assert findings == []
+    assert families == {
+        "solar.resource_peak_calibration": {
+            "solar.resource_peak_calibration.v3",
+        },
+    }
+
+
+def test_rejects_retired_solar_schema_identifier():
+    retired = "solar.verification.einsum." + "v1"
+
+    findings, _ = audit_text(Path("attestation.yaml"), retired)
+
+    assert findings == [
+        f"attestation.yaml: unsupported schema identifier {retired}",
+    ]
+
+
+def test_package_data_is_audited_but_root_data_is_excluded():
+    assert not any(
+        path == Path("src/sol_execbench/data")
+        or path.is_relative_to("src/sol_execbench/data")
+        for path in MODULE.EXCLUDED_PREFIXES
+    )
+    assert Path("data") in MODULE.EXCLUDED_PREFIXES
+
+
 def test_upstream_tolerance_name_is_rejected_everywhere():
     upstream_name = "required_" + "match_ratio"
 

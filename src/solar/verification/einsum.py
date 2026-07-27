@@ -23,6 +23,7 @@ from typing import Any
 
 import yaml
 
+from solar.schema_versions import EINSUM_VERIFICATION_SCHEMA_VERSION
 from solar.verification.errors import EinsumExecutionError, VerificationError
 from solar.verification.executor import (
     EinsumGraphExecutor,
@@ -462,7 +463,7 @@ def _file_attestation(
         ),
         "predicate": {
             "status": "passed",
-            "verifier": "solar.verification.einsum.v2",
+            "verifier": EINSUM_VERIFICATION_SCHEMA_VERSION,
             "reference": {
                 "entry_point": reference_entry_point,
                 "input_factory": input_factory_name,
@@ -543,7 +544,7 @@ def _callable_attestation(
         "predicateType": "https://solar-rocm.dev/attestations/callable-to-einsum/v1",
         "predicate": {
             "status": "passed",
-            "verifier": "solar.verification.einsum.v2",
+            "verifier": EINSUM_VERIFICATION_SCHEMA_VERSION,
             "tolerance": dict(tolerance),
             "execution": dict(execution),
             "cases": list(cases),
@@ -620,7 +621,7 @@ def _validated_replay_predicate(
     predicate = artifact.get("predicate") or {}
     if (
         predicate.get("status") != "passed"
-        or predicate.get("verifier") != "solar.verification.einsum.v2"
+        or predicate.get("verifier") != EINSUM_VERIFICATION_SCHEMA_VERSION
     ):
         raise VerificationError(
             "verification artifact is not a trusted passing result",

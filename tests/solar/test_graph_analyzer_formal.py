@@ -19,6 +19,9 @@ from solar.analysis.graph_models import (
 )
 from solar.analysis.orojenesis import OrojenesisRunner
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
+from solar.schema_versions import (
+    OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
+)
 
 
 def _einsum_layer(
@@ -70,7 +73,7 @@ def _formal_plan() -> tuple[FusionPlan, dict]:
         "single": _einsum_layer("sx", "sw", "sy", m=2, k=3, n=4),
     }
     region_problem = {
-        "schema_version": 1,
+        "schema_version": OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
         "kind": "broadcast_batch_linear_matmul",
         "composition": "broadcast_batch_linear_tile_shape_v1",
         "nodes": [

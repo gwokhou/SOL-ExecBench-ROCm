@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from solar.analysis import orojenesis
+from solar.schema_versions import OROJENESIS_IDENTITY_SCHEMA_VERSION
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
@@ -22,7 +23,7 @@ def _write_toolchain(
     mapper.chmod(0o755)
     mapper_sha256 = hashlib.sha256(mapper.read_bytes()).hexdigest()
     provenance = {
-        "schema_version": orojenesis.OROJENESIS_IDENTITY_SCHEMA_VERSION,
+        "schema_version": OROJENESIS_IDENTITY_SCHEMA_VERSION,
         "source": {
             "repository": orojenesis.OROJENESIS_REPOSITORY,
             "commit": orojenesis.OROJENESIS_COMMIT,

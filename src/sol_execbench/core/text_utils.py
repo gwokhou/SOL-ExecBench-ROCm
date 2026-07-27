@@ -11,17 +11,6 @@ from typing import TypeVar
 _T = TypeVar("_T")
 
 
-def markdown_table_cell(value: object) -> str:
-    """Return text safe for a pipe-delimited Markdown table cell."""
-    text = "" if value is None else str(value)
-    return (
-        text.replace("\\", "\\\\")
-        .replace("|", "\\|")
-        .replace("\n", " ")
-        .replace("\r", " ")
-    )
-
-
 def subprocess_text(value: str | bytes | None) -> str:
     """Normalize subprocess output to text."""
     if value is None:
