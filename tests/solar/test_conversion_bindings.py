@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from solar.einsum.bindings import bind_inputs
-from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import OperatorGraphArtifact, TensorSignature
+from solar.ir.bindings import bind_inputs
+from solar.ir.conversion import convert_operator_graph
 
 
 def _start(name: str, shape: list[int], source_input_index: int) -> dict:

@@ -7,8 +7,8 @@ import pytest
 import torch
 import yaml
 
-from solar.verification import einsum as verification
-from solar.verification.einsum import VerificationError
+from solar.verification import verify as verification
+from solar.verification.verify import VerificationError
 
 REFERENCE_SOURCE = """
 import torch

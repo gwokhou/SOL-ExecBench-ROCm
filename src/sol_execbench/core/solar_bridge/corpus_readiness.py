@@ -383,7 +383,7 @@ def _finish_audit(
         problems=int(summary["problem_count"]),
         workloads=int(summary["workload_count"]),
         extraction_passed=int(counts["graph_extraction"]),
-        conversion_passed=int(counts["einsum_conversion"]),
+        conversion_passed=int(counts["ir_conversion"]),
         verification_passed=int(counts["conversion_verification"]),
         fully_ready_problems=int(summary["fully_ready_problem_count"]),
         matrix_path=matrix_path,

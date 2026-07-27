@@ -210,7 +210,7 @@ SAFE_ENV_VARS = {
 
 # File patterns for different graph types
 GRAPH_FILE_PATTERNS = {
-    "einsum_graph": "einsum_graph.yaml",
+    "ir_graph": "einsum_graph.yaml",
 }
 
 # Analysis output file names

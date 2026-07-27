@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from solar.einsum import semantics
-from solar.einsum.semantics import SemanticGraphError
+from solar.ir.aten import AtenIrError, validate_aten_graph
+from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
 
 
 def _layer(operation: str = "add", *, inputs: int = 2, outputs: int = 1):
@@ -27,7 +27,7 @@ def _layer(operation: str = "add", *, inputs: int = 2, outputs: int = 1):
 
 def _graph(layer=None):
     return {
-        "schema_version": semantics.EINSUM_GRAPH_SCHEMA_VERSION,
+        "schema_version": IR_GRAPH_SCHEMA_VERSION,
         "layers": {"operation": layer or _layer()},
     }
 
@@ -72,10 +72,10 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
         "effects": {"mutates": [], "aliases": [], "atomic": False},
     }
     graph = {
-        "schema_version": 3,
+        "schema_version": IR_GRAPH_SCHEMA_VERSION,
         "layers": {"start": start, "einsum": einsum, "dynamic": dynamic},
     }
-    semantics.validate_semantic_graph(graph)
+    validate_aten_graph(graph)
 
 
 @pytest.mark.parametrize(
@@ -168,22 +168,22 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
         ),
     ],
 )
-def test_validate_rejects_incomplete_semantic_contracts(
+def test_validate_rejects_incomplete_aten_contracts(
     mutate,
     message,
 ) -> None:
     graph = _graph()
     graph["layers"]["operation"]["semantic_op"] = _aten_semantic()
     mutate(graph)
-    with pytest.raises(SemanticGraphError, match=message):
-        semantics.validate_semantic_graph(graph)
+    with pytest.raises(AtenIrError, match=message):
+        validate_aten_graph(graph)
 
 
 def test_validate_rejects_bad_einsum_and_missing_required_parameters() -> None:
     einsum = _layer("matmul")
     einsum["semantic_op"] = {"kind": "einsum", "equation": "AB"}
-    with pytest.raises(SemanticGraphError, match="no exact einsum equation"):
-        semantics.validate_semantic_graph(_graph(einsum))
+    with pytest.raises(AtenIrError, match="no exact einsum equation"):
+        validate_aten_graph(_graph(einsum))
 
     softmax = _layer("softmax", inputs=1)
     softmax["semantic_op"] = {
@@ -193,11 +193,8 @@ def test_validate_rejects_bad_einsum_and_missing_required_parameters() -> None:
         "kwargs": {},
         "effects": {"mutates": [], "aliases": []},
     }
-    with pytest.raises(
-        SemanticGraphError,
-        match="lacks exact softmax parameters",
-    ):
-        semantics.validate_semantic_graph(_graph(softmax))
+    with pytest.raises(AtenIrError, match="lacks exact softmax parameters"):
+        validate_aten_graph(_graph(softmax))
 
     sliced = _layer("slice", inputs=1)
     sliced["semantic_op"] = {
@@ -207,5 +204,5 @@ def test_validate_rejects_bad_einsum_and_missing_required_parameters() -> None:
         "kwargs": {"dim": 0},
         "effects": {"mutates": [], "aliases": []},
     }
-    with pytest.raises(SemanticGraphError, match="explicit slice bounds"):
-        semantics.validate_semantic_graph(_graph(sliced))
+    with pytest.raises(AtenIrError, match="explicit slice bounds"):
+        validate_aten_graph(_graph(sliced))

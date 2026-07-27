@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Versioned AMD compute-resource accounting for executable einsum graphs.
+"""Versioned AMD compute-resource accounting for executable IR graphs.
 
 The counters in this module are hardware independent.  Architecture profiles
 map them to conservative, sourced upper rates.  Official analysis is
@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from solar.common.constants import normalize_dtype
+from solar.ir.contracts import layer_operation
 
 RESOURCE_MODEL_VERSION = "amd_resource_v1"
 
@@ -267,7 +268,7 @@ class _ResourceContext:
         strict: bool,
         compute_precision: str | None,
     ) -> _ResourceContext:
-        semantic = layer.get("semantic_op") or {}
+        semantic = layer_operation(layer)
         target = str(semantic.get("target") or layer.get("type") or "").lower()
         target = target.rsplit(".", maxsplit=1)[-1]
         if target.endswith("_") and not target.endswith("__"):

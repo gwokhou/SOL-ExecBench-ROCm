@@ -66,7 +66,7 @@ def _capabilities() -> dict[str, str]:
         "evidence.evaluation_sidecars": "diagnostic_non_authoritative",
         "evidence.runtime_environment": "platform_observation_non_authoritative",
         "solar.graph_extraction": "solar.graph",
-        "solar.einsum_conversion": "solar.einsum",
+        "solar.ir_conversion": "solar.ir",
         "solar.conversion_verification": "solar.verification",
         "solar.formal_bound": "solar.analysis",
         "solar.bound_policy": "rocm_formal_requires_pinned_orojenesis",
@@ -124,7 +124,7 @@ def _ownership_boundaries() -> list[dict[str, Any]]:
             "owner": "solar",
             "scope": [
                 "operator_graph",
-                "einsum_graph",
+                "ir_graph",
                 "conversion_attestation",
                 "formal_sol_bound",
             ],

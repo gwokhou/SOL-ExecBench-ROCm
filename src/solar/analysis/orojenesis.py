@@ -55,6 +55,7 @@ from solar.analysis.orojenesis_problem import (
 from solar.analysis.orojenesis_process import (
     run_mapper_process as _default_mapper_runner,
 )
+from solar.ir.contracts import CONTRACTION_KIND, INPUT_KIND, layer_operation
 
 OROJENESIS_COMMIT = "97d52178bf9a9c209bf79be96b87c164bcd35625"
 OROJENESIS_REPOSITORY = "https://github.com/NVlabs/timeloop.git"
@@ -689,7 +690,7 @@ def _matmul_descriptor(
     layer_id: str,
     layer: Mapping[str, Any],
 ) -> dict[str, Any]:
-    semantic = layer.get("semantic_op") or {}
+    semantic = layer_operation(layer)
     if semantic.get("kind") != "einsum":
         raise OrojenesisError(
             "multi-einsum chains accept exact einsum layers only",
@@ -814,7 +815,7 @@ class _RegionTensorMetadata:
 def _region_einsum_tokens(
     layer: Mapping[str, Any],
 ) -> tuple[Mapping[str, Any], str, list[list[str]], list[str]]:
-    semantic = layer.get("semantic_op") or {}
+    semantic = layer_operation(layer)
     if semantic.get("kind") != "einsum":
         raise OrojenesisError(
             "multi-einsum regions accept exact einsum layers only",
@@ -1045,9 +1046,9 @@ class _ViewMetadata:
 
 
 def _view_metadata(layer: Mapping[str, Any]) -> _ViewMetadata | None:
-    semantic = layer.get("semantic_op") or {}
+    semantic = layer_operation(layer)
     target = str(semantic.get("target", ""))
-    if semantic.get("kind") != "aten" or target not in {
+    if semantic.get("kind") in {INPUT_KIND, CONTRACTION_KIND} or target not in {
         "view",
         "transpose",
         "permute",

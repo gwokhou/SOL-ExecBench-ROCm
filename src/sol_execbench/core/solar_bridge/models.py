@@ -30,7 +30,7 @@ FORMAL_ARTIFACT_PATHS = frozenset(
 )
 READINESS_STAGE_ARTIFACTS = {
     SolarStage.GRAPH_EXTRACTION: "operator_graph.yaml",
-    SolarStage.EINSUM_CONVERSION: "einsum_graph.yaml",
+    SolarStage.IR_CONVERSION: "einsum_graph.yaml",
     SolarStage.CONVERSION_VERIFICATION: "conversion-attestation.yaml",
 }
 READINESS_STAGES = tuple(READINESS_STAGE_ARTIFACTS)

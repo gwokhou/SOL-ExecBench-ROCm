@@ -15,11 +15,12 @@ from pathlib import Path
 
 from solar.common.types import DynamicValue
 from solar.contracts import SolarReadinessStatus, SolarStage, SolarStageStatus
-from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import extract_operator_graph
+from solar.ir.contracts import DEFAULT_IR_KIND, IrKind, normalize_ir_kind
+from solar.ir.conversion import convert_operator_graph
 from solar.rocm.architecture import ArchitectureProfile
 from solar.verification import (
-    EinsumExecutionError,
+    IrExecutionError,
     VerificationError,
     VerificationPolicy,
     verify_callable_conversion,
@@ -28,7 +29,7 @@ from solar.verification import (
 InputFactory = Callable[[int], Sequence[DynamicValue]]
 READINESS_STAGES = (
     SolarStage.GRAPH_EXTRACTION,
-    SolarStage.EINSUM_CONVERSION,
+    SolarStage.IR_CONVERSION,
     SolarStage.CONVERSION_VERIFICATION,
 )
 
@@ -44,6 +45,7 @@ class ConversionReadinessRequest:
     reference_sha256: str
     architecture: str | Path | Mapping[str, DynamicValue]
     output_dir: Path
+    representation: IrKind | str = DEFAULT_IR_KIND
     device: str = "cpu"
     trace_seed: int = 200
     verification_seeds: tuple[int, ...] = (11, 29, 47)
@@ -55,6 +57,11 @@ class ConversionReadinessRequest:
 
     def __post_init__(self) -> None:
         """Validate stable request identity fields."""
+        object.__setattr__(
+            self,
+            "representation",
+            normalize_ir_kind(self.representation),
+        )
         if not self.analysis_id.strip() or not self.reference_name.strip():
             raise ValueError("analysis_id and reference_name must be non-empty")
         if re.fullmatch(r"[0-9a-f]{64}", self.reference_sha256) is None:
@@ -176,8 +183,12 @@ def audit_conversion(
             name=request.analysis_id,
         )
         passed.append(_passed_stage(stage, operator.path))
-        stage = SolarStage.EINSUM_CONVERSION
-        einsum = convert_operator_graph(operator, output_dir=staging)
+        stage = SolarStage.IR_CONVERSION
+        einsum = convert_operator_graph(
+            operator,
+            output_dir=staging,
+            representation=request.representation,
+        )
         passed.append(_passed_stage(stage, einsum.path))
         stage = SolarStage.CONVERSION_VERIFICATION
         attestation = staging / "conversion-attestation.yaml"
@@ -286,7 +297,7 @@ def readiness_reason_code(stage: SolarStage, exc: Exception) -> str:
         if "solar_graph_untracked_dispatch" in message:
             return "tensor_dispatch_lineage_lost"
         return "graph_extraction_failed"
-    if stage is SolarStage.EINSUM_CONVERSION:
+    if stage is SolarStage.IR_CONVERSION:
         if any(
             token in message for token in ("source-to-graph", "graph input")
         ):
@@ -300,7 +311,7 @@ def readiness_reason_code(stage: SolarStage, exc: Exception) -> str:
             return "exact_operation_unsupported"
         return "strict_conversion_failed"
     if stage is SolarStage.CONVERSION_VERIFICATION:
-        if isinstance(exc, EinsumExecutionError):
+        if isinstance(exc, IrExecutionError):
             return "exact_replay_failed"
         if (
             isinstance(exc, VerificationError)

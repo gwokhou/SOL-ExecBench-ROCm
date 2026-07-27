@@ -1,38 +1,18 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Exact source-input and reference-output checks for canonical operator graphs."""
+"""Source-input and reference-output bindings shared by IR backends."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from copy import deepcopy
-from pathlib import Path
+from typing import Any
 
-import yaml
-
-from solar.common.types import DynamicValue, NodeDict
-from solar.einsum.semantics import validate_semantic_graph
 from solar.graph.extraction import OperatorGraphArtifact, TensorSignature
 
 
-def accept_semantic_operator_graph(
-    traced: Mapping[str, DynamicValue],
-    operator: OperatorGraphArtifact,
-    output: Path,
-) -> Path:
-    """Validate and persist one exact make_fx ATen graph."""
-    converted: NodeDict = deepcopy(dict(traced))
-    converted["source_input_indices"] = bind_inputs(converted, operator)
-    _validate_declared_outputs(converted, operator.reference_outputs)
-    validate_semantic_graph(converted)
-    einsum_path = output / "einsum_graph.yaml"
-    einsum_path.write_text(yaml.safe_dump(converted, sort_keys=False))
-    return einsum_path
-
-
 def bind_inputs(
-    graph: Mapping[str, DynamicValue],
+    graph: Mapping[str, Any],
     operator: OperatorGraphArtifact,
 ) -> list[int]:
     """Validate exact source indices recorded on canonical start layers."""
@@ -56,42 +36,15 @@ def bind_inputs(
     return result
 
 
-def _start_layers(graph: Mapping[str, DynamicValue]) -> list[NodeDict]:
-    return [
-        layer
-        for layer in (graph.get("layers") or {}).values()
-        if str(layer.get("type", "")).lower() == "start"
-    ]
-
-
-def _validate_input_signature(
-    layer: Mapping[str, DynamicValue],
-    source_index: int,
-    inputs: Mapping[int, TensorSignature],
-) -> None:
-    shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
-    dtypes = (layer.get("tensor_dtypes") or {}).get("outputs") or []
-    signature = inputs.get(source_index)
-    if (
-        len(shapes) != 1
-        or len(dtypes) != 1
-        or signature is None
-        or tuple(shapes[0]) != signature.shape
-        or str(dtypes[0]) != signature.dtype
-    ):
-        raise RuntimeError(
-            "make_fx input provenance does not match graph metadata",
-        )
-
-
-def _validate_declared_outputs(
-    graph: Mapping[str, DynamicValue],
+def validate_declared_outputs(
+    graph: Mapping[str, Any],
     expected: Sequence[TensorSignature],
 ) -> None:
+    """Ensure the graph outputs retain traced reference metadata exactly."""
     declared = graph.get("outputs")
     if not isinstance(declared, list) or len(declared) != len(expected):
         raise RuntimeError(
-            "make_fx graph output arity does not match reference",
+            "make_fx graph output arity does not match reference"
         )
     metadata: dict[str, TensorSignature] = {}
     for layer in (graph.get("layers") or {}).values():
@@ -113,11 +66,46 @@ def _validate_declared_outputs(
         for name, signature in zip(declared, expected, strict=True)
     ):
         raise RuntimeError(
-            "make_fx graph outputs do not match reference metadata",
+            "make_fx graph outputs do not match reference metadata"
         )
 
 
-__all__ = [
-    "accept_semantic_operator_graph",
-    "bind_inputs",
-]
+def bind_graph(
+    graph: dict[str, Any],
+    operator: OperatorGraphArtifact,
+) -> dict[str, Any]:
+    """Attach and validate the public source-input binding for one IR graph."""
+    graph["source_input_indices"] = bind_inputs(graph, operator)
+    validate_declared_outputs(graph, operator.reference_outputs)
+    return graph
+
+
+def _start_layers(graph: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    return [
+        layer
+        for layer in (graph.get("layers") or {}).values()
+        if str(layer.get("type", "")).lower() == "start"
+    ]
+
+
+def _validate_input_signature(
+    layer: Mapping[str, Any],
+    source_index: int,
+    inputs: Mapping[int, TensorSignature],
+) -> None:
+    shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
+    dtypes = (layer.get("tensor_dtypes") or {}).get("outputs") or []
+    signature = inputs.get(source_index)
+    if (
+        len(shapes) != 1
+        or len(dtypes) != 1
+        or signature is None
+        or tuple(shapes[0]) != signature.shape
+        or str(dtypes[0]) != signature.dtype
+    ):
+        raise RuntimeError(
+            "make_fx input provenance does not match graph metadata",
+        )
+
+
+__all__ = ["bind_graph", "bind_inputs", "validate_declared_outputs"]

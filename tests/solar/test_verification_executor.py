@@ -6,8 +6,8 @@ import pytest
 import torch
 import torch.nn.functional as functional
 
-from solar.verification import einsum as verification
-from solar.verification.einsum import EinsumExecutionError, EinsumGraphExecutor
+from solar.verification import verify as verification
+from solar.verification.verify import IrExecutionError, IrGraphExecutor
 
 
 def _metadata(value: Any) -> tuple[list[list[int]], list[str]]:
@@ -82,7 +82,7 @@ def _execute(
         "layers": {**starts, "operation": operation},
         "outputs": output_names,
     }
-    return EinsumGraphExecutor(graph, check_shapes=check_shapes)(
+    return IrGraphExecutor(graph, check_shapes=check_shapes)(
         *[tensor.clone() for tensor in tensors],
     )
 
@@ -189,7 +189,7 @@ def test_einsum_and_matrix_dispatch() -> None:
         }
     graph = {"schema_version": 3, "layers": {**starts, "op": layer}}
     torch.testing.assert_close(
-        EinsumGraphExecutor(graph)(left, right),
+        IrGraphExecutor(graph)(left, right),
         expected,
     )
     torch.testing.assert_close(
@@ -568,21 +568,21 @@ def test_library_quantization_and_aten_fallback_dispatch() -> None:
 
 
 def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
-    with pytest.raises(EinsumExecutionError, match="schema_version"):
-        EinsumGraphExecutor({"schema_version": 0, "layers": {}})
+    with pytest.raises(IrExecutionError, match="schema_version"):
+        IrGraphExecutor({"schema_version": 0, "layers": {}})
     with pytest.raises(
-        EinsumExecutionError,
+        IrExecutionError,
         match="unsupported extended einsum",
     ):
         verification._torch_equation("A(P+R)->A")
     with pytest.raises(
-        EinsumExecutionError,
+        IrExecutionError,
         match="explicit transpose dimensions",
     ):
         value = torch.ones(2, 2, 2)
         _execute("transpose", (value,), expected=value)
     with pytest.raises(
-        EinsumExecutionError,
+        IrExecutionError,
         match="unsupported exact operation",
     ):
         value = torch.ones(1)
@@ -592,7 +592,7 @@ def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
 def test_argument_decoder_rejects_bad_tensor_dtype_and_mapping() -> None:
     value = torch.ones(1)
     with pytest.raises(
-        EinsumExecutionError,
+        IrExecutionError,
         match="outside its input metadata",
     ):
         _execute(
@@ -601,14 +601,14 @@ def test_argument_decoder_rejects_bad_tensor_dtype_and_mapping() -> None:
             arguments=[{"tensor": 3}],
             expected=value,
         )
-    with pytest.raises(EinsumExecutionError, match="invalid dtype"):
+    with pytest.raises(IrExecutionError, match="invalid dtype"):
         _execute(
             "to",
             (value,),
             arguments=[{"tensor": 0}, {"dtype": "not_a_dtype"}],
             expected=value,
         )
-    with pytest.raises(EinsumExecutionError, match="invalid semantic argument"):
+    with pytest.raises(IrExecutionError, match="invalid semantic argument"):
         _execute(
             "identity",
             (value,),

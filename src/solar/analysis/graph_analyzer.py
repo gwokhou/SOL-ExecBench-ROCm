@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Analyze an einsum graph into hardware-independent compute and I/O metrics.
+"""Analyze a SOLAR IR graph into hardware-independent compute and I/O metrics.
 
-This is the second SOLAR pipeline stage, converting ``einsum_graph.yaml`` into
+This is the second SOLAR pipeline stage, converting an IR graph artifact into
 ``analysis.yaml``. It emits per-layer and graph totals plus conservative formal
 fusion and Orojenesis evidence. See ``SOL_GUIDE.md`` for the memory models and
 formal-evidence contract.
@@ -128,13 +128,14 @@ from solar.common.constants import (
 from solar.common.types import TensorShapes
 from solar.common.utils import ensure_directory
 from solar.einsum.analyzer import EinsumAnalyzer
-from solar.einsum.semantics import (
-    EINSUM_GRAPH_SCHEMA_VERSION,
-    SemanticGraphError,
-    validate_semantic_graph,
+from solar.ir.contracts import (
+    layer_analysis,
+    layer_operation,
+    validate_ir_graph,
 )
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
 from solar.schema_versions import (
+    IR_GRAPH_SCHEMA_VERSION,
     OROJENESIS_ANALYSIS_SCHEMA_VERSION,
 )
 from solar.schema_versions import (
@@ -145,8 +146,8 @@ from solar.schema_versions import (
 )
 
 
-class EinsumGraphAnalyzer:
-    """Analyze `einsum_graph.yaml` and write `analysis.yaml`."""
+class IrGraphAnalyzer:
+    """Analyze a SOLAR IR graph and write `analysis.yaml`."""
 
     def __init__(self, debug: bool = False) -> None:
         """Initialize graph analysis and operation-cost helpers."""
@@ -155,7 +156,7 @@ class EinsumGraphAnalyzer:
 
     def analyze_graph(
         self,
-        einsum_graph_path: PathLike,
+        graph_path: PathLike,
         output_dir: PathLike,
         *,
         precision: str = DEFAULT_PRECISION,
@@ -165,14 +166,14 @@ class EinsumGraphAnalyzer:
         orojenesis_runner: OrojenesisRunner | None = None,
         require_orojenesis: bool = False,
     ) -> dict[str, Any] | None:
-        """Analyze an einsum graph and write `analysis.yaml`.
+        """Analyze a SOLAR IR graph and write `analysis.yaml`.
 
         Args:
-            einsum_graph_path: Path to `einsum_graph.yaml`.
+            graph_path: Path to the IR graph artifact.
             output_dir: Directory to write `analysis.yaml` into.
             precision: Tensor precision for byte calculations (e.g., fp32, bf16).
-            copy_graph: If True, copy the einsum graph into output dir using the
-                canonical name `einsum_graph.yaml`.
+            copy_graph: If True, copy the IR graph into output dir under its
+                source file name.
             strict: Reject unsupported layers and every implicit dtype fallback.
             architecture: Architecture profile or path used for formal bounds.
             orojenesis_runner: Optional configured tile-evidence runner.
@@ -184,7 +185,7 @@ class EinsumGraphAnalyzer:
         """
         return self._analyze_job(
             _AnalysisJob(
-                graph_path=einsum_graph_path,
+                graph_path=graph_path,
                 output_dir=output_dir,
                 precision=precision,
                 copy_graph=copy_graph,
@@ -200,8 +201,8 @@ class EinsumGraphAnalyzer:
         job: _AnalysisJob,
     ) -> tuple[Path, Path] | None:
         source = Path(job.graph_path)
-        reordered = source.parent / "einsum_graph_reordered.yaml"
-        if source.name == "einsum_graph.yaml" and reordered.exists():
+        reordered = source.parent / f"{source.stem}_reordered.yaml"
+        if reordered.exists():
             if self.debug:
                 print(f"Debug: using reordered graph {reordered}")
             source = reordered
@@ -209,7 +210,7 @@ class EinsumGraphAnalyzer:
         if source.exists():
             return source, output_dir
         if self.debug:
-            print(f"Debug: einsum graph not found: {source}")
+            print(f"Debug: IR graph not found: {source}")
         return None
 
     def _load_graph(self, source: Path) -> dict[str, Any] | None:
@@ -218,7 +219,7 @@ class EinsumGraphAnalyzer:
                 return yaml.safe_load(file) or {}
         except (OSError, UnicodeError, yaml.YAMLError) as exc:
             if self.debug:
-                print(f"Debug: failed reading einsum graph: {exc}")
+                print(f"Debug: failed reading IR graph: {exc}")
             return None
 
     @staticmethod
@@ -227,16 +228,16 @@ class EinsumGraphAnalyzer:
         strict: bool,
     ) -> tuple[bool, bool]:
         semantic_graph = (
-            int(graph.get("schema_version", 0)) == EINSUM_GRAPH_SCHEMA_VERSION
+            int(graph.get("schema_version", 0)) == IR_GRAPH_SCHEMA_VERSION
         )
         if not semantic_graph:
             raise ValueError(
-                "analysis requires executable semantics: einsum graph must use "
-                f"schema_version={EINSUM_GRAPH_SCHEMA_VERSION}",
+                "analysis requires executable semantics: IR graph must use "
+                f"schema_version={IR_GRAPH_SCHEMA_VERSION}",
             )
         try:
-            validate_semantic_graph(graph)
-        except SemanticGraphError as exc:
+            validate_ir_graph(graph)
+        except ValueError as exc:
             if strict:
                 raise ValueError(
                     f"strict analysis requires executable semantics: {exc}",
@@ -254,12 +255,12 @@ class EinsumGraphAnalyzer:
         if not enabled:
             return
         try:
-            destination = output_dir / "einsum_graph.yaml"
+            destination = output_dir / source.name
             if source.resolve() != destination.resolve():
                 destination.write_text(source.read_text())
         except (OSError, UnicodeError):
             if self.debug:
-                print("Debug: failed to copy einsum_graph.yaml")
+                print(f"Debug: failed to copy {source.name}")
 
     @staticmethod
     def _validate_strict_layers(all_layers: dict[str, Any]) -> None:
@@ -267,11 +268,12 @@ class EinsumGraphAnalyzer:
         for layer_id, layer in all_layers.items():
             layer_type = str(layer.get("type", "")).lower()
             if layer_type != "start":
-                if layer.get("is_einsum_supportable") is not True:
+                analysis = layer_analysis(layer)
+                if not analysis.is_einsum_supportable:
                     failures.append(f"{layer_id}: unsupported operation")
-                semantic = layer.get("semantic_op") or {}
-                if semantic.get("kind") == "einsum" and not layer.get(
-                    "einsum_equation",
+                if (
+                    layer_operation(layer).get("kind") == "einsum"
+                    and not analysis.equation
                 ):
                     failures.append(f"{layer_id}: empty einsum equation")
             shapes = layer.get("tensor_shapes") or {}
@@ -398,12 +400,7 @@ class EinsumGraphAnalyzer:
     @staticmethod
     def _parse_layer(layer_id: str, layer: dict[str, Any]) -> _LayerData:
         op_type = str(layer.get("type", "unknown"))
-        if "is_real_einsum" not in layer:
-            raise ValueError(
-                f"Layer '{layer_id}' (type={op_type}) is missing "
-                "'is_real_einsum' field. All layers in the einsum graph must "
-                "specify is_real_einsum: true/false.",
-            )
+        analysis = layer_analysis(layer)
         shapes = layer.get("tensor_shapes") or {}
         types = layer.get("tensor_types") or {}
         dtypes = layer.get("tensor_dtypes") or {}
@@ -415,8 +412,8 @@ class EinsumGraphAnalyzer:
             layer_id=layer_id,
             layer=layer,
             op_type=op_type,
-            equation=str(layer.get("einsum_equation", "") or ""),
-            is_real_einsum=bool(layer["is_real_einsum"]),
+            equation=analysis.equation,
+            is_real_einsum=analysis.is_real_einsum,
             input_layer_ids=list(connections.get("inputs") or []),
             output_layer_ids=list(connections.get("outputs") or []),
             input_shapes=input_shapes,
@@ -510,7 +507,7 @@ class EinsumGraphAnalyzer:
             writes = [0] * len(data.output_sizes)
             other_ops = 0
         elif data.op_type in SCATTER_OPS:
-            slice_elements = EinsumGraphAnalyzer._scatter_write_elements(data)
+            slice_elements = IrGraphAnalyzer._scatter_write_elements(data)
             reads = [0] * len(data.input_sizes)
             writes = [slice_elements] if data.output_sizes else []
             writes += [0] * max(0, len(data.output_sizes) - 1)
@@ -658,7 +655,7 @@ class EinsumGraphAnalyzer:
             else prepared.fallback_precision
         )
         resource_precision: str | None = None
-        semantic = data.layer.get("semantic_op") or {}
+        semantic = layer_operation(data.layer)
         if compute.macs and semantic.get("kind") == "einsum":
             payload_precisions = [
                 topology.dequantized_payload_precision(
@@ -1030,11 +1027,8 @@ class EinsumGraphAnalyzer:
             for path in region.get("physical_paths") or []
             for layer_id in path
             if str(
-                (
-                    prepared.all_layers.get(str(layer_id), {}).get(
-                        "semantic_op",
-                    )
-                    or {}
+                layer_operation(
+                    prepared.all_layers.get(str(layer_id), {}),
                 ).get("target", ""),
             )
             in {"view", "transpose", "permute", "squeeze", "unsqueeze"}
@@ -1690,13 +1684,13 @@ class EinsumGraphAnalyzer:
         },
     )
 
-    def _resolve_quant_precision(self, einsum_graph_path: Path) -> str | None:
-        """Search for metadata.yaml near the einsum graph and return quant precision.
+    def _resolve_quant_precision(self, graph_path: Path) -> str | None:
+        """Search for metadata.yaml near the IR graph and return quant precision.
 
-        Walks up from the einsum_graph_path looking for metadata.yaml
+        Walks up from the IR graph path looking for metadata.yaml
         (max 3 levels). Picks highest-throughput quant dtype (nvfp4 > fp8).
         """
-        search_dir = einsum_graph_path.parent
+        search_dir = graph_path.parent
         for _ in range(3):
             candidate = search_dir / "metadata.yaml"
             if candidate.exists():
@@ -1722,4 +1716,4 @@ class EinsumGraphAnalyzer:
         return None
 
 
-__all__ = ["EinsumGraphAnalyzer"]
+__all__ = ["IrGraphAnalyzer"]
