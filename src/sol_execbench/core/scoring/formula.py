@@ -27,11 +27,11 @@ def sol_score(
         raise SolScoreAuditError("all runtimes must be finite and positive")
     if baseline_runtime <= sol_runtime:
         raise SolScoreAuditError(
-            "scoring baseline must be strictly slower than the SOL bound"
+            "scoring baseline must be strictly slower than the SOL bound",
         )
     if candidate_runtime < sol_runtime:
         raise SolScoreAuditError(
-            "candidate faster than SOL requires bound and reward-hacking review"
+            "candidate faster than SOL requires bound and reward-hacking review",
         )
     headroom = baseline_runtime - sol_runtime
     return 1.0 / (1.0 + (candidate_runtime - sol_runtime) / headroom)

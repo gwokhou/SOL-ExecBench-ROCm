@@ -12,14 +12,17 @@ from pathlib import Path
 from sol_execbench.core.bench.config.benchmark_config import (
     OFFICIAL_ROCM_TIMING_PROTOCOL,
 )
-from sol_execbench.core.data.solution_instance import Solution
-from sol_execbench.core.data.solution_models import SupportedHardware
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import load_json_value
+from sol_execbench.core.data.solution_instance import Solution
+from sol_execbench.core.data.solution_models import SupportedHardware
 from sol_execbench.core.data.trace import Environment, EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusEntry, AkaCorpusManifest
+from sol_execbench.core.dataset.aka_corpus import (
+    AkaCorpusEntry,
+    AkaCorpusManifest,
+)
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 from sol_execbench.core.platform.rdna4_validation import (
     RDNA4_VALIDATION_GFX_TARGET,
@@ -30,12 +33,16 @@ from sol_execbench.core.platform.rdna4_validation import (
     Rdna4EnvironmentIdentity,
     validate_environment_payload,
 )
-
-from .release_models import ProblemRunEvidence, ReleaseRunStatement
-from .release_builders import reference_baseline_solution
-from .release_environment import (
+from sol_execbench.core.scoring.release_builders import (
+    reference_baseline_solution,
+)
+from sol_execbench.core.scoring.release_environment import (
     ReleaseExecutionIdentity,
     release_execution_identity_from_payload,
+)
+from sol_execbench.core.scoring.release_models import (
+    ProblemRunEvidence,
+    ReleaseRunStatement,
 )
 
 _MAX_TRACE_BYTES = 16 * 1024 * 1024
@@ -99,7 +106,7 @@ def verify_release_run(
                 corpus=corpus,
                 require_passed=require_passed,
                 release_environment=environment,
-            )
+            ),
         )
     return VerifiedRun(
         statement.source_revision,
@@ -159,9 +166,13 @@ def _verify_problem_identity(
         evidence.definition_sha256 != expected["definition_sha256"]
         or evidence.workload_sha256 != expected["workload_sha256"]
     ):
-        raise ValueError(f"release problem identity mismatch: {evidence.problem_path}")
+        raise ValueError(
+            f"release problem identity mismatch: {evidence.problem_path}",
+        )
     if not entry.workload_uuids:
-        raise ValueError(f"scored problem has no workloads: {evidence.problem_path}")
+        raise ValueError(
+            f"scored problem has no workloads: {evidence.problem_path}",
+        )
 
 
 def _verify_reference_baseline(
@@ -175,16 +186,20 @@ def _verify_reference_baseline(
         expected_sha256=evidence.implementation.sha256,
         expected_size_bytes=evidence.implementation.size_bytes,
     )
-    observed = Solution.model_validate_json(solution_path.read_text(encoding="utf-8"))
+    observed = Solution.model_validate_json(
+        solution_path.read_text(encoding="utf-8"),
+    )
     definition = Definition.model_validate_json(
-        (corpus.authored_root / evidence.problem_path / "definition.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            corpus.authored_root / evidence.problem_path / "definition.json"
+        ).read_text(
+            encoding="utf-8",
+        ),
     )
     expected = reference_baseline_solution(definition)
     if observed.model_dump(mode="json") != expected.model_dump(mode="json"):
         raise ValueError(
-            f"release baseline is not the canonical reference: {evidence.problem_path}"
+            f"release baseline is not the canonical reference: {evidence.problem_path}",
         )
 
 
@@ -203,7 +218,9 @@ def _verify_problem_trace(
         expected_sha256=evidence.implementation.sha256,
         expected_size_bytes=evidence.implementation.size_bytes,
     )
-    solution = Solution.model_validate_json(solution_path.read_text(encoding="utf-8"))
+    solution = Solution.model_validate_json(
+        solution_path.read_text(encoding="utf-8"),
+    )
     problem_dir = corpus.authored_root / evidence.problem_path
     expected_workloads = _load_workloads(problem_dir / "workload.jsonl")
     trace_path = verify_artifact_file(
@@ -216,9 +233,13 @@ def _verify_problem_trace(
     definition_name = _definition_name(problem_dir / "definition.json")
     _verify_solution(solution, definition_name)
     if {trace.workload.uuid for trace in traces} != set(entry.workload_uuids):
-        raise ValueError(f"release trace workload denominator mismatch: {entry.slot}")
+        raise ValueError(
+            f"release trace workload denominator mismatch: {entry.slot}",
+        )
     if len(traces) != len(entry.workload_uuids):
-        raise ValueError(f"release trace contains duplicate workloads: {entry.slot}")
+        raise ValueError(
+            f"release trace contains duplicate workloads: {entry.slot}",
+        )
     return {
         (evidence.problem_path, trace.workload.uuid): _verify_trace(
             trace,
@@ -289,8 +310,12 @@ def _verify_trace(
     release_environment: ReleaseRunEnvironmentIdentity,
 ) -> VerifiedWorkloadRun:
     if trace.definition != definition_name or trace.solution != solution_name:
-        raise ValueError("release trace definition or solution identity mismatch")
-    if trace.workload.model_dump(mode="json") != expected.model_dump(mode="json"):
+        raise ValueError(
+            "release trace definition or solution identity mismatch",
+        )
+    if trace.workload.model_dump(mode="json") != expected.model_dump(
+        mode="json",
+    ):
         raise ValueError("release trace workload payload mismatch")
     evaluation = trace.evaluation
     if evaluation is None:
@@ -304,7 +329,12 @@ def _verify_trace(
     if require_passed and not passed:
         raise ValueError("baseline traces must pass every workload")
     latency = _verified_latency(trace) if passed else None
-    return VerifiedWorkloadRun(problem_path, trace.workload.uuid, latency, passed)
+    return VerifiedWorkloadRun(
+        problem_path,
+        trace.workload.uuid,
+        latency,
+        passed,
+    )
 
 
 def _verify_trace_environment(
@@ -326,17 +356,22 @@ def _verify_trace_environment(
         or environment.libs.get("triton") != RDNA4_VALIDATION_TRITON_VERSION
         or environment.execution_isolation != "container"
     ):
-        raise ValueError("release trace environment is not publication eligible")
+        raise ValueError(
+            "release trace environment is not publication eligible",
+        )
     if require_timing and (
         environment.clocks_locked is not True
         or environment.timing_protocol != OFFICIAL_ROCM_TIMING_PROTOCOL
     ):
-        raise ValueError("passing release trace lacks publication timing controls")
+        raise ValueError(
+            "passing release trace lacks publication timing controls",
+        )
 
 
 def _verified_latency(trace: Trace) -> float:
     evaluation = trace.evaluation
-    assert evaluation is not None and evaluation.performance is not None
+    if evaluation is None or evaluation.performance is None:
+        raise ValueError("passing release trace has no performance evidence")
     performance = evaluation.performance
     latency = performance.latency_ms
     if (
@@ -350,7 +385,9 @@ def _verified_latency(trace: Trace) -> float:
         or performance.timed_outputs_validated is not True
         or performance.cache_clear is None
     ):
-        raise ValueError("release trace does not satisfy the paper timing protocol")
+        raise ValueError(
+            "release trace does not satisfy the paper timing protocol",
+        )
     cache = performance.cache_clear
     if (
         cache.detected_l2_bytes is None
@@ -358,7 +395,9 @@ def _verified_latency(trace: Trace) -> float:
         or cache.source != "torch_device_properties"
         or cache.fallback_reason is not None
     ):
-        raise ValueError("release trace cache-clear evidence is not target-derived")
+        raise ValueError(
+            "release trace cache-clear evidence is not target-derived",
+        )
     return latency
 
 

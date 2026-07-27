@@ -36,7 +36,7 @@ _LAZY_IMPORTS = {
 }
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> object:
     if name not in _LAZY_IMPORTS:
         raise AttributeError(name)
     from importlib import import_module

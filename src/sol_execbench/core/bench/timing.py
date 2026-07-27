@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""GPU timing helpers backed by PyTorch device events."""
+
 from __future__ import annotations
 
 import statistics
@@ -44,11 +46,16 @@ def _summarize_statistics(
 
 
 def _get_empty_cache_for_benchmark(
-    device: str, policy: CacheClearPolicy | None = None
+    device: str,
+    policy: CacheClearPolicy | None = None,
 ) -> torch.Tensor:
     """Create the target-derived L2 cache-clearing buffer."""
     effective = policy or cache_clear_policy_for_device(device)
-    return torch.empty(effective.clear_buffer_bytes, dtype=torch.int8, device=device)
+    return torch.empty(
+        effective.clear_buffer_bytes,
+        dtype=torch.int8,
+        device=device,
+    )
 
 
 def _clear_cache(cache: torch.Tensor) -> None:
@@ -57,7 +64,8 @@ def _clear_cache(cache: torch.Tensor) -> None:
 
 
 def _measurement_budget_reached(
-    times_ms: list[float], min_measurement_time_seconds: float | None
+    times_ms: list[float],
+    min_measurement_time_seconds: float | None,
 ) -> bool:
     """Return whether the configured aggregate measurement budget is satisfied."""
     return (
@@ -72,7 +80,9 @@ def clone_args(args: list[Any]) -> list[Any]:
     Returns fresh copies of all tensor arguments so each benchmark iteration
     starts with independent data. Non-tensor arguments are passed through.
     """
-    return [arg.clone() if isinstance(arg, torch.Tensor) else arg for arg in args]
+    return [
+        arg.clone() if isinstance(arg, torch.Tensor) else arg for arg in args
+    ]
 
 
 def bench_time_with_device_events(
@@ -97,7 +107,10 @@ def bench_time_with_device_events(
     """
     if warmup < 0 or rep <= 0:
         raise ValueError("warmup must be >= 0 and rep must be > 0")
-    if min_measurement_time_seconds is not None and min_measurement_time_seconds <= 0:
+    if (
+        min_measurement_time_seconds is not None
+        and min_measurement_time_seconds <= 0
+    ):
         raise ValueError("min_measurement_time_seconds must be > 0 or None")
     cache = _get_empty_cache_for_benchmark(device, cache_clear_policy)
     torch.cuda.synchronize()
@@ -105,10 +118,10 @@ def bench_time_with_device_events(
     if setup is None:
         _fn = fn
 
-        def fn(_):
+        def fn(_: Any) -> Any:
             return _fn()
 
-        def setup():
+        def setup() -> Any:
             return None
 
     for _ in range(warmup):
@@ -174,5 +187,7 @@ def time_runnable(
             cache_clear_policy=cache_clear_policy,
         )
         if not times:
-            raise ValueError(f"No timing results for methodology: {methodology}")
+            raise ValueError(
+                f"No timing results for methodology: {methodology}",
+            )
         return _summarize_statistics(times, return_mode)

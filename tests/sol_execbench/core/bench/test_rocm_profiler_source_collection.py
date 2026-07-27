@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 import subprocess
+from collections.abc import Sequence
 
 import pytest
 
@@ -22,7 +22,6 @@ from sol_execbench.core.bench.timing_policy import (
     select_timing_policy,
 )
 
-
 ROCPROFV3_CSV = """Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)
 KERNEL_DISPATCH,rmsnorm_kernel,1000,5000,4000
 HIP_RUNTIME_API,hipLaunchKernel,900,5100,4200
@@ -30,7 +29,9 @@ KERNEL_DISPATCH,post_kernel,6000,9000,3000
 """
 
 
-def test_source_collection_selects_triton_rocprofv3_and_records_run_config(tmp_path):
+def test_source_collection_selects_triton_rocprofv3_and_records_run_config(
+    tmp_path,
+):
     calls: list[list[str]] = []
 
     def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -142,10 +143,12 @@ def test_discover_with_empty_output_file_does_not_register_every_file(tmp_path):
     assert [artifact.path.name for artifact in artifacts] == []
 
 
-def test_profile_collection_timeout_keeps_partial_artifacts_and_reasons(tmp_path):
+def test_profile_collection_timeout_keeps_partial_artifacts_and_reasons(
+    tmp_path,
+):
     def runner(command, cwd, timeout):
         (tmp_path / "profile_counters.csv").write_text(
-            "Metric,Value,Unit\nSQ_INSTS_VALU,1,count\n"
+            "Metric,Value,Unit\nSQ_INSTS_VALU,1,count\n",
         )
         raise subprocess.TimeoutExpired(cmd=list(command), timeout=timeout or 0)
 
@@ -164,7 +167,9 @@ def test_profile_collection_timeout_keeps_partial_artifacts_and_reasons(tmp_path
     assert "rocprof_command_failed" not in payload["reason_codes"]
     assert payload["artifact_coverage_status"] == "partial"
     assert payload["profiler_data_artifacts"] is True
-    assert any(artifact["kind"] == "counter_csv" for artifact in payload["artifacts"])
+    assert any(
+        artifact["kind"] == "counter_csv" for artifact in payload["artifacts"]
+    )
 
 
 def test_profile_result_rejects_contradictory_success_reason(tmp_path) -> None:

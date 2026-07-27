@@ -6,14 +6,14 @@
 
 from __future__ import annotations
 
-from .agent_feedback import (
+from sol_execbench.cli.sidecars.agent_feedback import (
     _agent_feedback_artifact_citations,
     _agent_feedback_identity_fields,
     _agent_feedback_run_id,
     _agent_feedback_sidecar_path,
     _write_agent_feedback_sidecar,
 )
-from .profile import (
+from sol_execbench.cli.sidecars.profile import (
     _profile_output_directory,
     _profile_sidecar_path,
     _profile_summary_artifact_citations,
@@ -21,7 +21,7 @@ from .profile import (
     _write_profile_sidecar,
     _write_profile_summary_sidecar,
 )
-from .static_evidence import (
+from sol_execbench.cli.sidecars.static_evidence import (
     STATIC_EVIDENCE_AUTO,
     STATIC_EVIDENCE_NONE,
     _collect_static_evidence_for_cli,

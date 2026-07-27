@@ -9,17 +9,21 @@ import os
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
-from sol_execbench.core.data.json_utils import atomic_write_json_value, load_json_value
+from sol_execbench.core.data.json_utils import (
+    atomic_write_json_value,
+    load_json_value,
+)
 from sol_execbench.core.process import (
     redacted_file_tail,
     run_in_process_group_to_files,
 )
 from sol_execbench.core.solar_bridge.models import (
-    SolarAnalysisStatus,
     SolarAnalysisOutcome,
+    SolarAnalysisStatus,
     SolarReadinessStatus,
     SolarStage,
     SolarStageAuditOutcome,
@@ -29,7 +33,9 @@ from sol_execbench.core.solar_bridge.models import (
 
 
 def run_solar_worker(
-    request: SolarWorkerRequest, *, timeout_seconds: float = 14_400
+    request: SolarWorkerRequest,
+    *,
+    timeout_seconds: float = 14_400,
 ) -> SolarAnalysisOutcome:
     """Run one analysis with process-group cleanup and file-backed logs."""
     payload, failure = _run_worker_payload(
@@ -45,14 +51,18 @@ def run_solar_worker(
             outcome.status is SolarAnalysisStatus.ANALYZED
             and not outcome.is_formal_publication
         ):
-            raise ValueError("SOLAR worker returned a non-formal analyzed response")
+            raise ValueError(
+                "SOLAR worker returned a non-formal analyzed response",
+            )
         return outcome
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- worker response boundary
         return _failed_outcome(request, "worker_response_invalid", str(exc))
 
 
 def run_solar_stage_worker(
-    request: SolarStageAuditRequest, *, timeout_seconds: float = 14_400
+    request: SolarStageAuditRequest,
+    *,
+    timeout_seconds: float = 14_400,
 ) -> SolarStageAuditOutcome:
     """Run one readiness audit with bounded isolated-process cleanup."""
     payload, failure = _run_worker_payload(
@@ -65,10 +75,16 @@ def run_solar_stage_worker(
     try:
         outcome = SolarStageAuditOutcome.from_dict(payload or {})
         if outcome.status is SolarReadinessStatus.READY and not outcome.ready:
-            raise ValueError("SOLAR stage worker returned invalid ready evidence")
+            raise ValueError(
+                "SOLAR stage worker returned invalid ready evidence",
+            )
         return outcome
-    except Exception as exc:
-        return _failed_stage_outcome(request, "worker_response_invalid", str(exc))
+    except Exception as exc:  # noqa: BLE001 -- worker response boundary
+        return _failed_stage_outcome(
+            request,
+            "worker_response_invalid",
+            str(exc),
+        )
 
 
 def _run_worker_payload(
@@ -77,7 +93,9 @@ def _run_worker_payload(
     module: str,
     timeout_seconds: float,
 ) -> tuple[Mapping[str, Any] | None, tuple[str, str] | None]:
-    with tempfile.TemporaryDirectory(prefix="sol-execbench-solar-worker-") as temp:
+    with tempfile.TemporaryDirectory(
+        prefix="sol-execbench-solar-worker-",
+    ) as temp:
         root = Path(temp)
         request_path = root / "request.json"
         response_path = root / "response.json"
@@ -104,7 +122,7 @@ def _run_worker_payload(
                 "worker_timeout",
                 f"SOLAR worker exceeded {timeout_seconds:g} seconds",
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- isolated process boundary
             return None, ("worker_execution_failed", str(exc))
         if response_path.is_file():
             try:
@@ -112,7 +130,7 @@ def _run_worker_payload(
                 if not isinstance(payload, dict):
                     raise ValueError("worker response must be a JSON object")
                 return payload, None
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- worker response boundary
                 return None, ("worker_response_invalid", str(exc))
         stderr = redacted_file_tail(stderr_path)
         stdout = redacted_file_tail(stdout_path)
@@ -121,7 +139,9 @@ def _run_worker_payload(
 
 
 def _failed_outcome(
-    request: SolarWorkerRequest, reason_code: str, message: str
+    request: SolarWorkerRequest,
+    reason_code: str,
+    message: str,
 ) -> SolarAnalysisOutcome:
     return SolarAnalysisOutcome(
         status=SolarAnalysisStatus.FAILED,
@@ -133,7 +153,9 @@ def _failed_outcome(
 
 
 def _failed_stage_outcome(
-    request: SolarStageAuditRequest, reason_code: str, message: str
+    request: SolarStageAuditRequest,
+    reason_code: str,
+    message: str,
 ) -> SolarStageAuditOutcome:
     return SolarStageAuditOutcome(
         status=SolarReadinessStatus.FAILED,

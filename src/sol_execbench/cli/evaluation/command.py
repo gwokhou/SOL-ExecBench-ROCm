@@ -14,31 +14,31 @@ from typing import Protocol
 
 from rich.console import Console
 
-from ...core.bench.io import flashinfer_safetensors_env
-from ...core.bench.rocm_profiler import (
+from sol_execbench.cli.evaluation.diagnostics import (
+    _DIAGNOSTIC_TAIL_LIMIT,
+    NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
+    NoTraceDiagnostics,
+    _diagnostic_tail,
+    _no_trace_diagnostics_sidecar_path,
+    _write_no_trace_diagnostics_sidecar,
+)
+from sol_execbench.cli.sidecars.profile import _profile_output_directory
+from sol_execbench.core.bench.io import flashinfer_safetensors_env
+from sol_execbench.core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,
     ProfileRunner,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
     collect_rocprofv3_profile,
 )
-from ...core.platform.runtime import resolve_rocm_tool
-from ...core.process.environment import (
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
+from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_GRACEFUL_EXIT,
     sanitized_subprocess_env,
 )
-from ...core.process.subprocesses import (
+from sol_execbench.core.process.subprocesses import (
     TextSubprocessRunner,
     run_in_process_group_bounded,
-)
-from ..sidecars.profile import _profile_output_directory
-from .diagnostics import (
-    NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
-    _DIAGNOSTIC_TAIL_LIMIT,
-    NoTraceDiagnostics,
-    _diagnostic_tail,
-    _no_trace_diagnostics_sidecar_path,
-    _write_no_trace_diagnostics_sidecar,
 )
 
 __all__ = [
@@ -80,7 +80,10 @@ def _evaluation_env(
     if graceful_exit:
         base[ENV_SOL_EXECBENCH_GRACEFUL_EXIT] = "1"
     sanitized = sanitized_subprocess_env(base, staging_dir=staging_dir)
-    return sanitized_subprocess_env(env_builder(sanitized), staging_dir=staging_dir)
+    return sanitized_subprocess_env(
+        env_builder(sanitized),
+        staging_dir=staging_dir,
+    )
 
 
 def _run_command(
@@ -92,7 +95,12 @@ def _run_command(
     runner: TextSubprocessRunner | None,
 ) -> subprocess.CompletedProcess[str]:
     if runner is None:
-        return run_in_process_group_bounded(command, cwd=cwd, timeout=timeout, env=env)
+        return run_in_process_group_bounded(
+            command,
+            cwd=cwd,
+            timeout=timeout,
+            env=env,
+        )
     return runner(
         command,
         cwd=cwd,
@@ -105,7 +113,6 @@ def _run_command(
 
 def _timeout_output_text(output: str | bytes | None) -> str:
     """Return timeout output as text regardless of subprocess typing."""
-
     if output is None:
         return ""
     if isinstance(output, bytes):
@@ -122,7 +129,6 @@ def _run_evaluation_command(
     runner: TextSubprocessRunner | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run the staged evaluation command with the standard ROCm allocator env."""
-
     env = _evaluation_env(staging_dir, env_builder)
     return _run_command(
         eval_cmd,
@@ -145,7 +151,6 @@ def _run_profiled_evaluation(
     profile_collector: ProfileCollector = collect_rocprofv3_profile,
 ) -> tuple[subprocess.CompletedProcess[str] | None, Rocprofv3ProfileResult]:
     """Run evaluation under `rocprofv3`, returning normal execution on failure."""
-
     output_directory = _profile_output_directory(output_file, staging_dir)
     request = Rocprofv3ProfileRequest(
         application_command=tuple(eval_cmd),
@@ -155,7 +160,9 @@ def _run_profiled_evaluation(
         timeout_seconds=timeout,
     )
     if rocprofv3_available is None:
-        rocprofv3_available = resolve_rocm_tool(ROCPROFV3_EXECUTABLE) is not None
+        rocprofv3_available = (
+            resolve_rocm_tool(ROCPROFV3_EXECUTABLE) is not None
+        )
     profile_result = profile_collector(
         request,
         rocprofv3_available=rocprofv3_available,

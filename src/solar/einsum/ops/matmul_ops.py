@@ -24,26 +24,31 @@ This module provides einsum handlers for:
 
 from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShape, TensorShapes
 
 
 class MatmulHandler(EinsumOpHandler):
     """Handler for matmul operations."""
 
-    supported_ops = ["matmul", "mm"]
+    supported_ops = ("matmul", "mm")
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for matrix multiplication."""
         input_shape = tensor_shapes.inputs[0]
-        weight_shape = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        weight_shape = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -54,136 +59,41 @@ class MatmulHandler(EinsumOpHandler):
         return self._generate_matmul_einsum(input_shape, weight_shape)
 
     def _generate_matmul_einsum(
-        self, input_shape: TensorShape, other_shape: TensorShape
+        self,
+        input_shape: TensorShape,
+        other_shape: TensorShape,
     ) -> EinsumOp:
-        """Generate einsum for matrix multiplication.
-
-        Handles broadcasting where inputs can have different batch dimensions.
-        PyTorch matmul broadcasting rules:
-        - [B, M, K] x [K, N] -> [B, M, N]  (2D weight broadcasts)
-        - [M, K] x [B, K, N] -> [B, M, N]  (2D input broadcasts)
-        - [B, M, K] x [B, K, N] -> [B, M, N]  (same batch dims)
-
-        Args:
-            input_shape: Shape of first input tensor.
-            other_shape: Shape of second input tensor.
-
-        Returns:
-            EinsumOp for the matmul operation.
-        """
-        # Handle different matmul cases based on actual tensor shapes
-        # PyTorch matmul with 1D operands:
-        # - [K] x [K, N] -> [N]       (vector-matrix)
-        # - [M, K] x [K] -> [M]       (matrix-vector)
-        # - [K] x [K] -> []           (dot product)
-        input_ndim = len(input_shape)
-        other_ndim = len(other_shape)
-
-        if input_ndim == 1 and other_ndim == 1:
-            # Dot product: [K] x [K] -> scalar
-            operands = [
-                EinsumOperand("Input", ["K"], is_output=False),
-                EinsumOperand("Weight", ["K"], is_output=False),
-                EinsumOperand("Output", [], is_output=True),
-            ]
-            equation = "K,K->"
-        elif input_ndim == 1 and other_ndim == 2:
-            # Vector-matrix: [K] x [K, N] -> [N]
-            operands = [
-                EinsumOperand("Input", ["K"], is_output=False),
-                EinsumOperand("Weight", ["K", "N"], is_output=False),
-                EinsumOperand("Output", ["N"], is_output=True),
-            ]
-            equation = "K,KN->N"
-        elif input_ndim == 2 and other_ndim == 1:
-            # Matrix-vector: [M, K] x [K] -> [M]
-            operands = [
-                EinsumOperand("Input", ["M", "K"], is_output=False),
-                EinsumOperand("Weight", ["K"], is_output=False),
-                EinsumOperand("Output", ["M"], is_output=True),
-            ]
-            equation = "MK,K->M"
-        elif input_ndim == 1 and other_ndim > 2:
-            # Vector with batched matrix: [K] x [B..., K, N] -> [B..., N]
-            batch_dims = other_ndim - 2
-            batch_letters = [f"B{i}" for i in range(batch_dims)]
-            dims_b = batch_letters + ["K", "N"]
-            dims_out = batch_letters + ["N"]
-            operands = [
-                EinsumOperand("Input", ["K"], is_output=False),
-                EinsumOperand("Weight", dims_b, is_output=False),
-                EinsumOperand("Output", dims_out, is_output=True),
-            ]
-            equation = f"K,{''.join(dims_b)}->{''.join(dims_out)}"
-        elif input_ndim == 2 and other_ndim == 2:
-            # Standard 2D matmul: [M, K] x [K, N] -> [M, N]
-            operands = [
-                EinsumOperand("Input", ["M", "K"], is_output=False),
-                EinsumOperand("Weight", ["K", "N"], is_output=False),
-                EinsumOperand("Output", ["M", "N"], is_output=True),
-            ]
-            equation = "MK,KN->MN"
-        elif input_ndim > 2 and other_ndim == 2:
-            # Batched input with 2D weight: [B0, ..., M, K] x [K, N] -> [B0, ..., M, N]
-            batch_dims = input_ndim - 2
-            batch_letters = [f"B{i}" for i in range(batch_dims)]
-            dims_a = batch_letters + ["M", "K"]
-            dims_b = ["K", "N"]  # No batch dims for weight
-            dims_out = batch_letters + ["M", "N"]
-
-            operands = [
-                EinsumOperand("Input", dims_a, is_output=False),
-                EinsumOperand("Weight", dims_b, is_output=False),
-                EinsumOperand("Output", dims_out, is_output=True),
-            ]
-            equation = f"{''.join(dims_a)},{''.join(dims_b)}->{''.join(dims_out)}"
-        elif input_ndim == 2 and other_ndim > 2:
-            # 2D input with batched weight: [M, K] x [B0, ..., K, N] -> [B0, ..., M, N]
-            batch_dims = other_ndim - 2
-            batch_letters = [f"B{i}" for i in range(batch_dims)]
-            dims_a = ["M", "K"]  # No batch dims for input
-            dims_b = batch_letters + ["K", "N"]
-            dims_out = batch_letters + ["M", "N"]
-
-            operands = [
-                EinsumOperand("Input", dims_a, is_output=False),
-                EinsumOperand("Weight", dims_b, is_output=False),
-                EinsumOperand("Output", dims_out, is_output=True),
-            ]
-            equation = f"{''.join(dims_a)},{''.join(dims_b)}->{''.join(dims_out)}"
-        else:
-            # Both have batch dimensions - use the actual batch dims from each tensor
-            input_batch_dims = input_ndim - 2
-            other_batch_dims = other_ndim - 2
-            output_batch_dims = max(input_batch_dims, other_batch_dims)
-
-            # Generate batch letters for output (max of both)
-            output_batch_letters = [f"B{i}" for i in range(output_batch_dims)]
-
-            # Input batch dims (may be fewer than output)
-            input_batch_letters = (
-                output_batch_letters[-input_batch_dims:] if input_batch_dims > 0 else []
-            )
-            dims_a = input_batch_letters + ["M", "K"]
-
-            # Other batch dims (may be fewer than output)
-            other_batch_letters = (
-                output_batch_letters[-other_batch_dims:] if other_batch_dims > 0 else []
-            )
-            dims_b = other_batch_letters + ["K", "N"]
-
-            dims_out = output_batch_letters + ["M", "N"]
-
-            operands = [
-                EinsumOperand("Input", dims_a, is_output=False),
-                EinsumOperand("Weight", dims_b, is_output=False),
-                EinsumOperand("Output", dims_out, is_output=True),
-            ]
-            equation = f"{''.join(dims_a)},{''.join(dims_b)}->{''.join(dims_out)}"
-
+        """Generate einsum labels for every PyTorch matmul rank combination."""
+        input_rank = len(input_shape)
+        other_rank = len(other_shape)
+        input_batch_rank = max(0, input_rank - 2)
+        other_batch_rank = max(0, other_rank - 2)
+        output_batch_rank = max(input_batch_rank, other_batch_rank)
+        output_batch = [f"B{index}" for index in range(output_batch_rank)]
+        input_batch = (
+            output_batch[-input_batch_rank:] if input_batch_rank else []
+        )
+        other_batch = (
+            output_batch[-other_batch_rank:] if other_batch_rank else []
+        )
+        input_dims = input_batch + (["K"] if input_rank == 1 else ["M", "K"])
+        other_dims = other_batch + (["K"] if other_rank == 1 else ["K", "N"])
+        output_dims = [
+            *output_batch,
+            *(["M"] if input_rank > 1 else []),
+            *(["N"] if other_rank > 1 else []),
+        ]
+        operands = [
+            EinsumOperand("Input", input_dims, is_output=False),
+            EinsumOperand("Weight", other_dims, is_output=False),
+            EinsumOperand("Output", output_dims, is_output=True),
+        ]
         return EinsumOp(
             operands=operands,
-            equation=equation,
+            equation=(
+                f"{''.join(input_dims)},{''.join(other_dims)}"
+                f"->{''.join(output_dims)}"
+            ),
             name="matmul",
             elementwise_op="mul",
             reduction_op="add",
@@ -193,14 +103,19 @@ class MatmulHandler(EinsumOpHandler):
 class LinearHandler(EinsumOpHandler):
     """Handler for linear (fully connected) layers."""
 
-    supported_ops = ["linear"]
+    supported_ops = ("linear",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for linear layer."""
         input_shape = tensor_shapes.inputs[0]
-        weight_shape = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        weight_shape = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -211,7 +126,9 @@ class LinearHandler(EinsumOpHandler):
         return self._generate_linear_einsum(input_shape, weight_shape)
 
     def _generate_linear_einsum(
-        self, input_shape: TensorShape, weight_shape: TensorShape
+        self,
+        input_shape: TensorShape,
+        weight_shape: TensorShape,
     ) -> EinsumOp:
         """Generate einsum for linear layer.
 
@@ -221,6 +138,7 @@ class LinearHandler(EinsumOpHandler):
 
         Returns:
             EinsumOp for the linear operation.
+
         """
         # Linear: input @ weight.T
         batch_dims = len(input_shape) - 1
@@ -253,14 +171,19 @@ class LinearHandler(EinsumOpHandler):
 class BmmHandler(EinsumOpHandler):
     """Handler for batch matrix multiplication."""
 
-    supported_ops = ["bmm"]
+    supported_ops = ("bmm",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for batch matrix multiplication."""
         input_shape = tensor_shapes.inputs[0]
-        weight_shape = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        weight_shape = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if input_shape is None or weight_shape is None:
             raise ValueError(f"Missing Input/Weight shapes for {op_name}")
@@ -268,7 +191,9 @@ class BmmHandler(EinsumOpHandler):
         return self._generate_bmm_einsum(input_shape, weight_shape)
 
     def _generate_bmm_einsum(
-        self, input_shape: TensorShape, other_shape: TensorShape
+        self,
+        input_shape: TensorShape,
+        other_shape: TensorShape,
     ) -> EinsumOp:
         """Generate einsum for batch matrix multiplication.
 

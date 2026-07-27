@@ -6,6 +6,11 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+from sol_execbench_type_helpers import (
+    make_definition,
+    make_solution,
+    make_workload,
+)
 
 from sol_execbench.cli.protocol import CliFailure, CliResult
 from sol_execbench.core.data.solution_instance import Solution
@@ -18,7 +23,6 @@ from sol_execbench.core.scoring.release_models import (
     ReleaseExecutionPlan,
     ReleaseRunKind,
 )
-from sol_execbench_type_helpers import make_definition, make_solution, make_workload
 
 
 class _TraceResult:
@@ -49,22 +53,31 @@ def _plan(
 
 
 def test_execute_release_plan_summarizes_candidate_results(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     plan = _plan(problems=(object(), object()))
     results = iter(
         [
             [_TraceResult(True), _TraceResult(False)],
             [_TraceResult(True)],
-        ]
+        ],
     )
-    monkeypatch.setattr(release_runner, "load_execution_plan", lambda *_a, **_k: plan)
+    monkeypatch.setattr(
+        release_runner,
+        "load_execution_plan",
+        lambda *_a, **_k: plan,
+    )
     monkeypatch.setattr(
         release_runner.AkaCorpusManifest,
         "load",
         staticmethod(lambda _path: object()),
     )
-    monkeypatch.setattr(release_runner, "_verify_plan_contract", lambda *_a: None)
+    monkeypatch.setattr(
+        release_runner,
+        "_verify_plan_contract",
+        lambda *_a: None,
+    )
     monkeypatch.setattr(
         release_runner,
         "_write_environment_evidence",
@@ -90,16 +103,25 @@ def test_execute_release_plan_summarizes_candidate_results(
 
 
 def test_execute_release_plan_rejects_incomplete_baseline(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     plan = _plan(role=ReleaseRunKind.BASELINE)
-    monkeypatch.setattr(release_runner, "load_execution_plan", lambda *_a, **_k: plan)
+    monkeypatch.setattr(
+        release_runner,
+        "load_execution_plan",
+        lambda *_a, **_k: plan,
+    )
     monkeypatch.setattr(
         release_runner.AkaCorpusManifest,
         "load",
         staticmethod(lambda _path: object()),
     )
-    monkeypatch.setattr(release_runner, "_verify_plan_contract", lambda *_a: None)
+    monkeypatch.setattr(
+        release_runner,
+        "_verify_plan_contract",
+        lambda *_a: None,
+    )
     monkeypatch.setattr(
         release_runner,
         "_write_environment_evidence",
@@ -111,7 +133,10 @@ def test_execute_release_plan_rejects_incomplete_baseline(
         lambda *_a, **_k: [_TraceResult(False)],
     )
 
-    with pytest.raises(ValueError, match="baseline did not pass every workload"):
+    with pytest.raises(
+        ValueError,
+        match="baseline did not pass every workload",
+    ):
         release_runner.execute_release_plan(
             tmp_path / "workspace/plans/plan.json",
             corpus_manifest_path=tmp_path / "manifest.yaml",
@@ -145,7 +170,7 @@ def _contract_objects(
             "suite/problem": {
                 "definition_sha256": "d" * 64,
                 "workload_sha256": "w" * 64,
-            }
+            },
         },
         authored_root=tmp_path / "source/problems",
     )
@@ -161,14 +186,19 @@ def _stub_contract_io(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(release_runner, "sha256_file", lambda _path: "same")
 
 
-def test_verify_plan_contract_accepts_exact_denominator(tmp_path, monkeypatch) -> None:
+def test_verify_plan_contract_accepts_exact_denominator(
+    tmp_path,
+    monkeypatch,
+) -> None:
     plan, corpus = _contract_objects(tmp_path)
     verified: list[tuple[Path, str]] = []
     _stub_contract_io(monkeypatch, tmp_path)
     monkeypatch.setattr(
         release_runner,
         "verify_release_source_state",
-        lambda root, expected_revision: verified.append((root, expected_revision)),
+        lambda root, expected_revision: verified.append(
+            (root, expected_revision),
+        ),
     )
 
     release_runner._verify_plan_contract(plan, tmp_path, corpus)
@@ -180,7 +210,11 @@ def test_verify_plan_contract_accepts_exact_denominator(tmp_path, monkeypatch) -
     ("mutation", "message"),
     [
         (
-            lambda plan: setattr(plan.problems[0], "problem_path", "other/problem"),
+            lambda plan: setattr(
+                plan.problems[0],
+                "problem_path",
+                "other/problem",
+            ),
             "problem denominator mismatch",
         ),
         (
@@ -190,7 +224,10 @@ def test_verify_plan_contract_accepts_exact_denominator(tmp_path, monkeypatch) -
     ],
 )
 def test_verify_plan_contract_rejects_drift(
-    tmp_path, monkeypatch, mutation, message
+    tmp_path,
+    monkeypatch,
+    mutation,
+    message,
 ) -> None:
     plan, corpus = _contract_objects(tmp_path)
     mutation(plan)
@@ -200,7 +237,10 @@ def test_verify_plan_contract_rejects_drift(
         release_runner._verify_plan_contract(plan, tmp_path, corpus)
 
 
-def test_verify_plan_contract_rejects_corpus_identity(tmp_path, monkeypatch) -> None:
+def test_verify_plan_contract_rejects_corpus_identity(
+    tmp_path,
+    monkeypatch,
+) -> None:
     plan, corpus = _contract_objects(tmp_path)
     monkeypatch.setattr(
         release_runner,
@@ -210,7 +250,9 @@ def test_verify_plan_contract_rejects_corpus_identity(tmp_path, monkeypatch) -> 
     monkeypatch.setattr(
         release_runner,
         "sha256_file",
-        lambda path: "bundled" if path.name == "bundled.yaml" else "authoritative",
+        lambda path: (
+            "bundled" if path.name == "bundled.yaml" else "authoritative"
+        ),
     )
 
     with pytest.raises(ValueError, match="corpus identity mismatch"):
@@ -218,7 +260,8 @@ def test_verify_plan_contract_rejects_corpus_identity(tmp_path, monkeypatch) -> 
 
 
 def test_environment_evidence_is_written_and_resume_validated(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     plan = _plan()
     validated: list[dict[str, Any]] = []
@@ -241,21 +284,28 @@ def test_environment_evidence_is_written_and_resume_validated(
     release_runner._write_environment_evidence(plan, tmp_path, resume=False)
 
     path = tmp_path / "environment.json"
-    assert json.loads(path.read_text())["release_execution"] == {"source": "exact"}
-    assert validated == [{"status": "ok", "release_execution": {"source": "exact"}}]
+    assert json.loads(path.read_text())["release_execution"] == {
+        "source": "exact",
+    }
+    assert validated == [
+        {"status": "ok", "release_execution": {"source": "exact"}},
+    ]
 
     resumed: list[str] = []
     monkeypatch.setattr(
         release_runner,
         "release_execution_identity_from_payload",
         lambda _payload, expected_source_revision: resumed.append(
-            expected_source_revision
+            expected_source_revision,
         ),
     )
     release_runner._write_environment_evidence(plan, tmp_path, resume=True)
     assert resumed == ["a" * 40]
 
-    with pytest.raises(FileExistsError, match="environment evidence already exists"):
+    with pytest.raises(
+        FileExistsError,
+        match="environment evidence already exists",
+    ):
         release_runner._write_environment_evidence(plan, tmp_path, resume=False)
 
 
@@ -296,7 +346,10 @@ def _stub_solution(monkeypatch, solution_path: Path) -> Solution:
     return cast(Solution, solution)
 
 
-def test_execute_problem_covers_resume_and_missing_trace(tmp_path, monkeypatch) -> None:
+def test_execute_problem_covers_resume_and_missing_trace(
+    tmp_path,
+    monkeypatch,
+) -> None:
     problem, corpus, solution_path = _problem(tmp_path)
     _stub_solution(monkeypatch, solution_path)
     expected = [cast(Trace, object())]
@@ -350,7 +403,10 @@ def test_execute_problem_covers_resume_and_missing_trace(tmp_path, monkeypatch) 
         )
 
 
-def test_execute_problem_converts_candidate_cli_failure(tmp_path, monkeypatch) -> None:
+def test_execute_problem_converts_candidate_cli_failure(
+    tmp_path,
+    monkeypatch,
+) -> None:
     problem, corpus, solution_path = _problem(tmp_path)
     _stub_solution(monkeypatch, solution_path)
     expected = [cast(Trace, object())]
@@ -358,7 +414,7 @@ def test_execute_problem_converts_candidate_cli_failure(tmp_path, monkeypatch) -
         release_runner,
         "run_evaluation_cli",
         lambda **_kwargs: (_ for _ in ()).throw(
-            CliFailure("timed out", code="evaluation_timeout", exit_code=4)
+            CliFailure("timed out", code="evaluation_timeout", exit_code=4),
         ),
     )
     writes: list[Path] = []
@@ -368,7 +424,11 @@ def test_execute_problem_converts_candidate_cli_failure(tmp_path, monkeypatch) -
         path.write_text("{}")
         writes.append(path)
 
-    monkeypatch.setattr(release_runner, "_write_candidate_failure", write_failure)
+    monkeypatch.setattr(
+        release_runner,
+        "_write_candidate_failure",
+        write_failure,
+    )
     monkeypatch.setattr(
         release_runner,
         "_validate_existing_trace",
@@ -418,14 +478,20 @@ def _problem_files(tmp_path: Path) -> tuple[Path, Solution]:
             "entry_point": "kernel.py::run",
             "destination_passing_style": False,
         },
-        sources=[{"path": "kernel.py", "content": "def run(x, y): return x + y"}],
+        sources=[
+            {"path": "kernel.py", "content": "def run(x, y): return x + y"},
+        ],
     )
     (problem_dir / "definition.json").write_text(definition.model_dump_json())
-    (problem_dir / "workload.jsonl").write_text(workload.model_dump_json() + "\n")
+    (problem_dir / "workload.jsonl").write_text(
+        workload.model_dump_json() + "\n",
+    )
     return problem_dir, solution
 
 
-def test_candidate_failure_writes_one_bounded_trace_per_workload(tmp_path) -> None:
+def test_candidate_failure_writes_one_bounded_trace_per_workload(
+    tmp_path,
+) -> None:
     problem_dir, solution = _problem_files(tmp_path)
     trace_path = tmp_path / "trace.jsonl"
 
@@ -460,7 +526,9 @@ def test_candidate_failure_writes_one_bounded_trace_per_workload(tmp_path) -> No
         )
 
 
-def test_evaluation_request_is_hardened_and_caps_compile_timeout(tmp_path) -> None:
+def test_evaluation_request_is_hardened_and_caps_compile_timeout(
+    tmp_path,
+) -> None:
     request = release_runner._evaluation_request(
         tmp_path / "problem",
         tmp_path / "solution.json",

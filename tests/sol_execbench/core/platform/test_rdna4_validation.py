@@ -22,15 +22,15 @@ def _environment() -> dict:
                     "parsed": {
                         "pci_vendor_ids": ["0x1002"],
                         "pci_device_ids": ["0x7590"],
-                    }
-                }
+                    },
+                },
             },
             "gpus": [
                 {
                     "index": 0,
                     "name": "AMD Radeon RX 9060 XT",
                     "gfx_target": "gfx1200",
-                }
+                },
             ],
             "rocm": {"version": "7.2.0"},
             "pytorch": {
@@ -88,7 +88,9 @@ def test_verifies_content_addressed_local_rdna4_bundle(tmp_path: Path):
     assert verified["target"]["torch_version"] == "2.11.0+rocm7.2"
 
 
-def test_local_validation_bundle_cannot_become_publisher_release(tmp_path: Path):
+def test_local_validation_bundle_cannot_become_publisher_release(
+    tmp_path: Path,
+):
     directory = tmp_path / "bundle"
     _write_bundle(directory)
 
@@ -148,7 +150,9 @@ def test_rejects_non_gfx1200_environment():
 
 def test_rejects_other_gfx1200_pci_device():
     payload = _environment()
-    payload["snapshot"]["tools"]["amd-smi"]["parsed"]["pci_device_ids"] = ["0x7550"]
+    payload["snapshot"]["tools"]["amd-smi"]["parsed"]["pci_device_ids"] = [
+        "0x7550",
+    ]
 
     with pytest.raises(ValueError, match="PCI identity"):
         validate_environment_payload(payload)
@@ -177,7 +181,9 @@ def test_rejects_rocm_outside_locked_scope():
         validate_environment_payload(payload)
 
 
-def test_rejects_manifest_target_that_disagrees_with_environment(tmp_path: Path):
+def test_rejects_manifest_target_that_disagrees_with_environment(
+    tmp_path: Path,
+):
     directory = tmp_path / "bundle"
     manifest = _write_bundle(directory)
     manifest.pop("payload_sha256")

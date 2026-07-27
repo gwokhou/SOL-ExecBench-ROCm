@@ -20,7 +20,10 @@ def require_tool(name: str) -> str:
     return path
 
 
-def run_command(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
+def run_command(
+    args: list[str],
+    timeout: int = 30,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
 
 
@@ -50,4 +53,6 @@ def test_rocm_runtime_tools():
     smi_version_args = [smi, "version"]
     result = run_command(smi_version_args, timeout=30)
     assert result.returncode == 0, command_output(result)
-    assert result.stdout.strip(), f"{' '.join(smi_version_args)} produced no output"
+    assert result.stdout.strip(), (
+        f"{' '.join(smi_version_args)} produced no output"
+    )

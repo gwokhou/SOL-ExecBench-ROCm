@@ -13,60 +13,89 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Analyze an einsum graph into hardware-independent metrics.
+"""Analyze an einsum graph into hardware-independent compute and I/O metrics.
 
-This module implements the **second stage** of the Solar pipeline:
-
-  `einsum_graph.yaml`  ->  `analysis.yaml`
-
-The output `analysis.yaml` is intended to be hardware-independent and includes:
-- per-layer: macs, flops (= 2 * macs), tensor dtypes, and exact byte traffic
-- totals across the graph
-
-Memory access models (elements are diagnostic; byte totals use each tensor dtype):
-- ``unfused``: every per-operation input and output access;
-- ``fused``: compulsory, deduplicated graph-external I/O;
-- ``prefetched`` / ``io_lower_bound``: compulsory I/O plus the safely composable
-  excess traffic selected from a capacity-constrained Orojenesis curve.
-
-Formal schema-v3 analysis also emits conservative fusion regions, hierarchy
-capacity pressure, the pinned solver inputs/raw curve and their SHA-256 hashes,
-and separate compute/memory overlap components. Verified canonical and extended
-MatMul regions use pinned multi-einsum FFMT evidence; unsupported composition
-is never approximated into a scored bound.
-
-Note: input_elements includes all inputs to an operation (including weights/biases).
-Weights are treated as inputs since they are just another operand to the computation.
-
-Note: "start" nodes are filtered out before analysis as they represent model inputs,
-not actual computation. Their outputs are treated as external inputs to the graph.
-
-See SOL_GUIDE.md for detailed explanation of the three SOL models.
+This is the second SOLAR pipeline stage, converting ``einsum_graph.yaml`` into
+``analysis.yaml``. It emits per-layer and graph totals plus conservative formal
+fusion and Orojenesis evidence. See ``SOL_GUIDE.md`` for the memory models and
+formal-evidence contract.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Set, Union, cast
+from types import MappingProxyType
+from typing import Any, cast
 
 import yaml
 
-from solar.einsum.analyzer import EinsumAnalyzer
-from solar.einsum.semantics import (
-    EINSUM_GRAPH_SCHEMA_VERSION,
-    SemanticGraphError,
-    validate_semantic_graph,
-)
-from solar.analysis.contraction_proofs import build_orojenesis_proof_graph
 from solar.analysis import formal_evidence
+from solar.analysis.contraction_proofs import build_orojenesis_proof_graph
 from solar.analysis.fusion import FusionPlanner
+from solar.analysis.graph_context import (
+    AnalysisJob as _AnalysisJob,
+)
+from solar.analysis.graph_context import (
+    GraphTopology as _GraphTopology,
+)
+from solar.analysis.graph_context import (
+    PathLike,
+)
+from solar.analysis.graph_context import (
+    PreparedAnalysis as _PreparedAnalysis,
+)
+from solar.analysis.graph_context import (
+    build_graph_topology as _build_graph_topology_data,
+)
+from solar.analysis.graph_context import (
+    product as _product,
+)
+from solar.analysis.graph_models import (
+    AnalysisAccumulator as _AnalysisAccumulator,
+)
+from solar.analysis.graph_models import (
+    AnalyzedLayer as _AnalyzedLayer,
+)
+from solar.analysis.graph_models import (
+    FormalAnalysis as _FormalAnalysis,
+)
+from solar.analysis.graph_models import (
+    FusionPlan as _FusionPlan,
+)
+from solar.analysis.graph_models import (
+    GraphIoTotals as _GraphIoTotals,
+)
+from solar.analysis.graph_models import (
+    InputIo as _InputIo,
+)
+from solar.analysis.graph_models import (
+    LayerCompute as _LayerCompute,
+)
+from solar.analysis.graph_models import (
+    LayerData as _LayerData,
+)
+from solar.analysis.graph_models import (
+    LayerIo as _LayerIo,
+)
+from solar.analysis.graph_models import (
+    LowerBound as _LowerBound,
+)
+from solar.analysis.graph_models import (
+    MemoryBytes as _MemoryBytes,
+)
+from solar.analysis.graph_models import (
+    MemoryElements as _MemoryElements,
+)
+from solar.analysis.graph_models import (
+    OutputIo as _OutputIo,
+)
+from solar.analysis.graph_models import (
+    ResourceAccounting as _ResourceAccounting,
+)
 from solar.analysis.graph_rules import (
-    BOOL_DTYPES,
-    QUANTIZED_PAYLOAD_PASSTHROUGH,
     SCATTER_OPS,
     SLICE_VIEW_OPS,
-    TRANSPARENT_OPS,
     ZERO_COMPUTE_OPS,
     ZERO_COPY_VIEW_OPS,
 )
@@ -74,42 +103,22 @@ from solar.analysis.operand_provenance import (
     contraction_external_source_dtypes,
     contraction_operands_are_graph_external,
 )
-from solar.analysis.graph_models import (
-    AnalysisAccumulator as _AnalysisAccumulator,
-    AnalyzedLayer as _AnalyzedLayer,
-    FormalAnalysis as _FormalAnalysis,
-    FusionPlan as _FusionPlan,
-    GraphIoTotals as _GraphIoTotals,
-    InputIo as _InputIo,
-    LayerCompute as _LayerCompute,
-    LayerData as _LayerData,
-    LayerIo as _LayerIo,
-    LowerBound as _LowerBound,
-    MemoryBytes as _MemoryBytes,
-    MemoryElements as _MemoryElements,
-    OutputIo as _OutputIo,
-    ResourceAccounting as _ResourceAccounting,
-)
 from solar.analysis.orojenesis import (
     OrojenesisError as OrojenesisError,
+)
+from solar.analysis.orojenesis import (
     OrojenesisRunner,
     find_multi_einsum_chains,
     find_multi_einsum_regions,
     select_capacity_point,
 )
+from solar.analysis.reporting import build_analysis_result, write_analysis
 from solar.analysis.resources import (
     RESOURCE_MODEL_VERSION,
     classify_layer_resources,
     is_mfma_operation,
     merge_resource_work,
 )
-from solar.analysis.reporting import build_analysis_result, write_analysis
-from solar.schema_versions import (
-    OROJENESIS_ANALYSIS_SCHEMA_VERSION,
-    SOLAR_ANALYSIS_SCHEMA_VERSION as SOLAR_ANALYSIS_SCHEMA_VERSION,
-    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION as SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
-)
-from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
 from solar.common.constants import (
     BYTES_PER_ELEMENT,
     DEFAULT_PRECISION,
@@ -118,155 +127,29 @@ from solar.common.constants import (
 )
 from solar.common.types import TensorShapes
 from solar.common.utils import ensure_directory
-
-PathLike = Union[str, Path]
-
-
-def _product(shape: List[int]) -> int:
-    out = 1
-    for d in shape:
-        out *= int(d)
-    return int(out)
-
-
-@dataclass(frozen=True, slots=True)
-class _AnalysisJob:
-    graph_path: PathLike
-    output_dir: PathLike
-    precision: str
-    copy_graph: bool
-    strict: bool
-    architecture: str | Path | ArchitectureProfile | None
-    orojenesis_runner: OrojenesisRunner | None
-    require_orojenesis: bool
-
-
-@dataclass(frozen=True, slots=True)
-class _PreparedAnalysis:
-    source: Path
-    output_dir: Path
-    graph: Dict[str, Any]
-    all_layers: Dict[str, Any]
-    declared_graph_outputs: Set[str]
-    semantic_graph: bool
-    semantic_complete: bool
-    strict: bool
-    requested_precision: str
-    fallback_precision: str
-    element_size: float
-    profile: ArchitectureProfile | None
-
-
-@dataclass(frozen=True, slots=True)
-class _GraphTopology:
-    layers: Dict[str, Any]
-    start_node_ids: Set[str]
-    bool_start_node_ids: Set[str]
-    all_layer_ids: Set[str]
-    transparent_layer_ids: Set[str]
-    tensor_producers: Dict[str, str]
-    tensor_consumers: Dict[str, Set[str]]
-    intermediate_tensors: Set[str]
-    bool_layers: Set[str]
-    dead_end_layers: Set[str]
-
-    def trace_source_through_views(self, layer_id: str) -> str:
-        """Trace backward through transparent view layers to the real source."""
-        visited: Set[str] = set()
-        current = layer_id
-        while current in self.transparent_layer_ids and current not in visited:
-            visited.add(current)
-            connections = (self.layers[current].get("connections") or {}).get(
-                "inputs"
-            ) or []
-            if not connections:
-                break
-            current = connections[0]
-        return current
-
-    def has_real_consumer(self, layer_id: str) -> bool:
-        """Return whether an output reaches a non-transparent graph layer."""
-        visited: Set[str] = set()
-        queue = [layer_id]
-        while queue:
-            current = queue.pop(0)
-            if current in visited:
-                continue
-            visited.add(current)
-            connections = (self.layers.get(current, {}).get("connections") or {}).get(
-                "outputs"
-            ) or []
-            for output_id in connections:
-                if output_id in self.transparent_layer_ids:
-                    queue.append(output_id)
-                elif output_id in self.all_layer_ids:
-                    return True
-        return False
-
-    def source_is_orphan(self, connection_id: str) -> bool:
-        source = (
-            self.trace_source_through_views(connection_id)
-            if connection_id in self.transparent_layer_ids
-            else connection_id
-        )
-        return source not in self.all_layer_ids and source not in self.start_node_ids
-
-    def dequantized_payload_precision(
-        self,
-        tensor_name: str,
-        profile: ArchitectureProfile | None,
-        fallback_precision: str,
-        visited: Set[str] | None = None,
-    ) -> str | None:
-        """Trace one contraction payload to an exact low-precision cast."""
-        if (
-            profile is None
-            or (producer_id := self.tensor_producers.get(tensor_name)) is None
-        ):
-            return None
-        seen = set(visited or ())
-        if producer_id in seen:
-            return None
-        seen.add(producer_id)
-        producer = self.layers[producer_id]
-        semantic = producer.get("semantic_op") or {}
-        target = str(semantic.get("target", ""))
-        names = (producer.get("tensor_names") or {}).get("inputs") or []
-        dtypes = producer.get("tensor_dtypes") or {}
-        inputs = list(dtypes.get("inputs") or [])
-        outputs = list(dtypes.get("outputs") or [])
-        if target == "to" and inputs and outputs:
-            source = profile.tensor_precision(inputs[0], fallback_precision)
-            destination = profile.tensor_precision(outputs[0], fallback_precision)
-            return (
-                source
-                if source in {"fp8", "int8", "int4"} and source != destination
-                else None
-            )
-        if target in QUANTIZED_PAYLOAD_PASSTHROUGH and names:
-            return self.dequantized_payload_precision(
-                str(names[0]), profile, fallback_precision, seen
-            )
-        if target == "mul":
-            candidates = {
-                candidate
-                for name in names
-                if (
-                    candidate := self.dequantized_payload_precision(
-                        str(name), profile, fallback_precision, seen
-                    )
-                )
-                is not None
-            }
-            if len(candidates) == 1:
-                return candidates.pop()
-        return None
+from solar.einsum.analyzer import EinsumAnalyzer
+from solar.einsum.semantics import (
+    EINSUM_GRAPH_SCHEMA_VERSION,
+    SemanticGraphError,
+    validate_semantic_graph,
+)
+from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
+from solar.schema_versions import (
+    OROJENESIS_ANALYSIS_SCHEMA_VERSION,
+)
+from solar.schema_versions import (
+    SOLAR_ANALYSIS_SCHEMA_VERSION as SOLAR_ANALYSIS_SCHEMA_VERSION,
+)
+from solar.schema_versions import (
+    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION as SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+)
 
 
 class EinsumGraphAnalyzer:
     """Analyze `einsum_graph.yaml` and write `analysis.yaml`."""
 
     def __init__(self, debug: bool = False) -> None:
+        """Initialize graph analysis and operation-cost helpers."""
         self.debug = debug
         self.einsum_analyzer = EinsumAnalyzer(debug=debug)
 
@@ -281,7 +164,7 @@ class EinsumGraphAnalyzer:
         architecture: str | Path | ArchitectureProfile | None = None,
         orojenesis_runner: OrojenesisRunner | None = None,
         require_orojenesis: bool = False,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Analyze an einsum graph and write `analysis.yaml`.
 
         Args:
@@ -291,9 +174,13 @@ class EinsumGraphAnalyzer:
             copy_graph: If True, copy the einsum graph into output dir using the
                 canonical name `einsum_graph.yaml`.
             strict: Reject unsupported layers and every implicit dtype fallback.
+            architecture: Architecture profile or path used for formal bounds.
+            orojenesis_runner: Optional configured tile-evidence runner.
+            require_orojenesis: Require complete tile evidence when true.
 
         Returns:
             Analysis dict, or None on failure.
+
         """
         return self._analyze_job(
             _AnalysisJob(
@@ -305,10 +192,13 @@ class EinsumGraphAnalyzer:
                 architecture=architecture,
                 orojenesis_runner=orojenesis_runner,
                 require_orojenesis=require_orojenesis,
-            )
+            ),
         )
 
-    def _resolve_analysis_paths(self, job: _AnalysisJob) -> tuple[Path, Path] | None:
+    def _resolve_analysis_paths(
+        self,
+        job: _AnalysisJob,
+    ) -> tuple[Path, Path] | None:
         source = Path(job.graph_path)
         reordered = source.parent / "einsum_graph_reordered.yaml"
         if source.name == "einsum_graph.yaml" and reordered.exists():
@@ -322,18 +212,19 @@ class EinsumGraphAnalyzer:
             print(f"Debug: einsum graph not found: {source}")
         return None
 
-    def _load_graph(self, source: Path) -> Dict[str, Any] | None:
+    def _load_graph(self, source: Path) -> dict[str, Any] | None:
         try:
             with open(source) as file:
                 return yaml.safe_load(file) or {}
-        except Exception as exc:
+        except (OSError, UnicodeError, yaml.YAMLError) as exc:
             if self.debug:
                 print(f"Debug: failed reading einsum graph: {exc}")
             return None
 
     @staticmethod
     def _validate_graph_semantics(
-        graph: Dict[str, Any], strict: bool
+        graph: dict[str, Any],
+        strict: bool,
     ) -> tuple[bool, bool]:
         semantic_graph = (
             int(graph.get("schema_version", 0)) == EINSUM_GRAPH_SCHEMA_VERSION
@@ -341,20 +232,24 @@ class EinsumGraphAnalyzer:
         if not semantic_graph:
             raise ValueError(
                 "analysis requires executable semantics: einsum graph must use "
-                f"schema_version={EINSUM_GRAPH_SCHEMA_VERSION}"
+                f"schema_version={EINSUM_GRAPH_SCHEMA_VERSION}",
             )
         try:
             validate_semantic_graph(graph)
         except SemanticGraphError as exc:
             if strict:
                 raise ValueError(
-                    f"strict analysis requires executable semantics: {exc}"
+                    f"strict analysis requires executable semantics: {exc}",
                 ) from exc
             return True, False
         return True, True
 
     def _copy_source_graph(
-        self, source: Path, output_dir: Path, *, enabled: bool
+        self,
+        source: Path,
+        output_dir: Path,
+        *,
+        enabled: bool,
     ) -> None:
         if not enabled:
             return
@@ -362,13 +257,13 @@ class EinsumGraphAnalyzer:
             destination = output_dir / "einsum_graph.yaml"
             if source.resolve() != destination.resolve():
                 destination.write_text(source.read_text())
-        except Exception:
+        except (OSError, UnicodeError):
             if self.debug:
                 print("Debug: failed to copy einsum_graph.yaml")
 
     @staticmethod
-    def _validate_strict_layers(all_layers: Dict[str, Any]) -> None:
-        failures: List[str] = []
+    def _validate_strict_layers(all_layers: dict[str, Any]) -> None:
+        failures: list[str] = []
         for layer_id, layer in all_layers.items():
             layer_type = str(layer.get("type", "")).lower()
             if layer_type != "start":
@@ -376,7 +271,7 @@ class EinsumGraphAnalyzer:
                     failures.append(f"{layer_id}: unsupported operation")
                 semantic = layer.get("semantic_op") or {}
                 if semantic.get("kind") == "einsum" and not layer.get(
-                    "einsum_equation"
+                    "einsum_equation",
                 ):
                     failures.append(f"{layer_id}: empty einsum equation")
             shapes = layer.get("tensor_shapes") or {}
@@ -384,12 +279,12 @@ class EinsumGraphAnalyzer:
             for side in ("inputs", "outputs"):
                 if len(shapes.get(side) or []) != len(dtypes.get(side) or []):
                     failures.append(
-                        f"{layer_id}: missing explicit {side} dtype metadata"
+                        f"{layer_id}: missing explicit {side} dtype metadata",
                     )
         if failures:
             raise ValueError(
                 "strict analysis refused an untrusted graph:\n- "
-                + "\n- ".join(failures)
+                + "\n- ".join(failures),
             )
 
     @staticmethod
@@ -399,12 +294,14 @@ class EinsumGraphAnalyzer:
         if isinstance(architecture, ArchitectureProfile):
             return architecture
         return (
-            ArchitectureProfile.load(architecture) if architecture is not None else None
+            ArchitectureProfile.load(architecture)
+            if architecture is not None
+            else None
         )
 
     @staticmethod
     def _validate_profile_dtypes(
-        all_layers: Dict[str, Any],
+        all_layers: dict[str, Any],
         profile: ArchitectureProfile,
         fallback_precision: str,
     ) -> None:
@@ -419,7 +316,7 @@ class EinsumGraphAnalyzer:
                 except ValueError as exc:
                     raise ValueError(
                         f"layer {layer_id} uses an architecture-incompatible "
-                        f"tensor dtype: {dtype}"
+                        f"tensor dtype: {dtype}",
                     ) from exc
 
     def _prepare_analysis(self, job: _AnalysisJob) -> _PreparedAnalysis | None:
@@ -431,16 +328,21 @@ class EinsumGraphAnalyzer:
         if graph is None:
             return None
         semantic_graph, semantic_complete = self._validate_graph_semantics(
-            graph, job.strict
+            graph,
+            job.strict,
         )
         self._copy_source_graph(source, output_dir, enabled=job.copy_graph)
-        all_layers: Dict[str, Any] = graph.get("layers") or {}
+        all_layers: dict[str, Any] = graph.get("layers") or {}
         if job.strict:
             self._validate_strict_layers(all_layers)
         requested_precision = normalize_dtype(job.precision)
         profile = self._resolve_architecture_profile(job.architecture)
         if job.strict and profile is not None:
-            self._validate_profile_dtypes(all_layers, profile, requested_precision)
+            self._validate_profile_dtypes(
+                all_layers,
+                profile,
+                requested_precision,
+            )
         return _PreparedAnalysis(
             source=source,
             output_dir=output_dir,
@@ -449,7 +351,7 @@ class EinsumGraphAnalyzer:
             declared_graph_outputs=set(
                 graph.get("outputs")
                 or (graph.get("graph_signature") or {}).get("joint_outputs")
-                or []
+                or [],
             ),
             semantic_graph=semantic_graph,
             semantic_complete=semantic_complete,
@@ -460,92 +362,11 @@ class EinsumGraphAnalyzer:
             profile=profile,
         )
 
-    @staticmethod
-    def _partition_graph_layers(
-        all_layers: Dict[str, Any],
-    ) -> tuple[Dict[str, Any], Set[str], Set[str]]:
-        layers: Dict[str, Any] = {}
-        start_node_ids: Set[str] = set()
-        bool_start_node_ids: Set[str] = set()
-        for layer_id, layer in all_layers.items():
-            if str(layer.get("type", "")).lower() != "start":
-                layers[layer_id] = layer
-                continue
-            start_node_ids.add(layer_id)
-            output_dtypes = (layer.get("tensor_dtypes") or {}).get("outputs") or []
-            if output_dtypes and all(
-                str(dtype) in BOOL_DTYPES for dtype in output_dtypes
-            ):
-                bool_start_node_ids.add(layer_id)
-        return layers, start_node_ids, bool_start_node_ids
-
-    @staticmethod
-    def _build_tensor_indices(
-        layers: Dict[str, Any],
-    ) -> tuple[Dict[str, str], Dict[str, Set[str]]]:
-        producers: Dict[str, str] = {}
-        consumers: Dict[str, Set[str]] = {}
-        for layer_id, layer in layers.items():
-            names = layer.get("tensor_names") or {}
-            for output_name in names.get("outputs") or []:
-                producers[output_name] = layer_id
-        for layer_id, layer in layers.items():
-            names = layer.get("tensor_names") or {}
-            for input_name in names.get("inputs") or []:
-                if input_name in producers:
-                    consumers.setdefault(input_name, set()).add(layer_id)
-        return producers, consumers
-
-    @staticmethod
-    def _propagate_bool_layers(
-        layers: Dict[str, Any], bool_start_node_ids: Set[str]
-    ) -> Set[str]:
-        bool_layers: Set[str] = set()
-        changed = bool(bool_start_node_ids)
-        while changed:
-            changed = False
-            for layer_id, layer in layers.items():
-                if layer_id in bool_layers:
-                    continue
-                input_ids = list((layer.get("connections") or {}).get("inputs") or [])
-                if input_ids and all(
-                    item in bool_start_node_ids or item in bool_layers
-                    for item in input_ids
-                ):
-                    bool_layers.add(layer_id)
-                    changed = True
-        return bool_layers
-
-    def _build_graph_topology(self, all_layers: Dict[str, Any]) -> _GraphTopology:
-        layers, start_ids, bool_start_ids = self._partition_graph_layers(all_layers)
-        all_layer_ids = set(layers)
-        transparent_ids = {
-            layer_id
-            for layer_id, layer in layers.items()
-            if str(layer.get("type", "")).lower() in TRANSPARENT_OPS
-        }
-        producers, consumers = self._build_tensor_indices(layers)
-        intermediate_tensors = {name for name in producers if bool(consumers.get(name))}
-        topology = _GraphTopology(
-            layers=layers,
-            start_node_ids=start_ids,
-            bool_start_node_ids=bool_start_ids,
-            all_layer_ids=all_layer_ids,
-            transparent_layer_ids=transparent_ids,
-            tensor_producers=producers,
-            tensor_consumers=consumers,
-            intermediate_tensors=intermediate_tensors,
-            bool_layers=self._propagate_bool_layers(layers, bool_start_ids),
-            dead_end_layers=set(),
-        )
-        topology = replace(
-            topology,
-            dead_end_layers={
-                layer_id
-                for layer_id in layers
-                if not topology.has_real_consumer(layer_id)
-            },
-        )
+    def _build_graph_topology(
+        self,
+        all_layers: dict[str, Any],
+    ) -> _GraphTopology:
+        topology = _build_graph_topology_data(all_layers)
         self._debug_topology(topology)
         return topology
 
@@ -556,30 +377,32 @@ class EinsumGraphAnalyzer:
         if topology.bool_start_node_ids:
             print(
                 f"Debug: Found {len(topology.bool_start_node_ids)} bool-typed "
-                f"start nodes: {topology.bool_start_node_ids}"
+                f"start nodes: {topology.bool_start_node_ids}",
             )
         print(f"Debug: Analyzing {len(topology.layers)} computation nodes")
-        print(f"Debug: Found {len(topology.intermediate_tensors)} intermediate tensors")
+        print(
+            f"Debug: Found {len(topology.intermediate_tensors)} intermediate tensors",
+        )
         for tensor_name in sorted(topology.intermediate_tensors)[:10]:
             print(f"  - {tensor_name}")
         if topology.transparent_layer_ids:
             print(
-                f"Debug: {len(topology.transparent_layer_ids)} transparent view layers"
+                f"Debug: {len(topology.transparent_layer_ids)} transparent view layers",
             )
         if topology.bool_layers:
             print(
                 f"Debug: Skipping memory for {len(topology.bool_layers)} "
-                f"bool-derived layers: {sorted(topology.bool_layers)}"
+                f"bool-derived layers: {sorted(topology.bool_layers)}",
             )
 
     @staticmethod
-    def _parse_layer(layer_id: str, layer: Dict[str, Any]) -> _LayerData:
+    def _parse_layer(layer_id: str, layer: dict[str, Any]) -> _LayerData:
         op_type = str(layer.get("type", "unknown"))
         if "is_real_einsum" not in layer:
             raise ValueError(
                 f"Layer '{layer_id}' (type={op_type}) is missing "
                 "'is_real_einsum' field. All layers in the einsum graph must "
-                "specify is_real_einsum: true/false."
+                "specify is_real_einsum: true/false.",
             )
         shapes = layer.get("tensor_shapes") or {}
         types = layer.get("tensor_types") or {}
@@ -615,7 +438,10 @@ class EinsumGraphAnalyzer:
         )
 
     def _compute_layer(self, data: _LayerData) -> _LayerCompute:
-        shapes = TensorShapes(inputs=data.input_shapes, outputs=data.output_shapes)
+        shapes = TensorShapes(
+            inputs=data.input_shapes,
+            outputs=data.output_shapes,
+        )
         operation = data.op_type
         if operation == "addmm" and len(data.input_shapes) >= 3:
             operation = "matmul"
@@ -627,12 +453,16 @@ class EinsumGraphAnalyzer:
             if data.is_real_einsum and data.equation:
                 cost = int(
                     self.einsum_analyzer.get_compute_cost(
-                        operation, shapes, equation=data.equation
-                    )
+                        operation,
+                        shapes,
+                        equation=data.equation,
+                    ),
                 )
             else:
-                cost = int(self.einsum_analyzer.get_compute_cost(operation, shapes))
-        except Exception:
+                cost = int(
+                    self.einsum_analyzer.get_compute_cost(operation, shapes),
+                )
+        except Exception:  # noqa: BLE001 -- operation-handler fallback
             cost = 0
         is_real_einsum = data.is_real_einsum
         if data.op_type in ZERO_COMPUTE_OPS:
@@ -720,7 +550,9 @@ class EinsumGraphAnalyzer:
         input_bytes = [
             float(count)
             * dtype_bytes(
-                data.input_dtypes[index] if index < len(data.input_dtypes) else None,
+                data.input_dtypes[index]
+                if index < len(data.input_dtypes)
+                else None,
                 fallback_precision,
             )
             for index, count in enumerate(memory.reads)
@@ -728,7 +560,9 @@ class EinsumGraphAnalyzer:
         output_bytes = [
             float(count)
             * dtype_bytes(
-                data.output_dtypes[index] if index < len(data.output_dtypes) else None,
+                data.output_dtypes[index]
+                if index < len(data.output_dtypes)
+                else None,
                 fallback_precision,
             )
             for index, count in enumerate(memory.writes)
@@ -753,10 +587,59 @@ class EinsumGraphAnalyzer:
         *,
         orphaned: bool,
     ) -> _ResourceAccounting:
+        compute_precision, resource_precision = self._resource_precision(
+            data,
+            compute,
+            topology,
+            prepared,
+        )
+        if compute.macs:
+            accumulator.macs_by_precision[compute_precision] += compute.macs
+        resources = classify_layer_resources(
+            data.layer,
+            macs=compute.macs,
+            fallback_precision=prepared.fallback_precision,
+            strict=prepared.strict,
+            compute_precision=resource_precision,
+        )
+        if orphaned:
+            resources = {
+                "model_version": RESOURCE_MODEL_VERSION,
+                "work": {},
+                "classification": "exempt",
+                "exemption_reason": "orphaned_dead_end",
+                "formulas": [],
+            }
+        layer_work = resources.get("work")
+        if not isinstance(layer_work, Mapping) or any(
+            not isinstance(value, Mapping) for value in layer_work.values()
+        ):
+            raise TypeError(
+                f"layer {data.layer_id!r} resource work is not a mapping",
+            )
+        merge_resource_work(
+            accumulator.resource_work,
+            cast(Mapping[str, Mapping[str, Any]], layer_work),
+        )
+        accumulator.resource_coverage[str(resources["classification"])] += 1
+        return _ResourceAccounting(compute_precision, resources)
+
+    @staticmethod
+    def _resource_precision(
+        data: _LayerData,
+        compute: _LayerCompute,
+        topology: _GraphTopology,
+        prepared: _PreparedAnalysis,
+    ) -> tuple[str, str | None]:
         compute_precisions = [
             normalized
             for dtype in data.input_dtypes
-            if (normalized := normalize_dtype(dtype, prepared.fallback_precision))
+            if (
+                normalized := normalize_dtype(
+                    dtype,
+                    prepared.fallback_precision,
+                )
+            )
             in {
                 "fp64",
                 "fp32",
@@ -779,7 +662,9 @@ class EinsumGraphAnalyzer:
         if compute.macs and semantic.get("kind") == "einsum":
             payload_precisions = [
                 topology.dequantized_payload_precision(
-                    name, prepared.profile, prepared.fallback_precision
+                    name,
+                    prepared.profile,
+                    prepared.fallback_precision,
                 )
                 for name in data.input_names
             ]
@@ -790,34 +675,7 @@ class EinsumGraphAnalyzer:
             ):
                 compute_precision = str(payload_precisions[0])
                 resource_precision = compute_precision
-        if compute.macs:
-            accumulator.macs_by_precision[compute_precision] += compute.macs
-        resources = classify_layer_resources(
-            data.layer,
-            macs=compute.macs,
-            fallback_precision=prepared.fallback_precision,
-            strict=prepared.strict,
-            compute_precision=resource_precision,
-        )
-        if orphaned:
-            resources = {
-                "model_version": RESOURCE_MODEL_VERSION,
-                "work": {},
-                "classification": "exempt",
-                "exemption_reason": "orphaned_dead_end",
-                "formulas": [],
-            }
-        layer_work = resources.get("work")
-        if not isinstance(layer_work, Mapping) or any(
-            not isinstance(value, Mapping) for value in layer_work.values()
-        ):
-            raise TypeError(f"layer {data.layer_id!r} resource work is not a mapping")
-        merge_resource_work(
-            accumulator.resource_work,
-            cast(Mapping[str, Mapping[str, Any]], layer_work),
-        )
-        accumulator.resource_coverage[str(resources["classification"])] += 1
-        return _ResourceAccounting(compute_precision, resources)
+        return compute_precision, resource_precision
 
     @staticmethod
     def _classify_layer_inputs(
@@ -835,13 +693,18 @@ class EinsumGraphAnalyzer:
             if memory_read <= 0:
                 continue
             input_type = (
-                data.input_types[index] if index < len(data.input_types) else "weight"
+                data.input_types[index]
+                if index < len(data.input_types)
+                else "weight"
             )
             input_name = (
                 data.input_names[index] if index < len(data.input_names) else ""
             )
             graph_internal = False
-            if input_type != "weight" and input_name in topology.tensor_producers:
+            if (
+                input_type != "weight"
+                and input_name in topology.tensor_producers
+            ):
                 producer_id = topology.tensor_producers[input_name]
                 source_id = topology.trace_source_through_views(producer_id)
                 graph_internal = (
@@ -860,11 +723,17 @@ class EinsumGraphAnalyzer:
                     memory_read,
                 )
                 accumulator.unique_external_input_bytes[input_name] = max(
-                    accumulator.unique_external_input_bytes.get(input_name, 0.0),
+                    accumulator.unique_external_input_bytes.get(
+                        input_name,
+                        0.0,
+                    ),
                     byte_counts.input_bytes[index],
                 )
         return _InputIo(
-            intermediate_elems, model_elems, intermediate_bytes, model_bytes
+            intermediate_elems,
+            model_elems,
+            intermediate_bytes,
+            model_bytes,
         )
 
     @staticmethod
@@ -873,7 +742,7 @@ class EinsumGraphAnalyzer:
         memory: _MemoryElements,
         byte_counts: _MemoryBytes,
         topology: _GraphTopology,
-        declared_outputs: Set[str],
+        declared_outputs: set[str],
         accumulator: _AnalysisAccumulator,
     ) -> _OutputIo:
         intermediate_flags = [
@@ -886,28 +755,42 @@ class EinsumGraphAnalyzer:
         ]
         external_flags = [
             str(name) in declared_outputs or not intermediate
-            for name, intermediate in zip(data.output_names, intermediate_flags)
+            for name, intermediate in zip(
+                data.output_names, intermediate_flags, strict=True
+            )
         ]
         intermediate_elems = sum(
             value
-            for value, intermediate in zip(memory.writes, intermediate_flags)
+            for value, intermediate in zip(
+                memory.writes, intermediate_flags, strict=True
+            )
             if intermediate
         )
         intermediate_bytes = sum(
             value
-            for value, intermediate in zip(byte_counts.output_bytes, intermediate_flags)
+            for value, intermediate in zip(
+                byte_counts.output_bytes,
+                intermediate_flags,
+                strict=True,
+            )
             if intermediate
         )
         model_elems = sum(
-            value for value, external in zip(memory.writes, external_flags) if external
+            value
+            for value, external in zip(
+                memory.writes, external_flags, strict=True
+            )
+            if external
         )
         model_bytes = sum(
             value
-            for value, external in zip(byte_counts.output_bytes, external_flags)
+            for value, external in zip(
+                byte_counts.output_bytes, external_flags, strict=True
+            )
             if external
         )
         for index, (name, external) in enumerate(
-            zip(data.output_names, external_flags)
+            zip(data.output_names, external_flags, strict=True),
         ):
             if not external:
                 continue
@@ -918,10 +801,12 @@ class EinsumGraphAnalyzer:
                 else 0.0
             )
             accumulator.unique_external_outputs[name] = max(
-                accumulator.unique_external_outputs.get(name, 0), int(elements)
+                accumulator.unique_external_outputs.get(name, 0),
+                int(elements),
             )
             accumulator.unique_external_output_bytes[name] = max(
-                accumulator.unique_external_output_bytes.get(name, 0.0), bytes_
+                accumulator.unique_external_output_bytes.get(name, 0.0),
+                bytes_,
             )
         return _OutputIo(
             intermediate_elems,
@@ -941,7 +826,11 @@ class EinsumGraphAnalyzer:
         accumulator: _AnalysisAccumulator,
     ) -> _LayerIo:
         inputs = self._classify_layer_inputs(
-            data, memory, byte_counts, topology, accumulator
+            data,
+            memory,
+            byte_counts,
+            topology,
+            accumulator,
         )
         outputs = self._classify_layer_outputs(
             data,
@@ -952,8 +841,10 @@ class EinsumGraphAnalyzer:
             accumulator,
         )
         return _LayerIo(
-            intermediate_elems=inputs.intermediate_elems + outputs.intermediate_elems,
-            intermediate_bytes=inputs.intermediate_bytes + outputs.intermediate_bytes,
+            intermediate_elems=inputs.intermediate_elems
+            + outputs.intermediate_elems,
+            intermediate_bytes=inputs.intermediate_bytes
+            + outputs.intermediate_bytes,
             model_elems=inputs.model_elems + outputs.model_elems,
             model_bytes=inputs.model_bytes + outputs.model_bytes,
             input_is_intermediate=inputs.intermediate_elems > 0,
@@ -969,7 +860,7 @@ class EinsumGraphAnalyzer:
         resources: _ResourceAccounting,
         io: _LayerIo,
     ) -> _AnalyzedLayer:
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "type": data.op_type,
             "einsum_equation": data.equation,
             "is_real_einsum": compute.is_real_einsum,
@@ -987,17 +878,24 @@ class EinsumGraphAnalyzer:
             "fused_bytes": float(io.model_bytes),
             "tensor_shapes": {
                 "inputs": [
-                    shape for shape in data.input_shapes if isinstance(shape, list)
+                    shape
+                    for shape in data.input_shapes
+                    if isinstance(shape, list)
                 ],
                 "outputs": [
-                    shape for shape in data.output_shapes if isinstance(shape, list)
+                    shape
+                    for shape in data.output_shapes
+                    if isinstance(shape, list)
                 ],
             },
             "tensor_sizes": {
                 "inputs": data.input_sizes,
                 "outputs": data.output_sizes,
             },
-            "memory_elements": {"inputs": memory.reads, "outputs": memory.writes},
+            "memory_elements": {
+                "inputs": memory.reads,
+                "outputs": memory.writes,
+            },
             "memory_bytes": {
                 "inputs": byte_counts.input_bytes,
                 "outputs": byte_counts.output_bytes,
@@ -1038,7 +936,7 @@ class EinsumGraphAnalyzer:
     def _analyze_layer(
         self,
         layer_id: str,
-        layer: Dict[str, Any],
+        layer: dict[str, Any],
         topology: _GraphTopology,
         prepared: _PreparedAnalysis,
         accumulator: _AnalysisAccumulator,
@@ -1048,7 +946,11 @@ class EinsumGraphAnalyzer:
         memory = self._memory_elements(data, compute, topology)
         if memory.orphaned:
             accumulator.orphaned_layers.add(layer_id)
-        byte_counts = self._memory_bytes(data, memory, prepared.fallback_precision)
+        byte_counts = self._memory_bytes(
+            data,
+            memory,
+            prepared.fallback_precision,
+        )
         accumulator.used_dtype_fallback |= byte_counts.used_dtype_fallback
         resources = self._account_layer_resources(
             data,
@@ -1059,12 +961,22 @@ class EinsumGraphAnalyzer:
             orphaned=memory.orphaned,
         )
         io = self._classify_layer_io(
-            data, memory, byte_counts, topology, prepared, accumulator
+            data,
+            memory,
+            byte_counts,
+            topology,
+            prepared,
+            accumulator,
         )
         accumulator.record(
             layer_id,
             self._serialize_analyzed_layer(
-                data, compute, memory, byte_counts, resources, io
+                data,
+                compute,
+                memory,
+                byte_counts,
+                resources,
+                io,
             ),
         )
 
@@ -1072,11 +984,11 @@ class EinsumGraphAnalyzer:
     def _graph_io_totals(accumulator: _AnalysisAccumulator) -> _GraphIoTotals:
         fused_elements = int(
             sum(accumulator.unique_external_inputs.values())
-            + sum(accumulator.unique_external_outputs.values())
+            + sum(accumulator.unique_external_outputs.values()),
         )
         fused_bytes = float(
             sum(accumulator.unique_external_input_bytes.values())
-            + sum(accumulator.unique_external_output_bytes.values())
+            + sum(accumulator.unique_external_output_bytes.values()),
         )
         return _GraphIoTotals(
             fused_elements=fused_elements,
@@ -1089,12 +1001,14 @@ class EinsumGraphAnalyzer:
                 sum(
                     layer.get("model_io_bytes", 0)
                     for layer in accumulator.layers.values()
-                )
+                ),
             ),
         )
 
     def _plan_fusion(
-        self, prepared: _PreparedAnalysis, topology: _GraphTopology
+        self,
+        prepared: _PreparedAnalysis,
+        topology: _GraphTopology,
     ) -> _FusionPlan:
         proof_graph_layers, proof_layers, unsupported_contractions = (
             build_orojenesis_proof_graph(
@@ -1106,7 +1020,9 @@ class EinsumGraphAnalyzer:
         chains = find_multi_einsum_chains(proof_graph_layers)
         regions = find_multi_einsum_regions(proof_graph_layers)
         region_paths = [
-            path for region in regions for path in region.get("physical_paths") or []
+            path
+            for region in regions
+            for path in region.get("physical_paths") or []
         ]
         verified_views = {
             str(layer_id)
@@ -1115,13 +1031,18 @@ class EinsumGraphAnalyzer:
             for layer_id in path
             if str(
                 (
-                    prepared.all_layers.get(str(layer_id), {}).get("semantic_op") or {}
-                ).get("target", "")
+                    prepared.all_layers.get(str(layer_id), {}).get(
+                        "semantic_op",
+                    )
+                    or {}
+                ).get("target", ""),
             )
             in {"view", "transpose", "permute", "squeeze", "unsqueeze"}
         }
         hierarchy = (
-            prepared.profile.memory_hierarchy if prepared.profile is not None else ()
+            prepared.profile.memory_hierarchy
+            if prepared.profile is not None
+            else ()
         )
         return _FusionPlan(
             fusion=FusionPlanner(
@@ -1152,7 +1073,7 @@ class EinsumGraphAnalyzer:
         )
 
     @staticmethod
-    def _word_bits(dtypes: List[str], element_size: float) -> int:
+    def _word_bits(dtypes: list[str], element_size: float) -> int:
         return min(
             (int(dtype_bytes(dtype) * 8) for dtype in dtypes),
             default=int(element_size * 8),
@@ -1160,7 +1081,7 @@ class EinsumGraphAnalyzer:
 
     @staticmethod
     def _select_capacity_and_rewrite_evidence(
-        result: Dict[str, Any],
+        result: dict[str, Any],
         last_cache: MemoryLevel | None,
         require_orojenesis: bool,
         missing_point_error: str,
@@ -1168,7 +1089,8 @@ class EinsumGraphAnalyzer:
     ) -> None:
         if last_cache is not None:
             point = select_capacity_point(
-                result["curve"], int(last_cache.capacity_bytes or 0)
+                result["curve"],
+                int(last_cache.capacity_bytes or 0),
             )
             if point is None and require_orojenesis:
                 raise ValueError(missing_point_error)
@@ -1186,16 +1108,21 @@ class EinsumGraphAnalyzer:
         runner: OrojenesisRunner,
         prepared: _PreparedAnalysis,
         last_cache: MemoryLevel | None,
-        orojenesis: Dict[str, Any],
+        orojenesis: dict[str, Any],
         require_orojenesis: bool,
     ) -> None:
         for index, layer_ids in enumerate(plan.chains):
-            layers = [(layer_id, plan.proof_layers[layer_id]) for layer_id in layer_ids]
+            layers = [
+                (layer_id, plan.proof_layers[layer_id])
+                for layer_id in layer_ids
+            ]
             dtypes = [
                 str(dtype)
                 for _, layer in layers
                 for side in ("inputs", "outputs")
-                for dtype in ((layer.get("tensor_dtypes") or {}).get(side) or [])
+                for dtype in (
+                    (layer.get("tensor_dtypes") or {}).get(side) or []
+                )
             ]
             chain_id = f"chain_{index}"
             result = runner.run_multi_chain(
@@ -1219,7 +1146,7 @@ class EinsumGraphAnalyzer:
         runner: OrojenesisRunner,
         prepared: _PreparedAnalysis,
         last_cache: MemoryLevel | None,
-        orojenesis: Dict[str, Any],
+        orojenesis: dict[str, Any],
         require_orojenesis: bool,
     ) -> None:
         for index, problem in enumerate(plan.regions):
@@ -1230,7 +1157,9 @@ class EinsumGraphAnalyzer:
                 for layer_id in layer_ids
                 for side in ("inputs", "outputs")
                 for dtype in (
-                    (plan.proof_layers[layer_id].get("tensor_dtypes") or {}).get(side)
+                    (
+                        plan.proof_layers[layer_id].get("tensor_dtypes") or {}
+                    ).get(side)
                     or []
                 )
             ]
@@ -1255,10 +1184,12 @@ class EinsumGraphAnalyzer:
         runner: OrojenesisRunner,
         prepared: _PreparedAnalysis,
         last_cache: MemoryLevel | None,
-        orojenesis: Dict[str, Any],
+        orojenesis: dict[str, Any],
         require_orojenesis: bool,
     ) -> None:
-        multi_member_ids = {layer_id for chain in plan.chains for layer_id in chain}
+        multi_member_ids = {
+            layer_id for chain in plan.chains for layer_id in chain
+        }
         multi_member_ids.update(
             str(layer_id)
             for region in plan.regions
@@ -1296,7 +1227,7 @@ class EinsumGraphAnalyzer:
         plan: _FusionPlan,
         runner: OrojenesisRunner,
         prepared: _PreparedAnalysis,
-        orojenesis: Dict[str, Any],
+        orojenesis: dict[str, Any],
         *,
         require_orojenesis: bool,
     ) -> None:
@@ -1304,7 +1235,7 @@ class EinsumGraphAnalyzer:
         orojenesis["toolchain"] = getattr(runner, "toolchain_identity", None)
         if orojenesis["toolchain"] is None and require_orojenesis:
             raise ValueError(
-                "strict formal analysis requires Orojenesis toolchain identity"
+                "strict formal analysis requires Orojenesis toolchain identity",
             )
         last_cache = self._last_cache(prepared.profile)
         self._run_chain_evidence(
@@ -1335,23 +1266,28 @@ class EinsumGraphAnalyzer:
     @staticmethod
     def _audit_layer_evidence(
         plan: _FusionPlan,
-        orojenesis: Dict[str, Any],
-        region_by_layer: Dict[str, Any],
-        all_layers: Dict[str, Any],
-    ) -> List[float]:
-        excesses: List[float] = []
+        orojenesis: dict[str, Any],
+        region_by_layer: dict[str, Any],
+        all_layers: dict[str, Any],
+    ) -> list[float]:
+        excesses: list[float] = []
         for layer_id, result in orojenesis["layers"].items():
             layer = plan.proof_layers[layer_id]
             point = (result.get("selected_capacity") or {}).get("point")
             region = region_by_layer[layer_id]
-            external = contraction_operands_are_graph_external(layer, all_layers)
+            external = contraction_operands_are_graph_external(
+                layer,
+                all_layers,
+            )
             applicable = bool(point and external)
             result["formal_applicability"] = {
                 "applicable": applicable,
                 "region": region["id"],
                 "graph_input_operands": external,
                 "operand_provenance": (
-                    "graph_input_or_recomputable_preprocess" if external else "internal"
+                    "graph_input_or_recomputable_preprocess"
+                    if external
+                    else "internal"
                 ),
                 "reason": (
                     "graph_input_or_recomputable_preprocess_contraction"
@@ -1361,17 +1297,25 @@ class EinsumGraphAnalyzer:
             }
             if not applicable:
                 continue
-            assert point is not None
+            if point is None:
+                raise ValueError(
+                    "applicable layer evidence has no selected point"
+                )
             word_bytes = int(result["word_bits"]) // 8
             names = layer.get("tensor_names") or {}
             shapes = layer.get("tensor_shapes") or {}
             modeled_tensors = {
                 str(name): list(shape)
                 for side in ("inputs", "outputs")
-                for name, shape in zip(names.get(side) or [], shapes.get(side) or [])
+                for name, shape in zip(
+                    names.get(side) or [],
+                    shapes.get(side) or [],
+                    strict=True,
+                )
             }
             compulsory_bytes = float(
-                sum(_product(shape) for shape in modeled_tensors.values()) * word_bytes
+                sum(_product(shape) for shape in modeled_tensors.values())
+                * word_bytes,
             )
             solver_bytes = float(point["dram_bytes"])
             result["audited_dram_bytes"] = solver_bytes
@@ -1382,14 +1326,16 @@ class EinsumGraphAnalyzer:
     @staticmethod
     def _audit_chain_evidence(
         plan: _FusionPlan,
-        orojenesis: Dict[str, Any],
-        region_by_layer: Dict[str, Any],
-    ) -> List[float]:
-        excesses: List[float] = []
+        orojenesis: dict[str, Any],
+        region_by_layer: dict[str, Any],
+    ) -> list[float]:
+        excesses: list[float] = []
         for result in orojenesis["chains"].values():
             point = (result.get("selected_capacity") or {}).get("point")
-            descriptors = ((result.get("problem") or {}).get("chain") or {}).get(
-                "layers"
+            descriptors = (
+                (result.get("problem") or {}).get("chain") or {}
+            ).get(
+                "layers",
             ) or []
             layer_ids = [str(item.get("id")) for item in descriptors]
             region_ids = {
@@ -1401,7 +1347,9 @@ class EinsumGraphAnalyzer:
                 point
                 and len(layer_ids) >= 2
                 and len(region_ids) == 1
-                and all(layer_id in plan.proof_layers for layer_id in layer_ids)
+                and all(
+                    layer_id in plan.proof_layers for layer_id in layer_ids
+                ),
             )
             result["formal_applicability"] = {
                 "applicable": applicable,
@@ -1416,7 +1364,10 @@ class EinsumGraphAnalyzer:
             }
             if not applicable:
                 continue
-            assert point is not None
+            if point is None:
+                raise ValueError(
+                    "applicable chain evidence has no selected point"
+                )
             first, last = descriptors[0], descriptors[-1]
             compulsory_elements = int(first["m"]) * int(first["k"])
             compulsory_elements += sum(
@@ -1424,7 +1375,7 @@ class EinsumGraphAnalyzer:
             )
             compulsory_elements += int(last["m"]) * int(last["n"])
             compulsory_bytes = float(
-                compulsory_elements * (int(result["word_bits"]) // 8)
+                compulsory_elements * (int(result["word_bits"]) // 8),
             )
             solver_bytes = float(point["dram_bytes"])
             result["audited_dram_bytes"] = solver_bytes
@@ -1435,10 +1386,10 @@ class EinsumGraphAnalyzer:
     @staticmethod
     def _audit_region_evidence(
         plan: _FusionPlan,
-        orojenesis: Dict[str, Any],
-        region_by_layer: Dict[str, Any],
-    ) -> List[float]:
-        excesses: List[float] = []
+        orojenesis: dict[str, Any],
+        region_by_layer: dict[str, Any],
+    ) -> list[float]:
+        excesses: list[float] = []
         for result in orojenesis["regions"].values():
             point = (result.get("selected_capacity") or {}).get("point")
             problem = result.get("problem") or {}
@@ -1453,7 +1404,9 @@ class EinsumGraphAnalyzer:
                 point
                 and len(layer_ids) >= 2
                 and len(region_ids) == 1
-                and all(layer_id in plan.proof_layers for layer_id in layer_ids)
+                and all(
+                    layer_id in plan.proof_layers for layer_id in layer_ids
+                ),
             )
             result["formal_applicability"] = {
                 "applicable": applicable,
@@ -1470,7 +1423,10 @@ class EinsumGraphAnalyzer:
             }
             if not applicable:
                 continue
-            assert point is not None
+            if point is None:
+                raise ValueError(
+                    "applicable region evidence has no selected point"
+                )
             by_id = {str(item["id"]): item for item in descriptors}
             roots = [str(item) for item in problem.get("roots") or []]
             leaves = [str(item) for item in problem.get("leaves") or []]
@@ -1484,7 +1440,7 @@ class EinsumGraphAnalyzer:
                 int(by_id[leaf]["m"]) * int(by_id[leaf]["n"]) for leaf in leaves
             )
             compulsory_bytes = float(
-                compulsory_elements * (int(result["word_bits"]) // 8)
+                compulsory_elements * (int(result["word_bits"]) // 8),
             )
             solver_bytes = float(point["dram_bytes"])
             result["audited_dram_bytes"] = solver_bytes
@@ -1495,7 +1451,7 @@ class EinsumGraphAnalyzer:
     def _audit_orojenesis_evidence(
         self,
         plan: _FusionPlan,
-        orojenesis: Dict[str, Any],
+        orojenesis: dict[str, Any],
         prepared: _PreparedAnalysis,
         audited_fused_bytes: float,
     ) -> tuple[float, bool]:
@@ -1505,17 +1461,27 @@ class EinsumGraphAnalyzer:
             for layer_id in region["layers"]
         }
         excesses = self._audit_layer_evidence(
-            plan, orojenesis, region_by_layer, prepared.all_layers
+            plan,
+            orojenesis,
+            region_by_layer,
+            prepared.all_layers,
         )
-        excesses.extend(self._audit_chain_evidence(plan, orojenesis, region_by_layer))
-        excesses.extend(self._audit_region_evidence(plan, orojenesis, region_by_layer))
+        excesses.extend(
+            self._audit_chain_evidence(plan, orojenesis, region_by_layer),
+        )
+        excesses.extend(
+            self._audit_region_evidence(plan, orojenesis, region_by_layer),
+        )
         tile_aware_bound = formal_evidence.audit_tile_evidence_contract(
             orojenesis,
             evidence_root=prepared.output_dir,
             proof_layer_count=len(plan.proof_layers),
             unsupported_layer_count=len(plan.unsupported_contraction_layers),
         )
-        return audited_fused_bytes + max(excesses, default=0.0), tile_aware_bound
+        return audited_fused_bytes + max(
+            excesses,
+            default=0.0,
+        ), tile_aware_bound
 
     def _run_formal_analysis(
         self,
@@ -1540,23 +1506,18 @@ class EinsumGraphAnalyzer:
             )
         plan = self._plan_fusion(prepared, topology)
         orojenesis["unsupported_contraction_layers"] = list(
-            plan.unsupported_contraction_layers
+            plan.unsupported_contraction_layers,
         )
         orojenesis["formal_coverage"] = {
             "applicable_layers": 0,
             "total_layers": len(plan.proof_layers)
             + len(plan.unsupported_contraction_layers),
         }
-        if plan.unsupported_contraction_layers and require_orojenesis:
-            unsupported = ", ".join(plan.unsupported_contraction_layers)
-            raise ValueError(
-                "strict formal analysis lacks an exact Orojenesis proof "
-                f"representation for contraction layers: {unsupported}"
-            )
-        if plan.proof_layers and runner is None and require_orojenesis:
-            raise ValueError(
-                "strict formal analysis requires the pinned Orojenesis toolchain"
-            )
+        self._validate_proof_requirements(
+            plan,
+            runner,
+            require_orojenesis=require_orojenesis,
+        )
         if runner is not None and plan.proof_layers:
             self._run_orojenesis_evidence(
                 plan,
@@ -1567,19 +1528,24 @@ class EinsumGraphAnalyzer:
             )
         elif not plan.proof_layers:
             orojenesis["status"] = formal_evidence.status_without_proof(
-                unsupported_contractions=bool(plan.unsupported_contraction_layers),
+                unsupported_contractions=bool(
+                    plan.unsupported_contraction_layers,
+                ),
                 runner_configured=runner is not None,
             )
         audited_prefetched_bytes = io_totals.fused_bytes
         tile_aware_bound = bool(
             require_orojenesis
             and not plan.proof_layers
-            and not plan.unsupported_contraction_layers
+            and not plan.unsupported_contraction_layers,
         )
         if plan.proof_layers and orojenesis["status"] == "complete":
             candidate_prefetched_bytes, tile_aware_bound = (
                 self._audit_orojenesis_evidence(
-                    plan, orojenesis, prepared, io_totals.fused_bytes
+                    plan,
+                    orojenesis,
+                    prepared,
+                    io_totals.fused_bytes,
                 )
             )
             if tile_aware_bound:
@@ -1595,6 +1561,24 @@ class EinsumGraphAnalyzer:
         )
 
     @staticmethod
+    def _validate_proof_requirements(
+        plan: _FusionPlan,
+        runner: OrojenesisRunner | None,
+        *,
+        require_orojenesis: bool,
+    ) -> None:
+        if plan.unsupported_contraction_layers and require_orojenesis:
+            unsupported = ", ".join(plan.unsupported_contraction_layers)
+            raise ValueError(
+                "strict formal analysis lacks an exact Orojenesis proof "
+                f"representation for contraction layers: {unsupported}",
+            )
+        if plan.proof_layers and runner is None and require_orojenesis:
+            raise ValueError(
+                "strict formal analysis requires the pinned Orojenesis toolchain",
+            )
+
+    @staticmethod
     def _lower_bound(
         prepared: _PreparedAnalysis,
         accumulator: _AnalysisAccumulator,
@@ -1605,19 +1589,20 @@ class EinsumGraphAnalyzer:
         seconds: float | None = None
         resource_seconds: dict[str, float] = {}
         compute_resource: str | None = None
-        components: Dict[str, Any] | None = None
+        components: dict[str, Any] | None = None
         if (
             prepared.profile is not None
             and prepared.semantic_graph
             and prepared.semantic_complete
         ):
             resource_seconds = prepared.profile.resource_seconds(
-                accumulator.resource_work
+                accumulator.resource_work,
             )
             compute_seconds = max(resource_seconds.values(), default=0.0)
             if resource_seconds:
                 compute_resource = max(
-                    sorted(resource_seconds), key=resource_seconds.__getitem__
+                    sorted(resource_seconds),
+                    key=resource_seconds.__getitem__,
                 )
             fused_memory_seconds = (
                 formal.audited_fused_bytes
@@ -1633,17 +1618,23 @@ class EinsumGraphAnalyzer:
                 "resource_seconds": resource_seconds,
                 "compute_resource": compute_resource,
                 "fused_memory_seconds": fused_memory_seconds,
-                "fused_unoverlapped_seconds": compute_seconds + fused_memory_seconds,
+                "fused_unoverlapped_seconds": compute_seconds
+                + fused_memory_seconds,
                 "prefetched_memory_seconds": prefetched_memory_seconds,
                 "prefetched_overlapped_seconds": seconds,
             }
         if require_orojenesis and not formal.tile_aware_bound:
             raise ValueError(
-                "strict analysis did not produce a complete tile-aware bound"
+                "strict analysis did not produce a complete tile-aware bound",
             )
-        return _LowerBound(seconds, resource_seconds, compute_resource, components)
+        return _LowerBound(
+            seconds,
+            resource_seconds,
+            compute_resource,
+            components,
+        )
 
-    def _analyze_job(self, job: _AnalysisJob) -> Optional[Dict[str, Any]]:
+    def _analyze_job(self, job: _AnalysisJob) -> dict[str, Any] | None:
         """Run validated graph analysis through explicit accounting stages."""
         prepared = self._prepare_analysis(job)
         if prepared is None:
@@ -1651,7 +1642,13 @@ class EinsumGraphAnalyzer:
         topology = self._build_graph_topology(prepared.all_layers)
         accumulator = _AnalysisAccumulator()
         for layer_id, layer in topology.layers.items():
-            self._analyze_layer(layer_id, layer, topology, prepared, accumulator)
+            self._analyze_layer(
+                layer_id,
+                layer,
+                topology,
+                prepared,
+                accumulator,
+            )
         io_totals = self._graph_io_totals(accumulator)
         formal = self._run_formal_analysis(
             prepared,
@@ -1681,17 +1678,19 @@ class EinsumGraphAnalyzer:
         return analysis
 
     # Maps metadata orig_dtypes keywords to Solar precision names
-    _QUANT_DTYPE_MAP = {
-        "nvfp4": "nvfp4",
-        "float4_e2m1fn_x2": "nvfp4",
-        "fp8": "fp8",
-        "float8_e4m3fn": "fp8",
-        "float8_e5m2": "fp8",
-        "float8_e4m3fnuz": "fp8",
-        "float8_e5m2fnuz": "fp8",
-    }
+    _QUANT_DTYPE_MAP = MappingProxyType(
+        {
+            "nvfp4": "nvfp4",
+            "float4_e2m1fn_x2": "nvfp4",
+            "fp8": "fp8",
+            "float8_e4m3fn": "fp8",
+            "float8_e5m2": "fp8",
+            "float8_e4m3fnuz": "fp8",
+            "float8_e5m2fnuz": "fp8",
+        },
+    )
 
-    def _resolve_quant_precision(self, einsum_graph_path: Path) -> Optional[str]:
+    def _resolve_quant_precision(self, einsum_graph_path: Path) -> str | None:
         """Search for metadata.yaml near the einsum graph and return quant precision.
 
         Walks up from the einsum_graph_path looking for metadata.yaml
@@ -1704,7 +1703,7 @@ class EinsumGraphAnalyzer:
                 try:
                     with open(candidate) as f:
                         meta = yaml.safe_load(f) or {}
-                except Exception:
+                except (OSError, UnicodeError, yaml.YAMLError):
                     return None
 
                 best = None
@@ -1713,7 +1712,8 @@ class EinsumGraphAnalyzer:
                     for keyword, prec in self._QUANT_DTYPE_MAP.items():
                         if keyword in orig:
                             if best is None or BYTES_PER_ELEMENT.get(
-                                prec, 99
+                                prec,
+                                99,
                             ) < BYTES_PER_ELEMENT.get(best, 99):
                                 best = prec
                             break

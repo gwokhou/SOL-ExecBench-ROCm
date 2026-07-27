@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 
 from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
+from sol_execbench.core.evaluator_contract import build_evaluator_contract
 from sol_execbench.core.scoring.aggregation import (
     WorkloadScore,
     aggregate_suite_scores,
     diagnostic_workload_score,
 )
-from sol_execbench.core.evaluator_contract import build_evaluator_contract
 from sol_execbench.core.scoring.formula import SolScoreAuditError, sol_score
 
 
@@ -24,7 +24,9 @@ def test_sol_score_preserves_paper_anchors():
     [(0.9, 2.0, 1.0), (1.0, 1.0, 1.0), (1.0, float("nan"), 0.5)],
 )
 def test_sol_score_treats_precondition_violations_as_audit_errors(
-    candidate, baseline, bound
+    candidate,
+    baseline,
+    bound,
 ):
     with pytest.raises(SolScoreAuditError):
         sol_score(candidate, baseline, bound)
@@ -42,7 +44,7 @@ def test_suite_aggregation_weights_problems_equally_and_excludes_sentinel():
                 0.0,
                 AkaCorpusRole.COMPATIBILITY_SENTINEL,
             ),
-        ]
+        ],
     )
 
     assert result.problem_scores == {"problem-a": 0.5, "problem-b": 1.0}
@@ -90,9 +92,13 @@ def test_diagnostic_workload_score_propagates_audit_errors():
 def test_machine_readable_contract_publishes_the_implemented_formula():
     contract = build_evaluator_contract()
 
-    assert contract.scoring["formula"] == ("1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))")
+    assert contract.scoring["formula"] == (
+        "1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))"
+    )
     assert contract.scoring["official_verifier_available"] is True
-    assert contract.scoring["official_policy_source"] == "pinned_corpus_manifest"
+    assert (
+        contract.scoring["official_policy_source"] == "pinned_corpus_manifest"
+    )
     assert contract.scoring["official_producer_gate"] == (
         "reviewed_orojenesis_mapper_allowlist"
     )

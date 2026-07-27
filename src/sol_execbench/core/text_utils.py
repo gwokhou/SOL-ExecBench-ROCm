@@ -13,7 +13,6 @@ _T = TypeVar("_T")
 
 def markdown_table_cell(value: object) -> str:
     """Return text safe for a pipe-delimited Markdown table cell."""
-
     text = "" if value is None else str(value)
     return (
         text.replace("\\", "\\\\")
@@ -25,7 +24,6 @@ def markdown_table_cell(value: object) -> str:
 
 def subprocess_text(value: str | bytes | None) -> str:
     """Normalize subprocess output to text."""
-
     if value is None:
         return ""
     if isinstance(value, bytes):
@@ -35,7 +33,6 @@ def subprocess_text(value: str | bytes | None) -> str:
 
 def text_tail(value: object, *, limit: int = 4000) -> str:
     """Normalize *value* to text and return its last *limit* characters."""
-
     if value is None:
         return ""
     if isinstance(value, bytes):
@@ -47,5 +44,4 @@ def text_tail(value: object, *, limit: int = 4000) -> str:
 
 def ordered_unique(values: Iterable[_T]) -> list[_T]:
     """Return values with duplicates removed while preserving first-seen order."""
-
     return list(dict.fromkeys(values))

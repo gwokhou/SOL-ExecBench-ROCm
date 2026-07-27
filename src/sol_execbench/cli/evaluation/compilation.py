@@ -11,10 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
 
-from ...core.bench.io import flashinfer_safetensors_env
-from ...core.bench.stderr import filter_benign_rocm_stderr
-from ...core.process.environment import sanitized_subprocess_env
-from ...core.process.subprocesses import (
+from sol_execbench.core.bench.io import flashinfer_safetensors_env
+from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
+from sol_execbench.core.process.environment import sanitized_subprocess_env
+from sol_execbench.core.process.subprocesses import (
     TextSubprocessRunner,
     run_in_process_group_bounded,
 )
@@ -28,7 +28,11 @@ class CompilePackagerBase(Protocol):
 
 
 class NativeCompilePackager(CompilePackagerBase, Protocol):
-    def compile(self) -> tuple[list[str], str]: ...
+    """Packager that exposes a native compilation command."""
+
+    def compile(self) -> tuple[list[str], str]:
+        """Return the compilation command and resulting artifact path."""
+        ...
 
 
 class CommandCompilePackager(CompilePackagerBase, Protocol):
@@ -42,6 +46,8 @@ CompilePackager = NativeCompilePackager | CommandCompilePackager
 
 @dataclass(frozen=True, slots=True)
 class CompilePhaseResult:
+    """Compilation outcome and optional terminal CLI result."""
+
     attempted: bool
     succeeded: bool
     artifact_path: Path | None
@@ -51,7 +57,8 @@ class CompilePhaseResult:
 
 
 def _compile_command(
-    packager: CompilePackager, output_path: Path
+    packager: CompilePackager,
+    output_path: Path,
 ) -> tuple[list[str], Path]:
     if hasattr(packager, "_make_compile_cmd"):
         command_packager = cast(CommandCompilePackager, packager)
@@ -68,12 +75,12 @@ def run_compile_phase(
     staging_dir: Path,
     compile_timeout: int,
     env_builder: Callable[
-        [Mapping[str, str]], dict[str, str]
+        [Mapping[str, str]],
+        dict[str, str],
     ] = flashinfer_safetensors_env,
     runner: TextSubprocessRunner | None = None,
 ) -> CompilePhaseResult:
     """Compile a staged HIP/C++ solution and return subprocess diagnostics."""
-
     if not packager._is_cpp:
         return CompilePhaseResult(
             attempted=False,
@@ -91,7 +98,10 @@ def run_compile_phase(
     env = sanitized_subprocess_env(env_builder(base), staging_dir=staging_dir)
     if runner is None:
         proc = run_in_process_group_bounded(
-            cmd, cwd=staging_dir, timeout=compile_timeout, env=env
+            cmd,
+            cwd=staging_dir,
+            timeout=compile_timeout,
+            env=env,
         )
     else:
         proc = runner(

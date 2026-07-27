@@ -9,13 +9,18 @@ from typing import Any
 
 import torch
 
-from sol_execbench.core.bench.evaluation_requests import WorkloadEvaluationRequest
 from sol_execbench.core.bench.eval_correctness import (
     emit_reward_hack_if_detected,
     run_correctness_rounds,
 )
-from sol_execbench.core.bench.eval_timing import measure_solution_latency
+from sol_execbench.core.bench.eval_timing import (
+    SolutionTimingResult,
+    measure_solution_latency,
+)
 from sol_execbench.core.bench.eval_trace_helpers import WorkloadTraceEmitter
+from sol_execbench.core.bench.evaluation_requests import (
+    WorkloadEvaluationRequest,
+)
 from sol_execbench.core.bench.reference_protocol import (
     ReferenceExecutionError,
     ReferenceFailureKind,
@@ -23,7 +28,7 @@ from sol_execbench.core.bench.reference_protocol import (
     ReferenceTimingCase,
 )
 from sol_execbench.core.bench.reward_hack import (
-    RewardHackDetected,
+    RewardHackError,
     ThreadInjectionMonitor,
     check_monkey_patch,
     check_thread_injection_from_monitor,
@@ -52,7 +57,9 @@ def evaluate_one_workload(
         emitter=emitter,
     )
     if correctness_result.failed or emit_reward_hack_if_detected(
-        emitter=emitter, workload=workload, check_fn=check_monkey_patch
+        emitter=emitter,
+        workload=workload,
+        check_fn=check_monkey_patch,
     ):
         return
     timing_case = _load_timing_case(request, emitter, workload, row_index)
@@ -123,12 +130,14 @@ def _measure_and_emit(
                 inputs=inputs,
                 expected_outputs=timing_case.outputs,
             )
-        except RewardHackDetected as exc:
+        except RewardHackError as exc:
             emitter.emit_status(
-                workload, EvaluationStatus.REWARD_HACK, extra_msg=str(exc)
+                workload,
+                EvaluationStatus.REWARD_HACK,
+                extra_msg=str(exc),
             )
             return
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- candidate timing boundary
             emitter.emit_status(
                 workload,
                 EvaluationStatus.RUNTIME_ERROR,
@@ -140,8 +149,12 @@ def _measure_and_emit(
             request.dependencies.integrity_snapshot,
             request.dependencies.driver_globals,
         )
-    except RewardHackDetected as exc:
-        emitter.emit_status(workload, EvaluationStatus.REWARD_HACK, extra_msg=str(exc))
+    except RewardHackError as exc:
+        emitter.emit_status(
+            workload,
+            EvaluationStatus.REWARD_HACK,
+            extra_msg=str(exc),
+        )
         return
     if emit_reward_hack_if_detected(
         emitter=emitter,
@@ -150,34 +163,48 @@ def _measure_and_emit(
         args=(thread_monitor,),
     ):
         return
-    sol_latency_ms = solution_timing.latency_ms
-    cache_policy = solution_timing.cache_clear_policy
     emitter.emit_status(
         workload,
         EvaluationStatus.PASSED,
         correctness=correctness,
-        performance=Performance(
-            latency_ms=sol_latency_ms,
-            reference_latency_ms=timing_case.reference_latency_ms,
-            speedup_factor=0.0,
-            warmup_runs=request.bench_config.warmup_runs,
-            timed_iterations=solution_timing.uniform_timed_iterations,
-            timed_iterations_per_trial=list(solution_timing.timed_iterations_per_trial),
-            trials=request.bench_config.trials,
-            statistic="mean",
-            timed_outputs_validated=True,
-            cache_clear=(
-                CacheClearEvidence(
-                    detected_l2_bytes=cache_policy.detected_l2_bytes,
-                    clear_buffer_bytes=cache_policy.clear_buffer_bytes,
-                    source=cache_policy.source,
-                    fallback_reason=cache_policy.fallback_reason,
-                )
-                if cache_policy is not None
-                else None
-            ),
+        performance=_performance_evidence(
+            request,
+            timing_case,
+            solution_timing,
         ),
         extra_msg=timing_case.timing_failure,
+    )
+
+
+def _performance_evidence(
+    request: WorkloadEvaluationRequest,
+    timing_case: ReferenceTimingCase,
+    solution_timing: SolutionTimingResult,
+) -> Performance:
+    cache_policy = solution_timing.cache_clear_policy
+    cache_clear = (
+        CacheClearEvidence(
+            detected_l2_bytes=cache_policy.detected_l2_bytes,
+            clear_buffer_bytes=cache_policy.clear_buffer_bytes,
+            source=cache_policy.source,
+            fallback_reason=cache_policy.fallback_reason,
+        )
+        if cache_policy is not None
+        else None
+    )
+    return Performance(
+        latency_ms=solution_timing.latency_ms,
+        reference_latency_ms=timing_case.reference_latency_ms,
+        speedup_factor=0.0,
+        warmup_runs=request.bench_config.warmup_runs,
+        timed_iterations=solution_timing.uniform_timed_iterations,
+        timed_iterations_per_trial=list(
+            solution_timing.timed_iterations_per_trial,
+        ),
+        trials=request.bench_config.trials,
+        statistic="mean",
+        timed_outputs_validated=True,
+        cache_clear=cache_clear,
     )
 
 

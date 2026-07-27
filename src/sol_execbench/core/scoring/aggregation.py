@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.scoring.formula import sol_score
 
-OFFICIAL_AGGREGATION_POLICY = "workload_mean_within_problem_then_equal_problem_mean_v1"
+OFFICIAL_AGGREGATION_POLICY = (
+    "workload_mean_within_problem_then_equal_problem_mean_v1"
+)
 
 
 @dataclass(frozen=True)
@@ -50,7 +52,8 @@ def aggregate_suite_scores(values: Iterable[WorkloadScore]) -> SuiteScore:
     if not grouped:
         raise ValueError("suite contains no score-eligible workloads")
     problem_scores = {
-        problem: sum(scores) / len(scores) for problem, scores in grouped.items()
+        problem: sum(scores) / len(scores)
+        for problem, scores in grouped.items()
     }
     return SuiteScore(
         score=sum(problem_scores.values()) / len(problem_scores),
@@ -78,6 +81,7 @@ def diagnostic_workload_score(
     Raises:
         SolScoreAuditError: if the runtimes violate a paper precondition
             (e.g. candidate faster than SOL, or baseline not slower than SOL).
+
     """
     score = sol_score(
         candidate_runtime,

@@ -41,14 +41,22 @@ def test_hipcc_compile_and_run():
             f.write(HIP_SRC)
 
         result = subprocess.run(
-            ["hipcc", src, "-o", exe], capture_output=True, text=True, timeout=120
+            ["hipcc", src, "-o", exe],
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         assert result.returncode == 0, (
             f"hipcc compile failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
         )
         assert os.path.isfile(exe), "Binary was not produced"
 
-        result = subprocess.run([exe], capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            [exe],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
         assert result.returncode == 0, (
             f"Binary exited nonzero:\nstdout: {result.stdout}\nstderr: {result.stderr}"
         )

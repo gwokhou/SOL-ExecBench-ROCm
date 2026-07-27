@@ -15,14 +15,15 @@ from sol_execbench.core.dataset.aka_contract import (
 )
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.integrity import verify_artifact_file
-from sol_execbench.core.timestamps import utc_timestamp
-
-from .release_builders import artifact_reference, load_execution_plan
-from .release_models import (
+from sol_execbench.core.scoring.release_builders import (
+    artifact_reference,
+    load_execution_plan,
+)
+from sol_execbench.core.scoring.release_models import (
+    MAX_RELEASE_STATEMENT_BYTES,
     ArtifactReference,
     BaselineStatement,
     CandidateStatement,
-    MAX_RELEASE_STATEMENT_BYTES,
     ProblemRunEvidence,
     ReleaseArtifactKind,
     ReleaseBundle,
@@ -34,8 +35,9 @@ from .release_models import (
     SolarManifestEvidence,
     release_model_payload,
 )
-from .release_solar import verify_solar_index
-from .release_traces import verify_release_run
+from sol_execbench.core.scoring.release_solar import verify_solar_index
+from sol_execbench.core.scoring.release_traces import verify_release_run
+from sol_execbench.core.timestamps import utc_timestamp
 
 _ReleaseArtifact = TypeVar("_ReleaseArtifact", bound=ReleaseModel)
 
@@ -65,7 +67,10 @@ def build_run_statement(
     statement = _run_statement(
         plan,
         corpus_manifest=plan.corpus_manifest,
-        environment=artifact_reference(workspace, workspace / plan.environment_path),
+        environment=artifact_reference(
+            workspace,
+            workspace / plan.environment_path,
+        ),
         problems=evidence,
     )
     verify_release_run(
@@ -113,7 +118,8 @@ def build_solar_index(
         generated_at=utc_timestamp(),
         source_revision=source_revision,
         corpus_manifest=artifact_reference(
-            workspace, workspace / "corpus" / "manifest.yaml"
+            workspace,
+            workspace / "corpus" / "manifest.yaml",
         ),
         entries=entries,
     )
@@ -182,7 +188,8 @@ def assemble_release_bundle(
         raise ValueError("release baseline is not authorized by the corpus")
     bundle = ReleaseBundle(
         corpus_manifest=artifact_reference(
-            workspace, workspace / "corpus" / "manifest.yaml"
+            workspace,
+            workspace / "corpus" / "manifest.yaml",
         ),
         baseline=references[ReleaseArtifactKind.BASELINE],
         candidate=references[ReleaseArtifactKind.CANDIDATE],

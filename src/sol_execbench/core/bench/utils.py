@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import torch
 
@@ -33,13 +33,14 @@ from sol_execbench.core.data.trace import (
 from sol_execbench.core.platform.runtime import env_snapshot
 from sol_execbench.core.process.stdio import flush_stdio_streams
 
-
 _MAX_EMBEDDED_LOG_BYTES = 64 * 1024
 
 
 def _read_log_file(
-    log_path: Optional[str], *, limit: int = _MAX_EMBEDDED_LOG_BYTES
-) -> Optional[str]:
+    log_path: str | None,
+    *,
+    limit: int = _MAX_EMBEDDED_LOG_BYTES,
+) -> str | None:
     if not log_path:
         return None
 
@@ -66,13 +67,14 @@ def _read_log_file(
 def make_eval(
     status: EvaluationStatus,
     device: str,
-    log_path: Optional[str],
-    correctness: Optional[Correctness] = None,
-    performance: Optional[Performance] = None,
-    extra_msg: Optional[str] = None,
+    log_path: str | None,
+    correctness: Correctness | None = None,
+    performance: Performance | None = None,
+    extra_msg: str | None = None,
     clocks_locked: bool | None = None,
     timing_protocol: str | None = None,
 ) -> Evaluation:
+    """Build an evaluation record with bounded embedded logs."""
     log_text = _read_log_file(log_path) or ""
     if extra_msg:
         log_text = log_text + "\n" + extra_msg if log_text else extra_msg

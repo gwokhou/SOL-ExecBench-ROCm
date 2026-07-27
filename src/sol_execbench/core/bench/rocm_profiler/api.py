@@ -25,8 +25,8 @@ from sol_execbench.core.bench.rocm_profiler.artifacts import (
     profile_output_directory_listing,
 )
 from sol_execbench.core.bench.rocm_profiler.commands import (
-    ProfileRunner,
     ProfilerRunner,
+    ProfileRunner,
     _default_profile_runner,
     _default_runner,
     build_rocprofv3_command,
@@ -35,9 +35,6 @@ from sol_execbench.core.bench.rocm_profiler.commands import (
     default_runner,
 )
 from sol_execbench.core.bench.rocm_profiler.models import (
-    ROCPROFV3_EVIDENCE_SCHEMA_VERSION,
-    ROCPROFV3_EXECUTABLE,
-    ROCPROFV3_PROFILE_SCHEMA_VERSION,
     ROCPROF_REASON_ARTIFACTS_REGISTERED,
     ROCPROF_REASON_COMMAND_FAILED,
     ROCPROF_REASON_COMMAND_TIMEOUT,
@@ -47,11 +44,14 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     ROCPROF_REASON_UNAVAILABLE,
     ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE,
     ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS,
+    ROCPROFV3_EVIDENCE_SCHEMA_VERSION,
+    ROCPROFV3_EXECUTABLE,
+    ROCPROFV3_PROFILE_SCHEMA_VERSION,
     DefaultTimingSelection,
-    Rocprofv3CollectionRequest,
-    Rocprofv3CollectionResult,
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
+    Rocprofv3CollectionRequest,
+    Rocprofv3CollectionResult,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,

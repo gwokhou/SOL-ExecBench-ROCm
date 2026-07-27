@@ -4,6 +4,5 @@ from __future__ import annotations
 
 from sol_execbench.core.platform.docker_matrix.cli import main
 
-
 if __name__ == "__main__":
     raise SystemExit(main())

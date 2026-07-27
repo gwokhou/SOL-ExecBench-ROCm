@@ -9,7 +9,6 @@ import pytest
 
 from sol_execbench.tools.amd_isa import open_isa
 
-
 pytestmark = [
     pytest.mark.cpp,
     pytest.mark.requires_network,

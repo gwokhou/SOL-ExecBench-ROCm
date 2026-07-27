@@ -10,13 +10,19 @@ from pathlib import Path
 
 from rich.console import Console
 
-from ...core.bench.decision.builder import build_decision_sidecar
-from ...core.bench.decision.precedence import apply_runtime_precedence
-from ...core.bench.decision.runtime import runtime_decision_precedence
-from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
-from ...core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
-from ...core.evidence.runtime_evidence import write_json_payload
-from ...core.platform.arch_capabilities import (
+from sol_execbench.core.bench.decision.builder import build_decision_sidecar
+from sol_execbench.core.bench.decision.precedence import (
+    apply_runtime_precedence,
+)
+from sol_execbench.core.bench.decision.runtime import (
+    runtime_decision_precedence,
+)
+from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
+from sol_execbench.core.bench.static_kernel.evidence import (
+    StaticKernelEvidenceSidecar,
+)
+from sol_execbench.core.evidence.runtime_evidence import write_json_payload
+from sol_execbench.core.platform.arch_capabilities import (
     ArchCapabilityBudgetStatus,
     ArchIsaBudget,
     arch_capability_budget_from_dict,
@@ -39,11 +45,15 @@ def _load_budget_from_environment(
     matching budget is preferred over other available budgets so a multi-GPU
     environment does not yield the wrong arch's limits.
     """
-
-    if environment_sidecar_path is None or not environment_sidecar_path.is_file():
+    if (
+        environment_sidecar_path is None
+        or not environment_sidecar_path.is_file()
+    ):
         return None
     try:
-        payload = json.loads(environment_sidecar_path.read_text(encoding="utf-8"))
+        payload = json.loads(
+            environment_sidecar_path.read_text(encoding="utf-8"),
+        )
     except (json.JSONDecodeError, OSError):
         return None
     candidates = [
@@ -55,7 +65,7 @@ def _load_budget_from_environment(
     if target_architecture:
         norm = target_architecture.split(":")[0].strip().lower()
         candidates.sort(
-            key=lambda entry: (entry.get("architecture") or "").lower() != norm
+            key=lambda entry: (entry.get("architecture") or "").lower() != norm,
         )
     for entry in candidates:
         try:
@@ -81,7 +91,6 @@ def _write_decision_sidecar(
     sol_version: str | None = None,
 ) -> Path | None:
     """Write an optional Layer R decision sidecar derived from static footprints."""
-
     if enabled == DECISION_NONE or output_file is None:
         return None
     footprints = (
@@ -97,7 +106,8 @@ def _write_decision_sidecar(
         if detected:
             target_architecture = detected[0]
     budget = _load_budget_from_environment(
-        environment_sidecar_path, target_architecture=target_architecture
+        environment_sidecar_path,
+        target_architecture=target_architecture,
     )
     sidecar = build_decision_sidecar(
         footprints=footprints,
@@ -124,9 +134,9 @@ def _write_decision_sidecar(
         write_json_payload(sidecar_path, sidecar.to_dict())
         console.print(
             "[green]Decision sidecar "
-            f"{sidecar.status}; saved hints to {sidecar_path}[/green]"
+            f"{sidecar.status}; saved hints to {sidecar_path}[/green]",
         )
         return sidecar_path
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- optional decision sidecar
         console.print(f"[yellow]Decision sidecar skipped: {exc}[/yellow]")
         return None

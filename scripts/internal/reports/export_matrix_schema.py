@@ -16,7 +16,6 @@ from sol_execbench.core.platform.compatibility import (
     export_rocm_compatibility_matrix_report_json_schema,
 )
 
-
 SCHEMA_FILENAMES = {
     "matrix_entry": "matrix-entry.schema.json",
     "rocm_compatibility_matrix_report": "rocm-compatibility-matrix-report.schema.json",
@@ -24,6 +23,7 @@ SCHEMA_FILENAMES = {
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the matrix-schema export argument parser."""
     parser = argparse.ArgumentParser(
         description="Export diagnostic ROCm Compatibility Matrix JSON Schemas.",
     )
@@ -57,6 +57,7 @@ def _write_schema(path: Path, schema: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Export compatibility matrix JSON schemas."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -68,7 +69,8 @@ def main(argv: list[str] | None = None) -> int:
         schemas = export_matrix_json_schemas()
         for schema_name in sorted(schemas):
             _write_schema(
-                args.output_dir / SCHEMA_FILENAMES[schema_name], schemas[schema_name]
+                args.output_dir / SCHEMA_FILENAMES[schema_name],
+                schemas[schema_name],
             )
         return 0
 

@@ -79,7 +79,9 @@ def _validate_input_signature(
         or tuple(shapes[0]) != signature.shape
         or str(dtypes[0]) != signature.dtype
     ):
-        raise RuntimeError("make_fx input provenance does not match graph metadata")
+        raise RuntimeError(
+            "make_fx input provenance does not match graph metadata",
+        )
 
 
 def _validate_declared_outputs(
@@ -88,7 +90,9 @@ def _validate_declared_outputs(
 ) -> None:
     declared = graph.get("outputs")
     if not isinstance(declared, list) or len(declared) != len(expected):
-        raise RuntimeError("make_fx graph output arity does not match reference")
+        raise RuntimeError(
+            "make_fx graph output arity does not match reference",
+        )
     metadata: dict[str, TensorSignature] = {}
     for layer in (graph.get("layers") or {}).values():
         names = (layer.get("tensor_names") or {}).get("outputs") or []
@@ -99,14 +103,18 @@ def _validate_declared_outputs(
         metadata.update(
             {
                 str(name): TensorSignature(tuple(shape), str(dtype))
-                for name, shape, dtype in zip(names, shapes, dtypes)
-            }
+                for name, shape, dtype in zip(
+                    names, shapes, dtypes, strict=True
+                )
+            },
         )
     if any(
         metadata.get(str(name)) != signature
-        for name, signature in zip(declared, expected)
+        for name, signature in zip(declared, expected, strict=True)
     ):
-        raise RuntimeError("make_fx graph outputs do not match reference metadata")
+        raise RuntimeError(
+            "make_fx graph outputs do not match reference metadata",
+        )
 
 
 __all__ = [

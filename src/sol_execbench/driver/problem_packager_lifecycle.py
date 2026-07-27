@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import logging
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from sol_execbench.core.bench.clock_lock import ClockLockLease
 
@@ -41,7 +41,7 @@ class ProblemPackagerLifecycle:
         try:
             if self.clock_lock is not None and not self.clock_lock.release():
                 reset_error = RuntimeError(
-                    "failed to reset and verify every GPU at AUTO"
+                    "failed to reset and verify every GPU at AUTO",
                 )
         finally:
             if self.clock_lock is not None:
@@ -65,5 +65,5 @@ class ProblemPackagerLifecycle:
         """Best-effort fallback for garbage collection."""
         try:
             self.close()
-        except BaseException as exc:
+        except BaseException as exc:  # noqa: BLE001 -- destructor-safe cleanup
             logger.error("ProblemPackager cleanup failed: %s", exc)

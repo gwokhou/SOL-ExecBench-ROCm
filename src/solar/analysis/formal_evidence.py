@@ -14,7 +14,11 @@ from solar.common.types import NodeDict
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
-def new_orojenesis_record(*, semantic_graph: bool, schema_version: int) -> NodeDict:
+def new_orojenesis_record(
+    *,
+    semantic_graph: bool,
+    schema_version: int,
+) -> NodeDict:
     """Return the canonical empty evidence record for one analysis."""
     return {
         "schema_version": schema_version,
@@ -27,7 +31,9 @@ def new_orojenesis_record(*, semantic_graph: bool, schema_version: int) -> NodeD
 
 
 def status_without_proof(
-    *, unsupported_contractions: bool, runner_configured: bool
+    *,
+    unsupported_contractions: bool,
+    runner_configured: bool,
 ) -> str:
     """Classify why an analysis did not run a tile proof."""
     if not unsupported_contractions:
@@ -42,7 +48,10 @@ def _applicable_layer_count(orojenesis: NodeDict) -> int:
     )
     for category in ("chains", "regions"):
         applicable += sum(
-            len((result.get("formal_applicability") or {}).get("layer_ids") or [])
+            len(
+                (result.get("formal_applicability") or {}).get("layer_ids")
+                or [],
+            )
             for result in orojenesis[category].values()
             if (result.get("formal_applicability") or {}).get("applicable")
         )
@@ -59,7 +68,11 @@ def _evidence_files_are_verified(result: NodeDict, evidence_root: Path) -> bool:
             return False
         relative = Path(str(evidence.get("path", "")))
         digest = str(evidence.get("sha256", ""))
-        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or not relative.parts
+        ):
             return False
         resolved = (root / relative).resolve()
         if (
@@ -103,7 +116,7 @@ def audit_tile_evidence_contract(
         and unsupported_layer_count == 0
         and total_layers > 0
         and applicable_layers == total_layers
-        and complete_results
+        and complete_results,
     )
 
 

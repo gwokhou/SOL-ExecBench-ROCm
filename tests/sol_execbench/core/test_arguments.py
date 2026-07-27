@@ -22,6 +22,7 @@ def test_parse_bool_rejects_unknown_value() -> None:
     [(None, None), ("", None), ("NONE", None), ("value", "value")],
 )
 def test_none_if_requested_normalizes_requested_nulls(
-    value: str | None, expected: str | None
+    value: str | None,
+    expected: str | None,
 ) -> None:
     assert none_if_requested(value) == expected

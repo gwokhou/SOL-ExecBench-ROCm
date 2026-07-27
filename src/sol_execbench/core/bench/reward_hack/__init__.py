@@ -25,13 +25,16 @@ detected.
 from __future__ import annotations
 
 from sol_execbench.core.bench.reward_hack.models import (
-    RewardHackDetected,
+    RewardHackError,
     SourceReview,
     SourceReviewIssue,
     SourceReviewSeverity,
 )
 from sol_execbench.core.bench.reward_hack.runtime import (
     _ELAPSED_TIME_ADDR as _ELAPSED_TIME_ADDR,
+)
+from sol_execbench.core.bench.reward_hack.runtime import (
+    ThreadInjectionMonitor,
     check_eval_integrity,
     check_lazy_outputs,
     check_monkey_patch,
@@ -40,12 +43,13 @@ from sol_execbench.core.bench.reward_hack.runtime import (
     check_thread_injection_from_monitor,
     snapshot_critical_functions,
     snapshot_runtime_integrity,
-    ThreadInjectionMonitor,
 )
-from sol_execbench.core.bench.reward_hack.static_review import review_solution_sources
+from sol_execbench.core.bench.reward_hack.static_review import (
+    review_solution_sources,
+)
 
 __all__ = [
-    "RewardHackDetected",
+    "RewardHackError",
     "SourceReview",
     "SourceReviewIssue",
     "SourceReviewSeverity",

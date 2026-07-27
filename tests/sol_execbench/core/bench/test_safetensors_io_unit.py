@@ -4,15 +4,18 @@
 from __future__ import annotations
 
 import builtins
-from pathlib import Path
 import sys
+from pathlib import Path
 from types import ModuleType
 
 import pytest
 import torch
-
-from sol_execbench.core.bench.safetensors_io import _resolve_blob_path, load_safetensors
 from sol_execbench_type_helpers import make_definition, make_workload
+
+from sol_execbench.core.bench.safetensors_io import (
+    _resolve_blob_path,
+    load_safetensors,
+)
 
 
 def _workload(inputs: dict[str, dict[str, str]]):
@@ -35,14 +38,23 @@ def _definition(**overrides):
 def _install_fake_safetensors(monkeypatch, load_file) -> None:
     package = ModuleType("safetensors")
     torch_module = ModuleType("safetensors.torch")
-    setattr(torch_module, "load_file", load_file)
-    setattr(package, "torch", torch_module)
+    setattr(  # noqa: B010 -- Populate a synthetic third-party module
+        torch_module,
+        "load_file",
+        load_file,
+    )
+    setattr(  # noqa: B010 -- Populate a synthetic third-party package
+        package,
+        "torch",
+        torch_module,
+    )
     monkeypatch.setitem(sys.modules, "safetensors", package)
     monkeypatch.setitem(sys.modules, "safetensors.torch", torch_module)
 
 
 def test_load_safetensors_resolves_partial_root_and_caches_file(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     blob_root = tmp_path / "trace"
     blob_root.mkdir()
@@ -75,7 +87,7 @@ def test_load_safetensors_resolves_partial_root_and_caches_file(
                 "path": "prefix/trace/tensor.safetensors",
                 "tensor_key": "second",
             },
-        }
+        },
     )
 
     result = load_safetensors(definition, workload, blob_roots=[blob_root])
@@ -94,7 +106,10 @@ def test_load_safetensors_resolves_partial_root_and_caches_file(
     ],
 )
 def test_load_safetensors_validates_key_shape_and_dtype(
-    tmp_path: Path, monkeypatch, loaded, message: str
+    tmp_path: Path,
+    monkeypatch,
+    loaded,
+    message: str,
 ) -> None:
     blob = tmp_path / "tensor.safetensors"
     blob.write_bytes(b"fixture")
@@ -105,8 +120,8 @@ def test_load_safetensors_validates_key_shape_and_dtype(
                 "type": "safetensors",
                 "path": str(blob),
                 "tensor_key": "data",
-            }
-        }
+            },
+        },
     )
 
     with pytest.raises(ValueError, match=message):
@@ -141,5 +156,9 @@ def test_load_safetensors_reports_missing_dependency(monkeypatch) -> None:
         load_safetensors(_definition(), _workload({"a": {"type": "random"}}))
 
 
-def test_resolve_blob_path_returns_none_when_no_suffix_exists(tmp_path: Path) -> None:
-    assert _resolve_blob_path(Path("a/b/tensor.safetensors"), [tmp_path]) is None
+def test_resolve_blob_path_returns_none_when_no_suffix_exists(
+    tmp_path: Path,
+) -> None:
+    assert (
+        _resolve_blob_path(Path("a/b/tensor.safetensors"), [tmp_path]) is None
+    )

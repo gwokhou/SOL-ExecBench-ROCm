@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from sol_execbench_type_helpers import make_trace, make_workload
 
 from sol_execbench.core import Solution
 from sol_execbench.core.bench.eval_runtime import (
@@ -29,7 +30,7 @@ from sol_execbench.core.bench.eval_runtime import (
     run_reward_hack_check,
     solution_uses_native_rocm,
 )
-from sol_execbench.core.bench.reward_hack import RewardHackDetected
+from sol_execbench.core.bench.reward_hack import RewardHackError
 from sol_execbench.core.data.solution import (
     BuildSpec,
     SourceFile,
@@ -37,10 +38,12 @@ from sol_execbench.core.data.solution import (
     SupportedLanguages,
 )
 from sol_execbench.core.data.trace import Trace
-from sol_execbench_type_helpers import make_trace, make_workload
 
 
-def _solution(entry_point: str = "kernel.py::run", languages: list[str] | None = None):
+def _solution(
+    entry_point: str = "kernel.py::run",
+    languages: list[str] | None = None,
+):
     source_path = entry_point.split("::", 1)[0]
     spec_languages = [
         SupportedLanguages(language) for language in (languages or ["pytorch"])
@@ -55,14 +58,16 @@ def _solution(entry_point: str = "kernel.py::run", languages: list[str] | None =
             entry_point=entry_point,
             destination_passing_style=False,
         ),
-        sources=[SourceFile(path=source_path, content="def run(x):\n    return x\n")],
+        sources=[
+            SourceFile(path=source_path, content="def run(x):\n    return x\n"),
+        ],
     )
 
 
 def test_load_staged_problem_reads_definition_and_workloads(tmp_path):
     (tmp_path / "definition.json").write_text(json.dumps({"name": "demo"}))
     (tmp_path / "workload.jsonl").write_text(
-        json.dumps({"uuid": "a"}) + "\n\n" + json.dumps({"uuid": "b"}) + "\n"
+        json.dumps({"uuid": "a"}) + "\n\n" + json.dumps({"uuid": "b"}) + "\n",
     )
 
     definition, workloads = load_staged_problem(tmp_path)
@@ -106,7 +111,7 @@ def test_emit_trace_jsonl_rejects_non_finite_trace_values():
 
 def test_run_reward_hack_check_returns_detected_message():
     def check():
-        raise RewardHackDetected("patched timing")
+        raise RewardHackError("patched timing")
 
     assert run_reward_hack_check(check) == "patched timing"
 
@@ -227,7 +232,11 @@ def test_load_user_function_imports_python_solution(tmp_path):
 def test_load_user_function_ignores_existing_simple_module_collision(tmp_path):
     (tmp_path / "kernel.py").write_text("def run():\n    return 'staged'\n")
     collision = types.ModuleType("kernel")
-    setattr(collision, "run", lambda: "collision")
+    setattr(  # noqa: B010 -- Construct a synthetic dynamic module collision
+        collision,
+        "run",
+        lambda: "collision",
+    )
     previous = sys.modules.get("kernel")
     sys.modules["kernel"] = collision
     try:
@@ -246,14 +255,21 @@ def test_load_user_function_ignores_existing_package_module_collision(tmp_path):
     package_dir.mkdir()
     (package_dir / "helper.py").write_text("VALUE = 'staged'\n")
     (package_dir / "kernel.py").write_text(
-        "from .helper import VALUE\n\ndef run():\n    return VALUE\n"
+        "from .helper import VALUE\n\ndef run():\n    return VALUE\n",
     )
     collision = types.ModuleType("pkg.kernel")
-    setattr(collision, "run", lambda: "collision")
+    setattr(  # noqa: B010 -- Construct a synthetic dynamic module collision
+        collision,
+        "run",
+        lambda: "collision",
+    )
     previous = sys.modules.get("pkg.kernel")
     sys.modules["pkg.kernel"] = collision
     try:
-        fn = load_user_function(_solution(entry_point="pkg/kernel.py::run"), tmp_path)
+        fn = load_user_function(
+            _solution(entry_point="pkg/kernel.py::run"),
+            tmp_path,
+        )
     finally:
         if previous is None:
             sys.modules.pop("pkg.kernel", None)

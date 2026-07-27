@@ -22,13 +22,16 @@ def test_coupling_resolves_imports_cycles_and_boundaries(
         "solar.gamma": package / "gamma.py",
     }
     module_paths["sol_execbench.alpha"].write_text(
-        "from . import beta\n", encoding="utf-8"
+        "from . import beta\n",
+        encoding="utf-8",
     )
     module_paths["sol_execbench.beta"].write_text(
-        "from . import alpha\n", encoding="utf-8"
+        "from . import alpha\n",
+        encoding="utf-8",
     )
     module_paths["solar.gamma"].write_text(
-        "import sol_execbench.alpha\n", encoding="utf-8"
+        "import sol_execbench.alpha\n",
+        encoding="utf-8",
     )
 
     edges = coupling.internal_import_edges(module_paths)
@@ -39,23 +42,23 @@ def test_coupling_resolves_imports_cycles_and_boundaries(
         ("solar.gamma", "sol_execbench.alpha"),
     }
     assert coupling.strongly_connected_components(module_paths, edges) == [
-        ("sol_execbench.alpha", "sol_execbench.beta")
+        ("sol_execbench.alpha", "sol_execbench.beta"),
     ]
     assert coupling.cross_package_violations(edges) == [
-        ("solar.gamma", "sol_execbench.alpha")
+        ("solar.gamma", "sol_execbench.alpha"),
     ]
     assert coupling.layer_violations(
         {
             (
                 "sol_execbench.core.bench.worker",
                 "sol_execbench.core.reports.writer",
-            )
-        }
+            ),
+        },
     ) == [
         (
             "sol_execbench.core.bench.worker",
             "sol_execbench.core.reports.writer",
-        )
+        ),
     ]
     assert coupling.is_under("solar.graph.extraction", "solar.graph")
     assert not coupling.is_under("solar.graphical", "solar.graph")
@@ -123,7 +126,7 @@ def _dataset_policy() -> dict[str, Any]:
                 "release_bundle_redistribution": True,
             },
             "ignored-non-object",
-        ]
+        ],
     }
 
 
@@ -140,11 +143,13 @@ def test_dataset_redistribution_distinguishes_repository_and_release(
         mode="repository",
     )
     assert [finding.path for finding in repository_findings] == [
-        "data/restricted/sample.json"
+        "data/restricted/sample.json",
     ]
     assert (
         redistribution.check_paths(
-            ["data/restricted/sample.json"], policy, mode="release"
+            ["data/restricted/sample.json"],
+            policy,
+            mode="release",
         )
         == []
     )
@@ -182,7 +187,7 @@ release_bundle_redistribution = false
             "--path",
             "data/restricted/item.json",
             "--json",
-        ]
+        ],
     )
     payload = json.loads(capsys.readouterr().out)
 
@@ -212,7 +217,9 @@ def test_dataset_redistribution_rejects_invalid_policy(
         redistribution.load_dataset_policy(path)
 
 
-def test_readability_ast_metrics_and_nested_qualified_names(load_script) -> None:
+def test_readability_ast_metrics_and_nested_qualified_names(
+    load_script,
+) -> None:
     readability = load_script("scripts/check_readability.py")
     tree = ast.parse(
         """
@@ -221,7 +228,7 @@ class Outer:
         async def nested(value):
             return value
         return nested
-"""
+""",
     )
     visitor = readability._QualifiedFunctionVisitor()
     visitor.visit(tree)
@@ -234,6 +241,43 @@ class Outer:
         "Outer.method",
         "Outer.method.nested",
     ]
+
+
+def test_readability_metrics_automatically_scan_scripts(
+    load_script,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    readability = load_script("scripts/check_readability.py")
+    source_root = tmp_path / "src"
+    script_root = tmp_path / "scripts"
+    test_root = tmp_path / "tests"
+    source_root.mkdir()
+    script_root.mkdir()
+    test_root.mkdir()
+    (source_root / "typed.py").write_text(
+        "from typing import Any\nvalue: Any = 1\n",
+        encoding="utf-8",
+    )
+    long_body = "\n".join(["    value += 1"] * 79)
+    (script_root / "maintenance.py").write_text(
+        "from typing import Any\n"
+        "def oversized(value: Any):\n"
+        f"{long_body}\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(readability, "ROOT", tmp_path)
+    monkeypatch.setattr(readability, "SOURCE_ROOT", source_root)
+    monkeypatch.setattr(readability, "SCRIPT_ROOT", script_root)
+    monkeypatch.setattr(readability, "TEST_ROOT", test_root)
+    monkeypatch.setattr(readability, "REFACTORED_MODULES", set())
+
+    metrics, failures = readability.collect_metrics()
+
+    assert metrics.long_functions == 1
+    assert metrics.production_any_modules == 1
+    assert failures == []
 
 
 def test_readability_solar_debt_detects_added_removed_and_changed_items(
@@ -262,12 +306,15 @@ def test_readability_solar_debt_detects_added_removed_and_changed_items(
 
     failures = readability.check_solar_debt(current)
 
-    assert any("removed without baseline update: removed" in item for item in failures)
+    assert any(
+        "removed without baseline update: removed" in item for item in failures
+    )
     assert any("added: added=100" in item for item in failures)
     assert any("changed without baseline update" in item for item in failures)
     assert any("any_modules added: added.py" in item for item in failures)
     assert any(
-        "any_modules removed without baseline update" in item for item in failures
+        "any_modules removed without baseline update" in item
+        for item in failures
     )
 
 

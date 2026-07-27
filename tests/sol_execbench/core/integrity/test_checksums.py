@@ -18,5 +18,5 @@ def test_checksum_helpers_are_deterministic(tmp_path: Path) -> None:
     assert sha256_bytes(b"checksum payload") == expected
     assert sha256_file(path) == expected
     assert stable_json_checksum({"b": 2, "a": 1}) == stable_json_checksum(
-        {"a": 1, "b": 2}
+        {"a": 1, "b": 2},
     )

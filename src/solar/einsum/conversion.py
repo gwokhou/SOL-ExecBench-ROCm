@@ -35,7 +35,9 @@ def convert_operator_graph(
         raise RuntimeError("operator graph schema is not supported")
     if traced.get("extraction_kind") != _MAKE_FX_REFERENCE_KIND:
         raise RuntimeError("semantic operator graph provenance is not trusted")
-    return EinsumGraphArtifact(accept_semantic_operator_graph(traced, operator, output))
+    return EinsumGraphArtifact(
+        accept_semantic_operator_graph(traced, operator, output),
+    )
 
 
 __all__ = ["EinsumGraphArtifact", "convert_operator_graph"]

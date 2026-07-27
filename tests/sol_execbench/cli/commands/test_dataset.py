@@ -7,7 +7,9 @@ from click.testing import CliRunner
 
 from sol_execbench.cli.commands import dataset as cli_dataset
 from sol_execbench.cli.main import cli
-from sol_execbench.core.dataset.aka_compatibility import AkaMaterializationTarget
+from sol_execbench.core.dataset.aka_compatibility import (
+    AkaMaterializationTarget,
+)
 from sol_execbench.core.platform.runtime import RocmDeviceInfo
 
 
@@ -47,8 +49,16 @@ def test_materialize_detects_target_and_uses_target_specific_default(
             "gfx_target": "gfx1150",
         },
     )
-    monkeypatch.setattr(cli_dataset.AkaCorpusManifest, "load", lambda _path: manifest)
-    monkeypatch.setattr(cli_dataset, "detect_rocm_device", lambda device: _device())
+    monkeypatch.setattr(
+        cli_dataset.AkaCorpusManifest,
+        "load",
+        lambda _path: manifest,
+    )
+    monkeypatch.setattr(
+        cli_dataset,
+        "detect_rocm_device",
+        lambda device: _device(),
+    )
 
     result = CliRunner().invoke(
         cli,
@@ -82,7 +92,9 @@ def test_materialize_rejects_detected_target_mismatch(monkeypatch) -> None:
         lambda _path: SimpleNamespace(),
     )
     monkeypatch.setattr(
-        cli_dataset, "detect_rocm_device", lambda _device_name: _device("gfx1200")
+        cli_dataset,
+        "detect_rocm_device",
+        lambda _device_name: _device("gfx1200"),
     )
 
     result = CliRunner().invoke(

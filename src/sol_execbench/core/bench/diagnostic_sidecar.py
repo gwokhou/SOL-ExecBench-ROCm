@@ -137,7 +137,6 @@ class DiagnosticGovernanceGuardrail(DiagnosticSidecarAuthority):
 
 def compact_path(path: str | None) -> str | None:
     """Return the basename of ``path``, or ``None`` if ``path`` is ``None``."""
-
     if path is None:
         return None
     return Path(path).name
@@ -150,7 +149,6 @@ def match_optional(
     expected: str | None,
 ) -> None:
     """Append ``"<field>_mismatch"`` when ``expected`` is set and differs."""
-
     if expected is not None and actual != expected:
         reasons.append(f"{field}_mismatch")
 
@@ -162,7 +160,6 @@ def match_required_optional(
     expected: str | None,
 ) -> None:
     """Append ``"<field>_missing"`` / ``"<field>_mismatch"`` per the required rule."""
-
     if expected is None:
         return
     if actual is None:
@@ -185,11 +182,12 @@ def classify_freshness(
     argument. The caller owns this predicate because the two sidecars validate
     different identity field sets.
     """
-
     if reasons:
         return DiagnosticFreshnessStatus.STALE, list(reasons)
     if not any_expected:
-        return DiagnosticFreshnessStatus.UNKNOWN, ["insufficient_expected_identity"]
+        return DiagnosticFreshnessStatus.UNKNOWN, [
+            "insufficient_expected_identity",
+        ]
     return DiagnosticFreshnessStatus.CURRENT, []
 
 
@@ -212,17 +210,26 @@ def classify_diagnostic_governance(
       - freshness ``unknown`` -> ``unavailable`` / (reasons or ``["sidecar_freshness_unknown"]``)
       - otherwise -> ``usable_diagnostic`` / ``[]``
     """
-
     if parse_error is not None:
-        return DiagnosticGovernanceStatus.INVALID_DIAGNOSTIC, ["sidecar_parse_error"]
+        return DiagnosticGovernanceStatus.INVALID_DIAGNOSTIC, [
+            "sidecar_parse_error",
+        ]
     if not sidecar_present:
         return DiagnosticGovernanceStatus.UNAVAILABLE, ["sidecar_missing"]
     if freshness_status == DiagnosticFreshnessStatus.STALE:
-        return DiagnosticGovernanceStatus.STALE_DIAGNOSTIC, freshness_reason_codes or [
-            "sidecar_stale"
-        ]
+        return (
+            DiagnosticGovernanceStatus.STALE_DIAGNOSTIC,
+            freshness_reason_codes
+            or [
+                "sidecar_stale",
+            ],
+        )
     if freshness_status == DiagnosticFreshnessStatus.UNKNOWN:
-        return DiagnosticGovernanceStatus.UNAVAILABLE, freshness_reason_codes or [
-            "sidecar_freshness_unknown"
-        ]
+        return (
+            DiagnosticGovernanceStatus.UNAVAILABLE,
+            freshness_reason_codes
+            or [
+                "sidecar_freshness_unknown",
+            ],
+        )
     return DiagnosticGovernanceStatus.USABLE_DIAGNOSTIC, []

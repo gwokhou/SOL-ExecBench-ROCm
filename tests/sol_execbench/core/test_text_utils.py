@@ -27,4 +27,7 @@ def test_subprocess_text_normalizes_none_bytes_and_strings() -> None:
 
 
 def test_ordered_unique_preserves_first_seen_order() -> None:
-    assert ordered_unique(["gfx1200", "gfx942", "gfx1200"]) == ["gfx1200", "gfx942"]
+    assert ordered_unique(["gfx1200", "gfx942", "gfx1200"]) == [
+        "gfx1200",
+        "gfx942",
+    ]

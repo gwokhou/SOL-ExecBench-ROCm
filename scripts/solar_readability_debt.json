@@ -28,38 +28,11 @@
     "src/solar/rocm/architecture.py",
     "src/solar/verification/einsum.py"
   ],
-  "long_functions": {
-    "src/solar/analysis/fusion.py:FusionPlanner.plan": 182,
-    "src/solar/analysis/orojenesis.py:OrojenesisRunner.run_multi_chain": 128,
-    "src/solar/analysis/orojenesis.py:OrojenesisRunner.run_multi_region": 127,
-    "src/solar/analysis/orojenesis.py:_internal_zero_copy_view": 100,
-    "src/solar/analysis/orojenesis.py:_region_matmul_descriptor": 133,
-    "src/solar/analysis/orojenesis.py:compose_multi_einsum_curve": 101,
-    "src/solar/analysis/orojenesis.py:compose_multi_einsum_region_curve": 157,
-    "src/solar/analysis/orojenesis.py:find_multi_einsum_regions": 207,
-    "src/solar/common/utils.py:parse_dim_tokens": 94,
-    "src/solar/einsum/ops/attention_ops.py:ScaledDotProductAttentionHandler.create_subgraph": 135,
-    "src/solar/einsum/ops/base.py:EinsumOpHandler._try_fix_einsum_ranks": 81,
-    "src/solar/einsum/ops/matmul_ops.py:MatmulHandler._generate_matmul_einsum": 135,
-    "src/solar/einsum/ops/reduction_ops.py:ReductionHandler._generate_reduction_einsum": 124,
-    "src/solar/einsum/semantics.py:build_semantic_operation": 99,
-    "src/solar/einsum/semantics.py:validate_semantic_graph": 132,
-    "src/solar/rocm/architecture.py:ArchitectureProfile.validate": 99,
-    "src/solar/verification/einsum.py:EinsumGraphExecutor.__call__": 133,
-    "src/solar/verification/einsum.py:EinsumGraphExecutor._execute_layer": 214,
-    "src/solar/verification/einsum.py:create_verification_artifact": 88,
-    "src/solar/verification/einsum.py:replay_verification_artifact": 129
-  },
+  "long_functions": {},
   "oversized_modules": {
     "src/solar/analysis/graph_analyzer.py": 1725,
-    "src/solar/analysis/orojenesis.py": 2027,
-    "src/solar/verification/einsum.py": 1113
+    "src/solar/analysis/orojenesis.py": 1784
   },
-  "wide_functions": {
-    "src/solar/verification/einsum.py:_run_cases": 11,
-    "src/solar/verification/einsum.py:create_verification_artifact": 15,
-    "src/solar/verification/einsum.py:replay_verification_artifact": 11,
-    "src/solar/verification/einsum.py:verify_callable_conversion": 14
-  },
+  "wide_functions": {},
   "wildcard_imports": []
 }

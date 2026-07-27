@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
 import pytest
+import torch
 
 from sol_execbench.core.bench.correctness import (
     check_output_shape_dtype,
@@ -59,7 +59,7 @@ class TestComputeErrorStats:
     def test_within_tolerance(self):
         ref = torch.tensor([1.0, 2.0, 3.0])
         out = ref + 1e-6
-        c, exceeds = compute_error_stats(out, ref, _spec())
+        _c, exceeds = compute_error_stats(out, ref, _spec())
         assert not exceeds
 
     def test_exceeds_tolerance(self):
@@ -198,13 +198,17 @@ class TestComputeErrorStats:
         # Just within
         out_in = torch.tensor([1.0 + tol - 1e-7])
         _, exceeds_in = compute_error_stats(
-            out_in, ref, _spec(max_atol=atol, max_rtol=rtol)
+            out_in,
+            ref,
+            _spec(max_atol=atol, max_rtol=rtol),
         )
         assert not exceeds_in
         # Just outside
         out_out = torch.tensor([1.0 + tol + 1e-7])
         _, exceeds_out = compute_error_stats(
-            out_out, ref, _spec(max_atol=atol, max_rtol=rtol)
+            out_out,
+            ref,
+            _spec(max_atol=atol, max_rtol=rtol),
         )
         assert exceeds_out
 
@@ -256,7 +260,7 @@ class TestComputeErrorStats:
         ref = torch.tensor([smallest_normal / 2])  # subnormal
         out = torch.tensor([smallest_normal / 2 + 1e-40])
         cfg = _spec(max_atol=1e-5, max_rtol=0.0)
-        c, exceeds = compute_error_stats(out, ref, cfg)
+        _c, exceeds = compute_error_stats(out, ref, cfg)
         assert not exceeds
 
     # ------------------------------------------------------------------
@@ -267,7 +271,11 @@ class TestComputeErrorStats:
         """0-d tensors work correctly."""
         ref = torch.tensor(5.0)
         out = torch.tensor(5.001)
-        c, exceeds = compute_error_stats(out, ref, _spec(max_atol=0.01, max_rtol=0.01))
+        c, exceeds = compute_error_stats(
+            out,
+            ref,
+            _spec(max_atol=0.01, max_rtol=0.01),
+        )
         assert not exceeds
         assert c.max_absolute_error == pytest.approx(0.001, abs=1e-4)
 
@@ -279,7 +287,7 @@ class TestComputeErrorStats:
         """float16 inputs are upcast to float32 internally."""
         ref = torch.tensor([1.0, 2.0], dtype=torch.float16)
         out = torch.tensor([1.0, 2.0], dtype=torch.float16)
-        c, exceeds = compute_error_stats(out, ref, _spec())
+        _c, exceeds = compute_error_stats(out, ref, _spec())
         assert not exceeds
 
 
@@ -294,13 +302,19 @@ class TestCheckOutputShapeDtype:
         ref = [torch.zeros((2, 2), dtype=torch.float32)]
         user = [torch.zeros(4, dtype=torch.float16)]
 
-        assert check_output_shape_dtype(ref, user) == EvaluationStatus.INCORRECT_SHAPE
+        assert (
+            check_output_shape_dtype(ref, user)
+            == EvaluationStatus.INCORRECT_SHAPE
+        )
 
     def test_returns_incorrect_dtype_when_shape_matches(self):
         ref = [torch.zeros(2, dtype=torch.float32)]
         user = [torch.zeros(2, dtype=torch.float16)]
 
-        assert check_output_shape_dtype(ref, user) == EvaluationStatus.INCORRECT_DTYPE
+        assert (
+            check_output_shape_dtype(ref, user)
+            == EvaluationStatus.INCORRECT_DTYPE
+        )
 
     def test_bfloat16_inputs(self):
         """bfloat16 inputs are upcast to float32 internally."""

@@ -53,7 +53,10 @@ def test_tool_probe_result_serializes_status_and_parsed_fields():
 def test_probe_tool_reports_unavailable_without_running_command():
     calls: list[list[str]] = []
 
-    def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+    def runner(
+        command: list[str],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
         calls.append(command)
         return ProbeCompletedProcess(returncode=0)
 
@@ -71,7 +74,10 @@ def test_probe_tool_reports_unavailable_without_running_command():
 
 
 def test_probe_tool_reports_available_and_parses_gfx_target():
-    def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+    def runner(
+        command: list[str],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
         assert command == ["/fake/rocminfo"]
         assert timeout_seconds == 2.0
         return ProbeCompletedProcess(
@@ -120,7 +126,7 @@ def test_parse_probe_output_ignores_rocm_generic_isa_labels() -> None:
 
 def test_parse_probe_output_records_exact_amd_pci_identity() -> None:
     parsed = parse_probe_output(
-        "VENDOR_ID: 0x1002\nDEVICE_ID: 0x7590\nSUBSYSTEM_ID: 0x2438\n"
+        "VENDOR_ID: 0x1002\nDEVICE_ID: 0x7590\nSUBSYSTEM_ID: 0x2438\n",
     )
 
     assert parsed["pci_vendor_ids"] == ["0x1002"]
@@ -133,7 +139,7 @@ def test_summarize_gpus_deduplicates_single_pytorch_device_from_tools():
             tool="rocminfo",
             status=EnvironmentEvidenceStatus.AVAILABLE,
             parsed={"gfx_targets": ["gfx1200"]},
-        )
+        ),
     }
     pytorch = PytorchRocmSummary(
         available=True,
@@ -148,12 +154,15 @@ def test_summarize_gpus_deduplicates_single_pytorch_device_from_tools():
             index=0,
             name="AMD Radeon RX 9060 XT",
             gfx_target="gfx1200",
-        )
+        ),
     ]
 
 
 def test_probe_tool_reports_nonzero_exit_as_failed():
-    def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+    def runner(
+        command: list[str],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
         return ProbeCompletedProcess(returncode=1, stderr="permission denied")
 
     result = probe_tool(
@@ -169,8 +178,15 @@ def test_probe_tool_reports_nonzero_exit_as_failed():
 
 
 def test_probe_tool_reports_timeout():
-    def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
-        raise subprocess.TimeoutExpired(command, timeout_seconds, output="partial")
+    def runner(
+        command: list[str],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
+        raise subprocess.TimeoutExpired(
+            command,
+            timeout_seconds,
+            output="partial",
+        )
 
     result = probe_tool(
         "rocminfo",
@@ -187,7 +203,10 @@ def test_probe_tool_reports_timeout():
 def test_collect_environment_snapshot_uses_injected_runner_and_is_gpu_free():
     commands: list[list[str]] = []
 
-    def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+    def runner(
+        command: list[str],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
         commands.append(command)
         if command == ["/fake/rocm_agent_enumerator"]:
             return ProbeCompletedProcess(returncode=0, stdout="gfx1200\n")
@@ -210,14 +229,20 @@ def test_collect_environment_snapshot_uses_injected_runner_and_is_gpu_free():
 
 def test_collect_environment_snapshot_handles_missing_tools():
     snapshot = collect_environment_snapshot(
-        runner=lambda command, timeout_seconds: ProbeCompletedProcess(returncode=0),
+        runner=lambda command, timeout_seconds: ProbeCompletedProcess(
+            returncode=0,
+        ),
         which=lambda _tool: None,
         collect_pytorch=False,
         now=lambda: datetime(2026, 5, 25, tzinfo=UTC),
     )
 
     assert snapshot.collection_status == EnvironmentEvidenceStatus.UNAVAILABLE
-    assert set(snapshot.tools) == {"amd-smi", "rocminfo", "rocm_agent_enumerator"}
+    assert set(snapshot.tools) == {
+        "amd-smi",
+        "rocminfo",
+        "rocm_agent_enumerator",
+    }
     assert all(
         result.status == EnvironmentEvidenceStatus.UNAVAILABLE
         for result in snapshot.tools.values()
@@ -233,7 +258,7 @@ def test_build_environment_diagnostics_combines_snapshot_and_checks():
                 tool="rocminfo",
                 command=["rocminfo"],
                 status=EnvironmentEvidenceStatus.UNAVAILABLE,
-            )
+            ),
         },
     )
     diagnostics = build_environment_diagnostics(
@@ -243,7 +268,7 @@ def test_build_environment_diagnostics_combines_snapshot_and_checks():
                 name="pytorch_rocm_runtime",
                 status=EnvironmentEvidenceStatus.SKIPPED,
                 message="skipped",
-            )
+            ),
         ],
         now=lambda: datetime(2026, 5, 25, tzinfo=UTC),
     )

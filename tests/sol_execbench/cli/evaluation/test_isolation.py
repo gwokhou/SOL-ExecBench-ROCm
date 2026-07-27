@@ -16,7 +16,10 @@ from sol_execbench.cli.protocol import CliFailure
 
 def test_untrusted_evaluation_requires_container(monkeypatch):
     monkeypatch.delenv("SOL_EXECBENCH_SANDBOXED", raising=False)
-    request = cast(EvaluationRequest, SimpleNamespace(unsafe_local_execution=False))
+    request = cast(
+        EvaluationRequest,
+        SimpleNamespace(unsafe_local_execution=False),
+    )
 
     with pytest.raises(CliFailure, match="requires the hardened container"):
         require_execution_isolation(request)
@@ -24,14 +27,20 @@ def test_untrusted_evaluation_requires_container(monkeypatch):
 
 def test_explicit_unsafe_local_override_is_diagnostic_escape_hatch(monkeypatch):
     monkeypatch.delenv("SOL_EXECBENCH_SANDBOXED", raising=False)
-    request = cast(EvaluationRequest, SimpleNamespace(unsafe_local_execution=True))
+    request = cast(
+        EvaluationRequest,
+        SimpleNamespace(unsafe_local_execution=True),
+    )
 
     require_execution_isolation(request)
 
 
 def test_container_marker_allows_evaluation(monkeypatch):
     monkeypatch.setenv("SOL_EXECBENCH_SANDBOXED", "1")
-    request = cast(EvaluationRequest, SimpleNamespace(unsafe_local_execution=False))
+    request = cast(
+        EvaluationRequest,
+        SimpleNamespace(unsafe_local_execution=False),
+    )
 
     require_execution_isolation(request)
 
@@ -41,7 +50,11 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
     monkeypatch.delenv("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION", raising=False)
     request = cast(
         EvaluationRequest,
-        SimpleNamespace(unsafe_local_execution=True, timeout=5, device="cuda:1"),
+        SimpleNamespace(
+            unsafe_local_execution=True,
+            timeout=5,
+            device="cuda:1",
+        ),
     )
     first_inside = threading.Event()
     second_attempted = threading.Event()
@@ -58,13 +71,17 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
 
     def evaluate_first():
         with phases.evaluation_execution_boundary(request):
-            observed.append(os.environ.get("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"))
+            observed.append(
+                os.environ.get("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"),
+            )
             first_inside.set()
             assert second_attempted.wait(timeout=2)
 
     def evaluate_second():
         with phases.evaluation_execution_boundary(request):
-            observed.append(os.environ.get("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"))
+            observed.append(
+                os.environ.get("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"),
+            )
 
     first = threading.Thread(target=evaluate_first, name="first")
     second = threading.Thread(target=evaluate_second, name="second")

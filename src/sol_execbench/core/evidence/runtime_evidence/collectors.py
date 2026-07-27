@@ -14,7 +14,6 @@ from sol_execbench.core.platform.dependency_matrix import (
     collect_pytorch_dependency_observation,
 )
 
-
 VISIBLE_DEVICE_ENV_VARS = (
     "HIP_VISIBLE_DEVICES",
     "ROCR_VISIBLE_DEVICES",
@@ -46,7 +45,9 @@ def collect_visible_device_environment(
 ) -> dict[str, str]:
     """Collect GPU visibility environment variables when set."""
     source = os.environ if environ is None else environ
-    return {name: source[name] for name in VISIBLE_DEVICE_ENV_VARS if name in source}
+    return {
+        name: source[name] for name in VISIBLE_DEVICE_ENV_VARS if name in source
+    }
 
 
 def collect_gpu_evidence(
@@ -68,15 +69,26 @@ def collect_gpu_evidence(
                     device_count = int(torch.cuda.device_count())
                 if device_name is None and device_count and device_count > 0:
                     device_name = str(torch.cuda.get_device_name(0))
-                if gfx_architecture is None and device_count and device_count > 0:
+                if (
+                    gfx_architecture is None
+                    and device_count
+                    and device_count > 0
+                ):
                     props = torch.cuda.get_device_properties(0)
-                    gfx_architecture = getattr(props, "gcnArchName", None) or getattr(
-                        props, "gfx_arch", None
+                    gfx_architecture = getattr(
+                        props,
+                        "gcnArchName",
+                        None,
+                    ) or getattr(
+                        props,
+                        "gfx_arch",
+                        None,
                     )
                     if gfx_architecture is not None:
-                        gfx_architecture = str(gfx_architecture).split(":", maxsplit=1)[
-                            0
-                        ]
+                        gfx_architecture = str(gfx_architecture).split(
+                            ":",
+                            maxsplit=1,
+                        )[0]
             except (AttributeError, RuntimeError):
                 pass
 
@@ -119,14 +131,17 @@ def build_host_evidence(
 def build_dependency_observation(
     overrides: PytorchDependencyObservation | None = None,
     *,
-    collect_observation: Callable[[], PytorchDependencyObservation] | None = None,
+    collect_observation: Callable[[], PytorchDependencyObservation]
+    | None = None,
 ) -> PytorchDependencyObservation:
     """Build dependency observations from injected values or local packages."""
     overrides = overrides or PytorchDependencyObservation()
     if not any(
         getattr(overrides, field) is not None for field in _LOCAL_RUNTIME_FIELDS
     ):
-        collector = collect_observation or collect_pytorch_dependency_observation
+        collector = (
+            collect_observation or collect_pytorch_dependency_observation
+        )
         observation = collector()
         updates = {
             field: value

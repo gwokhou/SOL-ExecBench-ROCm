@@ -24,7 +24,9 @@ def test_guard_publishes_verified_host_state_and_releases_lease(
     lease = ClockLockLease(locked=True, acquired=True)
     release_calls: list[bool] = []
     monkeypatch.setattr(
-        host_clock_guard, "acquire_gpu_lock", lambda **kwargs: _gpu_lock()
+        host_clock_guard,
+        "acquire_gpu_lock",
+        lambda **kwargs: _gpu_lock(),
     )
     monkeypatch.setattr(host_clock_guard, "acquire_clock_lock", lambda: lease)
 
@@ -60,7 +62,9 @@ def test_guard_runs_unlocked_without_false_clock_claim(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        host_clock_guard, "acquire_gpu_lock", lambda **kwargs: _gpu_lock()
+        host_clock_guard,
+        "acquire_gpu_lock",
+        lambda **kwargs: _gpu_lock(),
     )
     monkeypatch.setattr(
         host_clock_guard,

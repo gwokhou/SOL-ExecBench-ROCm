@@ -20,7 +20,8 @@ from sol_execbench.core.platform.arch_capabilities import (
 
 GFX942 = load_packaged_arch_capability_budget("gfx942")
 IDENTITY = StaticResourceFootprintIdentity(
-    artifact_id="k0", extractor_tool_id="roc-objdump"
+    artifact_id="k0",
+    extractor_tool_id="roc-objdump",
 )
 
 
@@ -34,7 +35,8 @@ def _cls(hints, value: DecisionBottleneckClass):
 
 def test_spill_detected_is_inferred_high():
     hints = derive_decision_hints(
-        [_fp(scratch_bytes=1024, spill_detected=True, identity=IDENTITY)], GFX942
+        [_fp(scratch_bytes=1024, spill_detected=True, identity=IDENTITY)],
+        GFX942,
     )
     spill = _cls(hints, DecisionBottleneckClass.SPILL_DETECTED)
     assert spill and spill[0].confidence is DecisionConfidence.INFERRED_HIGH
@@ -50,7 +52,9 @@ def test_register_pressure_medium_under_ratio():
 def test_register_pressure_high_at_limit():
     hints = derive_decision_hints([_fp(vgpr_used=256)], GFX942)
     assert (
-        _cls(hints, DecisionBottleneckClass.REGISTER_PRESSURE_HIGH)[0].confidence
+        _cls(hints, DecisionBottleneckClass.REGISTER_PRESSURE_HIGH)[
+            0
+        ].confidence
         is DecisionConfidence.INFERRED_HIGH
     )
 
@@ -63,7 +67,8 @@ def test_lds_pressure():
 def test_no_pressure_emits_nothing():
     assert (
         derive_decision_hints(
-            [_fp(vgpr_used=20, lds_bytes=1024, scratch_bytes=0)], GFX942
+            [_fp(vgpr_used=20, lds_bytes=1024, scratch_bytes=0)],
+            GFX942,
         )
         == []
     )
@@ -71,7 +76,8 @@ def test_no_pressure_emits_nothing():
 
 def test_budget_none_emits_only_spill():
     hints = derive_decision_hints(
-        [_fp(vgpr_used=250, scratch_bytes=512, spill_detected=True)], None
+        [_fp(vgpr_used=250, scratch_bytes=512, spill_detected=True)],
+        None,
     )
     assert len(hints) == 1
     assert hints[0].bottleneck_class is DecisionBottleneckClass.SPILL_DETECTED
@@ -79,7 +85,10 @@ def test_budget_none_emits_only_spill():
 
 def test_dynamic_budget_emits_no_layer_r_hints():
     dynamic = GFX942.model_copy(
-        update={"register_allocation_model": "dynamic", "architecture": "gfx1200"}
+        update={
+            "register_allocation_model": "dynamic",
+            "architecture": "gfx1200",
+        },
     )
     # Dynamic arch: no Layer R hint (no detected bottleneck); the limitation is
     # recorded at the sidecar level, not as a misleading bottleneck hint.
@@ -90,9 +99,15 @@ def test_dynamic_budget_sidecar_carries_limitation():
     from sol_execbench.core.bench.decision.builder import build_decision_sidecar
 
     dynamic = GFX942.model_copy(
-        update={"register_allocation_model": "dynamic", "architecture": "gfx1200"}
+        update={
+            "register_allocation_model": "dynamic",
+            "architecture": "gfx1200",
+        },
     )
-    sidecar = build_decision_sidecar(footprints=[_fp(vgpr_used=40)], budget=dynamic)
+    sidecar = build_decision_sidecar(
+        footprints=[_fp(vgpr_used=40)],
+        budget=dynamic,
+    )
     assert sidecar.hints == []
     assert any("dynamic" in lim.lower() for lim in sidecar.limitations)
 
@@ -110,10 +125,14 @@ def test_dynamic_budget_still_emits_spill():
     # Spill is deterministic and arch-agnostic, so a dynamic-allocation budget
     # (gfx1200/RDNA4) must still emit SPILL_DETECTED; only pressure is gated.
     dynamic = GFX942.model_copy(
-        update={"register_allocation_model": "dynamic", "architecture": "gfx1200"}
+        update={
+            "register_allocation_model": "dynamic",
+            "architecture": "gfx1200",
+        },
     )
     hints = derive_decision_hints(
-        [_fp(vgpr_used=250, scratch_bytes=1024, spill_detected=True)], dynamic
+        [_fp(vgpr_used=250, scratch_bytes=1024, spill_detected=True)],
+        dynamic,
     )
     spill = _cls(hints, DecisionBottleneckClass.SPILL_DETECTED)
     assert spill and spill[0].confidence is DecisionConfidence.INFERRED_HIGH
@@ -124,7 +143,10 @@ def test_dynamic_budget_still_emits_spill():
 
 def test_dynamic_budget_suppresses_pressure_without_spill():
     dynamic = GFX942.model_copy(
-        update={"register_allocation_model": "dynamic", "architecture": "gfx1200"}
+        update={
+            "register_allocation_model": "dynamic",
+            "architecture": "gfx1200",
+        },
     )
     # vgpr_used=256 would trigger register_pressure on a static budget.
     assert derive_decision_hints([_fp(vgpr_used=256)], dynamic) == []

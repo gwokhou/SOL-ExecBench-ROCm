@@ -5,15 +5,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
-from pathlib import Path
 import re
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
 
 from sol_execbench.core.integrity.checksums import sha256_file
-from sol_execbench.core.process.subprocesses import run_in_process_group
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
-
+from sol_execbench.core.process.subprocesses import run_in_process_group
 
 MAX_DISASSEMBLY_BYTES = 64 * 1024 * 1024
 _TARGET_ARCH = re.compile(r"--(gfx[0-9a-z]+)(?::[^\s]+)?$")
@@ -23,6 +23,8 @@ _ELF_MACHINE_AMDGPU = 224
 
 @dataclass(frozen=True)
 class ExtractedCodeObject:
+    """One extracted AMDGPU code object and its bounded disassembly."""
+
     architecture: str
     path: Path
     sha256: str
@@ -31,10 +33,12 @@ class ExtractedCodeObject:
 
 
 def bundled_architectures(
-    binary: Path, workspace: Path, *, timeout_seconds: float = 30.0
+    binary: Path,
+    workspace: Path,
+    *,
+    timeout_seconds: float = 30.0,
 ) -> tuple[str, ...]:
     """Return AMDGPU targets embedded in a HIP host binary."""
-
     fatbin = _dump_fatbin(binary, workspace, timeout_seconds)
     bundler = _required_tool("clang-offload-bundler")
     result = _run(
@@ -57,7 +61,6 @@ def extract_code_object(
     timeout_seconds: float = 30.0,
 ) -> ExtractedCodeObject:
     """Extract and disassemble one exact AMDGPU target from *binary*."""
-
     workspace.mkdir(parents=True, exist_ok=True)
     architecture = architecture.lower().split(":", maxsplit=1)[0].strip()
     if _ARCHITECTURE.fullmatch(architecture) is None:
@@ -97,7 +100,8 @@ def extract_code_object(
         )
     objdump = _required_tool("llvm-objdump")
     disassembly = _run(
-        [str(objdump), "--disassemble", str(code_object)], timeout_seconds
+        [str(objdump), "--disassemble", str(code_object)],
+        timeout_seconds,
     ).stdout
     if len(disassembly.encode("utf-8")) > MAX_DISASSEMBLY_BYTES:
         raise ValueError("ISA disassembly exceeds output limit")
@@ -130,11 +134,16 @@ def _dump_fatbin(binary: Path, workspace: Path, timeout_seconds: float) -> Path:
 def _required_tool(name: str) -> Path:
     tool = resolve_rocm_tool(name)
     if tool is None:
-        raise FileNotFoundError(f"required ROCm ISA tool is unavailable: {name}")
+        raise FileNotFoundError(
+            f"required ROCm ISA tool is unavailable: {name}",
+        )
     return tool
 
 
-def _run(command: list[str], timeout_seconds: float):
+def _run(
+    command: list[str],
+    timeout_seconds: float,
+) -> subprocess.CompletedProcess[str]:
     result = run_in_process_group(command, timeout=timeout_seconds)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout)[-4000:]

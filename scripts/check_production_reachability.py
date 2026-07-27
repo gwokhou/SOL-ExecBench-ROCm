@@ -46,7 +46,9 @@ def _resolve_from_import(
 ) -> str | None:
     if node.level == 0:
         return node.module
-    package = module if path.name == "__init__.py" else module.rpartition(".")[0]
+    package = (
+        module if path.name == "__init__.py" else module.rpartition(".")[0]
+    )
     relative = "." * node.level + (node.module or "")
     try:
         return importlib.util.resolve_name(relative, package)
@@ -59,7 +61,9 @@ def _edges(module: str, path: Path, modules: set[str]) -> set[str]:
     edges: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            edges.update(alias.name for alias in node.names if alias.name in modules)
+            edges.update(
+                alias.name for alias in node.names if alias.name in modules
+            )
         elif isinstance(node, ast.ImportFrom):
             base = _resolve_from_import(module, path, node)
             if base in modules:
@@ -102,7 +106,9 @@ def unreachable_modules() -> list[str]:
     modules = set(files)
     roots = set(ENTRY_MODULES)
     roots.update(_repository_tool_roots(modules))
-    roots.update(module for module, path in files.items() if path.name == "__main__.py")
+    roots.update(
+        module for module, path in files.items() if path.name == "__main__.py"
+    )
     roots.update(
         module
         for module in modules
@@ -111,7 +117,9 @@ def unreachable_modules() -> list[str]:
             for package in DYNAMIC_PACKAGE_ROOTS
         )
     )
-    graph = {module: _edges(module, path, modules) for module, path in files.items()}
+    graph = {
+        module: _edges(module, path, modules) for module, path in files.items()
+    }
     reached: set[str] = set()
     queue = deque(sorted(roots & modules))
     while queue:
@@ -128,10 +136,13 @@ def unreachable_modules() -> list[str]:
 
 
 def main() -> int:
+    """Report production modules unreachable from supported entry points."""
     unreachable = unreachable_modules()
     if unreachable:
         print(
-            "\n".join(f"unreachable production module: {item}" for item in unreachable)
+            "\n".join(
+                f"unreachable production module: {item}" for item in unreachable
+            ),
         )
     return bool(unreachable)
 

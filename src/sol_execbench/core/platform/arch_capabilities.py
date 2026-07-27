@@ -16,7 +16,9 @@ from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.platform.confidence import EstimateConfidence
 
-ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION = SCHEMA_VERSIONS["arch_capability_budget"]
+ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION = SCHEMA_VERSIONS[
+    "arch_capability_budget"
+]
 _BUILTIN_ARCH_BUDGETS = ("gfx942", "gfx1150", "gfx1200")
 
 
@@ -107,7 +109,6 @@ _OPTIONAL_BUDGET_KEYS = {"lds_confidence"}
 
 def _normalize_gfx_token(gfx_target: str) -> str:
     """Normalize a gfx target string to a stable architecture token."""
-
     return gfx_target.split(":", maxsplit=1)[0].strip().lower()
 
 
@@ -115,12 +116,14 @@ def _require_keys(payload: dict[str, Any]) -> None:
     unknown = sorted(set(payload.keys()) - _ALLOWED_BUDGET_KEYS)
     if unknown:
         raise ValueError(
-            f"arch capability budget has unknown field(s): {', '.join(unknown)}"
+            f"arch capability budget has unknown field(s): {', '.join(unknown)}",
         )
-    missing = sorted(_ALLOWED_BUDGET_KEYS - _OPTIONAL_BUDGET_KEYS - set(payload.keys()))
+    missing = sorted(
+        _ALLOWED_BUDGET_KEYS - _OPTIONAL_BUDGET_KEYS - set(payload.keys()),
+    )
     if missing:
         raise ValueError(
-            f"arch capability budget missing required field(s): {', '.join(missing)}"
+            f"arch capability budget missing required field(s): {', '.join(missing)}",
         )
 
 
@@ -131,49 +134,54 @@ def arch_capability_budget_from_dict(
     expected_architecture: str | None = None,
 ) -> ArchIsaBudget:
     """Create an arch capability budget from a parsed JSON payload."""
-
     if not isinstance(payload, dict):
         raise ValueError("arch capability budget payload must be a JSON object")
     _require_keys(payload)
     architecture = str(payload["architecture"]).strip()
     if not architecture:
         raise ValueError(
-            "arch capability budget field 'architecture' must be non-empty"
+            "arch capability budget field 'architecture' must be non-empty",
         )
-    if expected_architecture is not None and architecture != expected_architecture:
+    if (
+        expected_architecture is not None
+        and architecture != expected_architecture
+    ):
         raise ValueError(
             f"arch capability budget architecture '{architecture}' does not match "
-            f"expected '{expected_architecture}'"
+            f"expected '{expected_architecture}'",
         )
     enriched = dict(payload)
     try:
         enriched["confidence"] = EstimateConfidence(str(payload["confidence"]))
         enriched["lds_confidence"] = EstimateConfidence(
-            str(payload.get("lds_confidence", payload["confidence"]))
+            str(payload.get("lds_confidence", payload["confidence"])),
         )
     except ValueError as exc:
         valid = ", ".join(EstimateConfidence)
         raise ValueError(
             f"{source or 'arch capability budget'} has invalid confidence "
-            f"'{payload['confidence']}', expected one of: {valid}"
+            f"'{payload['confidence']}', expected one of: {valid}",
         ) from exc
     try:
         return ArchIsaBudget.model_validate(enriched)
-    except Exception as exc:  # pragma: no cover - re-raised as ValueError for callers
+    except (
+        Exception
+    ) as exc:  # pragma: no cover - re-raised as ValueError for callers
         raise ValueError(
-            f"{source or 'arch capability budget'} is invalid: {exc}"
+            f"{source or 'arch capability budget'} is invalid: {exc}",
         ) from exc
 
 
 def load_packaged_arch_capability_budget(architecture: str) -> ArchIsaBudget:
     """Load a packaged arch capability budget resource by architecture token."""
-
-    path = resources.files("sol_execbench.data.arch_capability_budgets").joinpath(
-        f"{architecture}.json"
+    path = resources.files(
+        "sol_execbench.data.arch_capability_budgets",
+    ).joinpath(
+        f"{architecture}.json",
     )
     if not path.is_file():
         raise FileNotFoundError(
-            f"packaged arch capability budget not found for architecture '{architecture}'"
+            f"packaged arch capability budget not found for architecture '{architecture}'",
         )
     payload = json.loads(path.read_text(encoding="utf-8"))
     return arch_capability_budget_from_dict(
@@ -185,7 +193,6 @@ def load_packaged_arch_capability_budget(architecture: str) -> ArchIsaBudget:
 
 def default_arch_capability_budgets() -> dict[str, ArchIsaBudget]:
     """Return the built-in arch capability budget catalog."""
-
     return {
         arch: load_packaged_arch_capability_budget(arch)
         for arch in _BUILTIN_ARCH_BUDGETS
@@ -202,9 +209,10 @@ def derive_arch_capability_budget(
     Uncovered architectures return ``None`` so callers can downgrade rather than
     promote unknown budget values.
     """
-
     if gfx_target is None:
         return None
-    effective = catalog if catalog is not None else default_arch_capability_budgets()
+    effective = (
+        catalog if catalog is not None else default_arch_capability_budgets()
+    )
     token = _normalize_gfx_token(gfx_target)
     return effective.get(token)

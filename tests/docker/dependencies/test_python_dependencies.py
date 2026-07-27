@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-from pathlib import Path
 import tomllib
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 PYPROJECT = ROOT / "pyproject.toml"

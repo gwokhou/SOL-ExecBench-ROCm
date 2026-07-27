@@ -5,15 +5,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 import hashlib
-from pathlib import Path
 import re
+from collections.abc import Sequence
+from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     extract_amdgpu_targets,
 )
-from sol_execbench.core.bench.static_kernel.artifacts import display_artifact_path
+from sol_execbench.core.bench.static_kernel.artifacts import (
+    display_artifact_path,
+)
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticIsaAnalysis,
     StaticKernelEvidenceArtifact,
@@ -32,7 +34,6 @@ from sol_execbench.core.platform.amdgpu_code_object import (
 )
 from sol_execbench.core.platform.isa_validation import analyze_isa_disassembly
 
-
 _ARCHITECTURE = re.compile(r"gfx[0-9a-z]+")
 _MAX_METADATA_SCAN_BYTES = 128 * 1024 * 1024
 
@@ -49,7 +50,6 @@ def collect_static_isa_analyses(
     list[StaticKernelEvidenceArtifact],
 ]:
     """Decode all discoverable AMDGPU targets without affecting benchmark authority."""
-
     analyses: list[StaticIsaAnalysis] = []
     tool_runs: list[StaticKernelEvidenceToolRun] = []
     generated: list[StaticKernelEvidenceArtifact] = []
@@ -60,7 +60,10 @@ def collect_static_isa_analyses(
             continue
         try:
             architectures = _architectures(
-                artifact, path, evidence_root, timeout_seconds
+                artifact,
+                path,
+                evidence_root,
+                timeout_seconds,
             )
         except (OSError, RuntimeError, ValueError) as exc:
             analyses.append(_failed_analysis(artifact.artifact_id, exc))
@@ -83,11 +86,13 @@ def collect_static_isa_analyses(
                 analyses.append(analysis)
                 tool_runs.append(tool_run)
                 generated.extend(new_artifacts)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- per-artifact isolation
                 analyses.append(
-                    _failed_analysis(artifact.artifact_id, exc, architecture)
+                    _failed_analysis(artifact.artifact_id, exc, architecture),
                 )
-                tool_runs.append(_failed_tool_run(exc, timeout_seconds, architecture))
+                tool_runs.append(
+                    _failed_tool_run(exc, timeout_seconds, architecture),
+                )
     return analyses, tool_runs, generated
 
 
@@ -109,9 +114,14 @@ def _collect_architecture(
     | None
 ):
     architecture = _normalize_architecture(architecture)
-    workspace = _artifact_workspace(evidence_root, artifact.artifact_id) / architecture
+    workspace = (
+        _artifact_workspace(evidence_root, artifact.artifact_id) / architecture
+    )
     extracted = extract_code_object(
-        binary, architecture, workspace, timeout_seconds=timeout_seconds
+        binary,
+        architecture,
+        workspace,
+        timeout_seconds=timeout_seconds,
     )
     identity = (extracted.sha256, architecture)
     if identity in seen:
@@ -121,7 +131,9 @@ def _collect_architecture(
     disassembly_path.parent.mkdir(parents=True, exist_ok=True)
     disassembly_path.write_text(extracted.disassembly, encoding="utf-8")
     decoded = analyze_isa_disassembly(
-        architecture, extracted.disassembly, allow_download=True
+        architecture,
+        extracted.disassembly,
+        allow_download=True,
     )
     analysis = StaticIsaAnalysis(
         artifact_id=artifact.artifact_id,
@@ -219,13 +231,15 @@ def _generated_artifacts(
                     disassembly_present=artifact_type == "isa_disassembly",
                     detected_architectures=[architecture],
                 ),
-            )
+            ),
         )
     return values
 
 
 def _failed_analysis(
-    artifact_id: str, exc: Exception, architecture: str = "unknown"
+    artifact_id: str,
+    exc: Exception,
+    architecture: str = "unknown",
 ) -> StaticIsaAnalysis:
     return StaticIsaAnalysis(
         artifact_id=artifact_id,
@@ -236,7 +250,9 @@ def _failed_analysis(
 
 
 def _failed_tool_run(
-    exc: Exception, timeout_seconds: float, architecture: str = "unknown"
+    exc: Exception,
+    timeout_seconds: float,
+    architecture: str = "unknown",
 ) -> StaticKernelEvidenceToolRun:
     return StaticKernelEvidenceToolRun(
         tool_id="amd-isa",

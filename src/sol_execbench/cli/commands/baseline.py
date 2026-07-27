@@ -20,7 +20,10 @@ from sol_execbench.core.scoring.release_runner import execute_release_plan
 console = Console(stderr=True)
 
 
-@click.group("baseline", context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(
+    "baseline",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 def baseline_cli() -> None:
     """Build and execute content-addressed release baselines."""
 
@@ -166,7 +169,7 @@ def release_run_cli(
     }
     console.print(
         f"[green]Release {result.role}: "
-        f"{result.passed}/{result.workloads} workloads passed.[/green]"
+        f"{result.passed}/{result.workloads} workloads passed.[/green]",
     )
     return CliResult(data=report)
 

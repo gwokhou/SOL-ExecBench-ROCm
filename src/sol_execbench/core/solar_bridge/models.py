@@ -5,10 +5,11 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import math
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from solar.contracts import (
     SolarAnalysisStatus,
@@ -25,7 +26,7 @@ FORMAL_ARTIFACT_PATHS = frozenset(
         "einsum_graph.yaml",
         "conversion-attestation.yaml",
         "solar-analysis.yaml",
-    }
+    },
 )
 READINESS_STAGE_ARTIFACTS = {
     SolarStage.GRAPH_EXTRACTION: "operator_graph.yaml",
@@ -37,6 +38,8 @@ READINESS_STAGES = tuple(READINESS_STAGE_ARTIFACTS)
 
 @dataclass(frozen=True)
 class SolarWorkerRequest:
+    """Serializable request for one isolated SOLAR analysis."""
+
     problem_dir: str
     workload_uuid: str
     output_dir: str
@@ -44,18 +47,22 @@ class SolarWorkerRequest:
     orojenesis_home: str | None
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "SolarWorkerRequest":
+    def from_dict(cls, value: Mapping[str, Any]) -> SolarWorkerRequest:
+        """Build a request from its process-boundary mapping."""
         return cls(
             problem_dir=str(value["problem_dir"]),
             workload_uuid=str(value["workload_uuid"]),
             output_dir=str(value["output_dir"]),
             device=str(value["device"]),
             orojenesis_home=(
-                str(value["orojenesis_home"]) if value.get("orojenesis_home") else None
+                str(value["orojenesis_home"])
+                if value.get("orojenesis_home")
+                else None
             ),
         )
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible process-boundary mapping."""
         return asdict(self)
 
 
@@ -69,7 +76,8 @@ class SolarStageAuditRequest:
     device: str
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "SolarStageAuditRequest":
+    def from_dict(cls, value: Mapping[str, Any]) -> SolarStageAuditRequest:
+        """Build a stage-audit request from a mapping."""
         return cls(
             problem_dir=str(value["problem_dir"]),
             workload_uuid=str(value["workload_uuid"]),
@@ -78,11 +86,14 @@ class SolarStageAuditRequest:
         )
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible process-boundary mapping."""
         return asdict(self)
 
 
 @dataclass(frozen=True)
 class SolarAnalysisOutcome:
+    """Serializable success or failure from an isolated SOLAR analysis."""
+
     status: SolarAnalysisStatus
     analysis_id: str
     output_dir: str | None = None
@@ -103,12 +114,16 @@ class SolarAnalysisOutcome:
             object.__setattr__(self, "stage", SolarStage(self.stage))
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "SolarAnalysisOutcome":
+    def from_dict(cls, value: Mapping[str, Any]) -> SolarAnalysisOutcome:
+        """Build an analysis outcome from a worker response mapping."""
         data = dict(value)
-        data["artifacts"] = tuple(dict(item) for item in data.get("artifacts") or [])
+        data["artifacts"] = tuple(
+            dict(item) for item in data.get("artifacts") or []
+        )
         return cls(**data)
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible worker response mapping."""
         data = asdict(self)
         data["status"] = self.status
         data["stage"] = self.stage
@@ -142,7 +157,9 @@ class SolarAnalysisOutcome:
                 path.is_absolute()
                 or ".." in path.parts
                 or len(sha256) != 64
-                or any(character not in "0123456789abcdef" for character in sha256)
+                or any(
+                    character not in "0123456789abcdef" for character in sha256
+                )
             ):
                 return False
             paths.add(str(path))
@@ -174,13 +191,17 @@ class SolarStageAuditOutcome:
             )
 
     @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "SolarStageAuditOutcome":
+    def from_dict(cls, value: Mapping[str, Any]) -> SolarStageAuditOutcome:
+        """Build a stage-audit outcome from a worker response mapping."""
         data = dict(value)
         data["stages"] = tuple(dict(item) for item in data.get("stages") or [])
-        data["artifacts"] = tuple(dict(item) for item in data.get("artifacts") or [])
+        data["artifacts"] = tuple(
+            dict(item) for item in data.get("artifacts") or []
+        )
         return cls(**data)
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible worker response mapping."""
         data = asdict(self)
         data["status"] = self.status
         data["failure_stage"] = self.failure_stage
@@ -203,7 +224,9 @@ class SolarStageAuditOutcome:
         ):
             return False
         try:
-            stages = {SolarStage(str(item.get("stage"))): item for item in self.stages}
+            stages = {
+                SolarStage(str(item.get("stage"))): item for item in self.stages
+            }
         except ValueError:
             return False
         if set(stages) != set(READINESS_STAGES):

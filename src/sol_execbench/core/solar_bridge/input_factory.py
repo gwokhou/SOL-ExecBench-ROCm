@@ -5,8 +5,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from sol_execbench.core.bench.custom_inputs import isolated_torch_rng
 from sol_execbench.core.bench.input_generation import gen_inputs
@@ -30,7 +31,9 @@ def build_input_factory(
         else None
     )
     safetensors = load_safetensors(
-        definition, workload, blob_roots=[problem_dir, *problem_dir.parents]
+        definition,
+        workload,
+        blob_roots=[problem_dir, *problem_dir.parents],
     )
 
     def factory(seed: int) -> tuple[Any, ...]:
@@ -44,7 +47,7 @@ def build_input_factory(
                     custom_inputs_fn=custom,
                     row_index=row_index,
                     seed=seed,
-                )
+                ),
             )
 
     return factory

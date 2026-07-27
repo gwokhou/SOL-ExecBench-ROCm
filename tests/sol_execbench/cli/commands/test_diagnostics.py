@@ -4,11 +4,13 @@ import json
 import subprocess
 from pathlib import Path
 
-
 from sol_execbench.cli import evaluation as cli_evaluation
 
 
-def test_run_evaluation_command_passes_flashinfer_env(tmp_path: Path, monkeypatch):
+def test_run_evaluation_command_passes_flashinfer_env(
+    tmp_path: Path,
+    monkeypatch,
+):
     captured_env = None
     monkeypatch.setenv("OPENAI_API_KEY", "must-not-reach-submission")
     monkeypatch.setenv("HTTPS_PROXY", "http://credential-bearing-proxy")
@@ -46,7 +48,8 @@ def test_run_evaluation_command_passes_flashinfer_env(tmp_path: Path, monkeypatc
 
 
 def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path,
+    monkeypatch,
 ):
     captured_env = None
 
@@ -113,7 +116,9 @@ def test_no_trace_diagnostics_sidecar_survives_removed_staging(tmp_path: Path):
     assert sidecar.name == "sol_execbench_demo.no-trace-diagnostics.json"
 
 
-def test_no_trace_diagnostics_sidecar_keeps_staging_when_requested(tmp_path: Path):
+def test_no_trace_diagnostics_sidecar_keeps_staging_when_requested(
+    tmp_path: Path,
+):
     staging = tmp_path / "sol_execbench_demo"
 
     sidecar = cli_evaluation._no_trace_diagnostics_sidecar_path(
@@ -125,11 +130,17 @@ def test_no_trace_diagnostics_sidecar_keeps_staging_when_requested(tmp_path: Pat
     assert sidecar == staging / "no-trace-diagnostics.json"
 
 
-def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(tmp_path: Path):
+def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(
+    tmp_path: Path,
+):
     output = tmp_path / "traces.jsonl"
     staging = tmp_path / "staging"
-    stdout = "library noise\n" + ("x" * (cli_evaluation._DIAGNOSTIC_TAIL_LIMIT + 10))
-    stderr = "runtime failed\n" + ("y" * (cli_evaluation._DIAGNOSTIC_TAIL_LIMIT + 20))
+    stdout = "library noise\n" + (
+        "x" * (cli_evaluation._DIAGNOSTIC_TAIL_LIMIT + 10)
+    )
+    stderr = "runtime failed\n" + (
+        "y" * (cli_evaluation._DIAGNOSTIC_TAIL_LIMIT + 20)
+    )
 
     written = cli_evaluation._write_no_trace_diagnostics_sidecar(
         output_file=output,
@@ -147,21 +158,30 @@ def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(tmp_path: P
     assert written is not None
     payload = json.loads(written.read_text())
     assert (
-        payload["schema_version"] == cli_evaluation.NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
+        payload["schema_version"]
+        == cli_evaluation.NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
     )
     assert payload["diagnostic_only"] is True
     assert payload["canonical_trace_jsonl"] is False
     assert payload["reason"] == "no_parseable_traces"
     assert payload["returncode"] == 2
-    assert payload["stdout_tail"] == stdout[-cli_evaluation._DIAGNOSTIC_TAIL_LIMIT :]
-    assert payload["stderr_tail"] == stderr[-cli_evaluation._DIAGNOSTIC_TAIL_LIMIT :]
+    assert (
+        payload["stdout_tail"]
+        == stdout[-cli_evaluation._DIAGNOSTIC_TAIL_LIMIT :]
+    )
+    assert (
+        payload["stderr_tail"]
+        == stderr[-cli_evaluation._DIAGNOSTIC_TAIL_LIMIT :]
+    )
     assert payload["stdout_truncated"] is True
     assert payload["stderr_truncated"] is True
     assert payload["stdout_line_count"] == 2
     assert payload["stderr_line_count"] == 2
 
 
-def test_no_trace_diagnostics_sidecar_records_empty_stdout_failure(tmp_path: Path):
+def test_no_trace_diagnostics_sidecar_records_empty_stdout_failure(
+    tmp_path: Path,
+):
     output = tmp_path / "traces.jsonl"
     staging = tmp_path / "staging"
 

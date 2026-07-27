@@ -16,7 +16,9 @@ PROFILE_SUMMARY_SCHEMA_VERSION: Final = "sol_execbench.profile_summary.v3"
 ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
     "sol_execbench.environment_diagnostics.v1"
 )
-ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION: Final = "sol_execbench.environment_snapshot.v2"
+ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION: Final = (
+    "sol_execbench.environment_snapshot.v2"
+)
 EVALUATOR_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.evaluator_contract.v4"
 ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION: Final = (
     "sol_execbench.rocm_compatibility_matrix.v1"
@@ -34,16 +36,24 @@ RDNA4_VALIDATION_SCHEMA_VERSION: Final = "sol_execbench.rdna4_validation.v2"
 RELEASE_BASELINE_SCHEMA_VERSION: Final = "sol_execbench.release_baseline.v1"
 RELEASE_BUNDLE_SCHEMA_VERSION: Final = "sol_execbench.release_bundle.v2"
 RELEASE_CANDIDATE_SCHEMA_VERSION: Final = "sol_execbench.release_candidate.v1"
-RELEASE_ENVIRONMENT_SCHEMA_VERSION: Final = "sol_execbench.release_environment.v1"
-RELEASE_EXECUTION_PLAN_SCHEMA_VERSION: Final = "sol_execbench.release_execution_plan.v2"
-RELEASE_SOLAR_INDEX_SCHEMA_VERSION: Final = "sol_execbench.release_solar_index.v1"
+RELEASE_ENVIRONMENT_SCHEMA_VERSION: Final = (
+    "sol_execbench.release_environment.v1"
+)
+RELEASE_EXECUTION_PLAN_SCHEMA_VERSION: Final = (
+    "sol_execbench.release_execution_plan.v2"
+)
+RELEASE_SOLAR_INDEX_SCHEMA_VERSION: Final = (
+    "sol_execbench.release_solar_index.v1"
+)
 ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION: Final = (
     "sol_execbench.rocprofv3_overhead_calibration.v2"
 )
 STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION: Final = (
     "sol_execbench.static_artifact_manifest.v1"
 )
-STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION: Final = "sol_execbench.static_kernel_evidence.v3"
+STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION: Final = (
+    "sol_execbench.static_kernel_evidence.v3"
+)
 TOOLCHAIN_ROUTING_SCHEMA_VERSION: Final = "sol_execbench.toolchain_routing.v1"
 
 SCHEMA_VERSIONS: Final[dict[str, str]] = {
@@ -89,11 +99,17 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "rocm_event_timing_paper_counts": "sol_execbench.rocm_event_timing.paper_counts.v3",
 }
 
-AgentFeedbackSchemaVersion: TypeAlias = Literal["sol_execbench.agent_feedback.v3"]
+AgentFeedbackSchemaVersion: TypeAlias = Literal[
+    "sol_execbench.agent_feedback.v3"
+]
 DecisionSchemaVersion: TypeAlias = Literal["sol_execbench.decision.v2"]
-ProfileSummarySchemaVersion: TypeAlias = Literal["sol_execbench.profile_summary.v3"]
+ProfileSummarySchemaVersion: TypeAlias = Literal[
+    "sol_execbench.profile_summary.v3"
+]
 
-CURRENT_SCHEMA_VERSIONS: Final[frozenset[str]] = frozenset(SCHEMA_VERSIONS.values())
+CURRENT_SCHEMA_VERSIONS: Final[frozenset[str]] = frozenset(
+    SCHEMA_VERSIONS.values(),
+)
 
 __all__ = [
     "AGENT_FEEDBACK_SCHEMA_VERSION",

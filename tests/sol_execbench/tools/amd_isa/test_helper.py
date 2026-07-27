@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -15,7 +15,9 @@ from sol_execbench.tools.amd_isa.helper import ensure_helper
 
 @pytest.mark.cpp
 @pytest.mark.skipif(shutil.which("cmake") is None, reason="CMake is required")
-def test_vendored_helper_builds_and_rejects_invalid_protocol(tmp_path: Path) -> None:
+def test_vendored_helper_builds_and_rejects_invalid_protocol(
+    tmp_path: Path,
+) -> None:
     helper = ensure_helper(tmp_path / "cache")
 
     result = subprocess.run(

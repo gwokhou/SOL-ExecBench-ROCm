@@ -22,7 +22,9 @@ from sol_execbench.cli.evaluation import command as cli_evaluation
 from sol_execbench.cli.main import cli
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-LINEAR_BACKWARD_EXAMPLE = REPO_ROOT / "tests/sol_execbench/samples/linear_backward"
+LINEAR_BACKWARD_EXAMPLE = (
+    REPO_ROOT / "tests/sol_execbench/samples/linear_backward"
+)
 
 
 def _stage_pytorch_problem(tmp_path: Path) -> Path:
@@ -50,7 +52,11 @@ def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
     def _raise_timeout(eval_cmd, *, staging_dir, timeout):  # noqa: ARG001
         raise subprocess.TimeoutExpired(cmd=eval_cmd, timeout=timeout)
 
-    monkeypatch.setattr(cli_evaluation, "_run_evaluation_command", _raise_timeout)
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_evaluation_command",
+        _raise_timeout,
+    )
 
     result = CliRunner().invoke(
         cli,
@@ -70,7 +76,9 @@ def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
     assert result.exit_code == 4, result.output
     assert "timed out" in result.output.lower()
 
-    sidecar = trace_path.with_name(f"{trace_path.name}.no-trace-diagnostics.json")
+    sidecar = trace_path.with_name(
+        f"{trace_path.name}.no-trace-diagnostics.json",
+    )
     assert sidecar.exists(), result.output
     payload = json.loads(sidecar.read_text())
     assert payload["reason"] == "evaluation_timeout"

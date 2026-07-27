@@ -54,7 +54,6 @@ _RECOMMENDATIONS = {
 
 def _ratio(used: int | None, limit: int | None) -> float | None:
     """Return ``used / limit`` or ``None`` when either side is unset or invalid."""
-
     if used is None or limit is None or limit <= 0:
         return None
     return used / limit
@@ -64,7 +63,6 @@ def _hint_identity(
     footprint: StaticResourceFootprint,
 ) -> DecisionHintIdentity | None:
     """Mirror the footprint identity into a per-hint provenance block."""
-
     ident = footprint.identity
     if ident is None:
         return None
@@ -76,9 +74,11 @@ def _hint_identity(
     )
 
 
-def _occupancy_low(footprint: StaticResourceFootprint, budget: ArchIsaBudget) -> bool:
+def _occupancy_low(
+    footprint: StaticResourceFootprint,
+    budget: ArchIsaBudget,
+) -> bool:
     """Whether the reported occupancy is below 50% of the architectural ceiling."""
-
     occ = footprint.occupancy_estimate_waves_per_cu
     ceiling = budget.waves_per_cu_max
     if occ is None or ceiling is None or ceiling <= 0:
@@ -146,7 +146,7 @@ def _derive_for_footprint(
                 architecture=arch,
                 footprint=footprint,
                 evidence_refs=["footprint.vgpr_used", "budget.vgpr_limit"],
-            )
+            ),
         )
 
     # LDS_PRESSURE_HIGH -- per-workgroup LDS budget.
@@ -172,7 +172,7 @@ def _derive_for_footprint(
                     "footprint.lds_bytes",
                     "budget.lds_per_workgroup_bytes",
                 ],
-            )
+            ),
         )
 
     return hints
@@ -184,7 +184,9 @@ def _spill_hint(
 ) -> DecisionHint | None:
     """Derive the architecture-independent deterministic spill signal."""
     scratch = footprint.scratch_bytes
-    if footprint.spill_detected is not True and (scratch is None or scratch <= 0):
+    if footprint.spill_detected is not True and (
+        scratch is None or scratch <= 0
+    ):
         return None
     size = f"{scratch} B" if scratch is not None else "unknown size"
     return _make_hint(
@@ -209,7 +211,6 @@ def derive_decision_hints(
     derive deterministic signals such as spill. Never promotes unknown values:
     missing fields simply produce no hint.
     """
-
     if not footprints:
         return []
 
@@ -225,6 +226,10 @@ def derive_decision_hints(
     hints: list[DecisionHint] = []
     for fp in footprints:
         hints.extend(
-            _derive_for_footprint(fp, budget, pressure_derivable=pressure_derivable)
+            _derive_for_footprint(
+                fp,
+                budget,
+                pressure_derivable=pressure_derivable,
+            ),
         )
     return hints

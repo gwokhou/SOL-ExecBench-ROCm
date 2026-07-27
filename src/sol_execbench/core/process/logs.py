@@ -20,7 +20,7 @@ _TOKEN_PATTERN = re.compile(
     r"|authorization"
     r")"
     r"(\s*:\s*bearer\s+|\s*[:=]\s*)"
-    r"([^\s'\"]+)"
+    r"([^\s'\"]+)",
 )
 _TOKEN_PREFIX_OVERLAP_CHARS = 512
 _TOKEN_VALUE_DELIMITERS = frozenset(" \t\r\n'\"")
@@ -28,11 +28,11 @@ _TOKEN_VALUE_DELIMITERS = frozenset(" \t\r\n'\"")
 
 def redacted_text_tail(value: str, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
     """Return the bounded tail of *value* with common credentials redacted."""
-
     if limit <= 0:
         return ""
     redacted = _TOKEN_PATTERN.sub(
-        lambda match: f"{match.group(1)}{match.group(2)}<redacted>", value
+        lambda match: f"{match.group(1)}{match.group(2)}<redacted>",
+        value,
     )
     return redacted[-limit:]
 
@@ -100,7 +100,6 @@ def _redacted_file_tail(path: Path, limit: int) -> str:
 
 def redacted_file_tail(path: Path, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
     """Return a bounded, credential-redacted tail from *path*."""
-
     if limit <= 0:
         return ""
     try:
@@ -117,7 +116,6 @@ def temporary_stream_path(
     name_prefix: str = "",
 ) -> Path:
     """Allocate a persistent temporary log path with a filesystem-safe prefix."""
-
     safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
     with tempfile.NamedTemporaryFile(
         prefix=f"{name_prefix}{safe_name}_{stream_name}_",
@@ -136,7 +134,6 @@ def run_command_to_files(
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> subprocess.CompletedProcess[str]:
     """Run *command* with stdout and stderr redirected to separate files."""
-
     with (
         stdout_path.open("w", encoding="utf-8") as stdout_handle,
         stderr_path.open("w", encoding="utf-8") as stderr_handle,

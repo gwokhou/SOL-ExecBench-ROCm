@@ -21,14 +21,12 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import torch
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.workload import SafetensorsInput, Workload
-
 
 FLASHINFER_TRACE_ENV = "FLASHINFER_TRACE_DIR"
 
@@ -43,7 +41,6 @@ def flashinfer_safetensors_env(
     directory, so subprocesses need an additional root when the local trace checkout is
     available. User-provided ``FLASHINFER_TRACE_DIR`` always wins.
     """
-
     env = dict(os.environ if base_env is None else base_env)
     if env.get(FLASHINFER_TRACE_ENV):
         return env
@@ -54,7 +51,7 @@ def flashinfer_safetensors_env(
     return env
 
 
-def _resolve_blob_path(rel: Path, blob_roots: List[Path]) -> Optional[Path]:
+def _resolve_blob_path(rel: Path, blob_roots: list[Path]) -> Path | None:
     """Resolve a relative path against blob roots, handling partial overlap.
 
     Tries ``root / rel`` first, then progressively strips leading components
@@ -73,8 +70,8 @@ def _resolve_blob_path(rel: Path, blob_roots: List[Path]) -> Optional[Path]:
 def load_safetensors(
     definition: Definition,
     workload: Workload,
-    blob_roots: Optional[List[Path]] = None,
-) -> Dict[str, torch.Tensor]:
+    blob_roots: list[Path] | None = None,
+) -> dict[str, torch.Tensor]:
     """Load safetensors inputs for a workload.
 
     Safetensors blobs are resolved from the staging directory (passed via
@@ -86,13 +83,13 @@ def load_safetensors(
         import safetensors.torch as st
     except Exception as e:
         raise RuntimeError(
-            "safetensors is not available in the current environment"
+            "safetensors is not available in the current environment",
         ) from e
 
     expected = definition.get_input_shapes(workload.axes)
 
-    safe_tensors: Dict[str, torch.Tensor] = {}
-    loaded_files: Dict[str, Dict[str, torch.Tensor]] = {}
+    safe_tensors: dict[str, torch.Tensor] = {}
+    loaded_files: dict[str, dict[str, torch.Tensor]] = {}
     for name, input_spec in workload.inputs.items():
         if not isinstance(input_spec, SafetensorsInput):
             continue
@@ -111,17 +108,21 @@ def load_safetensors(
             loaded_files[path] = st.load_file(path)
         tensors = loaded_files[path]
         if input_spec.tensor_key not in tensors:
-            raise ValueError(f"Missing key '{input_spec.tensor_key}' in '{path}'")
+            raise ValueError(
+                f"Missing key '{input_spec.tensor_key}' in '{path}'",
+            )
         t = tensors[input_spec.tensor_key]
         if tuple(t.shape) != expected[name]:
-            raise ValueError(f"'{name}' expected {expected[name]}, got {list(t.shape)}")
+            raise ValueError(
+                f"'{name}' expected {expected[name]}, got {list(t.shape)}",
+            )
         expect_dtype = dtype_str_to_torch_dtype(definition.inputs[name].dtype)
         if t.dtype != expect_dtype:
             raise ValueError(f"'{name}' expected {expect_dtype}, got {t.dtype}")
 
         try:
             t = t.contiguous().pin_memory()
-        except Exception:
+        except RuntimeError:
             t = t.contiguous()
         safe_tensors[name] = t
     return safe_tensors

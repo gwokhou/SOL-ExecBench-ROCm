@@ -31,15 +31,20 @@ from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 from sol_execbench.core.platform.environment_diagnostics import (
     build_environment_diagnostics,
 )
-from sol_execbench.core.platform.rdna4_validation import validate_environment_payload
-
-from .release_builders import load_execution_plan
-from .release_environment import (
+from sol_execbench.core.platform.rdna4_validation import (
+    validate_environment_payload,
+)
+from sol_execbench.core.scoring.release_builders import load_execution_plan
+from sol_execbench.core.scoring.release_environment import (
     current_release_execution_identity,
     release_execution_identity_from_payload,
     verify_release_source_state,
 )
-from .release_models import ExecutionPlanProblem, ReleaseExecutionPlan, ReleaseRunKind
+from sol_execbench.core.scoring.release_models import (
+    ExecutionPlanProblem,
+    ReleaseExecutionPlan,
+    ReleaseRunKind,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +90,11 @@ def execute_release_plan(
     if plan.role is ReleaseRunKind.BASELINE and passed != workloads:
         raise ValueError("release baseline did not pass every workload")
     return ReleaseRunResult(
-        plan.role, plan.run_id, len(plan.problems), workloads, passed
+        plan.role,
+        plan.run_id,
+        len(plan.problems),
+        workloads,
+        passed,
     )
 
 
@@ -116,7 +125,9 @@ def _verify_plan_contract(
             item.definition_sha256 != identity["definition_sha256"]
             or item.workload_sha256 != identity["workload_sha256"]
         ):
-            raise ValueError(f"release execution plan identity mismatch: {path}")
+            raise ValueError(
+                f"release execution plan identity mismatch: {path}",
+            )
     verify_release_source_state(
         corpus.authored_root.parents[1],
         expected_revision=plan.source_revision,
@@ -133,7 +144,7 @@ def _write_environment_evidence(
     if path.exists():
         if not resume:
             raise FileExistsError(
-                f"release environment evidence already exists: {path}"
+                f"release environment evidence already exists: {path}",
             )
         payload = load_json_value(path)
         validate_environment_payload(payload)
@@ -145,7 +156,7 @@ def _write_environment_evidence(
     payload = build_environment_diagnostics().model_dump(mode="json")
     validate_environment_payload(payload)
     payload["release_execution"] = current_release_execution_identity(
-        plan.source_revision
+        plan.source_revision,
     ).to_dict()
     atomic_write_json_value(path, payload)
 
@@ -168,11 +179,18 @@ def _execute_problem(
         expected_size_bytes=problem.implementation.size_bytes,
     )
     problem_dir = corpus.authored_root / problem.problem_path
-    solution = Solution.model_validate_json(solution_path.read_text(encoding="utf-8"))
+    solution = Solution.model_validate_json(
+        solution_path.read_text(encoding="utf-8"),
+    )
     if trace_path.exists():
         if not resume:
             raise FileExistsError(f"release trace already exists: {trace_path}")
-        return _validate_existing_trace(trace_path, problem_dir, solution, plan.role)
+        return _validate_existing_trace(
+            trace_path,
+            problem_dir,
+            solution,
+            plan.role,
+        )
     try:
         result = run_evaluation_cli(
             request=_evaluation_request(
@@ -181,7 +199,7 @@ def _execute_problem(
                 trace_path,
                 timeout_seconds=timeout_seconds,
                 device=device,
-            )
+            ),
         )
     except CliFailure as exc:
         if plan.role is not ReleaseRunKind.CANDIDATE:
@@ -196,9 +214,14 @@ def _execute_problem(
     else:
         if result.exit_code not in {0, 1} or not trace_path.is_file():
             raise ValueError(
-                f"release evaluator produced no trace: {problem.problem_path}"
+                f"release evaluator produced no trace: {problem.problem_path}",
             )
-    return _validate_existing_trace(trace_path, problem_dir, solution, plan.role)
+    return _validate_existing_trace(
+        trace_path,
+        problem_dir,
+        solution,
+        plan.role,
+    )
 
 
 def _evaluation_request(
@@ -250,7 +273,7 @@ def _write_candidate_failure(
     if failure.cli_exit_code < 4:
         raise failure
     definition = Definition.model_validate_json(
-        (problem_dir / "definition.json").read_text(encoding="utf-8")
+        (problem_dir / "definition.json").read_text(encoding="utf-8"),
     )
     workloads = load_jsonl_file(Workload, problem_dir / "workload.jsonl")
     message = str(failure)[:8192]

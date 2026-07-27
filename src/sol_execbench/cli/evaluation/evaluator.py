@@ -24,7 +24,6 @@ from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import CliFailure, CliResult, artifact
 from sol_execbench.driver.problem_packager import ProblemPackager
 
-
 console = Console(stderr=True)
 
 # Compatibility exports for callers of the root evaluator module.  The
@@ -35,10 +34,10 @@ PROFILE_ROCPROFV3 = cli_phases.PROFILE_ROCPROFV3
 
 def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
     """Evaluate a SOL-ExecBench solution on GPU."""
-
     cli_phases.require_execution_isolation(request)
     cli_problem_io.require_materialized_target_match(
-        request.problem_dir, request.device
+        request.problem_dir,
+        request.device,
     )
 
     resolved_inputs = cli_problem_io.resolve_problem_inputs(
@@ -67,14 +66,16 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
     console.print(f"[bold]Workloads:[/bold] {len(workloads)}")
     if resolved_inputs.config_file:
         console.print(
-            f"[bold]Config:[/bold]   {json.dumps(dataclasses.asdict(config))}"
+            f"[bold]Config:[/bold]   {json.dumps(dataclasses.asdict(config))}",
         )
 
     staging_dir = Path(tempfile.mkdtemp(prefix="sol_execbench_"))
     with ExitStack() as resources:
         if not request.keep_staging:
             resources.callback(shutil.rmtree, staging_dir, ignore_errors=True)
-        resources.enter_context(cli_phases.evaluation_execution_boundary(request))
+        resources.enter_context(
+            cli_phases.evaluation_execution_boundary(request),
+        )
         packager = resources.enter_context(
             ProblemPackager(
                 definition=definition,
@@ -85,7 +86,7 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
                 # The outer resource scope owns staging cleanup so constructor
                 # and lock-acquisition failures cannot leak the directory.
                 keep_output_dir=True,
-            )
+            ),
         )
         return _run_packaged_evaluation(
             request=request,
@@ -139,9 +140,12 @@ def _run_packaged_evaluation(
                 source_sha256=request.feedback_source_sha256,
                 sol_version=request.feedback_sol_version,
             ),
-        )
+        ),
     )
-    cli_outputs.emit_trace_output(traces=traces, json_output=request.json_output)
+    cli_outputs.emit_trace_output(
+        traces=traces,
+        json_output=request.json_output,
+    )
     passed = sum(1 for trace in traces if trace.is_successful())
     all_passed = cli_outputs.all_traces_passed(traces)
     artifacts = (
@@ -192,7 +196,8 @@ def _run_evaluation_phases(
     )
 
     if isinstance(
-        runtime_result, cli_evaluation_runtime.EvaluationRuntimeNoTraceFailure
+        runtime_result,
+        cli_evaluation_runtime.EvaluationRuntimeNoTraceFailure,
     ):
         cli_phases.handle_no_trace_failure(
             context,

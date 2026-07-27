@@ -21,6 +21,7 @@ from solar.rocm.architecture import ArchitectureProfile
 from solar.verification import (
     EinsumExecutionError,
     VerificationError,
+    VerificationPolicy,
     verify_callable_conversion,
 )
 
@@ -53,6 +54,7 @@ class ConversionReadinessRequest:
     allow_negative_inf: bool = False
 
     def __post_init__(self) -> None:
+        """Validate stable request identity fields."""
         if not self.analysis_id.strip() or not self.reference_name.strip():
             raise ValueError("analysis_id and reference_name must be non-empty")
         if re.fullmatch(r"[0-9a-f]{64}", self.reference_sha256) is None:
@@ -67,6 +69,7 @@ class ReadinessArtifact:
     sha256: str
 
     def to_dict(self) -> dict[str, str]:
+        """Return a JSON-compatible artifact mapping."""
         return asdict(self)
 
 
@@ -86,6 +89,7 @@ class ReadinessStage:
         object.__setattr__(self, "status", SolarStageStatus(self.status))
 
     def to_dict(self) -> dict[str, DynamicValue]:
+        """Return a JSON-compatible stage mapping."""
         value = asdict(self)
         value["stage"] = self.stage
         value["status"] = self.status
@@ -119,15 +123,20 @@ class ConversionReadinessResult:
 
     @property
     def ready(self) -> bool:
+        """Return whether every readiness stage passed."""
         return self.status is SolarReadinessStatus.READY and all(
             item.status is SolarStageStatus.PASSED for item in self.stages
         )
 
     @property
     def artifacts(self) -> tuple[ReadinessArtifact, ...]:
-        return tuple(item.artifact for item in self.stages if item.artifact is not None)
+        """Return content-addressed artifacts from completed stages."""
+        return tuple(
+            item.artifact for item in self.stages if item.artifact is not None
+        )
 
     def to_dict(self) -> dict[str, DynamicValue]:
+        """Return a JSON-compatible readiness result."""
         value = asdict(self)
         value["status"] = self.status
         value["failure_stage"] = self.failure_stage
@@ -142,9 +151,13 @@ def audit_conversion(
     """Run the three readiness stages atomically while retaining failure evidence."""
     output = request.output_dir.resolve()
     if output.exists():
-        raise FileExistsError(f"SOLAR readiness output already exists: {output}")
+        raise FileExistsError(
+            f"SOLAR readiness output already exists: {output}",
+        )
     output.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent),
+    )
     passed: list[ReadinessStage] = []
     architecture_sha256: str | None = None
     stage = SolarStage.ARCHITECTURE
@@ -170,7 +183,7 @@ def audit_conversion(
         attestation = staging / "conversion-attestation.yaml"
         _verify(request, einsum.path, attestation)
         passed.append(_passed_stage(stage, attestation))
-    except Exception as exc:  # fail closed and retain completed stage evidence
+    except Exception as exc:  # noqa: BLE001 -- retain staged failure evidence
         failure = exc
     try:
         result = _result(
@@ -189,7 +202,9 @@ def audit_conversion(
 
 
 def _verify(
-    request: ConversionReadinessRequest, graph_path: Path, output_path: Path
+    request: ConversionReadinessRequest,
+    graph_path: Path,
+    output_path: Path,
 ) -> None:
     verify_callable_conversion(
         reference=request.reference,
@@ -198,13 +213,15 @@ def _verify(
         reference_sha256=request.reference_sha256,
         graph_path=graph_path,
         output_path=output_path,
-        atol=request.atol,
-        rtol=request.rtol,
-        required_matched_ratio=request.required_matched_ratio,
-        max_error_cap=request.max_error_cap,
-        allow_negative_inf=request.allow_negative_inf,
-        seeds=request.verification_seeds,
-        device=request.device,
+        policy=VerificationPolicy(
+            atol=request.atol,
+            rtol=request.rtol,
+            required_matched_ratio=request.required_matched_ratio,
+            max_error_cap=request.max_error_cap,
+            allow_negative_inf=request.allow_negative_inf,
+            seeds=request.verification_seeds,
+            device=request.device,
+        ),
     )
 
 
@@ -270,17 +287,25 @@ def readiness_reason_code(stage: SolarStage, exc: Exception) -> str:
             return "tensor_dispatch_lineage_lost"
         return "graph_extraction_failed"
     if stage is SolarStage.EINSUM_CONVERSION:
-        if any(token in message for token in ("source-to-graph", "graph input")):
+        if any(
+            token in message for token in ("source-to-graph", "graph input")
+        ):
             return "source_input_binding_failed"
         if "reference output" in message or "traced graph output" in message:
             return "reference_output_binding_failed"
-        if any(token in message for token in ("unsupported", "no handler", "vstack")):
+        if any(
+            token in message
+            for token in ("unsupported", "no handler", "vstack")
+        ):
             return "exact_operation_unsupported"
         return "strict_conversion_failed"
     if stage is SolarStage.CONVERSION_VERIFICATION:
         if isinstance(exc, EinsumExecutionError):
             return "exact_replay_failed"
-        if isinstance(exc, VerificationError) and "numerical mismatch" in message:
+        if (
+            isinstance(exc, VerificationError)
+            and "numerical mismatch" in message
+        ):
             return "numerical_equivalence_failed"
         return "conversion_not_proven"
     return "readiness_audit_failed"
@@ -291,9 +316,16 @@ def _profile_hash(
 ) -> str:
     import json
 
-    value = profile.to_dict() if isinstance(profile, ArchitectureProfile) else profile
+    value = (
+        profile.to_dict()
+        if isinstance(profile, ArchitectureProfile)
+        else profile
+    )
     encoded = json.dumps(
-        value, sort_keys=True, separators=(",", ":"), default=str
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
     ).encode()
     return hashlib.sha256(encoded).hexdigest()
 

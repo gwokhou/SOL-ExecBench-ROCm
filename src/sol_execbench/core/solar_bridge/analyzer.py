@@ -5,13 +5,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 from sol_execbench.core.integrity import sha256_bytes
 from sol_execbench.core.solar_bridge.models import (
-    SolarAnalysisStatus,
     SolarAnalysisOutcome,
+    SolarAnalysisStatus,
     SolarStage,
     SolarStageAuditOutcome,
     formal_precision_for_definition,
@@ -33,14 +33,10 @@ def formal_producer_readiness() -> tuple[bool, str]:
     return True, "ready"
 
 
-def formal_architecture_profile_hash(architecture: str = FORMAL_ARCHITECTURE) -> str:
-    """Return the canonical SHA-256 of SOLAR's packaged architecture profile.
-
-    This is the sole outer-package entry point that inspects a SOLAR profile's
-    identity hash, so callers (including tests) never import ``solar`` directly.
-    It intentionally wraps a private ``solar.api`` helper: the bridge owns the
-    coupling to SOLAR internals so the rest of the benchmark stays decoupled.
-    """
+def formal_architecture_profile_hash(
+    architecture: str = FORMAL_ARCHITECTURE,
+) -> str:
+    """Return the canonical hash of a packaged SOLAR architecture profile."""
     from solar.api import _profile_hash
     from solar.rocm.architecture import ArchitectureProfile
 
@@ -94,7 +90,7 @@ def audit_workload_stages(
             required_matched_ratio=workload.tolerance.required_matched_ratio,
             max_error_cap=workload.tolerance.max_error_cap,
             allow_negative_inf=workload.tolerance.allow_negative_inf,
-        )
+        ),
     )
     return SolarStageAuditOutcome.from_dict(result.to_dict())
 
@@ -167,12 +163,14 @@ def _require_formal_device(device: str) -> None:
         raise RuntimeError("formal SOLAR analysis requires a ROCm device")
     selected = torch.device(device)
     index = (
-        selected.index if selected.index is not None else torch.cuda.current_device()
+        selected.index
+        if selected.index is not None
+        else torch.cuda.current_device()
     )
     properties = torch.cuda.get_device_properties(index)
     gfx_target = str(getattr(properties, "gcnArchName", "")).split(":", 1)[0]
     if gfx_target != FORMAL_GFX_TARGET:
         raise RuntimeError(
             f"formal SOLAR analysis requires {FORMAL_GFX_TARGET}, got {gfx_target or 'unknown'}; "
-            "other AMD devices remain diagnostic evaluation targets"
+            "other AMD devices remain diagnostic evaluation targets",
         )

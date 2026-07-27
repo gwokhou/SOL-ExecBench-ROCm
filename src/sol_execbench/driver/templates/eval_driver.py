@@ -35,7 +35,12 @@ from pathlib import Path
 _real_stdout_fd = os.dup(1)
 _real_stdout = os.fdopen(_real_stdout_fd, "w", buffering=1)
 os.dup2(2, 1)  # fd 1 now points at stderr
-sys.stdout = open(1, "w", buffering=1, closefd=False)
+sys.stdout = open(  # noqa: SIM115 -- process-lifetime stream replacement
+    1,
+    "w",
+    buffering=1,
+    closefd=False,
+)
 
 import torch  # noqa: E402 — must come after redirect
 
@@ -97,7 +102,8 @@ _dps = _solution.spec.destination_passing_style
 
 # ── Device and output metadata ───────────────────────────────────────────────
 _device = os.environ.get(
-    "SOL_EXECBENCH_DEVICE", "cuda:0" if torch.cuda.is_available() else "cpu"
+    "SOL_EXECBENCH_DEVICE",
+    "cuda:0" if torch.cuda.is_available() else "cpu",
 )
 _output_names = list(definition.outputs.keys())
 _output_dtypes_torch = {
@@ -139,7 +145,7 @@ _integrity_snapshot = snapshot_runtime_integrity(globals())
 _check_integrity = check_runtime_integrity
 
 # ── Evaluate each workload ────────────────────────────────────────────────────
-# evaluate_workloads emits traces via emit_trace_jsonl, which uses allow_nan=False.
+# Trace JSONL emission rejects nonstandard NaN values.
 try:
     # Resolve candidate code only after the trusted reference channel exists.
     # The reference implementation itself is never imported in this process.
@@ -167,7 +173,7 @@ try:
 finally:
     _reference_client.close()
 
-# TorchInductor and ROCm runtimes can leave non-daemon worker threads alive after
+# TorchInductor and ROCm can leave non-daemon workers alive after
 # all benchmark traces have been emitted.  The driver is a one-shot subprocess,
 # so flush the trace stream and terminate explicitly instead of letting teardown
 # hang validation jobs. Profiler-backed timing runs need normal interpreter
@@ -176,7 +182,7 @@ try:
     _real_stdout.flush()
     sys.stderr.flush()
     sys.stdout.flush()
-except Exception:
+except (OSError, ValueError):
     pass
 if os.environ.get("SOL_EXECBENCH_GRACEFUL_EXIT") == "1":
     sys.exit(0)

@@ -28,7 +28,7 @@ class _OperandSourceTracer:
             str(name): _ProducedTensor(producer, output_index)
             for producer in layers.values()
             for output_index, name in enumerate(
-                (producer.get("tensor_names") or {}).get("outputs") or []
+                (producer.get("tensor_names") or {}).get("outputs") or [],
             )
         }
 
@@ -50,23 +50,25 @@ class _OperandSourceTracer:
             and semantic.get("target") in RECOMPUTABLE_OPERAND_TARGETS
             and not effects.get("mutates")
             and not effects.get("atomic")
-            and not effects.get("opaque_library_call")
+            and not effects.get("opaque_library_call"),
         )
 
     @staticmethod
     def _is_low_precision_dequantization(producer: NodeDict) -> bool:
         dtypes = producer.get("tensor_dtypes") or {}
         inputs = [
-            str(item).removeprefix("torch.") for item in dtypes.get("inputs") or []
+            str(item).removeprefix("torch.")
+            for item in dtypes.get("inputs") or []
         ]
         outputs = [
-            str(item).removeprefix("torch.") for item in dtypes.get("outputs") or []
+            str(item).removeprefix("torch.")
+            for item in dtypes.get("outputs") or []
         ]
         return bool(
             inputs
             and outputs
             and inputs[0] in LOW_PRECISION_DEQUANT_DTYPES
-            and inputs[0] != outputs[0]
+            and inputs[0] != outputs[0],
         )
 
     def _trace_recomputation(
@@ -99,7 +101,9 @@ class _OperandSourceTracer:
             return set(), False, False
         producer = produced.layer
         if str(producer.get("type", "")).lower() == "start":
-            output_dtypes = (producer.get("tensor_dtypes") or {}).get("outputs") or []
+            output_dtypes = (producer.get("tensor_dtypes") or {}).get(
+                "outputs",
+            ) or []
             if produced.output_index not in range(len(output_dtypes)):
                 return None
             return {str(output_dtypes[produced.output_index])}, False, False
@@ -111,13 +115,20 @@ class _OperandSourceTracer:
             if int(alias.get("output", -1)) == produced.output_index
             and not bool(alias.get("conditional", False))
         ]
-        input_names = list((producer.get("tensor_names") or {}).get("inputs") or [])
+        input_names = list(
+            (producer.get("tensor_names") or {}).get("inputs") or [],
+        )
         next_visited = visited | {name}
         if len(aliases) == 1:
             return self._trace_alias(aliases, input_names, next_visited)
         if not input_names or not self._is_recomputable(semantic, effects):
             return None
-        return self._trace_recomputation(producer, semantic, input_names, next_visited)
+        return self._trace_recomputation(
+            producer,
+            semantic,
+            input_names,
+            next_visited,
+        )
 
     def trace_operands(self, layer: NodeDict) -> list[SourceTrace] | None:
         result: list[SourceTrace] = []
@@ -133,20 +144,23 @@ class _OperandSourceTracer:
 
 
 def _contraction_operand_sources(
-    layer: NodeDict, layers: dict[str, NodeDict]
+    layer: NodeDict,
+    layers: dict[str, NodeDict],
 ) -> list[SourceTrace] | None:
     return _OperandSourceTracer(layers).trace_operands(layer)
 
 
 def contraction_operands_are_graph_external(
-    layer: NodeDict, layers: dict[str, NodeDict]
+    layer: NodeDict,
+    layers: dict[str, NodeDict],
 ) -> bool:
     """Return whether contraction operands are external or safely recomputable."""
     return _contraction_operand_sources(layer, layers) is not None
 
 
 def contraction_external_source_dtypes(
-    layer: NodeDict, layers: dict[str, NodeDict]
+    layer: NodeDict,
+    layers: dict[str, NodeDict],
 ) -> set[str]:
     """Return graph-input dtypes for a proven recomputable contraction region."""
     traced = _contraction_operand_sources(layer, layers)

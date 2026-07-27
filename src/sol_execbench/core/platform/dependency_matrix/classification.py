@@ -37,7 +37,6 @@ def classify_dependency_preflight(
     allow_mixed_version_debug: bool = False,
 ) -> DependencyPreflightResult:
     """Classify a selected Target's observed PyTorch ROCm dependency stack."""
-
     status, reason_code, reason = _classify_observation(
         target=target,
         policy=policy,
@@ -107,7 +106,9 @@ def _classify_observation(
         )
 
     mismatch_reason = _mismatch_reason(
-        target=target, policy=policy, observation=observation
+        target=target,
+        policy=policy,
+        observation=observation,
     )
     if mismatch_reason is not None:
         return (
@@ -131,6 +132,18 @@ def _mismatch_reason(
     policy: PytorchDependencyPolicy,
     observation: PytorchDependencyObservation,
 ) -> str | None:
+    return (
+        _torch_mismatch_reason(target, policy, observation)
+        or _triton_mismatch_reason(policy, observation)
+        or _rocm_mismatch_reason(policy, observation)
+    )
+
+
+def _torch_mismatch_reason(
+    target: DockerTargetManifestEntry,
+    policy: PytorchDependencyPolicy,
+    observation: PytorchDependencyObservation,
+) -> str | None:
     if observation.torch_cuda_version:
         return (
             f"CUDA PyTorch runtime {observation.torch_cuda_version} was observed for "
@@ -141,7 +154,10 @@ def _mismatch_reason(
             f"torch distribution {observation.torch_distribution_version!r} does not "
             f"match policy {policy.torch_version!r}."
         )
-    if observation.torch_version and observation.torch_version != policy.torch_version:
+    if (
+        observation.torch_version
+        and observation.torch_version != policy.torch_version
+    ):
         return (
             f"torch runtime version {observation.torch_version!r} does not match "
             f"policy {policy.torch_version!r}."
@@ -151,7 +167,9 @@ def _mismatch_reason(
             f"torch local-version {observation.torch_local_version!r} does not match "
             f"policy {policy.expected_local_version!r}."
         )
-    expected_rocm_target = target.pytorch_rocm_target or policy.expected_local_version
+    expected_rocm_target = (
+        target.pytorch_rocm_target or policy.expected_local_version
+    )
     if observation.torch_rocm_target != expected_rocm_target:
         return (
             f"torch ROCm target {observation.torch_rocm_target!r} does not match "
@@ -167,23 +185,43 @@ def _mismatch_reason(
             f"torch HIP version {observation.torch_hip_version!r} does not match "
             f"policy {policy.expected_local_version!r}."
         )
-    if observation.torchvision_distribution_version != policy.torchvision_version:
+    if (
+        observation.torchvision_distribution_version
+        != policy.torchvision_version
+    ):
         return (
             "torchvision distribution "
             f"{observation.torchvision_distribution_version!r} does not match policy "
             f"{policy.torchvision_version!r}."
         )
+    return None
+
+
+def _triton_mismatch_reason(
+    policy: PytorchDependencyPolicy,
+    observation: PytorchDependencyObservation,
+) -> str | None:
     if observation.triton_rocm_status != "installed":
         return (
             f"triton-rocm status {observation.triton_rocm_status!r} does not match "
             "required installed policy."
         )
-    if observation.triton_rocm_distribution_version != policy.triton_rocm_version:
+    if (
+        observation.triton_rocm_distribution_version
+        != policy.triton_rocm_version
+    ):
         return (
             "triton-rocm distribution "
             f"{observation.triton_rocm_distribution_version!r} does not match policy "
             f"{policy.triton_rocm_version!r}."
         )
+    return None
+
+
+def _rocm_mismatch_reason(
+    policy: PytorchDependencyPolicy,
+    observation: PytorchDependencyObservation,
+) -> str | None:
     if not _version_matches_expected(
         observation.container_rocm_user_space_version,
         policy.expected_local_version,
@@ -232,7 +270,10 @@ def _rocm_major_minor(expected_local_version: str) -> str | None:
     return ".".join(parts[:2])
 
 
-def _version_matches_expected(version: str | None, expected_local_version: str) -> bool:
+def _version_matches_expected(
+    version: str | None,
+    expected_local_version: str,
+) -> bool:
     expected = _rocm_major_minor(expected_local_version)
     if version is None or expected is None:
         return True

@@ -28,7 +28,9 @@ def _request(
 def test_audit_conversion_records_all_passing_stage_digests(
     tmp_path: Path,
 ) -> None:
-    result = audit_conversion(_request(tmp_path / "ready", lambda value: value + 1))
+    result = audit_conversion(
+        _request(tmp_path / "ready", lambda value: value + 1),
+    )
 
     assert result.ready
     assert [item.stage for item in result.stages] == [
@@ -53,7 +55,9 @@ def test_audit_conversion_retains_passed_artifacts_on_failure(
         raise RuntimeError("cannot bind source arguments to graph inputs")
 
     monkeypatch.setattr("solar.readiness.convert_operator_graph", fail)
-    result = audit_conversion(_request(tmp_path / "failed", lambda value: value + 1))
+    result = audit_conversion(
+        _request(tmp_path / "failed", lambda value: value + 1),
+    )
 
     assert not result.ready
     assert result.failure_stage == "einsum_conversion"

@@ -11,11 +11,12 @@ import io
 import json
 from collections.abc import Sequence
 from contextlib import redirect_stderr, redirect_stdout
+from types import MappingProxyType
 from typing import Any
 
 import click
 
-from .protocol import (
+from sol_execbench.cli.protocol import (
     EXIT_EXECUTION,
     CliFailure,
     CliResult,
@@ -29,21 +30,50 @@ VERSION = "3.0.0"
 class LazyGroup(click.Group):
     """A standard Click group whose top-level domains are imported on demand."""
 
-    _loaders = {
-        "evaluate": ("sol_execbench.cli.commands.evaluate", "evaluate_cli"),
-        "baseline": ("sol_execbench.cli.commands.baseline", "baseline_cli"),
-        "environment": ("sol_execbench.cli.commands.metadata", "environment_cli"),
-        "contract": ("sol_execbench.cli.commands.metadata", "contract_cli"),
-        "toolchain": ("sol_execbench.cli.commands.metadata", "toolchain_cli"),
-        "dataset": ("sol_execbench.cli.commands.dataset", "dataset_cli"),
-        "solar": ("sol_execbench.cli.commands.solar", "solar_cli"),
-        "score": ("sol_execbench.cli.commands.official_score", "score_cli"),
-    }
+    _loaders = MappingProxyType(
+        {
+            "evaluate": (
+                "sol_execbench.cli.commands.evaluate",
+                "evaluate_cli",
+            ),
+            "baseline": (
+                "sol_execbench.cli.commands.baseline",
+                "baseline_cli",
+            ),
+            "environment": (
+                "sol_execbench.cli.commands.metadata",
+                "environment_cli",
+            ),
+            "contract": (
+                "sol_execbench.cli.commands.metadata",
+                "contract_cli",
+            ),
+            "toolchain": (
+                "sol_execbench.cli.commands.metadata",
+                "toolchain_cli",
+            ),
+            "dataset": (
+                "sol_execbench.cli.commands.dataset",
+                "dataset_cli",
+            ),
+            "solar": ("sol_execbench.cli.commands.solar", "solar_cli"),
+            "score": (
+                "sol_execbench.cli.commands.official_score",
+                "score_cli",
+            ),
+        },
+    )
 
     def list_commands(self, ctx: click.Context) -> list[str]:
+        """Return lazily registered command names."""
         return list(self._loaders)
 
-    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
+    def get_command(
+        self,
+        ctx: click.Context,
+        cmd_name: str,
+    ) -> click.Command | None:
+        """Import and return the requested command on demand."""
         target = self._loaders.get(cmd_name)
         if target is None:
             return None
@@ -53,18 +83,24 @@ class LazyGroup(click.Group):
         return getattr(import_module(module_name), attribute)
 
     def resolve_command(
-        self, ctx: click.Context, args: list[str]
+        self,
+        ctx: click.Context,
+        args: list[str],
     ) -> tuple[str | None, click.Command | None, list[str]]:
+        """Resolve a command and suggest the closest name on failure."""
         try:
             return super().resolve_command(ctx, args)
         except click.UsageError as exc:
             if args:
                 matches = difflib.get_close_matches(
-                    args[0], self.list_commands(ctx), n=1
+                    args[0],
+                    self.list_commands(ctx),
+                    n=1,
                 )
                 if matches:
                     raise click.UsageError(
-                        f"{exc.message}\nDid you mean '{matches[0]}'?", ctx=exc.ctx
+                        f"{exc.message}\nDid you mean '{matches[0]}'?",
+                        ctx=exc.ctx,
                     ) from exc
             raise
 
@@ -81,51 +117,45 @@ class RootGroup(LazyGroup):
         windows_expand_args: bool = True,
         **extra: Any,
     ) -> Any:
+        """Run the root command with a single JSON response boundary."""
         import sys
 
         raw_args = list(args) if args is not None else sys.argv[1:]
         json_mode = _requested_json(raw_args)
-        standalone = standalone_mode
         captured_stdout = io.StringIO()
         captured_stderr = io.StringIO()
         try:
-            if json_mode:
-                with redirect_stdout(captured_stdout), redirect_stderr(captured_stderr):
-                    result = super().main(
-                        args=raw_args,
-                        prog_name=prog_name,
-                        complete_var=complete_var,
-                        standalone_mode=False,
-                        windows_expand_args=windows_expand_args,
-                        **extra,
-                    )
-            else:
-                result = super().main(
-                    args=raw_args,
-                    prog_name=prog_name,
-                    complete_var=complete_var,
-                    standalone_mode=False,
-                    windows_expand_args=windows_expand_args,
-                    **extra,
-                )
-            cli_result = result if isinstance(result, CliResult) else CliResult()
+            result = self._invoke(
+                raw_args,
+                json_mode=json_mode,
+                captured_stdout=captured_stdout,
+                captured_stderr=captured_stderr,
+                prog_name=prog_name,
+                complete_var=complete_var,
+                windows_expand_args=windows_expand_args,
+                **extra,
+            )
+            cli_result = (
+                result if isinstance(result, CliResult) else CliResult()
+            )
             exit_code = cli_result.exit_code
             if json_mode:
                 click.echo(
                     json.dumps(
                         response_success(_command_name(raw_args), cli_result),
                         sort_keys=True,
-                    )
+                    ),
                 )
         except click.exceptions.Exit as exc:
             exit_code = exc.exit_code
             if json_mode and exc.exit_code != 0:
                 click.echo(
                     json.dumps(
-                        response_failure(_command_name(raw_args), exc), sort_keys=True
-                    )
+                        response_failure(_command_name(raw_args), exc),
+                        sort_keys=True,
+                    ),
                 )
-        except (click.ClickException, Exception) as exc:
+        except Exception as exc:  # noqa: BLE001 -- top-level CLI response boundary
             if isinstance(exc, click.UsageError):
                 exit_code = 2
             elif isinstance(exc, CliFailure):
@@ -139,16 +169,45 @@ class RootGroup(LazyGroup):
             if json_mode:
                 click.echo(
                     json.dumps(
-                        response_failure(_command_name(raw_args), exc), sort_keys=True
-                    )
+                        response_failure(_command_name(raw_args), exc),
+                        sort_keys=True,
+                    ),
                 )
             elif isinstance(exc, click.ClickException):
                 exc.show()
             else:
                 click.echo(f"Error: {exc}", err=True)
-        if standalone:
+        if standalone_mode:
             raise SystemExit(exit_code)
         return exit_code if exit_code else result
+
+    def _invoke(
+        self,
+        raw_args: list[str],
+        *,
+        json_mode: bool,
+        captured_stdout: io.StringIO,
+        captured_stderr: io.StringIO,
+        prog_name: str | None,
+        complete_var: str | None,
+        windows_expand_args: bool,
+        **extra: Any,
+    ) -> Any:
+        invoke_options = {
+            "args": raw_args,
+            "prog_name": prog_name,
+            "complete_var": complete_var,
+            "standalone_mode": False,
+            "windows_expand_args": windows_expand_args,
+            **extra,
+        }
+        if not json_mode:
+            return super().main(**invoke_options)
+        with (
+            redirect_stdout(captured_stdout),
+            redirect_stderr(captured_stderr),
+        ):
+            return super().main(**invoke_options)
 
 
 def _requested_json(args: list[str]) -> bool:
@@ -169,7 +228,8 @@ def _command_name(args: list[str]) -> str:
         for index, argument in enumerate(args)
         if argument != "--format=json"
         and not (
-            argument == "--format" or (index > 0 and args[index - 1] == "--format")
+            argument == "--format"
+            or (index > 0 and args[index - 1] == "--format")
         )
     ]
     if not values or values[0].startswith("-"):

@@ -31,9 +31,11 @@ _REQUIRED_ARTIFACTS = frozenset(
         "pytest-rdna4.xml",
         "pytest.stderr.txt",
         "pytest.stdout.txt",
-    }
+    },
 )
-_LOCAL_ATTESTATION_KINDS = frozenset({"github_actions_self_hosted", "local_unsigned"})
+_LOCAL_ATTESTATION_KINDS = frozenset(
+    {"github_actions_self_hosted", "local_unsigned"},
+)
 _ROCM_PATH_VERSION = re.compile(r"(?:^|/)rocm-(\d+\.\d+\.\d+)(?:/|$)")
 
 
@@ -51,6 +53,7 @@ class Rdna4EnvironmentIdentity:
     pci_device_id: str
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible environment identity."""
         return {
             "gfx_target": self.gfx_target,
             "device_name": self.device_name,
@@ -69,7 +72,9 @@ def summarize_junit(path: Path) -> dict[str, int]:
         root = ElementTree.parse(path).getroot()
     except (ElementTree.ParseError, OSError) as exc:
         raise ValueError("RDNA4 validation JUnit artifact is invalid") from exc
-    suites = [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
+    suites = (
+        [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
+    )
     if not suites:
         raise ValueError("RDNA4 validation JUnit artifact has no test suites")
     return {
@@ -97,26 +102,38 @@ def validate_environment_payload(payload: object) -> Rdna4EnvironmentIdentity:
         or gpus[0].get("gfx_target") != RDNA4_VALIDATION_GFX_TARGET
     )
     if invalid_device:
-        raise ValueError("RDNA4 validation requires exactly one RX 9060 XT gfx1200 GPU")
+        raise ValueError(
+            "RDNA4 validation requires exactly one RX 9060 XT gfx1200 GPU",
+        )
     pytorch = snapshot_data.get("pytorch")
     if not isinstance(pytorch, dict) or pytorch.get("available") is not True:
-        raise ValueError("RDNA4 validation requires an available PyTorch ROCm runtime")
+        raise ValueError(
+            "RDNA4 validation requires an available PyTorch ROCm runtime",
+        )
     if (
         pytorch.get("device_count") != 1
         or not isinstance(pytorch.get("device_name"), str)
         or not str(pytorch.get("device_name")).strip()
         or pytorch.get("gfx_target") != RDNA4_VALIDATION_GFX_TARGET
     ):
-        raise ValueError("RDNA4 PyTorch device identity does not match the GPU probe")
+        raise ValueError(
+            "RDNA4 PyTorch device identity does not match the GPU probe",
+        )
     torch_version = str(pytorch.get("torch_version", ""))
     hip_version = str(pytorch.get("hip_version", ""))
     if torch_version != RDNA4_VALIDATION_TORCH_VERSION:
-        raise ValueError("RDNA4 validation PyTorch version is outside the locked scope")
+        raise ValueError(
+            "RDNA4 validation PyTorch version is outside the locked scope",
+        )
     if hip_version != RDNA4_VALIDATION_HIP_VERSION:
-        raise ValueError("RDNA4 validation HIP version is outside the locked scope")
+        raise ValueError(
+            "RDNA4 validation HIP version is outside the locked scope",
+        )
     rocm_version = _rocm_version(snapshot_data)
     if rocm_version != RDNA4_VALIDATION_ROCM_VERSION:
-        raise ValueError("RDNA4 validation ROCm version is outside the locked scope")
+        raise ValueError(
+            "RDNA4 validation ROCm version is outside the locked scope",
+        )
     _verify_pci_identity(snapshot_data)
     device_index = gpus[0].get("index")
     if device_index is not None and type(device_index) is not int:
@@ -141,7 +158,9 @@ def _verify_pci_identity(snapshot: dict[str, Any]) -> None:
         parsed.get("pci_vendor_ids") != [RDNA4_VALIDATION_PCI_VENDOR_ID]
         or parsed.get("pci_device_ids") != [RDNA4_VALIDATION_PCI_DEVICE_ID]
     ):
-        raise ValueError("RDNA4 validation PCI identity does not match the RX 9060 XT")
+        raise ValueError(
+            "RDNA4 validation PCI identity does not match the RX 9060 XT",
+        )
 
 
 def _rocm_version(snapshot: dict[str, Any]) -> str:
@@ -233,11 +252,13 @@ def verify_validation_directory(
     )
     _verify_artifacts(directory, manifest.get("artifacts"))
     environment = json.loads(
-        (directory / "environment-doctor.json").read_text(encoding="utf-8")
+        (directory / "environment-doctor.json").read_text(encoding="utf-8"),
     )
     identity = validate_environment_payload(environment)
     if manifest.get("target") != identity.to_dict():
-        raise ValueError("RDNA4 validation target does not match environment evidence")
+        raise ValueError(
+            "RDNA4 validation target does not match environment evidence",
+        )
     stored_counts = {
         field_name: int(manifest["pytest"][field_name])
         for field_name in ("tests", "failures", "errors", "skipped")
@@ -264,7 +285,8 @@ def _verify_manifest_contract(
         pytest_summary.get("returncode") != 0
         or pytest_summary.get("tests", 0) <= 0
         or any(
-            pytest_summary.get(name) != 0 for name in ("failures", "errors", "skipped")
+            pytest_summary.get(name) != 0
+            for name in ("failures", "errors", "skipped")
         )
     ):
         raise ValueError("RDNA4 validation pytest summary is not clean")
@@ -272,7 +294,10 @@ def _verify_manifest_contract(
         manifest.get("source_revision") != expected_source_revision
     ):
         raise ValueError("RDNA4 validation source revision mismatch")
-    if re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("source_revision", ""))) is None:
+    if (
+        re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("source_revision", "")))
+        is None
+    ):
         raise ValueError("RDNA4 validation source revision is invalid")
     if not isinstance(manifest.get("source_dirty"), bool):
         raise ValueError("RDNA4 validation source dirty state is invalid")

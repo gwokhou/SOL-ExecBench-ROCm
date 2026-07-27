@@ -5,14 +5,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 
 
 def flush_stdio_streams() -> None:
     """Flush standard streams while tolerating unavailable stream backends."""
-
     for stream in (sys.stdout, sys.stderr):
-        try:
+        with contextlib.suppress(OSError, ValueError):
             stream.flush()
-        except Exception:
-            pass

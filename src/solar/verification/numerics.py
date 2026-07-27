@@ -41,7 +41,10 @@ def _tensor_leaves(value: DynamicValue) -> list[DynamicValue]:
 def _same_storage(left: DynamicValue, right: DynamicValue) -> bool:
     import torch
 
-    if not isinstance(left, torch.Tensor) or not isinstance(right, torch.Tensor):
+    if not isinstance(left, torch.Tensor) or not isinstance(
+        right,
+        torch.Tensor,
+    ):
         return False
     if left is right:
         return True
@@ -52,7 +55,8 @@ def _same_storage(left: DynamicValue, right: DynamicValue) -> bool:
 
 
 def alias_relation(
-    outputs: DynamicValue, inputs: DynamicValue
+    outputs: DynamicValue,
+    inputs: DynamicValue,
 ) -> tuple[tuple[bool, ...], ...]:
     """Return the complete input/output tensor-storage alias relation."""
     leaves = [*_tensor_leaves(inputs), *_tensor_leaves(outputs)]
@@ -85,19 +89,23 @@ def assert_close(
     )
     if isinstance(actual, torch.Tensor) and isinstance(expected, torch.Tensor):
         return _tensor_close_stats(actual, expected, *policy)
-    if isinstance(actual, (tuple, list)) and isinstance(expected, (tuple, list)):
+    if isinstance(actual, (tuple, list)) and isinstance(
+        expected,
+        (tuple, list),
+    ):
         if len(actual) != len(expected):
             raise VerificationError("output arity mismatch")
-        return _nested_close_stats(zip(actual, expected), policy)
+        return _nested_close_stats(zip(actual, expected, strict=True), policy)
     if isinstance(actual, dict) and isinstance(expected, dict):
         if actual.keys() != expected.keys():
             raise VerificationError("output mapping keys differ")
         return _nested_close_stats(
-            ((actual[key], expected[key]) for key in actual), policy
+            ((actual[key], expected[key]) for key in actual),
+            policy,
         )
     if actual != expected:
         raise VerificationError(
-            f"non-tensor output mismatch: {actual!r} != {expected!r}"
+            f"non-tensor output mismatch: {actual!r} != {expected!r}",
         )
     return {"max_abs_error": 0.0, "matched_ratio": 1.0}
 
@@ -120,9 +128,13 @@ def _nested_close_stats(
         for actual, expected in pairs
     ]
     return {
-        "max_abs_error": max((item["max_abs_error"] for item in stats), default=0.0),
+        "max_abs_error": max(
+            (item["max_abs_error"] for item in stats),
+            default=0.0,
+        ),
         "matched_ratio": min(
-            (item.get("matched_ratio", 1.0) for item in stats), default=1.0
+            (item.get("matched_ratio", 1.0) for item in stats),
+            default=1.0,
         ),
     }
 
@@ -139,16 +151,19 @@ def _tensor_close_stats(
 ) -> dict[str, float]:
     import torch
 
-    if not isinstance(actual, torch.Tensor) or not isinstance(expected, torch.Tensor):
+    if not isinstance(actual, torch.Tensor) or not isinstance(
+        expected,
+        torch.Tensor,
+    ):
         raise TypeError("tensor comparison requires tensor operands")
     if actual.shape != expected.shape:
         raise VerificationError(
             f"output shape mismatch: einsum={tuple(actual.shape)}, "
-            f"reference={tuple(expected.shape)}"
+            f"reference={tuple(expected.shape)}",
         )
     if actual.dtype != expected.dtype:
         raise VerificationError(
-            f"output dtype mismatch: einsum={actual.dtype}, reference={expected.dtype}"
+            f"output dtype mismatch: einsum={actual.dtype}, reference={expected.dtype}",
         )
     if not (actual.is_floating_point() or actual.is_complex()):
         if not torch.equal(actual, expected):
@@ -180,7 +195,10 @@ def _floating_close_stats(
     """Compare large tensors in bounded chunks to cap verifier peak memory."""
     import torch
 
-    if not isinstance(actual, torch.Tensor) or not isinstance(expected, torch.Tensor):
+    if not isinstance(actual, torch.Tensor) or not isinstance(
+        expected,
+        torch.Tensor,
+    ):
         raise TypeError("floating comparison requires tensor operands")
     dtype = torch.complex64 if actual.is_complex() else torch.float32
     output, reference = actual.reshape(-1), expected.reshape(-1)
@@ -201,14 +219,16 @@ def _floating_close_stats(
         matching_nonfinite = matching_negative_inf | matching_nan
         if bool(
             ((~torch.isfinite(out)) & ~matching_nonfinite).any()
-            or ((~torch.isfinite(ref)) & ~matching_nonfinite).any()
+            or ((~torch.isfinite(ref)) & ~matching_nonfinite).any(),
         ):
             raise VerificationError("non-finite tensor values are not allowed")
         if bool(matching_nonfinite.any()):
             finite = ~matching_nonfinite
             out, ref = out[finite], ref[finite]
         difference = (out - ref).abs()
-        matched_count += int((difference <= atol + rtol * ref.abs()).sum().item())
+        matched_count += int(
+            (difference <= atol + rtol * ref.abs()).sum().item(),
+        )
         finite_count += difference.numel()
         if difference.numel():
             max_abs = max(max_abs, float(difference.max().item()))
@@ -219,11 +239,11 @@ def _floating_close_stats(
     if matched_ratio < required_matched_ratio:
         raise VerificationError(
             f"numerical mismatch: matched_ratio={matched_ratio:.6g}, "
-            f"required={required_matched_ratio:.6g}, max_abs={max_abs:.6g}"
+            f"required={required_matched_ratio:.6g}, max_abs={max_abs:.6g}",
         )
     if max_error_cap is not None and max_abs > max_error_cap:
         raise VerificationError(
-            f"maximum error {max_abs:.6g} exceeds cap {max_error_cap:.6g}"
+            f"maximum error {max_abs:.6g} exceeds cap {max_error_cap:.6g}",
         )
     stats = {"max_abs_error": max_abs, "matched_ratio": matched_ratio}
     if allow_matching_nan and matching_nan_count:
@@ -232,7 +252,8 @@ def _floating_close_stats(
 
 
 def pattern_inputs(
-    inputs: tuple[DynamicValue, ...], pattern: str
+    inputs: tuple[DynamicValue, ...],
+    pattern: str,
 ) -> tuple[DynamicValue, ...]:
     """Apply a deterministic verification pattern to tensor inputs."""
     import torch
@@ -247,16 +268,18 @@ def pattern_inputs(
         if pattern == "boundary":
             if value.is_floating_point():
                 flat = torch.arange(value.numel(), device=value.device).reshape(
-                    value.shape
+                    value.shape,
                 )
                 return ((flat % 3) - 1).to(value.dtype)
             if value.dtype == torch.bool:
                 flat = torch.arange(value.numel(), device=value.device).reshape(
-                    value.shape
+                    value.shape,
                 )
                 return (flat % 2).bool()
             return torch.zeros_like(value)
-        raise VerificationError(f"unknown verification input pattern: {pattern}")
+        raise VerificationError(
+            f"unknown verification input pattern: {pattern}",
+        )
 
     return tuple(transform(value) for value in inputs)
 

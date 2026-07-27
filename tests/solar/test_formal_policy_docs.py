@@ -10,7 +10,7 @@ def test_formal_policy_docs_separate_paper_bound_from_cli_publication():
     scoring = (ROOT / "docs" / "SCORING-V3.md").read_text(encoding="utf-8")
     boundary = (ROOT / "docs" / "SOLAR-BOUNDARY.md").read_text(encoding="utf-8")
     configuration = (ROOT / "docs" / "user" / "CONFIGURATION.md").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     for text in (scoring, boundary):

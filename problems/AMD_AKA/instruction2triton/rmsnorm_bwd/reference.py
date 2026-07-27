@@ -7,7 +7,7 @@ def run(x, g, grad_output):
     xr = x.clone().detach().requires_grad_()
     gr = g.clone().detach().requires_grad_()
     rms = torch.sqrt(
-        torch.sum(xr.float() ** 2, dim=-1, keepdim=True) * (1.0 / xr.shape[-1])
+        torch.sum(xr.float() ** 2, dim=-1, keepdim=True) * (1.0 / xr.shape[-1]),
     )
     y = (xr.float() / rms * gr.float()).to(x.dtype)
     y.backward(grad_output)

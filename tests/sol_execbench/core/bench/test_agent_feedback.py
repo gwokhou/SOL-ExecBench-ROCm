@@ -12,9 +12,11 @@ from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackBuildRequest,
     AgentFeedbackSidecar,
     artifact_citation_from_path,
-    build_agent_feedback_sidecar as _build_agent_feedback_sidecar,
     evaluate_agent_feedback_governance,
     validate_agent_feedback_freshness,
+)
+from sol_execbench.core.bench.agent_feedback import (
+    build_agent_feedback_sidecar as _build_agent_feedback_sidecar,
 )
 from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticArtifactCitation,
@@ -69,15 +71,21 @@ def build_agent_feedback_sidecar(
                 generated_at=generated_at,
             ),
             artifact_citations=artifact_citations,
-        )
+        ),
     )
 
 
 def _trace(status: EvaluationStatus = EvaluationStatus.PASSED) -> Trace:
     correctness = None
     performance = None
-    if status in {EvaluationStatus.PASSED, EvaluationStatus.INCORRECT_NUMERICAL}:
-        correctness = Correctness(max_relative_error=0.0, max_absolute_error=0.0)
+    if status in {
+        EvaluationStatus.PASSED,
+        EvaluationStatus.INCORRECT_NUMERICAL,
+    }:
+        correctness = Correctness(
+            max_relative_error=0.0,
+            max_absolute_error=0.0,
+        )
     if status == EvaluationStatus.PASSED:
         performance = Performance(
             latency_ms=1.0,
@@ -94,7 +102,10 @@ def _trace(status: EvaluationStatus = EvaluationStatus.PASSED) -> Trace:
         ),
         evaluation=Evaluation(
             status=status,
-            environment=Environment(hardware="AMD gfx1200", libs={"hip": "7.0"}),
+            environment=Environment(
+                hardware="AMD gfx1200",
+                libs={"hip": "7.0"},
+            ),
             timestamp="2026-06-16T00:00:00Z",
             correctness=correctness,
             performance=performance,
@@ -171,7 +182,9 @@ def test_agent_feedback_sidecar_is_diagnostic_only_for_passing_trace():
     assert "Canonical Trace JSONL remains" in payload["limitations"][1]
 
 
-def test_agent_feedback_sidecar_builder_emits_no_legacy_identity_aliases() -> None:
+def test_agent_feedback_sidecar_builder_emits_no_legacy_identity_aliases() -> (
+    None
+):
     sidecar = build_agent_feedback_sidecar(
         traces=[_trace()],
         trace_path="trace.jsonl",
@@ -261,7 +274,7 @@ def test_agent_feedback_sidecar_records_identity_and_artifact_citations(
             "path": "trace.jsonl",
             "sha256": citation.sha256,
             "status": None,
-        }
+        },
     ]
     assert citation.sha256 is not None
     assert len(citation.sha256) == 64
@@ -285,14 +298,19 @@ def test_agent_feedback_sidecar_freshness_uses_canonical_sol_version() -> None:
         source_sha256="source-sha",
         sol_version="v3.0.0",
     )
-    stale = validate_agent_feedback_freshness(sidecar, sol_version="v3.0.0-stale")
+    stale = validate_agent_feedback_freshness(
+        sidecar,
+        sol_version="v3.0.0-stale",
+    )
 
     assert current.status == "current"
     assert stale.status == "stale"
     assert stale.reason_codes == ["sol_version_mismatch"]
 
 
-def test_agent_feedback_freshness_validation_classifies_identity(tmp_path: Path):
+def test_agent_feedback_freshness_validation_classifies_identity(
+    tmp_path: Path,
+):
     trace_path = tmp_path / "trace.jsonl"
     sidecar = build_agent_feedback_sidecar(
         traces=[_trace()],
@@ -386,7 +404,7 @@ def test_agent_feedback_sidecar_summarizes_failures_and_optional_profile():
 
 def test_agent_feedback_sidecar_includes_trace_feedback_items() -> None:
     sidecar = build_agent_feedback_sidecar(
-        traces=[_trace(EvaluationStatus.COMPILE_ERROR)]
+        traces=[_trace(EvaluationStatus.COMPILE_ERROR)],
     )
     payload = sidecar.model_dump(mode="json")
 
@@ -416,7 +434,7 @@ def test_agent_feedback_authority_freezes_diagnostic_boundary():
 
 def test_agent_feedback_sidecar_rejects_unknown_bottleneck():
     sidecar = build_agent_feedback_sidecar(
-        traces=[_trace(EvaluationStatus.COMPILE_ERROR)]
+        traces=[_trace(EvaluationStatus.COMPILE_ERROR)],
     )
     payload = sidecar.model_dump(mode="json")
     payload["items"][0]["bottleneck"] = "ad_hoc_bottleneck"
@@ -463,7 +481,7 @@ def test_agent_feedback_governance_guardrail_states_remain_diagnostic_only(
 
 def test_agent_feedback_governance_rejects_unknown_authority_field():
     guardrail = evaluate_agent_feedback_governance(
-        sidecar=build_agent_feedback_sidecar(traces=[_trace()])
+        sidecar=build_agent_feedback_sidecar(traces=[_trace()]),
     )
     payload = guardrail.model_dump(mode="json")
     payload["unsupported_authority"] = True

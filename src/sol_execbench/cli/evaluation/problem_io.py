@@ -13,17 +13,19 @@ from pathlib import Path
 import click
 import yaml
 
-from ...core.bench.config import BenchmarkConfig
-from ...core.data.definition import Definition
-from ...core.data.json_utils import load_json_file, load_jsonl_file
-from ...core.data.solution import Solution
-from ...core.data.workload import Workload
-from ...core.platform.runtime import detect_rocm_device
-from ..protocol import EXIT_UNAVAILABLE, CliFailure
+from sol_execbench.cli.protocol import EXIT_UNAVAILABLE, CliFailure
+from sol_execbench.core.bench.config import BenchmarkConfig
+from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.json_utils import load_json_file, load_jsonl_file
+from sol_execbench.core.data.solution import Solution
+from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.platform.runtime import detect_rocm_device
 
 
 @dataclass(frozen=True)
 class ResolvedProblemInputs:
+    """Resolved paths for one evaluation's problem inputs."""
+
     definition_file: Path
     workload_file: Path
     solution_file: Path
@@ -84,7 +86,10 @@ __all__ = [
 ]
 
 
-def require_materialized_target_match(problem_dir: Path | None, device: str) -> None:
+def require_materialized_target_match(
+    problem_dir: Path | None,
+    device: str,
+) -> None:
     """Reject a target-specific problem tree on a different exact GPU."""
     if problem_dir is None:
         return
@@ -132,7 +137,9 @@ def _resolve_problem_dir(
     cfg_path = problem_dir / "config.json"
     sol_path = problem_dir / "solution.json"
     if not def_path.exists():
-        raise click.ClickException(f"definition.json not found in {problem_dir}")
+        raise click.ClickException(
+            f"definition.json not found in {problem_dir}",
+        )
     if not wkl_path.exists():
         raise click.ClickException(f"workload.jsonl not found in {problem_dir}")
     return (
@@ -151,6 +158,7 @@ def resolve_problem_inputs(
     solution_file: Path | None,
     config_file: Path | None,
 ) -> ResolvedProblemInputs:
+    """Resolve problem-directory and explicit-file CLI inputs."""
     if problem_dir:
         def_path = problem_dir / "definition.json"
         wkl_path = problem_dir / "workload.jsonl"
@@ -160,12 +168,14 @@ def resolve_problem_inputs(
         if definition_file is None:
             if not def_path.exists():
                 raise click.ClickException(
-                    f"definition.json not found in {problem_dir}"
+                    f"definition.json not found in {problem_dir}",
                 )
             definition_file = def_path
         if workload_file is None:
             if not wkl_path.exists():
-                raise click.ClickException(f"workload.jsonl not found in {problem_dir}")
+                raise click.ClickException(
+                    f"workload.jsonl not found in {problem_dir}",
+                )
             workload_file = wkl_path
         if config_file is None and cfg_path.exists():
             config_file = cfg_path
@@ -178,7 +188,7 @@ def resolve_problem_inputs(
         raise click.ClickException("Provide PROBLEM_DIR or --workload")
     if not solution_file:
         raise click.ClickException(
-            "Provide PROBLEM_DIR with solution.json or --solution"
+            "Provide PROBLEM_DIR with solution.json or --solution",
         )
 
     return ResolvedProblemInputs(

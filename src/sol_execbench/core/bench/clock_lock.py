@@ -32,7 +32,9 @@ from pydantic import ValidationError
 
 from sol_execbench.core.platform.amd_smi import parse_performance_levels
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
-from sol_execbench.core.process.environment import ENV_SOL_EXECBENCH_CLOCKS_LOCKED
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_CLOCKS_LOCKED,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,14 +52,30 @@ class ClockLockLease:
 
     locked: bool
     acquired: bool
-    _released: bool = field(default=False, init=False, repr=False, compare=False)
+    _released: bool = field(
+        default=False,
+        init=False,
+        repr=False,
+        compare=False,
+    )
     _previous_environment: str | None = field(
-        default=None, init=False, repr=False, compare=False
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
     )
     _environment_published: bool = field(
-        default=False, init=False, repr=False, compare=False
+        default=False,
+        init=False,
+        repr=False,
+        compare=False,
     )
-    _detached: bool = field(default=False, init=False, repr=False, compare=False)
+    _detached: bool = field(
+        default=False,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     @property
     def active(self) -> bool:
@@ -93,25 +111,31 @@ class ClockLockLease:
         self._detached = True
 
     def __del__(self) -> None:
+        """Report leaked active leases without raising during finalization."""
         try:
             if self.active:
                 logger.error(
                     "gpu_clock_lease_leaked: owned STABLE_PEAK lease was "
-                    "garbage-collected without release or detach"
+                    "garbage-collected without release or detach",
                 )
-        except BaseException:
+        except BaseException:  # noqa: BLE001 -- destructor must not escape
             # Destructors must never turn observability into shutdown failure.
             pass
 
-    def __enter__(self) -> "ClockLockLease":
+    def __enter__(self) -> ClockLockLease:
+        """Return this lease for context-managed use."""
         return self
 
     def publish_environment(self) -> None:
         """Publish verified state while retaining the previous environment."""
         if self._environment_published:
             return
-        self._previous_environment = os.environ.get(ENV_SOL_EXECBENCH_CLOCKS_LOCKED)
-        os.environ[ENV_SOL_EXECBENCH_CLOCKS_LOCKED] = "1" if self.locked else "0"
+        self._previous_environment = os.environ.get(
+            ENV_SOL_EXECBENCH_CLOCKS_LOCKED,
+        )
+        os.environ[ENV_SOL_EXECBENCH_CLOCKS_LOCKED] = (
+            "1" if self.locked else "0"
+        )
         self._environment_published = True
 
     def restore_environment(self) -> None:
@@ -121,7 +145,9 @@ class ClockLockLease:
         if self._previous_environment is None:
             os.environ.pop(ENV_SOL_EXECBENCH_CLOCKS_LOCKED, None)
         else:
-            os.environ[ENV_SOL_EXECBENCH_CLOCKS_LOCKED] = self._previous_environment
+            os.environ[ENV_SOL_EXECBENCH_CLOCKS_LOCKED] = (
+                self._previous_environment
+            )
         self._environment_published = False
 
     def __exit__(
@@ -130,6 +156,7 @@ class ClockLockLease:
         exc_value: BaseException | None,
         traceback: object,
     ) -> None:
+        """Release the lease while preserving an active body exception."""
         if self.release():
             return
         message = "failed to reset and verify every GPU at AUTO"
@@ -144,7 +171,8 @@ def _amd_smi_executable() -> str:
 
 
 def _has_command_failure(
-    result: subprocess.CompletedProcess, markers: tuple[str, ...]
+    result: subprocess.CompletedProcess,
+    markers: tuple[str, ...],
 ) -> str | None:
     output_parts = []
     for value in (result.stdout, result.stderr):
@@ -164,12 +192,19 @@ def _has_command_failure(
 
 def _run_checked_amd_smi(command: list[str]) -> subprocess.CompletedProcess:
     result = subprocess.run(
-        command, check=True, capture_output=True, text=True, timeout=30
+        command,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     failure = _has_command_failure(result, AMD_SMI_FAILURE_MARKERS)
     if failure:
         raise subprocess.CalledProcessError(
-            result.returncode, command, output=result.stdout, stderr=result.stderr
+            result.returncode,
+            command,
+            output=result.stdout,
+            stderr=result.stderr,
         )
     return result
 
@@ -230,6 +265,7 @@ def probe_clock_lock_available() -> bool:
                 ["sudo", "-n", "-l", "--", *command],
                 capture_output=True,
                 timeout=10,
+                check=False,
             ).returncode
             == 0
             for command in commands
@@ -256,7 +292,9 @@ def acquire_clock_lock() -> ClockLockLease:
     if initial_levels is None:
         return ClockLockLease(locked=False, acquired=False)
     if _levels_are(initial_levels, "STABLE_PEAK"):
-        logger.info("GPU clocks are already at STABLE_PEAK; preserving external lock")
+        logger.info(
+            "GPU clocks are already at STABLE_PEAK; preserving external lock",
+        )
         return ClockLockLease(locked=True, acquired=False)
     if not _levels_are(initial_levels, "AUTO"):
         logger.warning(
@@ -276,7 +314,7 @@ def acquire_clock_lock() -> ClockLockLease:
                 "set",
                 "-l",
                 "STABLE_PEAK",
-            ]
+            ],
         )
         logger.info("GPU clock locked to STABLE_PEAK")
         logger.info("Waiting %ss for clocks to stabilize...", VERIFY_DELAY_S)
@@ -325,8 +363,10 @@ def unlock_clocks() -> bool:
     GPU was verified back in AUTO mode.
     """
     try:
-        _run_checked_amd_smi(["sudo", "-n", _amd_smi_executable(), "set", "-l", "AUTO"])
-    except Exception as e:
+        _run_checked_amd_smi(
+            ["sudo", "-n", _amd_smi_executable(), "set", "-l", "AUTO"],
+        )
+    except Exception as e:  # noqa: BLE001 -- Cleanup must never mask callers
         logger.warning("Failed to unlock clocks: %s", e)
         return False
     if not _all_gpus_at_level("AUTO"):

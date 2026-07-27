@@ -45,7 +45,7 @@ try:
     _ready = _worker.stdout.readline().strip() if _worker.stdout else ""
     if _ready != "READY":
         raise RuntimeError(
-            f"trusted reference worker failed before readiness (exit={_worker.poll()})"
+            f"trusted reference worker failed before readiness (exit={_worker.poll()})",
         )
     if _worker.stdout is not None:
         _worker.stdout.close()

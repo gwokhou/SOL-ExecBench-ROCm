@@ -26,32 +26,53 @@ from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
 
 
 class PreparedAnalysisView(Protocol):
-    @property
-    def source(self) -> Path: ...
+    """Read-only prepared-analysis fields consumed by report serialization."""
 
     @property
-    def semantic_graph(self) -> bool: ...
+    def source(self) -> Path:
+        """Return the source graph path."""
+        ...
 
     @property
-    def semantic_complete(self) -> bool: ...
+    def semantic_graph(self) -> bool:
+        """Return whether the graph uses executable semantics."""
+        ...
 
     @property
-    def requested_precision(self) -> str: ...
+    def semantic_complete(self) -> bool:
+        """Return whether every layer has complete semantics."""
+        ...
 
     @property
-    def fallback_precision(self) -> str: ...
+    def requested_precision(self) -> str:
+        """Return the requested compute precision."""
+        ...
 
     @property
-    def element_size(self) -> float: ...
+    def fallback_precision(self) -> str:
+        """Return the fallback compute precision."""
+        ...
 
     @property
-    def profile(self) -> ArchitectureProfile | None: ...
+    def element_size(self) -> float:
+        """Return the modeled element size in bytes."""
+        ...
 
     @property
-    def strict(self) -> bool: ...
+    def profile(self) -> ArchitectureProfile | None:
+        """Return the loaded architecture profile, if available."""
+        ...
+
+    @property
+    def strict(self) -> bool:
+        """Return whether formal strict analysis is required."""
+        ...
 
 
-def _orojenesis_elements(orojenesis: NodeDict, element_size: float) -> float | None:
+def _orojenesis_elements(
+    orojenesis: NodeDict,
+    element_size: float,
+) -> float | None:
     if not orojenesis["layers"] and not orojenesis["chains"]:
         return None
     return sum(
@@ -80,7 +101,9 @@ def _analysis_totals(
         "macs": int(accumulator.total_macs),
         "other_ops": int(accumulator.total_other_ops),
         "flops": int(accumulator.total_flops),
-        "macs_by_precision": dict(sorted(accumulator.macs_by_precision.items())),
+        "macs_by_precision": dict(
+            sorted(accumulator.macs_by_precision.items()),
+        ),
         "resource_work": {
             resource: dict(sorted(modes.items()))
             for resource, modes in sorted(accumulator.resource_work.items())
@@ -90,7 +113,8 @@ def _analysis_totals(
         "unfused_elements": int(accumulator.total_unfused_elems),
         "unfused_bytes": accumulator.total_unfused_bytes,
         "orojenesis_elements": _orojenesis_elements(
-            formal.orojenesis, prepared.element_size
+            formal.orojenesis,
+            prepared.element_size,
         ),
         "fused_elements": io_totals.fused_elements,
         "fused_bytes": formal.audited_fused_bytes,
@@ -119,10 +143,14 @@ def _analysis_metadata(
         "fallback_precision": prepared.fallback_precision,
         "bytes_per_element": prepared.element_size,
         "dtype_accounting": (
-            "fallback_global" if accumulator.used_dtype_fallback else "per_tensor"
+            "fallback_global"
+            if accumulator.used_dtype_fallback
+            else "per_tensor"
         ),
         "source_graph": str(prepared.source),
-        "source_graph_sha256": hashlib.sha256(prepared.source.read_bytes()).hexdigest(),
+        "source_graph_sha256": hashlib.sha256(
+            prepared.source.read_bytes(),
+        ).hexdigest(),
         "fusion": formal.fusion,
         "orojenesis": formal.orojenesis,
         "bound_kind": (

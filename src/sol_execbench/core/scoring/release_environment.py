@@ -104,7 +104,7 @@ def _validated_identity(
         raise ValueError("release environment source revision is invalid")
     if _CONTAINER_IMAGE_ID.fullmatch(container_image_id) is None:
         raise ValueError(
-            f"{CONTAINER_IMAGE_ID_ENV} must be an immutable sha256 image ID"
+            f"{CONTAINER_IMAGE_ID_ENV} must be an immutable sha256 image ID",
         )
     return ReleaseExecutionIdentity(source_revision, container_image_id)
 

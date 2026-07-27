@@ -34,7 +34,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 import pytest
 import torch
@@ -57,8 +56,8 @@ def _stage_evaluation_templates(tmp_path: Path) -> None:
 def parse_eval_result(stdout: str, stderr: str) -> list[dict]:
     """Parse JSONL Trace dicts from eval_driver stdout."""
     traces = []
-    for line in stdout.splitlines():
-        line = line.strip()
+    for raw_line in stdout.splitlines():
+        line = raw_line.strip()
         if line.startswith("{"):
             traces.append(json.loads(line))
     return traces
@@ -133,10 +132,10 @@ def _stage_definitions(tmp_path: Path, definition: dict) -> None:
 def _run_eval_driver(
     tmp_path: Path,
     kernel_code: str,
-    bench_config: Optional[dict] = None,
-    extra_env: Optional[dict] = None,
-    definition: Optional[dict] = None,
-    workload: Optional[dict] = None,
+    bench_config: dict | None = None,
+    extra_env: dict | None = None,
+    definition: dict | None = None,
+    workload: dict | None = None,
 ) -> list[dict]:
     """Write all staging files and run eval_driver.py in a subprocess.
 
@@ -148,9 +147,11 @@ def _run_eval_driver(
             warnings on machines where clock locking is not available.
         extra_env: Additional environment variables for the subprocess.
         definition: Problem definition dict. Defaults to ``_MINIMAL_DEFINITION``.
+        workload: Workload dict. Defaults to ``_MINIMAL_WORKLOAD``.
 
     Returns:
         List of Trace dicts parsed from the driver's stdout.
+
     """
     result = _run_eval_driver_process(
         tmp_path,
@@ -166,10 +167,10 @@ def _run_eval_driver(
 def _run_eval_driver_process(
     tmp_path: Path,
     kernel_code: str,
-    bench_config: Optional[dict] = None,
-    extra_env: Optional[dict] = None,
-    definition: Optional[dict] = None,
-    workload: Optional[dict] = None,
+    bench_config: dict | None = None,
+    extra_env: dict | None = None,
+    definition: dict | None = None,
+    workload: dict | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run the isolated reference/candidate workflow and return its result."""
     _stage_evaluation_templates(tmp_path)
@@ -178,7 +179,7 @@ def _run_eval_driver_process(
         definition if definition is not None else _MINIMAL_DEFINITION,
     )
     (tmp_path / "workload.jsonl").write_text(
-        json.dumps(workload if workload is not None else _MINIMAL_WORKLOAD)
+        json.dumps(workload if workload is not None else _MINIMAL_WORKLOAD),
     )
     solution = {
         **_SOLUTION_SPEC,
@@ -187,7 +188,7 @@ def _run_eval_driver_process(
     (tmp_path / "solution.json").write_text(json.dumps(solution))
     (tmp_path / "kernel.py").write_text(kernel_code)
 
-    # Default config: disable clock-locking for machines without ROCm clock access.
+    # Disable clock locking by default where ROCm clock access is absent.
     cfg = (
         bench_config
         if bench_config is not None
@@ -229,7 +230,9 @@ def test_reference_source_is_removed_before_candidate_execution(tmp_path):
     assert result.returncode == 0
     assert not (tmp_path / TRUSTED_DEFINITION_FILE).exists()
     assert not (tmp_path / "_reference.py").exists()
-    candidate_definition = json.loads((tmp_path / "definition.json").read_text())
+    candidate_definition = json.loads(
+        (tmp_path / "definition.json").read_text(),
+    )
     assert candidate_definition["reference"] != _MINIMAL_DEFINITION["reference"]
 
 
@@ -286,7 +289,7 @@ def test_custom_inputs_success_path_is_cpu_safe(tmp_path):
         "    return {\n"
         "        'a': torch.ones((axes['m'], axes['k']), device=device),\n"
         "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
-        "    }\n"
+        "    }\n",
     )
     kernel = "import torch\ndef run(a, b):\n    return a @ b\n"
 
@@ -308,7 +311,7 @@ def test_custom_inputs_schema_mismatch_preempts_reference_run(tmp_path):
         "    return {\n"
         "        'a': torch.ones((axes['m'], axes['k'] + 1), device=device),\n"
         "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
-        "    }\n"
+        "    }\n",
     )
     kernel = "import torch\ndef run(a, b):\n    return a @ b\n"
 
@@ -330,13 +333,15 @@ def test_custom_inputs_schema_mismatch_preempts_reference_run(tmp_path):
 def test_custom_inputs_device_mismatch_preempts_reference_run(tmp_path):
     """Wrong-device generated tensors are classified before reference run()."""
     if torch.cuda.is_available():
-        pytest.skip("CPU mismatch path only applies when CUDA/HIP is unavailable")
+        pytest.skip(
+            "CPU mismatch path only applies when CUDA/HIP is unavailable",
+        )
     definition = _custom_inputs_definition(
         "def generate_inputs(axes, device):\n"
         "    return {\n"
         "        'a': torch.ones((axes['m'], axes['k']), device='meta'),\n"
         "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
-        "    }\n"
+        "    }\n",
     )
     kernel = "import torch\ndef run(a, b):\n    return a @ b\n"
 
@@ -357,7 +362,7 @@ def test_custom_inputs_non_oom_generation_error_class(tmp_path):
     """Non-OOM generation failures stay separate from reference failures."""
     definition = _custom_inputs_definition(
         "def generate_inputs(axes, device):\n"
-        "    raise RuntimeError('synthetic generation failure')\n"
+        "    raise RuntimeError('synthetic generation failure')\n",
     )
     kernel = "import torch\ndef run(a, b):\n    return a @ b\n"
 
@@ -462,7 +467,7 @@ def test_custom_inputs_use_a_distinct_seed_for_each_correctness_round(tmp_path):
         "    return {\n"
         "        'a': torch.full((axes['m'], axes['k']), value, device=device),\n"
         "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
-        "    }\n"
+        "    }\n",
     )
     kernel = (
         "_saved = None\n"
@@ -501,9 +506,7 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     _stage_evaluation_templates(tmp_path)
     _stage_definitions(tmp_path, definition)
     (tmp_path / "workload.jsonl").write_text(json.dumps(workload))
-    kernel = (
-        "def run(x):\n    original = x.clone()\n    x.add_(1)\n    return original\n"
-    )
+    kernel = "def run(x):\n    original = x.clone()\n    x.add_(1)\n    return original\n"
     solution = {
         **_SOLUTION_SPEC,
         "definition": "test_alias_freeze",
@@ -512,7 +515,7 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     (tmp_path / "solution.json").write_text(json.dumps(solution))
     (tmp_path / "kernel.py").write_text(kernel)
     (tmp_path / "config.json").write_text(
-        json.dumps({"lock_clocks": False, "benchmark_reference": False})
+        json.dumps({"lock_clocks": False, "benchmark_reference": False}),
     )
 
     result = subprocess.run(
@@ -548,7 +551,9 @@ def test_noisy_user_stdout_stays_out_of_trace_jsonl(tmp_path):
 
     assert len(traces) == 1
     assert traces[0]["evaluation"]["status"] == "PASSED"
-    assert all(json.loads(line) for line in result.stdout.splitlines() if line.strip())
+    assert all(
+        json.loads(line) for line in result.stdout.splitlines() if line.strip()
+    )
     assert "import noise from solution" not in result.stdout
     assert "run noise from solution" not in result.stdout
     assert "import noise from solution" in result.stderr
@@ -779,7 +784,9 @@ def test_static_source_review_blocks_semantic_cache(tmp_path):
     assert "semantic_output_cache" in ev.get("log", "")
 
 
-def test_static_source_review_flags_precision_downgrade_without_blocking(tmp_path):
+def test_static_source_review_flags_precision_downgrade_without_blocking(
+    tmp_path,
+):
     """Internal downcasts are diagnostic; runtime correctness remains authoritative."""
     kernel = "def run(x, y):\n    return (x.half() + y.half()).float()\n"
     traces = _run_eval_driver(tmp_path, kernel)
@@ -804,9 +811,7 @@ def test_nan_kernel_produces_valid_json(tmp_path):
     Strict parsers (e.g., Rust serde_json) reject the entire line, silently
     dropping the trace.  The fix sanitizes NaN/Inf to null before dumping.
     """
-    kernel = (
-        "import torch\n\ndef run(x, y):\n    return torch.full_like(x, float('nan'))\n"
-    )
+    kernel = "import torch\n\ndef run(x, y):\n    return torch.full_like(x, float('nan'))\n"
     traces = _run_eval_driver(tmp_path, kernel)
 
     assert len(traces) == 1
@@ -827,9 +832,7 @@ def test_nan_kernel_produces_valid_json(tmp_path):
 
 def test_inf_kernel_produces_valid_json(tmp_path):
     """Kernel that outputs Inf must produce strictly valid JSON traces."""
-    kernel = (
-        "import torch\n\ndef run(x, y):\n    return torch.full_like(x, float('inf'))\n"
-    )
+    kernel = "import torch\n\ndef run(x, y):\n    return torch.full_like(x, float('inf'))\n"
     traces = _run_eval_driver(tmp_path, kernel)
 
     assert len(traces) == 1
@@ -847,9 +850,7 @@ def test_inf_kernel_produces_valid_json(tmp_path):
 
 def test_nan_correctness_fields_are_finite_with_flags(tmp_path):
     """NaN outputs must produce finite correctness values with has_nan=True."""
-    kernel = (
-        "import torch\n\ndef run(x, y):\n    return torch.full_like(x, float('nan'))\n"
-    )
+    kernel = "import torch\n\ndef run(x, y):\n    return torch.full_like(x, float('nan'))\n"
     traces = _run_eval_driver(tmp_path, kernel)
 
     assert len(traces) == 1

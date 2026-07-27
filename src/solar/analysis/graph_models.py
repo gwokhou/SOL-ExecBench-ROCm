@@ -11,6 +11,8 @@ from solar.common.types import GraphValue, NodeDict
 
 @dataclass(frozen=True, slots=True)
 class LayerData:
+    """Normalized metadata for one graph layer."""
+
     layer_id: str
     layer: NodeDict
     op_type: str
@@ -32,6 +34,8 @@ class LayerData:
 
 @dataclass(frozen=True, slots=True)
 class LayerCompute:
+    """Computed operation counts for one layer."""
+
     is_real_einsum: bool
     macs: int
     other_ops: int
@@ -40,6 +44,8 @@ class LayerCompute:
 
 @dataclass(frozen=True, slots=True)
 class MemoryElements:
+    """Element-level memory accounting for one layer."""
+
     reads: list[int]
     writes: list[int]
     other_ops: int
@@ -48,6 +54,8 @@ class MemoryElements:
 
 @dataclass(frozen=True, slots=True)
 class MemoryBytes:
+    """Byte-level memory accounting for one layer."""
+
     input_elems: int
     output_elems: int
     unfused_elems: int
@@ -59,12 +67,16 @@ class MemoryBytes:
 
 @dataclass(frozen=True, slots=True)
 class ResourceAccounting:
+    """Per-resource work attributed to one layer."""
+
     compute_precision: str
     resources: NodeDict
 
 
 @dataclass(frozen=True, slots=True)
 class InputIo:
+    """Classified input traffic for one layer."""
+
     intermediate_elems: int
     model_elems: int
     intermediate_bytes: float
@@ -73,6 +85,8 @@ class InputIo:
 
 @dataclass(frozen=True, slots=True)
 class OutputIo:
+    """Classified output traffic for one layer."""
+
     intermediate_elems: int
     model_elems: int
     intermediate_bytes: float
@@ -82,6 +96,8 @@ class OutputIo:
 
 @dataclass(frozen=True, slots=True)
 class LayerIo:
+    """Combined input and output traffic for one layer."""
+
     intermediate_elems: int
     intermediate_bytes: float
     model_elems: int
@@ -92,6 +108,8 @@ class LayerIo:
 
 @dataclass(frozen=True, slots=True)
 class AnalyzedLayer:
+    """Completed accounting result for one layer."""
+
     payload: NodeDict
     macs: int
     other_ops: int
@@ -104,6 +122,8 @@ class AnalyzedLayer:
 
 @dataclass(slots=True)
 class AnalysisAccumulator:
+    """Mutable totals accumulated while traversing a graph."""
+
     layers: dict[str, NodeDict] = field(default_factory=dict)
     total_macs: int = 0
     total_other_ops: int = 0
@@ -112,10 +132,12 @@ class AnalysisAccumulator:
     total_intermediate_elems: int = 0
     total_unfused_bytes: float = 0.0
     total_intermediate_bytes: float = 0.0
-    macs_by_precision: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    macs_by_precision: dict[str, int] = field(
+        default_factory=lambda: defaultdict(int),
+    )
     resource_work: dict[str, dict[str, int]] = field(default_factory=dict)
     resource_coverage: dict[str, int] = field(
-        default_factory=lambda: {"modeled": 0, "exempt": 0, "unclassified": 0}
+        default_factory=lambda: {"modeled": 0, "exempt": 0, "unclassified": 0},
     )
     unique_external_inputs: dict[str, int] = field(default_factory=dict)
     unique_external_outputs: dict[str, int] = field(default_factory=dict)
@@ -125,6 +147,7 @@ class AnalysisAccumulator:
     used_dtype_fallback: bool = False
 
     def record(self, layer_id: str, analyzed: AnalyzedLayer) -> None:
+        """Add one analyzed layer to the aggregate totals."""
         self.layers[layer_id] = analyzed.payload
         self.total_macs += analyzed.macs
         self.total_other_ops += analyzed.other_ops
@@ -137,6 +160,8 @@ class AnalysisAccumulator:
 
 @dataclass(frozen=True, slots=True)
 class GraphIoTotals:
+    """Graph-level fused and model-I/O totals."""
+
     fused_elements: int
     fused_bytes: float
     model_io_elements: int
@@ -145,6 +170,8 @@ class GraphIoTotals:
 
 @dataclass(frozen=True, slots=True)
 class FusionPlan:
+    """Fusion regions, chains, and supporting proof layers."""
+
     fusion: NodeDict
     chains: list[list[str]]
     regions: list[NodeDict]
@@ -154,6 +181,8 @@ class FusionPlan:
 
 @dataclass(frozen=True, slots=True)
 class FormalAnalysis:
+    """Audited fusion evidence and tile-aware analysis status."""
+
     fusion: NodeDict | None
     orojenesis: NodeDict
     audited_fused_bytes: float
@@ -163,6 +192,8 @@ class FormalAnalysis:
 
 @dataclass(frozen=True, slots=True)
 class LowerBound:
+    """Computed lower bound and its resource components."""
+
     seconds: float | None
     resource_seconds: dict[str, float]
     compute_resource: str | None

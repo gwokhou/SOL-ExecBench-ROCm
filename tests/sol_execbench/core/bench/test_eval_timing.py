@@ -5,13 +5,15 @@ from typing import cast
 
 import pytest
 import torch
+from sol_execbench_type_helpers import make_workload
 
 from sol_execbench.core.bench import eval_timing
-from sol_execbench.core.bench.evaluation_requests import WorkloadEvaluationRequest
 from sol_execbench.core.bench.eval_runtime import TimingResult
-from sol_execbench.core.bench.reward_hack import RewardHackDetected
+from sol_execbench.core.bench.evaluation_requests import (
+    WorkloadEvaluationRequest,
+)
+from sol_execbench.core.bench.reward_hack import RewardHackError
 from sol_execbench.core.data.workload import Workload
-from sol_execbench_type_helpers import make_workload
 
 
 def _request(*, destination_passing_style: bool = False):
@@ -68,13 +70,17 @@ def test_solution_timing_records_actual_iterations_for_each_trial(monkeypatch):
             TimingResult(latency_ms=1.0, timed_iterations=2),
             TimingResult(latency_ms=2.0, timed_iterations=3),
             TimingResult(latency_ms=3.0, timed_iterations=2),
-        )
+        ),
     )
     monkeypatch.setattr(
-        eval_timing, "_build_timed_output_validator", lambda **kwargs: lambda *_: None
+        eval_timing,
+        "_build_timed_output_validator",
+        lambda **kwargs: lambda *_: None,
     )
     monkeypatch.setattr(
-        eval_timing, "_measure_solution_trial", lambda *args: next(trial_results)
+        eval_timing,
+        "_measure_solution_trial",
+        lambda *args: next(trial_results),
     )
 
     result = eval_timing.measure_solution_latency(
@@ -97,7 +103,9 @@ def test_solution_timing_reports_uniform_actual_iteration_count(monkeypatch):
     )
     workload = cast(Workload, object())
     monkeypatch.setattr(
-        eval_timing, "_build_timed_output_validator", lambda **kwargs: lambda *_: None
+        eval_timing,
+        "_build_timed_output_validator",
+        lambda **kwargs: lambda *_: None,
     )
     monkeypatch.setattr(
         eval_timing,
@@ -117,11 +125,17 @@ def test_solution_timing_reports_uniform_actual_iteration_count(monkeypatch):
     assert result.uniform_timed_iterations == 4
 
 
-def test_measure_solution_trial_passes_outputs_and_benchmark_config(monkeypatch):
+def test_measure_solution_trial_passes_outputs_and_benchmark_config(
+    monkeypatch,
+):
     request, _ = _request(destination_passing_style=True)
     allocated = [torch.empty(4)]
     observed: dict[str, object] = {}
-    monkeypatch.setattr(eval_timing, "allocate_outputs", lambda *_args: allocated)
+    monkeypatch.setattr(
+        eval_timing,
+        "allocate_outputs",
+        lambda *_args: allocated,
+    )
 
     def measure(fn, inputs, outputs, device, **kwargs):
         observed.update(
@@ -139,7 +153,10 @@ def test_measure_solution_trial_passes_outputs_and_benchmark_config(monkeypatch)
         return None
 
     result = eval_timing._measure_solution_trial(
-        request, {"N": 4}, [torch.ones(4)], validator
+        request,
+        {"N": 4},
+        [torch.ones(4)],
+        validator,
     )
 
     assert result.latency_ms == 1.5
@@ -162,7 +179,12 @@ def test_measure_solution_trial_maps_timing_failure(monkeypatch):
     )
 
     with pytest.raises(RuntimeError, match="timing failed"):
-        eval_timing._measure_solution_trial(request, {}, [], lambda *_args: None)
+        eval_timing._measure_solution_trial(
+            request,
+            {},
+            [],
+            lambda *_args: None,
+        )
 
 
 def test_timed_validator_accepts_matching_functional_output() -> None:
@@ -177,7 +199,9 @@ def test_timed_validator_accepts_matching_functional_output() -> None:
 
     validator([torch.zeros(4)], torch.ones(4))
 
-    assert integrity_calls == [({"reference": 1}, request.dependencies.driver_globals)]
+    assert integrity_calls == [
+        ({"reference": 1}, request.dependencies.driver_globals),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -187,7 +211,10 @@ def test_timed_validator_accepts_matching_functional_output() -> None:
         (torch.zeros(4), "differs from the reference"),
     ],
 )
-def test_timed_validator_rejects_shape_and_numerical_changes(actual, message) -> None:
+def test_timed_validator_rejects_shape_and_numerical_changes(
+    actual,
+    message,
+) -> None:
     request, _ = _request()
     validator = eval_timing._build_timed_output_validator(
         request=request,
@@ -196,7 +223,7 @@ def test_timed_validator_rejects_shape_and_numerical_changes(actual, message) ->
         expected=[torch.ones(4)],
     )
 
-    with pytest.raises(RewardHackDetected, match=message):
+    with pytest.raises(RewardHackError, match=message):
         validator([torch.zeros(4)], actual)
 
 

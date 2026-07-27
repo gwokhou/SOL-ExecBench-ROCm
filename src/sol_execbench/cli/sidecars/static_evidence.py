@@ -6,11 +6,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from rich.console import Console
 
-from ...core.bench.static_kernel.evidence import (
+from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceSidecar,
     StaticKernelEvidenceSourceReference,
@@ -21,7 +22,7 @@ from ...core.bench.static_kernel.evidence import (
     collect_static_kernel_artifacts,
     run_static_kernel_extractors,
 )
-from ...core.evidence.runtime_evidence import write_json_payload
+from sol_execbench.core.evidence.runtime_evidence import write_json_payload
 
 console = Console(stderr=True)
 
@@ -29,17 +30,21 @@ STATIC_EVIDENCE_NONE = "none"
 STATIC_EVIDENCE_AUTO = "auto"
 
 
-def _static_evidence_directory(output_file: Path | None, staging_dir: Path) -> Path:
+def _static_evidence_directory(
+    output_file: Path | None,
+    staging_dir: Path,
+) -> Path:
     """Return the static evidence artifact directory for an evaluation run."""
-
     if output_file is not None:
         return output_file.with_name(f"{output_file.name}.static-evidence")
     return staging_dir / "static-evidence"
 
 
-def _static_evidence_sidecar_path(output_file: Path | None, staging_dir: Path) -> Path:
+def _static_evidence_sidecar_path(
+    output_file: Path | None,
+    staging_dir: Path,
+) -> Path:
     """Return the static evidence JSON sidecar path for an evaluation run."""
-
     if output_file is not None:
         return output_file.with_name(f"{output_file.name}.static-evidence.json")
     return staging_dir / "static-evidence.json"
@@ -49,7 +54,6 @@ def _static_evidence_summary(
     sidecar: StaticKernelEvidenceSidecar,
 ) -> dict[str, object]:
     """Return a compact human-facing static evidence summary."""
-
     classification = sidecar.classification
     return {
         "status": sidecar.status,
@@ -86,7 +90,6 @@ def _static_evidence_payload(
     sidecar: StaticKernelEvidenceSidecar,
 ) -> dict[str, object]:
     """Return the JSON sidecar payload with a compact summary section."""
-
     payload = sidecar.model_dump(mode="json")
     payload["summary"] = _static_evidence_summary(sidecar)
     return payload
@@ -98,7 +101,6 @@ def _write_static_evidence_sidecar(
     sidecar: StaticKernelEvidenceSidecar | None,
 ) -> Path | None:
     """Write optional static evidence metadata without changing trace JSONL."""
-
     if sidecar is None:
         return None
 
@@ -107,11 +109,13 @@ def _write_static_evidence_sidecar(
         write_json_payload(sidecar_path, _static_evidence_payload(sidecar))
         console.print(
             "[green]Static evidence "
-            f"{sidecar.status}; saved metadata to {sidecar_path}[/green]"
+            f"{sidecar.status}; saved metadata to {sidecar_path}[/green]",
         )
         return sidecar_path
-    except Exception as exc:
-        console.print(f"[yellow]Static evidence metadata skipped: {exc}[/yellow]")
+    except Exception as exc:  # noqa: BLE001 -- optional metadata sidecar
+        console.print(
+            f"[yellow]Static evidence metadata skipped: {exc}[/yellow]",
+        )
         return None
 
 
@@ -122,17 +126,20 @@ def _collect_static_evidence_for_cli(
     staging_dir: Path,
     output_file: Path | None,
     target_architecture: str | None = None,
-    artifact_collector=collect_static_kernel_artifacts,
-    extractor_runner=run_static_kernel_extractors,
+    artifact_collector: Callable[
+        ..., StaticKernelEvidenceSidecar
+    ] = collect_static_kernel_artifacts,
+    extractor_runner: Callable[
+        ..., StaticKernelEvidenceSidecar
+    ] = run_static_kernel_extractors,
 ) -> StaticKernelEvidenceSidecar | None:
     """Collect optional static evidence for the CLI."""
-
     if enabled == STATIC_EVIDENCE_NONE:
         return None
     evidence_dir = _static_evidence_directory(output_file, staging_dir)
     if not is_cpp:
         return build_static_kernel_evidence_unsupported(
-            StaticKernelEvidenceReasonCode.UNSUPPORTED_SOLUTION_TYPE
+            StaticKernelEvidenceReasonCode.UNSUPPORTED_SOLUTION_TYPE,
         )
     try:
         artifact_sidecar = artifact_collector(
@@ -149,7 +156,7 @@ def _collect_static_evidence_for_cli(
             sidecar_base_directory=evidence_dir,
             analyze_isa=True,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- diagnostic collection boundary
         sidecar = build_static_kernel_evidence_failed()
         return sidecar.model_copy(
             update={
@@ -162,7 +169,7 @@ def _collect_static_evidence_for_cli(
                             value=type(exc).__name__,
                             description="Static evidence collection is nonfatal.",
                         ),
-                    )
-                ]
-            }
+                    ),
+                ],
+            },
         )

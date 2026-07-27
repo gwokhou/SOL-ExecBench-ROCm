@@ -64,7 +64,8 @@ def test_probe_reports_gpu_discovery_failure(capsys, monkeypatch) -> None:
 
 
 def test_probe_reports_target_and_workload_identity_mismatches(
-    capsys, monkeypatch
+    capsys,
+    monkeypatch,
 ) -> None:
     monkeypatch.setattr(
         worker,
@@ -76,16 +77,23 @@ def test_probe_reports_target_and_workload_identity_mismatches(
 
     monkeypatch.setattr(worker, "detect_rocm_device", _matching_device)
     monkeypatch.setattr(
-        worker, "ReferenceService", lambda *_args, **_kwargs: _service()
+        worker,
+        "ReferenceService",
+        lambda *_args, **_kwargs: _service(),
     )
     worker._run_probe(_args(workload_uuid="other"))
     assert _payload(capsys)["reason_code"] == "reference_execution_failed"
 
 
-def test_probe_rejects_oversized_input_and_case_payloads(capsys, monkeypatch) -> None:
+def test_probe_rejects_oversized_input_and_case_payloads(
+    capsys,
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(worker, "detect_rocm_device", _matching_device)
     monkeypatch.setattr(
-        worker, "ReferenceService", lambda *_args, **_kwargs: _service()
+        worker,
+        "ReferenceService",
+        lambda *_args, **_kwargs: _service(),
     )
     monkeypatch.setattr(
         worker,
@@ -96,7 +104,11 @@ def test_probe_rejects_oversized_input_and_case_payloads(capsys, monkeypatch) ->
     worker._run_probe(_args())
     assert _payload(capsys)["reason_code"] == "reference_ipc_payload_limit"
 
-    monkeypatch.setattr(worker, "reference_values_storage_bytes", lambda _inputs: 8)
+    monkeypatch.setattr(
+        worker,
+        "reference_values_storage_bytes",
+        lambda _inputs: 8,
+    )
     monkeypatch.setattr(
         worker,
         "reference_case_storage_bytes",
@@ -108,29 +120,46 @@ def test_probe_rejects_oversized_input_and_case_payloads(capsys, monkeypatch) ->
         lambda *_args, **_kwargs: [torch.ones(2)],
     )
     monkeypatch.setattr(
-        worker, "stable_reference_outputs", lambda outputs, _inputs: outputs
+        worker,
+        "stable_reference_outputs",
+        lambda outputs, _inputs: outputs,
     )
 
     worker._run_probe(_args())
     assert _payload(capsys)["reason_code"] == "reference_ipc_payload_limit"
 
 
-def test_probe_success_exercises_allocator_and_cache(capsys, monkeypatch) -> None:
+def test_probe_success_exercises_allocator_and_cache(
+    capsys,
+    monkeypatch,
+) -> None:
     calls: list[str] = []
     fake_cache = SimpleNamespace(zero_=lambda: calls.append("zero"))
     monkeypatch.setattr(worker, "detect_rocm_device", _matching_device)
     monkeypatch.setattr(
-        worker, "ReferenceService", lambda *_args, **_kwargs: _service()
+        worker,
+        "ReferenceService",
+        lambda *_args, **_kwargs: _service(),
     )
-    monkeypatch.setattr(worker, "reference_values_storage_bytes", lambda _inputs: 8)
-    monkeypatch.setattr(worker, "reference_case_storage_bytes", lambda _case: 16)
+    monkeypatch.setattr(
+        worker,
+        "reference_values_storage_bytes",
+        lambda _inputs: 8,
+    )
+    monkeypatch.setattr(
+        worker,
+        "reference_case_storage_bytes",
+        lambda _case: 16,
+    )
     monkeypatch.setattr(
         worker,
         "call_and_collect_outputs",
         lambda *_args, **_kwargs: [torch.ones(2)],
     )
     monkeypatch.setattr(
-        worker, "stable_reference_outputs", lambda outputs, _inputs: outputs
+        worker,
+        "stable_reference_outputs",
+        lambda outputs, _inputs: outputs,
     )
     monkeypatch.setattr(
         worker,
@@ -141,10 +170,14 @@ def test_probe_success_exercises_allocator_and_cache(capsys, monkeypatch) -> Non
         worker,
         "ShiftingMemoryPoolAllocator",
         lambda *_args: SimpleNamespace(
-            get_unique_args=lambda: calls.append("allocate")
+            get_unique_args=lambda: calls.append("allocate"),
         ),
     )
-    monkeypatch.setattr(worker.torch, "empty", lambda *_args, **_kwargs: fake_cache)
+    monkeypatch.setattr(
+        worker.torch,
+        "empty",
+        lambda *_args, **_kwargs: fake_cache,
+    )
     monkeypatch.setattr(
         worker.torch.cuda,
         "synchronize",
@@ -179,7 +212,11 @@ def test_probe_classifies_execution_failures(
     service = _service()
     service.prepare_inputs = lambda *_args: (_ for _ in ()).throw(exception)
     monkeypatch.setattr(worker, "detect_rocm_device", _matching_device)
-    monkeypatch.setattr(worker, "ReferenceService", lambda *_args, **_kwargs: service)
+    monkeypatch.setattr(
+        worker,
+        "ReferenceService",
+        lambda *_args, **_kwargs: service,
+    )
 
     worker._run_probe(_args())
 

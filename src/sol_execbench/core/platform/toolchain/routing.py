@@ -10,19 +10,21 @@ import shutil
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from .models import (
+from sol_execbench.core.platform.toolchain.models import (
     DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
     ProbeRunner,
-    ToolLifecycle,
     ToolchainCapability,
     ToolchainRoutingDecision,
     ToolchainRoutingReport,
     ToolchainRoutingRequest,
     ToolchainStatus,
+    ToolLifecycle,
     Which,
 )
-from .probes import probe_toolchain_tool
-from .registry import default_toolchain_registry
+from sol_execbench.core.platform.toolchain.probes import probe_toolchain_tool
+from sol_execbench.core.platform.toolchain.registry import (
+    default_toolchain_registry,
+)
 
 
 def build_toolchain_routing_report(
@@ -35,7 +37,6 @@ def build_toolchain_routing_report(
     now: Callable[[], datetime] | None = None,
 ) -> ToolchainRoutingReport:
     """Build a diagnostic routing report for a requested evidence path."""
-
     generated_at = (now or (lambda: datetime.now(UTC)))().isoformat()
     decisions: list[ToolchainRoutingDecision] = []
     effective_registry = registry or default_toolchain_registry()
@@ -69,7 +70,7 @@ def build_toolchain_routing_report(
                     f"{request.evidence_level} and artifact "
                     f"{request.artifact_type}."
                 ),
-            )
+            ),
         )
 
     return ToolchainRoutingReport(
@@ -88,6 +89,7 @@ def decision_for_capability(
     which: Which,
     timeout_seconds: float,
 ) -> ToolchainRoutingDecision | None:
+    """Build a routing decision for one capability and request."""
     if request.evidence_level not in capability.evidence_levels:
         return None
     if request.artifact_type not in capability.artifact_types:
@@ -103,7 +105,8 @@ def decision_for_capability(
             source_refs=capability.source_refs,
         )
     if request.gpu_architecture and not supports_arch(
-        capability, request.gpu_architecture
+        capability,
+        request.gpu_architecture,
     ):
         return ToolchainRoutingDecision(
             tool_id=capability.tool_id,
@@ -159,7 +162,11 @@ def decision_for_capability(
     )
 
 
-def supports_arch(capability: ToolchainCapability, gpu_architecture: str) -> bool:
+def supports_arch(
+    capability: ToolchainCapability,
+    gpu_architecture: str,
+) -> bool:
+    """Return whether a capability supports an architecture."""
     if not capability.gpu_arch_patterns:
         return True
     return any(
@@ -172,6 +179,7 @@ def lifecycle_decision(
     capability: ToolchainCapability,
     status: ToolchainStatus,
 ) -> ToolchainRoutingDecision:
+    """Build a decision for an unavailable lifecycle state."""
     reason_code = f"tool_{status}"
     replacement = (
         f" Use {capability.replacement_tool_id} instead."

@@ -82,8 +82,12 @@ def test_addmm_proof_excludes_the_non_contraction_bias_operand() -> None:
 
 
 @pytest.mark.parametrize("target", ["conv2d", "scaled_dot_product_attention"])
-def test_unmodeled_contractions_are_never_treated_as_proven(target: str) -> None:
+def test_unmodeled_contractions_are_never_treated_as_proven(
+    target: str,
+) -> None:
     layer = _aten_layer(target, [[1, 2, 3, 3], [2, 2, 1, 1]], [1, 2, 3, 3])
 
     assert requires_tile_evidence(layer)
-    assert build_orojenesis_proof_layer(layer, analyzer=EinsumAnalyzer()) is None
+    assert (
+        build_orojenesis_proof_layer(layer, analyzer=EinsumAnalyzer()) is None
+    )

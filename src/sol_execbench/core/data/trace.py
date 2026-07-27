@@ -17,12 +17,15 @@
 """Strong-typed data definitions for traces and evaluations."""
 
 from enum import StrEnum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 
-from .base_model import BaseModelWithDocstrings, NonEmptyString
-from .workload import Workload
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    NonEmptyString,
+)
+from sol_execbench.core.data.workload import Workload
 
 
 class Correctness(BaseModelWithDocstrings):
@@ -45,12 +48,13 @@ class Correctness(BaseModelWithDocstrings):
     """True when the solution or reference output contains NaN values."""
     has_inf: bool = Field(default=False)
     """True when the solution or reference output contains Inf values (but no NaN)."""
-    extra: Optional[dict[str, Any]] = Field(default=None)
+    extra: dict[str, Any] | None = Field(default=None)
     """Extra metrics for correctness evaluation."""
 
     @field_validator("max_relative_error", "max_absolute_error")
     @classmethod
-    def non_negative(cls, v: float):
+    def non_negative(cls, v: float) -> float:
+        """Require a nonnegative correctness metric."""
         if v < 0:
             raise ValueError("must be non-negative")
         return v
@@ -159,9 +163,9 @@ class Evaluation(BaseModelWithDocstrings):
     """Timestamp when the evaluation was performed (ISO format recommended)."""
     log: str = ""
     """Captured stdout/stderr from the evaluation run."""
-    correctness: Optional[Correctness] = None
+    correctness: Correctness | None = None
     """Correctness metrics (present for PASSED and INCORRECT_NUMERICAL status)."""
-    performance: Optional[Performance] = None
+    performance: Performance | None = None
     """Performance metrics (present only for PASSED status)."""
 
     @model_validator(mode="after")
@@ -171,38 +175,39 @@ class Evaluation(BaseModelWithDocstrings):
         Ensures that correctness and performance metrics are present or absent
         based on the evaluation status, following the schema requirements.
 
-        Raises
+        Raises:
         ------
         ValueError
             If correctness/performance presence doesn't match status requirements.
+
         """
         if self.status == EvaluationStatus.PASSED:
             if self.correctness is None:
                 raise ValueError(
-                    f"Evaluation must include correctness when status is {self.status}"
+                    f"Evaluation must include correctness when status is {self.status}",
                 )
             if self.performance is None:
                 raise ValueError(
-                    f"Evaluation must include performance when status is {self.status}"
+                    f"Evaluation must include performance when status is {self.status}",
                 )
         elif self.status == EvaluationStatus.INCORRECT_NUMERICAL:
             if self.correctness is None:
                 raise ValueError(
-                    f"Evaluation must include correctness when status is {self.status}"
+                    f"Evaluation must include correctness when status is {self.status}",
                 )
             if self.performance is not None:
                 raise ValueError(
-                    f"Evaluation must not include performance when status is {self.status}"
+                    f"Evaluation must not include performance when status is {self.status}",
                 )
         else:
-            # For other error statuses, neither correctness nor performance should be present
+            # Other error statuses contain no correctness or performance.
             if self.correctness is not None:
                 raise ValueError(
-                    f"Evaluation must not include correctness when status is {self.status}"
+                    f"Evaluation must not include correctness when status is {self.status}",
                 )
             if self.performance is not None:
                 raise ValueError(
-                    f"Evaluation must not include performance when status is {self.status}"
+                    f"Evaluation must not include performance when status is {self.status}",
                 )
         return self
 
@@ -223,29 +228,34 @@ class Trace(BaseModelWithDocstrings):
     """Name of the Definition that specifies the computational workload."""
     workload: Workload
     """Concrete workload configuration with specific axis values and inputs."""
-    solution: Optional[str] = None
+    solution: str | None = None
     """Name of the Solution implementation (None for workload-only traces)."""
-    evaluation: Optional[Evaluation] = None
+    evaluation: Evaluation | None = None
     """Evaluation results from benchmarking (None for workload-only traces)."""
 
     def is_workload_trace(self) -> bool:
         """Check if this is a workload-only trace.
 
-        Returns
+        Returns:
         -------
         bool
             True if this is a workload trace without solution/evaluation data.
+
         """
         return self.solution is None and self.evaluation is None
 
     def is_successful(self) -> bool:
         """Check if the benchmark execution was successful.
 
-        Returns
+        Returns:
         -------
         bool
             True if this is a regular trace with successful evaluation status.
             False for workload traces or failed evaluations.
+
         """
         evaluation = self.evaluation
-        return evaluation is not None and evaluation.status == EvaluationStatus.PASSED
+        return (
+            evaluation is not None
+            and evaluation.status == EvaluationStatus.PASSED
+        )

@@ -22,7 +22,6 @@ from sol_execbench.core.platform.compatibility import (
     build_matrix_entry,
 )
 
-
 EXPECTED_MATRIX_STATUSES = {
     "host_validated",
     "container_validated",
@@ -88,7 +87,7 @@ def _representative_entry() -> MatrixEntry:
                 path="artifacts/compatibility.json",
                 uri="file://artifacts/compatibility.json",
                 description="Bounded compatibility probe payload.",
-            )
+            ),
         ],
     )
 
@@ -98,17 +97,30 @@ def test_matrix_entry_serializes_target_and_observed_evidence_separately():
     payload = entry.model_dump(mode="json")
 
     assert payload["schema_version"] == ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
-    assert payload["schema_version"] == "sol_execbench.rocm_compatibility_matrix.v1"
+    assert (
+        payload["schema_version"]
+        == "sol_execbench.rocm_compatibility_matrix.v1"
+    )
     assert payload["target"]["requested_rocm_user_space_version"] == "7.1.0"
-    assert payload["target"]["docker_image_repository"] == "rocm/dev-ubuntu-24.04"
+    assert (
+        payload["target"]["docker_image_repository"] == "rocm/dev-ubuntu-24.04"
+    )
     assert payload["target"]["docker_image_tag"] == "7.1.0-complete"
     assert payload["target"]["pytorch_rocm_target"] == "rocm7.1"
     assert payload["target"]["validation_scope"] == "container_user_space"
     assert payload["target"]["intended_gpu_architecture"] == "gfx1200"
     assert payload["observed"]["host"]["rocm_version"] == "7.1.0"
-    assert payload["observed"]["container"]["rocm_user_space_version"] == "7.1.0"
-    assert payload["observed"]["python_dependency"]["torch_rocm_target"] == "rocm7.1"
-    assert payload["observed"]["toolchain"]["hipcc_version"] == "HIP version: 7.1.0"
+    assert (
+        payload["observed"]["container"]["rocm_user_space_version"] == "7.1.0"
+    )
+    assert (
+        payload["observed"]["python_dependency"]["torch_rocm_target"]
+        == "rocm7.1"
+    )
+    assert (
+        payload["observed"]["toolchain"]["hipcc_version"]
+        == "HIP version: 7.1.0"
+    )
     assert payload["observed"]["gpu"]["gfx_architecture"] == "gfx1200"
     assert MatrixEntry.model_validate(payload) == entry
     assert entry.to_dict() == payload
@@ -152,7 +164,10 @@ def test_matrix_report_contains_entries_and_status_counts():
 def test_matrix_report_rejects_status_counts_that_disagree_with_entries():
     entry = _representative_entry()
 
-    with pytest.raises(ValidationError, match="status_counts must match entries"):
+    with pytest.raises(
+        ValidationError,
+        match="status_counts must match entries",
+    ):
         RocmCompatibilityMatrixReport(
             generated_at="2026-05-28T05:22:46Z",
             entries=[entry],
@@ -163,7 +178,10 @@ def test_matrix_report_rejects_status_counts_that_disagree_with_entries():
 def test_matrix_report_rejects_omitted_status_counts_when_entries_exist():
     entry = _representative_entry()
 
-    with pytest.raises(ValidationError, match="status_counts must match entries"):
+    with pytest.raises(
+        ValidationError,
+        match="status_counts must match entries",
+    ):
         RocmCompatibilityMatrixReport(
             generated_at="2026-05-28T05:22:46Z",
             entries=[entry],
@@ -188,7 +206,7 @@ def test_matrix_entry_carries_artifacts_and_diagnostic_claim_boundaries():
             "path": "artifacts/compatibility.json",
             "uri": "file://artifacts/compatibility.json",
             "description": "Bounded compatibility probe payload.",
-        }
+        },
     ]
     assert payload["claim_boundary"] == {
         "diagnostic_compatibility_evidence": True,

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 from multiprocessing.connection import Connection
-from typing import Iterator
 
 import pytest
 import torch
@@ -57,7 +57,10 @@ def test_reference_case_round_trip_uses_safe_tensor_payload() -> None:
 def test_reference_failure_is_not_deserialized_as_pickle() -> None:
     with _one_way_connection() as (sender, receiver):
         send_failure(sender, "reference exploded")
-        with pytest.raises(ReferenceExecutionError, match="reference exploded") as exc:
+        with pytest.raises(
+            ReferenceExecutionError,
+            match="reference exploded",
+        ) as exc:
             receive_case(receiver, device="cpu")
     assert exc.value.kind is ReferenceFailureKind.REFERENCE_EXECUTION
 
@@ -69,7 +72,9 @@ def test_protocol_version_is_explicit() -> None:
 def test_invalid_failure_category_is_rejected_as_protocol_error() -> None:
     with _one_way_connection() as (sender, receiver):
         sender.send_bytes(
-            json.dumps({"ok": False, "failure_kind": ["not", "a", "string"]}).encode()
+            json.dumps(
+                {"ok": False, "failure_kind": ["not", "a", "string"]},
+            ).encode(),
         )
         with pytest.raises(ReferenceProtocolError, match="category is invalid"):
             receive_case(receiver, device="cpu")
@@ -80,13 +85,18 @@ def test_send_json_wraps_closed_pipe_as_protocol_error() -> None:
     os.close(read_fd)
     sender = Connection(write_fd, readable=False, writable=True)
     try:
-        with pytest.raises(ReferenceProtocolError, match="control channel closed"):
+        with pytest.raises(
+            ReferenceProtocolError,
+            match="control channel closed",
+        ):
             send_json(sender, {"protocol": PROTOCOL_VERSION})
     finally:
         sender.close()
 
 
-def test_receive_case_rejects_oversized_payload_before_allocation(monkeypatch) -> None:
+def test_receive_case_rejects_oversized_payload_before_allocation(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(reference_protocol, "MAX_REFERENCE_PAYLOAD_BYTES", 4)
     with _one_way_connection() as (sender, receiver):
         send_json(
@@ -102,7 +112,10 @@ def test_receive_case_rejects_oversized_payload_before_allocation(monkeypatch) -
         )
         sender.send_bytes(b"12345")
 
-        with pytest.raises(ReferenceProtocolError, match="payload is too large"):
+        with pytest.raises(
+            ReferenceProtocolError,
+            match="payload is too large",
+        ):
             receive_case(receiver, device="cpu")
 
 
@@ -113,11 +126,12 @@ def test_receive_case_wraps_device_materialization_failure(monkeypatch) -> None:
             reference_protocol,
             "_decode_values",
             lambda *args, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("device out of memory")
+                RuntimeError("device out of memory"),
             ),
         )
 
         with pytest.raises(
-            ReferenceProtocolError, match="tensor materialization failed"
+            ReferenceProtocolError,
+            match="tensor materialization failed",
         ):
             receive_case(receiver, device="cuda")

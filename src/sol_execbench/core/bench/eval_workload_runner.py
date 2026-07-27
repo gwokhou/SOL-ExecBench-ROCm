@@ -5,11 +5,15 @@
 from __future__ import annotations
 
 from sol_execbench.core.bench.clock_lock import are_clocks_locked
-from sol_execbench.core.bench.evaluation_requests import WorkloadEvaluationRequest
 from sol_execbench.core.bench.eval_correctness import set_evaluation_seed
 from sol_execbench.core.bench.eval_trace_helpers import WorkloadTraceEmitter
-from sol_execbench.core.bench.eval_workload_execution import evaluate_one_workload
-from sol_execbench.core.bench.reward_hack import RewardHackDetected
+from sol_execbench.core.bench.eval_workload_execution import (
+    evaluate_one_workload,
+)
+from sol_execbench.core.bench.evaluation_requests import (
+    WorkloadEvaluationRequest,
+)
+from sol_execbench.core.bench.reward_hack import RewardHackError
 from sol_execbench.core.data.trace import EvaluationStatus
 
 
@@ -18,7 +22,9 @@ def evaluate_workloads(request: WorkloadEvaluationRequest) -> None:
     clocks_locked = are_clocks_locked()
     clock_status = None
     if request.bench_config.lock_clocks:
-        clock_status = "Clocks locked: yes" if clocks_locked else "Clocks locked: no"
+        clock_status = (
+            "Clocks locked: yes" if clocks_locked else "Clocks locked: no"
+        )
     emitter = WorkloadTraceEmitter(
         definition=request.definition,
         solution_name=request.solution_name,
@@ -45,7 +51,7 @@ def _preflight_succeeds(
             request.dependencies.integrity_snapshot,
             request.dependencies.driver_globals,
         )
-    except RewardHackDetected as integrity_err:
+    except RewardHackError as integrity_err:
         emitter.emit_status_for_workloads(
             request.workloads,
             EvaluationStatus.REWARD_HACK,

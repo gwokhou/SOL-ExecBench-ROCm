@@ -23,7 +23,7 @@ RECOMPUTABLE_OPERAND_TARGETS = frozenset(
         "transpose",
         "unsqueeze",
         "view",
-    }
+    },
 )
 
 LOW_PRECISION_DEQUANT_DTYPES = frozenset(
@@ -34,7 +34,7 @@ LOW_PRECISION_DEQUANT_DTYPES = frozenset(
         "float8_e5m2fnuz",
         "int8",
         "int4",
-    }
+    },
 )
 
 TRANSPARENT_OPS = frozenset(
@@ -55,7 +55,7 @@ TRANSPARENT_OPS = frozenset(
         "chunk",
         "split",
         "tensor_split",
-    }
+    },
 )
 
 QUANTIZED_PAYLOAD_PASSTHROUGH = frozenset(
@@ -70,7 +70,7 @@ QUANTIZED_PAYLOAD_PASSTHROUGH = frozenset(
         "transpose",
         "unsqueeze",
         "view",
-    }
+    },
 )
 
 ZERO_COMPUTE_OPS = frozenset(
@@ -124,7 +124,7 @@ ZERO_COMPUTE_OPS = frozenset(
         "half",
         "bfloat16",
         "int",
-    }
+    },
 )
 
 ZERO_COPY_VIEW_OPS = TRANSPARENT_OPS
@@ -138,7 +138,7 @@ SCATTER_OPS = frozenset(
         "index_copy_",
         "index_put",
         "index_put_",
-    }
+    },
 )
 
 __all__ = [

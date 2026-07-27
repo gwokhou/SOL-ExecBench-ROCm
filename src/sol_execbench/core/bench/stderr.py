@@ -13,10 +13,7 @@ def filter_benign_rocm_stderr(text: str | bytes | None) -> str:
     """Remove fixed ROCm userspace noise lines from diagnostic stderr text."""
     if text is None:
         return ""
-    if isinstance(text, bytes):
-        value = text.decode(errors="replace")
-    else:
-        value = text
+    value = text.decode(errors="replace") if isinstance(text, bytes) else text
     lines = [
         line
         for line in value.splitlines()

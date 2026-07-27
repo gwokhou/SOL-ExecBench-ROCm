@@ -23,15 +23,15 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any, List, Optional
+from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShapes, TensorShape
 
 
 class ReductionHandler(EinsumOpHandler):
@@ -43,7 +43,7 @@ class ReductionHandler(EinsumOpHandler):
     All these operations support dim and keepdim parameters.
     """
 
-    supported_ops = [
+    supported_ops = (
         # Standard reductions
         "sum",
         "mean",
@@ -68,13 +68,18 @@ class ReductionHandler(EinsumOpHandler):
         # NaN-aware reductions
         "nansum",
         "nanmean",
-    ]
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for reduction operation."""
-        input_shape = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        input_shape = (
+            tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -96,78 +101,36 @@ class ReductionHandler(EinsumOpHandler):
         # whose output rank matches the input, from the genuine reduce-all
         # case. Without this, dims=None
         # would unconditionally collapse to a scalar — see kbl_l2/{83,93}.
-        out_shape = tensor_shapes.outputs[0] if tensor_shapes.num_outputs > 0 else None
+        out_shape = (
+            tensor_shapes.outputs[0] if tensor_shapes.num_outputs > 0 else None
+        )
         return self._generate_reduction_einsum(
-            input_shape, op_type, dims, keepdim, output_shape=out_shape
+            input_shape,
+            op_type,
+            dims,
+            keepdim,
+            output_shape=out_shape,
         )
 
     def _generate_reduction_einsum(
         self,
         shape: TensorShape,
         op_type: str = "sum",
-        dims: Optional[List[int]] = None,
+        dims: list[int] | None = None,
         keepdim: bool = False,
-        output_shape: Optional[TensorShape] = None,
+        output_shape: TensorShape | None = None,
     ) -> EinsumOp:
-        """Generate einsum for reduction operations.
-
-        Args:
-            shape: Input tensor shape.
-            op_type: Type of reduction (sum, mean, max, etc.).
-            dims: Dimensions to reduce along.
-            keepdim: Whether to keep reduced dimensions (size 1).
-
-        Returns:
-            EinsumOp for the reduction operation.
-
-        When keepdim=True, reduced dimensions are kept with a special marker.
-        For example, sum over dim 1 with keepdim=True:
-            Input: ABC -> Output: A1C (where 1 represents the kept dimension)
-        In einsum notation, we use the same label but mark it as reduced:
-            ABC->A[B]C where [B] indicates B is reduced but kept
-        For simplicity, we keep the label in output when keepdim=True.
-        """
+        """Generate extended einsum notation for a reduction."""
         ndims = len(shape)
         input_labels = list(string.ascii_uppercase[:ndims])
-
-        # Normalize dims to handle negative indices
-        if dims is not None:
-            normalized_dims = []
-            for d in dims:
-                if d < 0:
-                    d = ndims + d
-                normalized_dims.append(d)
-            dims = normalized_dims
-
-        # Determine output labels based on reduction dims and keepdim.
-        # When dims is None we'd normally reduce over all axes, but the
-        # binary elementwise overloads of min/max (`torch.min(x, other)`)
-        # also reach this handler with dims=None. Disambiguate via the
-        # observed output rank when available: if the output has the same
-        # rank as the input, treat as elementwise (output_labels = input).
-        if dims is None:
-            if (
-                output_shape is not None
-                and len(output_shape) == ndims
-                and op_type in {"min", "max"}
-            ):
-                # Binary elementwise min/max: rank-preserving, no reduction.
-                output_labels = input_labels.copy()
-            elif keepdim:
-                # Keep all dims but they become size 1
-                output_labels = input_labels.copy()
-            else:
-                output_labels = []
-        else:
-            if keepdim:
-                # Keep all labels, reduced dims will have size 1
-                output_labels = input_labels.copy()
-            else:
-                # Remove reduced dimensions from output
-                output_labels = []
-                for i, label in enumerate(input_labels):
-                    if i not in dims:
-                        output_labels.append(label)
+        normalized_dims = _normalized_dims(dims, ndims)
+        output_labels = _reduction_output_labels(
+            input_labels,
+            op_type=op_type,
+            dims=normalized_dims,
+            keepdim=keepdim,
+            output_shape=output_shape,
+        )
 
         operands = [
             EinsumOperand("Input", input_labels, is_output=False),
@@ -208,7 +171,9 @@ class ReductionHandler(EinsumOpHandler):
         # axis is collapsed, so there's no reduction. Mark it as a plain
         # elementwise op.
         is_binary_elementwise = (
-            dims is None and op_type in {"min", "max"} and len(output_labels) == ndims
+            normalized_dims is None
+            and op_type in {"min", "max"}
+            and len(output_labels) == ndims
         )
         if is_binary_elementwise:
             elementwise_op = op_type
@@ -225,6 +190,39 @@ class ReductionHandler(EinsumOpHandler):
             elementwise_op=elementwise_op,
             reduction_op=reduction_op,
         )
+
+
+def _normalized_dims(
+    dims: list[int] | None,
+    rank: int,
+) -> list[int] | None:
+    if dims is None:
+        return None
+    return [
+        dimension if dimension >= 0 else rank + dimension for dimension in dims
+    ]
+
+
+def _reduction_output_labels(
+    input_labels: list[str],
+    *,
+    op_type: str,
+    dims: list[int] | None,
+    keepdim: bool,
+    output_shape: TensorShape | None,
+) -> list[str]:
+    if dims is None:
+        rank_preserving = (
+            output_shape is not None
+            and len(output_shape) == len(input_labels)
+            and op_type in {"min", "max"}
+        )
+        return input_labels.copy() if rank_preserving or keepdim else []
+    if keepdim:
+        return input_labels.copy()
+    return [
+        label for index, label in enumerate(input_labels) if index not in dims
+    ]
 
 
 # Register handler with global registry (without loading other handlers)

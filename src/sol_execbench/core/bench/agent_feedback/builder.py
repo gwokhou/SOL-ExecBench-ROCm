@@ -30,8 +30,8 @@ from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,
     StaticKernelEvidenceStatus,
 )
-from sol_execbench.core.evaluator_contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.data.trace import Trace
+from sol_execbench.core.evaluator_contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.timestamps import utc_timestamp
 
 
@@ -63,12 +63,13 @@ def build_agent_feedback_sidecar(
     request: AgentFeedbackBuildRequest,
 ) -> AgentFeedbackSidecar:
     """Build a bounded diagnostic feedback sidecar from existing evaluation data."""
-
     traces = request.traces
     profile_result = request.profile_result
     static_evidence = request.static_evidence
     identity = request.identity
-    evaluations = [trace.evaluation for trace in traces if trace.evaluation is not None]
+    evaluations = [
+        trace.evaluation for trace in traces if trace.evaluation is not None
+    ]
     evaluated = [trace for trace in traces if trace.evaluation is not None]
     status_counter = Counter(evaluation.status for evaluation in evaluations)
     status = _aggregate_status(evaluated, profile_result, static_evidence)
@@ -98,7 +99,9 @@ def build_agent_feedback_sidecar(
             trace_count=len(traces),
             evaluated_trace_count=len(evaluated),
             status_counts=dict(
-                sorted((status, count) for status, count in status_counter.items())
+                sorted(
+                    (status, count) for status, count in status_counter.items()
+                ),
             ),
             profile_status=profile_result.status if profile_result else None,
             static_evidence_status=(
@@ -146,7 +149,7 @@ def _source_refs(
                 kind="profile",
                 label="rocprofv3_profile",
                 status=profile_result.status,
-            )
+            ),
         )
     if static_evidence is not None:
         refs.append(
@@ -154,7 +157,7 @@ def _source_refs(
                 kind="static_evidence",
                 label="static_kernel_evidence",
                 status=static_evidence.status,
-            )
+            ),
         )
     return refs
 
@@ -169,16 +172,22 @@ def _limitations(
         "Canonical Trace JSONL remains the authority for correctness, timing, scoring, and status.",
     ]
     if not traces:
-        limitations.append("No evaluated trace rows were available for feedback.")
+        limitations.append(
+            "No evaluated trace rows were available for feedback.",
+        )
     if profile_result is None:
         limitations.append("No rocprofv3 profile sidecar was supplied.")
     elif profile_result.status is not Rocprofv3ProfileStatus.SUCCESS:
-        limitations.append(f"rocprofv3 profile status is {profile_result.status}.")
+        limitations.append(
+            f"rocprofv3 profile status is {profile_result.status}.",
+        )
     if static_evidence is None:
         limitations.append("No static kernel evidence sidecar was supplied.")
     elif static_evidence.status not in {
         StaticKernelEvidenceStatus.COLLECTED,
         StaticKernelEvidenceStatus.PARTIAL,
     }:
-        limitations.append(f"Static evidence status is {static_evidence.status}.")
+        limitations.append(
+            f"Static evidence status is {static_evidence.status}.",
+        )
     return limitations

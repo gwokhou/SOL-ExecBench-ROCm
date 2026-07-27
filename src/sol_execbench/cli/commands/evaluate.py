@@ -14,10 +14,13 @@ from sol_execbench.cli.evaluation.evaluator import (
     run_evaluation_cli,
 )
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
-from sol_execbench.cli.protocol import CliFailure, output_format
+from sol_execbench.cli.protocol import CliFailure, CliResult, output_format
 
 
-@click.command("evaluate", context_settings={"help_option_names": ["-h", "--help"]})
+@click.command(
+    "evaluate",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 @click.argument(
     "problem_dir",
     required=False,
@@ -50,7 +53,12 @@ from sol_execbench.cli.protocol import CliFailure, output_format
     type=click.IntRange(min=1),
     help="Compilation timeout in seconds (HIP/C++ only).",
 )
-@click.option("--timeout", default=300, show_default=True, type=click.IntRange(min=1))
+@click.option(
+    "--timeout",
+    default=300,
+    show_default=True,
+    type=click.IntRange(min=1),
+)
 @click.option(
     "--device",
     default="cuda:0",
@@ -81,7 +89,7 @@ from sol_execbench.cli.protocol import CliFailure, output_format
         [
             cli_static_evidence.STATIC_EVIDENCE_NONE,
             cli_static_evidence.STATIC_EVIDENCE_AUTO,
-        ]
+        ],
     ),
     default=cli_static_evidence.STATIC_EVIDENCE_NONE,
     show_default=True,
@@ -120,7 +128,7 @@ def evaluate_cli(
     feedback_source_sha256: str | None,
     feedback_sol_version: str | None,
     verbose: bool,
-):
+) -> CliResult:
     """Evaluate a solution and preserve canonical traces as a JSONL artifact.
 
     Example: ``sol-execbench evaluate PROBLEM_DIR --solution solution.json``
@@ -131,29 +139,13 @@ def evaluate_cli(
     2 for invalid input, 3 when the environment is unavailable, and 4 on an
     execution failure.
     """
-    if problem_dir is not None and (definition_file or workload_file):
-        raise CliFailure(
-            "PROBLEM_DIR cannot be combined with --definition or --workload",
-            code="conflicting_inputs",
-        )
-    if problem_dir is None and not all((definition_file, workload_file, solution_file)):
-        raise CliFailure(
-            "without PROBLEM_DIR, --definition, --workload, and --solution are required together",
-            code="incomplete_input_set",
-        )
-    if problem_dir is not None and solution_file is None:
-        solution_file = problem_dir / "solution.json"
-        if not solution_file.is_file():
-            raise CliFailure(
-                "--solution is required because PROBLEM_DIR has no solution.json"
-            )
-    if output_format() == "json" and trace_output is None:
-        raise CliFailure(
-            "evaluate in JSON mode requires --trace-output",
-            code="missing_trace_output",
-            hint="Add --trace-output PATH after the evaluate subcommand.",
-        )
-    assert solution_file is not None
+    solution_file = _validated_solution_file(
+        problem_dir=problem_dir,
+        definition_file=definition_file,
+        workload_file=workload_file,
+        solution_file=solution_file,
+        trace_output=trace_output,
+    )
     request = EvaluationRequest(
         problem_dir=problem_dir,
         definition_file=definition_file,
@@ -181,7 +173,48 @@ def evaluate_cli(
     return run_evaluation_cli(request=request)
 
 
-setattr(
+def _validated_solution_file(
+    *,
+    problem_dir: Path | None,
+    definition_file: Path | None,
+    workload_file: Path | None,
+    solution_file: Path | None,
+    trace_output: Path | None,
+) -> Path:
+    if problem_dir is not None and (definition_file or workload_file):
+        raise CliFailure(
+            "PROBLEM_DIR cannot be combined with --definition or --workload",
+            code="conflicting_inputs",
+        )
+    if problem_dir is None and not all(
+        (definition_file, workload_file, solution_file),
+    ):
+        raise CliFailure(
+            "without PROBLEM_DIR, --definition, --workload, and --solution are required together",
+            code="incomplete_input_set",
+        )
+    if problem_dir is not None and solution_file is None:
+        solution_file = problem_dir / "solution.json"
+        if not solution_file.is_file():
+            raise CliFailure(
+                "--solution is required because PROBLEM_DIR has no solution.json",
+            )
+    if output_format() == "json" and trace_output is None:
+        raise CliFailure(
+            "evaluate in JSON mode requires --trace-output",
+            code="missing_trace_output",
+            hint="Add --trace-output PATH after the evaluate subcommand.",
+        )
+    if solution_file is None:
+        raise CliFailure(
+            "--solution is required",
+            code="missing_solution",
+            hint="Pass --solution PATH or provide PROBLEM_DIR/solution.json.",
+        )
+    return solution_file
+
+
+setattr(  # noqa: B010 -- Click contract metadata is attached dynamically
     evaluate_cli,
     "cli_constraints",
     [

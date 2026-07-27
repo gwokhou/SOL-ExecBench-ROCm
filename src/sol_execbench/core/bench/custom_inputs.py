@@ -19,8 +19,8 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping, Sequence
-from contextlib import contextmanager
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -29,7 +29,6 @@ import torch
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.workload import Workload
-
 
 GEN_INPUTS_ERROR = "gen_inputs_error"
 GEN_INPUTS_OOM_BLOCKED = "gen_inputs_oom_blocked"
@@ -40,6 +39,8 @@ GEN_INPUTS_DEVICE_MISMATCH = "gen_inputs_device_mismatch"
 
 @dataclass(frozen=True)
 class CustomInputProvenance:
+    """Reproducibility and failure metadata for custom input generation."""
+
     entrypoint: str | None
     seed: int
     workload_uuid: str | None
@@ -48,6 +49,7 @@ class CustomInputProvenance:
     failure_class: str | None = None
 
     def log_text(self) -> str:
+        """Return a stable single-line provenance summary."""
         parts = [
             f"entrypoint={self.entrypoint or '<none>'}",
             f"seed={self.seed}",
@@ -61,6 +63,8 @@ class CustomInputProvenance:
 
 
 class CustomInputGenerationError(RuntimeError):
+    """Custom-input failure with a stable class and provenance."""
+
     def __init__(
         self,
         message: str,
@@ -68,6 +72,7 @@ class CustomInputGenerationError(RuntimeError):
         failure_class: str,
         provenance: CustomInputProvenance,
     ) -> None:
+        """Initialize a classified custom-input generation failure."""
         super().__init__(message)
         self.failure_class = failure_class
         self.provenance = provenance
@@ -92,36 +97,33 @@ def derive_custom_input_seed(
             (
                 "" if base_seed is None else str(base_seed),
                 "" if round_index is None else str(round_index),
-            )
+            ),
         )
     digest = hashlib.sha256("\0".join(parts).encode("utf-8")).digest()
     return int.from_bytes(digest[:8], "big") & 0x7FFF_FFFF_FFFF_FFFF
 
 
 @contextmanager
-def isolated_torch_rng(seed: int):
+def isolated_torch_rng(seed: int) -> Iterator[None]:
+    """Temporarily seed Torch RNGs and restore their previous states."""
     cpu_state = torch.random.get_rng_state()
     cuda_states = None
     if torch.cuda.is_available():
         try:
             cuda_states = torch.cuda.get_rng_state_all()
-        except Exception:
+        except RuntimeError:
             cuda_states = None
     try:
         torch.manual_seed(seed)
         if torch.cuda.is_available():
-            try:
+            with suppress(RuntimeError):
                 torch.cuda.manual_seed_all(seed)
-            except Exception:
-                pass
         yield
     finally:
         torch.random.set_rng_state(cpu_state)
         if cuda_states is not None:
-            try:
+            with suppress(RuntimeError):
                 torch.cuda.set_rng_state_all(cuda_states)
-            except Exception:
-                pass
 
 
 def _custom_input_provenance(
@@ -159,7 +161,11 @@ def _raise_custom_input_error(
 def _classify_custom_generation_exception(exc: BaseException) -> str:
     text = str(exc).lower()
     name = type(exc).__name__.lower()
-    if isinstance(exc, TimeoutError) or "timeout" in text or "timed out" in text:
+    if (
+        isinstance(exc, TimeoutError)
+        or "timeout" in text
+        or "timed out" in text
+    ):
         return GEN_INPUTS_TIMEOUT
     if (
         isinstance(exc, torch.cuda.OutOfMemoryError)
@@ -263,6 +269,7 @@ def gen_custom_inputs(
     row_index: int | None = None,
     seed: int | None = None,
 ) -> tuple[dict[str, Any], CustomInputProvenance]:
+    """Generate, validate, and describe custom inputs for one workload."""
     seed = (
         derive_custom_input_seed(definition, workload, row_index=row_index)
         if seed is None
@@ -289,7 +296,9 @@ def gen_custom_inputs(
             provenance=replace(provenance, failure_class=failure_class),
         )
         raise err from exc
-    generated_keys = tuple(generated.keys()) if isinstance(generated, Mapping) else ()
+    generated_keys = (
+        tuple(generated.keys()) if isinstance(generated, Mapping) else ()
+    )
     provenance = _custom_input_provenance(
         definition,
         workload,

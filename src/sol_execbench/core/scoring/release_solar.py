@@ -21,13 +21,15 @@ from sol_execbench.core.integrity import (
     validate_sha256,
     verify_artifact_file,
 )
+from sol_execbench.core.scoring.release_models import (
+    ArtifactReference,
+    SolarIndexStatement,
+)
 from sol_execbench.core.solar_bridge.models import (
     FORMAL_ARTIFACT_PATHS,
     FORMAL_BOUND_KIND,
     SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
 )
-
-from .release_models import ArtifactReference, SolarIndexStatement
 
 _MAX_SOLAR_MANIFEST_BYTES = 1024 * 1024
 
@@ -41,7 +43,9 @@ def verify_solar_index(
     """Verify exact formal-manifest coverage and return each SOL bound in ms."""
     _verify_corpus_reference(index.corpus_manifest, bundle_root, corpus)
     expected = _expected_workloads(corpus)
-    observed = {(item.problem_path, item.workload_uuid) for item in index.entries}
+    observed = {
+        (item.problem_path, item.workload_uuid) for item in index.entries
+    }
     if observed != expected:
         raise ValueError("release SOLAR workload denominator mismatch")
     bounds: dict[tuple[str, str], float] = {}
@@ -100,18 +104,21 @@ def _verify_solar_manifest(
     payload = _load_manifest(path)
     definition = Definition.model_validate_json(
         (corpus.authored_root / problem_path / "definition.json").read_text(
-            encoding="utf-8"
-        )
+            encoding="utf-8",
+        ),
     )
     _verify_manifest_identity(
         payload,
         definition=definition,
         workload_uuid=workload_uuid,
-        architecture_sha256=str(corpus.formal_analysis["architecture_profile_sha256"]),
+        architecture_sha256=str(
+            corpus.formal_analysis["architecture_profile_sha256"],
+        ),
     )
     _verify_manifest_artifacts(path.parent, payload.get("artifacts"))
     bound = payload.get("bound")
-    assert isinstance(bound, dict)
+    if not isinstance(bound, dict):
+        raise ValueError("formal SOLAR manifest bound is missing")
     return float(bound["seconds"]) * 1000.0
 
 
@@ -137,15 +144,19 @@ def _verify_manifest_identity(
     bound = payload.get("bound")
     if not all(isinstance(item, dict) for item in (reference, contract, bound)):
         raise ValueError("formal SOLAR manifest contract is incomplete")
-    assert isinstance(reference, dict)
-    assert isinstance(contract, dict)
-    assert isinstance(bound, dict)
+    if (
+        not isinstance(reference, dict)
+        or not isinstance(contract, dict)
+        or not isinstance(bound, dict)
+    ):
+        raise ValueError("formal SOLAR manifest contract is incomplete")
     seconds = bound.get("seconds")
     if (
         payload.get("schema_version") != SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
         or payload.get("analysis_id") != f"{definition.name}:{workload_uuid}"
         or payload.get("architecture_sha256") != architecture_sha256
-        or reference.get("sha256") != sha256_bytes(definition.reference.encode())
+        or reference.get("sha256")
+        != sha256_bytes(definition.reference.encode())
         or contract.get("require_orojenesis") is not True
         or payload.get("publication_eligible") is not True
         or bound.get("kind") != FORMAL_BOUND_KIND
@@ -164,13 +175,22 @@ def _verify_manifest_artifacts(root: Path, value: object) -> None:
     for raw in value:
         if not isinstance(raw, dict):
             raise ValueError("formal SOLAR artifact entry is invalid")
-        relative = validate_relative_artifact_path(raw.get("path"), "SOLAR artifact")
+        relative = validate_relative_artifact_path(
+            raw.get("path"),
+            "SOLAR artifact",
+        )
         digest = validate_sha256(raw.get("sha256"), "SOLAR artifact SHA-256")
         if relative in observed:
-            raise ValueError("formal SOLAR manifest contains duplicate artifacts")
+            raise ValueError(
+                "formal SOLAR manifest contains duplicate artifacts",
+            )
         observed.add(relative)
         path = root / relative
-        if path.is_symlink() or not path.is_file() or sha256_file(path) != digest:
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or sha256_file(path) != digest
+        ):
             raise ValueError("formal SOLAR artifact identity mismatch")
     if observed != FORMAL_ARTIFACT_PATHS:
         raise ValueError("formal SOLAR artifact denominator mismatch")

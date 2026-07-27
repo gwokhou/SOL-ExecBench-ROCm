@@ -48,8 +48,8 @@ def _write_request(tmp_path: Path) -> tuple[Path, Path]:
                 "output_dir": str(tmp_path / "output"),
                 "device": "hip:0",
                 "orojenesis_home": None,
-            }
-        )
+            },
+        ),
     )
     return request, response
 
@@ -64,8 +64,8 @@ def _write_stage_request(tmp_path: Path) -> tuple[Path, Path]:
                 "workload_uuid": "workload-1",
                 "output_dir": str(tmp_path / "output"),
                 "device": "hip:0",
-            }
-        )
+            },
+        ),
     )
     return request, response
 
@@ -75,7 +75,10 @@ def test_analysis_worker_serializes_success(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         worker,
         "analyze_workload",
-        lambda **kwargs: _formal_outcome(kwargs["workload_uuid"], kwargs["output_dir"]),
+        lambda **kwargs: _formal_outcome(
+            kwargs["workload_uuid"],
+            kwargs["output_dir"],
+        ),
     )
     monkeypatch.setattr(sys, "argv", ["worker", str(request), str(response)])
 
@@ -86,7 +89,8 @@ def test_analysis_worker_serializes_success(tmp_path, monkeypatch) -> None:
 
 
 def test_analysis_worker_converts_exception_to_stable_failure(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     request, response = _write_request(tmp_path)
 
@@ -117,7 +121,8 @@ def test_analysis_worker_converts_exception_to_stable_failure(
 
 
 def test_analysis_worker_replaces_unserializable_outcome_with_failure(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     request, response = _write_request(tmp_path)
     monkeypatch.setattr(
@@ -150,7 +155,11 @@ def test_stage_worker_serializes_success(tmp_path, monkeypatch) -> None:
             output_dir=kwargs["output_dir"],
         ),
     )
-    monkeypatch.setattr(sys, "argv", ["stage-worker", str(request), str(response)])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["stage-worker", str(request), str(response)],
+    )
 
     with pytest.raises(SystemExit, match="0"):
         stage_worker.main()
@@ -159,7 +168,8 @@ def test_stage_worker_serializes_success(tmp_path, monkeypatch) -> None:
 
 
 def test_stage_worker_converts_exception_to_bounded_failure(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     request, response = _write_stage_request(tmp_path)
 
@@ -167,7 +177,11 @@ def test_stage_worker_converts_exception_to_bounded_failure(
         raise RuntimeError("x" * 5000)
 
     monkeypatch.setattr(stage_worker, "audit_workload_stages", fail)
-    monkeypatch.setattr(sys, "argv", ["stage-worker", str(request), str(response)])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["stage-worker", str(request), str(response)],
+    )
 
     with pytest.raises(SystemExit, match="0"):
         stage_worker.main()
@@ -179,7 +193,8 @@ def test_stage_worker_converts_exception_to_bounded_failure(
 
 
 def test_stage_worker_reports_response_serialization_failure(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     request, response = _write_stage_request(tmp_path)
     monkeypatch.setattr(
@@ -190,8 +205,16 @@ def test_stage_worker_reports_response_serialization_failure(
             analysis_id=kwargs["workload_uuid"],
         ),
     )
-    monkeypatch.setattr(stage_worker, "write_worker_response", lambda *_args: False)
-    monkeypatch.setattr(sys, "argv", ["stage-worker", str(request), str(response)])
+    monkeypatch.setattr(
+        stage_worker,
+        "write_worker_response",
+        lambda *_args: False,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["stage-worker", str(request), str(response)],
+    )
 
     with pytest.raises(SystemExit, match="1"):
         stage_worker.main()

@@ -5,7 +5,6 @@ import torch
 
 from sol_execbench.core.bench.io import normalize_outputs
 
-
 CPU = torch.device("cpu")
 NAMES = ["out"]
 DTYPES = {"out": torch.float32}

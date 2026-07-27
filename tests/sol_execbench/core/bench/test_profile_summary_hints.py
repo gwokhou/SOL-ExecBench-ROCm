@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sol_execbench.core.bench.profile_summary.hints import derive_bottleneck_hints
+from sol_execbench.core.bench.profile_summary.hints import (
+    derive_bottleneck_hints,
+)
 from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryKernelMetric,
 )
@@ -16,8 +18,8 @@ def test_derive_bottleneck_hints_reports_insufficient_counters() -> None:
                 unit="ms",
                 source="trace.csv",
                 artifact="trace.csv",
-            )
-        ]
+            ),
+        ],
     )
 
     assert [hint.model_dump(mode="json") for hint in hints] == [
@@ -28,11 +30,13 @@ def test_derive_bottleneck_hints_reports_insufficient_counters() -> None:
             "message": "No bounded counter artifact was available for bottleneck classification.",
             "source_metrics": [],
             "evidence_artifacts": [],
-        }
+        },
     ]
 
 
-def test_derive_bottleneck_hints_uses_percent_and_fraction_l2_thresholds() -> None:
+def test_derive_bottleneck_hints_uses_percent_and_fraction_l2_thresholds() -> (
+    None
+):
     percent_hints = derive_bottleneck_hints(
         [
             ProfileSummaryKernelMetric(
@@ -42,8 +46,8 @@ def test_derive_bottleneck_hints_uses_percent_and_fraction_l2_thresholds() -> No
                 unit="percent",
                 source="counters.csv",
                 artifact="counters.csv",
-            )
-        ]
+            ),
+        ],
     )
     fraction_hints = derive_bottleneck_hints(
         [
@@ -54,8 +58,8 @@ def test_derive_bottleneck_hints_uses_percent_and_fraction_l2_thresholds() -> No
                 unit="ratio",
                 source="counters.csv",
                 artifact="counters.csv",
-            )
-        ]
+            ),
+        ],
     )
 
     assert [hint.category for hint in percent_hints] == ["memory_l2_bound"]
@@ -81,7 +85,7 @@ def test_derive_bottleneck_hints_reports_lds_and_valu_signals() -> None:
                 source="counters.csv",
                 artifact="counters.csv",
             ),
-        ]
+        ],
     )
 
     assert [hint.category for hint in hints] == ["lds_bound", "compute_bound"]

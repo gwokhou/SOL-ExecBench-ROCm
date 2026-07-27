@@ -24,7 +24,10 @@ def _resolve_rocm_library(name: str, candidates: tuple[str, ...]) -> str:
             return found
 
     result = subprocess.run(
-        ["ldconfig", "-p"], capture_output=True, text=True, timeout=30
+        ["ldconfig", "-p"],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     assert result.returncode == 0, result.stderr
     for line in result.stdout.splitlines():

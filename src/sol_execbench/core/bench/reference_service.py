@@ -15,7 +15,9 @@ from typing import Any, TextIO
 import torch
 
 from sol_execbench.core.bench.config import BenchmarkConfig
-from sol_execbench.core.bench.eval_output_integrity import stable_reference_outputs
+from sol_execbench.core.bench.eval_output_integrity import (
+    stable_reference_outputs,
+)
 from sol_execbench.core.bench.eval_runtime import (
     load_reference_function,
     measure_reference_latency,
@@ -29,10 +31,10 @@ from sol_execbench.core.bench.io import (
 )
 from sol_execbench.core.bench.reference_protocol import (
     PROTOCOL_VERSION,
+    TRUSTED_DEFINITION_FILE,
     ReferenceCase,
     ReferenceFailureKind,
     ReferenceProtocolError,
-    TRUSTED_DEFINITION_FILE,
     receive_json,
     send_case,
     send_failure,
@@ -48,10 +50,11 @@ class ReferenceRequestError(ValueError):
     """A candidate-side request did not satisfy the reference protocol."""
 
 
-class InputGenerationFailure(RuntimeError):
+class InputGenerationError(RuntimeError):
     """Trusted input generation failed before the reference function ran."""
 
     def __init__(self, message: str, *, failure_class: str) -> None:
+        """Initialize a classified input-generation failure."""
         super().__init__(f"{failure_class}: {message}")
         self.failure_class = failure_class
 
@@ -66,13 +69,20 @@ class ReferenceService:
         device: str,
         definition_path: Path | None = None,
     ) -> None:
+        """Initialize trusted reference execution for a staged problem."""
         self.staging_dir = staging_dir
         self.device = device
-        trusted_definition = definition_path or staging_dir / TRUSTED_DEFINITION_FILE
-        self.definition = Definition.model_validate_json(trusted_definition.read_text())
+        trusted_definition = (
+            definition_path or staging_dir / TRUSTED_DEFINITION_FILE
+        )
+        self.definition = Definition.model_validate_json(
+            trusted_definition.read_text(),
+        )
         self.workloads = [
             Workload.model_validate_json(line)
-            for line in (staging_dir / "workload.jsonl").read_text().splitlines()
+            for line in (staging_dir / "workload.jsonl")
+            .read_text()
+            .splitlines()
             if line.strip()
         ]
         config_path = staging_dir / "config.json"
@@ -82,7 +92,7 @@ class ReferenceService:
             else BenchmarkConfig()
         )
         self.reference_module, self.reference = load_reference_function(
-            self.definition.reference
+            self.definition.reference,
         )
         self.custom_inputs = (
             getattr(
@@ -100,18 +110,21 @@ class ReferenceService:
         self._safetensors: dict[str, dict[str, Any]] = {}
 
     def handle(
-        self, request: dict[str, Any]
+        self,
+        request: dict[str, Any],
     ) -> tuple[str, ReferenceCase, float, str | None]:
         """Validate one request and produce its trusted response."""
         operation = request.get("operation")
         if operation not in {"correctness", "timing"}:
             raise ReferenceRequestError(
-                f"unsupported reference operation: {operation!r}"
+                f"unsupported reference operation: {operation!r}",
             )
         row_index = request.get("row_index")
         round_index = request.get("round_index")
         workload_uuid = request.get("workload_uuid")
-        if not isinstance(row_index, int) or not 0 <= row_index < len(self.workloads):
+        if not isinstance(row_index, int) or not 0 <= row_index < len(
+            self.workloads,
+        ):
             raise ReferenceRequestError("reference row_index is invalid")
         if not isinstance(round_index, int) or not 0 <= round_index < 10:
             raise ReferenceRequestError("reference round_index is invalid")
@@ -121,13 +134,14 @@ class ReferenceService:
         try:
             inputs = self.prepare_inputs(workload, row_index, round_index)
         except CustomInputGenerationError as exc:
-            raise InputGenerationFailure(
+            raise InputGenerationError(
                 f"{exc}\n{exc.provenance.log_text()}",
                 failure_class=exc.failure_class,
             ) from exc
-        except Exception as exc:
-            raise InputGenerationFailure(
-                str(exc), failure_class=GEN_INPUTS_ERROR
+        except Exception as exc:  # noqa: BLE001 -- trusted request isolation
+            raise InputGenerationError(
+                str(exc),
+                failure_class=GEN_INPUTS_ERROR,
             ) from exc
         resolved_axes = self.definition.get_resolved_axes_values(workload.axes)
         outputs = call_and_collect_outputs(
@@ -152,10 +166,12 @@ class ReferenceService:
         )
 
     def prepare_inputs(
-        self, workload: Workload, row_index: int, round_index: int
+        self,
+        workload: Workload,
+        row_index: int,
+        round_index: int,
     ) -> list[Any]:
         """Generate one trusted, deterministically seeded workload input set."""
-
         safe_tensors = self._safetensors_for(workload)
         seed = derive_custom_input_seed(
             self.definition,
@@ -178,7 +194,9 @@ class ReferenceService:
         cached = self._safetensors.get(workload.uuid)
         if cached is not None:
             return cached
-        if not any(value.type == "safetensors" for value in workload.inputs.values()):
+        if not any(
+            value.type == "safetensors" for value in workload.inputs.values()
+        ):
             result: dict[str, Any] = {}
         else:
             roots = [self.staging_dir]
@@ -203,13 +221,20 @@ class ReferenceService:
             )
             for _ in range(self.config.trials)
         ]
-        failure = next((result.failure for result in results if result.failure), None)
+        failure = next(
+            (result.failure for result in results if result.failure),
+            None,
+        )
         if failure is not None:
             return 0.0, failure
         return statistics.mean(result.latency_ms for result in results), None
 
 
-def _validated_request(request: dict[str, Any], *, token: str) -> dict[str, Any]:
+def _validated_request(
+    request: dict[str, Any],
+    *,
+    token: str,
+) -> dict[str, Any]:
     if request.get("protocol") != PROTOCOL_VERSION:
         raise ReferenceRequestError("reference protocol version mismatch")
     if request.get("token") != token:
@@ -242,7 +267,7 @@ def _serve_connection(
                 torch.cuda.empty_cache()
         except ReferenceRequestError as exc:
             send_failure(writer, str(exc))
-        except InputGenerationFailure as exc:
+        except InputGenerationError as exc:
             send_failure(
                 writer,
                 str(exc),
@@ -252,9 +277,12 @@ def _serve_connection(
             return
         except (BrokenPipeError, EOFError):
             return
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- trusted request isolation
             try:
-                send_failure(writer, f"trusted reference execution failed: {exc}")
+                send_failure(
+                    writer,
+                    f"trusted reference execution failed: {exc}",
+                )
             except (BrokenPipeError, EOFError):
                 return
 
@@ -276,7 +304,7 @@ def serve_reference_worker(
 
 
 __all__ = [
-    "InputGenerationFailure",
+    "InputGenerationError",
     "ReferenceRequestError",
     "ReferenceService",
     "serve_reference_worker",

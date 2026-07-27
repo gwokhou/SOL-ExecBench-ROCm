@@ -11,14 +11,16 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
-from ..data.base_model import BaseModelWithDocstrings
-from ..integrity.schema_versions import (
+from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.integrity.schema_versions import (
     ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION,
     ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
 )
-from ..process.subprocesses import ProbeCompletedProcess
-from .arch_capabilities import ArchCapabilityBudgetStatus, ArchIsaBudget
-
+from sol_execbench.core.platform.arch_capabilities import (
+    ArchCapabilityBudgetStatus,
+    ArchIsaBudget,
+)
+from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
 DEFAULT_PROBE_TIMEOUT_SECONDS = 3.0
 
@@ -115,7 +117,9 @@ class EnvironmentCapabilityBudget(BaseModelWithDocstrings):
     """Derived arch capability budget for one detected GPU."""
 
     model_config = ConfigDict(
-        use_attribute_docstrings=True, extra="forbid", frozen=True
+        use_attribute_docstrings=True,
+        extra="forbid",
+        frozen=True,
     )
 
     status: ArchCapabilityBudgetStatus
@@ -147,7 +151,9 @@ class EnvironmentSnapshot(BaseModelWithDocstrings):
     """Per-tool probe evidence."""
     gpus: list[GpuEnvironmentSummary] = Field(default_factory=list)
     """Best-effort detected GPU summaries."""
-    capability_budgets: list[EnvironmentCapabilityBudget] = Field(default_factory=list)
+    capability_budgets: list[EnvironmentCapabilityBudget] = Field(
+        default_factory=list,
+    )
     """Derived arch capability budgets for detected GPUs."""
     rocm: RocmEnvironmentSummary = Field(default_factory=RocmEnvironmentSummary)
     """ROCm runtime visibility summary."""

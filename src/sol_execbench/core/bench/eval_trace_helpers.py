@@ -13,6 +13,7 @@ from sol_execbench.core.bench.utils import make_eval
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import (
     Correctness,
+    Evaluation,
     EvaluationStatus,
     Performance,
     Trace,
@@ -22,6 +23,8 @@ from sol_execbench.core.data.workload import Workload
 
 @dataclass(frozen=True)
 class WorkloadTraceEmitter:
+    """Construct and emit canonical workload evaluation traces."""
+
     definition: Definition
     solution_name: str
     device: str
@@ -38,7 +41,8 @@ class WorkloadTraceEmitter:
         correctness: Correctness | None = None,
         performance: Performance | None = None,
         extra_msg: str | None = None,
-    ):
+    ) -> Evaluation:
+        """Build an evaluation record with clock and log metadata."""
         parts = [part for part in (self.clock_status_msg, extra_msg) if part]
         return make_eval(
             status,
@@ -61,6 +65,7 @@ class WorkloadTraceEmitter:
         performance: Performance | None = None,
         extra_msg: str | None = None,
     ) -> Trace:
+        """Build a canonical trace for one workload."""
         return Trace(
             definition=self.definition.name,
             solution=self.solution_name,
@@ -75,6 +80,7 @@ class WorkloadTraceEmitter:
         )
 
     def emit_trace(self, trace: Trace) -> None:
+        """Write one trace to the configured JSONL stream."""
         emit_trace_jsonl(trace, self.real_stdout)
 
     def emit_status(
@@ -86,6 +92,7 @@ class WorkloadTraceEmitter:
         correctness: Correctness | None = None,
         performance: Performance | None = None,
     ) -> None:
+        """Build and emit one workload status."""
         self.emit_trace(
             self.build_trace(
                 workload,
@@ -93,7 +100,7 @@ class WorkloadTraceEmitter:
                 correctness=correctness,
                 performance=performance,
                 extra_msg=extra_msg,
-            )
+            ),
         )
 
     def emit_status_for_workloads(
@@ -103,5 +110,6 @@ class WorkloadTraceEmitter:
         *,
         extra_msg: str | None = None,
     ) -> None:
+        """Emit the same status for each supplied workload."""
         for workload in workloads:
             self.emit_status(workload, status, extra_msg=extra_msg)

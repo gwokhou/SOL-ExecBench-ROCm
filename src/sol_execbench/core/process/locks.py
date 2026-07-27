@@ -6,9 +6,9 @@
 from __future__ import annotations
 
 import fcntl
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 
 @contextmanager
@@ -20,7 +20,7 @@ def exclusive_file_lock(path: Path) -> Iterator[None]:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise RuntimeError(
-                f"exclusive process lock is already held: {path}"
+                f"exclusive process lock is already held: {path}",
             ) from exc
         try:
             yield

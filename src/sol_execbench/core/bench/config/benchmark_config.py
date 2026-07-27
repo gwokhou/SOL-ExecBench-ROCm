@@ -22,8 +22,9 @@ from dataclasses import dataclass, field
 
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
-
-OFFICIAL_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS["rocm_event_timing_paper_counts"]
+OFFICIAL_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS[
+    "rocm_event_timing_paper_counts"
+]
 CUSTOM_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS["rocm_event_timing_custom"]
 
 
@@ -42,7 +43,8 @@ class BenchmarkConfig:
     benchmark_reference: bool = field(default=True)
     seed: int = field(default=200)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Validate benchmark iteration and timing settings."""
         if self.warmup_runs < 0:
             raise ValueError("warmup_runs must be >= 0")
         if self.iterations <= 0:

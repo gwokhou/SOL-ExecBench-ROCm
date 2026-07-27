@@ -29,10 +29,14 @@ def _parse_args() -> argparse.Namespace:
         default=REPO_ROOT / "problems" / "AMD_AKA" / "manifest.yaml",
     )
     parser.add_argument(
-        "--aka-root", type=Path, default=REPO_ROOT / "data" / "AgentKernelArena"
+        "--aka-root",
+        type=Path,
+        default=REPO_ROOT / "data" / "AgentKernelArena",
     )
     parser.add_argument(
-        "--problems-root", type=Path, default=REPO_ROOT / "problems" / "AMD_AKA"
+        "--problems-root",
+        type=Path,
+        default=REPO_ROOT / "problems" / "AMD_AKA",
     )
     parser.add_argument(
         "--device",
@@ -54,9 +58,12 @@ def _device(value: str) -> torch.device:
 
 
 def main() -> int:
+    """Run semantic-equivalence checks for selected AKA corpus entries."""
     args = _parse_args()
     if not args.aka_root.is_dir():
-        raise FileNotFoundError(f"pinned AKA clone is required: {args.aka_root}")
+        raise FileNotFoundError(
+            f"pinned AKA clone is required: {args.aka_root}",
+        )
     if args.max_workloads is not None and args.max_workloads <= 0:
         raise ValueError("--max-workloads must be positive")
     manifest = AkaCorpusManifest.load(args.manifest)
@@ -76,16 +83,19 @@ def main() -> int:
         print(
             f"[{status}] {report.problem_name}: {report.workloads_checked} workloads, "
             f"{report.outputs_checked} outputs, cross-check={report.crosscheck}; "
-            f"{report.detail}"
+            f"{report.detail}",
         )
     passed = sum(report.passed for report in reports)
-    crossed = sum(report.crosscheck is CrosscheckStatus.PASSED for report in reports)
+    crossed = sum(
+        report.crosscheck is CrosscheckStatus.PASSED for report in reports
+    )
     not_applicable = sum(
-        report.crosscheck is CrosscheckStatus.NOT_APPLICABLE for report in reports
+        report.crosscheck is CrosscheckStatus.NOT_APPLICABLE
+        for report in reports
     )
     print(
         f"{passed}/{len(reports)} problems passed; "
-        f"{crossed} source-equivalent, {not_applicable} explicitly not applicable"
+        f"{crossed} source-equivalent, {not_applicable} explicitly not applicable",
     )
     return 0 if passed == len(reports) else 1
 

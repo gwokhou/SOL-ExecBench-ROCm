@@ -14,10 +14,12 @@ from sol_execbench.core.data.solution import SupportedLanguages
 
 def test_supported_languages_map_to_timing_source_types():
     assert (
-        classify_timing_source([SupportedLanguages.PYTORCH]) == TimingSourceType.PYTORCH
+        classify_timing_source([SupportedLanguages.PYTORCH])
+        == TimingSourceType.PYTORCH
     )
     assert (
-        classify_timing_source([SupportedLanguages.TRITON]) == TimingSourceType.TRITON
+        classify_timing_source([SupportedLanguages.TRITON])
+        == TimingSourceType.TRITON
     )
 
     for language in (
@@ -32,17 +34,26 @@ def test_supported_languages_map_to_timing_source_types():
 
 def test_classifier_handles_strings_empty_and_mixed_inputs():
     assert classify_timing_source(["pytorch"]) == TimingSourceType.PYTORCH
-    assert classify_timing_source(["triton", "pytorch"]) == TimingSourceType.TRITON
+    assert (
+        classify_timing_source(["triton", "pytorch"]) == TimingSourceType.TRITON
+    )
     assert classify_timing_source([]) == TimingSourceType.UNKNOWN
-    assert classify_timing_source(["not-a-language"]) == TimingSourceType.UNKNOWN
-    assert classify_timing_source(["pytorch", "hip_cpp"]) == TimingSourceType.MIXED
+    assert (
+        classify_timing_source(["not-a-language"]) == TimingSourceType.UNKNOWN
+    )
+    assert (
+        classify_timing_source(["pytorch", "hip_cpp"]) == TimingSourceType.MIXED
+    )
 
 
 def test_policy_table_has_distinct_source_specific_interpretations():
     policies = {policy.source_type: policy for policy in timing_policy_table()}
 
     assert set(policies) == set(TimingSourceType)
-    assert policies[TimingSourceType.PYTORCH].backend == TimingBackend.PYTORCH_PROFILER
+    assert (
+        policies[TimingSourceType.PYTORCH].backend
+        == TimingBackend.PYTORCH_PROFILER
+    )
     assert (
         policies[TimingSourceType.PYTORCH].activity_domain
         == TimingActivityDomain.PYTORCH_OPERATOR_ATTRIBUTION
@@ -52,7 +63,9 @@ def test_policy_table_has_distinct_source_specific_interpretations():
         policies[TimingSourceType.TRITON].activity_domain
         == TimingActivityDomain.KERNEL_ACTIVITY
     )
-    assert policies[TimingSourceType.HIP_NATIVE].backend == TimingBackend.ROCPROFV3
+    assert (
+        policies[TimingSourceType.HIP_NATIVE].backend == TimingBackend.ROCPROFV3
+    )
     assert (
         policies[TimingSourceType.HIP_NATIVE].activity_domain
         == TimingActivityDomain.KERNEL_ACTIVITY
@@ -63,7 +76,7 @@ def test_policy_table_has_distinct_source_specific_interpretations():
                 policies[TimingSourceType.PYTORCH].interpretation,
                 policies[TimingSourceType.TRITON].interpretation,
                 policies[TimingSourceType.HIP_NATIVE].interpretation,
-            }
+            },
         )
         == 3
     )
@@ -83,12 +96,15 @@ def test_every_policy_exposes_auditable_metadata():
 
 
 def test_event_timing_fallback_is_labeled_and_not_profiler_backed():
-    policy = select_timing_policy(TimingSourceType.HIP_NATIVE, profiler_available=False)
+    policy = select_timing_policy(
+        TimingSourceType.HIP_NATIVE,
+        profiler_available=False,
+    )
 
     assert policy.backend == TimingBackend.DEVICE_EVENTS
     assert policy.activity_domain == TimingActivityDomain.FALLBACK_EVENT_TIMING
     assert policy.fallback_applied is True
-    assert "profiler-backed timing is unavailable" == policy.reason
+    assert policy.reason == "profiler-backed timing is unavailable"
     assert "not profiler-backed kernel activity timing" in policy.interpretation
 
 

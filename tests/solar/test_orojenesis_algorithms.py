@@ -90,7 +90,16 @@ def _linear_layers(*, batched: bool = False) -> dict[str, dict]:
         "x": _start("x"),
         "w0": _start("w0"),
         "w1": _start("w1"),
-        "mm0": _matmul("mm0", "x", "w0", "hidden", m=first_m, k=3, n=4, batch=batch),
+        "mm0": _matmul(
+            "mm0",
+            "x",
+            "w0",
+            "hidden",
+            m=first_m,
+            k=3,
+            n=4,
+            batch=batch,
+        ),
         "mm1": _matmul(
             "mm1",
             "hidden",
@@ -134,13 +143,15 @@ def test_problem_architecture_mapper_and_capacity_helpers():
     assert problem["problem"]["instance"] == {"A": 2, "B": 3, "C": 4}
     assert problem["problem"]["shape"]["dimensions"] == ["A", "B", "C"]
     assert (
-        orojenesis.OrojenesisRunner.architecture(16)["architecture"]["subtree"][0][
-            "local"
-        ][0]["attributes"]["word-bits"]
+        orojenesis.OrojenesisRunner.architecture(16)["architecture"]["subtree"][
+            0
+        ]["local"][0]["attributes"]["word-bits"]
         == 16
     )
     assert (
-        orojenesis.OrojenesisRunner.multi_architecture(8)["architecture"]["version"]
+        orojenesis.OrojenesisRunner.multi_architecture(8)["architecture"][
+            "version"
+        ]
         == 0.2
     )
     assert (
@@ -159,7 +170,9 @@ def test_problem_architecture_mapper_and_capacity_helpers():
     ) == {"buffer_bytes": 4, "dram_bytes": 20}
     assert orojenesis.select_capacity_point([], 6) is None
 
-    roles = [orojenesis.multi_einsum_mapper_role(index, 5) for index in range(5)]
+    roles = [
+        orojenesis.multi_einsum_mapper_role(index, 5) for index in range(5)
+    ]
     assert roles == ["first", "second", "middle", "middle", "last"]
     assert orojenesis.multi_einsum_mapper_role(1, 2) == "second_last"
     for role in {"first", "second", "middle", "last", "second_last"}:
@@ -170,7 +183,10 @@ def test_problem_architecture_mapper_and_capacity_helpers():
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
-        (lambda layer: layer["semantic_op"].update(kind="aten"), "exact einsum"),
+        (
+            lambda layer: layer["semantic_op"].update(kind="aten"),
+            "exact einsum",
+        ),
         (
             lambda layer: layer["semantic_op"].update(equation="MK,KN->M"),
             "output shape",
@@ -215,7 +231,10 @@ def test_curve_parsing_filters_rows_and_builds_pareto(tmp_path):
         (256, 10.0),
     ]
     with pytest.raises(orojenesis.OrojenesisError, match="missing OAVES"):
-        orojenesis.OrojenesisRunner.parse_curve(tmp_path / "missing", word_bytes=2)
+        orojenesis.OrojenesisRunner.parse_curve(
+            tmp_path / "missing",
+            word_bytes=2,
+        )
     path.write_text("bad,row,only\n", encoding="utf-8")
     with pytest.raises(orojenesis.OrojenesisError, match="no valid"):
         orojenesis.OrojenesisRunner.parse_curve(path, word_bytes=2)
@@ -227,7 +246,9 @@ def test_linear_chain_problem_discovery_and_roles():
     problem = orojenesis.multi_einsum_problem(chain)
     assert [item["id"] for item in problem["chain"]["layers"]] == ["mm0", "mm1"]
     assert orojenesis.find_multi_einsum_chains(layers) == [["mm0", "mm1"]]
-    layer_problem = orojenesis.multi_einsum_layer_problem(problem["chain"]["layers"][0])
+    layer_problem = orojenesis.multi_einsum_layer_problem(
+        problem["chain"]["layers"][0],
+    )
     assert layer_problem["problem"]["instance"] == {"M": 2, "K": 3, "N": 4}
 
     incomplete = deepcopy(layers)
@@ -243,21 +264,30 @@ def test_linear_chain_problem_discovery_and_roles():
     [
         (lambda chain: chain.pop(), "at least two"),
         (
-            lambda chain: chain[1][1]["tensor_names"]["inputs"].__setitem__(0, "x"),
+            lambda chain: chain[1][1]["tensor_names"]["inputs"].__setitem__(
+                0,
+                "x",
+            ),
             "producer-consumer",
         ),
         (
-            lambda chain: chain[1][1]["tensor_shapes"]["inputs"][0].__setitem__(0, 9),
+            lambda chain: chain[1][1]["tensor_shapes"]["inputs"][0].__setitem__(
+                0,
+                9,
+            ),
             "shapes are inconsistent",
         ),
         (
             lambda chain: chain[1][1]["tensor_dtypes"]["outputs"].__setitem__(
-                0, "float32"
+                0,
+                "float32",
             ),
             "one exact tensor dtype",
         ),
         (
-            lambda chain: chain[0][1]["semantic_op"]["effects"].update(mutates=True),
+            lambda chain: chain[0][1]["semantic_op"]["effects"].update(
+                mutates=True,
+            ),
             "observable effects",
         ),
     ],
@@ -272,11 +302,17 @@ def test_linear_chain_rejects_unsound_problems(mutation, message):
 
 def test_mapping_record_parse_and_linear_composition(tmp_path):
     first = _write_mapping(tmp_path / "first.csv", mapping="first")
-    second = _write_mapping(tmp_path / "second.csv", buffer_bytes=32, mapping="second")
+    second = _write_mapping(
+        tmp_path / "second.csv",
+        buffer_bytes=32,
+        mapping="second",
+    )
     records = orojenesis.parse_multi_mapping_records(first, word_bytes=2)
     assert records[0]["dram_bytes"] == 12
     curve = orojenesis.compose_multi_einsum_curve(
-        [[first], [second]], row_tiles=[2], word_bytes=2
+        [[first], [second]],
+        row_tiles=[2],
+        word_bytes=2,
     )
     assert curve[0]["buffer_bytes"] == 96
     assert curve[0]["mappings"] == ["first", "second"]
@@ -284,17 +320,22 @@ def test_mapping_record_parse_and_linear_composition(tmp_path):
     serialized = tmp_path / "serialized.csv"
     with serialized.open("w", newline="") as handle:
         csv.writer(handle).writerow(
-            [96, 5.0, curve[0]["dram_accesses_words"], '["first","second"]', 2]
+            [96, 5.0, curve[0]["dram_accesses_words"], '["first","second"]', 2],
         )
     assert (
-        orojenesis.parse_multi_einsum_curve(serialized, word_bytes=2)[0]["row_tile"]
+        orojenesis.parse_multi_einsum_curve(serialized, word_bytes=2)[0][
+            "row_tile"
+        ]
         == 2
     )
 
 
 def test_mapping_and_composition_validation(tmp_path):
     missing = tmp_path / "missing.csv"
-    with pytest.raises(orojenesis.OrojenesisError, match="missing multi-einsum"):
+    with pytest.raises(
+        orojenesis.OrojenesisError,
+        match="missing multi-einsum",
+    ):
         orojenesis.parse_multi_mapping_records(missing, word_bytes=2)
 
     invalid = _write_mapping(tmp_path / "invalid.csv", accesses=(1, 1, 1))
@@ -309,14 +350,23 @@ def test_mapping_and_composition_validation(tmp_path):
     empty.write_text("short,row\n", encoding="utf-8")
     with pytest.raises(orojenesis.OrojenesisError, match="no mapping records"):
         orojenesis.parse_multi_mapping_records(empty, word_bytes=2)
-    with pytest.raises(orojenesis.OrojenesisError, match="matrix is incomplete"):
-        orojenesis.compose_multi_einsum_curve([[empty]], row_tiles=[1], word_bytes=2)
+    with pytest.raises(
+        orojenesis.OrojenesisError,
+        match="matrix is incomplete",
+    ):
+        orojenesis.compose_multi_einsum_curve(
+            [[empty]],
+            row_tiles=[1],
+            word_bytes=2,
+        )
 
     left = _write_mapping(tmp_path / "left.csv", output_util=8)
     right = _write_mapping(tmp_path / "right.csv", input_util=16)
     with pytest.raises(orojenesis.OrojenesisError, match="no compatible"):
         orojenesis.compose_multi_einsum_curve(
-            [[left], [right]], row_tiles=[1], word_bytes=2
+            [[left], [right]],
+            row_tiles=[1],
+            word_bytes=2,
         )
 
 
@@ -335,7 +385,8 @@ def test_batched_layout_and_fanout_region_discovery():
     batched_regions = orojenesis.find_multi_einsum_regions(batched)
     assert batched_regions[0]["kind"] == "broadcast_batch_linear_matmul"
     assert (
-        orojenesis.multi_einsum_region_problem(batched_regions[0]) == batched_regions[0]
+        orojenesis.multi_einsum_region_problem(batched_regions[0])
+        == batched_regions[0]
     )
 
     layout = {
@@ -366,17 +417,28 @@ def test_batched_layout_and_fanout_region_discovery():
 
 
 def test_region_roles_and_curve_composition(tmp_path):
-    region = orojenesis.find_multi_einsum_regions(_linear_layers(batched=True))[0]
+    region = orojenesis.find_multi_einsum_regions(_linear_layers(batched=True))[
+        0
+    ]
     assert orojenesis.multi_einsum_region_mapper_role(region, "mm0") == "first"
-    assert orojenesis.multi_einsum_region_mapper_role(region, "mm1") == "second_last"
+    assert (
+        orojenesis.multi_einsum_region_mapper_role(region, "mm1")
+        == "second_last"
+    )
     with pytest.raises(orojenesis.OrojenesisError, match="unknown"):
         orojenesis.multi_einsum_region_mapper_role(region, "missing")
 
     first = _write_mapping(
-        tmp_path / "first.csv", input_util=24, output_util=24, mapping="a"
+        tmp_path / "first.csv",
+        input_util=24,
+        output_util=24,
+        mapping="a",
     )
     second = _write_mapping(
-        tmp_path / "second.csv", input_util=24, output_util=24, mapping="b"
+        tmp_path / "second.csv",
+        input_util=24,
+        output_util=24,
+        mapping="b",
     )
     curve = orojenesis.compose_multi_einsum_region_curve(
         region,
@@ -389,7 +451,7 @@ def test_region_roles_and_curve_composition(tmp_path):
     serialized = tmp_path / "region.csv"
     with serialized.open("w", newline="") as handle:
         csv.writer(handle).writerow(
-            [128, 4.0, curve[0]["dram_accesses_words"], '["a","b"]']
+            [128, 4.0, curve[0]["dram_accesses_words"], '["a","b"]'],
         )
     assert (
         orojenesis.parse_multi_einsum_region_curve(serialized, word_bytes=2)[0][
@@ -400,7 +462,9 @@ def test_region_roles_and_curve_composition(tmp_path):
 
 
 def test_region_validation_errors(tmp_path):
-    region = orojenesis.find_multi_einsum_regions(_linear_layers(batched=True))[0]
+    region = orojenesis.find_multi_einsum_regions(_linear_layers(batched=True))[
+        0
+    ]
     mutations = [
         lambda item: item.update(schema_version=0),
         lambda item: item.update(composition="wrong"),
@@ -415,7 +479,11 @@ def test_region_validation_errors(tmp_path):
         with pytest.raises(orojenesis.OrojenesisError):
             orojenesis.multi_einsum_region_problem(candidate)
 
-    mapping = _write_mapping(tmp_path / "mapping.csv", input_util=5, output_util=5)
+    mapping = _write_mapping(
+        tmp_path / "mapping.csv",
+        input_util=5,
+        output_util=5,
+    )
     with pytest.raises(orojenesis.OrojenesisError, match="rectangular"):
         orojenesis.compose_multi_einsum_region_curve(
             region,
@@ -425,7 +493,10 @@ def test_region_validation_errors(tmp_path):
         )
     with pytest.raises(orojenesis.OrojenesisError, match="width"):
         orojenesis.compose_multi_einsum_region_curve(
-            region, {}, row_tiles_by_node={}, word_bytes=0
+            region,
+            {},
+            row_tiles_by_node={},
+            word_bytes=0,
         )
 
     serialized = tmp_path / "serialized.csv"

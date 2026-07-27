@@ -9,7 +9,7 @@ import torch
 
 
 def module_fn(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
-    """Performs matrix multiply of a with (b + b)."""
+    """Perform matrix multiply of a with (b + b)."""
     return torch.matmul(a, b + b)
 
 

@@ -19,12 +19,11 @@ This module defines the core data structures and abstract base class
 for all einsum operation handlers.
 """
 
+import logging
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-import logging
-
-import re
+from typing import Any, ClassVar, Optional
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.common.utils import validate_einsum_ranks_match_shapes
@@ -37,12 +36,12 @@ class EinsumOperand:
     """Represents an operand in an einsum operation."""
 
     name: str
-    dims: List[str]
+    dims: list[str]
     is_output: bool = False
-    stride: Optional[Dict[str, int]] = None
-    dilation: Optional[Dict[str, int]] = None
+    stride: dict[str, int] | None = None
+    dilation: dict[str, int] | None = None
 
-    def to_timeloop_dataspace(self) -> Dict[str, Any]:
+    def to_timeloop_dataspace(self) -> dict[str, Any]:
         """Convert to timeloop dataspace format."""
         dataspace = {
             "name": self.name,
@@ -72,21 +71,25 @@ class EinsumOp:
     Max pooling:             elementwise_op='copy', reduction_op='max'
     """
 
-    operands: List[EinsumOperand]
+    operands: list[EinsumOperand]
     equation: str
     name: str
     is_real_einsum: bool = True
-    elementwise_op: str = "mul"  # 'mul', 'add', 'sub', 'div', 'max', 'min', 'copy'
+    elementwise_op: str = (
+        "mul"  # 'mul', 'add', 'sub', 'div', 'max', 'min', 'copy'
+    )
     reduction_op: str = "add"  # 'add', 'max', 'min', 'mul', 'none'
-    is_einsum_supportable: bool = True  # Can this op be expressed with extended einsum?
+    is_einsum_supportable: bool = (
+        True  # Can this op be expressed with extended einsum?
+    )
 
     @property
-    def input_operands(self) -> List[EinsumOperand]:
+    def input_operands(self) -> list[EinsumOperand]:
         """Get input operands."""
         return [op for op in self.operands if not op.is_output]
 
     @property
-    def output_operands(self) -> List[EinsumOperand]:
+    def output_operands(self) -> list[EinsumOperand]:
         """Get output operands."""
         return [op for op in self.operands if op.is_output]
 
@@ -101,7 +104,7 @@ class EinsumOp:
         """
         return compute_cost_from_equation(self.equation, tensor_shapes)
 
-    def to_torch_einsum(self, tensor_names: Optional[List[str]] = None) -> str:
+    def to_torch_einsum(self, tensor_names: list[str] | None = None) -> str:
         """Convert to torch.einsum format."""
         input_operands = self.input_operands
 
@@ -110,7 +113,7 @@ class EinsumOp:
         elif len(tensor_names) != len(input_operands):
             raise ValueError(
                 f"Number of tensor names ({len(tensor_names)}) must match "
-                f"number of input operands ({len(input_operands)})"
+                f"number of input operands ({len(input_operands)})",
             )
 
         equation_str = f"'{self.equation}'"
@@ -118,7 +121,7 @@ class EinsumOp:
         return f"torch.einsum({equation_str}, {tensor_args})"
 
 
-def _parse_dim_atoms(dim: str) -> List[str]:
+def _parse_dim_atoms(dim: str) -> list[str]:
     """Parse a possibly compound dim into atomic rank names.
 
     'P+R' -> ['P', 'R']
@@ -128,13 +131,13 @@ def _parse_dim_atoms(dim: str) -> List[str]:
     return [d.strip() for d in re.split(r"[+\-]", dim) if d.strip()]
 
 
-def _parse_equation_operand(operand: str) -> List[str]:
+def _parse_equation_operand(operand: str) -> list[str]:
     """Parse one einsum operand into rank tokens.
 
     Supports single-letter ranks with optional digits and parenthesized
     compound ranks, e.g. ``BGI(P+R)`` -> ``["B", "G", "I", "P+R"]``.
     """
-    tokens: List[str] = []
+    tokens: list[str] = []
     i = 0
     while i < len(operand):
         if operand[i] == "(":
@@ -153,7 +156,10 @@ def _parse_equation_operand(operand: str) -> List[str]:
     return tokens
 
 
-def compute_cost_from_equation(equation: str, tensor_shapes: TensorShapes) -> int:
+def compute_cost_from_equation(
+    equation: str,
+    tensor_shapes: TensorShapes,
+) -> int:
     """Calculate compute cost from an einsum equation and tensor shapes.
 
     The cost model is the product of every unique rank used by the equation.
@@ -165,10 +171,12 @@ def compute_cost_from_equation(equation: str, tensor_shapes: TensorShapes) -> in
         return 0
 
     lhs, rhs = equation.split("->", 1)
-    input_tokens = [_parse_equation_operand(operand) for operand in lhs.split(",")]
+    input_tokens = [
+        _parse_equation_operand(operand) for operand in lhs.split(",")
+    ]
     output_tokens = _parse_equation_operand(rhs)
 
-    all_ranks: Dict[str, Optional[int]] = {}
+    all_ranks: dict[str, int | None] = {}
     for tokens in input_tokens:
         for token in tokens:
             for atom in _parse_dim_atoms(token):
@@ -177,7 +185,10 @@ def compute_cost_from_equation(equation: str, tensor_shapes: TensorShapes) -> in
         for atom in _parse_dim_atoms(token):
             all_ranks.setdefault(atom, None)
 
-    def _resolve(tokens_by_operand: List[List[str]], shapes: List[TensorShape]) -> None:
+    def _resolve(
+        tokens_by_operand: list[list[str]],
+        shapes: list[TensorShape],
+    ) -> None:
         for idx, tokens in enumerate(tokens_by_operand):
             if idx >= len(shapes):
                 break
@@ -207,19 +218,23 @@ class EinsumOpHandler(ABC):
     and should access inputs/outputs by index, not by name.
     """
 
-    supported_ops: List[str] = []
+    supported_ops: ClassVar[tuple[str, ...]] = ()
 
-    def __init__(self, debug: bool = False):
+    def __init__(self, debug: bool = False) -> None:
         """Initialize the handler.
 
         Args:
             debug: Enable debug output.
+
         """
         self.debug = debug
 
     @abstractmethod
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate an einsum operation for the given operation.
 
@@ -230,8 +245,8 @@ class EinsumOpHandler(ABC):
 
         Returns:
             EinsumOp representing the operation.
+
         """
-        pass
 
     def can_handle(self, op_name: str) -> bool:
         """Check if this handler can process the given operation.
@@ -241,11 +256,14 @@ class EinsumOpHandler(ABC):
 
         Returns:
             True if this handler supports the operation.
+
         """
         return op_name.lower() in [op.lower() for op in self.supported_ops]
 
     def _validate_einsum(
-        self, einsum_op: "EinsumOp", tensor_shapes: Dict[str, List[List[int]]]
+        self,
+        einsum_op: "EinsumOp",
+        tensor_shapes: dict[str, list[list[int]]],
     ) -> "EinsumOp":
         """Validate that einsum ranks match tensor shapes.
 
@@ -259,15 +277,21 @@ class EinsumOpHandler(ABC):
 
         Returns:
             The validated (and possibly corrected) EinsumOp.
+
         """
         is_valid, error_msg = validate_einsum_ranks_match_shapes(
-            einsum_op.equation, tensor_shapes
+            einsum_op.equation,
+            tensor_shapes,
         )
 
         if not is_valid:
             logger.warning(
-                f"Einsum rank mismatch for {einsum_op.name}: {error_msg}. "
-                f"Equation: {einsum_op.equation}, tensor_shapes: {tensor_shapes}"
+                "Einsum rank mismatch for %s: %s. Equation: %s, "
+                "tensor_shapes: %s",
+                einsum_op.name,
+                error_msg,
+                einsum_op.equation,
+                tensor_shapes,
             )
             # Try to fix by regenerating equation from shapes
             corrected_op = self._try_fix_einsum_ranks(einsum_op, tensor_shapes)
@@ -277,20 +301,11 @@ class EinsumOpHandler(ABC):
         return einsum_op
 
     def _try_fix_einsum_ranks(
-        self, einsum_op: "EinsumOp", tensor_shapes: Dict[str, List[List[int]]]
+        self,
+        einsum_op: "EinsumOp",
+        tensor_shapes: dict[str, list[list[int]]],
     ) -> Optional["EinsumOp"]:
-        """Attempt to fix einsum equation to match actual tensor shapes.
-
-        This is a best-effort fix that regenerates the equation based on
-        actual tensor ranks.
-
-        Args:
-            einsum_op: The EinsumOp with mismatched ranks.
-            tensor_shapes: Dictionary with "inputs" and "outputs" keys containing shape lists.
-
-        Returns:
-            Corrected EinsumOp if fix was possible, None otherwise.
-        """
+        """Best-effort regenerate an equation from observed tensor ranks."""
         import string
 
         # Get actual shapes from tensor_shapes
@@ -320,13 +335,15 @@ class EinsumOpHandler(ABC):
 
             # Handle broadcasting: use output labels for the larger tensor
             if input_1_rank < input_rank:
-                # Second input is smaller, use suffix of output labels (broadcast from right)
+                # A smaller second input uses the output-label suffix.
                 input_1_labels = (
                     output_labels[-input_1_rank:] if input_1_rank > 0 else ""
                 )
             elif input_1_rank > input_rank:
                 # First input is smaller, use suffix of output labels
-                input_labels = output_labels[-input_rank:] if input_rank > 0 else ""
+                input_labels = (
+                    output_labels[-input_rank:] if input_rank > 0 else ""
+                )
                 input_1_labels = output_labels
             else:
                 input_1_labels = input_labels
@@ -346,7 +363,11 @@ class EinsumOpHandler(ABC):
                 EinsumOperand("Output", list(output_labels), is_output=True),
             ]
 
-        logger.info(f"Fixed einsum equation: {einsum_op.equation} -> {new_equation}")
+        logger.info(
+            "Fixed einsum equation: %s -> %s",
+            einsum_op.equation,
+            new_equation,
+        )
 
         return EinsumOp(
             operands=new_operands,
@@ -370,20 +391,22 @@ class AFOperand:
     """
 
     name: str
-    dims_lowercase: List[str]
-    dims_uppercase: Optional[List[str]] = None
+    dims_lowercase: list[str]
+    dims_uppercase: list[str] | None = None
     is_output: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dict to finally dump to AF yaml."""
-        operand = dict()
+        operand = {}
         operand["name"] = self.name
         operand["projection"] = (
             [d.lower() for d in self.dims_lowercase]
             if self.dims_uppercase is None
             else {
                 d.upper(): pr.lower()
-                for d, pr in zip(self.dims_uppercase, self.dims_lowercase)
+                for d, pr in zip(
+                    self.dims_uppercase, self.dims_lowercase, strict=True
+                )
             }
         )
         if self.is_output:
@@ -400,12 +423,12 @@ class AFOp:
     """
 
     name: str
-    tensor_accesses: List[AFOperand]
+    tensor_accesses: list[AFOperand]
     is_copy_operation: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dict to finally dump to AF yaml."""
-        op_dict = dict()
+        op_dict = {}
         op_dict["name"] = self.name
         if self.is_copy_operation:
             op_dict["is_copy_operation"] = True

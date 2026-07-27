@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityStatus,
     MatrixEntry,
@@ -14,9 +16,6 @@ from sol_execbench.core.platform.compatibility import (
     MatrixValidationScope,
     MatrixValidationScopeField,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
-
 
 ROCM_DOCKER_TARGETS_SCHEMA_VERSION = SCHEMA_VERSIONS["rocm_docker_targets"]
 
@@ -58,9 +57,12 @@ class DockerTargetManifestEntry(BaseModelWithDocstrings):
 
     @model_validator(mode="after")
     def _require_container_scope(self) -> DockerTargetManifestEntry:
-        if self.validation_scope is not MatrixValidationScope.CONTAINER_USER_SPACE:
+        if (
+            self.validation_scope
+            is not MatrixValidationScope.CONTAINER_USER_SPACE
+        ):
             raise ValueError(
-                "Docker Target manifest entries must use container_user_space"
+                "Docker Target manifest entries must use container_user_space",
             )
         return self
 
@@ -80,7 +82,6 @@ class DockerTargetManifest(BaseModelWithDocstrings):
     @property
     def targets_by_id(self) -> dict[str, DockerTargetManifestEntry]:
         """Return declared Targets keyed by id."""
-
         return {target.target_id: target for target in self.targets}
 
     @model_validator(mode="after")
@@ -89,7 +90,9 @@ class DockerTargetManifest(BaseModelWithDocstrings):
         if len(ids) != len(set(ids)):
             raise ValueError("Docker Target ids must be unique")
         if self.default_target_id not in ids:
-            raise ValueError("default_target_id must reference a declared Target")
+            raise ValueError(
+                "default_target_id must reference a declared Target",
+            )
         return self
 
 
@@ -159,7 +162,6 @@ class DockerPreflightResult(BaseModelWithDocstrings):
 
     def to_preview_payload(self) -> dict[str, Any]:
         """Return shell-consumable JSON for preflight classification."""
-
         entry_payload = self.entry.model_dump(mode="json")
         decision_payload = self.decision.model_dump(mode="json")
         target_payload = entry_payload["target"]
@@ -178,7 +180,9 @@ class DockerPreflightResult(BaseModelWithDocstrings):
             "probes_allowed": decision_payload["probes_allowed"],
             "smoke_allowed": decision_payload["smoke_allowed"],
             "score_authority": decision_payload["score_authority"],
-            "paper_parity_authority": decision_payload["paper_parity_authority"],
+            "paper_parity_authority": decision_payload[
+                "paper_parity_authority"
+            ],
             "leaderboard_authority": decision_payload["leaderboard_authority"],
             "container_user_space_validated": decision_payload[
                 "container_user_space_validated"

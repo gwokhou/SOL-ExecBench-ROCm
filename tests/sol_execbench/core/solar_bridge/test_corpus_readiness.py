@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from sol_execbench.core.integrity import sha256_file
@@ -35,7 +35,7 @@ def _ready_outcome(request) -> SolarStageAuditOutcome:
                 "reason_code": None,
                 "message": None,
                 "artifact": {"path": name, "sha256": sha256_file(path)},
-            }
+            },
         )
     return SolarStageAuditOutcome(
         status=SolarReadinessStatus.READY,
@@ -82,7 +82,8 @@ def test_corpus_audit_derives_and_addresses_the_full_scored_denominator(
     assert not any("l2n55" in record["problem_path"] for record in records)
     assert all(
         len(record["verification_seeds"]) == 3
-        and set(record["verification_patterns"]) == {"random", "zeros", "boundary"}
+        and set(record["verification_patterns"])
+        == {"random", "zeros", "boundary"}
         for record in records
     )
     summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
@@ -132,7 +133,9 @@ def test_corpus_audit_keeps_failed_workload_in_the_matrix(
         json.loads(line)
         for line in result.matrix_path.read_text(encoding="utf-8").splitlines()
     ]
-    failed = [record for record in records if record["workload_uuid"] == failed_uuid]
+    failed = [
+        record for record in records if record["workload_uuid"] == failed_uuid
+    ]
     assert len(failed) == 1
     assert failed[0]["reason_code"] == "source_input_binding_failed"
     assert len(failed[0]["trace_identity_sha256"]) == 64

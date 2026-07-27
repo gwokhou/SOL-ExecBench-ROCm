@@ -19,8 +19,12 @@ from sol_execbench.core.data.trace import EvaluationStatus
 def trace_feedback_items(
     status_counter: Counter[EvaluationStatus],
 ) -> list[AgentFeedbackItem]:
+    """Build actionable feedback items from evaluation status counts."""
     items: list[AgentFeedbackItem] = []
-    for status, count in sorted(status_counter.items(), key=lambda item: item[0]):
+    for status, count in sorted(
+        status_counter.items(),
+        key=lambda item: item[0],
+    ):
         item = _item_for_status(status, count)
         if item is not None:
             items.append(item)
@@ -39,9 +43,12 @@ def trace_feedback_items(
                     "performance diagnosis."
                 ),
                 source_refs=[
-                    DiagnosticSourceRef(kind="trace", label="canonical_trace_jsonl")
+                    DiagnosticSourceRef(
+                        kind="trace",
+                        label="canonical_trace_jsonl",
+                    ),
                 ],
-            )
+            ),
         )
     return items
 
@@ -90,7 +97,10 @@ def _item_for_status(
                 "Fix numerical correctness before interpreting performance feedback."
             ),
         )
-    if status in {EvaluationStatus.INCORRECT_SHAPE, EvaluationStatus.INCORRECT_DTYPE}:
+    if status in {
+        EvaluationStatus.INCORRECT_SHAPE,
+        EvaluationStatus.INCORRECT_DTYPE,
+    }:
         return _action_item(
             code=status.lower(),
             bottleneck=AgentFeedbackBottleneck.INTERFACE_CORRECTNESS,

@@ -44,7 +44,10 @@ from sol_execbench.core.dataset.aka_contract import (
     AkaSourceFamily,
     AkaSuite,
 )
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusEntry, AkaCorpusManifest
+from sol_execbench.core.dataset.aka_corpus import (
+    AkaCorpusEntry,
+    AkaCorpusManifest,
+)
 from sol_execbench.core.integrity import sha256_bytes, sha256_file
 from sol_execbench.core.integrity.schema_versions import (
     RELEASE_ENVIRONMENT_SCHEMA_VERSION,
@@ -58,7 +61,9 @@ from sol_execbench.core.platform.rdna4_validation import (
     RDNA4_VALIDATION_TORCH_VERSION,
     RDNA4_VALIDATION_TRITON_VERSION,
 )
-from sol_execbench.core.scoring.official_scoring import official_score_availability
+from sol_execbench.core.scoring.official_scoring import (
+    official_score_availability,
+)
 from sol_execbench.core.scoring.release_assembly import assemble_release_bundle
 from sol_execbench.core.scoring.release_builders import (
     artifact_reference,
@@ -96,7 +101,10 @@ def test_caller_authored_manifest_cannot_publish_scoring_policy(
     report = official_score_availability(corpus.path)
 
     assert report["policy"]["authorized"] is False
-    assert report["policy"]["reason_code"] == "corpus_manifest_not_repository_pinned"
+    assert (
+        report["policy"]["reason_code"]
+        == "corpus_manifest_not_repository_pinned"
+    )
     assert report["verifier"]["requires_signatures"] is False
 
 
@@ -108,7 +116,10 @@ def test_content_addressed_release_bundle_verifies_and_scores(
     bundle_path = _write_bundle(corpus, workspace)
     _trust_fixture(monkeypatch, corpus)
 
-    result = verify_and_score_release(bundle_path, corpus_manifest_path=corpus.path)
+    result = verify_and_score_release(
+        bundle_path,
+        corpus_manifest_path=corpus.path,
+    )
 
     expected = 1.0 / (1.0 + (1.5 - 1.0) / (2.0 - 1.0))
     assert result.suite.score == pytest.approx(expected)
@@ -130,7 +141,10 @@ def test_publisher_assembly_verifies_and_scores(
         statement_paths=statements,
         output_path=workspace / "release-bundle.json",
     )
-    result = verify_and_score_release(bundle_path, corpus_manifest_path=corpus.path)
+    result = verify_and_score_release(
+        bundle_path,
+        corpus_manifest_path=corpus.path,
+    )
 
     assert result.baseline_id == _BASELINE_ID
     assert result.suite.scored_workloads == 4
@@ -165,7 +179,9 @@ def test_release_rejects_trace_environment_drift(
     value: str,
 ) -> None:
     corpus, workspace = _release_fixture(tmp_path)
-    trace_path = workspace / "candidate" / "traces" / _PROBLEM_PATH / "trace.jsonl"
+    trace_path = (
+        workspace / "candidate" / "traces" / _PROBLEM_PATH / "trace.jsonl"
+    )
     traces = load_jsonl_file(Trace, trace_path)
     changed = []
     for trace in traces:
@@ -180,17 +196,22 @@ def test_release_rejects_trace_environment_drift(
             trace.model_copy(
                 update={
                     "evaluation": trace.evaluation.model_copy(
-                        update={"environment": environment.model_copy(update=update)}
-                    )
-                }
-            )
+                        update={
+                            "environment": environment.model_copy(
+                                update=update
+                            ),
+                        },
+                    ),
+                },
+            ),
         )
     atomic_write_jsonl_values(trace_path, changed)
     bundle_path = _write_bundle(corpus, workspace)
     _trust_fixture(monkeypatch, corpus)
 
     with pytest.raises(
-        ValueError, match="release trace environment is not publication eligible"
+        ValueError,
+        match="release trace environment is not publication eligible",
     ):
         verify_and_score_release(bundle_path, corpus_manifest_path=corpus.path)
 
@@ -200,7 +221,9 @@ def test_candidate_failures_score_zero_without_timing_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     corpus, workspace = _release_fixture(tmp_path)
-    trace_path = workspace / "candidate" / "traces" / _PROBLEM_PATH / "trace.jsonl"
+    trace_path = (
+        workspace / "candidate" / "traces" / _PROBLEM_PATH / "trace.jsonl"
+    )
     traces = load_jsonl_file(Trace, trace_path)
     failed = [
         trace.model_copy(
@@ -208,12 +231,12 @@ def test_candidate_failures_score_zero_without_timing_metadata(
                 "evaluation": Evaluation(
                     status=EvaluationStatus.RUNTIME_ERROR,
                     environment=trace.evaluation.environment.model_copy(
-                        update={"clocks_locked": None, "timing_protocol": None}
+                        update={"clocks_locked": None, "timing_protocol": None},
                     ),
                     timestamp="2026-07-25T00:00:00Z",
                     log="candidate failed",
-                )
-            }
+                ),
+            },
         )
         for trace in traces
         if trace.evaluation is not None
@@ -222,7 +245,10 @@ def test_candidate_failures_score_zero_without_timing_metadata(
     bundle_path = _write_bundle(corpus, workspace)
     _trust_fixture(monkeypatch, corpus)
 
-    result = verify_and_score_release(bundle_path, corpus_manifest_path=corpus.path)
+    result = verify_and_score_release(
+        bundle_path,
+        corpus_manifest_path=corpus.path,
+    )
 
     assert result.suite.score == 0.0
     assert result.suite.scored_workloads == 4
@@ -238,7 +264,11 @@ def test_candidate_failures_score_zero_without_timing_metadata(
             "sha256:" + "e" * 64,
             "different environment identities",
         ),
-        ("container_image_id", "sha256:" + "z" * 64, "immutable sha256 image ID"),
+        (
+            "container_image_id",
+            "sha256:" + "z" * 64,
+            "immutable sha256 image ID",
+        ),
     ],
 )
 def test_release_rejects_execution_environment_drift(
@@ -265,18 +295,29 @@ def test_release_rejects_noncanonical_baseline_solution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     corpus, workspace = _release_fixture(tmp_path)
-    path = workspace / "baseline" / "implementations" / _PROBLEM_PATH / "solution.json"
+    path = (
+        workspace
+        / "baseline"
+        / "implementations"
+        / _PROBLEM_PATH
+        / "solution.json"
+    )
     solution = Solution.model_validate_json(path.read_text(encoding="utf-8"))
     atomic_write_json_value(
         path,
-        solution.model_copy(update={"author": "not the release baseline"}).model_dump(
-            mode="json"
+        solution.model_copy(
+            update={"author": "not the release baseline"},
+        ).model_dump(
+            mode="json",
         ),
     )
     bundle_path = _write_bundle(corpus, workspace)
     _trust_fixture(monkeypatch, corpus)
 
-    with pytest.raises(ValueError, match="baseline is not the canonical reference"):
+    with pytest.raises(
+        ValueError,
+        match="baseline is not the canonical reference",
+    ):
         verify_and_score_release(bundle_path, corpus_manifest_path=corpus.path)
 
 
@@ -316,7 +357,8 @@ def test_release_bundle_schema_rejects_legacy_signature_fields(
     corpus, workspace = _release_fixture(tmp_path)
     statements = _write_statements(corpus, workspace)
     baseline = artifact_reference(
-        workspace, statements[ReleaseArtifactKind.BASELINE]
+        workspace,
+        statements[ReleaseArtifactKind.BASELINE],
     ).model_dump(mode="json")
     baseline["signature"] = {"path": "baseline.sig", "sha256": "0" * 64}
 
@@ -324,16 +366,19 @@ def test_release_bundle_schema_rejects_legacy_signature_fields(
         ReleaseBundle.model_validate(
             {
                 "corpus_manifest": artifact_reference(
-                    workspace, workspace / "corpus" / "manifest.yaml"
+                    workspace,
+                    workspace / "corpus" / "manifest.yaml",
                 ),
                 "baseline": baseline,
                 "candidate": artifact_reference(
-                    workspace, statements[ReleaseArtifactKind.CANDIDATE]
+                    workspace,
+                    statements[ReleaseArtifactKind.CANDIDATE],
                 ),
                 "solar": artifact_reference(
-                    workspace, statements[ReleaseArtifactKind.SOLAR]
+                    workspace,
+                    statements[ReleaseArtifactKind.SOLAR],
                 ),
-            }
+            },
         )
 
 
@@ -383,12 +428,14 @@ def _release_fixture(tmp_path: Path) -> tuple[AkaCorpusManifest, Path]:
             _PROBLEM_PATH: {
                 "definition_sha256": sha256_file(problem / "definition.json"),
                 "workload_sha256": sha256_file(problem / "workload.jsonl"),
-            }
+            },
         },
         formal_coverage_requirements={},
         official_scoring={
             "status": "available",
-            "release_policy": str(AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1),
+            "release_policy": str(
+                AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1,
+            ),
             "baseline_id": _BASELINE_ID,
         },
     )
@@ -401,7 +448,9 @@ def _write_corpus_manifest(authored: Path, problem: Path) -> Path:
     payload = {
         "official_scoring": {
             "status": "available",
-            "release_policy": str(AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1),
+            "release_policy": str(
+                AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1,
+            ),
             "baseline_id": _BASELINE_ID,
         },
         "definition_sha256": sha256_file(problem / "definition.json"),
@@ -414,7 +463,7 @@ def _write_corpus_manifest(authored: Path, problem: Path) -> Path:
 def _write_run_artifacts(corpus: AkaCorpusManifest, workspace: Path) -> None:
     problem = corpus.authored_root / _PROBLEM_PATH
     definition = Definition.model_validate_json(
-        (problem / "definition.json").read_text(encoding="utf-8")
+        (problem / "definition.json").read_text(encoding="utf-8"),
     )
     workloads = load_jsonl_file(Workload, problem / "workload.jsonl")
     baseline = reference_baseline_solution(definition)
@@ -424,13 +473,20 @@ def _write_run_artifacts(corpus: AkaCorpusManifest, workspace: Path) -> None:
         ("candidate", candidate, 1.5),
     ):
         solution_path = (
-            workspace / kind / "implementations" / _PROBLEM_PATH / "solution.json"
+            workspace
+            / kind
+            / "implementations"
+            / _PROBLEM_PATH
+            / "solution.json"
         )
         trace_path = workspace / kind / "traces" / _PROBLEM_PATH / "trace.jsonl"
         atomic_write_json_value(solution_path, solution.model_dump(mode="json"))
         atomic_write_jsonl_values(
             trace_path,
-            [_trace(definition, solution, workload, latency) for workload in workloads],
+            [
+                _trace(definition, solution, workload, latency)
+                for workload in workloads
+            ],
         )
         atomic_write_json_value(
             workspace / kind / "environment.json",
@@ -516,15 +572,15 @@ def _environment_evidence() -> dict[str, object]:
                     "parsed": {
                         "pci_vendor_ids": [RDNA4_VALIDATION_PCI_VENDOR_ID],
                         "pci_device_ids": [RDNA4_VALIDATION_PCI_DEVICE_ID],
-                    }
-                }
+                    },
+                },
             },
             "gpus": [
                 {
                     "index": 0,
                     "gfx_target": "gfx1200",
                     "name": "AMD Radeon Graphics",
-                }
+                },
             ],
             "pytorch": {
                 "available": True,
@@ -542,7 +598,7 @@ def _environment_evidence() -> dict[str, object]:
 def _write_solar_artifacts(corpus: AkaCorpusManifest, workspace: Path) -> None:
     problem = corpus.authored_root / _PROBLEM_PATH
     definition = Definition.model_validate_json(
-        (problem / "definition.json").read_text(encoding="utf-8")
+        (problem / "definition.json").read_text(encoding="utf-8"),
     )
     for workload in load_jsonl_file(Workload, problem / "workload.jsonl"):
         root = workspace / "solar" / "manifests" / _PROBLEM_PATH / workload.uuid
@@ -593,15 +649,21 @@ def _write_bundle_from_statements(
 ) -> Path:
     bundle = ReleaseBundle(
         corpus_manifest=artifact_reference(
-            workspace, workspace / "corpus" / "manifest.yaml"
+            workspace,
+            workspace / "corpus" / "manifest.yaml",
         ),
         baseline=artifact_reference(
-            workspace, statements[ReleaseArtifactKind.BASELINE]
+            workspace,
+            statements[ReleaseArtifactKind.BASELINE],
         ),
         candidate=artifact_reference(
-            workspace, statements[ReleaseArtifactKind.CANDIDATE]
+            workspace,
+            statements[ReleaseArtifactKind.CANDIDATE],
         ),
-        solar=artifact_reference(workspace, statements[ReleaseArtifactKind.SOLAR]),
+        solar=artifact_reference(
+            workspace,
+            statements[ReleaseArtifactKind.SOLAR],
+        ),
     )
     bundle_path = workspace / "release-bundle.json"
     atomic_write_json_value(bundle_path, release_model_payload(bundle))
@@ -615,7 +677,10 @@ def _write_statements(
     baseline_id: str = _BASELINE_ID,
     candidate_revision: str = _SOURCE_REVISION,
 ) -> dict[ReleaseArtifactKind, Path]:
-    corpus_ref = artifact_reference(workspace, workspace / "corpus" / "manifest.yaml")
+    corpus_ref = artifact_reference(
+        workspace,
+        workspace / "corpus" / "manifest.yaml",
+    )
     baseline = _run_statement(
         corpus,
         workspace,
@@ -633,13 +698,19 @@ def _write_statements(
     solar = _solar_statement(corpus, workspace, corpus_ref)
     return {
         ReleaseArtifactKind.BASELINE: _write_payload(
-            workspace, ReleaseArtifactKind.BASELINE, baseline
+            workspace,
+            ReleaseArtifactKind.BASELINE,
+            baseline,
         ),
         ReleaseArtifactKind.CANDIDATE: _write_payload(
-            workspace, ReleaseArtifactKind.CANDIDATE, candidate
+            workspace,
+            ReleaseArtifactKind.CANDIDATE,
+            candidate,
         ),
         ReleaseArtifactKind.SOLAR: _write_payload(
-            workspace, ReleaseArtifactKind.SOLAR, solar
+            workspace,
+            ReleaseArtifactKind.SOLAR,
+            solar,
         ),
     }
 
@@ -660,7 +731,11 @@ def _run_statement(
         workload_sha256=identity["workload_sha256"],
         implementation=artifact_reference(
             workspace,
-            workspace / kind / "implementations" / _PROBLEM_PATH / "solution.json",
+            workspace
+            / kind
+            / "implementations"
+            / _PROBLEM_PATH
+            / "solution.json",
         ),
         trace=artifact_reference(
             workspace,
@@ -672,7 +747,8 @@ def _run_statement(
         "source_revision": source_revision,
         "corpus_manifest": corpus_ref,
         "environment": artifact_reference(
-            workspace, workspace / kind / "environment.json"
+            workspace,
+            workspace / kind / "environment.json",
         ),
         "problems": (evidence,),
     }
@@ -701,7 +777,7 @@ def _solar_statement(
                 problem_path=_PROBLEM_PATH,
                 workload_uuid=workload_uuid,
                 manifest=artifact_reference(workspace, manifest),
-            )
+            ),
         )
     return SolarIndexStatement(
         generated_at="2026-07-25T00:00:00Z",

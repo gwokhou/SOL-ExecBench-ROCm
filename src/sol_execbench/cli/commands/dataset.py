@@ -17,16 +17,21 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from sol_execbench.cli.protocol import EXIT_UNAVAILABLE, CliFailure, CliResult, artifact
-from sol_execbench.core.dataset.aka_corpus import (
-    AKA_REVISION,
-    AkaCorpusManifest,
+from sol_execbench.cli.protocol import (
+    EXIT_UNAVAILABLE,
+    CliFailure,
+    CliResult,
+    artifact,
 )
 from sol_execbench.core.dataset.aka_compatibility import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
     SUPPORTED_AKA_GFX_TARGETS,
     AkaProbeInfrastructureError,
     materialization_target,
+)
+from sol_execbench.core.dataset.aka_corpus import (
+    AKA_REVISION,
+    AkaCorpusManifest,
 )
 from sol_execbench.core.platform.runtime import detect_rocm_device
 
@@ -37,7 +42,10 @@ DEFAULT_AKA_ROOT = Path("data/AgentKernelArena")
 DEFAULT_FETCH_SCRIPT = Path("scripts/fetch_aka_source.sh")
 
 
-@click.group("dataset", context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(
+    "dataset",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 def dataset_cli() -> None:
     """Materialize and audit the AKA-derived problem corpus."""
 
@@ -143,7 +151,7 @@ def materialize_cli(
         f"[green]Materialized {report['problems']} problems / "
         f"{report['workloads']} workloads for {report['gfx_target']} in {result_path} "
         f"({report['excluded_workloads']} workloads excluded)"
-        f"[/green]"
+        f"[/green]",
     )
     record = result_path / "materialization-manifest.yaml"
     return CliResult(
@@ -173,7 +181,11 @@ def materialize_cli(
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     required=True,
 )
-def audit_cli(manifest_path: Path, aka_root: Path, problem_root: Path) -> CliResult:
+def audit_cli(
+    manifest_path: Path,
+    aka_root: Path,
+    problem_root: Path,
+) -> CliResult:
     """Fail closed if local problems differ from the pinned AKA selection."""
     manifest = _load_manifest(manifest_path)
     try:
@@ -184,11 +196,11 @@ def audit_cli(manifest_path: Path, aka_root: Path, problem_root: Path) -> CliRes
         report["aka_provenance"] = manifest.audit_aka_provenance(aka_root)
         console.print(
             f"[green]AKA provenance bound to {report['aka_provenance']['revision'][:12]} "
-            f"({report['aka_provenance']['checksums_verified']} checksums verified)[/green]"
+            f"({report['aka_provenance']['checksums_verified']} checksums verified)[/green]",
         )
     console.print(
         f"[green]Valid AKA corpus: {report['problems']} problems, "
-        f"{report['scored']} scored[/green]"
+        f"{report['scored']} scored[/green]",
     )
     return CliResult(data={"problem_root": str(problem_root), **report})
 
@@ -212,7 +224,7 @@ def _ensure_aka_clone(aka_root: Path) -> None:
     if not DEFAULT_FETCH_SCRIPT.is_file():
         console.print(
             f"[yellow]AKA fetch script missing at {DEFAULT_FETCH_SCRIPT}; "
-            f"continuing without verifying the AKA clone.[/yellow]"
+            f"continuing without verifying the AKA clone.[/yellow]",
         )
         return
     try:
@@ -220,7 +232,7 @@ def _ensure_aka_clone(aka_root: Path) -> None:
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         console.print(
             f"[yellow]Could not fetch/verify AKA clone ({exc}); "
-            f"continuing with authored problems only.[/yellow]"
+            f"continuing with authored problems only.[/yellow]",
         )
 
 

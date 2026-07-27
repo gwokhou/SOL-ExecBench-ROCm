@@ -21,7 +21,7 @@ This module provides utility functions following Google's Python style guide.
 import importlib.util
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Union
 
 import yaml
 
@@ -47,9 +47,11 @@ class NoAliasDumper(yaml.SafeDumper):
             - - 16
             output_shapes:
             - - 16
+
     """
 
-    def ignore_aliases(self, data):
+    def ignore_aliases(self, data: Any) -> bool:
+        """Disable YAML anchors and aliases for every represented value."""
         return True
 
 
@@ -67,6 +69,7 @@ def format_number(n: int) -> str:
         '1.50K'
         >>> format_number(2500000)
         '2.50M'
+
     """
     if n < 1000:
         return str(n)
@@ -102,6 +105,7 @@ def load_module_from_file(file_path: Union[str, Path]) -> Any:
 
     Raises:
         ImportError: If the module cannot be loaded.
+
     """
     file_path = Path(file_path)
     if not file_path.exists():
@@ -124,6 +128,7 @@ def ensure_directory(path: Union[str, Path]) -> Path:
 
     Returns:
         Path object for the directory.
+
     """
     path = Path(path)
     path.mkdir(parents=True, exist_ok=True)
@@ -138,14 +143,16 @@ def get_file_prefix(filename: str) -> str:
 
     Returns:
         The prefix (e.g., "1").
+
     """
     base_name = Path(filename).stem
     return base_name.split("_")[0]
 
 
 def parse_kernel_ids(
-    kernel_ids: Optional[List[int]], available_files: List[Path]
-) -> List[Path]:
+    kernel_ids: list[int] | None,
+    available_files: list[Path],
+) -> list[Path]:
     """Filter files by kernel IDs.
 
     Args:
@@ -154,6 +161,7 @@ def parse_kernel_ids(
 
     Returns:
         Filtered list of file paths matching the kernel IDs.
+
     """
     if kernel_ids is None:
         return available_files
@@ -170,8 +178,10 @@ def parse_kernel_ids(
 
 
 def merge_dicts(
-    base: Dict[str, Any], update: Dict[str, Any], deep: bool = True
-) -> Dict[str, Any]:
+    base: dict[str, Any],
+    update: dict[str, Any],
+    deep: bool = True,
+) -> dict[str, Any]:
     """Merge two dictionaries.
 
     Args:
@@ -181,6 +191,7 @@ def merge_dicts(
 
     Returns:
         Merged dictionary (modifies base in-place and returns it).
+
     """
     for key, value in update.items():
         if (
@@ -195,7 +206,7 @@ def merge_dicts(
     return base
 
 
-def validate_shapes(shapes: Dict[str, List[int]]) -> bool:
+def validate_shapes(shapes: dict[str, list[int]]) -> bool:
     """Validate tensor shapes dictionary.
 
     Args:
@@ -203,11 +214,12 @@ def validate_shapes(shapes: Dict[str, List[int]]) -> bool:
 
     Returns:
         True if all shapes are valid, False otherwise.
+
     """
     if not shapes:
         return False
 
-    for name, shape in shapes.items():
+    for shape in shapes.values():
         if not isinstance(shape, (list, tuple)):
             return False
         if not shape:  # Empty shape
@@ -226,6 +238,7 @@ def convert_numpy_types(obj: Any) -> Any:
 
     Returns:
         Object with numpy types converted to Python types.
+
     """
     import numpy as np
 
@@ -243,39 +256,18 @@ def convert_numpy_types(obj: Any) -> Any:
         return obj
 
 
-def parse_dim_tokens(dims_str: str, validate: bool = True) -> List[str]:
-    """Parse a dimension string into individual dimension tokens.
-
-    Tokens are in the format: SINGLE capital letter optionally followed by integer,
-    OR parenthesized groups like (P+R) for convolution-style notation.
-    Examples: A, B, A0, A1, A12, Z99, (P+R), (Q+S), etc.
-
-    IMPORTANT:
-    - Multi-letter prefixes are NOT allowed. Each token starts with exactly ONE letter.
-    - Repeated ranks in the same tensor are NOT allowed (raises ValueError).
-    - Parenthesized groups like (P+R) are preserved as single tokens.
-
-    All tokens are returned in uppercase for consistency.
-
-    Examples:
-        "ABC" -> ["A", "B", "C"]
-        "A1B1C1" -> ["A1", "B1", "C1"]
-        "A1B2C3" -> ["A1", "B2", "C3"]
-        "ABCA1B1" -> ["A", "B", "C", "A1", "B1"]
-        "A12B34" -> ["A12", "B34"]
-        "BC(P+R)(Q+S)" -> ["B", "C", "(P+R)", "(Q+S)"]
-        "AA" -> raises ValueError (repeated rank "A")
-        "A0A0" -> raises ValueError (repeated rank "A0")
+def parse_dim_tokens(dims_str: str, validate: bool = True) -> list[str]:
+    """Parse uppercase rank tokens and parenthesized compound dimensions.
 
     Args:
-        dims_str: String of dimension names (e.g., "ABC", "A1B1C1", "A12B34", "BC(P+R)(Q+S)")
-        validate: If True, raise ValueError on repeated ranks. Default True.
+        dims_str: Compact dimension notation such as ``A1BC(P+R)``.
+        validate: Whether to reject repeated tokens.
 
     Returns:
-        List of individual dimension tokens (uppercase)
+        Individual uppercase dimension tokens.
 
     Raises:
-        ValueError: If validate=True and there are repeated ranks in the tensor.
+        ValueError: If validation finds a repeated token.
     """
     if not dims_str:
         return []
@@ -333,13 +325,16 @@ def parse_dim_tokens(dims_str: str, validate: bool = True) -> List[str]:
             seen.add(token)
         raise ValueError(
             f"Repeated rank(s) in tensor dimensions: {duplicates}. "
-            f"Each dimension must be unique. Got: {tokens}"
+            f"Each dimension must be unique. Got: {tokens}",
         )
 
     return tokens
 
 
-def validate_dim_tokens(tokens: List[str], raise_on_error: bool = False) -> bool:
+def validate_dim_tokens(
+    tokens: list[str],
+    raise_on_error: bool = False,
+) -> bool:
     """Validate that dimension tokens have no duplicates (repeated ranks).
 
     Each dimension in a tensor must be unique. Repeated ranks like ["A", "A"]
@@ -359,6 +354,7 @@ def validate_dim_tokens(tokens: List[str], raise_on_error: bool = False) -> bool
         validate_dim_tokens(["A", "B", "C"]) -> True
         validate_dim_tokens(["A", "A"]) -> False (repeated rank)
         validate_dim_tokens(["A0", "A1", "B0"]) -> True
+
     """
     if len(tokens) == len(set(tokens)):
         return True
@@ -372,7 +368,7 @@ def validate_dim_tokens(tokens: List[str], raise_on_error: bool = False) -> bool
             seen.add(token)
         raise ValueError(
             f"Repeated rank(s) in tensor dimensions: {duplicates}. "
-            f"Each dimension must be unique. Got: {tokens}"
+            f"Each dimension must be unique. Got: {tokens}",
         )
 
     return False
@@ -395,6 +391,7 @@ def parse_einsum_equation(equation: str) -> tuple:
 
     Returns:
         Tuple of (list of input operand token lists, output tokens)
+
     """
     if not equation or "->" not in equation:
         return [], []
@@ -409,10 +406,10 @@ def parse_einsum_equation(equation: str) -> tuple:
     output_tokens = parse_dim_tokens(rhs)
 
     # Parse input operands (comma-separated)
-    input_operands: List[List[str]] = []
+    input_operands: list[list[str]] = []
     if lhs:
-        for operand_str in lhs.split(","):
-            operand_str = operand_str.strip()
+        for raw_operand in lhs.split(","):
+            operand_str = raw_operand.strip()
             if operand_str:
                 input_operands.append(parse_dim_tokens(operand_str))
 
@@ -421,8 +418,8 @@ def parse_einsum_equation(equation: str) -> tuple:
 
 def validate_einsum_ranks_match_shapes(
     equation: str,
-    tensor_shapes: Dict[str, List[List[int]]],
-) -> Tuple[bool, str]:
+    tensor_shapes: dict[str, list[list[int]]],
+) -> tuple[bool, str]:
     """Validate that einsum equation ranks match tensor shapes.
 
     This function checks that the number of dimensions in each operand of the
@@ -441,6 +438,7 @@ def validate_einsum_ranks_match_shapes(
         (True, "")
         >>> validate_einsum_ranks_match_shapes("AB,AB->AB", {"inputs": [[32, 64], [64]], "outputs": [[32, 64]]})
         (False, "Einsum input operand 1 has 2 dims (AB) but tensor has shape [64] (1 dims)")
+
     """
     if not equation or "->" not in equation:
         return True, ""  # Can't validate without proper equation
@@ -469,7 +467,7 @@ def validate_einsum_ranks_match_shapes(
             operand_str = "".join(operand_tokens)
             errors.append(
                 f"Einsum input operand {i} has {expected_rank} dims ({operand_str}) "
-                f"but tensor has shape {shape} ({actual_rank} dims)"
+                f"but tensor has shape {shape} ({actual_rank} dims)",
             )
 
     # Validate output operand
@@ -483,7 +481,7 @@ def validate_einsum_ranks_match_shapes(
                 output_str = "".join(output_tokens)
                 errors.append(
                     f"Einsum output has {expected_rank} dims ({output_str}) "
-                    f"but tensor has shape {output_shape} ({actual_rank} dims)"
+                    f"but tensor has shape {output_shape} ({actual_rank} dims)",
                 )
 
     if errors:
@@ -492,9 +490,9 @@ def validate_einsum_ranks_match_shapes(
 
 
 def validate_tensor_names_match_shapes(
-    tensor_names: Dict[str, List[str]],
-    tensor_shapes: Dict[str, List[List[int]]],
-) -> Tuple[bool, str]:
+    tensor_names: dict[str, list[str]],
+    tensor_shapes: dict[str, list[list[int]]],
+) -> tuple[bool, str]:
     """Validate that tensor_names and tensor_shapes have matching counts.
 
     This function checks that the number of tensor names matches the number of
@@ -520,6 +518,7 @@ def validate_tensor_names_match_shapes(
         ...     {"inputs": [[32, 64]], "outputs": [[32, 128]]}
         ... )
         (False, "Input tensor_names has 2 entries but tensor_shapes has 1")
+
     """
     errors = []
 
@@ -530,7 +529,7 @@ def validate_tensor_names_match_shapes(
     if len(input_names) != len(input_shapes):
         errors.append(
             f"Input tensor_names has {len(input_names)} entries "
-            f"but tensor_shapes has {len(input_shapes)}"
+            f"but tensor_shapes has {len(input_shapes)}",
         )
 
     # Validate outputs
@@ -540,7 +539,7 @@ def validate_tensor_names_match_shapes(
     if len(output_names) != len(output_shapes):
         errors.append(
             f"Output tensor_names has {len(output_names)} entries "
-            f"but tensor_shapes has {len(output_shapes)}"
+            f"but tensor_shapes has {len(output_shapes)}",
         )
 
     if errors:
@@ -548,7 +547,7 @@ def validate_tensor_names_match_shapes(
     return True, ""
 
 
-def load_einsum_graph_to_networkx(layers: Dict[str, Any]) -> Any:
+def load_einsum_graph_to_networkx(layers: dict[str, Any]) -> Any:
     """Build a NetworkX DiGraph from einsum graph layers dict.
 
     Each node is a layer (operation), and edges represent data flow
@@ -559,6 +558,7 @@ def load_einsum_graph_to_networkx(layers: Dict[str, Any]) -> Any:
 
     Returns:
         NetworkX DiGraph with nodes and edges representing the computation graph
+
     """
     import networkx as nx
 
@@ -587,28 +587,37 @@ def load_einsum_graph_to_networkx(layers: Dict[str, Any]) -> Any:
 
 # AccelForge yaml dumping with flow style
 class FlowDict(dict):
-    pass
+    """Dictionary rendered with YAML flow style."""
 
 
 class FlowList(list):
-    pass
+    """List rendered with YAML flow style."""
 
 
 class LocalDumper(NoAliasDumper):
-    pass
+    """No-alias YAML dumper with local flow-style representers."""
 
 
 LocalDumper.add_representer(
     FlowDict,
-    lambda d, x: d.represent_mapping("tag:yaml.org,2002:map", x, flow_style=True),
+    lambda d, x: d.represent_mapping(
+        "tag:yaml.org,2002:map",
+        x,
+        flow_style=True,
+    ),
 )
 LocalDumper.add_representer(
     FlowList,
-    lambda d, x: d.represent_sequence("tag:yaml.org,2002:seq", x, flow_style=True),
+    lambda d, x: d.represent_sequence(
+        "tag:yaml.org,2002:seq",
+        x,
+        flow_style=True,
+    ),
 )
 
 
-def flowify(x):
+def flowify(x: Any) -> Any:
+    """Recursively wrap compact YAML fields in flow-style containers."""
     if isinstance(x, dict):
         out = {}
         for k, v in x.items():

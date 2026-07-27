@@ -40,7 +40,7 @@ import sys
 import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -66,7 +66,9 @@ from solar.rocm.architecture import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SOLAR_ROOT = REPO_ROOT / "src" / "solar"
-PROBE_DIR = REPO_ROOT / "src" / "sol_execbench" / "data" / "hardware_calibration_probes"
+PROBE_DIR = (
+    REPO_ROOT / "src" / "sol_execbench" / "data" / "hardware_calibration_probes"
+)
 
 SCHEMA_VERSION = RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION
 TIMING_PROFILE = RESOURCE_PEAK_TIMING_PROFILE
@@ -97,6 +99,7 @@ class SampleBatch:
     telemetry_after: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible sample batch."""
         payload: dict[str, Any] = {
             "process_batch": self.process_batch,
             "samples": list(self.samples),
@@ -296,7 +299,9 @@ PROBES: tuple[dict[str, Any], ...] = (
 
 
 def _run(
-    cmd: list[str], *, timeout_seconds: float = COMMAND_TIMEOUT_SECONDS
+    cmd: list[str],
+    *,
+    timeout_seconds: float = COMMAND_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess[str]:
     completed = run_in_process_group_bounded(
         cmd,
@@ -305,7 +310,9 @@ def _run(
     )
     if completed.returncode != 0:
         detail = redacted_text_tail(completed.stderr or completed.stdout or "")
-        raise RuntimeError(f"command failed with exit {completed.returncode}: {detail}")
+        raise RuntimeError(
+            f"command failed with exit {completed.returncode}: {detail}",
+        )
     return completed
 
 
@@ -318,17 +325,23 @@ def _required_rocm_tool(name: str) -> str:
 
 def _git_revision() -> str:
     try:
-        return _run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"]).stdout.strip()
-    except Exception:
+        return _run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+        ).stdout.strip()
+    except Exception:  # noqa: BLE001 -- revision metadata is best-effort
         return "unknown"
 
 
 def _device_identity() -> dict[str, Any]:
     summary = collect_pytorch_rocm_summary()
-    if not summary.available or not summary.device_name or not summary.gfx_target:
+    if (
+        not summary.available
+        or not summary.device_name
+        or not summary.gfx_target
+    ):
         raise RuntimeError(
             "PyTorch ROCm could not identify a visible AMD GPU: "
-            f"{summary.error or 'device metadata unavailable'}"
+            f"{summary.error or 'device metadata unavailable'}",
         )
     amdsmi = _run([_required_rocm_tool("amd-smi"), "version"]).stdout
     hipcc_result = _run([_required_rocm_tool("hipcc"), "--version"])
@@ -341,7 +354,9 @@ def _device_identity() -> dict[str, Any]:
         "hip_version": summary.hip_version,
         "amdsmi_version": re.sub(r"\s+", " ", amdsmi).strip()[:500],
         "hipcc_version": [
-            line.strip() for line in hipcc_output.splitlines() if "HIP version" in line
+            line.strip()
+            for line in hipcc_output.splitlines()
+            if "HIP version" in line
         ][:1],
     }
 
@@ -350,7 +365,9 @@ def _clock_state() -> dict[str, Any]:
     """Read current GFX clock + deep-sleep state (read-only, no sudo)."""
     state: dict[str, Any] = {"clock_locked_verified": False}
     try:
-        metric = _run([_required_rocm_tool("amd-smi"), "metric", "--clock"]).stdout
+        metric = _run(
+            [_required_rocm_tool("amd-smi"), "metric", "--clock"],
+        ).stdout
         clk_match = re.search(r"CLK:\s*(\d+)\s*MHz", metric)
         sleep_match = re.search(r"DEEP_SLEEP:\s*(\w+)", metric)
         max_match = re.search(r"MAX_CLK:\s*(\d+)\s*MHz", metric)
@@ -366,7 +383,7 @@ def _clock_state() -> dict[str, Any]:
                 state["deep_sleep"] == "DISABLED"
                 and state.get("gfx_clock_mhz", 0) > 1000
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- record diagnostic probe failure
         state["error"] = str(exc)
     return state
 
@@ -380,7 +397,9 @@ def _compile_probe(
     compiler_defines: Mapping[str, int] | None = None,
 ) -> Path:
     definition_items = sorted((compiler_defines or {}).items())
-    label = "-".join(f"{name.lower()}-{value}" for name, value in definition_items)
+    label = "-".join(
+        f"{name.lower()}-{value}" for name, value in definition_items
+    )
     binary_directory = workdir / "binaries" / source.stem
     binary_directory.mkdir(parents=True, exist_ok=True)
     binary = binary_directory / f"{source.stem}-{label or 'default'}.bin"
@@ -393,14 +412,13 @@ def _compile_probe(
             "-o",
             str(binary),
             str(source),
-        ]
+        ],
     )
     return binary
 
 
 def _telemetry_snapshot(amdsmi: str) -> dict[str, Any]:
     """Capture a bounded, machine-readable environmental snapshot."""
-
     result = _run(
         [
             amdsmi,
@@ -412,7 +430,7 @@ def _telemetry_snapshot(amdsmi: str) -> dict[str, Any]:
             "--json",
             "--gpu",
             "0",
-        ]
+        ],
     )
     try:
         payload = json.loads(result.stdout)
@@ -420,7 +438,7 @@ def _telemetry_snapshot(amdsmi: str) -> dict[str, Any]:
     except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
         raise RuntimeError("amd-smi returned invalid telemetry JSON") from exc
     return {
-        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "captured_at": datetime.now(UTC).isoformat(),
         "gfx_clock_mhz": _metric_value(gpu, "clock", "gfx_0", "clk"),
         "gfx_max_clock_mhz": _metric_value(gpu, "clock", "gfx_0", "max_clk"),
         "memory_clock_mhz": _metric_value(gpu, "clock", "mem_0", "clk"),
@@ -464,10 +482,12 @@ def _parse_result_samples(binary: Path, stdout: str) -> tuple[float, ...]:
     if len(samples) != SAMPLES_PER_PROCESS_BATCH:
         raise RuntimeError(
             f"probe {binary.name} produced {len(samples)} RESULT lines; "
-            f"expected {SAMPLES_PER_PROCESS_BATCH}"
+            f"expected {SAMPLES_PER_PROCESS_BATCH}",
         )
     if any(not np.isfinite(sample) or sample <= 0 for sample in samples):
-        raise RuntimeError(f"probe {binary.name} produced invalid RESULT values")
+        raise RuntimeError(
+            f"probe {binary.name} produced invalid RESULT values",
+        )
     return tuple(samples)
 
 
@@ -495,7 +515,9 @@ def _flatten_samples(batches: tuple[SampleBatch, ...]) -> tuple[float, ...]:
     return samples
 
 
-def _bootstrap_median_interval(batch_medians: tuple[float, ...]) -> dict[str, Any]:
+def _bootstrap_median_interval(
+    batch_medians: tuple[float, ...],
+) -> dict[str, Any]:
     values = np.asarray(batch_medians, dtype=np.float64)
     generator = np.random.default_rng(BOOTSTRAP_SEED)
     indices = generator.integers(
@@ -535,7 +557,7 @@ def _sample_statistics(batches: tuple[SampleBatch, ...]) -> dict[str, Any]:
         "interquartile_range": float(upper_quartile - lower_quartile),
         "batch_medians": list(batch_medians),
         "bootstrap_median_confidence_interval_95": _bootstrap_median_interval(
-            batch_medians
+            batch_medians,
         ),
     }
 
@@ -562,7 +584,7 @@ def _telemetry_summary(batches: tuple[SampleBatch, ...]) -> dict[str, Any]:
                 float(snapshot[field])
                 for snapshot in snapshots
                 if isinstance(snapshot.get(field), (int, float))
-            )
+            ),
         )
         for field in numeric_fields
     }
@@ -571,21 +593,25 @@ def _telemetry_summary(batches: tuple[SampleBatch, ...]) -> dict[str, Any]:
         "sampling": "immediately before and after each held-out process batch",
         "numeric": numeric,
         "deep_sleep_states": sorted(
-            {str(item["deep_sleep"]) for item in snapshots if item.get("deep_sleep")}
+            {
+                str(item["deep_sleep"])
+                for item in snapshots
+                if item.get("deep_sleep")
+            },
         ),
         "throttle_statuses": sorted(
             {
                 str(item["throttle_status"])
                 for item in snapshots
                 if item.get("throttle_status")
-            }
+            },
         ),
         "performance_levels": sorted(
             {
                 str(item["performance_level"])
                 for item in snapshots
                 if item.get("performance_level")
-            }
+            },
         ),
     }
 
@@ -622,7 +648,6 @@ CALIBRATION_INSTRUCTION_NAMES: tuple[str, ...] = tuple(
 
 def _isa_spec_evidence(architecture: str) -> dict[str, Any]:
     """Validate candidate instructions against the machine-readable ISA."""
-
     report = inspect_isa_requirements(architecture, CALIBRATION_ISA_CHECKS)
     supported = set(report.supported_instructions)
     return {
@@ -674,7 +699,9 @@ def _bf16_fallback_check(
     emitted = _count_emitted(measurement, VALU_BF16_INSTRUCTIONS)
     fallback = _count_emitted(measurement, VALU_FP32_FALLBACK_INSTRUCTIONS)
     runtime_passed = measurement["runtime_probe_passed"] is True
-    passed = bool(not declared and emitted == 0 and fallback > 0 and runtime_passed)
+    passed = bool(
+        not declared and emitted == 0 and fallback > 0 and runtime_passed,
+    )
     return {
         "expectation": "fallback",
         "status": "passed" if passed else "failed",
@@ -705,12 +732,14 @@ def _instruction_check_specs() -> tuple[tuple[str, str, tuple[str, ...]], ...]:
 
 
 def _instruction_validation(
-    spec_evidence: dict[str, Any], measurements: list[dict[str, Any]]
+    spec_evidence: dict[str, Any],
+    measurements: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Cross-check ISA declaration, compiler emission, and runtime execution."""
-
     presence = spec_evidence["instruction_presence"]
-    by_probe = {measurement["probe"]: measurement for measurement in measurements}
+    by_probe = {
+        measurement["probe"]: measurement for measurement in measurements
+    }
     checks = {
         name: _native_instruction_check(
             measurement=by_probe[probe],
@@ -728,7 +757,7 @@ def _instruction_validation(
     )
     if failed or tuple(sorted(checks)) != REQUIRED_INSTRUCTION_CHECKS:
         raise RuntimeError(
-            f"ISA/spec, compiler-emission, and runtime checks disagree: failed={failed}"
+            f"ISA/spec, compiler-emission, and runtime checks disagree: failed={failed}",
         )
     return {
         "status": "passed",
@@ -749,21 +778,21 @@ def _calibration_coverage(measurements: list[dict[str, Any]]) -> dict[str, Any]:
             precision
             for measurement in measurements
             for precision in measurement["covers_precisions"]
-        }
+        },
     )
     covered_resources = sorted(
         {
             target
             for measurement in measurements
             for target in measurement["covers_resource_modes"]
-        }
+        },
     )
     if (
         tuple(covered_precisions) != REQUIRED_PRECISIONS
         or tuple(covered_resources) != REQUIRED_RESOURCE_MODES
     ):
         raise RuntimeError(
-            "calibration probes do not exactly cover the declared requirements"
+            "calibration probes do not exactly cover the declared requirements",
         )
     return {
         "status": "passed",
@@ -781,7 +810,6 @@ def _compiler_isa_evidence(
     tracked_instructions: tuple[str, ...],
 ) -> dict[str, Any]:
     """Extract emitted GPU ISA and count the instructions relevant to a probe."""
-
     extracted = extract_code_object(
         binary,
         architecture,
@@ -866,10 +894,10 @@ def _tune_probe(
                     binaries[candidate],
                     tuning_round,
                     amdsmi=None,
-                )
+                ),
             )
             execution_order.append(
-                {"tuning_round": tuning_round, tuning.parameter: candidate}
+                {"tuning_round": tuning_round, tuning.parameter: candidate},
             )
     candidates = [
         _tuning_candidate_entry(
@@ -931,7 +959,10 @@ def _prepare_probe(
             tuning_batches,
         )
         selected = prepared.selected_configuration
-        print(f"[tune] {source.name}: selected {dict(selected)}", file=sys.stderr)
+        print(
+            f"[tune] {source.name}: selected {dict(selected)}",
+            file=sys.stderr,
+        )
         return prepared
     binary = _compile_probe(source, workdir, hipcc, architecture)
     return PreparedProbe(
@@ -971,14 +1002,14 @@ def _measure_held_out(
                     probe.binary,
                     process_batch,
                     amdsmi=amdsmi,
-                )
+                ),
             )
             execution_order.append(
                 {
                     "process_batch": process_batch,
                     "position": position,
                     "probe": source_name,
-                }
+                },
             )
     return (
         {name: tuple(batches) for name, batches in collected.items()},
@@ -989,7 +1020,11 @@ def _measure_held_out(
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", default="RX_9060_XT")
-    parser.add_argument("--gfx", default="gfx1200", help="ISA target / offload arch")
+    parser.add_argument(
+        "--gfx",
+        default="gfx1200",
+        help="ISA target / offload arch",
+    )
     parser.add_argument(
         "--out",
         type=Path,
@@ -1024,7 +1059,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         parser.error("--tuning-batches must be positive")
     if args.measurement_batches < MIN_HELD_OUT_PROCESS_BATCHES:
         parser.error(
-            f"--measurement-batches must be at least {MIN_HELD_OUT_PROCESS_BATCHES}"
+            f"--measurement-batches must be at least {MIN_HELD_OUT_PROCESS_BATCHES}",
         )
     return args
 
@@ -1058,7 +1093,9 @@ def _probe_entry(
         "mode": probe["mode"],
         "covers_precisions": list(probe["covers_precisions"]),
         "covers_resource_modes": list(probe["covers_resource_modes"]),
-        "result_unit": ("ops/s" if probe["resource"] != "bandwidth" else "bytes/s"),
+        "result_unit": (
+            "ops/s" if probe["resource"] != "bandwidth" else "bytes/s"
+        ),
         "result_scale": result_scale,
         "measurement_phase": "held_out_after_configuration_freeze",
         "primary_statistic": sample_statistics["primary_statistic"],
@@ -1076,7 +1113,9 @@ def _probe_entry(
         "best_observed_ops_per_second": best_observed_ops_per_second,
         "nominal_ops_per_second": nominal,
         "nominal_source": probe["nominal_source"],
-        "measured_to_nominal_ratio": (ops_per_second / nominal if nominal else None),
+        "measured_to_nominal_ratio": (
+            ops_per_second / nominal if nominal else None
+        ),
         "best_observed_to_nominal_ratio": (
             best_observed_ops_per_second / nominal if nominal else None
         ),
@@ -1093,7 +1132,9 @@ def _probe_entry(
 
 
 def _collect_measurements(
-    args: argparse.Namespace, workdir: Path, hipcc: str
+    args: argparse.Namespace,
+    workdir: Path,
+    hipcc: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     prepared = tuple(
         _prepare_probe(
@@ -1142,12 +1183,12 @@ def _collect_measurements(
             contradictions.append(
                 f"{probe['resource']}/{probe['mode']} measured "
                 f"{best_observed:.4e} > "
-                f"nominal {nominal:.4e} ({probe['nominal_source']})"
+                f"nominal {nominal:.4e} ({probe['nominal_source']})",
             )
     if contradictions:
         details = "\n".join(f"  - {item}" for item in contradictions)
         raise RuntimeError(
-            "calibration contradicts one or more nominal limits:\n" + details
+            "calibration contradicts one or more nominal limits:\n" + details,
         )
     return measurements, execution_order
 
@@ -1165,7 +1206,7 @@ def _build_artifact(
     return {
         "schema_version": SCHEMA_VERSION,
         "timing_profile": TIMING_PROFILE,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "profile": args.profile,
         "device": device,
         "clock_setup": {
@@ -1212,7 +1253,10 @@ def _build_artifact(
         "measurements": measurements,
         "calibration_coverage": _calibration_coverage(measurements),
         "isa_spec_evidence": spec_evidence,
-        "instruction_validation": _instruction_validation(spec_evidence, measurements),
+        "instruction_validation": _instruction_validation(
+            spec_evidence,
+            measurements,
+        ),
         "policy": (
             "SOL bounds use the AMD nominal theoretical peak; the sustained "
             "held-out median here is audit evidence only and must not replace "
@@ -1285,10 +1329,14 @@ def _calibrate(args: argparse.Namespace, workdir: Path) -> int:
     device = _device_identity()
     if device["gfx_target"] != args.gfx:
         raise RuntimeError(
-            f"visible GPU is {device['gfx_target']}, expected {args.gfx}"
+            f"visible GPU is {device['gfx_target']}, expected {args.gfx}",
         )
     spec_evidence = _isa_spec_evidence(args.gfx)
-    measurements, held_out_execution_order = _collect_measurements(args, workdir, hipcc)
+    measurements, held_out_execution_order = _collect_measurements(
+        args,
+        workdir,
+        hipcc,
+    )
     artifact = _build_artifact(
         args,
         clock=clock,
@@ -1303,11 +1351,12 @@ def _calibrate(args: argparse.Namespace, workdir: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run resource-peak calibration and persist audited evidence."""
     args = _parse_args(argv)
     if args.workdir is not None:
         return _calibrate(args, args.workdir)
     with tempfile.TemporaryDirectory(
-        prefix="solar-resource-peak-calibration-"
+        prefix="solar-resource-peak-calibration-",
     ) as temporary:
         return _calibrate(args, Path(temporary))
 

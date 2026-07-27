@@ -14,13 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Validated models describing solution source and compilation metadata."""
+
 from enum import StrEnum
 from pathlib import Path
-from typing import Optional
 
 from pydantic import Field, field_validator, model_validator
 
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings, NonEmptyString
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    NonEmptyString,
+)
 
 
 class SupportedLanguages(StrEnum):
@@ -55,7 +59,7 @@ NATIVE_ROCM_LANGUAGES = frozenset(
         SupportedLanguages.MIOPEN,
         SupportedLanguages.CK,
         SupportedLanguages.ROCWMMA,
-    }
+    },
 )
 
 
@@ -141,9 +145,13 @@ def _validate_compile_flag(flag: str) -> None:
     if flag.startswith("@") or ",@" in flag or "=@" in flag:
         raise ValueError(f"Compile option uses a response file: {flag}")
     if flag in _PATH_INJECTION_EXACT_FLAGS:
-        raise ValueError(f"Compile option requires an external path value: {flag}")
+        raise ValueError(
+            f"Compile option requires an external path value: {flag}"
+        )
     if any(flag.startswith(marker) for marker in _LINKER_LOADER_MARKERS):
-        raise ValueError(f"Compile option controls runtime linker paths: {flag}")
+        raise ValueError(
+            f"Compile option controls runtime linker paths: {flag}"
+        )
     if flag in _ALLOWED_ROCM_SYSTEM_PATH_FLAGS:
         return
     if any(flag.startswith(prefix) for prefix in _PATH_INJECTION_PREFIXES):
@@ -169,19 +177,20 @@ class SourceFile(BaseModelWithDocstrings):
     def _validate_source_path(self) -> "SourceFile":
         """Validate source path for security.
 
-        Raises
+        Raises:
         ------
         ValueError
             If the path contains security issues (absolute paths or path traversal).
+
         """
         src_path = Path(self.path)
         if src_path.is_absolute():
             raise ValueError(
-                f"Invalid source path (absolute path not allowed): {self.path}"
+                f"Invalid source path (absolute path not allowed): {self.path}",
             )
         if ".." in src_path.parts:
             raise ValueError(
-                f"Invalid source path (parent directory traversal not allowed): {self.path}"
+                f"Invalid source path (parent directory traversal not allowed): {self.path}",
             )
         return self
 
@@ -228,25 +237,26 @@ class BuildSpec(BaseModelWithDocstrings):
     """Whether to use destination passing style for the solution. If True, the solution should
     accept the output tensors as the last arguments. If False, the solution should return the
     output tensors."""
-    binding: Optional[SupportedBindings] = None
+    binding: SupportedBindings | None = None
     """The binding type to use for HIP/C++ solutions. If None, defaults to 'torch' for
     HIP/C++ languages. Ignored for Python and Triton languages."""
-    compile_options: Optional[CompileOptions] = None
+    compile_options: CompileOptions | None = None
     """Optional compiler and linker flags. Only used for HIP/C++ solutions with torch binding."""
 
     @model_validator(mode="after")
     def _validate_entry_point(self) -> "BuildSpec":
         """Validate entry_point format.
 
-        Raises
+        Raises:
         ------
         ValueError
             If entry_point doesn't follow the required format.
+
         """
         if self.entry_point.count("::") != 1:
             raise ValueError(
                 f"Invalid entry point format: {self.entry_point}. Expected "
-                '"<file_path>::<function_name>".'
+                '"<file_path>::<function_name>".',
             )
         return self
 
@@ -254,16 +264,21 @@ class BuildSpec(BaseModelWithDocstrings):
     def _validate_languages(self) -> "BuildSpec":
         """Validate languages support matrix.
 
-        Raises
+        Raises:
         ------
         ValueError
             If the languages are not valid.
-        """
 
-        python_languages = [SupportedLanguages.PYTORCH, SupportedLanguages.TRITON]
+        """
+        python_languages = [
+            SupportedLanguages.PYTORCH,
+            SupportedLanguages.TRITON,
+        ]
 
         included_python_langs = [
-            language for language in self.languages if language in python_languages
+            language
+            for language in self.languages
+            if language in python_languages
         ]
         included_cpp_langs = [
             language
@@ -273,7 +288,7 @@ class BuildSpec(BaseModelWithDocstrings):
         if len(included_cpp_langs) and len(included_python_langs):
             raise ValueError(
                 f"HIP/C++ and Python cannot be mixed, but got {included_cpp_langs} "
-                f"and {included_python_langs}"
+                f"and {included_python_langs}",
             )
 
         # Validate entry point file suffix matches the language category.
@@ -290,11 +305,11 @@ class BuildSpec(BaseModelWithDocstrings):
         ):
             raise ValueError(
                 f"HIP/C++ languages require a .hip or C/C++ entry point file, "
-                f"but got '{entry_file}' (suffix '{suffix}')"
+                f"but got '{entry_file}' (suffix '{suffix}')",
             )
         if included_python_langs and suffix != ".py":
             raise ValueError(
                 f"Python languages require a .py entry point file, "
-                f"but got '{entry_file}' (suffix '{suffix}')"
+                f"but got '{entry_file}' (suffix '{suffix}')",
             )
         return self

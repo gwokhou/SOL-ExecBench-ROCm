@@ -10,9 +10,9 @@ import fnmatch
 import subprocess
 import sys
 import tomllib
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
@@ -22,6 +22,8 @@ PROVENANCE_PATH = REPO_ROOT / "provenance.toml"
 
 @dataclass(frozen=True)
 class DatasetRedistributionFinding:
+    """One path that violates the dataset redistribution policy."""
+
     path: str
     source_id: str
     source_name: str
@@ -31,13 +33,18 @@ class DatasetRedistributionFinding:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Check staged, release, and explicit paths against dataset policy."""
     args = _parse_args(argv)
     policy = load_dataset_policy(args.provenance)
 
     findings: list[DatasetRedistributionFinding] = []
     if args.staged:
         findings.extend(
-            check_paths(_staged_paths(args.repo_root), policy, mode="repository")
+            check_paths(
+                _staged_paths(args.repo_root),
+                policy,
+                mode="repository",
+            ),
         )
     for release_root in args.release_root:
         findings.extend(check_release_root(release_root, policy))
@@ -70,7 +77,11 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     parser.add_argument("--provenance", type=Path, default=PROVENANCE_PATH)
-    parser.add_argument("--staged", action="store_true", help="Check git staged paths.")
+    parser.add_argument(
+        "--staged",
+        action="store_true",
+        help="Check git staged paths.",
+    )
     parser.add_argument(
         "--release-root",
         type=Path,
@@ -95,6 +106,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
 
 def load_dataset_policy(path: Path = PROVENANCE_PATH) -> dict[str, object]:
+    """Load and minimally validate dataset policy from provenance metadata."""
     provenance = tomllib.loads(path.read_text(encoding="utf-8"))
     policy = provenance.get("dataset_policy")
     if not isinstance(policy, dict):
@@ -109,6 +121,7 @@ def check_release_root(
     release_root: Path,
     policy: dict[str, object],
 ) -> list[DatasetRedistributionFinding]:
+    """Check every file beneath a release root."""
     if not release_root.exists():
         return []
     paths = [
@@ -125,6 +138,7 @@ def check_paths(
     *,
     mode: str,
 ) -> list[DatasetRedistributionFinding]:
+    """Return policy findings for normalized repository-relative paths."""
     findings: list[DatasetRedistributionFinding] = []
     for raw_path in paths:
         normalized = _normalize_path(raw_path)
@@ -138,13 +152,15 @@ def check_paths(
                     path=normalized,
                     source_id=str(source["id"]),
                     source_name=str(source.get("name", source["id"])),
-                    redistribution_class=str(source.get("redistribution_class", "")),
+                    redistribution_class=str(
+                        source.get("redistribution_class", ""),
+                    ),
                     mode=mode,
                     message=(
                         f"{source.get('name', source['id'])} is not allowed for "
                         f"{mode} redistribution by this project"
                     ),
-                )
+                ),
             )
             break
     return findings
@@ -181,7 +197,9 @@ def _staged_paths(repo_root: Path) -> list[str]:
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError(completed.stderr.strip() or "git staged path query failed")
+        raise RuntimeError(
+            completed.stderr.strip() or "git staged path query failed",
+        )
     return [line for line in completed.stdout.splitlines() if line.strip()]
 
 

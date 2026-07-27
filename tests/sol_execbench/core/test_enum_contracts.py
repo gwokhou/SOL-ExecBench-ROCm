@@ -14,7 +14,10 @@ from sol_execbench.core.dataset.aka_contract import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SOURCE_ROOTS = (REPO_ROOT / "src" / "sol_execbench", REPO_ROOT / "src" / "solar")
+SOURCE_ROOTS = (
+    REPO_ROOT / "src" / "sol_execbench",
+    REPO_ROOT / "src" / "solar",
+)
 
 
 def _production_trees() -> list[tuple[Path, ast.Module]]:
@@ -42,7 +45,7 @@ def test_all_production_string_enums_use_strenum() -> None:
             bases = _base_names(node)
             if {"str", "Enum"} <= bases:
                 legacy.append(
-                    f"{path.relative_to(REPO_ROOT)}:{node.lineno}:{node.name}"
+                    f"{path.relative_to(REPO_ROOT)}:{node.lineno}:{node.name}",
                 )
 
     assert legacy == []
@@ -53,28 +56,40 @@ def test_strenum_members_are_unique_literal_strings() -> None:
     duplicate: list[str] = []
     for path, tree in _production_trees():
         for node in ast.walk(tree):
-            if not isinstance(node, ast.ClassDef) or "StrEnum" not in _base_names(node):
+            if not isinstance(
+                node,
+                ast.ClassDef,
+            ) or "StrEnum" not in _base_names(node):
                 continue
             values: dict[str, str] = {}
             for statement in node.body:
-                if not isinstance(statement, ast.Assign) or len(statement.targets) != 1:
+                if (
+                    not isinstance(statement, ast.Assign)
+                    or len(statement.targets) != 1
+                ):
                     continue
                 target = statement.targets[0]
-                if not isinstance(target, ast.Name) or target.id.startswith("_"):
+                if not isinstance(target, ast.Name) or target.id.startswith(
+                    "_",
+                ):
                     continue
-                if not isinstance(statement.value, ast.Constant) or not isinstance(
-                    statement.value.value, str
+                if not isinstance(
+                    statement.value,
+                    ast.Constant,
+                ) or not isinstance(
+                    statement.value.value,
+                    str,
                 ):
                     invalid.append(
                         f"{path.relative_to(REPO_ROOT)}:{statement.lineno}:"
-                        f"{node.name}.{target.id}"
+                        f"{node.name}.{target.id}",
                     )
                     continue
                 value = statement.value.value
                 if previous := values.get(value):
                     duplicate.append(
                         f"{path.relative_to(REPO_ROOT)}:{statement.lineno}:"
-                        f"{node.name}.{previous}/{target.id}={value!r}"
+                        f"{node.name}.{previous}/{target.id}={value!r}",
                     )
                 values[value] = target.id
 

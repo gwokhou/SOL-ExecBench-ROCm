@@ -24,18 +24,18 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShape, TensorShapes
 
 
-def generate_dim_labels(num_dims: int, prefix: str = "") -> List[str]:
+def generate_dim_labels(num_dims: int, prefix: str = "") -> list[str]:
     """Generate dimension labels that support more than 26 dimensions.
 
     Uses a char+number scheme:
@@ -48,9 +48,10 @@ def generate_dim_labels(num_dims: int, prefix: str = "") -> List[str]:
 
     Returns:
         List of dimension label strings.
+
     """
     if prefix:
-        # Use uppercase prefix + number scheme: I0, I1, I2, ... or O0, O1, O2, ...
+        # Use numbered uppercase labels such as I0, I1 or O0, O1.
         prefix_upper = prefix.upper()
         return [f"{prefix_upper}{i}" for i in range(num_dims)]
 
@@ -72,37 +73,46 @@ class TensorManipulationHandler(EinsumOpHandler):
     """Handler for tensor manipulation operations."""
 
     # Operations that change the layout (different input/output ranks)
-    RESHAPE_OPS = {
-        "view",
-        "reshape",
-        "flatten",
-        "unflatten",
-        "squeeze",
-        "unsqueeze",
-        "expand",
-        "repeat",
-        "cat",
-        "concat",
-        "stack",
-        "vstack",
-        "split",
-        "chunk",
-        "__getitem__",
-        "getitem",
-        "select",
-        "index_select",
-    }
+    RESHAPE_OPS = frozenset(
+        {
+            "view",
+            "reshape",
+            "flatten",
+            "unflatten",
+            "squeeze",
+            "unsqueeze",
+            "expand",
+            "repeat",
+            "cat",
+            "concat",
+            "stack",
+            "vstack",
+            "split",
+            "chunk",
+            "__getitem__",
+            "getitem",
+            "select",
+            "index_select",
+        },
+    )
 
     # Operations that reorder dimensions (same ranks, different order)
     # Tensor.T carries one tensor argument and reverses the dimensions,
     # including for square matrices where shape equality alone cannot reveal
     # the transpose.
-    TRANSPOSE_OPS = {"transpose", "permute", "t", "__get__", "contiguous"}
+    TRANSPOSE_OPS = frozenset(
+        {"transpose", "permute", "t", "__get__", "contiguous"},
+    )
 
-    supported_ops = list(RESHAPE_OPS | TRANSPOSE_OPS)
+    supported_ops: ClassVar[tuple[str, ...]] = tuple(
+        RESHAPE_OPS | TRANSPOSE_OPS,
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for tensor manipulation operation."""
         if tensor_shapes.num_inputs < 1:
@@ -110,7 +120,9 @@ class TensorManipulationHandler(EinsumOpHandler):
 
         input_shape = tensor_shapes.inputs[0]
         output_shape = (
-            tensor_shapes.outputs[0] if tensor_shapes.num_outputs > 0 else input_shape
+            tensor_shapes.outputs[0]
+            if tensor_shapes.num_outputs > 0
+            else input_shape
         )
 
         # Get module_args for explicit permutation info
@@ -119,12 +131,18 @@ class TensorManipulationHandler(EinsumOpHandler):
         # Transpose/permute operations use same dimension labels (reordered)
         if op_name.lower() in self.TRANSPOSE_OPS:
             return self._generate_transpose_einsum(
-                input_shape, output_shape, op_name, module_args
+                input_shape,
+                output_shape,
+                op_name,
+                module_args,
             )
 
         # Reshape operations - try to preserve dimension labels where possible
         return self._generate_reshape_einsum(
-            input_shape, output_shape, op_name, module_args
+            input_shape,
+            output_shape,
+            op_name,
+            module_args,
         )
 
     def _generate_transpose_einsum(
@@ -132,7 +150,7 @@ class TensorManipulationHandler(EinsumOpHandler):
         input_shape: TensorShape,
         output_shape: TensorShape,
         operation_name: str,
-        module_args: Optional[Dict[str, Any]] = None,
+        module_args: dict[str, Any] | None = None,
     ) -> EinsumOp:
         """Generate einsum for transpose/permute operations.
 
@@ -157,25 +175,30 @@ class TensorManipulationHandler(EinsumOpHandler):
         if in_dims != out_dims:
             # Fall back to reshape behavior if dims don't match
             return self._generate_reshape_einsum(
-                input_shape, output_shape, operation_name
+                input_shape,
+                output_shape,
+                operation_name,
             )
 
         # Tensor.T is recorded as ``__get__`` without explicit dimensions.
         # Its contract is to reverse every dimension, which must win over
         # shape matching for square or repeated-size tensors.
-        out_label_list: Optional[List[str]]
+        out_label_list: list[str] | None
         if operation_name.lower() == "__get__":
             out_label_list = list(reversed(in_label_list))
         else:
             # Try to use explicit permutation from module_args.
             out_label_list = self._apply_permutation_from_args(
-                in_label_list, module_args
+                in_label_list,
+                module_args,
             )
 
         # Fall back to shape-based inference if no explicit permutation
         if out_label_list is None:
             out_label_list = self._match_transpose_dims(
-                input_shape, output_shape, in_label_list
+                input_shape,
+                output_shape,
+                in_label_list,
             )
 
         # Join labels for equation string
@@ -200,9 +223,9 @@ class TensorManipulationHandler(EinsumOpHandler):
 
     def _apply_permutation_from_args(
         self,
-        in_labels: List[str],
-        module_args: Optional[Dict[str, Any]] = None,
-    ) -> Optional[List[str]]:
+        in_labels: list[str],
+        module_args: dict[str, Any] | None = None,
+    ) -> list[str] | None:
         """Apply explicit permutation from module_args if available.
 
         Args:
@@ -211,6 +234,7 @@ class TensorManipulationHandler(EinsumOpHandler):
 
         Returns:
             Reordered labels if permutation found, None otherwise.
+
         """
         if not module_args:
             return None
@@ -240,7 +264,10 @@ class TensorManipulationHandler(EinsumOpHandler):
             dim1 = module_args["dim1"]
             if 0 <= dim0 < len(in_labels) and 0 <= dim1 < len(in_labels):
                 out_labels = list(in_labels)
-                out_labels[dim0], out_labels[dim1] = out_labels[dim1], out_labels[dim0]
+                out_labels[dim0], out_labels[dim1] = (
+                    out_labels[dim1],
+                    out_labels[dim0],
+                )
                 return out_labels
 
         return None
@@ -249,8 +276,8 @@ class TensorManipulationHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         output_shape: TensorShape,
-        in_labels: List[str],
-    ) -> List[str]:
+        in_labels: list[str],
+    ) -> list[str]:
         """Match output dimensions to input dimensions by shape values.
 
         This infers the permutation by matching shape values.
@@ -263,16 +290,19 @@ class TensorManipulationHandler(EinsumOpHandler):
 
         Returns:
             Labels for output dimensions (reordered input labels)
+
         """
         # Build a mapping of shape value -> list of (index, label) pairs
-        shape_to_labels: Dict[int, List[tuple]] = {}
-        for i, (size, label) in enumerate(zip(input_shape, in_labels)):
+        shape_to_labels: dict[int, list[tuple]] = {}
+        for i, (size, label) in enumerate(
+            zip(input_shape, in_labels, strict=True)
+        ):
             if size not in shape_to_labels:
                 shape_to_labels[size] = []
             shape_to_labels[size].append((i, label))
 
         # Track which input labels have been used
-        used_counts: Dict[int, int] = {size: 0 for size in shape_to_labels}
+        used_counts: dict[int, int] = dict.fromkeys(shape_to_labels, 0)
 
         # Build output labels by matching shapes
         out_labels = []
@@ -292,7 +322,7 @@ class TensorManipulationHandler(EinsumOpHandler):
                 out_labels.append(
                     in_labels[len(out_labels)]
                     if len(out_labels) < len(in_labels)
-                    else "X"
+                    else "X",
                 )
 
         return out_labels
@@ -301,8 +331,8 @@ class TensorManipulationHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         output_shape: TensorShape,
-        in_labels: List[str],
-    ) -> List[str]:
+        in_labels: list[str],
+    ) -> list[str]:
         """Match output dimensions to input dimensions for reshape/view operations.
 
         Preserves dimension labels where the size is unchanged at the same position
@@ -320,12 +350,13 @@ class TensorManipulationHandler(EinsumOpHandler):
 
         Returns:
             Labels for output dimensions
+
         """
         in_dims = len(input_shape)
         out_dims = len(output_shape)
 
         # Initialize output labels as None (to be filled)
-        out_labels: List[Optional[str]] = [None] * out_dims
+        out_labels: list[str | None] = [None] * out_dims
         used_in_labels: set = set()
 
         # Match from the start
@@ -362,7 +393,10 @@ class TensorManipulationHandler(EinsumOpHandler):
                 while True:
                     new_label = f"R{new_label_idx}"
                     new_label_idx += 1
-                    if new_label not in used_in_labels and new_label not in out_labels:
+                    if (
+                        new_label not in used_in_labels
+                        and new_label not in out_labels
+                    ):
                         break
                 out_labels[i] = new_label
 
@@ -373,7 +407,7 @@ class TensorManipulationHandler(EinsumOpHandler):
         input_shape: TensorShape,
         output_shape: TensorShape,
         operation_name: str,
-        module_args: Optional[Dict[str, Any]] = None,
+        module_args: dict[str, Any] | None = None,
     ) -> EinsumOp:
         """Generate einsum for reshape/view operations.
 
@@ -395,7 +429,9 @@ class TensorManipulationHandler(EinsumOpHandler):
 
         # Try to match output dimensions to input dimensions
         out_label_list = self._match_reshape_dims(
-            input_shape, output_shape, in_label_list
+            input_shape,
+            output_shape,
+            in_label_list,
         )
 
         # Join labels for equation string
@@ -422,10 +458,13 @@ class TensorManipulationHandler(EinsumOpHandler):
 class MatrixStructureHandler(EinsumOpHandler):
     """Handler for matrix structure operations."""
 
-    supported_ops = ["diag", "diagonal", "tril", "triu"]
+    supported_ops = ("diag", "diagonal", "tril", "triu")
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for matrix structure operation."""
         if tensor_shapes.num_inputs < 1:
@@ -436,7 +475,9 @@ class MatrixStructureHandler(EinsumOpHandler):
         return self._generate_matrix_structure_einsum(input_shape, op_name)
 
     def _generate_matrix_structure_einsum(
-        self, input_shape: TensorShape, operation: str
+        self,
+        input_shape: TensorShape,
+        operation: str,
     ) -> EinsumOp:
         """Generate einsum for matrix structure ops.
 
@@ -449,13 +490,8 @@ class MatrixStructureHandler(EinsumOpHandler):
         labels = string.ascii_uppercase[:dims]
 
         if operation == "diag":
-            if dims == 1:
-                # 1D -> 2D diagonal matrix: A -> AB (not AA)
-                # The diagonal constraint is implicit, not expressed in einsum
-                output_labels = "AB"
-            else:
-                # 2D+ -> 1D diagonal extraction
-                output_labels = labels[0]
+            # 1D constructs a matrix; higher ranks extract a diagonal.
+            output_labels = "AB" if dims == 1 else labels[0]
         elif operation == "transpose" and dims >= 2:
             # Swap last two dims
             output_labels = labels[:-2] + labels[-1] + labels[-2]
@@ -474,7 +510,8 @@ class MatrixStructureHandler(EinsumOpHandler):
             operands=operands,
             equation=equation,
             name=operation,
-            is_real_einsum=False,  # diag is not a real einsum (has implicit constraint)
+            # Diagonal operations contain an implicit constraint.
+            is_real_einsum=False,
             elementwise_op="copy",
             reduction_op="none",
         )

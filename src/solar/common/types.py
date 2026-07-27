@@ -20,31 +20,34 @@ following Google's Python style guide for type annotations.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Union
 
 # Type aliases for better readability
 DynamicValue = Any
 GraphValue = DynamicValue
-TensorShape = List[int]
-NodeDict = Dict[str, Any]
-EdgeList = List[Tuple[str, str]]
+TensorShape = list[int]
+NodeDict = dict[str, Any]
+EdgeList = list[tuple[str, str]]
 
 
 @dataclass
 class TensorShapes:
     """Positional tensor shapes for an operation.
+
     with ordered lists of shapes matching the einsum operand order.
     """
 
-    inputs: List[TensorShape] = field(default_factory=list)
-    outputs: List[TensorShape] = field(default_factory=list)
+    inputs: list[TensorShape] = field(default_factory=list)
+    outputs: list[TensorShape] = field(default_factory=list)
 
     @property
     def num_inputs(self) -> int:
+        """Return the number of positional input shapes."""
         return len(self.inputs)
 
     @property
     def num_outputs(self) -> int:
+        """Return the number of positional output shapes."""
         return len(self.outputs)
 
     def input_rank(self, idx: int) -> int:
@@ -73,20 +76,21 @@ class NodeInfo:
         input_types: Type classification per input: 'input' or 'weight'.
         output_types: Type classification per output: 'output'.
         module_args: Module-specific arguments.
+
     """
 
     node_id: str
     type: str
     node_class: str = "UnknownNode"
-    input_nodes: List[str] = field(default_factory=list)
-    output_nodes: List[str] = field(default_factory=list)
-    input_shapes: List[TensorShape] = field(default_factory=list)
-    output_shapes: List[TensorShape] = field(default_factory=list)
-    input_dtypes: List[str] = field(default_factory=list)
-    output_dtypes: List[str] = field(default_factory=list)
-    input_types: List[str] = field(default_factory=list)
-    output_types: List[str] = field(default_factory=list)
-    module_args: Dict[str, Any] = field(default_factory=dict)
+    input_nodes: list[str] = field(default_factory=list)
+    output_nodes: list[str] = field(default_factory=list)
+    input_shapes: list[TensorShape] = field(default_factory=list)
+    output_shapes: list[TensorShape] = field(default_factory=list)
+    input_dtypes: list[str] = field(default_factory=list)
+    output_dtypes: list[str] = field(default_factory=list)
+    input_types: list[str] = field(default_factory=list)
+    output_types: list[str] = field(default_factory=list)
+    module_args: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> NodeDict:
         """Convert NodeInfo to a dictionary representation."""
@@ -117,13 +121,14 @@ class GraphInfo:
         total_nodes: Total number of nodes.
         graph_class: Class of the graph object.
         metadata: Additional metadata about the graph.
+
     """
 
-    nodes: List[NodeInfo]
+    nodes: list[NodeInfo]
     edges: EdgeList = field(default_factory=list)
     total_nodes: int = 0
     graph_class: str = "ComputationGraph"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -137,14 +142,15 @@ class EinsumOperation:
         is_output: Whether this is an output operand.
         compute_cost: Number of operations required.
         memory_cost: Memory elements accessed.
+
     """
 
     equation: str
-    operand_names: List[str]
-    operand_dims: List[List[str]]
-    is_output: List[bool] = field(default_factory=list)
-    compute_cost: Optional[int] = None
-    memory_cost: Optional[Dict[str, int]] = None
+    operand_names: list[str]
+    operand_dims: list[list[str]]
+    is_output: list[bool] = field(default_factory=list)
+    compute_cost: int | None = None
+    memory_cost: dict[str, int] | None = None
     is_real_einsum: bool = True
 
 
@@ -158,13 +164,14 @@ class AnalysisResult:
         fusion_analysis: Results of fusion analysis.
         roofline_performance: Roofline model results.
         metadata: Additional analysis metadata.
+
     """
 
-    layers: Dict[str, Dict[str, Any]]
-    total: Dict[str, Union[int, float]]
-    fusion_analysis: Optional[Dict[str, Any]] = None
-    roofline_performance: Optional[Dict[str, Any]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    layers: dict[str, dict[str, Any]]
+    total: dict[str, Union[int, float]]
+    fusion_analysis: dict[str, Any] | None = None
+    roofline_performance: dict[str, Any] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -178,6 +185,7 @@ class ProcessingConfig:
         timeout: Timeout for processing in seconds.
         output_dir: Directory for output files.
         debug: Enable debug output.
+
     """
 
     save_graph: bool = False

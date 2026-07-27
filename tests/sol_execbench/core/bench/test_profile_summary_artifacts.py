@@ -39,7 +39,7 @@ def test_profile_artifact_classifier_covers_kind(
 
 def test_profile_artifact_classifier_cases_cover_every_kind() -> None:
     assert {expected for _, expected in _ARTIFACT_KIND_CASES} == set(
-        Rocprofv3ArtifactKind
+        Rocprofv3ArtifactKind,
     )
 
 
@@ -49,7 +49,13 @@ def _profile_result(
 ) -> Rocprofv3ProfileResult:
     return Rocprofv3ProfileResult(
         status=Rocprofv3ProfileStatus.SUCCESS,
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        command=(
+            "rocprofv3",
+            "--kernel-trace",
+            "--",
+            "python",
+            "eval_driver.py",
+        ),
         output_directory=tmp_path,
         output_file="profile",
         artifacts=artifacts,
@@ -67,7 +73,7 @@ def test_structured_profile_evidence_parses_trace_counter_and_metadata(
     trace_csv.write_text(
         "Domain,Name,Duration(ns)\n"
         "KERNEL_DISPATCH,matmul_kernel,2000000\n"
-        "HIP_RUNTIME_API,hipLaunchKernel,50000\n"
+        "HIP_RUNTIME_API,hipLaunchKernel,50000\n",
     )
     counter_csv = tmp_path / "profile_counters.csv"
     counter_csv.write_text("Metric,Value,Unit\nSQ_INSTS_VALU,120000,count\n")
@@ -103,7 +109,9 @@ def test_structured_profile_evidence_parses_trace_counter_and_metadata(
 
     evidence = structured_profile_evidence(profile)
 
-    assert [metric.model_dump(mode="json") for metric in evidence.workload_metrics] == [
+    assert [
+        metric.model_dump(mode="json") for metric in evidence.workload_metrics
+    ] == [
         {
             "name": "artifact_coverage_status",
             "value": "complete",
@@ -133,12 +141,26 @@ def test_structured_profile_evidence_parses_trace_counter_and_metadata(
         )
         for metric in evidence.kernel_metrics
     ] == [
-        ("matmul_kernel", "kernel_duration_ms", 2.0, "ms", "profile_kernel_trace.csv"),
-        ("profile_counters", "SQ_INSTS_VALU", 120000, "count", "profile_counters.csv"),
+        (
+            "matmul_kernel",
+            "kernel_duration_ms",
+            2.0,
+            "ms",
+            "profile_kernel_trace.csv",
+        ),
+        (
+            "profile_counters",
+            "SQ_INSTS_VALU",
+            120000,
+            "count",
+            "profile_counters.csv",
+        ),
     ]
-    assert [hint.category for hint in evidence.bottleneck_hints] == ["compute_bound"]
+    assert [hint.category for hint in evidence.bottleneck_hints] == [
+        "compute_bound",
+    ]
     assert evidence.parse_warnings == [
-        "profile.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v3"
+        "profile.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v3",
     ]
 
 
@@ -146,7 +168,9 @@ def test_structured_profile_evidence_rejects_bool_and_nan_dispatch_count(
     tmp_path: Path,
 ) -> None:
     metadata_json = tmp_path / "profile.json"
-    metadata_json.write_text('{"kernel_dispatches": true, "dispatch_count": "nan"}\n')
+    metadata_json.write_text(
+        '{"kernel_dispatches": true, "dispatch_count": "nan"}\n',
+    )
     profile = _profile_result(
         tmp_path,
         (
@@ -197,7 +221,9 @@ def test_structured_profile_evidence_reports_missing_artifacts(
     evidence = structured_profile_evidence(profile)
 
     assert evidence.kernel_metrics == []
-    assert [metric.model_dump(mode="json") for metric in evidence.workload_metrics] == [
+    assert [
+        metric.model_dump(mode="json") for metric in evidence.workload_metrics
+    ] == [
         {
             "name": "artifact_coverage_status",
             "value": "complete",
@@ -206,7 +232,7 @@ def test_structured_profile_evidence_reports_missing_artifacts(
             "workload_id": None,
             "artifact": None,
             "parse_status": "available",
-        }
+        },
     ]
     assert evidence.parse_warnings == [
         "missing_kernel_trace.csv: profiler artifact is missing",

@@ -20,7 +20,9 @@ from sol_execbench.core.platform.docker_matrix.models import (
 from sol_execbench.core.platform.docker_matrix.targets import to_matrix_target
 
 
-def _observed_device_nodes(observation: DockerPreflightObservation) -> list[str]:
+def _observed_device_nodes(
+    observation: DockerPreflightObservation,
+) -> list[str]:
     nodes = []
     if observation.dev_kfd_present and observation.dev_kfd_accessible:
         nodes.append("/dev/kfd")
@@ -40,11 +42,15 @@ def _runtime_unavailable_reason(
             "provide native Linux ROCm device passthrough."
         )
     if not observation.dev_kfd_present:
-        return "/dev/kfd is missing on the host before Docker benchmark execution."
+        return (
+            "/dev/kfd is missing on the host before Docker benchmark execution."
+        )
     if not observation.dev_kfd_accessible:
         return "/dev/kfd is not accessible before Docker benchmark execution."
     if not observation.dev_dri_present:
-        return "/dev/dri is missing on the host before Docker benchmark execution."
+        return (
+            "/dev/dri is missing on the host before Docker benchmark execution."
+        )
     if not observation.dev_dri_accessible:
         return "/dev/dri is not accessible before Docker benchmark execution."
     if observation.gpu_accessible is False:
@@ -56,7 +62,6 @@ def classify_docker_preflight(
     observation: DockerPreflightObservation,
 ) -> DockerPreflightResult:
     """Classify Docker runtime observations before benchmark execution."""
-
     reason = _runtime_unavailable_reason(observation)
     status = (
         MatrixCompatibilityStatus.RUNTIME_UNAVAILABLE

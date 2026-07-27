@@ -35,7 +35,7 @@ _VIEW_OPS = frozenset(
         "transpose",
         "unsqueeze",
         "view",
-    }
+    },
 )
 _MEMORY_ONLY_OPS = frozenset(
     {
@@ -52,7 +52,7 @@ _MEMORY_ONLY_OPS = frozenset(
         "stack",
         "tensor_split",
         "vstack",
-    }
+    },
 )
 _MFMA_OPS = frozenset(
     {
@@ -67,7 +67,7 @@ _MFMA_OPS = frozenset(
         "linear",
         "matmul",
         "mm",
-    }
+    },
 )
 _SFU_OPS = frozenset(
     {
@@ -79,7 +79,7 @@ _SFU_OPS = frozenset(
         "sin",
         "sqrt",
         "tanh",
-    }
+    },
 )
 _COMPOSITE_SFU_OPS = frozenset(
     {
@@ -91,14 +91,14 @@ _COMPOSITE_SFU_OPS = frozenset(
         "sigmoid",
         "silu",
         "softplus",
-    }
+    },
 )
 _REDUCTION_OPS = frozenset(
-    {"amax", "amin", "argmax", "argmin", "logsumexp", "mean", "prod", "sum"}
+    {"amax", "amin", "argmax", "argmin", "logsumexp", "mean", "prod", "sum"},
 )
 _VARIANCE_OPS = frozenset({"std", "std_mean", "var", "var_mean"})
 _NORMALIZATION_OPS = frozenset(
-    {"batch_norm", "group_norm", "layer_norm", "log_softmax", "softmax"}
+    {"batch_norm", "group_norm", "layer_norm", "log_softmax", "softmax"},
 )
 _ATOMIC_OPS = frozenset(
     {
@@ -108,10 +108,10 @@ _ATOMIC_OPS = frozenset(
         "index_put",
         "scatter",
         "scatter_add",
-    }
+    },
 )
 _SCAN_SORT_OPS = frozenset(
-    {"argsort", "cummax", "cummin", "cumprod", "cumsum", "sort", "topk"}
+    {"argsort", "cummax", "cummin", "cumprod", "cumsum", "sort", "topk"},
 )
 _CONVERSION_OPS = frozenset(
     {
@@ -128,10 +128,10 @@ _CONVERSION_OPS = frozenset(
         "to",
         "type",
         "type_as",
-    }
+    },
 )
 _INDEX_OPS = frozenset(
-    {"embedding", "embedding_bag", "gather", "index_select", "tril", "triu"}
+    {"embedding", "embedding_bag", "gather", "index_select", "tril", "triu"},
 )
 _VALU_OPS = frozenset(
     {
@@ -158,7 +158,7 @@ _VALU_OPS = frozenset(
         "sub",
         "where",
         "zeros_like",
-    }
+    },
 )
 
 
@@ -205,7 +205,10 @@ def _accumulation_mode(dtype: Any, fallback: str) -> str:
     return f"{source}->{source}"
 
 
-def _reduction_groups(shape: list[int] | None, semantic: Mapping[str, Any]) -> int:
+def _reduction_groups(
+    shape: list[int] | None,
+    semantic: Mapping[str, Any],
+) -> int:
     if not shape:
         return 1
     kwargs = semantic.get("kwargs") or {}
@@ -346,7 +349,8 @@ def _exempt(reason: str) -> _RuleResult:
 
 
 def _mfma_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.kind != "einsum" and not (
         context.target in _MFMA_OPS and context.macs > 0
@@ -362,7 +366,8 @@ def _mfma_rule(
 
 
 def _attention_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target != "scaled_dot_product_attention":
         return _NO_MATCH
@@ -371,7 +376,7 @@ def _attention_rule(
     if len(q_shape) < 2 or len(k_shape) < 2:
         if context.strict:
             raise ResourceClassificationError(
-                "scaled_dot_product_attention requires ranked Q/K tensors"
+                "scaled_dot_product_attention requires ranked Q/K tensors",
             )
         return _MATCHED
     q_rows = int(math.prod(q_shape[:-1]))
@@ -391,21 +396,30 @@ def _attention_rule(
         "softmax max+sum combines",
     )
     accumulator.add("sfu", context.mode, score_elements, "softmax exponentials")
-    accumulator.add("valu", context.mode, 2 * score_elements, "softmax subtract+divide")
+    accumulator.add(
+        "valu",
+        context.mode,
+        2 * score_elements,
+        "softmax subtract+divide",
+    )
     return _MATCHED
 
 
 def _view_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     del accumulator
     return (
-        _exempt("metadata_or_alias_only") if context.target in _VIEW_OPS else _NO_MATCH
+        _exempt("metadata_or_alias_only")
+        if context.target in _VIEW_OPS
+        else _NO_MATCH
     )
 
 
 def _memory_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     del accumulator
     memory_only = context.target in _MEMORY_ONLY_OPS or context.target in {
@@ -418,7 +432,8 @@ def _memory_rule(
 
 
 def _atomic_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     effects = context.semantic.get("effects") or {}
     if context.target not in _ATOMIC_OPS and not bool(effects.get("atomic")):
@@ -429,7 +444,9 @@ def _atomic_rule(
         else max(context.output_n, context.input_n)
     )
     update_dtype = (
-        context.input_dtypes[-1] if len(context.input_dtypes) >= 2 else context.dtype
+        context.input_dtypes[-1]
+        if len(context.input_dtypes) >= 2
+        else context.dtype
     )
     accumulator.add(
         "atomic",
@@ -441,7 +458,8 @@ def _atomic_rule(
 
 
 def _scan_sort_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target not in _SCAN_SORT_OPS:
         return _NO_MATCH
@@ -455,7 +473,8 @@ def _scan_sort_rule(
 
 
 def _conversion_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target not in _CONVERSION_OPS:
         return _NO_MATCH
@@ -493,7 +512,8 @@ def _conversion_rule(
 
 
 def _normalization_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target not in _NORMALIZATION_OPS:
         return _NO_MATCH
@@ -506,19 +526,36 @@ def _normalization_rule(
     combines = max(0, context.output_n - groups)
     if context.target in {"softmax", "log_softmax"}:
         accumulator.add(
-            "reduction", context.mode, 2 * combines, "maximum and sum reductions"
+            "reduction",
+            context.mode,
+            2 * combines,
+            "maximum and sum reductions",
         )
         accumulator.add(
-            "sfu", context.mode, context.output_n, "exponential or logarithm"
+            "sfu",
+            context.mode,
+            context.output_n,
+            "exponential or logarithm",
         )
         accumulator.add(
-            "valu", context.mode, 2 * context.output_n, "normalization arithmetic"
+            "valu",
+            context.mode,
+            2 * context.output_n,
+            "normalization arithmetic",
         )
     else:
         accumulator.add(
-            "reduction", context.mode, 2 * combines, "mean and variance reductions"
+            "reduction",
+            context.mode,
+            2 * combines,
+            "mean and variance reductions",
         )
-        accumulator.add("sfu", context.mode, groups, "inverse square root per group")
+        accumulator.add(
+            "sfu",
+            context.mode,
+            groups,
+            "inverse square root per group",
+        )
         accumulator.add(
             "valu",
             context.mode,
@@ -529,7 +566,8 @@ def _normalization_rule(
 
 
 def _variance_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target not in _VARIANCE_OPS:
         return _NO_MATCH
@@ -563,7 +601,8 @@ def _variance_rule(
 
 
 def _reduction_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target not in _REDUCTION_OPS:
         return _NO_MATCH
@@ -600,7 +639,8 @@ def _reduction_rule(
 
 
 def _sfu_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target not in _SFU_OPS:
         return _NO_MATCH
@@ -614,7 +654,8 @@ def _sfu_rule(
 
 
 def _composite_sfu_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target not in _COMPOSITE_SFU_OPS:
         return _NO_MATCH
@@ -634,7 +675,8 @@ def _composite_sfu_rule(
 
 
 def _index_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target not in _INDEX_OPS:
         return _NO_MATCH
@@ -648,7 +690,8 @@ def _index_rule(
 
 
 def _valu_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.target not in _VALU_OPS:
         return _NO_MATCH
@@ -662,7 +705,8 @@ def _valu_rule(
 
 
 def _macs_fallback_rule(
-    context: _ResourceContext, accumulator: _ResourceAccumulator
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
 ) -> _RuleResult:
     if context.macs <= 0:
         return _NO_MATCH
@@ -675,7 +719,10 @@ def _macs_fallback_rule(
     return _MATCHED
 
 
-type _ResourceRule = Callable[[_ResourceContext, _ResourceAccumulator], _RuleResult]
+type _ResourceRule = Callable[
+    [_ResourceContext, _ResourceAccumulator],
+    _RuleResult,
+]
 
 _RESOURCE_RULES: tuple[_ResourceRule, ...] = (
     _mfma_rule,
@@ -720,13 +767,14 @@ def classify_layer_resources(
     if strict:
         raise ResourceClassificationError(
             f"operation {context.target or '<missing>'!r} has no "
-            f"{RESOURCE_MODEL_VERSION} rule"
+            f"{RESOURCE_MODEL_VERSION} rule",
         )
     return accumulator.result()
 
 
 def merge_resource_work(
-    totals: dict[str, dict[str, int]], layer_work: Mapping[str, Mapping[str, Any]]
+    totals: dict[str, dict[str, int]],
+    layer_work: Mapping[str, Mapping[str, Any]],
 ) -> None:
     """Add one layer's nested resource counters to graph totals."""
     for resource, modes in layer_work.items():
@@ -742,12 +790,16 @@ def validate_resource_work(value: Any) -> dict[str, dict[str, float]]:
     normalized: dict[str, dict[str, float]] = {}
     for resource, modes in value.items():
         if not isinstance(modes, Mapping) or not modes:
-            raise ValueError(f"resource_work.{resource} must be a non-empty mapping")
+            raise ValueError(
+                f"resource_work.{resource} must be a non-empty mapping",
+            )
         normalized[str(resource)] = {}
         for mode, amount in modes.items():
             parsed = float(amount)
             if not math.isfinite(parsed) or parsed < 0:
-                raise ValueError("resource work must be finite and non-negative")
+                raise ValueError(
+                    "resource work must be finite and non-negative",
+                )
             normalized[str(resource)][str(mode)] = parsed
     return normalized
 

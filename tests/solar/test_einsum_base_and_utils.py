@@ -32,8 +32,8 @@ from solar.common.utils import (
     validate_tensor_names_match_shapes,
 )
 from solar.einsum.ops.base import (
-    AFOperand,
     AFOp,
+    AFOperand,
     EinsumOp,
     EinsumOperand,
     compute_cost_from_equation,
@@ -92,8 +92,12 @@ def test_kernel_filter_and_dictionary_merge() -> None:
         {"nested": {"keep": 1, "replace": 2}},
         {"nested": {"replace": 3, "add": 4}},
     ) == {"nested": {"keep": 1, "replace": 3, "add": 4}}
-    assert merge_dicts({"nested": {"old": 1}}, {"nested": {"new": 2}}, deep=False) == {
-        "nested": {"new": 2}
+    assert merge_dicts(
+        {"nested": {"old": 1}},
+        {"nested": {"new": 2}},
+        deep=False,
+    ) == {
+        "nested": {"new": 2},
     }
 
 
@@ -150,7 +154,9 @@ def test_dimension_token_validation_reports_duplicates() -> None:
 
 
 @pytest.mark.parametrize("equation", ("", "AB,BC", "AB->AC->BC"))
-def test_parse_einsum_equation_rejects_malformed_equations(equation: str) -> None:
+def test_parse_einsum_equation_rejects_malformed_equations(
+    equation: str,
+) -> None:
     assert parse_einsum_equation(equation) == ([], [])
 
 
@@ -202,9 +208,15 @@ def test_tensor_name_validation_reports_both_count_mismatches() -> None:
 def test_graph_loader_only_links_known_nodes() -> None:
     graph = load_einsum_graph_to_networkx(
         {
-            "a": {"connections": {"outputs": ["b", "missing"]}, "kind": "source"},
-            "b": {"connections": {"inputs": ["a"], "outputs": []}, "kind": "sink"},
-        }
+            "a": {
+                "connections": {"outputs": ["b", "missing"]},
+                "kind": "source",
+            },
+            "b": {
+                "connections": {"inputs": ["a"], "outputs": []},
+                "kind": "sink",
+            },
+        },
     )
 
     assert set(graph.nodes) == {"a", "b"}
@@ -257,13 +269,15 @@ def test_einsum_operand_operation_and_cost_contracts() -> None:
     assert output_operand.to_timeloop_dataspace()["read_write"] == "true"
     assert operation.input_operands == operation.operands[:2]
     assert operation.output_operands == [output_operand]
-    assert operation.to_torch_einsum() == ("torch.einsum('MK,KN->MN', Input, Weight)")
+    assert operation.to_torch_einsum() == (
+        "torch.einsum('MK,KN->MN', Input, Weight)"
+    )
     assert operation.to_torch_einsum(["x", "weight"]) == (
         "torch.einsum('MK,KN->MN', x, weight)"
     )
     assert (
         operation.get_compute_cost(
-            TensorShapes(inputs=[[2, 3], [3, 4]], outputs=[[2, 4]])
+            TensorShapes(inputs=[[2, 3], [3, 4]], outputs=[[2, 4]]),
         )
         == 24
     )
@@ -314,21 +328,30 @@ def test_handler_validation_fixes_unary_and_binary_rank_mismatches() -> None:
     assert not handler.can_handle("conv2d")
     assert (
         handler._validate_einsum(
-            unary, {"inputs": [[2, 3]], "outputs": [[2, 3]]}
+            unary,
+            {"inputs": [[2, 3]], "outputs": [[2, 3]]},
         ).equation
         == "AB->AB"
     )
     assert (
         handler._validate_einsum(
-            binary, {"inputs": [[2, 3], [3]], "outputs": [[2, 3]]}
+            binary,
+            {"inputs": [[2, 3], [3]], "outputs": [[2, 3]]},
         ).equation
         == "AB,B->AB"
     )
-    assert handler._validate_einsum(unary, {"inputs": [], "outputs": []}) is unary
-    assert handler._validate_einsum(unary, {"inputs": [[2]], "outputs": [[2]]}) is unary
+    assert (
+        handler._validate_einsum(unary, {"inputs": [], "outputs": []}) is unary
+    )
+    assert (
+        handler._validate_einsum(unary, {"inputs": [[2]], "outputs": [[2]]})
+        is unary
+    )
 
 
-def test_handler_validation_covers_larger_second_input_and_missing_shapes() -> None:
+def test_handler_validation_covers_larger_second_input_and_missing_shapes() -> (
+    None
+):
     handler = MatmulHandler()
     operation = EinsumOp(
         [
@@ -347,7 +370,10 @@ def test_handler_validation_covers_larger_second_input_and_missing_shapes() -> N
     assert corrected is not None
     assert corrected.equation == "B,AB->AB"
     assert (
-        handler._try_fix_einsum_ranks(operation, {"inputs": [[1]], "outputs": []})
+        handler._try_fix_einsum_ranks(
+            operation,
+            {"inputs": [[1]], "outputs": []},
+        )
         is None
     )
     assert (
@@ -364,7 +390,12 @@ def test_handler_validation_covers_larger_second_input_and_missing_shapes() -> N
 
 def test_accelforge_operands_and_operations_serialize_optional_fields() -> None:
     lowered = AFOperand("input", ["M", "N"])
-    renamed = AFOperand("output", ["m", "n"], ["Batch", "Channel"], is_output=True)
+    renamed = AFOperand(
+        "output",
+        ["m", "n"],
+        ["Batch", "Channel"],
+        is_output=True,
+    )
 
     assert lowered.to_dict() == {
         "name": "input",
@@ -375,7 +406,11 @@ def test_accelforge_operands_and_operations_serialize_optional_fields() -> None:
         "projection": {"BATCH": "m", "CHANNEL": "n"},
         "output": True,
     }
-    assert AFOp("copy", [lowered, renamed], is_copy_operation=True).to_dict() == {
+    assert AFOp(
+        "copy",
+        [lowered, renamed],
+        is_copy_operation=True,
+    ).to_dict() == {
         "name": "copy",
         "is_copy_operation": True,
         "tensor_accesses": [lowered.to_dict(), renamed.to_dict()],

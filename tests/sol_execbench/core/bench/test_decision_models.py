@@ -28,9 +28,14 @@ def _sidecar(**overrides) -> DecisionSidecar:
         status=DiagnosticSidecarStatus.AVAILABLE,
         reason_code=DecisionReasonCode.DECISION_RENDERED,
         identity=ExtendedDiagnosticIdentity(
-            generated_at="2026-07-10T00:00:00Z", sol_version="v3.0.0"
+            generated_at="2026-07-10T00:00:00Z",
+            sol_version="v3.0.0",
         ),
-        summary=DecisionSummary(hint_count=1, footprint_count=1, architecture="gfx942"),
+        summary=DecisionSummary(
+            hint_count=1,
+            footprint_count=1,
+            architecture="gfx942",
+        ),
     )
     if overrides:
         return sidecar.model_copy(update=overrides)
@@ -54,25 +59,32 @@ def test_sidecar_round_trip():
                 bottleneck_class=DecisionBottleneckClass.SPILL_DETECTED,
                 confidence=DecisionConfidence.INFERRED_HIGH,
                 message="spill detected",
-            )
-        ]
+            ),
+        ],
     )
     rebuilt = DecisionSidecar.model_validate(sidecar.to_dict())
-    assert rebuilt.hints[0].bottleneck_class == DecisionBottleneckClass.SPILL_DETECTED
+    assert (
+        rebuilt.hints[0].bottleneck_class
+        == DecisionBottleneckClass.SPILL_DETECTED
+    )
     assert rebuilt.hints[0].confidence == DecisionConfidence.INFERRED_HIGH
 
 
 def test_sidecar_rejects_unknown_field():
     with pytest.raises(ValidationError, match="bogus"):
         ExtendedDiagnosticIdentity.model_validate(
-            {"generated_at": "x", "sol_version": "y", "bogus": 1}
+            {"generated_at": "x", "sol_version": "y", "bogus": 1},
         )
 
 
 def test_sidecar_is_frozen():
     sidecar = _sidecar()
     with pytest.raises(ValidationError, match="frozen"):
-        setattr(sidecar, "status", DiagnosticSidecarStatus.PARTIAL)
+        setattr(  # noqa: B010 -- Exercise Pydantic's runtime frozen check
+            sidecar,
+            "status",
+            DiagnosticSidecarStatus.PARTIAL,
+        )
 
 
 def test_bottleneck_class_is_closed_layer_r():

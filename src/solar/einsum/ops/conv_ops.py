@@ -20,28 +20,33 @@ This module provides einsum handlers for:
 - convtranspose1d, convtranspose2d, convtranspose3d
 """
 
-from typing import Any, Tuple
+from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShape, TensorShapes
 
 
 class Conv1dHandler(EinsumOpHandler):
     """Handler for 1D convolution."""
 
-    supported_ops = ["conv1d"]
+    supported_ops = ("conv1d",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for 1D convolution."""
         input_shape = tensor_shapes.inputs[0]
-        weight_shape = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        weight_shape = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if input_shape is None or weight_shape is None:
             raise ValueError(f"Missing Input/Weight shapes for {op_name}")
@@ -77,9 +82,9 @@ class Conv1dHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        stride: Tuple[int] = (1,),
-        padding: Tuple[int] = (0,),
-        dilation: Tuple[int] = (1,),
+        stride: tuple[int] = (1,),
+        padding: tuple[int] = (0,),
+        dilation: tuple[int] = (1,),
         groups: int = 1,
         in_channels: int = 0,
         out_channels: int = 0,
@@ -125,14 +130,19 @@ class Conv1dHandler(EinsumOpHandler):
 class Conv2dHandler(EinsumOpHandler):
     """Handler for 2D convolution."""
 
-    supported_ops = ["conv2d"]
+    supported_ops = ("conv2d",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for 2D convolution."""
         input_shape = tensor_shapes.inputs[0]
-        weight_shape = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        weight_shape = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if input_shape is None or weight_shape is None:
             raise ValueError(f"Missing Input/Weight shapes for {op_name}")
@@ -168,9 +178,9 @@ class Conv2dHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        stride: Tuple[int, int] = (1, 1),
-        padding: Tuple[int, int] = (0, 0),
-        dilation: Tuple[int, int] = (1, 1),
+        stride: tuple[int, int] = (1, 1),
+        padding: tuple[int, int] = (0, 0),
+        dilation: tuple[int, int] = (1, 1),
         groups: int = 1,
         in_channels: int = 0,
         out_channels: int = 0,
@@ -184,23 +194,43 @@ class Conv2dHandler(EinsumOpHandler):
         """
         if groups == 1:
             operands = [
-                EinsumOperand("Input", ["B", "C", "P+R", "Q+S"], is_output=False),
+                EinsumOperand(
+                    "Input",
+                    ["B", "C", "P+R", "Q+S"],
+                    is_output=False,
+                ),
                 EinsumOperand("Weight", ["O", "C", "R", "S"], is_output=False),
                 EinsumOperand("Output", ["B", "O", "P", "Q"], is_output=True),
             ]
             equation = "BC(P+R)(Q+S),OCRS->BOPQ"
         elif groups == in_channels and groups == out_channels:
             operands = [
-                EinsumOperand("Input", ["B", "O", "P+R", "Q+S"], is_output=False),
+                EinsumOperand(
+                    "Input",
+                    ["B", "O", "P+R", "Q+S"],
+                    is_output=False,
+                ),
                 EinsumOperand("Weight", ["O", "C", "R", "S"], is_output=False),
                 EinsumOperand("Output", ["B", "O", "P", "Q"], is_output=True),
             ]
             equation = "BO(P+R)(Q+S),OCRS->BOPQ"
         else:
             operands = [
-                EinsumOperand("Input", ["B", "G", "I", "P+R", "Q+S"], is_output=False),
-                EinsumOperand("Weight", ["G", "O", "I", "R", "S"], is_output=False),
-                EinsumOperand("Output", ["B", "G", "O", "P", "Q"], is_output=True),
+                EinsumOperand(
+                    "Input",
+                    ["B", "G", "I", "P+R", "Q+S"],
+                    is_output=False,
+                ),
+                EinsumOperand(
+                    "Weight",
+                    ["G", "O", "I", "R", "S"],
+                    is_output=False,
+                ),
+                EinsumOperand(
+                    "Output",
+                    ["B", "G", "O", "P", "Q"],
+                    is_output=True,
+                ),
             ]
             equation = "BGI(P+R)(Q+S),GOIRS->BGOPQ"
 
@@ -216,14 +246,19 @@ class Conv2dHandler(EinsumOpHandler):
 class Conv3dHandler(EinsumOpHandler):
     """Handler for 3D convolution."""
 
-    supported_ops = ["conv3d"]
+    supported_ops = ("conv3d",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for 3D convolution."""
         input_shape = tensor_shapes.inputs[0]
-        weight_shape = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        weight_shape = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if input_shape is None or weight_shape is None:
             raise ValueError(f"Missing Input/Weight shapes for {op_name}")
@@ -233,16 +268,20 @@ class Conv3dHandler(EinsumOpHandler):
         dilation = tuple(kwargs.get("dilation", (1, 1, 1)))
 
         return self._generate_conv3d_einsum(
-            input_shape, weight_shape, stride, padding, dilation
+            input_shape,
+            weight_shape,
+            stride,
+            padding,
+            dilation,
         )
 
     def _generate_conv3d_einsum(
         self,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        stride: Tuple[int, int, int] = (1, 1, 1),
-        padding: Tuple[int, int, int] = (0, 0, 0),
-        dilation: Tuple[int, int, int] = (1, 1, 1),
+        stride: tuple[int, int, int] = (1, 1, 1),
+        padding: tuple[int, int, int] = (0, 0, 0),
+        dilation: tuple[int, int, int] = (1, 1, 1),
     ) -> EinsumOp:
         """Generate einsum for 3D convolution.
 
@@ -251,17 +290,28 @@ class Conv3dHandler(EinsumOpHandler):
         The input spatial dimensions are expressed as (P+T), (Q+R), (U+S) to show
         the sliding window relationship that can be flattened into loops.
         """
-        B, C, D, H, W = input_shape
-        O, _, KD, KH, KW = weight_shape
+        _batch, _channels, depth, height, width = input_shape
+        _outputs, _, kernel_depth, kernel_height, kernel_width = weight_shape
 
-        (D + 2 * padding[0] - dilation[0] * (KD - 1) - 1) // stride[0] + 1
-        (H + 2 * padding[1] - dilation[1] * (KH - 1) - 1) // stride[1] + 1
-        (W + 2 * padding[2] - dilation[2] * (KW - 1) - 1) // stride[2] + 1
+        _output_depth = (
+            depth + 2 * padding[0] - dilation[0] * (kernel_depth - 1) - 1
+        ) // stride[0] + 1
+        _output_height = (
+            height + 2 * padding[1] - dilation[1] * (kernel_height - 1) - 1
+        ) // stride[1] + 1
+        _output_width = (
+            width + 2 * padding[2] - dilation[2] * (kernel_width - 1) - 1
+        ) // stride[2] + 1
 
-        # Sliding window format: Input[B,C,P+T,Q+R,U+S] * Weight[O,C,T,R,S] -> Output[B,O,P,Q,U]
+        # Sliding windows contract input B,C,P+T,Q+R,U+S with weight
+        # O,C,T,R,S to produce output B,O,P,Q,U.
         # P,Q,U are output positions, T,R,S are kernel positions
         operands = [
-            EinsumOperand("Input", ["B", "C", "P+T", "Q+R", "U+S"], is_output=False),
+            EinsumOperand(
+                "Input",
+                ["B", "C", "P+T", "Q+R", "U+S"],
+                is_output=False,
+            ),
             EinsumOperand("Weight", ["O", "C", "T", "R", "S"], is_output=False),
             EinsumOperand("Output", ["B", "O", "P", "Q", "U"], is_output=True),
         ]
@@ -281,14 +331,19 @@ class Conv3dHandler(EinsumOpHandler):
 class ConvTranspose1dHandler(EinsumOpHandler):
     """Handler for 1D transposed convolution."""
 
-    supported_ops = ["convtranspose1d", "conv_transpose1d"]
+    supported_ops = ("convtranspose1d", "conv_transpose1d")
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for 1D transposed convolution."""
         input_shape = tensor_shapes.inputs[0]
-        weight_shape = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        weight_shape = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -335,14 +390,19 @@ class ConvTranspose1dHandler(EinsumOpHandler):
 class ConvTranspose2dHandler(EinsumOpHandler):
     """Handler for 2D transposed convolution."""
 
-    supported_ops = ["convtranspose2d", "conv_transpose2d"]
+    supported_ops = ("convtranspose2d", "conv_transpose2d")
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for 2D transposed convolution."""
         input_shape = tensor_shapes.inputs[0]
-        weight_shape = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        weight_shape = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -387,14 +447,19 @@ class ConvTranspose2dHandler(EinsumOpHandler):
 class ConvTranspose3dHandler(EinsumOpHandler):
     """Handler for 3D transposed convolution."""
 
-    supported_ops = ["convtranspose3d", "conv_transpose3d"]
+    supported_ops = ("convtranspose3d", "conv_transpose3d")
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for 3D transposed convolution."""
         input_shape = tensor_shapes.inputs[0]
-        weight_shape = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        weight_shape = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -422,7 +487,11 @@ class ConvTranspose3dHandler(EinsumOpHandler):
         operands = [
             EinsumOperand("Input", ["B", "C", "P", "Q", "U"], is_output=False),
             EinsumOperand("Weight", ["C", "K", "T", "R", "S"], is_output=False),
-            EinsumOperand("Output", ["B", "K", "P+T", "Q+R", "U+S"], is_output=True),
+            EinsumOperand(
+                "Output",
+                ["B", "K", "P+T", "Q+R", "U+S"],
+                is_output=True,
+            ),
         ]
 
         equation = "BCPQU,CKTRS->BK(P+T)(Q+R)(U+S)"

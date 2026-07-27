@@ -12,19 +12,26 @@ from pathlib import Path
 
 from rich.console import Console
 
-from ...core.bench.agent_feedback import (
+from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackBuildIdentity,
     AgentFeedbackBuildRequest,
     artifact_citation_from_path,
     build_agent_feedback_sidecar,
 )
-from ...core.bench.diagnostic_sidecar import DiagnosticArtifactCitation
-from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
-from ...core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
-from ...core.integrity.checksums import sha256_file, stable_json_checksum
-from ...core.data.solution import Solution
-from ...core.data.trace import Trace
-from ...core.evidence.runtime_evidence import write_json_payload
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticArtifactCitation,
+)
+from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
+from sol_execbench.core.bench.static_kernel.evidence import (
+    StaticKernelEvidenceSidecar,
+)
+from sol_execbench.core.data.solution import Solution
+from sol_execbench.core.data.trace import Trace
+from sol_execbench.core.evidence.runtime_evidence import write_json_payload
+from sol_execbench.core.integrity.checksums import (
+    sha256_file,
+    stable_json_checksum,
+)
 
 console = Console(stderr=True)
 
@@ -74,7 +81,6 @@ class ResolvedAgentFeedbackIdentity:
 
 def _agent_feedback_sidecar_path(output_file: Path | None) -> Path | None:
     """Return the optional agent feedback sidecar path for a trace output."""
-
     if output_file is None:
         return None
     return output_file.with_name(f"{output_file.name}.agent-feedback.json")
@@ -84,7 +90,6 @@ def _write_agent_feedback_sidecar(
     request: AgentFeedbackWriteRequest,
 ) -> Path | None:
     """Write optional agent feedback metadata without changing trace JSONL."""
-
     sidecar_path = _agent_feedback_sidecar_path(request.output_file)
     if sidecar_path is None:
         return None
@@ -121,8 +126,10 @@ def _write_agent_feedback_sidecar(
         write_json_payload(sidecar_path, sidecar)
         console.print(f"[green]Saved agent feedback to {sidecar_path}[/green]")
         return sidecar_path
-    except Exception as exc:
-        console.print(f"[yellow]Agent feedback metadata skipped: {exc}[/yellow]")
+    except Exception as exc:  # noqa: BLE001 -- optional metadata sidecar
+        console.print(
+            f"[yellow]Agent feedback metadata skipped: {exc}[/yellow]",
+        )
         return None
 
 
@@ -130,7 +137,6 @@ def _agent_feedback_identity_fields(
     request: AgentFeedbackWriteRequest,
 ) -> ResolvedAgentFeedbackIdentity:
     """Derive stable feedback freshness identity from emitted trace data."""
-
     traces = request.traces
     overrides = request.identity
     target_records = [
@@ -141,14 +147,16 @@ def _agent_feedback_identity_fields(
         for trace in traces
     ]
     solution_labels = sorted(
-        {trace.solution for trace in traces if trace.solution is not None}
+        {trace.solution for trace in traces if trace.solution is not None},
     )
 
     return ResolvedAgentFeedbackIdentity(
         target_id=(
             overrides.target_id
             if overrides.target_id is not None
-            else (stable_json_checksum(target_records) if target_records else None)
+            else (
+                stable_json_checksum(target_records) if target_records else None
+            )
         ),
         run_id=(
             overrides.run_id
@@ -158,12 +166,20 @@ def _agent_feedback_identity_fields(
         candidate_id=(
             overrides.candidate_id
             if overrides.candidate_id is not None
-            else (stable_json_checksum(solution_labels) if solution_labels else None)
+            else (
+                stable_json_checksum(solution_labels)
+                if solution_labels
+                else None
+            )
         ),
         source_sha256=(
             overrides.source_sha256
             if overrides.source_sha256 is not None
-            else (request.solution.hash() if request.solution is not None else None)
+            else (
+                request.solution.hash()
+                if request.solution is not None
+                else None
+            )
         ),
     )
 
@@ -173,12 +189,13 @@ def _agent_feedback_run_id(
     traces: Sequence[Trace],
 ) -> str | None:
     """Return a stable run id from the persisted trace file or trace payload."""
-
     if output_file is not None and output_file.is_file():
         return sha256_file(output_file)
     if not traces:
         return None
-    return stable_json_checksum([trace.model_dump(mode="json") for trace in traces])
+    return stable_json_checksum(
+        [trace.model_dump(mode="json") for trace in traces],
+    )
 
 
 def _agent_feedback_artifact_citations(
@@ -190,7 +207,6 @@ def _agent_feedback_artifact_citations(
     trace_sha256: str | None = None,
 ) -> list[DiagnosticArtifactCitation]:
     """Return compact citations for artifacts written during this CLI run."""
-
     citations: list[DiagnosticArtifactCitation] = []
     if output_file is not None:
         citations.append(
@@ -199,15 +215,19 @@ def _agent_feedback_artifact_citations(
                 label="canonical_trace_jsonl",
                 path=output_file,
                 sha256=trace_sha256,
-            )
+            ),
         )
     for kind, label, path in (
         ("environment", "environment_snapshot", environment_sidecar_path),
         ("profile", "rocprofv3_profile", profile_sidecar_path),
-        ("static_evidence", "static_kernel_evidence", static_evidence_sidecar_path),
+        (
+            "static_evidence",
+            "static_kernel_evidence",
+            static_evidence_sidecar_path,
+        ),
     ):
         if path is not None:
             citations.append(
-                artifact_citation_from_path(kind=kind, label=label, path=path)
+                artifact_citation_from_path(kind=kind, label=label, path=path),
             )
     return citations

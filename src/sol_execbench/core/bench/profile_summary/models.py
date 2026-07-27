@@ -16,7 +16,6 @@ from sol_execbench.core.bench.rocm_profiler.models import (
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
-
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
 
@@ -157,11 +156,17 @@ class ProfileSummaryContent(BaseModelWithDocstrings):
     """Bounded failed reason."""
     metrics: list[ProfileSummaryMetric] = Field(default_factory=list)
     """Bounded normalized profile metrics derived from metadata."""
-    workload_metrics: list[ProfileSummaryStructuredMetric] = Field(default_factory=list)
+    workload_metrics: list[ProfileSummaryStructuredMetric] = Field(
+        default_factory=list,
+    )
     """Structured workload-level profile metrics."""
-    kernel_metrics: list[ProfileSummaryKernelMetric] = Field(default_factory=list)
+    kernel_metrics: list[ProfileSummaryKernelMetric] = Field(
+        default_factory=list,
+    )
     """Structured kernel-level profile metrics."""
-    bottleneck_hints: list[ProfileSummaryBottleneckHint] = Field(default_factory=list)
+    bottleneck_hints: list[ProfileSummaryBottleneckHint] = Field(
+        default_factory=list,
+    )
     """Conservative diagnostic bottleneck hints."""
     parse_warnings: list[str] = Field(default_factory=list)
     """Bounded artifact parse warnings."""

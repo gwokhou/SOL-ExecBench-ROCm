@@ -28,7 +28,10 @@ def _attr_path(node: ast.AST) -> str:
 def _has_direct_hardware_marked_test(path: Path, marker: str) -> bool:
     tree = ast.parse(path.read_text())
     for node in ast.walk(tree):
-        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+        if not isinstance(
+            node,
+            ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
+        ):
             continue
         is_test = (
             node.name.startswith("Test")
@@ -88,7 +91,10 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
 
     assert "timing_serial tests skipped by default" in conftest
     assert 'timing_selected = "timing_serial" in markexpr' in conftest
-    assert 'if "timing_serial" in item.keywords and not timing_selected' in conftest
+    assert (
+        'if "timing_serial" in item.keywords and not timing_selected'
+        in conftest
+    )
 
     forbidden = ["requires_sm100", "sm_100", "Blackwell", "_gpu_sm_version"]
     for phrase in forbidden:
@@ -114,7 +120,8 @@ def test_cdna3_marker_has_concrete_hardware_gated_test_surface():
     ]
 
     assert any(
-        _has_direct_hardware_marked_test(path, "requires_cdna3") for path in candidates
+        _has_direct_hardware_marked_test(path, "requires_cdna3")
+        for path in candidates
     )
 
 
@@ -126,7 +133,8 @@ def test_rdna4_marker_has_concrete_hardware_gated_test_surface():
     ]
 
     assert any(
-        _has_direct_hardware_marked_test(path, "requires_rdna4") for path in candidates
+        _has_direct_hardware_marked_test(path, "requires_rdna4")
+        for path in candidates
     )
 
 
@@ -175,7 +183,9 @@ def test_user_facing_compile_text_uses_hip_cpp():
 
 
 def test_reward_hack_skip_text_uses_rocm_gpu_availability():
-    reward_hack_tests = _read("tests/sol_execbench/core/bench/test_reward_hack.py")
+    reward_hack_tests = _read(
+        "tests/sol_execbench/core/bench/test_reward_hack.py",
+    )
 
     assert "ROCm GPU unavailable" in reward_hack_tests
     assert "CUDA not available" not in reward_hack_tests

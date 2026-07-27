@@ -8,10 +8,11 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from math import prod
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, TypedDict
+from typing import Any, TypedDict
 
 from sol_execbench.core.bench.reference_protocol import (
     MAX_REFERENCE_TENSOR_STORAGE_BYTES,
@@ -89,7 +90,11 @@ class AkaExecutionTarget:
 
     def __post_init__(self) -> None:
         """Normalize manifest boundary values and reject unknown members."""
-        object.__setattr__(self, "generation", AkaTargetGeneration(self.generation))
+        object.__setattr__(
+            self,
+            "generation",
+            AkaTargetGeneration(self.generation),
+        )
         object.__setattr__(
             self,
             "supported_tensor_dtypes",
@@ -105,6 +110,7 @@ class AkaMaterializationTarget:
     cache_clear: CacheClearPolicy
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible materialization target."""
         return {
             "device": self.device.device,
             "device_index": self.device.index,
@@ -140,6 +146,7 @@ class AkaWorkloadDecision:
         object.__setattr__(self, "stage", AkaCompatibilityStage(self.stage))
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible workload decision."""
         return {
             "path": self.problem_path,
             "workload_uuid": self.workload_uuid,
@@ -169,7 +176,10 @@ class AkaCorpusSelection:
 
     @property
     def excluded(self) -> tuple[AkaWorkloadDecision, ...]:
-        return tuple(decision for decision in self.decisions if not decision.included)
+        """Return workloads excluded from the selected target."""
+        return tuple(
+            decision for decision in self.decisions if not decision.included
+        )
 
 
 @dataclass(frozen=True)
@@ -181,7 +191,8 @@ class StaticReferenceStorage:
 
 
 Probe = Callable[
-    [Path, int, Workload, AkaMaterializationTarget, float], AkaWorkloadDecision
+    [Path, int, Workload, AkaMaterializationTarget, float],
+    AkaWorkloadDecision,
 ]
 
 
@@ -189,39 +200,44 @@ def load_execution_targets(
     payload: Mapping[str, Any],
 ) -> dict[str, AkaExecutionTarget]:
     """Parse the manifest's closed target execution catalog."""
-
     if set(payload) != set(SUPPORTED_AKA_GFX_TARGETS):
         raise ValueError(
             "AKA execution_targets must define exactly "
-            + ", ".join(SUPPORTED_AKA_GFX_TARGETS)
+            + ", ".join(SUPPORTED_AKA_GFX_TARGETS),
         )
     targets: dict[str, AkaExecutionTarget] = {}
     for gfx_target, raw in payload.items():
         if not isinstance(raw, Mapping):
-            raise ValueError(f"AKA execution target {gfx_target} must be an object")
+            raise ValueError(
+                f"AKA execution target {gfx_target} must be an object",
+            )
         raw_dtypes = raw.get("supported_tensor_dtypes") or ()
         try:
             dtypes = frozenset(DType(str(value)) for value in raw_dtypes)
         except ValueError as exc:
             raise ValueError(
                 f"AKA execution target {gfx_target} has unknown dtypes: "
-                f"{sorted(map(str, raw_dtypes))}"
+                f"{sorted(map(str, raw_dtypes))}",
             ) from exc
         if not dtypes:
             raise ValueError(
-                f"AKA execution target {gfx_target} lacks supported dtypes"
+                f"AKA execution target {gfx_target} lacks supported dtypes",
             )
         expected = AKA_EXECUTION_TARGET_SPECS[gfx_target]
         try:
             generation = AkaTargetGeneration(str(raw.get("generation") or ""))
         except ValueError as exc:
             raise ValueError(
-                f"AKA execution target {gfx_target} generation changed"
+                f"AKA execution target {gfx_target} generation changed",
             ) from exc
         if generation != expected["generation"]:
-            raise ValueError(f"AKA execution target {gfx_target} generation changed")
+            raise ValueError(
+                f"AKA execution target {gfx_target} generation changed",
+            )
         if dtypes != frozenset(expected["supported_tensor_dtypes"]):
-            raise ValueError(f"AKA execution target {gfx_target} dtype policy changed")
+            raise ValueError(
+                f"AKA execution target {gfx_target} dtype policy changed",
+            )
         targets[gfx_target] = AkaExecutionTarget(
             gfx_target=gfx_target,
             generation=generation,
@@ -232,9 +248,10 @@ def load_execution_targets(
 
 def materialization_target(device: RocmDeviceInfo) -> AkaMaterializationTarget:
     """Build target-selection evidence from an observed device."""
-
     if device.gfx_target not in SUPPORTED_AKA_GFX_TARGETS:
-        raise ValueError(f"unsupported AKA execution target: {device.gfx_target}")
+        raise ValueError(
+            f"unsupported AKA execution target: {device.gfx_target}",
+        )
     return AkaMaterializationTarget(
         device=device,
         cache_clear=derive_cache_clear_policy(device.l2_cache_bytes),
@@ -243,20 +260,22 @@ def materialization_target(device: RocmDeviceInfo) -> AkaMaterializationTarget:
 
 def definition_tensor_dtypes(definition: Definition) -> frozenset[DType]:
     """Return every input/output tensor dtype required by a Definition."""
-
     tensors = [*definition.inputs.values(), *definition.outputs.values()]
     return frozenset(tensor.dtype for tensor in tensors)
 
 
 def static_reference_storage(
-    definition: Definition, workload: Workload
+    definition: Definition,
+    workload: Workload,
 ) -> StaticReferenceStorage:
     """Compute reference IPC storage from schema shapes without allocating tensors."""
-
     input_shapes = definition.get_input_shapes(workload.axes)
     output_shapes = definition.get_output_shapes(workload.axes)
     input_bytes = _shaped_tensor_storage_bytes(definition.inputs, input_shapes)
-    output_bytes = _shaped_tensor_storage_bytes(definition.outputs, output_shapes)
+    output_bytes = _shaped_tensor_storage_bytes(
+        definition.outputs,
+        output_shapes,
+    )
     return StaticReferenceStorage(
         input_storage_bytes=input_bytes,
         reference_case_bytes=input_bytes + output_bytes,
@@ -275,10 +294,12 @@ def _shaped_tensor_storage_bytes(
 
 
 def _static_exclusion(
-    definition: Definition, workload: Workload, target: AkaExecutionTarget
+    definition: Definition,
+    workload: Workload,
+    target: AkaExecutionTarget,
 ) -> tuple[str, str, dict[str, int]] | None:
     unsupported = sorted(
-        definition_tensor_dtypes(definition) - target.supported_tensor_dtypes
+        definition_tensor_dtypes(definition) - target.supported_tensor_dtypes,
     )
     if unsupported:
         return (
@@ -310,9 +331,10 @@ def select_corpus_for_target(
     probe: Probe | None = None,
 ) -> AkaCorpusSelection:
     """Partition every canonical workload for one observed target."""
-
     if target.device.gfx_target != execution_target.gfx_target:
-        raise ValueError("observed device and manifest execution target do not match")
+        raise ValueError(
+            "observed device and manifest execution target do not match",
+        )
     if probe_timeout_seconds <= 0:
         raise ValueError("AKA probe timeout must be positive")
     effective_probe = probe or probe_workload
@@ -321,7 +343,7 @@ def select_corpus_for_target(
     for entry in entries:
         problem_dir = authored_root / entry.relative_problem_dir
         definition = Definition.model_validate_json(
-            (problem_dir / "definition.json").read_text(encoding="utf-8")
+            (problem_dir / "definition.json").read_text(encoding="utf-8"),
         )
         workloads = tuple(
             Workload.model_validate_json(line)
@@ -332,7 +354,11 @@ def select_corpus_for_target(
         )
         selected: list[Workload] = []
         for row_index, workload in enumerate(workloads):
-            static_exclusion = _static_exclusion(definition, workload, execution_target)
+            static_exclusion = _static_exclusion(
+                definition,
+                workload,
+                execution_target,
+            )
             if static_exclusion is not None:
                 reason_code, detail, metrics = static_exclusion
                 decision = AkaWorkloadDecision(
@@ -358,13 +384,15 @@ def select_corpus_for_target(
                     or decision.workload_uuid != workload.uuid
                 ):
                     raise AkaProbeInfrastructureError(
-                        "probe decision identity does not match the selected workload"
+                        "probe decision identity does not match the selected workload",
                     )
             decisions.append(decision)
             if decision.included:
                 selected.append(workload)
         if selected:
-            problems.append(AkaProblemSelection(entry=entry, workloads=tuple(selected)))
+            problems.append(
+                AkaProblemSelection(entry=entry, workloads=tuple(selected)),
+            )
     return AkaCorpusSelection(tuple(problems), tuple(decisions))
 
 
@@ -392,35 +420,42 @@ def _probe_command(
 
 
 def _parse_probe_output(
-    stdout: str, *, problem_path: str, workload_uuid: str
+    stdout: str,
+    *,
+    problem_path: str,
+    workload_uuid: str,
 ) -> AkaWorkloadDecision:
     lines = [
-        line for line in stdout.splitlines() if line.startswith(PROBE_RESULT_PREFIX)
+        line
+        for line in stdout.splitlines()
+        if line.startswith(PROBE_RESULT_PREFIX)
     ]
     if len(lines) != 1:
         raise AkaProbeInfrastructureError(
-            f"probe worker returned {len(lines)} structured results for {workload_uuid}"
+            f"probe worker returned {len(lines)} structured results for {workload_uuid}",
         )
     try:
         payload = json.loads(lines[0][len(PROBE_RESULT_PREFIX) :])
     except json.JSONDecodeError as exc:
         raise AkaProbeInfrastructureError(
-            f"probe worker returned invalid JSON for {workload_uuid}"
+            f"probe worker returned invalid JSON for {workload_uuid}",
         ) from exc
     try:
         status = AkaProbeStatus(str(payload.get("status") or ""))
     except ValueError as exc:
         raise AkaProbeInfrastructureError(
-            f"probe worker returned invalid status for {workload_uuid}"
+            f"probe worker returned invalid status for {workload_uuid}",
         ) from exc
     if status is AkaProbeStatus.INFRASTRUCTURE_ERROR:
-        raise AkaProbeInfrastructureError(str(payload.get("detail") or "probe failed"))
+        raise AkaProbeInfrastructureError(
+            str(payload.get("detail") or "probe failed"),
+        )
     metrics = payload.get("metrics") or {}
     if not isinstance(metrics, dict) or any(
         not isinstance(value, int) for value in metrics.values()
     ):
         raise AkaProbeInfrastructureError(
-            f"probe worker returned invalid metrics for {workload_uuid}"
+            f"probe worker returned invalid metrics for {workload_uuid}",
         )
     included = status is AkaProbeStatus.COMPATIBLE
     return AkaWorkloadDecision(
@@ -430,7 +465,7 @@ def _parse_probe_output(
         stage=AkaCompatibilityStage.LIVE_PROBE,
         reason_code=str(
             payload.get("reason_code")
-            or ("probe_passed" if included else "probe_failed")
+            or ("probe_passed" if included else "probe_failed"),
         ),
         detail=redacted_text_tail(str(payload.get("detail") or "")),
         metrics={str(key): value for key, value in metrics.items()},
@@ -445,7 +480,6 @@ def probe_workload(
     timeout_seconds: float,
 ) -> AkaWorkloadDecision:
     """Run one target probe with bounded output and process-group cleanup."""
-
     command = _probe_command(problem_dir, row_index, workload, target)
     try:
         completed = run_in_process_group_bounded(
@@ -456,7 +490,9 @@ def probe_workload(
         )
     except subprocess.TimeoutExpired:
         return AkaWorkloadDecision(
-            problem_path=problem_dir.relative_to(problem_dir.parents[1]).as_posix(),
+            problem_path=problem_dir.relative_to(
+                problem_dir.parents[1],
+            ).as_posix(),
             workload_uuid=workload.uuid,
             included=False,
             stage=AkaCompatibilityStage.LIVE_PROBE,
@@ -466,7 +502,7 @@ def probe_workload(
     if completed.returncode != 0:
         detail = redacted_text_tail(completed.stderr or completed.stdout or "")
         raise AkaProbeInfrastructureError(
-            f"probe worker exited {completed.returncode} for {workload.uuid}: {detail}"
+            f"probe worker exited {completed.returncode} for {workload.uuid}: {detail}",
         )
     problem_path = problem_dir.relative_to(problem_dir.parents[1]).as_posix()
     return _parse_probe_output(

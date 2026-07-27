@@ -14,7 +14,9 @@ ENV_SOL_EXECBENCH_CLOCKS_LOCKED = "SOL_EXECBENCH_CLOCKS_LOCKED"
 ENV_SOL_EXECBENCH_DEVICE = "SOL_EXECBENCH_DEVICE"
 ENV_SOL_EXECBENCH_GRACEFUL_EXIT = "SOL_EXECBENCH_GRACEFUL_EXIT"
 ENV_SOL_EXECBENCH_SANDBOXED = "SOL_EXECBENCH_SANDBOXED"
-ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION = "SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"
+ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION = (
+    "SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"
+)
 
 _PASSTHROUGH_NAMES = frozenset(
     {
@@ -44,12 +46,14 @@ _PASSTHROUGH_NAMES = frozenset(
         ENV_SOL_EXECBENCH_SANDBOXED,
         ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION,
         "VIRTUAL_ENV",
-    }
+    },
 )
 
 
 def sanitized_subprocess_env(
-    base: Mapping[str, str], *, staging_dir: Path
+    base: Mapping[str, str],
+    *,
+    staging_dir: Path,
 ) -> dict[str, str]:
     """Return the minimum runtime environment, excluding credentials and proxies."""
     result = {name: base[name] for name in _PASSTHROUGH_NAMES if name in base}
@@ -58,7 +62,7 @@ def sanitized_subprocess_env(
             "HOME": str(staging_dir),
             "TMPDIR": str(staging_dir / ".tmp"),
             "PYTORCH_ALLOC_CONF": "expandable_segments:True",
-        }
+        },
     )
     return result
 

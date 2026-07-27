@@ -7,12 +7,12 @@ from click.testing import CliRunner
 from sol_execbench.cli.main import cli
 from sol_execbench.core.platform.toolchain import (
     TOOLCHAIN_ROUTING_SCHEMA_VERSION,
-    ToolLifecycle,
     ToolchainArtifactType,
     ToolchainCapability,
     ToolchainEvidenceLevel,
     ToolchainRoutingRequest,
     ToolchainStatus,
+    ToolLifecycle,
     build_toolchain_routing_report,
     default_toolchain_registry,
 )
@@ -42,7 +42,10 @@ def test_default_registry_records_lifecycle_and_static_tools():
 
 
 def test_routing_selects_available_tool_and_preserves_authority_boundaries():
-    def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+    def runner(
+        command: list[str],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
         assert command == ["/fake/rocprofv3", "--version"]
         assert timeout_seconds == 3.0
         return ProbeCompletedProcess(returncode=0, stdout="rocprofv3 7.0.0")
@@ -64,7 +67,9 @@ def test_routing_selects_available_tool_and_preserves_authority_boundaries():
     assert payload["correctness_authority"] is False
     assert payload["performance_authority"] is False
     assert payload["leaderboard_authority"] is False
-    selected = [decision for decision in payload["decisions"] if decision["selected"]]
+    selected = [
+        decision for decision in payload["decisions"] if decision["selected"]
+    ]
     assert selected[0]["status"] == ToolchainStatus.AVAILABLE
 
 
@@ -82,7 +87,7 @@ def test_routing_reports_migrated_legacy_tool_and_fallback():
                 replacement_tool_id="rocm-systems",
                 evidence_levels=[ToolchainEvidenceLevel.PROFILING],
                 artifact_types=[ToolchainArtifactType.EXECUTABLE_RUN],
-            )
+            ),
         ],
     )
 
@@ -106,7 +111,7 @@ def test_routing_rejects_wrong_artifact_with_explicit_reason():
                 evidence_levels=[ToolchainEvidenceLevel.PROFILING],
                 artifact_types=[ToolchainArtifactType.EXECUTABLE_RUN],
                 expected_binaries=["rocprofv3"],
-            )
+            ),
         ],
     )
 
@@ -118,7 +123,10 @@ def test_routing_rejects_wrong_artifact_with_explicit_reason():
 def test_static_tools_are_routable_and_optional_candidates_remain_nonmandatory():
     commands: list[list[str]] = []
 
-    def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+    def runner(
+        command: list[str],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
         commands.append(command)
         return ProbeCompletedProcess(returncode=0, stdout=f"{command[0]} ok")
 
@@ -132,7 +140,9 @@ def test_static_tools_are_routable_and_optional_candidates_remain_nonmandatory()
     )
 
     assert report.selected_tool_id == "readelf"
-    statuses = {decision.tool_id: decision.status for decision in report.decisions}
+    statuses = {
+        decision.tool_id: decision.status for decision in report.decisions
+    }
     assert statuses["readelf"] == ToolchainStatus.AVAILABLE
     assert statuses["llvm-objdump"] == ToolchainStatus.AVAILABLE
     assert statuses["roc-objdump"] == ToolchainStatus.UNAVAILABLE
@@ -142,7 +152,10 @@ def test_static_tools_are_routable_and_optional_candidates_remain_nonmandatory()
 
 
 def test_toolchain_cli_prints_routing_json(monkeypatch):
-    def runner(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+    def runner(
+        command: list[str],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
         return ProbeCompletedProcess(returncode=0, stdout="rocprofv3 7.0.0")
 
     monkeypatch.setattr(
@@ -179,4 +192,6 @@ def test_toolchain_cli_can_list_registry():
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)["data"]
     tool_ids = {entry["tool_id"] for entry in payload}
-    assert {"rocprofv3", "rocm-systems", "rga", "llvm-objdump"}.issubset(tool_ids)
+    assert {"rocprofv3", "rocm-systems", "rga", "llvm-objdump"}.issubset(
+        tool_ids,
+    )

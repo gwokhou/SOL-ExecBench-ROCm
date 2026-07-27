@@ -26,19 +26,19 @@ This module provides einsum handlers for:
 import string
 from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShapes, TensorShape
 
 
 class NormalizationHandler(EinsumOpHandler):
     """Handler for normalization operations."""
 
-    supported_ops = [
+    supported_ops = (
         "batch_norm",
         "batchnorm",
         "batchnorm1d",
@@ -51,13 +51,18 @@ class NormalizationHandler(EinsumOpHandler):
         "instance_norm",
         "instancenorm",
         "normalize",
-    ]
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for normalization operation."""
-        input_shape = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        input_shape = (
+            tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -65,7 +70,9 @@ class NormalizationHandler(EinsumOpHandler):
         return self._generate_normalization_einsum(input_shape, op_name)
 
     def _generate_normalization_einsum(
-        self, input_shape: TensorShape, norm_type: str
+        self,
+        input_shape: TensorShape,
+        norm_type: str,
     ) -> EinsumOp:
         """Generate einsum for normalization.
 
@@ -91,7 +98,8 @@ class NormalizationHandler(EinsumOpHandler):
             equation=equation,
             name=norm_type,
             is_real_einsum=False,
-            elementwise_op=normalized_norm,  # e.g., "batchnorm", "batchnorm2d", "layernorm"
+            # Examples include batchnorm, batchnorm2d, and layernorm.
+            elementwise_op=normalized_norm,
             reduction_op="none",
         )
 

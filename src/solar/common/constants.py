@@ -18,8 +18,6 @@
 This module defines constants following Google's Python style guide conventions.
 """
 
-from typing import FrozenSet
-
 # Default settings
 DEFAULT_PRECISION = "fp16"
 DEFAULT_BATCH_SIZE = 5
@@ -86,7 +84,7 @@ def dtype_bytes(dtype: object, fallback: str | None = None) -> float:
 
 
 # Supported operations for einsum analysis
-SUPPORTED_OPERATIONS: FrozenSet[str] = frozenset(
+SUPPORTED_OPERATIONS: frozenset[str] = frozenset(
     {
         # Matrix operations
         "matmul",
@@ -142,7 +140,7 @@ SUPPORTED_OPERATIONS: FrozenSet[str] = frozenset(
         "reshape",
         "flatten",
         "view",
-    }
+    },
 )
 
 # Node type mappings for graph processing
@@ -178,7 +176,7 @@ GEOMETRIC_ATTRS = frozenset(
         "output_padding",
         "normalized_shape",
         "output_size",
-    }
+    },
 )
 
 # Boolean attributes for modules
@@ -192,7 +190,7 @@ BOOLEAN_ATTRS = frozenset(
         "count_include_pad",
         "return_indices",
         "sparse",
-    }
+    },
 )
 
 # Environment variables for safe execution

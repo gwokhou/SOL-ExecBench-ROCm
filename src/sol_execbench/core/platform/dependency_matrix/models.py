@@ -6,12 +6,11 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict
 
+from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.platform.compatibility import (
     MatrixEntry,
     MatrixExecutionDecision,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-
 
 _MODEL_CONFIG = ConfigDict(
     extra="forbid",
@@ -101,7 +100,6 @@ class DependencyPreflightResult(BaseModelWithDocstrings):
 
     def to_preview_payload(self) -> dict[str, Any]:
         """Return shell-consumable JSON for dependency preflight classification."""
-
         entry_payload = self.entry.model_dump(mode="json")
         decision_payload = self.decision.model_dump(mode="json")
         target_payload = entry_payload["target"]
@@ -129,7 +127,9 @@ class DependencyPreflightResult(BaseModelWithDocstrings):
             "probes_allowed": decision_payload["probes_allowed"],
             "smoke_allowed": decision_payload["smoke_allowed"],
             "score_authority": decision_payload["score_authority"],
-            "paper_parity_authority": decision_payload["paper_parity_authority"],
+            "paper_parity_authority": decision_payload[
+                "paper_parity_authority"
+            ],
             "leaderboard_authority": decision_payload["leaderboard_authority"],
             "container_user_space_validated": decision_payload[
                 "container_user_space_validated"

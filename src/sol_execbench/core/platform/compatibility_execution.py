@@ -34,7 +34,6 @@ def build_matrix_entry(
     artifacts: Sequence[MatrixArtifactReference] = (),
 ) -> MatrixEntry:
     """Build a strict Matrix Entry from explicit Target and evidence inputs."""
-
     return MatrixEntry(
         target=target,
         observed=observed,
@@ -52,7 +51,6 @@ def classify_matrix_entry_for_execution(
     allow_mixed_version_debug: bool = False,
 ) -> MatrixExecutionDecision:
     """Classify a Matrix Entry into deterministic pre-benchmark allowances."""
-
     status = entry.status
     reason_code = entry.reason_code
     claims = entry.claim_boundary

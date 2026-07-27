@@ -12,12 +12,13 @@ from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.scoring.release_assembly import build_solar_index
 from sol_execbench.core.scoring.release_builders import load_execution_plan
-from sol_execbench.core.scoring.release_environment import verify_release_source_state
+from sol_execbench.core.scoring.release_environment import (
+    verify_release_source_state,
+)
 from sol_execbench.core.scoring.release_models import SolarIndexStatement
 from sol_execbench.core.scoring.release_solar import verify_solar_index
-
-from .models import SolarWorkerRequest
-from .runner import run_solar_worker
+from sol_execbench.core.solar_bridge.models import SolarWorkerRequest
+from sol_execbench.core.solar_bridge.runner import run_solar_worker
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,14 +70,16 @@ def build_release_solar_manifests(
             if output.exists():
                 if not resume:
                     raise FileExistsError(
-                        f"SOLAR release output already exists: {output}"
+                        f"SOLAR release output already exists: {output}",
                     )
                 resumed += 1
                 continue
             outcome = run_solar_worker(
                 SolarWorkerRequest(
                     problem_dir=str(
-                        (corpus.authored_root / entry.relative_problem_dir).resolve()
+                        (
+                            corpus.authored_root / entry.relative_problem_dir
+                        ).resolve(),
                     ),
                     workload_uuid=workload_uuid,
                     output_dir=str(output),
@@ -88,7 +91,7 @@ def build_release_solar_manifests(
             if not outcome.is_formal_publication:
                 raise RuntimeError(
                     f"SOLAR failed for {entry.relative_problem_dir}/{workload_uuid}: "
-                    f"{outcome.stage}/{outcome.reason_code}: {outcome.message}"
+                    f"{outcome.stage}/{outcome.reason_code}: {outcome.message}",
                 )
             generated += 1
     index_path = workspace / "statements" / "solar.json"
@@ -125,9 +128,11 @@ def _finish_index(
         )
         return
     if not resume:
-        raise FileExistsError(f"SOLAR release index already exists: {index_path}")
+        raise FileExistsError(
+            f"SOLAR release index already exists: {index_path}",
+        )
     index = SolarIndexStatement.model_validate_json(
-        index_path.read_text(encoding="utf-8")
+        index_path.read_text(encoding="utf-8"),
     )
     if index.source_revision != source_revision:
         raise ValueError("resumed SOLAR release index source revision mismatch")

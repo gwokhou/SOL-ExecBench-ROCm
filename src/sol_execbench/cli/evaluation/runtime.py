@@ -12,18 +12,20 @@ from enum import StrEnum
 from pathlib import Path
 from typing import ClassVar, Protocol
 
-from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
-from ...core.bench.stderr import filter_benign_rocm_stderr
-from ...core.data.trace import Trace
-from ...core.reports.relative_metrics import apply_reference_speedups
-from . import command as cli_evaluation
-from .profile_mode import PROFILE_ROCPROFV3
+from sol_execbench.cli.evaluation import command as cli_evaluation
+from sol_execbench.cli.evaluation.profile_mode import PROFILE_ROCPROFV3
+from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
+from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
+from sol_execbench.core.data.trace import Trace
+from sol_execbench.core.reports.relative_metrics import apply_reference_speedups
 
 
 class EvaluationPackager(Protocol):
     """Minimal staged-package behavior needed by runtime evaluation."""
 
-    def convert_stdout_to_traces(self, stdout: str) -> list[Trace]: ...
+    def convert_stdout_to_traces(self, stdout: str) -> list[Trace]:
+        """Parse staged-driver standard output into traces."""
+        ...
 
 
 class EvaluationRuntimeFailureReason(StrEnum):
@@ -36,6 +38,8 @@ class EvaluationRuntimeFailureReason(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class EvaluationRuntimeSuccess:
+    """Successful runtime execution with parsed traces and diagnostics."""
+
     traces: list[Trace]
     stdout: str
     stderr: str
@@ -61,6 +65,8 @@ class EvaluationRuntimeNoTraceFailure:
 
 @dataclass(frozen=True, slots=True)
 class EvaluationRuntimeTimeout(EvaluationRuntimeNoTraceFailure):
+    """Execution that exceeded its timeout without producing traces."""
+
     reason: ClassVar[EvaluationRuntimeFailureReason] = (
         EvaluationRuntimeFailureReason.TIMEOUT
     )
@@ -68,6 +74,8 @@ class EvaluationRuntimeTimeout(EvaluationRuntimeNoTraceFailure):
 
 @dataclass(frozen=True, slots=True)
 class EvaluationRuntimeFailedNoStdout(EvaluationRuntimeNoTraceFailure):
+    """Failed execution that produced no standard output."""
+
     reason: ClassVar[EvaluationRuntimeFailureReason] = (
         EvaluationRuntimeFailureReason.FAILED_NO_STDOUT
     )
@@ -75,6 +83,8 @@ class EvaluationRuntimeFailedNoStdout(EvaluationRuntimeNoTraceFailure):
 
 @dataclass(frozen=True, slots=True)
 class EvaluationRuntimeNoParseableTraces(EvaluationRuntimeNoTraceFailure):
+    """Execution whose output contained no parseable traces."""
+
     reason: ClassVar[EvaluationRuntimeFailureReason] = (
         EvaluationRuntimeFailureReason.NO_PARSEABLE_TRACES
     )
@@ -103,7 +113,10 @@ def _run_profiled_or_none(
     output_file: Path | None,
     timeout: int,
     profile: str,
-) -> tuple[subprocess.CompletedProcess[str] | None, Rocprofv3ProfileResult | None]:
+) -> tuple[
+    subprocess.CompletedProcess[str] | None,
+    Rocprofv3ProfileResult | None,
+]:
     if profile != PROFILE_ROCPROFV3:
         return None, None
     return cli_evaluation._run_profiled_evaluation(
@@ -124,7 +137,6 @@ def run_evaluation_runtime(
     profile: str,
 ) -> EvaluationRuntimeResult:
     """Run evaluation and classify subprocess outcomes without CLI side effects."""
-
     profiled_proc, profile_result = _run_profiled_or_none(
         eval_cmd,
         staging_dir=staging_dir,

@@ -18,11 +18,11 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceStatus,
     StaticKernelEvidenceToolRun,
 )
+from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.process.subprocesses import (
     ProbeCompletedProcess,
     run_bounded_probe,
 )
-from sol_execbench.core.integrity.checksums import sha256_file
 
 ExtractorRunner = Callable[[list[str], float], ProbeCompletedProcess]
 RAW_OUTPUT_LIMIT = 64 * 1024
@@ -39,6 +39,7 @@ def run_static_extractor(
     timeout_seconds: float,
     runner: ExtractorRunner | None,
 ) -> tuple[StaticKernelEvidenceToolRun, StaticKernelEvidenceArtifact | None]:
+    """Run one bounded extractor and persist its raw output."""
     effective_runner = runner or run_bounded_probe
     try:
         completed = effective_runner(command, timeout_seconds)
@@ -191,6 +192,7 @@ def write_raw_extractor_output(
     stdout: object,
     stderr: object,
 ) -> StaticKernelEvidenceArtifact:
+    """Persist bounded extractor output and return its artifact record."""
     output_path = evidence_root / "extractors" / artifact_id / f"{tool_id}.txt"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_text = bounded_raw_output(stdout=stdout, stderr=stderr)
@@ -205,16 +207,22 @@ def write_raw_extractor_output(
         sha256=sha256_file(output_path),
         producer=tool_id,
         inspectable=False,
-        classification=StaticKernelEvidenceClassification(metadata_present=True),
+        classification=StaticKernelEvidenceClassification(
+            metadata_present=True,
+        ),
     )
 
 
 def bounded_raw_output(*, stdout: object, stderr: object) -> str:
-    text = f"stdout:\n{decode_output(stdout)}\n\nstderr:\n{decode_output(stderr)}"
+    """Combine and bound decoded extractor streams."""
+    text = (
+        f"stdout:\n{decode_output(stdout)}\n\nstderr:\n{decode_output(stderr)}"
+    )
     return text[-RAW_OUTPUT_LIMIT:]
 
 
 def decode_output(value: object) -> str:
+    """Decode a possibly byte-valued subprocess stream."""
     if value is None:
         return ""
     if isinstance(value, bytes):
@@ -223,4 +231,5 @@ def decode_output(value: object) -> str:
 
 
 def tail_text(value: object, limit: int = TAIL_LIMIT) -> str:
+    """Return a bounded decoded tail from a subprocess stream."""
     return decode_output(value)[-limit:]

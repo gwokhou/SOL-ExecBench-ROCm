@@ -10,12 +10,11 @@ import shutil
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from ..process.subprocesses import run_bounded_probe
-from .arch_capabilities import (
+from sol_execbench.core.platform.arch_capabilities import (
     ArchCapabilityBudgetStatus,
     derive_arch_capability_budget,
 )
-from .environment_models import (
+from sol_execbench.core.platform.environment_models import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
     EnvironmentCapabilityBudget,
     EnvironmentEvidenceStatus,
@@ -27,8 +26,12 @@ from .environment_models import (
     ToolProbeResult,
     Which,
 )
-from .environment_probes import collect_pytorch_rocm_summary, probe_tool
-from .runtime import detect_rocm_version
+from sol_execbench.core.platform.environment_probes import (
+    collect_pytorch_rocm_summary,
+    probe_tool,
+)
+from sol_execbench.core.platform.runtime import detect_rocm_version
+from sol_execbench.core.process.subprocesses import run_bounded_probe
 
 
 def collect_environment_snapshot(
@@ -40,7 +43,6 @@ def collect_environment_snapshot(
     now: Callable[[], datetime] | None = None,
 ) -> EnvironmentSnapshot:
     """Collect optional ROCm environment evidence."""
-
     effective_runner = runner or run_bounded_probe
     generated_at = (now or (lambda: datetime.now(UTC)))().isoformat()
     tools = {
@@ -81,7 +83,9 @@ def collect_environment_snapshot(
             version=detect_rocm_version(),
             hip_visible_devices=visible_devices.get("HIP_VISIBLE_DEVICES"),
             rocr_visible_devices=visible_devices.get("ROCR_VISIBLE_DEVICES"),
-            hsa_override_gfx_version=visible_devices.get("HSA_OVERRIDE_GFX_VERSION"),
+            hsa_override_gfx_version=visible_devices.get(
+                "HSA_OVERRIDE_GFX_VERSION",
+            ),
         ),
         pytorch=pytorch,
         visible_devices=visible_devices,
@@ -93,6 +97,7 @@ def aggregate_status(
     tools: dict[str, ToolProbeResult],
     pytorch: PytorchRocmSummary | None,
 ) -> EnvironmentEvidenceStatus:
+    """Aggregate tool and PyTorch probes into one environment status."""
     statuses = {tool.status for tool in tools.values()}
     if pytorch and pytorch.available:
         return EnvironmentEvidenceStatus.AVAILABLE
@@ -109,13 +114,16 @@ def summarize_gpus(
     tools: dict[str, ToolProbeResult],
     pytorch: PytorchRocmSummary | None,
 ) -> list[GpuEnvironmentSummary]:
+    """Merge tool and PyTorch GPU observations without duplicates."""
     gpus: list[GpuEnvironmentSummary] = []
     # Probe tools expose ISA targets rather than device IDs.  If PyTorch sees a
-    # single device, a matching target from a tool is evidence about that device,
+    # single device, a matching tool target is evidence for that device,
     # not an additional GPU.
     pytorch_targets = (
         {pytorch.gfx_target.lower()}
-        if pytorch is not None and pytorch.device_count == 1 and pytorch.gfx_target
+        if pytorch is not None
+        and pytorch.device_count == 1
+        and pytorch.gfx_target
         else set()
     )
     if pytorch and (pytorch.device_name or pytorch.gfx_target):
@@ -125,7 +133,7 @@ def summarize_gpus(
                 index=0,
                 name=pytorch.device_name,
                 gfx_target=pytorch.gfx_target,
-            )
+            ),
         )
     for tool_name, result in tools.items():
         gfx_targets = result.parsed.get("gfx_targets")
@@ -138,7 +146,7 @@ def summarize_gpus(
                         source=tool_name,
                         index=index,
                         gfx_target=str(gfx_target),
-                    )
+                    ),
                 )
     return gpus
 
@@ -152,7 +160,6 @@ def derive_capability_budgets(
     architectures downgrade to ``unsupported`` rather than promoting unknown
     budget values.
     """
-
     budgets: list[EnvironmentCapabilityBudget] = []
     seen: set[str] = set()
     for gpu in gpus:
@@ -171,7 +178,7 @@ def derive_capability_budgets(
                     architecture=budget.architecture,
                     budget=budget,
                     source="packaged:arch_capability_budgets",
-                )
+                ),
             )
         else:
             budgets.append(
@@ -180,7 +187,7 @@ def derive_capability_budgets(
                     architecture=gfx_target,
                     reason_code="unsupported_architecture",
                     source="packaged:arch_capability_budgets",
-                )
+                ),
             )
     return budgets
 
@@ -189,6 +196,7 @@ def snapshot_warnings(
     tools: dict[str, ToolProbeResult],
     pytorch: PytorchRocmSummary | None,
 ) -> list[str]:
+    """Return compact warnings for unavailable environment probes."""
     warnings: list[str] = []
     for name, result in tools.items():
         if result.status != EnvironmentEvidenceStatus.AVAILABLE:
@@ -199,5 +207,12 @@ def snapshot_warnings(
 
 
 def visible_device_environment() -> dict[str, str]:
-    keys = ("HIP_VISIBLE_DEVICES", "ROCR_VISIBLE_DEVICES", "HSA_OVERRIDE_GFX_VERSION")
-    return {key: value for key in keys if (value := os.environ.get(key)) is not None}
+    """Return configured GPU visibility environment variables."""
+    keys = (
+        "HIP_VISIBLE_DEVICES",
+        "ROCR_VISIBLE_DEVICES",
+        "HSA_OVERRIDE_GFX_VERSION",
+    )
+    return {
+        key: value for key in keys if (value := os.environ.get(key)) is not None
+    }

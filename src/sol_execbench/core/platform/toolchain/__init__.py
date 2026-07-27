@@ -9,12 +9,10 @@ import shutil
 from collections.abc import Callable
 from datetime import datetime
 
-from ...process.subprocesses import run_bounded_probe as _run_probe
-from .models import (
+from sol_execbench.core.platform.toolchain.models import (
     DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
     TOOLCHAIN_ROUTING_SCHEMA_VERSION,
     ProbeRunner,
-    ToolLifecycle,
     ToolchainArtifactType,
     ToolchainCapability,
     ToolchainEvidenceLevel,
@@ -23,12 +21,18 @@ from .models import (
     ToolchainRoutingReport,
     ToolchainRoutingRequest,
     ToolchainStatus,
+    ToolLifecycle,
     Which,
 )
-from .probes import probe_toolchain_tool
-from .registry import default_toolchain_registry
-from .routing import (
+from sol_execbench.core.platform.toolchain.probes import probe_toolchain_tool
+from sol_execbench.core.platform.toolchain.registry import (
+    default_toolchain_registry,
+)
+from sol_execbench.core.platform.toolchain.routing import (
     build_toolchain_routing_report as _build_toolchain_routing_report,
+)
+from sol_execbench.core.process.subprocesses import (
+    run_bounded_probe as _run_probe,
 )
 
 
@@ -42,7 +46,6 @@ def build_toolchain_routing_report(
     now: Callable[[], datetime] | None = None,
 ) -> ToolchainRoutingReport:
     """Build a diagnostic routing report for a requested evidence path."""
-
     return _build_toolchain_routing_report(
         request,
         registry=registry,

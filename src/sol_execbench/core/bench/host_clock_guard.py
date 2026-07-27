@@ -13,8 +13,10 @@ from collections.abc import Callable, Mapping, Sequence
 
 from sol_execbench.core.bench.clock_lock import acquire_clock_lock
 from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
-from sol_execbench.core.process.environment import ENV_SOL_EXECBENCH_CLOCKS_LOCKED
 from sol_execbench.core.process import run_attached_process_group
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_CLOCKS_LOCKED,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,8 @@ AttachedRunner = Callable[
 
 
 def _default_runner(
-    command: Sequence[str], env: Mapping[str, str]
+    command: Sequence[str],
+    env: Mapping[str, str],
 ) -> subprocess.CompletedProcess[str]:
     return run_attached_process_group(command, env=env)
 
@@ -61,20 +64,24 @@ def run_with_host_clock_guard(
     timeout_seconds = _lock_timeout_seconds(base_environment)
 
     try:
-        with acquire_gpu_lock(timeout_seconds=timeout_seconds):
-            with acquire_clock_lock() as clock_lease:
-                child_environment = {
-                    **base_environment,
-                    **_HOST_MANAGED_ENV,
-                    ENV_SOL_EXECBENCH_CLOCKS_LOCKED: "1" if clock_lease.locked else "0",
-                }
-                if not clock_lease.locked:
-                    logger.warning(
-                        "Host clock locking unavailable; child will run with "
-                        "SOL_EXECBENCH_CLOCKS_LOCKED=0"
-                    )
-                completed = runner(command, child_environment)
-                return completed.returncode
+        with (
+            acquire_gpu_lock(timeout_seconds=timeout_seconds),
+            acquire_clock_lock() as clock_lease,
+        ):
+            child_environment = {
+                **base_environment,
+                **_HOST_MANAGED_ENV,
+                ENV_SOL_EXECBENCH_CLOCKS_LOCKED: "1"
+                if clock_lease.locked
+                else "0",
+            }
+            if not clock_lease.locked:
+                logger.warning(
+                    "Host clock locking unavailable; child will run with "
+                    "SOL_EXECBENCH_CLOCKS_LOCKED=0",
+                )
+            completed = runner(command, child_environment)
+            return completed.returncode
     except TimeoutError as exc:
         logger.error("%s", exc)
         return _GPU_BUSY_EXIT_CODE
@@ -84,7 +91,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Hold the host GPU lock and verified clock lease around one child process"
-        )
+        ),
     )
     parser.add_argument("command", nargs=argparse.REMAINDER)
     return parser

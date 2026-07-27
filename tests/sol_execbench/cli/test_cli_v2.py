@@ -68,7 +68,8 @@ def test_evaluate_json_requires_separate_trace_artifact(tmp_path: Path) -> None:
 
 
 def test_evaluate_json_returns_summary_and_artifact(
-    monkeypatch, tmp_path: Path
+    monkeypatch,
+    tmp_path: Path,
 ) -> None:
     problem = tmp_path / "problem"
     problem.mkdir()
@@ -84,7 +85,8 @@ def test_evaluate_json_returns_summary_and_artifact(
         )
 
     monkeypatch.setattr(
-        "sol_execbench.cli.commands.evaluate.run_evaluation_cli", fake_run
+        "sol_execbench.cli.commands.evaluate.run_evaluation_cli",
+        fake_run,
     )
     result = CliRunner().invoke(
         cli,
@@ -105,12 +107,14 @@ def test_evaluate_json_returns_summary_and_artifact(
     assert payload["ok"] is True
     assert payload["command"] == "evaluate"
     assert payload["artifacts"] == [
-        {"path": str(trace), "type": "canonical_trace_jsonl"}
+        {"path": str(trace), "type": "canonical_trace_jsonl"},
     ]
     assert trace.read_text() == '{"canonical":"trace"}\n'
 
 
-def test_evaluate_input_relationships_fail_before_execution(tmp_path: Path) -> None:
+def test_evaluate_input_relationships_fail_before_execution(
+    tmp_path: Path,
+) -> None:
     problem = tmp_path / "problem"
     problem.mkdir()
     definition = tmp_path / "definition.json"
@@ -130,10 +134,25 @@ def test_evaluate_input_relationships_fail_before_execution(tmp_path: Path) -> N
         ],
     )
     incomplete = CliRunner().invoke(
-        cli, ["evaluate", "--definition", str(definition), "--solution", str(solution)]
+        cli,
+        [
+            "evaluate",
+            "--definition",
+            str(definition),
+            "--solution",
+            str(solution),
+        ],
     )
     invalid_timeout = CliRunner().invoke(
-        cli, ["evaluate", str(problem), "--solution", str(solution), "--timeout", "0"]
+        cli,
+        [
+            "evaluate",
+            str(problem),
+            "--solution",
+            str(solution),
+            "--timeout",
+            "0",
+        ],
     )
 
     assert conflict.exit_code == 2
@@ -155,7 +174,9 @@ def test_score_exposes_publisher_policy_without_score_inputs() -> None:
     payload = json.loads(result.output)
     assert payload["data"]["policy"]["authorized"] is True
     assert payload["data"]["verifier"]["available"] is True
-    assert payload["data"]["verifier"]["accepts_caller_authored_inputs"] is False
+    assert (
+        payload["data"]["verifier"]["accepts_caller_authored_inputs"] is False
+    )
     assert payload["data"]["verifier"]["requires_signatures"] is False
     assert payload["data"]["producer"] == {
         "ready": False,

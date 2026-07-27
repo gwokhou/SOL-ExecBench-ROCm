@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Build a staged native solution as a Torch extension."""
+
 import json
 from pathlib import Path
 
@@ -70,7 +72,9 @@ ld_flags = (
 )
 
 rocm_arches = [
-    target for target in solution.spec.target_hardware if target.startswith("gfx")
+    target
+    for target in solution.spec.target_hardware
+    if target.startswith("gfx")
 ]
 if rocm_arches and "PYTORCH_ROCM_ARCH" not in ENVIRON:
     ENVIRON["PYTORCH_ROCM_ARCH"] = ";".join(dict.fromkeys(rocm_arches))
@@ -89,7 +93,7 @@ extra_include_paths = [str(HERE)]
 ext.load(
     name="benchmark_kernel",
     sources=sources,
-    # PyTorch extension API uses this keyword for device compiler flags on ROCm too.
+    # PyTorch uses this keyword for ROCm device compiler flags too.
     extra_cuda_cflags=hip_cflags,
     extra_cflags=cflags,
     extra_ldflags=ld_flags,
@@ -100,7 +104,9 @@ ext.load(
 
 # Rename platform-suffixed .so → benchmark_kernel.so
 so_files = [
-    f for f in HERE.glob("benchmark_kernel*.so") if f.name != "benchmark_kernel.so"
+    f
+    for f in HERE.glob("benchmark_kernel*.so")
+    if f.name != "benchmark_kernel.so"
 ]
 if so_files:
     so_files[0].rename("benchmark_kernel.so")

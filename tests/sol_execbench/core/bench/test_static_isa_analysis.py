@@ -28,7 +28,8 @@ def _artifact(path: Path) -> StaticKernelEvidenceArtifact:
 
 
 def test_collect_static_isa_analysis_emits_structured_diagnostics(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     binary = tmp_path / "kernel.bin"
     binary.write_bytes(b"binary")
@@ -83,7 +84,8 @@ def test_collect_static_isa_analysis_emits_structured_diagnostics(
 
 
 def test_collect_static_isa_analysis_is_soft_when_tooling_is_unavailable(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     binary = tmp_path / "kernel.bin"
     binary.write_bytes(b"binary")
@@ -109,11 +111,13 @@ def test_collect_static_isa_analysis_is_soft_when_tooling_is_unavailable(
     assert generated == []
 
 
-def test_collect_static_isa_analysis_rejects_unsafe_target_path(tmp_path) -> None:
+def test_collect_static_isa_analysis_rejects_unsafe_target_path(
+    tmp_path,
+) -> None:
     binary = tmp_path / "kernel.bin"
     binary.write_bytes(b"binary")
     artifact = _artifact(binary).model_copy(
-        update={"target_architecture": "../gfx1200"}
+        update={"target_architecture": "../gfx1200"},
     )
 
     analyses, tool_runs, generated = collect_static_isa_analyses(

@@ -72,7 +72,9 @@ class CalibrationEntry(Protocol):
 
 
 def dtype_default_tolerance(
-    dtype: str, *, margin: float = DEFAULT_MARGIN
+    dtype: str,
+    *,
+    margin: float = DEFAULT_MARGIN,
 ) -> ToleranceSpec:
     """Return the safety-margined floor for one output dtype."""
     atol, rtol = _DTYPE_FLOORS.get(dtype, _DTYPE_FLOORS["float32"])
@@ -94,7 +96,9 @@ def calibrate_tolerance(
         raise ValueError("calibration safety margin must be at least 1.0")
     if not output_dtypes:
         raise ValueError("calibration requires at least one output dtype")
-    floors = [dtype_default_tolerance(dtype, margin=margin) for dtype in output_dtypes]
+    floors = [
+        dtype_default_tolerance(dtype, margin=margin) for dtype in output_dtypes
+    ]
     return _tolerance(
         max(
             _MIN_ATOL_FLOOR,
@@ -127,7 +131,7 @@ def workload_contract_sha256(
                 mode="json",
                 exclude={"tolerance"},
             ),
-        }
+        },
     )
 
 
@@ -139,18 +143,24 @@ def load_tolerance_calibration(path: Path) -> dict[str, object]:
     if int(data.get("schema_version", 0)) != CALIBRATION_SCHEMA_VERSION:
         raise ValueError(
             f"AKA tolerance calibration must use schema_version "
-            f"{CALIBRATION_SCHEMA_VERSION}"
+            f"{CALIBRATION_SCHEMA_VERSION}",
         )
     if data.get("method") != CALIBRATION_METHOD:
         raise ValueError(
-            f"AKA tolerance calibration method must be {CALIBRATION_METHOD}"
+            f"AKA tolerance calibration method must be {CALIBRATION_METHOD}",
         )
     if float(data.get("margin", 0.0)) < 1.0:
-        raise ValueError("AKA tolerance calibration margin must be at least 1.0")
+        raise ValueError(
+            "AKA tolerance calibration margin must be at least 1.0",
+        )
     if int(data.get("seed_count", 0)) < 2:
-        raise ValueError("AKA tolerance calibration requires at least two seeds")
+        raise ValueError(
+            "AKA tolerance calibration requires at least two seeds",
+        )
     if int(data.get("repeats_per_seed", 0)) < 2:
-        raise ValueError("AKA tolerance calibration requires repeated executions")
+        raise ValueError(
+            "AKA tolerance calibration requires repeated executions",
+        )
     if not isinstance(data.get("records"), list):
         raise ValueError("AKA tolerance calibration records must be a list")
     return data
@@ -162,13 +172,19 @@ def calibration_tolerances(path: Path) -> dict[str, ToleranceSpec]:
     result: dict[str, ToleranceSpec] = {}
     for record in _record_list(data):
         if not isinstance(record, Mapping):
-            raise ValueError("AKA tolerance calibration record must be an object")
+            raise ValueError(
+                "AKA tolerance calibration record must be an object",
+            )
         if record.get("status") != CalibrationStatus.CALIBRATED:
             continue
         uuid = str(record.get("workload_uuid") or "")
         if not uuid or uuid in result:
-            raise ValueError("calibration workload UUID is missing or duplicated")
-        result[uuid] = ToleranceSpec.model_validate(record.get("tolerance") or {})
+            raise ValueError(
+                "calibration workload UUID is missing or duplicated",
+            )
+        result[uuid] = ToleranceSpec.model_validate(
+            record.get("tolerance") or {},
+        )
     return result
 
 
@@ -182,20 +198,29 @@ def validate_calibration_binding(
 ) -> dict[str, object]:
     """Verify artifact identity, coverage, contracts, and authored tolerances."""
     relative = validate_relative_artifact_path(
-        binding.get("path"), "tolerance calibration path"
+        binding.get("path"),
+        "tolerance calibration path",
     )
     expected_sha = validate_sha256(
-        binding.get("sha256"), "tolerance calibration SHA-256"
+        binding.get("sha256"),
+        "tolerance calibration SHA-256",
     )
     path = authored_root / relative
     if not path.is_file() or sha256_file(path) != expected_sha:
         raise ValueError("AKA tolerance calibration artifact identity changed")
     data = load_tolerance_calibration(path)
     if data.get("aka_revision") != source_revision:
-        raise ValueError("AKA tolerance calibration pins a different source revision")
+        raise ValueError(
+            "AKA tolerance calibration pins a different source revision",
+        )
     device = data.get("device")
-    if not isinstance(device, Mapping) or device.get("gfx_target") != formal_gfx_target:
-        raise ValueError("AKA tolerance calibration was not run on the formal target")
+    if (
+        not isinstance(device, Mapping)
+        or device.get("gfx_target") != formal_gfx_target
+    ):
+        raise ValueError(
+            "AKA tolerance calibration was not run on the formal target",
+        )
     records = _index_records(_record_list(data))
     _validate_record_coverage(authored_root, entries, records)
     return {
@@ -211,11 +236,15 @@ def _index_records(records: list[object]) -> dict[str, Mapping[str, object]]:
     indexed: dict[str, Mapping[str, object]] = {}
     for raw in records:
         if not isinstance(raw, Mapping):
-            raise ValueError("AKA tolerance calibration record must be an object")
+            raise ValueError(
+                "AKA tolerance calibration record must be an object",
+            )
         record = cast(Mapping[str, object], raw)
         uuid = str(record.get("workload_uuid") or "")
         if not uuid or uuid in indexed:
-            raise ValueError("calibration workload UUID is missing or duplicated")
+            raise ValueError(
+                "calibration workload UUID is missing or duplicated",
+            )
         indexed[uuid] = record
     return indexed
 
@@ -225,21 +254,29 @@ def _validate_record_coverage(
     entries: Sequence[CalibrationEntry],
     records: Mapping[str, Mapping[str, object]],
 ) -> None:
-    expected_uuids = {uuid for entry in entries for uuid in tuple(entry.workload_uuids)}
+    expected_uuids = {
+        uuid for entry in entries for uuid in tuple(entry.workload_uuids)
+    }
     if set(records) != expected_uuids:
-        raise ValueError("AKA tolerance calibration workload coverage is incomplete")
+        raise ValueError(
+            "AKA tolerance calibration workload coverage is incomplete",
+        )
     for entry in entries:
         problem_path = entry.relative_problem_dir.as_posix()
         definition, workloads = _load_problem(authored_root / problem_path)
         for workload in workloads:
             _validate_workload_record(
-                entry, problem_path, definition, workload, records[workload.uuid]
+                entry,
+                problem_path,
+                definition,
+                workload,
+                records[workload.uuid],
             )
 
 
 def _load_problem(problem_dir: Path) -> tuple[Definition, tuple[Workload, ...]]:
     definition = Definition.model_validate_json(
-        (problem_dir / "definition.json").read_text(encoding="utf-8")
+        (problem_dir / "definition.json").read_text(encoding="utf-8"),
     )
     workloads = tuple(
         Workload.model_validate_json(line)
@@ -259,7 +296,9 @@ def _validate_workload_record(
     record: Mapping[str, object],
 ) -> None:
     if record.get("problem_path") != problem_path:
-        raise ValueError(f"calibration problem path mismatch for {workload.uuid}")
+        raise ValueError(
+            f"calibration problem path mismatch for {workload.uuid}",
+        )
     expected_status = (
         CalibrationStatus.EXCLUDED
         if entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE
@@ -267,18 +306,27 @@ def _validate_workload_record(
     )
     if record.get("status") != expected_status:
         raise ValueError(f"calibration status mismatch for {workload.uuid}")
-    if record.get("contract_sha256") != workload_contract_sha256(definition, workload):
+    if record.get("contract_sha256") != workload_contract_sha256(
+        definition,
+        workload,
+    ):
         raise ValueError(f"calibration contract changed for {workload.uuid}")
     if expected_status is CalibrationStatus.EXCLUDED:
         if record.get("reason_code") != entry.exclusion_reason_code:
-            raise ValueError(f"calibration exclusion mismatch for {workload.uuid}")
+            raise ValueError(
+                f"calibration exclusion mismatch for {workload.uuid}",
+            )
         return
     calibrated = ToleranceSpec.model_validate(record.get("tolerance") or {})
     if workload.tolerance != calibrated:
-        raise ValueError(f"authored tolerance is not calibrated for {workload.uuid}")
+        raise ValueError(
+            f"authored tolerance is not calibrated for {workload.uuid}",
+        )
     samples = record.get("samples")
     if not isinstance(samples, int) or samples <= 0:
-        raise ValueError(f"calibration has no runtime samples for {workload.uuid}")
+        raise ValueError(
+            f"calibration has no runtime samples for {workload.uuid}",
+        )
 
 
 def _record_list(data: Mapping[str, object]) -> list[object]:

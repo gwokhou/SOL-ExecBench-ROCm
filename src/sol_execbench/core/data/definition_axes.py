@@ -6,11 +6,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
-from .definition_models import AxisConst, AxisExpr, AxisVar, TensorSpec
-from .dtypes import dtype_str_to_torch_dtype
-from .shapes import resolve_shape_expression
+from sol_execbench.core.data.definition_models import (
+    AxisConst,
+    AxisExpr,
+    AxisVar,
+    TensorSpec,
+)
+from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
+from sol_execbench.core.data.shapes import resolve_shape_expression
 
 if TYPE_CHECKING:
     import torch
@@ -28,7 +34,9 @@ def const_axes(definition: Any) -> dict[str, int]:
 def var_axes(definition: Any) -> list[str]:
     """Return variable axis names."""
     return [
-        name for name, axis in definition.axes.items() if isinstance(axis, AxisVar)
+        name
+        for name, axis in definition.axes.items()
+        if isinstance(axis, AxisVar)
     ]
 
 
@@ -42,27 +50,37 @@ def expr_axes(definition: Any) -> dict[str, AxisExpr]:
 
 
 def get_axes_values(
-    definition: Any, input_shapes: Iterable[Optional[tuple[int, ...]]]
+    definition: Any,
+    input_shapes: Iterable[tuple[int, ...] | None],
 ) -> dict[str, int]:
     """Get concrete variable axis values from input shapes."""
     var_axes_values: dict[str, int] = {}
-    for (inp_name, inp_spec), inp_shape in zip(definition.inputs.items(), input_shapes):
+    for (inp_name, inp_spec), inp_shape in zip(
+        definition.inputs.items(), input_shapes, strict=True
+    ):
         if inp_spec.shape is None:
             continue
         if inp_shape is None:
-            raise ValueError(f"Input '{inp_name}' expected shaped tensor, got scalar")
+            raise ValueError(
+                f"Input '{inp_name}' expected shaped tensor, got scalar"
+            )
         if len(inp_spec.shape) != len(inp_shape):
             raise ValueError(
                 f"Input '{inp_name}''s defined dimension is {len(inp_spec.shape)} but the "
-                f"actual dimension is {len(inp_shape)}"
+                f"actual dimension is {len(inp_shape)}",
             )
-        for axis_name, axis_value in zip(inp_spec.shape, inp_shape):
-            if axis_name in definition.axes and definition.axes[axis_name].type == "var":
+        for axis_name, axis_value in zip(
+            inp_spec.shape, inp_shape, strict=True
+        ):
+            if (
+                axis_name in definition.axes
+                and definition.axes[axis_name].type == "var"
+            ):
                 if axis_name in var_axes_values:
                     if var_axes_values[axis_name] != axis_value:
                         raise ValueError(
                             f"Axis '{axis_name}' has different values for different input "
-                            f"tensors: {var_axes_values[axis_name]} and {axis_value}"
+                            f"tensors: {var_axes_values[axis_name]} and {axis_value}",
                         )
                 else:
                     var_axes_values[axis_name] = axis_value
@@ -70,21 +88,25 @@ def get_axes_values(
     if len(var_axes_values) != len(definition.var_axes):
         raise ValueError(
             f"Missing values for variable axes: "
-            f"{set(definition.var_axes) - set(var_axes_values.keys())}"
+            f"{set(definition.var_axes) - set(var_axes_values.keys())}",
         )
     return var_axes_values
 
 
 def get_axes_values_from_inputs(
-    definition: Any, inputs: Iterable[Any]
+    definition: Any,
+    inputs: Iterable[Any],
 ) -> dict[str, int]:
     """Get concrete variable axis values directly from input values."""
-    shapes = [tuple(val.shape) if hasattr(val, "shape") else None for val in inputs]
+    shapes = [
+        tuple(val.shape) if hasattr(val, "shape") else None for val in inputs
+    ]
     return get_axes_values(definition, shapes)
 
 
 def get_resolved_axes_values(
-    definition: Any, var_axes_values: dict[str, int]
+    definition: Any,
+    var_axes_values: dict[str, int],
 ) -> dict[str, int]:
     """Resolve constants, variables, and expression axes into concrete values."""
     resolved_axes_values: dict[str, int] = definition.const_axes.copy()
@@ -94,7 +116,8 @@ def get_resolved_axes_values(
 
     for name, axis in definition.expr_axes.items():
         resolved_axes_values[name] = resolve_shape_expression(
-            axis.expression, resolved_axes_values
+            axis.expression,
+            resolved_axes_values,
         )
     return resolved_axes_values
 
@@ -102,8 +125,8 @@ def get_resolved_axes_values(
 def get_shapes(
     definition: Any,
     tensors: Iterable[TensorSpec],
-    var_axes_values: Optional[dict[str, int]] = None,
-) -> list[Optional[tuple[int, ...]]]:
+    var_axes_values: dict[str, int] | None = None,
+) -> list[tuple[int, ...] | None]:
     """Get concrete tensor shapes given variable axis values."""
     var_axes_values = var_axes_values or {}
     shapes = []
@@ -127,26 +150,34 @@ def get_shapes(
 
 
 def get_input_shapes(
-    definition: Any, var_axes_values: Optional[dict[str, int]] = None
-) -> dict[str, Optional[tuple[int, ...]]]:
+    definition: Any,
+    var_axes_values: dict[str, int] | None = None,
+) -> dict[str, tuple[int, ...] | None]:
     """Get concrete input shapes given variable axis values."""
     shapes = get_shapes(definition, definition.inputs.values(), var_axes_values)
-    return dict(zip(definition.inputs.keys(), shapes))
+    return dict(zip(definition.inputs.keys(), shapes, strict=True))
 
 
 def get_output_shapes(
-    definition: Any, var_values: Optional[dict[str, int]] = None
-) -> dict[str, Optional[tuple[int, ...]]]:
+    definition: Any,
+    var_values: dict[str, int] | None = None,
+) -> dict[str, tuple[int, ...] | None]:
     """Get concrete output shapes given variable axis values."""
     shapes = get_shapes(definition, definition.outputs.values(), var_values)
-    return dict(zip(definition.outputs.keys(), shapes))
+    return dict(zip(definition.outputs.keys(), shapes, strict=True))
 
 
 def torch_input_dtypes(definition: Any) -> list[torch.dtype]:
     """Get the torch data types of the input tensors."""
-    return [dtype_str_to_torch_dtype(spec.dtype) for spec in definition.inputs.values()]
+    return [
+        dtype_str_to_torch_dtype(spec.dtype)
+        for spec in definition.inputs.values()
+    ]
 
 
 def torch_output_dtypes(definition: Any) -> list[torch.dtype]:
     """Get the torch data types of the output tensors."""
-    return [dtype_str_to_torch_dtype(spec.dtype) for spec in definition.outputs.values()]
+    return [
+        dtype_str_to_torch_dtype(spec.dtype)
+        for spec in definition.outputs.values()
+    ]

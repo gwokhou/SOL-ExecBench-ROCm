@@ -10,7 +10,6 @@ import yaml
 from solar.verification import einsum as verification
 from solar.verification.einsum import VerificationError
 
-
 REFERENCE_SOURCE = """
 import torch
 
@@ -77,7 +76,8 @@ def verification_files(tmp_path: Path):
 
 
 def test_create_and_replay_source_verification_artifact(
-    tmp_path: Path, verification_files
+    tmp_path: Path,
+    verification_files,
 ) -> None:
     reference, graph = verification_files
     output = tmp_path / "verification.yaml"
@@ -90,8 +90,7 @@ def test_create_and_replay_source_verification_artifact(
         workload_name="identity",
         workload_parameters={},
         output_path=output,
-        atol=0.0,
-        rtol=0.0,
+        policy=verification.VerificationPolicy(atol=0.0, rtol=0.0),
     )
 
     assert yaml.safe_load(output.read_text()) == artifact
@@ -102,13 +101,16 @@ def test_create_and_replay_source_verification_artifact(
         graph_path=graph,
         workload_name="identity",
         workload_parameters={},
-        atol=0.0,
-        rtol=0.0,
+        required_tolerance=verification.TolerancePolicy(
+            atol=0.0,
+            rtol=0.0,
+        ),
     )
 
 
 def test_callable_verification_writes_hash_bound_attestation(
-    tmp_path: Path, verification_files
+    tmp_path: Path,
+    verification_files,
 ) -> None:
     _, graph = verification_files
     output = tmp_path / "callable.yaml"
@@ -120,8 +122,7 @@ def test_callable_verification_writes_hash_bound_attestation(
         reference_sha256="a" * 64,
         graph_path=graph,
         output_path=output,
-        atol=0.0,
-        rtol=0.0,
+        policy=verification.VerificationPolicy(atol=0.0, rtol=0.0),
     )
 
     assert artifact["subject"][0]["digest"]["sha256"] == "a" * 64
@@ -134,12 +135,24 @@ def test_callable_verification_writes_hash_bound_attestation(
     [
         (
             verification.create_verification_artifact,
-            {"seeds": (1, 1, 2)},
+            {
+                "policy": verification.VerificationPolicy(
+                    atol=0.0,
+                    rtol=0.0,
+                    seeds=(1, 1, 2),
+                ),
+            },
             "at least three seeds",
         ),
         (
             verification.create_verification_artifact,
-            {"patterns": ("random", "zeros")},
+            {
+                "policy": verification.VerificationPolicy(
+                    atol=0.0,
+                    rtol=0.0,
+                    patterns=("random", "zeros"),
+                ),
+            },
             "boundary patterns",
         ),
         (
@@ -149,25 +162,40 @@ def test_callable_verification_writes_hash_bound_attestation(
         ),
         (
             verification.verify_callable_conversion,
-            {"seeds": (1, 1, 2)},
+            {
+                "policy": verification.VerificationPolicy(
+                    atol=0.0,
+                    rtol=0.0,
+                    seeds=(1, 1, 2),
+                ),
+            },
             "at least three seeds",
         ),
         (
             verification.verify_callable_conversion,
-            {"patterns": ("random", "zeros")},
+            {
+                "policy": verification.VerificationPolicy(
+                    atol=0.0,
+                    rtol=0.0,
+                    patterns=("random", "zeros"),
+                ),
+            },
             "boundary patterns",
         ),
     ],
 )
 def test_artifact_creation_rejects_weak_case_sets(
-    tmp_path: Path, verification_files, function, kwargs, message
+    tmp_path: Path,
+    verification_files,
+    function,
+    kwargs,
+    message,
 ) -> None:
     reference, graph = verification_files
     common = {
         "graph_path": graph,
         "output_path": tmp_path / "out.yaml",
-        "atol": 0.0,
-        "rtol": 0.0,
+        "policy": verification.VerificationPolicy(atol=0.0, rtol=0.0),
     }
     if function is verification.create_verification_artifact:
         common.update(
@@ -197,11 +225,7 @@ def test_run_cases_validates_source_input_indices(verification_files) -> None:
         "reference": lambda *values: values[0],
         "input_factory": lambda parameters, device: [torch.ones(2, 2), 4],
         "cases": cases,
-        "atol": 0.0,
-        "rtol": 0.0,
-        "required_matched_ratio": 1.0,
-        "max_error_cap": None,
-        "allow_negative_inf": False,
+        "tolerance": verification.TolerancePolicy(atol=0.0, rtol=0.0),
         "device": "cpu",
         "check_shapes": True,
     }
@@ -228,7 +252,10 @@ def test_pattern_inputs_cover_float_bool_integer_and_unknown() -> None:
     assert boundary[1].tolist() == [False, True, False]
     assert boundary[2].tolist() == [0, 0, 0]
     assert boundary[3] == "value"
-    with pytest.raises(VerificationError, match="unknown verification input pattern"):
+    with pytest.raises(
+        VerificationError,
+        match="unknown verification input pattern",
+    ):
         verification._pattern_inputs(source, "missing")
 
 
@@ -262,9 +289,12 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
         == 0.0
     )
     assert (
-        verification._assert_close({"x": torch.ones(1)}, {"x": torch.ones(1)}, 0, 0)[
-            "max_abs_error"
-        ]
+        verification._assert_close(
+            {"x": torch.ones(1)},
+            {"x": torch.ones(1)},
+            0,
+            0,
+        )["max_abs_error"]
         == 0.0
     )
     assert verification._assert_close("x", "x", 0, 0)["max_abs_error"] == 0.0
@@ -272,7 +302,11 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
     cases = [
         (torch.ones(2), torch.ones(3), "shape mismatch"),
         (torch.ones(2), torch.ones(2, dtype=torch.float16), "dtype mismatch"),
-        (torch.tensor([1]), torch.tensor([2]), "integer/bool tensor values differ"),
+        (
+            torch.tensor([1]),
+            torch.tensor([2]),
+            "integer/bool tensor values differ",
+        ),
         (torch.tensor([torch.nan]), torch.tensor([torch.nan]), "non-finite"),
         (torch.zeros(2), torch.ones(2), "all-zero output"),
         ((torch.ones(1),), (torch.ones(1), torch.ones(1)), "arity mismatch"),
@@ -294,7 +328,9 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
         )
 
 
-def test_pure_contraction_roundoff_requires_both_results_within_gamma_bound() -> None:
+def test_pure_contraction_roundoff_requires_both_results_within_gamma_bound() -> (
+    None
+):
     graph = {
         "layers": {
             "contract": {
@@ -303,8 +339,8 @@ def test_pure_contraction_roundoff_requires_both_results_within_gamma_bound() ->
                     "kind": "einsum",
                     "equation": "MK,KN->MN",
                 },
-            }
-        }
+            },
+        },
     }
     left = torch.ones(2, 16)
     right = torch.ones(16, 1)
@@ -336,8 +372,7 @@ def source_artifact(tmp_path: Path, verification_files):
             workload_name="identity",
             workload_parameters={},
             output_path=tmp_path / "verification.yaml",
-            atol=0.0,
-            rtol=0.0,
+            policy=verification.VerificationPolicy(atol=0.0, rtol=0.0),
         ),
         reference,
         graph,
@@ -359,7 +394,7 @@ def source_artifact(tmp_path: Path, verification_files):
         ),
         (
             lambda value: value["predicate"]["workload"].update(
-                parameters_sha256="0" * 64
+                parameters_sha256="0" * 64,
             ),
             "workload parameters mismatch",
         ),
@@ -373,12 +408,15 @@ def source_artifact(tmp_path: Path, verification_files):
         ),
         (
             lambda value: value["predicate"]["cases"].__setitem__(
-                slice(None), value["predicate"]["cases"][:2]
+                slice(None),
+                value["predicate"]["cases"][:2],
             ),
             "lacks the required cases",
         ),
         (
-            lambda value: value["predicate"]["execution"].update(device_type="tpu"),
+            lambda value: value["predicate"]["execution"].update(
+                device_type="tpu",
+            ),
             "no supported replay device",
         ),
         (
@@ -388,7 +426,9 @@ def source_artifact(tmp_path: Path, verification_files):
     ],
 )
 def test_replay_rejects_untrusted_artifact_mutations(
-    source_artifact, mutate, message
+    source_artifact,
+    mutate,
+    message,
 ) -> None:
     artifact, reference, graph = source_artifact
     artifact = deepcopy(artifact)
@@ -400,8 +440,10 @@ def test_replay_rejects_untrusted_artifact_mutations(
             graph_path=graph,
             workload_name="identity",
             workload_parameters={},
-            atol=0.0,
-            rtol=0.0,
+            required_tolerance=verification.TolerancePolicy(
+                atol=0.0,
+                rtol=0.0,
+            ),
         )
 
 
@@ -416,8 +458,7 @@ def test_replay_rejects_subject_digest_mismatches(source_artifact) -> None:
             graph_path=graph,
             workload_name="identity",
             workload_parameters={},
-            atol=0,
-            rtol=0,
+            required_tolerance=verification.TolerancePolicy(atol=0, rtol=0),
         )
     changed = deepcopy(artifact)
     changed["subject"][1]["digest"]["sha256"] = "0" * 64
@@ -428,8 +469,7 @@ def test_replay_rejects_subject_digest_mismatches(source_artifact) -> None:
             graph_path=graph,
             workload_name="identity",
             workload_parameters={},
-            atol=0,
-            rtol=0,
+            required_tolerance=verification.TolerancePolicy(atol=0, rtol=0),
         )
 
 

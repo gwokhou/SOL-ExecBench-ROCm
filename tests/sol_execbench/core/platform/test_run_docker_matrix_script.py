@@ -10,8 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from sol_execbench.core.platform.docker_matrix import load_docker_target_manifest
-
+from sol_execbench.core.platform.docker_matrix import (
+    load_docker_target_manifest,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 DOCKERFILE_PATH = REPO_ROOT / "docker" / "Dockerfile"
@@ -55,14 +56,17 @@ def test_dockerfile_keeps_existing_runtime_setup() -> None:
     assert "util-linux" in dockerfile
     assert "uv sync --frozen --no-install-project --no-dev" in dockerfile
     assert "uv sync --frozen --no-editable --no-dev" in dockerfile
-    assert "uv sync --frozen --no-install-project --all-groups" not in dockerfile
+    assert (
+        "uv sync --frozen --no-install-project --all-groups" not in dockerfile
+    )
     assert "uv sync --frozen --no-editable --all-groups" not in dockerfile
     assert "uv pip install --python /venv/bin/python" in dockerfile
     assert '"torch==${PYTORCH_TORCH_VERSION}"' in dockerfile
     assert '"torchvision==${PYTORCH_TORCHVISION_VERSION}"' in dockerfile
     assert '"triton-rocm==${TRITON_ROCM_VERSION}"' in dockerfile
     assert (
-        "COPY --from=ghcr.io/astral-sh/uv:0.11.31 /uv /usr/local/bin/uv" in dockerfile
+        "COPY --from=ghcr.io/astral-sh/uv:0.11.31 /uv /usr/local/bin/uv"
+        in dockerfile
     )
     assert "COPY docker/entrypoint.sh /entrypoint.sh" in dockerfile
     assert 'ENTRYPOINT ["/entrypoint.sh"]' in dockerfile
@@ -87,10 +91,10 @@ def test_entrypoint_registers_owned_lock_cleanup_before_locking() -> None:
 
     cleanup_index = entrypoint.index("trap 'cleanup' EXIT")
     gpu_lock_index = entrypoint.index(
-        '\nif [ "${SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST:-0}" != "1" ]'
+        '\nif [ "${SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST:-0}" != "1" ]',
     )
     clock_lock_index = entrypoint.index(
-        '\nif [ "${SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST:-0}" = "1" ]'
+        '\nif [ "${SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST:-0}" = "1" ]',
     )
     assert cleanup_index < gpu_lock_index < clock_lock_index
     assert "SOL_EXECBENCH_GPU_LOCK_FD=9" in entrypoint
@@ -99,13 +103,18 @@ def test_entrypoint_registers_owned_lock_cleanup_before_locking() -> None:
     assert 'if [ "${SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED}" = "1" ]' in entrypoint
 
 
-def test_entrypoint_verifies_host_managed_clock_state_without_container_sudo() -> None:
+def test_entrypoint_verifies_host_managed_clock_state_without_container_sudo() -> (
+    None
+):
     entrypoint = ENTRYPOINT_PATH.read_text(encoding="utf-8")
 
     assert "SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST" in entrypoint
     assert "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST" in entrypoint
     assert "verify_host_managed_clocks" in entrypoint
-    assert "from sol_execbench.core.bench.clock_lock import verify_clocks" in entrypoint
+    assert (
+        "from sol_execbench.core.bench.clock_lock import verify_clocks"
+        in entrypoint
+    )
     assert "HOST_CLOCKS_DECLARED" in entrypoint
 
 
@@ -141,7 +150,9 @@ def test_entrypoint_rejects_false_host_clock_claim(tmp_path: Path) -> None:
     assert "failed container verification" in result.stdout
 
 
-def test_entrypoint_releases_owned_lock_after_workload_failure(tmp_path: Path) -> None:
+def test_entrypoint_releases_owned_lock_after_workload_failure(
+    tmp_path: Path,
+) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     cleanup_log = tmp_path / "cleanup.log"
@@ -177,7 +188,9 @@ printf 'CLOCKS_LOCKED=1\nCLOCK_LOCK_ACQUIRED=1\n'
     assert cleanup_log.read_text(encoding="utf-8") == "cleanup\n"
 
 
-def test_entrypoint_holds_gpu_lock_until_clock_cleanup_finishes(tmp_path: Path) -> None:
+def test_entrypoint_holds_gpu_lock_until_clock_cleanup_finishes(
+    tmp_path: Path,
+) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     fake_python = bin_dir / "python"
@@ -293,7 +306,11 @@ def test_run_docker_host_helpers_use_uv_managed_python() -> None:
 
     assert "uv run python" in script
     assert "SOL_EXECBENCH_HOST_PYTHON" in script
-    assert not re.search(r"^\s*python\s+-m\s+sol_execbench", script, re.MULTILINE)
+    assert not re.search(
+        r"^\s*python\s+-m\s+sol_execbench",
+        script,
+        re.MULTILINE,
+    )
     assert not re.search(r"^\s*python\s+-c\b", script, re.MULTILINE)
 
 
@@ -315,11 +332,17 @@ def test_run_docker_default_build_preview_uses_rocm_7_2_build_args() -> None:
 
     assert completed.returncode == 0, completed.stderr
     assert "docker build -t sol-execbench:rocm-7.2-complete" in completed.stdout
-    assert '--build-arg ROCM_DOCKER_IMAGE="rocm/dev-ubuntu-24.04"' in completed.stdout
-    assert '--build-arg ROCM_DOCKER_TAG="7.2-complete"' in completed.stdout
-    assert '--build-arg PYTORCH_TORCH_VERSION="2.11.0+rocm7.2"' in completed.stdout
     assert (
-        '--build-arg PYTORCH_TORCHVISION_VERSION="0.26.0+rocm7.2"' in completed.stdout
+        '--build-arg ROCM_DOCKER_IMAGE="rocm/dev-ubuntu-24.04"'
+        in completed.stdout
+    )
+    assert '--build-arg ROCM_DOCKER_TAG="7.2-complete"' in completed.stdout
+    assert (
+        '--build-arg PYTORCH_TORCH_VERSION="2.11.0+rocm7.2"' in completed.stdout
+    )
+    assert (
+        '--build-arg PYTORCH_TORCHVISION_VERSION="0.26.0+rocm7.2"'
+        in completed.stdout
     )
     assert (
         '--build-arg PYTORCH_ROCM_INDEX_URL="https://download.pytorch.org/whl/rocm7.2"'
@@ -336,7 +359,9 @@ def test_run_docker_default_build_preview_uses_rocm_7_2_build_args() -> None:
 
 @pytest.mark.requires_linux
 @pytest.mark.subprocess_uv
-def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> None:
+def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> (
+    None
+):
     manifest = load_docker_target_manifest(MANIFEST_PATH)
     non_default = next(
         target
@@ -344,7 +369,11 @@ def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> 
         if target.target_id != manifest.default_target_id
     )
 
-    completed = _run_docker_preview("--build", "--target", non_default.target_id)
+    completed = _run_docker_preview(
+        "--build",
+        "--target",
+        non_default.target_id,
+    )
 
     assert completed.returncode == 0, completed.stderr
     assert (
@@ -362,7 +391,8 @@ def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> 
     assert non_default.pytorch_dependency_policy is not None
     assert (
         '--build-arg PYTORCH_TORCH_VERSION="'
-        f'{non_default.pytorch_dependency_policy["torch_version"]}"' in completed.stdout
+        f'{non_default.pytorch_dependency_policy["torch_version"]}"'
+        in completed.stdout
     )
     assert (
         '--build-arg PYTORCH_TORCHVISION_VERSION="'
@@ -371,13 +401,16 @@ def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> 
     )
     assert (
         '--build-arg PYTORCH_ROCM_INDEX_URL="'
-        f'{non_default.pytorch_dependency_policy["uv_index_url"]}"' in completed.stdout
+        f'{non_default.pytorch_dependency_policy["uv_index_url"]}"'
+        in completed.stdout
     )
 
 
 @pytest.mark.requires_linux
 @pytest.mark.subprocess_uv
-def test_run_docker_target_flag_is_not_forwarded_to_docker_args_or_command() -> None:
+def test_run_docker_target_flag_is_not_forwarded_to_docker_args_or_command() -> (
+    None
+):
     manifest = load_docker_target_manifest(MANIFEST_PATH)
 
     completed = _run_docker_preview(
@@ -428,7 +461,9 @@ def test_run_docker_unknown_target_rejected_before_docker_commands() -> None:
 
 @pytest.mark.requires_linux
 @pytest.mark.subprocess_uv
-def test_run_docker_preflight_only_emits_runtime_unavailable_diagnostics() -> None:
+def test_run_docker_preflight_only_emits_runtime_unavailable_diagnostics() -> (
+    None
+):
     completed = _run_docker_preflight(
         "--preflight-only",
         SOL_EXECBENCH_DOCKER_CONTEXT="desktop-linux",
@@ -483,7 +518,9 @@ def test_run_docker_runtime_unavailable_skips_build_and_run() -> None:
 
 @pytest.mark.requires_linux
 @pytest.mark.subprocess_uv
-def test_run_docker_preflight_only_available_exits_without_build_or_run() -> None:
+def test_run_docker_preflight_only_available_exits_without_build_or_run() -> (
+    None
+):
     completed = _run_docker_preflight(
         "--preflight-only",
         "--build",
@@ -574,7 +611,9 @@ def test_run_docker_explicit_not_tested_smoke_reaches_dry_run_command() -> None:
 
     assert completed.returncode == 0, completed.stderr
     assert "+ docker run" in completed.stdout
-    assert "sol-execbench tests/sol_execbench/samples/rmsnorm" in completed.stdout
+    assert (
+        "sol-execbench tests/sol_execbench/samples/rmsnorm" in completed.stdout
+    )
 
 
 @pytest.mark.requires_linux

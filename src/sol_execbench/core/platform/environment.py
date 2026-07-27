@@ -5,11 +5,11 @@
 
 from __future__ import annotations
 
-from .environment_diagnostics import (
+from sol_execbench.core.platform.environment_diagnostics import (
     build_environment_diagnostics,
     run_pytorch_smoke_checks,
 )
-from .environment_models import (
+from sol_execbench.core.platform.environment_models import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
     ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
     EnvironmentCheckResult,
@@ -23,11 +23,13 @@ from .environment_models import (
     ToolProbeResult,
     Which,
 )
-from .environment_probes import (
+from sol_execbench.core.platform.environment_probes import (
     collect_pytorch_rocm_summary,
     probe_tool,
 )
-from .environment_snapshot import collect_environment_snapshot
+from sol_execbench.core.platform.environment_snapshot import (
+    collect_environment_snapshot,
+)
 
 __all__ = [
     "DEFAULT_PROBE_TIMEOUT_SECONDS",

@@ -18,20 +18,28 @@ from sol_execbench.core.dataset.aka_contract import (
 )
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
-
-from .aggregation import SuiteScore, WorkloadScore, aggregate_suite_scores
-from .formula import sol_score
-from .official_scoring import OFFICIAL_CORPUS_MANIFEST_SHA256
-from .release_models import (
+from sol_execbench.core.scoring.aggregation import (
+    SuiteScore,
+    WorkloadScore,
+    aggregate_suite_scores,
+)
+from sol_execbench.core.scoring.formula import sol_score
+from sol_execbench.core.scoring.official_scoring import (
+    OFFICIAL_CORPUS_MANIFEST_SHA256,
+)
+from sol_execbench.core.scoring.release_models import (
+    MAX_RELEASE_STATEMENT_BYTES,
     BaselineStatement,
     CandidateStatement,
-    MAX_RELEASE_STATEMENT_BYTES,
     ReleaseBundle,
     ReleaseModel,
     SolarIndexStatement,
 )
-from .release_solar import verify_solar_index
-from .release_traces import VerifiedRun, verify_release_run
+from sol_execbench.core.scoring.release_solar import verify_solar_index
+from sol_execbench.core.scoring.release_traces import (
+    VerifiedRun,
+    verify_release_run,
+)
 
 _Statement = TypeVar("_Statement", bound=ReleaseModel)
 
@@ -47,6 +55,7 @@ class OfficialScoreResult:
     suite: SuiteScore
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible official score result."""
         return {
             "status": "official",
             "candidate_id": self.candidate_id,
@@ -134,9 +143,12 @@ def _load_statements(
         )
         loaded.append(_load_model(path, model))
     baseline, candidate, solar = loaded
-    assert isinstance(baseline, BaselineStatement)
-    assert isinstance(candidate, CandidateStatement)
-    assert isinstance(solar, SolarIndexStatement)
+    if not isinstance(baseline, BaselineStatement):
+        raise TypeError("baseline statement has the wrong model type")
+    if not isinstance(candidate, CandidateStatement):
+        raise TypeError("candidate statement has the wrong model type")
+    if not isinstance(solar, SolarIndexStatement):
+        raise TypeError("SOLAR statement has the wrong model type")
     return baseline, candidate, solar
 
 
@@ -149,12 +161,17 @@ def _verify_release_pins(
     scoring = corpus.official_scoring
     if scoring.get("status") != AkaOfficialScoringStatus.AVAILABLE:
         raise ValueError("corpus manifest does not authorize official scoring")
-    if scoring.get("release_policy") != AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1:
+    if (
+        scoring.get("release_policy")
+        != AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1
+    ):
         raise ValueError("corpus manifest uses an unsupported release policy")
     if scoring.get("baseline_id") != baseline.baseline_id:
         raise ValueError("official scoring baseline_id is not corpus-pinned")
     if not (
-        baseline.source_revision == candidate.source_revision == solar.source_revision
+        baseline.source_revision
+        == candidate.source_revision
+        == solar.source_revision
     ):
         raise ValueError("release evidence source revisions do not match")
 
@@ -216,7 +233,8 @@ def _score_workload(
     candidate_passed: bool,
     sol_latency: float,
 ) -> WorkloadScore:
-    assert baseline_latency is not None
+    if baseline_latency is None:
+        raise ValueError(f"baseline has no latency for {identity}")
     if not candidate_passed:
         return WorkloadScore(identity[0], identity[1], 0.0)
     if candidate_latency is None:
@@ -227,10 +245,17 @@ def _score_workload(
 
 def _load_model(path: Path, model: type[_Statement]) -> _Statement:
     if not path.is_file() or path.stat().st_size > MAX_RELEASE_STATEMENT_BYTES:
-        raise ValueError("release statement is missing or exceeds the size limit")
+        raise ValueError(
+            "release statement is missing or exceeds the size limit",
+        )
     try:
         return model.model_validate_json(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, ValidationError, json.JSONDecodeError) as exc:
+    except (
+        OSError,
+        UnicodeError,
+        ValidationError,
+        json.JSONDecodeError,
+    ) as exc:
         raise ValueError(f"invalid release statement: {path.name}") from exc
 
 

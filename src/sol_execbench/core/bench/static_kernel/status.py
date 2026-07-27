@@ -9,20 +9,27 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Generic, Protocol, TypeVar
 
-
 _StatusT = TypeVar("_StatusT")
 _ReasonT = TypeVar("_ReasonT")
 
 
 class StaticToolRunLike(Protocol):
-    @property
-    def command(self) -> list[str]: ...
+    """Minimal tool-run fields consumed by generic aggregators."""
 
     @property
-    def status(self) -> object: ...
+    def command(self) -> list[str]:
+        """Return the executed command."""
+        ...
 
     @property
-    def reason_code(self) -> object: ...
+    def status(self) -> object:
+        """Return the domain status value."""
+        ...
+
+    @property
+    def reason_code(self) -> object:
+        """Return the stable domain reason code."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,8 +63,12 @@ def aggregate_extractor_status_value(
 ) -> _StatusT:
     """Return aggregate extractor status from individual tool runs."""
     executable_runs = [run for run in tool_runs if run.command]
-    successes = [run for run in executable_runs if run.status == vocabulary.collected]
-    failures = [run for run in executable_runs if run.status == vocabulary.failed]
+    successes = [
+        run for run in executable_runs if run.status == vocabulary.collected
+    ]
+    failures = [
+        run for run in executable_runs if run.status == vocabulary.failed
+    ]
     if successes and len(successes) == len(executable_runs):
         return vocabulary.collected
     if successes:
@@ -86,7 +97,9 @@ def aggregate_extractor_reason_value(
             return vocabulary.partial_disassembly_reason
         return vocabulary.partial_reason
     if status == vocabulary.failed_status:
-        if any(run.reason_code == vocabulary.timeout_reason for run in tool_runs):
+        if any(
+            run.reason_code == vocabulary.timeout_reason for run in tool_runs
+        ):
             return vocabulary.timeout_reason
         return vocabulary.failed_reason
     return vocabulary.unavailable_reason

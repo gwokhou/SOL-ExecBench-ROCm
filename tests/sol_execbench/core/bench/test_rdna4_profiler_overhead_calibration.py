@@ -16,8 +16,8 @@ import pytest
 
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3TimingEvidence,
-    build_timing_evidence,
     _read_overhead_calibration,
+    build_timing_evidence,
 )
 from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
@@ -90,9 +90,7 @@ class TestBuildTimingEvidenceWithOverhead:
 
     def test_build_with_overhead(self):
         policy = _make_policy()
-        csv = (
-            "Name,Dispatch_ID,Duration_ns,Calls,Queue_ID,Signal\nkernel,0,1000,1,0,0\n"
-        )
+        csv = "Name,Dispatch_ID,Duration_ns,Calls,Queue_ID,Signal\nkernel,0,1000,1,0,0\n"
         evidence = build_timing_evidence(
             policy=policy,
             csv_content=csv,
@@ -104,9 +102,7 @@ class TestBuildTimingEvidenceWithOverhead:
 
     def test_build_without_overhead(self):
         policy = _make_policy()
-        csv = (
-            "Name,Dispatch_ID,Duration_ns,Calls,Queue_ID,Signal\nkernel,0,1000,1,0,0\n"
-        )
+        csv = "Name,Dispatch_ID,Duration_ns,Calls,Queue_ID,Signal\nkernel,0,1000,1,0,0\n"
         evidence = build_timing_evidence(
             policy=policy,
             csv_content=csv,
@@ -183,7 +179,10 @@ class TestReadOverheadCalibration:
 
     def test_rejects_architecture_mismatch(self, tmp_path):
         cal_path = tmp_path / "cal.json"
-        cal_path.write_text(json.dumps(self._payload()) + "\n", encoding="utf-8")
+        cal_path.write_text(
+            json.dumps(self._payload()) + "\n",
+            encoding="utf-8",
+        )
 
         result = _read_overhead_calibration(
             cal_path,
@@ -194,7 +193,10 @@ class TestReadOverheadCalibration:
 
     def test_rejects_unknown_clock_state(self, tmp_path):
         cal_path = tmp_path / "cal.json"
-        cal_path.write_text(json.dumps(self._payload()) + "\n", encoding="utf-8")
+        cal_path.write_text(
+            json.dumps(self._payload()) + "\n",
+            encoding="utf-8",
+        )
 
         result = _read_overhead_calibration(
             cal_path,
@@ -233,7 +235,7 @@ class TestReadOverheadCalibration:
                 self._payload(
                     profiler_executable=str(profiler),
                     profiler_executable_sha256=sha256_file(profiler),
-                )
+                ),
             )
             + "\n",
             encoding="utf-8",
@@ -260,7 +262,8 @@ class TestCalibrationScriptArgs:
             / "scripts/internal/rdna4/run_rdna4_profiler_overhead_calibration.py"
         )
         spec = spec_from_file_location(
-            "run_rdna4_profiler_overhead_calibration", SCRIPT_PATH
+            "run_rdna4_profiler_overhead_calibration",
+            SCRIPT_PATH,
         )
         assert spec is not None and spec.loader is not None
         mod = module_from_spec(spec)
@@ -310,7 +313,7 @@ class TestCalibrationScriptArgs:
                 "/tmp/rocprofv3-gfx1200-patched",
                 "--source-revision",
                 "a" * 40,
-            ]
+            ],
         )
         assert args.profiler_executable.endswith("rocprofv3-gfx1200-patched")
         assert args.source_revision == "a" * 40
@@ -328,7 +331,8 @@ class TestCalibrationJsonSchema:
             / "scripts/internal/rdna4/run_rdna4_profiler_overhead_calibration.py"
         )
         spec = spec_from_file_location(
-            "run_rdna4_profiler_overhead_calibration_schema", SCRIPT_PATH
+            "run_rdna4_profiler_overhead_calibration_schema",
+            SCRIPT_PATH,
         )
         assert spec is not None and spec.loader is not None
         mod = module_from_spec(spec)
@@ -351,7 +355,8 @@ class TestCalibrationClockSetup:
             / "scripts/internal/rdna4/run_rdna4_profiler_overhead_calibration.py"
         )
         spec = spec_from_file_location(
-            "run_rdna4_profiler_overhead_calibration_clock_setup", SCRIPT_PATH
+            "run_rdna4_profiler_overhead_calibration_clock_setup",
+            SCRIPT_PATH,
         )
         assert spec is not None and spec.loader is not None
         mod = module_from_spec(spec)
@@ -367,7 +372,8 @@ class TestCalibrationClockSetup:
             mod,
             "acquire_clock_lock",
             lambda: (
-                calls.append("lock") or mod.ClockLockLease(locked=True, acquired=True)
+                calls.append("lock")
+                or mod.ClockLockLease(locked=True, acquired=True)
             ),
         )
         monkeypatch.setattr(
@@ -411,7 +417,10 @@ class TestCalibrationClockSetup:
         mod._teardown_calibration_clocks(state, reset_clocks=True)
         assert calls == []
 
-    def test_teardown_without_reset_explicitly_detaches_owned_lease(self, monkeypatch):
+    def test_teardown_without_reset_explicitly_detaches_owned_lease(
+        self,
+        monkeypatch,
+    ):
         mod = self._load_script()
         lease = mod.ClockLockLease(locked=True, acquired=True)
         monkeypatch.setenv("SOL_EXECBENCH_CLOCKS_LOCKED", "1")
@@ -444,15 +453,24 @@ class TestCalibrationClockSetup:
             build_kwargs = cast(dict[str, Any], captured["kwargs"])
             output_directory = Path(cast(str, build_kwargs["output_directory"]))
             (
-                output_directory / "rocprofv3-overhead-calibration_kernel_trace.csv"
+                output_directory
+                / "rocprofv3-overhead-calibration_kernel_trace.csv"
             ).write_text(
                 "Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)\n"
                 "KERNEL_DISPATCH,vector_add,0,10,10\n",
                 encoding="utf-8",
             )
-            return subprocess.CompletedProcess(command, 0, stdout="[1.25, 1.5]\n")
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="[1.25, 1.5]\n",
+            )
 
-        monkeypatch.setattr(rocm_profiler, "build_rocprofv3_command", fake_build)
+        monkeypatch.setattr(
+            rocm_profiler,
+            "build_rocprofv3_command",
+            fake_build,
+        )
         monkeypatch.setattr(mod, "run_in_process_group_bounded", fake_run)
 
         temp_dir = tmp_path / "tmp" / "rdna4-overhead-calibration"
@@ -471,7 +489,11 @@ class TestCalibrationClockSetup:
         output_directory = Path(kwargs["output_directory"])
         assert output_directory.is_relative_to(temp_dir)
 
-    def test_run_with_rocprofv3_rejects_nonzero_exit(self, monkeypatch, tmp_path):
+    def test_run_with_rocprofv3_rejects_nonzero_exit(
+        self,
+        monkeypatch,
+        tmp_path,
+    ):
         mod = self._load_script()
 
         monkeypatch.setattr(
@@ -493,7 +515,11 @@ class TestCalibrationClockSetup:
                 temp_dir=tmp_path,
             )
 
-    def test_run_with_rocprofv3_requires_kernel_trace(self, monkeypatch, tmp_path):
+    def test_run_with_rocprofv3_requires_kernel_trace(
+        self,
+        monkeypatch,
+        tmp_path,
+    ):
         mod = self._load_script()
 
         monkeypatch.setattr(

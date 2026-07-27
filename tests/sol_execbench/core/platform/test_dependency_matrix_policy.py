@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sol_execbench.core.platform.compatibility import (
+    MatrixClaimBoundary,
+    MatrixCompatibilityReasonCode,
+    MatrixCompatibilityStatus,
+    MatrixObservedEvidence,
+    build_matrix_entry,
+)
 from sol_execbench.core.platform.dependency_matrix import (
     dependency_policy_evidence_for_target,
     load_docker_target_dependency_policy,
@@ -11,14 +18,6 @@ from sol_execbench.core.platform.docker_matrix import (
     select_docker_target,
     to_matrix_target,
 )
-from sol_execbench.core.platform.compatibility import (
-    MatrixClaimBoundary,
-    MatrixCompatibilityReasonCode,
-    MatrixCompatibilityStatus,
-    MatrixObservedEvidence,
-    build_matrix_entry,
-)
-
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
@@ -48,12 +47,14 @@ def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
 
     assert manifest.default_target_id == "rocm-7.2.0-ubuntu-24.04-container"
     assert (
-        manifest.targets_by_id[manifest.default_target_id].docker_image_repository
+        manifest.targets_by_id[
+            manifest.default_target_id
+        ].docker_image_repository
         == "rocm/dev-ubuntu-24.04"
     )
-    assert manifest.targets_by_id[manifest.default_target_id].docker_image_tag == (
-        "7.2-complete"
-    )
+    assert manifest.targets_by_id[
+        manifest.default_target_id
+    ].docker_image_tag == ("7.2-complete")
     for target in manifest.targets:
         policy = load_docker_target_dependency_policy(target)
         assert set(policy.model_dump(mode="json")) == EXPECTED_POLICY_FIELDS
@@ -62,11 +63,17 @@ def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
         assert policy.policy_id
         assert target.pytorch_rocm_target == policy.expected_local_version
         assert target.pytorch_rocm_target is not None
-        assert target.pytorch_rocm_target.replace(".", "") in policy.uv_index_name
+        assert (
+            target.pytorch_rocm_target.replace(".", "") in policy.uv_index_name
+        )
         assert policy.expected_local_version in policy.uv_index_url
         assert policy.suggested_uv_command
-        assert policy.uv_index_url.startswith("https://download.pytorch.org/whl/")
-        assert policy.triton_rocm_index_url == "https://download.pytorch.org/whl/"
+        assert policy.uv_index_url.startswith(
+            "https://download.pytorch.org/whl/",
+        )
+        assert (
+            policy.triton_rocm_index_url == "https://download.pytorch.org/whl/"
+        )
 
 
 def test_default_target_policy_matches_rocm_7_2_project_default() -> None:
@@ -90,10 +97,10 @@ def test_default_target_policy_matches_rocm_7_2_project_default() -> None:
 def test_non_default_target_policies_record_explicit_workflows() -> None:
     manifest = load_docker_target_manifest(MANIFEST_PATH)
     rocm_70 = load_docker_target_dependency_policy(
-        manifest.targets_by_id["rocm-7.0.2-ubuntu-24.04-container"]
+        manifest.targets_by_id["rocm-7.0.2-ubuntu-24.04-container"],
     )
     rocm_72 = load_docker_target_dependency_policy(
-        manifest.targets_by_id["rocm-7.2.0-ubuntu-24.04-container"]
+        manifest.targets_by_id["rocm-7.2.0-ubuntu-24.04-container"],
     )
 
     assert rocm_70.torch_version == "2.10.0+rocm7.0"

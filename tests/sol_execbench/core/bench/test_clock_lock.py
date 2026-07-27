@@ -35,7 +35,10 @@ def _mock_tool_paths(monkeypatch):
 class TestProbeClockLockAvailable:
     def test_returns_true_when_all_lifecycle_commands_are_allowed(self):
         probe_result = MagicMock(returncode=0)
-        with patch(f"{_MODULE}.subprocess.run", return_value=probe_result) as mock_run:
+        with patch(
+            f"{_MODULE}.subprocess.run",
+            return_value=probe_result,
+        ) as mock_run:
             result = probe_clock_lock_available()
 
         assert result is True
@@ -53,7 +56,9 @@ class TestProbeClockLockAvailable:
             ],
             ["sudo", "-n", "-l", "--", "amd-smi", "set", "-l", "AUTO"],
         ]
-        assert all(call.kwargs["timeout"] == 10 for call in mock_run.call_args_list)
+        assert all(
+            call.kwargs["timeout"] == 10 for call in mock_run.call_args_list
+        )
 
     def test_returns_false_when_sudo_fails(self):
         probe_result = MagicMock(returncode=1)
@@ -98,7 +103,9 @@ class TestLockClocks:
             timeout=30,
         )
 
-    def test_returns_false_when_stable_peak_reports_failure_with_zero_exit(self):
+    def test_returns_false_when_stable_peak_reports_failure_with_zero_exit(
+        self,
+    ):
         failed = MagicMock(
             returncode=0,
             stdout="ERROR: GPU[0]\t: Unable to set performance level\n",
@@ -239,7 +246,10 @@ class TestLockClocks:
                 f"{_MODULE}._observed_performance_levels",
                 return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
             ),
-            patch(f"{_MODULE}.subprocess.run", side_effect=RuntimeError("boom")),
+            patch(
+                f"{_MODULE}.subprocess.run",
+                side_effect=RuntimeError("boom"),
+            ),
             patch(f"{_MODULE}.unlock_clocks", return_value=True) as unlock,
             pytest.raises(RuntimeError, match="boom"),
         ):
@@ -275,7 +285,10 @@ class TestClockLockLease:
 
     def test_failed_release_can_be_retried(self):
         lease = ClockLockLease(locked=True, acquired=True)
-        with patch(f"{_MODULE}.unlock_clocks", side_effect=[False, True]) as unlock:
+        with patch(
+            f"{_MODULE}.unlock_clocks",
+            side_effect=[False, True],
+        ) as unlock:
             assert lease.release() is False
             assert lease.active is True
             assert lease.released is False
@@ -291,9 +304,9 @@ class TestClockLockLease:
         with (
             patch(f"{_MODULE}.unlock_clocks", return_value=False),
             pytest.raises(RuntimeError, match="failed to reset"),
+            lease,
         ):
-            with lease:
-                pass
+            pass
         lease.detach()
 
     def test_cleanup_failure_does_not_mask_body_exception(self):
@@ -301,12 +314,12 @@ class TestClockLockLease:
         with (
             patch(f"{_MODULE}.unlock_clocks", return_value=False),
             pytest.raises(ValueError, match="body failed") as caught,
+            lease,
         ):
-            with lease:
-                raise ValueError("body failed")
+            raise ValueError("body failed")
 
         assert caught.value.__notes__ == [
-            "failed to reset and verify every GPU at AUTO"
+            "failed to reset and verify every GPU at AUTO",
         ]
         lease.detach()
 
@@ -328,7 +341,11 @@ class TestClockLockLease:
         assert "gpu_clock_lease_leaked" in caplog.text
 
     @pytest.mark.parametrize("resolution", ("release", "detach"))
-    def test_resolved_owned_lease_does_not_emit_leak_error(self, resolution, caplog):
+    def test_resolved_owned_lease_does_not_emit_leak_error(
+        self,
+        resolution,
+        caplog,
+    ):
         lease = ClockLockLease(locked=True, acquired=True)
         if resolution == "release":
             with patch(f"{_MODULE}.unlock_clocks", return_value=True):
@@ -362,7 +379,7 @@ class TestVerifyClocks:
     def test_stable_peak_detected(self):
         result = self._make_smi_result(
             '{"gpu_data": [{"gpu": 0, "perf_level": '
-            '"AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"}]}'
+            '"AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"}]}',
         )
         with patch(f"{_MODULE}.subprocess.run", return_value=result) as run:
             assert verify_clocks() is True
@@ -376,7 +393,7 @@ class TestVerifyClocks:
 
     def test_auto_detected_as_not_locked(self):
         result = self._make_smi_result(
-            '{"gpu_data": [{"gpu": 0, "perf_level": "AMDSMI_DEV_PERF_LEVEL_AUTO"}]}'
+            '{"gpu_data": [{"gpu": 0, "perf_level": "AMDSMI_DEV_PERF_LEVEL_AUTO"}]}',
         )
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
             assert verify_clocks() is False
@@ -385,7 +402,7 @@ class TestVerifyClocks:
         result = self._make_smi_result(
             '{"gpu_data": ['
             '{"gpu": 0, "perf_level": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"},'
-            '{"gpu": 1, "perf_level": "AMDSMI_DEV_PERF_LEVEL_AUTO"}]}'
+            '{"gpu": 1, "perf_level": "AMDSMI_DEV_PERF_LEVEL_AUTO"}]}',
         )
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
             assert verify_clocks() is False
@@ -394,7 +411,7 @@ class TestVerifyClocks:
         result = self._make_smi_result(
             '{"gpu_data": ['
             '{"gpu": 0, "perf_level": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"},'
-            '{"gpu": 1, "perf_level": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"}]}'
+            '{"gpu": 1, "perf_level": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"}]}',
         )
         with patch(f"{_MODULE}.subprocess.run", return_value=result):
             assert verify_clocks() is True
@@ -436,7 +453,8 @@ class TestUnlockClocks:
             stderr="",
         )
         with patch(
-            f"{_MODULE}.subprocess.run", side_effect=[reset, verify]
+            f"{_MODULE}.subprocess.run",
+            side_effect=[reset, verify],
         ) as mock_run:
             assert unlock_clocks() is True
 
@@ -463,7 +481,10 @@ class TestUnlockClocks:
             assert unlock_clocks() is False
 
     def test_does_not_raise_on_failure(self):
-        with patch(f"{_MODULE}.subprocess.run", side_effect=Exception("no sudo")):
+        with patch(
+            f"{_MODULE}.subprocess.run",
+            side_effect=Exception("no sudo"),
+        ):
             assert unlock_clocks() is False
 
 

@@ -3,9 +3,9 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import sol_execbench.driver as _driver_pkg
 from sol_execbench_type_helpers import make_solution
 
+import sol_execbench.driver as _driver_pkg
 
 _TEMPLATES_DIR = Path(_driver_pkg.__file__).parent / "templates"
 
@@ -71,5 +71,5 @@ def test_hip_cpp_sources_accept_pytorch_rocm_stream_api_text():
 def test_emit_uses_strict_json():
     source = _driver_source()
 
-    assert "allow_nan=False" in source
+    assert "emit_trace_jsonl(_trace, _real_stdout)" in source
     assert "_sanitize_floats" not in source

@@ -2,17 +2,23 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 from sol_execbench.core.evidence import runtime_evidence
 from sol_execbench.core.evidence.runtime_evidence import cli
-from sol_execbench.core.evidence.runtime_evidence.models import RuntimeFailureEvidence
-from sol_execbench.core.platform.dependency_matrix import PytorchDependencyObservation
-from sol_execbench.core.platform.docker_matrix import load_docker_target_manifest
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeFailureEvidence,
+)
+from sol_execbench.core.platform.dependency_matrix import (
+    PytorchDependencyObservation,
+)
+from sol_execbench.core.platform.docker_matrix import (
+    load_docker_target_manifest,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
@@ -63,7 +69,7 @@ def test_runtime_entry_keeps_scopes_and_failure_artifacts_separate() -> None:
                 category="dependency",
                 status="recorded",
                 message="diagnostic only",
-            )
+            ),
         ],
         container_validated=True,
     )
@@ -72,7 +78,10 @@ def test_runtime_entry_keeps_scopes_and_failure_artifacts_separate() -> None:
     assert payload["status"] == "container_validated"
     assert payload["claim_boundary"]["container_user_space_validated"] is True
     assert payload["claim_boundary"]["native_host_validated"] is False
-    assert payload["observed"]["host"]["device_nodes"] == ["/dev/kfd", "/dev/dri"]
+    assert payload["observed"]["host"]["device_nodes"] == [
+        "/dev/kfd",
+        "/dev/dri",
+    ]
     assert payload["observed"]["gpu"]["gfx_architecture"] == "gfx1200"
     assert payload["artifacts"][0]["kind"] == "runtime_evidence_dependency"
 
@@ -92,7 +101,8 @@ def test_runtime_unavailable_overrides_dependency_classification() -> None:
 
 def test_runtime_evidence_io_round_trips_entry_and_aggregate(tmp_path) -> None:
     entry = runtime_evidence.build_runtime_matrix_entry(
-        target=_target(), dependency_observation=_matching_observation()
+        target=_target(),
+        dependency_observation=_matching_observation(),
     )
     entry_path = tmp_path / "entry.json"
     report_path = tmp_path / "report.json"
@@ -105,7 +115,9 @@ def test_runtime_evidence_io_round_trips_entry_and_aggregate(tmp_path) -> None:
     assert json.loads(entry_path.read_text())["schema_version"] == (
         "sol_execbench.rocm_compatibility_matrix.v1"
     )
-    assert json.loads(report_path.read_text())["status_counts"] == {"not_tested": 1}
+    assert json.loads(report_path.read_text())["status_counts"] == {
+        "not_tested": 1,
+    }
 
 
 def test_collectors_use_injected_values_without_hardware_probe() -> None:
@@ -139,13 +151,15 @@ def test_dependency_collector_preserves_explicit_toolchain_overrides(
         return observed
 
     monkeypatch.setattr(
-        runtime_evidence, "collect_pytorch_dependency_observation", collect
+        runtime_evidence,
+        "collect_pytorch_dependency_observation",
+        collect,
     )
     result = runtime_evidence.build_dependency_observation(
         PytorchDependencyObservation(
             container_rocm_user_space_version="7.2.0",
             hipcc_version="HIP 7.2.0",
-        )
+        ),
     )
 
     assert collector_calls == 1
@@ -220,7 +234,7 @@ def test_runtime_evidence_cli_collects_and_aggregates(tmp_path, capsys) -> None:
 
     assert (
         runtime_evidence.main(
-            ["aggregate", "--output", str(report_path), str(entry_path)]
+            ["aggregate", "--output", str(report_path), str(entry_path)],
         )
         == 0
     )
@@ -239,7 +253,7 @@ def test_runtime_evidence_cli_rejects_invalid_boolean(tmp_path, capsys) -> None:
                 str(tmp_path / "entry.json"),
                 "--dev-kfd-present",
                 "maybe",
-            ]
+            ],
         )
 
     assert "expected boolean value" in capsys.readouterr().err

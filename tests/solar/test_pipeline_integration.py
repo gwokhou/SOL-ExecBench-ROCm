@@ -51,7 +51,11 @@ def _masked_fill(value: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     return value.masked_fill(mask, -1.0)
 
 
-def _where(mask: torch.Tensor, left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
+def _where(
+    mask: torch.Tensor,
+    left: torch.Tensor,
+    right: torch.Tensor,
+) -> torch.Tensor:
     return torch.where(mask, left, right)
 
 
@@ -63,18 +67,26 @@ def _embedding(indices: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
     return functional.embedding(indices, weight)
 
 
-def _sdpa(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
+def _sdpa(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+) -> torch.Tensor:
     return functional.scaled_dot_product_attention(query, key, value)
 
 
 def _linear(
-    value: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
+    value: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
 ) -> torch.Tensor:
     return functional.linear(value, weight, bias)
 
 
 def _layer_norm(
-    value: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
+    value: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
 ) -> torch.Tensor:
     return functional.layer_norm(value, (3,), weight, bias, 1e-5)
 
@@ -190,7 +202,9 @@ def test_cpu_pipeline_preserves_reference_semantics(
     actual = EinsumGraphExecutor(graph)(*inputs)
 
     torch.testing.assert_close(actual, reference(*inputs), equal_nan=True)
-    assert sorted(graph["source_input_indices"]) == sorted(operator.used_source_indices)
+    assert sorted(graph["source_input_indices"]) == sorted(
+        operator.used_source_indices,
+    )
     assert graph["outputs"]
     analysis = EinsumGraphAnalyzer().analyze_graph(
         converted.path,
@@ -202,7 +216,9 @@ def test_cpu_pipeline_preserves_reference_semantics(
     assert analysis["schema_version"] == 3
 
 
-def test_extraction_tracks_only_tensor_inputs_used_by_reference(tmp_path: Path) -> None:
+def test_extraction_tracks_only_tensor_inputs_used_by_reference(
+    tmp_path: Path,
+) -> None:
     unused = torch.zeros(2)
 
     def reference(value: torch.Tensor, scale: float, ignored: torch.Tensor):
@@ -240,7 +256,10 @@ def test_extraction_preserves_source_positions_when_use_order_differs(
 
 
 def test_extraction_rejects_non_tensor_reference_output(tmp_path: Path) -> None:
-    with pytest.raises(RuntimeError, match="tensor reference inputs and outputs"):
+    with pytest.raises(
+        RuntimeError,
+        match="tensor reference inputs and outputs",
+    ):
         extract_operator_graph(
             lambda value: int(value.sum()),
             (torch.ones(2),),
@@ -270,6 +289,8 @@ def test_canonical_extraction_preserves_explicit_backward_reference(
     graph = yaml.safe_load(converted.path.read_text())
 
     assert graph["joint_graph"] is False
-    assert any(layer.get("phase") == "reference" for layer in graph["layers"].values())
+    assert any(
+        layer.get("phase") == "reference" for layer in graph["layers"].values()
+    )
     actual = EinsumGraphExecutor(graph)(*inputs)
     torch.testing.assert_close(actual, reference(*inputs))

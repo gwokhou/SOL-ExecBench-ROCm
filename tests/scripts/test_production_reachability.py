@@ -1,9 +1,9 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-
 SCRIPT_PATH = (
-    Path(__file__).resolve().parents[2] / "scripts/check_production_reachability.py"
+    Path(__file__).resolve().parents[2]
+    / "scripts/check_production_reachability.py"
 )
 SPEC = spec_from_file_location("check_production_reachability", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None
@@ -15,7 +15,9 @@ def test_repository_has_no_unreachable_production_modules() -> None:
     assert reachability.unreachable_modules() == []
 
 
-def test_edges_detect_relative_and_literal_dynamic_imports(tmp_path: Path) -> None:
+def test_edges_detect_relative_and_literal_dynamic_imports(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "module.py"
     source.write_text(
         "from . import sibling\nWORKER = 'example.worker'\n",

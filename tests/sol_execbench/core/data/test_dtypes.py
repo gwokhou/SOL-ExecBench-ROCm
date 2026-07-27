@@ -17,8 +17,8 @@
 
 """Tests for sol_execbench.core.data.dtypes and the re-export via utils."""
 
-import torch
 import pytest
+import torch
 
 from sol_execbench.core.data.dtypes import (
     dtype_storage_bits,
@@ -113,7 +113,14 @@ class TestIsDtypeInteger:
 
     @pytest.mark.parametrize(
         "dtype",
-        [torch.int8, torch.int16, torch.int32, torch.int64, torch.uint8, torch.bool],
+        [
+            torch.int8,
+            torch.int16,
+            torch.int32,
+            torch.int64,
+            torch.uint8,
+            torch.bool,
+        ],
     )
     def test_integer_dtypes(self, dtype):
         assert is_dtype_integer(dtype) is True

@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 import torch
 
@@ -15,6 +14,7 @@ from sol_execbench.core.data.definition import Definition
 
 
 def is_sampling_operation(definition: Definition) -> bool:
+    """Return whether a definition represents a sampling operation."""
     return getattr(definition, "op_type", None) == "sampling"
 
 
@@ -33,9 +33,11 @@ def _is_weight_matrix(name: str, shape: tuple[int, ...]) -> bool:
     if name.endswith(weight_suffixes) or name == "weight":
         return True
     stripped = name.rstrip("0123456789")
-    if stripped and stripped in ("weight",) or stripped.endswith(weight_suffixes):
-        return True
-    return False
+    return bool(
+        stripped
+        and stripped in ("weight",)
+        or stripped.endswith(weight_suffixes)
+    )
 
 
 def _is_norm_weight(name: str) -> bool:
@@ -65,22 +67,22 @@ def _is_norm_bias(name: str) -> bool:
 
 
 def _is_causal_attention_mask(
-    name: str, shape: tuple[int, ...], description: Optional[str]
+    name: str,
+    shape: tuple[int, ...],
+    description: str | None,
 ) -> bool:
     if len(shape) < 2 or shape[-1] != shape[-2]:
         return False
     if name in ("attention_mask", "causal_mask"):
         return True
-    if (
+    return bool(
         description
         and "attention mask" in description.lower()
         and "causal" in description.lower()
-    ):
-        return True
-    return False
+    )
 
 
-def _is_binary_mask(name: str, description: Optional[str]) -> bool:
+def _is_binary_mask(name: str, description: str | None) -> bool:
     mask_names = (
         "x_mask",
         "text_mask",
@@ -94,42 +96,53 @@ def _is_binary_mask(name: str, description: Optional[str]) -> bool:
         desc_lower = description.lower()
         if any(
             kw in desc_lower
-            for kw in ("binary", "{0, 1}", "0 or 1", "1.0 for valid", "0.0 for masked")
+            for kw in (
+                "binary",
+                "{0, 1}",
+                "0 or 1",
+                "1.0 for valid",
+                "0.0 for masked",
+            )
         ):
             return True
     return False
 
 
 def _is_rope_cos_sin(name: str) -> bool:
-    return name in ("cos", "sin", "cos_cached", "sin_cached", "rope_cos", "rope_sin")
+    return name in (
+        "cos",
+        "sin",
+        "cos_cached",
+        "sin_cached",
+        "rope_cos",
+        "rope_sin",
+    )
 
 
-def _is_positive_tensor(name: str, description: Optional[str]) -> bool:
+def _is_positive_tensor(name: str, description: str | None) -> bool:
     positive_names = ("rstd", "std", "variance", "var")
     if name in positive_names:
         return True
     if name.endswith(("_rstd", "_std", "_variance", "_var")):
         return True
     base = name.rstrip("0123456789")
-    if base in positive_names or base.endswith(("_rstd", "_std", "_var")):
-        return True
-    return False
+    return bool(
+        base in positive_names or base.endswith(("_rstd", "_std", "_var"))
+    )
 
 
 def _is_ssm_decay(name: str) -> bool:
     return name in ("A", "A_log", "A_cumsum", "g")
 
 
-def _is_softmax_output(name: str, description: Optional[str]) -> bool:
+def _is_softmax_output(name: str, description: str | None) -> bool:
     if name in ("attn_weights", "attention_weights", "routing_weights"):
         return True
-    if (
+    return bool(
         description
         and "softmax" in description.lower()
         and "output" in description.lower()
-    ):
-        return True
-    return False
+    )
 
 
 def _generate_heuristic_tensor(
@@ -137,8 +150,8 @@ def _generate_heuristic_tensor(
     shape: tuple[int, ...],
     dtype: torch.dtype,
     device: torch.device,
-    description: Optional[str] = None,
-) -> Optional[torch.Tensor]:
+    description: str | None = None,
+) -> torch.Tensor | None:
     """Generate a tensor using heuristics based on the input name.
 
     Returns None if no heuristic matches, falling back to _rand_tensor.
@@ -146,9 +159,13 @@ def _generate_heuristic_tensor(
     if not dtype.is_floating_point:
         return None
 
-    # Low-precision floats (FP8, FP4) don't support ops like torch.randn/ones/empty.uniform_;
+    # Low-precision floats (FP8, FP4) do not support random/fill operations;
     # fall back to _rand_tensor() which generates in float32 then converts.
-    if dtype in (torch.float8_e4m3fn, torch.float8_e5m2, torch.float4_e2m1fn_x2):
+    if dtype in (
+        torch.float8_e4m3fn,
+        torch.float8_e5m2,
+        torch.float4_e2m1fn_x2,
+    ):
         return None
 
     if _is_norm_weight(name):
@@ -161,7 +178,8 @@ def _generate_heuristic_tensor(
         seq_len = shape[-1]
         mask = torch.zeros(shape, dtype=dtype, device=device)
         causal = torch.triu(
-            torch.ones(seq_len, seq_len, device=device), diagonal=1
+            torch.ones(seq_len, seq_len, device=device),
+            diagonal=1,
         ).bool()
         mask[..., causal] = torch.finfo(dtype).min
         return mask
@@ -171,7 +189,8 @@ def _generate_heuristic_tensor(
 
     if _is_rope_cos_sin(name):
         t = torch.randn(shape, dtype=torch.float32, device=device).clamp_(
-            -math.pi, math.pi
+            -math.pi,
+            math.pi,
         )
         if name in ("cos", "cos_cached", "rope_cos"):
             return torch.cos(t).to(dtype)
@@ -181,14 +200,7 @@ def _generate_heuristic_tensor(
         return torch.randn(shape, dtype=dtype, device=device).abs() + 0.1
 
     if _is_ssm_decay(name):
-        if name == "A_cumsum":
-            raw = torch.empty(shape, dtype=dtype, device=device).uniform_(-0.1, 0.0)
-            return raw.cumsum(dim=-1)
-        if name == "A_log":
-            return torch.empty(shape, dtype=dtype, device=device).uniform_(-5.0, -1.0)
-        if name == "A":
-            return torch.empty(shape, dtype=dtype, device=device).uniform_(-1.0, -0.001)
-        return torch.empty(shape, dtype=dtype, device=device).uniform_(-5.0, 0.0)
+        return _generate_ssm_decay(name, shape, dtype, device)
 
     if _is_softmax_output(name, description):
         logits = torch.randn(shape, dtype=torch.float32, device=device)
@@ -196,6 +208,29 @@ def _generate_heuristic_tensor(
 
     if _is_weight_matrix(name, shape):
         fan_in = shape[-1]
-        return torch.randn(shape, dtype=dtype, device=device) / math.sqrt(fan_in)
+        return torch.randn(shape, dtype=dtype, device=device) / math.sqrt(
+            fan_in,
+        )
 
     return None
+
+
+def _generate_ssm_decay(
+    name: str,
+    shape: tuple[int, ...],
+    dtype: torch.dtype,
+    device: torch.device,
+) -> torch.Tensor:
+    if name == "A_cumsum":
+        values = torch.empty(shape, dtype=dtype, device=device).uniform_(
+            -0.1,
+            0.0,
+        )
+        return values.cumsum(dim=-1)
+    if name == "A_log":
+        limits = (-5.0, -1.0)
+    elif name == "A":
+        limits = (-1.0, -0.001)
+    else:
+        limits = (-5.0, 0.0)
+    return torch.empty(shape, dtype=dtype, device=device).uniform_(*limits)

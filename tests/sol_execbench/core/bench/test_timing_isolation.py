@@ -10,7 +10,6 @@ import logging
 import os
 import subprocess
 
-
 from sol_execbench.core.bench.timing_isolation import (
     _detect_gpu_count,
     clear_gpu_cache_between_subprocesses,
@@ -39,10 +38,12 @@ class TestDetectConcurrentGpuProcesses:
                         {
                             "gpu": 0,
                             "process_list": [
-                                {"process_info": "No running processes detected"}
+                                {
+                                    "process_info": "No running processes detected",
+                                },
                             ],
-                        }
-                    ]
+                        },
+                    ],
                 ),
                 stderr="",
             ),
@@ -62,8 +63,8 @@ class TestDetectConcurrentGpuProcesses:
                         {"pid": 12345, "name": "python"},
                         {"pid": 67890, "name": "rocprofv3"},
                     ],
-                }
-            ]
+                },
+            ],
         )
         with unittest.mock.patch(
             "subprocess.run",
@@ -91,7 +92,8 @@ class TestDetectConcurrentGpuProcesses:
             assert result == []
             # Check for timeout in log (case-insensitive)
             assert (
-                "timeout" in caplog.text.lower() or "timed out" in caplog.text.lower()
+                "timeout" in caplog.text.lower()
+                or "timed out" in caplog.text.lower()
             )
 
     def test_file_not_found_handling(self, caplog):
@@ -127,8 +129,8 @@ class TestVerifyClockStateWithWarning:
 
     def test_clocks_not_locked(self, caplog):
         """Test that False is returned and warning is logged when clocks not locked."""
-        import unittest.mock
         import logging
+        import unittest.mock
 
         caplog.set_level(logging.WARNING)
 
@@ -143,8 +145,8 @@ class TestVerifyClockStateWithWarning:
 
     def test_context_parameter_in_log(self, caplog):
         """Test that context parameter appears in log messages."""
-        import unittest.mock
         import logging
+        import unittest.mock
 
         caplog.set_level(logging.INFO)
 
@@ -161,8 +163,8 @@ class TestClearGpuCacheBetweenSubprocesses:
 
     def test_clears_cache_when_torch_available(self, caplog):
         """Test that torch.cuda.empty_cache() is called when torch is available."""
-        import unittest.mock
         import logging
+        import unittest.mock
 
         caplog.set_level(logging.DEBUG)
 
@@ -183,7 +185,8 @@ class TestClearGpuCacheBetweenSubprocesses:
             clear_gpu_cache_between_subprocesses()
             # Should not raise exception
             assert (
-                "cache cleared" in caplog.text.lower() or "torch" in caplog.text.lower()
+                "cache cleared" in caplog.text.lower()
+                or "torch" in caplog.text.lower()
             )
 
 
@@ -194,51 +197,55 @@ class TestCollectTimingEnvironmentSnapshot:
         """Test that snapshot dict has required keys."""
         import unittest.mock
 
-        with unittest.mock.patch(
-            "sol_execbench.core.bench.timing_isolation.detect_concurrent_gpu_processes",
-            return_value=[],
-        ):
-            with unittest.mock.patch(
+        with (
+            unittest.mock.patch(
+                "sol_execbench.core.bench.timing_isolation.detect_concurrent_gpu_processes",
+                return_value=[],
+            ),
+            unittest.mock.patch(
                 "sol_execbench.core.bench.clock_lock.are_clocks_locked",
                 return_value=False,
-            ):
-                with unittest.mock.patch(
-                    "sol_execbench.core.platform.environment.collect_environment_snapshot",
-                    return_value=self._mock_snapshot(),
-                ):
-                    snapshot = collect_timing_environment_snapshot()
+            ),
+            unittest.mock.patch(
+                "sol_execbench.core.platform.environment.collect_environment_snapshot",
+                return_value=self._mock_snapshot(),
+            ),
+        ):
+            snapshot = collect_timing_environment_snapshot()
 
-                    assert "schema_version" in snapshot
-                    assert "generated_at" in snapshot
-                    assert "gpu_processes" in snapshot
-                    assert "clocks_locked" in snapshot
-                    assert "tools_available" in snapshot
-                    assert "warnings" in snapshot
+            assert "schema_version" in snapshot
+            assert "generated_at" in snapshot
+            assert "gpu_processes" in snapshot
+            assert "clocks_locked" in snapshot
+            assert "tools_available" in snapshot
+            assert "warnings" in snapshot
 
     def test_schema_version(self):
         """Test that schema version is set correctly."""
         import unittest.mock
 
-        with unittest.mock.patch(
-            "sol_execbench.core.bench.timing_isolation.detect_concurrent_gpu_processes",
-            return_value=[],
-        ):
-            with unittest.mock.patch(
+        with (
+            unittest.mock.patch(
+                "sol_execbench.core.bench.timing_isolation.detect_concurrent_gpu_processes",
+                return_value=[],
+            ),
+            unittest.mock.patch(
                 "sol_execbench.core.bench.clock_lock.are_clocks_locked",
                 return_value=False,
-            ):
-                with unittest.mock.patch(
-                    "sol_execbench.core.platform.environment.collect_environment_snapshot",
-                    return_value=self._mock_snapshot(),
-                ):
-                    snapshot = collect_timing_environment_snapshot()
-                    assert (
-                        snapshot["schema_version"]
-                        == "sol_execbench.timing_isolation_snapshot.v1"
-                    )
+            ),
+            unittest.mock.patch(
+                "sol_execbench.core.platform.environment.collect_environment_snapshot",
+                return_value=self._mock_snapshot(),
+            ),
+        ):
+            snapshot = collect_timing_environment_snapshot()
+            assert (
+                snapshot["schema_version"]
+                == "sol_execbench.timing_isolation_snapshot.v1"
+            )
 
     def _mock_snapshot(self):
-        """Helper to create a mock environment snapshot."""
+        """Create a mock environment snapshot."""
         from sol_execbench.core.platform.environment import EnvironmentSnapshot
 
         return EnvironmentSnapshot(
@@ -252,54 +259,56 @@ class TestIntegrationPreflightAudit:
 
     def test_preflight_audit_flow(self, caplog):
         """Test complete pre-flight audit: detection → verification → snapshot."""
-        import unittest.mock
         import logging
+        import unittest.mock
+
         from sol_execbench.core.bench import timing_isolation
 
         caplog.set_level(logging.INFO)
 
-        with unittest.mock.patch.object(
-            timing_isolation,
-            "detect_concurrent_gpu_processes",
-            return_value=[{"pid": 12345, "device": "0000:01:00.1", "name": "python"}],
-        ):
-            with unittest.mock.patch(
+        with (
+            unittest.mock.patch.object(
+                timing_isolation,
+                "detect_concurrent_gpu_processes",
+                return_value=[
+                    {
+                        "pid": 12345,
+                        "device": "0000:01:00.1",
+                        "name": "python",
+                    },
+                ],
+            ),
+            unittest.mock.patch(
                 "sol_execbench.core.bench.clock_lock.verify_clocks",
                 return_value=True,
-            ):
-                with unittest.mock.patch(
-                    "sol_execbench.core.bench.clock_lock.are_clocks_locked",
-                    return_value=True,
-                ):
-                    with unittest.mock.patch(
-                        "sol_execbench.core.platform.environment.collect_environment_snapshot",
-                        return_value=self._mock_snapshot(),
-                    ):
-                        # Step 1: Detect concurrent processes
-                        processes = timing_isolation.detect_concurrent_gpu_processes()
-                        assert len(processes) == 1
+            ),
+            unittest.mock.patch(
+                "sol_execbench.core.bench.clock_lock.are_clocks_locked",
+                return_value=True,
+            ),
+            unittest.mock.patch(
+                "sol_execbench.core.platform.environment.collect_environment_snapshot",
+                return_value=self._mock_snapshot(),
+            ),
+        ):
+            processes = timing_isolation.detect_concurrent_gpu_processes()
+            assert len(processes) == 1
 
-                        # Step 2: Verify clock state
-                        clocks_ok = timing_isolation.verify_clock_state_with_warning(
-                            context="batch_start"
-                        )
-                        assert clocks_ok is True
+            clocks_ok = timing_isolation.verify_clock_state_with_warning(
+                context="batch_start",
+            )
+            assert clocks_ok is True
 
-                        # Step 3: Collect snapshot
-                        snapshot = (
-                            timing_isolation.collect_timing_environment_snapshot()
-                        )
-                        assert (
-                            snapshot["schema_version"]
-                            == "sol_execbench.timing_isolation_snapshot.v1"
-                        )
-
-                        # Verify audit flow completed
-                        assert "concurrent" in caplog.text.lower() or len(processes) > 0
-                        assert "clock" in caplog.text.lower()
+            snapshot = timing_isolation.collect_timing_environment_snapshot()
+            assert (
+                snapshot["schema_version"]
+                == "sol_execbench.timing_isolation_snapshot.v1"
+            )
+            assert "concurrent" in caplog.text.lower() or processes
+            assert "clock" in caplog.text.lower()
 
     def _mock_snapshot(self):
-        """Helper to create a mock environment snapshot."""
+        """Create a mock environment snapshot."""
         from sol_execbench.core.platform.environment import EnvironmentSnapshot
 
         return EnvironmentSnapshot(
@@ -319,7 +328,7 @@ class TestValidateGpuDeviceIsolation:
             [
                 {"gpu": 0, "bdf": "0000:01:00.0"},
                 {"gpu": 1, "bdf": "0000:02:00.0"},
-            ]
+            ],
         )
         with unittest.mock.patch(
             "subprocess.run",
@@ -336,60 +345,72 @@ class TestValidateGpuDeviceIsolation:
         """Single GPU system is always isolated regardless of ROCR_VISIBLE_DEVICES."""
         import unittest.mock
 
-        with unittest.mock.patch(
-            "sol_execbench.core.bench.timing_isolation._detect_gpu_count",
-            return_value=1,
+        with (
+            unittest.mock.patch(
+                "sol_execbench.core.bench.timing_isolation._detect_gpu_count",
+                return_value=1,
+            ),
+            unittest.mock.patch.dict("os.environ", {}, clear=False),
         ):
-            with unittest.mock.patch.dict("os.environ", {}, clear=False):
-                result = validate_gpu_device_isolation()
-                assert result["isolated"] is True
-                assert result["gpu_count"] == 1
+            result = validate_gpu_device_isolation()
+            assert result["isolated"] is True
+            assert result["gpu_count"] == 1
 
     def test_multi_gpu_with_restriction_is_isolated(self):
         """Multi-GPU with ROCR_VISIBLE_DEVICES set is isolated."""
         import unittest.mock
 
-        with unittest.mock.patch(
-            "sol_execbench.core.bench.timing_isolation._detect_gpu_count",
-            return_value=4,
+        with (
+            unittest.mock.patch(
+                "sol_execbench.core.bench.timing_isolation._detect_gpu_count",
+                return_value=4,
+            ),
+            unittest.mock.patch.dict(
+                "os.environ",
+                {"ROCR_VISIBLE_DEVICES": "0"},
+                clear=False,
+            ),
         ):
-            with unittest.mock.patch.dict(
-                "os.environ", {"ROCR_VISIBLE_DEVICES": "0"}, clear=False
-            ):
-                result = validate_gpu_device_isolation()
-                assert result["isolated"] is True
-                assert result["gpu_count"] == 4
-                assert result["rocr_visible_devices"] == "0"
+            result = validate_gpu_device_isolation()
+            assert result["isolated"] is True
+            assert result["gpu_count"] == 4
+            assert result["rocr_visible_devices"] == "0"
 
     def test_multi_gpu_without_restriction_not_isolated(self):
         """Multi-GPU without ROCR_VISIBLE_DEVICES is not isolated."""
         import unittest.mock
 
-        with unittest.mock.patch(
-            "sol_execbench.core.bench.timing_isolation._detect_gpu_count",
-            return_value=4,
+        with (
+            unittest.mock.patch(
+                "sol_execbench.core.bench.timing_isolation._detect_gpu_count",
+                return_value=4,
+            ),
+            unittest.mock.patch.dict("os.environ", {}, clear=False),
         ):
-            with unittest.mock.patch.dict("os.environ", {}, clear=False):
-                # Ensure ROCR_VISIBLE_DEVICES is not set
-                os.environ.pop("ROCR_VISIBLE_DEVICES", None)
-                result = validate_gpu_device_isolation()
-                assert result["isolated"] is False
-                assert result["gpu_count"] == 4
-                assert any("multi_gpu_no_restriction" in w for w in result["warnings"])
+            # Ensure ROCR_VISIBLE_DEVICES is not set
+            os.environ.pop("ROCR_VISIBLE_DEVICES", None)
+            result = validate_gpu_device_isolation()
+            assert result["isolated"] is False
+            assert result["gpu_count"] == 4
+            assert any(
+                "multi_gpu_no_restriction" in w for w in result["warnings"]
+            )
 
     def test_gpu_device_sets_env_var(self):
         """Providing gpu_device sets ROCR_VISIBLE_DEVICES."""
         import unittest.mock
 
-        with unittest.mock.patch(
-            "sol_execbench.core.bench.timing_isolation._detect_gpu_count",
-            return_value=2,
+        with (
+            unittest.mock.patch(
+                "sol_execbench.core.bench.timing_isolation._detect_gpu_count",
+                return_value=2,
+            ),
+            unittest.mock.patch.dict("os.environ", {}, clear=False),
         ):
-            with unittest.mock.patch.dict("os.environ", {}, clear=False):
-                result = validate_gpu_device_isolation(gpu_device=1)
-                assert result["isolated"] is True
-                assert result["gpu_device_set"] is True
-                assert os.environ.get("ROCR_VISIBLE_DEVICES") == "1"
+            result = validate_gpu_device_isolation(gpu_device=1)
+            assert result["isolated"] is True
+            assert result["gpu_device_set"] is True
+            assert os.environ.get("ROCR_VISIBLE_DEVICES") == "1"
 
     def test_gpu_count_unknown(self):
         """Unknown GPU count (amd-smi unavailable) generates warning."""

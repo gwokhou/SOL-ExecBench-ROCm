@@ -10,9 +10,9 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import subprocess
 import tempfile
+from pathlib import Path
 
 
 def _sha256(path: Path) -> str:
@@ -69,6 +69,7 @@ def _arguments() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Write verified provenance for a pinned Orojenesis build."""
     args = _arguments()
     home = args.home.resolve()
     mapper = home / "bin" / "timeloop-mapper"
@@ -111,7 +112,10 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=args.output.parent, delete=False
+        "w",
+        encoding="utf-8",
+        dir=args.output.parent,
+        delete=False,
     ) as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
         handle.write("\n")

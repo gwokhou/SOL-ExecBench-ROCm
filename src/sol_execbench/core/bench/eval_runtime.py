@@ -9,18 +9,18 @@ import json
 import linecache
 import os
 import statistics
-from functools import partial
 import sys
 import time
 import types
+from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable
+from typing import Any
 
-from sol_execbench.core.bench.reward_hack import RewardHackDetected
-from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES
-from sol_execbench.core.data.solution import Solution
+from sol_execbench.core.bench.reward_hack import RewardHackError
+from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES, Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.platform.runtime import CacheClearPolicy
 
@@ -119,9 +119,9 @@ def measure_latency(
             validator=validator,
         )
         return _timing_result(latency_raw, rep, min_measurement_time_seconds)
-    except RewardHackDetected:
+    except RewardHackError:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- injected timer boundary
         return TimingResult(latency_ms=0.0, failure=f"Timing failed: {exc}")
 
 
@@ -166,7 +166,9 @@ def _timing_result(
 ) -> TimingResult:
     """Normalize the timing helper's scalar or per-iteration return contract."""
     if isinstance(value, (list, tuple)):
-        if not value or not all(isinstance(item, (int, float)) for item in value):
+        if not value or not all(
+            isinstance(item, (int, float)) for item in value
+        ):
             return TimingResult(
                 latency_ms=0.0,
                 failure="Timing returned invalid sample sequence",
@@ -196,14 +198,14 @@ def load_staged_problem(
     if not definition_path.exists():
         raise RuntimeError(
             "definition.json not found in staging directory — "
-            "client must supply definition and workloads inline"
+            "client must supply definition and workloads inline",
         )
 
     definition = json.loads(definition_path.read_text())
     workloads: list[dict[str, Any]] = []
     if workload_path.exists():
-        for line in workload_path.read_text().splitlines():
-            line = line.strip()
+        for raw_line in workload_path.read_text().splitlines():
+            line = raw_line.strip()
             if line:
                 workloads.append(json.loads(line))
     return definition, workloads
@@ -226,7 +228,7 @@ def run_reward_hack_check(
     """Run a reward-hack check and return the detected message, if any."""
     try:
         check_fn(*args)
-    except RewardHackDetected as exc:
+    except RewardHackError as exc:
         return str(exc)
     except Exception:
         if not suppress_errors:
@@ -296,17 +298,26 @@ def load_reference_function(reference_code: str) -> tuple[Any, Any]:
                 reference_code.splitlines(keepends=True),
                 str(ref_file),
             )
-            ref_spec = importlib.util.spec_from_file_location("_reference", ref_file)
+            ref_spec = importlib.util.spec_from_file_location(
+                "_reference",
+                ref_file,
+            )
             if ref_spec is None or ref_spec.loader is None:
-                raise RuntimeError("Unable to create module spec for reference code")
+                raise RuntimeError(
+                    "Unable to create module spec for reference code",
+                )
             ref_module = importlib.util.module_from_spec(ref_spec)
             ref_spec.loader.exec_module(ref_module)
     except Exception as ref_err:
-        raise RuntimeError(f"Failed to exec reference code: {ref_err}") from ref_err
+        raise RuntimeError(
+            f"Failed to exec reference code: {ref_err}",
+        ) from ref_err
 
     ref_fn = vars(ref_module).get("run")
     if ref_fn is None:
-        raise RuntimeError("Reference code does not define a top-level 'run' function")
+        raise RuntimeError(
+            "Reference code does not define a top-level 'run' function",
+        )
     return ref_module, ref_fn
 
 
@@ -344,14 +355,19 @@ def measure_reference_latency(
         )
     return ReferenceTimingResult(
         latency_ms=0.0,
-        failure=result.failure.replace("Timing failed", "Reference timing failed", 1),
+        failure=result.failure.replace(
+            "Timing failed",
+            "Reference timing failed",
+            1,
+        ),
     )
 
 
 def solution_uses_native_rocm(solution: Solution) -> bool:
     """Return whether a solution should load a compiled native ROCm module."""
     return any(
-        language in NATIVE_ROCM_LANGUAGES for language in solution.spec.languages
+        language in NATIVE_ROCM_LANGUAGES
+        for language in solution.spec.languages
     )
 
 
@@ -363,22 +379,35 @@ def block_cpp_extension_load() -> None:
         raise RuntimeError(
             "torch.utils.cpp_extension.load() and load_inline() are not permitted "
             'on the GPU server. Use a native HIP language (e.g. "hip_cpp") in your '
-            "solution spec to compile on the compile server."
+            "solution spec to compile on the compile server.",
         )
 
-    setattr(cpp_ext, "load", blocked_cpp_ext_load)
-    setattr(cpp_ext, "load_inline", blocked_cpp_ext_load)
+    setattr(  # noqa: B010 -- Security boundary replaces a dynamic module hook
+        cpp_ext,
+        "load",
+        blocked_cpp_ext_load,
+    )
+    setattr(  # noqa: B010 -- Security boundary replaces a dynamic module hook
+        cpp_ext,
+        "load_inline",
+        blocked_cpp_ext_load,
+    )
 
 
 def load_user_function(solution: Solution, staging_dir: Path) -> Any:
     """Resolve and return the submitted solution entry-point function."""
-    entry_module_or_file, entry_func_name = parse_entry_point(solution.spec.entry_point)
+    entry_module_or_file, entry_func_name = parse_entry_point(
+        solution.spec.entry_point,
+    )
 
     if solution_uses_native_rocm(solution):
         so_path = staging_dir / "benchmark_kernel.so"
         if not so_path.exists():
             raise RuntimeError(f"benchmark_kernel.so not found at {so_path}")
-        spec_obj = importlib.util.spec_from_file_location("benchmark_kernel", so_path)
+        spec_obj = importlib.util.spec_from_file_location(
+            "benchmark_kernel",
+            so_path,
+        )
         if spec_obj is None or spec_obj.loader is None:
             raise RuntimeError(f"Unable to create module spec for {so_path}")
         user_mod = importlib.util.module_from_spec(spec_obj)

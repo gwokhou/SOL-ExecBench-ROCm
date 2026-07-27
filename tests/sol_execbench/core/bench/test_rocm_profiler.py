@@ -6,12 +6,12 @@ from collections.abc import Sequence
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3CollectionRequest,
     Rocprofv3ProfileRequest,
-    build_rocprofv3_profile_command,
     build_rocprofv3_command,
+    build_rocprofv3_profile_command,
     build_timing_evidence,
     collect_rocprofv3_profile,
-    discover_rocprofv3_artifacts,
     collect_rocprofv3_timing,
+    discover_rocprofv3_artifacts,
     parse_rocprofv3_csv,
     select_default_timing,
 )
@@ -20,7 +20,6 @@ from sol_execbench.core.bench.timing_policy import (
     TimingSourceType,
     select_timing_policy,
 )
-
 
 ROCPROFV3_CSV = """Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)
 KERNEL_DISPATCH,rmsnorm_kernel,1000,5000,4000
@@ -48,7 +47,12 @@ def test_build_rocprofv3_command_places_application_after_separator():
         "--output-file",
         "timing",
     ]
-    assert command[separator_index + 1 :] == ["uv", "run", "sol-execbench", "problem"]
+    assert command[separator_index + 1 :] == [
+        "uv",
+        "run",
+        "sol-execbench",
+        "problem",
+    ]
 
 
 def test_build_rocprofv3_profile_command_prefers_rocpd_artifacts():
@@ -113,7 +117,9 @@ def test_profile_artifact_discovery_accepts_unprefixed_rocprofv3_root_outputs(
     ]
 
 
-def test_profile_artifact_discovery_recurses_and_filters_known_outputs(tmp_path):
+def test_profile_artifact_discovery_recurses_and_filters_known_outputs(
+    tmp_path,
+):
     profile_dir = tmp_path / "profile"
     profile_dir.mkdir()
     (profile_dir / "profile.rocpd").write_text("db")
@@ -197,7 +203,8 @@ def test_profile_collection_records_success_metadata(tmp_path):
 
 
 def test_default_profile_collection_requests_graceful_eval_driver_exit(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ):
     captured_env: dict[str, str] = {}
 
@@ -231,7 +238,9 @@ def test_default_profile_collection_requests_graceful_eval_driver_exit(
 
 def test_profile_collection_unavailable_is_nonfatal_metadata(tmp_path):
     def runner(
-        command: Sequence[str], cwd, timeout
+        command: Sequence[str],
+        cwd,
+        timeout,
     ) -> subprocess.CompletedProcess[str]:
         raise AssertionError(f"runner should not be called: {command}")
 
@@ -282,14 +291,16 @@ def test_profile_collection_failure_records_artifact_and_stderr_tail(tmp_path):
 
     assert result.status == "failed"
     assert payload["returncode"] == 22
-    assert payload["failed_reason"] == "rocprofv3 command failed with exit code 22"
+    assert (
+        payload["failed_reason"] == "rocprofv3 command failed with exit code 22"
+    )
     assert payload["artifact_coverage_status"] == "partial"
     assert payload["reason_codes"] == [
         "rocprof_command_failed",
         "rocprof_partial_artifact_coverage",
     ]
     assert payload["warnings"] == [
-        "rocprofv3 registered artifacts, but coverage is incomplete or only opaque artifacts were discovered"
+        "rocprofv3 registered artifacts, but coverage is incomplete or only opaque artifacts were discovered",
     ]
     assert payload["stderr_tail"] == "profiler failed"
     assert payload["artifacts"][0]["kind"] == "trace_csv"
@@ -327,7 +338,7 @@ def test_profile_collection_no_artifacts_records_stable_reason_code(tmp_path):
     assert payload["output_format"] == "rocpd"
     assert payload["profiler_data_artifacts"] is False
     assert payload["output_directory_listing"] == [
-        f"profile.diagnostics.json:{(tmp_path / 'profile.diagnostics.json').stat().st_size}"
+        f"profile.diagnostics.json:{(tmp_path / 'profile.diagnostics.json').stat().st_size}",
     ]
     assert "rocprof_no_registered_artifacts" in payload["reason_codes"]
 
@@ -366,22 +377,24 @@ def test_profile_collection_no_profiler_data_registers_diagnostic_log(tmp_path):
         "rocprof_diagnostic_log_registered",
     ]
     assert payload["warnings"] == [
-        "rocprofv3 returned success but produced no profiler data artifacts"
+        "rocprofv3 returned success but produced no profiler data artifacts",
     ]
     assert payload["artifacts"] == [
         {
             "kind": "diagnostic_json",
             "path": str(tmp_path / "profile.diagnostics.json"),
-            "size_bytes": (tmp_path / "profile.diagnostics.json").stat().st_size,
-        }
+            "size_bytes": (tmp_path / "profile.diagnostics.json")
+            .stat()
+            .st_size,
+        },
     ]
     diagnostic_payload = (tmp_path / "profile.diagnostics.json").read_text(
-        encoding="utf-8"
+        encoding="utf-8",
     )
     assert "rocprof output generation without files" in diagnostic_payload
     assert '"output_format": "rocpd"' in diagnostic_payload
     assert payload["output_directory_listing"] == [
-        f"profile.diagnostics.json:{(tmp_path / 'profile.diagnostics.json').stat().st_size}"
+        f"profile.diagnostics.json:{(tmp_path / 'profile.diagnostics.json').stat().st_size}",
     ]
 
 
@@ -424,18 +437,20 @@ def test_profile_collection_existing_diagnostic_log_does_not_count_as_success(
         "rocprof_diagnostic_log_registered",
     ]
     assert payload["warnings"] == [
-        "rocprofv3 returned success but produced no profiler data artifacts"
+        "rocprofv3 returned success but produced no profiler data artifacts",
     ]
     assert payload["artifacts"] == [
         {
             "kind": "diagnostic_json",
             "path": str(diagnostic),
             "size_bytes": diagnostic.stat().st_size,
-        }
+        },
     ]
     diagnostic_payload = diagnostic.read_text(encoding="utf-8")
     assert "stale-diagnostic" not in diagnostic_payload
-    assert "rocprof initialized but generated no data files" in diagnostic_payload
+    assert (
+        "rocprof initialized but generated no data files" in diagnostic_payload
+    )
     assert '"generated_at":' in diagnostic_payload
 
 
@@ -448,9 +463,11 @@ def test_parse_rocprofv3_csv_keeps_domains_separate():
         "post_kernel",
     ]
     assert [row.name for row in rows if not row.is_kernel_activity] == [
-        "hipLaunchKernel"
+        "hipLaunchKernel",
     ]
-    assert sum(row.duration_ms for row in rows if row.is_kernel_activity) == 0.007
+    assert (
+        sum(row.duration_ms for row in rows if row.is_kernel_activity) == 0.007
+    )
 
 
 def test_timing_evidence_contains_auditable_profiler_fields():
@@ -542,7 +559,11 @@ def test_live_collection_invokes_runner_and_reads_generated_csv(tmp_path):
 
     assert result.profiler_collected is True
     assert calls
-    assert calls[0][:3] == ["rocprofv3", "--kernel-trace", "--hip-runtime-trace"]
+    assert calls[0][:3] == [
+        "rocprofv3",
+        "--kernel-trace",
+        "--hip-runtime-trace",
+    ]
     assert calls[0][-4:] == ["uv", "run", "sol-execbench", "problem"]
     assert result.evidence is not None
     assert result.evidence.kernel_duration_ms == 0.007
@@ -552,7 +573,8 @@ def test_live_collection_invokes_runner_and_reads_generated_csv(tmp_path):
 
 
 def test_default_live_collection_requests_graceful_eval_driver_exit(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ):
     captured_env: dict[str, str] = {}
 
@@ -586,7 +608,8 @@ def test_default_live_collection_requests_graceful_eval_driver_exit(
 
 
 def test_default_live_collection_passes_timeout_to_bounded_runner(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ):
     captured_timeout: list[float | None] = []
 
@@ -650,10 +673,12 @@ def test_live_collection_labels_profiler_timeout_as_fallback(tmp_path):
 
 def test_live_collection_prefers_kernel_trace_csv(tmp_path):
     def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        (tmp_path / "timing_agent_info.csv").write_text("Name,Value\nagent,gfx1200\n")
+        (tmp_path / "timing_agent_info.csv").write_text(
+            "Name,Value\nagent,gfx1200\n",
+        )
         (tmp_path / "timing_hip_api_trace.csv").write_text(
             "Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)\n"
-            "HIP_RUNTIME_API,hipLaunchKernel,1,2,1\n"
+            "HIP_RUNTIME_API,hipLaunchKernel,1,2,1\n",
         )
         (tmp_path / "timing_kernel_trace.csv").write_text(ROCPROFV3_CSV)
         return subprocess.CompletedProcess(
@@ -682,10 +707,12 @@ def test_live_collection_prefers_kernel_trace_csv(tmp_path):
 
 def test_live_collection_rejects_kernel_policy_without_kernel_rows(tmp_path):
     def runner(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        (tmp_path / "timing_agent_info.csv").write_text("Name,Value\nagent,gfx1200\n")
+        (tmp_path / "timing_agent_info.csv").write_text(
+            "Name,Value\nagent,gfx1200\n",
+        )
         (tmp_path / "timing_hip_api_trace.csv").write_text(
             "Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)\n"
-            "HIP_RUNTIME_API,hipLaunchKernel,1,2,1\n"
+            "HIP_RUNTIME_API,hipLaunchKernel,1,2,1\n",
         )
         return subprocess.CompletedProcess(
             args=list(command),

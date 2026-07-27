@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .problem_packager import ProblemPackager
+"""Execution-driver public API."""
+
+from sol_execbench.driver.problem_packager import ProblemPackager
 
 __all__ = ["ProblemPackager"]

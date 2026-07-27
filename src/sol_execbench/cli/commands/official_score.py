@@ -10,15 +10,21 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from sol_execbench.cli.protocol import EXIT_RESULT_FAILED, CliFailure, CliResult
-from sol_execbench.cli.protocol import artifact
+from sol_execbench.cli.protocol import (
+    EXIT_RESULT_FAILED,
+    CliFailure,
+    CliResult,
+    artifact,
+)
+from sol_execbench.core.scoring.official_scoring import (
+    official_score_availability,
+)
 from sol_execbench.core.scoring.release_assembly import (
     assemble_release_bundle,
     build_run_statement,
 )
 from sol_execbench.core.scoring.release_builders import load_execution_plan
 from sol_execbench.core.scoring.release_models import ReleaseArtifactKind
-from sol_execbench.core.scoring.official_scoring import official_score_availability
 from sol_execbench.core.scoring.release_verifier import verify_and_score_release
 
 console = Console(stderr=True)
@@ -43,21 +49,21 @@ def official_score_status_cli(manifest_path: Path) -> CliResult:
     if not report["policy"]["authorized"]:
         console.print(
             "[yellow]Official-score policy is not authorized: "
-            f"{report['policy']['reason_code']}.[/yellow]"
+            f"{report['policy']['reason_code']}.[/yellow]",
         )
     elif not report["producer"]["ready"]:
         console.print(
             "[yellow]Official-score verifier is available, but release production "
-            f"is blocked: {report['producer']['reason_code']}.[/yellow]"
+            f"is blocked: {report['producer']['reason_code']}.[/yellow]",
         )
     elif not report["published_release"]["available"]:
         console.print(
             "[yellow]Official-score verifier and producer are ready, but no "
-            "repository release bundle is published.[/yellow]"
+            "repository release bundle is published.[/yellow]",
         )
     else:
         console.print(
-            "[green]A repository official-score release is published.[/green]"
+            "[green]A repository official-score release is published.[/green]",
         )
     return CliResult(data=report)
 
@@ -89,7 +95,9 @@ def official_score_cli(bundle: Path, manifest_path: Path) -> CliResult:
             hint="Verify every content-addressed artifact and the pinned corpus.",
         ) from exc
     report = result.to_dict()
-    console.print(f"[green]Official SOL score: {result.suite.score:.9g}[/green]")
+    console.print(
+        f"[green]Official SOL score: {result.suite.score:.9g}[/green]",
+    )
     return CliResult(data=report)
 
 
@@ -145,7 +153,8 @@ def assemble_bundle_cli(workspace: Path, manifest_path: Path) -> CliResult:
     """Verify publisher statements and assemble the release bundle."""
     root = workspace.resolve()
     statements = {
-        kind: root / "statements" / f"{kind}.json" for kind in ReleaseArtifactKind
+        kind: root / "statements" / f"{kind}.json"
+        for kind in ReleaseArtifactKind
     }
     try:
         path = assemble_release_bundle(

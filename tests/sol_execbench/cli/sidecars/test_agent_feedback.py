@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sol_execbench.cli.sidecars import agent_feedback as cli_agent_feedback_sidecar
+from sol_execbench.cli.sidecars import (
+    agent_feedback as cli_agent_feedback_sidecar,
+)
 from sol_execbench.core.data.solution import (
     BuildSpec,
     Solution,
@@ -17,8 +19,7 @@ from sol_execbench.core.data.trace import (
     EvaluationStatus,
     Trace,
 )
-from sol_execbench.core.data.workload import ScalarInput
-from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload import ScalarInput, Workload
 
 
 def _solution(source: str = "def run(x):\n    return x\n") -> Solution:
@@ -46,7 +47,10 @@ def _trace() -> Trace:
         ),
         evaluation=Evaluation(
             status=EvaluationStatus.COMPILE_ERROR,
-            environment=Environment(hardware="AMD gfx1200", libs={"hip": "7.0"}),
+            environment=Environment(
+                hardware="AMD gfx1200",
+                libs={"hip": "7.0"},
+            ),
             timestamp="2026-06-16T00:00:00Z",
         ),
     )
@@ -81,7 +85,7 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
                 source_sha256="source-sha",
                 sol_version="custom-sol-tag",
             ),
-        )
+        ),
     )
 
     assert written == tmp_path / "trace.jsonl.agent-feedback.json"
@@ -112,7 +116,7 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
             "path": "trace.jsonl",
             "sha256": trace_citations[0]["sha256"],
             "status": None,
-        }
+        },
     ]
     assert trace_citations[0]["sha256"] is not None
     assert len(trace_citations[0]["sha256"]) == 64
@@ -133,24 +137,28 @@ def test_agent_feedback_identity_uses_solution_source_hash(tmp_path: Path):
             solution=first,
             profile_result=None,
             static_evidence=None,
+        ),
+    )
+    second_identity = (
+        cli_agent_feedback_sidecar._agent_feedback_identity_fields(
+            cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
+                output_file=output,
+                traces=[trace],
+                solution=second,
+                profile_result=None,
+                static_evidence=None,
+            ),
         )
     )
-    second_identity = cli_agent_feedback_sidecar._agent_feedback_identity_fields(
-        cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
-            output_file=output,
-            traces=[trace],
-            solution=second,
-            profile_result=None,
-            static_evidence=None,
-        )
-    )
-    no_solution_identity = cli_agent_feedback_sidecar._agent_feedback_identity_fields(
-        cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
-            output_file=output,
-            traces=[trace],
-            solution=None,
-            profile_result=None,
-            static_evidence=None,
+    no_solution_identity = (
+        cli_agent_feedback_sidecar._agent_feedback_identity_fields(
+            cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
+                output_file=output,
+                traces=[trace],
+                solution=None,
+                profile_result=None,
+                static_evidence=None,
+            ),
         )
     )
 
@@ -167,7 +175,9 @@ def test_agent_feedback_identity_uses_solution_source_hash(tmp_path: Path):
     assert not hasattr(no_solution_identity, "source_hash")
 
 
-def test_agent_feedback_identity_accepts_consumer_identity_fields(tmp_path: Path):
+def test_agent_feedback_identity_accepts_consumer_identity_fields(
+    tmp_path: Path,
+):
     output = tmp_path / "trace.jsonl"
     output.write_text('{"definition":"toy"}\n')
     trace = _trace()
@@ -185,7 +195,7 @@ def test_agent_feedback_identity_accepts_consumer_identity_fields(tmp_path: Path
                 candidate_id="candidate-sha",
                 source_sha256="source-sha",
             ),
-        )
+        ),
     )
 
     assert identity == cli_agent_feedback_sidecar.ResolvedAgentFeedbackIdentity(

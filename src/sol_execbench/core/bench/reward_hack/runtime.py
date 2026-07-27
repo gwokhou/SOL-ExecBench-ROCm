@@ -26,12 +26,11 @@ from __future__ import annotations
 
 import _thread
 import threading
-from typing import Any, List
+from typing import Any
 
 import torch
 
-from sol_execbench.core.bench.reward_hack.models import RewardHackDetected
-
+from sol_execbench.core.bench.reward_hack.models import RewardHackError
 
 _ELAPSED_TIME_ADDR: int | None = None
 
@@ -39,7 +38,7 @@ try:
     import torch.cuda as _tc_init
 
     _ELAPSED_TIME_ADDR = id(_tc_init.Event.elapsed_time)
-except Exception:
+except (AttributeError, RuntimeError):
     pass
 
 
@@ -50,7 +49,8 @@ def check_monkey_patch() -> None:
     module load time.  Must be called before the timed section.
 
     Raises:
-        RewardHackDetected: If the timing function has been replaced.
+        RewardHackError: If the timing function has been replaced.
+
     """
     try:
         import torch.cuda as _tc
@@ -59,12 +59,12 @@ def check_monkey_patch() -> None:
             _ELAPSED_TIME_ADDR is not None
             and id(_tc.Event.elapsed_time) != _ELAPSED_TIME_ADDR
         ):
-            raise RewardHackDetected(
-                "torch.cuda.Event.elapsed_time has been monkey-patched"
+            raise RewardHackError(
+                "torch.cuda.Event.elapsed_time has been monkey-patched",
             )
-    except RewardHackDetected:
+    except RewardHackError:
         raise
-    except Exception:
+    except (AttributeError, RuntimeError):
         pass
 
 
@@ -75,12 +75,13 @@ def check_thread_injection(threads_before: int, threads_after: int) -> None:
     pass both values here.
 
     Raises:
-        RewardHackDetected: If the thread count increased.
+        RewardHackError: If the thread count increased.
+
     """
     if threads_after > threads_before:
-        raise RewardHackDetected(
+        raise RewardHackError(
             f"Thread injection detected: "
-            f"{threads_after} threads after call vs {threads_before} before"
+            f"{threads_after} threads after call vs {threads_before} before",
         )
 
 
@@ -101,6 +102,7 @@ class ThreadInjectionMonitor:
     """
 
     def __init__(self, interval_s: float = 0.001) -> None:
+        """Initialize a monitor with a positive sampling interval."""
         if interval_s <= 0:
             raise ValueError("thread sampling interval must be positive")
         self._interval = interval_s
@@ -115,7 +117,8 @@ class ThreadInjectionMonitor:
         self._original_threading_raw_start: Any = None
         self._thread_start_wrapper: Any = None
 
-    def __enter__(self) -> "ThreadInjectionMonitor":
+    def __enter__(self) -> ThreadInjectionMonitor:
+        """Install thread-start guards and begin sampling."""
         # Baseline is captured before the monitor thread starts, so it does not
         # include the monitor itself.
         self._baseline = threading.active_count()
@@ -136,37 +139,71 @@ class ThreadInjectionMonitor:
         self._original_thread_start = threading.Thread.start
         self._original_raw_start = _thread.start_new_thread
         self._original_threading_raw_start = getattr(
-            threading, "_start_new_thread", None
+            threading,
+            "_start_new_thread",
+            None,
         )
         monitor = self
 
         def guarded_thread_start(
-            thread: threading.Thread, *args: Any, **kwargs: Any
+            thread: threading.Thread,
+            *args: Any,
+            **kwargs: Any,
         ) -> Any:
             return monitor._guard_thread_start(thread, *args, **kwargs)
 
         self._thread_start_wrapper = guarded_thread_start
-        setattr(threading.Thread, "start", guarded_thread_start)
-        setattr(_thread, "start_new_thread", self._guard_raw_start)
+        setattr(  # noqa: B010 -- Guard intentionally replaces a runtime hook
+            threading.Thread,
+            "start",
+            guarded_thread_start,
+        )
+        setattr(  # noqa: B010 -- Guard intentionally replaces a runtime hook
+            _thread,
+            "start_new_thread",
+            self._guard_raw_start,
+        )
         if self._original_threading_raw_start is not None:
-            setattr(threading, "_start_new_thread", self._guard_raw_start)
+            setattr(  # noqa: B010 -- Guard intentionally replaces a runtime hook
+                threading,
+                "_start_new_thread",
+                self._guard_raw_start,
+            )
 
     def _restore_start_guards(self) -> None:
         if self._original_thread_start is not None:
-            setattr(threading.Thread, "start", self._original_thread_start)
+            setattr(  # noqa: B010 -- Restore the guarded runtime hook
+                threading.Thread,
+                "start",
+                self._original_thread_start,
+            )
         if self._original_raw_start is not None:
-            setattr(_thread, "start_new_thread", self._original_raw_start)
+            setattr(  # noqa: B010 -- Restore the guarded runtime hook
+                _thread,
+                "start_new_thread",
+                self._original_raw_start,
+            )
         if self._original_threading_raw_start is not None:
-            setattr(threading, "_start_new_thread", self._original_threading_raw_start)
+            setattr(  # noqa: B010 -- Restore the guarded runtime hook
+                threading,
+                "_start_new_thread",
+                self._original_threading_raw_start,
+            )
 
     def _guard_thread_start(
-        self, thread: threading.Thread, *args: Any, **kwargs: Any
+        self,
+        thread: threading.Thread,
+        *args: Any,
+        **kwargs: Any,
     ) -> Any:
         self._starts_observed += 1
         return self._original_thread_start(thread, *args, **kwargs)
 
     def _guard_raw_start(
-        self, function: Any, args: tuple[Any, ...], kwargs: dict[str, Any] | None = None
+        self,
+        function: Any,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any] | None = None,
     ) -> Any:
         self._starts_observed += 1
         return self._original_raw_start(function, args, kwargs or {})
@@ -182,6 +219,7 @@ class ThreadInjectionMonitor:
                 break
 
     def __exit__(self, *exc: object) -> bool:
+        """Stop sampling, restore thread entry points, and propagate errors."""
         self._restore_start_guards()
         self._stop.set()
         if self._thread is not None:
@@ -190,55 +228,65 @@ class ThreadInjectionMonitor:
 
     @property
     def baseline(self) -> int:
+        """Return the active-thread count captured before monitoring."""
         return self._baseline
 
     @property
     def peak(self) -> int:
+        """Return the largest active-thread count observed."""
         return self._peak
 
     @property
     def starts_observed(self) -> int:
+        """Return the number of guarded thread starts observed."""
         return self._starts_observed
 
 
-def check_thread_injection_from_monitor(monitor: ThreadInjectionMonitor) -> None:
+def check_thread_injection_from_monitor(
+    monitor: ThreadInjectionMonitor,
+) -> None:
     """Raise if the monitor observed more threads than its baseline.
 
     Companion to :class:`ThreadInjectionMonitor`: compares the baseline
     captured at monitor entry against the peak sampled during the timed region.
 
     Raises:
-        RewardHackDetected: If the peak thread count exceeded the baseline.
+        RewardHackError: If the peak thread count exceeded the baseline.
+
     """
     if monitor.starts_observed > 0:
-        raise RewardHackDetected(
+        raise RewardHackError(
             "Thread injection detected: "
-            f"{monitor.starts_observed} thread start event(s) during timed execution"
+            f"{monitor.starts_observed} thread start event(s) during timed execution",
         )
     if monitor.peak > monitor.baseline:
-        raise RewardHackDetected(
+        raise RewardHackError(
             f"Thread injection detected: peak {monitor.peak} threads during "
-            f"timed execution vs {monitor.baseline} at baseline"
+            f"timed execution vs {monitor.baseline} at baseline",
         )
 
 
-def check_lazy_outputs(outputs: List[Any]) -> None:
+def check_lazy_outputs(outputs: list[Any]) -> None:
     """Detect lazy/proxy tensors in the user output.
 
     Uses strict ``type()`` equality — not ``isinstance`` — so any subclass
     (including ``FakeTensor``) is rejected.
 
     Raises:
-        RewardHackDetected: If any output is not exactly ``torch.Tensor``.
+        RewardHackError: If any output is not exactly ``torch.Tensor``.
+
     """
     for t in outputs:
         if type(t) is not torch.Tensor:
-            raise RewardHackDetected(
-                f"Lazy evaluation detected: output is {type(t).__name__}, not torch.Tensor"
+            raise RewardHackError(
+                f"Lazy evaluation detected: output is {type(t).__name__}, not torch.Tensor",
             )
 
 
-def snapshot_critical_functions(namespace: dict, names: List[str]) -> dict[str, int]:
+def snapshot_critical_functions(
+    namespace: dict,
+    names: list[str],
+) -> dict[str, int]:
     """Capture ``id()`` of named functions from a namespace.
 
     Call this **before** user code is imported.  Pass the returned dict to
@@ -250,6 +298,7 @@ def snapshot_critical_functions(namespace: dict, names: List[str]) -> dict[str, 
 
     Returns:
         Mapping of name → ``id()`` for each name present in *namespace*.
+
     """
     return {name: id(namespace[name]) for name in names if name in namespace}
 
@@ -265,17 +314,20 @@ def check_eval_integrity(snapshot: dict[str, int], namespace: dict) -> None:
         namespace: The current globals dict to check.
 
     Raises:
-        RewardHackDetected: If any function identity has changed.
+        RewardHackError: If any function identity has changed.
+
     """
     for name, expected_id in snapshot.items():
         current = namespace.get(name)
         if current is None or id(current) != expected_id:
-            raise RewardHackDetected(
-                f"Eval driver integrity violated: '{name}' has been monkey-patched"
+            raise RewardHackError(
+                f"Eval driver integrity violated: '{name}' has been monkey-patched",
             )
 
 
-def _runtime_integrity_namespace(driver_namespace: dict[str, Any]) -> dict[str, Any]:
+def _runtime_integrity_namespace(
+    driver_namespace: dict[str, Any],
+) -> dict[str, Any]:
     import importlib
     import sys
 
@@ -301,14 +353,20 @@ def _runtime_integrity_namespace(driver_namespace: dict[str, Any]) -> dict[str, 
     return namespace
 
 
-def snapshot_runtime_integrity(driver_namespace: dict[str, Any]) -> dict[str, int]:
+def snapshot_runtime_integrity(
+    driver_namespace: dict[str, Any],
+) -> dict[str, int]:
     """Snapshot driver and cross-module timing/correctness functions."""
     namespace = _runtime_integrity_namespace(driver_namespace)
     return snapshot_critical_functions(namespace, list(namespace))
 
 
 def check_runtime_integrity(
-    snapshot: dict[str, int], driver_namespace: dict[str, Any]
+    snapshot: dict[str, int],
+    driver_namespace: dict[str, Any],
 ) -> None:
     """Detect monkey-patching across the complete evaluation call graph."""
-    check_eval_integrity(snapshot, _runtime_integrity_namespace(driver_namespace))
+    check_eval_integrity(
+        snapshot,
+        _runtime_integrity_namespace(driver_namespace),
+    )

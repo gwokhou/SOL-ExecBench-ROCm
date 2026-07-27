@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from types import MappingProxyType
 
 from sol_execbench.core.platform.isa_validation import (
     IsaInstructionRequirement,
@@ -27,21 +27,23 @@ class _Decoder:
                         "group": "Vector ALU",
                         "subgroups": ["WMMA", "Floating Point"],
                     },
-                }
-            ]
+                },
+            ],
         ]
 
 
 class _Isa:
     explorer = _Explorer()
     decoder = _Decoder()
-    provenance: dict[str, Any] = {
-        "family": "rdna4",
-        "release": "fixture",
-        "spec_sha256": "a" * 64,
-        "decoder_version": "1.2.0",
-        "architecture": "AMD RDNA 4",
-    }
+    provenance = MappingProxyType(
+        {
+            "family": "rdna4",
+            "release": "fixture",
+            "spec_sha256": "a" * 64,
+            "decoder_version": "1.2.0",
+            "architecture": "AMD RDNA 4",
+        },
+    )
 
     def __enter__(self):
         return self
@@ -75,4 +77,6 @@ def test_disassembly_analysis_aggregates_functional_groups() -> None:
     assert analysis.decoded_instruction_count == 1
     assert analysis.functional_group_counts == {"Vector ALU": 1}
     assert analysis.observed_matrix_units == ("wmma",)
-    assert analysis.matched_instruction_counts == {"V_WMMA_F32_16X16X16_BF16": 1}
+    assert analysis.matched_instruction_counts == {
+        "V_WMMA_F32_16X16X16_BF16": 1,
+    }

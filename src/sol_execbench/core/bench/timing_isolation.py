@@ -26,13 +26,15 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.platform.amd_smi import parse_gpu_count, parse_processes
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
 logger = logging.getLogger(__name__)
 
-TIMING_ISOLATION_SNAPSHOT_SCHEMA_VERSION = SCHEMA_VERSIONS["timing_isolation_snapshot"]
+TIMING_ISOLATION_SNAPSHOT_SCHEMA_VERSION = SCHEMA_VERSIONS[
+    "timing_isolation_snapshot"
+]
 GPU_ISOLATION_SCHEMA_VERSION = SCHEMA_VERSIONS["gpu_device_isolation"]
 
 
@@ -42,6 +44,7 @@ def _run_amd_smi_json(*arguments: str) -> str:
         capture_output=True,
         text=True,
         timeout=5,
+        check=False,
     )
     if result.returncode != 0:
         raise subprocess.CalledProcessError(
@@ -65,7 +68,9 @@ def detect_concurrent_gpu_processes() -> list[dict[str, Any]]:
     try:
         raw = _run_amd_smi_json("process")
     except FileNotFoundError:
-        logger.warning("amd-smi not found; cannot detect concurrent GPU processes")
+        logger.warning(
+            "amd-smi not found; cannot detect concurrent GPU processes",
+        )
         return []
     except subprocess.TimeoutExpired:
         logger.warning("amd-smi process timed out after 5 seconds")
@@ -91,6 +96,7 @@ def verify_clock_state_with_warning(context: str = "batch_start") -> bool:
 
     Returns:
         ``True`` if clocks are in STABLE_PEAK mode, ``False`` otherwise
+
     """
     from sol_execbench.core.bench.clock_lock import verify_clocks
 
@@ -125,11 +131,11 @@ def clear_gpu_cache_between_subprocesses() -> None:
             logger.debug("GPU cache cleared at subprocess boundary")
         else:
             logger.debug(
-                "torch.cuda.is_available() returned False; skipping cache clear"
+                "torch.cuda.is_available() returned False; skipping cache clear",
             )
     except ImportError:
         logger.debug("torch not available; skipping GPU cache clear")
-    except Exception as e:
+    except RuntimeError as e:
         logger.warning("Failed to clear GPU cache: %s", e)
 
 
@@ -176,23 +182,29 @@ def validate_gpu_device_isolation(
         - ``rocr_visible_devices``: Current ``ROCR_VISIBLE_DEVICES`` value or None
         - ``gpu_device_set``: Whether a specific device was requested and set
         - ``warnings``: List of non-fatal warnings
+
     """
     warnings: list[str] = []
 
     if gpu_device is not None:
         os.environ["ROCR_VISIBLE_DEVICES"] = str(gpu_device)
-        logger.info("Set ROCR_VISIBLE_DEVICES=%d for GPU device isolation", gpu_device)
+        logger.info(
+            "Set ROCR_VISIBLE_DEVICES=%d for GPU device isolation",
+            gpu_device,
+        )
 
     rocr_visible = os.environ.get("ROCR_VISIBLE_DEVICES")
     gpu_count = _detect_gpu_count()
 
     if gpu_count == 0:
-        warnings.append("gpu_count_unknown: amd-smi unavailable or returned no GPUs")
+        warnings.append(
+            "gpu_count_unknown: amd-smi unavailable or returned no GPUs",
+        )
     elif gpu_count > 1 and rocr_visible is None:
         warnings.append(
             f"multi_gpu_no_restriction: {gpu_count} GPUs detected but "
             "ROCR_VISIBLE_DEVICES not set — timing may be affected by "
-            "cross-device interference"
+            "cross-device interference",
         )
 
     isolated = gpu_count <= 1 or rocr_visible is not None
@@ -221,7 +233,9 @@ def collect_timing_environment_snapshot() -> dict[str, Any]:
     The snapshot is designed for JSON serialization in batch summary sidecars.
     """
     from sol_execbench.core.bench.clock_lock import are_clocks_locked
-    from sol_execbench.core.platform.environment import collect_environment_snapshot
+    from sol_execbench.core.platform.environment import (
+        collect_environment_snapshot,
+    )
 
     # Collect base environment snapshot (without PyTorch for speed)
     base_snapshot = collect_environment_snapshot(collect_pytorch=False)
@@ -240,7 +254,7 @@ def collect_timing_environment_snapshot() -> dict[str, Any]:
     warnings = list(base_snapshot.warnings)
     if gpu_processes:
         warnings.append(
-            f"concurrent_gpu_processes: {len(gpu_processes)} process(es) detected"
+            f"concurrent_gpu_processes: {len(gpu_processes)} process(es) detected",
         )
     if not clocks_locked:
         warnings.append("clocks_not_locked: GPU not in STABLE_PEAK mode")

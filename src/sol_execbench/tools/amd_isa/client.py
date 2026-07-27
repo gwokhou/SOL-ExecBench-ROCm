@@ -5,19 +5,20 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
-from pathlib import Path
 import select
 import signal
 import subprocess
 import threading
-from typing import Any, Mapping
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
 
 from sol_execbench.tools.amd_isa.errors import IsaDecodeError, IsaProtocolError
 from sol_execbench.tools.amd_isa.helper import ensure_helper
 from sol_execbench.tools.amd_isa.repository import IsaSpecRepository
-
 
 _MAX_MESSAGE_BYTES = 64 * 1024 * 1024
 
@@ -35,21 +36,30 @@ class Decoder(_Endpoint):
     """Decoder operations backed by ``amdisa::IsaDecoder``."""
 
     def get_instruction(self, name: str) -> Mapping[str, Any]:
+        """Return the named instruction definition."""
         return self._call("get_instruction", name=name)
 
     def decode_machine_code(self, machine_code: int) -> list[Mapping[str, Any]]:
+        """Decode one unsigned 64-bit instruction encoding."""
         if not 0 <= machine_code <= 0xFFFFFFFFFFFFFFFF:
             raise ValueError("machine_code must be an unsigned 64-bit integer")
         return self._call("get_instruction", machine_code=machine_code)
 
     def decode_stream(self, words: list[int]) -> list[list[Mapping[str, Any]]]:
+        """Decode a stream of unsigned 32-bit instruction words."""
         if any(not 0 <= word <= 0xFFFFFFFF for word in words):
-            raise ValueError("instruction words must be unsigned 32-bit integers")
+            raise ValueError(
+                "instruction words must be unsigned 32-bit integers",
+            )
         return self._call("decode_stream", words=words)
 
     def decode_disassembly(
-        self, text: str, *, resolve_direct_branch_targets: bool = False
+        self,
+        text: str,
+        *,
+        resolve_direct_branch_targets: bool = False,
     ) -> list[list[Mapping[str, Any]]]:
+        """Decode textual disassembly into instruction definitions."""
         return self._call(
             "decode_disassembly",
             text=text,
@@ -61,30 +71,39 @@ class Explorer(_Endpoint):
     """Explorer operations backed by ``amdisa::explorer::Spec``."""
 
     def architecture(self) -> Mapping[str, Any]:
+        """Return architecture metadata for the loaded specification."""
         return self._call("architecture")
 
     def list_instructions(self) -> list[Mapping[str, Any]]:
+        """Return every instruction definition."""
         return self._call("list_instructions")
 
     def get_instruction(self, name: str) -> Mapping[str, Any]:
+        """Return the named instruction definition."""
         return self._call("get_instruction", name=name)
 
     def list_data_formats(self) -> list[Mapping[str, Any]]:
+        """Return every declared data format."""
         return self._call("list_data_formats")
 
     def get_data_format(self, name: str) -> Mapping[str, Any]:
+        """Return the named data format."""
         return self._call("get_data_format", name=name)
 
     def list_operand_types(self) -> list[Mapping[str, Any]]:
+        """Return every declared operand type."""
         return self._call("list_operand_types")
 
     def get_operand_type(self, name: str) -> Mapping[str, Any]:
+        """Return the named operand type."""
         return self._call("get_operand_type", name=name)
 
     def list_functional_groups(self) -> list[Mapping[str, Any]]:
+        """Return every declared functional group."""
         return self._call("list_functional_groups")
 
     def get_functional_group(self, name: str) -> Mapping[str, Any]:
+        """Return the named functional group."""
         return self._call("get_functional_group", name=name)
 
 
@@ -99,6 +118,7 @@ class AmdIsa:
         timeout_seconds: float = 120.0,
         provenance: Mapping[str, Any] | None = None,
     ) -> None:
+        """Start a helper process and load an ISA specification."""
         self._process = subprocess.Popen(
             [str(helper)],
             stdin=subprocess.PIPE,
@@ -129,6 +149,7 @@ class AmdIsa:
 
     @property
     def provenance(self) -> Mapping[str, Any]:
+        """Return immutable-by-contract provenance for the loaded specification."""
         return self._provenance
 
     def _call(self, method: str, params: Mapping[str, object]) -> Any:
@@ -154,38 +175,48 @@ class AmdIsa:
                 self._process.stdin.write(encoded + "\n")
                 self._process.stdin.flush()
                 readable, _, _ = select.select(
-                    [self._process.stdout], [], [], self._timeout_seconds
+                    [self._process.stdout],
+                    [],
+                    [],
+                    self._timeout_seconds,
                 )
                 if not readable:
                     raise IsaProtocolError("AMD ISA helper response timed out")
                 raw = self._process.stdout.readline()
             except OSError as exc:
-                raise IsaProtocolError("AMD ISA helper communication failed") from exc
+                raise IsaProtocolError(
+                    "AMD ISA helper communication failed",
+                ) from exc
             if not raw:
-                raise IsaProtocolError("AMD ISA helper closed its response stream")
+                raise IsaProtocolError(
+                    "AMD ISA helper closed its response stream",
+                )
             if len(raw.encode("utf-8")) > _MAX_MESSAGE_BYTES:
                 raise IsaProtocolError(
-                    "AMD ISA helper response exceeds protocol size limit"
+                    "AMD ISA helper response exceeds protocol size limit",
                 )
             try:
                 response = json.loads(raw)
             except json.JSONDecodeError as exc:
-                raise IsaProtocolError("AMD ISA helper returned invalid JSON") from exc
+                raise IsaProtocolError(
+                    "AMD ISA helper returned invalid JSON",
+                ) from exc
             if response.get("id") != request_id:
                 raise IsaProtocolError(
-                    "AMD ISA helper response id does not match request"
+                    "AMD ISA helper response id does not match request",
                 )
             if response.get("ok") is True:
                 return response.get("result")
             error = response.get("error", {})
-            raise IsaDecodeError(str(error.get("message", "AMD ISA operation failed")))
+            raise IsaDecodeError(
+                str(error.get("message", "AMD ISA operation failed")),
+            )
 
     def close(self) -> None:
+        """Shut down the helper process and release its resources."""
         if self._process.poll() is None:
-            try:
+            with contextlib.suppress(IsaDecodeError, IsaProtocolError):
                 self._call("shutdown", {})
-            except (IsaDecodeError, IsaProtocolError):
-                pass
             try:
                 self._process.wait(timeout=2)
             except subprocess.TimeoutExpired:
@@ -197,15 +228,15 @@ class AmdIsa:
                     self._process.wait(timeout=2)
 
     def _terminate_process_group(self, signal_number: int) -> None:
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(self._process.pid, signal_number)
-        except ProcessLookupError:
-            pass
 
     def __enter__(self) -> AmdIsa:
+        """Return this client for context-managed use."""
         return self
 
     def __exit__(self, *_: object) -> None:
+        """Close the helper when leaving a context."""
         self.close()
 
 

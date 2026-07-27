@@ -15,7 +15,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES, SupportedLanguages
+from sol_execbench.core.data.solution import (
+    NATIVE_ROCM_LANGUAGES,
+    SupportedLanguages,
+)
 
 
 class TimingSourceType(StrEnum):
@@ -78,7 +81,9 @@ _PYTHON_LANGUAGES = {
 }
 
 
-def _coerce_language(language: SupportedLanguages | str) -> SupportedLanguages | None:
+def _coerce_language(
+    language: SupportedLanguages | str,
+) -> SupportedLanguages | None:
     if isinstance(language, SupportedLanguages):
         return language
     try:

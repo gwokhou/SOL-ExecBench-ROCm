@@ -18,10 +18,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import select
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -63,7 +63,9 @@ def _start_lock_holder(output_dir: Path) -> subprocess.Popen[str]:
     if ready != "READY":
         holder.kill()
         _stdout, stderr = holder.communicate()
-        raise AssertionError(f"lock holder failed before readiness: {ready} {stderr}")
+        raise AssertionError(
+            f"lock holder failed before readiness: {ready} {stderr}",
+        )
     return holder
 
 
@@ -97,11 +99,12 @@ class TestProcessLock:
     def test_exclusive_acquire(self, tmp_path):
         """Test that second concurrent acquisition exits the process."""
         # First acquisition should succeed
-        with acquire_pid_lock(tmp_path):
-            # Second acquisition should trigger sys.exit(1)
-            with pytest.raises(SystemExit):
-                with acquire_pid_lock(tmp_path):
-                    pass
+        with (
+            acquire_pid_lock(tmp_path),
+            pytest.raises(SystemExit),
+            acquire_pid_lock(tmp_path),
+        ):
+            pass
 
     def test_contention_exits_with_diagnostic(self, tmp_path):
         """Test that subprocess exits with code 1 and prints diagnostic when lock is held."""

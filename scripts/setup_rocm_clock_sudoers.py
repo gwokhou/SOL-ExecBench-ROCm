@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import getpass
 import json
 import os
@@ -17,7 +18,6 @@ import sys
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
-
 
 SUDOERS_PATH = Path("/etc/sudoers.d/sol-execbench-amd-smi")
 SUDOERS_DIR = Path("/etc/sudoers.d")
@@ -72,6 +72,8 @@ Known legacy cleanup:
 
 @dataclass(frozen=True)
 class SudoCommandCheck:
+    """Result of one passwordless sudo policy check."""
+
     command: list[str]
     status: str
     returncode: int | None
@@ -98,7 +100,7 @@ def validate_render_inputs(*, user: str, amd_smi: str, label: str) -> None:
         raise ValueError(f"unsafe sudoers label: {label!r}")
     if _ABSOLUTE_PATH_PATTERN.fullmatch(amd_smi) is None:
         raise ValueError(
-            "amd-smi must be an absolute path containing only safe sudoers characters"
+            "amd-smi must be an absolute path containing only safe sudoers characters",
         )
 
 
@@ -110,9 +112,15 @@ def validate_target_user(user: str) -> None:
         raise ValueError(f"target user does not exist: {user}") from exc
 
 
-def _assert_root_controlled(path: Path, *, follow_symlinks: bool = True) -> None:
+def _assert_root_controlled(
+    path: Path,
+    *,
+    follow_symlinks: bool = True,
+) -> None:
     info = path.stat(follow_symlinks=follow_symlinks)
-    permissions_are_unsafe = not stat.S_ISLNK(info.st_mode) and info.st_mode & 0o022
+    permissions_are_unsafe = (
+        not stat.S_ISLNK(info.st_mode) and info.st_mode & 0o022
+    )
     if info.st_uid != 0 or permissions_are_unsafe:
         raise PermissionError(f"path is not root-controlled: {path}")
 
@@ -129,6 +137,7 @@ def validate_amd_smi_executable(amd_smi: str) -> None:
 
 
 def amd_smi_command_patterns(amd_smi: str) -> list[str]:
+    """Return the exact AMD SMI command patterns allowed by sudoers."""
     return [
         f"{amd_smi} version",
         f"{amd_smi} set -l STABLE_PEAK",
@@ -142,6 +151,7 @@ def render_sudoers(
     amd_smi: str,
     label: str = DEFAULT_LABEL,
 ) -> str:
+    """Render a narrowly scoped sudoers rule for AMD SMI clock control."""
     validate_render_inputs(user=user, amd_smi=amd_smi, label=label)
     patterns = ", \\\n    ".join(amd_smi_command_patterns(amd_smi))
     lines = [
@@ -153,6 +163,7 @@ def render_sudoers(
 
 
 def protected_commands(amd_smi: str) -> list[list[str]]:
+    """Return the clock commands protected by the sudoers rule."""
     return [
         [amd_smi, "version"],
         [amd_smi, "set", "-l", "STABLE_PEAK"],
@@ -163,7 +174,8 @@ def protected_commands(amd_smi: str) -> list[list[str]]:
 def check_commands(amd_smi: str) -> list[list[str]]:
     """Return read-only sudo policy queries, never the protected commands."""
     return [
-        ["sudo", "-n", "-l", "--", *command] for command in protected_commands(amd_smi)
+        ["sudo", "-n", "-l", "--", *command]
+        for command in protected_commands(amd_smi)
     ]
 
 
@@ -191,7 +203,12 @@ def _run_check(command: list[str]) -> SudoCommandCheck:
         status = "password_required"
     elif any(marker in output for marker in _COMMAND_FAILURE_MARKERS):
         status = "command_failed"
-    return SudoCommandCheck(command, status, result.returncode, _tail(stderr.strip()))
+    return SudoCommandCheck(
+        command,
+        status,
+        result.returncode,
+        _tail(stderr.strip()),
+    )
 
 
 def check_passwordless_coverage(amd_smi: str) -> list[SudoCommandCheck]:
@@ -204,7 +221,12 @@ def verify_passwordless_coverage_live(amd_smi: str) -> list[SudoCommandCheck]:
     version, stable_peak, auto = protected_commands(amd_smi)
     results = [_run_check(["sudo", "-n", *version])]
     if results[0].status != "covered":
-        skipped = SudoCommandCheck(stable_peak, "skipped", None, "version check failed")
+        skipped = SudoCommandCheck(
+            stable_peak,
+            "skipped",
+            None,
+            "version check failed",
+        )
         return [
             *results,
             skipped,
@@ -220,17 +242,27 @@ def verify_passwordless_coverage_live(amd_smi: str) -> list[SudoCommandCheck]:
 def _visudo() -> str:
     executable = shutil.which("visudo")
     if executable is None:
-        raise FileNotFoundError("visudo is required to validate sudoers content")
+        raise FileNotFoundError(
+            "visudo is required to validate sudoers content",
+        )
     return executable
 
 
 def validate_sudoers_content(content: str) -> None:
     """Fail closed unless visudo accepts the complete generated content."""
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        delete=False,
+    ) as handle:
         handle.write(content)
         temp_path = Path(handle.name)
     try:
-        subprocess.run([_visudo(), "-cf", str(temp_path)], check=True, timeout=10)
+        subprocess.run(
+            [_visudo(), "-cf", str(temp_path)],
+            check=True,
+            timeout=10,
+        )
     finally:
         temp_path.unlink(missing_ok=True)
 
@@ -245,12 +277,17 @@ def validate_install_destination(path: Path) -> None:
     if path.exists():
         info = path.lstat()
         if not stat.S_ISREG(info.st_mode):
-            raise PermissionError(f"existing sudoers destination is unsafe: {path}")
+            raise PermissionError(
+                f"existing sudoers destination is unsafe: {path}",
+            )
         _assert_root_controlled(path, follow_symlinks=False)
 
 
 def _stage_sudoers(path: Path, content: bytes) -> Path:
-    descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    descriptor, name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        dir=path.parent,
+    )
     staged = Path(name)
     try:
         os.fchmod(descriptor, 0o440)
@@ -259,10 +296,8 @@ def _stage_sudoers(path: Path, content: bytes) -> Path:
             handle.flush()
             os.fsync(handle.fileno())
     except BaseException:
-        try:
+        with contextlib.suppress(OSError):
             os.close(descriptor)
-        except OSError:
-            pass
         staged.unlink(missing_ok=True)
         raise
     return staged
@@ -304,6 +339,7 @@ def install_sudoers(content: str, path: Path = SUDOERS_PATH) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description=__doc__,
         epilog=HELP_EPILOG,
@@ -320,7 +356,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _print_checks(checks: list[SudoCommandCheck], amd_smi: str, as_json: bool) -> bool:
+def _print_checks(
+    checks: list[SudoCommandCheck],
+    amd_smi: str,
+    as_json: bool,
+) -> bool:
     all_covered = all(check.status == "covered" for check in checks)
     payload = {
         "status": "covered" if all_covered else "missing",
@@ -336,10 +376,15 @@ def _print_checks(checks: list[SudoCommandCheck], amd_smi: str, as_json: bool) -
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Validate, render, install, or check the clock sudoers rule."""
     args = parse_args(argv)
     amd_smi = resolve_amd_smi(args.amd_smi)
     try:
-        validate_render_inputs(user=args.user, amd_smi=amd_smi, label=DEFAULT_LABEL)
+        validate_render_inputs(
+            user=args.user,
+            amd_smi=amd_smi,
+            label=DEFAULT_LABEL,
+        )
         validate_target_user(args.user)
         if args.mode != "print":
             validate_amd_smi_executable(amd_smi)
@@ -356,7 +401,7 @@ def main(argv: list[str] | None = None) -> int:
             else check_passwordless_coverage(amd_smi)
         )
         return 0 if _print_checks(checks, amd_smi, args.json) else 1
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- CLI boundary reports all failures
         payload = {"status": "failed", "error": str(exc)}
         if args.json:
             print(json.dumps(payload, sort_keys=True))

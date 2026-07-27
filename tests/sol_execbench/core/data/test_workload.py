@@ -56,7 +56,11 @@ class TestGetScalarInputs:
         wkl = _wkl(
             a={"type": "random"},
             b={"type": "scalar", "value": 7},
-            c={"type": "safetensors", "path": "f.safetensors", "tensor_key": "k"},
+            c={
+                "type": "safetensors",
+                "path": "f.safetensors",
+                "tensor_key": "k",
+            },
         )
         assert wkl.get_scalar_inputs() == {"b": 7}
 

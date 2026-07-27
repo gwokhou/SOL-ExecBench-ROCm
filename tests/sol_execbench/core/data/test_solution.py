@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
+from sol_execbench_type_helpers import make_build_spec
 
 from sol_execbench.core.data.solution import (
     BuildSpec,
@@ -17,15 +18,14 @@ from sol_execbench.core.data.solution import (
     SupportedHardware,
     SupportedLanguages,
 )
-from sol_execbench_type_helpers import make_build_spec
 
 
 def _make_spec(**overrides):
-    base = dict(
-        languages=["triton"],
-        target_hardware=["LOCAL"],
-        entry_point="kernel.py::run",
-    )
+    base = {
+        "languages": ["triton"],
+        "target_hardware": ["LOCAL"],
+        "entry_point": "kernel.py::run",
+    }
     base.update(overrides)
     return make_build_spec(**base)
 
@@ -33,10 +33,14 @@ def _make_spec(**overrides):
 PYTHON_LANGUAGES = ["pytorch", "triton"]
 NATIVE_LANGUAGES = ["hip_cpp", "hipblas", "miopen", "ck", "rocwmma"]
 CDNA3_TARGETS = ["gfx940", "gfx941", "gfx942"]
+
+
 class TestLanguageValidation:
     """BuildSpec accepts only ROCm-native language categories."""
 
-    @pytest.mark.parametrize("langs", [["pytorch"], ["triton"], ["pytorch", "triton"]])
+    @pytest.mark.parametrize(
+        "langs", [["pytorch"], ["triton"], ["pytorch", "triton"]]
+    )
     def test_pure_python_languages_accepted(self, langs):
         spec = _make_spec(languages=langs)
         assert set(spec.languages) == {SupportedLanguages(lg) for lg in langs}
@@ -67,14 +71,16 @@ class TestLanguageValidation:
     )
     def test_mixed_python_and_native_languages_rejected(self, langs):
         with pytest.raises(
-            ValidationError, match="HIP/C\\+\\+ and Python cannot be mixed"
+            ValidationError,
+            match="HIP/C\\+\\+ and Python cannot be mixed",
         ):
             _make_spec(languages=langs, entry_point="kernel.hip::run")
 
     def test_unknown_language_is_rejected_by_closed_enum(self):
         with pytest.raises(ValidationError, match="unsupported_language"):
             _make_spec(
-                languages=["unsupported_language"], entry_point="kernel.hip::run"
+                languages=["unsupported_language"],
+                entry_point="kernel.hip::run",
             )
 
     @pytest.mark.parametrize("lang", [lg.value for lg in SupportedLanguages])
@@ -100,7 +106,8 @@ class TestEntryPointSuffixValidation:
     @pytest.mark.parametrize("lang", NATIVE_LANGUAGES)
     def test_native_language_rejects_py_entry(self, lang):
         with pytest.raises(
-            ValidationError, match="require a .hip or C/C\\+\\+ entry point"
+            ValidationError,
+            match="require a .hip or C/C\\+\\+ entry point",
         ):
             _make_spec(languages=[lang], entry_point="kernel.py::run")
 
@@ -110,10 +117,13 @@ class TestEntryPointSuffixValidation:
             _make_spec(languages=[lang], entry_point="kernel.cu::run")
 
     @pytest.mark.parametrize(
-        "suffix", [".hip", ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp"]
+        "suffix",
+        [".hip", ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp"],
     )
     def test_native_language_accepts_valid_suffixes(self, suffix):
-        spec = _make_spec(languages=["hip_cpp"], entry_point=f"kernel{suffix}::run")
+        spec = _make_spec(
+            languages=["hip_cpp"], entry_point=f"kernel{suffix}::run"
+        )
         assert spec.languages == [SupportedLanguages.HIP_CPP]
 
     @pytest.mark.parametrize("lang", PYTHON_LANGUAGES)
@@ -135,7 +145,8 @@ class TestHardwareAndCompileOptions:
         assert not hasattr(SupportedHardware, "B200")
 
     @pytest.mark.parametrize(
-        "target", ["LOCAL", "gfx1150", "gfx1200", *CDNA3_TARGETS]
+        "target",
+        ["LOCAL", "gfx1150", "gfx1200", *CDNA3_TARGETS],
     )
     def test_rocm_hardware_targets_accepted(self, target):
         spec = _make_spec(target_hardware=[target])
@@ -146,13 +157,16 @@ class TestHardwareAndCompileOptions:
             _make_spec(target_hardware=["gfx950"])
 
     @pytest.mark.parametrize("target", CDNA3_TARGETS)
-    def test_cdna3_targets_are_schema_supported_not_hardware_validated(self, target):
+    def test_cdna3_targets_are_schema_supported_not_hardware_validated(
+        self, target
+    ):
         spec = _make_spec(target_hardware=[target])
         assert spec.target_hardware == [SupportedHardware(target)]
 
     @pytest.mark.parametrize("target", CDNA3_TARGETS)
     def test_cdna3_native_offload_arch_metadata_is_accepted_without_validation_claim(
-        self, target
+        self,
+        target,
     ):
         spec = _make_spec(
             languages=["hip_cpp"],
@@ -173,6 +187,7 @@ class TestHardwareAndCompileOptions:
         assert opts.cflags == []
         assert opts.hip_cflags == ["-O3"]
         assert opts.ld_flags == []
+
     def test_unknown_compile_option_is_rejected(self):
         with pytest.raises(ValidationError, match="extra_forbidden"):
             _make_spec(
@@ -203,7 +218,10 @@ class TestHardwareAndCompileOptions:
 
         assert spec.compile_options is not None
         assert spec.compile_options.cflags == ["-Wall"]
-        assert spec.compile_options.hip_cflags == ["-O3", "--offload-arch=gfx1200"]
+        assert spec.compile_options.hip_cflags == [
+            "-O3",
+            "--offload-arch=gfx1200",
+        ]
         assert spec.compile_options.ld_flags == ["-lrocblas"]
 
     @pytest.mark.parametrize(
@@ -216,10 +234,16 @@ class TestHardwareAndCompileOptions:
             ("hip_cflags", "-fplugin=/tmp/plugin.so", "host paths"),
             ("ld_flags", "-L/usr/local/lib", "host paths"),
             ("ld_flags", "-Wl,-rpath,/tmp/lib", "runtime linker paths"),
-            ("ld_flags", "-Wl,--dynamic-linker=/lib64/ld-linux-x86-64.so.2", "runtime linker paths"),
+            (
+                "ld_flags",
+                "-Wl,--dynamic-linker=/lib64/ld-linux-x86-64.so.2",
+                "runtime linker paths",
+            ),
         ],
     )
-    def test_dangerous_native_compile_options_rejected(self, field, flag, message):
+    def test_dangerous_native_compile_options_rejected(
+        self, field, flag, message
+    ):
         with pytest.raises(ValidationError, match=message):
             _make_spec(
                 languages=["hip_cpp"],
@@ -229,19 +253,20 @@ class TestHardwareAndCompileOptions:
 
 
 class TestSolutionHashCoversBehaviorFields:
-    """The build cache is keyed on solution.hash() (eval_runtime stages under a
-    directory named by the hash prefix), so the hash must cover every field that
-    changes the compiled artifact or runtime behavior -- otherwise two different
-    solutions collide on the same cached build."""
+    """Verify the solution hash covers every behavior field.
+
+    The build cache stages under the hash prefix, so omitted behavior fields
+    would let distinct solutions collide.
+    """
 
     @staticmethod
     def _solution(**spec_overrides: Any):
-        kwargs: dict[str, Any] = dict(
-            languages=[SupportedLanguages.HIP_CPP],
-            target_hardware=[SupportedHardware.GFX1200],
-            entry_point="kernel.hip::run",
-            binding=None,
-        )
+        kwargs: dict[str, Any] = {
+            "languages": [SupportedLanguages.HIP_CPP],
+            "target_hardware": [SupportedHardware.GFX1200],
+            "entry_point": "kernel.hip::run",
+            "binding": None,
+        }
         kwargs.update(spec_overrides)
         return Solution(
             name="sol",
@@ -255,8 +280,8 @@ class TestSolutionHashCoversBehaviorFields:
         base = self._solution()
         with_opts = self._solution(
             compile_options=CompileOptions(
-                hip_cflags=["-O3", "--offload-arch=gfx1200"]
-            )
+                hip_cflags=["-O3", "--offload-arch=gfx1200"],
+            ),
         )
         assert base.hash() != with_opts.hash()
         assert base != with_opts

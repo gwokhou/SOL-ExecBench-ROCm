@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from sol_execbench.cli.evaluation import runtime as evaluation_runtime
 from sol_execbench.cli.evaluation import command as cli_evaluation
+from sol_execbench.cli.evaluation import runtime as evaluation_runtime
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
@@ -143,7 +143,11 @@ def test_run_evaluation_runtime_classifies_timeout(
             stderr=b"partial stderr",
         )
 
-    monkeypatch.setattr(cli_evaluation, "_run_evaluation_command", _raise_timeout)
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_evaluation_command",
+        _raise_timeout,
+    )
 
     result = evaluation_runtime.run_evaluation_runtime(
         packager,
@@ -154,7 +158,10 @@ def test_run_evaluation_runtime_classifies_timeout(
         profile="none",
     )
 
-    assert isinstance(result, evaluation_runtime.EvaluationRuntimeNoTraceFailure)
+    assert isinstance(
+        result,
+        evaluation_runtime.EvaluationRuntimeNoTraceFailure,
+    )
     assert result.reason == "evaluation_timeout"
     assert result.returncode == 124
     assert result.stdout == "partial stdout"
@@ -188,7 +195,10 @@ def test_run_evaluation_runtime_classifies_failure_without_stdout(
         profile="none",
     )
 
-    assert isinstance(result, evaluation_runtime.EvaluationRuntimeNoTraceFailure)
+    assert isinstance(
+        result,
+        evaluation_runtime.EvaluationRuntimeNoTraceFailure,
+    )
     assert result.reason == "evaluation_failed_no_stdout"
     assert result.returncode == 2
     assert result.stdout == " \n"
@@ -222,7 +232,10 @@ def test_run_evaluation_runtime_classifies_no_parseable_traces(
         profile="none",
     )
 
-    assert isinstance(result, evaluation_runtime.EvaluationRuntimeNoTraceFailure)
+    assert isinstance(
+        result,
+        evaluation_runtime.EvaluationRuntimeNoTraceFailure,
+    )
     assert result.reason == "no_parseable_traces"
     assert result.returncode == 0
     assert result.stdout == "not json traces"
@@ -255,7 +268,11 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
             stderr="",
         )
 
-    monkeypatch.setattr(cli_evaluation, "_run_profiled_evaluation", _run_profiled)
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_profiled_evaluation",
+        _run_profiled,
+    )
     monkeypatch.setattr(cli_evaluation, "_run_evaluation_command", _run_command)
 
     result = evaluation_runtime.run_evaluation_runtime(

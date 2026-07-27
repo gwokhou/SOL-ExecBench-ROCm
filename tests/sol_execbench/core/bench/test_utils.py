@@ -18,9 +18,9 @@
 """Tests for sol_execbench.core.bench.utils."""
 
 import torch
+from sol_execbench_type_helpers import make_definition
 
 from sol_execbench.core.bench.utils import call_and_collect_outputs
-from sol_execbench_type_helpers import make_definition
 
 
 def test_call_and_collect_outputs_normalizes_return_value_outputs():

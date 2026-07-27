@@ -10,12 +10,13 @@ from typing import Annotated, Literal
 
 from pydantic import BeforeValidator, ConfigDict, Field
 
-from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarAuthority
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticSidecarAuthority,
+)
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import (
     STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
 )
-
 
 _STATIC_MODEL_CONFIG = ConfigDict(
     extra="forbid",
@@ -158,7 +159,7 @@ class StaticResourceFootprint(DiagnosticSidecarAuthority):
     source_confidence: str | None = None
     """Confidence of the footprint values when known."""
     source_references: list[StaticKernelEvidenceSourceReference] = Field(
-        default_factory=list
+        default_factory=list,
     )
     """References supporting this footprint."""
 
@@ -175,7 +176,7 @@ class StaticKernelEvidenceKernel(BaseModelWithDocstrings):
     detected_architectures: list[str] = Field(default_factory=list)
     """Architectures associated with this kernel."""
     source_references: list[StaticKernelEvidenceSourceReference] = Field(
-        default_factory=list
+        default_factory=list,
     )
     """References supporting this kernel metadata."""
     footprint: StaticResourceFootprint | None = None
@@ -239,11 +240,11 @@ class StaticKernelEvidenceArtifact(BaseModelWithDocstrings):
     inspectable: bool = False
     """Whether later static tools may inspect this artifact."""
     classification: StaticKernelEvidenceClassification = Field(
-        default_factory=StaticKernelEvidenceClassification
+        default_factory=StaticKernelEvidenceClassification,
     )
     """Conservative artifact classification."""
     source_references: list[StaticKernelEvidenceSourceReference] = Field(
-        default_factory=list
+        default_factory=list,
     )
     """References supporting this artifact entry."""
 
@@ -287,7 +288,7 @@ class StaticKernelEvidenceSidecar(DiagnosticSidecarAuthority):
     reason_code: StaticKernelEvidenceReasonCodeField
     """Aggregate reason code."""
     classification: StaticKernelEvidenceClassification = Field(
-        default_factory=StaticKernelEvidenceClassification
+        default_factory=StaticKernelEvidenceClassification,
     )
     """Aggregate conservative classification."""
     artifacts: list[StaticKernelEvidenceArtifact] = Field(default_factory=list)
@@ -303,7 +304,7 @@ class StaticKernelEvidenceSidecar(DiagnosticSidecarAuthority):
     warnings: list[StaticKernelEvidenceWarning] = Field(default_factory=list)
     """Nonfatal static evidence warnings."""
     source_references: list[StaticKernelEvidenceSourceReference] = Field(
-        default_factory=list
+        default_factory=list,
     )
     """References supporting this sidecar."""
 

@@ -35,15 +35,15 @@ https://docs.pytorch.org/docs/stable/nn.functional.html#loss-functions
 
 import re
 import string
-from typing import Any, Optional
+from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShapes, TensorShape
 
 
 class LossHandler(EinsumOpHandler):
@@ -58,7 +58,7 @@ class LossHandler(EinsumOpHandler):
     - reduction='sum' -> scalar output
     """
 
-    supported_ops = [
+    supported_ops = (
         # KL divergence
         "kl_div",
         # Cross entropy variants
@@ -85,17 +85,22 @@ class LossHandler(EinsumOpHandler):
         "multi_margin_loss",
         "multilabel_margin_loss",
         "multilabel_soft_margin_loss",
-    ]
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for loss function operation.
 
         Loss functions compute a loss value from predictions and targets.
         The output shape depends on the reduction parameter.
         """
-        input_shape = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        input_shape = (
+            tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        )
         output_shape = (
             tensor_shapes.outputs[0] if tensor_shapes.num_outputs > 0 else None
         )
@@ -109,7 +114,12 @@ class LossHandler(EinsumOpHandler):
         # Normalize op name
         op_type = op_name.lower()
 
-        return self._generate_loss_einsum(input_shape, output_shape, op_type, reduction)
+        return self._generate_loss_einsum(
+            input_shape,
+            output_shape,
+            op_type,
+            reduction,
+        )
 
     def _parse_reduction_mode(self, kwargs: Any) -> str:
         """Parse reduction mode from kwargs or raw_attributes.
@@ -136,7 +146,7 @@ class LossHandler(EinsumOpHandler):
     def _generate_loss_einsum(
         self,
         input_shape: TensorShape,
-        output_shape: Optional[TensorShape],
+        output_shape: TensorShape | None,
         op_type: str = "mse_loss",
         reduction: str = "mean",
     ) -> EinsumOp:
@@ -150,6 +160,7 @@ class LossHandler(EinsumOpHandler):
 
         Returns:
             EinsumOp for the loss operation.
+
         """
         ndims = len(input_shape)
         input_labels = list(string.ascii_uppercase[:ndims])
@@ -197,7 +208,9 @@ class LossHandler(EinsumOpHandler):
         }
 
         # Reduction operation for loss (typically add then divide)
-        reduction_op = "add" if reduction in {"mean", "sum", "batchmean"} else "none"
+        reduction_op = (
+            "add" if reduction in {"mean", "sum", "batchmean"} else "none"
+        )
 
         return EinsumOp(
             operands=operands,

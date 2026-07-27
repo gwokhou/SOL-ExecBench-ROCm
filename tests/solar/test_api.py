@@ -9,11 +9,11 @@ import torch
 import yaml
 
 import solar.api as api
+from solar.analysis.orojenesis import OrojenesisError
 from solar.api import AnalysisFailure, AnalysisRequest, AnalysisResult
 from solar.contracts import SolarStage
 from solar.einsum.conversion import EinsumGraphArtifact
 from solar.graph.extraction import OperatorGraphArtifact
-from solar.analysis.orojenesis import OrojenesisError
 from solar.verification import VerificationError
 
 
@@ -61,7 +61,11 @@ def _matmul_request(
     )
 
 
-def _conv_request(output: Path, *, require_orojenesis: bool = True) -> AnalysisRequest:
+def _conv_request(
+    output: Path,
+    *,
+    require_orojenesis: bool = True,
+) -> AnalysisRequest:
     def reference(value: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
         return torch.nn.functional.conv2d(value, weight, padding=1)
 
@@ -82,9 +86,16 @@ def _conv_request(output: Path, *, require_orojenesis: bool = True) -> AnalysisR
     )
 
 
-def test_analyze_publishes_only_complete_atomic_artifact_set(tmp_path, monkeypatch):
+def test_analyze_publishes_only_complete_atomic_artifact_set(
+    tmp_path,
+    monkeypatch,
+):
     output = tmp_path / "result"
-    monkeypatch.setattr(api.ArchitectureProfile, "load", lambda value: _Profile())
+    monkeypatch.setattr(
+        api.ArchitectureProfile,
+        "load",
+        lambda value: _Profile(),
+    )
 
     def extract(reference, inputs, *, device, output_dir, name):
         del reference, inputs, device, name
@@ -110,7 +121,11 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(tmp_path, monkeypat
     monkeypatch.setattr(api, "extract_operator_graph", extract)
     monkeypatch.setattr(api, "convert_operator_graph", convert)
     monkeypatch.setattr(api, "verify_callable_conversion", verify)
-    monkeypatch.setattr(api, "_run_analysis", lambda request, profile, root: analysis)
+    monkeypatch.setattr(
+        api,
+        "_run_analysis",
+        lambda request, profile, root: analysis,
+    )
 
     result = api.analyze(_request(output))
 
@@ -135,11 +150,17 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(tmp_path, monkeypat
 
 def test_analyze_failure_leaves_no_partial_output(tmp_path, monkeypatch):
     output = tmp_path / "result"
-    monkeypatch.setattr(api.ArchitectureProfile, "load", lambda value: _Profile())
+    monkeypatch.setattr(
+        api.ArchitectureProfile,
+        "load",
+        lambda value: _Profile(),
+    )
     monkeypatch.setattr(
         api,
         "extract_operator_graph",
-        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("unsupported")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("unsupported"),
+        ),
     )
 
     result = api.analyze(_request(output))
@@ -152,7 +173,11 @@ def test_analyze_failure_leaves_no_partial_output(tmp_path, monkeypatch):
 
 def test_conversion_failure_has_its_own_stable_stage(tmp_path, monkeypatch):
     output = tmp_path / "result"
-    monkeypatch.setattr(api.ArchitectureProfile, "load", lambda value: _Profile())
+    monkeypatch.setattr(
+        api.ArchitectureProfile,
+        "load",
+        lambda value: _Profile(),
+    )
 
     def extract(reference, inputs, *, device, output_dir, name):
         del reference, inputs, device, name
@@ -164,7 +189,9 @@ def test_conversion_failure_has_its_own_stable_stage(tmp_path, monkeypatch):
     monkeypatch.setattr(
         api,
         "convert_operator_graph",
-        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("unsupported op")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("unsupported op"),
+        ),
     )
 
     result = api.analyze(_request(output))
@@ -231,7 +258,7 @@ def test_bound_and_reason_code_helpers_fail_closed():
             "schema_version": 3,
             "total": {"lower_bound_seconds": 0, "compute_resource": None},
             "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
-        }
+        },
     )
     assert valid.seconds == 0
     assert valid.limiting_resource is None
@@ -241,8 +268,10 @@ def test_bound_and_reason_code_helpers_fail_closed():
                 {
                     "schema_version": 3,
                     "total": {"lower_bound_seconds": seconds},
-                    "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
-                }
+                    "metadata": {
+                        "bound_kind": "capacity_constrained_tile_aware_v1",
+                    },
+                },
             )
     with pytest.raises(ValueError, match="non-tile-aware"):
         api._extract_bound(
@@ -250,15 +279,19 @@ def test_bound_and_reason_code_helpers_fail_closed():
                 "schema_version": 3,
                 "total": {"lower_bound_seconds": 1},
                 "metadata": {"bound_kind": "roofline"},
-            }
+            },
         )
     with pytest.raises(ValueError, match="unsupported schema"):
         api._extract_bound({"schema_version": 0})
-    assert api._reason_code(SolarStage.FORMAL_ANALYSIS, OrojenesisError("missing")) == (
-        "toolchain_unavailable"
-    )
+    assert api._reason_code(
+        SolarStage.FORMAL_ANALYSIS,
+        OrojenesisError("missing"),
+    ) == ("toolchain_unavailable")
     assert (
-        api._reason_code(SolarStage.CONVERSION_VERIFICATION, VerificationError("bad"))
+        api._reason_code(
+            SolarStage.CONVERSION_VERIFICATION,
+            VerificationError("bad"),
+        )
         == "conversion_not_proven"
     )
     assert api._reason_code(SolarStage.GRAPH_EXTRACTION, RuntimeError()) == (
@@ -279,7 +312,9 @@ def test_default_api_matmul_is_paper_roofline_without_orojenesis(tmp_path):
     assert result.bound.kind == "roofline_eq1_v1"
     assert result.sol_score_eligible is True
     assert result.publication_eligible is False
-    analysis = yaml.safe_load((result.output_dir / "solar-analysis.yaml").read_text())
+    analysis = yaml.safe_load(
+        (result.output_dir / "solar-analysis.yaml").read_text(),
+    )
     evidence = analysis["metadata"]["orojenesis"]
     assert evidence["status"] == "not_requested"
     assert evidence["formal_coverage"] == {
@@ -292,12 +327,14 @@ def test_default_api_matmul_is_paper_roofline_without_orojenesis(tmp_path):
 
 
 def test_formal_api_matmul_requires_and_records_orojenesis_evidence(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ):
     calls: list[str] = []
 
     class FakeRunner:
-        toolchain_identity = {"verification_mode": "fake"}
+        def __init__(self) -> None:
+            self.toolchain_identity = {"verification_mode": "fake"}
 
         def run_layer(self, layer, output_dir, *, word_bits):
             calls.append(layer["semantic_op"]["equation"])
@@ -311,21 +348,25 @@ def test_formal_api_matmul_requires_and_records_orojenesis_evidence(
                     "raw": {
                         "path": raw.name,
                         "sha256": hashlib.sha256(raw.read_bytes()).hexdigest(),
-                    }
+                    },
                 },
             }
 
     runner = FakeRunner()
     monkeypatch.setattr(api, "OrojenesisRunner", lambda home: runner)
 
-    result = api.analyze(_matmul_request(tmp_path / "result", require_orojenesis=True))
+    result = api.analyze(
+        _matmul_request(tmp_path / "result", require_orojenesis=True),
+    )
 
     assert isinstance(result, AnalysisResult)
     assert result.bound.kind == "capacity_constrained_tile_aware_v1"
     assert result.sol_score_eligible is True
     assert result.publication_eligible is True
     assert calls == ["MK,KN->MN"]
-    analysis = yaml.safe_load((result.output_dir / "solar-analysis.yaml").read_text())
+    analysis = yaml.safe_load(
+        (result.output_dir / "solar-analysis.yaml").read_text(),
+    )
     evidence = analysis["metadata"]["orojenesis"]
     assert evidence["status"] == "complete"
     assert evidence["formal_coverage"] == {
@@ -336,10 +377,12 @@ def test_formal_api_matmul_requires_and_records_orojenesis_evidence(
 
 
 def test_incomplete_optional_orojenesis_evidence_falls_back_to_eq1(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ):
     class FakeRunner:
-        toolchain_identity = {"verification_mode": "fake"}
+        def __init__(self) -> None:
+            self.toolchain_identity = {"verification_mode": "fake"}
 
         def run_layer(self, layer, output_dir, *, word_bits):
             del layer, output_dir
@@ -355,23 +398,32 @@ def test_incomplete_optional_orojenesis_evidence_falls_back_to_eq1(
         _matmul_request(
             tmp_path / "result",
             orojenesis_home="configured-but-incomplete",
-        )
+        ),
     )
 
     assert isinstance(result, AnalysisResult)
     assert result.bound.kind == "roofline_eq1_v1"
-    analysis = yaml.safe_load((result.output_dir / "solar-analysis.yaml").read_text())
+    analysis = yaml.safe_load(
+        (result.output_dir / "solar-analysis.yaml").read_text(),
+    )
     assert analysis["metadata"]["orojenesis"]["status"] == "incomplete"
-    assert analysis["total"]["prefetched_bytes"] == analysis["total"]["fused_bytes"]
+    assert (
+        analysis["total"]["prefetched_bytes"]
+        == analysis["total"]["fused_bytes"]
+    )
 
 
 def test_default_api_keeps_unmodeled_contraction_on_paper_roofline(tmp_path):
-    result = api.analyze(_conv_request(tmp_path / "result", require_orojenesis=False))
+    result = api.analyze(
+        _conv_request(tmp_path / "result", require_orojenesis=False),
+    )
 
     assert isinstance(result, AnalysisResult)
     assert result.bound.kind == "roofline_eq1_v1"
     assert result.sol_score_eligible is True
-    analysis = yaml.safe_load((result.output_dir / "solar-analysis.yaml").read_text())
+    analysis = yaml.safe_load(
+        (result.output_dir / "solar-analysis.yaml").read_text(),
+    )
     evidence = analysis["metadata"]["orojenesis"]
     assert evidence["status"] == "not_requested"
     assert evidence["formal_coverage"] == {
@@ -381,10 +433,12 @@ def test_default_api_keeps_unmodeled_contraction_on_paper_roofline(tmp_path):
 
 
 def test_strict_api_rejects_contraction_without_exact_orojenesis_proof(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ):
     class FakeRunner:
-        toolchain_identity = {"verification_mode": "fake"}
+        def __init__(self) -> None:
+            self.toolchain_identity = {"verification_mode": "fake"}
 
     monkeypatch.setattr(api, "OrojenesisRunner", lambda home: FakeRunner())
     output = tmp_path / "result"
@@ -400,7 +454,8 @@ def test_strict_api_rejects_contraction_without_exact_orojenesis_proof(
 
 
 def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ):
     observed: dict[str, object] = {}
 
@@ -413,13 +468,15 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
         api,
         "OrojenesisRunner",
         lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("runner must not be constructed")
+            AssertionError("runner must not be constructed"),
         ),
     )
     monkeypatch.setattr(api, "EinsumGraphAnalyzer", FakeAnalyzer)
 
     result = api._run_analysis(
-        _request(tmp_path / "result"), cast(Any, _Profile()), tmp_path
+        _request(tmp_path / "result"),
+        cast(Any, _Profile()),
+        tmp_path,
     )
 
     assert result == {"schema_version": 3}

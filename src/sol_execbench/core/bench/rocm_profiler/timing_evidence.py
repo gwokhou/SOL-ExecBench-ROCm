@@ -9,15 +9,13 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Final
 
+from sol_execbench.core.bench.rocm_profiler.calibration import (
+    Rocprofv3OverheadCalibration,
+)
 from sol_execbench.core.bench.rocm_profiler.models import (
     DefaultTimingSelection,
     Rocprofv3TimingEvidence,
     Rocprofv3TimingRow,
-)
-from sol_execbench.core.integrity import sha256_file
-from sol_execbench.core.platform.runtime import resolve_rocm_tool
-from sol_execbench.core.bench.rocm_profiler.calibration import (
-    Rocprofv3OverheadCalibration,
 )
 from sol_execbench.core.bench.rocm_profiler.timing_parsing import (
     parse_rocprofv3_csv,
@@ -28,6 +26,8 @@ from sol_execbench.core.bench.timing_policy import (
     TimingPolicy,
     select_timing_policy,
 )
+from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
 
 
 def select_default_timing(
@@ -163,7 +163,7 @@ def read_overhead_calibration(
         return None
     try:
         calibration = Rocprofv3OverheadCalibration.model_validate_json(
-            calibration_path.read_text(encoding="utf-8")
+            calibration_path.read_text(encoding="utf-8"),
         )
         mismatch = _calibration_identity_mismatch(
             calibration,
@@ -181,7 +181,9 @@ def read_overhead_calibration(
         return calibration.overhead_ms
     except (json.JSONDecodeError, ValueError, OSError) as exc:
         logging.getLogger(__name__).warning(
-            "Failed to read overhead calibration from %s: %s", calibration_path, exc
+            "Failed to read overhead calibration from %s: %s",
+            calibration_path,
+            exc,
         )
         return None
 
@@ -194,7 +196,9 @@ def _calibration_identity_mismatch(
     expected_clock_locked: bool | None | object,
 ) -> str | None:
     if expected_gpu_architecture is not None:
-        expected_arch = expected_gpu_architecture.split(":", maxsplit=1)[0].lower()
+        expected_arch = expected_gpu_architecture.split(":", maxsplit=1)[
+            0
+        ].lower()
         calibration_arch = calibration.gpu_architecture.split(":", maxsplit=1)[
             0
         ].lower()

@@ -21,7 +21,6 @@ from sol_execbench.core.evidence import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.text_utils import text_tail
 
-
 ROCPROFV3_EXECUTABLE = "rocprofv3"
 ROCPROFV3_EVIDENCE_SCHEMA_VERSION = SCHEMA_VERSIONS["rocprofv3_timing"]
 ROCPROFV3_PROFILE_SCHEMA_VERSION = SCHEMA_VERSIONS["rocprofv3_profile"]
@@ -74,13 +73,13 @@ class Rocprofv3ArtifactCoverageStatus(StrEnum):
     COMPLETE = "complete"
 
 
-# Artifact kinds that are diagnostic/opaque only and never count as profiler data.
+# Diagnostic or opaque artifact kinds never count as profiler data.
 # Single source of truth; profile_summary.py reuses this for status/limitations.
 _NON_DATA_ARTIFACT_KINDS = frozenset(
     {
         Rocprofv3ArtifactKind.DIAGNOSTIC_JSON,
         Rocprofv3ArtifactKind.OTHER,
-    }
+    },
 )
 
 
@@ -162,7 +161,10 @@ class Rocprofv3ProfileResult:
     output_format: str | None = None
     profiler_data_artifacts: bool = False
     output_directory_listing: tuple[str, ...] = ()
-    schema_version: str = field(init=False, default=ROCPROFV3_PROFILE_SCHEMA_VERSION)
+    schema_version: str = field(
+        init=False,
+        default=ROCPROFV3_PROFILE_SCHEMA_VERSION,
+    )
 
     def __post_init__(self) -> None:
         """Reject contradictory status and reason combinations."""
@@ -174,16 +176,27 @@ class Rocprofv3ProfileResult:
                 Rocprofv3ArtifactCoverageStatus(self.artifact_coverage_status),
             )
         if self.status is Rocprofv3ProfileStatus.SUCCESS:
-            if self.skipped_reason is not None or self.failed_reason is not None:
-                raise ValueError("successful profiling cannot include failure reasons")
+            if (
+                self.skipped_reason is not None
+                or self.failed_reason is not None
+            ):
+                raise ValueError(
+                    "successful profiling cannot include failure reasons",
+                )
         elif self.status is Rocprofv3ProfileStatus.UNAVAILABLE:
             if self.skipped_reason is None or self.failed_reason is not None:
-                raise ValueError("unavailable profiling requires only a skipped reason")
+                raise ValueError(
+                    "unavailable profiling requires only a skipped reason",
+                )
         elif self.status is Rocprofv3ProfileStatus.FAILED:
             if self.failed_reason is None or self.skipped_reason is not None:
-                raise ValueError("failed profiling requires only a failed reason")
+                raise ValueError(
+                    "failed profiling requires only a failed reason",
+                )
         elif self.skipped_reason is not None:
-            raise ValueError("partial profiling cannot include a skipped reason")
+            raise ValueError(
+                "partial profiling cannot include a skipped reason",
+            )
 
     @property
     def succeeded(self) -> bool:
@@ -283,7 +296,10 @@ class Rocprofv3TimingEvidence:
     fallback_applied: bool = False
     fallback_reason: str | None = None
     profiler_overhead_ms: float | None = None
-    schema_version: str = field(init=False, default=ROCPROFV3_EVIDENCE_SCHEMA_VERSION)
+    schema_version: str = field(
+        init=False,
+        default=ROCPROFV3_EVIDENCE_SCHEMA_VERSION,
+    )
     derived: bool = True
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
 
@@ -291,7 +307,9 @@ class Rocprofv3TimingEvidence:
     def kernel_duration_ms(self) -> float:
         """Aggregate kernel activity duration in milliseconds."""
         return sum(
-            row.duration_ms for row in self.parsed_rows if row.is_kernel_activity
+            row.duration_ms
+            for row in self.parsed_rows
+            if row.is_kernel_activity
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -393,11 +411,16 @@ class Rocprofv3CollectionResult:
     def __post_init__(self) -> None:
         """Keep evidence presence consistent with fallback routing."""
         if self.evidence is None and not self.selection.fallback_applied:
-            raise ValueError("profiler-backed selection requires timing evidence")
+            raise ValueError(
+                "profiler-backed selection requires timing evidence",
+            )
         if self.evidence is not None and (
-            self.selection.fallback_applied or not self.selection.profiler_backed
+            self.selection.fallback_applied
+            or not self.selection.profiler_backed
         ):
-            raise ValueError("fallback selection cannot include profiler evidence")
+            raise ValueError(
+                "fallback selection cannot include profiler evidence",
+            )
 
     @property
     def profiler_collected(self) -> bool:
@@ -410,11 +433,15 @@ class Rocprofv3CollectionResult:
             "profiler_collected": self.profiler_collected,
             "selection": self.selection.to_dict(),
             "command": list(self.command),
-            "csv_path": str(self.csv_path) if self.csv_path is not None else None,
+            "csv_path": str(self.csv_path)
+            if self.csv_path is not None
+            else None,
             "returncode": self.returncode,
             "stdout": self.stdout,
             "stderr": self.stderr,
-            "evidence": self.evidence.to_dict() if self.evidence is not None else None,
+            "evidence": self.evidence.to_dict()
+            if self.evidence is not None
+            else None,
         }
 
 
@@ -427,10 +454,12 @@ def _normalize_header(header: str | None) -> str:
 
 
 def is_profiler_data_artifact(artifact: Rocprofv3ProfileArtifact) -> bool:
+    """Return whether an artifact contains profiler data."""
     return artifact.kind not in _NON_DATA_ARTIFACT_KINDS
 
 
 def has_profiler_data_artifact(
     artifacts: Sequence[Rocprofv3ProfileArtifact],
 ) -> bool:
+    """Return whether any supplied artifact contains profiler data."""
     return any(is_profiler_data_artifact(artifact) for artifact in artifacts)

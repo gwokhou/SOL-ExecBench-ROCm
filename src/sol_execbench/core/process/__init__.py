@@ -3,22 +3,22 @@
 
 """Process-execution primitives shared across SOL ExecBench."""
 
-from .logs import (
+from sol_execbench.core.process.locks import exclusive_file_lock
+from sol_execbench.core.process.logs import (
     DEFAULT_LOG_TAIL_CHARS,
     redacted_file_tail,
     redacted_text_tail,
     run_command_to_files,
     temporary_stream_path,
 )
-from .locks import exclusive_file_lock
-from .subprocesses import (
+from sol_execbench.core.process.stdio import flush_stdio_streams
+from sol_execbench.core.process.subprocesses import (
     ProbeCompletedProcess,
     run_attached_process_group,
     run_bounded_probe,
     run_in_process_group,
     run_in_process_group_to_files,
 )
-from .stdio import flush_stdio_streams
 
 __all__ = [
     "DEFAULT_LOG_TAIL_CHARS",

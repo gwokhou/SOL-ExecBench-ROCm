@@ -66,7 +66,7 @@ def test_load_workloads_skips_blank_lines(tmp_path: Path) -> None:
     workload_path.write_text(
         json.dumps(_workload_payload("w0"))
         + "\n\n"
-        + json.dumps(_workload_payload("w1"))
+        + json.dumps(_workload_payload("w1")),
     )
 
     workloads = problem_io._load_workloads(workload_path)
@@ -90,14 +90,21 @@ def test_load_config_reads_json(tmp_path: Path) -> None:
     assert config.iterations == 7
 
 
-def test_resolve_problem_dir_finds_optional_config_and_solution(tmp_path: Path) -> None:
+def test_resolve_problem_dir_finds_optional_config_and_solution(
+    tmp_path: Path,
+) -> None:
     problem_dir = tmp_path / "problem"
     problem_dir.mkdir()
-    for name in ("definition.json", "workload.jsonl", "config.json", "solution.json"):
+    for name in (
+        "definition.json",
+        "workload.jsonl",
+        "config.json",
+        "solution.json",
+    ):
         (problem_dir / name).write_text("{}")
 
     definition, workload, config, solution = problem_io._resolve_problem_dir(
-        problem_dir
+        problem_dir,
     )
 
     assert definition == problem_dir / "definition.json"
@@ -119,7 +126,9 @@ def test_resolve_problem_dir_rejects_missing_definition(tmp_path: Path) -> None:
         raise AssertionError("expected ClickException")
 
 
-def test_resolve_problem_inputs_uses_problem_dir_defaults(tmp_path: Path) -> None:
+def test_resolve_problem_inputs_uses_problem_dir_defaults(
+    tmp_path: Path,
+) -> None:
     problem_dir = tmp_path / "problem"
     problem_dir.mkdir()
     definition = problem_dir / "definition.json"
@@ -207,6 +216,8 @@ def test_resolve_problem_inputs_rejects_missing_solution() -> None:
             config_file=None,
         )
     except click.ClickException as exc:
-        assert "Provide PROBLEM_DIR with solution.json or --solution" in str(exc)
+        assert "Provide PROBLEM_DIR with solution.json or --solution" in str(
+            exc,
+        )
     else:
         raise AssertionError("expected ClickException")

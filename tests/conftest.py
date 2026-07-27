@@ -17,10 +17,10 @@
 import contextlib
 import fcntl
 import sys
-from importlib.util import find_spec, module_from_spec, spec_from_file_location
-from platform import machine
 from collections.abc import Callable, Iterator
+from importlib.util import find_spec, module_from_spec, spec_from_file_location
 from pathlib import Path
+from platform import machine
 from types import ModuleType
 
 import pytest
@@ -30,7 +30,7 @@ ScriptLoader = Callable[[str], ModuleType]
 
 _ROCM_DEVICE_NODES = (Path("/dev/kfd"), Path("/dev/dri"))
 _REAL_GPU_MARKERS = frozenset(
-    {"requires_rocm", "requires_rocm_gpu", "requires_rdna4", "requires_cdna3"}
+    {"requires_rocm", "requires_rocm_gpu", "requires_rdna4", "requires_cdna3"},
 )
 _REAL_GPU_XDIST_GROUP = "real_rocm_gpu"
 _REAL_GPU_LOCK_PATH = Path("/tmp/sol-execbench-real-gpu.lock")
@@ -43,10 +43,15 @@ def load_script() -> Iterator[ScriptLoader]:
     loaded: dict[str, ModuleType] = {}
 
     def _load(relative_path: str) -> ModuleType:
-        module_name = f"test_script_{relative_path.replace('/', '_').replace('.', '_')}"
+        module_name = (
+            f"test_script_{relative_path.replace('/', '_').replace('.', '_')}"
+        )
         if module_name in loaded:
             return loaded[module_name]
-        spec = spec_from_file_location(module_name, repository_root / relative_path)
+        spec = spec_from_file_location(
+            module_name,
+            repository_root / relative_path,
+        )
         assert spec is not None and spec.loader is not None
         module = module_from_spec(spec)
         sys.modules[module_name] = module
@@ -83,7 +88,9 @@ def _rocm_device_node_skip_reason(missing_nodes: tuple[str, ...]) -> str:
     )
 
 
-def _rocm_gpu_info(path_exists: PathExists | None = None) -> tuple[bool, str, str]:
+def _rocm_gpu_info(
+    path_exists: PathExists | None = None,
+) -> tuple[bool, str, str]:
     """Return ROCm GPU availability, AMD gfx architecture, and skip reason."""
     missing_nodes = _missing_rocm_device_nodes(path_exists)
     if missing_nodes:
@@ -97,7 +104,11 @@ def _rocm_gpu_info(path_exists: PathExists | None = None) -> tuple[bool, str, st
         if not torch.cuda.is_available():
             return False, "", "ROCm GPU unavailable through PyTorch"
         props = torch.cuda.get_device_properties(0)
-        arch = getattr(props, "gcnArchName", "") or getattr(props, "gfx_arch_name", "")
+        arch = getattr(props, "gcnArchName", "") or getattr(
+            props,
+            "gfx_arch_name",
+            "",
+        )
         return True, str(arch).split(":", maxsplit=1)[0], ""
     except ImportError as exc:
         return False, "", f"PyTorch import failed: {exc}"
@@ -196,7 +207,10 @@ def pytest_configure(config):
         "markers",
         "requires_rocwmma: test requires rocWMMA headers",
     )
-    config.addinivalue_line("markers", "requires_miopen: test requires MIOpen headers")
+    config.addinivalue_line(
+        "markers",
+        "requires_miopen: test requires MIOpen headers",
+    )
     config.addinivalue_line(
         "markers",
         "requires_rdna4: test requires the validated AMD gfx1200 RDNA 4 target",
@@ -212,7 +226,8 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[pytest.Item]
+    config: pytest.Config,
+    items: list[pytest.Item],
 ) -> None:
     """Skip tests based on hardware availability.
 
@@ -228,40 +243,44 @@ def pytest_collection_modifyitems(
     detected = gfx_arch or "unavailable"
     supported_arch = _is_rdna4(gfx_arch) or _is_cdna3(gfx_arch)
     skip_not_linux = pytest.mark.skip(reason="test requires Linux")
-    skip_not_x86_64 = pytest.mark.skip(reason="test requires x86_64 architecture")
+    skip_not_x86_64 = pytest.mark.skip(
+        reason="test requires x86_64 architecture",
+    )
     skip_timing = pytest.mark.skip(
-        reason="timing_serial tests skipped by default; run with: pytest tests -m timing_serial -n 0"
+        reason="timing_serial tests skipped by default; run with: pytest tests -m timing_serial -n 0",
     )
     skip_docker_dependency = pytest.mark.skip(
-        reason="docker_dependency tests skipped by default; run with: pytest tests/docker/dependencies -m docker_dependency"
+        reason="docker_dependency tests skipped by default; run with: pytest tests/docker/dependencies -m docker_dependency",
     )
     skip_native_extension_serial = pytest.mark.skip(
-        reason="native_extension_serial tests skipped by default; run with: pytest tests -m native_extension_serial -n 0"
+        reason="native_extension_serial tests skipped by default; run with: pytest tests -m native_extension_serial -n 0",
     )
     skip_no_rocm = pytest.mark.skip(reason=rocm_skip_reason)
     skip_no_rocm_dev = pytest.mark.skip(
-        reason="ROCm HIP development headers unavailable"
+        reason="ROCm HIP development headers unavailable",
     )
     skip_no_triton_rocm = pytest.mark.skip(
-        reason="triton-rocm Python package unavailable"
+        reason="triton-rocm Python package unavailable",
     )
     skip_no_safetensors_torch = pytest.mark.skip(
-        reason="safetensors.torch support unavailable"
+        reason="safetensors.torch support unavailable",
     )
-    skip_no_ck = pytest.mark.skip(reason="Composable Kernel headers unavailable")
+    skip_no_ck = pytest.mark.skip(
+        reason="Composable Kernel headers unavailable",
+    )
     skip_no_rocwmma = pytest.mark.skip(reason="rocWMMA headers unavailable")
     skip_no_miopen = pytest.mark.skip(reason="MIOpen headers unavailable")
     skip_rdna4 = pytest.mark.skip(
-        reason=f"requires exact AMD gfx1200 RDNA 4 target (detected {detected})"
+        reason=f"requires exact AMD gfx1200 RDNA 4 target (detected {detected})",
     )
     skip_cdna3 = pytest.mark.skip(
-        reason=f"requires AMD CDNA 3 ROCm GPU (detected {detected})"
+        reason=f"requires AMD CDNA 3 ROCm GPU (detected {detected})",
     )
     skip_unsupported = pytest.mark.skip(
-        reason=f"unsupported AMD GPU architecture for ROCm test (detected {detected})"
+        reason=f"unsupported AMD GPU architecture for ROCm test (detected {detected})",
     )
     skip_legacy_cutile = pytest.mark.skip(
-        reason="legacy cuTile tests are NVIDIA-only and unavailable in this ROCm-only port"
+        reason="legacy cuTile tests are NVIDIA-only and unavailable in this ROCm-only port",
     )
 
     # If the user passed -m that includes timing_serial, don't auto-skip them.
@@ -272,9 +291,14 @@ def pytest_collection_modifyitems(
 
     for item in items:
         _assign_real_gpu_xdist_group(item)
-        if any(item.iter_markers(name="requires_linux")) and sys.platform != "linux":
+        if (
+            any(item.iter_markers(name="requires_linux"))
+            and sys.platform != "linux"
+        ):
             item.add_marker(skip_not_linux)
-        if any(item.iter_markers(name="requires_x86_64")) and machine().lower() not in {
+        if any(
+            item.iter_markers(name="requires_x86_64"),
+        ) and machine().lower() not in {
             "x86_64",
             "amd64",
         }:
@@ -284,7 +308,10 @@ def pytest_collection_modifyitems(
             or any(item.iter_markers(name="requires_rocm_gpu"))
         ) and not rocm_available:
             item.add_marker(skip_no_rocm)
-        if any(item.iter_markers(name="requires_rocm_dev")) and not rocm_dev_available:
+        if (
+            any(item.iter_markers(name="requires_rocm_dev"))
+            and not rocm_dev_available
+        ):
             item.add_marker(skip_no_rocm_dev)
         if (
             any(item.iter_markers(name="requires_triton_rocm"))
@@ -298,13 +325,23 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_no_safetensors_torch)
         if any(item.iter_markers(name="requires_ck")) and not ck_available:
             item.add_marker(skip_no_ck)
-        if any(item.iter_markers(name="requires_rocwmma")) and not rocwmma_available:
+        if (
+            any(item.iter_markers(name="requires_rocwmma"))
+            and not rocwmma_available
+        ):
             item.add_marker(skip_no_rocwmma)
-        if any(item.iter_markers(name="requires_miopen")) and not miopen_available:
+        if (
+            any(item.iter_markers(name="requires_miopen"))
+            and not miopen_available
+        ):
             item.add_marker(skip_no_miopen)
-        if any(item.iter_markers(name="requires_rdna4")) and not _is_rdna4(gfx_arch):
+        if any(item.iter_markers(name="requires_rdna4")) and not _is_rdna4(
+            gfx_arch,
+        ):
             item.add_marker(skip_rdna4 if rocm_available else skip_no_rocm)
-        if any(item.iter_markers(name="requires_cdna3")) and not _is_cdna3(gfx_arch):
+        if any(item.iter_markers(name="requires_cdna3")) and not _is_cdna3(
+            gfx_arch,
+        ):
             item.add_marker(skip_cdna3 if rocm_available else skip_no_rocm)
         if (
             any(item.iter_markers(name="requires_rocm"))
@@ -316,7 +353,10 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_legacy_cutile)
         if "timing_serial" in item.keywords and not timing_selected:
             item.add_marker(skip_timing)
-        if "docker_dependency" in item.keywords and not docker_dependency_selected:
+        if (
+            "docker_dependency" in item.keywords
+            and not docker_dependency_selected
+        ):
             item.add_marker(skip_docker_dependency)
         if (
             "native_extension_serial" in item.keywords
@@ -348,7 +388,9 @@ def _assign_real_gpu_xdist_group(item: pytest.Item) -> None:
 
 def _has_real_gpu_marker(item: pytest.Item) -> bool:
     """Return whether an item declares that it touches real GPU hardware."""
-    return any(any(item.iter_markers(name=marker)) for marker in _REAL_GPU_MARKERS)
+    return any(
+        any(item.iter_markers(name=marker)) for marker in _REAL_GPU_MARKERS
+    )
 
 
 @contextlib.contextmanager

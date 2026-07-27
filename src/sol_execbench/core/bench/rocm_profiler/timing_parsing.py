@@ -15,8 +15,16 @@ def parse_rocprofv3_csv(content: str) -> tuple[Rocprofv3TimingRow, ...]:
     reader = csv.DictReader(content.splitlines())
     rows: list[Rocprofv3TimingRow] = []
     for raw_row in reader:
-        normalized = {_normalize_header(key): value for key, value in raw_row.items()}
-        name = _first_value(normalized, "kernelname", "name", "function", "operation")
+        normalized = {
+            _normalize_header(key): value for key, value in raw_row.items()
+        }
+        name = _first_value(
+            normalized,
+            "kernelname",
+            "name",
+            "function",
+            "operation",
+        )
         domain = _first_value(normalized, "domain", "kind", "type", "category")
         duration_ns = _duration_ns(normalized)
         if name is None or domain is None or duration_ns is None:
@@ -26,8 +34,12 @@ def parse_rocprofv3_csv(content: str) -> tuple[Rocprofv3TimingRow, ...]:
                 name=name,
                 domain=domain,
                 duration_ns=duration_ns,
-                raw={key: value for key, value in raw_row.items() if key is not None},
-            )
+                raw={
+                    key: value
+                    for key, value in raw_row.items()
+                    if key is not None
+                },
+            ),
         )
     return tuple(rows)
 
@@ -42,7 +54,13 @@ def summarize_rocprofv3_csv(path: Path) -> tuple[int, float]:
             normalized = {
                 _normalize_header(key): value for key, value in raw_row.items()
             }
-            domain = _first_value(normalized, "domain", "kind", "type", "category")
+            domain = _first_value(
+                normalized,
+                "domain",
+                "kind",
+                "type",
+                "category",
+            )
             row_duration_ns = _duration_ns(normalized)
             if domain is None or row_duration_ns is None:
                 continue

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import pytest
 import torch
-
-from sol_execbench.core.bench.io import load_safetensors
 from sol_execbench_type_helpers import make_definition, make_workload
 
+from sol_execbench.core.bench.io import load_safetensors
 
 pytestmark = [
     pytest.mark.native_extension,
@@ -37,7 +36,7 @@ def test_resolves_relative_path_from_blob_root(tmp_path):
                 "type": "safetensors",
                 "path": "tensor.safetensors",
                 "tensor_key": "data",
-            }
+            },
         },
     )
 
@@ -58,7 +57,7 @@ def test_tries_second_root_when_first_misses(tmp_path):
                 "type": "safetensors",
                 "path": "tensor.safetensors",
                 "tensor_key": "data",
-            }
+            },
         },
     )
 
@@ -81,7 +80,7 @@ def test_missing_file_raises(tmp_path):
                 "type": "safetensors",
                 "path": "missing.safetensors",
                 "tensor_key": "k",
-            }
+            },
         },
     )
 
@@ -97,4 +96,6 @@ def test_skips_non_safetensors_inputs(tmp_path):
         inputs={"a": {"type": "random"}},
     )
 
-    assert load_safetensors(_definition(), workload, blob_roots=[tmp_path]) == {}
+    assert (
+        load_safetensors(_definition(), workload, blob_roots=[tmp_path]) == {}
+    )

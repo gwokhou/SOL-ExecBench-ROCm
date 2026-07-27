@@ -6,7 +6,9 @@ from sol_execbench.core.bench.agent_feedback.items import trace_feedback_items
 from sol_execbench.core.data.trace import EvaluationStatus
 
 
-def test_trace_feedback_items_reports_all_passed_when_no_failure_items() -> None:
+def test_trace_feedback_items_reports_all_passed_when_no_failure_items() -> (
+    None
+):
     items = trace_feedback_items(Counter({EvaluationStatus.PASSED: 2}))
     payload = [item.model_dump(mode="json") for item in items]
 
@@ -28,9 +30,9 @@ def test_trace_feedback_items_reports_all_passed_when_no_failure_items() -> None
                     "kind": "trace",
                     "label": "canonical_trace_jsonl",
                     "status": None,
-                }
+                },
             ],
-        }
+        },
     ]
 
 
@@ -44,8 +46,8 @@ def test_trace_feedback_items_reports_compile_runtime_timeout_and_policy_failure
                 EvaluationStatus.RUNTIME_ERROR: 2,
                 EvaluationStatus.TIMEOUT: 3,
                 EvaluationStatus.REWARD_HACK: 4,
-            }
-        )
+            },
+        ),
     )
 
     assert [(item.code, item.severity, item.bottleneck) for item in items] == [
@@ -54,10 +56,14 @@ def test_trace_feedback_items_reports_compile_runtime_timeout_and_policy_failure
         ("runtime_error", "action", "runtime_failure"),
         ("timeout", "action", "timeout"),
     ]
-    assert all(item.source_refs[0].label == "canonical_trace_jsonl" for item in items)
+    assert all(
+        item.source_refs[0].label == "canonical_trace_jsonl" for item in items
+    )
 
 
-def test_trace_feedback_items_reports_correctness_and_reference_failures() -> None:
+def test_trace_feedback_items_reports_correctness_and_reference_failures() -> (
+    None
+):
     items = trace_feedback_items(
         Counter(
             {
@@ -65,8 +71,8 @@ def test_trace_feedback_items_reports_correctness_and_reference_failures() -> No
                 EvaluationStatus.INCORRECT_SHAPE: 1,
                 EvaluationStatus.INCORRECT_DTYPE: 1,
                 EvaluationStatus.INVALID_REFERENCE: 1,
-            }
-        )
+            },
+        ),
     )
 
     assert [(item.code, item.severity, item.bottleneck) for item in items] == [

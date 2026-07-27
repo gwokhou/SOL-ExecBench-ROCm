@@ -7,11 +7,15 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal, Optional, Union
+from typing import Literal, Union
 
 from pydantic import BaseModel, Field
 
-from .base_model import BaseModelWithDocstrings, NonEmptyString, NonNegativeInt
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    NonEmptyString,
+    NonNegativeInt,
+)
 
 
 class AxisConst(BaseModelWithDocstrings):
@@ -21,7 +25,7 @@ class AxisConst(BaseModelWithDocstrings):
     """The type identifier for constant axes."""
     value: NonNegativeInt
     """The constant integer value of this axis dimension."""
-    description: Optional[str] = None
+    description: str | None = None
     """An optional human-readable description explaining the purpose of this axis."""
 
 
@@ -30,7 +34,7 @@ class AxisVar(BaseModel):
 
     type: Literal["var"] = "var"
     """The type identifier for variable axes."""
-    description: Optional[str] = Field(default=None)
+    description: str | None = Field(default=None)
     """An optional human-readable description explaining the purpose of this axis."""
 
 
@@ -41,7 +45,7 @@ class AxisExpr(BaseModel):
     """The type identifier for expression axes."""
     expression: NonEmptyString
     """The mathematical expression that defines the value of this axis."""
-    description: Optional[str] = Field(default=None)
+    description: str | None = Field(default=None)
     """An optional human-readable description explaining the purpose of this axis."""
 
 
@@ -79,11 +83,11 @@ class DType(StrEnum):
 class TensorSpec(BaseModelWithDocstrings):
     """Specification for an input, output, or scalar tensor."""
 
-    shape: Optional[list[NonEmptyString]]
+    shape: list[NonEmptyString] | None
     """List of axis names defining the tensor shape. None for scalar values."""
     dtype: DType
     """The data type of all elements in this tensor."""
-    description: Optional[str] = None
+    description: str | None = None
     """An optional human-readable description of this tensor's purpose and usage."""
 
 

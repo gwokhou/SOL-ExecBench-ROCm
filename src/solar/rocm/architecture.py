@@ -5,20 +5,27 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import hashlib
-from importlib import resources
 import json
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from importlib import resources
 from pathlib import Path
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 import yaml
 
 from solar.common.constants import normalize_dtype
 from solar.rocm.audit_validation import (
     audit_mapping as _audit_mapping,
+)
+from solar.rocm.audit_validation import (
     audit_nonnegative_int as _audit_nonnegative_int,
+)
+from solar.rocm.audit_validation import (
     audit_sha256 as _audit_sha256,
+)
+from solar.rocm.audit_validation import (
     audit_string_set as _audit_string_set,
 )
 
@@ -44,17 +51,21 @@ _VENDOR_SPECIFIC_DTYPES = frozenset(
         "float8_e5m2fnuz",
         "float4_e2m1",
         "float4_e2m1fn_x2",
-    }
+    },
 )
 
 
 def _packaged_profile_path(name: str) -> Path:
-    return Path(__file__).resolve().parents[1] / "configs" / "arch" / f"{name}.yaml"
+    return (
+        Path(__file__).resolve().parents[1]
+        / "configs"
+        / "arch"
+        / f"{name}.yaml"
+    )
 
 
 def resource_peak_payload_sha256(payload: Mapping[str, Any]) -> str:
     """Return the resource-audit digest with ``payload_sha256`` omitted."""
-
     unsigned = dict(payload)
     unsigned.pop("payload_sha256", None)
     encoded = json.dumps(
@@ -80,7 +91,6 @@ def verify_resource_peak_audit(
     expected_instruction_checks: tuple[str, ...],
 ) -> dict[str, Any]:
     """Load and validate one content-addressed resource-peak audit artifact."""
-
     if not path.is_file():
         raise ValueError(f"architecture audit evidence file is missing: {path}")
     if path.stat().st_size > _MAX_AUDIT_BYTES:
@@ -92,12 +102,16 @@ def verify_resource_peak_audit(
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ValueError("architecture audit evidence is not valid JSON") from exc
+        raise ValueError(
+            "architecture audit evidence is not valid JSON",
+        ) from exc
     if not isinstance(raw, dict):
         raise ValueError("architecture audit evidence must be a JSON object")
     payload = cast(dict[str, Any], raw)
     if payload.get("payload_sha256") != resource_peak_payload_sha256(payload):
-        raise ValueError("architecture audit evidence payload checksum mismatch")
+        raise ValueError(
+            "architecture audit evidence payload checksum mismatch",
+        )
     _verify_audit_contract(
         payload,
         expected_schema_version=expected_schema_version,
@@ -118,7 +132,8 @@ def verify_resource_peak_audit(
     )
     measurements = cast(dict[str, Mapping[str, Any]], raw_measurements)
     instruction_presence, isa_spec_sha256 = _verify_audit_isa_spec(
-        payload.get("isa_spec_evidence"), expected_gfx_target=expected_gfx_target
+        payload.get("isa_spec_evidence"),
+        expected_gfx_target=expected_gfx_target,
     )
     _verify_audit_coverage(
         payload.get("calibration_coverage"),
@@ -156,11 +171,15 @@ def _verify_audit_contract(
         raise ValueError("architecture audit evidence lacks a GPU identity")
     clock_setup = _audit_mapping(payload.get("clock_setup"), "clock_setup")
     if bool(clock_setup.get("clock_locked_verified")) != expected_clocks_locked:
-        raise ValueError("architecture audit evidence clock-lock state mismatch")
+        raise ValueError(
+            "architecture audit evidence clock-lock state mismatch",
+        )
 
 
 def _verify_audit_isa_spec(
-    value: object, *, expected_gfx_target: str
+    value: object,
+    *,
+    expected_gfx_target: str,
 ) -> tuple[Mapping[str, bool], str]:
     evidence = _audit_mapping(value, "isa_spec_evidence")
     if evidence.get("architecture") != expected_gfx_target:
@@ -174,12 +193,15 @@ def _verify_audit_isa_spec(
     ):
         raise ValueError("architecture audit ISA provenance is incomplete")
     raw_presence = _audit_mapping(
-        evidence.get("instruction_presence"), "instruction presence"
+        evidence.get("instruction_presence"),
+        "instruction presence",
     )
     if not raw_presence or any(
         not isinstance(value, bool) for value in raw_presence.values()
     ):
-        raise ValueError("architecture audit instruction presence must be boolean")
+        raise ValueError(
+            "architecture audit instruction presence must be boolean",
+        )
     return cast(Mapping[str, bool], raw_presence), spec_sha256
 
 
@@ -204,9 +226,13 @@ def _verify_audit_coverage(
         if _audit_string_set(coverage.get(field_name), field_name) != expected:
             raise ValueError(f"architecture audit {field_name} mismatch")
     if covered_precisions != set(expected_precisions):
-        raise ValueError("architecture audit precision calibration coverage mismatch")
+        raise ValueError(
+            "architecture audit precision calibration coverage mismatch",
+        )
     if covered_resource_modes != set(expected_resource_modes):
-        raise ValueError("architecture audit resource calibration coverage mismatch")
+        raise ValueError(
+            "architecture audit resource calibration coverage mismatch",
+        )
 
 
 def _verify_audit_instruction_checks(
@@ -219,12 +245,17 @@ def _verify_audit_instruction_checks(
 ) -> None:
     validation = _audit_mapping(value, "instruction_validation")
     if validation.get("status") != "passed":
-        raise ValueError("architecture audit instruction validation did not pass")
+        raise ValueError(
+            "architecture audit instruction validation did not pass",
+        )
     required = _audit_string_set(
-        validation.get("required_checks"), "instruction required_checks"
+        validation.get("required_checks"),
+        "instruction required_checks",
     )
     if required != set(expected_checks):
-        raise ValueError("architecture audit required instruction checks mismatch")
+        raise ValueError(
+            "architecture audit required instruction checks mismatch",
+        )
     checks = _audit_mapping(validation.get("checks"), "instruction checks")
     if set(checks) != required:
         raise ValueError("architecture audit instruction check set mismatch")
@@ -244,28 +275,38 @@ def _verify_audit_instruction_check(
     instruction_presence: Mapping[str, bool],
     isa_spec_sha256: str,
 ) -> None:
-    if check.get("status") != "passed" or check.get("runtime_probe_passed") is not True:
+    if (
+        check.get("status") != "passed"
+        or check.get("runtime_probe_passed") is not True
+    ):
         raise ValueError("architecture audit instruction check did not pass")
     probe = str(check.get("probe", ""))
     measurement = measurements.get(probe)
     if measurement is None:
         raise ValueError(
-            "architecture audit instruction check references unknown probe"
+            "architecture audit instruction check references unknown probe",
         )
     compiler_isa = _audit_mapping(
-        measurement.get("compiler_isa"), "measurement compiler_isa"
+        measurement.get("compiler_isa"),
+        "measurement compiler_isa",
     )
     compiler_provenance = _audit_mapping(
-        compiler_isa.get("spec_provenance"), "compiler ISA provenance"
+        compiler_isa.get("spec_provenance"),
+        "compiler ISA provenance",
     )
     if compiler_provenance.get("spec_sha256") != isa_spec_sha256:
-        raise ValueError("architecture audit compiler ISA specification mismatch")
+        raise ValueError(
+            "architecture audit compiler ISA specification mismatch",
+        )
     counts = _audit_mapping(
-        compiler_isa.get("matched_instruction_counts"), "matched instruction counts"
+        compiler_isa.get("matched_instruction_counts"),
+        "matched instruction counts",
     )
     instructions = _audit_string_set(check.get("instructions"), "instructions")
     if not instructions.issubset(instruction_presence):
-        raise ValueError("architecture audit instruction is absent from ISA evidence")
+        raise ValueError(
+            "architecture audit instruction is absent from ISA evidence",
+        )
     declared = any(instruction_presence[name] for name in instructions)
     if declared is not check.get("isa_declared"):
         raise ValueError("architecture audit ISA declaration mismatch")
@@ -274,10 +315,29 @@ def _verify_audit_instruction_check(
         for name in instructions
     )
     claimed_emitted = _audit_nonnegative_int(
-        check.get("compiler_emitted_count"), "compiler emitted count"
+        check.get("compiler_emitted_count"),
+        "compiler emitted count",
     )
     if emitted != claimed_emitted:
-        raise ValueError("architecture audit compiler instruction count mismatch")
+        raise ValueError(
+            "architecture audit compiler instruction count mismatch",
+        )
+    _verify_instruction_expectation(
+        check,
+        instruction_presence,
+        counts,
+        instructions,
+        emitted,
+    )
+
+
+def _verify_instruction_expectation(
+    check: Mapping[str, Any],
+    instruction_presence: Mapping[str, bool],
+    counts: Mapping[str, Any],
+    instructions: set[str],
+    emitted: int,
+) -> None:
     expectation = check.get("expectation")
     if expectation == "native":
         if (
@@ -285,17 +345,24 @@ def _verify_audit_instruction_check(
             or emitted <= 0
             or check.get("native_instruction_usable") is not True
         ):
-            raise ValueError("architecture audit native instruction evidence mismatch")
+            raise ValueError(
+                "architecture audit native instruction evidence mismatch",
+            )
         return
     if expectation != "fallback":
-        raise ValueError("architecture audit instruction expectation is invalid")
+        raise ValueError(
+            "architecture audit instruction expectation is invalid",
+        )
     fallback_names = _audit_string_set(
-        check.get("fallback_instructions"), "fallback instructions"
+        check.get("fallback_instructions"),
+        "fallback instructions",
     )
     if not fallback_names.issubset(instruction_presence) or not any(
         instruction_presence[name] for name in fallback_names
     ):
-        raise ValueError("architecture audit fallback is absent from ISA evidence")
+        raise ValueError(
+            "architecture audit fallback is absent from ISA evidence",
+        )
     fallback_count = sum(
         _audit_nonnegative_int(counts.get(name), "fallback instruction count")
         for name in fallback_names
@@ -306,24 +373,29 @@ def _verify_audit_instruction_check(
         or fallback_count <= 0
         or fallback_count
         != _audit_nonnegative_int(
-            check.get("fallback_emitted_count"), "fallback emitted count"
+            check.get("fallback_emitted_count"),
+            "fallback emitted count",
         )
         or check.get("native_instruction_usable") is not False
     ):
-        raise ValueError("architecture audit fallback instruction evidence mismatch")
+        raise ValueError(
+            "architecture audit fallback instruction evidence mismatch",
+        )
 
 
 def _validate_audit_evidence_config(evidence: Mapping[str, Any]) -> None:
     status = str(evidence.get("status", ""))
     if status not in {"verified", "unavailable"}:
-        raise ValueError("audit_evidence.status must be verified or unavailable")
+        raise ValueError(
+            "audit_evidence.status must be verified or unavailable",
+        )
     evidence_sha = str(evidence.get("sha256", ""))
     if evidence_sha:
         try:
             _audit_sha256(evidence_sha, "audit_evidence.sha256")
         except ValueError as exc:
             raise ValueError(
-                "audit_evidence.sha256 must be a lowercase SHA-256"
+                "audit_evidence.sha256 must be a lowercase SHA-256",
             ) from exc
     if status != "verified":
         return
@@ -342,19 +414,23 @@ def _validate_audit_evidence_config(evidence: Mapping[str, Any]) -> None:
     missing_fields = sorted(required_fields - set(evidence))
     if missing_fields:
         raise ValueError(
-            f"verified audit evidence lacks required fields: {missing_fields}"
+            f"verified audit evidence lacks required fields: {missing_fields}",
         )
     required_unthrottled = evidence.get("required_unthrottled")
     evidence_scope = evidence.get("evidence_scope")
     if not isinstance(required_unthrottled, bool):
-        raise ValueError("verified audit evidence requires a boolean throttle policy")
+        raise ValueError(
+            "verified audit evidence requires a boolean throttle policy",
+        )
     expected_scope = (
         UNTHROTTLED_RESOURCE_PEAK_SCOPE
         if required_unthrottled
         else INSTRUCTION_RUNTIME_AUDIT_SCOPE
     )
     if evidence_scope != expected_scope:
-        raise ValueError("verified audit evidence scope contradicts throttle policy")
+        raise ValueError(
+            "verified audit evidence scope contradicts throttle policy",
+        )
     checks = evidence.get("required_instruction_checks")
     if (
         not isinstance(checks, list)
@@ -363,7 +439,7 @@ def _validate_audit_evidence_config(evidence: Mapping[str, Any]) -> None:
         or len(set(checks)) != len(checks)
     ):
         raise ValueError(
-            "verified audit evidence requires unique instruction check names"
+            "verified audit evidence requires unique instruction check names",
         )
 
 
@@ -378,7 +454,8 @@ class MemoryLevel:
     source: str | None = None
 
     @classmethod
-    def load(cls, data: Mapping[str, Any]) -> "MemoryLevel":
+    def load(cls, data: Mapping[str, Any]) -> MemoryLevel:
+        """Build a memory level from serialized profile data."""
         capacity = data.get("capacity_bytes")
         bandwidth = data.get("bandwidth_bytes_per_second")
         return cls(
@@ -390,6 +467,23 @@ class MemoryLevel:
             ),
             source=str(data.get("source", "")) or None,
         )
+
+
+def _load_profile_data(
+    value: str | Path | Mapping[str, Any],
+) -> tuple[dict[str, Any], str | None]:
+    if isinstance(value, Mapping):
+        return {str(key): item for key, item in value.items()}, None
+    path = Path(value)
+    if not path.exists():
+        root = Path(__file__).resolve().parents[2]
+        path = root / "configs" / "arch" / f"{value}.yaml"
+    if path.exists():
+        return yaml.safe_load(path.read_text()) or {}, str(path)
+    resource = resources.files("solar.configs.arch").joinpath(f"{value}.yaml")
+    if not resource.is_file():
+        raise FileNotFoundError(f"Architecture profile not found: {value}")
+    return yaml.safe_load(resource.read_text()) or {}, str(resource)
 
 
 @dataclass(frozen=True)
@@ -408,7 +502,9 @@ class ArchitectureProfile:
     resource_model_version: str = ""
     resource_limits: dict[str, dict[str, float]] = field(default_factory=dict)
     resource_limit_sources: dict[str, str] = field(default_factory=dict)
-    calibration_exempt_modes: dict[str, dict[str, str]] = field(default_factory=dict)
+    calibration_exempt_modes: dict[str, dict[str, str]] = field(
+        default_factory=dict,
+    )
     precision_support: dict[str, dict[str, Any]] = field(default_factory=dict)
     profile_revision: str = ""
     audit_evidence: dict[str, Any] = field(default_factory=dict)
@@ -418,31 +514,13 @@ class ArchitectureProfile:
     memory_hierarchy: tuple[MemoryLevel, ...] = ()
 
     @classmethod
-    def load(cls, value: str | Path | Mapping[str, Any]) -> "ArchitectureProfile":
+    def load(cls, value: str | Path | Mapping[str, Any]) -> ArchitectureProfile:
         """Load a normalized AMD ROCm architecture description."""
-        if isinstance(value, Mapping):
-            data = dict(value)
-            source = None
-        else:
-            path = Path(value)
-            if not path.exists():
-                root = Path(__file__).resolve().parents[2]
-                path = root / "configs" / "arch" / f"{value}.yaml"
-            if path.exists():
-                data = yaml.safe_load(path.read_text()) or {}
-                source = str(path)
-            else:
-                resource = resources.files("solar.configs.arch").joinpath(
-                    f"{value}.yaml"
-                )
-                if not resource.is_file():
-                    raise FileNotFoundError(f"Architecture profile not found: {value}")
-                data = yaml.safe_load(resource.read_text()) or {}
-                source = str(resource)
+        data, source = _load_profile_data(value)
         if "peak_ops_per_second" not in data:
             raise ValueError(
                 "ROCm architecture profiles must define normalized "
-                "peak_ops_per_second fields"
+                "peak_ops_per_second fields",
             )
         profile = cls(
             name=str(data["name"]),
@@ -451,12 +529,13 @@ class ArchitectureProfile:
             compute_units=int(data.get("compute_units", 0)),
             memory_capacity_bytes=int(data.get("memory_capacity_bytes", 0)),
             memory_bandwidth_bytes_per_second=float(
-                data["memory_bandwidth_bytes_per_second"]
+                data["memory_bandwidth_bytes_per_second"],
             ),
             l2_bytes=int(data.get("l2_bytes", 0)),
             last_level_cache_bytes=int(data.get("last_level_cache_bytes", 0)),
             peak_ops_per_second={
-                str(k).lower(): float(v) for k, v in data["peak_ops_per_second"].items()
+                str(k).lower(): float(v)
+                for k, v in data["peak_ops_per_second"].items()
             },
             resource_model_version=str(data.get("resource_model_version", "")),
             resource_limits={
@@ -464,11 +543,15 @@ class ArchitectureProfile:
                     str(mode).lower(): float(rate)
                     for mode, rate in (modes or {}).items()
                 }
-                for resource_name, modes in (data.get("resource_limits") or {}).items()
+                for resource_name, modes in (
+                    data.get("resource_limits") or {}
+                ).items()
             },
             resource_limit_sources={
                 str(key).lower(): str(value)
-                for key, value in (data.get("resource_limit_sources") or {}).items()
+                for key, value in (
+                    data.get("resource_limit_sources") or {}
+                ).items()
             },
             calibration_exempt_modes={
                 str(resource_name).lower(): {
@@ -481,7 +564,9 @@ class ArchitectureProfile:
             },
             precision_support={
                 str(precision).lower(): dict(support or {})
-                for precision, support in (data.get("precision_support") or {}).items()
+                for precision, support in (
+                    data.get("precision_support") or {}
+                ).items()
             },
             profile_revision=str(data.get("profile_revision", "")),
             audit_evidence=dict(data.get("audit_evidence") or {}),
@@ -489,33 +574,50 @@ class ArchitectureProfile:
                 str(k).lower(): str(v).lower()
                 for k, v in (data.get("precision_aliases") or {}).items()
             },
-            clock_hz=(float(data["clock_hz"]) if data.get("clock_hz") else None),
+            clock_hz=(
+                float(data["clock_hz"]) if data.get("clock_hz") else None
+            ),
             source=str(data.get("source") or source or "") or None,
             memory_hierarchy=tuple(
-                MemoryLevel.load(item) for item in (data.get("memory_hierarchy") or [])
+                MemoryLevel.load(item)
+                for item in (data.get("memory_hierarchy") or [])
             ),
         )
         profile.validate()
         return profile
 
     def validate(self) -> None:
+        """Validate all required architecture and audit invariants."""
         if not self.name:
             raise ValueError("architecture name is required")
         if self.vendor.upper() != "AMD":
-            raise ValueError("SOLAR-ROCm accepts AMD architecture profiles only")
+            raise ValueError(
+                "SOLAR-ROCm accepts AMD architecture profiles only",
+            )
         if self.memory_bandwidth_bytes_per_second <= 0:
             raise ValueError("memory bandwidth must be positive")
         if not self.peak_ops_per_second or any(
             value <= 0 for value in self.peak_ops_per_second.values()
         ):
-            raise ValueError("at least one positive peak throughput is required")
+            raise ValueError(
+                "at least one positive peak throughput is required",
+            )
         from solar.analysis.resources import RESOURCE_MODEL_VERSION
 
         if self.resource_model_version != RESOURCE_MODEL_VERSION:
             raise ValueError(
-                f"architecture resource_model_version must be {RESOURCE_MODEL_VERSION}"
+                "architecture resource_model_version must be "
+                f"{RESOURCE_MODEL_VERSION}",
             )
-        required_resources = {
+        self._validate_resource_limits()
+        self._validate_precision_support()
+        if not self.profile_revision:
+            raise ValueError("architecture profile_revision is required")
+        _validate_audit_evidence_config(self.audit_evidence)
+        self._validate_memory_hierarchy()
+
+    def _validate_resource_limits(self) -> None:
+        required = {
             "mfma",
             "valu",
             "sfu",
@@ -524,72 +626,92 @@ class ArchitectureProfile:
             "scan_sort",
             "conversion",
         }
-        if set(self.resource_limits) != required_resources:
-            missing = sorted(required_resources - set(self.resource_limits))
-            extra = sorted(set(self.resource_limits) - required_resources)
+        if set(self.resource_limits) != required:
+            missing = sorted(required - set(self.resource_limits))
+            extra = sorted(set(self.resource_limits) - required)
             raise ValueError(
-                f"resource_limits must define the complete AMD resource set; "
-                f"missing={missing}, extra={extra}"
+                "resource_limits must define the complete AMD resource set; "
+                f"missing={missing}, extra={extra}",
             )
         for resource_name, modes in self.resource_limits.items():
             if not modes or any(value <= 0 for value in modes.values()):
                 raise ValueError(
-                    f"resource limit rates for {resource_name} must be positive"
+                    f"resource limit rates for {resource_name} must be positive",
                 )
             if resource_name not in self.resource_limit_sources:
                 raise ValueError(
-                    f"resource limit source is required for {resource_name}"
+                    f"resource limit source is required for {resource_name}",
                 )
-        for resource_name, exempt_modes in self.calibration_exempt_modes.items():
+        for (
+            resource_name,
+            exempt_modes,
+        ) in self.calibration_exempt_modes.items():
             if resource_name not in self.resource_limits:
                 raise ValueError(
-                    f"calibration exemption has unknown resource {resource_name}"
+                    f"calibration exemption has unknown resource {resource_name}",
                 )
             for mode, reason in exempt_modes.items():
-                if mode not in self.resource_limits[resource_name] or not reason:
+                if (
+                    mode not in self.resource_limits[resource_name]
+                    or not reason
+                ):
                     raise ValueError(
-                        "calibration exemptions require a declared mode and reason"
+                        "calibration exemptions require a declared mode and reason",
                     )
+
+    def _validate_precision_support(self) -> None:
         if set(self.precision_support) != set(self.peak_ops_per_second):
             missing = sorted(
-                set(self.peak_ops_per_second) - set(self.precision_support)
+                set(self.peak_ops_per_second) - set(self.precision_support),
             )
-            extra = sorted(set(self.precision_support) - set(self.peak_ops_per_second))
+            extra = sorted(
+                set(self.precision_support) - set(self.peak_ops_per_second),
+            )
             raise ValueError(
-                "precision_support must describe every published peak precision; "
-                f"missing={missing}, extra={extra}"
+                "precision_support must describe every published peak "
+                f"precision; missing={missing}, extra={extra}",
             )
+        required_fields = {
+            "hardware",
+            "software",
+            "calibration",
+            "evidence",
+        }
         for precision, support in self.precision_support.items():
-            required_fields = {"hardware", "software", "calibration", "evidence"}
             if not required_fields.issubset(support):
                 raise ValueError(
                     f"precision_support.{precision} must define "
-                    f"{sorted(required_fields)}"
+                    f"{sorted(required_fields)}",
                 )
             if support["calibration"] not in {"required", "exempt"}:
                 raise ValueError(
-                    f"precision_support.{precision}.calibration must be required or exempt"
+                    f"precision_support.{precision}.calibration must be "
+                    "required or exempt",
                 )
-            if not all(str(support[field]).strip() for field in required_fields):
+            if not all(
+                str(support[field]).strip() for field in required_fields
+            ):
                 raise ValueError(
-                    f"precision_support.{precision} fields must be non-empty"
+                    f"precision_support.{precision} fields must be non-empty",
                 )
             if (
                 support["calibration"] == "exempt"
                 and not str(support.get("limitation", "")).strip()
             ):
                 raise ValueError(
-                    f"precision_support.{precision} exemption requires a limitation"
+                    f"precision_support.{precision} exemption requires "
+                    "a limitation",
                 )
-        if not self.profile_revision:
-            raise ValueError("architecture profile_revision is required")
-        _validate_audit_evidence_config(self.audit_evidence)
+
+    def _validate_memory_hierarchy(self) -> None:
         names = [level.name for level in self.memory_hierarchy]
         if len(names) != len(set(names)):
             raise ValueError("memory hierarchy level names must be unique")
         for level in self.memory_hierarchy:
             if not level.name or not level.scope:
-                raise ValueError("memory hierarchy levels require name and scope")
+                raise ValueError(
+                    "memory hierarchy levels require name and scope",
+                )
             if level.capacity_bytes is not None and level.capacity_bytes <= 0:
                 raise ValueError("memory hierarchy capacities must be positive")
             if (
@@ -602,27 +724,41 @@ class ArchitectureProfile:
         """Reject formal use when the resource audit is not verified and present."""
         if self.audit_evidence.get("status") != "verified":
             reason = self.audit_evidence.get("reason_code", "not_verified")
-            raise ValueError(f"architecture audit evidence unavailable: {reason}")
+            raise ValueError(
+                f"architecture audit evidence unavailable: {reason}",
+            )
         path_value = str(self.audit_evidence.get("path", ""))
         if not path_value:
-            raise ValueError("verified architecture audit evidence lacks a path")
+            raise ValueError(
+                "verified architecture audit evidence lacks a path",
+            )
         profile_path = _packaged_profile_path(self.name)
         evidence_path = profile_path.parents[2] / path_value
         verify_resource_peak_audit(
             evidence_path,
             expected_sha256=str(self.audit_evidence["sha256"]),
-            expected_schema_version=str(self.audit_evidence["required_schema_version"]),
-            expected_timing_profile=str(self.audit_evidence["required_timing_profile"]),
-            expected_clocks_locked=bool(self.audit_evidence["required_clocks_locked"]),
-            expected_unthrottled=bool(self.audit_evidence["required_unthrottled"]),
+            expected_schema_version=str(
+                self.audit_evidence["required_schema_version"],
+            ),
+            expected_timing_profile=str(
+                self.audit_evidence["required_timing_profile"],
+            ),
+            expected_clocks_locked=bool(
+                self.audit_evidence["required_clocks_locked"],
+            ),
+            expected_unthrottled=bool(
+                self.audit_evidence["required_unthrottled"],
+            ),
             expected_gfx_target=str(self.audit_evidence["gfx_target"]),
             expected_precisions=self.required_calibration_precisions(),
             expected_resource_modes=self.required_calibration_resource_modes(),
             expected_instruction_checks=tuple(
                 sorted(
                     str(item)
-                    for item in self.audit_evidence["required_instruction_checks"]
-                )
+                    for item in self.audit_evidence[
+                        "required_instruction_checks"
+                    ]
+                ),
             ),
         )
 
@@ -633,7 +769,7 @@ class ArchitectureProfile:
                 precision
                 for precision, support in self.precision_support.items()
                 if support["calibration"] == "required"
-            )
+            ),
         )
 
     def required_calibration_resource_modes(self) -> tuple[str, ...]:
@@ -644,16 +780,17 @@ class ArchitectureProfile:
                 for resource, modes in self.resource_limits.items()
                 for mode in modes
                 if mode not in self.calibration_exempt_modes.get(resource, {})
-            )
+            ),
         )
 
     def peak_for(self, precision: str) -> float:
+        """Return peak operations per second for a normalized precision."""
         key = self.normalize_precision(precision)
         try:
             return self.peak_ops_per_second[key]
         except KeyError as exc:
             raise ValueError(
-                f"Precision {precision!r} is not supported by {self.name}"
+                f"Precision {precision!r} is not supported by {self.name}",
             ) from exc
 
     def normalize_precision(self, precision: str) -> str:
@@ -661,7 +798,11 @@ class ArchitectureProfile:
         key = _PRECISION_ALIASES.get(precision.lower(), precision.lower())
         return self.precision_aliases.get(key, key)
 
-    def tensor_precision(self, dtype: object, fallback: str | None = None) -> str:
+    def tensor_precision(
+        self,
+        dtype: object,
+        fallback: str | None = None,
+    ) -> str:
         """Resolve a tensor dtype without merging incompatible vendor formats."""
         key = str(dtype or "").strip().lower()
         if key.startswith("torch."):
@@ -670,13 +811,16 @@ class ArchitectureProfile:
             precision = self.normalize_precision(key)
             if precision == key or precision not in self.peak_ops_per_second:
                 raise ValueError(
-                    f"Tensor dtype {key!r} is not supported by {self.name}"
+                    f"Tensor dtype {key!r} is not supported by {self.name}",
                 )
             return precision
         return normalize_dtype(key, fallback)
 
     def theoretical_seconds(
-        self, flops: float, fused_bytes: float, precision: str
+        self,
+        flops: float,
+        fused_bytes: float,
+        precision: str,
     ) -> float:
         """Return max(compute time, memory time), the published SOL lower bound."""
         return max(
@@ -685,14 +829,18 @@ class ArchitectureProfile:
         )
 
     def theoretical_seconds_by_precision(
-        self, macs_by_precision: Mapping[str, float], fused_bytes: float
+        self,
+        macs_by_precision: Mapping[str, float],
+        fused_bytes: float,
     ) -> float:
         """Return SOL using the artifact's per-operation compute precisions."""
         compute_seconds = sum(
             2.0 * float(macs) / self.peak_for(precision)
             for precision, macs in macs_by_precision.items()
         )
-        memory_seconds = float(fused_bytes) / self.memory_bandwidth_bytes_per_second
+        memory_seconds = (
+            float(fused_bytes) / self.memory_bandwidth_bytes_per_second
+        )
         return max(compute_seconds, memory_seconds)
 
     def resource_rate_for(self, resource: str, mode: str) -> float:
@@ -703,18 +851,19 @@ class ArchitectureProfile:
             modes = self.resource_limits[resource_name]
         except KeyError as exc:
             raise ValueError(
-                f"Resource {resource!r} is not supported by {self.name}"
+                f"Resource {resource!r} is not supported by {self.name}",
             ) from exc
         if mode_name in modes:
             return modes[mode_name]
         if "generic" in modes:
             return modes["generic"]
         raise ValueError(
-            f"Resource mode {resource_name}:{mode_name} is not supported by {self.name}"
+            f"Resource mode {resource_name}:{mode_name} is not supported by {self.name}",
         )
 
     def resource_seconds(
-        self, resource_work: Mapping[str, Mapping[str, float]]
+        self,
+        resource_work: Mapping[str, Mapping[str, float]],
     ) -> dict[str, float]:
         """Reduce graph counters to per-pipeline times.
 
@@ -737,7 +886,9 @@ class ArchitectureProfile:
         """Return the resource-aware compute/memory overlapped SOL bound."""
         resource_times = self.resource_seconds(resource_work)
         compute_seconds = max(resource_times.values(), default=0.0)
-        memory_seconds = float(fused_bytes) / self.memory_bandwidth_bytes_per_second
+        memory_seconds = (
+            float(fused_bytes) / self.memory_bandwidth_bytes_per_second
+        )
         return max(compute_seconds, memory_seconds)
 
     @property
@@ -746,6 +897,7 @@ class ArchitectureProfile:
         return max(self.l2_bytes, self.last_level_cache_bytes)
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible architecture profile."""
         return {
             "name": self.name,
             "vendor": self.vendor,

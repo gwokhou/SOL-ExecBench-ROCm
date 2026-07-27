@@ -14,15 +14,17 @@ from sol_execbench.core.dataset.aka_task import (
     AkaTask,
     correctness_runner_path,
     extract_function_source,
+    function_arg_names,
     functional_reference_path,
     functional_reference_text,
-    function_arg_names,
     iter_suite_tasks,
     materialize_get_inputs,
     read_task,
 )
 
-FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "aka" / "sample_func.py"
+FIXTURE = (
+    Path(__file__).resolve().parents[2] / "fixtures" / "aka" / "sample_func.py"
+)
 
 
 def test_extract_module_fn_source_lifts_the_function_body():
@@ -56,7 +58,9 @@ def _task(tmp_path: Path, config: dict[str, object]) -> AkaTask:
     return read_task(tmp_path, "tasks/torch2hip/example")
 
 
-def test_read_task_exposes_closed_properties_and_missing_config(tmp_path) -> None:
+def test_read_task_exposes_closed_properties_and_missing_config(
+    tmp_path,
+) -> None:
     task = _task(
         tmp_path,
         {
@@ -81,7 +85,8 @@ def test_read_task_exposes_closed_properties_and_missing_config(tmp_path) -> Non
     ],
 )
 def test_functional_reference_resolves_command_argument(
-    tmp_path, argument: str
+    tmp_path,
+    argument: str,
 ) -> None:
     task = _task(
         tmp_path,
@@ -94,7 +99,9 @@ def test_functional_reference_resolves_command_argument(
     assert functional_reference_text(task) == reference.read_text()
 
 
-def test_functional_reference_fallback_requires_exactly_one_file(tmp_path) -> None:
+def test_functional_reference_fallback_requires_exactly_one_file(
+    tmp_path,
+) -> None:
     task = _task(tmp_path, {})
     directory = task.root / "pytorch_code_functional"
     directory.mkdir()
@@ -120,7 +127,7 @@ def test_correctness_runner_ignores_invalid_commands_and_uses_last_python_file(
             "correctness_command": [
                 "unterminated '",
                 "python helper.py runner.py --flag",
-            ]
+            ],
         },
     )
     (task.root / "helper.py").write_text("")
@@ -148,11 +155,16 @@ def test_correctness_runner_ignores_invalid_commands_and_uses_last_python_file(
     ],
 )
 def test_materialize_get_inputs_supports_iterators_and_factories(
-    tmp_path, source: str
+    tmp_path,
+    source: str,
 ) -> None:
     task = _task(
         tmp_path,
-        {"correctness_command": ["python check.py --py_func_file reference.py"]},
+        {
+            "correctness_command": [
+                "python check.py --py_func_file reference.py",
+            ],
+        },
     )
     (task.root / "reference.py").write_text(source)
 
@@ -165,7 +177,11 @@ def test_materialize_get_inputs_supports_iterators_and_factories(
 def test_materialize_get_inputs_requires_generator(tmp_path) -> None:
     task = _task(
         tmp_path,
-        {"correctness_command": ["python check.py --py_func_file reference.py"]},
+        {
+            "correctness_command": [
+                "python check.py --py_func_file reference.py",
+            ],
+        },
     )
     (task.root / "reference.py").write_text("VALUE = 1\n")
 

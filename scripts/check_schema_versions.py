@@ -6,8 +6,8 @@ from __future__ import annotations
 import re
 import subprocess
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from sol_execbench.core.integrity.schema_versions import CURRENT_SCHEMA_VERSIONS
 
@@ -44,7 +44,10 @@ TEXT_SUFFIXES = {
 }
 
 
-def audit_text(path: Path, content: str) -> tuple[list[str], dict[str, set[str]]]:
+def audit_text(
+    path: Path,
+    content: str,
+) -> tuple[list[str], dict[str, set[str]]]:
     """Return findings and schema IDs grouped by family for one file."""
     findings: list[str] = []
     families: dict[str, set[str]] = defaultdict(set)
@@ -52,9 +55,16 @@ def audit_text(path: Path, content: str) -> tuple[list[str], dict[str, set[str]]
         family = VERSION_SUFFIX_RE.sub("", schema_id)
         families[family].add(schema_id)
         if schema_id not in CURRENT_SCHEMA_VERSIONS:
-            findings.append(f"{path}: unsupported schema identifier {schema_id}")
-    if UPSTREAM_TOLERANCE_FIELD in content and path not in UPSTREAM_FIELD_ALLOWLIST:
-        findings.append(f"{path}: upstream tolerance name escaped the import boundary")
+            findings.append(
+                f"{path}: unsupported schema identifier {schema_id}",
+            )
+    if (
+        UPSTREAM_TOLERANCE_FIELD in content
+        and path not in UPSTREAM_FIELD_ALLOWLIST
+    ):
+        findings.append(
+            f"{path}: upstream tolerance name escaped the import boundary",
+        )
     return findings, families
 
 
@@ -73,7 +83,9 @@ def audit_paths(paths: Iterable[Path]) -> list[str]:
             families[family].update(versions)
     for family, versions in sorted(families.items()):
         if len(versions) > 1:
-            findings.append(f"{family}: multiple schema versions: {sorted(versions)}")
+            findings.append(
+                f"{family}: multiple schema versions: {sorted(versions)}",
+            )
     return findings
 
 
@@ -98,7 +110,12 @@ def first_party_paths() -> tuple[Path, ...]:
 
 def main() -> int:
     """Run the repository schema audit."""
-    retired_roots = (".planning", ".superpowers", "docs/examples", "docs/releases")
+    retired_roots = (
+        ".planning",
+        ".superpowers",
+        "docs/examples",
+        "docs/releases",
+    )
     findings = [
         f"retired archive root still exists: {path}"
         for path in retired_roots

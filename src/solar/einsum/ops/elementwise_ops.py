@@ -23,19 +23,19 @@ This module provides einsum handlers for:
 import string
 from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShapes, TensorShape
 
 
 class UnaryElementwiseHandler(EinsumOpHandler):
     """Handler for unary elementwise operations."""
 
-    supported_ops = [
+    supported_ops = (
         "relu",
         "leaky_relu",
         "prelu",
@@ -74,13 +74,18 @@ class UnaryElementwiseHandler(EinsumOpHandler):
         "dropout_",
         "bitwise_not",
         "__invert__",
-    ]
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for unary elementwise operation."""
-        input_shape = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        input_shape = (
+            tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -88,7 +93,9 @@ class UnaryElementwiseHandler(EinsumOpHandler):
         return self._generate_elementwise_einsum(input_shape, op_name)
 
     def _generate_elementwise_einsum(
-        self, shape: TensorShape, op_type: str = "elementwise"
+        self,
+        shape: TensorShape,
+        op_type: str = "elementwise",
     ) -> EinsumOp:
         """Generate einsum for unary elementwise operations.
 
@@ -98,6 +105,7 @@ class UnaryElementwiseHandler(EinsumOpHandler):
 
         Returns:
             EinsumOp for the elementwise operation.
+
         """
         dims = len(shape)
         labels = string.ascii_uppercase[:dims]
@@ -125,7 +133,7 @@ class UnaryElementwiseHandler(EinsumOpHandler):
 class BinaryElementwiseHandler(EinsumOpHandler):
     """Handler for binary elementwise operations."""
 
-    supported_ops = [
+    supported_ops = (
         "add",
         "sub",
         "mul",
@@ -158,13 +166,18 @@ class BinaryElementwiseHandler(EinsumOpHandler):
         "bitwise_and",
         "__and__",
         "masked_fill",
-    ]
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for binary elementwise operation."""
-        input_shape = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        input_shape = (
+            tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -186,7 +199,9 @@ class BinaryElementwiseHandler(EinsumOpHandler):
 
         if input_1_shape is not None:
             einsum_op = self._generate_binary_elementwise_einsum(
-                input_shape, input_1_shape, op_type
+                input_shape,
+                input_1_shape,
+                op_type,
             )
             shapes_dict = {
                 "inputs": [list(input_shape), list(input_1_shape)],
@@ -195,7 +210,10 @@ class BinaryElementwiseHandler(EinsumOpHandler):
             return self._validate_einsum(einsum_op, shapes_dict)
 
         # Fallback to unary (scalar broadcast case)
-        einsum_op = self._generate_unary_elementwise_einsum(input_shape, op_type)
+        einsum_op = self._generate_unary_elementwise_einsum(
+            input_shape,
+            op_type,
+        )
         shapes_dict = {
             "inputs": [list(input_shape)],
             "outputs": [list(output_shape)] if output_shape else [],
@@ -203,7 +221,10 @@ class BinaryElementwiseHandler(EinsumOpHandler):
         return self._validate_einsum(einsum_op, shapes_dict)
 
     def _generate_binary_elementwise_einsum(
-        self, input_shape: TensorShape, input_1_shape: TensorShape, op_type: str = "add"
+        self,
+        input_shape: TensorShape,
+        input_1_shape: TensorShape,
+        op_type: str = "add",
     ) -> EinsumOp:
         """Generate einsum for binary elementwise operations with broadcasting.
 
@@ -219,6 +240,7 @@ class BinaryElementwiseHandler(EinsumOpHandler):
 
         Returns:
             EinsumOp for the binary elementwise operation.
+
         """
         # A 0-dim (scalar) operand is allowed: it broadcasts against the other
         # operand and is read once (empty label list -> empty projection). This
@@ -226,18 +248,20 @@ class BinaryElementwiseHandler(EinsumOpHandler):
         # Handle broadcasting: compute output shape
         max_dims = max(len(input_shape), len(input_1_shape))
 
-        # Pad shorter shape with 1s at the front (broadcasting aligns from right)
+        # Prefix a shorter shape with ones for right-aligned broadcasting.
         padded_input = [1] * (max_dims - len(input_shape)) + list(input_shape)
-        padded_input_1 = [1] * (max_dims - len(input_1_shape)) + list(input_1_shape)
+        padded_input_1 = [1] * (max_dims - len(input_1_shape)) + list(
+            input_1_shape,
+        )
 
         # Compute broadcast output shape
         output_shape = []
-        for d1, d2 in zip(padded_input, padded_input_1):
+        for d1, d2 in zip(padded_input, padded_input_1, strict=True):
             if d1 == d2 or d1 == 1 or d2 == 1:
                 output_shape.append(max(d1, d2))
             else:
                 raise ValueError(
-                    f"Incompatible shapes for broadcasting: {input_shape} and {input_1_shape}"
+                    f"Incompatible shapes for broadcasting: {input_shape} and {input_1_shape}",
                 )
 
         # Generate dimension labels for output (full rank)
@@ -267,7 +291,9 @@ class BinaryElementwiseHandler(EinsumOpHandler):
         )
 
     def _generate_unary_elementwise_einsum(
-        self, shape: TensorShape, op_type: str
+        self,
+        shape: TensorShape,
+        op_type: str,
     ) -> EinsumOp:
         """Generate einsum for scalar broadcast case."""
         dims = len(shape)

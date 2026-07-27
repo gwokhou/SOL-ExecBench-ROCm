@@ -7,11 +7,10 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from sol_execbench.cli.evaluation import evaluator
-from sol_execbench.cli.evaluation import problem_io
+from sol_execbench.cli.evaluation import evaluator, problem_io
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
-from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.cli.protocol import CliFailure
+from sol_execbench.core.bench.config import BenchmarkConfig
 
 
 @pytest.mark.parametrize("keep_staging", [False, True])
@@ -86,12 +85,13 @@ def test_staging_scope_handles_failure_before_packager_construction(
 
 
 def test_materialized_problem_rejects_wrong_exact_device_target(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     problem_dir = tmp_path / "torch2hip" / "problem"
     problem_dir.mkdir(parents=True)
     (tmp_path / "materialization-manifest.yaml").write_text(
-        yaml.safe_dump({"target": {"gfx_target": "gfx942"}})
+        yaml.safe_dump({"target": {"gfx_target": "gfx942"}}),
     )
     monkeypatch.setattr(
         problem_io,
@@ -106,12 +106,13 @@ def test_materialized_problem_rejects_wrong_exact_device_target(
 
 
 def test_materialized_problem_accepts_matching_exact_device_target(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     problem_dir = tmp_path / "torch2hip" / "problem"
     problem_dir.mkdir(parents=True)
     (tmp_path / "materialization-manifest.yaml").write_text(
-        yaml.safe_dump({"target": {"gfx_target": "gfx1150"}})
+        yaml.safe_dump({"target": {"gfx_target": "gfx1150"}}),
     )
     monkeypatch.setattr(
         problem_io,
