@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from collections.abc import Callable, Mapping
@@ -23,6 +24,10 @@ from sol_execbench.cli.evaluation.diagnostics import (
     _write_no_trace_diagnostics_sidecar,
 )
 from sol_execbench.cli.sidecars.profile import _profile_output_directory
+from sol_execbench.core.bench.clock_lock import (
+    ClockLockLease,
+    acquire_clock_lock,
+)
 from sol_execbench.core.bench.io import flashinfer_safetensors_env
 from sol_execbench.core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,
@@ -54,7 +59,9 @@ __all__ = [
 ]
 
 console = Console(stderr=True)
+logger = logging.getLogger(__name__)
 EnvironmentBuilder = Callable[[Mapping[str, str]], dict[str, str]]
+ClockLocker = Callable[[], ClockLockLease]
 
 
 class ProfileCollector(Protocol):
@@ -149,8 +156,30 @@ def _run_profiled_evaluation(
     subprocess_run: TextSubprocessRunner | None = None,
     rocprofv3_available: bool | None = None,
     profile_collector: ProfileCollector = collect_rocprofv3_profile,
+    clock_locker: ClockLocker = acquire_clock_lock,
 ) -> tuple[subprocess.CompletedProcess[str] | None, Rocprofv3ProfileResult]:
-    """Run evaluation under `rocprofv3`, returning normal execution on failure."""
+    """Run evaluation under `rocprofv3`, returning normal execution on failure.
+
+    The rocprofv3 collection is wrapped in a best-effort STABLE_PEAK clock lock.
+
+    Why we lock the clock: on gfx1200 (RDNA4) the SQ perf counter
+    ``SQ_WAVE_CYCLES`` (event 24) reads exactly zero under the default ``AUTO``
+    power policy, because the dVFS shader-clock transitions suppress its
+    increment. That silently corrupts every derived occupancy/stall metric
+    (``MeanOccupancyPerCU``, ``OccupancyPercent``, ``WAVE_DEP_WAIT``,
+    ``WAVE_ISSUE_WAIT``). Holding a stable power state removes the transitions
+    so the counter accumulates normally; ``STABLE_PEAK`` is chosen over AMD's
+    ``STABLE_STD`` because it keeps a representative high SCLK/MCLK mix, whereas
+    STD collapses MCLK and bandwidth-starves the kernel (see issue for data).
+    Background: https://github.com/ROCm/rocm-systems/issues/8523 and AMD's
+    stable-power-state guidance in the rocprofiler-sdk limitations doc.
+
+    The lock comes from :func:`acquire_clock_lock`: idempotent (an outer
+    STABLE_PEAK is preserved, never released by this inner acquire) and
+    best-effort -- if the lock is unsupported or unavailable, profiling still
+    runs unlocked and a warning is logged that gfx1200 counters may be
+    unreliable.
+    """
     output_directory = _profile_output_directory(output_file, staging_dir)
     request = Rocprofv3ProfileRequest(
         application_command=tuple(eval_cmd),
@@ -163,17 +192,30 @@ def _run_profiled_evaluation(
         rocprofv3_available = (
             resolve_rocm_tool(ROCPROFV3_EXECUTABLE) is not None
         )
-    profile_result = profile_collector(
-        request,
-        rocprofv3_available=rocprofv3_available,
-        runner=lambda command, cwd, timeout_seconds: _run_command(
-            list(command),
-            cwd=cwd,
-            timeout=timeout_seconds,
-            env=_evaluation_env(staging_dir, env_builder, graceful_exit=True),
-            runner=subprocess_run,
-        ),
-    )
+    # gfx1200: SQ_WAVE_CYCLES reads zero under AUTO/dVFS (ROCm issue #8523,
+    # https://github.com/ROCm/rocm-systems/issues/8523). Hold STABLE_PEAK for
+    # the rocprofv3 collection so the counter and its derived occupancy/stall
+    # metrics are valid. Idempotent vs an outer lock; best-effort skip below.
+    with clock_locker() as clock_lease:
+        if not clock_lease.locked:
+            logger.warning(
+                "rocprofv3 profiling is running without a STABLE_PEAK clock "
+                "lock; on gfx1200 SQ_WAVE_CYCLES and derived occupancy/stall "
+                "metrics may read zero (ROCm issue #8523).",
+            )
+        profile_result = profile_collector(
+            request,
+            rocprofv3_available=rocprofv3_available,
+            runner=lambda command, cwd, timeout_seconds: _run_command(
+                list(command),
+                cwd=cwd,
+                timeout=timeout_seconds,
+                env=_evaluation_env(
+                    staging_dir, env_builder, graceful_exit=True
+                ),
+                runner=subprocess_run,
+            ),
+        )
     if profile_result.succeeded:
         profiled_proc = subprocess.CompletedProcess(
             args=list(profile_result.command),

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
+#
+# DEPRECATED: the SOL ExecBench harness now locks STABLE_PEAK inside its
+# rocprofv3 profiling path, so harness profiling no longer needs this wrapper.
+# This installer is retained only for standalone rocprofv3 use. See README.md.
 
 set -euo pipefail
 
@@ -21,6 +25,10 @@ readonly SUDO_BIN="${SOL_EXECBENCH_SUDO:-sudo}"
 
 usage() {
   cat <<'EOF'
+DEPRECATED — the SOL ExecBench harness now locks STABLE_PEAK automatically
+during rocprofv3 profiling, so harness runs no longer need this wrapper.
+This installer is retained only for standalone rocprofv3 use. See README.md.
+
 Install the gfx1200 SQ_WAVE_CYCLES local workaround.
 
 Usage:
