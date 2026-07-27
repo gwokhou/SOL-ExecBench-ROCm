@@ -41,16 +41,6 @@ class EinsumOperand:
     stride: dict[str, int] | None = None
     dilation: dict[str, int] | None = None
 
-    def to_timeloop_dataspace(self) -> dict[str, Any]:
-        """Convert to timeloop dataspace format."""
-        dataspace = {
-            "name": self.name,
-            "projection": self.dims,
-        }
-        if self.is_output:
-            dataspace["read_write"] = "true"
-        return dataspace
-
 
 @dataclass
 class EinsumOp:
@@ -83,16 +73,6 @@ class EinsumOp:
         True  # Can this op be expressed with extended einsum?
     )
 
-    @property
-    def input_operands(self) -> list[EinsumOperand]:
-        """Get input operands."""
-        return [op for op in self.operands if not op.is_output]
-
-    @property
-    def output_operands(self) -> list[EinsumOperand]:
-        """Get output operands."""
-        return [op for op in self.operands if op.is_output]
-
     def get_compute_cost(self, tensor_shapes: TensorShapes) -> int:
         """Calculate compute cost from einsum rank dimensions.
 
@@ -103,22 +83,6 @@ class EinsumOp:
         Total cost = product of all unique resolved rank dimension sizes.
         """
         return compute_cost_from_equation(self.equation, tensor_shapes)
-
-    def to_torch_einsum(self, tensor_names: list[str] | None = None) -> str:
-        """Convert to torch.einsum format."""
-        input_operands = self.input_operands
-
-        if tensor_names is None:
-            tensor_names = [op.name for op in input_operands]
-        elif len(tensor_names) != len(input_operands):
-            raise ValueError(
-                f"Number of tensor names ({len(tensor_names)}) must match "
-                f"number of input operands ({len(input_operands)})",
-            )
-
-        equation_str = f"'{self.equation}'"
-        tensor_args = ", ".join(tensor_names)
-        return f"torch.einsum({equation_str}, {tensor_args})"
 
 
 def _parse_dim_atoms(dim: str) -> list[str]:
@@ -248,18 +212,6 @@ class EinsumOpHandler(ABC):
 
         """
 
-    def can_handle(self, op_name: str) -> bool:
-        """Check if this handler can process the given operation.
-
-        Args:
-            op_name: Normalized operation name.
-
-        Returns:
-            True if this handler supports the operation.
-
-        """
-        return op_name.lower() in [op.lower() for op in self.supported_ops]
-
     def _validate_einsum(
         self,
         einsum_op: "EinsumOp",
@@ -378,64 +330,6 @@ class EinsumOpHandler(ABC):
             reduction_op=einsum_op.reduction_op,
             is_einsum_supportable=einsum_op.is_einsum_supportable,
         )
-
-
-@dataclass
-class AFOperand:
-    """One tensor access in AccelForge (AF) einsum YAML.
-
-    - dims_lowercase: Labels in the current (renamed) einsum equation. The projection
-      targets AccelForge uses for this access.
-    - dims_uppercase: Optional parallel list of labels from the input graph node's
-      tensor notation. If None, don't do renaming and use the dims_lowercase list as is.
-    """
-
-    name: str
-    dims_lowercase: list[str]
-    dims_uppercase: list[str] | None = None
-    is_output: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dict to finally dump to AF yaml."""
-        operand = {}
-        operand["name"] = self.name
-        operand["projection"] = (
-            [d.lower() for d in self.dims_lowercase]
-            if self.dims_uppercase is None
-            else {
-                d.upper(): pr.lower()
-                for d, pr in zip(
-                    self.dims_uppercase, self.dims_lowercase, strict=True
-                )
-            }
-        )
-        if self.is_output:
-            operand["output"] = True
-        return operand
-
-
-@dataclass
-class AFOp:
-    """Represents an operation in AccelForge (AF) einsum format.
-
-    - tensor_accesses: List of tensor accesses.
-    - is_copy_operation: Used to copy input tensors into memory.
-    """
-
-    name: str
-    tensor_accesses: list[AFOperand]
-    is_copy_operation: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dict to finally dump to AF yaml."""
-        op_dict = {}
-        op_dict["name"] = self.name
-        if self.is_copy_operation:
-            op_dict["is_copy_operation"] = True
-        op_dict["tensor_accesses"] = [
-            operand.to_dict() for operand in self.tensor_accesses
-        ]
-        return op_dict
 
 
 __all__ = [

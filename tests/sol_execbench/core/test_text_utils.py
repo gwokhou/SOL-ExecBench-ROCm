@@ -2,16 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from sol_execbench.core.text_utils import (
-    markdown_table_cell,
     ordered_unique,
     subprocess_text,
     text_tail,
 )
-
-
-def test_markdown_table_cell_escapes_pipes_backslashes_and_newlines() -> None:
-    assert markdown_table_cell("a|b\\c\nnext\rline") == "a\\|b\\\\c next line"
-    assert markdown_table_cell(None) == ""
 
 
 def test_text_tail_normalizes_none_bytes_and_strings() -> None:

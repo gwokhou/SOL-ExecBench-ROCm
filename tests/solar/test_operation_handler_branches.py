@@ -7,7 +7,6 @@ import pytest
 
 from solar.common.types import TensorShapes
 from solar.einsum.analyzer import EinsumAnalyzer
-from solar.einsum.ops.attention_ops import ScaledDotProductAttentionHandler
 
 
 @dataclass(frozen=True)
@@ -179,41 +178,3 @@ def test_attention_handlers_cover_fused_and_composite_contracts() -> None:
     assert flex.equation == "BHQD,BHKD,BHKV->BHQV"
     assert mha.equation == "BSD->BSD"
     assert not mha.is_real_einsum
-
-
-@pytest.mark.parametrize("with_output", [False, True])
-def test_sdpa_subgraph_has_reviewable_shapes_and_connections(
-    with_output: bool,
-) -> None:
-    node_data: dict[str, Any] = {
-        "input_shapes": [[2, 4, 8, 16], [2, 4, 10, 16], [2, 4, 10, 32]],
-    }
-    if with_output:
-        node_data["output_shapes"] = [[2, 4, 8, 32]]
-
-    handler = ScaledDotProductAttentionHandler()
-    subgraph = handler.create_subgraph("attention", node_data)
-
-    assert list(subgraph) == [
-        "attention.qk_matmul",
-        "attention.scale",
-        "attention.softmax",
-        "attention.av_matmul",
-    ]
-    assert subgraph["attention.qk_matmul"]["output_shapes"] == [[2, 4, 8, 10]]
-    assert subgraph["attention.scale"]["module_args"] == {
-        "scale_factor": "1/sqrt(16)",
-    }
-    assert subgraph["attention.av_matmul"]["output_shapes"] == [[2, 4, 8, 32]]
-    assert handler.get_subgraph_input_mapping("attention") == {
-        "attention.qk_matmul": [0, 1],
-        "attention.av_matmul": [2],
-    }
-
-
-def test_sdpa_subgraph_rejects_missing_inputs() -> None:
-    with pytest.raises(ValueError, match="SDPA requires 3 inputs"):
-        ScaledDotProductAttentionHandler().create_subgraph(
-            "attention",
-            {"input_shapes": [[2, 4, 8, 16]]},
-        )

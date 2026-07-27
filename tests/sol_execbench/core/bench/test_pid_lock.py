@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import json
 import select
 import subprocess
 import sys
@@ -25,10 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from sol_execbench.core.bench.pid_lock import (
-    acquire_pid_lock,
-    read_pid_lock_contention_marker,
-)
+from sol_execbench.core.bench.pid_lock import acquire_pid_lock
 
 _MODULE = "sol_execbench.core.bench.pid_lock"
 
@@ -207,34 +203,3 @@ with acquire_pid_lock(output_dir):
         with acquire_pid_lock(nested_dir):
             assert nested_dir.exists()
             assert (nested_dir / ".sol-execbench.lock").exists()
-
-
-class TestReadContentionMarker:
-    """Test read_pid_lock_contention_marker function."""
-
-    def test_returns_false_when_no_marker(self, tmp_path):
-        assert read_pid_lock_contention_marker(tmp_path) is False
-
-    def test_returns_true_when_valid_marker_exists(self, tmp_path):
-        marker = tmp_path / ".sol-execbench-lock-contention.json"
-        marker.write_text(
-            json.dumps({"pid_lock_contention": True}) + "\n",
-            encoding="utf-8",
-        )
-        assert read_pid_lock_contention_marker(tmp_path) is True
-        assert not marker.exists(), "Marker should be consumed after reading"
-
-    def test_returns_false_when_marker_has_false_value(self, tmp_path):
-        marker = tmp_path / ".sol-execbench-lock-contention.json"
-        marker.write_text(
-            json.dumps({"pid_lock_contention": False}) + "\n",
-            encoding="utf-8",
-        )
-        assert read_pid_lock_contention_marker(tmp_path) is False
-        assert not marker.exists()
-
-    def test_returns_false_for_invalid_json_and_cleans_up(self, tmp_path):
-        marker = tmp_path / ".sol-execbench-lock-contention.json"
-        marker.write_text("not json", encoding="utf-8")
-        assert read_pid_lock_contention_marker(tmp_path) is False
-        assert not marker.exists()

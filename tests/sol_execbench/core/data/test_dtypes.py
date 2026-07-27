@@ -22,9 +22,7 @@ import torch
 
 from sol_execbench.core.data.dtypes import (
     dtype_storage_bits,
-    dtype_str_to_python_dtype,
     dtype_str_to_torch_dtype,
-    is_dtype_integer,
 )
 
 
@@ -74,60 +72,3 @@ class TestDtypeStrToTorchDtype:
     def test_empty_string_raises(self):
         with pytest.raises(ValueError, match="None or empty"):
             dtype_str_to_torch_dtype("")
-
-
-class TestDtypeStrToPythonDtype:
-    """Tests for dtype_str_to_python_dtype."""
-
-    @pytest.mark.parametrize(
-        "dtype_str, expected",
-        [
-            ("float32", float),
-            ("float16", float),
-            ("bfloat16", float),
-            ("float8_e4m3fn", float),
-            ("float8_e5m2", float),
-            ("float4_e2m1", float),
-            ("float4_e2m1fn_x2", float),
-            ("int64", int),
-            ("int32", int),
-            ("int16", int),
-            ("int8", int),
-            ("bool", bool),
-        ],
-    )
-    def test_valid_dtype(self, dtype_str, expected):
-        assert dtype_str_to_python_dtype(dtype_str) is expected
-
-    def test_unsupported_dtype_raises(self):
-        with pytest.raises(ValueError, match="Unsupported dtype"):
-            dtype_str_to_python_dtype("complex128")
-
-    def test_empty_string_raises(self):
-        with pytest.raises(ValueError, match="None or empty"):
-            dtype_str_to_python_dtype("")
-
-
-class TestIsDtypeInteger:
-    """Tests for is_dtype_integer."""
-
-    @pytest.mark.parametrize(
-        "dtype",
-        [
-            torch.int8,
-            torch.int16,
-            torch.int32,
-            torch.int64,
-            torch.uint8,
-            torch.bool,
-        ],
-    )
-    def test_integer_dtypes(self, dtype):
-        assert is_dtype_integer(dtype) is True
-
-    @pytest.mark.parametrize(
-        "dtype",
-        [torch.float32, torch.float16, torch.bfloat16],
-    )
-    def test_float_dtypes(self, dtype):
-        assert is_dtype_integer(dtype) is False

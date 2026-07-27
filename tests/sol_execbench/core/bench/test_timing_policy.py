@@ -7,7 +7,6 @@ from sol_execbench.core.bench.timing_policy import (
     classify_timing_source,
     select_timing_policy,
     timing_policy_for_languages,
-    timing_policy_table,
 )
 from sol_execbench.core.data.solution import SupportedLanguages
 
@@ -47,7 +46,10 @@ def test_classifier_handles_strings_empty_and_mixed_inputs():
 
 
 def test_policy_table_has_distinct_source_specific_interpretations():
-    policies = {policy.source_type: policy for policy in timing_policy_table()}
+    policies = {
+        source_type: select_timing_policy(source_type)
+        for source_type in TimingSourceType
+    }
 
     assert set(policies) == set(TimingSourceType)
     assert (
@@ -83,7 +85,8 @@ def test_policy_table_has_distinct_source_specific_interpretations():
 
 
 def test_every_policy_exposes_auditable_metadata():
-    for policy in timing_policy_table():
+    for source_type in TimingSourceType:
+        policy = select_timing_policy(source_type)
         payload = policy.to_dict()
 
         assert payload["source_type"]

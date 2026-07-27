@@ -17,7 +17,6 @@ import gzip
 import struct
 import zlib
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
 from types import MappingProxyType
 from typing import cast
 
@@ -362,85 +361,6 @@ def extract_amdgpu_targets(data: bytes) -> tuple[str, ...]:
         if match is not None:
             targets.add(match.split(":", maxsplit=1)[0])
     return tuple(sorted(targets))
-
-
-@dataclass(frozen=True)
-class AmdgpuKernelMetadata:
-    """Resource fields for one named kernel in an AMDGPU code object."""
-
-    name: str
-    symbol: str | None
-    architecture: str
-    vgpr_count: int | None
-    sgpr_count: int | None
-    vgpr_spill_count: int
-    sgpr_spill_count: int
-    private_segment_bytes: int | None
-    group_segment_bytes: int | None
-
-
-def extract_amdgpu_kernel_metadata(
-    data: bytes,
-    *,
-    target_architecture: str,
-) -> list[AmdgpuKernelMetadata]:
-    """Extract named resource records for authoritative kernel matching.
-
-    This is intentionally separate from ``extract_amdgpu_footprints``: callers
-    proving fusion capacity must reject ambiguous kernel matches and cannot use
-    anonymous diagnostic footprints.
-    """
-    wanted = target_architecture.split(":")[0].strip().lower()
-    records: list[AmdgpuKernelMetadata] = []
-    for metadata in _iter_amdgpu_metadata(data):
-        target = metadata.get("amdhsa.target")
-        if not isinstance(target, str) or wanted not in target.lower():
-            continue
-        kernels = metadata.get("amdhsa.kernels")
-        if not isinstance(kernels, list):
-            continue
-        for kernel in kernels:
-            if not isinstance(kernel, dict):
-                continue
-            kernel_metadata = cast(dict[object, object], kernel)
-            name = kernel_metadata.get(".name")
-            if not isinstance(name, str) or not name:
-                continue
-            symbol = kernel_metadata.get(".symbol")
-            records.append(
-                AmdgpuKernelMetadata(
-                    name=name,
-                    symbol=symbol if isinstance(symbol, str) else None,
-                    architecture=wanted,
-                    vgpr_count=_metadata_int(
-                        kernel_metadata,
-                        ".vgpr_count",
-                    ),
-                    sgpr_count=_metadata_int(
-                        kernel_metadata,
-                        ".sgpr_count",
-                    ),
-                    vgpr_spill_count=_metadata_int(
-                        kernel_metadata,
-                        ".vgpr_spill_count",
-                    )
-                    or 0,
-                    sgpr_spill_count=_metadata_int(
-                        kernel_metadata,
-                        ".sgpr_spill_count",
-                    )
-                    or 0,
-                    private_segment_bytes=_metadata_int(
-                        kernel_metadata,
-                        ".private_segment_fixed_size",
-                    ),
-                    group_segment_bytes=_metadata_int(
-                        kernel_metadata,
-                        ".group_segment_fixed_size",
-                    ),
-                ),
-            )
-    return records
 
 
 def _metadata_int(

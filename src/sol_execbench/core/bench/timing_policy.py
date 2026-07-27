@@ -240,14 +240,3 @@ def timing_policy_for_languages(
         classify_timing_source(languages),
         profiler_available=profiler_available,
     )
-
-
-def timing_policy_table(
-    *,
-    profiler_available: bool = True,
-) -> tuple[TimingPolicy, ...]:
-    """Return inspectable policies for every internal source type."""
-    return tuple(
-        select_timing_policy(source_type, profiler_available=profiler_available)
-        for source_type in TimingSourceType
-    )

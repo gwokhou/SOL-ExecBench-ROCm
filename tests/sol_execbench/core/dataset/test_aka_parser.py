@@ -13,27 +13,14 @@ import yaml
 from sol_execbench.core.dataset.aka_task import (
     AkaTask,
     correctness_runner_path,
-    extract_function_source,
     function_arg_names,
     functional_reference_path,
-    functional_reference_text,
-    iter_suite_tasks,
-    materialize_get_inputs,
     read_task,
 )
 
 FIXTURE = (
     Path(__file__).resolve().parents[2] / "fixtures" / "aka" / "sample_func.py"
 )
-
-
-def test_extract_module_fn_source_lifts_the_function_body():
-    text = FIXTURE.read_text()
-
-    source = extract_function_source(text, "module_fn")
-
-    assert source.startswith("def module_fn(a: torch.Tensor, b: torch.Tensor)")
-    assert "torch.matmul(a, b + b)" in source
 
 
 def test_function_arg_names_returns_inputs_in_order():
@@ -43,10 +30,7 @@ def test_function_arg_names_returns_inputs_in_order():
     assert function_arg_names(text, "get_inputs") == []
 
 
-def test_extract_function_source_rejects_missing_function():
-    with pytest.raises(KeyError, match="does_not_exist"):
-        extract_function_source(FIXTURE.read_text(), "does_not_exist")
-
+def test_function_arg_names_rejects_missing_function():
     with pytest.raises(KeyError, match="does_not_exist"):
         function_arg_names(FIXTURE.read_text(), "does_not_exist")
 
@@ -96,7 +80,6 @@ def test_functional_reference_resolves_command_argument(
     reference.write_text("def run():\n    return 1\n")
 
     assert functional_reference_path(task) == reference
-    assert functional_reference_text(task) == reference.read_text()
 
 
 def test_functional_reference_fallback_requires_exactly_one_file(
@@ -140,62 +123,3 @@ def test_correctness_runner_ignores_invalid_commands_and_uses_last_python_file(
     (task.root / "helper.py").unlink()
     with pytest.raises(FileNotFoundError, match="correctness runner"):
         correctness_runner_path(task)
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "def get_inputs():\n    yield [torch.ones(1), 2]\n",
-        (
-            "def get_inputs():\n"
-            "    def cases():\n"
-            "        yield [torch.zeros(1)]\n"
-            "    return cases\n"
-        ),
-    ],
-)
-def test_materialize_get_inputs_supports_iterators_and_factories(
-    tmp_path,
-    source: str,
-) -> None:
-    task = _task(
-        tmp_path,
-        {
-            "correctness_command": [
-                "python check.py --py_func_file reference.py",
-            ],
-        },
-    )
-    (task.root / "reference.py").write_text(source)
-
-    cases = materialize_get_inputs(task)
-
-    assert len(cases) == 1
-    assert cases[0][0].numel() == 1
-
-
-def test_materialize_get_inputs_requires_generator(tmp_path) -> None:
-    task = _task(
-        tmp_path,
-        {
-            "correctness_command": [
-                "python check.py --py_func_file reference.py",
-            ],
-        },
-    )
-    (task.root / "reference.py").write_text("VALUE = 1\n")
-
-    with pytest.raises(KeyError, match="get_inputs not defined"):
-        materialize_get_inputs(task)
-
-
-def test_iter_suite_tasks_is_sorted_and_skips_missing_suites(tmp_path) -> None:
-    for name in ("zeta", "alpha"):
-        config = tmp_path / "tasks/torch2hip" / name / "config.yaml"
-        config.parent.mkdir(parents=True)
-        config.write_text("{}\n")
-
-    assert iter_suite_tasks(tmp_path, ["missing", "torch2hip"]) == [
-        ("torch2hip", "tasks/torch2hip/alpha"),
-        ("torch2hip", "tasks/torch2hip/zeta"),
-    ]

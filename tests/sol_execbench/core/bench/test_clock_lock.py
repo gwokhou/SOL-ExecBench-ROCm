@@ -15,7 +15,6 @@ from sol_execbench.core.bench.clock_lock import (
     acquire_clock_lock,
     are_clocks_locked,
     lock_clocks,
-    probe_clock_lock_available,
     unlock_clocks,
     verify_clocks,
 )
@@ -30,44 +29,6 @@ def _mock_tool_paths(monkeypatch):
         "resolve_rocm_tool_command",
         lambda _tool: "amd-smi",
     )
-
-
-class TestProbeClockLockAvailable:
-    def test_returns_true_when_all_lifecycle_commands_are_allowed(self):
-        probe_result = MagicMock(returncode=0)
-        with patch(
-            f"{_MODULE}.subprocess.run",
-            return_value=probe_result,
-        ) as mock_run:
-            result = probe_clock_lock_available()
-
-        assert result is True
-        assert [call.args[0] for call in mock_run.call_args_list] == [
-            ["sudo", "-n", "-l", "--", "amd-smi", "version"],
-            [
-                "sudo",
-                "-n",
-                "-l",
-                "--",
-                "amd-smi",
-                "set",
-                "-l",
-                "STABLE_PEAK",
-            ],
-            ["sudo", "-n", "-l", "--", "amd-smi", "set", "-l", "AUTO"],
-        ]
-        assert all(
-            call.kwargs["timeout"] == 10 for call in mock_run.call_args_list
-        )
-
-    def test_returns_false_when_sudo_fails(self):
-        probe_result = MagicMock(returncode=1)
-        with patch(f"{_MODULE}.subprocess.run", return_value=probe_result):
-            assert probe_clock_lock_available() is False
-
-    def test_returns_false_when_amd_smi_not_found(self):
-        with patch(f"{_MODULE}.subprocess.run", side_effect=FileNotFoundError):
-            assert probe_clock_lock_available() is False
 
 
 class TestLockClocks:

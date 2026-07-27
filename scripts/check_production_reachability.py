@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject first-party Python modules unreachable from production entry points."""
+"""Reject unreachable modules and private/public compatibility aliases."""
 
 from __future__ import annotations
 
@@ -20,6 +20,13 @@ ENTRY_MODULES = {
 DYNAMIC_PACKAGE_ROOTS = {
     "solar.einsum.ops",
     "sol_execbench.driver.templates",
+}
+PRIVATE_PUBLIC_ALIAS_ALLOWLIST = {
+    (
+        "sol_execbench.driver.templates.eval_driver",
+        "_check_integrity",
+        "check_runtime_integrity",
+    ),
 }
 
 
@@ -135,16 +142,58 @@ def unreachable_modules() -> list[str]:
     )
 
 
+def private_public_aliases() -> list[str]:
+    """Return simple private/public aliases that recreate compatibility seams."""
+    findings: list[str] = []
+    for module, path in _module_files().items():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+                value = node.value
+            elif isinstance(node, ast.AnnAssign):
+                targets = [node.target]
+                value = node.value
+            else:
+                continue
+            if not isinstance(value, ast.Name):
+                continue
+            for target in targets:
+                if not isinstance(target, ast.Name):
+                    continue
+                names = (module, target.id, value.id)
+                crosses_public_boundary = target.id.startswith(
+                    "_",
+                ) != value.id.startswith("_")
+                if (
+                    crosses_public_boundary
+                    and names not in PRIVATE_PUBLIC_ALIAS_ALLOWLIST
+                ):
+                    findings.append(
+                        f"{module}:{node.lineno}: "
+                        f"{target.id} aliases {value.id}",
+                    )
+    return sorted(findings)
+
+
 def main() -> int:
     """Report production modules unreachable from supported entry points."""
     unreachable = unreachable_modules()
+    aliases = private_public_aliases()
     if unreachable:
         print(
             "\n".join(
                 f"unreachable production module: {item}" for item in unreachable
             ),
         )
-    return bool(unreachable)
+    if aliases:
+        print(
+            "\n".join(
+                f"private/public compatibility alias: {item}"
+                for item in aliases
+            ),
+        )
+    return bool(unreachable or aliases)
 
 
 if __name__ == "__main__":

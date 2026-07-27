@@ -8,7 +8,6 @@ from __future__ import annotations
 from sol_execbench.core.bench.decision.builder import build_decision_sidecar
 from sol_execbench.core.bench.decision.precedence import (
     apply_runtime_precedence,
-    runtime_precedence_limitation,
 )
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
@@ -28,7 +27,10 @@ def test_runtime_available_adds_precedence_note():
         runtime_profile_available=True,
     )
 
-    assert runtime_precedence_limitation() in annotated.limitations
+    assert any(
+        "Runtime profile takes precedence" in limitation
+        for limitation in annotated.limitations
+    )
     assert annotated.status == sidecar.status  # status unchanged
 
 
@@ -46,7 +48,10 @@ def test_unavailable_sidecar_not_annotated():
         sidecar,
         runtime_profile_available=True,
     )
-    assert runtime_precedence_limitation() not in annotated.limitations
+    assert not any(
+        "Runtime profile takes precedence" in limitation
+        for limitation in annotated.limitations
+    )
 
 
 def test_precedence_annotation_is_idempotent():

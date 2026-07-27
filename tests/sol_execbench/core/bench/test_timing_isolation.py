@@ -12,13 +12,10 @@ import subprocess
 
 from sol_execbench.core.bench.timing_isolation import (
     _detect_gpu_count,
-    clear_gpu_cache_between_subprocesses,
-    collect_timing_environment_snapshot,
     detect_concurrent_gpu_processes,
     validate_gpu_device_isolation,
     verify_clock_state_with_warning,
 )
-from sol_execbench.core.platform.environment import EnvironmentEvidenceStatus
 
 
 class TestDetectConcurrentGpuProcesses:
@@ -156,165 +153,6 @@ class TestVerifyClockStateWithWarning:
         ):
             verify_clock_state_with_warning(context="problem_42")
             assert "problem_42" in caplog.text
-
-
-class TestClearGpuCacheBetweenSubprocesses:
-    """Test GPU cache clearing at subprocess boundaries."""
-
-    def test_clears_cache_when_torch_available(self, caplog):
-        """Test that torch.cuda.empty_cache() is called when torch is available."""
-        import logging
-        import unittest.mock
-
-        caplog.set_level(logging.DEBUG)
-
-        mock_torch = unittest.mock.MagicMock()
-        mock_torch.cuda.is_available.return_value = True
-
-        with unittest.mock.patch.dict("sys.modules", {"torch": mock_torch}):
-            clear_gpu_cache_between_subprocesses()
-            mock_torch.cuda.empty_cache.assert_called_once()
-            assert "cache cleared" in caplog.text.lower()
-
-    def test_graceful_when_torch_unavailable(self, caplog):
-        """Test that function handles torch unavailable gracefully."""
-        import unittest.mock
-
-        caplog.set_level(logging.DEBUG)
-        with unittest.mock.patch.dict("sys.modules", {"torch": None}):
-            clear_gpu_cache_between_subprocesses()
-            # Should not raise exception
-            assert (
-                "cache cleared" in caplog.text.lower()
-                or "torch" in caplog.text.lower()
-            )
-
-
-class TestCollectTimingEnvironmentSnapshot:
-    """Test environment snapshot collection for timing audits."""
-
-    def test_snapshot_structure(self):
-        """Test that snapshot dict has required keys."""
-        import unittest.mock
-
-        with (
-            unittest.mock.patch(
-                "sol_execbench.core.bench.timing_isolation.detect_concurrent_gpu_processes",
-                return_value=[],
-            ),
-            unittest.mock.patch(
-                "sol_execbench.core.bench.clock_lock.are_clocks_locked",
-                return_value=False,
-            ),
-            unittest.mock.patch(
-                "sol_execbench.core.platform.environment.collect_environment_snapshot",
-                return_value=self._mock_snapshot(),
-            ),
-        ):
-            snapshot = collect_timing_environment_snapshot()
-
-            assert "schema_version" in snapshot
-            assert "generated_at" in snapshot
-            assert "gpu_processes" in snapshot
-            assert "clocks_locked" in snapshot
-            assert "tools_available" in snapshot
-            assert "warnings" in snapshot
-
-    def test_schema_version(self):
-        """Test that schema version is set correctly."""
-        import unittest.mock
-
-        with (
-            unittest.mock.patch(
-                "sol_execbench.core.bench.timing_isolation.detect_concurrent_gpu_processes",
-                return_value=[],
-            ),
-            unittest.mock.patch(
-                "sol_execbench.core.bench.clock_lock.are_clocks_locked",
-                return_value=False,
-            ),
-            unittest.mock.patch(
-                "sol_execbench.core.platform.environment.collect_environment_snapshot",
-                return_value=self._mock_snapshot(),
-            ),
-        ):
-            snapshot = collect_timing_environment_snapshot()
-            assert (
-                snapshot["schema_version"]
-                == "sol_execbench.timing_isolation_snapshot.v1"
-            )
-
-    def _mock_snapshot(self):
-        """Create a mock environment snapshot."""
-        from sol_execbench.core.platform.environment import EnvironmentSnapshot
-
-        return EnvironmentSnapshot(
-            generated_at="2026-06-10T00:00:00Z",
-            collection_status=EnvironmentEvidenceStatus.AVAILABLE,
-        )
-
-
-class TestIntegrationPreflightAudit:
-    """Integration test for pre-flight audit flow."""
-
-    def test_preflight_audit_flow(self, caplog):
-        """Test complete pre-flight audit: detection → verification → snapshot."""
-        import logging
-        import unittest.mock
-
-        from sol_execbench.core.bench import timing_isolation
-
-        caplog.set_level(logging.INFO)
-
-        with (
-            unittest.mock.patch.object(
-                timing_isolation,
-                "detect_concurrent_gpu_processes",
-                return_value=[
-                    {
-                        "pid": 12345,
-                        "device": "0000:01:00.1",
-                        "name": "python",
-                    },
-                ],
-            ),
-            unittest.mock.patch(
-                "sol_execbench.core.bench.clock_lock.verify_clocks",
-                return_value=True,
-            ),
-            unittest.mock.patch(
-                "sol_execbench.core.bench.clock_lock.are_clocks_locked",
-                return_value=True,
-            ),
-            unittest.mock.patch(
-                "sol_execbench.core.platform.environment.collect_environment_snapshot",
-                return_value=self._mock_snapshot(),
-            ),
-        ):
-            processes = timing_isolation.detect_concurrent_gpu_processes()
-            assert len(processes) == 1
-
-            clocks_ok = timing_isolation.verify_clock_state_with_warning(
-                context="batch_start",
-            )
-            assert clocks_ok is True
-
-            snapshot = timing_isolation.collect_timing_environment_snapshot()
-            assert (
-                snapshot["schema_version"]
-                == "sol_execbench.timing_isolation_snapshot.v1"
-            )
-            assert "concurrent" in caplog.text.lower() or processes
-            assert "clock" in caplog.text.lower()
-
-    def _mock_snapshot(self):
-        """Create a mock environment snapshot."""
-        from sol_execbench.core.platform.environment import EnvironmentSnapshot
-
-        return EnvironmentSnapshot(
-            generated_at="2026-06-10T00:00:00Z",
-            collection_status=EnvironmentEvidenceStatus.AVAILABLE,
-        )
 
 
 class TestValidateGpuDeviceIsolation:

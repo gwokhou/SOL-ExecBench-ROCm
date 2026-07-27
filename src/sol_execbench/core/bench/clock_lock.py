@@ -251,29 +251,6 @@ def _reset_after_failed_lock() -> None:
         logger.error("Failed to restore GPU clocks to AUTO after lock failure")
 
 
-def probe_clock_lock_available() -> bool:
-    """Check read-only sudo policy coverage for every clock lifecycle command."""
-    amd_smi = _amd_smi_executable()
-    commands = (
-        [amd_smi, "version"],
-        [amd_smi, "set", "-l", "STABLE_PEAK"],
-        [amd_smi, "set", "-l", "AUTO"],
-    )
-    try:
-        return all(
-            subprocess.run(
-                ["sudo", "-n", "-l", "--", *command],
-                capture_output=True,
-                timeout=10,
-                check=False,
-            ).returncode
-            == 0
-            for command in commands
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-
-
 def acquire_clock_lock() -> ClockLockLease:
     """Request STABLE_PEAK and report whether this process changed the policy.
 

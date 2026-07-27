@@ -107,9 +107,3 @@ def _first_numeric(row: dict[str, str], *keys: str) -> float | None:
         if value:
             return float(value)
     return None
-
-
-normalize_header = _normalize_header
-first_value = _first_value
-duration_ns = _duration_ns
-first_numeric = _first_numeric

@@ -22,6 +22,7 @@ from typing import Any
 
 import yaml
 
+from solar import schema_versions as _schemas
 from solar.analysis.orojenesis_common import OrojenesisError
 from solar.analysis.orojenesis_curves import (
     compose_multi_einsum_curve,
@@ -54,7 +55,6 @@ from solar.analysis.orojenesis_problem import (
 from solar.analysis.orojenesis_process import (
     run_mapper_process as _default_mapper_runner,
 )
-from solar.schema_versions import OROJENESIS_IDENTITY_SCHEMA_VERSION
 
 OROJENESIS_COMMIT = "97d52178bf9a9c209bf79be96b87c164bcd35625"
 OROJENESIS_REPOSITORY = "https://github.com/NVlabs/timeloop.git"
@@ -89,7 +89,7 @@ MULTI_EINSUM_BATCH_COMPOSITION = "broadcast_batch_linear_tile_shape_v1"
 MULTI_EINSUM_FANOUT_COMPOSITION = "matmul_fanout_tree_tile_shape_v1"
 _TOKEN = re.compile(r"[A-Za-z][0-9]*")
 _IDENTITY_POLICY = OrojenesisIdentityPolicy(
-    schema_version=OROJENESIS_IDENTITY_SCHEMA_VERSION,
+    schema_version=_schemas.OROJENESIS_IDENTITY_SCHEMA_VERSION,
     repository=OROJENESIS_REPOSITORY,
     commit=OROJENESIS_COMMIT,
     tree_oid=OROJENESIS_TREE_OID,
@@ -670,11 +670,6 @@ def _divisors(value: int) -> list[int]:
     return small + list(reversed(large))
 
 
-def multi_einsum_row_tiles(value: int) -> list[int]:
-    """Return the complete deterministic FFMT sweep for the shared M axis."""
-    return _divisors(value)
-
-
 def multi_einsum_mapper_role(layer_index: int, layer_count: int) -> str:
     """Map a chain position to the pinned ``_relax_io_kn`` FFMT variant."""
     if layer_count < 2 or layer_index not in range(layer_count):
@@ -792,7 +787,9 @@ def multi_einsum_problem(
                 "multi-einsum chain M dimension or dtype drifted",
             )
     return {
-        "schema_version": 1,
+        "schema_version": (
+            _schemas.OROJENESIS_MULTI_EINSUM_PROBLEM_SCHEMA_VERSION
+        ),
         "chain": {"kind": "linear_matmul", "layers": descriptors},
     }
 
@@ -1481,7 +1478,9 @@ def _component_region(
         and str(edge["consumer"]) == consumer
     ]
     return {
-        "schema_version": 1,
+        "schema_version": (
+            _schemas.OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION
+        ),
         "kind": kind,
         "composition": composition,
         "nodes": [discovery.descriptors[node] for node in schedule],
@@ -1531,13 +1530,14 @@ def find_multi_einsum_regions(
 
 def multi_einsum_region_problem(region: Mapping[str, Any]) -> dict[str, Any]:
     """Validate and canonicalize a supported extended MatMul region."""
+    schema_version = _schemas.OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION
     try:
         descriptor = json.loads(json.dumps(region, sort_keys=True))
     except (TypeError, ValueError) as exc:
         raise OrojenesisError(
             "multi-einsum region is not serializable",
         ) from exc
-    if int(descriptor.get("schema_version", 0)) != 1:
+    if int(descriptor.get("schema_version", 0)) != schema_version:
         raise OrojenesisError("unsupported multi-einsum region schema")
     compositions = {
         "linear_matmul_with_axis_maps": MULTI_EINSUM_LAYOUT_COMPOSITION,
@@ -1756,7 +1756,6 @@ __all__ = [
     "OROJENESIS_BUILDER_IMAGE",
     "OROJENESIS_CA_CERTIFICATES_BOOTSTRAP_SHA256",
     "OROJENESIS_COMPILER_WRAPPER_SHA256",
-    "OROJENESIS_IDENTITY_SCHEMA_VERSION",
     "OROJENESIS_OPENSSL_BOOTSTRAP_SHA256",
     "OROJENESIS_PROVENANCE_FILENAME",
     "OROJENESIS_REPOSITORY",
@@ -1776,7 +1775,6 @@ __all__ = [
     "multi_einsum_problem",
     "multi_einsum_region_mapper_role",
     "multi_einsum_region_problem",
-    "multi_einsum_row_tiles",
     "parse_multi_einsum_curve",
     "parse_multi_einsum_region_curve",
     "parse_multi_mapping_records",

@@ -94,7 +94,7 @@ _PROFILE_ARTIFACT_SUFFIXES = {
     ".sqlite3",
     ".trace",
 }
-_PROFILE_OUTPUT_DIR_NAMES = {
+PROFILE_OUTPUT_DIR_NAMES = {
     "rocprofiler",
     "rocprofiler-sdk",
     "rocprofv3",

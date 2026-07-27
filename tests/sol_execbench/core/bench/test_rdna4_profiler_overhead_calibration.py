@@ -16,8 +16,8 @@ import pytest
 
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3TimingEvidence,
-    _read_overhead_calibration,
     build_timing_evidence,
+    read_overhead_calibration,
 )
 from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
@@ -113,7 +113,7 @@ class TestBuildTimingEvidenceWithOverhead:
 
 
 class TestReadOverheadCalibration:
-    """Test _read_overhead_calibration function."""
+    """Test read_overhead_calibration."""
 
     @staticmethod
     def _payload(**overrides):
@@ -149,22 +149,22 @@ class TestReadOverheadCalibration:
                 json.dumps(self._payload()) + "\n",
                 encoding="utf-8",
             )
-            result = _read_overhead_calibration(cal_path)
+            result = read_overhead_calibration(cal_path)
             assert result == 0.023
 
     def test_returns_none_for_missing_file(self):
-        result = _read_overhead_calibration(Path("/nonexistent/file.json"))
+        result = read_overhead_calibration(Path("/nonexistent/file.json"))
         assert result is None
 
     def test_returns_none_for_none_path(self):
-        result = _read_overhead_calibration(None)
+        result = read_overhead_calibration(None)
         assert result is None
 
     def test_returns_none_for_invalid_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             cal_path = Path(tmpdir) / "cal.json"
             cal_path.write_text("not json", encoding="utf-8")
-            result = _read_overhead_calibration(cal_path)
+            result = read_overhead_calibration(cal_path)
             assert result is None
 
     def test_returns_none_for_unsupported_schema(self):
@@ -174,7 +174,7 @@ class TestReadOverheadCalibration:
                 json.dumps({"schema_version": "unsupported"}) + "\n",
                 encoding="utf-8",
             )
-            result = _read_overhead_calibration(cal_path)
+            result = read_overhead_calibration(cal_path)
             assert result is None
 
     def test_rejects_architecture_mismatch(self, tmp_path):
@@ -184,7 +184,7 @@ class TestReadOverheadCalibration:
             encoding="utf-8",
         )
 
-        result = _read_overhead_calibration(
+        result = read_overhead_calibration(
             cal_path,
             expected_gpu_architecture="gfx942",
         )
@@ -198,7 +198,7 @@ class TestReadOverheadCalibration:
             encoding="utf-8",
         )
 
-        result = _read_overhead_calibration(
+        result = read_overhead_calibration(
             cal_path,
             expected_clock_locked=None,
         )
@@ -216,7 +216,7 @@ class TestReadOverheadCalibration:
         cal_path = tmp_path / "cal.json"
         cal_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
-        result = _read_overhead_calibration(
+        result = read_overhead_calibration(
             cal_path,
             expected_gpu_architecture="gfx1200:sramecc-",
             expected_profiler_executable=str(profiler),
@@ -242,7 +242,7 @@ class TestReadOverheadCalibration:
         )
         profiler.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
 
-        result = _read_overhead_calibration(
+        result = read_overhead_calibration(
             cal_path,
             expected_profiler_executable=str(profiler),
         )

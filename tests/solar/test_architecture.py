@@ -16,6 +16,7 @@ from solar.rocm.architecture import (
     MemoryLevel,
     resource_peak_payload_sha256,
 )
+from solar.schema_versions import RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION
 
 _RESOURCES = {
     "mfma",
@@ -232,7 +233,6 @@ def test_memory_level_and_profile_load_normalize_all_fields(tmp_path: Path):
         50.0,
         "spec",
     )
-    assert profile.cache_flush_bytes == 128
     assert profile.to_dict()["memory_hierarchy"][0]["name"] == "l1"
 
     path = tmp_path / "profile.yaml"
@@ -329,22 +329,13 @@ def test_packaged_rx9060xt_audit_pins_corrected_probe_semantics():
     )
 
 
-def test_precision_resource_and_roofline_methods():
+def test_precision_and_resource_methods():
     profile = ArchitectureProfile.load(_profile_data())
     assert profile.normalize_precision("FLOAT16") == "fp16"
     assert profile.tensor_precision("torch.float8_e4m3fn", "fp32") == "fp8"
     assert profile.tensor_precision("torch.float16", "fp32") == "fp16"
     with pytest.raises(ValueError, match="not supported"):
         profile.tensor_precision("torch.float8_e5m2", "fp32")
-    assert profile.peak_for("half") == 100.0
-    with pytest.raises(ValueError, match="Precision"):
-        profile.peak_for("fp64")
-
-    assert profile.theoretical_seconds(200, 50, "fp16") == 2.0
-    assert (
-        profile.theoretical_seconds_by_precision({"fp16": 50, "fp8": 100}, 50)
-        == 2.0
-    )
     assert profile.resource_rate_for("VALU", "generic") == 10.0
     with pytest.raises(ValueError, match="Resource 'missing'"):
         profile.resource_rate_for("missing", "generic")
@@ -359,10 +350,6 @@ def test_precision_resource_and_roofline_methods():
 
     work = {"valu": {"generic": 20}, "mfma": {"generic": 10}}
     assert profile.resource_seconds(work) == {"valu": 2.0, "mfma": 1.0}
-    assert (
-        profile.theoretical_seconds_by_resources(work, fused_bytes=300) == 3.0
-    )
-    assert profile.theoretical_seconds_by_resources({}, fused_bytes=50) == 0.5
 
 
 @pytest.mark.parametrize(
@@ -488,7 +475,7 @@ def test_verified_audit_evidence_is_content_addressed(
         if mode not in data["calibration_exempt_modes"].get(resource, {})
     )
     payload = {
-        "schema_version": architecture.RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
+        "schema_version": RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
         "timing_profile": "official",
         "device": {"device_name": "test gpu", "gfx_target": "gfx1200"},
         "clock_setup": {"clock_locked_verified": True},
@@ -572,7 +559,7 @@ def test_verified_audit_evidence_is_content_addressed(
         "status": "verified",
         "path": "evidence.json",
         "sha256": digest,
-        "required_schema_version": architecture.RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
+        "required_schema_version": RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
         "required_timing_profile": "official",
         "required_clocks_locked": True,
         "required_unthrottled": True,

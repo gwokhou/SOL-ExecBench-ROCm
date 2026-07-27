@@ -10,9 +10,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from sol_execbench.core.bench.rocm_profiler.models import (
-    _NON_DATA_ARTIFACT_KINDS,
     _PROFILE_ARTIFACT_SUFFIXES,
-    _PROFILE_OUTPUT_DIR_NAMES,
+    PROFILE_OUTPUT_DIR_NAMES,
     ROCPROF_REASON_ARTIFACTS_REGISTERED,
     ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
     ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
@@ -22,10 +21,8 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
-    has_profiler_data_artifact,
+    is_profiler_data_artifact,
 )
-
-PROFILE_OUTPUT_DIR_NAMES = _PROFILE_OUTPUT_DIR_NAMES
 
 
 def discover_rocprofv3_artifacts(
@@ -183,11 +180,6 @@ def profile_artifact_coverage_metadata(
     )
 
 
-def is_profiler_data_artifact(artifact: Rocprofv3ProfileArtifact) -> bool:
-    """Return whether an artifact contains profiler data rather than diagnostics."""
-    return artifact.kind not in _NON_DATA_ARTIFACT_KINDS
-
-
 def classify_profile_artifact(path: Path) -> Rocprofv3ArtifactKind:
     """Classify a profiler artifact from its filename and suffix."""
     name = path.name.lower()
@@ -229,16 +221,3 @@ def profile_output_directory_listing(output_directory: Path) -> tuple[str, ...]:
         elif path.is_file():
             listing.append(f"{relative}:{path.stat().st_size}")
     return tuple(listing[:200])
-
-
-# Compatibility aliases for the old monolithic module's private helper names.
-_profile_artifact_sort_key = profile_artifact_sort_key
-_is_profile_artifact_candidate = is_profile_artifact_candidate
-_is_known_profile_artifact_name = is_known_profile_artifact_name
-_is_unprefixed_profile_artifact_name = is_unprefixed_profile_artifact_name
-_normalize_profile_artifact_token = normalize_profile_artifact_token
-_profile_artifact_coverage_metadata = profile_artifact_coverage_metadata
-_is_profiler_data_artifact = is_profiler_data_artifact
-_has_profiler_data_artifact = has_profiler_data_artifact
-_classify_profile_artifact = classify_profile_artifact
-_profile_output_directory_listing = profile_output_directory_listing

@@ -3,14 +3,12 @@
 
 """Timing isolation audit infrastructure for ROCm profiling scripts.
 
-This module provides five public functions for detecting and warning about
+This module provides three functions for detecting and warning about
 conditions that could introduce timing variability or measurement bias:
 
 1. ``detect_concurrent_gpu_processes()`` — Detect concurrent GPU processes via amd-smi
 2. ``verify_clock_state_with_warning()`` — Verify STABLE_PEAK clock mode with context-aware logging
-3. ``clear_gpu_cache_between_subprocesses()`` — Clear GPU cache at subprocess boundaries
-4. ``collect_timing_environment_snapshot()`` — Record environment state for reproducibility audits
-5. ``validate_gpu_device_isolation()`` — Validate GPU device isolation for timing-sensitive workloads
+3. ``validate_gpu_device_isolation()`` — Validate GPU device isolation for timing-sensitive workloads
 
 All functions follow graceful degradation principles: log warnings but don't raise
 exceptions when probes fail or tools are unavailable.
@@ -21,7 +19,6 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
@@ -32,9 +29,6 @@ from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 
 logger = logging.getLogger(__name__)
 
-TIMING_ISOLATION_SNAPSHOT_SCHEMA_VERSION = SCHEMA_VERSIONS[
-    "timing_isolation_snapshot"
-]
 GPU_ISOLATION_SCHEMA_VERSION = SCHEMA_VERSIONS["gpu_device_isolation"]
 
 
@@ -117,28 +111,6 @@ def verify_clock_state_with_warning(context: str = "batch_start") -> bool:
     return clocks_locked
 
 
-def clear_gpu_cache_between_subprocesses() -> None:
-    """Clear GPU cache at subprocess boundaries via ``torch.cuda.empty_cache()``.
-
-    Imports torch inside the function to avoid requiring it at module level.
-    Logs a debug message on success and warnings on any exceptions.
-    """
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            logger.debug("GPU cache cleared at subprocess boundary")
-        else:
-            logger.debug(
-                "torch.cuda.is_available() returned False; skipping cache clear",
-            )
-    except ImportError:
-        logger.debug("torch not available; skipping GPU cache clear")
-    except RuntimeError as e:
-        logger.warning("Failed to clear GPU cache: %s", e)
-
-
 def _detect_gpu_count() -> int:
     """Detect GPU count via ``amd-smi list --json``.
 
@@ -215,56 +187,5 @@ def validate_gpu_device_isolation(
         "gpu_count": gpu_count,
         "rocr_visible_devices": rocr_visible,
         "gpu_device_set": gpu_device is not None,
-        "warnings": warnings,
-    }
-
-
-def collect_timing_environment_snapshot() -> dict[str, Any]:
-    """Collect timing environment snapshot for reproducibility audits.
-
-    Returns a dict with keys:
-    - ``schema_version``: Snapshot schema version identifier
-    - ``generated_at``: UTC timestamp in ISO format
-    - ``gpu_processes``: List of concurrent GPU processes (from ``detect_concurrent_gpu_processes``)
-    - ``clocks_locked``: Whether clocks are in STABLE_PEAK mode (from ``are_clocks_locked``)
-    - ``tools_available``: Map of tool name to availability status
-    - ``warnings``: List of non-fatal collection warnings
-
-    The snapshot is designed for JSON serialization in batch summary sidecars.
-    """
-    from sol_execbench.core.bench.clock_lock import are_clocks_locked
-    from sol_execbench.core.platform.environment import (
-        collect_environment_snapshot,
-    )
-
-    # Collect base environment snapshot (without PyTorch for speed)
-    base_snapshot = collect_environment_snapshot(collect_pytorch=False)
-
-    # Collect timing-specific information
-    gpu_processes = detect_concurrent_gpu_processes()
-    clocks_locked = are_clocks_locked()
-    gpu_isolation = validate_gpu_device_isolation()
-
-    # Build tools_available map from base snapshot
-    tools_available = {}
-    for tool_name, tool_result in base_snapshot.tools.items():
-        tools_available[tool_name] = tool_result.status
-
-    # Collect warnings
-    warnings = list(base_snapshot.warnings)
-    if gpu_processes:
-        warnings.append(
-            f"concurrent_gpu_processes: {len(gpu_processes)} process(es) detected",
-        )
-    if not clocks_locked:
-        warnings.append("clocks_not_locked: GPU not in STABLE_PEAK mode")
-
-    return {
-        "schema_version": TIMING_ISOLATION_SNAPSHOT_SCHEMA_VERSION,
-        "generated_at": datetime.now(UTC).isoformat(),
-        "gpu_processes": gpu_processes,
-        "clocks_locked": clocks_locked,
-        "gpu_isolation": gpu_isolation,
-        "tools_available": tools_available,
         "warnings": warnings,
     }

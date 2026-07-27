@@ -8,11 +8,11 @@ from pathlib import Path
 import pytest
 
 from solar.rocm.architecture import (
-    RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
     RESOURCE_PEAK_TIMING_PROFILE,
     resource_peak_payload_sha256,
     verify_resource_peak_audit,
 )
+from solar.schema_versions import RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION
 
 _EXPECTED_PRECISIONS = ("fp16",)
 _EXPECTED_RESOURCE_MODES = ("valu/fp16",)

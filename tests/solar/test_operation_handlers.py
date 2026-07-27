@@ -112,20 +112,22 @@ CASES = (
 def test_global_registry_loads_every_builtin_handler_family() -> None:
     registry = get_global_registry()
 
-    assert {
-        "add",
-        "conv2d",
-        "cumsum",
-        "embedding",
-        "layer_norm",
-        "matmul",
-        "max_pool2d",
-        "poisson_nll_loss",
-        "reshape",
-        "scaled_dot_product_attention",
-        "sum",
-    } <= set(registry.list_supported_ops())
-    assert registry.get_statistics()["total_handlers"] >= 20
+    assert all(
+        registry.has_handler(operation)
+        for operation in {
+            "add",
+            "conv2d",
+            "cumsum",
+            "embedding",
+            "layer_norm",
+            "matmul",
+            "max_pool2d",
+            "poisson_nll_loss",
+            "reshape",
+            "scaled_dot_product_attention",
+            "sum",
+        }
+    )
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.operation)

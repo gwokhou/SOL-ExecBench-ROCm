@@ -272,6 +272,3 @@ def find_rocprofv3_csv(output_directory: Path, output_file: str) -> Path | None:
         if candidate.name.endswith("_kernel_trace.csv"):
             return candidate
     return candidates[0]
-
-
-_find_rocprofv3_csv = find_rocprofv3_csv

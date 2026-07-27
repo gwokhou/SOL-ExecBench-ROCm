@@ -40,13 +40,9 @@ from sol_execbench.core.bench.rocm_profiler.api import (
     default_profile_runner,
     default_runner,
     discover_rocprofv3_artifacts,
-    duration_ns,
     find_rocprofv3_csv,
-    first_numeric,
-    first_value,
     has_profiler_data_artifact,
     is_profiler_data_artifact,
-    normalize_header,
     parse_rocprofv3_csv,
     prepare_profile_output_directory,
     profile_output_directory_listing,
@@ -56,9 +52,6 @@ from sol_execbench.core.bench.rocm_profiler.api import (
     subprocess_text,
     summarize_rocprofv3_csv,
     write_rocprofv3_diagnostic_artifact,
-)
-from sol_execbench.core.bench.rocm_profiler.api import (
-    _read_overhead_calibration as _read_overhead_calibration,
 )
 
 __all__ = [
@@ -99,13 +92,9 @@ __all__ = [
     "default_profile_runner",
     "default_runner",
     "discover_rocprofv3_artifacts",
-    "duration_ns",
     "find_rocprofv3_csv",
-    "first_numeric",
-    "first_value",
     "has_profiler_data_artifact",
     "is_profiler_data_artifact",
-    "normalize_header",
     "parse_rocprofv3_csv",
     "prepare_profile_output_directory",
     "profile_output_directory_listing",

@@ -128,28 +128,6 @@ def require_materialized_target_match(
         )
 
 
-def _resolve_problem_dir(
-    problem_dir: Path,
-) -> tuple[Path, Path, Path | None, Path | None]:
-    """Return (definition.json, workload.jsonl, config.json?, solution.json?)."""
-    def_path = problem_dir / "definition.json"
-    wkl_path = problem_dir / "workload.jsonl"
-    cfg_path = problem_dir / "config.json"
-    sol_path = problem_dir / "solution.json"
-    if not def_path.exists():
-        raise click.ClickException(
-            f"definition.json not found in {problem_dir}",
-        )
-    if not wkl_path.exists():
-        raise click.ClickException(f"workload.jsonl not found in {problem_dir}")
-    return (
-        def_path,
-        wkl_path,
-        cfg_path if cfg_path.exists() else None,
-        sol_path if sol_path.exists() else None,
-    )
-
-
 def resolve_problem_inputs(
     *,
     problem_dir: Path | None,

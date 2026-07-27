@@ -70,11 +70,12 @@ def build_rocprofv3_profile_command(
     return [*command, "--", *application_command]
 
 
-def _default_runner(
+def default_runner(
     command: Sequence[str],
     *,
     timeout_seconds: float = 300.0,
 ) -> subprocess.CompletedProcess[str]:
+    """Run a profiler command with bounded output and process cleanup."""
     env = {**os.environ, ENV_SOL_EXECBENCH_GRACEFUL_EXIT: "1"}
     return run_in_process_group_bounded(
         command,
@@ -83,11 +84,12 @@ def _default_runner(
     )
 
 
-def _default_profile_runner(
+def default_profile_runner(
     command: Sequence[str],
     working_directory: Path | None,
     timeout_seconds: int | None,
 ) -> subprocess.CompletedProcess[str]:
+    """Run a profiler command from an optional working directory."""
     env = {**os.environ, ENV_SOL_EXECBENCH_GRACEFUL_EXIT: "1"}
     return run_in_process_group_bounded(
         command,
@@ -95,7 +97,3 @@ def _default_profile_runner(
         timeout=timeout_seconds,
         env=env,
     )
-
-
-default_runner = _default_runner
-default_profile_runner = _default_profile_runner

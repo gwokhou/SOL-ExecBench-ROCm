@@ -31,7 +31,7 @@
   "long_functions": {},
   "oversized_modules": {
     "src/solar/analysis/graph_analyzer.py": 1725,
-    "src/solar/analysis/orojenesis.py": 1784
+    "src/solar/analysis/orojenesis.py": 1782
   },
   "wide_functions": {},
   "wildcard_imports": []
