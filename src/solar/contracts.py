@@ -186,7 +186,7 @@ def write_request_manifest(
         },
         "analysis_contract": {
             "precision": request.precision,
-            "representation": request.representation.value,
+            "representation": normalize_ir_kind(request.representation).value,
             "trace_seed": request.trace_seed,
             "verification_seeds": list(request.verification_seeds),
             "atol": request.atol,
