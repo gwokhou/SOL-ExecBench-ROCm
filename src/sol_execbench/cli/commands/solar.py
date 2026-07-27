@@ -16,7 +16,6 @@ from sol_execbench.cli.protocol import (
     CliResult,
     artifact,
 )
-from sol_execbench.core.solar_bridge.learn_runner import run_handler_learning
 from sol_execbench.core.solar_bridge.corpus_readiness import (
     audit_corpus_stage_readiness,
 )
@@ -219,51 +218,6 @@ def corpus_audit_cli(
             artifact(result.summary_path, "json_file"),
         ),
         exit_code=0 if result.ready else EXIT_RESULT_FAILED,
-    )
-
-
-@solar_cli.command("learn-handler")
-@click.argument("node_type")
-@click.argument(
-    "sample_node", type=click.Path(exists=True, dir_okay=False, path_type=Path)
-)
-@click.option(
-    "--output", required=True, type=click.Path(file_okay=False, path_type=Path)
-)
-@click.option("--model", default="gpt-4", show_default=True)
-@click.option("--timeout", "timeout_seconds", default=600.0, show_default=True)
-def learn_handler_cli(
-    node_type: str,
-    sample_node: Path,
-    output: Path,
-    model: str,
-    timeout_seconds: float,
-) -> CliResult:
-    """Create a verified candidate that remains forbidden in formal analysis."""
-    try:
-        result = run_handler_learning(
-            node_type=node_type,
-            sample_path=sample_node,
-            output_dir=output,
-            model=model,
-            timeout_seconds=timeout_seconds,
-        )
-    except Exception as exc:
-        result = {
-            "status": "failed",
-            "reason_code": "worker_execution_failed",
-            "message": str(exc)[:4096],
-        }
-    if result.get("status") != "generated":
-        console.print(f"[red]{result.get('message', 'handler learning failed')}[/red]")
-        return CliResult(data=result, exit_code=EXIT_RESULT_FAILED)
-    console.print(
-        "[yellow]Verified candidate generated; formal use remains forbidden until "
-        "reviewed and committed under src/solar/handlers.[/yellow]"
-    )
-    return CliResult(
-        data=result,
-        artifacts=(artifact(output / "candidate.yaml", "solar_handler_candidate"),),
     )
 
 

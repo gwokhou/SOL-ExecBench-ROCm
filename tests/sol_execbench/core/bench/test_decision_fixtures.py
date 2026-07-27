@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from sol_execbench.core.bench.decision.decision_models import DecisionSidecar
 
@@ -49,5 +50,5 @@ def test_malformed_fixture_rejected():
     payload = json.loads(
         (FIXTURE_DIR / "malformed.decision.json").read_text(encoding="utf-8")
     )
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         DecisionSidecar.model_validate(payload)

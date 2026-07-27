@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticFreshnessValidation,
+    DiagnosticGovernanceGuardrail,
     classify_diagnostic_governance,
     classify_freshness,
     compact_path,
@@ -13,8 +15,6 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     match_required_optional,
 )
 from sol_execbench.core.bench.profile_summary.sidecar_models import (
-    ProfileSummaryFreshnessValidation,
-    ProfileSummaryGovernanceGuardrail,
     ProfileSummarySidecar,
 )
 
@@ -25,7 +25,7 @@ def validate_profile_summary_freshness(
     trace_path: str | None = None,
     sol_version: str | None = None,
     run_id: str | None = None,
-) -> ProfileSummaryFreshnessValidation:
+) -> DiagnosticFreshnessValidation:
     """Classify whether a profile summary identity matches expected run identity."""
 
     reasons: list[str] = []
@@ -37,7 +37,7 @@ def validate_profile_summary_freshness(
         trace_path is not None or run_id is not None or sol_version is not None
     )
     status, reason_codes = classify_freshness(reasons, any_expected=any_expected)
-    return ProfileSummaryFreshnessValidation(
+    return DiagnosticFreshnessValidation(
         status=status,
         reason_codes=reason_codes,
     )
@@ -46,9 +46,9 @@ def validate_profile_summary_freshness(
 def evaluate_profile_summary_governance(
     *,
     sidecar: ProfileSummarySidecar | None,
-    freshness: ProfileSummaryFreshnessValidation | None = None,
+    freshness: DiagnosticFreshnessValidation | None = None,
     parse_error: str | None = None,
-) -> ProfileSummaryGovernanceGuardrail:
+) -> DiagnosticGovernanceGuardrail:
     """Return diagnostic-only governance state for an optional profile summary."""
 
     status, reason_codes = classify_diagnostic_governance(
@@ -59,7 +59,7 @@ def evaluate_profile_summary_governance(
         ),
         parse_error=parse_error,
     )
-    return ProfileSummaryGovernanceGuardrail(
+    return DiagnosticGovernanceGuardrail(
         status=status,
         reason_codes=reason_codes,
     )

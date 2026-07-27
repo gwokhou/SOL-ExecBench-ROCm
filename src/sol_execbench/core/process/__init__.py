@@ -12,7 +12,9 @@ from .logs import (
 )
 from .locks import exclusive_file_lock
 from .subprocesses import (
+    ProbeCompletedProcess,
     run_attached_process_group,
+    run_bounded_probe,
     run_in_process_group,
     run_in_process_group_to_files,
 )
@@ -20,11 +22,13 @@ from .stdio import flush_stdio_streams
 
 __all__ = [
     "DEFAULT_LOG_TAIL_CHARS",
+    "ProbeCompletedProcess",
     "exclusive_file_lock",
     "flush_stdio_streams",
     "redacted_file_tail",
     "redacted_text_tail",
     "run_attached_process_group",
+    "run_bounded_probe",
     "run_command_to_files",
     "run_in_process_group",
     "run_in_process_group_to_files",

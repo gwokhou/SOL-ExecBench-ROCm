@@ -5,12 +5,10 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.bench.agent_feedback.models import (
-    AgentFeedbackFreshnessValidation,
-    AgentFeedbackGovernanceGuardrail,
-    AgentFeedbackSidecar,
-)
+from sol_execbench.core.bench.agent_feedback.models import AgentFeedbackSidecar
 from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticFreshnessValidation,
+    DiagnosticGovernanceGuardrail,
     classify_diagnostic_governance,
     classify_freshness,
     compact_path,
@@ -28,7 +26,7 @@ def validate_agent_feedback_freshness(
     candidate_id: str | None = None,
     source_sha256: str | None = None,
     sol_version: str | None = None,
-) -> AgentFeedbackFreshnessValidation:
+) -> DiagnosticFreshnessValidation:
     """Classify whether a sidecar identity matches expected run identity."""
 
     reasons: list[str] = []
@@ -53,7 +51,7 @@ def validate_agent_feedback_freshness(
         (target_id, run_id, candidate_id, source_sha256, sol_version)
     )
     status, reason_codes = classify_freshness(reasons, any_expected=any_expected)
-    return AgentFeedbackFreshnessValidation(
+    return DiagnosticFreshnessValidation(
         status=status,
         reason_codes=reason_codes,
     )
@@ -62,9 +60,9 @@ def validate_agent_feedback_freshness(
 def evaluate_agent_feedback_governance(
     *,
     sidecar: AgentFeedbackSidecar | None,
-    freshness: AgentFeedbackFreshnessValidation | None = None,
+    freshness: DiagnosticFreshnessValidation | None = None,
     parse_error: str | None = None,
-) -> AgentFeedbackGovernanceGuardrail:
+) -> DiagnosticGovernanceGuardrail:
     """Return diagnostic-only governance state for an optional feedback sidecar."""
 
     status, reason_codes = classify_diagnostic_governance(
@@ -75,7 +73,7 @@ def evaluate_agent_feedback_governance(
         ),
         parse_error=parse_error,
     )
-    return AgentFeedbackGovernanceGuardrail(
+    return DiagnosticGovernanceGuardrail(
         status=status,
         reason_codes=reason_codes,
     )

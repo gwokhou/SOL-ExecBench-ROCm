@@ -8,16 +8,18 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.bench.agent_feedback import (
-    AgentFeedbackArtifactCitation,
     AgentFeedbackBuildIdentity,
     AgentFeedbackBuildRequest,
-    AgentFeedbackGovernanceGuardrail,
-    AgentFeedbackIdentity,
     AgentFeedbackSidecar,
     artifact_citation_from_path,
     build_agent_feedback_sidecar as _build_agent_feedback_sidecar,
     evaluate_agent_feedback_governance,
     validate_agent_feedback_freshness,
+)
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticArtifactCitation,
+    DiagnosticGovernanceGuardrail,
+    ExtendedDiagnosticIdentity,
 )
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
@@ -49,7 +51,7 @@ def build_agent_feedback_sidecar(
     source_sha256: str | None = None,
     sol_version: str | None = None,
     generated_at: str | None = None,
-    artifact_citations: Sequence[AgentFeedbackArtifactCitation] = (),
+    artifact_citations: Sequence[DiagnosticArtifactCitation] = (),
 ) -> AgentFeedbackSidecar:
     """Keep individual builder tests focused on the field under assertion."""
     return _build_agent_feedback_sidecar(
@@ -101,7 +103,7 @@ def _trace(status: EvaluationStatus = EvaluationStatus.PASSED) -> Trace:
 
 
 def test_agent_feedback_identity_uses_canonical_fields_only() -> None:
-    identity = AgentFeedbackIdentity(
+    identity = ExtendedDiagnosticIdentity(
         generated_at="2026-01-01T00:00:00Z",
         sol_version="v3.0.0",
         trace_path="trace.jsonl",
@@ -146,7 +148,7 @@ def test_agent_feedback_identity_rejects_legacy_alias_fields(
     legacy_kwargs: dict[str, str],
 ) -> None:
     with pytest.raises(ValidationError, match=legacy_alias):
-        AgentFeedbackIdentity(
+        ExtendedDiagnosticIdentity(
             generated_at="2026-01-01T00:00:00Z",
             sol_version="v3.0.0",
             trace_path="trace.jsonl",
@@ -467,4 +469,4 @@ def test_agent_feedback_governance_rejects_unknown_authority_field():
     payload["unsupported_authority"] = True
 
     with pytest.raises(ValidationError):
-        AgentFeedbackGovernanceGuardrail.model_validate(payload)
+        DiagnosticGovernanceGuardrail.model_validate(payload)

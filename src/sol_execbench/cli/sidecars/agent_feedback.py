@@ -13,12 +13,12 @@ from pathlib import Path
 from rich.console import Console
 
 from ...core.bench.agent_feedback import (
-    AgentFeedbackArtifactCitation,
     AgentFeedbackBuildIdentity,
     AgentFeedbackBuildRequest,
     artifact_citation_from_path,
     build_agent_feedback_sidecar,
 )
+from ...core.bench.diagnostic_sidecar import DiagnosticArtifactCitation
 from ...core.bench.rocm_profiler import Rocprofv3ProfileResult
 from ...core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
 from ...core.integrity.checksums import sha256_file, stable_json_checksum
@@ -188,10 +188,10 @@ def _agent_feedback_artifact_citations(
     profile_sidecar_path: Path | None,
     static_evidence_sidecar_path: Path | None,
     trace_sha256: str | None = None,
-) -> list[AgentFeedbackArtifactCitation]:
+) -> list[DiagnosticArtifactCitation]:
     """Return compact citations for artifacts written during this CLI run."""
 
-    citations: list[AgentFeedbackArtifactCitation] = []
+    citations: list[DiagnosticArtifactCitation] = []
     if output_file is not None:
         citations.append(
             artifact_citation_from_path(

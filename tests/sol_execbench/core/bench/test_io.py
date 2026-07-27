@@ -41,8 +41,6 @@ from sol_execbench.core.bench.io import (
     flashinfer_safetensors_env,
     gen_inputs,
     isolated_torch_rng,
-    load_safetensors,
-    normalize_outputs,
 )
 from sol_execbench_type_helpers import make_definition, make_workload
 
@@ -612,70 +610,6 @@ def _make_workload(**overrides):
 
 
 # ------------------------------------------------------------------
-# normalize_outputs
-# ------------------------------------------------------------------
-
-
-class TestNormalizeOutputs:
-    _CPU = torch.device("cpu")
-    _NAMES = ["out"]
-    _DTYPES = {"out": torch.float32}
-
-    def test_single_tensor_passthrough(self):
-        t = torch.zeros(3)
-        result = normalize_outputs(
-            t, device=self._CPU, output_names=self._NAMES, output_dtypes=self._DTYPES
-        )
-        assert torch.equal(result["out"], t)
-
-    def test_dict_passthrough(self):
-        t = torch.ones(3)
-        result = normalize_outputs(
-            {"out": t},
-            device=self._CPU,
-            output_names=self._NAMES,
-            output_dtypes=self._DTYPES,
-        )
-        assert torch.equal(result["out"], t)
-
-    def test_tuple_maps_to_output_names(self):
-        t1, t2 = torch.zeros(2), torch.ones(2)
-        result = normalize_outputs(
-            (t1, t2),
-            device=self._CPU,
-            output_names=["a", "b"],
-            output_dtypes={"a": torch.float32, "b": torch.float32},
-        )
-        assert torch.equal(result["a"], t1)
-        assert torch.equal(result["b"], t2)
-
-    def test_scalar_converted_to_tensor(self):
-        result = normalize_outputs(
-            3.0, device=self._CPU, output_names=self._NAMES, output_dtypes=self._DTYPES
-        )
-        assert isinstance(result["out"], torch.Tensor)
-        assert abs(float(result["out"]) - 3.0) < 1e-6
-
-    def test_single_tensor_with_multiple_outputs_raises(self):
-        with pytest.raises(RuntimeError):
-            normalize_outputs(
-                torch.zeros(3),
-                device=self._CPU,
-                output_names=["a", "b"],
-                output_dtypes={"a": torch.float32, "b": torch.float32},
-            )
-
-    def test_tuple_wrong_length_raises(self):
-        with pytest.raises(RuntimeError):
-            normalize_outputs(
-                (torch.zeros(3),),
-                device=self._CPU,
-                output_names=["a", "b"],
-                output_dtypes={"a": torch.float32, "b": torch.float32},
-            )
-
-
-# ------------------------------------------------------------------
 # gen_inputs
 # ------------------------------------------------------------------
 
@@ -912,83 +846,3 @@ class TestGenInputs:
         )
         with pytest.raises(RuntimeError, match="CustomInput"):
             gen_inputs(d, wkl, "cpu")
-
-
-# ------------------------------------------------------------------
-# load_safetensors
-# ------------------------------------------------------------------
-
-
-class TestLoadSafetensors:
-    pytestmark = [
-        pytest.mark.native_extension,
-        pytest.mark.native_extension_serial,
-        pytest.mark.requires_safetensors_torch,
-    ]
-
-    def test_resolves_relative_path_from_blob_root(self, tmp_path):
-        st = pytest.importorskip("safetensors.torch")
-        t = torch.tensor([1.0, 2.0, 3.0, 4.0])
-        st.save_file({"data": t}, tmp_path / "tensor.safetensors")
-
-        d = _make_definition()
-        wkl = make_workload(
-            uuid="u",
-            axes={"N": 4},
-            inputs={
-                "a": {
-                    "type": "safetensors",
-                    "path": "tensor.safetensors",
-                    "tensor_key": "data",
-                }
-            },
-        )
-        result = load_safetensors(d, wkl, blob_roots=[tmp_path])
-        assert "a" in result
-        assert result["a"].shape == torch.Size([4])
-
-    def test_tries_second_root_when_first_misses(self, tmp_path):
-        st = pytest.importorskip("safetensors.torch")
-        t = torch.tensor([1.0, 2.0, 3.0, 4.0])
-        st.save_file({"data": t}, tmp_path / "tensor.safetensors")
-
-        d = _make_definition()
-        wkl = make_workload(
-            uuid="u",
-            axes={"N": 4},
-            inputs={
-                "a": {
-                    "type": "safetensors",
-                    "path": "tensor.safetensors",
-                    "tensor_key": "data",
-                }
-            },
-        )
-        wrong_root = tmp_path / "nonexistent"
-        result = load_safetensors(d, wkl, blob_roots=[wrong_root, tmp_path])
-        assert "a" in result
-
-    def test_missing_file_raises(self, tmp_path):
-        pytest.importorskip("safetensors")
-        d = _make_definition()
-        wkl = make_workload(
-            uuid="u",
-            axes={"N": 4},
-            inputs={
-                "a": {
-                    "type": "safetensors",
-                    "path": "missing.safetensors",
-                    "tensor_key": "k",
-                }
-            },
-        )
-        with pytest.raises(Exception):
-            load_safetensors(d, wkl, blob_roots=[tmp_path])
-
-    def test_skips_non_safetensors_inputs(self, tmp_path):
-        """Random inputs are not loaded by load_safetensors — result dict is empty."""
-        pytest.importorskip("safetensors")
-        d = _make_definition()
-        wkl = _make_workload()  # all random
-        result = load_safetensors(d, wkl, blob_roots=[tmp_path])
-        assert result == {}

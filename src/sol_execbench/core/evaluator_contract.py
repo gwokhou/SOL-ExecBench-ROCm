@@ -25,7 +25,7 @@ class EvaluatorContract(BaseModelWithDocstrings):
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
 
-    schema_version: Literal["sol_execbench.evaluator_contract.v3"] = (
+    schema_version: Literal["sol_execbench.evaluator_contract.v4"] = (
         SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION
     )
     contract_version: Literal["3.0"] = SOL_EXECBENCH_CONTRACT_VERSION
@@ -97,7 +97,10 @@ def _scoring_contract() -> dict[str, Any]:
     return {
         "formula": "1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))",
         "official_publication": "manifest_gated_content_addressed_release_bundle",
-        "scorer_implemented": True,
+        "official_verifier_available": True,
+        "official_policy_source": "pinned_corpus_manifest",
+        "official_producer_gate": "reviewed_orojenesis_mapper_allowlist",
+        "official_release_source": "repository_release_bundle",
         "baseline_strategy": "trusted_reference_eager_v1",
         "incorrect_candidate": 0,
         "aggregation": "workload_mean_within_problem_then_equal_problem_mean_v1",

@@ -1,4 +1,4 @@
-"""Enforce separate line and branch coverage floors for Solar."""
+"""Enforce separate line and branch coverage floors for one source package."""
 
 from __future__ import annotations
 
@@ -48,16 +48,19 @@ def check_report(report: dict[str, Any], policy: dict[str, Any]) -> list[str]:
         if branch < float(floors["branch"]):
             failures.append(f"{path}: branch {branch:.2f}% < {floors['branch']:.2f}%")
 
-    solar = [
+    package = str(policy.get("package", "solar"))
+    source_prefix = f"src/{package}/"
+    vendor_prefix = f"src/{package}/_vendor/"
+    package_summaries = [
         entry["summary"]
         for name, entry in files.items()
-        if "src/solar/" in name and "src/solar/_vendor/" not in name
+        if source_prefix in name and vendor_prefix not in name
     ]
-    if not solar:
-        failures.append("coverage report has no project-owned Solar files")
+    if not package_summaries:
+        failures.append(f"coverage report has no project-owned {package} files")
         return failures
     totals = {
-        key: sum(int(summary.get(key, 0)) for summary in solar)
+        key: sum(int(summary.get(key, 0)) for summary in package_summaries)
         for key in (
             "covered_lines",
             "num_statements",
@@ -68,10 +71,12 @@ def check_report(report: dict[str, Any], policy: dict[str, Any]) -> list[str]:
     line, branch = _summary_percentages(totals)
     global_floors = policy["global"]
     if line < float(global_floors["line"]):
-        failures.append(f"Solar total: line {line:.2f}% < {global_floors['line']:.2f}%")
+        failures.append(
+            f"{package} total: line {line:.2f}% < {global_floors['line']:.2f}%"
+        )
     if branch < float(global_floors["branch"]):
         failures.append(
-            f"Solar total: branch {branch:.2f}% < {global_floors['branch']:.2f}%"
+            f"{package} total: branch {branch:.2f}% < {global_floors['branch']:.2f}%"
         )
     return failures
 
@@ -85,9 +90,9 @@ def main() -> int:
     policy = json.loads(args.policy.read_text(encoding="utf-8"))
     failures = check_report(report, policy)
     if failures:
-        print("Solar coverage policy failed:\n- " + "\n- ".join(failures))
+        print("Coverage policy failed:\n- " + "\n- ".join(failures))
         return 1
-    print("Solar coverage policy passed")
+    print("Coverage policy passed")
     return 0
 
 

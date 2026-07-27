@@ -1,4 +1,4 @@
-# Evaluator Contract v3
+# Evaluator Contract v4
 
 The machine-readable contract is emitted by
 `sol_execbench.core.evaluator_contract.build_evaluator_contract`. It is the current
@@ -62,11 +62,18 @@ precision/resource coverage and all required ISA/code-object/runtime instruction
 checks, together with its frozen tuning and held-out measurement evidence,
 before graph extraction.
 
-The fixed corpus records `official_scoring.status: available`, the
-`content_addressed_publisher_v1` policy, and the canonical
-`rx9060xt-gfx1200-reference-v1` baseline. The CLI implements the deterministic
-trusted-reference baseline generator and content-addressed publisher-bundle
-verifier. Formula-helper results, diagnostic speedups, and raw caller timing
+Official-score status is reported as four independent facts:
+
+- the content-addressed bundle verifier is implemented;
+- the pinned corpus policy authorizes that verifier and baseline identity;
+- the formal producer is ready only when a reviewed Orojenesis mapper digest is
+  allowlisted;
+- a repository release exists only when a verified publisher bundle is
+  distributed under `RELEASE/`.
+
+The current policy is authorized and the verifier is available, while the empty
+mapper allowlist blocks release production and no repository release bundle is
+published. Formula-helper results, diagnostic speedups, and raw caller timing
 JSON are not official scores. Release execution additionally requires a clean
 source tree at the declared Git revision, records the immutable Docker image
 ID, and requires baseline and candidate evidence to use the same environment

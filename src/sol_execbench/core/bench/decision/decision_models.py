@@ -13,15 +13,15 @@ authority. See ``docs/user/decision_sidecar_contract.md`` and
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
 
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
-    DiagnosticFreshnessStatus,
-    DiagnosticGovernanceStatus,
-    DiagnosticSidecarAuthority,
+    DiagnosticArtifactCitation,
+    DiagnosticSidecarEnvelope,
     DiagnosticSidecarStatus,
+    DiagnosticSourceRef,
+    ExtendedDiagnosticIdentity,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import (
@@ -30,11 +30,6 @@ from sol_execbench.core.integrity.schema_versions import (
 )
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
-
-# Public compatibility names for this sidecar's contract vocabulary.
-DecisionStatus = DiagnosticSidecarStatus
-DecisionFreshnessStatus = DiagnosticFreshnessStatus
-DecisionGovernanceStatus = DiagnosticGovernanceStatus
 
 
 class DecisionReasonCode(StrEnum):
@@ -74,77 +69,6 @@ class DecisionConfidence(StrEnum):
     INFERRED_HIGH = "inferred_high"
     INFERRED_MEDIUM = "inferred_medium"
     INFERRED_LOW = "inferred_low"
-
-
-class DecisionSourceRef(BaseModelWithDocstrings):
-    """Compact reference to source evidence used by the decision sidecar."""
-
-    model_config = _MODEL_CONFIG
-
-    kind: str
-    """Evidence kind such as static_evidence, environment, or profile."""
-    label: str
-    """Stable compact label for the evidence source."""
-    status: str | None = None
-    """Optional source status."""
-
-
-class DecisionArtifactCitation(BaseModelWithDocstrings):
-    """Compact sidecar artifact citation."""
-
-    model_config = _MODEL_CONFIG
-
-    kind: str
-    """Artifact kind such as static_evidence or environment."""
-    label: str
-    """Compact artifact label."""
-    path: str | None = None
-    """Compact path, normally a file name or relative path."""
-    sha256: str | None = None
-    """Artifact checksum when available."""
-    status: str | None = None
-    """Optional source status."""
-
-
-class DecisionIdentity(BaseModelWithDocstrings):
-    """Freshness identity for a generated decision sidecar."""
-
-    model_config = _MODEL_CONFIG
-
-    generated_at: str
-    """UTC timestamp when the sidecar was generated."""
-    sol_version: str
-    """Producer/runtime SOL version or HIP-facing supported SOL tag."""
-    trace_path: str | None = None
-    """Compact trace path or file name when available."""
-    target_id: str | None = None
-    """Optional target/run denominator identity."""
-    run_id: str | None = None
-    """Optional run identity."""
-    candidate_id: str | None = None
-    """Canonical candidate identity."""
-    source_sha256: str | None = None
-    """Canonical source-content SHA256 identity."""
-
-
-class DecisionFreshnessValidation(BaseModelWithDocstrings):
-    """Result of validating decision freshness identity."""
-
-    model_config = _MODEL_CONFIG
-
-    status: DecisionFreshnessStatus
-    """Freshness result."""
-    reason_codes: list[str] = Field(default_factory=list)
-    """Stable reason codes explaining stale or unknown status."""
-
-
-class DecisionGovernanceGuardrail(DiagnosticSidecarAuthority):
-    """Authority boundary after optional decision governance checks."""
-
-    status: DecisionGovernanceStatus
-    """Diagnostic governance status."""
-    reason_codes: list[str] = Field(default_factory=list)
-    """Stable reason codes for unavailable, stale, or invalid states."""
 
 
 class DecisionHintIdentity(BaseModelWithDocstrings):
@@ -189,7 +113,7 @@ class DecisionHint(BaseModelWithDocstrings):
     """Per-hint limitations, such as the dynamic-allocation static-derivation gap."""
     evidence_refs: list[str] = Field(default_factory=list)
     """Upstream evidence references supporting the hint."""
-    source_refs: list[DecisionSourceRef] = Field(default_factory=list)
+    source_refs: list[DiagnosticSourceRef] = Field(default_factory=list)
     """Compact source references supporting this hint."""
 
 
@@ -208,21 +132,20 @@ class DecisionSummary(BaseModelWithDocstrings):
     """Counts per bottleneck class label."""
 
 
-class DecisionSidecar(BaseModelWithDocstrings):
+class DecisionSidecar(DiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for Layer R optimization hints."""
 
     model_config = _MODEL_CONFIG
 
     schema_version: DecisionSchemaVersion = DECISION_SCHEMA_VERSION
-    status: DecisionStatus
+    status: DiagnosticSidecarStatus
     reason_code: DecisionReasonCode
-    identity: DecisionIdentity
-    authority: Literal["diagnostic"] = "diagnostic"
+    identity: ExtendedDiagnosticIdentity
     summary: DecisionSummary
     hints: list[DecisionHint] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
-    source_refs: list[DecisionSourceRef] = Field(default_factory=list)
-    artifact_citations: list[DecisionArtifactCitation] = Field(default_factory=list)
+    source_refs: list[DiagnosticSourceRef] = Field(default_factory=list)
+    artifact_citations: list[DiagnosticArtifactCitation] = Field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible sidecar payload."""

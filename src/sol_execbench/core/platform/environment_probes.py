@@ -13,7 +13,6 @@ from typing import Any
 from .environment_models import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
     EnvironmentEvidenceStatus,
-    ProbeCompletedProcess,
     ProbeRunner,
     PytorchRocmSummary,
     ToolProbeResult,
@@ -134,21 +133,6 @@ def collect_pytorch_rocm_summary() -> PytorchRocmSummary:
             cuda_version=cuda_version,
             error=str(exc),
         )
-
-
-def run_probe(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
-    completed = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-    )
-    return ProbeCompletedProcess(
-        returncode=completed.returncode,
-        stdout=completed.stdout or "",
-        stderr=completed.stderr or "",
-    )
 
 
 def parse_probe_output(output: str) -> dict[str, Any]:

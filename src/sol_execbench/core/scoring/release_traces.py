@@ -31,7 +31,7 @@ from sol_execbench.core.platform.rdna4_validation import (
     validate_environment_payload,
 )
 
-from .release_models import ArtifactReference, ProblemRunEvidence, ReleaseRunStatement
+from .release_models import ProblemRunEvidence, ReleaseRunStatement
 from .release_builders import reference_baseline_solution
 from .release_environment import (
     ReleaseExecutionIdentity,
@@ -114,10 +114,20 @@ def _verify_corpus_and_environment(
     bundle_root: Path,
     corpus: AkaCorpusManifest,
 ) -> ReleaseRunEnvironmentIdentity:
-    bundled_manifest = _artifact_path(statement.corpus_manifest, bundle_root)
+    bundled_manifest = verify_artifact_file(
+        bundle_root,
+        statement.corpus_manifest.path,
+        expected_sha256=statement.corpus_manifest.sha256,
+        expected_size_bytes=statement.corpus_manifest.size_bytes,
+    )
     if sha256_file(bundled_manifest) != sha256_file(corpus.path):
         raise ValueError("release run corpus identity mismatch")
-    environment_path = _artifact_path(statement.environment, bundle_root)
+    environment_path = verify_artifact_file(
+        bundle_root,
+        statement.environment.path,
+        expected_sha256=statement.environment.sha256,
+        expected_size_bytes=statement.environment.size_bytes,
+    )
     payload = load_json_value(environment_path)
     return ReleaseRunEnvironmentIdentity(
         runtime=validate_environment_payload(payload),
@@ -159,7 +169,12 @@ def _verify_reference_baseline(
     bundle_root: Path,
     corpus: AkaCorpusManifest,
 ) -> None:
-    solution_path = _artifact_path(evidence.implementation, bundle_root)
+    solution_path = verify_artifact_file(
+        bundle_root,
+        evidence.implementation.path,
+        expected_sha256=evidence.implementation.sha256,
+        expected_size_bytes=evidence.implementation.size_bytes,
+    )
     observed = Solution.model_validate_json(solution_path.read_text(encoding="utf-8"))
     definition = Definition.model_validate_json(
         (corpus.authored_root / evidence.problem_path / "definition.json").read_text(
@@ -182,11 +197,22 @@ def _verify_problem_trace(
     require_passed: bool,
     release_environment: ReleaseRunEnvironmentIdentity,
 ) -> dict[tuple[str, str], VerifiedWorkloadRun]:
-    solution_path = _artifact_path(evidence.implementation, bundle_root)
+    solution_path = verify_artifact_file(
+        bundle_root,
+        evidence.implementation.path,
+        expected_sha256=evidence.implementation.sha256,
+        expected_size_bytes=evidence.implementation.size_bytes,
+    )
     solution = Solution.model_validate_json(solution_path.read_text(encoding="utf-8"))
     problem_dir = corpus.authored_root / evidence.problem_path
     expected_workloads = _load_workloads(problem_dir / "workload.jsonl")
-    traces = _load_traces(_artifact_path(evidence.trace, bundle_root))
+    trace_path = verify_artifact_file(
+        bundle_root,
+        evidence.trace.path,
+        expected_sha256=evidence.trace.sha256,
+        expected_size_bytes=evidence.trace.size_bytes,
+    )
+    traces = _load_traces(trace_path)
     definition_name = _definition_name(problem_dir / "definition.json")
     _verify_solution(solution, definition_name)
     if {trace.workload.uuid for trace in traces} != set(entry.workload_uuids):
@@ -205,15 +231,6 @@ def _verify_problem_trace(
         )
         for trace in traces
     }
-
-
-def _artifact_path(reference: ArtifactReference, root: Path) -> Path:
-    return verify_artifact_file(
-        root,
-        reference.path,
-        expected_sha256=reference.sha256,
-        expected_size_bytes=reference.size_bytes,
-    )
 
 
 def _load_workloads(path: Path) -> dict[str, Workload]:

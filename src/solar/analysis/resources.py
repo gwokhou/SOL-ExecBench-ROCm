@@ -162,6 +162,11 @@ _VALU_OPS = frozenset(
 )
 
 
+def is_mfma_operation(target: str) -> bool:
+    """Return whether a canonical operation is modeled as an MFMA contraction."""
+    return target in _MFMA_OPS
+
+
 class ResourceClassificationError(ValueError):
     """Raised when a semantic compute node has no exact resource rule."""
 
@@ -751,6 +756,7 @@ __all__ = [
     "RESOURCE_MODEL_VERSION",
     "ResourceClassificationError",
     "classify_layer_resources",
+    "is_mfma_operation",
     "merge_resource_work",
     "validate_resource_work",
 ]

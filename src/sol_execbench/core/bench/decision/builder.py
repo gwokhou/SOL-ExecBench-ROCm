@@ -9,16 +9,18 @@ from collections import Counter
 from collections.abc import Sequence
 
 from sol_execbench.core.bench.decision.decision_models import (
-    DecisionArtifactCitation,
-    DecisionIdentity,
     DecisionReasonCode,
     DecisionSidecar,
-    DecisionSourceRef,
-    DecisionStatus,
     DecisionSummary,
 )
 from sol_execbench.core.bench.decision.derivation import derive_decision_hints
-from sol_execbench.core.bench.diagnostic_sidecar import compact_path
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticArtifactCitation,
+    DiagnosticSidecarStatus,
+    DiagnosticSourceRef,
+    ExtendedDiagnosticIdentity,
+    compact_path,
+)
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
 )
@@ -38,7 +40,7 @@ def build_decision_sidecar(
     source_sha256: str | None = None,
     sol_version: str | None = None,
     generated_at: str | None = None,
-    artifact_citations: Sequence[DecisionArtifactCitation] = (),
+    artifact_citations: Sequence[DiagnosticArtifactCitation] = (),
 ) -> DecisionSidecar:
     """Build a diagnostic-only Layer R decision sidecar from static facts.
 
@@ -54,7 +56,7 @@ def build_decision_sidecar(
     return DecisionSidecar(
         status=status,
         reason_code=reason_code,
-        identity=DecisionIdentity(
+        identity=ExtendedDiagnosticIdentity(
             generated_at=generated_at or utc_timestamp(),
             sol_version=sol_version or SOL_EXECBENCH_RELEASE,
             trace_path=compact_path(trace_path),
@@ -79,19 +81,22 @@ def build_decision_sidecar(
 def _aggregate(
     footprints: Sequence[StaticResourceFootprint],
     budget: ArchIsaBudget | None,
-) -> tuple[DecisionStatus, DecisionReasonCode]:
+) -> tuple[DiagnosticSidecarStatus, DecisionReasonCode]:
     if not footprints:
-        return DecisionStatus.UNAVAILABLE, DecisionReasonCode.NO_DECISION_INPUTS
+        return (
+            DiagnosticSidecarStatus.UNAVAILABLE,
+            DecisionReasonCode.NO_DECISION_INPUTS,
+        )
     if budget is None:
-        return DecisionStatus.PARTIAL, DecisionReasonCode.PARTIAL_DECISION
-    return DecisionStatus.AVAILABLE, DecisionReasonCode.DECISION_RENDERED
+        return DiagnosticSidecarStatus.PARTIAL, DecisionReasonCode.PARTIAL_DECISION
+    return DiagnosticSidecarStatus.AVAILABLE, DecisionReasonCode.DECISION_RENDERED
 
 
-def _source_refs(budget: ArchIsaBudget | None) -> list[DecisionSourceRef]:
+def _source_refs(budget: ArchIsaBudget | None) -> list[DiagnosticSourceRef]:
     budget_status = "available" if budget is not None else "unavailable"
     return [
-        DecisionSourceRef(kind="static_evidence", label="static_resource_footprints"),
-        DecisionSourceRef(
+        DiagnosticSourceRef(kind="static_evidence", label="static_resource_footprints"),
+        DiagnosticSourceRef(
             kind="environment",
             label="arch_capability_budget",
             status=budget_status,

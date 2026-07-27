@@ -9,8 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.artifacts import (
-    _relative_path_string,
-    _sha256_file,
+    display_artifact_path,
 )
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceArtifact,
@@ -19,7 +18,11 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceStatus,
     StaticKernelEvidenceToolRun,
 )
-from sol_execbench.core.platform.environment import ProbeCompletedProcess
+from sol_execbench.core.process.subprocesses import (
+    ProbeCompletedProcess,
+    run_bounded_probe,
+)
+from sol_execbench.core.integrity.checksums import sha256_file
 
 ExtractorRunner = Callable[[list[str], float], ProbeCompletedProcess]
 RAW_OUTPUT_LIMIT = 64 * 1024
@@ -36,7 +39,7 @@ def run_static_extractor(
     timeout_seconds: float,
     runner: ExtractorRunner | None,
 ) -> tuple[StaticKernelEvidenceToolRun, StaticKernelEvidenceArtifact | None]:
-    effective_runner = runner or run_extractor_command
+    effective_runner = runner or run_bounded_probe
     try:
         completed = effective_runner(command, timeout_seconds)
     except subprocess.TimeoutExpired as exc:
@@ -179,23 +182,6 @@ def _completed_result(
     )
 
 
-def run_extractor_command(
-    command: list[str], timeout_seconds: float
-) -> ProbeCompletedProcess:
-    completed = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-    )
-    return ProbeCompletedProcess(
-        returncode=completed.returncode,
-        stdout=completed.stdout or "",
-        stderr=completed.stderr or "",
-    )
-
-
 def write_raw_extractor_output(
     *,
     tool_id: str,
@@ -214,9 +200,9 @@ def write_raw_extractor_output(
         artifact_type="extractor_raw_output",
         status=StaticKernelEvidenceStatus.COLLECTED,
         reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
-        persisted_path=_relative_path_string(output_path, sidecar_base),
+        persisted_path=display_artifact_path(output_path, sidecar_base),
         size_bytes=output_path.stat().st_size,
-        sha256=_sha256_file(output_path),
+        sha256=sha256_file(output_path),
         producer=tool_id,
         inspectable=False,
         classification=StaticKernelEvidenceClassification(metadata_present=True),

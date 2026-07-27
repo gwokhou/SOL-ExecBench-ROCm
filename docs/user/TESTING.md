@@ -33,11 +33,13 @@ uv run --with ruff ruff check .
 uv run ty check
 uv run python scripts/check_coupling.py
 uv run python scripts/check_readability.py
+uv run python scripts/check_production_reachability.py
 uv run python scripts/check_current_docs.py
 ```
 
 These gates scan both `sol_execbench` and `solar`, including package-direction
-rules, stage entry points and non-increasing SOLAR readability debt.
+rules, production reachability, stage entry points and synchronized SOLAR
+readability debt.
 
 ## Hardware markers
 

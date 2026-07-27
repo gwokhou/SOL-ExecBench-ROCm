@@ -16,7 +16,7 @@ solar.api
 hash-bound graphs, conversion proof, formal lower bound
 ```
 
-`solar` may depend on PyTorch, torchview, graph conversion code, architecture
+`solar` may depend on PyTorch graph capture, semantic graph code, architecture
 profiles, and Orojenesis. It must not import `sol_execbench` or model benchmark
 definitions, workloads, solutions, candidate timing, baselines, or scores.
 
@@ -31,15 +31,12 @@ contract tests under `tests/sol_execbench/core/solar_bridge/` may reference
 public `solar.api` types (`AnalysisResult`, `AnalysisFailure`, `ArtifactRef`,
 `SolBound`) to verify the outcome-mapping logic.
 
-Formal conversion is offline and fail-closed. The converter reads generated
-handlers only from `src/solar/handlers/`. The learning command writes candidates
-elsewhere and cannot activate them automatically. Formal lookup accepts only
-records with passed verification, `formal_review: approved`, matching metadata
-and source SHA-256 values, and a safe package-relative source path.
-Graph extraction also fails closed before conversion when any tensor dispatch
-loses torchview `RecorderTensor` lineage. This covers both fully empty traces
-and partial graphs in which only some operations remain visible; SOLAR never
-publishes a lower bound from the surviving subset.
+Formal conversion is offline and fail-closed. Graph extraction has one canonical
+path: `make_fx` captures exact ATen operations, source argument indices, tensor
+metadata, effects, and outputs into schema v3. Conversion accepts only that
+provenance and validates it before replay or analysis. Unsupported tracing,
+execution, or resource accounting stops publication; there is no generated
+handler lookup or alternate graph schema.
 
 The ROCm formal-publication profile uses a pinned Orojenesis mapper when the
 stricter capacity-constrained bound is requested

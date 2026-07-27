@@ -10,7 +10,6 @@ from solar.verification.einsum import (
     create_verification_artifact,
     replay_verification_artifact,
     verify_callable_conversion,
-    verify_generated_handler,
 )
 
 __all__ = [
@@ -20,5 +19,4 @@ __all__ = [
     "create_verification_artifact",
     "replay_verification_artifact",
     "verify_callable_conversion",
-    "verify_generated_handler",
 ]

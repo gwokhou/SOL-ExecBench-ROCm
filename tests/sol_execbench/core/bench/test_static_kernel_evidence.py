@@ -36,7 +36,7 @@ from sol_execbench.core.bench.static_kernel.extractor_routing import (
     extractor_command,
     static_extractor_tool_ids,
 )
-from sol_execbench.core.platform.environment import ProbeCompletedProcess
+from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
 
 EXPECTED_STATUSES = {

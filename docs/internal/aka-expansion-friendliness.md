@@ -25,9 +25,8 @@ a typed I/O tensor contract (`axes`/`inputs`/`outputs`) + a set of dynamic
 workload shapes**, and must produce **one** solution bundle with **one**
 `entry_point::{function}` matching that contract. The agent is *never* handed an
 existing kernel to optimize and *never* handed a natural-language instruction as
-the authoritative oracle. (`src/solar/` derives the SOL *bound* via graph→einsum
-conversion; it does not emit candidate kernels — `solar_bridge/learn_worker.py`
-extends the einsum-handler lookup table, not a solution generator.)
+the authoritative oracle. (`src/solar/` derives the SOL *bound* from its exact
+semantic graph; it does not emit candidate kernels.)
 
 ### Layer 2 — Runtime model
 

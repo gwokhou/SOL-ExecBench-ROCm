@@ -13,6 +13,7 @@ import re
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     extract_amdgpu_targets,
 )
+from sol_execbench.core.bench.static_kernel.artifacts import display_artifact_path
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticIsaAnalysis,
     StaticKernelEvidenceArtifact,
@@ -207,7 +208,7 @@ def _generated_artifacts(
                 artifact_type=artifact_type,
                 status=StaticKernelEvidenceStatus.COLLECTED,
                 reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
-                persisted_path=_relative(path, sidecar_base),
+                persisted_path=display_artifact_path(path, sidecar_base),
                 size_bytes=path.stat().st_size,
                 sha256=sha256_file(path),
                 producer="amd-isa",
@@ -258,13 +259,6 @@ def _reason_code(exc: Exception) -> str:
         "IsaProtocolError": "isa_protocol_failed",
         "FileNotFoundError": "isa_artifact_tool_unavailable",
     }.get(name, "isa_artifact_extraction_failed")
-
-
-def _relative(path: Path, base: Path) -> str:
-    try:
-        return path.resolve().relative_to(base).as_posix()
-    except ValueError:
-        return path.resolve().as_posix()
 
 
 __all__ = ["collect_static_isa_analyses"]

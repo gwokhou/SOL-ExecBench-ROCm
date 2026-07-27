@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -17,6 +16,7 @@ from ..integrity.schema_versions import (
     ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION,
     ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
 )
+from ..process.subprocesses import ProbeCompletedProcess
 from .arch_capabilities import ArchCapabilityBudgetStatus, ArchIsaBudget
 
 
@@ -191,15 +191,6 @@ class EnvironmentDiagnostics(BaseModelWithDocstrings):
     """Environment snapshot evidence."""
     checks: list[EnvironmentCheckResult] = Field(default_factory=list)
     """Preflight check results."""
-
-
-@dataclass(frozen=True)
-class ProbeCompletedProcess:
-    """Small subprocess result shape used by injectable probe runners."""
-
-    returncode: int
-    stdout: str = ""
-    stderr: str = ""
 
 
 ProbeRunner = Callable[[list[str], float], ProbeCompletedProcess]

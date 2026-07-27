@@ -62,7 +62,12 @@ def _verify_corpus_reference(
     bundle_root: Path,
     corpus: AkaCorpusManifest,
 ) -> None:
-    bundled = _artifact_path(reference, bundle_root)
+    bundled = verify_artifact_file(
+        bundle_root,
+        reference.path,
+        expected_sha256=reference.sha256,
+        expected_size_bytes=reference.size_bytes,
+    )
     if sha256_file(bundled) != sha256_file(corpus.path):
         raise ValueError("release SOLAR index corpus identity mismatch")
 
@@ -84,7 +89,12 @@ def _verify_solar_manifest(
     problem_path: str,
     workload_uuid: str,
 ) -> float:
-    path = _artifact_path(reference, bundle_root)
+    path = verify_artifact_file(
+        bundle_root,
+        reference.path,
+        expected_sha256=reference.sha256,
+        expected_size_bytes=reference.size_bytes,
+    )
     if path.stat().st_size > _MAX_SOLAR_MANIFEST_BYTES:
         raise ValueError("formal SOLAR manifest exceeds the size limit")
     payload = _load_manifest(path)
@@ -164,15 +174,6 @@ def _verify_manifest_artifacts(root: Path, value: object) -> None:
             raise ValueError("formal SOLAR artifact identity mismatch")
     if observed != FORMAL_ARTIFACT_PATHS:
         raise ValueError("formal SOLAR artifact denominator mismatch")
-
-
-def _artifact_path(reference: ArtifactReference, root: Path) -> Path:
-    return verify_artifact_file(
-        root,
-        reference.path,
-        expected_sha256=reference.sha256,
-        expected_size_bytes=reference.size_bytes,
-    )
 
 
 __all__ = ["verify_solar_index"]

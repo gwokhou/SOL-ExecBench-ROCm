@@ -24,7 +24,6 @@ import yaml
 
 from solar.einsum.semantics import (
     SemanticGraphError,
-    annotate_semantics,
     validate_semantic_graph,
 )
 from solar.verification.errors import EinsumExecutionError, VerificationError
@@ -324,6 +323,17 @@ class EinsumGraphExecutor:
         }
         target = str(semantic.get("target", ""))
         output_shapes = _shapes(layer)
+
+        exact_target = semantic.get("exact_target")
+        if semantic.get("kind") == "aten" and isinstance(exact_target, str):
+            packet = getattr(torch.ops.aten, exact_target, None)
+            overload_name = str(semantic.get("overload", "default"))
+            overload = getattr(packet, overload_name, None) if packet else None
+            if overload is None:
+                raise EinsumExecutionError(
+                    f"ATen operation {exact_target}.{overload_name} is unavailable"
+                )
+            return overload(*arguments, **kwargs)
 
         effects = semantic.get("effects") or {}
         if effects.get("mutates"):
@@ -1100,93 +1110,4 @@ def _execution_identity(device: str) -> dict[str, Any]:
         "backend": "cuda",
         "device": f"cuda:{index}",
         "device_name": str(properties.name),
-    }
-
-
-def _resolve_torch_operation(node_type: str) -> Callable[..., Any]:
-    import torch
-    import torch.nn.functional as functional
-
-    normalized = node_type.lower().split(".")[-1]
-    for owner in (torch, functional):
-        function = getattr(owner, normalized, None)
-        if callable(function):
-            return function
-    raise VerificationError(f"cannot resolve PyTorch reference operation {node_type!r}")
-
-
-def verify_generated_handler(
-    node_type: str,
-    source_code: str,
-    node_data: Mapping[str, Any],
-    *,
-    atol: float = 1e-5,
-    rtol: float = 1e-5,
-) -> dict[str, Any]:
-    """Numerically validate generated handler code before it may be cached."""
-    import torch
-
-    safe_builtins = {
-        "abs": abs,
-        "bool": bool,
-        "dict": dict,
-        "enumerate": enumerate,
-        "float": float,
-        "int": int,
-        "isinstance": isinstance,
-        "len": len,
-        "list": list,
-        "max": max,
-        "min": min,
-        "range": range,
-        "str": str,
-        "tuple": tuple,
-        "zip": zip,
-    }
-    namespace: dict[str, Any] = {
-        "__builtins__": safe_builtins,
-        "Dict": dict,
-        "Any": Any,
-    }
-    exec(source_code, namespace, namespace)  # pylint: disable=exec-used
-    name = f"create_{node_type}_subgraph"
-    function = namespace.get(name)
-    if not callable(function):
-        raise VerificationError(f"generated handler does not define {name}")
-    subgraph = function("verification_node", dict(node_data))
-    if not isinstance(subgraph, Mapping) or not subgraph:
-        raise VerificationError("generated handler returned an empty subgraph")
-    input_shapes = [
-        tuple(int(dim) for dim in shape) for shape in node_data.get("input_shapes", [])
-    ]
-    if not input_shapes:
-        raise VerificationError("generated handler validation requires input shapes")
-    dtypes = list(node_data.get("input_dtypes") or [])
-    cases = []
-    for seed, pattern in ((11, "random"), (29, "zeros"), (47, "boundary")):
-        generator = torch.Generator(device="cpu").manual_seed(seed)
-        tensors = []
-        for index, shape in enumerate(input_shapes):
-            dtype_name = str(
-                dtypes[index] if index < len(dtypes) else "torch.float32"
-            ).split(".")[-1]
-            dtype = getattr(torch, dtype_name, torch.float32)
-            value = torch.randn(shape, generator=generator, dtype=dtype)
-            tensors.append(value)
-        inputs = _pattern_inputs(tuple(tensors), pattern)
-        kwargs = {
-            key: value
-            for key, value in (node_data.get("module_args") or {}).items()
-            if isinstance(value, (str, int, float, bool, tuple, list))
-            and key != "raw_attributes"
-        }
-        expected = _resolve_torch_operation(node_type)(*_clone(inputs), **kwargs)
-        graph = annotate_semantics({"layers": dict(subgraph)}, strict=True)
-        actual = EinsumGraphExecutor(graph, check_shapes=True)(*_clone(inputs))
-        _assert_close(actual, expected, atol, rtol)
-        cases.append({"seed": seed, "pattern": pattern})
-    return {
-        "status": "passed",
-        "verifier": "solar.generated_handler.v1",
-        "cases": cases,
     }

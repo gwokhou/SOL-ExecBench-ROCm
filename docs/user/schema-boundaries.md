@@ -21,5 +21,6 @@ Allowed parser boundaries:
 - source reference adapters such as `paper_denominator_sources.py`
 - sidecar readers that require their sole supported schema version
 
-Business logic must not add new `isinstance(value, dict)` payload checks. Use
-`sol_execbench.core.data.path_access` helpers or define a local typed adapter.
+Business logic must not add new `isinstance(value, dict)` payload checks.
+Define a focused typed adapter at the artifact parser boundary instead of
+adding generic nested-payload access helpers.

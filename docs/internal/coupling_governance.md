@@ -5,6 +5,7 @@
 ```bash
 uv run python scripts/check_coupling.py
 uv run python scripts/check_readability.py
+uv run python scripts/check_production_reachability.py
 uv run python scripts/check_current_docs.py
 uv run --with ruff ruff check .
 uv run ty check
@@ -39,11 +40,15 @@ tests and current documentation in the same change.
 
 ## Readability debt
 
-The standard baseline is non-increasing. SOLAR is additionally checked against
+The standard baseline is an exact snapshot and must be lowered whenever debt is
+removed. SOLAR is additionally checked against
 `scripts/solar_readability_debt.json`, an exact inventory of pre-existing long/wide
-functions, `Any` modules and oversized modules. New debt or growth fails CI;
-removing or shrinking an item passes without editing the inventory. Vendored
-torchview code is excluded because it is not project-owned.
+functions, `Any` modules and oversized modules. Any change must update the
+inventory in the same patch, so removed debt cannot silently become future
+headroom. `scripts/check_production_reachability.py` rejects bundled source
+modules that are unreachable from public entry points, isolated workers, dynamic
+operation registries, or checked-in tooling. Vendored modules are not exempt:
+retained third-party code must still have a production path.
 
 Passing import checks alone is not completion. Stages must be named, raw data
 must stop at parsers, mutable orchestration state must be typed, subprocess I/O

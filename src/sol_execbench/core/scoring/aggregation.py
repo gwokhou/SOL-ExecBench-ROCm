@@ -70,11 +70,10 @@ def diagnostic_workload_score(
 ) -> WorkloadScore:
     """Build an aggregate-able WorkloadScore from explicit runtimes.
 
-    DIAGNOSTIC, non-official: the official scorer is intentionally not wired
-    (the paper's T_b baseline and release authority are not published).
-    This helper lets a caller that has measured a candidate time, derived a SOL
-    bound from SOLAR, and supplied an explicit baseline produce a workload score
-    for diagnostic display. It is never a publication-grade score.
+    DIAGNOSTIC, non-official: the official bundle verifier is a separate input
+    boundary. This helper lets a caller that has measured a candidate time,
+    derived a SOL bound from SOLAR, and supplied an explicit baseline produce a
+    workload score for diagnostic display. It is never a publication-grade score.
 
     Raises:
         SolScoreAuditError: if the runtimes violate a paper precondition

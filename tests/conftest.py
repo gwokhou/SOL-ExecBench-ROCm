@@ -17,14 +17,16 @@
 import contextlib
 import fcntl
 import sys
-from importlib.util import find_spec
+from importlib.util import find_spec, module_from_spec, spec_from_file_location
 from platform import machine
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 PathExists = Callable[[Path], bool]
+ScriptLoader = Callable[[str], ModuleType]
 
 _ROCM_DEVICE_NODES = (Path("/dev/kfd"), Path("/dev/dri"))
 _REAL_GPU_MARKERS = frozenset(
@@ -32,6 +34,34 @@ _REAL_GPU_MARKERS = frozenset(
 )
 _REAL_GPU_XDIST_GROUP = "real_rocm_gpu"
 _REAL_GPU_LOCK_PATH = Path("/tmp/sol-execbench-real-gpu.lock")
+
+
+@pytest.fixture
+def load_script() -> Iterator[ScriptLoader]:
+    """Load repository support scripts without creating a nested conftest module."""
+    repository_root = Path(__file__).resolve().parent.parent
+    loaded: dict[str, ModuleType] = {}
+
+    def _load(relative_path: str) -> ModuleType:
+        module_name = f"test_script_{relative_path.replace('/', '_').replace('.', '_')}"
+        if module_name in loaded:
+            return loaded[module_name]
+        spec = spec_from_file_location(module_name, repository_root / relative_path)
+        assert spec is not None and spec.loader is not None
+        module = module_from_spec(spec)
+        sys.modules[module_name] = module
+        try:
+            spec.loader.exec_module(module)
+        except BaseException:
+            sys.modules.pop(module_name, None)
+            raise
+        loaded[module_name] = module
+        return module
+
+    yield _load
+    for name, module in loaded.items():
+        if sys.modules.get(name) is module:
+            sys.modules.pop(name)
 
 
 def _missing_rocm_device_nodes(

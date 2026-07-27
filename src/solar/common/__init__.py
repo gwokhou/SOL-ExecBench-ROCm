@@ -31,13 +31,6 @@ from solar.common.utils import (
     setup_safe_environment,
     load_module_from_file,
 )
-from solar.common.einsum_graph_check import (
-    EinsumGraphChecker,
-    ValidationError,
-    ValidationResult,
-    check_einsum_graph,
-    check_einsum_graph_file,
-)
 
 __all__ = [
     # Types
@@ -53,10 +46,4 @@ __all__ = [
     "format_number",
     "setup_safe_environment",
     "load_module_from_file",
-    # Einsum graph checker
-    "EinsumGraphChecker",
-    "ValidationError",
-    "ValidationResult",
-    "check_einsum_graph",
-    "check_einsum_graph_file",
 ]

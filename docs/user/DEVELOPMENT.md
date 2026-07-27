@@ -9,6 +9,7 @@ uv run --with ruff ruff format .
 uv run ty check
 uv run python scripts/check_coupling.py
 uv run python scripts/check_readability.py
+uv run python scripts/check_production_reachability.py
 uv run pytest tests/ -q
 ```
 

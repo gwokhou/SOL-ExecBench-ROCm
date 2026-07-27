@@ -11,7 +11,6 @@ from sol_execbench.core.platform.environment import (
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
     GpuEnvironmentSummary,
-    ProbeCompletedProcess,
     PytorchRocmSummary,
     ToolProbeResult,
     build_environment_diagnostics,
@@ -20,6 +19,7 @@ from sol_execbench.core.platform.environment import (
 )
 from sol_execbench.core.platform.environment_probes import parse_probe_output
 from sol_execbench.core.platform.environment_snapshot import summarize_gpus
+from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
 
 def test_minimal_environment_snapshot_round_trips():

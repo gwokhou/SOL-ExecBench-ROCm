@@ -39,6 +39,28 @@ class TextSubprocessRunner(Protocol):
     ) -> subprocess.CompletedProcess[str]: ...
 
 
+@dataclass(frozen=True)
+class ProbeCompletedProcess:
+    """Small subprocess result shape used by injectable probe runners."""
+
+    returncode: int
+    stdout: str = ""
+    stderr: str = ""
+
+
+def run_bounded_probe(
+    command: list[str],
+    timeout_seconds: float,
+) -> ProbeCompletedProcess:
+    """Run a small diagnostic command with bounded output and group cleanup."""
+    completed = run_in_process_group_bounded(command, timeout=timeout_seconds)
+    return ProbeCompletedProcess(
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+    )
+
+
 def run_in_process_group(
     command: Sequence[str],
     *,

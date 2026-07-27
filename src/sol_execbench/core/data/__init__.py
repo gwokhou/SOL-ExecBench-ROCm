@@ -28,10 +28,6 @@ _EXPORTS = {
     "AxisVar": ".definition",
     "TensorSpec": ".definition",
     "Definition": ".definition",
-    "SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION": ".contract",
-    "SOL_EXECBENCH_CONTRACT_VERSION": ".contract",
-    "EvaluatorContract": ".contract",
-    "build_evaluator_contract": ".contract",
     "SourceFile": ".solution",
     "BuildSpec": ".solution",
     "CompileOptions": ".solution",
@@ -67,11 +63,6 @@ __all__ = [
     "AxisVar",
     "TensorSpec",
     "Definition",
-    # Contract types
-    "SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION",
-    "SOL_EXECBENCH_CONTRACT_VERSION",
-    "EvaluatorContract",
-    "build_evaluator_contract",
     # Solution types
     "SourceFile",
     "BuildSpec",

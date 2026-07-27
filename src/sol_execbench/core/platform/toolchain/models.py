@@ -13,7 +13,7 @@ from pydantic import ConfigDict, Field
 
 from ...data.base_model import BaseModelWithDocstrings
 from ...integrity.schema_versions import TOOLCHAIN_ROUTING_SCHEMA_VERSION
-from ..environment import ProbeCompletedProcess
+from ...process.subprocesses import ProbeCompletedProcess
 
 
 DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS = 3.0

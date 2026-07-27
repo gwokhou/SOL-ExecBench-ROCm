@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce readability metrics with a non-increasing repository baseline."""
+"""Enforce readability metrics against an explicitly synchronized baseline."""
 
 from __future__ import annotations
 
@@ -152,25 +152,33 @@ def collect_solar_debt() -> dict[str, object]:
 
 
 def check_solar_debt(current: dict[str, object]) -> list[str]:
-    """Reject new or enlarged SOLAR debt against the exact inventory."""
+    """Require the SOLAR debt inventory to match the current tree exactly."""
     baseline = json.loads(SOLAR_DEBT_PATH.read_text(encoding="utf-8"))
     failures: list[str] = []
     for category in ("long_functions", "wide_functions", "oversized_modules"):
         actual = current[category]
         expected = baseline[category]
         assert isinstance(actual, dict) and isinstance(expected, dict)
-        for key, value in actual.items():
-            if key not in expected:
-                failures.append(f"SOLAR {category} added: {key}={value}")
-            elif int(value) > int(expected[key]):
+        for key in sorted(set(actual) | set(expected)):
+            if key not in actual:
                 failures.append(
-                    f"SOLAR {category} increased: {key}={value} > {expected[key]}"
+                    f"SOLAR {category} removed without baseline update: {key}"
+                )
+            elif key not in expected:
+                failures.append(f"SOLAR {category} added: {key}={actual[key]}")
+            elif int(actual[key]) != int(expected[key]):
+                failures.append(
+                    f"SOLAR {category} changed without baseline update: "
+                    f"{key}={actual[key]} != {expected[key]}"
                 )
     for category in ("any_modules", "wildcard_imports"):
         actual_items = set(current[category])
         expected_items = set(baseline[category])
-        for item in sorted(actual_items - expected_items):
-            failures.append(f"SOLAR {category} added: {item}")
+        for item in sorted(actual_items ^ expected_items):
+            change = (
+                "added" if item in actual_items else "removed without baseline update"
+            )
+            failures.append(f"SOLAR {category} {change}: {item}")
     return failures
 
 
@@ -188,8 +196,11 @@ def main() -> int:
     if not args.no_baseline:
         baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
         for name, value in asdict(metrics).items():
-            if value > int(baseline[name]):
-                failures.append(f"{name} increased: {value} > {baseline[name]}")
+            if value != int(baseline[name]):
+                failures.append(
+                    f"{name} changed without baseline update: "
+                    f"{value} != {baseline[name]}"
+                )
         failures.extend(check_solar_debt(solar_debt))
     payload = {
         "metrics": asdict(metrics),

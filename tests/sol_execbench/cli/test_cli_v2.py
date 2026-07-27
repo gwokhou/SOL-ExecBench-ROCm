@@ -153,9 +153,14 @@ def test_score_exposes_publisher_policy_without_score_inputs() -> None:
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["data"]["status"] == "available"
-    assert payload["data"]["scorer_implemented"] is True
-    assert payload["data"]["accepts_caller_authored_inputs"] is False
-    assert payload["data"]["requires_signatures"] is False
+    assert payload["data"]["policy"]["authorized"] is True
+    assert payload["data"]["verifier"]["available"] is True
+    assert payload["data"]["verifier"]["accepts_caller_authored_inputs"] is False
+    assert payload["data"]["verifier"]["requires_signatures"] is False
+    assert payload["data"]["producer"] == {
+        "ready": False,
+        "reason_code": "formal_mapper_not_allowlisted",
+    }
+    assert payload["data"]["published_release"]["available"] is False
 
     assert CliRunner().invoke(cli, ["score", "official"]).exit_code == 2

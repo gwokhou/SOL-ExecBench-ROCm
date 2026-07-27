@@ -32,7 +32,7 @@ locked in `uv.lock`. Important dependency families include:
 | Triton ROCm | Triton kernel examples and evaluation. |
 | ROCm runtime and tools | HIP compiler, `rocminfo`, `amd-smi`, `rocprofv3`, AMD GPU runtime libraries. |
 | Pydantic, Click, Rich | Schemas and CLI. |
-| safetensors, datasets | Benchmark input loading and dataset workflows. |
+| safetensors | Tensor payload transport and safetensors-backed benchmark inputs. |
 | pytest, pytest-xdist | Test execution and parallelization tooling. |
 | Ruff, Ty | Development-time linting, formatting, and type checking. |
 

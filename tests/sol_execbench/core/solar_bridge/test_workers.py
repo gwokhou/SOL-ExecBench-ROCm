@@ -7,10 +7,12 @@ from typing import cast
 
 import pytest
 
-from sol_execbench.core.solar_bridge import learn_worker, worker
+from sol_execbench.core.solar_bridge import stage_worker, worker
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
+    SolarReadinessStatus,
+    SolarStageAuditOutcome,
 )
 
 
@@ -46,6 +48,22 @@ def _write_request(tmp_path: Path) -> tuple[Path, Path]:
                 "output_dir": str(tmp_path / "output"),
                 "device": "hip:0",
                 "orojenesis_home": None,
+            }
+        )
+    )
+    return request, response
+
+
+def _write_stage_request(tmp_path: Path) -> tuple[Path, Path]:
+    request = tmp_path / "stage-request.json"
+    response = tmp_path / "stage-response.json"
+    request.write_text(
+        json.dumps(
+            {
+                "problem_dir": str(tmp_path / "problem"),
+                "workload_uuid": "workload-1",
+                "output_dir": str(tmp_path / "output"),
+                "device": "hip:0",
             }
         )
     )
@@ -121,94 +139,59 @@ def test_analysis_worker_replaces_unserializable_outcome_with_failure(
     assert payload["reason_code"] == "worker_response_failed"
 
 
-def test_learning_worker_serializes_generated_candidate(tmp_path, monkeypatch) -> None:
-    request = tmp_path / "learn-request.json"
-    response = tmp_path / "learn-response.json"
-    sample = tmp_path / "sample.yaml"
-    sample.write_text("type: custom_add\n")
-    request.write_text(
-        json.dumps(
-            {
-                "node_type": "custom_add",
-                "sample_path": str(sample),
-                "output_dir": str(tmp_path / "output"),
-                "model": "test-model",
-            }
-        )
-    )
+def test_stage_worker_serializes_success(tmp_path, monkeypatch) -> None:
+    request, response = _write_stage_request(tmp_path)
     monkeypatch.setattr(
-        "solar.learning.learn_handler_candidate",
-        lambda **kwargs: {"node_type": kwargs["node_type"]},
+        stage_worker,
+        "audit_workload_stages",
+        lambda **kwargs: SolarStageAuditOutcome(
+            status=SolarReadinessStatus.READY,
+            analysis_id=kwargs["workload_uuid"],
+            output_dir=kwargs["output_dir"],
+        ),
     )
-    monkeypatch.setattr(sys, "argv", ["learn-worker", str(request), str(response)])
+    monkeypatch.setattr(sys, "argv", ["stage-worker", str(request), str(response)])
 
     with pytest.raises(SystemExit, match="0"):
-        learn_worker.main()
+        stage_worker.main()
 
-    assert json.loads(response.read_text()) == {
-        "status": "generated",
-        "artifact": {"node_type": "custom_add"},
-    }
+    assert json.loads(response.read_text())["status"] == "ready"
 
 
-def test_learning_worker_serializes_failure(tmp_path, monkeypatch) -> None:
-    request = tmp_path / "learn-request.json"
-    response = tmp_path / "learn-response.json"
-    sample = tmp_path / "sample.yaml"
-    sample.write_text("type: custom_add\n")
-    request.write_text(
-        json.dumps(
-            {
-                "node_type": "custom_add",
-                "sample_path": str(sample),
-                "output_dir": str(tmp_path / "output"),
-                "model": "test-model",
-            }
-        )
-    )
-
-    def fail(**kwargs):
-        del kwargs
-        raise RuntimeError("model unavailable")
-
-    monkeypatch.setattr("solar.learning.learn_handler_candidate", fail)
-    monkeypatch.setattr(sys, "argv", ["learn-worker", str(request), str(response)])
-
-    with pytest.raises(SystemExit, match="1"):
-        learn_worker.main()
-
-    assert json.loads(response.read_text()) == {
-        "status": "failed",
-        "reason_code": "handler_learning_failed",
-        "message": "model unavailable",
-    }
-
-
-def test_learning_worker_replaces_unserializable_artifact_with_failure(
+def test_stage_worker_converts_exception_to_bounded_failure(
     tmp_path, monkeypatch
 ) -> None:
-    request = tmp_path / "learn-request.json"
-    response = tmp_path / "learn-response.json"
-    sample = tmp_path / "sample.yaml"
-    sample.write_text("type: custom_add\n")
-    request.write_text(
-        json.dumps(
-            {
-                "node_type": "custom_add",
-                "sample_path": str(sample),
-                "output_dir": str(tmp_path / "output"),
-                "model": "test-model",
-            }
-        )
-    )
-    monkeypatch.setattr(
-        "solar.learning.learn_handler_candidate", lambda **kwargs: b"not-json"
-    )
-    monkeypatch.setattr(sys, "argv", ["learn-worker", str(request), str(response)])
+    request, response = _write_stage_request(tmp_path)
 
-    with pytest.raises(SystemExit, match="1"):
-        learn_worker.main()
+    def fail(**_kwargs):
+        raise RuntimeError("x" * 5000)
+
+    monkeypatch.setattr(stage_worker, "audit_workload_stages", fail)
+    monkeypatch.setattr(sys, "argv", ["stage-worker", str(request), str(response)])
+
+    with pytest.raises(SystemExit, match="0"):
+        stage_worker.main()
 
     payload = json.loads(response.read_text())
     assert payload["status"] == "failed"
-    assert payload["reason_code"] == "worker_response_failed"
+    assert payload["reason_code"] == "bridge_failed"
+    assert len(payload["message"]) == 4096
+
+
+def test_stage_worker_reports_response_serialization_failure(
+    tmp_path, monkeypatch
+) -> None:
+    request, response = _write_stage_request(tmp_path)
+    monkeypatch.setattr(
+        stage_worker,
+        "audit_workload_stages",
+        lambda **kwargs: SolarStageAuditOutcome(
+            status=SolarReadinessStatus.READY,
+            analysis_id=kwargs["workload_uuid"],
+        ),
+    )
+    monkeypatch.setattr(stage_worker, "write_worker_response", lambda *_args: False)
+    monkeypatch.setattr(sys, "argv", ["stage-worker", str(request), str(response)])
+
+    with pytest.raises(SystemExit, match="1"):
+        stage_worker.main()

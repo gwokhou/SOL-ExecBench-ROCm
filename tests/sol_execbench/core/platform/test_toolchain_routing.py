@@ -5,7 +5,6 @@ import json
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
-from sol_execbench.core.platform.environment import ProbeCompletedProcess
 from sol_execbench.core.platform.toolchain import (
     TOOLCHAIN_ROUTING_SCHEMA_VERSION,
     ToolLifecycle,
@@ -17,6 +16,7 @@ from sol_execbench.core.platform.toolchain import (
     build_toolchain_routing_report,
     default_toolchain_registry,
 )
+from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
 
 def _which(binary: str) -> str | None:

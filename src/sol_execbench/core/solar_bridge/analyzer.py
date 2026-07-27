@@ -24,6 +24,15 @@ from sol_execbench.core.solar_bridge.workload_context import (
 FORMAL_ARCHITECTURE, FORMAL_GFX_TARGET = "RX_9060_XT", "gfx1200"
 
 
+def formal_producer_readiness() -> tuple[bool, str]:
+    """Report whether this release can produce publication-grade SOLAR bounds."""
+    from solar.analysis.orojenesis import OROJENESIS_TRUSTED_MAPPER_SHA256
+
+    if not OROJENESIS_TRUSTED_MAPPER_SHA256:
+        return False, "formal_mapper_not_allowlisted"
+    return True, "ready"
+
+
 def formal_architecture_profile_hash(architecture: str = FORMAL_ARCHITECTURE) -> str:
     """Return the canonical SHA-256 of SOLAR's packaged architecture profile.
 
