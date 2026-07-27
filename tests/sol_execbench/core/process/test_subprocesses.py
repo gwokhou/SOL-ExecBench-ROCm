@@ -68,10 +68,13 @@ def test_bounded_process_group_keeps_only_output_tail(tmp_path):
 
 
 def test_bounded_process_group_does_not_create_unbounded_stream_files(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ):
     def reject_temp_directory(*args, **kwargs):
-        raise AssertionError("bounded capture must not spool output to a regular file")
+        raise AssertionError(
+            "bounded capture must not spool output to a regular file",
+        )
 
     monkeypatch.setattr(tempfile, "TemporaryDirectory", reject_temp_directory)
 
@@ -120,24 +123,36 @@ def test_timeout_cleans_descendant_processes(tmp_path, monkeypatch):
         subprocesses._terminate_process_group(process)
         pytest.fail("descendant process did not start within 5 seconds")
 
-    monkeypatch.setattr(subprocesses.subprocess, "Popen", wait_for_descendant_start)
+    monkeypatch.setattr(
+        subprocesses.subprocess,
+        "Popen",
+        wait_for_descendant_start,
+    )
 
     with pytest.raises(subprocess.TimeoutExpired):
-        run_in_process_group((sys.executable, "-c", program), cwd=tmp_path, timeout=0.1)
+        run_in_process_group(
+            (sys.executable, "-c", program),
+            cwd=tmp_path,
+            timeout=0.1,
+        )
 
     child_pid = int(child_pid_path.read_text())
     assert _wait_for_process_exit(child_pid)
 
 
 def test_bounded_runner_allows_descendant_to_flush_output(tmp_path):
-    child_program = "import time; time.sleep(0.05); print('flushed tail', flush=True)"
+    child_program = (
+        "import time; time.sleep(0.05); print('flushed tail', flush=True)"
+    )
     program = (
         "import subprocess, sys; "
         f"subprocess.Popen([sys.executable, '-c', {child_program!r}])"
     )
 
     result = run_in_process_group_bounded(
-        (sys.executable, "-c", program), cwd=tmp_path, timeout=2
+        (sys.executable, "-c", program),
+        cwd=tmp_path,
+        timeout=2,
     )
 
     assert result.returncode == 0
@@ -164,17 +179,26 @@ def test_bounded_runner_cleans_up_on_keyboard_interrupt(tmp_path, monkeypatch):
             time.sleep(0.01)
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(subprocesses, "_wait_for_exit_without_reaping", interrupt_once)
+    monkeypatch.setattr(
+        subprocesses,
+        "_wait_for_exit_without_reaping",
+        interrupt_once,
+    )
 
     with pytest.raises(KeyboardInterrupt):
         run_in_process_group_bounded(
-            (sys.executable, "-c", program), cwd=tmp_path, timeout=5
+            (sys.executable, "-c", program),
+            cwd=tmp_path,
+            timeout=5,
         )
 
     assert _wait_for_process_exit(int(pid_path.read_text()))
 
 
-def test_file_runner_cleans_successful_leader_descendants(tmp_path, monkeypatch):
+def test_file_runner_cleans_successful_leader_descendants(
+    tmp_path,
+    monkeypatch,
+):
     child_pid_path = tmp_path / "file-child.pid"
     child_program = "import time; time.sleep(60)"
     program = (
@@ -197,17 +221,23 @@ def test_file_runner_cleans_successful_leader_descendants(tmp_path, monkeypatch)
 
 
 def test_group_signal_is_disabled_after_leader_is_reaped(monkeypatch):
-    process = subprocess.Popen((sys.executable, "-c", "pass"), start_new_session=True)
+    process = subprocess.Popen(
+        (sys.executable, "-c", "pass"),
+        start_new_session=True,
+    )
     process.wait(timeout=2)
 
     def reject_stale_signal(*args, **kwargs):
-        raise AssertionError("must not signal a group through a reaped leader PID")
+        raise AssertionError(
+            "must not signal a group through a reaped leader PID",
+        )
 
     monkeypatch.setattr(subprocesses.os, "killpg", reject_stale_signal)
 
     assert (
         subprocesses._signal_unreaped_process_group(
-            process, subprocesses.signal.SIGKILL
+            process,
+            subprocesses.signal.SIGKILL,
         )
         is False
     )

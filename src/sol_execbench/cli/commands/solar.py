@@ -19,12 +19,14 @@ from sol_execbench.cli.protocol import (
 from sol_execbench.core.solar_bridge.corpus_readiness import (
     audit_corpus_stage_readiness,
 )
-from sol_execbench.core.solar_bridge.release import build_release_solar_manifests
 from sol_execbench.core.solar_bridge.models import (
-    SolarAnalysisStatus,
     SolarAnalysisOutcome,
+    SolarAnalysisStatus,
     SolarStage,
     SolarWorkerRequest,
+)
+from sol_execbench.core.solar_bridge.release import (
+    build_release_solar_manifests,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
 
@@ -38,11 +40,14 @@ def solar_cli() -> None:
 
 @solar_cli.command("analyze")
 @click.argument(
-    "problem_dir", type=click.Path(exists=True, file_okay=False, path_type=Path)
+    "problem_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
 )
 @click.option("--workload", "workload_uuid", required=True)
 @click.option(
-    "--output", required=True, type=click.Path(file_okay=False, path_type=Path)
+    "--output",
+    required=True,
+    type=click.Path(file_okay=False, path_type=Path),
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
@@ -50,7 +55,12 @@ def solar_cli() -> None:
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     envvar="SOLAR_OROJENESIS_HOME",
 )
-@click.option("--timeout", "timeout_seconds", default=14_400.0, show_default=True)
+@click.option(
+    "--timeout",
+    "timeout_seconds",
+    default=14_400.0,
+    show_default=True,
+)
 def analyze_cli(
     problem_dir: Path,
     workload_uuid: str,
@@ -69,7 +79,7 @@ def analyze_cli(
     )
     try:
         outcome = run_solar_worker(request, timeout_seconds=timeout_seconds)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- isolated worker boundary
         outcome = SolarAnalysisOutcome(
             status=SolarAnalysisStatus.FAILED,
             analysis_id=workload_uuid,
@@ -90,13 +100,18 @@ def analyze_cli(
         )
     data = outcome.to_dict()
     if outcome.status is not SolarAnalysisStatus.ANALYZED:
-        console.print(f"[red]SOLAR failed at {outcome.stage}: {outcome.message}[/red]")
+        console.print(
+            f"[red]SOLAR failed at {outcome.stage}: {outcome.message}[/red]",
+        )
         return CliResult(data=data, exit_code=EXIT_RESULT_FAILED)
     console.print(
-        f"[green]Formal SOL bound: {outcome.lower_bound_seconds:.9g} s[/green]"
+        f"[green]Formal SOL bound: {outcome.lower_bound_seconds:.9g} s[/green]",
     )
     artifacts = tuple(
-        artifact(Path(outcome.output_dir or output) / item["path"], "solar_artifact")
+        artifact(
+            Path(outcome.output_dir or output) / item["path"],
+            "solar_artifact",
+        )
         for item in outcome.artifacts
     )
     return CliResult(data=data, artifacts=artifacts)
@@ -121,7 +136,12 @@ def analyze_cli(
     envvar="SOLAR_OROJENESIS_HOME",
 )
 @click.option("--device", default="cuda:0", show_default=True)
-@click.option("--timeout", "timeout_seconds", default=14_400.0, show_default=True)
+@click.option(
+    "--timeout",
+    "timeout_seconds",
+    default=14_400.0,
+    show_default=True,
+)
 @click.option("--resume", is_flag=True)
 def release_build_cli(
     workspace: Path,
@@ -159,7 +179,7 @@ def release_build_cli(
         "index": str(result.index_path),
     }
     console.print(
-        f"[green]Formal SOLAR release: {result.workloads} workloads indexed.[/green]"
+        f"[green]Formal SOLAR release: {result.workloads} workloads indexed.[/green]",
     )
     return CliResult(
         data=report,
@@ -180,7 +200,12 @@ def release_build_cli(
     show_default=True,
 )
 @click.option("--device", default="cuda:0", show_default=True)
-@click.option("--timeout", "timeout_seconds", default=14_400.0, show_default=True)
+@click.option(
+    "--timeout",
+    "timeout_seconds",
+    default=14_400.0,
+    show_default=True,
+)
 @click.option("--resume", is_flag=True)
 def corpus_audit_cli(
     output: Path,
@@ -209,7 +234,7 @@ def corpus_audit_cli(
     console.print(
         f"[{color}]SOLAR corpus readiness: "
         f"{result.verification_passed}/{result.workloads} workloads verified."
-        f"[/{color}]"
+        f"[/{color}]",
     )
     return CliResult(
         data=result.to_dict(),

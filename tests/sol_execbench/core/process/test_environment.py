@@ -5,7 +5,9 @@ from pathlib import Path
 from sol_execbench.core.process.environment import sanitized_subprocess_env
 
 
-def test_preserves_explicit_rocm_and_thread_runtime_configuration(tmp_path: Path):
+def test_preserves_explicit_rocm_and_thread_runtime_configuration(
+    tmp_path: Path,
+):
     base = {
         "HIP_CLANG_PATH": "/opt/rocm/llvm/bin",
         "OMP_NUM_THREADS": "3",

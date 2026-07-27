@@ -30,15 +30,15 @@ For example, cumsum on input of size N returns output of size N:
 """
 
 import string
-from typing import Any, Optional
+from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShapes, TensorShape
 
 
 class CumulativeHandler(EinsumOpHandler):
@@ -53,7 +53,7 @@ class CumulativeHandler(EinsumOpHandler):
     expressed as standard einsum but we represent them for analysis.
     """
 
-    supported_ops = [
+    supported_ops = (
         # Cumulative operations - preserve input shape
         "cumsum",  # Cumulative sum
         "cumprod",  # Cumulative product
@@ -62,17 +62,22 @@ class CumulativeHandler(EinsumOpHandler):
         # Scan operations
         "scan",
         "prefix_sum",
-    ]
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for cumulative operation.
 
         Since cumulative operations preserve input shape, the einsum
         equation has identical input and output dimensions.
         """
-        input_shape = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        input_shape = (
+            tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
+        )
 
         if input_shape is None:
             raise ValueError(f"Missing Input shape for {op_name}")
@@ -95,7 +100,10 @@ class CumulativeHandler(EinsumOpHandler):
         return self._generate_cumulative_einsum(input_shape, op_type, dim)
 
     def _generate_cumulative_einsum(
-        self, shape: TensorShape, op_type: str = "cumsum", dim: Optional[int] = None
+        self,
+        shape: TensorShape,
+        op_type: str = "cumsum",
+        dim: int | None = None,
     ) -> EinsumOp:
         """Generate einsum for cumulative operations.
 
@@ -113,6 +121,7 @@ class CumulativeHandler(EinsumOpHandler):
 
         The einsum representation shows that output has same rank and
         dimensions as input.
+
         """
         ndims = len(shape)
         labels = list(string.ascii_uppercase[:ndims])

@@ -14,7 +14,9 @@ from sol_execbench.core.solar_bridge import input_factory
 
 @pytest.mark.parametrize("custom_entrypoint", [None, "make_inputs"])
 def test_input_factory_binds_seed_safetensors_and_optional_custom_generator(
-    tmp_path: Path, monkeypatch, custom_entrypoint: str | None
+    tmp_path: Path,
+    monkeypatch,
+    custom_entrypoint: str | None,
 ) -> None:
     custom = object()
     module = SimpleNamespace(make_inputs=custom)

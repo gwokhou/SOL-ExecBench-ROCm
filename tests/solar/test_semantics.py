@@ -48,7 +48,10 @@ def _graph(layer=None):
         ("add_", "add"),
     ],
 )
-def test_build_semantics_canonicalizes_operation_names(operation, target) -> None:
+def test_build_semantics_canonicalizes_operation_names(
+    operation,
+    target,
+) -> None:
     semantic = semantics.build_semantic_operation(_layer(operation))
     assert semantic["target"] == target
 
@@ -100,18 +103,24 @@ def test_inferred_kwargs_views_and_effects_are_explicit() -> None:
     semantic = semantics.build_semantic_operation(reshape)
     assert semantic["kwargs"] == {"dim": [0], "shape": [1, 2]}
     assert semantic["effects"]["aliases"] == [
-        {"output": 0, "input": 0, "conditional": True}
+        {"output": 0, "input": 0, "conditional": True},
     ]
 
     mutation = _layer("copy_", inputs=1)
     mutation["aliases"] = [{"output": 0, "input": 0}]
-    assert semantics.build_semantic_operation(mutation)["effects"]["mutates"] == [0]
+    assert semantics.build_semantic_operation(mutation)["effects"][
+        "mutates"
+    ] == [0]
 
     scatter = _layer("scatter", inputs=3)
-    assert semantics.build_semantic_operation(scatter)["effects"]["atomic"] is True
+    assert (
+        semantics.build_semantic_operation(scatter)["effects"]["atomic"] is True
+    )
     linear = _layer("linear", inputs=3)
     assert (
-        semantics.build_semantic_operation(linear)["effects"]["opaque_library_call"]
+        semantics.build_semantic_operation(linear)["effects"][
+            "opaque_library_call"
+        ]
         is True
     )
 
@@ -121,7 +130,9 @@ def test_softmax_requires_dimension_and_non_strict_annotation_records_unsupporte
 ):
     graph = {"layers": {"softmax": _layer("softmax", inputs=1)}}
     annotated = semantics.annotate_semantics(deepcopy(graph), strict=False)
-    assert annotated["layers"]["softmax"]["semantic_op"]["kind"] == "unsupported"
+    assert (
+        annotated["layers"]["softmax"]["semantic_op"]["kind"] == "unsupported"
+    )
 
     with pytest.raises(SemanticGraphError, match="explicit dim"):
         semantics.annotate_semantics(deepcopy(graph), strict=True)
@@ -156,12 +167,18 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
-        (lambda graph: graph.update(schema_version=0), "current schema_version"),
+        (
+            lambda graph: graph.update(schema_version=0),
+            "current schema_version",
+        ),
         (lambda graph: graph.update(layers={}), "has no layers"),
-        (lambda graph: graph["layers"].update(operation=[]), "is not a mapping"),
+        (
+            lambda graph: graph["layers"].update(operation=[]),
+            "is not a mapping",
+        ),
         (
             lambda graph: graph["layers"]["operation"].update(
-                tensor_dtypes={"inputs": [], "outputs": ["torch.float32"]}
+                tensor_dtypes={"inputs": [], "outputs": ["torch.float32"]},
             ),
             "explicit inputs name/shape/dtype",
         ),
@@ -171,68 +188,81 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
         ),
         (
             lambda graph: graph["layers"]["operation"]["semantic_op"].update(
-                kind="unsupported"
+                kind="unsupported",
             ),
             "not executable exactly",
         ),
         (
             lambda graph: graph["layers"]["operation"]["semantic_op"].update(
-                target="not-a-real-operation"
+                target="not-a-real-operation",
             ),
             "unsupported exact operation",
         ),
         (
             lambda graph: graph["layers"]["operation"]["semantic_op"].update(
-                arguments={}
+                arguments={},
             ),
             "lacks explicit arguments",
         ),
         (
             lambda graph: graph["layers"]["operation"]["semantic_op"].update(
-                kwargs=["bad"]
+                kwargs=["bad"],
             ),
             "invalid keyword arguments",
         ),
         (
             lambda graph: graph["layers"]["operation"]["semantic_op"].update(
-                arguments=[{"tensor": 4}, {"tensor": 1}]
+                arguments=[{"tensor": 4}, {"tensor": 1}],
             ),
             "outside its input metadata",
         ),
         (
             lambda graph: graph["layers"]["operation"]["semantic_op"].update(
-                arguments=[{"tensor": 0}, {"value": 1}]
+                arguments=[{"tensor": 0}, {"value": 1}],
             ),
             "does not preserve every ordered tensor",
         ),
         (
-            lambda graph: graph["layers"]["operation"]["semantic_op"].pop("effects"),
+            lambda graph: graph["layers"]["operation"]["semantic_op"].pop(
+                "effects",
+            ),
             "lacks explicit effects",
         ),
         (
-            lambda graph: graph["layers"]["operation"]["semantic_op"]["effects"].update(
-                mutates="bad"
+            lambda graph: graph["layers"]["operation"]["semantic_op"][
+                "effects"
+            ].update(
+                mutates="bad",
             ),
             "invalid mutation/alias effects",
         ),
         (
-            lambda graph: graph["layers"]["operation"]["semantic_op"]["effects"].update(
-                mutates=[4]
+            lambda graph: graph["layers"]["operation"]["semantic_op"][
+                "effects"
+            ].update(
+                mutates=[4],
             ),
             "invalid mutation target",
         ),
         (
-            lambda graph: graph["layers"]["operation"]["semantic_op"]["effects"].update(
-                aliases=[{"input": 0, "output": 4}]
+            lambda graph: graph["layers"]["operation"]["semantic_op"][
+                "effects"
+            ].update(
+                aliases=[{"input": 0, "output": 4}],
             ),
             "invalid alias effect",
         ),
     ],
 )
-def test_validate_rejects_incomplete_semantic_contracts(mutate, message) -> None:
+def test_validate_rejects_incomplete_semantic_contracts(
+    mutate,
+    message,
+) -> None:
     graph = _graph()
-    graph["layers"]["operation"]["semantic_op"] = semantics.build_semantic_operation(
-        graph["layers"]["operation"]
+    graph["layers"]["operation"]["semantic_op"] = (
+        semantics.build_semantic_operation(
+            graph["layers"]["operation"],
+        )
     )
     mutate(graph)
     with pytest.raises(SemanticGraphError, match=message):
@@ -253,7 +283,10 @@ def test_validate_rejects_bad_einsum_and_missing_required_parameters() -> None:
         "kwargs": {},
         "effects": {"mutates": [], "aliases": []},
     }
-    with pytest.raises(SemanticGraphError, match="lacks exact softmax parameters"):
+    with pytest.raises(
+        SemanticGraphError,
+        match="lacks exact softmax parameters",
+    ):
         semantics.validate_semantic_graph(_graph(softmax))
 
     sliced = _layer("slice", inputs=1)

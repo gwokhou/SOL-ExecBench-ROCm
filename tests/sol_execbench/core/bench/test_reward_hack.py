@@ -25,7 +25,7 @@ import pytest
 import torch
 
 from sol_execbench.core.bench.reward_hack import (
-    RewardHackDetected,
+    RewardHackError,
     check_eval_integrity,
     check_lazy_outputs,
     check_monkey_patch,
@@ -43,16 +43,20 @@ class TestCheckMonkeyPatch:
         check_monkey_patch()  # must not raise
 
     def test_raises_when_elapsed_time_replaced(self, monkeypatch):
-        """RewardHackDetected when elapsed_time identity differs from the captured address."""
+        """Raise RewardHackError when the captured elapsed-time identity changes."""
         from sol_execbench.core.bench import reward_hack
 
         if reward_hack._ELAPSED_TIME_ADDR is None:
             pytest.skip(
-                "ROCm GPU unavailable; _ELAPSED_TIME_ADDR was not captured at import"
+                "ROCm GPU unavailable; _ELAPSED_TIME_ADDR was not captured at import",
             )
 
-        monkeypatch.setattr(torch.cuda.Event, "elapsed_time", lambda self, other: 0.0)
-        with pytest.raises(RewardHackDetected, match="monkey-patched"):
+        monkeypatch.setattr(
+            torch.cuda.Event,
+            "elapsed_time",
+            lambda self, other: 0.0,
+        )
+        with pytest.raises(RewardHackError, match="monkey-patched"):
             check_monkey_patch()
 
 
@@ -67,11 +71,11 @@ class TestCheckThreadInjection:
         check_thread_injection(5, 3)
 
     def test_raises_when_count_increases(self):
-        with pytest.raises(RewardHackDetected, match="Thread injection"):
+        with pytest.raises(RewardHackError, match="Thread injection"):
             check_thread_injection(3, 5)
 
     def test_error_message_includes_both_counts(self):
-        with pytest.raises(RewardHackDetected) as exc:
+        with pytest.raises(RewardHackError) as exc:
             check_thread_injection(2, 7)
         msg = str(exc.value)
         assert "7" in msg and "2" in msg
@@ -107,12 +111,14 @@ class TestThreadInjectionMonitor:
         monitor = ThreadInjectionMonitor()
         monitor._baseline = 4
         monitor._peak = 7
-        with pytest.raises(RewardHackDetected, match="peak 7"):
+        with pytest.raises(RewardHackError, match="peak 7"):
             check_thread_injection_from_monitor(monitor)
 
     def test_detects_a_real_transient_worker(self):
-        """A worker thread alive only during the timed region is caught by the
-        concurrent sampler, which a single before/after delta would miss."""
+        """Detect a worker that exists only during the timed region.
+
+        The concurrent sampler catches workers that a before/after delta misses.
+        """
         import threading
         import time
 
@@ -125,7 +131,9 @@ class TestThreadInjectionMonitor:
             def worker() -> None:
                 stop.wait(0.2)
 
-            workers = [threading.Thread(target=worker, daemon=True) for _ in range(2)]
+            workers = [
+                threading.Thread(target=worker, daemon=True) for _ in range(2)
+            ]
             for w in workers:
                 w.start()
             time.sleep(0.05)
@@ -150,7 +158,7 @@ class TestThreadInjectionMonitor:
 
         assert monitor.peak == monitor.baseline
         assert monitor.starts_observed > 0
-        with pytest.raises(RewardHackDetected, match="thread start event"):
+        with pytest.raises(RewardHackError, match="thread start event"):
             check_thread_injection_from_monitor(monitor)
 
     def test_event_guard_catches_low_level_thread_start(self):
@@ -175,9 +183,11 @@ class TestThreadInjectionMonitor:
 
         original_thread_start = threading.Thread.start
         original_raw_start = _thread.start_new_thread
-        with pytest.raises(RuntimeError, match="timing failed"):
-            with ThreadInjectionMonitor():
-                raise RuntimeError("timing failed")
+        with (
+            pytest.raises(RuntimeError, match="timing failed"),
+            ThreadInjectionMonitor(),
+        ):
+            raise RuntimeError("timing failed")
 
         assert threading.Thread.start is original_thread_start
         assert _thread.start_new_thread is original_raw_start
@@ -194,11 +204,11 @@ class TestCheckLazyOutputs:
         check_lazy_outputs([])
 
     def test_raises_for_non_tensor(self):
-        with pytest.raises(RewardHackDetected, match="Lazy evaluation"):
+        with pytest.raises(RewardHackError, match="Lazy evaluation"):
             check_lazy_outputs([torch.zeros(2), 42])
 
     def test_raises_for_none(self):
-        with pytest.raises(RewardHackDetected, match="NoneType"):
+        with pytest.raises(RewardHackError, match="NoneType"):
             check_lazy_outputs([None])
 
     def test_raises_for_tensor_subclass(self):
@@ -209,11 +219,11 @@ class TestCheckLazyOutputs:
 
         base = torch.zeros(2)
         sub = base.as_subclass(SubTensor)
-        with pytest.raises(RewardHackDetected):
+        with pytest.raises(RewardHackError):
             check_lazy_outputs([sub])
 
     def test_error_message_includes_actual_type_name(self):
-        with pytest.raises(RewardHackDetected) as exc:
+        with pytest.raises(RewardHackError) as exc:
             check_lazy_outputs(["a string"])
         assert "str" in str(exc.value)
 
@@ -240,14 +250,17 @@ class TestEvalIntegrity:
         ns: dict[str, Any] = {"time_runnable": original}
         snap = snapshot_critical_functions(ns, ["time_runnable"])
         ns["time_runnable"] = lambda *a, **kw: 0.001  # attacker replaces it
-        with pytest.raises(RewardHackDetected, match="time_runnable.*monkey-patched"):
+        with pytest.raises(
+            RewardHackError,
+            match="time_runnable.*monkey-patched",
+        ):
             check_eval_integrity(snap, ns)
 
     def test_raises_when_function_deleted(self):
         ns = {"compute_error_stats": lambda: None}
         snap = snapshot_critical_functions(ns, ["compute_error_stats"])
         del ns["compute_error_stats"]
-        with pytest.raises(RewardHackDetected, match="compute_error_stats"):
+        with pytest.raises(RewardHackError, match="compute_error_stats"):
             check_eval_integrity(snap, ns)
 
     def test_reports_first_violated_name(self):
@@ -255,7 +268,7 @@ class TestEvalIntegrity:
         ns = {"a": fn, "b": fn}
         snap = snapshot_critical_functions(ns, ["a", "b"])
         ns["b"] = lambda: None  # replace only b
-        with pytest.raises(RewardHackDetected, match="'b'"):
+        with pytest.raises(RewardHackError, match="'b'"):
             check_eval_integrity(snap, ns)
 
     def test_empty_snapshot_always_passes(self):
@@ -278,7 +291,7 @@ class TestEvalIntegrity:
 
         ns["time_runnable"] = patched
 
-        with pytest.raises(RewardHackDetected, match="time_runnable"):
+        with pytest.raises(RewardHackError, match="time_runnable"):
             check_eval_integrity(snap, ns)
 
 
@@ -298,12 +311,14 @@ class TestStaticSourceReview:
                 "s = torch.cuda.Stream()\n"
                 "def run(x):\n"
                 "    with torch.cuda.stream(s):\n"
-                "        return x + 1\n"
-            )
+                "        return x + 1\n",
+            ),
         )
 
         assert review.blocked is True
-        assert {issue.rule for issue in review.issues} == {"hidden_async_stream"}
+        assert {issue.rule for issue in review.issues} == {
+            "hidden_async_stream",
+        }
 
     @pytest.mark.parametrize(
         "content",
@@ -331,10 +346,11 @@ class TestStaticSourceReview:
         ],
     )
     def test_reports_jit_forking_concurrency_exploit(self, content):
-        """torch.jit.fork (paper §4.4.1 JIT Forking) runs work on a C++ TorchScript
-        thread that the runtime threading.active_count() guard cannot observe, so it
-        is blocked statically under parallel_execution like its thread/stream siblings.
-        Covers direct call plus import-alias obfuscations."""
+        """Block TorchScript JIT forking as a concurrency exploit.
+
+        ``torch.jit.fork`` runs work on a C++ thread invisible to the runtime
+        thread-count guard. This covers direct calls and import aliases.
+        """
         review = review_solution_sources(_solution_with_source(content))
 
         assert review.blocked is True
@@ -361,12 +377,14 @@ class TestStaticSourceReview:
                 "_cache = {}\n"
                 "def run(x):\n"
                 "    key = x.data_ptr()\n"
-                "    return _cache.setdefault(key, x + 1)\n"
-            )
+                "    return _cache.setdefault(key, x + 1)\n",
+            ),
         )
 
         assert review.blocked is True
-        assert "semantic_output_cache" in {issue.rule for issue in review.issues}
+        assert "semantic_output_cache" in {
+            issue.rule for issue in review.issues
+        }
 
     def test_reports_unauthorized_file_and_loader_patterns(self):
         review = review_solution_sources(
@@ -375,32 +393,38 @@ class TestStaticSourceReview:
                 "payload = base64.b64decode('AA==')\n"
                 "lib = ctypes.CDLL('/tmp/libx.so')\n"
                 "def run(x):\n"
-                "    return x\n"
-            )
+                "    return x\n",
+            ),
         )
 
         assert review.blocked is True
-        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+        assert "unauthorized_file_or_loader" in {
+            issue.rule for issue in review.issues
+        }
 
     def test_reports_os_process_execution_patterns(self):
         review = review_solution_sources(
             _solution_with_source(
-                "import os\ndef run(x):\n    os.system('true')\n    return x\n"
-            )
+                "import os\ndef run(x):\n    os.system('true')\n    return x\n",
+            ),
         )
 
         assert review.blocked is True
-        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+        assert "unauthorized_file_or_loader" in {
+            issue.rule for issue in review.issues
+        }
 
     def test_reports_dynamic_import_process_execution_patterns(self):
         review = review_solution_sources(
             _solution_with_source(
-                "def run(x):\n    __import__('os').system('true')\n    return x\n"
-            )
+                "def run(x):\n    __import__('os').system('true')\n    return x\n",
+            ),
         )
 
         assert review.blocked is True
-        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+        assert "unauthorized_file_or_loader" in {
+            issue.rule for issue in review.issues
+        }
 
     def test_reports_getattr_os_process_execution_patterns(self):
         review = review_solution_sources(
@@ -408,36 +432,39 @@ class TestStaticSourceReview:
                 "import os\n"
                 "def run(x):\n"
                 "    getattr(os, 'system')('true')\n"
-                "    return x\n"
-            )
+                "    return x\n",
+            ),
         )
 
         assert review.blocked is True
-        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+        assert "unauthorized_file_or_loader" in {
+            issue.rule for issue in review.issues
+        }
 
     def test_reports_getattr_dynamic_import_process_execution_patterns(self):
         review = review_solution_sources(
             _solution_with_source(
                 "def run(x):\n"
                 "    getattr(__import__('os'), 'system')('true')\n"
-                "    return x\n"
-            )
+                "    return x\n",
+            ),
         )
 
         assert review.blocked is True
-        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+        assert "unauthorized_file_or_loader" in {
+            issue.rule for issue in review.issues
+        }
 
     def test_reports_getattr_indirect_stream_creation(self):
         """getattr(torch.cuda, 'Stream') bypasses the direct-name stream check."""
-
         review = review_solution_sources(
             _solution_with_source(
                 "import torch\n"
                 "def run(x):\n"
                 "    make_stream = getattr(torch.cuda, 'Stream')\n"
                 "    with make_stream():\n"
-                "        return x + 1\n"
-            )
+                "        return x + 1\n",
+            ),
         )
 
         assert review.blocked is True
@@ -453,11 +480,16 @@ class TestStaticSourceReview:
             "import torch\ndef run(x):\n    torch.ops.load_library('/tmp/libx.so')\n    return x\n",
         ],
     )
-    def test_reports_additional_file_network_loader_bypass_families(self, content):
+    def test_reports_additional_file_network_loader_bypass_families(
+        self,
+        content,
+    ):
         review = review_solution_sources(_solution_with_source(content))
 
         assert review.blocked is True
-        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+        assert "unauthorized_file_or_loader" in {
+            issue.rule for issue in review.issues
+        }
 
     @pytest.mark.parametrize(
         "content",
@@ -487,7 +519,7 @@ class TestStaticSourceReview:
                 "# subprocess open('/tmp/x') torch.cuda.Stream()\n"
                 "def run(x):\n"
                 "    note = \"ctypes.CDLL('/tmp/x') and x.data_ptr()\"\n"
-                "    return x + 1\n"
+                "    return x + 1\n",
             ),
             output_dtypes={"out": torch.float32},
         )
@@ -501,8 +533,8 @@ class TestStaticSourceReview:
                 "import triton.language as tl\n"
                 "@triton.jit\n"
                 "def kernel(x, offs):\n"
-                "    return tl.load(x + offs)\n"
-            )
+                "    return tl.load(x + offs)\n",
+            ),
         )
 
         assert review.blocked is False
@@ -514,16 +546,20 @@ class TestStaticSourceReview:
                 "    def load(self):\n"
                 "        return 1\n"
                 "def run(x):\n"
-                "    return Loader().load()\n"
-            )
+                "    return Loader().load()\n",
+            ),
         )
 
         assert review.blocked is True
-        assert "unauthorized_file_or_loader" in {issue.rule for issue in review.issues}
+        assert "unauthorized_file_or_loader" in {
+            issue.rule for issue in review.issues
+        }
 
     def test_blocking_message_includes_structured_review_evidence(self):
         review = review_solution_sources(
-            _solution_with_source("def run(x):\n    return open('/tmp/x').read()\n")
+            _solution_with_source(
+                "def run(x):\n    return open('/tmp/x').read()\n",
+            ),
         )
 
         message = review.format_blocking_message()
@@ -538,26 +574,30 @@ class TestStaticSourceReview:
                 "import os\n"
                 "def run(x):\n"
                 "    _ = os.environ.get('UNUSED', '')\n"
-                "    return x\n"
-            )
+                "    return x\n",
+            ),
         )
 
         assert review.blocked is False
 
-    def test_flags_precision_downgrade_for_float32_outputs_without_blocking(self):
+    def test_flags_precision_downgrade_for_float32_outputs_without_blocking(
+        self,
+    ):
         review = review_solution_sources(
             _solution_with_source("def run(x):\n    return x.half().float()\n"),
             output_dtypes={"out": torch.float32},
         )
 
         assert review.blocked is False
-        assert [issue.rule for issue in review.issues] == ["precision_downgrade"]
+        assert [issue.rule for issue in review.issues] == [
+            "precision_downgrade",
+        ]
         assert {issue.severity for issue in review.issues} == {"flag"}
 
     def test_flags_precision_downgrade_dtype_keyword_for_float32_outputs(self):
         review = review_solution_sources(
             _solution_with_source(
-                "import torch\ndef run(x):\n    return x.to(dtype=torch.float16)\n"
+                "import torch\ndef run(x):\n    return x.to(dtype=torch.float16)\n",
             ),
             output_dtypes={"out": torch.float32},
         )
@@ -573,7 +613,7 @@ class TestStaticSourceReview:
                 "    grad_x = grad_output.float() * weight\n"
                 "    grad_x_bf16 = grad_x.to(torch.bfloat16)\n"
                 "    grad_weight = grad_output.float().sum(dim=0)\n"
-                "    return grad_x_bf16, grad_weight\n"
+                "    return grad_x_bf16, grad_weight\n",
             ),
             output_dtypes={
                 "grad_x": torch.bfloat16,
@@ -594,7 +634,7 @@ class TestStaticSourceReview:
                 "    return {'grad_key_cache': grad_key_cache, 'cache_len': cache_len}\n"
                 "def run(key_cache, key_states):\n"
                 "    updated_key_cache = torch.cat([key_cache, key_states], dim=2)\n"
-                "    return updated_key_cache\n"
+                "    return updated_key_cache\n",
             ),
             output_dtypes={"updated_key_cache": torch.bfloat16},
         )
@@ -605,7 +645,7 @@ class TestStaticSourceReview:
     def test_allows_legitimate_torch_compile_solution(self):
         review = review_solution_sources(
             _solution_with_source(
-                "import torch\n@torch.compile\ndef run(x, y):\n    return x + y\n"
+                "import torch\n@torch.compile\ndef run(x, y):\n    return x + y\n",
             ),
             output_dtypes={"z": torch.float32},
         )
@@ -619,7 +659,7 @@ class TestStaticSourceReview:
                 "auto stream = at::cuda::getCurrentCUDAStream();\n"
                 "kernel<<<grid, block, 0, stream>>>(args);\n",
                 path="kernel.hip",
-            )
+            ),
         )
 
         assert review.blocked is False
@@ -632,7 +672,7 @@ class TestStaticSourceReview:
                 "             a.data_ptr<float>(), k, &beta,\n"
                 "             out.data_ptr<float>(), n);\n",
                 path="main.cpp",
-            )
+            ),
         )
 
         assert review.blocked is False

@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, RootModel
 
 
 class AmdSmiPerformanceLevel(BaseModel):
+    """Performance-level record for one GPU."""
+
     model_config = ConfigDict(extra="ignore")
 
     gpu: int | str
@@ -15,12 +17,16 @@ class AmdSmiPerformanceLevel(BaseModel):
 
 
 class AmdSmiPerformancePayload(BaseModel):
+    """Top-level AMD SMI performance-level response."""
+
     model_config = ConfigDict(extra="ignore")
 
     gpu_data: list[AmdSmiPerformanceLevel]
 
 
 class AmdSmiProcess(BaseModel):
+    """Process record reported by AMD SMI."""
+
     model_config = ConfigDict(extra="ignore")
 
     pid: int | None = None
@@ -29,6 +35,8 @@ class AmdSmiProcess(BaseModel):
 
 
 class AmdSmiGpuProcesses(BaseModel):
+    """Processes associated with one GPU."""
+
     model_config = ConfigDict(extra="ignore")
 
     gpu: int | str
@@ -36,17 +44,19 @@ class AmdSmiGpuProcesses(BaseModel):
 
 
 class AmdSmiProcessPayload(RootModel[list[AmdSmiGpuProcesses]]):
-    pass
+    """Root list of per-GPU process records."""
 
 
 class AmdSmiGpuIdentity(BaseModel):
+    """Minimal identity record for one GPU."""
+
     model_config = ConfigDict(extra="ignore")
 
     gpu: int | str
 
 
 class AmdSmiListPayload(RootModel[list[AmdSmiGpuIdentity]]):
-    pass
+    """Root list returned by the AMD SMI list command."""
 
 
 def parse_performance_levels(raw: str) -> tuple[str, ...]:
@@ -54,7 +64,9 @@ def parse_performance_levels(raw: str) -> tuple[str, ...]:
     payload = AmdSmiPerformancePayload.model_validate_json(raw)
     if not payload.gpu_data:
         raise ValueError("amd-smi returned no GPU performance-level data")
-    levels = tuple(entry.perf_level.strip().upper() for entry in payload.gpu_data)
+    levels = tuple(
+        entry.perf_level.strip().upper() for entry in payload.gpu_data
+    )
     if any(not level for level in levels):
         raise ValueError("amd-smi returned an empty GPU performance level")
     return levels
@@ -73,7 +85,7 @@ def parse_processes(raw: str) -> list[dict[str, int | str]]:
                     "pid": process.pid,
                     "device": str(gpu_entry.gpu),
                     "name": process.name or process.process_name or "unknown",
-                }
+                },
             )
     return processes
 

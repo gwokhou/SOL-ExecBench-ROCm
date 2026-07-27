@@ -129,7 +129,9 @@ class ReleaseExecutionPlan(ReleaseModel):
     @classmethod
     def _revision(cls, value: str) -> str:
         if _REVISION.fullmatch(value) is None:
-            raise ValueError("execution-plan source revision must be a Git SHA-1")
+            raise ValueError(
+                "execution-plan source revision must be a Git SHA-1",
+            )
         return value
 
     @field_validator("environment_path")
@@ -138,12 +140,14 @@ class ReleaseExecutionPlan(ReleaseModel):
         return validate_relative_artifact_path(value, "environment path")
 
     @model_validator(mode="after")
-    def _contract(self) -> "ReleaseExecutionPlan":
+    def _contract(self) -> ReleaseExecutionPlan:
         identities = [item.problem_path for item in self.problems]
         if self.schema_version != RELEASE_EXECUTION_PLAN_SCHEMA_VERSION:
             raise ValueError("release execution-plan schema mismatch")
         if len(identities) != len(set(identities)):
-            raise ValueError("release execution plan contains duplicate problems")
+            raise ValueError(
+                "release execution plan contains duplicate problems",
+            )
         return self
 
 
@@ -170,7 +174,7 @@ class ReleaseRunStatement(ReleaseModel):
         return value
 
     @model_validator(mode="after")
-    def _unique_problems(self) -> "ReleaseRunStatement":
+    def _unique_problems(self) -> ReleaseRunStatement:
         names = [item.problem_path for item in self.problems]
         if len(names) != len(set(names)):
             raise ValueError("release run contains duplicate problems")
@@ -184,7 +188,7 @@ class BaselineStatement(ReleaseRunStatement):
     baseline_id: str = Field(min_length=1)
 
     @model_validator(mode="after")
-    def _schema(self) -> "BaselineStatement":
+    def _schema(self) -> BaselineStatement:
         if self.schema_version != RELEASE_BASELINE_SCHEMA_VERSION:
             raise ValueError("release baseline schema mismatch")
         return self
@@ -197,7 +201,7 @@ class CandidateStatement(ReleaseRunStatement):
     candidate_id: str = Field(min_length=1)
 
     @model_validator(mode="after")
-    def _schema(self) -> "CandidateStatement":
+    def _schema(self) -> CandidateStatement:
         if self.schema_version != RELEASE_CANDIDATE_SCHEMA_VERSION:
             raise ValueError("release candidate schema mismatch")
         return self
@@ -238,8 +242,10 @@ class SolarIndexStatement(ReleaseModel):
         return value
 
     @model_validator(mode="after")
-    def _contract(self) -> "SolarIndexStatement":
-        identities = [(item.problem_path, item.workload_uuid) for item in self.entries]
+    def _contract(self) -> SolarIndexStatement:
+        identities = [
+            (item.problem_path, item.workload_uuid) for item in self.entries
+        ]
         if self.schema_version != RELEASE_SOLAR_INDEX_SCHEMA_VERSION:
             raise ValueError("release SOLAR index schema mismatch")
         if len(identities) != len(set(identities)):
@@ -257,14 +263,18 @@ class ReleaseBundle(ReleaseModel):
     solar: ArtifactReference
 
     @model_validator(mode="after")
-    def _contract(self) -> "ReleaseBundle":
+    def _contract(self) -> ReleaseBundle:
         if self.schema_version != RELEASE_BUNDLE_SCHEMA_VERSION:
             raise ValueError("release bundle schema mismatch")
         statements = (self.baseline, self.candidate, self.solar)
-        if any(item.size_bytes > MAX_RELEASE_STATEMENT_BYTES for item in statements):
+        if any(
+            item.size_bytes > MAX_RELEASE_STATEMENT_BYTES for item in statements
+        ):
             raise ValueError("release statement exceeds the size limit")
         if len({item.path for item in statements}) != len(statements):
-            raise ValueError("release statements must use distinct artifact paths")
+            raise ValueError(
+                "release statements must use distinct artifact paths",
+            )
         return self
 
 

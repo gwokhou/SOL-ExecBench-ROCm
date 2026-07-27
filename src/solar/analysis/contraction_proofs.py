@@ -5,8 +5,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from typing import Mapping, Sequence
 
 from solar.analysis.resources import is_mfma_operation
 from solar.common.types import GraphValue, NodeDict, TensorShapes
@@ -33,7 +33,8 @@ def requires_tile_evidence(layer: Mapping[str, GraphValue]) -> bool:
 
 
 def _select(
-    values: Sequence[GraphValue], indices: Sequence[int]
+    values: Sequence[GraphValue],
+    indices: Sequence[int],
 ) -> list[GraphValue] | None:
     try:
         return [deepcopy(values[index]) for index in indices]
@@ -42,7 +43,8 @@ def _select(
 
 
 def _select_input_metadata(
-    proof: NodeDict, indices: tuple[int, ...]
+    proof: NodeDict,
+    indices: tuple[int, ...],
 ) -> tuple[list[GraphValue], list[GraphValue]] | None:
     containers = ("tensor_names", "tensor_shapes", "tensor_dtypes")
     for container_name in containers:
@@ -57,7 +59,10 @@ def _select_input_metadata(
             return None
         container["inputs"] = selected
     tensor_types = proof.get("tensor_types")
-    if isinstance(tensor_types, dict) and isinstance(tensor_types.get("inputs"), list):
+    if isinstance(tensor_types, dict) and isinstance(
+        tensor_types.get("inputs"),
+        list,
+    ):
         selected_types = _select(tensor_types["inputs"], indices)
         if selected_types is None:
             return None

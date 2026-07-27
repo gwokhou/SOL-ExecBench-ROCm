@@ -40,7 +40,10 @@ def _request(tmp_path: Path) -> SolarWorkerRequest:
     )
 
 
-def test_run_solar_worker_returns_structured_response(tmp_path, monkeypatch) -> None:
+def test_run_solar_worker_returns_structured_response(
+    tmp_path,
+    monkeypatch,
+) -> None:
     observed: dict[str, object] = {}
 
     def fake_run(command, stdout_path, stderr_path, **kwargs):
@@ -61,7 +64,8 @@ def test_run_solar_worker_returns_structured_response(tmp_path, monkeypatch) -> 
 
 
 def test_run_solar_worker_rejects_non_formal_analyzed_response(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     def fake_run(command, stdout_path, stderr_path, **kwargs):
         del stdout_path, stderr_path, kwargs
@@ -78,7 +82,10 @@ def test_run_solar_worker_rejects_non_formal_analyzed_response(
     assert outcome.reason_code == "worker_response_invalid"
 
 
-def test_run_solar_worker_reports_bounded_worker_error(tmp_path, monkeypatch) -> None:
+def test_run_solar_worker_reports_bounded_worker_error(
+    tmp_path,
+    monkeypatch,
+) -> None:
     def fake_run(command, stdout_path, stderr_path, **kwargs):
         del stdout_path, kwargs
         stderr_path.write_text("worker failed safely")
@@ -93,7 +100,10 @@ def test_run_solar_worker_reports_bounded_worker_error(tmp_path, monkeypatch) ->
     assert outcome.message == "worker failed safely"
 
 
-def test_run_solar_worker_returns_structured_timeout(tmp_path, monkeypatch) -> None:
+def test_run_solar_worker_returns_structured_timeout(
+    tmp_path,
+    monkeypatch,
+) -> None:
     def fake_run(command, stdout_path, stderr_path, **kwargs):
         del stdout_path, stderr_path, kwargs
         raise subprocess.TimeoutExpired(command, 3)

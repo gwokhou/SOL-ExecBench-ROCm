@@ -115,7 +115,7 @@ def test_profile_summary_content_models_remain_strict_and_frozen(
             {
                 **payload,
                 "unexpected": "field",
-            }
+            },
         )
 
     with pytest.raises(ValidationError):

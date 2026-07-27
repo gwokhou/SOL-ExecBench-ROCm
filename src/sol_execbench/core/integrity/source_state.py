@@ -43,7 +43,9 @@ def verify_git_source_state(
     git = resolve_tool_path("git")
     if git is None:
         raise RuntimeError("Git is required to verify release source state")
-    top_level = Path(_git_output(git, root, "rev-parse", "--show-toplevel")).resolve()
+    top_level = Path(
+        _git_output(git, root, "rev-parse", "--show-toplevel"),
+    ).resolve()
     if top_level != root:
         raise ValueError("release source root is not the Git repository root")
     revision = _git_output(git, root, "rev-parse", "HEAD")
@@ -62,12 +64,14 @@ def verify_git_source_state(
     state = GitSourceState(
         revision=revision,
         tracked_dirty=tracked.returncode == 1,
-        untracked_paths=tuple(line for line in untracked_output.splitlines() if line),
+        untracked_paths=tuple(
+            line for line in untracked_output.splitlines() if line
+        ),
     )
     if state.revision != expected_revision:
         raise ValueError(
             "release source revision mismatch: "
-            f"expected {expected_revision}, observed {state.revision}"
+            f"expected {expected_revision}, observed {state.revision}",
         )
     if not state.clean:
         raise ValueError("release source paths contain uncommitted changes")
@@ -77,7 +81,9 @@ def verify_git_source_state(
 def _git_output(git: Path, root: Path, *arguments: str) -> str:
     completed = _run_git(git, root, *arguments)
     if completed.returncode != 0:
-        raise RuntimeError(f"Git source-state command failed: {' '.join(arguments)}")
+        raise RuntimeError(
+            f"Git source-state command failed: {' '.join(arguments)}",
+        )
     return completed.stdout.strip()
 
 
@@ -93,7 +99,9 @@ def _run_git(
             max_capture_bytes=_MAX_GIT_OUTPUT_BYTES,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise RuntimeError("Git source-state command could not complete") from exc
+        raise RuntimeError(
+            "Git source-state command could not complete",
+        ) from exc
 
 
 __all__ = ["GitSourceState", "verify_git_source_state"]

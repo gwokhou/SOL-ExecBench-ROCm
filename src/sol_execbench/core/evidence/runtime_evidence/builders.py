@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeFailureEvidence,
+)
 from sol_execbench.core.platform.compatibility import (
     MatrixArtifactReference,
     MatrixClaimBoundary,
@@ -31,7 +34,6 @@ from sol_execbench.core.platform.docker_matrix import (
     DockerTargetManifestEntry,
     to_matrix_target,
 )
-from sol_execbench.core.evidence.runtime_evidence.models import RuntimeFailureEvidence
 
 
 def build_runtime_matrix_entry(
@@ -96,7 +98,10 @@ def _matrix_status(
             MatrixCompatibilityReasonCode.ROCM_RUNTIME_UNAVAILABLE,
             runtime_unavailable_reason,
         )
-    if container_validated and entry.status is MatrixCompatibilityStatus.NOT_TESTED:
+    if (
+        container_validated
+        and entry.status is MatrixCompatibilityStatus.NOT_TESTED
+    ):
         return (
             MatrixCompatibilityStatus.CONTAINER_VALIDATED,
             MatrixCompatibilityReasonCode.CONTAINER_USER_SPACE_VALIDATED,

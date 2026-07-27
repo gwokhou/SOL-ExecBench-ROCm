@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 from sol_execbench.core.platform.runtime import (
     FALLBACK_CACHE_CLEAR_BYTES,
-    detect_rocm_device,
     derive_cache_clear_policy,
+    detect_rocm_device,
     discover_rocm_root,
     hardware_from_device,
     resolve_rocm_tool,
@@ -49,7 +49,7 @@ def test_detect_rocm_device_reads_exact_arch_and_l2_properties() -> None:
     fake_torch = SimpleNamespace(
         __version__="2.9-test",
         version=SimpleNamespace(hip="7.2-test"),
-        **{"cuda": rocm_device_api},
+        **{"cuda": rocm_device_api},  # noqa: PIE804 -- Audited namespace form
         device=lambda value: SimpleNamespace(type="cuda", index=int(value[-1])),
     )
 
@@ -70,7 +70,8 @@ def test_discover_rocm_root_prefers_configured_directory(tmp_path) -> None:
     configured.mkdir()
 
     root = discover_rocm_root(
-        environ={"ROCM_PATH": str(configured)}, which=lambda _: None
+        environ={"ROCM_PATH": str(configured)},
+        which=lambda _: None,
     )
 
     assert root == configured.resolve()
@@ -97,7 +98,9 @@ def test_resolve_rocm_tool_falls_back_to_configured_root(tmp_path) -> None:
 
     assert (
         resolve_rocm_tool(
-            "rocminfo", environ={"ROCM_PATH": str(root)}, which=lambda _: None
+            "rocminfo",
+            environ={"ROCM_PATH": str(root)},
+            which=lambda _: None,
         )
         == rocminfo
     )
@@ -111,19 +114,26 @@ def test_resolve_rocm_tool_command_preserves_path_symlink(tmp_path) -> None:
     wrapper.parent.mkdir(parents=True)
     wrapper.symlink_to(target)
 
-    assert resolve_rocm_tool_command("amd-smi", which=lambda _: str(wrapper)) == str(
-        wrapper
+    assert resolve_rocm_tool_command(
+        "amd-smi",
+        which=lambda _: str(wrapper),
+    ) == str(
+        wrapper,
     )
 
 
-def test_resolve_rocm_tool_command_falls_back_to_configured_root(tmp_path) -> None:
+def test_resolve_rocm_tool_command_falls_back_to_configured_root(
+    tmp_path,
+) -> None:
     root = tmp_path / "rocm"
     amd_smi = root / "bin/amd-smi"
     amd_smi.parent.mkdir(parents=True)
     amd_smi.write_text("tool", encoding="utf-8")
 
     assert resolve_rocm_tool_command(
-        "amd-smi", environ={"ROCM_PATH": str(root)}, which=lambda _: None
+        "amd-smi",
+        environ={"ROCM_PATH": str(root)},
+        which=lambda _: None,
     ) == str(amd_smi)
 
 
@@ -131,6 +141,9 @@ def test_rocm_search_roots_puts_discovered_root_first(tmp_path) -> None:
     root = tmp_path / "custom-rocm"
     root.mkdir()
 
-    roots = rocm_search_roots(environ={"ROCM_PATH": str(root)}, which=lambda _: None)
+    roots = rocm_search_roots(
+        environ={"ROCM_PATH": str(root)},
+        which=lambda _: None,
+    )
 
     assert roots[0] == root.resolve()

@@ -21,9 +21,10 @@ def derive_bottleneck_hints(
     kernel_metrics: Sequence[ProfileSummaryKernelMetric],
 ) -> list[ProfileSummaryBottleneckHint]:
     """Derive conservative diagnostic bottleneck hints from kernel metrics."""
-
     counter_metrics = [
-        metric for metric in kernel_metrics if metric.name != "kernel_duration_ms"
+        metric
+        for metric in kernel_metrics
+        if metric.name != "kernel_duration_ms"
     ]
     if not counter_metrics:
         return [
@@ -32,7 +33,7 @@ def derive_bottleneck_hints(
                 severity=ProfileSummaryHintSeverity.LOW,
                 confidence=ProfileSummaryHintConfidence.HIGH,
                 message="No bounded counter artifact was available for bottleneck classification.",
-            )
+            ),
         ]
 
     by_name: dict[str, list[ProfileSummaryKernelMetric]] = {}
@@ -41,7 +42,9 @@ def derive_bottleneck_hints(
     hints: list[ProfileSummaryBottleneckHint] = []
     l2_metrics = by_name.get("l2cachehitrate", [])
     if l2_metrics:
-        low_l2 = [metric for metric in l2_metrics if _is_low_l2_hit_rate(metric)]
+        low_l2 = [
+            metric for metric in l2_metrics if _is_low_l2_hit_rate(metric)
+        ]
         if low_l2:
             hints.append(
                 ProfileSummaryBottleneckHint(
@@ -51,7 +54,7 @@ def derive_bottleneck_hints(
                     message="Low L2 hit-rate counter suggests memory/L2 pressure.",
                     source_metrics=[metric.name for metric in low_l2],
                     evidence_artifacts=_metric_artifacts(low_l2),
-                )
+                ),
             )
     lds_metrics = by_name.get("ldsbankconflict", [])
     if lds_metrics and any(
@@ -65,7 +68,7 @@ def derive_bottleneck_hints(
                 message="LDS bank conflict counter is present and non-zero.",
                 source_metrics=[metric.name for metric in lds_metrics],
                 evidence_artifacts=_metric_artifacts(lds_metrics),
-            )
+            ),
         )
     valu_metrics = by_name.get("sqinstsvalu", [])
     if valu_metrics:
@@ -77,7 +80,7 @@ def derive_bottleneck_hints(
                 message="VALU instruction counter is present without stronger memory or launch evidence.",
                 source_metrics=[metric.name for metric in valu_metrics],
                 evidence_artifacts=_metric_artifacts(valu_metrics),
-            )
+            ),
         )
     if hints:
         return hints
@@ -89,7 +92,7 @@ def derive_bottleneck_hints(
             message="Counter artifact was parsed, but no conservative bottleneck rule matched.",
             source_metrics=[metric.name for metric in counter_metrics],
             evidence_artifacts=_metric_artifacts(counter_metrics),
-        )
+        ),
     ]
 
 
@@ -100,7 +103,6 @@ def _is_low_l2_hit_rate(metric: ProfileSummaryKernelMetric) -> bool:
     a fixed ``< 60`` threshold would flag every fraction value. The unit hint
     selects the threshold, falling back to the value's magnitude.
     """
-
     value = _numeric_value(metric.value)
     if value is None:
         return False
@@ -112,8 +114,12 @@ def _is_low_l2_hit_rate(metric: ProfileSummaryKernelMetric) -> bool:
     return value < 0.6 if value <= 1.0 else value < 60.0
 
 
-def _metric_artifacts(metrics: Sequence[ProfileSummaryKernelMetric]) -> list[str]:
-    artifacts = {metric.artifact for metric in metrics if metric.artifact is not None}
+def _metric_artifacts(
+    metrics: Sequence[ProfileSummaryKernelMetric],
+) -> list[str]:
+    artifacts = {
+        metric.artifact for metric in metrics if metric.artifact is not None
+    }
     return sorted(artifacts)
 
 
@@ -123,7 +129,6 @@ def _normalize_key(value: str | None) -> str:
 
 def _finite_or_none(value: int | float) -> int | float | None:
     """Pass through finite numbers; reject NaN/Inf so they never reach sidecar JSON."""
-
     return value if math.isfinite(value) else None
 
 

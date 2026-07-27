@@ -20,7 +20,7 @@ def tensor_storage_id(value: Any) -> tuple[str, int | None, int] | None:
             value.device.index,
             value.untyped_storage().data_ptr(),
         )
-    except Exception:
+    except RuntimeError:
         return None
 
 
@@ -29,11 +29,14 @@ def tensor_aliases_any(value: Any, candidates: list[Any]) -> bool:
     storage_id = tensor_storage_id(value)
     if storage_id is None:
         return False
-    return any(storage_id == tensor_storage_id(candidate) for candidate in candidates)
+    return any(
+        storage_id == tensor_storage_id(candidate) for candidate in candidates
+    )
 
 
 def stable_reference_outputs(
-    outputs: list[torch.Tensor], inputs: list[Any]
+    outputs: list[torch.Tensor],
+    inputs: list[Any],
 ) -> list[torch.Tensor]:
     """Clone reference outputs that alias inputs so user code cannot mutate them."""
     stable = []

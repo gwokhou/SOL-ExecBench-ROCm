@@ -3,15 +3,20 @@
 
 """Paper-defined scoring outside the SOLAR analysis boundary."""
 
-from .aggregation import (
+from sol_execbench.core.scoring.aggregation import (
     SuiteScore,
     WorkloadScore,
     aggregate_suite_scores,
     diagnostic_workload_score,
 )
-from .formula import SolScoreAuditError, sol_score
-from .official_scoring import official_score_availability
-from .release_verifier import OfficialScoreResult, verify_and_score_release
+from sol_execbench.core.scoring.formula import SolScoreAuditError, sol_score
+from sol_execbench.core.scoring.official_scoring import (
+    official_score_availability,
+)
+from sol_execbench.core.scoring.release_verifier import (
+    OfficialScoreResult,
+    verify_and_score_release,
+)
 
 __all__ = [
     "SuiteScore",

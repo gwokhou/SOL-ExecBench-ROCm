@@ -8,16 +8,16 @@ from __future__ import annotations
 import shutil
 import subprocess
 
-from ...process.subprocesses import run_bounded_probe
-from ..runtime import resolve_tool_path
-from ...text_utils import text_tail
-from .models import (
+from sol_execbench.core.platform.runtime import resolve_tool_path
+from sol_execbench.core.platform.toolchain.models import (
     DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
     ProbeRunner,
     ToolchainProbeResult,
     ToolchainStatus,
     Which,
 )
+from sol_execbench.core.process.subprocesses import run_bounded_probe
+from sol_execbench.core.text_utils import text_tail
 
 
 def probe_toolchain_tool(
@@ -30,7 +30,6 @@ def probe_toolchain_tool(
     timeout_seconds: float = DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
 ) -> ToolchainProbeResult:
     """Run one bounded toolchain probe."""
-
     resolved_path = resolve_tool_path(binary, which=which)
     path = str(resolved_path) if resolved_path is not None else None
     if path is None:

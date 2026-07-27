@@ -23,7 +23,10 @@ _FOOTPRINT = StaticResourceFootprint(scratch_bytes=8, spill_detected=True)
 
 def test_runtime_available_adds_precedence_note():
     sidecar = build_decision_sidecar(footprints=[_FOOTPRINT], budget=GFX942)
-    annotated = apply_runtime_precedence(sidecar, runtime_profile_available=True)
+    annotated = apply_runtime_precedence(
+        sidecar,
+        runtime_profile_available=True,
+    )
 
     assert runtime_precedence_limitation() in annotated.limitations
     assert annotated.status == sidecar.status  # status unchanged
@@ -31,12 +34,18 @@ def test_runtime_available_adds_precedence_note():
 
 def test_no_runtime_leaves_sidecar_unchanged():
     sidecar = build_decision_sidecar(footprints=[_FOOTPRINT], budget=GFX942)
-    assert apply_runtime_precedence(sidecar, runtime_profile_available=False) is sidecar
+    assert (
+        apply_runtime_precedence(sidecar, runtime_profile_available=False)
+        is sidecar
+    )
 
 
 def test_unavailable_sidecar_not_annotated():
     sidecar = build_decision_sidecar(footprints=[], budget=GFX942)
-    annotated = apply_runtime_precedence(sidecar, runtime_profile_available=True)
+    annotated = apply_runtime_precedence(
+        sidecar,
+        runtime_profile_available=True,
+    )
     assert runtime_precedence_limitation() not in annotated.limitations
 
 
@@ -55,8 +64,10 @@ def test_demoted_classes_lower_hint_confidence():
     sidecar = build_decision_sidecar(
         footprints=[
             StaticResourceFootprint(
-                vgpr_used=250, scratch_bytes=1024, spill_detected=True
-            )
+                vgpr_used=250,
+                scratch_bytes=1024,
+                spill_detected=True,
+            ),
         ],
         budget=GFX942,
     )

@@ -3,7 +3,9 @@ from __future__ import annotations
 from sol_execbench.core.platform.runtime import detect_rocm_version
 
 
-def test_collect_rocm_version_file_uses_discovered_root_argument(tmp_path) -> None:
+def test_collect_rocm_version_file_uses_discovered_root_argument(
+    tmp_path,
+) -> None:
     root = tmp_path / "custom-rocm"
     version_file = root / ".info" / "version"
     version_file.parent.mkdir(parents=True)

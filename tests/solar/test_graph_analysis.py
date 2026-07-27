@@ -61,7 +61,7 @@ def _analyze(
 ):
     graph_path = tmp_path / "einsum_graph.yaml"
     graph_path.write_text(
-        yaml.safe_dump({"schema_version": schema_version, "layers": layers})
+        yaml.safe_dump({"schema_version": schema_version, "layers": layers}),
     )
     output_dir = tmp_path / "analysis"
     result = EinsumGraphAnalyzer().analyze_graph(
@@ -141,7 +141,10 @@ def test_transparent_view_preserves_internal_io_and_shared_input_deduplication(
 
 
 @pytest.mark.parametrize("strict", [False, True])
-def test_analysis_rejects_unsupported_schema(tmp_path: Path, strict: bool) -> None:
+def test_analysis_rejects_unsupported_schema(
+    tmp_path: Path,
+    strict: bool,
+) -> None:
     with pytest.raises(ValueError, match="schema_version=3"):
         _analyze(tmp_path, {"start": _start()}, strict=strict, schema_version=0)
 
@@ -163,15 +166,19 @@ def test_low_precision_dequantization_is_proven_recomputable() -> None:
             },
         },
     }
-    contraction = {"tensor_names": {"inputs": ["dequant.Output", "right.Output"]}}
+    contraction = {
+        "tensor_names": {"inputs": ["dequant.Output", "right.Output"]},
+    }
 
     assert contraction_operands_are_graph_external(contraction, layers) is True
     assert contraction_external_source_dtypes(contraction, layers) == {
-        "torch.float8_e4m3fn"
+        "torch.float8_e4m3fn",
     }
 
 
-def test_materialized_preprocessing_without_dequantization_is_not_composable() -> None:
+def test_materialized_preprocessing_without_dequantization_is_not_composable() -> (
+    None
+):
     layers = {
         "start": _start(),
         "reshape": {
@@ -190,7 +197,8 @@ def test_materialized_preprocessing_without_dequantization_is_not_composable() -
 
     assert (
         contraction_operands_are_graph_external(
-            {"tensor_names": {"inputs": ["reshape.Output"]}}, layers
+            {"tensor_names": {"inputs": ["reshape.Output"]}},
+            layers,
         )
         is False
     )

@@ -9,10 +9,10 @@ from __future__ import annotations
 import os
 import platform
 import shutil
-from dataclasses import dataclass
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_SANDBOXED,
@@ -54,7 +54,6 @@ class CacheClearPolicy:
 
 def derive_cache_clear_policy(l2_cache_bytes: int | None) -> CacheClearPolicy:
     """Use twice the detected L2, falling back to the historical 256 MiB."""
-
     if l2_cache_bytes is not None and l2_cache_bytes > 0:
         return CacheClearPolicy(
             detected_l2_bytes=l2_cache_bytes,
@@ -70,35 +69,44 @@ def derive_cache_clear_policy(l2_cache_bytes: int | None) -> CacheClearPolicy:
 
 
 def detect_rocm_device(
-    device: str = "cuda:0", *, torch_module: Any | None = None
+    device: str = "cuda:0",
+    *,
+    torch_module: Any | None = None,
 ) -> RocmDeviceInfo:
     """Detect one concrete PyTorch ROCm device and its execution capacities."""
-
     if torch_module is None:
         import torch as torch_module  # noqa: PLC0415
 
     parsed = torch_module.device(device)
     if parsed.type != "cuda":
-        raise ValueError(f"ROCm target device must use the cuda namespace: {device}")
+        raise ValueError(
+            f"ROCm target device must use the cuda namespace: {device}",
+        )
     hip_version = getattr(getattr(torch_module, "version", None), "hip", None)
     if hip_version is None or not torch_module.cuda.is_available():
         raise RuntimeError("PyTorch ROCm device is unavailable")
     index = (
-        parsed.index if parsed.index is not None else torch_module.cuda.current_device()
+        parsed.index
+        if parsed.index is not None
+        else torch_module.cuda.current_device()
     )
     if index < 0 or index >= torch_module.cuda.device_count():
         raise ValueError(f"ROCm device index is out of range: {index}")
     properties = torch_module.cuda.get_device_properties(index)
     raw_gfx = getattr(properties, "gcnArchName", "") or getattr(
-        properties, "gfx_arch_name", ""
+        properties,
+        "gfx_arch_name",
+        "",
     )
     gfx_target = str(raw_gfx).split(":", maxsplit=1)[0].strip().lower()
     if not gfx_target.startswith("gfx"):
         raise RuntimeError(
-            f"ROCm device did not expose a concrete gfx target: {raw_gfx!r}"
+            f"ROCm device did not expose a concrete gfx target: {raw_gfx!r}",
         )
     raw_l2 = getattr(properties, "L2_cache_size", None)
-    l2_cache_bytes = int(raw_l2) if raw_l2 is not None and int(raw_l2) > 0 else None
+    l2_cache_bytes = (
+        int(raw_l2) if raw_l2 is not None and int(raw_l2) > 0 else None
+    )
     return RocmDeviceInfo(
         device=f"cuda:{index}",
         index=index,
@@ -113,7 +121,6 @@ def detect_rocm_device(
 
 def cache_clear_policy_for_device(device: str) -> CacheClearPolicy:
     """Detect the device L2 and resolve its benchmark cache-clear policy."""
-
     return derive_cache_clear_policy(detect_rocm_device(device).l2_cache_bytes)
 
 
@@ -233,7 +240,9 @@ def rocm_search_roots(
     is_dir: Callable[[Path], bool] = Path.is_dir,
 ) -> tuple[Path, ...]:
     """Return ordered roots suitable for ROCm header and library discovery."""
-    candidates = [discover_rocm_root(environ=environ, which=which, is_dir=is_dir)]
+    candidates = [
+        discover_rocm_root(environ=environ, which=which, is_dir=is_dir),
+    ]
     candidates.extend((Path("/opt/rocm"), Path("/usr"), Path("/usr/local")))
     roots: list[Path] = []
     for candidate in candidates:
@@ -250,19 +259,18 @@ def env_snapshot(
     *,
     clocks_locked: bool | None = None,
     timing_protocol: str | None = None,
-) -> "Environment":
+) -> Environment:
     """Collect the hardware and library information for *device*."""
-
     import torch
 
     from sol_execbench.core.data.trace import Environment
 
-    libs: Dict[str, str] = {"torch": torch.__version__}
+    libs: dict[str, str] = {"torch": torch.__version__}
     try:
         import triton as _tr
 
         libs["triton"] = getattr(_tr, "__version__", "unknown")
-    except Exception:
+    except ImportError:
         pass
 
     try:
@@ -272,7 +280,7 @@ def env_snapshot(
             libs["hip"] = str(hip_version)
         elif cuda_version := getattr(tv, "cuda", None):
             libs["cuda"] = str(cuda_version)
-    except Exception:
+    except ImportError:
         pass
     if rocm_version := detect_rocm_version():
         libs["rocm"] = rocm_version
@@ -292,7 +300,6 @@ def env_snapshot(
 
 def hardware_from_device(device: str) -> str:
     """Return a human-readable hardware name for a Torch device."""
-
     import torch
 
     parsed_device = torch.device(device)
@@ -306,7 +313,7 @@ def hardware_from_device(device: str) -> str:
                 for line in handle:
                     if line.startswith("model name"):
                         return line.split(":", 1)[1].strip()
-        except Exception:
+        except (OSError, UnicodeError):
             pass
         return platform.processor() or platform.machine() or "CPU"
     if parsed_device.type == "mps":
@@ -314,6 +321,6 @@ def hardware_from_device(device: str) -> str:
     if parsed_device.type == "xpu" and hasattr(torch, "xpu"):
         try:
             return torch.xpu.get_device_name(parsed_device.index)
-        except Exception:
+        except RuntimeError:
             return "Intel XPU"
     return parsed_device.type

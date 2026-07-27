@@ -17,7 +17,6 @@ from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
 
 def _pack(obj):
     """Minimal msgpack packer for test fixture construction (mirror of _unpack)."""
-
     if isinstance(obj, bool):
         return bytes([0xC3 if obj else 0xC2])
     if isinstance(obj, int):
@@ -50,7 +49,6 @@ def _pack(obj):
 
 def _note(desc_bytes: bytes, note_type: int = 0x20) -> bytes:
     """Wrap a metadata description in an AMDGPU ELF note."""
-
     name = b"AMDGPU\x00"
     namesz = len(name)
     descsz = len(desc_bytes)
@@ -70,7 +68,7 @@ def test_extract_footprint_from_minimal_metadata():
                 ".wavefront_size": 32,
                 ".private_segment_fixed_size": 1024,
                 ".group_segment_fixed_size": 4096,
-            }
+            },
         ],
         "amdhsa.target": "amdgcn-amd-amdhsa--gfx942",
     }
@@ -92,8 +90,12 @@ def test_extract_footprint_from_minimal_metadata():
 def test_no_spill_when_scratch_zero():
     metadata = {
         "amdhsa.kernels": [
-            {".vgpr_count": 13, ".sgpr_count": 14, ".private_segment_fixed_size": 0}
-        ]
+            {
+                ".vgpr_count": 13,
+                ".sgpr_count": 14,
+                ".private_segment_fixed_size": 0,
+            },
+        ],
     }
     fps = extract_amdgpu_footprints(_note(_pack(metadata)), artifact_id="k0")
 
@@ -115,18 +117,20 @@ def test_extract_named_kernel_metadata_for_authority_matching():
                 ".sgpr_spill_count": 0,
                 ".private_segment_fixed_size": 0,
                 ".group_segment_fixed_size": 4096,
-            }
+            },
         ],
     }
     records = extract_amdgpu_kernel_metadata(
-        _note(_pack(metadata)), target_architecture="gfx1200"
+        _note(_pack(metadata)),
+        target_architecture="gfx1200",
     )
     assert len(records) == 1
     assert records[0].name == "fused_reduction"
     assert records[0].group_segment_bytes == 4096
     assert (
         extract_amdgpu_kernel_metadata(
-            _note(_pack(metadata)), target_architecture="gfx942"
+            _note(_pack(metadata)),
+            target_architecture="gfx942",
         )
         == []
     )
@@ -138,7 +142,10 @@ def test_empty_when_no_kernels():
 
 
 def test_malformed_does_not_raise():
-    assert extract_amdgpu_footprints(b"\x00\x01\x02 not valid", artifact_id="k0") == []
+    assert (
+        extract_amdgpu_footprints(b"\x00\x01\x02 not valid", artifact_id="k0")
+        == []
+    )
     assert extract_amdgpu_footprints(b"", artifact_id="k0") == []
 
 
@@ -146,8 +153,12 @@ def test_multiple_kernels_yield_multiple_footprints():
     metadata = {
         "amdhsa.kernels": [
             {".vgpr_count": 10, ".sgpr_count": 5},
-            {".vgpr_count": 200, ".sgpr_count": 20, ".private_segment_fixed_size": 512},
-        ]
+            {
+                ".vgpr_count": 200,
+                ".sgpr_count": 20,
+                ".private_segment_fixed_size": 512,
+            },
+        ],
     }
     fps = extract_amdgpu_footprints(_note(_pack(metadata)), artifact_id="k0")
 
@@ -175,7 +186,9 @@ def test_target_architecture_filter_skips_other_archs():
     data = _note(_pack(meta_a)) + b"\x00" * 16 + _note(_pack(meta_b))
 
     fps = extract_amdgpu_footprints(
-        data, artifact_id="k0", target_architecture="gfx942"
+        data,
+        artifact_id="k0",
+        target_architecture="gfx942",
     )
     assert len(fps) == 1
     assert fps[0].vgpr_used == 10  # gfx942 kernel, not gfx1150's 99
@@ -191,7 +204,10 @@ _FIXTURE = (
 
 
 def test_real_code_object_fixture():
-    fps = extract_amdgpu_footprints(_FIXTURE.read_bytes(), artifact_id="rmsnorm")
+    fps = extract_amdgpu_footprints(
+        _FIXTURE.read_bytes(),
+        artifact_id="rmsnorm",
+    )
 
     assert len(fps) == 1
     fp = fps[0]
@@ -249,7 +265,9 @@ def test_spill_only_kernel_without_register_counts():
     # C7: a kernel with scratch/LDS data but no register counts still yields a
     # footprint (with None register fields) rather than being dropped.
     metadata = {
-        "amdhsa.kernels": [{".private_segment_fixed_size": 2048}]  # no vgpr/sgpr
+        "amdhsa.kernels": [
+            {".private_segment_fixed_size": 2048},
+        ],  # no vgpr/sgpr
     }
     fps = extract_amdgpu_footprints(_note(_pack(metadata)), artifact_id="k0")
     assert len(fps) == 1

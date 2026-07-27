@@ -28,9 +28,10 @@ if TYPE_CHECKING:
 _DTYPE_LOOKUP_T = TypeVar("_DTYPE_LOOKUP_T")
 
 
-def _resolve_dtype(dtype_str: str, mapping: dict[str, _DTYPE_LOOKUP_T]) -> _DTYPE_LOOKUP_T:
+def _resolve_dtype(
+    dtype_str: str, mapping: dict[str, _DTYPE_LOOKUP_T]
+) -> _DTYPE_LOOKUP_T:
     """Resolve a dtype string via *mapping*, raising a consistent error."""
-
     if not dtype_str:
         raise ValueError("dtype is None or empty")
     dtype = mapping.get(dtype_str)
@@ -60,6 +61,7 @@ def _get_dtype_str_to_python_dtype() -> dict[str, type]:
 
 
 def dtype_str_to_python_dtype(dtype_str: str) -> type:
+    """Resolve a serialized dtype name to a Python scalar type."""
     return _resolve_dtype(dtype_str, _get_dtype_str_to_python_dtype())
 
 
@@ -86,12 +88,12 @@ def _get_dtype_str_to_torch_dtype() -> dict[str, torch.dtype]:
 
 
 def dtype_str_to_torch_dtype(dtype_str: str) -> torch.dtype:
+    """Resolve a serialized dtype name to a Torch dtype."""
     return _resolve_dtype(dtype_str, _get_dtype_str_to_torch_dtype())
 
 
 def dtype_storage_bits(dtype_str: str) -> int:
     """Return the physical bit width of one logical tensor element."""
-
     return _resolve_dtype(
         dtype_str,
         {
@@ -128,7 +130,7 @@ def _get_integer_dtypes() -> frozenset[torch.dtype]:
             torch.uint32,
             torch.uint64,
             torch.bool,
-        )
+        ),
     )
 
 

@@ -10,8 +10,9 @@ from sol_execbench.core.platform.dependency_matrix import (
     classify_dependency_preflight,
     load_docker_target_dependency_policy,
 )
-from sol_execbench.core.platform.docker_matrix import load_docker_target_manifest
-
+from sol_execbench.core.platform.docker_matrix import (
+    load_docker_target_manifest,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
@@ -74,7 +75,9 @@ def test_module_main_emits_default_dependency_preflight_json() -> None:
     assert payload["torchvision_version"] == "0.26.0+rocm7.2"
     assert payload["triton_rocm_version"] == "3.6.0"
     assert payload["triton_rocm_index_name"] == "pytorch-rocm-root"
-    assert payload["triton_rocm_index_url"] == "https://download.pytorch.org/whl/"
+    assert (
+        payload["triton_rocm_index_url"] == "https://download.pytorch.org/whl/"
+    )
     assert payload["status"] == "not_tested"
     assert payload["reason_code"] == "target_not_tested"
     assert payload["benchmark_allowed"] is False
@@ -119,7 +122,9 @@ def test_cli_json_matches_underlying_matrix_entry_policy_payload() -> None:
         assert payload[key] == matrix_policy[key]
 
 
-def test_rocm_7_1_target_with_default_rocm_7_2_stack_reports_mixed_version() -> None:
+def test_rocm_7_1_target_with_default_rocm_7_2_stack_reports_mixed_version() -> (
+    None
+):
     completed = subprocess.run(
         _base_command(
             "--target",

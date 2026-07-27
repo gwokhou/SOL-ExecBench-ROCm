@@ -3,6 +3,9 @@
 
 """AKA-derived problem-corpus support."""
 
-from .aka_corpus import AkaCorpusEntry, AkaCorpusManifest
+from sol_execbench.core.dataset.aka_corpus import (
+    AkaCorpusEntry,
+    AkaCorpusManifest,
+)
 
 __all__ = ["AkaCorpusEntry", "AkaCorpusManifest"]

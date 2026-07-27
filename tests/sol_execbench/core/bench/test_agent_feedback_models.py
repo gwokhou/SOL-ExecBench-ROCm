@@ -4,9 +4,11 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from sol_execbench.core.bench.agent_feedback import (
+    _MODEL_CONFIG as FacadeModelConfig,
+)
+from sol_execbench.core.bench.agent_feedback import (
     AGENT_FEEDBACK_SCHEMA_VERSION as FacadeSchemaVersion,
 )
-from sol_execbench.core.bench.agent_feedback import _MODEL_CONFIG as FacadeModelConfig
 from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackBottleneck as FacadeBottleneck,
 )
@@ -26,8 +28,8 @@ from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackSummary as FacadeSummary,
 )
 from sol_execbench.core.bench.agent_feedback.models import (
-    AGENT_FEEDBACK_SCHEMA_VERSION,
     _MODEL_CONFIG,
+    AGENT_FEEDBACK_SCHEMA_VERSION,
     AgentFeedbackBottleneck,
     AgentFeedbackItem,
     AgentFeedbackReasonCode,
@@ -62,14 +64,18 @@ def test_agent_feedback_model_names_remain_reexported_from_facade() -> None:
     "model",
     [
         DiagnosticSourceRef(kind="trace", label="canonical_trace_jsonl"),
-        DiagnosticArtifactCitation(kind="trace", label="trace", path="trace.jsonl"),
+        DiagnosticArtifactCitation(
+            kind="trace",
+            label="trace",
+            path="trace.jsonl",
+        ),
         ExtendedDiagnosticIdentity(
             generated_at="2026-01-01T00:00:00Z",
             sol_version="v3.0.0",
         ),
         DiagnosticFreshnessValidation(status=DiagnosticFreshnessStatus.CURRENT),
         DiagnosticGovernanceGuardrail(
-            status=DiagnosticGovernanceStatus.USABLE_DIAGNOSTIC
+            status=DiagnosticGovernanceStatus.USABLE_DIAGNOSTIC,
         ),
         AgentFeedbackItem(
             code="compile_error",
@@ -85,11 +91,16 @@ def test_agent_feedback_model_names_remain_reexported_from_facade() -> None:
                 generated_at="2026-01-01T00:00:00Z",
                 sol_version="v3.0.0",
             ),
-            summary=AgentFeedbackSummary(trace_count=0, evaluated_trace_count=0),
+            summary=AgentFeedbackSummary(
+                trace_count=0,
+                evaluated_trace_count=0,
+            ),
         ),
     ],
 )
-def test_agent_feedback_models_remain_strict_and_frozen(model: BaseModel) -> None:
+def test_agent_feedback_models_remain_strict_and_frozen(
+    model: BaseModel,
+) -> None:
     model_type = type(model)
     payload = model.model_dump(mode="json")
 

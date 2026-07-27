@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import subprocess
+from collections.abc import Sequence
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from collections.abc import Sequence
 
 import pytest
 import torch
@@ -16,7 +16,11 @@ def test_aka_author_seed_helpers_and_coverage_inventory(load_script) -> None:
     author = load_script("scripts/internal/aka_author_seed.py")
 
     assert author._ax_var("rows") == {"type": "var", "description": "rows"}
-    assert author._ax_const(4) == {"type": "const", "value": 4, "description": ""}
+    assert author._ax_const(4) == {
+        "type": "const",
+        "value": 4,
+        "description": "",
+    }
     assert author._ax_expr("M * 2", "double") == {
         "type": "expr",
         "expression": "M * 2",
@@ -68,7 +72,7 @@ def test_orojenesis_provenance_hash_and_compiler_identity(
         provenance.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(
-            stdout="clang version 19.0\nCopyright\n"
+            stdout="clang version 19.0\nCopyright\n",
         ),
     )
 
@@ -86,7 +90,10 @@ def test_matrix_schema_export_writes_single_and_complete_sets(
     entry_path = tmp_path / "entry.json"
     all_path = tmp_path / "schemas"
 
-    assert exporter.main(["--model", "matrix-entry", "--output", str(entry_path)]) == 0
+    assert (
+        exporter.main(["--model", "matrix-entry", "--output", str(entry_path)])
+        == 0
+    )
     assert exporter.main(["--model", "all", "--output-dir", str(all_path)]) == 0
 
     entry = json.loads(entry_path.read_text(encoding="utf-8"))
@@ -124,7 +131,9 @@ def test_clock_lock_workload_amd_smi_and_log_are_bounded(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    workload = load_script("scripts/internal/rdna4/rdna4_clock_lock_workload_test.py")
+    workload = load_script(
+        "scripts/internal/rdna4/rdna4_clock_lock_workload_test.py",
+    )
     seen: dict[str, Any] = {}
 
     def fake_run(command, **kwargs):
@@ -133,7 +142,11 @@ def test_clock_lock_workload_amd_smi_and_log_are_bounded(
         return SimpleNamespace(stdout="clock: 2900 MHz\n")
 
     monkeypatch.setattr(workload, "OUTPUT_DIR", tmp_path)
-    monkeypatch.setattr(workload.shutil, "which", lambda _name: "/usr/bin/amd-smi")
+    monkeypatch.setattr(
+        workload.shutil,
+        "which",
+        lambda _name: "/usr/bin/amd-smi",
+    )
     monkeypatch.setattr(workload.subprocess, "run", fake_run)
 
     assert workload.amd_smi("metric", "-c") == "clock: 2900 MHz\n"
@@ -153,10 +166,13 @@ def test_resource_peak_calibration_parses_and_summarizes_samples(
     load_script,
 ) -> None:
     calibration = load_script(
-        "scripts/internal/rdna4/run_rdna4_resource_peak_calibration.py"
+        "scripts/internal/rdna4/run_rdna4_resource_peak_calibration.py",
     )
     values = [1, 2, 3, 4, 5, 6, 7]
-    samples = calibration._parse_result_samples(Path("probe"), _result_output(values))
+    samples = calibration._parse_result_samples(
+        Path("probe"),
+        _result_output(values),
+    )
     batches = (
         calibration.SampleBatch(
             process_batch=0,
@@ -178,7 +194,9 @@ def test_resource_peak_calibration_parses_and_summarizes_samples(
     }
     assert calibration._numeric_summary(()) is None
     assert calibration._sample_statistics(batches)["primary_result"] == 4.0
-    assert calibration._telemetry_summary(batches)["numeric"]["gfx_clock_mhz"] == {
+    assert calibration._telemetry_summary(batches)["numeric"][
+        "gfx_clock_mhz"
+    ] == {
         "minimum": 1000.0,
         "median": 1100.0,
         "maximum": 1200.0,
@@ -200,7 +218,7 @@ def test_resource_peak_calibration_rejects_invalid_sample_batches(
     values: list[object],
 ) -> None:
     calibration = load_script(
-        "scripts/internal/rdna4/run_rdna4_resource_peak_calibration.py"
+        "scripts/internal/rdna4/run_rdna4_resource_peak_calibration.py",
     )
 
     with pytest.raises(RuntimeError, match="produced"):
@@ -210,9 +228,11 @@ def test_resource_peak_calibration_rejects_invalid_sample_batches(
         calibration._flatten_samples(())
 
 
-def test_resource_peak_calibration_requires_complete_coverage(load_script) -> None:
+def test_resource_peak_calibration_requires_complete_coverage(
+    load_script,
+) -> None:
     calibration = load_script(
-        "scripts/internal/rdna4/run_rdna4_resource_peak_calibration.py"
+        "scripts/internal/rdna4/run_rdna4_resource_peak_calibration.py",
     )
     measurements = [
         {
@@ -225,7 +245,7 @@ def test_resource_peak_calibration_requires_complete_coverage(load_script) -> No
     assert calibration._calibration_coverage(measurements)["status"] == "passed"
     with pytest.raises(RuntimeError, match="do not exactly cover"):
         calibration._calibration_coverage(
-            [{"covers_precisions": (), "covers_resource_modes": ()}]
+            [{"covers_precisions": (), "covers_resource_modes": ()}],
         )
 
 
@@ -237,7 +257,11 @@ def test_rdna4_validation_helpers_and_verify_mode(
 ) -> None:
     validation = load_script("scripts/internal/rdna4/run_rdna4_validation.py")
     output = validation._prepare_output(tmp_path / "new")
-    monkeypatch.setattr(validation, "verify_validation_directory", lambda *a, **k: None)
+    monkeypatch.setattr(
+        validation,
+        "verify_validation_directory",
+        lambda *a, **k: None,
+    )
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
 
     assert output.is_dir()
@@ -263,8 +287,14 @@ def test_rdna4_validation_timeout_and_argument_checks(
     def raise_timeout(*args, **kwargs):
         raise subprocess.TimeoutExpired(["pytest"], 1)
 
-    monkeypatch.setattr(validation, "run_in_process_group_to_files", raise_timeout)
+    monkeypatch.setattr(
+        validation,
+        "run_in_process_group_to_files",
+        raise_timeout,
+    )
 
     assert validation._run_tests(tmp_path, 1.0) == 124
     with pytest.raises(ValueError, match="timeout must be positive"):
-        validation.main(["--output-dir", str(tmp_path / "out"), "--timeout", "0"])
+        validation.main(
+            ["--output-dir", str(tmp_path / "out"), "--timeout", "0"],
+        )

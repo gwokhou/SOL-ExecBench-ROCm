@@ -18,11 +18,15 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal, Union
 
 from pydantic import Field, model_validator
 
-from .base_model import BaseModelWithDocstrings, NonEmptyString, NonNegativeInt
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    NonEmptyString,
+    NonNegativeInt,
+)
 
 
 class RandomInput(BaseModelWithDocstrings):
@@ -94,7 +98,7 @@ class ToleranceSpec(BaseModelWithDocstrings):
     """The maximum relative error allowed for the problem."""
     required_matched_ratio: float = Field(default=0.99)
     """The ratio of elements that must pass the correctness bounds to be considered correct."""
-    max_error_cap: Optional[float] = Field(default=None)
+    max_error_cap: float | None = Field(default=None)
     """Hard ceiling on maximum absolute error. If set, correctness fails when any
     element's absolute error exceeds this cap, regardless of matched ratio."""
     allow_negative_inf: bool = Field(default=False)
@@ -135,11 +139,12 @@ class Workload(BaseModelWithDocstrings):
         ]
         if len(custom_inputs) > 0 and len(non_custom_inputs) > 0:
             raise ValueError(
-                f"A workload cannot have both custom and non-custom inputs. Custom: {custom_inputs}. Non-custom: {non_custom_inputs}"
+                f"A workload cannot have both custom and non-custom inputs. Custom: {custom_inputs}. Non-custom: {non_custom_inputs}",
             )
         return self
 
     def get_scalar_inputs(self) -> dict[str, int | float | bool]:
+        """Return scalar input values keyed by input name."""
         return {
             name: input.value
             for name, input in self.inputs.items()

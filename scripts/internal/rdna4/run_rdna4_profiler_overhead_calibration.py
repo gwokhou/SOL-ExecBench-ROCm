@@ -16,25 +16,29 @@ import logging
 import os
 import re
 import sys
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
+from statistics import median
+from typing import Any, NamedTuple
 
 from sol_execbench.core.bench.clock_lock import (
     ClockLockLease,
     acquire_clock_lock,
 )
 from sol_execbench.core.bench.pid_lock import acquire_pid_lock
+from sol_execbench.core.bench.rocm_profiler.calibration import (
+    ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
+    Rocprofv3OverheadCalibration,
+)
 from sol_execbench.core.bench.timing_isolation import (
     detect_concurrent_gpu_processes,
     validate_gpu_device_isolation,
     verify_clock_state_with_warning,
 )
-from sol_execbench.core.bench.rocm_profiler.calibration import (
-    ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
-    Rocprofv3OverheadCalibration,
-)
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.platform.runtime import (
+    RocmDeviceInfo,
     detect_rocm_device,
     resolve_rocm_tool_command,
 )
@@ -50,218 +54,336 @@ DEFAULT_ELEMENT_COUNT = 1_000_000
 DEFAULT_TEMP_ROOT = Path("/tmp/sol-execbench-rdna4-overhead-calibration")
 
 
-class CalibrationClockState:
+class CalibrationRequest(NamedTuple):
+    """Inputs for one profiler-overhead calibration run."""
+
+    output_path: Path
+    iterations: int = DEFAULT_ITERATIONS
+    warmup_runs: int = DEFAULT_WARMUP_RUNS
+    gpu_architecture: str = DEFAULT_GPU_ARCHITECTURE
+    element_count: int = DEFAULT_ELEMENT_COUNT
+    strict_isolation: bool = True
+    gpu_device: int | None = None
+    manage_clocks: bool = True
+    reset_clocks: bool = True
+    profiler_executable: str | None = None
+    source_revision: str | None = None
+
+
+class CalibrationEnvironment(NamedTuple):
+    """Resolved tools and GPU-isolation evidence for a calibration run."""
+
+    profiler_executable: str
+    profiler_executable_path: Path
+    gpu_isolation: dict[str, Any]
+
+
+class IsolationAudit(NamedTuple):
+    """Outcome of the timing-isolation pre-flight checks."""
+
+    accepted: bool
+    clock_ok: bool
+
+
+class CalibrationClockState(NamedTuple):
     """Clock state managed by this calibration process."""
 
-    def __init__(
-        self,
-        *,
-        clock_locked: bool,
-        lock_acquired: bool,
-        previous_env: str | None,
-        lease: ClockLockLease | None = None,
-    ) -> None:
-        self.clock_locked = clock_locked
-        self.lock_acquired = lock_acquired
-        self.previous_env = previous_env
-        self.lease = lease
+    clock_locked: bool
+    lock_acquired: bool
+    previous_env: str | None
+    lease: ClockLockLease | None = None
 
 
-def run_calibration(
-    *,
-    output_path: Path,
-    iterations: int = DEFAULT_ITERATIONS,
-    warmup_runs: int = DEFAULT_WARMUP_RUNS,
-    gpu_architecture: str = DEFAULT_GPU_ARCHITECTURE,
-    element_count: int = DEFAULT_ELEMENT_COUNT,
-    strict_isolation: bool = True,
-    gpu_device: int | None = None,
-    manage_clocks: bool = True,
-    reset_clocks: bool = True,
-    profiler_executable: str | None = None,
-    source_revision: str | None = None,
-) -> int:
-    """Run rocprofv3 overhead calibration and write result to output_path."""
-    if iterations <= 0:
+def _validate_request(request: CalibrationRequest) -> None:
+    if request.iterations <= 0:
         raise ValueError("iterations must be positive")
-    if warmup_runs < 0:
+    if request.warmup_runs < 0:
         raise ValueError("warmup runs must not be negative")
-    if element_count <= 0:
+    if request.element_count <= 0:
         raise ValueError("element count must be positive")
     if (
-        source_revision is not None
-        and re.fullmatch(r"[0-9a-f]{40}", source_revision) is None
+        request.source_revision is not None
+        and re.fullmatch(r"[0-9a-f]{40}", request.source_revision) is None
     ):
-        raise ValueError("source revision must be a full lowercase Git object id")
-    resolved_profiler = profiler_executable or resolve_rocm_tool_command("rocprofv3")
+        raise ValueError(
+            "source revision must be a full lowercase Git object id",
+        )
+
+
+def _prepare_environment(
+    request: CalibrationRequest,
+) -> CalibrationEnvironment | None:
+    resolved_profiler = (
+        request.profiler_executable
+        or resolve_rocm_tool_command(
+            "rocprofv3",
+        )
+    )
     profiler_executable_path = Path(resolved_profiler).resolve(strict=True)
-    gpu_isolation = validate_gpu_device_isolation(gpu_device=gpu_device)
-    if strict_isolation and not gpu_isolation["isolated"]:
+    gpu_isolation = validate_gpu_device_isolation(
+        gpu_device=request.gpu_device,
+    )
+    if request.strict_isolation and not gpu_isolation["isolated"]:
         logger.error(
             "STRICT ISOLATION: GPU device isolation check failed, aborting: %s",
             gpu_isolation["warnings"],
         )
+        return None
+    return CalibrationEnvironment(
+        profiler_executable=resolved_profiler,
+        profiler_executable_path=profiler_executable_path,
+        gpu_isolation=gpu_isolation,
+    )
+
+
+def run_calibration(request: CalibrationRequest) -> int:
+    """Run rocprofv3 overhead calibration and write its result."""
+    _validate_request(request)
+    environment = _prepare_environment(request)
+    if environment is None:
         return 1
     clock_state = _setup_calibration_clocks(
-        manage_clocks=manage_clocks,
-        strict_isolation=strict_isolation,
+        manage_clocks=request.manage_clocks,
+        strict_isolation=request.strict_isolation,
     )
-    if strict_isolation and not clock_state.clock_locked:
+    if request.strict_isolation and not clock_state.clock_locked:
         return 1
 
     try:
-        import torch
-
-        try:
-            visible_device_count = torch.cuda.device_count()
-            device_info = detect_rocm_device("cuda:0", torch_module=torch)
-        except (RuntimeError, ValueError) as exc:
-            logger.error("ROCm device detection failed: %s", exc)
-            return 1
-        expected_architecture = gpu_architecture.split(":", maxsplit=1)[0].lower()
-        if visible_device_count != 1:
-            logger.error(
-                "Calibration requires exactly one visible ROCm GPU, detected %d",
-                visible_device_count,
-            )
-            return 1
-        if device_info.gfx_target != expected_architecture:
-            logger.error(
-                "GPU architecture mismatch: detected %s, expected %s",
-                device_info.gfx_target,
-                expected_architecture,
-            )
-            return 1
-        gpu_isolation["visible_gpu_architecture"] = device_info.gfx_target
-        gpu_isolation["visible_gpu_name"] = device_info.name
-
-        # Pre-flight isolation audit
-        logger.info("Running timing isolation pre-flight audit...")
-        concurrent_processes = detect_concurrent_gpu_processes()
-        if concurrent_processes:
-            if strict_isolation:
-                logger.error(
-                    "STRICT ISOLATION: Detected %d concurrent GPU process(es), aborting: %s",
-                    len(concurrent_processes),
-                    concurrent_processes,
-                )
-                return 1
-            logger.warning(
-                "Detected %d concurrent GPU process(es): %s",
-                len(concurrent_processes),
-                concurrent_processes,
-            )
-
-        clock_ok = verify_clock_state_with_warning(context="calibration_start")
-        if not clock_ok:
-            if strict_isolation:
-                logger.error(
-                    "STRICT ISOLATION: Clock state verification failed, aborting"
-                )
-                return 1
-            logger.warning("Clock state verification failed at calibration start")
-
-        for warn in gpu_isolation["warnings"]:
-            logger.warning("GPU device isolation: %s", warn)
-
-        # Build minimal HIP kernel (vector add)
-        a = torch.randn(element_count, device="cuda", dtype=torch.float32)
-        b = torch.randn(element_count, device="cuda", dtype=torch.float32)
-        c = torch.empty_like(a)
-
-        # Warmup
-        for _ in range(warmup_runs):
-            torch.add(a, b, out=c)
-            torch.cuda.synchronize()
-
-        # Baseline: device events WITHOUT rocprofv3
-        baseline_durations: list[float] = []
-        for _ in range(iterations):
-            start = torch.cuda.Event(enable_timing=True)
-            end = torch.cuda.Event(enable_timing=True)
-            start.record()
-            torch.add(a, b, out=c)
-            end.record()
-            torch.cuda.synchronize()
-            baseline_durations.append(start.elapsed_time(end))
-
-        # Profiler-backed: device events WITH rocprofv3
-        profiler_durations: list[float] = []
-        try:
-            profiler_result = _run_with_rocprofv3(
-                element_count=element_count,
-                iterations=iterations,
-                warmup_runs=warmup_runs,
-                temp_dir=DEFAULT_TEMP_ROOT,
-                profiler_executable=resolved_profiler,
-            )
-            profiler_durations = profiler_result
-        except Exception as exc:
-            logger.error("rocprofv3 profiling failed: %s", exc)
-            return 1
-
-        if not profiler_durations:
-            logger.error("rocprofv3 did not produce timing measurements")
-            return 1
-
-        # Compute overhead
-        from statistics import median
-
-        baseline_median = median(baseline_durations)
-        profiler_median = median(profiler_durations)
-        overhead_ms = profiler_median - baseline_median
-
-        calibration = Rocprofv3OverheadCalibration.model_validate(
-            {
-                "schema_version": CALIBRATION_SCHEMA_VERSION,
-                "generated_at": _utc_timestamp(),
-                "baseline_median_ms": round(baseline_median, 6),
-                "profiler_median_ms": round(profiler_median, 6),
-                "overhead_ms": round(overhead_ms, 6),
-                "iterations": iterations,
-                "warmup_runs": warmup_runs,
-                "element_count": element_count,
-                "gpu_architecture": device_info.gfx_target,
-                "profiler_executable": resolved_profiler,
-                "profiler_executable_sha256": sha256_file(profiler_executable_path),
-                "clock_locked": clock_ok,
-                "clock_setup": {
-                    "managed": manage_clocks,
-                    "lock_acquired": clock_state.lock_acquired,
-                    "reset_on_exit": reset_clocks,
-                },
-                "gpu_isolation": gpu_isolation,
-                "baseline_sample_count": len(baseline_durations),
-                "profiler_sample_count": len(profiler_durations),
-            }
-        ).model_dump(mode="json", exclude_none=True)
-        if source_revision is not None:
-            calibration["source_revision"] = source_revision
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(
-            json.dumps(calibration, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        logger.info(
-            "Calibration complete: baseline=%.6fms, profiler=%.6fms, overhead=%.6fms",
-            baseline_median,
-            profiler_median,
-            overhead_ms,
-        )
-        logger.info("Calibration written to: %s", output_path)
-        return 0
+        return _execute_calibration(request, environment, clock_state)
     finally:
         active_exception = sys.exception()
         try:
             _teardown_calibration_clocks(
                 clock_state,
-                reset_clocks=reset_clocks,
+                reset_clocks=request.reset_clocks,
             )
         except Exception as cleanup_error:
             if active_exception is None:
                 raise
             active_exception.add_note(str(cleanup_error))
+
+
+def _detect_device(
+    request: CalibrationRequest,
+    environment: CalibrationEnvironment,
+) -> RocmDeviceInfo | None:
+    import torch
+
+    try:
+        visible_device_count = torch.cuda.device_count()
+        device_info = detect_rocm_device("cuda:0", torch_module=torch)
+    except (RuntimeError, ValueError) as exc:
+        logger.error("ROCm device detection failed: %s", exc)
+        return None
+    expected_architecture = request.gpu_architecture.split(":", maxsplit=1)[
+        0
+    ].lower()
+    if visible_device_count != 1:
+        logger.error(
+            "Calibration requires exactly one visible ROCm GPU, detected %d",
+            visible_device_count,
+        )
+        return None
+    if device_info.gfx_target != expected_architecture:
+        logger.error(
+            "GPU architecture mismatch: detected %s, expected %s",
+            device_info.gfx_target,
+            expected_architecture,
+        )
+        return None
+    environment.gpu_isolation["visible_gpu_architecture"] = (
+        device_info.gfx_target
+    )
+    environment.gpu_isolation["visible_gpu_name"] = device_info.name
+    return device_info
+
+
+def _audit_isolation(
+    request: CalibrationRequest,
+    environment: CalibrationEnvironment,
+) -> IsolationAudit:
+    logger.info("Running timing isolation pre-flight audit...")
+    concurrent_processes = detect_concurrent_gpu_processes()
+    if concurrent_processes and request.strict_isolation:
+        logger.error(
+            "STRICT ISOLATION: Detected %d concurrent GPU process(es), aborting: %s",
+            len(concurrent_processes),
+            concurrent_processes,
+        )
+        return IsolationAudit(accepted=False, clock_ok=False)
+    if concurrent_processes:
+        logger.warning(
+            "Detected %d concurrent GPU process(es): %s",
+            len(concurrent_processes),
+            concurrent_processes,
+        )
+    clock_ok = verify_clock_state_with_warning(context="calibration_start")
+    if not clock_ok and request.strict_isolation:
+        logger.error(
+            "STRICT ISOLATION: Clock state verification failed, aborting",
+        )
+        return IsolationAudit(accepted=False, clock_ok=False)
+    if not clock_ok:
+        logger.warning("Clock state verification failed at calibration start")
+    for warning in environment.gpu_isolation["warnings"]:
+        logger.warning("GPU device isolation: %s", warning)
+    return IsolationAudit(accepted=True, clock_ok=clock_ok)
+
+
+def _measure_baseline(request: CalibrationRequest) -> list[float]:
+    import torch
+
+    a = torch.randn(
+        request.element_count,
+        device="cuda",
+        dtype=torch.float32,
+    )
+    b = torch.randn(
+        request.element_count,
+        device="cuda",
+        dtype=torch.float32,
+    )
+    c = torch.empty_like(a)
+    for _ in range(request.warmup_runs):
+        torch.add(a, b, out=c)
+        torch.cuda.synchronize()
+
+    durations: list[float] = []
+    for _ in range(request.iterations):
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        start.record()
+        torch.add(a, b, out=c)
+        end.record()
+        torch.cuda.synchronize()
+        durations.append(start.elapsed_time(end))
+    return durations
+
+
+def _measure_with_profiler(
+    request: CalibrationRequest,
+    environment: CalibrationEnvironment,
+) -> list[float] | None:
+    try:
+        durations = _run_with_rocprofv3(
+            element_count=request.element_count,
+            iterations=request.iterations,
+            warmup_runs=request.warmup_runs,
+            temp_dir=DEFAULT_TEMP_ROOT,
+            profiler_executable=environment.profiler_executable,
+        )
+    except Exception as exc:  # noqa: BLE001 -- report calibration boundary
+        logger.error("rocprofv3 profiling failed: %s", exc)
+        return None
+    if not durations:
+        logger.error("rocprofv3 did not produce timing measurements")
+        return None
+    return durations
+
+
+def _calibration_payload(
+    request: CalibrationRequest,
+    environment: CalibrationEnvironment,
+    clock_state: CalibrationClockState,
+    device_info: RocmDeviceInfo,
+    audit: IsolationAudit,
+    baseline_durations: list[float],
+    profiler_durations: list[float],
+) -> tuple[dict[str, Any], float, float, float]:
+    baseline_median = median(baseline_durations)
+    profiler_median = median(profiler_durations)
+    overhead_ms = profiler_median - baseline_median
+    payload = Rocprofv3OverheadCalibration.model_validate(
+        {
+            "schema_version": CALIBRATION_SCHEMA_VERSION,
+            "generated_at": _utc_timestamp(),
+            "baseline_median_ms": round(baseline_median, 6),
+            "profiler_median_ms": round(profiler_median, 6),
+            "overhead_ms": round(overhead_ms, 6),
+            "iterations": request.iterations,
+            "warmup_runs": request.warmup_runs,
+            "element_count": request.element_count,
+            "gpu_architecture": device_info.gfx_target,
+            "profiler_executable": environment.profiler_executable,
+            "profiler_executable_sha256": sha256_file(
+                environment.profiler_executable_path,
+            ),
+            "clock_locked": audit.clock_ok,
+            "clock_setup": {
+                "managed": request.manage_clocks,
+                "lock_acquired": clock_state.lock_acquired,
+                "reset_on_exit": request.reset_clocks,
+            },
+            "gpu_isolation": environment.gpu_isolation,
+            "baseline_sample_count": len(baseline_durations),
+            "profiler_sample_count": len(profiler_durations),
+        },
+    ).model_dump(mode="json", exclude_none=True)
+    if request.source_revision is not None:
+        payload["source_revision"] = request.source_revision
+    return payload, baseline_median, profiler_median, overhead_ms
+
+
+def _write_calibration(
+    request: CalibrationRequest,
+    environment: CalibrationEnvironment,
+    clock_state: CalibrationClockState,
+    device_info: RocmDeviceInfo,
+    audit: IsolationAudit,
+    baseline_durations: list[float],
+    profiler_durations: list[float],
+) -> None:
+    payload, baseline_median, profiler_median, overhead_ms = (
+        _calibration_payload(
+            request,
+            environment,
+            clock_state,
+            device_info,
+            audit,
+            baseline_durations,
+            profiler_durations,
+        )
+    )
+    request.output_path.parent.mkdir(parents=True, exist_ok=True)
+    request.output_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    logger.info(
+        "Calibration complete: baseline=%.6fms, profiler=%.6fms, overhead=%.6fms",
+        baseline_median,
+        profiler_median,
+        overhead_ms,
+    )
+    logger.info("Calibration written to: %s", request.output_path)
+
+
+def _execute_calibration(
+    request: CalibrationRequest,
+    environment: CalibrationEnvironment,
+    clock_state: CalibrationClockState,
+) -> int:
+    device_info = _detect_device(request, environment)
+    if device_info is None:
+        return 1
+    audit = _audit_isolation(request, environment)
+    if not audit.accepted:
+        return 1
+    baseline_durations = _measure_baseline(request)
+    profiler_durations = _measure_with_profiler(request, environment)
+    if profiler_durations is None:
+        return 1
+    _write_calibration(
+        request,
+        environment,
+        clock_state,
+        device_info,
+        audit,
+        baseline_durations,
+        profiler_durations,
+    )
+    return 0
 
 
 def _setup_calibration_clocks(
@@ -271,11 +393,15 @@ def _setup_calibration_clocks(
 ) -> CalibrationClockState:
     previous_env = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED")
     if not manage_clocks:
-        clock_locked = verify_clock_state_with_warning(context="calibration_preflight")
+        clock_locked = verify_clock_state_with_warning(
+            context="calibration_preflight",
+        )
         if clock_locked:
             os.environ["SOL_EXECBENCH_CLOCKS_LOCKED"] = "1"
         elif strict_isolation:
-            logger.error("STRICT ISOLATION: Clock state verification failed, aborting")
+            logger.error(
+                "STRICT ISOLATION: Clock state verification failed, aborting",
+            )
         return CalibrationClockState(
             clock_locked=clock_locked,
             lock_acquired=False,
@@ -286,7 +412,9 @@ def _setup_calibration_clocks(
     lease = acquire_clock_lock()
     if not lease.locked:
         if strict_isolation:
-            logger.error("STRICT ISOLATION: Failed to lock GPU clocks, aborting")
+            logger.error(
+                "STRICT ISOLATION: Failed to lock GPU clocks, aborting",
+            )
         else:
             logger.warning("Failed to lock GPU clocks for calibration")
         return CalibrationClockState(
@@ -316,7 +444,9 @@ def _teardown_calibration_clocks(
             if reset_clocks:
                 logger.info("Resetting GPU clocks to AUTO after calibration...")
                 if not clock_state.lease.release():
-                    raise RuntimeError("failed to reset and verify every GPU at AUTO")
+                    raise RuntimeError(
+                        "failed to reset and verify every GPU at AUTO",
+                    )
             else:
                 logger.info("Retaining GPU clock policy by explicit request")
                 clock_state.lease.detach()
@@ -339,16 +469,62 @@ def _run_with_rocprofv3(
 
     Uses the same rocprofv3 infrastructure as the batch script for consistency.
     """
-    import tempfile
-
     from sol_execbench.core.bench.rocm_profiler import (
         build_rocprofv3_command,
         find_rocprofv3_csv,
         summarize_rocprofv3_csv,
     )
 
-    # Create a minimal Python script that runs vector add under rocprofv3
-    inner_script = (
+    if temp_dir is not None:
+        temp_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdir:
+        script_path = Path(tmpdir) / "inner_calibration.py"
+        script_path.write_text(
+            _profiler_inner_script(
+                element_count=element_count,
+                iterations=iterations,
+                warmup_runs=warmup_runs,
+            ),
+            encoding="utf-8",
+        )
+        output_dir = Path(tmpdir) / "rocprof_output"
+        output_dir.mkdir()
+        command = build_rocprofv3_command(
+            [sys.executable, str(script_path)],
+            output_directory=str(output_dir),
+            output_file="rocprofv3-overhead-calibration",
+            executable=profiler_executable,
+        )
+        result = run_in_process_group_bounded(command, timeout=300)
+        if result.returncode != 0:
+            raise RuntimeError(
+                "rocprofv3 inner script failed with exit code "
+                f"{result.returncode}: {(result.stderr or '')[-4096:]}",
+            )
+        csv_path = find_rocprofv3_csv(
+            output_dir,
+            "rocprofv3-overhead-calibration",
+        )
+        if csv_path is None:
+            raise RuntimeError("rocprofv3 did not produce a kernel-trace CSV")
+        kernel_rows, _ = summarize_rocprofv3_csv(csv_path)
+        if kernel_rows <= 0:
+            raise RuntimeError(
+                "rocprofv3 kernel-trace CSV contained no kernel rows",
+            )
+        durations = _parse_profiled_durations(result.stdout or "")
+        if durations is not None:
+            return durations
+    raise RuntimeError("profiled child did not emit device-event durations")
+
+
+def _profiler_inner_script(
+    *,
+    element_count: int,
+    iterations: int,
+    warmup_runs: int,
+) -> str:
+    return (
         "import torch\n"
         "import json\n"
         "import sys\n"
@@ -371,77 +547,53 @@ def _run_with_rocprofv3(
         "print(json.dumps(durations))\n"
     )
 
-    if temp_dir is not None:
-        temp_dir.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=temp_dir) as tmpdir:
-        script_path = Path(tmpdir) / "inner_calibration.py"
-        script_path.write_text(inner_script, encoding="utf-8")
 
-        output_dir = Path(tmpdir) / "rocprof_output"
-        output_dir.mkdir()
-
-        command = build_rocprofv3_command(
-            [sys.executable, str(script_path)],
-            output_directory=str(output_dir),
-            output_file="rocprofv3-overhead-calibration",
-            executable=profiler_executable,
-        )
-
-        result = run_in_process_group_bounded(
-            command,
-            timeout=300,
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(
-                "rocprofv3 inner script failed with exit code "
-                f"{result.returncode}: {(result.stderr or '')[-4096:]}"
-            )
-        csv_path = find_rocprofv3_csv(
-            output_dir,
-            "rocprofv3-overhead-calibration",
-        )
-        if csv_path is None:
-            raise RuntimeError("rocprofv3 did not produce a kernel-trace CSV")
-        kernel_rows, _ = summarize_rocprofv3_csv(csv_path)
-        if kernel_rows <= 0:
-            raise RuntimeError("rocprofv3 kernel-trace CSV contained no kernel rows")
-
-        for line in (result.stdout or "").splitlines():
-            line = line.strip()
-            if line.startswith("["):
-                try:
-                    durations = json.loads(line)
-                    if isinstance(durations, list) and all(
-                        isinstance(d, (int, float)) for d in durations
-                    ):
-                        return [float(d) for d in durations]
-                except json.JSONDecodeError:
-                    continue
-
-    raise RuntimeError("profiled child did not emit device-event durations")
+def _parse_profiled_durations(stdout: str) -> list[float] | None:
+    for raw_line in stdout.splitlines():
+        line = raw_line.strip()
+        if not line.startswith("["):
+            continue
+        try:
+            durations = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(durations, list) and all(
+            isinstance(duration, (int, float)) for duration in durations
+        ):
+            return [float(duration) for duration in durations]
+    return None
 
 
 def _utc_timestamp() -> str:
     from datetime import UTC, datetime
 
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse profiler-overhead calibration arguments."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--output-path",
         type=Path,
         default=Path(
-            "out/rdna4-overhead-calibration/rocprofv3-overhead-calibration.json"
+            "out/rdna4-overhead-calibration/rocprofv3-overhead-calibration.json",
         ),
         help="Path to write the calibration JSON sidecar.",
     )
     parser.add_argument("--iterations", type=int, default=DEFAULT_ITERATIONS)
     parser.add_argument("--warmup-runs", type=int, default=DEFAULT_WARMUP_RUNS)
     parser.add_argument("--gpu-architecture", default=DEFAULT_GPU_ARCHITECTURE)
-    parser.add_argument("--element-count", type=int, default=DEFAULT_ELEMENT_COUNT)
+    parser.add_argument(
+        "--element-count",
+        type=int,
+        default=DEFAULT_ELEMENT_COUNT,
+    )
     parser.add_argument(
         "--profiler-executable",
         help="Explicit rocprofv3 executable or patched wrapper for this calibration.",
@@ -478,6 +630,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run calibration and write its content-addressed evidence."""
     args = parse_args(argv)
     logging.basicConfig(
         level=logging.INFO,
@@ -487,17 +640,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         with acquire_pid_lock(output_dir):
             return run_calibration(
-                output_path=args.output_path,
-                iterations=args.iterations,
-                warmup_runs=args.warmup_runs,
-                gpu_architecture=args.gpu_architecture,
-                element_count=args.element_count,
-                strict_isolation=args.strict_isolation,
-                gpu_device=args.gpu_device,
-                manage_clocks=args.lock_clocks,
-                reset_clocks=args.reset_clocks,
-                profiler_executable=args.profiler_executable,
-                source_revision=args.source_revision,
+                CalibrationRequest(
+                    output_path=args.output_path,
+                    iterations=args.iterations,
+                    warmup_runs=args.warmup_runs,
+                    gpu_architecture=args.gpu_architecture,
+                    element_count=args.element_count,
+                    strict_isolation=args.strict_isolation,
+                    gpu_device=args.gpu_device,
+                    manage_clocks=args.lock_clocks,
+                    reset_clocks=args.reset_clocks,
+                    profiler_executable=args.profiler_executable,
+                    source_revision=args.source_revision,
+                ),
             )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}")

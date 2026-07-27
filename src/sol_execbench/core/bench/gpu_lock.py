@@ -21,13 +21,18 @@ class GpuLockVerificationError(RuntimeError):
 
 def gpu_lock_directory() -> Path:
     """Return the shared lock directory configured by the container wrapper."""
-    value = os.environ.get("SOL_EXECBENCH_GPU_LOCK_DIR", "/tmp/sol-execbench-locks")
+    value = os.environ.get(
+        "SOL_EXECBENCH_GPU_LOCK_DIR",
+        "/tmp/sol-execbench-locks",
+    )
     return Path(value)
 
 
 @contextlib.contextmanager
 def acquire_gpu_lock(
-    device_index: int = 0, *, timeout_seconds: float = 60.0
+    device_index: int = 0,
+    *,
+    timeout_seconds: float = 60.0,
 ) -> Iterator[None]:
     """Serialize access to one GPU across evaluator processes and containers."""
     if timeout_seconds <= 0:
@@ -47,7 +52,7 @@ def acquire_gpu_lock(
                 if time.monotonic() >= deadline:
                     raise TimeoutError(
                         f"GPU {device_index} is busy; lock wait exceeded "
-                        f"{timeout_seconds:g} seconds"
+                        f"{timeout_seconds:g} seconds",
                     ) from None
                 time.sleep(0.1)
         handle.seek(0)
@@ -62,7 +67,9 @@ def acquire_gpu_lock(
 
 @contextlib.contextmanager
 def acquire_evaluation_gpu_lock(
-    device_index: int = 0, *, timeout_seconds: float = 60.0
+    device_index: int = 0,
+    *,
+    timeout_seconds: float = 60.0,
 ) -> Iterator[None]:
     """Acquire locally or verify a host-held lock around container evaluation."""
     if os.environ.get(_HOST_MANAGED_ENV) != "1":
@@ -71,7 +78,7 @@ def acquire_evaluation_gpu_lock(
         return
     if not _external_gpu_lock_is_held(device_index):
         raise GpuLockVerificationError(
-            f"host-managed GPU {device_index} lock is not held"
+            f"host-managed GPU {device_index} lock is not held",
         )
     yield
 
@@ -99,7 +106,10 @@ def _reuse_inherited_lock(lock_path: Path) -> bool:
         expected = lock_path.stat()
     except (OSError, ValueError):
         return False
-    if (inherited.st_dev, inherited.st_ino) != (expected.st_dev, expected.st_ino):
+    if (inherited.st_dev, inherited.st_ino) != (
+        expected.st_dev,
+        expected.st_ino,
+    ):
         return False
     try:
         fcntl.flock(file_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)

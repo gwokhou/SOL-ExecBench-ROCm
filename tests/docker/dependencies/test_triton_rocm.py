@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-import torch
 import pytest
+import torch
 
 pytestmark = [
     pytest.mark.docker_dependency,

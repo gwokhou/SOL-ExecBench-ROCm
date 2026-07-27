@@ -11,11 +11,6 @@ from typing import Literal
 
 from pydantic import Field
 
-from sol_execbench.core.integrity.checksums import sha256_file
-from sol_execbench.core.integrity.schema_versions import (
-    STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION,
-)
-from sol_execbench.core.data.base_model import StrictArtifactModel
 from sol_execbench.core.bench.static_kernel.evidence_builders import (
     build_static_kernel_evidence_sidecar,
     build_static_kernel_evidence_unavailable,
@@ -28,7 +23,11 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceSourceReference,
     StaticKernelEvidenceStatus,
 )
-
+from sol_execbench.core.data.base_model import StrictArtifactModel
+from sol_execbench.core.integrity.checksums import sha256_file
+from sol_execbench.core.integrity.schema_versions import (
+    STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+)
 
 _PRIMARY_ARTIFACT_NAME = "benchmark_kernel.so"
 _COMPILER_OUTPUT_SUFFIXES = {".log", ".txt"}
@@ -65,19 +64,19 @@ def collect_static_kernel_artifacts(
     target_architecture: str | None = None,
 ) -> StaticKernelEvidenceSidecar:
     """Persist current-build static artifacts into an evidence directory."""
-
     build_root = build_directory.resolve()
     if not build_root.is_dir():
         return build_static_kernel_evidence_unavailable(
-            StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE
+            StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE,
         )
 
     primary_artifact = build_root / primary_artifact_name
     if artifact_manifest_path is None and not _is_contained_file(
-        primary_artifact, build_root
+        primary_artifact,
+        build_root,
     ):
         return build_static_kernel_evidence_unavailable(
-            StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE
+            StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE,
         )
 
     evidence_root = evidence_directory.resolve()
@@ -108,7 +107,7 @@ def collect_static_kernel_artifacts(
 
     if not artifacts:
         return build_static_kernel_evidence_unavailable(
-            StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE
+            StaticKernelEvidenceReasonCode.ARTIFACT_UNAVAILABLE,
         )
 
     return build_static_kernel_evidence_sidecar(
@@ -169,7 +168,7 @@ def _discover_manifest_static_artifact_paths(
     artifact_manifest_path: Path,
 ) -> tuple[Path, ...]:
     manifest = StaticArtifactManifest.model_validate_json(
-        artifact_manifest_path.read_text(encoding="utf-8")
+        artifact_manifest_path.read_text(encoding="utf-8"),
     )
 
     candidates: list[Path] = []
@@ -197,7 +196,7 @@ def _artifact_manifest_entry_path(entry: object, index: int) -> Path:
         return Path(entry.path)
     raise ValueError(
         f"Static artifact manifest artifacts[{index}] must be a path string "
-        "or an object with a path string"
+        "or an object with a path string",
     )
 
 
@@ -212,7 +211,7 @@ def _artifact_manifest_source_references(
             kind="artifact_manifest",
             value=display_artifact_path(artifact_manifest_path, sidecar_base),
             description="Build artifact manifest used to select current-build static artifacts.",
-        )
+        ),
     ]
 
 
@@ -253,7 +252,7 @@ def _persist_static_artifact(
                 kind="producer",
                 value=producer,
                 description="Build step that registered this current-build artifact.",
-            )
+            ),
         ],
     )
 
@@ -274,7 +273,9 @@ def _static_artifact_type(path: Path) -> str | None:
 
 def _is_compiler_output_name(name: str) -> bool:
     normalized = name.lower()
-    return any(marker in normalized for marker in ("build", "compile", "compiler"))
+    return any(
+        marker in normalized for marker in ("build", "compile", "compiler")
+    )
 
 
 def _is_contained_file(path: Path, root: Path) -> bool:

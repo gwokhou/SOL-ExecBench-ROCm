@@ -17,9 +17,11 @@ from sol_execbench.core.bench.correctness import (
     compute_error_stats,
 )
 from sol_execbench.core.bench.eval_runtime import TimingResult, measure_latency
-from sol_execbench.core.bench.evaluation_requests import WorkloadEvaluationRequest
+from sol_execbench.core.bench.evaluation_requests import (
+    WorkloadEvaluationRequest,
+)
 from sol_execbench.core.bench.io import allocate_outputs, normalize_outputs
-from sol_execbench.core.bench.reward_hack import RewardHackDetected
+from sol_execbench.core.bench.reward_hack import RewardHackError
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.runtime import (
     CacheClearPolicy,
@@ -63,12 +65,20 @@ def measure_solution_latency(
         else None
     )
     trials = [
-        _measure_solution_trial(request, resolved_axes, inputs, validator, cache_policy)
+        _measure_solution_trial(
+            request,
+            resolved_axes,
+            inputs,
+            validator,
+            cache_policy,
+        )
         for _ in range(request.bench_config.trials)
     ]
     return SolutionTimingResult(
         latency_ms=statistics.mean(trial.latency_ms for trial in trials),
-        timed_iterations_per_trial=tuple(trial.timed_iterations for trial in trials),
+        timed_iterations_per_trial=tuple(
+            trial.timed_iterations for trial in trials
+        ),
         cache_clear_policy=cache_policy,
     )
 
@@ -117,15 +127,19 @@ def _build_timed_output_validator(
         actual = _timed_outputs(request, inputs, args, result)
         issue = check_output_shape_dtype(expected, actual)
         if issue is not None:
-            raise RewardHackDetected(
-                f"timed invocation returned invalid output shape or dtype: {issue}"
+            raise RewardHackError(
+                f"timed invocation returned invalid output shape or dtype: {issue}",
             )
         for reference, candidate in zip(expected, actual, strict=True):
-            _, exceeds = compute_error_stats(candidate, reference, workload.tolerance)
+            _, exceeds = compute_error_stats(
+                candidate,
+                reference,
+                workload.tolerance,
+            )
             if exceeds:
-                raise RewardHackDetected(
+                raise RewardHackError(
                     "timed invocation output differs from the reference; "
-                    "correctness and timing phases must execute identical behavior"
+                    "correctness and timing phases must execute identical behavior",
                 )
 
     return validate

@@ -7,11 +7,12 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterable
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
 from multiprocessing.connection import Connection
-from typing import Any, Iterable
+from typing import Any
 
 import torch
 from safetensors.torch import load as load_safetensors_bytes
@@ -27,7 +28,9 @@ REFERENCE_PID_ENV = "SOL_EXECBENCH_REFERENCE_PID"
 TRUSTED_DEFINITION_FILE = "reference_definition.json"
 _MAX_HEADER_BYTES = 1 << 20
 MAX_REFERENCE_PAYLOAD_BYTES = 1 << 30
-MAX_REFERENCE_TENSOR_STORAGE_BYTES = MAX_REFERENCE_PAYLOAD_BYTES - _MAX_HEADER_BYTES
+MAX_REFERENCE_TENSOR_STORAGE_BYTES = (
+    MAX_REFERENCE_PAYLOAD_BYTES - _MAX_HEADER_BYTES
+)
 
 
 class ReferenceProtocolError(RuntimeError):
@@ -45,6 +48,7 @@ class ReferenceExecutionError(RuntimeError):
     """The trusted service could not produce a case for a classified reason."""
 
     def __init__(self, message: str, *, kind: ReferenceFailureKind) -> None:
+        """Initialize a classified trusted-reference failure."""
         super().__init__(message)
         self.kind = kind
 
@@ -68,18 +72,28 @@ class ReferenceTimingCase(ReferenceCase):
 def send_json(connection: Connection, value: dict[str, Any]) -> None:
     """Send a strictly encoded JSON control frame."""
     encoded = json.dumps(
-        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode()
     if len(encoded) > _MAX_HEADER_BYTES:
         raise ReferenceProtocolError("reference IPC JSON header is too large")
     _send_bytes(connection, encoded, channel="control")
 
 
-def _send_bytes(connection: Connection, payload: bytes, *, channel: str) -> None:
+def _send_bytes(
+    connection: Connection,
+    payload: bytes,
+    *,
+    channel: str,
+) -> None:
     try:
         connection.send_bytes(payload)
     except (EOFError, OSError) as exc:
-        raise ReferenceProtocolError(f"reference IPC {channel} channel closed") from exc
+        raise ReferenceProtocolError(
+            f"reference IPC {channel} channel closed",
+        ) from exc
 
 
 def receive_json(connection: Connection) -> dict[str, Any]:
@@ -88,11 +102,17 @@ def receive_json(connection: Connection) -> dict[str, Any]:
         encoded = connection.recv_bytes(maxlength=_MAX_HEADER_BYTES)
         value = json.loads(encoded.decode())
     except (EOFError, OSError) as exc:
-        raise ReferenceProtocolError("reference IPC control channel closed") from exc
+        raise ReferenceProtocolError(
+            "reference IPC control channel closed",
+        ) from exc
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ReferenceProtocolError("reference IPC header is not valid JSON") from exc
+        raise ReferenceProtocolError(
+            "reference IPC header is not valid JSON",
+        ) from exc
     if not isinstance(value, dict):
-        raise ReferenceProtocolError("reference IPC header must be a JSON object")
+        raise ReferenceProtocolError(
+            "reference IPC header must be a JSON object",
+        )
     return value
 
 
@@ -108,7 +128,6 @@ def _storage_span(tensor: torch.Tensor) -> int:
 
 def reference_values_storage_bytes(values: Iterable[Any]) -> int:
     """Return the physical tensor-storage bytes carried by reference IPC."""
-
     return sum(
         _storage_span(value) * value.element_size()
         for value in values
@@ -118,22 +137,25 @@ def reference_values_storage_bytes(values: Iterable[Any]) -> int:
 
 def reference_case_storage_bytes(case: ReferenceCase) -> int:
     """Return the physical input/output bytes carried by one reference case."""
-
-    return reference_values_storage_bytes(case.inputs) + reference_values_storage_bytes(
-        case.outputs
+    return reference_values_storage_bytes(
+        case.inputs,
+    ) + reference_values_storage_bytes(
+        case.outputs,
     )
 
 
 def _encode_values(
-    values: Iterable[Any], prefix: str
+    values: Iterable[Any],
+    prefix: str,
 ) -> tuple[list[dict[str, Any]], dict[str, torch.Tensor]]:
     metadata: list[dict[str, Any]] = []
     tensors: dict[str, torch.Tensor] = {}
-    for index, value in enumerate(values):
+    for index, item in enumerate(values):
+        value = item
         if not isinstance(value, torch.Tensor):
             if not isinstance(value, (bool, int, float)):
                 raise ReferenceProtocolError(
-                    f"unsupported reference IPC scalar: {type(value).__name__}"
+                    f"unsupported reference IPC scalar: {type(value).__name__}",
                 )
             metadata.append({"kind": "scalar", "value": value})
             continue
@@ -143,7 +165,9 @@ def _encode_values(
         span = _storage_span(value)
         if span:
             storage = value.as_strided(
-                (span,), (1,), storage_offset=value.storage_offset()
+                (span,),
+                (1,),
+                storage_offset=value.storage_offset(),
             )
             tensors[key] = storage.detach().cpu().contiguous()
         else:
@@ -154,7 +178,7 @@ def _encode_values(
                 "key": key,
                 "shape": list(value.shape),
                 "stride": list(value.stride()),
-            }
+            },
         )
     return metadata, tensors
 
@@ -175,14 +199,18 @@ def _decode_values(
             values.append(value)
             continue
         if kind != "tensor":
-            raise ReferenceProtocolError(f"unknown reference IPC value kind: {kind!r}")
+            raise ReferenceProtocolError(
+                f"unknown reference IPC value kind: {kind!r}",
+            )
         key = item.get("key")
         shape = item.get("shape")
         stride = item.get("stride")
         if not isinstance(key, str) or key not in tensors:
             raise ReferenceProtocolError("reference IPC tensor key is missing")
         if not isinstance(shape, list) or not isinstance(stride, list):
-            raise ReferenceProtocolError("reference IPC tensor metadata is invalid")
+            raise ReferenceProtocolError(
+                "reference IPC tensor metadata is invalid",
+            )
         storage = tensors[key].to(device=device)
         values.append(storage.as_strided(tuple(shape), tuple(stride), 0))
     return values
@@ -200,7 +228,9 @@ def send_case(
     output_metadata, output_tensors = _encode_values(case.outputs, "output")
     payload = save_safetensors_bytes({**input_tensors, **output_tensors})
     if len(payload) > MAX_REFERENCE_PAYLOAD_BYTES:
-        raise ReferenceProtocolError("reference IPC tensor payload is too large")
+        raise ReferenceProtocolError(
+            "reference IPC tensor payload is too large",
+        )
     send_json(
         connection,
         {
@@ -225,10 +255,11 @@ def receive_case(connection: Connection, *, device: str) -> ReferenceTimingCase:
             failure_kind = ReferenceFailureKind(raw_kind)
         except (TypeError, ValueError) as exc:
             raise ReferenceProtocolError(
-                "reference IPC failure category is invalid"
+                "reference IPC failure category is invalid",
             ) from exc
         raise ReferenceExecutionError(
-            str(header.get("error") or "reference failed"), kind=failure_kind
+            str(header.get("error") or "reference failed"),
+            kind=failure_kind,
         )
     if header.get("protocol") != PROTOCOL_VERSION:
         raise ReferenceProtocolError("reference IPC protocol version mismatch")
@@ -249,7 +280,9 @@ def receive_case(connection: Connection, *, device: str) -> ReferenceTimingCase:
     try:
         tensors = load_safetensors_bytes(payload)
     except Exception as exc:
-        raise ReferenceProtocolError("reference IPC tensor payload is invalid") from exc
+        raise ReferenceProtocolError(
+            "reference IPC tensor payload is invalid",
+        ) from exc
     inputs_meta = header.get("inputs")
     outputs_meta = header.get("outputs")
     if not isinstance(inputs_meta, list) or not isinstance(outputs_meta, list):
@@ -266,14 +299,16 @@ def receive_case(connection: Connection, *, device: str) -> ReferenceTimingCase:
         raise
     except Exception as exc:
         raise ReferenceProtocolError(
-            f"reference IPC tensor materialization failed on {device}"
+            f"reference IPC tensor materialization failed on {device}",
         ) from exc
     return ReferenceTimingCase(
         inputs=inputs,
         outputs=outputs,
         reference_latency_ms=float(latency),
         timing_failure=(
-            str(header["timing_failure"]) if header.get("timing_failure") else None
+            str(header["timing_failure"])
+            if header.get("timing_failure")
+            else None
         ),
     )
 
@@ -308,6 +343,7 @@ class ReferenceClient:
         device: str,
         worker_pid: int | None = None,
     ) -> None:
+        """Initialize a client over authenticated IPC connections."""
         self._reader = reader
         self._writer = writer
         self._token = token
@@ -316,8 +352,13 @@ class ReferenceClient:
         self._closed = False
 
     def correctness_case(
-        self, *, workload_uuid: str, row_index: int, round_index: int
+        self,
+        *,
+        workload_uuid: str,
+        row_index: int,
+        round_index: int,
     ) -> ReferenceCase:
+        """Request a fresh correctness case for one workload round."""
         response = self._request(
             "correctness",
             workload_uuid=workload_uuid,
@@ -327,8 +368,13 @@ class ReferenceClient:
         return ReferenceCase(inputs=response.inputs, outputs=response.outputs)
 
     def timing_case(
-        self, *, workload_uuid: str, row_index: int, round_index: int
+        self,
+        *,
+        workload_uuid: str,
+        row_index: int,
+        round_index: int,
     ) -> ReferenceTimingCase:
+        """Request a fresh timing case for one workload round."""
         return self._request(
             "timing",
             workload_uuid=workload_uuid,
@@ -351,10 +397,16 @@ class ReferenceClient:
         return receive_case(self._reader, device=self._device)
 
     def close(self) -> None:
+        """Shut down the reference worker and close both IPC connections."""
         if self._closed:
             return
         try:
-            with suppress(BrokenPipeError, EOFError, OSError, ReferenceProtocolError):
+            with suppress(
+                BrokenPipeError,
+                EOFError,
+                OSError,
+                ReferenceProtocolError,
+            ):
                 send_json(
                     self._writer,
                     {
@@ -369,10 +421,8 @@ class ReferenceClient:
             self._writer.close()
             self._reader.close()
             if self._worker_pid is not None:
-                try:
+                with suppress(ChildProcessError):
                     os.waitpid(self._worker_pid, 0)
-                except ChildProcessError:
-                    pass
 
 
 def connect_reference_worker(*, device: str) -> ReferenceClient:
@@ -382,7 +432,9 @@ def connect_reference_worker(*, device: str) -> ReferenceClient:
     token = os.environ.pop(REFERENCE_TOKEN_ENV, None)
     raw_pid = os.environ.pop(REFERENCE_PID_ENV, None)
     if request_fd is None or response_fd is None or not token:
-        raise ReferenceProtocolError("trusted reference worker is not configured")
+        raise ReferenceProtocolError(
+            "trusted reference worker is not configured",
+        )
     writer = Connection(int(request_fd), readable=False, writable=True)
     reader = Connection(int(response_fd), readable=True, writable=False)
     worker_pid = int(raw_pid) if raw_pid else None

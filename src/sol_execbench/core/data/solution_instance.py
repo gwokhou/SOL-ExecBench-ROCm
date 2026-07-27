@@ -18,18 +18,19 @@
 
 import hashlib
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from pydantic import ConfigDict, Field, PrivateAttr, field_validator, model_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    model_validator,
+)
 
-
-import hashlib
-from pathlib import Path
-from typing import Any, Optional
-
-from pydantic import ConfigDict, Field, PrivateAttr, model_validator
-
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings, NonEmptyString
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    NonEmptyString,
+)
 from sol_execbench.core.data.solution_models import BuildSpec, SourceFile
 
 
@@ -58,17 +59,18 @@ class Solution(BaseModelWithDocstrings):
     """Technical specifications for building and executing this solution."""
     sources: list[SourceFile] = Field(min_length=1)
     """Array of source code files representing the complete implementation."""
-    description: Optional[str] = Field(default=None)
+    description: str | None = Field(default=None)
     """Optional human-readable description of the solution's technique or approach."""
 
     @model_validator(mode="after")
     def _validate_source_path_entry_point(self) -> "Solution":
         """Validate source file paths for uniqueness and entry file existence.
 
-        Raises
+        Raises:
         ------
         ValueError
             If duplicate source file paths are found or the entry file is not found in the sources.
+
         """
         seen_paths = set()
         for source in self.sources:
@@ -80,7 +82,9 @@ class Solution(BaseModelWithDocstrings):
         entry_file = self.spec.entry_point.split("::")[0]
 
         if entry_file not in seen_paths:
-            raise ValueError(f"Entry source file '{entry_file}' not found in sources")
+            raise ValueError(
+                f"Entry source file '{entry_file}' not found in sources"
+            )
 
         return self
 
@@ -90,10 +94,11 @@ class Solution(BaseModelWithDocstrings):
         The entry point format is '{file_path}::{function_name}', and this method
         returns the file path component as a Path object.
 
-        Returns
+        Returns:
         -------
         Path
             The relative path to the entry source file (e.g., 'main.py', 'src/kernel.cu').
+
         """
         return Path(self.spec.entry_point.split("::")[0])
 
@@ -104,14 +109,16 @@ class Solution(BaseModelWithDocstrings):
         returns the function name component. This is the symbol that builders will
         look up in the compiled module or imported Python module.
 
-        Returns
+        Returns:
         -------
         str
             The function or symbol name to be loaded (e.g., 'run', 'forward', 'kernel').
+
         """
         return self.spec.entry_point.split("::")[-1]
 
     def model_post_init(self, __context: Any) -> None:
+        """Cache the deterministic content hash after model validation."""
         # Precompute hash once since the model is frozen/immutable.
         object.__setattr__(self, "_hash_cache", self._compute_hash())
 
@@ -148,18 +155,23 @@ class Solution(BaseModelWithDocstrings):
         The hash is used for caching build artifacts, allowing solutions with the same
         hash to reuse the same cached build result.
 
-        Returns
+        Returns:
         -------
         str
             A SHA1 hash (40 hex characters) uniquely identifying this solution's content.
+
         """
         return self._hash_cache
 
     def __hash__(self) -> int:  # pragma: no cover - trivial wrapper
+        """Return a native hash derived from the cached content digest."""
         # Use the memoized content hash for fast hashing in dict/set keys.
         return hash(self._hash_cache)
 
-    def __eq__(self, other: object) -> bool:  # pragma: no cover - trivial wrapper
+    def __eq__(
+        self, other: object
+    ) -> bool:  # pragma: no cover - trivial wrapper
+        """Compare solutions by their deterministic content digest."""
         if not isinstance(other, Solution):
             return NotImplemented
         return self._hash_cache == other._hash_cache

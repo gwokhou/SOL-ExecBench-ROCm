@@ -11,13 +11,15 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from sol_execbench.core.bench.rocm_profiler.models import ROCPROFV3_EXECUTABLE
-from sol_execbench.core.process.environment import ENV_SOL_EXECBENCH_GRACEFUL_EXIT
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_GRACEFUL_EXIT,
+)
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
-
 
 ProfilerRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 ProfileRunner = Callable[
-    [Sequence[str], Path | None, int | None], subprocess.CompletedProcess[str]
+    [Sequence[str], Path | None, int | None],
+    subprocess.CompletedProcess[str],
 ]
 
 

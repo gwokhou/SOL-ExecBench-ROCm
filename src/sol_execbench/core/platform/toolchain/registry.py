@@ -5,17 +5,16 @@
 
 from __future__ import annotations
 
-from .models import (
-    ToolLifecycle,
+from sol_execbench.core.platform.toolchain.models import (
     ToolchainArtifactType,
     ToolchainCapability,
     ToolchainEvidenceLevel,
+    ToolLifecycle,
 )
 
 
 def default_toolchain_registry() -> list[ToolchainCapability]:
     """Return the built-in ROCm toolchain capability registry."""
-
     return [
         *_profiling_capabilities(),
         *_repository_capabilities(),
@@ -136,79 +135,98 @@ def _runtime_capabilities() -> list[ToolchainCapability]:
 
 def _static_analysis_capabilities() -> list[ToolchainCapability]:
     """Return static code-object inspection and compiler-analysis capabilities."""
-
     return [
-        ToolchainCapability(
-            tool_id="readelf",
-            display_name="readelf",
-            lifecycle=ToolLifecycle.ACTIVE,
-            evidence_levels=[ToolchainEvidenceLevel.STATIC],
-            artifact_types=[
-                ToolchainArtifactType.ELF_OBJECT,
-                ToolchainArtifactType.ROCM_BINARY,
-                ToolchainArtifactType.STATIC_FUTURE,
-            ],
-            hardware_generations=["RDNA 4", "CDNA 3", "CDNA 4"],
-            gpu_arch_patterns=["gfx*"],
-            expected_binaries=["readelf"],
-            probe_command=["readelf", "--version"],
-            source_refs=["https://sourceware.org/binutils/docs/binutils/readelf.html"],
-            notes="Optional fallback for ELF metadata.",
-        ),
-        ToolchainCapability(
-            tool_id="llvm-objdump",
-            display_name="LLVM objdump",
-            lifecycle=ToolLifecycle.ACTIVE,
-            evidence_levels=[ToolchainEvidenceLevel.STATIC],
-            artifact_types=[
-                ToolchainArtifactType.ELF_OBJECT,
-                ToolchainArtifactType.ROCM_BINARY,
-                ToolchainArtifactType.STATIC_FUTURE,
-            ],
-            hardware_generations=["RDNA 4", "CDNA 3", "CDNA 4"],
-            gpu_arch_patterns=["gfx*"],
-            expected_binaries=["llvm-objdump"],
-            probe_command=["llvm-objdump", "--version"],
-            source_refs=["https://llvm.org/docs/CommandGuide/llvm-objdump.html"],
-            notes="Optional object inspection route.",
-        ),
-        ToolchainCapability(
-            tool_id="roc-objdump",
-            display_name="roc-objdump",
-            lifecycle=ToolLifecycle.CANDIDATE,
-            evidence_levels=[ToolchainEvidenceLevel.STATIC],
-            artifact_types=[
-                ToolchainArtifactType.ELF_OBJECT,
-                ToolchainArtifactType.ROCM_BINARY,
-                ToolchainArtifactType.STATIC_FUTURE,
-            ],
-            hardware_generations=["RDNA 4", "CDNA 3", "CDNA 4"],
-            gpu_arch_patterns=["gfx*"],
-            expected_binaries=["roc-objdump"],
-            probe_command=["roc-objdump", "--version"],
-            source_refs=[
-                "https://rocm.docs.amd.com/projects/HIP/en/develop/understand/compilers.html"
-            ],
-            notes="Distribution-dependent candidate for static evidence.",
-        ),
-        ToolchainCapability(
-            tool_id="rga",
-            display_name="Radeon GPU Analyzer",
-            lifecycle=ToolLifecycle.PLANNED,
-            evidence_levels=[ToolchainEvidenceLevel.STATIC],
-            artifact_types=[
-                ToolchainArtifactType.HIP_COMPILER_OUTPUT,
-                ToolchainArtifactType.ROCM_BINARY,
-                ToolchainArtifactType.STATIC_FUTURE,
-            ],
-            hardware_generations=["RDNA 4", "CDNA 3", "CDNA 4"],
-            gpu_arch_patterns=["gfx*"],
-            expected_binaries=["rga"],
-            probe_command=["rga", "--version"],
-            source_refs=[
-                "https://github.com/GPUOpen-Tools/radeon_gpu_analyzer",
-                "https://gpuopen.com/manuals/rga_manual/help_manual/",
-            ],
-            notes="Optional compiler-facing static evidence route.",
-        ),
+        _readelf_capability(),
+        _llvm_objdump_capability(),
+        _roc_objdump_capability(),
+        _rga_capability(),
     ]
+
+
+def _readelf_capability() -> ToolchainCapability:
+    return ToolchainCapability(
+        tool_id="readelf",
+        display_name="readelf",
+        lifecycle=ToolLifecycle.ACTIVE,
+        evidence_levels=[ToolchainEvidenceLevel.STATIC],
+        artifact_types=[
+            ToolchainArtifactType.ELF_OBJECT,
+            ToolchainArtifactType.ROCM_BINARY,
+            ToolchainArtifactType.STATIC_FUTURE,
+        ],
+        hardware_generations=["RDNA 4", "CDNA 3", "CDNA 4"],
+        gpu_arch_patterns=["gfx*"],
+        expected_binaries=["readelf"],
+        probe_command=["readelf", "--version"],
+        source_refs=[
+            "https://sourceware.org/binutils/docs/binutils/readelf.html",
+        ],
+        notes="Optional fallback for ELF metadata.",
+    )
+
+
+def _llvm_objdump_capability() -> ToolchainCapability:
+    return ToolchainCapability(
+        tool_id="llvm-objdump",
+        display_name="LLVM objdump",
+        lifecycle=ToolLifecycle.ACTIVE,
+        evidence_levels=[ToolchainEvidenceLevel.STATIC],
+        artifact_types=[
+            ToolchainArtifactType.ELF_OBJECT,
+            ToolchainArtifactType.ROCM_BINARY,
+            ToolchainArtifactType.STATIC_FUTURE,
+        ],
+        hardware_generations=["RDNA 4", "CDNA 3", "CDNA 4"],
+        gpu_arch_patterns=["gfx*"],
+        expected_binaries=["llvm-objdump"],
+        probe_command=["llvm-objdump", "--version"],
+        source_refs=[
+            "https://llvm.org/docs/CommandGuide/llvm-objdump.html",
+        ],
+        notes="Optional object inspection route.",
+    )
+
+
+def _roc_objdump_capability() -> ToolchainCapability:
+    return ToolchainCapability(
+        tool_id="roc-objdump",
+        display_name="roc-objdump",
+        lifecycle=ToolLifecycle.CANDIDATE,
+        evidence_levels=[ToolchainEvidenceLevel.STATIC],
+        artifact_types=[
+            ToolchainArtifactType.ELF_OBJECT,
+            ToolchainArtifactType.ROCM_BINARY,
+            ToolchainArtifactType.STATIC_FUTURE,
+        ],
+        hardware_generations=["RDNA 4", "CDNA 3", "CDNA 4"],
+        gpu_arch_patterns=["gfx*"],
+        expected_binaries=["roc-objdump"],
+        probe_command=["roc-objdump", "--version"],
+        source_refs=[
+            "https://rocm.docs.amd.com/projects/HIP/en/develop/understand/compilers.html",
+        ],
+        notes="Distribution-dependent candidate for static evidence.",
+    )
+
+
+def _rga_capability() -> ToolchainCapability:
+    return ToolchainCapability(
+        tool_id="rga",
+        display_name="Radeon GPU Analyzer",
+        lifecycle=ToolLifecycle.PLANNED,
+        evidence_levels=[ToolchainEvidenceLevel.STATIC],
+        artifact_types=[
+            ToolchainArtifactType.HIP_COMPILER_OUTPUT,
+            ToolchainArtifactType.ROCM_BINARY,
+            ToolchainArtifactType.STATIC_FUTURE,
+        ],
+        hardware_generations=["RDNA 4", "CDNA 3", "CDNA 4"],
+        gpu_arch_patterns=["gfx*"],
+        expected_binaries=["rga"],
+        probe_command=["rga", "--version"],
+        source_refs=[
+            "https://github.com/GPUOpen-Tools/radeon_gpu_analyzer",
+            "https://gpuopen.com/manuals/rga_manual/help_manual/",
+        ],
+        notes="Optional compiler-facing static evidence route.",
+    )

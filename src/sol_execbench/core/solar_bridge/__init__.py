@@ -3,6 +3,9 @@
 
 """Isolated outer-to-SOLAR bridge."""
 
-from .models import SolarAnalysisOutcome, SolarWorkerRequest
+from sol_execbench.core.solar_bridge.models import (
+    SolarAnalysisOutcome,
+    SolarWorkerRequest,
+)
 
 __all__ = ["SolarAnalysisOutcome", "SolarWorkerRequest"]

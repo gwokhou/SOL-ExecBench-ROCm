@@ -25,7 +25,9 @@ def test_alias_cycle_missing_dtype_and_effects_fail_closed():
                 "kind": "aten",
                 "target": "view",
                 "effects": {
-                    "aliases": [{"input": 9, "output": 0, "conditional": False}]
+                    "aliases": [
+                        {"input": 9, "output": 0, "conditional": False},
+                    ],
                 },
             },
             "tensor_names": {"inputs": ["input"], "outputs": ["bad"]},
@@ -45,7 +47,9 @@ def test_alias_cycle_missing_dtype_and_effects_fail_closed():
                 "kind": "aten",
                 "target": "view",
                 "effects": {
-                    "aliases": [{"input": 0, "output": 0, "conditional": False}]
+                    "aliases": [
+                        {"input": 0, "output": 0, "conditional": False},
+                    ],
                 },
             },
             "tensor_names": {"inputs": ["loop"], "outputs": ["loop"]},
@@ -66,12 +70,13 @@ def test_conditional_alias_is_not_treated_as_zero_copy():
                 "kind": "aten",
                 "target": "view",
                 "effects": {
-                    "aliases": [{"input": 0, "output": 0, "conditional": True}]
+                    "aliases": [{"input": 0, "output": 0, "conditional": True}],
                 },
             },
             "tensor_names": {"inputs": ["input"], "outputs": ["output"]},
         },
     }
     assert not contraction_operands_are_graph_external(
-        {"tensor_names": {"inputs": ["output"]}}, layers
+        {"tensor_names": {"inputs": ["output"]}},
+        layers,
     )

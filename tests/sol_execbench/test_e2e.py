@@ -41,6 +41,11 @@ from pathlib import Path
 
 import pytest
 import torch
+from sol_execbench_type_helpers import (
+    make_definition,
+    make_trace,
+    make_workload,
+)
 
 from sol_execbench.core import (
     BenchmarkConfig,
@@ -50,7 +55,6 @@ from sol_execbench.core import (
     Workload,
 )
 from sol_execbench.driver.problem_packager import ProblemPackager
-from sol_execbench_type_helpers import make_definition, make_trace, make_workload
 
 _SAMPLES_DIR = Path(__file__).parent / "samples"
 
@@ -211,12 +215,13 @@ _CPP_LANGUAGES = {"hip_cpp", "hipblas", "miopen", "ck", "rocwmma"}
 
 
 def _load_sample(
-    sample: str, solution_file: str
+    sample: str,
+    solution_file: str,
 ) -> tuple[Definition, Solution, list[Workload]]:
     """Load definition, solution, and workloads from a self-contained sample directory."""
     sample_dir = _SAMPLES_DIR / sample
     definition = make_definition(
-        **json.loads((sample_dir / "definition.json").read_text())
+        **json.loads((sample_dir / "definition.json").read_text()),
     )
     sol_dict = json.loads((sample_dir / solution_file).read_text())
     solution = Solution(**sol_dict)
@@ -287,10 +292,18 @@ def _mark_case(case: Sample) -> list:
 )
 def test_e2e(tmp_path: Path, case: Sample):
     """End-to-end evaluation: load sample -> package -> compile (if C++) -> execute -> assert PASSED."""
-    if case.test_id == "triton_ref_vecadd_python" and not torch.cuda.is_available():
-        pytest.skip("Triton JIT reference e2e requires an active CUDA/HIP driver")
+    if (
+        case.test_id == "triton_ref_vecadd_python"
+        and not torch.cuda.is_available()
+    ):
+        pytest.skip(
+            "Triton JIT reference e2e requires an active CUDA/HIP driver",
+        )
 
-    definition, solution, workloads = _load_sample(case.sample, case.solution_file)
+    definition, solution, workloads = _load_sample(
+        case.sample,
+        case.solution_file,
+    )
     config = BenchmarkConfig(lock_clocks=False)
 
     pkg = ProblemPackager(
@@ -343,7 +356,9 @@ def test_e2e(tmp_path: Path, case: Sample):
         assert trace.definition == definition.name
 
         ev = trace.evaluation
-        assert ev is not None, f"Trace missing evaluation (uuid={trace.workload.uuid})"
+        assert ev is not None, (
+            f"Trace missing evaluation (uuid={trace.workload.uuid})"
+        )
         assert ev.correctness is not None, (
             f"PASSED trace missing correctness (uuid={trace.workload.uuid})"
         )
@@ -411,7 +426,7 @@ def test_reward_hack_e2e(tmp_path: Path, case: EvilCase):
 
 
 # ---------------------------------------------------------------------------
-# CLI e2e test — runs `sol-execbench evaluate <problem_dir> --trace-output <output>`
+# CLI end-to-end evaluation with a trace-output artifact.
 # ---------------------------------------------------------------------------
 
 
@@ -425,7 +440,7 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
     if missing_inputs:
         pytest.skip(
             "GQA paged-decode safetensors inputs are not available locally: "
-            + ", ".join(str(path) for path in missing_inputs[:2])
+            + ", ".join(str(path) for path in missing_inputs[:2]),
         )
 
     output_file = tmp_path / "traces.jsonl"
@@ -460,7 +475,9 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
     for line in lines:
         trace = make_trace(**json.loads(line))
         ev = trace.evaluation
-        assert ev is not None, f"Workload {trace.workload.uuid} missing evaluation"
+        assert ev is not None, (
+            f"Workload {trace.workload.uuid} missing evaluation"
+        )
         assert ev.status == EvaluationStatus.PASSED, (
             f"Workload {trace.workload.uuid} did not pass: "
             f"status={ev.status} log={ev.log}"

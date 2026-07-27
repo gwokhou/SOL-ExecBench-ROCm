@@ -21,7 +21,9 @@ MANIFEST = REPO_ROOT / "problems" / "AMD_AKA" / "manifest.yaml"
 SOURCE_REVISION = "a" * 40
 
 
-def test_release_baseline_materializes_exact_scored_corpus(tmp_path: Path) -> None:
+def test_release_baseline_materializes_exact_scored_corpus(
+    tmp_path: Path,
+) -> None:
     workspace = materialize_release_baseline(
         MANIFEST,
         tmp_path / "release",
@@ -48,28 +50,35 @@ def test_release_baseline_materializes_exact_scored_corpus(tmp_path: Path) -> No
     assert {item.problem_path for item in baseline.problems} == expected
     assert baseline.role == ReleaseRunKind.BASELINE
     assert not (workspace / "rerun").exists()
-    assert sha256_file(workspace / "corpus" / "manifest.yaml") == sha256_file(MANIFEST)
+    assert sha256_file(workspace / "corpus" / "manifest.yaml") == sha256_file(
+        MANIFEST,
+    )
     solution = Solution.model_validate_json(
         (workspace / baseline.problems[0].implementation.path).read_text(
-            encoding="utf-8"
-        )
+            encoding="utf-8",
+        ),
     )
     source = solution.sources[0].content
     definition = next(
         entry
         for entry in corpus.entries
-        if entry.relative_problem_dir.as_posix() == baseline.problems[0].problem_path
+        if entry.relative_problem_dir.as_posix()
+        == baseline.problems[0].problem_path
     )
     definition_payload = Definition.model_validate_json(
         (
-            corpus.authored_root / definition.relative_problem_dir / "definition.json"
-        ).read_text(encoding="utf-8")
+            corpus.authored_root
+            / definition.relative_problem_dir
+            / "definition.json"
+        ).read_text(encoding="utf-8"),
     )
     assert source == definition_payload.reference
     assert "torch.compile" not in source
 
 
-def test_release_baseline_refuses_to_overwrite_workspace(tmp_path: Path) -> None:
+def test_release_baseline_refuses_to_overwrite_workspace(
+    tmp_path: Path,
+) -> None:
     output = tmp_path / "release"
     output.mkdir()
 

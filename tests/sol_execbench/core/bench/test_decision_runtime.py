@@ -10,7 +10,9 @@ from pathlib import Path
 from sol_execbench.core.bench.decision.decision_models import (
     DecisionBottleneckClass,
 )
-from sol_execbench.core.bench.decision.runtime import runtime_decision_precedence
+from sol_execbench.core.bench.decision.runtime import (
+    runtime_decision_precedence,
+)
 from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryHintCategory,
 )
@@ -48,14 +50,18 @@ def _result(
         skipped_reason="missing"
         if status is Rocprofv3ProfileStatus.UNAVAILABLE
         else None,
-        failed_reason="failed" if status is Rocprofv3ProfileStatus.FAILED else None,
+        failed_reason="failed"
+        if status is Rocprofv3ProfileStatus.FAILED
+        else None,
     )
 
 
-def test_missing_and_unavailable_profiles_have_no_precedence(tmp_path: Path) -> None:
+def test_missing_and_unavailable_profiles_have_no_precedence(
+    tmp_path: Path,
+) -> None:
     assert runtime_decision_precedence(None).available is False
     unavailable = runtime_decision_precedence(
-        _result(tmp_path, status=Rocprofv3ProfileStatus.UNAVAILABLE)
+        _result(tmp_path, status=Rocprofv3ProfileStatus.UNAVAILABLE),
     )
     assert unavailable.available is False
 
@@ -88,13 +94,13 @@ def test_lds_runtime_classification_supersedes_only_static_lds(
             tmp_path,
             status=Rocprofv3ProfileStatus.SUCCESS,
             metric="LDS_BANK_CONFLICT",
-        )
+        ),
     )
 
     assert precedence.available is True
     assert precedence.categories == (ProfileSummaryHintCategory.LDS_BOUND,)
     assert precedence.demoted_classes == frozenset(
-        {DecisionBottleneckClass.LDS_PRESSURE_HIGH}
+        {DecisionBottleneckClass.LDS_PRESSURE_HIGH},
     )
 
 
@@ -106,7 +112,7 @@ def test_compute_classification_is_runtime_context_not_a_static_conflict(
             tmp_path,
             status=Rocprofv3ProfileStatus.SUCCESS,
             metric="SQ_INSTS_VALU",
-        )
+        ),
     )
 
     assert precedence.available is True

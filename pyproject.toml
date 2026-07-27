@@ -96,8 +96,12 @@ show_missing = true
 skip_covered = false
 
 [tool.ruff]
-# Exclude generated code from linting and formatting
+# The formatter applies the Google 80-column target wherever Python can wrap
+# safely. E501 stays disabled for literal strings and unbreakable import/test
+# names, which the guide treats as practical exceptions.
 force-exclude = true
+line-length = 80
+target-version = "py312"
 exclude = [
     ".git",
     ".venv",
@@ -106,12 +110,57 @@ exclude = [
     "dist",
     "*.egg-info",
     ".ruff_cache",
-    "data",
-    "examples"
+    "/data",
+    "/examples",
 ]
 
 [tool.ruff.lint]
-ignore = ["E741"]
+extend-select = [
+    "ANN",
+    "B",
+    "BLE",
+    "C4",
+    "D",
+    "G",
+    "I",
+    "N",
+    "PIE",
+    "PLW2901",
+    "RUF012",
+    "RUF059",
+    "S101",
+    "SIM",
+    "TID",
+]
+ignore = [
+    "ANN401", # Dynamic external payload boundaries are inventoried separately.
+    "E741",   # Mathematical kernels use conventional short dimension names.
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"problems/**/reference.py" = [
+    "ANN",
+    "D103",
+    "N",
+]
+"tests/**/*.py" = [
+    "ANN",
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D107",
+    "N",
+    "S101",
+]
 
 [tool.ty.src]
 include = ["src", "tests"]

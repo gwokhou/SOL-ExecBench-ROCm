@@ -48,7 +48,9 @@ def test_explicit_dependency_observation_bypasses_local_collection() -> None:
     )
 
     def collect() -> PytorchDependencyObservation:
-        raise AssertionError("explicit observations must bypass local collection")
+        raise AssertionError(
+            "explicit observations must bypass local collection",
+        )
 
     result = build_dependency_observation(
         overrides,
@@ -62,7 +64,11 @@ def test_gpu_collector_discovers_rocm_device_and_normalizes_architecture(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(torch.cuda, "device_count", lambda: 2)
-    monkeypatch.setattr(torch.cuda, "get_device_name", lambda _index: "AMD Fixture")
+    monkeypatch.setattr(
+        torch.cuda,
+        "get_device_name",
+        lambda _index: "AMD Fixture",
+    )
     monkeypatch.setattr(
         torch.cuda,
         "get_device_properties",
@@ -93,5 +99,5 @@ def test_gpu_collector_tolerates_runtime_probe_failure(monkeypatch) -> None:
 
 def test_visible_device_collector_ignores_unrelated_variables() -> None:
     assert collect_visible_device_environment(
-        {"ROCR_VISIBLE_DEVICES": "0", "UNRELATED": "ignored"}
+        {"ROCR_VISIBLE_DEVICES": "0", "UNRELATED": "ignored"},
     ) == {"ROCR_VISIBLE_DEVICES": "0"}

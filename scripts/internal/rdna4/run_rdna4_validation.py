@@ -8,13 +8,16 @@ from __future__ import annotations
 
 import argparse
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 from sol_execbench.core.data.json_utils import atomic_write_json_value
-from sol_execbench.core.platform.environment import build_environment_diagnostics
+from sol_execbench.core.platform.environment import (
+    build_environment_diagnostics,
+)
 from sol_execbench.core.platform.rdna4_validation import (
+    Rdna4EnvironmentIdentity,
     build_validation_manifest,
     validate_environment_payload,
     verify_validation_directory,
@@ -53,7 +56,7 @@ def _prepare_output(path: Path) -> Path:
     return output
 
 
-def _collect_environment(output: Path):
+def _collect_environment(output: Path) -> Rdna4EnvironmentIdentity:
     diagnostics = build_environment_diagnostics().model_dump(mode="json")
     atomic_write_json_value(output / "environment-doctor.json", diagnostics)
     return validate_environment_payload(diagnostics)
@@ -153,6 +156,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run or verify the local RDNA4 validation bundle."""
     args = _parse_args(argv)
     if args.verify is not None:
         verify_validation_directory(
@@ -164,7 +168,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.timeout <= 0:
         raise ValueError("--timeout must be positive")
-    assert args.output_dir is not None
+    if args.output_dir is None:
+        raise ValueError("--output-dir is required unless --verify is used")
     return _run(args.output_dir, args.timeout)
 
 

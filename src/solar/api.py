@@ -31,9 +31,9 @@ from solar.contracts import (
     AnalysisRequest,
     AnalysisResult,
     ArtifactRef,
-    SolBound,
     SolarAnalysisStatus,
     SolarStage,
+    SolBound,
     write_request_manifest,
 )
 from solar.einsum.conversion import convert_operator_graph
@@ -45,7 +45,11 @@ from solar.readiness import (
     ReadinessStage,
     audit_conversion,
 )
-from solar.verification import VerificationError, verify_callable_conversion
+from solar.verification import (
+    VerificationError,
+    VerificationPolicy,
+    verify_callable_conversion,
+)
 
 
 def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
@@ -59,7 +63,9 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             f"exists: {output}",
         )
     output.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent),
+    )
     stage = SolarStage.ARCHITECTURE
     try:
         profile = ArchitectureProfile.load(request.architecture)
@@ -85,13 +91,15 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             reference_sha256=request.reference_sha256,
             graph_path=einsum.path,
             output_path=staging / "conversion-attestation.yaml",
-            atol=request.atol,
-            rtol=request.rtol,
-            required_matched_ratio=request.required_matched_ratio,
-            max_error_cap=request.max_error_cap,
-            allow_negative_inf=request.allow_negative_inf,
-            seeds=request.verification_seeds,
-            device=request.device,
+            policy=VerificationPolicy(
+                atol=request.atol,
+                rtol=request.rtol,
+                required_matched_ratio=request.required_matched_ratio,
+                max_error_cap=request.max_error_cap,
+                allow_negative_inf=request.allow_negative_inf,
+                seeds=request.verification_seeds,
+                device=request.device,
+            ),
         )
         stage = SolarStage.FORMAL_ANALYSIS
         analysis = _run_analysis(request, profile, staging)
@@ -114,13 +122,15 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             artifacts=artifacts,
             bound=bound,
         )
-    except Exception as exc:  # fail closed at the public boundary
+    except Exception as exc:  # noqa: BLE001 -- fail-closed public boundary
         shutil.rmtree(staging, ignore_errors=True)
         return _failure(request, stage, _reason_code(stage, exc), str(exc))
 
 
 def _run_analysis(
-    request: AnalysisRequest, profile: ArchitectureProfile, staging: Path
+    request: AnalysisRequest,
+    profile: ArchitectureProfile,
+    staging: Path,
 ) -> dict[str, Any]:
     runner = (
         OrojenesisRunner(request.orojenesis_home)
@@ -143,7 +153,8 @@ def _run_analysis(
 
 
 def _extract_bound(
-    analysis: Mapping[str, Any], require_orojenesis: bool = True
+    analysis: Mapping[str, Any],
+    require_orojenesis: bool = True,
 ) -> SolBound:
     if analysis.get("schema_version") != SOLAR_ANALYSIS_SCHEMA_VERSION:
         raise ValueError("formal analysis uses an unsupported schema")
@@ -151,12 +162,16 @@ def _extract_bound(
     metadata = analysis.get("metadata") or {}
     seconds = total.get("lower_bound_seconds")
     kind = str(metadata.get("bound_kind", ""))
-    if seconds is None or not math.isfinite(float(seconds)) or float(seconds) < 0:
+    if (
+        seconds is None
+        or not math.isfinite(float(seconds))
+        or float(seconds) < 0
+    ):
         raise ValueError("formal analysis lacks a finite lower bound")
     if require_orojenesis:
         if kind != FORMAL_BOUND_KIND:
             raise ValueError(
-                f"strict analysis returned non-tile-aware bound kind {kind!r}"
+                f"strict analysis returned non-tile-aware bound kind {kind!r}",
             )
     elif kind not in SOL_BOUND_KINDS:
         raise ValueError(f"analysis returned unsupported bound kind {kind!r}")
@@ -165,7 +180,8 @@ def _extract_bound(
 
 
 def _finish_artifacts(
-    staging: Path, analysis: dict[str, Any]
+    staging: Path,
+    analysis: dict[str, Any],
 ) -> tuple[ArtifactRef, ...]:
     metadata = analysis.get("metadata") or {}
     metadata["source_graph"] = "einsum_graph.yaml"
@@ -185,7 +201,10 @@ def _finish_artifacts(
 
 def _profile_hash(profile: ArchitectureProfile) -> str:
     encoded = json.dumps(
-        profile.to_dict(), sort_keys=True, separators=(",", ":"), default=str
+        profile.to_dict(),
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
     ).encode()
     return hashlib.sha256(encoded).hexdigest()
 

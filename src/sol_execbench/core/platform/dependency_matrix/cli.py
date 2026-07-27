@@ -8,6 +8,8 @@ from pathlib import Path
 
 from sol_execbench.core.arguments import (
     none_if_requested as _none_if_requested,
+)
+from sol_execbench.core.arguments import (
     parse_bool as _parse_bool,
 )
 from sol_execbench.core.platform.dependency_matrix.classification import (
@@ -33,7 +35,9 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     preflight = subparsers.add_parser("preflight")
     preflight.add_argument(
-        "--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST
+        "--manifest",
+        type=Path,
+        default=DEFAULT_DOCKER_TARGET_MANIFEST,
     )
     preflight.add_argument("--target")
     preflight.add_argument("--allow-mixed-version-debug", action="store_true")
@@ -76,9 +80,13 @@ def _observation_args_present(args: argparse.Namespace) -> bool:
     )
 
 
-def _observation_from_args(args: argparse.Namespace) -> PytorchDependencyObservation:
+def _observation_from_args(
+    args: argparse.Namespace,
+) -> PytorchDependencyObservation:
     return PytorchDependencyObservation(
-        torch_distribution_version=_none_if_requested(args.torch_distribution_version),
+        torch_distribution_version=_none_if_requested(
+            args.torch_distribution_version,
+        ),
         torch_version=_none_if_requested(args.torch_version),
         torch_local_version=_none_if_requested(args.torch_local_version),
         torch_rocm_target=_none_if_requested(args.torch_rocm_target),
@@ -87,14 +95,14 @@ def _observation_from_args(args: argparse.Namespace) -> PytorchDependencyObserva
         torch_device_available=args.torch_device_available,
         torch_import_error=_none_if_requested(args.torch_import_error),
         torchvision_distribution_version=_none_if_requested(
-            args.torchvision_distribution_version
+            args.torchvision_distribution_version,
         ),
         triton_rocm_distribution_version=_none_if_requested(
-            args.triton_rocm_distribution_version
+            args.triton_rocm_distribution_version,
         ),
         triton_rocm_status=_none_if_requested(args.triton_rocm_status),
         container_rocm_user_space_version=_none_if_requested(
-            args.container_rocm_user_space_version
+            args.container_rocm_user_space_version,
         ),
         hipcc_version=_none_if_requested(args.hipcc_version),
         toolchain_rocm_version=_none_if_requested(args.toolchain_rocm_version),
@@ -103,10 +111,12 @@ def _observation_from_args(args: argparse.Namespace) -> PytorchDependencyObserva
 
 def main(argv: list[str] | None = None) -> int:
     """Emit shell-consumable PyTorch ROCm dependency Matrix JSON."""
-
     args = _build_parser().parse_args(argv)
     if args.command == "preflight":
-        selection = select_docker_target(args.target, manifest_path=args.manifest)
+        selection = select_docker_target(
+            args.target,
+            manifest_path=args.manifest,
+        )
         policy = load_docker_target_dependency_policy(selection.target)
         observation = (
             _observation_from_args(args)

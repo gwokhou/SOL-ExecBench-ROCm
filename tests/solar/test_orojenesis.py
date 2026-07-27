@@ -11,7 +11,11 @@ from solar.analysis import orojenesis
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _write_toolchain(tmp_path: Path, *, archive_sha256: str) -> tuple[Path, str]:
+def _write_toolchain(
+    tmp_path: Path,
+    *,
+    archive_sha256: str,
+) -> tuple[Path, str]:
     mapper = tmp_path / "bin" / "timeloop-mapper"
     mapper.parent.mkdir()
     mapper.write_bytes(b"untrusted mapper")
@@ -33,7 +37,9 @@ def _write_toolchain(tmp_path: Path, *, archive_sha256: str) -> tuple[Path, str]
                 ),
                 "openssl": orojenesis.OROJENESIS_OPENSSL_BOOTSTRAP_SHA256,
             },
-            "compiler_wrapper_sha256": (orojenesis.OROJENESIS_COMPILER_WRAPPER_SHA256),
+            "compiler_wrapper_sha256": (
+                orojenesis.OROJENESIS_COMPILER_WRAPPER_SHA256
+            ),
             "builder_image": orojenesis.OROJENESIS_BUILDER_IMAGE,
             "package_source_mode": "snapshot_only",
             "ubuntu_snapshot": orojenesis.OROJENESIS_UBUNTU_SNAPSHOT,
@@ -42,22 +48,27 @@ def _write_toolchain(tmp_path: Path, *, archive_sha256: str) -> tuple[Path, str]
         },
     }
     (tmp_path / orojenesis.OROJENESIS_PROVENANCE_FILENAME).write_text(
-        json.dumps(provenance), encoding="utf-8"
+        json.dumps(provenance),
+        encoding="utf-8",
     )
     return tmp_path, mapper_sha256
 
 
 def test_self_declared_mapper_digest_is_not_a_trust_anchor(tmp_path):
     home, _ = _write_toolchain(
-        tmp_path, archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256
+        tmp_path,
+        archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256,
     )
 
-    with pytest.raises(orojenesis.OrojenesisError, match="artifact is not trusted"):
+    with pytest.raises(
+        orojenesis.OrojenesisError,
+        match="artifact is not trusted",
+    ):
         orojenesis.OrojenesisRunner(home)
 
 
 def test_current_release_has_no_trusted_mapper_artifact():
-    assert orojenesis.OROJENESIS_TRUSTED_MAPPER_SHA256 == frozenset()
+    assert frozenset() == orojenesis.OROJENESIS_TRUSTED_MAPPER_SHA256
 
 
 def test_compiler_wrapper_digest_matches_repository_file():
@@ -75,13 +86,19 @@ def test_provenance_must_match_pinned_source_archive(tmp_path, monkeypatch):
         frozenset({mapper_sha256}),
     )
 
-    with pytest.raises(orojenesis.OrojenesisError, match="source archive mismatch"):
+    with pytest.raises(
+        orojenesis.OrojenesisError,
+        match="source archive mismatch",
+    ):
         orojenesis.OrojenesisRunner(home)
 
 
 def test_runner_requires_configured_home(monkeypatch):
     monkeypatch.delenv("SOLAR_OROJENESIS_HOME", raising=False)
-    with pytest.raises(orojenesis.OrojenesisError, match="set --orojenesis-home"):
+    with pytest.raises(
+        orojenesis.OrojenesisError,
+        match="set --orojenesis-home",
+    ):
         orojenesis.OrojenesisRunner()
 
 
@@ -90,16 +107,24 @@ def test_runner_requires_executable_mapper(tmp_path):
         orojenesis.OrojenesisRunner(tmp_path)
 
 
-def test_valid_provenance_manifest_is_returned_as_identity(tmp_path, monkeypatch):
+def test_valid_provenance_manifest_is_returned_as_identity(
+    tmp_path,
+    monkeypatch,
+):
     home, mapper_sha256 = _write_toolchain(
-        tmp_path, archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256
+        tmp_path,
+        archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256,
     )
     monkeypatch.setattr(
-        orojenesis, "OROJENESIS_TRUSTED_MAPPER_SHA256", frozenset({mapper_sha256})
+        orojenesis,
+        "OROJENESIS_TRUSTED_MAPPER_SHA256",
+        frozenset({mapper_sha256}),
     )
     runner = orojenesis.OrojenesisRunner(home, timeout_seconds=17)
     assert runner.timeout_seconds == 17
-    assert runner.toolchain_identity["verification_mode"] == "provenance_manifest"
+    assert (
+        runner.toolchain_identity["verification_mode"] == "provenance_manifest"
+    )
     assert len(runner.toolchain_identity["provenance_sha256"]) == 64
 
 
@@ -111,7 +136,10 @@ def test_valid_provenance_manifest_is_returned_as_identity(tmp_path, monkeypatch
             lambda item: item["source"].update(repository="wrong"),
             "repository mismatch",
         ),
-        (lambda item: item["source"].update(commit="wrong"), "revision mismatch"),
+        (
+            lambda item: item["source"].update(commit="wrong"),
+            "revision mismatch",
+        ),
         (
             lambda item: item["source"].update(tree_git_oid="wrong"),
             "source tree mismatch",
@@ -141,7 +169,9 @@ def test_valid_provenance_manifest_is_returned_as_identity(tmp_path, monkeypatch
             "Ubuntu snapshot mismatch",
         ),
         (
-            lambda item: item["build"]["bootstrap_packages"].update(openssl="wrong"),
+            lambda item: item["build"]["bootstrap_packages"].update(
+                openssl="wrong",
+            ),
             "bootstrap package mismatch",
         ),
         (
@@ -152,17 +182,26 @@ def test_valid_provenance_manifest_is_returned_as_identity(tmp_path, monkeypatch
             lambda item: item["build"].update(source_date_epoch=0),
             "source epoch mismatch",
         ),
-        (lambda item: item["build"].update(compiler=""), "lacks build identity"),
+        (
+            lambda item: item["build"].update(compiler=""),
+            "lacks build identity",
+        ),
     ],
 )
 def test_provenance_manifest_rejects_identity_drift(
-    tmp_path, monkeypatch, mutation, message
+    tmp_path,
+    monkeypatch,
+    mutation,
+    message,
 ):
     home, mapper_sha256 = _write_toolchain(
-        tmp_path, archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256
+        tmp_path,
+        archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256,
     )
     monkeypatch.setattr(
-        orojenesis, "OROJENESIS_TRUSTED_MAPPER_SHA256", frozenset({mapper_sha256})
+        orojenesis,
+        "OROJENESIS_TRUSTED_MAPPER_SHA256",
+        frozenset({mapper_sha256}),
     )
     path = home / orojenesis.OROJENESIS_PROVENANCE_FILENAME
     provenance = json.loads(path.read_text(encoding="utf-8"))
@@ -175,27 +214,36 @@ def test_provenance_manifest_rejects_identity_drift(
 @pytest.mark.parametrize("content", ["not-json", "[]"])
 def test_provenance_manifest_must_be_an_object(tmp_path, monkeypatch, content):
     home, mapper_sha256 = _write_toolchain(
-        tmp_path, archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256
+        tmp_path,
+        archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256,
     )
     monkeypatch.setattr(
-        orojenesis, "OROJENESIS_TRUSTED_MAPPER_SHA256", frozenset({mapper_sha256})
+        orojenesis,
+        "OROJENESIS_TRUSTED_MAPPER_SHA256",
+        frozenset({mapper_sha256}),
     )
     (home / orojenesis.OROJENESIS_PROVENANCE_FILENAME).write_text(
-        content, encoding="utf-8"
+        content,
+        encoding="utf-8",
     )
     expected = "cannot parse" if content == "not-json" else "must be an object"
     with pytest.raises(orojenesis.OrojenesisError, match=expected):
         orojenesis.OrojenesisRunner(home)
 
 
-def test_missing_provenance_cannot_fall_back_to_git_checkout(tmp_path, monkeypatch):
+def test_missing_provenance_cannot_fall_back_to_git_checkout(
+    tmp_path,
+    monkeypatch,
+):
     mapper = tmp_path / "bin" / "timeloop-mapper"
     mapper.parent.mkdir()
     mapper.write_bytes(b"mapper")
     mapper.chmod(0o755)
     mapper_sha256 = hashlib.sha256(mapper.read_bytes()).hexdigest()
     monkeypatch.setattr(
-        orojenesis, "OROJENESIS_TRUSTED_MAPPER_SHA256", frozenset({mapper_sha256})
+        orojenesis,
+        "OROJENESIS_TRUSTED_MAPPER_SHA256",
+        frozenset({mapper_sha256}),
     )
 
     with pytest.raises(orojenesis.OrojenesisError, match="provenance manifest"):

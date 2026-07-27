@@ -43,16 +43,25 @@ def trace_make_fx_reference(
     try:
         graph_module = make_fx(tensor_reference)(*tensor_inputs.values())
         placeholders = [
-            node for node in graph_module.graph.nodes if node.op == "placeholder"
+            node
+            for node in graph_module.graph.nodes
+            if node.op == "placeholder"
         ]
         if len(placeholders) != len(tensor_indices):
-            raise RuntimeError("make_fx tensor input arity does not match reference")
+            raise RuntimeError(
+                "make_fx tensor input arity does not match reference",
+            )
         used = [
             (node, source_index)
-            for node, source_index in zip(placeholders, tensor_indices)
+            for node, source_index in zip(
+                placeholders, tensor_indices, strict=True
+            )
             if node.users
         ]
-        graph = ReferenceGraphSerializer().serialize_fx_reference(graph_module, name)
+        graph = ReferenceGraphSerializer().serialize_fx_reference(
+            graph_module,
+            name,
+        )
         for node, source_index in used:
             layer = graph["layers"].get(node.name)
             if layer is None:
@@ -60,7 +69,7 @@ def trace_make_fx_reference(
             layer["source_input_index"] = source_index
     except Exception as extraction_error:
         raise RuntimeError(
-            f"make_fx reference extraction failed: {extraction_error}"
+            f"make_fx reference extraction failed: {extraction_error}",
         ) from extraction_error
     operator_path = output / "operator_graph.yaml"
     operator_path.write_text(yaml.safe_dump(graph, sort_keys=False))

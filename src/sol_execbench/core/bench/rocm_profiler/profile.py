@@ -13,8 +13,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
-
 from sol_execbench.core.bench.rocm_profiler.artifacts import (
     PROFILE_OUTPUT_DIR_NAMES,
     discover_rocprofv3_artifacts,
@@ -40,8 +38,11 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
+)
+from sol_execbench.core.bench.rocm_profiler.models import (
     _tail as tail,
 )
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.text_utils import subprocess_text
 
 
@@ -63,7 +64,10 @@ def collect_rocprofv3_profile(
     if not rocprofv3_available:
         return _unavailable_result(request, command)
 
-    prepare_profile_output_directory(request.output_directory, request.output_file)
+    prepare_profile_output_directory(
+        request.output_directory,
+        request.output_file,
+    )
     run = runner or default_profile_runner
     try:
         completed = run(
@@ -77,7 +81,8 @@ def collect_rocprofv3_profile(
 
 
 def _unavailable_result(
-    request: Rocprofv3ProfileRequest, command: Sequence[str]
+    request: Rocprofv3ProfileRequest,
+    command: Sequence[str],
 ) -> Rocprofv3ProfileResult:
     return Rocprofv3ProfileResult(
         status=Rocprofv3ProfileStatus.UNAVAILABLE,
@@ -139,7 +144,12 @@ def _completed_profile_result(
     )
     if completed.returncode != 0:
         return _failed_command_result(request, command, completed, artifacts)
-    artifacts = _diagnostic_artifacts_when_empty(request, completed, command, artifacts)
+    artifacts = _diagnostic_artifacts_when_empty(
+        request,
+        completed,
+        command,
+        artifacts,
+    )
     if not artifacts:
         return _no_artifacts_result(request, command, completed)
     return _successful_profile_result(request, command, completed, artifacts)
@@ -184,7 +194,10 @@ def _diagnostic_artifacts_when_empty(
     if artifacts:
         return tuple(artifacts)
     write_rocprofv3_diagnostic_artifact(request, completed, command)
-    return discover_rocprofv3_artifacts(request.output_directory, request.output_file)
+    return discover_rocprofv3_artifacts(
+        request.output_directory,
+        request.output_file,
+    )
 
 
 def _no_artifacts_result(
@@ -263,12 +276,15 @@ def profile_result_metadata(
         "output_format": request.output_format,
         "profiler_data_artifacts": has_profiler_data_artifact(artifacts),
         "output_directory_listing": profile_output_directory_listing(
-            request.output_directory
+            request.output_directory,
         ),
     }
 
 
-def prepare_profile_output_directory(output_directory: Path, output_file: str) -> None:
+def prepare_profile_output_directory(
+    output_directory: Path,
+    output_file: str,
+) -> None:
     """Remove stale artifacts that would be registered for this profile run."""
     output_directory.mkdir(parents=True, exist_ok=True)
     for path in sorted(
@@ -277,7 +293,11 @@ def prepare_profile_output_directory(output_directory: Path, output_file: str) -
         reverse=True,
     ):
         if path.is_file():
-            if is_profile_artifact_candidate(path, output_directory, output_file):
+            if is_profile_artifact_candidate(
+                path,
+                output_directory,
+                output_file,
+            ):
                 path.unlink(missing_ok=True)
             continue
         if not path.is_dir():
@@ -321,7 +341,7 @@ def write_rocprofv3_diagnostic_artifact(
         "output_file": request.output_file,
         "output_format": request.output_format,
         "output_directory_listing": profile_output_directory_listing(
-            request.output_directory
+            request.output_directory,
         ),
         "stdout_tail": tail(completed.stdout or ""),
         "stderr_tail": tail(completed.stderr or ""),
@@ -331,7 +351,10 @@ def write_rocprofv3_diagnostic_artifact(
         ],
     }
     try:
-        path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+        path.write_text(
+            json.dumps(payload, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     except OSError:
         return None
     return path

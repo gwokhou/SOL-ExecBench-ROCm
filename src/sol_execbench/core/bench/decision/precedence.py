@@ -27,7 +27,6 @@ _RUNTIME_PRECEDENCE_NOTE = (
 
 def runtime_precedence_limitation() -> str:
     """Return the stable runtime-precedence limitation string."""
-
     return _RUNTIME_PRECEDENCE_NOTE
 
 
@@ -51,7 +50,6 @@ def apply_runtime_precedence(
     decides which classes a runtime profile supersedes. Unavailable sidecars and
     no-runtime cases are returned unchanged.
     """
-
     if not runtime_profile_available:
         return sidecar
     if sidecar.status == DiagnosticSidecarStatus.UNAVAILABLE:
@@ -61,7 +59,8 @@ def apply_runtime_precedence(
         limitations.append(_RUNTIME_PRECEDENCE_NOTE)
     demoted = demoted_classes or set()
     hints = []
-    for hint in sidecar.hints:
+    for original_hint in sidecar.hints:
+        hint = original_hint
         if (
             hint.bottleneck_class in demoted
             and hint.confidence != DecisionConfidence.INFERRED_LOW
@@ -73,7 +72,9 @@ def apply_runtime_precedence(
                 update={
                     "confidence": DecisionConfidence.INFERRED_LOW,
                     "limitations": hint_limitations,
-                }
+                },
             )
         hints.append(hint)
-    return sidecar.model_copy(update={"limitations": limitations, "hints": hints})
+    return sidecar.model_copy(
+        update={"limitations": limitations, "hints": hints},
+    )

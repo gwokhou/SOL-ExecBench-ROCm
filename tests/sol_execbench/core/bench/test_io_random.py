@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import pytest
 import torch
+from sol_execbench_type_helpers import make_definition, make_workload
 
 from sol_execbench.core.bench.io import _rand_tensor, gen_inputs
-from sol_execbench_type_helpers import make_definition, make_workload
 
 
 def _random_case():
@@ -58,7 +58,8 @@ class TestRandTensor:
 
     def test_float16(self) -> None:
         assert (
-            _rand_tensor([3], torch.float16, torch.device("cpu")).dtype == torch.float16
+            _rand_tensor([3], torch.float16, torch.device("cpu")).dtype
+            == torch.float16
         )
 
     def test_bfloat16(self) -> None:

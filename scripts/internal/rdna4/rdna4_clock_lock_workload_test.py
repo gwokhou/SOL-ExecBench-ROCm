@@ -18,6 +18,7 @@ OUTPUT_DIR = Path("out/rdna4-clock-lock-workload-20260609")
 
 
 def amd_smi(*args: str) -> str:
+    """Run a bounded AMD SMI query and return standard output."""
     executable = shutil.which("amd-smi") or "/opt/rocm/bin/amd-smi"
     result = subprocess.run(
         [executable, *args],
@@ -30,6 +31,7 @@ def amd_smi(*args: str) -> str:
 
 
 def log(label: str, content: str) -> None:
+    """Persist and print one labeled evidence fragment."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     safe = label.replace(" ", "_").replace("/", "_")
     path = OUTPUT_DIR / f"{safe}.txt"
@@ -41,6 +43,7 @@ def log(label: str, content: str) -> None:
 
 
 def run_gpu_workload(duration_sec: float = 45.0) -> None:
+    """Run sustained GEMM work while recording intermediate clock state."""
     import torch
 
     end = time.monotonic() + duration_sec
@@ -60,10 +63,14 @@ def run_gpu_workload(duration_sec: float = 45.0) -> None:
             print(f"  ... {i} iterations done, {remaining:.1f}s remaining")
     # Final sync
     torch.cuda.synchronize()
-    log("gpu_workload_end", f"Completed {i} GEMM iterations in {duration_sec}s\n")
+    log(
+        "gpu_workload_end",
+        f"Completed {i} GEMM iterations in {duration_sec}s\n",
+    )
 
 
 def main() -> None:
+    """Collect pre-, active-, and post-workload clock-lock evidence."""
     print("=" * 60)
     print("RDNA4 STABLE_PEAK Clock-Lock Workload Test")
     print(f"Output dir: {OUTPUT_DIR}")

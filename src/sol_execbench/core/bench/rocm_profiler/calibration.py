@@ -24,9 +24,9 @@ class CalibrationClockSetup(StrictArtifactModel):
 class Rocprofv3OverheadCalibration(StrictArtifactModel):
     """One current profiler-overhead calibration artifact."""
 
-    schema_version: Literal["sol_execbench.rocprofv3_overhead_calibration.v2"] = (
-        ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION
-    )
+    schema_version: Literal[
+        "sol_execbench.rocprofv3_overhead_calibration.v2"
+    ] = ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION
     generated_at: str
     baseline_median_ms: float
     profiler_median_ms: float

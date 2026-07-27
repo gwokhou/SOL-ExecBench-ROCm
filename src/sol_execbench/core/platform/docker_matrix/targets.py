@@ -11,6 +11,8 @@ from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,
     MatrixContainerEvidence,
+    MatrixEntry,
+    MatrixExecutionDecision,
     MatrixObservedEvidence,
     MatrixTarget,
     MatrixValidationScope,
@@ -29,14 +31,12 @@ def load_docker_target_manifest(
     path: str | Path = DEFAULT_DOCKER_TARGET_MANIFEST,
 ) -> DockerTargetManifest:
     """Load and validate the checked-in Docker Target manifest."""
-
     payload = json.loads(Path(path).read_text())
     return DockerTargetManifest.model_validate(payload)
 
 
 def to_matrix_target(target: DockerTargetManifestEntry) -> MatrixTarget:
     """Convert a declared Docker Target entry into the Phase 78 Matrix Target."""
-
     return MatrixTarget(
         target_id=target.target_id,
         requested_rocm_user_space_version=target.requested_rocm_user_space_version,
@@ -52,7 +52,6 @@ def docker_build_args_for_target(
     target: DockerTargetManifestEntry,
 ) -> dict[str, str]:
     """Return Dockerfile build args for the selected ROCm base image."""
-
     args = {
         "ROCM_DOCKER_IMAGE": target.docker_image_repository,
         "ROCM_DOCKER_TAG": target.docker_image_tag,
@@ -62,11 +61,17 @@ def docker_build_args_for_target(
         args.update(
             {
                 "PYTORCH_TORCH_VERSION": policy.get("torch_version", ""),
-                "PYTORCH_TORCHVISION_VERSION": policy.get("torchvision_version", ""),
+                "PYTORCH_TORCHVISION_VERSION": policy.get(
+                    "torchvision_version",
+                    "",
+                ),
                 "PYTORCH_ROCM_INDEX_URL": policy.get("uv_index_url", ""),
                 "TRITON_ROCM_VERSION": policy.get("triton_rocm_version", ""),
-                "TRITON_ROCM_INDEX_URL": policy.get("triton_rocm_index_url", ""),
-            }
+                "TRITON_ROCM_INDEX_URL": policy.get(
+                    "triton_rocm_index_url",
+                    "",
+                ),
+            },
         )
     return args
 
@@ -102,7 +107,7 @@ def _not_tested_selection(
                 image_repository=target.docker_image_repository,
                 image_tag=target.docker_image_tag,
                 image_digest=None,
-            )
+            ),
         ),
         status=MatrixCompatibilityStatus.NOT_TESTED,
         reason_code=MatrixCompatibilityReasonCode.TARGET_NOT_TESTED,
@@ -133,7 +138,6 @@ def select_docker_target(
     override_image_tag: str | None = None,
 ) -> DockerTargetSelection:
     """Select a declared Docker Target or an explicit unsafe/untested override."""
-
     manifest = load_docker_target_manifest(manifest_path)
     selected_id = target_id or manifest.default_target_id
     target = manifest.targets_by_id.get(selected_id)
@@ -143,12 +147,12 @@ def select_docker_target(
     if not allow_unknown_override:
         raise ValueError(
             f"Unknown Docker Target {selected_id!r}; choose a declared Target or "
-            "pass an explicit unsafe/untested override."
+            "pass an explicit unsafe/untested override.",
         )
     if not override_image_repository or not override_image_tag:
         raise ValueError(
             "Unknown Docker Target overrides require override_image_repository "
-            "and override_image_tag."
+            "and override_image_tag.",
         )
 
     override_target = _unsafe_override_entry(
@@ -167,7 +171,9 @@ def select_docker_target(
     )
 
 
-def _selection_entry_for_preview(selection: DockerTargetSelection):
+def _selection_entry_for_preview(
+    selection: DockerTargetSelection,
+) -> tuple[MatrixEntry, MatrixExecutionDecision]:
     if selection.entry is not None and selection.decision is not None:
         return selection.entry, selection.decision
     preview_selection = _not_tested_selection(
@@ -179,8 +185,8 @@ def _selection_entry_for_preview(selection: DockerTargetSelection):
         ),
         unknown_override=False,
     )
-    assert preview_selection.entry is not None
-    assert preview_selection.decision is not None
+    if preview_selection.entry is None or preview_selection.decision is None:
+        raise RuntimeError("preview selection omitted its diagnostic decision")
     return preview_selection.entry, preview_selection.decision
 
 
@@ -194,7 +200,6 @@ def preview_docker_target_selection(
     image_digest: str | None = None,
 ) -> dict[str, Any]:
     """Return shell-consumable JSON data for Docker Target selection."""
-
     selection = select_docker_target(
         target_id,
         manifest_path=manifest_path,

@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from io import BytesIO
 import hashlib
 import zipfile
+from io import BytesIO
 
 import pytest
 
@@ -25,7 +25,7 @@ def _entry(payload: bytes) -> dict[str, object]:
             "rdna4": {
                 "name": "amdgpu_isa_rdna4.xml",
                 "sha256": hashlib.sha256(payload).hexdigest(),
-            }
+            },
         },
     }
 
@@ -42,7 +42,8 @@ def test_unknown_architecture_is_explicitly_unavailable() -> None:
 
 
 def test_repository_downloads_once_and_checks_extracted_files(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     payload = b"<isa>fixture</isa>"
     entry = _entry(payload)
@@ -56,7 +57,10 @@ def test_repository_downloads_once_and_checks_extracted_files(
         calls += 1
         return BytesIO(archive.getvalue())
 
-    monkeypatch.setattr("sol_execbench.tools.amd_isa.repository.urlopen", open_fixture)
+    monkeypatch.setattr(
+        "sol_execbench.tools.amd_isa.repository.urlopen",
+        open_fixture,
+    )
     repository = IsaSpecRepository(cache_root=tmp_path / "cache")
     repository._releases = {"fixture": entry}
     repository._default_release = "fixture"
@@ -74,7 +78,8 @@ def test_offline_repository_never_downloads(tmp_path) -> None:
 
 
 def test_resolved_spec_carries_release_family_and_checksum(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     payload = b"<isa>fixture</isa>"
     entry = _entry(payload)

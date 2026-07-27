@@ -13,7 +13,7 @@ import sys
 import threading
 import time
 from collections import deque
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Protocol
@@ -36,7 +36,9 @@ class TextSubprocessRunner(Protocol):
         text: bool,
         timeout: float | None,
         env: Mapping[str, str],
-    ) -> subprocess.CompletedProcess[str]: ...
+    ) -> subprocess.CompletedProcess[str]:
+        """Run a text subprocess and return its completed result."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -67,10 +69,8 @@ def run_in_process_group(
     cwd: str | os.PathLike[str] | None = None,
     env: Mapping[str, str] | None = None,
     timeout: float | None = None,
-    preexec_fn: Callable[[], None] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run *command* and kill every descendant if its timeout expires."""
-
     process = subprocess.Popen(
         list(command),
         cwd=cwd,
@@ -79,12 +79,14 @@ def run_in_process_group(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=True,
-        preexec_fn=preexec_fn,
     )
     try:
         stdout, stderr = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired as exc:
-        assert timeout is not None
+        if timeout is None:
+            raise RuntimeError(
+                "subprocess reported a timeout without a timeout limit"
+            ) from exc
         _terminate_process_group(process)
         stdout, stderr = process.communicate()
         raise subprocess.TimeoutExpired(
@@ -94,7 +96,10 @@ def run_in_process_group(
             stderr=stderr or exc.stderr,
         ) from exc
     return subprocess.CompletedProcess(
-        list(command), process.returncode, stdout, stderr
+        list(command),
+        process.returncode,
+        stdout,
+        stderr,
     )
 
 
@@ -129,7 +134,10 @@ def run_in_process_group_to_files(
         except BaseException:
             _terminate_unreaped_process_group(process)
             raise
-        _wait_for_process_group_members(process.pid, _PROCESS_GROUP_GRACE_SECONDS)
+        _wait_for_process_group_members(
+            process.pid,
+            _PROCESS_GROUP_GRACE_SECONDS,
+        )
         _cleanup_unreaped_process_group(process, ())
         return_code = process.wait()
     return subprocess.CompletedProcess(list(command), return_code, None, None)
@@ -163,7 +171,10 @@ def run_attached_process_group(
             return_code = process.wait(timeout=timeout)
         else:
             _wait_for_exit_without_reaping(process, timeout)
-            _wait_for_process_group_members(process.pid, _PROCESS_GROUP_GRACE_SECONDS)
+            _wait_for_process_group_members(
+                process.pid,
+                _PROCESS_GROUP_GRACE_SECONDS,
+            )
             _cleanup_unreaped_process_group(process, ())
             return_code = process.wait()
     except subprocess.TimeoutExpired as exc:
@@ -200,8 +211,9 @@ def run_in_process_group_bounded(
         stderr=subprocess.PIPE,
         start_new_session=True,
     )
-    assert process.stdout is not None
-    assert process.stderr is not None
+    if process.stdout is None or process.stderr is None:
+        _terminate_process_group(process)
+        raise RuntimeError("subprocess capture pipes were not created")
     stdout_capture = _TailCapture(max_capture_bytes)
     stderr_capture = _TailCapture(max_capture_bytes)
     workers = (
@@ -225,7 +237,10 @@ def run_in_process_group_bounded(
     _cleanup_unreaped_process_group(process, workers)
     return_code = process.wait()
     return subprocess.CompletedProcess(
-        list(command), return_code, stdout_capture.text(), stderr_capture.text()
+        list(command),
+        return_code,
+        stdout_capture.text(),
+        stderr_capture.text(),
     )
 
 
@@ -263,7 +278,10 @@ class _CaptureWorker:
     stop: threading.Event
 
 
-def _start_capture_thread(stream: IO[bytes], capture: _TailCapture) -> _CaptureWorker:
+def _start_capture_thread(
+    stream: IO[bytes],
+    capture: _TailCapture,
+) -> _CaptureWorker:
     stop = threading.Event()
 
     def drain() -> None:
@@ -284,7 +302,10 @@ def _start_capture_thread(stream: IO[bytes], capture: _TailCapture) -> _CaptureW
     return _CaptureWorker(thread=thread, stop=stop)
 
 
-def _join_capture_threads(workers: tuple[_CaptureWorker, ...], timeout: float) -> bool:
+def _join_capture_threads(
+    workers: tuple[_CaptureWorker, ...],
+    timeout: float,
+) -> bool:
     deadline = time.monotonic() + timeout
     for worker in workers:
         worker.thread.join(timeout=max(0.0, deadline - time.monotonic()))
@@ -298,7 +319,8 @@ def _stop_capture_threads(workers: tuple[_CaptureWorker, ...]) -> None:
 
 
 def _wait_for_exit_without_reaping(
-    process: subprocess.Popen[bytes] | subprocess.Popen[str], timeout: float | None
+    process: subprocess.Popen[bytes] | subprocess.Popen[str],
+    timeout: float | None,
 ) -> None:
     """Observe leader exit while retaining its PID/session identity for cleanup."""
     if timeout is None:
@@ -314,7 +336,8 @@ def _wait_for_exit_without_reaping(
 
 
 def _signal_unreaped_process_group(
-    process: subprocess.Popen[bytes] | subprocess.Popen[str], signal_number: int
+    process: subprocess.Popen[bytes] | subprocess.Popen[str],
+    signal_number: int,
 ) -> bool:
     """Signal only the session still anchored by this unreaped leader."""
     if process.returncode is not None:
@@ -348,14 +371,23 @@ def _cleanup_unreaped_process_group(
 ) -> None:
     if _process_group_has_live_members(process.pid):
         _signal_unreaped_process_group(process, signal.SIGTERM)
-        _wait_for_process_group_members(process.pid, _PROCESS_GROUP_GRACE_SECONDS)
+        _wait_for_process_group_members(
+            process.pid,
+            _PROCESS_GROUP_GRACE_SECONDS,
+        )
     if _process_group_has_live_members(process.pid):
         _signal_unreaped_process_group(process, signal.SIGKILL)
-        _wait_for_process_group_members(process.pid, _PROCESS_GROUP_GRACE_SECONDS)
+        _wait_for_process_group_members(
+            process.pid,
+            _PROCESS_GROUP_GRACE_SECONDS,
+        )
     _stop_capture_threads(workers)
 
 
-def _wait_for_process_group_members(process_group_id: int, timeout: float) -> bool:
+def _wait_for_process_group_members(
+    process_group_id: int,
+    timeout: float,
+) -> bool:
     deadline = time.monotonic() + timeout
     while _process_group_has_live_members(process_group_id):
         remaining = deadline - time.monotonic()
@@ -372,7 +404,11 @@ def _process_group_has_live_members(process_group_id: int) -> bool:
         try:
             raw = (entry / "stat").read_text()
             fields = raw[raw.rfind(")") + 2 :].split()
-            state, process_group, session = fields[0], int(fields[2]), int(fields[3])
+            state, process_group, session = (
+                fields[0],
+                int(fields[2]),
+                int(fields[3]),
+            )
         except (OSError, IndexError, ValueError):
             continue
         if (
@@ -390,7 +426,6 @@ def _terminate_process_group(
     drain_output: bool = True,
 ) -> None:
     """Terminate a session leader and its descendants, escalating if needed."""
-
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:

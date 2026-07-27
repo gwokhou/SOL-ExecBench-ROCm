@@ -81,17 +81,21 @@ class AnalysisRequest:
     allow_negative_inf: bool = False
 
     def __post_init__(self) -> None:
+        """Validate request identity, paths, and analysis options."""
         if not self.analysis_id.strip() or not self.reference_name.strip():
             raise ValueError("analysis_id and reference_name must be non-empty")
         if len(self.reference_sha256) != 64 or any(
-            character not in "0123456789abcdef" for character in self.reference_sha256
+            character not in "0123456789abcdef"
+            for character in self.reference_sha256
         ):
             raise ValueError("reference_sha256 must be a lowercase SHA-256")
         values = [self.atol, self.rtol, self.required_matched_ratio]
         if self.max_error_cap is not None:
             values.append(self.max_error_cap)
         if not all(math.isfinite(value) and value >= 0 for value in values):
-            raise ValueError("verification tolerances must be finite and non-negative")
+            raise ValueError(
+                "verification tolerances must be finite and non-negative",
+            )
         if self.required_matched_ratio > 1:
             raise ValueError("required_matched_ratio cannot exceed one")
 
@@ -187,7 +191,8 @@ def write_request_manifest(
         "sol_score_eligible": bound.kind in SOL_BOUND_KINDS,
         "publication_eligible": bound.kind == formal_bound_kind,
         "artifacts": [
-            {"path": artifact.path, "sha256": artifact.sha256} for artifact in artifacts
+            {"path": artifact.path, "sha256": artifact.sha256}
+            for artifact in artifacts
         ],
         "bound": {
             "seconds": bound.seconds,
@@ -195,7 +200,9 @@ def write_request_manifest(
             "limiting_resource": bound.limiting_resource,
         },
     }
-    (staging / "manifest.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False))
+    (staging / "manifest.yaml").write_text(
+        yaml.safe_dump(manifest, sort_keys=False),
+    )
 
 
 __all__ = [

@@ -24,7 +24,7 @@ def _contract() -> tuple[Definition, Workload]:
                     "shape": ["N"],
                     "dtype": "float32",
                     "description": "input",
-                }
+                },
             },
             "outputs": {
                 "first": {
@@ -39,14 +39,14 @@ def _contract() -> tuple[Definition, Workload]:
                 },
             },
             "reference": "def run(x):\n    return x, x.half()\n",
-        }
+        },
     )
     workload = Workload.model_validate(
         {
             "axes": {"N": 4},
             "inputs": {"x": {"type": "random"}},
             "uuid": "all-output-check",
-        }
+        },
     )
     return definition, workload
 
@@ -64,7 +64,10 @@ def test_normalize_outputs_checks_every_declared_output():
         source="test",
     )
 
-    assert [output.dtype for output in outputs] == [torch.float32, torch.float16]
+    assert [output.dtype for output in outputs] == [
+        torch.float32,
+        torch.float16,
+    ]
 
 
 def test_normalize_outputs_rejects_dtype_mismatch_in_later_output():

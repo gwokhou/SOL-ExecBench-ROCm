@@ -24,30 +24,33 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any, Optional
+from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShape, TensorShapes
 
 
 class EmbeddingHandler(EinsumOpHandler):
     """Handler for embedding operations."""
 
-    supported_ops = ["embedding"]
+    supported_ops = ("embedding",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for embedding lookup."""
         if tensor_shapes.num_inputs < 2:
             raise ValueError(
                 f"Embedding requires 2 inputs (indices, weight). "
-                f"Got {tensor_shapes.num_inputs}"
+                f"Got {tensor_shapes.num_inputs}",
             )
 
         input_shape = tensor_shapes.inputs[0]
@@ -56,7 +59,9 @@ class EmbeddingHandler(EinsumOpHandler):
         return self._generate_embedding_einsum(input_shape, weight_shape)
 
     def _generate_embedding_einsum(
-        self, indices_shape: TensorShape, weight_shape: TensorShape
+        self,
+        indices_shape: TensorShape,
+        weight_shape: TensorShape,
     ) -> EinsumOp:
         """Generate einsum for embedding lookup.
 
@@ -87,14 +92,19 @@ class EmbeddingHandler(EinsumOpHandler):
 class GRUHandler(EinsumOpHandler):
     """Handler for GRU operations."""
 
-    supported_ops = ["gru"]
+    supported_ops = ("gru",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for GRU."""
         input_shape = (
-            tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else [1, 1, 64]
+            tensor_shapes.inputs[0]
+            if tensor_shapes.num_inputs > 0
+            else [1, 1, 64]
         )
         hidden = (
             tensor_shapes.inputs[1]
@@ -106,7 +116,11 @@ class GRUHandler(EinsumOpHandler):
             if tensor_shapes.num_inputs > 2
             else [192, input_shape[-1]]
         )
-        w_hh = tensor_shapes.inputs[3] if tensor_shapes.num_inputs > 3 else [192, 64]
+        w_hh = (
+            tensor_shapes.inputs[3]
+            if tensor_shapes.num_inputs > 3
+            else [192, 64]
+        )
 
         return self._generate_gru_einsum(input_shape, hidden, w_ih, w_hh)
 
@@ -144,27 +158,38 @@ class GRUHandler(EinsumOpHandler):
 class LSTMHandler(EinsumOpHandler):
     """Handler for LSTM operations."""
 
-    supported_ops = ["lstm"]
+    supported_ops = ("lstm",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for LSTM."""
         input_shape = (
-            tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else [1, 1, 64]
+            tensor_shapes.inputs[0]
+            if tensor_shapes.num_inputs > 0
+            else [1, 1, 64]
         )
         hidden = (
             tensor_shapes.inputs[1]
             if tensor_shapes.num_inputs > 1
             else [1, input_shape[1], 64]
         )
-        cell = tensor_shapes.inputs[2] if tensor_shapes.num_inputs > 2 else hidden
+        cell = (
+            tensor_shapes.inputs[2] if tensor_shapes.num_inputs > 2 else hidden
+        )
         w_ih = (
             tensor_shapes.inputs[3]
             if tensor_shapes.num_inputs > 3
             else [256, input_shape[-1]]
         )
-        w_hh = tensor_shapes.inputs[4] if tensor_shapes.num_inputs > 4 else [256, 64]
+        w_hh = (
+            tensor_shapes.inputs[4]
+            if tensor_shapes.num_inputs > 4
+            else [256, 64]
+        )
 
         return self._generate_lstm_einsum(input_shape, hidden, cell, w_ih, w_hh)
 
@@ -204,13 +229,20 @@ class LSTMHandler(EinsumOpHandler):
 class RNNHandler(EinsumOpHandler):
     """Handler for basic RNN operations."""
 
-    supported_ops = ["rnn"]
+    supported_ops = ("rnn",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for basic RNN."""
-        (tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else [1, 1, 64])
+        (
+            tensor_shapes.inputs[0]
+            if tensor_shapes.num_inputs > 0
+            else [1, 1, 64]
+        )
 
         operands = [
             EinsumOperand("Input", ["S", "B", "I"], is_output=False),
@@ -234,14 +266,19 @@ class RNNHandler(EinsumOpHandler):
 class CrossEntropyHandler(EinsumOpHandler):
     """Handler for cross-entropy loss."""
 
-    supported_ops = ["cross_entropy", "crossentropy", "nll_loss", "nllloss"]
+    supported_ops = ("cross_entropy", "crossentropy", "nll_loss", "nllloss")
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for cross-entropy loss."""
         pred = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
-        target = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        target = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
 
         if pred is None:
             raise ValueError(f"Missing predictions shape for {op_name}")
@@ -256,24 +293,23 @@ class CrossEntropyHandler(EinsumOpHandler):
     def _generate_cross_entropy_einsum(
         self,
         predictions_shape: TensorShape,
-        targets_shape: Optional[TensorShape],
+        targets_shape: TensorShape | None,
         reduction: str = "mean",
     ) -> EinsumOp:
         """Generate einsum for cross-entropy loss."""
         dims = len(predictions_shape)
         labels = string.ascii_uppercase[:dims]
 
-        # Output depends on reduction
-        if reduction == "none":
-            out_labels = labels[0]  # batch dim only
-        else:
-            out_labels = ""  # scalar output
+        # Unreduced output retains only the batch dimension.
+        out_labels = labels[0] if reduction == "none" else ""
 
         operands = [
             EinsumOperand("Input", list(labels), is_output=False),
             EinsumOperand("Target", [labels[0]], is_output=False),
             EinsumOperand(
-                "Output", list(out_labels) if out_labels else [], is_output=True
+                "Output",
+                list(out_labels) if out_labels else [],
+                is_output=True,
             ),
         ]
 
@@ -297,7 +333,7 @@ class PairwiseLossHandler(EinsumOpHandler):
     and produce a scalar output (when reduction='mean' or 'sum').
     """
 
-    supported_ops = [
+    supported_ops = (
         "mse_loss",
         "l1_loss",
         "smooth_l1_loss",
@@ -305,15 +341,22 @@ class PairwiseLossHandler(EinsumOpHandler):
         "binary_cross_entropy",
         "kl_div",
         "cosine_embedding_loss",
-    ]
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for pairwise loss."""
         pred = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
-        target = tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
-        output = tensor_shapes.outputs[0] if tensor_shapes.num_outputs > 0 else None
+        target = (
+            tensor_shapes.inputs[1] if tensor_shapes.num_inputs > 1 else None
+        )
+        output = (
+            tensor_shapes.outputs[0] if tensor_shapes.num_outputs > 0 else None
+        )
 
         if pred is None:
             raise ValueError(f"Missing predictions shape for {op_name}")
@@ -324,12 +367,17 @@ class PairwiseLossHandler(EinsumOpHandler):
         if output is not None and len(output) > 0:
             reduction = "none"
 
-        return self._generate_pairwise_loss_einsum(pred, target, reduction, op_name)
+        return self._generate_pairwise_loss_einsum(
+            pred,
+            target,
+            reduction,
+            op_name,
+        )
 
     def _generate_pairwise_loss_einsum(
         self,
         predictions_shape: TensorShape,
-        targets_shape: Optional[TensorShape],
+        targets_shape: TensorShape | None,
         reduction: str,
         op_name: str,
     ) -> EinsumOp:
@@ -340,17 +388,16 @@ class PairwiseLossHandler(EinsumOpHandler):
         # Second input has same shape
         target_labels = labels
 
-        # Output depends on reduction
-        if reduction == "none":
-            out_labels = labels  # same shape as input
-        else:
-            out_labels = ""  # scalar output
+        # Unreduced output retains the input shape.
+        out_labels = labels if reduction == "none" else ""
 
         operands = [
             EinsumOperand("Input", list(labels), is_output=False),
             EinsumOperand("Target", list(target_labels), is_output=False),
             EinsumOperand(
-                "Output", list(out_labels) if out_labels else [], is_output=True
+                "Output",
+                list(out_labels) if out_labels else [],
+                is_output=True,
             ),
         ]
 
@@ -364,7 +411,8 @@ class PairwiseLossHandler(EinsumOpHandler):
             equation=equation,
             name=op_name,
             is_real_einsum=False,
-            elementwise_op=normalized_op,  # e.g., "mse", "l1", "smoothl1", "huber"
+            # Examples include mse, l1, smoothl1, and huber.
+            elementwise_op=normalized_op,
             reduction_op="add" if reduction != "none" else "none",
         )
 
@@ -372,7 +420,7 @@ class PairwiseLossHandler(EinsumOpHandler):
 class TrivialOpsHandler(EinsumOpHandler):
     """Handler for trivial/identity operations."""
 
-    supported_ops = [
+    supported_ops = (
         "clone",
         "detach",
         "copy_",
@@ -387,10 +435,13 @@ class TrivialOpsHandler(EinsumOpHandler):
         "pad",
         "unfold",
         "fold",
-    ]
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for trivial operations."""
         if tensor_shapes.num_inputs < 1:
@@ -401,7 +452,9 @@ class TrivialOpsHandler(EinsumOpHandler):
         return self._generate_identity_einsum(input_shape, op_name)
 
     def _generate_identity_einsum(
-        self, input_shape: TensorShape, op_name: str
+        self,
+        input_shape: TensorShape,
+        op_name: str,
     ) -> EinsumOp:
         """Generate identity einsum."""
         dims = len(input_shape)

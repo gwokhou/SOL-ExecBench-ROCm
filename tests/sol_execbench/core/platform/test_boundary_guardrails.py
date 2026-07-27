@@ -3,7 +3,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SRC_ROOT = REPO_ROOT / "src" / "sol_execbench"
 
@@ -25,15 +24,20 @@ HIP_AGENT_SEMANTICS = [
 
 
 def _source_files() -> list[Path]:
-    return [path for path in SRC_ROOT.rglob("*.py") if "__pycache__" not in path.parts]
+    return [
+        path
+        for path in SRC_ROOT.rglob("*.py")
+        if "__pycache__" not in path.parts
+    ]
 
 
 def _imports_hip_agent(path: Path) -> bool:
     tree = ast.parse(path.read_text(), filename=str(path))
     for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            if any(alias.name == "hip_agent" for alias in node.names):
-                return True
+        if isinstance(node, ast.Import) and any(
+            alias.name == "hip_agent" for alias in node.names
+        ):
+            return True
         if isinstance(node, ast.ImportFrom) and node.module == "hip_agent":
             return True
     return False

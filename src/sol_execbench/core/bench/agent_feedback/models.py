@@ -107,7 +107,9 @@ class AgentFeedbackSidecar(DiagnosticSidecarEnvelope):
     items: list[AgentFeedbackItem] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     source_refs: list[DiagnosticSourceRef] = Field(default_factory=list)
-    artifact_citations: list[DiagnosticArtifactCitation] = Field(default_factory=list)
+    artifact_citations: list[DiagnosticArtifactCitation] = Field(
+        default_factory=list,
+    )
 
     def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible sidecar payload."""

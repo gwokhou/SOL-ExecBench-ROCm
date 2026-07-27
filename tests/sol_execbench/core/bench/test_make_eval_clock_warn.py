@@ -55,7 +55,8 @@ class TestClockStatusMessage:
     def test_status_msg_with_extra_msg(self):
         """Status message is prepended before extra_msg."""
         ev = _make_eval_with_status(
-            "Clocks locked: yes", extra_msg="Timing failed: OOM"
+            "Clocks locked: yes",
+            extra_msg="Timing failed: OOM",
         )
         assert ev.log == "Clocks locked: yes\nTiming failed: OOM"
 
@@ -72,7 +73,9 @@ class TestClockLockValidation:
         import os
 
         cfg = BenchmarkConfig(lock_clocks=True)
-        clocks_locked = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
+        clocks_locked = (
+            os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
+        )
         assert cfg.lock_clocks and not clocks_locked
 
     def test_lock_clocks_true_locked_proceeds(self, monkeypatch):
@@ -81,7 +84,9 @@ class TestClockLockValidation:
         import os
 
         cfg = BenchmarkConfig(lock_clocks=True)
-        clocks_locked = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
+        clocks_locked = (
+            os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
+        )
         assert not (cfg.lock_clocks and not clocks_locked)
 
     def test_lock_clocks_false_unlocked_proceeds(self, monkeypatch):
@@ -90,7 +95,9 @@ class TestClockLockValidation:
         import os
 
         cfg = BenchmarkConfig(lock_clocks=False)
-        clocks_locked = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
+        clocks_locked = (
+            os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
+        )
         assert not (cfg.lock_clocks and not clocks_locked)
 
     def test_lock_clocks_false_locked_proceeds(self, monkeypatch):
@@ -99,5 +106,7 @@ class TestClockLockValidation:
         import os
 
         cfg = BenchmarkConfig(lock_clocks=False)
-        clocks_locked = os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
+        clocks_locked = (
+            os.environ.get("SOL_EXECBENCH_CLOCKS_LOCKED", "0") == "1"
+        )
         assert not (cfg.lock_clocks and not clocks_locked)

@@ -22,8 +22,9 @@ module load time.  The driver will detect the discrepancy and emit
 a REWARD_HACK trace.
 """
 
-import torch
 from typing import Any, cast
+
+import torch
 
 # Patch at module level — before the driver calls check_monkey_patch().
 cast(Any, torch.cuda.Event).elapsed_time = lambda self, end: 0.0

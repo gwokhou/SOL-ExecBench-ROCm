@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import ast
 import shlex
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import yaml
 
@@ -31,15 +32,20 @@ class AkaTask:
 
     @property
     def root(self) -> Path:
+        """Return the task directory."""
         return self.aka_root / self.task_path
 
     @property
     def task_type(self) -> str:
+        """Return the declared AKA task type."""
         return str(self.config.get("task_type") or "")
 
     @property
     def target_kernel_functions(self) -> tuple[str, ...]:
-        return tuple(str(s) for s in (self.config.get("target_kernel_functions") or []))
+        """Return the kernel functions targeted by the task."""
+        return tuple(
+            str(s) for s in (self.config.get("target_kernel_functions") or [])
+        )
 
 
 def read_task(aka_root: str | Path, task_path: str) -> AkaTask:
@@ -70,7 +76,7 @@ def functional_reference_path(task: AkaTask) -> Path:
         files = sorted(func_dir.glob("*.py")) if func_dir.is_dir() else []
         if len(files) != 1:
             raise FileNotFoundError(
-                f"could not resolve a unique functional reference for {task.task_path}"
+                f"could not resolve a unique functional reference for {task.task_path}",
             )
         candidate = files[0]
     return candidate if candidate.is_absolute() else (task.root / candidate)
@@ -93,7 +99,7 @@ def correctness_runner_path(task: AkaTask) -> Path:
         if files:
             return files[-1]
     raise FileNotFoundError(
-        f"could not resolve correctness runner for {task.task_path}"
+        f"could not resolve correctness runner for {task.task_path}",
     )
 
 
@@ -152,7 +158,8 @@ def materialize_get_inputs(task: AkaTask) -> list[list[Any]]:
 
 
 def iter_suite_tasks(
-    aka_root: str | Path, suites: Iterable[str]
+    aka_root: str | Path,
+    suites: Iterable[str],
 ) -> list[tuple[str, str]]:
     """Yield ``(suite, task_path)`` for every ``config.yaml`` under the suites."""
     root = Path(aka_root).resolve()

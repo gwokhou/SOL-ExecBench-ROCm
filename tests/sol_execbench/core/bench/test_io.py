@@ -19,12 +19,13 @@ from pathlib import Path
 
 import pytest
 import torch
+from sol_execbench_type_helpers import make_definition, make_workload
 
 from sol_execbench.core.bench.io import (
-    CustomInputGenerationError,
     FLASHINFER_TRACE_ENV,
     GEN_INPUTS_DEVICE_MISMATCH,
     GEN_INPUTS_SCHEMA_MISMATCH,
+    CustomInputGenerationError,
     ShiftingMemoryPoolAllocator,
     _cast_to_fp4x2,
     _generate_heuristic_tensor,
@@ -42,7 +43,6 @@ from sol_execbench.core.bench.io import (
     gen_inputs,
     isolated_torch_rng,
 )
-from sol_execbench_type_helpers import make_definition, make_workload
 
 
 def test_flashinfer_safetensors_env_preserves_user_root():
@@ -131,7 +131,9 @@ class TestIsCausalAttentionMask:
 
     def test_description_match(self):
         assert _is_causal_attention_mask(
-            "mask", (32, 32), "Causal attention mask for decoder"
+            "mask",
+            (32, 32),
+            "Causal attention mask for decoder",
         )
 
     def test_non_square_false(self):
@@ -143,13 +145,17 @@ class TestIsCausalAttentionMask:
 
 class TestIsBinaryMask:
     @pytest.mark.parametrize(
-        "name", ["x_mask", "text_mask", "aspect_ratio_mask", "drop_mask"]
+        "name",
+        ["x_mask", "text_mask", "aspect_ratio_mask", "drop_mask"],
     )
     def test_known_mask_names(self, name):
         assert _is_binary_mask(name, None)
 
     def test_suffix_with_binary_description(self):
-        assert _is_binary_mask("padding_mask", "binary mask, 1.0 for valid tokens")
+        assert _is_binary_mask(
+            "padding_mask",
+            "binary mask, 1.0 for valid tokens",
+        )
 
     def test_suffix_without_description(self):
         assert not _is_binary_mask("padding_mask", None)
@@ -160,7 +166,8 @@ class TestIsBinaryMask:
 
 class TestIsRopeCosSin:
     @pytest.mark.parametrize(
-        "name", ["cos", "sin", "cos_cached", "sin_cached", "rope_cos", "rope_sin"]
+        "name",
+        ["cos", "sin", "cos_cached", "sin_cached", "rope_cos", "rope_sin"],
     )
     def test_true_cases(self, name):
         assert _is_rope_cos_sin(name)
@@ -171,7 +178,8 @@ class TestIsRopeCosSin:
 
 class TestIsPositiveTensor:
     @pytest.mark.parametrize(
-        "name", ["rstd", "std", "variance", "q_rstd", "x_var", "variance1"]
+        "name",
+        ["rstd", "std", "variance", "q_rstd", "x_var", "variance1"],
     )
     def test_true_cases(self, name):
         assert _is_positive_tensor(name, None)
@@ -191,7 +199,8 @@ class TestIsSsmDecay:
 
 class TestIsSoftmaxOutput:
     @pytest.mark.parametrize(
-        "name", ["attn_weights", "attention_weights", "routing_weights"]
+        "name",
+        ["attn_weights", "attention_weights", "routing_weights"],
     )
     def test_true_cases(self, name):
         assert _is_softmax_output(name, None)
@@ -211,21 +220,30 @@ class TestIsSoftmaxOutput:
 class TestGenerateHeuristicTensor:
     def test_norm_weight_ones(self):
         t = _generate_heuristic_tensor(
-            "norm_weight", (128,), torch.float32, torch.device("cpu")
+            "norm_weight",
+            (128,),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         assert torch.allclose(t, torch.ones(128))
 
     def test_norm_bias_zeros(self):
         t = _generate_heuristic_tensor(
-            "input_layernorm_bias", (64,), torch.float32, torch.device("cpu")
+            "input_layernorm_bias",
+            (64,),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         assert torch.allclose(t, torch.zeros(64))
 
     def test_causal_mask_upper_triangular(self):
         t = _generate_heuristic_tensor(
-            "attention_mask", (1, 8, 8), torch.float32, torch.device("cpu")
+            "attention_mask",
+            (1, 8, 8),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         # Diagonal and below should be 0
@@ -236,7 +254,10 @@ class TestGenerateHeuristicTensor:
 
     def test_binary_mask_values(self):
         t = _generate_heuristic_tensor(
-            "x_mask", (100,), torch.float32, torch.device("cpu")
+            "x_mask",
+            (100,),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         unique = set(t.unique().tolist())
@@ -244,7 +265,10 @@ class TestGenerateHeuristicTensor:
 
     def test_rope_cos_in_range(self):
         t = _generate_heuristic_tensor(
-            "cos", (32, 64), torch.float32, torch.device("cpu")
+            "cos",
+            (32, 64),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         assert t.min().item() >= -1.0
@@ -252,7 +276,10 @@ class TestGenerateHeuristicTensor:
 
     def test_rope_sin_in_range(self):
         t = _generate_heuristic_tensor(
-            "sin", (32, 64), torch.float32, torch.device("cpu")
+            "sin",
+            (32, 64),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         assert t.min().item() >= -1.0
@@ -260,19 +287,30 @@ class TestGenerateHeuristicTensor:
 
     def test_positive_tensor(self):
         t = _generate_heuristic_tensor(
-            "rstd", (16, 32), torch.float32, torch.device("cpu")
+            "rstd",
+            (16, 32),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         assert t.min().item() > 0.0
 
     def test_ssm_decay_A_negative(self):
-        t = _generate_heuristic_tensor("A", (8, 16), torch.float32, torch.device("cpu"))
+        t = _generate_heuristic_tensor(
+            "A",
+            (8, 16),
+            torch.float32,
+            torch.device("cpu"),
+        )
         assert t is not None
         assert t.max().item() < 0.0
 
     def test_ssm_decay_A_cumsum_monotonic(self):
         t = _generate_heuristic_tensor(
-            "A_cumsum", (4, 32), torch.float32, torch.device("cpu")
+            "A_cumsum",
+            (4, 32),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         # Should be non-increasing along last dim
@@ -281,7 +319,10 @@ class TestGenerateHeuristicTensor:
 
     def test_softmax_output_sums_to_one(self):
         t = _generate_heuristic_tensor(
-            "attn_weights", (4, 8), torch.float32, torch.device("cpu")
+            "attn_weights",
+            (4, 8),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         row_sums = t.sum(dim=-1)
@@ -290,7 +331,10 @@ class TestGenerateHeuristicTensor:
     def test_weight_matrix_xavier_scale(self):
         shape = (256, 512)
         t = _generate_heuristic_tensor(
-            "weight", shape, torch.float32, torch.device("cpu")
+            "weight",
+            shape,
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is not None
         # Xavier scale: std ≈ 1/sqrt(fan_in) = 1/sqrt(512) ≈ 0.044
@@ -299,23 +343,36 @@ class TestGenerateHeuristicTensor:
 
     def test_no_heuristic_returns_none(self):
         t = _generate_heuristic_tensor(
-            "hidden_states", (4, 128), torch.float32, torch.device("cpu")
+            "hidden_states",
+            (4, 128),
+            torch.float32,
+            torch.device("cpu"),
         )
         assert t is None
 
     def test_integer_dtype_returns_none(self):
         t = _generate_heuristic_tensor(
-            "norm_weight", (128,), torch.int32, torch.device("cpu")
+            "norm_weight",
+            (128,),
+            torch.int32,
+            torch.device("cpu"),
         )
         assert t is None
 
     @pytest.mark.parametrize("dtype", [torch.float8_e4m3fn, torch.float8_e5m2])
     def test_fp8_dtype_returns_none(self, dtype):
         """FP8 dtypes must skip heuristics (torch.randn etc. don't support FP8)."""
-        # These names would match heuristics for float32 but must return None for FP8
+        # These names match float32 heuristics but must return None for FP8.
         for name in ("norm_weight", "rstd", "weight", "attn_weights"):
-            t = _generate_heuristic_tensor(name, (64, 64), dtype, torch.device("cpu"))
-            assert t is None, f"Expected None for FP8 heuristic '{name}', got tensor"
+            t = _generate_heuristic_tensor(
+                name,
+                (64, 64),
+                dtype,
+                torch.device("cpu"),
+            )
+            assert t is None, (
+                f"Expected None for FP8 heuristic '{name}', got tensor"
+            )
 
 
 # ------------------------------------------------------------------
@@ -329,7 +386,10 @@ class TestResolveBlobPath:
         (tmp_path / "foo" / "bar").mkdir(parents=True)
         (tmp_path / "foo" / "bar" / "data.safetensors").touch()
 
-        result = _resolve_blob_path(Path("foo/bar/data.safetensors"), [tmp_path])
+        result = _resolve_blob_path(
+            Path("foo/bar/data.safetensors"),
+            [tmp_path],
+        )
         assert result == tmp_path / "foo" / "bar" / "data.safetensors"
 
     def test_partial_overlap(self, tmp_path):
@@ -352,7 +412,10 @@ class TestResolveBlobPath:
 
     def test_no_match_returns_none(self, tmp_path):
         """No blob root contains the file."""
-        result = _resolve_blob_path(Path("foo/bar/data.safetensors"), [tmp_path])
+        result = _resolve_blob_path(
+            Path("foo/bar/data.safetensors"),
+            [tmp_path],
+        )
         assert result is None
 
     def test_prefers_full_path_over_stripped(self, tmp_path):
@@ -363,7 +426,10 @@ class TestResolveBlobPath:
         (tmp_path / "bar").mkdir(parents=True)
         (tmp_path / "bar" / "data.safetensors").touch()
 
-        result = _resolve_blob_path(Path("foo/bar/data.safetensors"), [tmp_path])
+        result = _resolve_blob_path(
+            Path("foo/bar/data.safetensors"),
+            [tmp_path],
+        )
         # Full match (start=0) should win
         assert result == tmp_path / "foo" / "bar" / "data.safetensors"
 
@@ -376,7 +442,10 @@ class TestResolveBlobPath:
         (root1 / "data" / "file.safetensors").touch()
         (root2 / "data" / "file.safetensors").touch()
 
-        result = _resolve_blob_path(Path("data/file.safetensors"), [root1, root2])
+        result = _resolve_blob_path(
+            Path("data/file.safetensors"),
+            [root1, root2],
+        )
         assert result == root1 / "data" / "file.safetensors"
 
     def test_falls_through_to_second_root(self, tmp_path):
@@ -387,7 +456,10 @@ class TestResolveBlobPath:
         (root2 / "data").mkdir(parents=True)
         (root2 / "data" / "file.safetensors").touch()
 
-        result = _resolve_blob_path(Path("data/file.safetensors"), [root1, root2])
+        result = _resolve_blob_path(
+            Path("data/file.safetensors"),
+            [root1, root2],
+        )
         assert result == root2 / "data" / "file.safetensors"
 
     def test_single_component_path(self, tmp_path):
@@ -424,7 +496,9 @@ class TestShiftingMemoryPoolAllocator:
 
         ptrs = [alloc.get_unique_args()[0].data_ptr() for _ in range(5)]
         diffs = [ptrs[i + 1] - ptrs[i] for i in range(4)]
-        assert all(d == ShiftingMemoryPoolAllocator._POOL_ALIGNMENT for d in diffs)
+        assert all(
+            d == ShiftingMemoryPoolAllocator._POOL_ALIGNMENT for d in diffs
+        )
 
     def test_input_data_preserved(self):
         """Returned views contain the same data as the original input."""
@@ -436,8 +510,11 @@ class TestShiftingMemoryPoolAllocator:
             assert torch.equal(args[0], src)
 
     def test_input_data_survives_inplace_mutation(self):
-        """Source data is re-copied each call, so in-place mutation of a view
-        does not corrupt subsequent calls."""
+        """Verify source data survives in-place mutation.
+
+        Source data is re-copied each call, so mutation of a view does not
+        corrupt subsequent calls.
+        """
         src = torch.tensor([1.0, 2.0, 3.0, 4.0])
         alloc = ShiftingMemoryPoolAllocator([src], [], total_iterations=3)
 
@@ -460,7 +537,12 @@ class TestShiftingMemoryPoolAllocator:
 
     def test_dtype_preserved(self):
         """Returned tensors have the same dtype as the original input."""
-        for dtype in (torch.float32, torch.float16, torch.bfloat16, torch.int32):
+        for dtype in (
+            torch.float32,
+            torch.float16,
+            torch.bfloat16,
+            torch.int32,
+        ):
             src = torch.ones(8, dtype=dtype)
             alloc = ShiftingMemoryPoolAllocator([src], [], total_iterations=2)
             args = alloc.get_unique_args()
@@ -519,7 +601,9 @@ class TestShiftingMemoryPoolAllocator:
 
         entry = alloc._input_entries[0]
         pool_numel = entry["pool"].numel()
-        expected = entry["storage_span"] + (iters - 1) * (256 // src.element_size())
+        expected = entry["storage_span"] + (iters - 1) * (
+            256 // src.element_size()
+        )
         assert pool_numel == expected
 
     def test_expanded_tensor_preserves_strides(self):
@@ -534,7 +618,7 @@ class TestShiftingMemoryPoolAllocator:
         alloc = ShiftingMemoryPoolAllocator([src], [], total_iterations=iters)
 
         entry = alloc._input_entries[0]
-        # Pool should be sized by storage_span (seq), not logical numel (batch*seq)
+        # Size the pool by storage span, not logical element count.
         assert entry["storage_span"] == seq
         expected_pool = seq + (iters - 1) * (256 // src.element_size())
         assert entry["pool"].numel() == expected_pool
@@ -591,20 +675,24 @@ _REFERENCE = "def run(a): return a"
 
 
 def _make_definition(**overrides):
-    base = dict(
-        name="test_op",
-        op_type="test",
-        axes={"N": {"type": "var"}},
-        inputs={"a": {"shape": ["N"], "dtype": "float32"}},
-        outputs={"b": {"shape": ["N"], "dtype": "float32"}},
-        reference=_REFERENCE,
-    )
+    base = {
+        "name": "test_op",
+        "op_type": "test",
+        "axes": {"N": {"type": "var"}},
+        "inputs": {"a": {"shape": ["N"], "dtype": "float32"}},
+        "outputs": {"b": {"shape": ["N"], "dtype": "float32"}},
+        "reference": _REFERENCE,
+    }
     base.update(overrides)
     return make_definition(**base)
 
 
 def _make_workload(**overrides):
-    base = dict(uuid="test-uuid", axes={"N": 4}, inputs={"a": {"type": "random"}})
+    base = {
+        "uuid": "test-uuid",
+        "axes": {"N": 4},
+        "inputs": {"a": {"type": "random"}},
+    }
     base.update(overrides)
     return make_workload(**base)
 
@@ -641,7 +729,10 @@ class TestGenInputs:
         wkl = make_workload(
             uuid="u",
             axes={"N": 4},
-            inputs={"a": {"type": "random"}, "s": {"type": "scalar", "value": 0.5}},
+            inputs={
+                "a": {"type": "random"},
+                "s": {"type": "scalar", "value": 0.5},
+            },
         )
         inputs = gen_inputs(d, wkl, "cpu")
         assert inputs[1] == 0.5
@@ -750,7 +841,9 @@ class TestGenInputs:
             gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
 
         assert excinfo.value.failure_class == GEN_INPUTS_SCHEMA_MISMATCH
-        assert excinfo.value.provenance.failure_class == GEN_INPUTS_SCHEMA_MISMATCH
+        assert (
+            excinfo.value.provenance.failure_class == GEN_INPUTS_SCHEMA_MISMATCH
+        )
         assert excinfo.value.provenance.generated_keys == ("a",)
 
     def test_custom_factory_dtype_mismatch_raises_schema_class(self):
@@ -771,7 +864,9 @@ class TestGenInputs:
         )
 
         def gen(axes, device):
-            return {"a": torch.ones(axes["N"], dtype=torch.int32, device=device)}
+            return {
+                "a": torch.ones(axes["N"], dtype=torch.int32, device=device),
+            }
 
         with pytest.raises(CustomInputGenerationError) as excinfo:
             gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
@@ -780,7 +875,9 @@ class TestGenInputs:
 
     def test_custom_factory_device_mismatch_raises_device_class(self):
         if torch.cuda.is_available():
-            pytest.skip("CPU mismatch path only applies when CUDA/HIP is unavailable")
+            pytest.skip(
+                "CPU mismatch path only applies when CUDA/HIP is unavailable",
+            )
         d = _make_definition(
             inputs={"a": {"shape": ["N"], "dtype": "float32"}},
             custom_inputs_entrypoint="gen",
@@ -798,7 +895,9 @@ class TestGenInputs:
         )
 
         def gen(axes, device):
-            return {"a": torch.ones(axes["N"], dtype=torch.float32, device="meta")}
+            return {
+                "a": torch.ones(axes["N"], dtype=torch.float32, device="meta"),
+            }
 
         with pytest.raises(CustomInputGenerationError) as excinfo:
             gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)

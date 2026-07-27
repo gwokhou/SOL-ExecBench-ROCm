@@ -22,6 +22,8 @@ EXIT_EXECUTION = 4
 
 @dataclass(frozen=True)
 class CliResult:
+    """Structured command result before text or JSON rendering."""
+
     data: Any = field(default_factory=dict)
     artifacts: tuple[dict[str, Any], ...] = ()
     warnings: tuple[str, ...] = ()
@@ -40,6 +42,7 @@ class CliFailure(click.ClickException):
         details: Any = None,
         hint: str | None = None,
     ) -> None:
+        """Initialize a classified user-facing CLI failure."""
         super().__init__(message)
         self.code = code
         self.cli_exit_code = exit_code
@@ -48,10 +51,12 @@ class CliFailure(click.ClickException):
 
 
 def artifact(path: Path, artifact_type: str) -> dict[str, Any]:
+    """Return a serialized CLI artifact reference."""
     return {"type": artifact_type, "path": str(path)}
 
 
 def response_success(command: str, result: CliResult | None) -> dict[str, Any]:
+    """Build a successful machine-readable CLI response."""
     result = result or CliResult()
     return {
         "schema_version": CLI_RESPONSE_SCHEMA_VERSION,
@@ -64,6 +69,7 @@ def response_success(command: str, result: CliResult | None) -> dict[str, Any]:
 
 
 def response_failure(command: str, error: BaseException) -> dict[str, Any]:
+    """Build a failed machine-readable CLI response."""
     if isinstance(error, CliFailure):
         code = error.code
         details = error.details
@@ -94,5 +100,6 @@ def response_failure(command: str, error: BaseException) -> dict[str, Any]:
 
 
 def output_format(ctx: click.Context | None = None) -> str:
+    """Return the root command's requested output format."""
     ctx = ctx or click.get_current_context()
     return str(ctx.find_root().params.get("output_format", "text"))

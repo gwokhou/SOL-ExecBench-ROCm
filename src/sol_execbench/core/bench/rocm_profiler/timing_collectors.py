@@ -67,7 +67,10 @@ def collect_rocprofv3_timing(
             request,
             f"rocprofv3 command timed out after {request.timeout_seconds:g} seconds",
             command=command,
-            csv_path=find_rocprofv3_csv(request.output_directory, request.output_file),
+            csv_path=find_rocprofv3_csv(
+                request.output_directory,
+                request.output_file,
+            ),
             stdout=subprocess_text(exc.stdout),
             stderr=subprocess_text(exc.stderr),
         )
@@ -110,7 +113,9 @@ def _result_from_completed_run(
         )
 
     evidence, compacted_kernel_rows = _build_collection_evidence(
-        request, csv_path, calibration_path
+        request,
+        csv_path,
+        calibration_path,
     )
     if _requires_kernel_activity(request, evidence, compacted_kernel_rows):
         return _fallback_result(
@@ -156,7 +161,8 @@ def _fallback_result(
     """Return a consistently labelled non-profiler timing result."""
     selection = DefaultTimingSelection(
         policy=select_timing_policy(
-            request.policy.source_type, profiler_available=False
+            request.policy.source_type,
+            profiler_available=False,
         ),
         profiler_backed=False,
         fallback_applied=True,
@@ -231,7 +237,10 @@ def collect_source_timing_evidence(
     runner: ProfilerRunner | None = None,
 ) -> Rocprofv3CollectionResult:
     """Select source-specific timing policy and collect evidence when supported."""
-    policy = timing_policy_for_languages(request.languages, profiler_available=True)
+    policy = timing_policy_for_languages(
+        request.languages,
+        profiler_available=True,
+    )
     collection_request = Rocprofv3CollectionRequest(
         application_command=request.application_command,
         output_directory=request.output_directory,
@@ -255,6 +264,7 @@ def collect_source_timing_evidence(
 
 
 def find_rocprofv3_csv(output_directory: Path, output_file: str) -> Path | None:
+    """Return the best matching rocprofv3 CSV output, if present."""
     candidates = sorted(output_directory.glob(f"{output_file}*.csv"))
     if not candidates:
         return None

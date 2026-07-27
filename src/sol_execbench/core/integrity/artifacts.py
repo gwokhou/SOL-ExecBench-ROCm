@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .checksums import sha256_file
+from sol_execbench.core.integrity.checksums import sha256_file
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
@@ -49,7 +49,9 @@ def verify_artifact_file(
     base = root.resolve()
     path = base / safe_path
     if path.is_symlink() or not path.is_file():
-        raise ValueError(f"release artifact is missing or not regular: {safe_path}")
+        raise ValueError(
+            f"release artifact is missing or not regular: {safe_path}",
+        )
     resolved = path.resolve()
     if resolved.parent != base and base not in resolved.parents:
         raise ValueError(f"release artifact escapes its bundle: {safe_path}")

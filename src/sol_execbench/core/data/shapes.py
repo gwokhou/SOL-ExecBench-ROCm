@@ -14,8 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Safe arithmetic evaluation for symbolic tensor shapes."""
+
 import ast
 import operator as op
+from collections.abc import Callable
+from typing import cast
 
 _BIN_OPS = {
     ast.Add: op.add,
@@ -34,24 +38,26 @@ _UNARY_OPS = {
 
 
 def resolve_shape_expression(expr: str, vars: dict[str, int]) -> int:
-    """
-    Safely evaluate a simple arithmetic expression with variables.
+    """Safely evaluate a simple arithmetic expression with variables.
+
     Allowed: numbers, variable names, + - * / // % **, parentheses, unary +/-
     Disallowed: function calls, attributes, subscripts, comprehensions, etc.
     """
 
-    def eval_node(node):
+    def eval_node(node: ast.expr) -> int | float:
         if isinstance(node, ast.Constant):  # numbers like 1, 2.5
             if isinstance(node.value, (int, float)):
                 return node.value
-            raise TypeError(f"Unsupported constant type: {type(node.value).__name__}")
+            raise TypeError(
+                f"Unsupported constant type: {type(node.value).__name__}"
+            )
 
         if isinstance(node, ast.Name):  # variable like x
             if node.id in vars:
                 v = vars[node.id]
                 if not isinstance(v, int):
                     raise TypeError(
-                        f"Variable '{node.id}' must be int, got {type(v).__name__}"
+                        f"Variable '{node.id}' must be int, got {type(v).__name__}",
                     )
                 return v
             raise NameError(f"Unknown variable: {node.id}")
@@ -60,13 +66,31 @@ def resolve_shape_expression(expr: str, vars: dict[str, int]) -> int:
             op_type = type(node.op)
             if op_type not in _BIN_OPS:
                 raise TypeError(f"Unsupported operator: {op_type.__name__}")
-            return _BIN_OPS[op_type](eval_node(node.left), eval_node(node.right))
+            binary_ops = cast(
+                dict[
+                    type[ast.operator],
+                    Callable[[int | float, int | float], int | float],
+                ],
+                _BIN_OPS,
+            )
+            return binary_ops[op_type](
+                eval_node(node.left), eval_node(node.right)
+            )
 
         if isinstance(node, ast.UnaryOp):
             op_type = type(node.op)
             if op_type not in _UNARY_OPS:
-                raise TypeError(f"Unsupported unary operator: {op_type.__name__}")
-            return _UNARY_OPS[op_type](eval_node(node.operand))
+                raise TypeError(
+                    f"Unsupported unary operator: {op_type.__name__}"
+                )
+            unary_ops = cast(
+                dict[
+                    type[ast.unaryop],
+                    Callable[[int | float], int | float],
+                ],
+                _UNARY_OPS,
+            )
+            return unary_ops[op_type](eval_node(node.operand))
 
         # Anything else is not allowed (Call, Attribute, Subscript, etc.)
         raise TypeError(f"Unsupported expression node: {type(node).__name__}")
@@ -78,6 +102,6 @@ def resolve_shape_expression(expr: str, vars: dict[str, int]) -> int:
         value = int(value)
     if not isinstance(value, int):
         raise TypeError(
-            f"Expression '{expr}' must evaluate to an integer, got {type(value).__name__}"
+            f"Expression '{expr}' must evaluate to an integer, got {type(value).__name__}",
         )
     return value

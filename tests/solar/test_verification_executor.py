@@ -12,7 +12,9 @@ from solar.verification.einsum import EinsumExecutionError, EinsumGraphExecutor
 
 def _metadata(value: Any) -> tuple[list[list[int]], list[str]]:
     values = list(value) if isinstance(value, (tuple, list)) else [value]
-    return [list(item.shape) for item in values], [str(item.dtype) for item in values]
+    return [list(item.shape) for item in values], [
+        str(item.dtype) for item in values
+    ]
 
 
 def _execute(
@@ -81,7 +83,7 @@ def _execute(
         "outputs": output_names,
     }
     return EinsumGraphExecutor(graph, check_shapes=check_shapes)(
-        *[tensor.clone() for tensor in tensors]
+        *[tensor.clone() for tensor in tensors],
     )
 
 
@@ -102,7 +104,8 @@ def test_binary_dispatch(target, function) -> None:
     right = torch.tensor([2.0, 2.0])
     expected = function(left, right)
     torch.testing.assert_close(
-        _execute(target, (left, right), expected=expected), expected
+        _execute(target, (left, right), expected=expected),
+        expected,
     )
 
 
@@ -131,7 +134,10 @@ def test_binary_dispatch(target, function) -> None:
 def test_unary_dispatch(target, function) -> None:
     value = torch.tensor([1.0, 2.0])
     expected = function(value)
-    torch.testing.assert_close(_execute(target, (value,), expected=expected), expected)
+    torch.testing.assert_close(
+        _execute(target, (value,), expected=expected),
+        expected,
+    )
 
 
 def test_leaky_relu_replays_functional_inplace_parameter() -> None:
@@ -182,9 +188,13 @@ def test_einsum_and_matrix_dispatch() -> None:
             "tensor_dtypes": {"inputs": [], "outputs": [str(tensor.dtype)]},
         }
     graph = {"schema_version": 3, "layers": {**starts, "op": layer}}
-    torch.testing.assert_close(EinsumGraphExecutor(graph)(left, right), expected)
     torch.testing.assert_close(
-        _execute("matmul", (left, right), expected=expected), expected
+        EinsumGraphExecutor(graph)(left, right),
+        expected,
+    )
+    torch.testing.assert_close(
+        _execute("matmul", (left, right), expected=expected),
+        expected,
     )
 
     bias = torch.ones(2, 4)
@@ -213,7 +223,10 @@ def test_mutation_mask_identity_and_dtype_dispatch() -> None:
         expected=expected,
     )
     torch.testing.assert_close(actual, expected)
-    torch.testing.assert_close(_execute("identity", (left,), expected=left), left)
+    torch.testing.assert_close(
+        _execute("identity", (left,), expected=left),
+        left,
+    )
 
     half = left.half()
     actual = _execute(
@@ -224,9 +237,11 @@ def test_mutation_mask_identity_and_dtype_dispatch() -> None:
     )
     assert actual.dtype == torch.float16
     assert _execute("long", (left,), expected=left.long()).dtype == torch.int64
-    assert _execute("type_as", (left, half), expected=left.type_as(half)).dtype == (
-        torch.float16
-    )
+    assert _execute(
+        "type_as",
+        (left, half),
+        expected=left.type_as(half),
+    ).dtype == (torch.float16)
     copied = torch.ops.aten._to_copy.default(left, layout=torch.strided)
     torch.testing.assert_close(
         _execute(
@@ -238,9 +253,13 @@ def test_mutation_mask_identity_and_dtype_dispatch() -> None:
         copied,
     )
     assert (
-        _execute("clone", (left,), expected=left.clone()).data_ptr() != left.data_ptr()
+        _execute("clone", (left,), expected=left.clone()).data_ptr()
+        != left.data_ptr()
     )
-    assert torch.equal(_execute("detach", (left,), expected=left.detach()), left)
+    assert torch.equal(
+        _execute("detach", (left,), expected=left.detach()),
+        left,
+    )
 
 
 def test_reduction_softmax_and_cumulative_dispatch() -> None:
@@ -254,7 +273,12 @@ def test_reduction_softmax_and_cumulative_dispatch() -> None:
         ("logsumexp", value.logsumexp(dim=1)),
     ):
         arguments = [{"tensor": 0}, {"value": 1}]
-        actual = _execute(target, (value,), arguments=arguments, expected=expected)
+        actual = _execute(
+            target,
+            (value,),
+            arguments=arguments,
+            expected=expected,
+        )
         torch.testing.assert_close(actual, expected)
     for target, expected in (
         ("softmax", torch.softmax(value, dim=1)),
@@ -308,11 +332,20 @@ def test_view_and_layout_dispatch() -> None:
         ("contiguous", [{"tensor": 0}], value.contiguous()),
         ("unsqueeze", [{"tensor": 0}, {"value": 0}], value.unsqueeze(0)),
         ("permute", [{"tensor": 0}, {"value": [1, 0]}], value.permute(1, 0)),
-        ("repeat", [{"tensor": 0}, {"value": 2}, {"value": 1}], value.repeat(2, 1)),
-        ("expand", [{"tensor": 0}, {"value": 2}, {"value": 3}], value.expand(2, 3)),
+        (
+            "repeat",
+            [{"tensor": 0}, {"value": 2}, {"value": 1}],
+            value.repeat(2, 1),
+        ),
+        (
+            "expand",
+            [{"tensor": 0}, {"value": 2}, {"value": 3}],
+            value.expand(2, 3),
+        ),
     ):
         torch.testing.assert_close(
-            _execute(target, (value,), arguments=arguments, expected=expected), expected
+            _execute(target, (value,), arguments=arguments, expected=expected),
+            expected,
         )
     transposed = value.transpose(0, 1)
     torch.testing.assert_close(
@@ -326,7 +359,8 @@ def test_view_and_layout_dispatch() -> None:
     )
     square = torch.arange(4.0).reshape(2, 2)
     torch.testing.assert_close(
-        _execute("transpose", (square,), expected=square.t()), square.t()
+        _execute("transpose", (square,), expected=square.t()),
+        square.t(),
     )
 
 
@@ -425,13 +459,17 @@ def test_library_quantization_and_aten_fallback_dispatch() -> None:
     bias = torch.ones(4)
     linear = functional.linear(value, weight, bias)
     torch.testing.assert_close(
-        _execute("linear", (value, weight, bias), expected=linear), linear
+        _execute("linear", (value, weight, bias), expected=linear),
+        linear,
     )
 
     image = torch.ones(1, 1, 3, 3)
     kernel = torch.ones(1, 1, 1, 1)
     conv = functional.conv2d(image, kernel)
-    torch.testing.assert_close(_execute("conv2d", (image, kernel), expected=conv), conv)
+    torch.testing.assert_close(
+        _execute("conv2d", (image, kernel), expected=conv),
+        conv,
+    )
 
     normalized = functional.layer_norm(value, (3,))
     torch.testing.assert_close(
@@ -509,7 +547,8 @@ def test_library_quantization_and_aten_fallback_dispatch() -> None:
     table = torch.arange(12.0).reshape(3, 4)
     embedded = functional.embedding(indices, table)
     torch.testing.assert_close(
-        _execute("embedding", (indices, table), expected=embedded), embedded
+        _execute("embedding", (indices, table), expected=embedded),
+        embedded,
     )
     clamped = torch.clamp(value, min=1.0, max=4.0)
     torch.testing.assert_close(
@@ -523,26 +562,39 @@ def test_library_quantization_and_aten_fallback_dispatch() -> None:
     )
     reciprocal = torch.ops.aten.reciprocal.default(value + 1)
     torch.testing.assert_close(
-        _execute("reciprocal", (value + 1,), expected=reciprocal), reciprocal
+        _execute("reciprocal", (value + 1,), expected=reciprocal),
+        reciprocal,
     )
 
 
 def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
     with pytest.raises(EinsumExecutionError, match="schema_version"):
         EinsumGraphExecutor({"schema_version": 0, "layers": {}})
-    with pytest.raises(EinsumExecutionError, match="unsupported extended einsum"):
+    with pytest.raises(
+        EinsumExecutionError,
+        match="unsupported extended einsum",
+    ):
         verification._torch_equation("A(P+R)->A")
-    with pytest.raises(EinsumExecutionError, match="explicit transpose dimensions"):
+    with pytest.raises(
+        EinsumExecutionError,
+        match="explicit transpose dimensions",
+    ):
         value = torch.ones(2, 2, 2)
         _execute("transpose", (value,), expected=value)
-    with pytest.raises(EinsumExecutionError, match="unsupported exact operation"):
+    with pytest.raises(
+        EinsumExecutionError,
+        match="unsupported exact operation",
+    ):
         value = torch.ones(1)
         _execute("definitely_missing", (value,), expected=value)
 
 
 def test_argument_decoder_rejects_bad_tensor_dtype_and_mapping() -> None:
     value = torch.ones(1)
-    with pytest.raises(EinsumExecutionError, match="outside its input metadata"):
+    with pytest.raises(
+        EinsumExecutionError,
+        match="outside its input metadata",
+    ):
         _execute(
             "identity",
             (value,),

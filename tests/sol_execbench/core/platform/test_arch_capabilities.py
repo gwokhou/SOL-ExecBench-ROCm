@@ -97,9 +97,17 @@ def test_derive_none_target_returns_none():
 def test_derive_capability_budgets_available_and_unsupported():
     budgets = derive_capability_budgets(
         [
-            GpuEnvironmentSummary(source="rocminfo", index=0, gfx_target="gfx942"),
-            GpuEnvironmentSummary(source="rocminfo", index=1, gfx_target="gfx1100"),
-        ]
+            GpuEnvironmentSummary(
+                source="rocminfo",
+                index=0,
+                gfx_target="gfx942",
+            ),
+            GpuEnvironmentSummary(
+                source="rocminfo",
+                index=1,
+                gfx_target="gfx1100",
+            ),
+        ],
     )
 
     assert [(budget.status, budget.architecture) for budget in budgets] == [
@@ -115,9 +123,17 @@ def test_derive_capability_budgets_available_and_unsupported():
 def test_derive_capability_budgets_dedupes_repeated_arch():
     budgets = derive_capability_budgets(
         [
-            GpuEnvironmentSummary(source="rocminfo", index=0, gfx_target="gfx942"),
-            GpuEnvironmentSummary(source="pytorch", index=0, gfx_target="gfx942"),
-        ]
+            GpuEnvironmentSummary(
+                source="rocminfo",
+                index=0,
+                gfx_target="gfx942",
+            ),
+            GpuEnvironmentSummary(
+                source="pytorch",
+                index=0,
+                gfx_target="gfx942",
+            ),
+        ],
     )
 
     assert len(budgets) == 1

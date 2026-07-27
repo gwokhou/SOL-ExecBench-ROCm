@@ -14,7 +14,8 @@ from pydantic import ValidationError
 from sol_execbench.core.bench.decision.decision_models import DecisionSidecar
 
 FIXTURE_DIR = (
-    Path(__file__).resolve().parents[4] / "tests/sol_execbench/fixtures/decision"
+    Path(__file__).resolve().parents[4]
+    / "tests/sol_execbench/fixtures/decision"
 )
 
 
@@ -37,7 +38,7 @@ def test_decision_fixtures_parse(name: str, expected_status: str):
 
 def test_valid_fixture_carries_hints():
     payload = json.loads(
-        (FIXTURE_DIR / "valid.decision.json").read_text(encoding="utf-8")
+        (FIXTURE_DIR / "valid.decision.json").read_text(encoding="utf-8"),
     )
     sidecar = DecisionSidecar.model_validate(payload)
 
@@ -48,7 +49,7 @@ def test_valid_fixture_carries_hints():
 
 def test_malformed_fixture_rejected():
     payload = json.loads(
-        (FIXTURE_DIR / "malformed.decision.json").read_text(encoding="utf-8")
+        (FIXTURE_DIR / "malformed.decision.json").read_text(encoding="utf-8"),
     )
     with pytest.raises(ValidationError):
         DecisionSidecar.model_validate(payload)

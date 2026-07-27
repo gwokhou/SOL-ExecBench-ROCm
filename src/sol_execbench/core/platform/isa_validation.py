@@ -33,6 +33,7 @@ class IsaSpecProvenance:
     specification_architecture: str
 
     def to_dict(self) -> dict[str, str]:
+        """Return JSON-compatible ISA specification provenance."""
         return asdict(self)
 
 
@@ -46,9 +47,11 @@ class IsaCapabilityReport:
     provenance: IsaSpecProvenance
 
     def supports(self, requirement: IsaInstructionRequirement) -> bool:
+        """Return whether the report satisfies an instruction requirement."""
         return requirement.instruction in self.supported_instructions
 
     def to_dict(self) -> dict[str, object]:
+        """Return a JSON-compatible capability report."""
         return {
             "architecture": self.architecture,
             "supported_instructions": list(self.supported_instructions),
@@ -70,6 +73,7 @@ class IsaDisassemblyAnalysis:
     provenance: IsaSpecProvenance
 
     def to_dict(self) -> dict[str, object]:
+        """Return a JSON-compatible disassembly analysis."""
         return {
             "architecture": self.architecture,
             "decoded_instruction_count": self.decoded_instruction_count,
@@ -92,7 +96,6 @@ def inspect_isa_requirements(
     opener: IsaOpener = open_isa,
 ) -> IsaCapabilityReport:
     """Confirm exact instruction names against the target architecture spec."""
-
     requested = tuple(dict.fromkeys(requirements))
     supported: list[str] = []
     matrix_units: set[str] = set()
@@ -100,7 +103,9 @@ def inspect_isa_requirements(
     with session as isa:
         for requirement in requested:
             try:
-                instruction = isa.explorer.get_instruction(requirement.instruction)
+                instruction = isa.explorer.get_instruction(
+                    requirement.instruction,
+                )
             except IsaDecodeError:
                 continue
             subgroups = set(_strings(instruction.get("functional_subgroups")))
@@ -127,7 +132,6 @@ def analyze_isa_disassembly(
     opener: IsaOpener = open_isa,
 ) -> IsaDisassemblyAnalysis:
     """Decode disassembly and aggregate stable instruction classifications."""
-
     expected = tuple(dict.fromkeys(expected_instructions))
     session = cast(AmdIsa, opener(architecture, allow_download=allow_download))
     with session as isa:
@@ -154,12 +158,17 @@ def analyze_isa_disassembly(
         functional_group_counts=dict(sorted(groups.items())),
         functional_subgroup_counts=dict(sorted(subgroups.items())),
         observed_matrix_units=matrix_units,
-        matched_instruction_counts={name: names.get(name, 0) for name in expected},
+        matched_instruction_counts={
+            name: names.get(name, 0) for name in expected
+        },
         provenance=provenance,
     )
 
 
-def _provenance(architecture: str, raw: Mapping[str, object]) -> IsaSpecProvenance:
+def _provenance(
+    architecture: str,
+    raw: Mapping[str, object],
+) -> IsaSpecProvenance:
     return IsaSpecProvenance(
         architecture=_normalize_architecture(architecture),
         family=str(raw.get("family", "")),

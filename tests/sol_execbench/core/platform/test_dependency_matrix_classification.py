@@ -19,7 +19,6 @@ from sol_execbench.core.platform.docker_matrix import (
     load_docker_target_manifest,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
 
@@ -64,20 +63,28 @@ def _assert_no_authority(result) -> None:
 
 
 def _assert_policy_payload(result) -> None:
-    payload = result.entry.model_dump(mode="json")["observed"]["dependency_policy"]
+    payload = result.entry.model_dump(mode="json")["observed"][
+        "dependency_policy"
+    ]
     assert payload["policy_id"]
     assert payload["expected_local_version"]
     assert payload["uv_index_name"]
-    assert payload["uv_index_url"].startswith("https://download.pytorch.org/whl/")
+    assert payload["uv_index_url"].startswith(
+        "https://download.pytorch.org/whl/",
+    )
     assert payload["lock_strategy"]
     assert payload["suggested_uv_command"]
     assert payload["triton_rocm_version"]
     assert payload["triton_rocm_index_name"]
-    assert payload["triton_rocm_index_url"] == "https://download.pytorch.org/whl/"
+    assert (
+        payload["triton_rocm_index_url"] == "https://download.pytorch.org/whl/"
+    )
 
 
 def test_unsupported_policy_is_pytorch_wheel_unavailable() -> None:
-    policy = _default_policy().model_copy(update={"wheel_availability": "unavailable"})
+    policy = _default_policy().model_copy(
+        update={"wheel_availability": "unavailable"},
+    )
 
     result = classify_dependency_preflight(
         target=_target(),
@@ -85,7 +92,10 @@ def test_unsupported_policy_is_pytorch_wheel_unavailable() -> None:
         observation=_matching_observation(torch_distribution_version=None),
     )
 
-    assert result.entry.status is MatrixCompatibilityStatus.PYTORCH_WHEEL_UNAVAILABLE
+    assert (
+        result.entry.status
+        is MatrixCompatibilityStatus.PYTORCH_WHEEL_UNAVAILABLE
+    )
     assert (
         result.entry.reason_code
         is MatrixCompatibilityReasonCode.PYTORCH_ROCM_WHEEL_UNAVAILABLE
@@ -101,11 +111,14 @@ def test_torch_import_error_blocks_even_when_metadata_matches_policy() -> None:
         target=_target(),
         policy=_default_policy(),
         observation=_matching_observation(
-            torch_import_error="libamdhip64.so: cannot open shared object file"
+            torch_import_error="libamdhip64.so: cannot open shared object file",
         ),
     )
 
-    assert result.entry.status is MatrixCompatibilityStatus.PYTORCH_WHEEL_UNAVAILABLE
+    assert (
+        result.entry.status
+        is MatrixCompatibilityStatus.PYTORCH_WHEEL_UNAVAILABLE
+    )
     assert (
         result.entry.reason_code
         is MatrixCompatibilityReasonCode.PYTORCH_ROCM_WHEEL_UNAVAILABLE
@@ -121,7 +134,10 @@ def test_torch_import_error_blocks_even_when_metadata_matches_policy() -> None:
     [
         ({"torch_local_version": None}, "local-version"),
         ({"torch_cuda_version": "12.8"}, "CUDA"),
-        ({"torch_local_version": "rocm7.0", "torch_rocm_target": "rocm7.0"}, "rocm"),
+        (
+            {"torch_local_version": "rocm7.0", "torch_rocm_target": "rocm7.0"},
+            "rocm",
+        ),
         ({"torch_hip_version": "7.0.0"}, "HIP"),
         ({"torchvision_distribution_version": "0.25.0+rocm7.0"}, "torchvision"),
         ({"triton_rocm_distribution_version": None}, "triton-rocm"),
@@ -159,7 +175,10 @@ def test_matching_default_rocm_7_1_dependency_stack_is_not_tested() -> None:
     )
 
     assert result.entry.status is MatrixCompatibilityStatus.NOT_TESTED
-    assert result.entry.reason_code is MatrixCompatibilityReasonCode.TARGET_NOT_TESTED
+    assert (
+        result.entry.reason_code
+        is MatrixCompatibilityReasonCode.TARGET_NOT_TESTED
+    )
     assert result.decision.benchmark_allowed is False
     _assert_no_authority(result)
     _assert_policy_payload(result)

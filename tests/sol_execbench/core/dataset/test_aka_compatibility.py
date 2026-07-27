@@ -9,10 +9,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from sol_execbench.core.dataset.aka_contract import (
-    AkaCompatibilityStage,
-    AkaProbeStatus,
-)
 from sol_execbench.core.dataset.aka_compatibility import (
     PROBE_RESULT_PREFIX,
     AkaProbeInfrastructureError,
@@ -20,6 +16,10 @@ from sol_execbench.core.dataset.aka_compatibility import (
     _parse_probe_output,
     materialization_target,
     select_corpus_for_target,
+)
+from sol_execbench.core.dataset.aka_contract import (
+    AkaCompatibilityStage,
+    AkaProbeStatus,
 )
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.platform.runtime import RocmDeviceInfo
@@ -74,7 +74,7 @@ def test_probe_statuses_map_to_closed_decisions(
             "status": status,
             "reason_code": "probe_result",
             "metrics": {"reference_case_bytes": 128},
-        }
+        },
     )
 
     decision = _parse_probe_output(
@@ -92,10 +92,13 @@ def test_probe_infrastructure_status_fails_closed() -> None:
         {
             "status": AkaProbeStatus.INFRASTRUCTURE_ERROR,
             "detail": "worker setup failed",
-        }
+        },
     )
 
-    with pytest.raises(AkaProbeInfrastructureError, match="worker setup failed"):
+    with pytest.raises(
+        AkaProbeInfrastructureError,
+        match="worker setup failed",
+    ):
         _parse_probe_output(
             stdout,
             problem_path="torch2hip/example",
@@ -105,10 +108,14 @@ def test_probe_infrastructure_status_fails_closed() -> None:
 
 def test_gfx942_static_filter_excludes_fp8_without_live_probe() -> None:
     manifest = AkaCorpusManifest.load(MANIFEST)
-    entry = next(item for item in manifest.entries if item.dtype == "float8_e4m3fn")
+    entry = next(
+        item for item in manifest.entries if item.dtype == "float8_e4m3fn"
+    )
 
     def unexpected_probe(*_args):
-        raise AssertionError("static-incompatible workload reached the live probe")
+        raise AssertionError(
+            "static-incompatible workload reached the live probe",
+        )
 
     selection = select_corpus_for_target(
         authored_root=manifest.authored_root,
@@ -121,12 +128,14 @@ def test_gfx942_static_filter_excludes_fp8_without_live_probe() -> None:
     assert selection.problems == ()
     assert selection.decisions
     assert {item.reason_code for item in selection.decisions} == {
-        "unsupported_target_dtype"
+        "unsupported_target_dtype",
     }
     assert all(item.stage == "static" for item in selection.decisions)
 
 
-def test_static_storage_filter_excludes_oversized_reference_without_probe() -> None:
+def test_static_storage_filter_excludes_oversized_reference_without_probe() -> (
+    None
+):
     manifest = AkaCorpusManifest.load(MANIFEST)
     entry = next(
         item
@@ -135,7 +144,9 @@ def test_static_storage_filter_excludes_oversized_reference_without_probe() -> N
     )
 
     def unexpected_probe(*_args):
-        raise AssertionError("static-incompatible workload reached the live probe")
+        raise AssertionError(
+            "static-incompatible workload reached the live probe",
+        )
 
     selection = select_corpus_for_target(
         authored_root=manifest.authored_root,
@@ -148,15 +159,19 @@ def test_static_storage_filter_excludes_oversized_reference_without_probe() -> N
     assert selection.problems == ()
     assert len(selection.decisions) == 3
     assert {item.reason_code for item in selection.decisions} == {
-        "reference_ipc_payload_limit"
+        "reference_ipc_payload_limit",
     }
     assert all(item.stage == "static" for item in selection.decisions)
     assert all(
         item.metrics["reference_case_bytes"] > item.metrics["ipc_limit_bytes"]
         for item in selection.decisions
     )
-    assert selection.decisions[0].metrics["input_storage_bytes"] == 4_299_292_672
-    assert selection.decisions[0].metrics["reference_case_bytes"] == 4_299_292_800
+    assert (
+        selection.decisions[0].metrics["input_storage_bytes"] == 4_299_292_672
+    )
+    assert (
+        selection.decisions[0].metrics["reference_case_bytes"] == 4_299_292_800
+    )
 
 
 def test_live_probe_decisions_partition_workloads() -> None:

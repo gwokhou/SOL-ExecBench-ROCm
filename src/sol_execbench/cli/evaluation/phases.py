@@ -17,10 +17,19 @@ from typing import NoReturn
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from sol_execbench.core.bench.static_kernel.evidence import StaticKernelEvidenceSidecar
+from sol_execbench.cli.evaluation import command as cli_evaluation
+from sol_execbench.cli.evaluation import compilation as cli_compilation
+from sol_execbench.cli.evaluation import profile_mode
+from sol_execbench.cli.evaluation import runtime as cli_evaluation_runtime
+from sol_execbench.cli.evaluation.requests import EvaluationRequest
+from sol_execbench.cli.protocol import EXIT_EXECUTION, CliFailure
+from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
 from sol_execbench.core.bench.gpu_lock import (
     GpuLockVerificationError,
     acquire_evaluation_gpu_lock,
+)
+from sol_execbench.core.bench.static_kernel.evidence import (
+    StaticKernelEvidenceSidecar,
 )
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_DEVICE,
@@ -28,14 +37,6 @@ from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION,
 )
 from sol_execbench.driver import ProblemPackager
-
-from . import command as cli_evaluation
-from . import compilation as cli_compilation
-from . import profile_mode
-from . import runtime as cli_evaluation_runtime
-from ..sidecars import static_evidence as cli_static_evidence
-from ..protocol import EXIT_EXECUTION, CliFailure
-from .requests import EvaluationRequest
 
 PROFILE_NONE = profile_mode.PROFILE_NONE
 PROFILE_ROCPROFV3 = profile_mode.PROFILE_ROCPROFV3
@@ -83,29 +84,31 @@ def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
     unsafe_name = ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION
     device_name = ENV_SOL_EXECBENCH_DEVICE
     try:
-        with acquire_evaluation_gpu_lock(
-            timeout_seconds=min(float(request.timeout), 60.0)
+        with (
+            acquire_evaluation_gpu_lock(
+                timeout_seconds=min(float(request.timeout), 60.0),
+            ),
+            _EXECUTION_ENV_LOCK,
         ):
-            with _EXECUTION_ENV_LOCK:
-                previous_unsafe = os.environ.get(unsafe_name)
-                previous_device = os.environ.get(device_name)
-                os.environ[device_name] = request.device
-                if (
-                    request.unsafe_local_execution
-                    and os.environ.get(ENV_SOL_EXECBENCH_SANDBOXED) != "1"
-                ):
-                    os.environ[unsafe_name] = "1"
-                try:
-                    yield
-                finally:
-                    if previous_unsafe is None:
-                        os.environ.pop(unsafe_name, None)
-                    else:
-                        os.environ[unsafe_name] = previous_unsafe
-                    if previous_device is None:
-                        os.environ.pop(device_name, None)
-                    else:
-                        os.environ[device_name] = previous_device
+            previous_unsafe = os.environ.get(unsafe_name)
+            previous_device = os.environ.get(device_name)
+            os.environ[device_name] = request.device
+            if (
+                request.unsafe_local_execution
+                and os.environ.get(ENV_SOL_EXECBENCH_SANDBOXED) != "1"
+            ):
+                os.environ[unsafe_name] = "1"
+            try:
+                yield
+            finally:
+                if previous_unsafe is None:
+                    os.environ.pop(unsafe_name, None)
+                else:
+                    os.environ[unsafe_name] = previous_unsafe
+                if previous_device is None:
+                    os.environ.pop(device_name, None)
+                else:
+                    os.environ[device_name] = previous_device
     except TimeoutError as exc:
         raise CliFailure(
             str(exc),
@@ -127,6 +130,7 @@ def run_optional_compile_phase(
     static_evidence: str,
     verbose: bool,
 ) -> StaticKernelEvidenceSidecar | None:
+    """Compile native solutions and optionally collect static evidence."""
     packager = context.packager
     static_evidence_result: StaticKernelEvidenceSidecar | None = None
     if packager._is_cpp:
@@ -135,7 +139,10 @@ def run_optional_compile_phase(
             TextColumn("[progress.description]{task.description}"),
             console=context.console,
         ) as progress:
-            task = progress.add_task("Compiling HIP/C++ solution...", total=None)
+            task = progress.add_task(
+                "Compiling HIP/C++ solution...",
+                total=None,
+            )
             compile_result = cli_compilation.run_compile_phase(
                 packager,
                 staging_dir=context.staging_dir,
@@ -157,7 +164,9 @@ def run_optional_compile_phase(
 
         context.console.print("[green]Compilation succeeded[/green]")
         if verbose and compile_result.filtered_stderr:
-            context.console.print(f"[dim]{compile_result.filtered_stderr}[/dim]")
+            context.console.print(
+                f"[dim]{compile_result.filtered_stderr}[/dim]",
+            )
 
         if static_evidence == cli_static_evidence.STATIC_EVIDENCE_AUTO:
             static_evidence_result = (
@@ -169,11 +178,13 @@ def run_optional_compile_phase(
                 )
             )
     elif static_evidence == cli_static_evidence.STATIC_EVIDENCE_AUTO:
-        static_evidence_result = cli_static_evidence._collect_static_evidence_for_cli(
-            enabled=static_evidence,
-            is_cpp=False,
-            staging_dir=context.staging_dir,
-            output_file=context.output_file,
+        static_evidence_result = (
+            cli_static_evidence._collect_static_evidence_for_cli(
+                enabled=static_evidence,
+                is_cpp=False,
+                staging_dir=context.staging_dir,
+                output_file=context.output_file,
+            )
         )
     return static_evidence_result
 
@@ -186,9 +197,10 @@ def run_evaluation_phase(
     profile: str,
     workload_count: int,
 ) -> cli_evaluation_runtime.EvaluationRuntimeResult:
+    """Execute the staged solution and parse its runtime result."""
     if profile == PROFILE_ROCPROFV3:
         context.console.print(
-            "[dim]Collecting optional rocprofv3 profiling evidence...[/dim]"
+            "[dim]Collecting optional rocprofv3 profiling evidence...[/dim]",
         )
 
     with Progress(
@@ -197,7 +209,8 @@ def run_evaluation_phase(
         console=context.console,
     ) as progress:
         task = progress.add_task(
-            f"Evaluating {workload_count} workload(s)...", total=None
+            f"Evaluating {workload_count} workload(s)...",
+            total=None,
         )
         runtime_result = cli_evaluation_runtime.run_evaluation_runtime(
             context.packager,
@@ -213,7 +226,7 @@ def run_evaluation_phase(
         context.console.print(
             "[yellow]rocprofv3 profiling unavailable or failed; "
             "running normal evaluation. Reason: "
-            f"{runtime_result.profile_fallback_reason}[/yellow]"
+            f"{runtime_result.profile_fallback_reason}[/yellow]",
         )
     return runtime_result
 
@@ -224,6 +237,7 @@ def handle_no_trace_failure(
     runtime_result: cli_evaluation_runtime.EvaluationRuntimeNoTraceFailure,
     keep_staging: bool,
 ) -> NoReturn:
+    """Persist diagnostics and raise a classified CLI failure."""
     context.console.print(f"[red]{runtime_result.message}[/red]")
     diagnostic_path = cli_evaluation._write_no_trace_diagnostics_sidecar(
         output_file=context.output_file,
@@ -238,7 +252,7 @@ def handle_no_trace_failure(
     )
     if diagnostic_path is not None:
         context.console.print(
-            f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]"
+            f"[yellow]Saved no-trace diagnostics to {diagnostic_path}[/yellow]",
         )
     if (
         runtime_result.reason
@@ -252,6 +266,8 @@ def handle_no_trace_failure(
         exit_code=EXIT_EXECUTION,
         details={
             "returncode": runtime_result.returncode,
-            "diagnostics_path": str(diagnostic_path) if diagnostic_path else None,
+            "diagnostics_path": str(diagnostic_path)
+            if diagnostic_path
+            else None,
         },
     )

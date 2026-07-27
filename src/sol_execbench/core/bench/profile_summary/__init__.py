@@ -5,6 +5,15 @@
 
 from __future__ import annotations
 
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticFreshnessStatus,
+    DiagnosticFreshnessValidation,
+    DiagnosticGovernanceGuardrail,
+    DiagnosticGovernanceStatus,
+    DiagnosticIdentity,
+    DiagnosticSidecarStatus,
+    SizedDiagnosticArtifactCitation,
+)
 from sol_execbench.core.bench.profile_summary.builder import (
     build_profile_summary_sidecar,
 )
@@ -26,20 +35,11 @@ from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryStructuredMetric,
 )
 from sol_execbench.core.bench.profile_summary.sidecar_models import (
-    PROFILE_SUMMARY_SCHEMA_VERSION,
     _MODEL_CONFIG,
     _PROFILE_SUMMARY_MODEL_EXPORTS,
+    PROFILE_SUMMARY_SCHEMA_VERSION,
     ProfileSummaryReasonCode,
     ProfileSummarySidecar,
-)
-from sol_execbench.core.bench.diagnostic_sidecar import (
-    DiagnosticFreshnessStatus,
-    DiagnosticFreshnessValidation,
-    DiagnosticGovernanceGuardrail,
-    DiagnosticGovernanceStatus,
-    DiagnosticIdentity,
-    DiagnosticSidecarStatus,
-    SizedDiagnosticArtifactCitation,
 )
 
 __all__ = [

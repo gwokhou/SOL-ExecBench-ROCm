@@ -42,7 +42,11 @@ def _series_ms(value: int | float | list[int | float]) -> list[float]:
     return [float(item) for item in value]
 
 
-def _trimmed_spread_ratio(times: list[float], *, trim_fraction: float = 0.10) -> float:
+def _trimmed_spread_ratio(
+    times: list[float],
+    *,
+    trim_fraction: float = 0.10,
+) -> float:
     """Return max/min after dropping symmetric outliers from both tails."""
     assert times
     ordered = sorted(times)
@@ -110,7 +114,7 @@ def test_measurement_budget_uses_aggregate_device_time() -> None:
 
 
 # ---------------------------------------------------------------------------
-# bench_time_with_device_events — requires a PyTorch ROCm device; tested via mock or skipped
+# Device-event timing requires PyTorch ROCm and is mocked or skipped.
 # ---------------------------------------------------------------------------
 
 
@@ -131,7 +135,10 @@ class TestBenchTimeWithDeviceEvents:
 
         return MockEvent
 
-    def test_bench_time_with_device_events_calls_setup_for_each_rep(self, monkeypatch):
+    def test_bench_time_with_device_events_calls_setup_for_each_rep(
+        self,
+        monkeypatch,
+    ):
         """setup() is called once per timed iteration (not during measurement)."""
         MockEvent = self._make_mock_event()
         monkeypatch.setattr(torch.cuda, "Event", MockEvent)
@@ -149,7 +156,7 @@ class TestBenchTimeWithDeviceEvents:
 
         # Can't test do_bench directly without a GPU.
         # Instead, test clone_args + setup integration at unit level
-        pass  # Covered by clone_args tests above
+        # Covered by clone_args tests above
 
     def test_bench_time_with_device_events_warmup_and_rep(self, monkeypatch):
         """Warmup and rep counts are respected."""
@@ -170,7 +177,10 @@ class TestBenchTimeWithDeviceEvents:
         assert _summarize_statistics(times, "median") == 3.0
         assert _summarize_statistics(times, "all") == times
 
-    def test_synchronizes_device_after_candidate_before_end_event(self, monkeypatch):
+    def test_synchronizes_device_after_candidate_before_end_event(
+        self,
+        monkeypatch,
+    ):
         calls: list[str] = []
 
         class MockEvent:
@@ -196,15 +206,20 @@ class TestBenchTimeWithDeviceEvents:
             lambda device, policy: None,
         )
         monkeypatch.setattr(
-            "sol_execbench.core.bench.timing._clear_cache", lambda cache: None
+            "sol_execbench.core.bench.timing._clear_cache",
+            lambda cache: None,
         )
         monkeypatch.setattr(torch.cuda, "Event", MockEvent)
         monkeypatch.setattr(
-            torch.cuda, "synchronize", lambda: calls.append("device_sync")
+            torch.cuda,
+            "synchronize",
+            lambda: calls.append("device_sync"),
         )
 
         result = bench_time_with_device_events(
-            lambda: calls.append("candidate"), warmup=0, rep=1
+            lambda: calls.append("candidate"),
+            warmup=0,
+            rep=1,
         )
 
         assert result == [0.5]
@@ -245,7 +260,11 @@ class TestBenchTimeWithDeviceEventsGPU:
     def test_trivial_kernel_low_variance(self):
         """Repeated trivial kernel timings should cluster tightly."""
         t = torch.zeros(1, device="cuda")
-        times = bench_time_with_device_events(lambda: t.add_(0), warmup=10, rep=100)
+        times = bench_time_with_device_events(
+            lambda: t.add_(0),
+            warmup=10,
+            rep=100,
+        )
         median = sorted(times)[len(times) // 2]
         # Drop top/bottom 10% to get interquartile range
         trimmed = sorted(times)[10:90]
@@ -262,10 +281,10 @@ class TestBenchTimeWithDeviceEventsGPU:
         large = torch.randn(4096, 4096, device="cuda")
 
         ms_small = statistics.median(
-            bench_time_with_device_events(lambda: torch.mm(small, small))
+            bench_time_with_device_events(lambda: torch.mm(small, small)),
         )
         ms_large = statistics.median(
-            bench_time_with_device_events(lambda: torch.mm(large, large))
+            bench_time_with_device_events(lambda: torch.mm(large, large)),
         )
 
         assert ms_large > ms_small * 2, (
@@ -278,10 +297,10 @@ class TestBenchTimeWithDeviceEventsGPU:
         n2 = torch.randn(2048, 2048, device="cuda")
 
         ms_1k = statistics.median(
-            bench_time_with_device_events(lambda: torch.mm(n1, n1))
+            bench_time_with_device_events(lambda: torch.mm(n1, n1)),
         )
         ms_2k = statistics.median(
-            bench_time_with_device_events(lambda: torch.mm(n2, n2))
+            bench_time_with_device_events(lambda: torch.mm(n2, n2)),
         )
 
         # 2048^3 / 1024^3 = 8x FLOPs. On modern GPUs the ratio may be less
@@ -319,13 +338,19 @@ class TestBenchTimeWithDeviceEventsGPU:
 
         ms_cheap = statistics.median(
             bench_time_with_device_events(
-                fn, warmup=warmup, rep=rep, setup=cheap_alloc.get_unique_args
-            )
+                fn,
+                warmup=warmup,
+                rep=rep,
+                setup=cheap_alloc.get_unique_args,
+            ),
         )
         ms_expensive = statistics.median(
             bench_time_with_device_events(
-                fn, warmup=warmup, rep=rep, setup=expensive_setup
-            )
+                fn,
+                warmup=warmup,
+                rep=rep,
+                setup=expensive_setup,
+            ),
         )
 
         # Both measure just add_(1) dispatch.  If setup leaks, expensive
@@ -350,7 +375,10 @@ class TestBenchTimeWithDeviceEventsGPU:
             return orig_get()
 
         bench_time_with_device_events(
-            lambda args: args[0].add_(1), warmup=warmup, rep=rep, setup=counting_setup
+            lambda args: args[0].add_(1),
+            warmup=warmup,
+            rep=rep,
+            setup=counting_setup,
         )
         assert calls[0] == total
 
@@ -370,8 +398,10 @@ class TestBenchTimeWithDeviceEventsGPU:
         # No setup — fn closes over `t`, same data every iteration
         ms_no_setup = statistics.median(
             bench_time_with_device_events(
-                lambda: torch.mm(t, t), warmup=warmup, rep=rep
-            )
+                lambda: torch.mm(t, t),
+                warmup=warmup,
+                rep=rep,
+            ),
         )
 
         # With allocator — provides shifted views each iteration
@@ -382,7 +412,7 @@ class TestBenchTimeWithDeviceEventsGPU:
                 warmup=warmup,
                 rep=rep,
                 setup=allocator.get_unique_args,
-            )
+            ),
         )
 
         ratio = ms_with_setup / ms_no_setup if ms_no_setup > 0 else float("inf")
@@ -407,10 +437,14 @@ class TestBenchTimeWithDeviceEventsGPU:
         large_extra = torch.randn(4096, 4096, device="cuda")
 
         alloc_small = ShiftingMemoryPoolAllocator(
-            [kernel_input, small_extra], [], total
+            [kernel_input, small_extra],
+            [],
+            total,
         )
         alloc_large = ShiftingMemoryPoolAllocator(
-            [kernel_input, large_extra], [], total
+            [kernel_input, large_extra],
+            [],
+            total,
         )
 
         # fn only uses args[0] for compute; args[1] is the extra tensor
@@ -419,13 +453,19 @@ class TestBenchTimeWithDeviceEventsGPU:
 
         ms_small = statistics.median(
             bench_time_with_device_events(
-                fn, warmup=warmup, rep=rep, setup=alloc_small.get_unique_args
-            )
+                fn,
+                warmup=warmup,
+                rep=rep,
+                setup=alloc_small.get_unique_args,
+            ),
         )
         ms_large = statistics.median(
             bench_time_with_device_events(
-                fn, warmup=warmup, rep=rep, setup=alloc_large.get_unique_args
-            )
+                fn,
+                warmup=warmup,
+                rep=rep,
+                setup=alloc_large.get_unique_args,
+            ),
         )
 
         ratio = ms_large / ms_small if ms_small > 0 else float("inf")
@@ -466,7 +506,7 @@ class TestBenchTimeWithDeviceEventsGPU:
                 "cuda:0",
                 warmup=warmup,
                 rep=rep,
-            )
+            ),
         )
         ms_large = _scalar_ms(
             time_runnable(
@@ -476,7 +516,7 @@ class TestBenchTimeWithDeviceEventsGPU:
                 "cuda:0",
                 warmup=warmup,
                 rep=rep,
-            )
+            ),
         )
 
         assert ms_large > ms_small, (
@@ -489,7 +529,11 @@ class TestBenchTimeWithDeviceEventsGPU:
         """bench_time_with_device_events returns exactly `rep` measurements."""
         t = torch.zeros(1, device="cuda")
         rep = 25
-        times = bench_time_with_device_events(lambda: t.add_(0), warmup=5, rep=rep)
+        times = bench_time_with_device_events(
+            lambda: t.add_(0),
+            warmup=5,
+            rep=rep,
+        )
         assert isinstance(times, list)
         assert len(times) == rep
         assert all(t > 0 for t in times)
@@ -529,7 +573,7 @@ class TestTimeRunnable:
                 "cuda:0",
                 warmup=50,
                 return_mode="all",
-            )
+            ),
         )
 
         spread_ratio = _trimmed_spread_ratio(times)
@@ -605,10 +649,17 @@ class TestStreamHidingDetection:
                 return torch.mm(x, x)
 
         ms_default = _scalar_ms(
-            time_runnable(default_kernel, [a], [], "cuda:0", warmup=10, rep=50)
+            time_runnable(default_kernel, [a], [], "cuda:0", warmup=10, rep=50),
         )
         ms_hidden = _scalar_ms(
-            time_runnable(stream_hidden_kernel, [a], [], "cuda:0", warmup=10, rep=50)
+            time_runnable(
+                stream_hidden_kernel,
+                [a],
+                [],
+                "cuda:0",
+                warmup=10,
+                rep=50,
+            ),
         )
 
         ratio = ms_hidden / ms_default if ms_default > 0 else float("inf")
@@ -632,10 +683,17 @@ class TestStreamHidingDetection:
             return result
 
         ms_default = _scalar_ms(
-            time_runnable(default_kernel, [a], [], "cuda:0", warmup=10, rep=50)
+            time_runnable(default_kernel, [a], [], "cuda:0", warmup=10, rep=50),
         )
         ms_hidden = _scalar_ms(
-            time_runnable(stream_hide_with_wait, [a], [], "cuda:0", warmup=10, rep=50)
+            time_runnable(
+                stream_hide_with_wait,
+                [a],
+                [],
+                "cuda:0",
+                warmup=10,
+                rep=50,
+            ),
         )
 
         ratio = ms_hidden / ms_default if ms_default > 0 else float("inf")
@@ -659,7 +717,14 @@ class TestStreamHidingDetection:
                 return torch.mm(x, x)
 
         ms = _scalar_ms(
-            time_runnable(stream_hidden_kernel, [a], [], "cuda:0", warmup=10, rep=50)
+            time_runnable(
+                stream_hidden_kernel,
+                [a],
+                [],
+                "cuda:0",
+                warmup=10,
+                rep=50,
+            ),
         )
 
         # 4096x4096 matmul takes ~0.9ms on RTX 4090; 0.1ms is a safe lower bound

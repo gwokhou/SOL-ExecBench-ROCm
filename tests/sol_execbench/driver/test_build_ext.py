@@ -78,7 +78,7 @@ def _exec_build_ext(
     """
     # Write solution.json
     (cwd / "solution.json").write_text(
-        _make_solution_json(compile_options, language=language)
+        _make_solution_json(compile_options, language=language),
     )
 
     script = _TEMPLATE_PATH.read_text()
@@ -104,7 +104,10 @@ def _exec_build_ext(
     previous_cxx = os.environ.get("CXX")
     try:
         os.chdir(cwd)
-        exec(compile(script, "build_ext.py", "exec"), {"__builtins__": __builtins__})
+        exec(
+            compile(script, "build_ext.py", "exec"),
+            {"__builtins__": __builtins__},
+        )
     finally:
         os.chdir(old_cwd)
         if previous_cxx is None:
@@ -205,12 +208,19 @@ class TestCompileOptions:
     def test_custom_hip_cflags(self, tmp_path):
         (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
-        mock = _exec_build_ext(tmp_path, {"hip_cflags": ["--offload-arch=gfx1200"]})
+        mock = _exec_build_ext(
+            tmp_path,
+            {"hip_cflags": ["--offload-arch=gfx1200"]},
+        )
         hip_cflags = mock.load.call_args.kwargs["extra_cuda_cflags"]
         assert hip_cflags == ["--offload-arch=gfx1200"]
 
     @pytest.mark.parametrize("language", ["ck", "rocwmma"])
-    def test_matrix_libraries_restore_hip_half_support(self, tmp_path, language):
+    def test_matrix_libraries_restore_hip_half_support(
+        self,
+        tmp_path,
+        language,
+    ):
         (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
 
@@ -246,7 +256,10 @@ class TestCompileOptions:
         mock = _exec_build_ext(tmp_path, {})
         assert mock.load.call_args.kwargs["extra_ldflags"] == []
 
-    def test_dangerous_compile_options_rejected_before_extension_load(self, tmp_path):
+    def test_dangerous_compile_options_rejected_before_extension_load(
+        self,
+        tmp_path,
+    ):
         (tmp_path / "k.hip").write_text("")
         (tmp_path / "benchmark_kernel.so").write_bytes(b"fake")
 
@@ -297,7 +310,10 @@ class TestSoRename:
 
     def test_no_so_raises(self, tmp_path):
         (tmp_path / "k.hip").write_text("")
-        with pytest.raises(FileNotFoundError, match="benchmark_kernel.so not produced"):
+        with pytest.raises(
+            FileNotFoundError,
+            match="benchmark_kernel.so not produced",
+        ):
             _exec_build_ext(tmp_path)
 
 

@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 import torch
 
@@ -29,9 +29,11 @@ def normalize_outputs(
     out: Any,
     *,
     device: torch.device,
-    output_names: List[str],
-    output_dtypes: Dict[str, torch.dtype],
-) -> Dict[str, torch.Tensor]:
+    output_names: list[str],
+    output_dtypes: dict[str, torch.dtype],
+) -> dict[str, torch.Tensor]:
+    """Normalize supported return forms to named output tensors."""
+
     def to_tensor(name: str, v: Any) -> torch.Tensor:
         if isinstance(v, torch.Tensor):
             return v.to(device) if v.device != device else v
@@ -39,36 +41,45 @@ def normalize_outputs(
         return torch.tensor(v, dtype=dtype, device=device)
 
     if isinstance(out, dict):
-        return {k: to_tensor(k, v) for k, v in out.items() if k in output_dtypes}
+        return {
+            k: to_tensor(k, v) for k, v in out.items() if k in output_dtypes
+        }
 
     if isinstance(out, torch.Tensor):
         if len(output_names) != 1:
             raise RuntimeError(
-                "Single Tensor returned but multiple outputs are defined"
+                "Single Tensor returned but multiple outputs are defined",
             )
         name = output_names[0]
         return {name: to_tensor(name, out)}
 
     if isinstance(out, (int, float, bool)):
         if len(output_names) != 1:
-            raise RuntimeError("Scalar returned but multiple outputs are defined")
+            raise RuntimeError(
+                "Scalar returned but multiple outputs are defined",
+            )
         name = output_names[0]
         return {name: to_tensor(name, out)}
 
     if isinstance(out, (tuple, list)):
         if len(out) != len(output_names):
             raise RuntimeError(
-                f"Tuple/list has {len(out)} elements but {len(output_names)} outputs expected"
+                f"Tuple/list has {len(out)} elements but {len(output_names)} outputs expected",
             )
-        return {name: to_tensor(name, val) for name, val in zip(output_names, out)}
+        return {
+            name: to_tensor(name, val)
+            for name, val in zip(output_names, out, strict=True)
+        }
 
     raise RuntimeError(
-        "Unexpected return type; must be Tensor, scalar, or dict[name -> Tensor/scalar]"
+        "Unexpected return type; must be Tensor, scalar, or dict[name -> Tensor/scalar]",
     )
 
 
 def allocate_outputs(
-    definition: Definition, resolved_axes: dict[str, int], device: str
+    definition: Definition,
+    resolved_axes: dict[str, int],
+    device: str,
 ) -> list[torch.Tensor]:
     """Allocate output tensors based on definition and resolved axis values.
 
@@ -82,15 +93,16 @@ def allocate_outputs(
     device : str
         The device to allocate tensors on (e.g., a PyTorch ROCm GPU device).
 
-    Returns
+    Returns:
     -------
     list[torch.Tensor]
         List of allocated (uninitialized) output tensors in definition order.
+
     """
     output_shapes = list(definition.get_output_shapes(resolved_axes).values())
 
     dtypes = definition.torch_output_dtypes
     return [
         torch.zeros([] if shape is None else shape, dtype=dtype, device=device)
-        for shape, dtype in zip(output_shapes, dtypes)
+        for shape, dtype in zip(output_shapes, dtypes, strict=True)
     ]

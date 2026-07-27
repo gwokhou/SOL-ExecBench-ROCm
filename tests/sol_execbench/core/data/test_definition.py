@@ -18,22 +18,20 @@
 """Tests for sol_execbench.core.data.definition.Definition."""
 
 import pytest
-
-from sol_execbench.core.data.definition import Definition
 from sol_execbench_type_helpers import make_definition
 
 _REFERENCE = "def run(a): return a"
 
 
 def _make(**overrides):
-    base = dict(
-        name="op",
-        op_type="gemm",
-        axes={"N": {"type": "var"}},
-        inputs={"a": {"shape": ["N"], "dtype": "float32"}},
-        outputs={"b": {"shape": ["N"], "dtype": "float32"}},
-        reference=_REFERENCE,
-    )
+    base = {
+        "name": "op",
+        "op_type": "gemm",
+        "axes": {"N": {"type": "var"}},
+        "inputs": {"a": {"shape": ["N"], "dtype": "float32"}},
+        "outputs": {"b": {"shape": ["N"], "dtype": "float32"}},
+        "reference": _REFERENCE,
+    }
     base.update(overrides)
     return make_definition(**base)
 
@@ -59,7 +57,10 @@ class TestGetResolvedAxesValues:
 
     def test_expr_axis_evaluated(self):
         d = _make(
-            axes={"N": {"type": "var"}, "N2": {"type": "expr", "expression": "N * 2"}},
+            axes={
+                "N": {"type": "var"},
+                "N2": {"type": "expr", "expression": "N * 2"},
+            },
             outputs={"b": {"shape": ["N2"], "dtype": "float32"}},
         )
         result = d.get_resolved_axes_values({"N": 5})
@@ -103,7 +104,9 @@ class TestDefinitionValidators:
 
     def test_undefined_axis_in_input_shape_raises(self):
         with pytest.raises(ValueError, match="undefined"):
-            _make(inputs={"a": {"shape": ["UNDEFINED_AXIS"], "dtype": "float32"}})
+            _make(
+                inputs={"a": {"shape": ["UNDEFINED_AXIS"], "dtype": "float32"}}
+            )
 
     def test_overlapping_input_output_names_raises(self):
         with pytest.raises(ValueError, match="overlap"):

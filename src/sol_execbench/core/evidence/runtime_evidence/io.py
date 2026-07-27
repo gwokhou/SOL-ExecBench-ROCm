@@ -6,9 +6,11 @@ import json
 from pathlib import Path
 from typing import cast
 
-from sol_execbench.core.platform.compatibility import MatrixEntry
-from sol_execbench.core.evidence.runtime_evidence.builders import build_aggregate_report
+from sol_execbench.core.evidence.runtime_evidence.builders import (
+    build_aggregate_report,
+)
 from sol_execbench.core.evidence.runtime_evidence.models import ModelDumpable
+from sol_execbench.core.platform.compatibility import MatrixEntry
 
 
 def write_json_payload(path: Path, payload: object) -> Path:

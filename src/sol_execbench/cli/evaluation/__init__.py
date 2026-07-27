@@ -1,9 +1,9 @@
 """Evaluation command helpers for the SOL ExecBench CLI."""
 
 from sol_execbench.cli.evaluation.command import (
+    _DIAGNOSTIC_TAIL_LIMIT,
     NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
     NoTraceDiagnostics,
-    _DIAGNOSTIC_TAIL_LIMIT,
     _diagnostic_tail,
     _no_trace_diagnostics_sidecar_path,
     _run_evaluation_command,

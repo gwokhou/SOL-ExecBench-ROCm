@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from __future__ import annotations
-
 import argparse
 import json
 from pathlib import Path
@@ -28,7 +26,9 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     preview = subparsers.add_parser("preview")
     preview.add_argument(
-        "--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST
+        "--manifest",
+        type=Path,
+        default=DEFAULT_DOCKER_TARGET_MANIFEST,
     )
     preview.add_argument("--target")
     preview.add_argument("--allow-unknown-target", action="store_true")
@@ -37,15 +37,25 @@ def _build_parser() -> argparse.ArgumentParser:
     preview.add_argument("--image-digest")
     preflight = subparsers.add_parser("preflight")
     preflight.add_argument(
-        "--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST
+        "--manifest",
+        type=Path,
+        default=DEFAULT_DOCKER_TARGET_MANIFEST,
     )
     preflight.add_argument("--target")
     preflight.add_argument("--docker-context")
     preflight.add_argument("--docker-host")
     preflight.add_argument("--dev-kfd-present", required=True, type=parse_bool)
-    preflight.add_argument("--dev-kfd-accessible", required=True, type=parse_bool)
+    preflight.add_argument(
+        "--dev-kfd-accessible",
+        required=True,
+        type=parse_bool,
+    )
     preflight.add_argument("--dev-dri-present", required=True, type=parse_bool)
-    preflight.add_argument("--dev-dri-accessible", required=True, type=parse_bool)
+    preflight.add_argument(
+        "--dev-dri-accessible",
+        required=True,
+        type=parse_bool,
+    )
     preflight.add_argument("--gpu-accessible", type=parse_bool)
     preflight.add_argument("--image-digest")
     return parser
@@ -53,7 +63,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """Emit shell-consumable Docker Matrix JSON."""
-
     args = _build_parser().parse_args(argv)
     if args.command == "preview":
         payload = preview_docker_target_selection(
@@ -67,7 +76,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(payload, sort_keys=True))
         return 0
     if args.command == "preflight":
-        selection = select_docker_target(args.target, manifest_path=args.manifest)
+        selection = select_docker_target(
+            args.target,
+            manifest_path=args.manifest,
+        )
         observation = DockerPreflightObservation(
             docker_context=args.docker_context,
             docker_host=args.docker_host,

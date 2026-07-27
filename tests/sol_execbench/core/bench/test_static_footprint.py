@@ -10,8 +10,8 @@ from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceReasonCode,
-    StaticKernelEvidenceStatus,
     StaticKernelEvidenceSidecar,
+    StaticKernelEvidenceStatus,
     StaticResourceFootprint,
 )
 from sol_execbench.core.bench.static_kernel.footprint_parsers import (
@@ -40,12 +40,16 @@ def test_parser_extracts_resource_markers():
 
 
 def test_parser_returns_none_without_markers():
-    assert parse_roc_objdump_resource_usage("no markers here", artifact_id="k0") is None
+    assert (
+        parse_roc_objdump_resource_usage("no markers here", artifact_id="k0")
+        is None
+    )
 
 
 def test_parser_spill_false_when_zero_scratch():
     footprint = parse_roc_objdump_resource_usage(
-        "; NumVgprs: 8\n; ScratchSize: 0\n", artifact_id="k0"
+        "; NumVgprs: 8\n; ScratchSize: 0\n",
+        artifact_id="k0",
     )
     assert footprint is not None
     assert footprint.spill_detected is False
@@ -67,7 +71,10 @@ def test_footprint_governance_flags_diagnostic_only():
 
 def test_footprint_round_trip():
     footprint = StaticResourceFootprint(
-        vgpr_used=32, sgpr_used=16, spill_detected=False, source_tool="roc-objdump"
+        vgpr_used=32,
+        sgpr_used=16,
+        spill_detected=False,
+        source_tool="roc-objdump",
     )
     payload = footprint.model_dump(mode="json")
     rebuilt = StaticResourceFootprint.model_validate(payload)
@@ -77,7 +84,9 @@ def test_footprint_round_trip():
 
 def test_valid_footprint_fixture_loads_as_v3_sidecar():
     payload = json.loads(
-        (FIXTURE_DIR / "valid.static-footprint.json").read_text(encoding="utf-8")
+        (FIXTURE_DIR / "valid.static-footprint.json").read_text(
+            encoding="utf-8",
+        ),
     )
     sidecar = StaticKernelEvidenceSidecar.model_validate(payload)
 
@@ -118,13 +127,23 @@ def test_extractor_collects_footprint_without_downgrading_base_status(tmp_path):
 
     def probe_runner(command, timeout_seconds):
         return ProbeCompletedProcess(
-            returncode=0, stdout=f"{command[0]} version", stderr=""
+            returncode=0,
+            stdout=f"{command[0]} version",
+            stderr="",
         )
 
     def extractor_runner(command, timeout_seconds):
         if command[0] == "roc-objdump":
-            return ProbeCompletedProcess(returncode=0, stdout=resource, stderr="")
-        return ProbeCompletedProcess(returncode=0, stdout="disassembly", stderr="")
+            return ProbeCompletedProcess(
+                returncode=0,
+                stdout=resource,
+                stderr="",
+            )
+        return ProbeCompletedProcess(
+            returncode=0,
+            stdout="disassembly",
+            stderr="",
+        )
 
     sidecar = run_static_kernel_extractors(
         artifacts=[artifact],
@@ -136,7 +155,10 @@ def test_extractor_collects_footprint_without_downgrading_base_status(tmp_path):
     )
 
     assert sidecar.status == "collected"
-    assert {run.tool_id for run in sidecar.tool_runs} == {"llvm-objdump", "readelf"}
+    assert {run.tool_id for run in sidecar.tool_runs} == {
+        "llvm-objdump",
+        "readelf",
+    }
     assert len(sidecar.footprints) == 1
     footprint = sidecar.footprints[0]
     assert footprint.vgpr_used == 40
@@ -171,7 +193,11 @@ def test_extractor_skips_footprint_when_roc_objdump_missing(tmp_path):
         return ProbeCompletedProcess(returncode=0, stdout="v", stderr="")
 
     def extractor_runner(command, timeout_seconds):
-        return ProbeCompletedProcess(returncode=0, stdout="disassembly", stderr="")
+        return ProbeCompletedProcess(
+            returncode=0,
+            stdout="disassembly",
+            stderr="",
+        )
 
     sidecar = run_static_kernel_extractors(
         artifacts=[artifact],

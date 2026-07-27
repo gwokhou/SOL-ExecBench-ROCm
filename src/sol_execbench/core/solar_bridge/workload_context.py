@@ -26,12 +26,14 @@ class SolarWorkloadContext:
 
 
 def load_solar_workload_context(
-    problem_dir: str | Path, workload_uuid: str, device: str
+    problem_dir: str | Path,
+    workload_uuid: str,
+    device: str,
 ) -> SolarWorkloadContext:
     """Load and uniquely select a workload without importing SOLAR."""
     problem = Path(problem_dir).resolve()
     definition = Definition.model_validate_json(
-        (problem / "definition.json").read_text()
+        (problem / "definition.json").read_text(),
     )
     workloads = [
         Workload.model_validate_json(line)
@@ -41,13 +43,19 @@ def load_solar_workload_context(
     row_index, workload = _select_workload(workloads, workload_uuid)
     module, reference = load_reference_function(definition.reference)
     factory = build_input_factory(
-        definition, workload, row_index, module, problem, device
+        definition,
+        workload,
+        row_index,
+        module,
+        problem,
+        device,
     )
     return SolarWorkloadContext(definition, workload, reference, factory)
 
 
 def _select_workload(
-    workloads: list[Workload], workload_uuid: str
+    workloads: list[Workload],
+    workload_uuid: str,
 ) -> tuple[int, Workload]:
     matches = [
         (index, workload)
@@ -55,7 +63,9 @@ def _select_workload(
         if workload.uuid == workload_uuid
     ]
     if len(matches) != 1:
-        raise ValueError(f"workload UUID must match exactly once: {workload_uuid}")
+        raise ValueError(
+            f"workload UUID must match exactly once: {workload_uuid}",
+        )
     return matches[0]
 
 

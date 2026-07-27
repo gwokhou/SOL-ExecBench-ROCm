@@ -28,9 +28,10 @@ import json
 import logging
 import os
 import sys
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
@@ -63,6 +64,7 @@ def acquire_pid_lock(output_dir: Path) -> Iterator[None]:
         >>> with acquire_pid_lock(Path("/tmp/output")):
         ...     # Critical section — no other process can acquire this lock
         ...     run_batch_profiling()
+
     """
     lock_file = output_dir / ".sol-execbench.lock"
 
@@ -78,7 +80,7 @@ def acquire_pid_lock(output_dir: Path) -> Iterator[None]:
         logger.debug("Acquired PID lock: %s", lock_file)
         yield
     except BlockingIOError:
-        # Lock is held by another process — write contention marker before exiting
+        # Record contention before exiting when another process holds the lock.
         _write_contention_marker(lock_file, output_dir)
         print(
             f"ERROR: Another instance holds lock: {lock_file}",
@@ -139,8 +141,6 @@ def read_pid_lock_contention_marker(output_dir: Path) -> bool:
         marker_path.unlink(missing_ok=True)
         return bool(payload.get("pid_lock_contention"))
     except (json.JSONDecodeError, OSError, ValueError):
-        try:
+        with contextlib.suppress(OSError):
             marker_path.unlink(missing_ok=True)
-        except OSError:
-            pass
         return False

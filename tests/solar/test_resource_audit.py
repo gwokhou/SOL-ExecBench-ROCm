@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import statistics
+from pathlib import Path
 
 import pytest
 
@@ -53,12 +53,18 @@ def _telemetry_summary(raw_batches: list[dict]) -> dict:
     return {
         "snapshot_count": len(snapshots),
         "deep_sleep_states": sorted({item["deep_sleep"] for item in snapshots}),
-        "throttle_statuses": sorted({item["throttle_status"] for item in snapshots}),
-        "performance_levels": sorted({item["performance_level"] for item in snapshots}),
+        "throttle_statuses": sorted(
+            {item["throttle_status"] for item in snapshots},
+        ),
+        "performance_levels": sorted(
+            {item["performance_level"] for item in snapshots},
+        ),
         "numeric": {
             field_name: {
                 "minimum": min(item[field_name] for item in snapshots),
-                "median": statistics.median(item[field_name] for item in snapshots),
+                "median": statistics.median(
+                    item[field_name] for item in snapshots
+                ),
                 "maximum": max(item[field_name] for item in snapshots),
             }
             for field_name in numeric_fields
@@ -173,7 +179,9 @@ def _tuning_candidate(
         "batch_medians": batch_medians,
         "selection_result": statistics.median(batch_medians),
         "all_sample_median": statistics.median(samples),
-        "interquartile_range": (_quantile(samples, 0.75) - _quantile(samples, 0.25)),
+        "interquartile_range": (
+            _quantile(samples, 0.75) - _quantile(samples, 0.25)
+        ),
         "raw_process_batches": raw_batches,
     }
 
@@ -213,7 +221,10 @@ def _payload() -> dict:
     payload = {
         "schema_version": RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
         "timing_profile": RESOURCE_PEAK_TIMING_PROFILE,
-        "device": {"device_name": "AMD Radeon RX 9060 XT", "gfx_target": "gfx1200"},
+        "device": {
+            "device_name": "AMD Radeon RX 9060 XT",
+            "gfx_target": "gfx1200",
+        },
         "clock_setup": {"clock_locked_verified": True},
         "experiment_protocol": {
             "design": "two_phase_tuning_then_held_out_measurement",
@@ -256,7 +267,7 @@ def _payload() -> dict:
                     "compiler_emitted_count": 4,
                     "runtime_probe_passed": True,
                     "native_instruction_usable": True,
-                }
+                },
             },
         },
         "calibration_coverage": {
@@ -277,7 +288,7 @@ def _payload() -> dict:
                     "matched_instruction_counts": {"V_PK_FMA_F16": 4},
                     "spec_provenance": {"spec_sha256": "a" * 64},
                 },
-            }
+            },
         ],
     }
     payload["payload_sha256"] = resource_peak_payload_sha256(payload)
@@ -332,8 +343,10 @@ def test_limited_scope_accepts_explicitly_reported_throttling(tmp_path: Path):
 
     verified = _verify(path, digest, expected_unthrottled=False)
 
-    assert verified["measurements"][0]["telemetry_summary"]["throttle_statuses"] == [
-        "THROTTLED"
+    assert verified["measurements"][0]["telemetry_summary"][
+        "throttle_statuses"
+    ] == [
+        "THROTTLED",
     ]
     with pytest.raises(ValueError, match="telemetry reports throttling"):
         _verify(path, digest)
@@ -355,7 +368,9 @@ def test_rejects_file_and_payload_identity_mismatches(tmp_path: Path):
     assert digest != tampered_digest
 
 
-def test_verifies_fallback_instruction_evidence_from_measurement(tmp_path: Path):
+def test_verifies_fallback_instruction_evidence_from_measurement(
+    tmp_path: Path,
+):
     path = tmp_path / "fallback.json"
     payload = _payload()
     check = payload["instruction_validation"]["checks"]["fp16_valu_fma"]
@@ -382,7 +397,10 @@ def test_verifies_fallback_instruction_evidence_from_measurement(tmp_path: Path)
 
     check["fallback_emitted_count"] = 7
     digest = _write(path, payload)
-    with pytest.raises(ValueError, match="fallback instruction evidence mismatch"):
+    with pytest.raises(
+        ValueError,
+        match="fallback instruction evidence mismatch",
+    ):
         _verify(path, digest)
 
 
@@ -395,10 +413,12 @@ def test_verifies_tuning_selection_is_separate_and_recomputable(tmp_path: Path):
     verified = _verify(path, digest)
 
     assert verified["measurements"][0]["selected_configuration"] == {
-        "waves_per_reported_wgp": 16
+        "waves_per_reported_wgp": 16,
     }
 
-    payload["measurements"][0]["tuning"]["held_out_samples_used_for_selection"] = True
+    payload["measurements"][0]["tuning"][
+        "held_out_samples_used_for_selection"
+    ] = True
     digest = _write(path, payload)
     with pytest.raises(ValueError, match="tuning protocol is invalid"):
         _verify(path, digest)
@@ -420,9 +440,9 @@ def test_verifies_tuning_selection_is_separate_and_recomputable(tmp_path: Path):
             "confidence interval is invalid",
         ),
         (
-            lambda item: item["experiment_protocol"]["held_out_execution_order"][
-                0
-            ].update(position=1),
+            lambda item: item["experiment_protocol"][
+                "held_out_execution_order"
+            ][0].update(position=1),
             "execution order is invalid",
         ),
         (
@@ -439,13 +459,17 @@ def test_verifies_tuning_selection_is_separate_and_recomputable(tmp_path: Path):
         ),
         (
             lambda item: item["measurements"][0]["telemetry_summary"].update(
-                snapshot_count=1
+                snapshot_count=1,
             ),
             "telemetry summary count mismatch",
         ),
     ],
 )
-def test_rejects_unreproducible_measurement_evidence(tmp_path: Path, mutation, message):
+def test_rejects_unreproducible_measurement_evidence(
+    tmp_path: Path,
+    mutation,
+    message,
+):
     path = tmp_path / "audit.json"
     payload = _payload()
     mutation(payload)
@@ -471,7 +495,9 @@ def test_rejects_unreproducible_measurement_evidence(tmp_path: Path, mutation, m
             "gfx target mismatch",
         ),
         (
-            lambda item: item["clock_setup"].update(clock_locked_verified=False),
+            lambda item: item["clock_setup"].update(
+                clock_locked_verified=False,
+            ),
             "clock-lock state mismatch",
         ),
         (
@@ -479,11 +505,15 @@ def test_rejects_unreproducible_measurement_evidence(tmp_path: Path, mutation, m
             "instruction validation did not pass",
         ),
         (
-            lambda item: item["calibration_coverage"].update(covered_precisions=[]),
+            lambda item: item["calibration_coverage"].update(
+                covered_precisions=[],
+            ),
             "covered_precisions mismatch",
         ),
         (
-            lambda item: item["calibration_coverage"].update(covered_resource_modes=[]),
+            lambda item: item["calibration_coverage"].update(
+                covered_resource_modes=[],
+            ),
             "covered_resource_modes mismatch",
         ),
         (
@@ -491,11 +521,15 @@ def test_rejects_unreproducible_measurement_evidence(tmp_path: Path, mutation, m
             "covered_precisions mismatch",
         ),
         (
-            lambda item: item["measurements"][0].update(covers_resource_modes=[]),
+            lambda item: item["measurements"][0].update(
+                covers_resource_modes=[],
+            ),
             "covered_resource_modes mismatch",
         ),
         (
-            lambda item: item["instruction_validation"].update(required_checks=[]),
+            lambda item: item["instruction_validation"].update(
+                required_checks=[],
+            ),
             "required instruction checks mismatch",
         ),
         (
@@ -505,8 +539,10 @@ def test_rejects_unreproducible_measurement_evidence(tmp_path: Path, mutation, m
             "native instruction evidence mismatch",
         ),
         (
-            lambda item: item["isa_spec_evidence"]["instruction_presence"].update(
-                V_PK_FMA_F16=False
+            lambda item: item["isa_spec_evidence"][
+                "instruction_presence"
+            ].update(
+                V_PK_FMA_F16=False,
             ),
             "ISA declaration mismatch",
         ),
@@ -523,7 +559,9 @@ def test_rejects_unreproducible_measurement_evidence(tmp_path: Path, mutation, m
             "compiler ISA specification mismatch",
         ),
         (
-            lambda item: item["measurements"][0].update(runtime_probe_passed=False),
+            lambda item: item["measurements"][0].update(
+                runtime_probe_passed=False,
+            ),
             "runtime probe did not pass",
         ),
         (

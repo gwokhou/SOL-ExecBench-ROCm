@@ -10,14 +10,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from sol_execbench.core.bench.static_kernel.evidence_builders import (
-    build_static_kernel_evidence_sidecar,
-)
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     extract_amdgpu_footprints,
 )
-from sol_execbench.core.bench.static_kernel.footprint_parsers import (
-    parse_roc_objdump_resource_usage,
+from sol_execbench.core.bench.static_kernel.evidence_builders import (
+    build_static_kernel_evidence_sidecar,
 )
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceArtifact,
@@ -31,26 +28,43 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
 )
 from sol_execbench.core.bench.static_kernel.extractor_execution import (
     ExtractorRunner,
+)
+from sol_execbench.core.bench.static_kernel.extractor_execution import (
     run_static_extractor as _run_static_extractor,
 )
 from sol_execbench.core.bench.static_kernel.extractor_routing import (
     aggregate_extractor_reason as _aggregate_extractor_reason,
+)
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
     aggregate_extractor_status as _aggregate_extractor_status,
+)
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
     artifact_persisted_path as _artifact_persisted_path,
+)
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
     classification_from_tool_runs as _classification_from_tool_runs,
+)
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
     extractor_command as _extractor_command,
+)
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
     reason_for_route_status as _reason_for_route_status,
+)
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
     route_static_tool as _route_static_tool,
+)
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
     static_extractor_tool_ids,
-    tool_run_from_route_decision as _tool_run_from_route_decision,
     toolchain_artifact_type_for_static_artifact,
+)
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
+    tool_run_from_route_decision as _tool_run_from_route_decision,
+)
+from sol_execbench.core.bench.static_kernel.footprint_parsers import (
+    parse_roc_objdump_resource_usage,
 )
 from sol_execbench.core.bench.static_kernel.isa_analysis import (
     collect_static_isa_analyses,
-)
-from sol_execbench.core.process.subprocesses import (
-    ProbeCompletedProcess,
-    run_bounded_probe,
 )
 from sol_execbench.core.platform.toolchain import (
     ProbeRunner,
@@ -59,7 +73,10 @@ from sol_execbench.core.platform.toolchain import (
     ToolchainStatus,
     Which,
 )
-
+from sol_execbench.core.process.subprocesses import (
+    ProbeCompletedProcess,
+    run_bounded_probe,
+)
 
 _FOOTPRINT_EXTRACTOR_TOOL_IDS = ("roc-objdump",)
 
@@ -79,7 +96,6 @@ class _ExtractorContext:
 
 def _memoize_which(which: Which) -> Which:
     """Cache ``which(binary)`` lookups; tool paths are invariant across a run."""
-
     cache: dict[str, str | None] = {}
 
     def resolved(binary: str) -> str | None:
@@ -97,10 +113,12 @@ def _memoize_probe_runner(runner: ProbeRunner | None) -> ProbeRunner:
     artifacts in one run, so memoizing it avoids N redundant subprocess spawns
     when the extractor loop routes the same tool per artifact.
     """
-
     cache: dict[tuple[str, ...], ProbeCompletedProcess] = {}
 
-    def resolved(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
+    def resolved(
+        command: list[str],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
         key = tuple(command)
         if key not in cache:
             cache[key] = (runner or run_bounded_probe)(command, timeout_seconds)
@@ -137,7 +155,10 @@ def run_static_kernel_extractors(
         which=_memoize_which(which),
         registry=list(registry) if registry is not None else None,
     )
-    tool_runs, warnings, output_artifacts = _run_routed_extractors(artifacts, context)
+    tool_runs, warnings, output_artifacts = _run_routed_extractors(
+        artifacts,
+        context,
+    )
 
     footprints, amdgpu_runs = _collect_resource_footprints(
         artifacts=artifacts,
@@ -182,7 +203,8 @@ def _run_routed_extractors(
     output_artifacts: list[StaticKernelEvidenceArtifact] = []
     for artifact in artifacts:
         runs, artifact_warnings, produced = _run_extractors_for_artifact(
-            artifact, context
+            artifact,
+            context,
         )
         tool_runs.extend(runs)
         warnings.extend(artifact_warnings)
@@ -210,7 +232,11 @@ def _run_extractors_for_artifact(
     output_artifacts: list[StaticKernelEvidenceArtifact] = []
     for tool_id in static_extractor_tool_ids():
         tool_run, warning, raw_artifact = _run_routed_tool(
-            tool_id, artifact, artifact_type, artifact_path, context
+            tool_id,
+            artifact,
+            artifact_type,
+            artifact_path,
+            context,
         )
         tool_runs.append(tool_run)
         if warning is not None:
@@ -221,7 +247,8 @@ def _run_extractors_for_artifact(
 
 
 def _unsupported_artifact_run(
-    artifact: StaticKernelEvidenceArtifact, context: _ExtractorContext
+    artifact: StaticKernelEvidenceArtifact,
+    context: _ExtractorContext,
 ) -> StaticKernelEvidenceToolRun:
     return StaticKernelEvidenceToolRun(
         tool_id="static-extractor",
@@ -236,7 +263,8 @@ def _unsupported_artifact_run(
 
 
 def _missing_artifact_run(
-    artifact: StaticKernelEvidenceArtifact, context: _ExtractorContext
+    artifact: StaticKernelEvidenceArtifact,
+    context: _ExtractorContext,
 ) -> StaticKernelEvidenceToolRun:
     return StaticKernelEvidenceToolRun(
         tool_id="static-extractor",
@@ -329,7 +357,6 @@ def _collect_resource_footprints(
     artifact that went through the native fallback, so the sidecar records the
     real footprint source.
     """
-
     footprints: list[StaticResourceFootprint] = []
     amdgpu_runs: list[StaticKernelEvidenceToolRun] = []
     for artifact in artifacts:
@@ -378,7 +405,10 @@ def _collect_routed_footprints(
             which=context.which,
             timeout_seconds=context.timeout_seconds,
         )
-        if route_decision is None or route_decision.status != ToolchainStatus.AVAILABLE:
+        if (
+            route_decision is None
+            or route_decision.status != ToolchainStatus.AVAILABLE
+        ):
             continue
         tool_run, raw_artifact = _run_static_extractor(
             tool_id=tool_id,
@@ -408,7 +438,10 @@ def _footprint_from_collected_output(
     raw_artifact: StaticKernelEvidenceArtifact | None,
     sidecar_base: Path,
 ) -> StaticResourceFootprint | None:
-    if tool_run.status != StaticKernelEvidenceStatus.COLLECTED or raw_artifact is None:
+    if (
+        tool_run.status != StaticKernelEvidenceStatus.COLLECTED
+        or raw_artifact is None
+    ):
         return None
     raw_path = _artifact_persisted_path(raw_artifact, sidecar_base)
     if raw_path is None or not raw_path.is_file():

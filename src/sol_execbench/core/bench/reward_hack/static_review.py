@@ -25,7 +25,8 @@ detected.
 from __future__ import annotations
 
 import ast
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import torch
 
@@ -36,8 +37,8 @@ from sol_execbench.core.bench.reward_hack.models import (
     _INDIRECT_STREAM_ATTRS,
     _JIT_FORK_CALLS,
     _PARALLEL_IMPORT_ROOTS,
-    _PRECISION_DOWNGRADE_RULE,
     _PRECISION_ATTRS,
+    _PRECISION_DOWNGRADE_RULE,
     _PRECISION_DTYPE_NAMES,
     _PROCESS_ATTRS,
     _PROCESS_PREFIXES,
@@ -47,9 +48,9 @@ from sol_execbench.core.bench.reward_hack.models import (
     _RISKY_METHODS,
     _RULE_BY_NAME,
     _STATIC_RULES,
-    _SourceRule,
     SourceReview,
     SourceReviewIssue,
+    _SourceRule,
 )
 
 
@@ -76,7 +77,9 @@ def review_solution_sources(
             for rule in _STATIC_RULES:
                 issues.extend(_match_rule(path, content, rule))
             if float32_contract:
-                issues.extend(_match_rule(path, content, _PRECISION_DOWNGRADE_RULE))
+                issues.extend(
+                    _match_rule(path, content, _PRECISION_DOWNGRADE_RULE),
+                )
     return SourceReview(issues=tuple(issues))
 
 
@@ -143,7 +146,8 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         if node.value is not None and _assignment_creates_semantic_cache(
-            [node.target], node.value
+            [node.target],
+            node.value,
         ):
             self._add("semantic_output_cache", node, self._node_source(node))
         self.generic_visit(node)
@@ -165,10 +169,19 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             self._add("semantic_output_cache", node, name)
         if self._is_unauthorized_call(node, name):
             self._add(
-                "unauthorized_file_or_loader", node, name or self._node_source(node)
+                "unauthorized_file_or_loader",
+                node,
+                name or self._node_source(node),
             )
-        if self.float32_contract and self._is_precision_downgrade_call(node, name):
-            self._add("precision_downgrade", node, name or self._node_source(node))
+        if self.float32_contract and self._is_precision_downgrade_call(
+            node,
+            name,
+        ):
+            self._add(
+                "precision_downgrade",
+                node,
+                name or self._node_source(node),
+            )
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -188,7 +201,7 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         }:
             return True
         return name.endswith(
-            (".wait_stream", *(f".{method}" for method in _GRAPH_METHODS))
+            (".wait_stream", *(f".{method}" for method in _GRAPH_METHODS)),
         )
 
     def _is_jit_fork_call(self, name: str) -> bool:
@@ -202,7 +215,9 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         ``from torch.jit import fork`` all canonicalize to ``torch.jit.fork``.
         """
         return (
-            name in _JIT_FORK_CALLS or name.endswith(".jit.fork") or name == "jit.fork"
+            name in _JIT_FORK_CALLS
+            or name.endswith(".jit.fork")
+            or name == "jit.fork"
         )
 
     def _is_indirect_stream_getattr(self, node: ast.Call) -> bool:
@@ -215,7 +230,8 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         if self._resolved_name(node.func) != "getattr" or len(node.args) < 2:
             return False
         if not isinstance(node.args[1], ast.Constant) or not isinstance(
-            node.args[1].value, str
+            node.args[1].value,
+            str,
         ):
             return False
         attr = node.args[1].value
@@ -264,12 +280,12 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         }:
             return True
         if name in _RISKY_METHODS or name.endswith(
-            tuple(f".{method}" for method in _RISKY_METHODS)
+            tuple(f".{method}" for method in _RISKY_METHODS),
         ):
             return True
         if name.startswith("os.") and _is_process_attr(name.rsplit(".", 1)[-1]):
             return True
-        if name.startswith("subprocess.") or name.startswith("socket."):
+        if name.startswith(("subprocess.", "socket.")):
             return True
         return self._is_risky_getattr_call(node)
 
@@ -278,7 +294,8 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             return True
         if name.endswith(".to"):
             return any(
-                self._resolved_name(arg) in _PRECISION_DTYPE_NAMES for arg in node.args
+                self._resolved_name(arg) in _PRECISION_DTYPE_NAMES
+                for arg in node.args
             ) or any(
                 self._resolved_name(keyword.value) in _PRECISION_DTYPE_NAMES
                 for keyword in node.keywords
@@ -288,18 +305,23 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
     def _check_decorators(self, decorators: list[ast.expr]) -> None:
         for decorator in decorators:
             name = self._resolved_name(
-                decorator.func if isinstance(decorator, ast.Call) else decorator
+                decorator.func
+                if isinstance(decorator, ast.Call)
+                else decorator,
             )
             if name in {"functools.lru_cache", "lru_cache"}:
                 self._add(
-                    "semantic_output_cache", decorator, self._node_source(decorator)
+                    "semantic_output_cache",
+                    decorator,
+                    self._node_source(decorator),
                 )
 
     def _is_risky_getattr_call(self, node: ast.Call) -> bool:
         if self._resolved_name(node.func) != "getattr" or len(node.args) < 2:
             return False
         if not isinstance(node.args[1], ast.Constant) or not isinstance(
-            node.args[1].value, str
+            node.args[1].value,
+            str,
         ):
             return False
         attr = node.args[1].value
@@ -318,7 +340,7 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
                 severity=rule.severity,
                 message=rule.message,
                 evidence=(evidence or self._node_source(node)).strip()[:120],
-            )
+            ),
         )
 
     def _node_source(self, node: ast.AST) -> str:
@@ -348,10 +370,13 @@ def _name_is_cache_container(name: str) -> bool:
 
 
 def _assignment_creates_semantic_cache(
-    targets: Iterable[ast.AST], value: ast.AST
+    targets: Iterable[ast.AST],
+    value: ast.AST,
 ) -> bool:
-    return any(_target_is_cache(target) for target in targets) and _value_is_cache(
-        value
+    return any(
+        _target_is_cache(target) for target in targets
+    ) and _value_is_cache(
+        value,
     )
 
 
@@ -378,10 +403,14 @@ def _dotted_name(node: ast.AST) -> str:
     if isinstance(node, ast.Attribute):
         base = _dotted_name(node.value)
         return f"{base}.{node.attr}" if base else node.attr
-    if isinstance(node, ast.Call) and _dotted_name(node.func) == "__import__":
-        if node.args and isinstance(node.args[0], ast.Constant):
-            if isinstance(node.args[0].value, str):
-                return node.args[0].value
+    if (
+        isinstance(node, ast.Call)
+        and _dotted_name(node.func) == "__import__"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    ):
+        return node.args[0].value
     return ""
 
 
@@ -414,7 +443,7 @@ def _match_rule(
                 severity=rule.severity,
                 message=rule.message,
                 evidence=evidence[:120],
-            )
+            ),
         )
     return tuple(found)
 
@@ -424,7 +453,7 @@ def _strip_comments(content: str) -> str:
     lines = []
     for line in content.splitlines():
         stripped = line.lstrip()
-        if stripped.startswith("#") or stripped.startswith("//"):
+        if stripped.startswith(("#", "//")):
             continue
         lines.append(line)
     return "\n".join(lines)

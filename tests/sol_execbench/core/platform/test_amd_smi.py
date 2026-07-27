@@ -15,7 +15,7 @@ def test_parse_performance_levels_requires_nonempty_gpu_data() -> None:
         '{"gpu_data": ['
         '{"gpu": 0, "perf_level": "AMDSMI_DEV_PERF_LEVEL_AUTO"},'
         '{"gpu": 1, "perf_level": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"}'
-        "]}"
+        "]}",
     ) == (
         "AMDSMI_DEV_PERF_LEVEL_AUTO",
         "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK",
@@ -34,7 +34,7 @@ def test_parse_processes_ignores_no_process_marker() -> None:
     assert (
         parse_processes(
             '[{"gpu": 0, "process_list": '
-            '[{"process_info": "No running processes detected"}]}]'
+            '[{"process_info": "No running processes detected"}]}]',
         )
         == []
     )
@@ -44,7 +44,7 @@ def test_parse_processes_normalizes_stable_fields() -> None:
     assert parse_processes(
         '[{"gpu": 0, "process_list": ['
         '{"pid": 42, "process_name": "worker", "memory_usage": 10}'
-        "]}]"
+        "]}]",
     ) == [{"pid": 42, "device": "0", "name": "worker"}]
 
 

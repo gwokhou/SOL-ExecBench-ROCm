@@ -8,8 +8,12 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+
 import torch
 
+from sol_execbench.core.bench.eval_output_integrity import (
+    stable_reference_outputs,
+)
 from sol_execbench.core.bench.io import ShiftingMemoryPoolAllocator
 from sol_execbench.core.bench.reference_protocol import (
     MAX_REFERENCE_TENSOR_STORAGE_BYTES,
@@ -18,7 +22,6 @@ from sol_execbench.core.bench.reference_protocol import (
     reference_values_storage_bytes,
 )
 from sol_execbench.core.bench.reference_service import ReferenceService
-from sol_execbench.core.bench.eval_output_integrity import stable_reference_outputs
 from sol_execbench.core.bench.utils import call_and_collect_outputs
 from sol_execbench.core.dataset.aka_compatibility import PROBE_RESULT_PREFIX
 from sol_execbench.core.dataset.aka_contract import AkaProbeStatus
@@ -44,17 +47,7 @@ def _emit(
 
 
 def _run_probe(args: argparse.Namespace) -> None:
-    try:
-        device_info = detect_rocm_device(args.device)
-    except Exception as exc:
-        _emit(AkaProbeStatus.INFRASTRUCTURE_ERROR, "gpu_unavailable", str(exc))
-        return
-    if device_info.gfx_target != args.expected_arch:
-        _emit(
-            AkaProbeStatus.INFRASTRUCTURE_ERROR,
-            "target_arch_mismatch",
-            f"detected {device_info.gfx_target}, expected {args.expected_arch}",
-        )
+    if not _device_matches(args):
         return
     try:
         service = ReferenceService(
@@ -78,7 +71,9 @@ def _run_probe(args: argparse.Namespace) -> None:
                 ipc_limit_bytes=MAX_REFERENCE_TENSOR_STORAGE_BYTES,
             )
             return
-        resolved_axes = service.definition.get_resolved_axes_values(workload.axes)
+        resolved_axes = service.definition.get_resolved_axes_values(
+            workload.axes,
+        )
         outputs = call_and_collect_outputs(
             service.reference,
             inputs,
@@ -90,7 +85,9 @@ def _run_probe(args: argparse.Namespace) -> None:
             output_dtypes=service.output_dtypes,
         )
         outputs = stable_reference_outputs(outputs, inputs)
-        case_bytes = reference_case_storage_bytes(ReferenceCase(inputs, outputs))
+        case_bytes = reference_case_storage_bytes(
+            ReferenceCase(inputs, outputs),
+        )
         if case_bytes > MAX_REFERENCE_TENSOR_STORAGE_BYTES:
             _emit(
                 AkaProbeStatus.INCOMPATIBLE,
@@ -123,11 +120,28 @@ def _run_probe(args: argparse.Namespace) -> None:
         _emit_reference_failure(exc)
 
 
+def _device_matches(args: argparse.Namespace) -> bool:
+    try:
+        device_info = detect_rocm_device(args.device)
+    except Exception as exc:  # noqa: BLE001 -- isolated hardware probe boundary
+        _emit(AkaProbeStatus.INFRASTRUCTURE_ERROR, "gpu_unavailable", str(exc))
+        return False
+    if device_info.gfx_target != args.expected_arch:
+        _emit(
+            AkaProbeStatus.INFRASTRUCTURE_ERROR,
+            "target_arch_mismatch",
+            f"detected {device_info.gfx_target}, expected {args.expected_arch}",
+        )
+        return False
+    return True
+
+
 def _emit_reference_failure(exc: Exception) -> None:
     _emit(AkaProbeStatus.INCOMPATIBLE, "reference_execution_failed", str(exc))
 
 
 def main() -> None:
+    """Run one isolated AKA workload compatibility probe."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--problem-dir", type=Path, required=True)
     parser.add_argument("--row-index", type=int, required=True)

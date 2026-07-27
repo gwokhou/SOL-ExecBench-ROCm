@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from pydantic import Field, model_validator
 
+from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.platform.compatibility_enums import (
     MATRIX_MODEL_CONFIG,
     MatrixValidationScopeField,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
 class MatrixArtifactReference(BaseModelWithDocstrings):

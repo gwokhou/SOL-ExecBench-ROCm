@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import statistics
 from copy import deepcopy
 from pathlib import Path
-import statistics
 
 import pytest
 import yaml
@@ -16,7 +16,6 @@ from solar.rocm.architecture import (
     MemoryLevel,
     resource_peak_payload_sha256,
 )
-
 
 _RESOURCES = {
     "mfma",
@@ -63,12 +62,18 @@ def _audit_telemetry_summary(raw_batches: list[dict]) -> dict:
     return {
         "snapshot_count": len(snapshots),
         "deep_sleep_states": sorted({item["deep_sleep"] for item in snapshots}),
-        "throttle_statuses": sorted({item["throttle_status"] for item in snapshots}),
-        "performance_levels": sorted({item["performance_level"] for item in snapshots}),
+        "throttle_statuses": sorted(
+            {item["throttle_status"] for item in snapshots},
+        ),
+        "performance_levels": sorted(
+            {item["performance_level"] for item in snapshots},
+        ),
         "numeric": {
             field_name: {
                 "minimum": min(item[field_name] for item in snapshots),
-                "median": statistics.median(item[field_name] for item in snapshots),
+                "median": statistics.median(
+                    item[field_name] for item in snapshots
+                ),
                 "maximum": max(item[field_name] for item in snapshots),
             }
             for field_name in numeric_fields
@@ -169,7 +174,9 @@ def _profile_data() -> dict:
         "last_level_cache_bytes": 128,
         "peak_ops_per_second": {"fp16": 100.0, "fp8": 200.0},
         "resource_model_version": RESOURCE_MODEL_VERSION,
-        "resource_limits": {resource: {"generic": 10.0} for resource in _RESOURCES},
+        "resource_limits": {
+            resource: {"generic": 10.0} for resource in _RESOURCES
+        },
         "resource_limit_sources": {
             resource: f"source for {resource}" for resource in _RESOURCES
         },
@@ -218,7 +225,13 @@ def test_memory_level_and_profile_load_normalize_all_fields(tmp_path: Path):
     profile = ArchitectureProfile.load(_profile_data())
     assert profile.name == "test_amd"
     assert profile.clock_hz == 2_000_000_000
-    assert profile.memory_hierarchy[0] == MemoryLevel("l1", "cu", 32, 50.0, "spec")
+    assert profile.memory_hierarchy[0] == MemoryLevel(
+        "l1",
+        "cu",
+        32,
+        50.0,
+        "spec",
+    )
     assert profile.cache_flush_bytes == 128
     assert profile.to_dict()["memory_hierarchy"][0]["name"] == "l1"
 
@@ -256,7 +269,9 @@ def test_packaged_rx9060xt_audit_pins_corrected_probe_semantics():
         measurements["vector_fp16_fp16.hip"]["nominal_ops_per_second"]
         == 25_600_000_000_000.0
     )
-    assert measurements["vector_bf16_bf16.hip"]["nominal_ops_per_second"] is None
+    assert (
+        measurements["vector_bf16_bf16.hip"]["nominal_ops_per_second"] is None
+    )
     assert payload["instruction_validation"]["checks"]["fp32_valu_fma"][
         "instructions"
     ] == ["V_DUAL_FMAC_F32"]
@@ -267,10 +282,13 @@ def test_packaged_rx9060xt_audit_pins_corrected_probe_semantics():
     assert payload["experiment_protocol"][
         "configuration_frozen_before_held_out_measurement"
     ]
-    assert payload["experiment_protocol"]["held_out_process_batches_per_probe"] == 7
+    assert (
+        payload["experiment_protocol"]["held_out_process_batches_per_probe"]
+        == 7
+    )
     assert payload["experiment_protocol"]["samples_per_process_batch"] == 7
     assert measurements["vector_fp32_fp32.hip"]["selected_configuration"] == {
-        "accumulator_count": 16
+        "accumulator_count": 16,
     }
     for probe in (
         "matrix_fp16_fp16_wmma.hip",
@@ -279,10 +297,11 @@ def test_packaged_rx9060xt_audit_pins_corrected_probe_semantics():
         "matrix_int8_int8_wmma.hip",
     ):
         assert measurements[probe]["selected_configuration"] == {
-            "waves_per_reported_wgp": 32
+            "waves_per_reported_wgp": 32,
         }
     assert (
-        "valu/generic" not in payload["calibration_coverage"]["required_resource_modes"]
+        "valu/generic"
+        not in payload["calibration_coverage"]["required_resource_modes"]
     )
 
     probe_root = (
@@ -322,7 +341,10 @@ def test_precision_resource_and_roofline_methods():
         profile.peak_for("fp64")
 
     assert profile.theoretical_seconds(200, 50, "fp16") == 2.0
-    assert profile.theoretical_seconds_by_precision({"fp16": 50, "fp8": 100}, 50) == 2.0
+    assert (
+        profile.theoretical_seconds_by_precision({"fp16": 50, "fp8": 100}, 50)
+        == 2.0
+    )
     assert profile.resource_rate_for("VALU", "generic") == 10.0
     with pytest.raises(ValueError, match="Resource 'missing'"):
         profile.resource_rate_for("missing", "generic")
@@ -337,7 +359,9 @@ def test_precision_resource_and_roofline_methods():
 
     work = {"valu": {"generic": 20}, "mfma": {"generic": 10}}
     assert profile.resource_seconds(work) == {"valu": 2.0, "mfma": 1.0}
-    assert profile.theoretical_seconds_by_resources(work, fused_bytes=300) == 3.0
+    assert (
+        profile.theoretical_seconds_by_resources(work, fused_bytes=300) == 3.0
+    )
     assert profile.theoretical_seconds_by_resources({}, fused_bytes=50) == 0.5
 
 
@@ -350,12 +374,18 @@ def test_precision_resource_and_roofline_methods():
             lambda item: item.update(memory_bandwidth_bytes_per_second=0),
             "bandwidth must be positive",
         ),
-        (lambda item: item.update(peak_ops_per_second={"fp16": 0}), "positive peak"),
+        (
+            lambda item: item.update(peak_ops_per_second={"fp16": 0}),
+            "positive peak",
+        ),
         (
             lambda item: item.update(resource_model_version="old"),
             "resource_model_version",
         ),
-        (lambda item: item["resource_limits"].pop("sfu"), "complete AMD resource set"),
+        (
+            lambda item: item["resource_limits"].pop("sfu"),
+            "complete AMD resource set",
+        ),
         (
             lambda item: item["resource_limits"]["sfu"].update(generic=0),
             "rates for sfu must be positive",
@@ -366,13 +396,13 @@ def test_precision_resource_and_roofline_methods():
         ),
         (
             lambda item: item["calibration_exempt_modes"].update(
-                unknown={"generic": "reason"}
+                unknown={"generic": "reason"},
             ),
             "unknown resource",
         ),
         (
             lambda item: item["calibration_exempt_modes"]["valu"].update(
-                absent="reason"
+                absent="reason",
             ),
             "declared mode and reason",
         ),
@@ -385,7 +415,9 @@ def test_precision_resource_and_roofline_methods():
             "must define",
         ),
         (
-            lambda item: item["precision_support"]["fp16"].update(calibration="maybe"),
+            lambda item: item["precision_support"]["fp16"].update(
+                calibration="maybe",
+            ),
             "required or exempt",
         ),
         (
@@ -403,7 +435,7 @@ def test_precision_resource_and_roofline_methods():
         ),
         (
             lambda item: item.update(
-                audit_evidence={"status": "unavailable", "sha256": "BAD"}
+                audit_evidence={"status": "unavailable", "sha256": "BAD"},
             ),
             "lowercase SHA-256",
         ),
@@ -413,7 +445,7 @@ def test_precision_resource_and_roofline_methods():
         ),
         (
             lambda item: item["memory_hierarchy"].append(
-                {"name": "l1", "scope": "device", "capacity_bytes": 1}
+                {"name": "l1", "scope": "device", "capacity_bytes": 1},
             ),
             "names must be unique",
         ),
@@ -427,20 +459,26 @@ def test_precision_resource_and_roofline_methods():
         ),
         (
             lambda item: item["memory_hierarchy"][0].update(
-                bandwidth_bytes_per_second=0
+                bandwidth_bytes_per_second=0,
             ),
             "bandwidths must be positive",
         ),
     ],
 )
-def test_profile_validation_rejects_incomplete_or_unsound_data(mutation, message):
+def test_profile_validation_rejects_incomplete_or_unsound_data(
+    mutation,
+    message,
+):
     data = _profile_data()
     mutation(data)
     with pytest.raises(ValueError, match=message):
         ArchitectureProfile.load(data)
 
 
-def test_verified_audit_evidence_is_content_addressed(tmp_path: Path, monkeypatch):
+def test_verified_audit_evidence_is_content_addressed(
+    tmp_path: Path,
+    monkeypatch,
+):
     evidence = tmp_path / "evidence.json"
     data = _profile_data()
     required_resources = sorted(
@@ -495,7 +533,7 @@ def test_verified_audit_evidence_is_content_addressed(tmp_path: Path, monkeypatc
                     "compiler_emitted_count": 2,
                     "runtime_probe_passed": True,
                     "native_instruction_usable": True,
-                }
+                },
             },
         },
         "calibration_coverage": {
@@ -516,7 +554,7 @@ def test_verified_audit_evidence_is_content_addressed(tmp_path: Path, monkeypatc
                     "matched_instruction_counts": {"V_PK_FMA_F16": 2},
                     "spec_provenance": {"spec_sha256": "a" * 64},
                 },
-            }
+            },
         ],
     }
     payload["payload_sha256"] = resource_peak_payload_sha256(payload)
@@ -525,7 +563,9 @@ def test_verified_audit_evidence_is_content_addressed(tmp_path: Path, monkeypatc
     profile_path = tmp_path / "profiles" / "arch" / "profile.yaml"
     profile_path.parent.mkdir(parents=True)
     monkeypatch.setattr(
-        architecture, "_packaged_profile_path", lambda name: profile_path
+        architecture,
+        "_packaged_profile_path",
+        lambda name: profile_path,
     )
 
     data["audit_evidence"] = {
@@ -553,7 +593,9 @@ def test_verified_audit_evidence_is_content_addressed(tmp_path: Path, monkeypatc
     ]:
         candidate = ArchitectureProfile.load(data)
         object.__setattr__(
-            candidate, "audit_evidence", deepcopy(data["audit_evidence"])
+            candidate,
+            "audit_evidence",
+            deepcopy(data["audit_evidence"]),
         )
         mutation(candidate.audit_evidence)
         with pytest.raises(ValueError, match=message):

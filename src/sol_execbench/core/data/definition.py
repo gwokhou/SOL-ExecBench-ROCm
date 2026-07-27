@@ -18,34 +18,49 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Iterable, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field, model_validator
 
-from .base_model import BaseModelWithDocstrings, NonEmptyString
-from .definition_axes import (
-    const_axes as _const_axes,
-    expr_axes as _expr_axes,
-    get_axes_values as _get_axes_values,
-    get_axes_values_from_inputs as _get_axes_values_from_inputs,
-    get_input_shapes as _get_input_shapes,
-    get_output_shapes as _get_output_shapes,
-    get_resolved_axes_values as _get_resolved_axes_values,
-    get_shapes as _get_shapes,
-    torch_input_dtypes as _torch_input_dtypes,
-    torch_output_dtypes as _torch_output_dtypes,
-    var_axes as _var_axes,
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    NonEmptyString,
 )
-from .definition_models import (
+from sol_execbench.core.data.definition_axes import const_axes as _const_axes
+from sol_execbench.core.data.definition_axes import expr_axes as _expr_axes
+from sol_execbench.core.data.definition_axes import (
+    get_axes_values as _get_axes_values,
+)
+from sol_execbench.core.data.definition_axes import (
+    get_axes_values_from_inputs as _get_axes_values_from_inputs,
+)
+from sol_execbench.core.data.definition_axes import (
+    get_input_shapes as _get_input_shapes,
+)
+from sol_execbench.core.data.definition_axes import (
+    get_output_shapes as _get_output_shapes,
+)
+from sol_execbench.core.data.definition_axes import (
+    get_resolved_axes_values as _get_resolved_axes_values,
+)
+from sol_execbench.core.data.definition_axes import get_shapes as _get_shapes
+from sol_execbench.core.data.definition_axes import (
+    torch_input_dtypes as _torch_input_dtypes,
+)
+from sol_execbench.core.data.definition_axes import (
+    torch_output_dtypes as _torch_output_dtypes,
+)
+from sol_execbench.core.data.definition_axes import var_axes as _var_axes
+from sol_execbench.core.data.definition_models import (
     AxisConst,
     AxisExpr,
     AxisSpec,
     AxisVar,
-    DType,
     TensorSpec,
 )
-from .definition_reference import (
+from sol_execbench.core.data.definition_reference import (
     validate_reference_code,
     validate_reference_inputs_match,
     verify_custom_inputs_entrypoint,
@@ -53,6 +68,15 @@ from .definition_reference import (
 
 if TYPE_CHECKING:
     import torch
+
+__all__ = [
+    "AxisConst",
+    "AxisExpr",
+    "AxisSpec",
+    "AxisVar",
+    "Definition",
+    "TensorSpec",
+]
 
 
 class Definition(BaseModelWithDocstrings):
@@ -64,7 +88,7 @@ class Definition(BaseModelWithDocstrings):
     """The required general compute category."""
     axes: dict[NonEmptyString, AxisSpec]
     """Dictionary of symbolic dimensions used in tensor shapes."""
-    custom_inputs_entrypoint: Optional[NonEmptyString] = Field(default=None)
+    custom_inputs_entrypoint: NonEmptyString | None = Field(default=None)
     """The entrypoint function to generate the inputs."""
     inputs: dict[NonEmptyString, TensorSpec]
     """Named input tensors required by this kernel."""
@@ -72,9 +96,9 @@ class Definition(BaseModelWithDocstrings):
     """Named output tensors produced by this kernel."""
     reference: NonEmptyString
     """Reference implementation code with a top-level run function."""
-    description: Optional[str] = Field(default=None)
+    description: str | None = Field(default=None)
     """Optional human-readable description of the kernel's purpose."""
-    hf_id: Optional[NonEmptyString] = Field(default=None)
+    hf_id: NonEmptyString | None = Field(default=None)
     """Optional HuggingFace model ID that the definition was sourced from."""
 
     @model_validator(mode="after")
@@ -92,9 +116,11 @@ class Definition(BaseModelWithDocstrings):
     @model_validator(mode="after")
     def _validate_input_names_are_not_axes(self) -> Definition:
         """Validate that input names are not axes."""
-        for name in self.inputs.keys():
+        for name in self.inputs:
             if name in self.axes:
-                raise ValueError(f"Input name '{name}' is not allowed to be an axis.")
+                raise ValueError(
+                    f"Input name '{name}' is not allowed to be an axis."
+                )
         return self
 
     @model_validator(mode="after")
@@ -116,10 +142,12 @@ class Definition(BaseModelWithDocstrings):
                 if axis_name.isdigit():
                     continue
                 if axis_name not in self.axes:
-                    tensor_type = "input" if tensor_name in self.inputs else "output"
+                    tensor_type = (
+                        "input" if tensor_name in self.inputs else "output"
+                    )
                     raise ValueError(
                         f'{tensor_type.capitalize()} "{tensor_name}" references undefined '
-                        f'axis "{axis_name}".'
+                        f'axis "{axis_name}".',
                     )
         return self
 
@@ -139,36 +167,43 @@ class Definition(BaseModelWithDocstrings):
         return _expr_axes(self)
 
     def get_axes_values(
-        self, input_shapes: Iterable[Optional[tuple[int, ...]]]
+        self,
+        input_shapes: Iterable[tuple[int, ...] | None],
     ) -> dict[str, int]:
         """Get concrete variable axis values from input shapes."""
         return _get_axes_values(self, input_shapes)
 
-    def get_axes_values_from_inputs(self, inputs: Iterable[Any]) -> dict[str, int]:
+    def get_axes_values_from_inputs(
+        self, inputs: Iterable[Any]
+    ) -> dict[str, int]:
         """Get concrete variable axis values directly from input values."""
         return _get_axes_values_from_inputs(self, inputs)
 
-    def get_resolved_axes_values(self, var_axes_values: dict[str, int]) -> dict[str, int]:
+    def get_resolved_axes_values(
+        self, var_axes_values: dict[str, int]
+    ) -> dict[str, int]:
         """Get concrete axis values from variable axis values."""
         return _get_resolved_axes_values(self, var_axes_values)
 
     def _get_shapes(
         self,
         tensors: Iterable[TensorSpec],
-        var_axes_values: Optional[dict[str, int]] = None,
-    ) -> list[Optional[tuple[int, ...]]]:
+        var_axes_values: dict[str, int] | None = None,
+    ) -> list[tuple[int, ...] | None]:
         """Get concrete tensor shapes given variable axis values."""
         return _get_shapes(self, tensors, var_axes_values)
 
     def get_input_shapes(
-        self, var_axes_values: Optional[dict[str, int]] = None
-    ) -> dict[str, Optional[tuple[int, ...]]]:
+        self,
+        var_axes_values: dict[str, int] | None = None,
+    ) -> dict[str, tuple[int, ...] | None]:
         """Get concrete input shapes given variable axis values."""
         return _get_input_shapes(self, var_axes_values)
 
     def get_output_shapes(
-        self, var_values: Optional[dict[str, int]] = None
-    ) -> dict[str, Optional[tuple[int, ...]]]:
+        self,
+        var_values: dict[str, int] | None = None,
+    ) -> dict[str, tuple[int, ...] | None]:
         """Get concrete output shapes given variable axis values."""
         return _get_output_shapes(self, var_values)
 

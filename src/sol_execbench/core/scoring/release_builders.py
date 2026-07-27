@@ -21,15 +21,14 @@ from sol_execbench.core.data.solution_models import (
 from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
 from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
-from sol_execbench.core.timestamps import utc_timestamp
-
-from .release_models import (
+from sol_execbench.core.scoring.release_models import (
     ArtifactReference,
     ExecutionPlanProblem,
     ReleaseExecutionPlan,
     ReleaseRunKind,
     release_model_payload,
 )
+from sol_execbench.core.timestamps import utc_timestamp
 
 
 def materialize_release_baseline(
@@ -45,7 +44,9 @@ def materialize_release_baseline(
     if output.exists():
         raise FileExistsError(f"release workspace already exists: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent),
+    )
     try:
         corpus_ref = _copy_corpus_manifest(corpus, staging)
         problems = _materialize_baseline_solutions(corpus, staging)
@@ -76,7 +77,9 @@ def materialize_release_candidate(
     workspace = workspace_root.resolve()
     destination = workspace / "candidate"
     if destination.exists():
-        raise FileExistsError(f"release candidate already exists: {destination}")
+        raise FileExistsError(
+            f"release candidate already exists: {destination}",
+        )
     _verify_workspace_corpus(corpus, workspace)
     staging = Path(tempfile.mkdtemp(prefix=".candidate.", dir=workspace))
     try:
@@ -92,7 +95,8 @@ def materialize_release_candidate(
             run_id=candidate_id,
             role=ReleaseRunKind.CANDIDATE,
             corpus_manifest=artifact_reference(
-                workspace, workspace / "corpus" / "manifest.yaml"
+                workspace,
+                workspace / "corpus" / "manifest.yaml",
             ),
             environment_path="candidate/environment.json",
             problems=problems,
@@ -116,7 +120,9 @@ def load_execution_plan(
     """Load a plan and verify all pre-existing content-addressed inputs."""
     path = plan_path.resolve()
     root = (workspace_root or path.parents[1]).resolve()
-    plan = ReleaseExecutionPlan.model_validate_json(path.read_text(encoding="utf-8"))
+    plan = ReleaseExecutionPlan.model_validate_json(
+        path.read_text(encoding="utf-8"),
+    )
     verify_artifact_file(
         root,
         plan.corpus_manifest.path,
@@ -140,7 +146,9 @@ def artifact_reference(root: Path, path: Path) -> ArtifactReference:
     if not resolved.is_file() or (
         resolved.parent != base and base not in resolved.parents
     ):
-        raise ValueError(f"artifact is not a regular file below release root: {path}")
+        raise ValueError(
+            f"artifact is not a regular file below release root: {path}",
+        )
     relative = resolved.relative_to(base).as_posix()
     return ArtifactReference(
         path=relative,
@@ -164,7 +172,9 @@ def _verify_workspace_corpus(
     workspace: Path,
 ) -> None:
     bundled = workspace / "corpus" / "manifest.yaml"
-    if not bundled.is_file() or sha256_file(bundled) != sha256_file(corpus.path):
+    if not bundled.is_file() or sha256_file(bundled) != sha256_file(
+        corpus.path,
+    ):
         raise ValueError("release workspace corpus manifest identity mismatch")
 
 
@@ -181,19 +191,29 @@ def _copy_candidate_solutions(
             continue
         problem_path = entry.relative_problem_dir.as_posix()
         source = candidate_root / problem_path / "solution.json"
-        solution = Solution.model_validate_json(source.read_text(encoding="utf-8"))
+        solution = Solution.model_validate_json(
+            source.read_text(encoding="utf-8"),
+        )
         definition = Definition.model_validate_json(
             (corpus.authored_root / problem_path / "definition.json").read_text(
-                encoding="utf-8"
-            )
+                encoding="utf-8",
+            ),
         )
         if solution.definition != definition.name:
-            raise ValueError(f"candidate targets wrong definition: {problem_path}")
-        destination = staging / "implementations" / problem_path / "solution.json"
+            raise ValueError(
+                f"candidate targets wrong definition: {problem_path}",
+            )
+        destination = (
+            staging / "implementations" / problem_path / "solution.json"
+        )
         atomic_write_json_value(destination, solution.model_dump(mode="json"))
         identity = corpus.materialized_problem_sha256[problem_path]
         final_path = (
-            workspace / "candidate" / "implementations" / problem_path / "solution.json"
+            workspace
+            / "candidate"
+            / "implementations"
+            / problem_path
+            / "solution.json"
         )
         problems.append(
             ExecutionPlanProblem(
@@ -206,7 +226,7 @@ def _copy_candidate_solutions(
                     size_bytes=destination.stat().st_size,
                 ),
                 trace_path=f"candidate/traces/{problem_path}/trace.jsonl",
-            )
+            ),
         )
     return tuple(problems)
 
@@ -223,11 +243,15 @@ def _materialize_baseline_solutions(
         identity = corpus.materialized_problem_sha256[problem_path]
         definition = Definition.model_validate_json(
             (corpus.authored_root / problem_path / "definition.json").read_text(
-                encoding="utf-8"
-            )
+                encoding="utf-8",
+            ),
         )
         destination = (
-            workspace / "baseline" / "implementations" / problem_path / "solution.json"
+            workspace
+            / "baseline"
+            / "implementations"
+            / problem_path
+            / "solution.json"
         )
         atomic_write_json_value(
             destination,
@@ -240,7 +264,7 @@ def _materialize_baseline_solutions(
                 workload_sha256=identity["workload_sha256"],
                 implementation=artifact_reference(workspace, destination),
                 trace_path=(f"baseline/traces/{problem_path}/trace.jsonl"),
-            )
+            ),
         )
     if not problems:
         raise ValueError("release corpus contains no scored baseline problems")

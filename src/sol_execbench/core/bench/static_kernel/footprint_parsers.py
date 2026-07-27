@@ -39,7 +39,6 @@ def parse_roc_objdump_resource_usage(
     Returns ``None`` when no recognizable resource markers are present so callers
     downgrade rather than emit an empty footprint. Diagnostic only.
     """
-
     vgpr_used = _first_int(text, _VGPR)
     sgpr_used = _first_int(text, _SGPR)
     scratch_bytes = _first_int(text, _SCRATCH)

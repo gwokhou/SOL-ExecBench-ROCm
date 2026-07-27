@@ -12,12 +12,17 @@ def test_make_fx_reference_records_strict_conversion_provenance() -> None:
     from torch.fx.experimental.proxy_tensor import make_fx
 
     graph = make_fx(lambda value: torch.sin(value))(torch.ones(2))
-    result = ReferenceGraphSerializer().serialize_fx_reference(graph, "reference")
+    result = ReferenceGraphSerializer().serialize_fx_reference(
+        graph,
+        "reference",
+    )
 
     assert result["schema_version"] == 3
     assert result["extraction_kind"] == "make_fx_reference_v1"
     assert result["joint_graph"] is False
-    assert any(layer.get("phase") == "reference" for layer in result["layers"].values())
+    assert any(
+        layer.get("phase") == "reference" for layer in result["layers"].values()
+    )
     assert all(
         layer.get("phase") in {"input", "reference"}
         for layer in result["layers"].values()
@@ -29,7 +34,9 @@ def test_argument_and_tensor_metadata_serialization() -> None:
     node = graph.placeholder("value")
     inputs = [node]
 
-    assert ReferenceGraphSerializer._serialize_argument(node, inputs) == {"tensor": 0}
+    assert ReferenceGraphSerializer._serialize_argument(node, inputs) == {
+        "tensor": 0,
+    }
     assert ReferenceGraphSerializer._serialize_argument(
         (
             torch.float16,
@@ -47,16 +54,18 @@ def test_argument_and_tensor_metadata_serialization() -> None:
         [{"value": 2}, {"value": "x"}],
     ]
     assert ReferenceGraphSerializer._serialize_argument(
-        torch.preserve_format, inputs
+        torch.preserve_format,
+        inputs,
     ) == ("preserve_format")
     assert ReferenceGraphSerializer._serialize_argument(
-        torch.contiguous_format, inputs
+        torch.contiguous_format,
+        inputs,
     ) == ("contiguous_format")
     assert ReferenceGraphSerializer._serialize_argument(object(), inputs)[
         "value"
     ].startswith("<object object")
     assert ReferenceGraphSerializer._tensor_metadata(
-        (torch.zeros(2, dtype=torch.float16), [torch.ones(1), "ignored"])
+        (torch.zeros(2, dtype=torch.float16), [torch.ones(1), "ignored"]),
     ) == [([2], "torch.float16"), ([1], "torch.float32")]
     assert ReferenceGraphSerializer._tensor_metadata("ignored") == []
 
@@ -98,7 +107,11 @@ def test_schema_effects_rejects_missing_or_inconsistent_schema() -> None:
     node = SimpleNamespace(target=target, args=(), kwargs={})
     with pytest.raises(RuntimeError, match="has no FunctionSchema"):
         ReferenceGraphSerializer._schema_effects(
-            node, [], target_name="opaque", exact_target="opaque", output_arity=1
+            node,
+            [],
+            target_name="opaque",
+            exact_target="opaque",
+            output_arity=1,
         )
 
     graph = torch.fx.Graph()

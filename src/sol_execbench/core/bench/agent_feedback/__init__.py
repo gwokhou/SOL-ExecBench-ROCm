@@ -18,8 +18,8 @@ from sol_execbench.core.bench.agent_feedback.governance import (
     validate_agent_feedback_freshness,
 )
 from sol_execbench.core.bench.agent_feedback.models import (
-    AGENT_FEEDBACK_SCHEMA_VERSION,
     _MODEL_CONFIG,
+    AGENT_FEEDBACK_SCHEMA_VERSION,
     AgentFeedbackBottleneck,
     AgentFeedbackItem,
     AgentFeedbackReasonCode,

@@ -52,7 +52,7 @@ class AkaEquivalenceReport:
 def load_problem(problem_dir: Path) -> tuple[Definition, tuple[Workload, ...]]:
     """Load one committed problem and its complete workload inventory."""
     definition = Definition.model_validate_json(
-        (problem_dir / "definition.json").read_text(encoding="utf-8")
+        (problem_dir / "definition.json").read_text(encoding="utf-8"),
     )
     workloads = tuple(
         Workload.model_validate_json(line)
@@ -83,7 +83,9 @@ def materialize_inputs(
             value = getattr(meta, "value", 0.0)
         else:
             dtype = dtype_str_to_torch_dtype(spec.dtype)
-            value = torch.randn(shape, dtype=torch.float32, device=device).to(dtype)
+            value = torch.randn(shape, dtype=torch.float32, device=device).to(
+                dtype,
+            )
         ordered.append(value)
         named[name] = value
     return ordered, named
@@ -93,7 +95,8 @@ def execute_reference(reference_source: str) -> Callable[..., object]:
     """Compile a trusted authored reference and return its ``run`` callable."""
     namespace: dict[str, object] = {"torch": torch}
     exec(  # noqa: S102 -- committed first-party benchmark source
-        compile(reference_source, "<aka-authored-reference>", "exec"), namespace
+        compile(reference_source, "<aka-authored-reference>", "exec"),
+        namespace,
     )
     run = namespace.get("run")
     if not callable(run):
@@ -125,25 +128,30 @@ def normalize_outputs(
 
 
 def _ordered_outputs(
-    value: object, names: Sequence[str], *, source: str
+    value: object,
+    names: Sequence[str],
+    *,
+    source: str,
 ) -> tuple[torch.Tensor, ...]:
     if isinstance(value, Mapping):
         mapping = cast(Mapping[str, object], value)
         if set(mapping) != set(names):
             raise ValueError(
                 f"{source} output keys {sorted(map(str, mapping))} "
-                f"do not match {sorted(names)}"
+                f"do not match {sorted(names)}",
             )
         values = tuple(mapping[name] for name in names)
     elif isinstance(value, (tuple, list)):
         if len(value) != len(names):
             raise ValueError(
-                f"{source} returned {len(value)} outputs; expected {len(names)}"
+                f"{source} returned {len(value)} outputs; expected {len(names)}",
             )
         values = tuple(value)
     else:
         if len(names) != 1:
-            raise ValueError(f"{source} returned one output; expected {len(names)}")
+            raise ValueError(
+                f"{source} returned one output; expected {len(names)}",
+            )
         values = (value,)
     if not all(torch.is_tensor(output) for output in values):
         kinds = [type(output).__name__ for output in values]
@@ -161,10 +169,12 @@ def _validate_output_tensor(
 ) -> None:
     if expected_shape is None or tuple(output.shape) != expected_shape:
         raise ValueError(
-            f"{label} shape {tuple(output.shape)} != declared {expected_shape}"
+            f"{label} shape {tuple(output.shape)} != declared {expected_shape}",
         )
     if output.dtype != expected_dtype:
-        raise ValueError(f"{label} dtype {output.dtype} != declared {expected_dtype}")
+        raise ValueError(
+            f"{label} dtype {output.dtype} != declared {expected_dtype}",
+        )
     finite = torch.isfinite(output.float())
     if allow_negative_inf:
         finite |= output.float() == float("-inf")
@@ -200,7 +210,9 @@ def _artifact_path(
         None,
     )
     if artifact is None:
-        raise ValueError(f"{entry.problem_name} has no {role} provenance binding")
+        raise ValueError(
+            f"{entry.problem_name} has no {role} provenance binding",
+        )
     return aka_root / entry.task_path / artifact.path
 
 
@@ -221,16 +233,20 @@ def _load_torch2hip_oracle(entry: AkaCorpusEntry, source: Path) -> Oracle:
         missing = [name for name in arg_names if name not in named]
         if missing:
             raise ValueError(
-                f"unadapted AKA signature mismatch for {entry.problem_name}: {missing}"
+                f"unadapted AKA signature mismatch for {entry.problem_name}: {missing}",
             )
         return callable_module(*(named[name] for name in arg_names))
 
     return direct
 
 
-def _layernorm_adapter(fn: Callable[..., object], values: Mapping[str, object]):
+def _layernorm_adapter(
+    fn: Callable[..., object],
+    values: Mapping[str, object],
+) -> object:
     x = values["x"]
-    assert isinstance(x, torch.Tensor)
+    if not isinstance(x, torch.Tensor):
+        raise TypeError("layernorm input x must be a tensor")
     return fn(
         x,
         values["weight"],
@@ -240,26 +256,40 @@ def _layernorm_adapter(fn: Callable[..., object], values: Mapping[str, object]):
     )
 
 
-def _sum_adapter(fn: Callable[..., object], values: Mapping[str, object]):
+def _sum_adapter(
+    fn: Callable[..., object],
+    values: Mapping[str, object],
+) -> object:
     return fn(values["x"], -1)
 
 
-def _maxpool_adapter(fn: Callable[..., object], values: Mapping[str, object]):
+def _maxpool_adapter(
+    fn: Callable[..., object],
+    values: Mapping[str, object],
+) -> object:
     return fn(values["x"], 2, 2, 0, 1)
 
 
-def _conv_adapter(fn: Callable[..., object], values: Mapping[str, object]):
+def _conv_adapter(
+    fn: Callable[..., object],
+    values: Mapping[str, object],
+) -> object:
     return fn(values["x"], values["weight"], values["bias"], 1, 0, 1, 1)
 
 
-def _depthwise_adapter(fn: Callable[..., object], values: Mapping[str, object]):
+def _depthwise_adapter(
+    fn: Callable[..., object],
+    values: Mapping[str, object],
+) -> object:
     x = values["x"]
-    assert isinstance(x, torch.Tensor)
+    if not isinstance(x, torch.Tensor):
+        raise TypeError("depthwise convolution input x must be a tensor")
     return fn(x, values["weight"], values["bias"], 1, 0, x.shape[1])
 
 
 _TORCH2HIP_ADAPTERS: dict[
-    str, Callable[[Callable[..., object], Mapping[str, object]], object]
+    str,
+    Callable[[Callable[..., object], Mapping[str, object]], object],
 ] = {
     "l1n40_layernorm": _layernorm_adapter,
     "l1n47_sum_reduction": _sum_adapter,
@@ -280,15 +310,19 @@ def _load_rmsnorm_backward_oracle(source: Path) -> Oracle:
         x = _grad_clone(values["x"], "x")
         g = _grad_clone(values["g"], "g")
         grad_output = values["grad_output"]
-        assert isinstance(grad_output, torch.Tensor)
+        if not isinstance(grad_output, torch.Tensor):
+            raise TypeError("RMSNorm grad_output must be a tensor")
         result = forward(x, g, False, x.dtype)
         if not isinstance(result, tuple) or len(result) != 2:
-            raise TypeError("AKA RMSNorm forward oracle returned an invalid result")
+            raise TypeError(
+                "AKA RMSNorm forward oracle returned an invalid result",
+            )
         output = result[0]
         if not isinstance(output, torch.Tensor):
             raise TypeError("AKA RMSNorm forward oracle returned a non-tensor")
         output.backward(grad_output)
-        assert x.grad is not None and g.grad is not None
+        if x.grad is None or g.grad is None:
+            raise RuntimeError("AKA RMSNorm oracle did not produce gradients")
         return x.grad.to(x.dtype), g.grad.to(g.dtype)
 
     return oracle
@@ -352,7 +386,12 @@ def check_problem_equivalence(
         raise ValueError(f"{entry.problem_name} has no workloads to validate")
     try:
         return _check_executable_problem(
-            entry, definition, selected, aka_root, device=device, seed=seed
+            entry,
+            definition,
+            selected,
+            aka_root,
+            device=device,
+            seed=seed,
         )
     except Exception as exc:  # noqa: BLE001 -- convert to a complete corpus report
         return AkaEquivalenceReport(
@@ -379,15 +418,24 @@ def _check_executable_problem(
     output_count = 0
     for index, workload in enumerate(workloads):
         ordered, named = materialize_inputs(
-            definition, workload, seed=seed + index, device=device
+            definition,
+            workload,
+            seed=seed + index,
+            device=device,
         )
         authored_outputs = normalize_outputs(
-            authored(*ordered), definition, workload, source="authored"
+            authored(*ordered),
+            definition,
+            workload,
+            source="authored",
         )
         output_count += len(authored_outputs)
         if oracle is not None:
             oracle_outputs = normalize_outputs(
-                oracle(named), definition, workload, source="AKA"
+                oracle(named),
+                definition,
+                workload,
+                source="AKA",
             )
             _compare_outputs(authored_outputs, oracle_outputs, workload)
     crosscheck = (
@@ -410,13 +458,19 @@ def _compare_outputs(
     oracle: Sequence[torch.Tensor],
     workload: Workload,
 ) -> None:
-    for index, (actual, expected) in enumerate(zip(authored, oracle, strict=True)):
-        stats, exceeds = compute_error_stats(actual, expected, workload.tolerance)
+    for index, (actual, expected) in enumerate(
+        zip(authored, oracle, strict=True),
+    ):
+        stats, exceeds = compute_error_stats(
+            actual,
+            expected,
+            workload.tolerance,
+        )
         if exceeds:
             raise ValueError(
                 f"output {index} diverges from AKA oracle: "
                 f"max_abs={stats.max_absolute_error:.3e}, "
-                f"max_rel={stats.max_relative_error:.3e}"
+                f"max_rel={stats.max_relative_error:.3e}",
             )
 
 

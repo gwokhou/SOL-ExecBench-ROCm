@@ -25,7 +25,8 @@ def _json(path: Path) -> dict:
 
 def _fixture_text() -> str:
     return "\n".join(
-        path.read_text(encoding="utf-8") for path in sorted(FIXTURE_DIR.iterdir())
+        path.read_text(encoding="utf-8")
+        for path in sorted(FIXTURE_DIR.iterdir())
     )
 
 
@@ -61,7 +62,7 @@ def test_agent_feedback_valid_fixtures_parse(name: str, expected_status: str):
 
 def test_agent_feedback_stale_fixture_classifies_as_stale_diagnostic():
     sidecar = AgentFeedbackSidecar.model_validate(
-        _json(FIXTURE_DIR / "stale.agent-feedback.json")
+        _json(FIXTURE_DIR / "stale.agent-feedback.json"),
     )
 
     freshness = validate_agent_feedback_freshness(
@@ -85,7 +86,7 @@ def test_agent_feedback_stale_fixture_classifies_as_stale_diagnostic():
 def test_agent_feedback_negative_fixtures_downgrade_to_invalid_or_missing():
     with pytest.raises(ValidationError):
         AgentFeedbackSidecar.model_validate(
-            _json(FIXTURE_DIR / "contradictory-authority.agent-feedback.json")
+            _json(FIXTURE_DIR / "contradictory-authority.agent-feedback.json"),
         )
     contradictory_guardrail = evaluate_agent_feedback_governance(
         sidecar=None,
@@ -104,8 +105,12 @@ def test_agent_feedback_negative_fixtures_downgrade_to_invalid_or_missing():
 
     assert contradictory_guardrail.status == "invalid_diagnostic"
     assert malformed_guardrail.status == "invalid_diagnostic"
-    assert missing_guardrail.status == missing_case["expected_governance_status"]
-    assert missing_guardrail.reason_codes == [missing_case["expected_reason_code"]]
+    assert (
+        missing_guardrail.status == missing_case["expected_governance_status"]
+    )
+    assert missing_guardrail.reason_codes == [
+        missing_case["expected_reason_code"],
+    ]
     for guardrail in (
         contradictory_guardrail,
         malformed_guardrail,

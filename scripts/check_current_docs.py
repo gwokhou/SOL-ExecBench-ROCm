@@ -50,19 +50,20 @@ def _broken_local_links(path: Path, text: str) -> list[str]:
         local_target = target.partition("#")[0]
         if local_target and not (path.parent / local_target).exists():
             failures.append(
-                f"{path.relative_to(ROOT)} has broken local link {target!r}"
+                f"{path.relative_to(ROOT)} has broken local link {target!r}",
             )
     return failures
 
 
 def main() -> int:
+    """Check current documentation content and local links."""
     failures: list[str] = []
     for path in CURRENT_DOCS:
         text = path.read_text(encoding="utf-8")
         for reference in RETIRED_REFERENCES:
             if reference in text:
                 failures.append(
-                    f"{path.relative_to(ROOT)} references retired path {reference!r}"
+                    f"{path.relative_to(ROOT)} references retired path {reference!r}",
                 )
         failures.extend(_broken_local_links(path, text))
     if failures:

@@ -20,14 +20,11 @@ handlers. Handlers can be registered using a decorator or explicit registration.
 """
 
 from importlib import import_module
-from typing import Any, Dict, List, Optional, Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from solar.einsum.ops.base import EinsumOpHandler, EinsumOp
     from solar.common.types import TensorShapes
-
-# Flag to track if handlers are being loaded (to prevent circular imports)
-_loading_handlers = False
+    from solar.einsum.ops.base import EinsumOp, EinsumOpHandler
 
 _BUILTIN_HANDLER_MODULES = (
     "attention_ops",
@@ -66,22 +63,24 @@ class EinsumOpRegistry:
         einsum_op = registry.get_einsum_op("matmul", shapes)
     """
 
-    def __init__(self, debug: bool = False):
+    def __init__(self, debug: bool = False) -> None:
         """Initialize the registry.
 
         Args:
             debug: Enable debug output for handlers.
+
         """
         self.debug = debug
-        self._handlers: Dict[str, "EinsumOpHandler"] = {}
-        self._handler_classes: List[Type["EinsumOpHandler"]] = []
-        self._op_to_handler: Dict[str, "EinsumOpHandler"] = {}
+        self._handlers: dict[str, EinsumOpHandler] = {}
+        self._handler_classes: list[type[EinsumOpHandler]] = []
+        self._op_to_handler: dict[str, EinsumOpHandler] = {}
 
-    def register_handler(self, handler_class: Type["EinsumOpHandler"]) -> None:
+    def register_handler(self, handler_class: type["EinsumOpHandler"]) -> None:
         """Register a handler class.
 
         Args:
             handler_class: Handler class to register.
+
         """
         # Instantiate the handler
         handler = handler_class(debug=self.debug)
@@ -92,11 +91,14 @@ class EinsumOpRegistry:
             op_key = op_name.lower()
             self._op_to_handler[op_key] = handler
             if self.debug:
-                print(f"Registered handler for '{op_key}': {handler_class.__name__}")
+                print(
+                    f"Registered handler for '{op_key}': {handler_class.__name__}",
+                )
 
     def register(
-        self, handler_class: Type["EinsumOpHandler"]
-    ) -> Type["EinsumOpHandler"]:
+        self,
+        handler_class: type["EinsumOpHandler"],
+    ) -> type["EinsumOpHandler"]:
         """Decorator to register a handler class.
 
         Usage:
@@ -107,7 +109,7 @@ class EinsumOpRegistry:
         self.register_handler(handler_class)
         return handler_class
 
-    def get_handler(self, op_name: str) -> Optional["EinsumOpHandler"]:
+    def get_handler(self, op_name: str) -> "EinsumOpHandler | None":
         """Get the handler for an operation.
 
         Args:
@@ -115,6 +117,7 @@ class EinsumOpRegistry:
 
         Returns:
             Handler if registered, None otherwise.
+
         """
         return self._op_to_handler.get(op_name.lower())
 
@@ -126,11 +129,15 @@ class EinsumOpRegistry:
 
         Returns:
             True if a handler exists.
+
         """
         return op_name.lower() in self._op_to_handler
 
     def get_einsum_op(
-        self, op_name: str, shapes: "TensorShapes", **kwargs: Any
+        self,
+        op_name: str,
+        shapes: "TensorShapes",
+        **kwargs: Any,
     ) -> "EinsumOp":
         """Get an einsum operation for the given operation name.
 
@@ -144,6 +151,7 @@ class EinsumOpRegistry:
 
         Raises:
             ValueError: If no handler is registered for the operation.
+
         """
         handler = self.get_handler(op_name)
         if handler is None:
@@ -151,19 +159,21 @@ class EinsumOpRegistry:
 
         return handler.generate_einsum(op_name, shapes, **kwargs)
 
-    def list_supported_ops(self) -> List[str]:
+    def list_supported_ops(self) -> list[str]:
         """List all supported operation names.
 
         Returns:
             List of operation names.
+
         """
         return sorted(self._op_to_handler.keys())
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get statistics about the registry.
 
         Returns:
             Dictionary with registry statistics.
+
         """
         return {
             "total_handlers": len(self._handler_classes),
@@ -172,9 +182,19 @@ class EinsumOpRegistry:
         }
 
 
-# Global registry instance
-_global_registry: Optional[EinsumOpRegistry] = None
-_handlers_loaded = False
+class _RegistryState:
+    """Hold the import-time registry state behind the public accessor."""
+
+    def __init__(self) -> None:
+        self.registry: EinsumOpRegistry | None = None
+        self.handlers_loaded = False
+        self.loading_handlers = False
+
+
+# Handler decorators run while their modules are imported, so one process-wide
+# state object is required to break recursive initialization. Keeping it private
+# and exposing it only through get_global_registry constrains mutation.
+_REGISTRY_STATE = _RegistryState()
 
 
 def get_global_registry(load_handlers: bool = True) -> EinsumOpRegistry:
@@ -185,22 +205,25 @@ def get_global_registry(load_handlers: bool = True) -> EinsumOpRegistry:
 
     Returns:
         The global registry instance.
-    """
-    global _global_registry, _handlers_loaded, _loading_handlers
 
-    if _global_registry is None:
-        _global_registry = EinsumOpRegistry()
+    """
+    if _REGISTRY_STATE.registry is None:
+        _REGISTRY_STATE.registry = EinsumOpRegistry()
 
     # Load handlers if requested and not already loaded/loading
-    if load_handlers and not _handlers_loaded and not _loading_handlers:
-        _loading_handlers = True
+    if (
+        load_handlers
+        and not _REGISTRY_STATE.handlers_loaded
+        and not _REGISTRY_STATE.loading_handlers
+    ):
+        _REGISTRY_STATE.loading_handlers = True
         try:
             _load_all_handlers()
-            _handlers_loaded = True
+            _REGISTRY_STATE.handlers_loaded = True
         finally:
-            _loading_handlers = False
+            _REGISTRY_STATE.loading_handlers = False
 
-    return _global_registry
+    return _REGISTRY_STATE.registry
 
 
 def _load_all_handlers() -> None:
@@ -210,8 +233,8 @@ def _load_all_handlers() -> None:
 
 
 def register_einsum_op(
-    handler_class: Type["EinsumOpHandler"],
-) -> Type["EinsumOpHandler"]:
+    handler_class: type["EinsumOpHandler"],
+) -> type["EinsumOpHandler"]:
     """Decorator to register a handler with the global registry.
 
     Usage:

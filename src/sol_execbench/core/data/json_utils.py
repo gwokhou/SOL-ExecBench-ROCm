@@ -19,9 +19,9 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import tempfile
-from typing import Any, Type, TypeVar, Union
+from pathlib import Path
+from typing import Any, TypeVar, Union
 
 from pydantic import BaseModel
 
@@ -30,17 +30,19 @@ T = TypeVar("T", bound=BaseModel)
 
 def atomic_write_json_value(path: Union[str, Path], value: Any) -> None:
     """Atomically write a deterministic JSON value in the destination directory."""
-
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
+        prefix=f".{destination.name}.",
+        suffix=".tmp",
+        dir=destination.parent,
     )
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             handle.write(
-                json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n"
+                json.dumps(value, indent=2, sort_keys=True, allow_nan=False)
+                + "\n",
             )
             handle.flush()
             os.fsync(handle.fileno())
@@ -54,11 +56,12 @@ def atomic_write_jsonl_values(
     values: list[Any],
 ) -> None:
     """Atomically write deterministic JSON Lines in the destination directory."""
-
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
+        prefix=f".{destination.name}.",
+        suffix=".tmp",
+        dir=destination.parent,
     )
     temporary = Path(temporary_name)
     try:
@@ -70,7 +73,7 @@ def atomic_write_jsonl_values(
                     else value
                 )
                 handle.write(
-                    json.dumps(payload, sort_keys=True, allow_nan=False) + "\n"
+                    json.dumps(payload, sort_keys=True, allow_nan=False) + "\n",
                 )
             handle.flush()
             os.fsync(handle.fileno())
@@ -80,8 +83,7 @@ def atomic_write_jsonl_values(
 
 
 def save_json_file(object: BaseModel, path: Union[str, Path]) -> None:
-    """
-    Save a Pydantic BaseModel object to a JSON file.
+    """Save a Pydantic BaseModel object to a JSON file.
 
     Parameters
     ----------
@@ -90,6 +92,7 @@ def save_json_file(object: BaseModel, path: Union[str, Path]) -> None:
     path : Union[str, Path]
         The file path where the JSON will be saved. Parent directories
         will be created if they don't exist.
+
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,13 +102,14 @@ def save_json_file(object: BaseModel, path: Union[str, Path]) -> None:
 
 def stable_model_json(model: BaseModel) -> str:
     """Serialize a Pydantic model with deterministic key ordering."""
-
-    return json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+    return (
+        json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True)
+        + "\n"
+    )
 
 
 def stable_model_checksum(model: BaseModel, checksum_field: str) -> str:
     """Return a stable checksum for *model* with *checksum_field* nulled."""
-
     payload = model.model_dump(mode="json")
     payload[checksum_field] = None
     encoded = json.dumps(
@@ -119,14 +123,12 @@ def stable_model_checksum(model: BaseModel, checksum_field: str) -> str:
 
 def load_json_value(path: Union[str, Path]) -> Any:
     """Load any JSON value from *path*."""
-
     path = Path(path)
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def load_json_dict(path: Union[str, Path]) -> dict:
     """Load a JSON object from *path*."""
-
     path = Path(path)
     payload = load_json_value(path)
     if not isinstance(payload, dict):
@@ -134,9 +136,8 @@ def load_json_dict(path: Union[str, Path]) -> dict:
     return payload
 
 
-def load_json_file(model_cls: Type[T], path: Union[str, Path]) -> T:
-    """
-    Load a Pydantic BaseModel object from a JSON file.
+def load_json_file(model_cls: type[T], path: Union[str, Path]) -> T:
+    """Load a Pydantic BaseModel object from a JSON file.
 
     Parameters
     ----------
@@ -145,26 +146,27 @@ def load_json_file(model_cls: Type[T], path: Union[str, Path]) -> T:
     path : Union[str, Path]
         The file path of the JSON file to load.
 
-    Returns
+    Returns:
     -------
     BaseModel
         An instance of the specified BaseModel class populated with
         data from the JSON file.
 
-    Raises
+    Raises:
     ------
     FileNotFoundError
         If the specified file does not exist.
     ValidationError
         If the JSON data doesn't match the BaseModel schema.
+
     """
     return model_cls.model_validate_json(Path(path).read_text(encoding="utf-8"))
 
 
 def save_jsonl_file(objects: list[BaseModel], path: Union[str, Path]) -> None:
-    """
-    Save a list of Pydantic BaseModel objects to a JSONL file. Each object is serialized as a
-    separate JSON object on its own line.
+    """Save Pydantic models to a JSONL file.
+
+    Each object is serialized as a separate JSON object on its own line.
 
     Parameters
     ----------
@@ -173,6 +175,7 @@ def save_jsonl_file(objects: list[BaseModel], path: Union[str, Path]) -> None:
     path : Union[str, Path]
         The file path where the JSONL will be saved. Parent directories
         will be created if they don't exist.
+
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -182,11 +185,11 @@ def save_jsonl_file(objects: list[BaseModel], path: Union[str, Path]) -> None:
         f.write(output_str)
 
 
-def load_jsonl_file(model_cls: Type[T], path: Union[str, Path]) -> list[T]:
-    """
-    Load a list of Pydantic BaseModel objects from a JSONL file. Each line in the JSONL file should
-    contain a valid JSON object that can be deserialized into the specified BaseModel class. Empty
-    lines are skipped.
+def load_jsonl_file(model_cls: type[T], path: Union[str, Path]) -> list[T]:
+    """Load Pydantic models from a JSONL file.
+
+    Each nonempty line must contain a JSON object that can be deserialized
+    into the specified model class.
 
     Parameters
     ----------
@@ -195,32 +198,34 @@ def load_jsonl_file(model_cls: Type[T], path: Union[str, Path]) -> list[T]:
     path : Union[str, Path]
         The file path of the JSONL file to load.
 
-    Returns
+    Returns:
     -------
     list[BaseModel]
         A list of instances of the specified BaseModel class, one for
         each valid JSON line in the file.
 
-    Raises
+    Raises:
     ------
     FileNotFoundError
         If the specified file does not exist.
     ValidationError
         If any JSON line doesn't match the BaseModel schema.
+
     """
     out: list[T] = []
     with Path(path).open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if line:
                 out.append(model_cls.model_validate_json(line))
     return out
 
 
 def append_jsonl_file(objects: list[BaseModel], path: Union[str, Path]) -> None:
-    """
-    Append a list of Pydantic BaseModel objects to a JSONL file. Each object is serialized as a
-    separate JSON object and appended to the end of the file, one per line.
+    """Append Pydantic models to a JSONL file.
+
+    Each object is serialized as a separate JSON object and appended on its
+    own line.
 
     Parameters
     ----------
@@ -229,6 +234,7 @@ def append_jsonl_file(objects: list[BaseModel], path: Union[str, Path]) -> None:
     path : Union[str, Path]
         The file path of the JSONL file to append to. Parent directories
         will be created if they don't exist.
+
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

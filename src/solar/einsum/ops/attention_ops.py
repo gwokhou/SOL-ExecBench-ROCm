@@ -30,15 +30,112 @@ The SDPA operation is expanded into a subgraph of simpler operations:
 4. weights @ V (matmul) -> output
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShape, TensorShapes
+
+
+def _qk_attention_node(
+    node_id: str,
+    query_shape: TensorShape,
+    key_shape: TensorShape,
+    scores_shape: TensorShape,
+) -> dict[str, Any]:
+    return {
+        "type": "matmul",
+        "einsum_equation": "BHQD,BHKD->BHQK",
+        "elementwise_op": "mul",
+        "reduction_op": "add",
+        "is_real_einsum": True,
+        "is_einsum_supportable": True,
+        "input_shapes": [query_shape, key_shape],
+        "output_shapes": [scores_shape],
+        "weight_shapes": [],
+        "weight_nodes": [],
+        "module_args": {"operation": "Q @ K^T"},
+        "connections": {
+            "inputs": [],
+            "outputs": [f"{node_id}.scale"],
+        },
+    }
+
+
+def _attention_scale_node(
+    node_id: str,
+    scores_shape: TensorShape,
+    embedding_dim: int,
+) -> dict[str, Any]:
+    return {
+        "type": "mul",
+        "einsum_equation": "BHQK->BHQK",
+        "elementwise_op": "mul",
+        "reduction_op": "none",
+        "is_real_einsum": False,
+        "is_einsum_supportable": True,
+        "input_shapes": [scores_shape],
+        "output_shapes": [scores_shape],
+        "weight_shapes": [],
+        "weight_nodes": [],
+        "module_args": {"scale_factor": f"1/sqrt({embedding_dim})"},
+        "connections": {
+            "inputs": [f"{node_id}.qk_matmul"],
+            "outputs": [f"{node_id}.softmax"],
+        },
+    }
+
+
+def _attention_softmax_node(
+    node_id: str,
+    scores_shape: TensorShape,
+) -> dict[str, Any]:
+    return {
+        "type": "softmax",
+        "einsum_equation": "BHQK->BHQK",
+        "elementwise_op": "softmax",
+        "reduction_op": "none",
+        "is_real_einsum": False,
+        "is_einsum_supportable": True,
+        "input_shapes": [scores_shape],
+        "output_shapes": [scores_shape],
+        "weight_shapes": [],
+        "weight_nodes": [],
+        "module_args": {"dim": -1},
+        "connections": {
+            "inputs": [f"{node_id}.scale"],
+            "outputs": [f"{node_id}.av_matmul"],
+        },
+    }
+
+
+def _attention_value_node(
+    node_id: str,
+    scores_shape: TensorShape,
+    value_shape: TensorShape,
+    output_shape: TensorShape,
+) -> dict[str, Any]:
+    return {
+        "type": "matmul",
+        "einsum_equation": "BHQK,BHKV->BHQV",
+        "elementwise_op": "mul",
+        "reduction_op": "add",
+        "is_real_einsum": True,
+        "is_einsum_supportable": True,
+        "input_shapes": [scores_shape, value_shape],
+        "output_shapes": [output_shape],
+        "weight_shapes": [],
+        "weight_nodes": [],
+        "module_args": {"operation": "attn_weights @ V"},
+        "connections": {
+            "inputs": [f"{node_id}.softmax"],
+            "outputs": [],
+        },
+    }
 
 
 class ScaledDotProductAttentionHandler(EinsumOpHandler):
@@ -54,17 +151,20 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
         return attn_weight @ value
     """
 
-    supported_ops = [
+    supported_ops = (
         "scaled_dot_product_attention",
         "sdpa",
         "attention",
-    ]
+    )
 
     # Mark this as an expandable operation
     is_expandable = True
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for scaled dot-product attention.
 
@@ -73,7 +173,7 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
         """
         if tensor_shapes.num_inputs < 3:
             raise ValueError(
-                f"SDPA requires 3 input shapes (Q, K, V). Got {tensor_shapes.num_inputs}"
+                f"SDPA requires 3 input shapes (Q, K, V). Got {tensor_shapes.num_inputs}",
             )
 
         query_shape = tensor_shapes.inputs[0]
@@ -83,7 +183,10 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
         is_causal = kwargs.get("is_causal", False)
 
         return self._generate_sdpa_einsum(
-            query_shape, key_shape, value_shape, is_causal
+            query_shape,
+            key_shape,
+            value_shape,
+            is_causal,
         )
 
     def _generate_sdpa_einsum(
@@ -132,143 +235,56 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
     def create_subgraph(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
-    ) -> Dict[str, Dict[str, Any]]:
-        """Expand SDPA into a subgraph of simpler operations.
-
-        Based on PyTorch's reference implementation:
-            attn_weight = query @ key.transpose(-2, -1) * scale_factor
-            attn_weight = torch.softmax(attn_weight, dim=-1)
-            return attn_weight @ value
-
-        Subgraph structure:
-            1. qk_matmul: Q @ K^T -> attention scores [B,H,Q,K]
-            2. scale: scores * (1/sqrt(d_k)) -> scaled scores [B,H,Q,K]
-            3. softmax: softmax(scaled_scores, dim=-1) -> attention weights [B,H,Q,K]
-            4. av_matmul: weights @ V -> output [B,H,Q,V]
-
-        Args:
-            node_id: Original node identifier.
-            node_data: Node data containing shapes and arguments.
-
-        Returns:
-            Dictionary of subgraph nodes.
-        """
+        node_data: dict[str, Any],
+    ) -> dict[str, dict[str, Any]]:
+        """Expand SDPA into matmul, scaling, softmax, and value matmul."""
         input_shapes = node_data.get("input_shapes", [])
         output_shapes = node_data.get("output_shapes", [])
-        node_data.get("module_args", {})
-
         if len(input_shapes) < 3:
-            raise ValueError(f"SDPA requires 3 inputs (Q, K, V). Got: {input_shapes}")
-
-        query_shape = list(input_shapes[0])  # [B, H, Q, D]
-        key_shape = list(input_shapes[1])  # [B, H, K, D]
-        value_shape = list(input_shapes[2])  # [B, H, K, V]
-        output_shape = list(output_shapes[0]) if output_shapes else None
-
-        # Infer dimensions
-        B = query_shape[0]  # batch
-        H = query_shape[1]  # heads
-        Q = query_shape[2]  # query sequence length
-        D = query_shape[3]  # embedding dim
-        K = key_shape[2]  # key sequence length
-        V = value_shape[3]  # value embedding dim
-
-        # Intermediate shapes
-        scores_shape = [B, H, Q, K]  # Q @ K^T
-
-        subgraph: Dict[str, Dict[str, Any]] = {}
-
-        # 1. Q @ K^T -> attention scores
-        # Einsum: BHQD,BHKD->BHQK (K is transposed, so D is contracted)
-        qk_node_id = f"{node_id}.qk_matmul"
-        subgraph[qk_node_id] = {
-            "type": "matmul",
-            "einsum_equation": "BHQD,BHKD->BHQK",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "input_shapes": [query_shape, key_shape],
-            "output_shapes": [scores_shape],
-            "weight_shapes": [],
-            "weight_nodes": [],
-            "module_args": {"operation": "Q @ K^T"},
-            "connections": {
-                "inputs": [],  # Will be connected by caller
-                "outputs": [f"{node_id}.scale"],
-            },
+            raise ValueError(
+                f"SDPA requires 3 inputs (Q, K, V). Got: {input_shapes}",
+            )
+        query_shape, key_shape, value_shape = (
+            list(input_shapes[0]),
+            list(input_shapes[1]),
+            list(input_shapes[2]),
+        )
+        batch, heads, query_length, embedding_dim = query_shape
+        key_length = key_shape[2]
+        scores_shape = [batch, heads, query_length, key_length]
+        output_shape = (
+            list(output_shapes[0])
+            if output_shapes
+            else [batch, heads, query_length, value_shape[3]]
+        )
+        return {
+            f"{node_id}.qk_matmul": _qk_attention_node(
+                node_id,
+                query_shape,
+                key_shape,
+                scores_shape,
+            ),
+            f"{node_id}.scale": _attention_scale_node(
+                node_id,
+                scores_shape,
+                embedding_dim,
+            ),
+            f"{node_id}.softmax": _attention_softmax_node(
+                node_id,
+                scores_shape,
+            ),
+            f"{node_id}.av_matmul": _attention_value_node(
+                node_id,
+                scores_shape,
+                value_shape,
+                output_shape,
+            ),
         }
-
-        # 2. Scale by 1/sqrt(d_k)
-        # This is an elementwise multiplication
-        scale_node_id = f"{node_id}.scale"
-        subgraph[scale_node_id] = {
-            "type": "mul",
-            "einsum_equation": "BHQK->BHQK",
-            "elementwise_op": "mul",
-            "reduction_op": "none",
-            "is_real_einsum": False,
-            "is_einsum_supportable": True,
-            "input_shapes": [scores_shape],
-            "output_shapes": [scores_shape],
-            "weight_shapes": [],
-            "weight_nodes": [],
-            "module_args": {"scale_factor": f"1/sqrt({D})"},
-            "connections": {
-                "inputs": [qk_node_id],
-                "outputs": [f"{node_id}.softmax"],
-            },
-        }
-
-        # 3. Softmax over K dimension (dim=-1)
-        softmax_node_id = f"{node_id}.softmax"
-        subgraph[softmax_node_id] = {
-            "type": "softmax",
-            "einsum_equation": "BHQK->BHQK",
-            "elementwise_op": "softmax",
-            "reduction_op": "none",
-            "is_real_einsum": False,
-            "is_einsum_supportable": True,
-            "input_shapes": [scores_shape],
-            "output_shapes": [scores_shape],
-            "weight_shapes": [],
-            "weight_nodes": [],
-            "module_args": {"dim": -1},
-            "connections": {
-                "inputs": [scale_node_id],
-                "outputs": [f"{node_id}.av_matmul"],
-            },
-        }
-
-        # 4. Attention weights @ V -> output
-        # Einsum: BHQK,BHKV->BHQV
-        av_node_id = f"{node_id}.av_matmul"
-        final_output_shape = output_shape if output_shape else [B, H, Q, V]
-        subgraph[av_node_id] = {
-            "type": "matmul",
-            "einsum_equation": "BHQK,BHKV->BHQV",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "input_shapes": [scores_shape, value_shape],
-            "output_shapes": [final_output_shape],
-            "weight_shapes": [],
-            "weight_nodes": [],
-            "module_args": {"operation": "attn_weights @ V"},
-            "connections": {
-                "inputs": [softmax_node_id],  # Also needs value input
-                "outputs": [],  # Will be connected by caller
-            },
-        }
-
-        return subgraph
 
     def get_subgraph_input_mapping(
         self,
         node_id: str,
-    ) -> Dict[str, List[int]]:
+    ) -> dict[str, list[int]]:
         """Get mapping of subgraph nodes to original input indices.
 
         For SDPA:
@@ -277,6 +293,7 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
 
         Returns:
             Dict mapping subgraph node IDs to list of original input indices.
+
         """
         return {
             f"{node_id}.qk_matmul": [0, 1],  # Q, K
@@ -287,16 +304,19 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
 class FlexAttentionHandler(EinsumOpHandler):
     """Handler for flex_attention (similar to SDPA)."""
 
-    supported_ops = ["flex_attention"]
+    supported_ops = ("flex_attention",)
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for flex_attention."""
         if tensor_shapes.num_inputs < 3:
             raise ValueError(
                 f"flex_attention requires 3 input shapes (Q, K, V). "
-                f"Got {tensor_shapes.num_inputs}"
+                f"Got {tensor_shapes.num_inputs}",
             )
 
         query = tensor_shapes.inputs[0]
@@ -306,7 +326,10 @@ class FlexAttentionHandler(EinsumOpHandler):
         return self._generate_flex_attention_einsum(query, key, value)
 
     def _generate_flex_attention_einsum(
-        self, query_shape: TensorShape, key_shape: TensorShape, value_shape: TensorShape
+        self,
+        query_shape: TensorShape,
+        key_shape: TensorShape,
+        value_shape: TensorShape,
     ) -> EinsumOp:
         """Generate einsum for flex_attention."""
         operands = [
@@ -330,10 +353,13 @@ class FlexAttentionHandler(EinsumOpHandler):
 class MultiHeadAttentionHandler(EinsumOpHandler):
     """Handler for multi-head attention forward."""
 
-    supported_ops = ["multi_head_attention_forward", "multihead_attention"]
+    supported_ops = ("multi_head_attention_forward", "multihead_attention")
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for multi-head attention."""
         if tensor_shapes.num_inputs < 1:

@@ -14,12 +14,12 @@ from sol_execbench.core.platform.environment import (
     EnvironmentSnapshot,
 )
 from sol_execbench.core.platform.toolchain import (
-    ToolLifecycle,
     ToolchainArtifactType,
     ToolchainCapability,
     ToolchainEvidenceLevel,
     ToolchainRoutingReport,
     ToolchainRoutingRequest,
+    ToolLifecycle,
 )
 
 
@@ -33,7 +33,7 @@ def test_evaluator_contract_uses_response_envelope() -> None:
     _, response = _json(["contract", "evaluator"])
     assert response["schema_version"] == "sol_execbench.cli_response.v1"
     assert response["data"]["schema_version"].startswith(
-        "sol_execbench.evaluator_contract."
+        "sol_execbench.evaluator_contract.",
     )
 
 
@@ -66,11 +66,13 @@ def test_doctor_outputs_diagnostics(monkeypatch) -> None:
                 name="pytorch_rocm_runtime",
                 status=EnvironmentEvidenceStatus.AVAILABLE,
                 message="ok",
-            )
+            ),
         ],
     )
     monkeypatch.setattr(
-        cli_metadata, "build_environment_diagnostics", lambda: diagnostics
+        cli_metadata,
+        "build_environment_diagnostics",
+        lambda: diagnostics,
     )
     _, response = _json(["environment", "doctor"])
     assert response["data"]["checks"][0]["name"] == "pytorch_rocm_runtime"
@@ -85,7 +87,11 @@ def test_toolchain_route_outputs_report(monkeypatch) -> None:
             selected_tool_id="rocprofv3",
         )
 
-    monkeypatch.setattr(cli_metadata, "build_toolchain_routing_report", fake_report)
+    monkeypatch.setattr(
+        cli_metadata,
+        "build_toolchain_routing_report",
+        fake_report,
+    )
     _, response = _json(["toolchain", "route", "--gpu-arch", "gfx1200"])
     assert response["data"]["selected_tool_id"] == "rocprofv3"
 
@@ -101,10 +107,13 @@ def test_toolchain_list_has_no_route_filters(monkeypatch) -> None:
                 lifecycle=ToolLifecycle.ACTIVE,
                 evidence_levels=[ToolchainEvidenceLevel.PROFILING],
                 artifact_types=[ToolchainArtifactType.EXECUTABLE_RUN],
-            )
+            ),
         ],
     )
     _, response = _json(["toolchain", "list"])
     assert response["data"][0]["tool_id"] == "rocprofv3"
-    rejected = CliRunner().invoke(cli, ["toolchain", "list", "--gpu-arch", "gfx1200"])
+    rejected = CliRunner().invoke(
+        cli,
+        ["toolchain", "list", "--gpu-arch", "gfx1200"],
+    )
     assert rejected.exit_code == 2

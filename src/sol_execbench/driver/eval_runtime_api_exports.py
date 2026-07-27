@@ -13,13 +13,13 @@ from sol_execbench.core.bench.eval_runtime import (
     measure_latency,
     run_reward_hack_check,
 )
+from sol_execbench.core.bench.eval_workload_runner import evaluate_workloads
 from sol_execbench.core.bench.evaluation_requests import (
     EvaluationDependencies,
     WorkloadEvaluationRequest,
 )
-from sol_execbench.core.bench.eval_workload_runner import evaluate_workloads
-from sol_execbench.core.bench.reference_protocol import connect_reference_worker
 from sol_execbench.core.bench.io import allocate_outputs, gen_inputs
+from sol_execbench.core.bench.reference_protocol import connect_reference_worker
 from sol_execbench.core.bench.reward_hack import (
     check_eval_integrity,
     check_lazy_outputs,

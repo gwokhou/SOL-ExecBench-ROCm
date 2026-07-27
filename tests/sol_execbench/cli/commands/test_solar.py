@@ -39,7 +39,10 @@ def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
     )
 
 
-def test_solar_analyze_cli_returns_bound_and_artifacts(tmp_path, monkeypatch) -> None:
+def test_solar_analyze_cli_returns_bound_and_artifacts(
+    tmp_path,
+    monkeypatch,
+) -> None:
     problem = tmp_path / "problem"
     problem.mkdir()
     output = tmp_path / "analysis"
@@ -47,7 +50,8 @@ def test_solar_analyze_cli_returns_bound_and_artifacts(tmp_path, monkeypatch) ->
         solar_commands,
         "run_solar_worker",
         lambda request, **kwargs: _formal_outcome(
-            request.workload_uuid, request.output_dir
+            request.workload_uuid,
+            request.output_dir,
         ),
     )
 
@@ -82,7 +86,10 @@ def test_solar_analyze_cli_returns_bound_and_artifacts(tmp_path, monkeypatch) ->
     }
 
 
-def test_solar_analyze_cli_rejects_non_formal_success(tmp_path, monkeypatch) -> None:
+def test_solar_analyze_cli_rejects_non_formal_success(
+    tmp_path,
+    monkeypatch,
+) -> None:
     problem = tmp_path / "problem"
     problem.mkdir()
     output = tmp_path / "analysis"
@@ -114,7 +121,10 @@ def test_solar_analyze_cli_rejects_non_formal_success(tmp_path, monkeypatch) -> 
     assert payload["data"]["reason_code"] == "non_formal_bound"
 
 
-def test_solar_analyze_cli_preserves_failed_stage(tmp_path, monkeypatch) -> None:
+def test_solar_analyze_cli_preserves_failed_stage(
+    tmp_path,
+    monkeypatch,
+) -> None:
     problem = tmp_path / "problem"
     problem.mkdir()
     monkeypatch.setattr(
@@ -145,10 +155,16 @@ def test_solar_analyze_cli_preserves_failed_stage(tmp_path, monkeypatch) -> None
     )
 
     assert result.exit_code == 1
-    assert json.loads(result.output)["data"]["reason_code"] == "verification_failed"
+    assert (
+        json.loads(result.output)["data"]["reason_code"]
+        == "verification_failed"
+    )
 
 
-def test_solar_analyze_cli_structures_runner_timeout(tmp_path, monkeypatch) -> None:
+def test_solar_analyze_cli_structures_runner_timeout(
+    tmp_path,
+    monkeypatch,
+) -> None:
     problem = tmp_path / "problem"
     problem.mkdir()
 
@@ -180,7 +196,10 @@ def test_solar_analyze_cli_structures_runner_timeout(tmp_path, monkeypatch) -> N
     assert payload["data"]["reason_code"] == "worker_execution_failed"
 
 
-def test_solar_corpus_audit_returns_incomplete_matrix(tmp_path, monkeypatch) -> None:
+def test_solar_corpus_audit_returns_incomplete_matrix(
+    tmp_path,
+    monkeypatch,
+) -> None:
     output = tmp_path / "audit"
     matrix = output / "matrix.jsonl"
     summary = output / "summary.json"

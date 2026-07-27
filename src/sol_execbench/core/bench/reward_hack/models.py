@@ -31,7 +31,7 @@ from enum import StrEnum
 from typing import Any
 
 
-class RewardHackDetected(RuntimeError):
+class RewardHackError(RuntimeError):
     """Raised when a reward-hacking pattern is detected in a submission."""
 
 
@@ -73,7 +73,8 @@ class SourceReview:
     def blocked(self) -> bool:
         """Whether any finding should reject execution."""
         return any(
-            issue.severity == SourceReviewSeverity.BLOCK for issue in self.issues
+            issue.severity == SourceReviewSeverity.BLOCK
+            for issue in self.issues
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -119,7 +120,7 @@ _STATIC_RULES = (
             r"cudaStreamCreate|hipStreamSynchronize|cudaStreamSynchronize|"
             r"torch\.cuda\.CUDAGraph|torch\.cuda\.graph|make_graphed_callables|"
             r"capture_begin|capture_end|replay|hipGraph[A-Za-z0-9_]*|"
-            r"cudaGraph[A-Za-z0-9_]*)\b"
+            r"cudaGraph[A-Za-z0-9_]*)\b",
         ),
         "non-default streams or graph capture can hide work from event timing",
     ),
@@ -128,7 +129,7 @@ _STATIC_RULES = (
         SourceReviewSeverity.BLOCK,
         re.compile(
             r"(\bdata_ptr\s*\(|\blru_cache\b|\bglobal\s+[_A-Za-z0-9]*cache\b|"
-            r"[_A-Za-z0-9]*cache\s*=\s*\{|\btobytes\s*\(|\bhashlib\b)"
+            r"[_A-Za-z0-9]*cache\s*=\s*\{|\btobytes\s*\(|\bhashlib\b)",
         ),
         "data-pointer or content-keyed caching can reuse outputs across phases",
         suffixes=(".py",),
@@ -139,7 +140,7 @@ _STATIC_RULES = (
         re.compile(
             r"\b(threading|_thread|multiprocessing|concurrent\.futures|"
             r"pthread_create|std::thread|hipLaunchHostFunc|"
-            r"torch\.jit\.fork|jit\.fork)\b"
+            r"torch\.jit\.fork|jit\.fork)\b",
         ),
         "submission-created workers can escape timed execution and cleanup",
     ),
@@ -154,7 +155,7 @@ _STATIC_RULES = (
             r"\b__import__\s*\(|\bimportlib\.(import_module|util)\b|"
             r"\bgetattr\s*\(\s*os\s*,\s*['\"](system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*)['\"]\s*\)|"
             r"\bos\.(system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*)\s*\(|"
-            r"\bpty\.spawn\s*\(|\bsocket\b|\burllib\b|\brequests\b)"
+            r"\bpty\.spawn\s*\(|\bsocket\b|\burllib\b|\brequests\b)",
         ),
         "file I/O, embedded payload decoding, dynamic native loading, or process/network access is not allowed in submitted sources",
     ),
@@ -167,7 +168,7 @@ _PRECISION_DOWNGRADE_RULE = _SourceRule(
     re.compile(
         r"(\.half\s*\(|\.bfloat16\s*\(|\.to\s*\(\s*torch\.(float16|bfloat16)|"
         r"\btorch\.(float16|bfloat16)\b|\btl\.(float16|bfloat16)\b|"
-        r"\.to\s*\(\s*tl\.(float16|bfloat16))"
+        r"\.to\s*\(\s*tl\.(float16|bfloat16))",
     ),
     "precision downgrade is not allowed for float32 output contracts without explicit benchmark approval",
 )
@@ -217,7 +218,13 @@ _RISKY_FILE_CALLS = {"open", "Path", "pathlib.Path"}
 _RISKY_DECODE_CALLS = {"eval", "exec", "compile", "__import__"}
 
 
-_RISKY_METHODS = {"read_text", "write_text", "load_library", "load", "load_inline"}
+_RISKY_METHODS = {
+    "read_text",
+    "write_text",
+    "load_library",
+    "load",
+    "load_inline",
+}
 
 
 _CACHE_METHODS = {"data_ptr", "tobytes"}
@@ -226,7 +233,7 @@ _CACHE_METHODS = {"data_ptr", "tobytes"}
 # Attribute names that create or enter a non-default HIP stream when
 # fetched indirectly via ``getattr`` (paper §4.4.1 concurrency exploit).
 # Direct ``torch.cuda.Stream()`` calls are already caught by the static regex
-# and the AST stream check; this set covers the ``getattr(torch.cuda, "Stream")``
+# and the AST stream check. This set also covers dynamic stream lookup.
 # obfuscation that bypasses those direct-name checks.
 _INDIRECT_STREAM_ATTRS = {"Stream", "ExternalStream", "stream"}
 

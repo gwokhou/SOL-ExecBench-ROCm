@@ -43,7 +43,6 @@ def build_profile_summary_sidecar(
     artifact_citations: Sequence[SizedDiagnosticArtifactCitation] = (),
 ) -> ProfileSummarySidecar:
     """Build a bounded diagnostic profile summary from rocprofv3 metadata."""
-
     status = _status_for_profile_result(profile_result)
     reason_code = _reason_code_for_profile_result(profile_result, status)
     return ProfileSummarySidecar(
@@ -75,7 +74,7 @@ def _status_for_profile_result(
         Rocprofv3ProfileStatus.SUCCESS,
         Rocprofv3ProfileStatus.PARTIAL,
     }:
-        # Successful process execution without profiler data is partial diagnostics,
+        # Successful execution without profiler data is partial diagnostics,
         # not missing and not full profile availability.
         return DiagnosticSidecarStatus.PARTIAL
     if profile_result.status in {
@@ -156,20 +155,22 @@ def _limitations(profile_result: Rocprofv3ProfileResult | None) -> list[str]:
         limitations.append("No rocprofv3 profile result was supplied.")
         return limitations
     if profile_result.status is not Rocprofv3ProfileStatus.SUCCESS:
-        limitations.append(f"rocprofv3 profile status is {profile_result.status}.")
-    elif not profile_result.has_profiler_data:
-        if (
-            profile_result.artifact_coverage_status
-            is not Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY
-        ):
-            limitations.append(
-                "rocprofv3 profile completed without profiler data artifacts."
-            )
+        limitations.append(
+            f"rocprofv3 profile status is {profile_result.status}.",
+        )
+    elif (
+        not profile_result.has_profiler_data
+        and profile_result.artifact_coverage_status
+        is not Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY
+    ):
+        limitations.append(
+            "rocprofv3 profile completed without profiler data artifacts.",
+        )
     if (
         profile_result.artifact_coverage_status
         is Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY
     ):
         limitations.append(
-            "rocprofv3 produced diagnostic logs but no profiler data artifacts."
+            "rocprofv3 produced diagnostic logs but no profiler data artifacts.",
         )
     return limitations

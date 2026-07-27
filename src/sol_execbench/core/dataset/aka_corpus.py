@@ -24,9 +24,10 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import yaml
 
@@ -60,7 +61,9 @@ from sol_execbench.core.dataset.aka_contract import (
     AkaSourceFamily,
     AkaSuite,
 )
-from sol_execbench.core.dataset.aka_tolerance import validate_calibration_binding
+from sol_execbench.core.dataset.aka_tolerance import (
+    validate_calibration_binding,
+)
 from sol_execbench.core.integrity import (
     sha256_file,
     validate_relative_artifact_path,
@@ -76,12 +79,12 @@ AKA_PROVENANCE_CLASS = "ecosystem_grounded"
 FORMAL_ARCHITECTURE = "solar:RX_9060_XT"
 FORMAL_GFX_TARGET = "gfx1200"
 FORMAL_ARCHITECTURE_SHA256 = (
-    "dd280604eef72a13d3e1510feb0a35842b976326a1b3cb9c2153ac1b0139a055"
+    "a3c780290392e7386e34233f9e3a0965a3f24f98d94326ecef647baa81160edc"
 )
 
 # Corpus-size bounds. The initial seed landed at 15 problems; the friendliness
 # expansion (docs/internal/aka-expansion-friendliness.md) grows it to 37 across
-# the three handling categories. The upper bound keeps headroom for further growth
+# the three handling categories. The upper bound leaves room for growth
 # while still bounding the manifest validator's check.
 SEED_SET_MIN_PROBLEMS = 15
 SEED_SET_MAX_PROBLEMS = 48
@@ -117,6 +120,7 @@ class AkaCorpusEntry:
 
     @property
     def relative_problem_dir(self) -> Path:
+        """Return the corpus-relative problem directory."""
         return Path(self.suite) / self.problem_name
 
 
@@ -136,10 +140,12 @@ class AkaCorpusManifest:
 
     @property
     def authored_root(self) -> Path:
+        """Return the root directory containing authored problems."""
         return self.path.parent
 
     @classmethod
-    def load(cls, path: str | Path) -> "AkaCorpusManifest":
+    def load(cls, path: str | Path) -> AkaCorpusManifest:
+        """Load and validate a corpus manifest."""
         manifest_path = Path(path).resolve()
         data = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
         _validate_manifest_header(data)
@@ -156,16 +162,21 @@ class AkaCorpusManifest:
             for item in problem_records
         }
         _validate_authored_problems(
-            manifest_path.parent, entries, materialized_problem_sha256
+            manifest_path.parent,
+            entries,
+            materialized_problem_sha256,
         )
         calibration = dict(data.get("tolerance_calibration") or {})
         validate_calibration_binding(
             authored_root=manifest_path.parent,
             binding=calibration,
             entries=entries,
-            source_revision=str((data.get("source") or {}).get("revision") or ""),
+            source_revision=str(
+                (data.get("source") or {}).get("revision") or "",
+            ),
             formal_gfx_target=str(
-                (data.get("formal_analysis") or {}).get("formal_gfx_target") or ""
+                (data.get("formal_analysis") or {}).get("formal_gfx_target")
+                or "",
             ),
         )
         return cls(
@@ -192,7 +203,7 @@ class AkaCorpusManifest:
         execution_target = self.execution_targets.get(target.device.gfx_target)
         if execution_target is None:
             raise ValueError(
-                f"unsupported AKA execution target: {target.device.gfx_target}"
+                f"unsupported AKA execution target: {target.device.gfx_target}",
             )
         selection = select_corpus_for_target(
             authored_root=self.authored_root,
@@ -204,9 +215,13 @@ class AkaCorpusManifest:
         )
         output = Path(output_root).resolve()
         if output.exists():
-            raise FileExistsError(f"materialization output already exists: {output}")
+            raise FileExistsError(
+                f"materialization output already exists: {output}",
+            )
         output.parent.mkdir(parents=True, exist_ok=True)
-        staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
+        staging = Path(
+            tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent),
+        )
         try:
             records = _mirror_selection(self.authored_root, staging, selection)
             _write_materialization_manifest(
@@ -229,11 +244,17 @@ class AkaCorpusManifest:
         record_path = output / "materialization-manifest.yaml"
         record = yaml.safe_load(record_path.read_text(encoding="utf-8")) or {}
         if int(record.get("schema_version", 0)) != 2:
-            raise ValueError("AKA materialization record must use schema_version 2")
+            raise ValueError(
+                "AKA materialization record must use schema_version 2",
+            )
         if record.get("aka_manifest_sha256") != sha256_file(self.path):
             raise ValueError("corpus manifest identity changed")
-        if record.get("source", {}).get("revision") != self.source.get("revision"):
-            raise ValueError("materialization record pins a different AKA revision")
+        if record.get("source", {}).get("revision") != self.source.get(
+            "revision",
+        ):
+            raise ValueError(
+                "materialization record pins a different AKA revision",
+            )
         target = _audit_materialization_target(record.get("target"), self)
         decisions = _audit_decision_partition(
             self.authored_root,
@@ -256,7 +277,9 @@ class AkaCorpusManifest:
             for entry in self.entries
             if entry.relative_problem_dir.as_posix() in selected_paths
         )
-        workload_count = sum(len(item.get("workload_uuids") or ()) for item in problems)
+        workload_count = sum(
+            len(item.get("workload_uuids") or ()) for item in problems
+        )
         coverage = _coverage_report(self, selected_entries, workload_count)
         if record.get("coverage") != coverage:
             raise ValueError("materialized coverage report is inconsistent")
@@ -297,13 +320,13 @@ class AkaCorpusManifest:
         head_file = root / ".aka-head"
         if not head_file.is_file():
             raise ValueError(
-                "AKA clone missing .aka-head; run scripts/fetch_aka_source.sh first"
+                "AKA clone missing .aka-head; run scripts/fetch_aka_source.sh first",
             )
         head = head_file.read_text().strip()
         if head != self.source.get("revision"):
             raise ValueError(
                 f"AKA clone at {head[:12]} but corpus pins "
-                f"{str(self.source.get('revision'))[:12]}"
+                f"{str(self.source.get('revision'))[:12]}",
             )
         checked = 0
         for entry in self.entries:
@@ -313,7 +336,7 @@ class AkaCorpusManifest:
                 if not path.is_file() or sha256_file(path) != artifact.sha256:
                     raise ValueError(
                         f"AKA {artifact.role} mismatch for {entry.task_path} "
-                        f"at {head[:12]}"
+                        f"at {head[:12]}",
                     )
                 checked += 1
         return {
@@ -327,11 +350,13 @@ class AkaCorpusManifest:
 def _validate_manifest_header(data: Mapping[str, Any]) -> None:
     if int(data.get("schema_version", 0)) != AKA_MANIFEST_SCHEMA_VERSION:
         raise ValueError(
-            f"AKA corpus manifest must use schema_version {AKA_MANIFEST_SCHEMA_VERSION}"
+            f"AKA corpus manifest must use schema_version {AKA_MANIFEST_SCHEMA_VERSION}",
         )
     source = data.get("source") or {}
     if source.get("repository") != AKA_REPOSITORY:
-        raise ValueError("corpus must derive from the AMD AgentKernelArena repository")
+        raise ValueError(
+            "corpus must derive from the AMD AgentKernelArena repository",
+        )
     if source.get("revision") != AKA_REVISION:
         raise ValueError("corpus AKA revision is not the pinned revision")
     if source.get("license") != AKA_LICENSE:
@@ -341,7 +366,9 @@ def _validate_manifest_header(data: Mapping[str, Any]) -> None:
     load_execution_targets(data.get("execution_targets") or {})
     formal = data.get("formal_analysis") or {}
     if formal.get("architecture_profile") != FORMAL_ARCHITECTURE:
-        raise ValueError("formal corpus must reference the packaged RX 9060 XT profile")
+        raise ValueError(
+            "formal corpus must reference the packaged RX 9060 XT profile",
+        )
     if formal.get("formal_gfx_target") != FORMAL_GFX_TARGET:
         raise ValueError("formal corpus must target gfx1200")
     if formal.get("architecture_profile_sha256") != FORMAL_ARCHITECTURE_SHA256:
@@ -350,17 +377,25 @@ def _validate_manifest_header(data: Mapping[str, Any]) -> None:
     try:
         status = AkaOfficialScoringStatus(str(scoring.get("status")))
     except ValueError:
-        raise ValueError("official scoring availability must be explicit") from None
+        raise ValueError(
+            "official scoring availability must be explicit",
+        ) from None
     if status is AkaOfficialScoringStatus.AVAILABLE:
         try:
             policy = AkaReleasePolicy(str(scoring.get("release_policy")))
         except ValueError:
-            raise ValueError("official scoring release policy is invalid") from None
+            raise ValueError(
+                "official scoring release policy is invalid",
+            ) from None
         if policy is not AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1:
             raise ValueError("official scoring release policy is unsupported")
         if scoring.get("baseline_id") != AKA_OFFICIAL_BASELINE_ID:
-            raise ValueError("official scoring baseline identity is not canonical")
-        required = tuple(str(item) for item in scoring.get("required_evidence") or ())
+            raise ValueError(
+                "official scoring baseline identity is not canonical",
+            )
+        required = tuple(
+            str(item) for item in scoring.get("required_evidence") or ()
+        )
         expected = tuple(AKA_REQUIRED_RELEASE_EVIDENCE)
         if required != expected:
             raise ValueError("official scoring evidence denominator is invalid")
@@ -387,19 +422,22 @@ def _load_entry(data: Mapping[str, Any]) -> AkaCorpusEntry:
         suite=AkaSuite(str(data["suite"])),
         role=AkaCorpusRole(str(data.get("role", AkaCorpusRole.SCORED))),
         exclusion_reason_code=str(data.get("exclusion_reason_code", "")),
-        workload_uuids=tuple(str(u) for u in (data.get("workload_uuids") or ())),
+        workload_uuids=tuple(
+            str(u) for u in (data.get("workload_uuids") or ())
+        ),
         aka_artifacts=artifacts,
         golden=dict(data.get("golden") or {}),
     )
 
 
 def _validate_entries(
-    entries: tuple[AkaCorpusEntry, ...], coverage: Mapping[str, Any]
+    entries: tuple[AkaCorpusEntry, ...],
+    coverage: Mapping[str, Any],
 ) -> None:
     if not (SEED_SET_MIN_PROBLEMS <= len(entries) <= SEED_SET_MAX_PROBLEMS):
         raise ValueError(
             f"AKA seed set must contain {SEED_SET_MIN_PROBLEMS}.."
-            f"{SEED_SET_MAX_PROBLEMS} problems, got {len(entries)}"
+            f"{SEED_SET_MAX_PROBLEMS} problems, got {len(entries)}",
         )
     names = [entry.problem_name for entry in entries]
     if len(set(names)) != len(names):
@@ -413,24 +451,30 @@ def _validate_entries(
     for entry in entries:
         validate_relative_artifact_path(entry.task_path, "AKA task path")
         _validate_artifact_bindings(entry)
-    unknown_roles = sorted({str(entry.role) for entry in entries} - set(AkaCorpusRole))
+    unknown_roles = sorted(
+        {str(entry.role) for entry in entries} - set(AkaCorpusRole),
+    )
     if unknown_roles:
-        raise ValueError(f"AKA corpus entries use unknown roles: {unknown_roles}")
+        raise ValueError(
+            f"AKA corpus entries use unknown roles: {unknown_roles}",
+        )
     for entry in entries:
         if entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE:
             if not entry.exclusion_reason_code:
                 raise ValueError(
-                    "target-incompatible corpus entries require an exclusion reason"
+                    "target-incompatible corpus entries require an exclusion reason",
                 )
         elif entry.exclusion_reason_code:
             raise ValueError(
-                "only target-incompatible corpus entries may declare an exclusion reason"
+                "only target-incompatible corpus entries may declare an exclusion reason",
             )
     sentinels = [
-        entry for entry in entries if entry.role == AkaCorpusRole.COMPATIBILITY_SENTINEL
+        entry
+        for entry in entries
+        if entry.role == AkaCorpusRole.COMPATIBILITY_SENTINEL
     ]
     # The DType enum names OCP FP8 as "float8_e4m3fn" / "float8_e5m2", so accept
-    # either the "fp8" or "float8" prefix when checking the sentinel is an FP8 task.
+    # Accept either the "fp8" or "float8" prefix for the FP8 sentinel.
     if sentinels and not all(
         entry.dtype.startswith(("fp8", "float8")) for entry in sentinels
     ):
@@ -446,7 +490,7 @@ def _validate_artifact_bindings(entry: AkaCorpusEntry) -> None:
     if set(roles) != required_roles or len(roles) != len(required_roles):
         raise ValueError(
             f"AKA entry {entry.problem_name} must bind exactly one artifact for "
-            f"each role: {sorted(required_roles)}"
+            f"each role: {sorted(required_roles)}",
         )
     for artifact in entry.aka_artifacts:
         validate_relative_artifact_path(artifact.path, "AKA artifact path")
@@ -457,7 +501,8 @@ def _validate_artifact_bindings(entry: AkaCorpusEntry) -> None:
 
 
 def _validate_coverage_truth(
-    entries: tuple[AkaCorpusEntry, ...], coverage: Mapping[str, Any]
+    entries: tuple[AkaCorpusEntry, ...],
+    coverage: Mapping[str, Any],
 ) -> None:
     """The declared coverage axes must truthfully aggregate the entries."""
     axes = coverage.get("axes") or {}
@@ -480,20 +525,25 @@ def _validate_coverage_truth(
         if actual != {k: int(v) for k, v in declared.items()}:
             raise ValueError(
                 f"coverage axis {axis_name!r} does not match entries: "
-                f"declared={declared}, actual={actual}"
+                f"declared={declared}, actual={actual}",
             )
     for combo in coverage.get("combinations") or []:
         min_count = int(combo.get("min_count", 0))
         if min_count <= 0:
             continue
-        matched = sum(1 for entry in entries if _entry_matches_combo(entry, combo))
+        matched = sum(
+            1 for entry in entries if _entry_matches_combo(entry, combo)
+        )
         if matched < min_count:
             raise ValueError(
-                f"coverage combination unmet ({matched}<{min_count}): {combo}"
+                f"coverage combination unmet ({matched}<{min_count}): {combo}",
             )
 
 
-def _entry_matches_combo(entry: AkaCorpusEntry, combo: Mapping[str, Any]) -> bool:
+def _entry_matches_combo(
+    entry: AkaCorpusEntry,
+    combo: Mapping[str, Any],
+) -> bool:
     mapping = {
         "operation": entry.operation,
         "dtype": entry.dtype,
@@ -504,7 +554,9 @@ def _entry_matches_combo(entry: AkaCorpusEntry, combo: Mapping[str, Any]) -> boo
         "suite": entry.suite,
     }
     return all(
-        str(mapping.get(k)) == str(v) for k, v in combo.items() if k != "min_count"
+        str(mapping.get(k)) == str(v)
+        for k, v in combo.items()
+        if k != "min_count"
     )
 
 
@@ -513,13 +565,15 @@ def _manifest_value(value: object) -> str:
 
 
 def _canonical_workload_lines(path: Path) -> tuple[list[str], dict[str, str]]:
-    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
+    lines = [
+        line for line in path.read_text(encoding="utf-8").splitlines() if line
+    ]
     by_uuid: dict[str, str] = {}
     for line in lines:
         uuid = str(json.loads(line).get("uuid") or "")
         if not uuid or uuid in by_uuid:
             raise ValueError(
-                f"canonical workload UUID is missing or duplicated: {path}"
+                f"canonical workload UUID is missing or duplicated: {path}",
             )
         by_uuid[uuid] = line
     return lines, by_uuid
@@ -556,7 +610,7 @@ def _mirror_selection(
                 "source_workload_sha256": sha256_file(src / "workload.jsonl"),
                 "workload_sha256": sha256_file(workload_path),
                 "workload_uuids": selected_uuids,
-            }
+            },
         )
     return records
 
@@ -586,32 +640,39 @@ def _write_materialization_manifest(
             "unknown_targets": "fail_closed",
         },
         "problems": records,
-        "workload_decisions": [decision.to_dict() for decision in selection.decisions],
+        "workload_decisions": [
+            decision.to_dict() for decision in selection.decisions
+        ],
         "coverage": _selection_coverage(manifest, selection),
     }
     (staging / "materialization-manifest.yaml").write_text(
-        yaml.safe_dump(payload, sort_keys=False)
+        yaml.safe_dump(payload, sort_keys=False),
     )
 
 
 def _validate_canonical_problem_inventory(
-    entries: tuple[AkaCorpusEntry, ...], problems: Any
+    entries: tuple[AkaCorpusEntry, ...],
+    problems: Any,
 ) -> None:
     """Require the local record to name every corpus problem exactly once."""
     if not isinstance(problems, list) or any(
         not isinstance(item, Mapping) for item in problems
     ):
-        raise ValueError("materialization problem inventory must be a list of objects")
+        raise ValueError(
+            "materialization problem inventory must be a list of objects",
+        )
     expected = {entry.relative_problem_dir.as_posix() for entry in entries}
     recorded = [str(item.get("path", "")) for item in problems]
     if len(recorded) != len(set(recorded)):
-        raise ValueError("materialization problem inventory contains duplicate paths")
+        raise ValueError(
+            "materialization problem inventory contains duplicate paths",
+        )
     if set(recorded) != expected:
         missing = sorted(expected - set(recorded))
         unexpected = sorted(set(recorded) - expected)
         raise ValueError(
             "materialization problem inventory mismatch: "
-            f"missing={missing}, unexpected={unexpected}"
+            f"missing={missing}, unexpected={unexpected}",
         )
 
 
@@ -627,7 +688,7 @@ def _validate_authored_problems(
         workload_path = root / "workload.jsonl"
         if not definition_path.is_file() or not workload_path.is_file():
             raise ValueError(
-                f"authored AKA problem missing on disk: {entry.relative_problem_dir}"
+                f"authored AKA problem missing on disk: {entry.relative_problem_dir}",
             )
         relative = entry.relative_problem_dir.as_posix()
         expected = sha256_record.get(relative, {})
@@ -635,13 +696,13 @@ def _validate_authored_problems(
             sha256_file(definition_path) != expected["definition_sha256"]
         ):
             raise ValueError(
-                f"authored definition checksum mismatch: {entry.relative_problem_dir}"
+                f"authored definition checksum mismatch: {entry.relative_problem_dir}",
             )
         if expected.get("workload_sha256") and (
             sha256_file(workload_path) != expected["workload_sha256"]
         ):
             raise ValueError(
-                f"authored workload checksum mismatch: {entry.relative_problem_dir}"
+                f"authored workload checksum mismatch: {entry.relative_problem_dir}",
             )
         definition = Definition.model_validate_json(definition_path.read_text())
         workloads = [
@@ -657,17 +718,19 @@ def _validate_authored_problems(
         if any(payload_incompatibility) and entry.role == AkaCorpusRole.SCORED:
             raise ValueError(
                 "scored AKA problem exceeds the static trusted-reference IPC "
-                f"limit: {entry.relative_problem_dir}"
+                f"limit: {entry.relative_problem_dir}",
             )
         if (
             entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE
             and entry.exclusion_reason_code == "reference_ipc_payload_limit"
-            and (not payload_incompatibility or not all(payload_incompatibility))
+            and (
+                not payload_incompatibility or not all(payload_incompatibility)
+            )
         ):
             raise ValueError(
                 "every workload in a target-incompatible AKA problem must exceed "
                 "the static trusted-reference IPC limit: "
-                f"{entry.relative_problem_dir}"
+                f"{entry.relative_problem_dir}",
             )
         for uuid in entry.workload_uuids:
             _verify_workload_uuid_present(workload_path, uuid)
@@ -715,9 +778,13 @@ def _coverage_report(
             counts[value] = counts.get(value, 0) + 1
         axes[axis] = counts
     gaps: list[dict[str, Any]] = []
-    for combo in manifest.formal_coverage_requirements.get("combinations") or []:
+    for combo in (
+        manifest.formal_coverage_requirements.get("combinations") or []
+    ):
         minimum = int(combo.get("min_count", 0))
-        matched = sum(_entry_matches_combo(entry, combo) for entry in selected_entries)
+        matched = sum(
+            _entry_matches_combo(entry, combo) for entry in selected_entries
+        )
         if matched < minimum:
             gaps.append({"requirement": dict(combo), "matched": matched})
     return {
@@ -729,13 +796,14 @@ def _coverage_report(
 
 
 def _canonical_workload_inventory(
-    authored_root: Path, entries: tuple[AkaCorpusEntry, ...]
+    authored_root: Path,
+    entries: tuple[AkaCorpusEntry, ...],
 ) -> dict[tuple[str, str], str]:
     inventory: dict[tuple[str, str], str] = {}
     for entry in entries:
         relative = entry.relative_problem_dir.as_posix()
         _, lines = _canonical_workload_lines(
-            authored_root / entry.relative_problem_dir / "workload.jsonl"
+            authored_root / entry.relative_problem_dir / "workload.jsonl",
         )
         for uuid, line in lines.items():
             inventory[(relative, uuid)] = line
@@ -752,7 +820,9 @@ def _audit_materialization_target(raw: Any, manifest: AkaCorpusManifest) -> str:
     if not isinstance(cache, Mapping):
         raise ValueError("cache-clear evidence must be an object")
     detected = raw.get("l2_cache_bytes")
-    detected_l2 = detected if isinstance(detected, int) and detected > 0 else None
+    detected_l2 = (
+        detected if isinstance(detected, int) and detected > 0 else None
+    )
     expected = derive_cache_clear_policy(detected_l2)
     if cache.get("detected_l2_bytes") != expected.detected_l2_bytes:
         raise ValueError("cache-clear L2 evidence is inconsistent")
@@ -770,20 +840,30 @@ def _audit_decision_partition(
     entries: tuple[AkaCorpusEntry, ...],
     raw: Any,
 ) -> list[Mapping[str, Any]]:
-    if not isinstance(raw, list) or any(not isinstance(item, Mapping) for item in raw):
-        raise ValueError("workload decision inventory must be a list of objects")
+    if not isinstance(raw, list) or any(
+        not isinstance(item, Mapping) for item in raw
+    ):
+        raise ValueError(
+            "workload decision inventory must be a list of objects",
+        )
     expected = set(_canonical_workload_inventory(authored_root, entries))
     observed = [
         (str(item.get("path") or ""), str(item.get("workload_uuid") or ""))
         for item in raw
     ]
     if len(observed) != len(set(observed)):
-        raise ValueError("workload decision inventory contains duplicate workloads")
+        raise ValueError(
+            "workload decision inventory contains duplicate workloads",
+        )
     if set(observed) != expected:
-        raise ValueError("workload decisions do not partition the canonical corpus")
+        raise ValueError(
+            "workload decisions do not partition the canonical corpus",
+        )
     for item in raw:
         if not isinstance(item.get("included"), bool):
-            raise ValueError("workload decisions must record a boolean included value")
+            raise ValueError(
+                "workload decisions must record a boolean included value",
+            )
         if not item.get("stage") or not item.get("reason_code"):
             raise ValueError("workload decisions require stage and reason_code")
     return raw
@@ -797,23 +877,33 @@ def _audit_selected_inventory(
     if not isinstance(problems, list) or any(
         not isinstance(item, Mapping) for item in problems
     ):
-        raise ValueError("materialization problem inventory must be a list of objects")
-    canonical_paths = {entry.relative_problem_dir.as_posix() for entry in entries}
+        raise ValueError(
+            "materialization problem inventory must be a list of objects",
+        )
+    canonical_paths = {
+        entry.relative_problem_dir.as_posix() for entry in entries
+    }
     paths = [str(item.get("path") or "") for item in problems]
     if len(paths) != len(set(paths)) or not set(paths) <= canonical_paths:
-        raise ValueError("materialized problem inventory is duplicated or unknown")
+        raise ValueError(
+            "materialized problem inventory is duplicated or unknown",
+        )
     included: dict[str, list[str]] = {}
     for decision in decisions:
         if decision["included"]:
             included.setdefault(str(decision["path"]), []).append(
-                str(decision["workload_uuid"])
+                str(decision["workload_uuid"]),
             )
     if set(paths) != set(included):
-        raise ValueError("materialized problems do not match included decisions")
+        raise ValueError(
+            "materialized problems do not match included decisions",
+        )
     for item in problems:
         path = str(item["path"])
         if list(item.get("workload_uuids") or ()) != included[path]:
-            raise ValueError(f"materialized workload inventory mismatch: {path}")
+            raise ValueError(
+                f"materialized workload inventory mismatch: {path}",
+            )
 
 
 def _audit_materialized_problem(
@@ -838,7 +928,8 @@ def _audit_materialized_problem(
         raise ValueError(f"workload identity mismatch: {item['path']}")
     _, source_lines = _canonical_workload_lines(canonical_workload)
     expected_payload = (
-        "\n".join(source_lines[str(uuid)] for uuid in item["workload_uuids"]) + "\n"
+        "\n".join(source_lines[str(uuid)] for uuid in item["workload_uuids"])
+        + "\n"
     )
     if workload_path.read_text(encoding="utf-8") != expected_payload:
         raise ValueError(f"selected workload payload mismatch: {item['path']}")
@@ -849,7 +940,8 @@ def _audit_materialized_problem(
 
 
 def _audit_no_unrecorded_problem_files(
-    output: Path, problems: list[Mapping[str, Any]]
+    output: Path,
+    problems: list[Mapping[str, Any]],
 ) -> None:
     expected = {str(item["path"]) for item in problems}
     observed = {
@@ -861,7 +953,9 @@ def _audit_no_unrecorded_problem_files(
         for path in output.glob("*/*/workload.jsonl")
     }
     if observed != expected or workload_paths != expected:
-        raise ValueError("materialization contains unrecorded or missing problem files")
+        raise ValueError(
+            "materialization contains unrecorded or missing problem files",
+        )
 
 
 __all__ = [

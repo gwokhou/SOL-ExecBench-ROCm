@@ -38,7 +38,7 @@
     ],
     "status": "passed"
   },
-  "calibration_script_sha256": "c6a070c5cf89dfff079467d6ebb7e00c040f531fbf84b14cedb97c964a01e829",
+  "calibration_script_sha256": "219567d4da0326a112934b36a23d92e483d7d5bc1c8f4dff26c741e6a0b597d7",
   "clock_setup": {
     "clock_locked_verified": true,
     "deep_sleep": "DISABLED",
@@ -6457,7 +6457,7 @@
       }
     }
   ],
-  "payload_sha256": "723a225880476508df109d04e16e2bd49e1f3f6c9f51866aa0fe30bbe5827c26",
+  "payload_sha256": "01df380c4cfea48642c8570232e646569310dc67a01ebc532f6b579f768c017b",
   "policy": "SOL bounds use the AMD nominal theoretical peak; the sustained held-out median here is audit evidence only and must not replace the nominal bound. Best-observed throughput is retained as supplemental evidence, never as the primary statistic.",
   "profile": "RX_9060_XT",
   "schema_version": "solar.resource_peak_calibration.v3",

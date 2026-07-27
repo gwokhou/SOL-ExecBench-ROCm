@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import pytest
 import torch
+from sol_execbench_type_helpers import make_workload
 
 from sol_execbench.core.bench import (
     eval_correctness,
@@ -14,9 +15,10 @@ from sol_execbench.core.bench import (
 )
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.bench.eval_timing import SolutionTimingResult
-from sol_execbench.core.platform.runtime import CacheClearPolicy
 from sol_execbench.core.bench.eval_trace_helpers import WorkloadTraceEmitter
-from sol_execbench.core.bench.evaluation_requests import WorkloadEvaluationRequest
+from sol_execbench.core.bench.evaluation_requests import (
+    WorkloadEvaluationRequest,
+)
 from sol_execbench.core.bench.reference_protocol import (
     ReferenceCase,
     ReferenceExecutionError,
@@ -24,9 +26,9 @@ from sol_execbench.core.bench.reference_protocol import (
     ReferenceProtocolError,
     ReferenceTimingCase,
 )
-from sol_execbench.core.bench.reward_hack import RewardHackDetected
+from sol_execbench.core.bench.reward_hack import RewardHackError
 from sol_execbench.core.data.trace import Correctness, EvaluationStatus
-from sol_execbench_type_helpers import make_workload
+from sol_execbench.core.platform.runtime import CacheClearPolicy
 
 
 class RecordingEmitter:
@@ -108,12 +110,15 @@ def _emitter() -> tuple[RecordingEmitter, WorkloadTraceEmitter]:
     ("kind", "expected"),
     [
         (ReferenceFailureKind.INPUT_GENERATION, EvaluationStatus.RUNTIME_ERROR),
-        (ReferenceFailureKind.REFERENCE_EXECUTION, EvaluationStatus.INVALID_REFERENCE),
+        (
+            ReferenceFailureKind.REFERENCE_EXECUTION,
+            EvaluationStatus.INVALID_REFERENCE,
+        ),
     ],
 )
 def test_correctness_rounds_classify_reference_failures(kind, expected) -> None:
     client = ReferenceClientStub(
-        correctness=ReferenceExecutionError("reference failed", kind=kind)
+        correctness=ReferenceExecutionError("reference failed", kind=kind),
     )
     request = _request(client)
     recording, emitter = _emitter()
@@ -131,7 +136,7 @@ def test_correctness_rounds_classify_reference_failures(kind, expected) -> None:
 
 def test_correctness_rounds_classify_protocol_failure() -> None:
     request = _request(
-        ReferenceClientStub(correctness=ReferenceProtocolError("bad frame"))
+        ReferenceClientStub(correctness=ReferenceProtocolError("bad frame")),
     )
     recording, emitter = _emitter()
 
@@ -150,7 +155,7 @@ def test_correctness_rounds_classify_protocol_failure() -> None:
 def test_correctness_rounds_classify_user_exception(monkeypatch) -> None:
     tensor = torch.ones(2)
     request = _request(
-        ReferenceClientStub(correctness=ReferenceCase([tensor], [tensor]))
+        ReferenceClientStub(correctness=ReferenceCase([tensor], [tensor])),
     )
     recording, emitter = _emitter()
 
@@ -179,11 +184,15 @@ def test_correctness_rounds_classify_user_exception(monkeypatch) -> None:
     ],
 )
 def test_correctness_rounds_reject_bad_candidate_outputs(
-    candidate, expected, monkeypatch
+    candidate,
+    expected,
+    monkeypatch,
 ) -> None:
     reference = torch.zeros(2)
     request = _request(
-        ReferenceClientStub(correctness=ReferenceCase([reference], [reference]))
+        ReferenceClientStub(
+            correctness=ReferenceCase([reference], [reference]),
+        ),
     )
     recording, emitter = _emitter()
     monkeypatch.setattr(
@@ -209,7 +218,9 @@ def test_correctness_rounds_execute_all_ten_cases(monkeypatch) -> None:
     request = _request(client)
     recording, emitter = _emitter()
     monkeypatch.setattr(
-        eval_correctness, "call_and_collect_outputs", lambda *args, **kwargs: [tensor]
+        eval_correctness,
+        "call_and_collect_outputs",
+        lambda *args, **kwargs: [tensor],
     )
 
     result = eval_correctness.run_correctness_rounds(
@@ -224,7 +235,9 @@ def test_correctness_rounds_execute_all_ten_cases(monkeypatch) -> None:
     assert recording.events == []
 
 
-def test_framework_thread_warmup_precedes_first_candidate_call(monkeypatch) -> None:
+def test_framework_thread_warmup_precedes_first_candidate_call(
+    monkeypatch,
+) -> None:
     tensor = torch.ones(2)
     client = ReferenceClientStub(correctness=ReferenceCase([tensor], [tensor]))
     request = _request(client)
@@ -248,7 +261,11 @@ def test_framework_thread_warmup_precedes_first_candidate_call(monkeypatch) -> N
         "_prepare_framework_thread_baseline",
         warm_framework_threads,
     )
-    monkeypatch.setattr(eval_correctness, "call_and_collect_outputs", call_candidate)
+    monkeypatch.setattr(
+        eval_correctness,
+        "call_and_collect_outputs",
+        call_candidate,
+    )
 
     result = eval_correctness.run_correctness_rounds(
         request=request,
@@ -267,13 +284,15 @@ def test_framework_thread_warmup_precedes_first_candidate_call(monkeypatch) -> N
     [
         (
             ReferenceExecutionError(
-                "input failed", kind=ReferenceFailureKind.INPUT_GENERATION
+                "input failed",
+                kind=ReferenceFailureKind.INPUT_GENERATION,
             ),
             EvaluationStatus.RUNTIME_ERROR,
         ),
         (
             ReferenceExecutionError(
-                "reference failed", kind=ReferenceFailureKind.REFERENCE_EXECUTION
+                "reference failed",
+                kind=ReferenceFailureKind.REFERENCE_EXECUTION,
             ),
             EvaluationStatus.INVALID_REFERENCE,
         ),
@@ -285,7 +304,10 @@ def test_timing_case_classifies_reference_failures(failure, expected) -> None:
     recording, emitter = _emitter()
 
     result = eval_workload_execution._load_timing_case(
-        request, emitter, request.workloads[0], 0
+        request,
+        emitter,
+        request.workloads[0],
+        0,
     )
 
     assert result is None
@@ -295,12 +317,17 @@ def test_timing_case_classifies_reference_failures(failure, expected) -> None:
 @pytest.mark.parametrize(
     ("error", "expected"),
     [
-        (RewardHackDetected("timed output changed"), EvaluationStatus.REWARD_HACK),
+        (
+            RewardHackError("timed output changed"),
+            EvaluationStatus.REWARD_HACK,
+        ),
         (RuntimeError("timer failed"), EvaluationStatus.RUNTIME_ERROR),
     ],
 )
 def test_measure_and_emit_classifies_timing_errors(
-    error, expected, monkeypatch
+    error,
+    expected,
+    monkeypatch,
 ) -> None:
     tensor = torch.ones(2)
     request = _request(ReferenceClientStub())
@@ -310,7 +337,11 @@ def test_measure_and_emit_classifies_timing_errors(
         "measure_solution_latency",
         lambda **kwargs: (_ for _ in ()).throw(error),
     )
-    monkeypatch.setattr(eval_workload_execution, "_release_device_cache", lambda: None)
+    monkeypatch.setattr(
+        eval_workload_execution,
+        "_release_device_cache",
+        lambda: None,
+    )
 
     eval_workload_execution._measure_and_emit(
         request,
@@ -341,9 +372,15 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
             ),
         ),
     )
-    monkeypatch.setattr(eval_workload_execution, "_release_device_cache", lambda: None)
     monkeypatch.setattr(
-        eval_workload_execution, "emit_reward_hack_if_detected", lambda **kwargs: False
+        eval_workload_execution,
+        "_release_device_cache",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        eval_workload_execution,
+        "emit_reward_hack_if_detected",
+        lambda **kwargs: False,
     )
 
     eval_workload_execution._measure_and_emit(
@@ -368,12 +405,15 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
 
 def test_preflight_rejects_integrity_failure() -> None:
     def fail(snapshot, globals_):
-        raise RewardHackDetected("driver patched")
+        raise RewardHackError("driver patched")
 
     request = _request(ReferenceClientStub(), check_integrity=fail)
     recording, emitter = _emitter()
 
-    assert eval_workload_runner._preflight_succeeds(request, emitter, False) is False
+    assert (
+        eval_workload_runner._preflight_succeeds(request, emitter, False)
+        is False
+    )
     assert recording.events[0][0] is EvaluationStatus.REWARD_HACK
 
 
@@ -381,7 +421,10 @@ def test_preflight_requires_requested_clock_lock() -> None:
     request = _request(ReferenceClientStub(), lock_clocks=True)
     recording, emitter = _emitter()
 
-    assert eval_workload_runner._preflight_succeeds(request, emitter, False) is False
+    assert (
+        eval_workload_runner._preflight_succeeds(request, emitter, False)
+        is False
+    )
     assert recording.events[0][0] is EvaluationStatus.RUNTIME_ERROR
 
 
@@ -400,7 +443,7 @@ def test_evaluate_workloads_seeds_and_dispatches_each_row(monkeypatch) -> None:
         eval_workload_runner,
         "evaluate_one_workload",
         lambda request, emitter, row_index, workload: observed["rows"].append(
-            (row_index, workload.uuid)
+            (row_index, workload.uuid),
         ),
     )
 

@@ -54,17 +54,21 @@ def test_optional_sidecars_use_consumer_identity_for_profile_summary(
                 source_sha256="source-sha",
                 sol_version="consumer-sol-version",
             ),
-        )
+        ),
     )
 
-    assert written.profile_summary == tmp_path / "trace.jsonl.profile-summary.json"
-    assert written.agent_feedback == tmp_path / "trace.jsonl.agent-feedback.json"
+    assert (
+        written.profile_summary == tmp_path / "trace.jsonl.profile-summary.json"
+    )
+    assert (
+        written.agent_feedback == tmp_path / "trace.jsonl.agent-feedback.json"
+    )
 
     profile_summary = json.loads(
-        (tmp_path / "trace.jsonl.profile-summary.json").read_text()
+        (tmp_path / "trace.jsonl.profile-summary.json").read_text(),
     )
     agent_feedback = json.loads(
-        (tmp_path / "trace.jsonl.agent-feedback.json").read_text()
+        (tmp_path / "trace.jsonl.agent-feedback.json").read_text(),
     )
 
     assert profile_summary["identity"]["run_id"] == "consumer-run-id"
@@ -79,7 +83,13 @@ def _profile_result(tmp_path: Path) -> Rocprofv3ProfileResult:
     artifact.write_text("profile artifact\n")
     return Rocprofv3ProfileResult(
         status=Rocprofv3ProfileStatus.SUCCESS,
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        command=(
+            "rocprofv3",
+            "--kernel-trace",
+            "--",
+            "python",
+            "eval_driver.py",
+        ),
         output_directory=tmp_path,
         output_file="profile",
         artifacts=(
@@ -107,7 +117,12 @@ def _solution() -> Solution:
             target_hardware=[SupportedHardware.LOCAL],
             entry_point="solution.py::run",
         ),
-        sources=[SourceFile(path="solution.py", content="def run(x):\n    return x\n")],
+        sources=[
+            SourceFile(
+                path="solution.py",
+                content="def run(x):\n    return x\n",
+            ),
+        ],
     )
 
 
@@ -122,7 +137,10 @@ def _trace() -> Trace:
         ),
         evaluation=Evaluation(
             status=EvaluationStatus.COMPILE_ERROR,
-            environment=Environment(hardware="AMD gfx1200", libs={"hip": "7.0"}),
+            environment=Environment(
+                hardware="AMD gfx1200",
+                libs={"hip": "7.0"},
+            ),
             timestamp="2026-06-16T00:00:00Z",
         ),
     )

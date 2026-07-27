@@ -11,8 +11,8 @@ from pathlib import Path
 from sol_execbench.core.data.json_utils import load_json_value
 from sol_execbench.core.solar_bridge.analyzer import analyze_workload
 from sol_execbench.core.solar_bridge.models import (
-    SolarAnalysisStatus,
     SolarAnalysisOutcome,
+    SolarAnalysisStatus,
     SolarStage,
     SolarWorkerRequest,
 )
@@ -20,6 +20,7 @@ from sol_execbench.core.solar_bridge.worker_io import write_worker_response
 
 
 def main() -> None:
+    """Run one isolated SOLAR analysis worker request."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("request", type=Path)
     parser.add_argument("response", type=Path)
@@ -34,7 +35,7 @@ def main() -> None:
             device=request.device,
             orojenesis_home=request.orojenesis_home,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- isolated worker boundary
         outcome = SolarAnalysisOutcome(
             status=SolarAnalysisStatus.FAILED,
             analysis_id=request.workload_uuid,
@@ -50,10 +51,14 @@ def main() -> None:
         message="worker response serialization failed",
     )
     response_written = write_worker_response(
-        args.response, outcome.to_dict(), fallback.to_dict()
+        args.response,
+        outcome.to_dict(),
+        fallback.to_dict(),
     )
     raise SystemExit(
-        0 if outcome.status is SolarAnalysisStatus.ANALYZED and response_written else 1
+        0
+        if outcome.status is SolarAnalysisStatus.ANALYZED and response_written
+        else 1,
     )
 
 

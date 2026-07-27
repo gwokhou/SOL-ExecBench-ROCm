@@ -57,7 +57,8 @@ def test_load_jsonl_file_uses_pydantic_validation_and_skips_blank_lines(
 ) -> None:
     path = tmp_path / "rows.jsonl"
     path.write_text(
-        json.dumps({"name": "a", "count": 1}) + "\n\n"
+        json.dumps({"name": "a", "count": 1})
+        + "\n\n"
         + json.dumps({"name": "b", "count": 2})
         + "\n",
         encoding="utf-8",

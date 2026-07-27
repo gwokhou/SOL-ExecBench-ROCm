@@ -11,22 +11,26 @@ from typing import Any
 
 import click
 
-from ...core.evaluator_contract import build_evaluator_contract
-from ...core.platform.environment import build_environment_diagnostics
-from ...core.platform.environment_models import EnvironmentEvidenceStatus
-from ...core.platform.toolchain import (
-    ToolchainArtifactType,
-    ToolchainEvidenceLevel,
-    ToolchainRoutingRequest,
-    build_toolchain_routing_report,
-    default_toolchain_registry,
-)
-from ..protocol import (
+from sol_execbench.cli.protocol import (
     CLI_CONTRACT_SCHEMA_VERSION,
     CLI_RESPONSE_SCHEMA_VERSION,
     EXIT_UNAVAILABLE,
     CliResult,
     output_format,
+)
+from sol_execbench.core.evaluator_contract import build_evaluator_contract
+from sol_execbench.core.platform.environment import (
+    build_environment_diagnostics,
+)
+from sol_execbench.core.platform.environment_models import (
+    EnvironmentEvidenceStatus,
+)
+from sol_execbench.core.platform.toolchain import (
+    ToolchainArtifactType,
+    ToolchainEvidenceLevel,
+    ToolchainRoutingRequest,
+    build_toolchain_routing_report,
+    default_toolchain_registry,
 )
 
 
@@ -49,7 +53,10 @@ def doctor_cli() -> CliResult:
     payload = build_environment_diagnostics().model_dump(mode="json")
     _show(payload)
     unavailable = payload.get("status") == EnvironmentEvidenceStatus.UNAVAILABLE
-    return CliResult(data=payload, exit_code=EXIT_UNAVAILABLE if unavailable else 0)
+    return CliResult(
+        data=payload,
+        exit_code=EXIT_UNAVAILABLE if unavailable else 0,
+    )
 
 
 @click.group("contract")
@@ -96,12 +103,17 @@ def cli_contract_cli() -> CliResult:
     return CliResult(data=payload)
 
 
-def _describe_command(command: click.Command, ctx: click.Context) -> dict[str, Any]:
+def _describe_command(
+    command: click.Command,
+    ctx: click.Context,
+) -> dict[str, Any]:
     params = []
     for param in command.get_params(ctx):
         entry: dict[str, Any] = {
             "name": param.name,
-            "kind": "argument" if isinstance(param, click.Argument) else "option",
+            "kind": "argument"
+            if isinstance(param, click.Argument)
+            else "option",
             "type": param.type.name,
             "required": bool(param.required),
         }
@@ -110,7 +122,10 @@ def _describe_command(command: click.Command, ctx: click.Context) -> dict[str, A
             entry["default"] = (
                 param.default
                 if param.default is None
-                or isinstance(param.default, (str, int, float, bool, list, tuple))
+                or isinstance(
+                    param.default,
+                    (str, int, float, bool, list, tuple),
+                )
                 else None
             )
             entry["multiple"] = param.multiple
@@ -129,7 +144,9 @@ def _describe_command(command: click.Command, ctx: click.Context) -> dict[str, A
             child = command.get_command(ctx, name)
             if child is None:
                 continue
-            children.append(_describe_command(child, click.Context(child, parent=ctx)))
+            children.append(
+                _describe_command(child, click.Context(child, parent=ctx)),
+            )
         result["commands"] = children
     return result
 
@@ -178,6 +195,8 @@ def toolchain_route_cli(
 @toolchain_cli.command("list")
 def toolchain_list_cli() -> CliResult:
     """List the registry; route-only filters are intentionally not accepted."""
-    payload = [item.model_dump(mode="json") for item in default_toolchain_registry()]
+    payload = [
+        item.model_dump(mode="json") for item in default_toolchain_registry()
+    ]
     _show(payload)
     return CliResult(data=payload)

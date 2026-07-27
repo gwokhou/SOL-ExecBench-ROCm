@@ -23,7 +23,9 @@ def test_cache_clear_buffer_uses_resolved_target_policy(monkeypatch) -> None:
         clear_buffer_bytes=8 * 1024**2,
         source="torch_device_properties",
     )
-    assert _get_empty_cache_for_benchmark("rocm-test-device", policy) is sentinel
+    assert (
+        _get_empty_cache_for_benchmark("rocm-test-device", policy) is sentinel
+    )
     assert observed == {
         "size": 8 * 1024**2,
         "dtype": torch.int8,

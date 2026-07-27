@@ -33,20 +33,20 @@ class RuntimeDecisionPrecedence:
 
 _SUPERSEDED_STATIC_CLASSES = {
     ProfileSummaryHintCategory.LDS_BOUND: frozenset(
-        {DecisionBottleneckClass.LDS_PRESSURE_HIGH}
+        {DecisionBottleneckClass.LDS_PRESSURE_HIGH},
     ),
     ProfileSummaryHintCategory.LAUNCH_OVERHEAD: frozenset(
         {
             DecisionBottleneckClass.REGISTER_PRESSURE_HIGH,
             DecisionBottleneckClass.LDS_PRESSURE_HIGH,
-        }
+        },
     ),
 }
 _NON_CLASSIFICATIONS = frozenset(
     {
         ProfileSummaryHintCategory.INSUFFICIENT_COUNTERS,
         ProfileSummaryHintCategory.UNKNOWN,
-    }
+    },
 )
 
 
@@ -59,7 +59,6 @@ def runtime_decision_precedence(
     failed, partial, data-free, and unclassified profiles all leave the static
     Decision hints untouched.
     """
-
     if (
         profile_result is None
         or profile_result.status is not Rocprofv3ProfileStatus.SUCCESS
@@ -74,8 +73,8 @@ def runtime_decision_precedence(
                 hint.category
                 for hint in evidence.bottleneck_hints
                 if hint.category not in _NON_CLASSIFICATIONS
-            }
-        )
+            },
+        ),
     )
     if not categories:
         return RuntimeDecisionPrecedence(available=False)

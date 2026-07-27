@@ -40,7 +40,8 @@ def test_only_solar_bridge_imports_solar_from_outer_package():
             if "solar_bridge" in path.parts:
                 continue
             if any(
-                name == "solar" or name.startswith("solar.") for name in _imports(path)
+                name == "solar" or name.startswith("solar.")
+                for name in _imports(path)
             ):
                 offenders.append(path)
     assert offenders == []

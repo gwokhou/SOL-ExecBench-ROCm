@@ -18,6 +18,19 @@ class SemanticGraphError(ValueError):
     """A graph does not contain complete, executable operation semantics."""
 
 
+def _collect_tensor_references(value: Any, references: set[int]) -> None:
+    """Add every serialized tensor reference nested under ``value``."""
+    if isinstance(value, Mapping):
+        if "tensor" in value:
+            references.add(int(value["tensor"]))
+            return
+        for item in value.values():
+            _collect_tensor_references(item, references)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _collect_tensor_references(item, references)
+
+
 SUPPORTED_ATEN_TARGETS = frozenset(
     {
         "__and__",
@@ -124,12 +137,12 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "vstack",
         "where",
         "zeros_like",
-    }
+    },
 )
 
 _MUTATING_TARGETS = frozenset({"copy", "setitem"})
 _ATOMIC_TARGETS = frozenset(
-    {"index_add", "index_copy", "index_put", "scatter", "scatter_add"}
+    {"index_add", "index_copy", "index_put", "scatter", "scatter_add"},
 )
 _LIBRARY_TARGETS = frozenset(
     {
@@ -146,7 +159,7 @@ _LIBRARY_TARGETS = frozenset(
         "layer_norm",
         "linear",
         "scaled_dot_product_attention",
-    }
+    },
 )
 
 # These ATen operations may return storage that aliases one of their inputs.
@@ -169,7 +182,7 @@ _ALIASING_TARGETS = frozenset(
         "transpose",
         "unsqueeze",
         "view",
-    }
+    },
 )
 
 
@@ -218,12 +231,11 @@ def _canonical_target(layer: Mapping[str, Any]) -> str:
     return aliases.get(target.rstrip("_"), target.rstrip("_"))
 
 
-def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
-    """Build the executable operation record for one cost-model layer."""
-    if str(layer.get("type", "")).lower() == "start":
-        return {"kind": "input", "target": "input", "arguments": [], "kwargs": {}}
-
-    names = (layer.get("tensor_names") or {}).get("inputs") or []
+def _aten_call(
+    layer: Mapping[str, Any],
+    names: list[Any],
+    target: str,
+) -> tuple[list[Any], dict[str, Any]]:
     module_args = layer.get("module_args") or {}
     recorded_arguments = module_args.get("call_arguments")
     recorded_kwargs = module_args.get("call_kwargs")
@@ -232,6 +244,95 @@ def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(recorded_arguments, list)
         else [{"tensor": index} for index in range(len(names))]
     )
+    raw_target = str(layer.get("type", "")).lower().rsplit(".", maxsplit=1)[-1]
+    if raw_target in {
+        "__radd__",
+        "__rmul__",
+        "__rpow__",
+        "__rsub__",
+        "__rtruediv__",
+    }:
+        if len(arguments) != 2:
+            raise SemanticGraphError(
+                f"{raw_target} requires exactly two arguments",
+            )
+        arguments = [arguments[1], arguments[0]]
+    kwargs: dict[str, Any] = (
+        _plain_value(recorded_kwargs)
+        if isinstance(recorded_kwargs, Mapping)
+        else {}
+    )
+    ignored_keys = {
+        "call_arguments",
+        "call_kwargs",
+        "function_name",
+        "hierarchical_name",
+        "raw_attributes",
+        "training",
+        "weights",
+    }
+    for source in (module_args, layer.get("additional_info") or {}):
+        if isinstance(source, Mapping) and not isinstance(
+            recorded_kwargs,
+            Mapping,
+        ):
+            for key, value in source.items():
+                if key not in ignored_keys:
+                    kwargs[str(key)] = _plain_value(value)
+    if "dims" in kwargs and "dim" not in kwargs:
+        kwargs["dim"] = kwargs.pop("dims")
+    if (
+        target in {"view", "reshape"}
+        and len(arguments) == 1
+        and "shape" not in kwargs
+    ):
+        output_shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
+        if len(output_shapes) == 1:
+            kwargs["shape"] = _plain_value(output_shapes[0])
+    return arguments, kwargs
+
+
+def _operation_effects(
+    layer: Mapping[str, Any],
+    target: str,
+    arguments: list[Any],
+) -> dict[str, Any]:
+    raw_layer_type = str(layer.get("type", ""))
+    mutating = (
+        target in _MUTATING_TARGETS
+        or (raw_layer_type.endswith("_") and not raw_layer_type.endswith("__"))
+        or layer.get("mutates_inputs") is True
+    )
+    aliases = list(_plain_value(layer.get("aliases") or []))
+    if target in _ALIASING_TARGETS and arguments and not aliases:
+        aliases = [
+            {
+                "output": 0,
+                "input": 0,
+                "conditional": target in {"reshape", "contiguous"},
+            },
+        ]
+    return {
+        "mutates": [0] if mutating and arguments else [],
+        "aliases": aliases,
+        "atomic": target in _ATOMIC_TARGETS,
+        "opaque_library_call": target in _LIBRARY_TARGETS,
+    }
+
+
+def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the executable operation record for one cost-model layer."""
+    if str(layer.get("type", "")).lower() == "start":
+        return {
+            "kind": "input",
+            "target": "input",
+            "arguments": [],
+            "kwargs": {},
+        }
+
+    names = (layer.get("tensor_names") or {}).get("inputs") or []
+    target = _canonical_target(layer)
+    arguments, kwargs = _aten_call(layer, names, target)
     if (
         layer.get("is_real_einsum") is True
         and layer.get("einsum_equation")
@@ -251,52 +352,9 @@ def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
             },
         }
 
-    target = _canonical_target(layer)
-    raw_target = str(layer.get("type", "")).lower().rsplit(".", maxsplit=1)[-1]
-    if raw_target in {"__radd__", "__rmul__", "__rpow__", "__rsub__", "__rtruediv__"}:
-        if len(arguments) != 2:
-            raise SemanticGraphError(f"{raw_target} requires exactly two arguments")
-        arguments = [arguments[1], arguments[0]]
-    kwargs: dict[str, Any] = (
-        _plain_value(recorded_kwargs) if isinstance(recorded_kwargs, Mapping) else {}
-    )
-    for source in (module_args, layer.get("additional_info") or {}):
-        if isinstance(source, Mapping):
-            for key, value in source.items():
-                if key not in {
-                    "call_arguments",
-                    "call_kwargs",
-                    "function_name",
-                    "hierarchical_name",
-                    "raw_attributes",
-                    "training",
-                    "weights",
-                } and not isinstance(recorded_kwargs, Mapping):
-                    kwargs[str(key)] = _plain_value(value)
-    if "dims" in kwargs and "dim" not in kwargs:
-        kwargs["dim"] = kwargs.pop("dims")
-    if target in {"view", "reshape"} and len(arguments) == 1 and "shape" not in kwargs:
-        output_shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
-        if len(output_shapes) == 1:
-            kwargs["shape"] = _plain_value(output_shapes[0])
     if target in {"softmax", "log_softmax"} and "dim" not in kwargs:
         raise SemanticGraphError(f"{target} requires an explicit dim")
 
-    raw_layer_type = str(layer.get("type", ""))
-    mutating = (
-        target in _MUTATING_TARGETS
-        or (raw_layer_type.endswith("_") and not raw_layer_type.endswith("__"))
-        or layer.get("mutates_inputs") is True
-    )
-    aliases = list(_plain_value(layer.get("aliases") or []))
-    if target in _ALIASING_TARGETS and arguments and not aliases:
-        aliases = [
-            {
-                "output": 0,
-                "input": 0,
-                "conditional": target in {"reshape", "contiguous"},
-            }
-        ]
     overload = str(layer.get("overload", "default"))
     if (
         overload == "default"
@@ -310,16 +368,15 @@ def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
         "overload": overload,
         "arguments": arguments,
         "kwargs": kwargs,
-        "effects": {
-            "mutates": [0] if mutating and arguments else [],
-            "aliases": aliases,
-            "atomic": target in _ATOMIC_TARGETS,
-            "opaque_library_call": target in _LIBRARY_TARGETS,
-        },
+        "effects": _operation_effects(layer, target, arguments),
     }
 
 
-def annotate_semantics(graph: dict[str, Any], *, strict: bool) -> dict[str, Any]:
+def annotate_semantics(
+    graph: dict[str, Any],
+    *,
+    strict: bool,
+) -> dict[str, Any]:
     """Attach the latest semantic schema and optionally validate it strictly."""
     graph["schema_version"] = EINSUM_GRAPH_SCHEMA_VERSION
     for layer_id, layer in (graph.get("layers") or {}).items():
@@ -344,134 +401,165 @@ def validate_semantic_graph(graph: Mapping[str, Any]) -> None:
     """Validate the latest graph contract without accepting legacy schemas."""
     if int(graph.get("schema_version", 0)) != EINSUM_GRAPH_SCHEMA_VERSION:
         raise SemanticGraphError(
-            f"einsum graph must use current schema_version={EINSUM_GRAPH_SCHEMA_VERSION}"
+            "einsum graph must use current "
+            f"schema_version={EINSUM_GRAPH_SCHEMA_VERSION}",
         )
     layers = graph.get("layers")
     if not isinstance(layers, Mapping) or not layers:
         raise SemanticGraphError("einsum graph has no layers")
     for layer_id, layer in layers.items():
-        if not isinstance(layer, Mapping):
-            raise SemanticGraphError(f"layer {layer_id} is not a mapping")
-        shapes = layer.get("tensor_shapes") or {}
-        dtypes = layer.get("tensor_dtypes") or {}
-        names = layer.get("tensor_names") or {}
-        for side in ("inputs", "outputs"):
-            arity = len(shapes.get(side) or [])
-            if (
-                len(dtypes.get(side) or []) != arity
-                or len(names.get(side) or []) != arity
-            ):
-                raise SemanticGraphError(
-                    f"layer {layer_id} lacks explicit {side} name/shape/dtype metadata"
-                )
-        semantic = layer.get("semantic_op")
-        if not isinstance(semantic, Mapping):
-            raise SemanticGraphError(f"layer {layer_id} has no semantic_op")
-        kind = str(semantic.get("kind", ""))
-        if kind == "input":
-            continue
-        if kind == "einsum":
-            equation = str(semantic.get("equation", ""))
-            if not equation or "->" not in equation:
-                raise SemanticGraphError(
-                    f"layer {layer_id} has no exact einsum equation"
-                )
-            continue
-        if kind != "aten":
-            raise SemanticGraphError(f"layer {layer_id} is not executable exactly")
-        target = str(semantic.get("target", ""))
-        if target not in SUPPORTED_ATEN_TARGETS:
-            import torch
+        _validate_semantic_layer(str(layer_id), layer)
 
-            if not target.isidentifier() or not hasattr(torch.ops.aten, target):
-                raise SemanticGraphError(
-                    f"layer {layer_id} uses unsupported exact operation {target!r}"
-                )
-        if not isinstance(semantic.get("arguments"), list):
-            raise SemanticGraphError(f"layer {layer_id} lacks explicit arguments")
-        arguments = semantic.get("arguments") or []
-        kwargs = semantic.get("kwargs") or {}
-        if not isinstance(kwargs, Mapping):
-            raise SemanticGraphError(f"layer {layer_id} has invalid keyword arguments")
 
-        referenced_tensors: set[int] = set()
-
-        def collect_tensor_references(value: Any) -> None:
-            if isinstance(value, Mapping):
-                if "tensor" in value:
-                    referenced_tensors.add(int(value["tensor"]))
-                else:
-                    for item in value.values():
-                        collect_tensor_references(item)
-            elif isinstance(value, (list, tuple)):
-                for item in value:
-                    collect_tensor_references(item)
-
-        collect_tensor_references(arguments)
-        collect_tensor_references(kwargs)
-        input_arity = len(names.get("inputs") or [])
-        if any(index < 0 or index >= input_arity for index in referenced_tensors):
-            raise SemanticGraphError(
-                f"layer {layer_id} references a tensor outside its input metadata"
-            )
-        if input_arity and referenced_tensors != set(range(input_arity)):
-            raise SemanticGraphError(
-                f"layer {layer_id} does not preserve every ordered tensor argument"
-            )
-
-        effects = semantic.get("effects")
-        if not isinstance(effects, Mapping):
-            raise SemanticGraphError(f"layer {layer_id} lacks explicit effects")
-        mutations = effects.get("mutates")
-        aliases = effects.get("aliases")
-        if not isinstance(mutations, list) or not isinstance(aliases, list):
-            raise SemanticGraphError(
-                f"layer {layer_id} has invalid mutation/alias effects"
-            )
-        if any(int(index) < 0 or int(index) >= input_arity for index in mutations):
-            raise SemanticGraphError(f"layer {layer_id} has invalid mutation target")
-        output_arity = len(names.get("outputs") or [])
-        for alias in aliases:
-            if (
-                not isinstance(alias, Mapping)
-                or int(alias.get("input", -1)) not in range(input_arity)
-                or int(alias.get("output", -1)) not in range(output_arity)
-            ):
-                raise SemanticGraphError(f"layer {layer_id} has invalid alias effect")
-        # Each item is (keyword spelling, positional arity that also proves the
-        # parameter was preserved). Tensor references and literal arguments
-        # share the ordered ``arguments`` list, matching the ATen call.
-        required_parameters = {
-            "chunk": (("chunks", 2),),
-            "expand": (("sizes", 2),),
-            "gather": (("dim", 3),),
-            "getitem": (("item", 2),),
-            "index_copy": (("dim", 4),),
-            "index_select": (("dim", 3),),
-            "log_softmax": (("dim", 2),),
-            "logsumexp": (("dim", 2),),
-            "narrow": (("dim", 4), ("start", 4), ("length", 4)),
-            "permute": (("dims", 2),),
-            "repeat": (("repeats", 2),),
-            "select": (("dim", 3), ("index", 3)),
-            "softmax": (("dim", 2),),
-            "split": (("split_size_or_sections", 2),),
-            "unsqueeze": (("dim", 2),),
-        }
-        missing = [
-            key
-            for key, positional_arity in required_parameters.get(target, ())
-            if key not in kwargs and len(arguments) < positional_arity
-        ]
-        if target == "slice" and not (
-            "dim" in kwargs and any(key in kwargs for key in ("start", "end", "step"))
+def _validate_semantic_layer(layer_id: str, layer: Any) -> None:
+    if not isinstance(layer, Mapping):
+        raise SemanticGraphError(f"layer {layer_id} is not a mapping")
+    shapes = layer.get("tensor_shapes") or {}
+    dtypes = layer.get("tensor_dtypes") or {}
+    names = layer.get("tensor_names") or {}
+    for side in ("inputs", "outputs"):
+        arity = len(shapes.get(side) or [])
+        if (
+            len(dtypes.get(side) or []) != arity
+            or len(names.get(side) or []) != arity
         ):
-            missing.append("explicit slice bounds")
-        if missing:
             raise SemanticGraphError(
-                f"layer {layer_id} lacks exact {target} parameters: "
-                + ", ".join(missing)
+                f"layer {layer_id} lacks explicit {side} "
+                "name/shape/dtype metadata",
             )
+    semantic = layer.get("semantic_op")
+    if not isinstance(semantic, Mapping):
+        raise SemanticGraphError(f"layer {layer_id} has no semantic_op")
+    kind = str(semantic.get("kind", ""))
+    if kind == "input":
+        return
+    if kind == "einsum":
+        equation = str(semantic.get("equation", ""))
+        if not equation or "->" not in equation:
+            raise SemanticGraphError(
+                f"layer {layer_id} has no exact einsum equation",
+            )
+        return
+    if kind != "aten":
+        raise SemanticGraphError(
+            f"layer {layer_id} is not executable exactly",
+        )
+    _validate_aten_semantics(layer_id, semantic, names)
+
+
+def _validate_aten_semantics(
+    layer_id: str,
+    semantic: Mapping[str, Any],
+    names: Mapping[str, Any],
+) -> None:
+    target = str(semantic.get("target", ""))
+    if target not in SUPPORTED_ATEN_TARGETS:
+        import torch
+
+        if not target.isidentifier() or not hasattr(torch.ops.aten, target):
+            raise SemanticGraphError(
+                f"layer {layer_id} uses unsupported exact operation {target!r}",
+            )
+    if not isinstance(semantic.get("arguments"), list):
+        raise SemanticGraphError(
+            f"layer {layer_id} lacks explicit arguments",
+        )
+    arguments = semantic.get("arguments") or []
+    kwargs = semantic.get("kwargs") or {}
+    if not isinstance(kwargs, Mapping):
+        raise SemanticGraphError(
+            f"layer {layer_id} has invalid keyword arguments",
+        )
+    input_arity = len(names.get("inputs") or [])
+    referenced_tensors: set[int] = set()
+    _collect_tensor_references(arguments, referenced_tensors)
+    _collect_tensor_references(kwargs, referenced_tensors)
+    if any(index < 0 or index >= input_arity for index in referenced_tensors):
+        raise SemanticGraphError(
+            f"layer {layer_id} references a tensor outside its input metadata",
+        )
+    if input_arity and referenced_tensors != set(range(input_arity)):
+        raise SemanticGraphError(
+            f"layer {layer_id} does not preserve every ordered tensor argument",
+        )
+    _validate_effects(layer_id, semantic, names, input_arity)
+    _validate_required_parameters(
+        layer_id,
+        target,
+        arguments,
+        kwargs,
+    )
+
+
+def _validate_effects(
+    layer_id: str,
+    semantic: Mapping[str, Any],
+    names: Mapping[str, Any],
+    input_arity: int,
+) -> None:
+    effects = semantic.get("effects")
+    if not isinstance(effects, Mapping):
+        raise SemanticGraphError(f"layer {layer_id} lacks explicit effects")
+    mutations = effects.get("mutates")
+    aliases = effects.get("aliases")
+    if not isinstance(mutations, list) or not isinstance(aliases, list):
+        raise SemanticGraphError(
+            f"layer {layer_id} has invalid mutation/alias effects",
+        )
+    if any(int(index) < 0 or int(index) >= input_arity for index in mutations):
+        raise SemanticGraphError(
+            f"layer {layer_id} has invalid mutation target",
+        )
+    output_arity = len(names.get("outputs") or [])
+    for alias in aliases:
+        if (
+            not isinstance(alias, Mapping)
+            or int(alias.get("input", -1)) not in range(input_arity)
+            or int(alias.get("output", -1)) not in range(output_arity)
+        ):
+            raise SemanticGraphError(
+                f"layer {layer_id} has invalid alias effect",
+            )
+
+
+def _validate_required_parameters(
+    layer_id: str,
+    target: str,
+    arguments: list[Any],
+    kwargs: Mapping[str, Any],
+) -> None:
+    required_parameters = {
+        "chunk": (("chunks", 2),),
+        "expand": (("sizes", 2),),
+        "gather": (("dim", 3),),
+        "getitem": (("item", 2),),
+        "index_copy": (("dim", 4),),
+        "index_select": (("dim", 3),),
+        "log_softmax": (("dim", 2),),
+        "logsumexp": (("dim", 2),),
+        "narrow": (("dim", 4), ("start", 4), ("length", 4)),
+        "permute": (("dims", 2),),
+        "repeat": (("repeats", 2),),
+        "select": (("dim", 3), ("index", 3)),
+        "softmax": (("dim", 2),),
+        "split": (("split_size_or_sections", 2),),
+        "unsqueeze": (("dim", 2),),
+    }
+    missing = [
+        key
+        for key, positional_arity in required_parameters.get(target, ())
+        if key not in kwargs and len(arguments) < positional_arity
+    ]
+    if target == "slice" and not (
+        "dim" in kwargs
+        and any(key in kwargs for key in ("start", "end", "step"))
+    ):
+        missing.append("explicit slice bounds")
+    if missing:
+        raise SemanticGraphError(
+            f"layer {layer_id} lacks exact {target} parameters: "
+            + ", ".join(missing),
+        )
 
 
 __all__ = [

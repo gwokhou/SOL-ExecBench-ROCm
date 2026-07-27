@@ -18,10 +18,10 @@ from sol_execbench.core.bench.static_kernel.evidence_builders import (
 )
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
+    StaticIsaAnalysis,
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceClassification,
     StaticKernelEvidenceKernel,
-    StaticIsaAnalysis,
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceSidecar,
     StaticKernelEvidenceSourceReference,

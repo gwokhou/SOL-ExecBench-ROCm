@@ -23,7 +23,6 @@ def profile_summary_artifact_citation_from_path(
     size_bytes: int | None = None,
 ) -> SizedDiagnosticArtifactCitation:
     """Build a compact citation from a profile-summary artifact path."""
-
     checksum = (
         sha256
         if sha256 is not None

@@ -44,7 +44,6 @@ class ExtractorCommandSpec:
 
     def command_for(self, artifact_path: Path) -> list[str]:
         """Build the bounded command for ``artifact_path``."""
-
         return [self.tool_id, *self.arguments, str(artifact_path)]
 
 
@@ -53,14 +52,16 @@ _EXTRACTOR_COMMAND_SPECS = {
     for spec in (
         ExtractorCommandSpec("llvm-objdump", ("--disassemble",)),
         ExtractorCommandSpec("readelf", ("--headers", "--wide")),
-        ExtractorCommandSpec("roc-objdump", ("--disassemble", "--resource-usage")),
+        ExtractorCommandSpec(
+            "roc-objdump",
+            ("--disassemble", "--resource-usage"),
+        ),
     )
 }
 
 
 def static_extractor_tool_ids() -> tuple[str, ...]:
     """Return general static extractors in deterministic execution order."""
-
     return ("llvm-objdump", "readelf")
 
 
@@ -73,10 +74,13 @@ def route_static_tool(
     which: Which,
     timeout_seconds: float,
 ) -> ToolchainRoutingDecision | None:
+    """Return the routing decision for one static extractor."""
     effective_registry = (
         list(registry) if registry is not None else default_toolchain_registry()
     )
-    tool_registry = [entry for entry in effective_registry if entry.tool_id == tool_id]
+    tool_registry = [
+        entry for entry in effective_registry if entry.tool_id == tool_id
+    ]
     report = build_toolchain_routing_report(
         ToolchainRoutingRequest(
             evidence_level=ToolchainEvidenceLevel.STATIC,
@@ -102,6 +106,7 @@ def tool_run_from_route_decision(
     reason: str,
     timeout_seconds: float,
 ) -> StaticKernelEvidenceToolRun:
+    """Build a tool-run record from a routing decision."""
     return StaticKernelEvidenceToolRun(
         tool_id=tool_id,
         command=command,
@@ -114,7 +119,6 @@ def tool_run_from_route_decision(
 
 def extractor_command(tool_id: str, artifact_path: Path) -> list[str]:
     """Build an extractor command from the registered command strategy."""
-
     try:
         return _EXTRACTOR_COMMAND_SPECS[tool_id].command_for(artifact_path)
     except KeyError as exc:
@@ -124,6 +128,7 @@ def extractor_command(tool_id: str, artifact_path: Path) -> list[str]:
 def toolchain_artifact_type_for_static_artifact(
     artifact: StaticKernelEvidenceArtifact,
 ) -> ToolchainArtifactType | None:
+    """Map a static artifact to the toolchain routing vocabulary."""
     if artifact.artifact_type in {"shared_library", "hsaco", "code_object"}:
         return ToolchainArtifactType.ROCM_BINARY
     if artifact.artifact_type == "object_file":
@@ -135,6 +140,7 @@ def artifact_persisted_path(
     artifact: StaticKernelEvidenceArtifact,
     sidecar_base: Path,
 ) -> Path | None:
+    """Resolve an artifact's persisted path against its sidecar base."""
     if artifact.persisted_path is None:
         return None
     path = Path(artifact.persisted_path)
@@ -143,7 +149,10 @@ def artifact_persisted_path(
     return sidecar_base / path
 
 
-def status_for_route_status(status: ToolchainStatus) -> StaticKernelEvidenceStatus:
+def status_for_route_status(
+    status: ToolchainStatus,
+) -> StaticKernelEvidenceStatus:
+    """Map a toolchain routing status to a static-evidence status."""
     if status == ToolchainStatus.UNSUPPORTED_ARTIFACT:
         return StaticKernelEvidenceStatus.UNSUPPORTED
     if status == ToolchainStatus.UNSUPPORTED_ARCH:
@@ -156,6 +165,7 @@ def status_for_route_status(status: ToolchainStatus) -> StaticKernelEvidenceStat
 def reason_for_route_status(
     status: ToolchainStatus,
 ) -> StaticKernelEvidenceReasonCode:
+    """Map a toolchain routing status to a stable reason code."""
     if status == ToolchainStatus.UNSUPPORTED_ARTIFACT:
         return StaticKernelEvidenceReasonCode.UNSUPPORTED_ARTIFACT_TYPE
     if status == ToolchainStatus.UNSUPPORTED_ARCH:
@@ -168,6 +178,7 @@ def reason_for_route_status(
 def aggregate_extractor_status(
     tool_runs: Sequence[StaticKernelEvidenceToolRun],
 ) -> StaticKernelEvidenceStatus:
+    """Aggregate extractor tool runs into one evidence status."""
     return aggregate_extractor_status_value(
         tuple(tool_runs),
         ExtractorStatusVocabulary(
@@ -182,6 +193,7 @@ def aggregate_extractor_status(
 def aggregate_extractor_reason(
     tool_runs: Sequence[StaticKernelEvidenceToolRun],
 ) -> StaticKernelEvidenceReasonCode:
+    """Return the reason code for an aggregate extractor result."""
     status = aggregate_extractor_status(tool_runs)
     return aggregate_extractor_reason_value(
         tuple(tool_runs),
@@ -206,8 +218,10 @@ def classification_from_tool_runs(
     tool_runs: Sequence[StaticKernelEvidenceToolRun],
     artifacts: Sequence[StaticKernelEvidenceArtifact],
 ) -> StaticKernelEvidenceClassification:
+    """Build artifact coverage classification from extractor results."""
     metadata_present = any(
-        run.tool_id == "readelf" and run.status == StaticKernelEvidenceStatus.COLLECTED
+        run.tool_id == "readelf"
+        and run.status == StaticKernelEvidenceStatus.COLLECTED
         for run in tool_runs
     )
     disassembly_present = any(
@@ -221,7 +235,7 @@ def classification_from_tool_runs(
             architecture
             for artifact in artifacts
             for architecture in artifact.classification.detected_architectures
-        }
+        },
     )
     return StaticKernelEvidenceClassification(
         metadata_present=metadata_present,

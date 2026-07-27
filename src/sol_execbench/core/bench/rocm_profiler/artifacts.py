@@ -10,21 +10,20 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from sol_execbench.core.bench.rocm_profiler.models import (
+    _NON_DATA_ARTIFACT_KINDS,
+    _PROFILE_ARTIFACT_SUFFIXES,
+    _PROFILE_OUTPUT_DIR_NAMES,
     ROCPROF_REASON_ARTIFACTS_REGISTERED,
     ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
     ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
     ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE,
     ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE,
     ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS,
-    _NON_DATA_ARTIFACT_KINDS,
-    _PROFILE_ARTIFACT_SUFFIXES,
-    _PROFILE_OUTPUT_DIR_NAMES,
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     has_profiler_data_artifact,
 )
-
 
 PROFILE_OUTPUT_DIR_NAMES = _PROFILE_OUTPUT_DIR_NAMES
 
@@ -38,22 +37,30 @@ def discover_rocprofv3_artifacts(
     if not output_directory.exists():
         return ()
 
-    for path in sorted(output_directory.rglob("*"), key=profile_artifact_sort_key):
+    for path in sorted(
+        output_directory.rglob("*"),
+        key=profile_artifact_sort_key,
+    ):
         if not path.is_file():
             continue
-        if not is_profile_artifact_candidate(path, output_directory, output_file):
+        if not is_profile_artifact_candidate(
+            path,
+            output_directory,
+            output_file,
+        ):
             continue
         artifacts.append(
             Rocprofv3ProfileArtifact(
                 path=path,
                 kind=classify_profile_artifact(path),
                 size_bytes=path.stat().st_size,
-            )
+            ),
         )
     return tuple(artifacts)
 
 
 def profile_artifact_sort_key(path: Path) -> tuple[str, ...]:
+    """Return a deterministic path-component sort key."""
     return tuple(path.parts)
 
 
@@ -62,6 +69,7 @@ def is_profile_artifact_candidate(
     output_directory: Path,
     output_file: str,
 ) -> bool:
+    """Return whether a path belongs to the requested profiler output."""
     name = path.name
     if output_file and name.startswith(output_file):
         return True
@@ -86,6 +94,7 @@ def is_profile_artifact_candidate(
 
 
 def is_known_profile_artifact_name(path: Path) -> bool:
+    """Return whether a filename uses a recognized profiler artifact form."""
     if path.suffix.lower() in _PROFILE_ARTIFACT_SUFFIXES:
         return True
     normalized_name = normalize_profile_artifact_token(path.name)
@@ -98,6 +107,7 @@ def is_known_profile_artifact_name(path: Path) -> bool:
 
 
 def is_unprefixed_profile_artifact_name(path: Path) -> bool:
+    """Return whether an unprefixed filename is a profiler artifact."""
     suffix = path.suffix.lower()
     normalized_name = normalize_profile_artifact_token(path.stem or path.name)
     if suffix in {".db", ".sqlite", ".sqlite3", ".rocpd", ".pftrace", ".otf2"}:
@@ -130,6 +140,7 @@ def is_unprefixed_profile_artifact_name(path: Path) -> bool:
 
 
 def normalize_profile_artifact_token(value: str) -> str:
+    """Normalize an artifact name or directory token for matching."""
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
 
@@ -138,6 +149,7 @@ def profile_artifact_coverage_metadata(
     *,
     command_succeeded: bool,
 ) -> tuple[Rocprofv3ArtifactCoverageStatus, tuple[str, ...], tuple[str, ...]]:
+    """Classify profiler artifact coverage and return reasons and warnings."""
     if not artifacts:
         return Rocprofv3ArtifactCoverageStatus.NONE, (), ()
 
@@ -152,7 +164,8 @@ def profile_artifact_coverage_metadata(
         )
 
     if command_succeeded and any(
-        artifact.kind is Rocprofv3ArtifactKind.DIAGNOSTIC_JSON for artifact in artifacts
+        artifact.kind is Rocprofv3ArtifactKind.DIAGNOSTIC_JSON
+        for artifact in artifacts
     ):
         return (
             Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY,
@@ -171,10 +184,12 @@ def profile_artifact_coverage_metadata(
 
 
 def is_profiler_data_artifact(artifact: Rocprofv3ProfileArtifact) -> bool:
+    """Return whether an artifact contains profiler data rather than diagnostics."""
     return artifact.kind not in _NON_DATA_ARTIFACT_KINDS
 
 
 def classify_profile_artifact(path: Path) -> Rocprofv3ArtifactKind:
+    """Classify a profiler artifact from its filename and suffix."""
     name = path.name.lower()
     suffix = path.suffix.lower()
     if suffix in {".db", ".sqlite", ".sqlite3", ".rocpd"}:
@@ -197,10 +212,14 @@ def classify_profile_artifact(path: Path) -> Rocprofv3ArtifactKind:
 
 
 def profile_output_directory_listing(output_directory: Path) -> tuple[str, ...]:
+    """Return a bounded deterministic listing of profiler output files."""
     if not output_directory.exists():
         return ()
     listing: list[str] = []
-    for path in sorted(output_directory.rglob("*"), key=profile_artifact_sort_key):
+    for path in sorted(
+        output_directory.rglob("*"),
+        key=profile_artifact_sort_key,
+    ):
         try:
             relative = path.relative_to(output_directory).as_posix()
         except ValueError:

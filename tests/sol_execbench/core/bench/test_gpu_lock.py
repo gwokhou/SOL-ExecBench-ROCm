@@ -24,13 +24,18 @@ def test_gpu_lock_uses_configured_shared_directory(tmp_path, monkeypatch):
 def test_gpu_lock_rejects_concurrent_evaluation(tmp_path, monkeypatch):
     monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
 
-    with acquire_gpu_lock(timeout_seconds=0.1):
-        with pytest.raises(TimeoutError, match="GPU 0 is busy"):
-            with acquire_gpu_lock(timeout_seconds=0.01):
-                pass
+    with (
+        acquire_gpu_lock(timeout_seconds=0.1),
+        pytest.raises(TimeoutError, match="GPU 0 is busy"),
+        acquire_gpu_lock(timeout_seconds=0.01),
+    ):
+        pass
 
 
-def test_gpu_lock_reuses_verified_entrypoint_file_descriptor(tmp_path, monkeypatch):
+def test_gpu_lock_reuses_verified_entrypoint_file_descriptor(
+    tmp_path,
+    monkeypatch,
+):
     monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
     lock_path = tmp_path / "gpu-0.lock"
     descriptor = os.open(lock_path, os.O_CREAT | os.O_APPEND | os.O_RDWR, 0o600)
@@ -48,15 +53,19 @@ def test_evaluation_reuses_observable_host_managed_lock(tmp_path, monkeypatch):
     monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
     monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST", "1")
 
-    with acquire_gpu_lock(timeout_seconds=0.1):
-        with acquire_evaluation_gpu_lock(timeout_seconds=0.01):
-            pass
+    with (
+        acquire_gpu_lock(timeout_seconds=0.1),
+        acquire_evaluation_gpu_lock(timeout_seconds=0.01),
+    ):
+        pass
 
 
 def test_evaluation_rejects_unheld_host_managed_lock(tmp_path, monkeypatch):
     monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
     monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST", "1")
 
-    with pytest.raises(GpuLockVerificationError, match="is not held"):
-        with acquire_evaluation_gpu_lock(timeout_seconds=0.01):
-            pass
+    with (
+        pytest.raises(GpuLockVerificationError, match="is not held"),
+        acquire_evaluation_gpu_lock(timeout_seconds=0.01),
+    ):
+        pass

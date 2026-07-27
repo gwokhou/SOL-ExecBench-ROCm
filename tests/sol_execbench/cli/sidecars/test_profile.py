@@ -59,7 +59,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     output.write_text('{"definition":"toy"}\n')
     profile_metadata = tmp_path / "trace.jsonl.profile.json"
     profile_metadata.write_text(
-        '{"schema_version":"sol_execbench.rocprofv3_profile.v1"}\n'
+        '{"schema_version":"sol_execbench.rocprofv3_profile.v1"}\n',
     )
     profile_artifact_dir = tmp_path / "trace.jsonl.rocprofv3" / "trace"
     profile_artifact_dir.mkdir(parents=True)
@@ -69,7 +69,13 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     counter_artifact.write_text("Metric,Value,Unit\nSQ_INSTS_VALU,12,count\n")
     result = Rocprofv3ProfileResult(
         status=Rocprofv3ProfileStatus.SUCCESS,
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        command=(
+            "rocprofv3",
+            "--kernel-trace",
+            "--",
+            "python",
+            "eval_driver.py",
+        ),
         output_directory=tmp_path / "trace.jsonl.rocprofv3",
         output_file="trace",
         artifacts=(
@@ -111,7 +117,9 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     assert payload["summary"]["profiler_status"] == "success"
     assert payload["summary"]["artifact_count"] == 2
     assert payload["summary"]["artifact_coverage_status"] == "complete"
-    assert payload["summary"]["reason_codes"] == ["rocprof_artifacts_registered"]
+    assert payload["summary"]["reason_codes"] == [
+        "rocprof_artifacts_registered",
+    ]
     assert payload["summary"]["kernel_metrics"] == [
         {
             "kernel_name": "trace_counters",
@@ -121,10 +129,14 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
             "source": "trace_counters.csv",
             "artifact": "trace_counters.csv",
             "parse_status": "available",
-        }
+        },
     ]
-    assert payload["summary"]["bottleneck_hints"][0]["category"] == "compute_bound"
-    citation_kinds = {citation["kind"] for citation in payload["artifact_citations"]}
+    assert (
+        payload["summary"]["bottleneck_hints"][0]["category"] == "compute_bound"
+    )
+    citation_kinds = {
+        citation["kind"] for citation in payload["artifact_citations"]
+    }
     assert citation_kinds == {"trace", "profile_metadata", "profiler_artifact"}
     profiler_citations = [
         citation
@@ -155,10 +167,12 @@ def test_profile_output_directory_tracks_trace_output(tmp_path: Path):
 
 
 def test_profile_output_directory_is_absolute_for_relative_trace_output(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path,
+    monkeypatch,
 ):
     monkeypatch.chdir(tmp_path)
 
     assert cli_profile_sidecars._profile_output_directory(
-        Path("out/trace.jsonl"), tmp_path
+        Path("out/trace.jsonl"),
+        tmp_path,
     ) == (tmp_path / "out" / "trace.jsonl.rocprofv3")

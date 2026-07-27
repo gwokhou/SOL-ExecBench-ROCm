@@ -12,10 +12,14 @@ external tools required (pure-Python msgpack + ELF note scan).
 
 from __future__ import annotations
 
+import contextlib
 import gzip
 import struct
 import zlib
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import cast
 
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
@@ -28,6 +32,20 @@ _AMDGPU_NOTE_NAME = b"AMDGPU\x00"
 # zlib.decompress over the remaining tail at each hit; without a cap a large
 # artifact with many incidental header-looking pairs becomes O(n^2) work.
 _MAX_ZLIB_STREAM_ATTEMPTS = 32
+_MSGPACK_SCALAR_FORMATS = MappingProxyType(
+    {
+        0xCA: (">f", 5),
+        0xCB: (">d", 9),
+        0xCC: (">B", 2),
+        0xCD: (">H", 3),
+        0xCE: (">I", 5),
+        0xCF: (">Q", 9),
+        0xD0: (">b", 2),
+        0xD1: (">h", 3),
+        0xD2: (">i", 5),
+        0xD3: (">q", 9),
+    },
+)
 
 
 def _unpack_msgpack(data: bytes, offset: int = 0) -> tuple[object, int]:
@@ -38,7 +56,6 @@ def _unpack_msgpack(data: bytes, offset: int = 0) -> tuple[object, int]:
     fixint, uint/int 8/16/32/64, float32/float64, nil, bool, bin8/16/32. Raises
     on genuinely unsupported codes (ext, etc.) so callers can skip bad notes.
     """
-
     code = data[offset]
     if code <= 0x7F:  # positive fixint
         return code, offset + 1
@@ -54,68 +71,87 @@ def _unpack_msgpack(data: bytes, offset: int = 0) -> tuple[object, int]:
         return False, offset + 1
     if code == 0xC3:
         return True, offset + 1
-    if code == 0xC4:  # bin8
-        n = data[offset + 1]
-        return data[offset + 2 : offset + 2 + n], offset + 2 + n
-    if code == 0xC5:  # bin16
-        n = struct.unpack_from(">H", data, offset + 1)[0]
-        return data[offset + 3 : offset + 3 + n], offset + 3 + n
-    if code == 0xC6:  # bin32
-        n = struct.unpack_from(">I", data, offset + 1)[0]
-        return data[offset + 5 : offset + 5 + n], offset + 5 + n
-    if code == 0xCA:  # float32
-        return struct.unpack_from(">f", data, offset + 1)[0], offset + 5
-    if code == 0xCB:  # float64
-        return struct.unpack_from(">d", data, offset + 1)[0], offset + 9
-    if code == 0xCC:
-        return data[offset + 1], offset + 2
-    if code == 0xCD:
-        return struct.unpack_from(">H", data, offset + 1)[0], offset + 3
-    if code == 0xCE:
-        return struct.unpack_from(">I", data, offset + 1)[0], offset + 5
-    if code == 0xCF:
-        return struct.unpack_from(">Q", data, offset + 1)[0], offset + 9
-    if code == 0xD0:
-        return struct.unpack_from(">b", data, offset + 1)[0], offset + 2
-    if code == 0xD1:
-        return struct.unpack_from(">h", data, offset + 1)[0], offset + 3
-    if code == 0xD2:
-        return struct.unpack_from(">i", data, offset + 1)[0], offset + 5
-    if code == 0xD3:  # int64
-        return struct.unpack_from(">q", data, offset + 1)[0], offset + 9
+    if 0xC4 <= code <= 0xC6:
+        return _unpack_binary(data, offset, code)
+    if code in _MSGPACK_SCALAR_FORMATS:
+        scalar_format, width = _MSGPACK_SCALAR_FORMATS[code]
+        return struct.unpack_from(
+            scalar_format,
+            data,
+            offset + 1,
+        )[0], offset + width
     if code == 0xD9:  # str8
         return _unpack_str(data, offset, data[offset + 1], 2)
     if code == 0xDA:  # str16
         return _unpack_str(
-            data, offset, struct.unpack_from(">H", data, offset + 1)[0], 3
+            data,
+            offset,
+            struct.unpack_from(">H", data, offset + 1)[0],
+            3,
         )
     if code == 0xDB:  # str32
         return _unpack_str(
-            data, offset, struct.unpack_from(">I", data, offset + 1)[0], 5
+            data,
+            offset,
+            struct.unpack_from(">I", data, offset + 1)[0],
+            5,
         )
     if code == 0xDC:  # array16
         return _unpack_array(
-            data, offset, struct.unpack_from(">H", data, offset + 1)[0], 3
+            data,
+            offset,
+            struct.unpack_from(">H", data, offset + 1)[0],
+            3,
         )
     if code == 0xDD:  # array32
         return _unpack_array(
-            data, offset, struct.unpack_from(">I", data, offset + 1)[0], 5
+            data,
+            offset,
+            struct.unpack_from(">I", data, offset + 1)[0],
+            5,
         )
     if code == 0xDE:  # map16
         return _unpack_map(
-            data, offset, struct.unpack_from(">H", data, offset + 1)[0], 3
+            data,
+            offset,
+            struct.unpack_from(">H", data, offset + 1)[0],
+            3,
         )
     if code == 0xDF:  # map32
         return _unpack_map(
-            data, offset, struct.unpack_from(">I", data, offset + 1)[0], 5
+            data,
+            offset,
+            struct.unpack_from(">I", data, offset + 1)[0],
+            5,
         )
     if 0xE0 <= code <= 0xFF:  # negative fixint
         return code - 0x100, offset + 1
     raise ValueError(f"unsupported msgpack code {code:#x} at offset {offset}")
 
 
+def _unpack_binary(
+    data: bytes,
+    offset: int,
+    code: int,
+) -> tuple[bytes, int]:
+    if code == 0xC4:
+        length, head = data[offset + 1], 2
+    elif code == 0xC5:
+        length = struct.unpack_from(">H", data, offset + 1)[0]
+        head = 3
+    else:
+        length = struct.unpack_from(">I", data, offset + 1)[0]
+        head = 5
+    start = offset + head
+    end = start + length
+    return data[start:end], end
+
+
 def _unpack_map(
-    data: bytes, offset: int, count: int, head: int = 1
+    data: bytes,
+    offset: int,
+    count: int,
+    head: int = 1,
 ) -> tuple[dict[object, object], int]:
     offset += head
     out: dict[object, object] = {}
@@ -127,7 +163,10 @@ def _unpack_map(
 
 
 def _unpack_array(
-    data: bytes, offset: int, count: int, head: int = 1
+    data: bytes,
+    offset: int,
+    count: int,
+    head: int = 1,
 ) -> tuple[list[object], int]:
     offset += head
     out: list[object] = []
@@ -137,14 +176,21 @@ def _unpack_array(
     return out, offset
 
 
-def _unpack_str(data: bytes, offset: int, length: int, head: int) -> tuple[str, int]:
+def _unpack_str(
+    data: bytes,
+    offset: int,
+    length: int,
+    head: int,
+) -> tuple[str, int]:
     offset += head
-    return data[offset : offset + length].decode("utf-8", "replace"), offset + length
+    return data[offset : offset + length].decode(
+        "utf-8",
+        "replace",
+    ), offset + length
 
 
-def _scan_amdgpu_notes(data: bytes):
+def _scan_amdgpu_notes(data: bytes) -> Iterator[dict[object, object]]:
     """Yield parsed AMDGPU metadata maps from a raw byte scan of ``data``."""
-
     search = 0
     while True:
         idx = data.find(_AMDGPU_NOTE_NAME, search)
@@ -165,10 +211,10 @@ def _scan_amdgpu_notes(data: bytes):
         except (ValueError, IndexError, struct.error):
             continue
         if isinstance(meta, dict):
-            yield meta
+            yield cast(dict[object, object], meta)
 
 
-def _decompressed_variants(data: bytes):
+def _decompressed_variants(data: bytes) -> Iterator[bytes]:
     """Best-effort yield of gzip/zlib-decompressed views of ``data``.
 
     Newer clang-offload-bundler outputs (Compressed Code Object Bundle, ccob)
@@ -177,17 +223,12 @@ def _decompressed_variants(data: bytes):
     embedded zlib streams (ccob per-target chunks). Full ccob manifest parsing
     is a documented follow-up; this covers the common compressed cases.
     """
-
     if data[:2] == b"\x1f\x8b":
-        try:
+        with contextlib.suppress(OSError):
             yield gzip.decompress(data)
-        except OSError:
-            pass
     if data[:1] == b"\x78":
-        try:
+        with contextlib.suppress(zlib.error):
             yield zlib.decompress(data)
-        except zlib.error:
-            pass
     search = 0
     attempts = 0
     while attempts < _MAX_ZLIB_STREAM_ATTEMPTS:
@@ -202,7 +243,7 @@ def _decompressed_variants(data: bytes):
             continue
 
 
-def _iter_amdgpu_metadata(data: bytes):
+def _iter_amdgpu_metadata(data: bytes) -> Iterator[dict[object, object]]:
     """Yield parsed AMDGPU metadata maps found anywhere in ``data``.
 
     Scans the byte stream for the ``AMDGPU`` ELF note name and parses each
@@ -210,14 +251,13 @@ def _iter_amdgpu_metadata(data: bytes):
     code-object bundles. Works on standalone code objects and on ``.so`` files
     (whose ``.hip_fatbin`` section embeds per-arch code objects).
     """
-
     yield from _scan_amdgpu_notes(data)
     for variant in _decompressed_variants(data):
         yield from _scan_amdgpu_notes(variant)
 
 
 def _footprint_from_kernel(
-    kernel: dict[object, object],
+    kernel: Mapping[object, object],
     *,
     artifact_id: str,
     source_sha256: str | None,
@@ -276,7 +316,6 @@ def extract_amdgpu_footprints(
     matches is used, so a multi-arch bundle does not yield the wrong arch's
     kernels. Diagnostic only; never raises on malformed input.
     """
-
     wanted = (
         target_architecture.split(":")[0].strip().lower()
         if target_architecture
@@ -294,8 +333,11 @@ def extract_amdgpu_footprints(
         for kernel in kernels:
             if not isinstance(kernel, dict):
                 continue
+            kernel_metadata = cast(dict[object, object], kernel)
             footprint = _footprint_from_kernel(
-                kernel, artifact_id=artifact_id, source_sha256=source_sha256
+                kernel_metadata,
+                artifact_id=artifact_id,
+                source_sha256=source_sha256,
             )
             if footprint is not None:
                 footprints.append(footprint)
@@ -304,14 +346,17 @@ def extract_amdgpu_footprints(
 
 def extract_amdgpu_targets(data: bytes) -> tuple[str, ...]:
     """Return normalized gfx targets declared by embedded AMDGPU metadata."""
-
     targets: set[str] = set()
     for metadata in _iter_amdgpu_metadata(data):
         target = metadata.get("amdhsa.target")
         if not isinstance(target, str):
             continue
         match = next(
-            (part for part in target.lower().split("-") if part.startswith("gfx")),
+            (
+                part
+                for part in target.lower().split("-")
+                if part.startswith("gfx")
+            ),
             None,
         )
         if match is not None:
@@ -335,7 +380,9 @@ class AmdgpuKernelMetadata:
 
 
 def extract_amdgpu_kernel_metadata(
-    data: bytes, *, target_architecture: str
+    data: bytes,
+    *,
+    target_architecture: str,
 ) -> list[AmdgpuKernelMetadata]:
     """Extract named resource records for authoritative kernel matching.
 
@@ -355,33 +402,50 @@ def extract_amdgpu_kernel_metadata(
         for kernel in kernels:
             if not isinstance(kernel, dict):
                 continue
-            name = kernel.get(".name")
+            kernel_metadata = cast(dict[object, object], kernel)
+            name = kernel_metadata.get(".name")
             if not isinstance(name, str) or not name:
                 continue
+            symbol = kernel_metadata.get(".symbol")
             records.append(
                 AmdgpuKernelMetadata(
                     name=name,
-                    symbol=(
-                        kernel.get(".symbol")
-                        if isinstance(kernel.get(".symbol"), str)
-                        else None
-                    ),
+                    symbol=symbol if isinstance(symbol, str) else None,
                     architecture=wanted,
-                    vgpr_count=_metadata_int(kernel, ".vgpr_count"),
-                    sgpr_count=_metadata_int(kernel, ".sgpr_count"),
-                    vgpr_spill_count=_metadata_int(kernel, ".vgpr_spill_count") or 0,
-                    sgpr_spill_count=_metadata_int(kernel, ".sgpr_spill_count") or 0,
+                    vgpr_count=_metadata_int(
+                        kernel_metadata,
+                        ".vgpr_count",
+                    ),
+                    sgpr_count=_metadata_int(
+                        kernel_metadata,
+                        ".sgpr_count",
+                    ),
+                    vgpr_spill_count=_metadata_int(
+                        kernel_metadata,
+                        ".vgpr_spill_count",
+                    )
+                    or 0,
+                    sgpr_spill_count=_metadata_int(
+                        kernel_metadata,
+                        ".sgpr_spill_count",
+                    )
+                    or 0,
                     private_segment_bytes=_metadata_int(
-                        kernel, ".private_segment_fixed_size"
+                        kernel_metadata,
+                        ".private_segment_fixed_size",
                     ),
                     group_segment_bytes=_metadata_int(
-                        kernel, ".group_segment_fixed_size"
+                        kernel_metadata,
+                        ".group_segment_fixed_size",
                     ),
-                )
+                ),
             )
     return records
 
 
-def _metadata_int(kernel: dict[object, object], key: str) -> int | None:
+def _metadata_int(
+    kernel: Mapping[object, object],
+    key: str,
+) -> int | None:
     value = kernel.get(key)
     return value if isinstance(value, int) and value >= 0 else None

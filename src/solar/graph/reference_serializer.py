@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 import operator
-from typing import Any, Dict
+from typing import Any
 
 import torch
 
@@ -27,8 +27,10 @@ class ReferenceGraphSerializer:
     """Serialize the canonical make_fx graph, including explicit backward ops."""
 
     def serialize_fx_reference(
-        self, graph_module: Any, model_name: str
-    ) -> Dict[str, Any]:
+        self,
+        graph_module: Any,
+        model_name: str,
+    ) -> dict[str, Any]:
         """Serialize a make_fx-captured reference, including explicit backward ops."""
         return self._serialize_graph(graph_module, model_name)
 
@@ -121,7 +123,9 @@ class ReferenceGraphSerializer:
         """Translate an ATen FunctionSchema alias contract to executable IR."""
         schema = getattr(node.target, "_schema", None)
         if schema is None:
-            raise RuntimeError(f"AOT target has no FunctionSchema: {node.target}")
+            raise RuntimeError(
+                f"AOT target has no FunctionSchema: {node.target}",
+            )
 
         def tensor_indices(value: Any) -> set[int]:
             import torch.fx
@@ -129,10 +133,14 @@ class ReferenceGraphSerializer:
             if isinstance(value, torch.fx.Node):
                 return {input_nodes.index(value)}
             if isinstance(value, (tuple, list)):
-                return {index for item in value for index in tensor_indices(item)}
+                return {
+                    index for item in value for index in tensor_indices(item)
+                }
             if isinstance(value, dict):
                 return {
-                    index for item in value.values() for index in tensor_indices(item)
+                    index
+                    for item in value.values()
+                    for index in tensor_indices(item)
                 }
             return set()
 
@@ -170,11 +178,13 @@ class ReferenceGraphSerializer:
             }
             for input_index, input_sets in aliases_by_input.items():
                 if returned_sets & input_sets:
-                    aliases.append({"output": output_index, "input": input_index})
+                    aliases.append(
+                        {"output": output_index, "input": input_index},
+                    )
 
         if target_name.endswith("_") and not mutations and input_nodes:
             raise RuntimeError(
-                f"mutating ATen target lacks a schema write effect: {node.target}"
+                f"mutating ATen target lacks a schema write effect: {node.target}",
             )
         return {
             "mutates": sorted(mutations),
@@ -185,7 +195,8 @@ class ReferenceGraphSerializer:
 
     @staticmethod
     def _start_layer(
-        node: Any, metadata: list[tuple[list[int], str]]
+        node: Any,
+        metadata: list[tuple[list[int], str]],
     ) -> dict[str, Any]:
         if len(metadata) != 1:
             raise RuntimeError(f"FX placeholder {node.name} is not one tensor")
@@ -215,15 +226,18 @@ class ReferenceGraphSerializer:
         import torch.fx
 
         source, selected = node.args
-        if not isinstance(source, torch.fx.Node) or not isinstance(selected, int):
+        if not isinstance(source, torch.fx.Node) or not isinstance(
+            selected,
+            int,
+        ):
             raise RuntimeError(
-                f"FX getitem {node.name} is not a fixed tensor selection"
+                f"FX getitem {node.name} is not a fixed tensor selection",
             )
         try:
             return node_output_names.get(source, [])[selected]
         except IndexError as exc:
             raise RuntimeError(
-                f"FX getitem {node.name} selects an unavailable output"
+                f"FX getitem {node.name} selects an unavailable output",
             ) from exc
 
     @staticmethod
@@ -266,7 +280,9 @@ class ReferenceGraphSerializer:
             },
             "connections": {
                 "inputs": [node.args[0].name],
-                "outputs": [item.name for item in node.users if item.op != "output"],
+                "outputs": [
+                    item.name for item in node.users if item.op != "output"
+                ],
             },
         }
 
@@ -282,7 +298,8 @@ class ReferenceGraphSerializer:
         return {
             "tensor_names": {
                 "inputs": [
-                    node_output_names[predecessor][0] for predecessor in input_nodes
+                    node_output_names[predecessor][0]
+                    for predecessor in input_nodes
                 ],
                 "outputs": output_tensor_names,
             },
@@ -290,7 +307,9 @@ class ReferenceGraphSerializer:
                 "inputs": [
                     shape
                     for predecessor in input_nodes
-                    for shape, _ in cls._tensor_metadata(predecessor.meta.get("val"))
+                    for shape, _ in cls._tensor_metadata(
+                        predecessor.meta.get("val"),
+                    )
                 ],
                 "outputs": [shape for shape, _ in metadata],
             },
@@ -298,13 +317,17 @@ class ReferenceGraphSerializer:
                 "inputs": [
                     dtype
                     for predecessor in input_nodes
-                    for _, dtype in cls._tensor_metadata(predecessor.meta.get("val"))
+                    for _, dtype in cls._tensor_metadata(
+                        predecessor.meta.get("val"),
+                    )
                 ],
                 "outputs": [dtype for _, dtype in metadata],
             },
             "connections": {
                 "inputs": [predecessor.name for predecessor in input_nodes],
-                "outputs": [item.name for item in node.users if item.op != "output"],
+                "outputs": [
+                    item.name for item in node.users if item.op != "output"
+                ],
             },
         }
 
@@ -317,17 +340,23 @@ class ReferenceGraphSerializer:
         target_text = str(node.target)
         parts = target_text.split(".")
         if len(parts) < 3 or parts[-3] != "aten":
-            raise RuntimeError(f"FX graph contains non-ATen target: {target_text}")
+            raise RuntimeError(
+                f"FX graph contains non-ATen target: {target_text}",
+            )
         target_name, overload = parts[-2:]
         input_nodes = list(node.all_input_nodes)
-        exact_target = self._canonical_aten_target(node, target_name, input_nodes)
+        exact_target = self._canonical_aten_target(
+            node,
+            target_name,
+            input_nodes,
+        )
         if any(
             len(node_output_names.get(predecessor, [])) != 1
             for predecessor in input_nodes
         ):
             raise RuntimeError(
                 f"FX node {node.name} consumes a structured tensor value; "
-                "explicit getitem lowering is required"
+                "explicit getitem lowering is required",
             )
         output_names = (
             [node.name]
@@ -342,7 +371,8 @@ class ReferenceGraphSerializer:
             "exact_target": target_name,
             "overload": overload,
             "arguments": [
-                self._serialize_argument(item, input_nodes) for item in node.args
+                self._serialize_argument(item, input_nodes)
+                for item in node.args
             ],
             "kwargs": {
                 str(key): self._serialize_argument(value, input_nodes)
@@ -383,7 +413,9 @@ class ReferenceGraphSerializer:
         return {
             "parameters": [],
             "buffers": [],
-            "user_inputs": [node.name for node in nodes if node.op == "placeholder"],
+            "user_inputs": [
+                node.name for node in nodes if node.op == "placeholder"
+            ],
             "user_outputs": output_names,
             "buffers_to_mutate": {},
             "parameters_to_mutate": {},
@@ -400,13 +432,15 @@ class ReferenceGraphSerializer:
         self,
         graph_module: Any,
         model_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         import torch.fx
 
         nodes = list(graph_module.graph.nodes)
         output_values = self._graph_output_values(nodes)
         output_names = [
-            node.name for node in output_values if isinstance(node, torch.fx.Node)
+            node.name
+            for node in output_values
+            if isinstance(node, torch.fx.Node)
         ]
         if len(output_names) != len(output_values):
             raise RuntimeError("make_fx reference outputs must all be tensors")
@@ -427,8 +461,15 @@ class ReferenceGraphSerializer:
                 raise RuntimeError(f"unsupported FX node kind: {node.op}")
             if node.target is operator.getitem:
                 node_output_names[node] = [node.name]
-                selected_name = self._getitem_source_name(node, node_output_names)
-                layers[node.name] = self._identity_layer(node, metadata, selected_name)
+                selected_name = self._getitem_source_name(
+                    node,
+                    node_output_names,
+                )
+                layers[node.name] = self._identity_layer(
+                    node,
+                    metadata,
+                    selected_name,
+                )
                 continue
             output_tensor_names, layer = self._aten_layer(
                 node,

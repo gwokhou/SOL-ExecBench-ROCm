@@ -31,16 +31,9 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.dataset.aka_corpus import (
-    AKA_LICENSE,
-    AKA_PROVENANCE_CLASS,
-    AKA_REPOSITORY,
-    AKA_REVISION,
-    FORMAL_ARCHITECTURE,
-    FORMAL_ARCHITECTURE_SHA256,
-    FORMAL_GFX_TARGET,
+from sol_execbench.core.dataset.aka_compatibility import (
+    AKA_EXECUTION_TARGET_SPECS,
 )
-from sol_execbench.core.dataset.aka_compatibility import AKA_EXECUTION_TARGET_SPECS
 from sol_execbench.core.dataset.aka_contract import (
     AKA_MANIFEST_SCHEMA_VERSION,
     AKA_OFFICIAL_BASELINE_ID,
@@ -55,6 +48,15 @@ from sol_execbench.core.dataset.aka_contract import (
     AkaReleasePolicy,
     AkaSourceFamily,
     AkaSuite,
+)
+from sol_execbench.core.dataset.aka_corpus import (
+    AKA_LICENSE,
+    AKA_PROVENANCE_CLASS,
+    AKA_REPOSITORY,
+    AKA_REVISION,
+    FORMAL_ARCHITECTURE,
+    FORMAL_ARCHITECTURE_SHA256,
+    FORMAL_GFX_TARGET,
 )
 from sol_execbench.core.dataset.aka_task import (
     correctness_runner_path,
@@ -79,6 +81,8 @@ CALIBRATION_PATH = PROBLEMS_ROOT / AKA_TOLERANCE_CALIBRATION_FILENAME
 
 @dataclass(frozen=True)
 class Spec:
+    """Authored specification for one generated AKA problem."""
+
     name: str
     suite: AkaSuite
     task_path: str
@@ -147,7 +151,7 @@ SPECS: list[Spec] = [
                 "shape": ["M", "N"],
                 "dtype": "float32",
                 "description": "a @ (b + b).",
-            }
+            },
         },
         reference="import torch\n\ndef run(a, b):\n    return torch.matmul(a, b + b)\n",
         workloads=[
@@ -186,7 +190,11 @@ SPECS: list[Spec] = [
             },
         },
         outputs={
-            "output": {"shape": ["M", "N"], "dtype": "float32", "description": "A @ B."}
+            "output": {
+                "shape": ["M", "N"],
+                "dtype": "float32",
+                "description": "A @ B.",
+            },
         },
         reference="import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
         workloads=[
@@ -229,7 +237,7 @@ SPECS: list[Spec] = [
                 "shape": ["M", "N"],
                 "dtype": "bfloat16",
                 "description": "A @ B.",
-            }
+            },
         },
         reference="import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
         workloads=[
@@ -272,12 +280,13 @@ SPECS: list[Spec] = [
                 "shape": ["Batch", "M", "N"],
                 "dtype": "bfloat16",
                 "description": "torch.bmm(A, B).",
-            }
+            },
         },
         reference="import torch\n\ndef run(A, B):\n    return torch.bmm(A, B)\n",
         workloads=[
             _wl(
-                {"Batch": 4, "M": 64, "K": 64, "N": 64}, {"A": "random", "B": "random"}
+                {"Batch": 4, "M": 64, "K": 64, "N": 64},
+                {"A": "random", "B": "random"},
             ),
             _wl(
                 {"Batch": 8, "M": 128, "K": 128, "N": 128},
@@ -318,7 +327,7 @@ SPECS: list[Spec] = [
                 "shape": ["M", "1"],
                 "dtype": "float32",
                 "description": "A @ B of shape (M, 1).",
-            }
+            },
         },
         reference="import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
         workloads=[
@@ -356,13 +365,23 @@ SPECS: list[Spec] = [
             },
         },
         outputs={
-            "output": {"shape": ["M", "N"], "dtype": "float16", "description": "A @ B."}
+            "output": {
+                "shape": ["M", "N"],
+                "dtype": "float16",
+                "description": "A @ B.",
+            },
         },
         reference="import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
         workloads=[
-            _wl({"M": 1823, "K": 781, "N": 511}, {"A": "random", "B": "random"}),
+            _wl(
+                {"M": 1823, "K": 781, "N": 511},
+                {"A": "random", "B": "random"},
+            ),
             _wl({"M": 359, "K": 127, "N": 211}, {"A": "random", "B": "random"}),
-            _wl({"M": 1024, "K": 333, "N": 717}, {"A": "random", "B": "random"}),
+            _wl(
+                {"M": 1024, "K": 333, "N": 717},
+                {"A": "random", "B": "random"},
+            ),
         ],
     ),
     Spec(
@@ -394,7 +413,11 @@ SPECS: list[Spec] = [
             },
         },
         outputs={
-            "output": {"shape": ["M", "N"], "dtype": "float32", "description": "A @ B."}
+            "output": {
+                "shape": ["M", "N"],
+                "dtype": "float32",
+                "description": "A @ B.",
+            },
         },
         reference="import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
         workloads=[
@@ -414,20 +437,23 @@ SPECS: list[Spec] = [
         source_family=AkaSourceFamily.KERNELBENCH,
         description="Row-wise softmax over the last dimension. Derived from AKA "
         "torch2hip/kernelbench/level1/l1n23_Softmax module_fn (dim=1).",
-        axes={"M": _ax_var("Rows."), "N": _ax_var("Columns (softmax dimension).")},
+        axes={
+            "M": _ax_var("Rows."),
+            "N": _ax_var("Columns (softmax dimension)."),
+        },
         inputs={
             "x": {
                 "shape": ["M", "N"],
                 "dtype": "float32",
                 "description": "Input (M, N).",
-            }
+            },
         },
         outputs={
             "output": {
                 "shape": ["M", "N"],
                 "dtype": "float32",
                 "description": "Row-wise softmax.",
-            }
+            },
         },
         reference="import torch\n\ndef run(x):\n    return torch.softmax(x, dim=-1)\n",
         workloads=[
@@ -454,14 +480,14 @@ SPECS: list[Spec] = [
                 "shape": ["M", "N"],
                 "dtype": "float16",
                 "description": "Input (M, N).",
-            }
+            },
         },
         outputs={
             "output": {
                 "shape": ["M", "N"],
                 "dtype": "float16",
                 "description": "F.gelu(x).",
-            }
+            },
         },
         reference="import torch.nn.functional as F\n\ndef run(x):\n    return F.gelu(x)\n",
         workloads=[
@@ -502,7 +528,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "F"],
                 "dtype": "bfloat16",
                 "description": "x / rms(x).",
-            }
+            },
         },
         reference=(
             "import torch\n\ndef run(x, eps):\n"
@@ -557,7 +583,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "N"],
                 "dtype": "float32",
                 "description": "layer_norm(x).",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -611,14 +637,14 @@ SPECS: list[Spec] = [
                 "shape": ["M", "N"],
                 "dtype": "float32",
                 "description": "Input (M, N).",
-            }
+            },
         },
         outputs={
             "output": {
                 "shape": ["M", "1"],
                 "dtype": "float32",
                 "description": "Row sums (M, 1).",
-            }
+            },
         },
         reference="import torch\n\ndef run(x):\n    return torch.sum(x, dim=-1, keepdim=True)\n",
         workloads=[
@@ -651,14 +677,14 @@ SPECS: list[Spec] = [
                 "shape": ["B", "C", "H", "W"],
                 "dtype": "float32",
                 "description": "Input (B, C, H, W).",
-            }
+            },
         },
         outputs={
             "output": {
                 "shape": ["B", "C", "H_out", "W_out"],
                 "dtype": "float32",
                 "description": "Pooled output.",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -702,14 +728,18 @@ SPECS: list[Spec] = [
                 "dtype": "float32",
                 "description": "Filters (O, C, K, K).",
             },
-            "bias": {"shape": ["O"], "dtype": "float32", "description": "Bias (O,)."},
+            "bias": {
+                "shape": ["O"],
+                "dtype": "float32",
+                "description": "Bias (O,).",
+            },
         },
         outputs={
             "output": {
                 "shape": ["B", "O", "H_out", "W_out"],
                 "dtype": "float32",
                 "description": "Convolution output.",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -762,14 +792,18 @@ SPECS: list[Spec] = [
                 "dtype": "float32",
                 "description": "Depthwise filters (C, 1, K, K).",
             },
-            "bias": {"shape": ["C"], "dtype": "float32", "description": "Bias (C,)."},
+            "bias": {
+                "shape": ["C"],
+                "dtype": "float32",
+                "description": "Bias (C,).",
+            },
         },
         outputs={
             "output": {
                 "shape": ["B", "C", "H_out", "W_out"],
                 "dtype": "float32",
                 "description": "Depthwise conv output.",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -814,14 +848,14 @@ SPECS: list[Spec] = [
                 "shape": ["M", "N"],
                 "dtype": "float32",
                 "description": "Input (M, N).",
-            }
+            },
         },
         outputs={
             "output": {
                 "shape": ["M", "N"],
                 "dtype": "float32",
                 "description": "x * sigmoid(x).",
-            }
+            },
         },
         reference="import torch\n\ndef run(x):\n    return x * torch.sigmoid(x)\n",
         workloads=[
@@ -865,7 +899,7 @@ SPECS: list[Spec] = [
                 "shape": ["M", "N"],
                 "dtype": "float32",
                 "description": "sigmoid(a * v) * max.",
-            }
+            },
         },
         reference="import torch\n\ndef run(v, a, max):\n    return torch.sigmoid(a * v) * max\n",
         workloads=[
@@ -921,7 +955,7 @@ SPECS: list[Spec] = [
                 "shape": ["M", "N"],
                 "dtype": "float32",
                 "description": "tanh(a * v) * max.",
-            }
+            },
         },
         reference="import torch\n\ndef run(v, a, max):\n    return torch.tanh(a * v) * max\n",
         workloads=[
@@ -982,7 +1016,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "OUT"],
                 "dtype": "float32",
                 "description": "softmax(gelu(linear(x))).",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -992,9 +1026,18 @@ SPECS: list[Spec] = [
             "    return F.softmax(x, dim=1)\n"
         ),
         workloads=[
-            _wl({"B": 256}, {"x": "random", "weight": "random", "bias": "random"}),
-            _wl({"B": 1024}, {"x": "random", "weight": "random", "bias": "random"}),
-            _wl({"B": 4096}, {"x": "random", "weight": "random", "bias": "random"}),
+            _wl(
+                {"B": 256},
+                {"x": "random", "weight": "random", "bias": "random"},
+            ),
+            _wl(
+                {"B": 1024},
+                {"x": "random", "weight": "random", "bias": "random"},
+            ),
+            _wl(
+                {"B": 4096},
+                {"x": "random", "weight": "random", "bias": "random"},
+            ),
         ],
     ),
     Spec(
@@ -1040,7 +1083,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "OUT"],
                 "dtype": "float32",
                 "description": "gelu(linear(x) / divisor).",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -1122,7 +1165,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "OUT"],
                 "dtype": "float32",
                 "description": "linear(x) * scaling + linear(x).",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -1219,7 +1262,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "OUT"],
                 "dtype": "float32",
                 "description": "group_norm(swish(linear(x)) + extra_bias).",
-            }
+            },
         },
         reference=(
             "import torch\nimport torch.nn.functional as F\n\n"
@@ -1316,7 +1359,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "O", "HO", "WO"],
                 "dtype": "float32",
                 "description": "instance_norm(conv2d(x)) / divide_by.",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -1430,7 +1473,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "C", "H", "W"],
                 "dtype": "float32",
                 "description": "Attention output feature map.",
-            }
+            },
         },
         reference=(
             "import torch\nimport torch.nn.functional as F\n\n"
@@ -1505,7 +1548,8 @@ SPECS: list[Spec] = [
             ),
         ],
     ),
-    # --- Cat2 (mechanical): rank-split of a variable-rank task (C9/C10 -> Cat1) ---
+    # --- Cat2 (mechanical): rank-split a variable-rank task
+    # (C9/C10 -> Cat1).
     Spec(
         name="gpumode_gelu_4d",
         suite=AkaSuite.TORCH2HIP,
@@ -1529,14 +1573,14 @@ SPECS: list[Spec] = [
                 "shape": ["B", "C", "H", "W"],
                 "dtype": "float32",
                 "description": "Input (B, C, H, W).",
-            }
+            },
         },
         outputs={
             "output": {
                 "shape": ["B", "C", "H", "W"],
                 "dtype": "float32",
                 "description": "F.gelu(x).",
-            }
+            },
         },
         reference="import torch.nn.functional as F\n\ndef run(x):\n    return F.gelu(x)\n",
         workloads=[
@@ -1568,14 +1612,14 @@ SPECS: list[Spec] = [
                 "shape": ["M", "N"],
                 "dtype": "float32",
                 "description": "FP32 input (M, N).",
-            }
+            },
         },
         outputs={
             "output": {
                 "shape": ["M", "N"],
                 "dtype": "float8_e4m3fn",
                 "description": "x cast to float8_e4m3fn.",
-            }
+            },
         },
         reference="import torch\n\ndef run(x):\n    return x.to(torch.float8_e4m3fn)\n",
         workloads=[
@@ -1680,14 +1724,14 @@ SPECS: list[Spec] = [
                 "shape": ["M", "D"],
                 "dtype": "bfloat16",
                 "description": "Input (M, D), D even.",
-            }
+            },
         },
         outputs={
             "output": {
                 "shape": ["M", "d"],
                 "dtype": "bfloat16",
                 "description": "silu(x) * y (M, d).",
-            }
+            },
         },
         reference=(
             "import torch\nimport torch.nn.functional as F\n\n"
@@ -1748,7 +1792,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "C", "H", "W"],
                 "dtype": "float32",
                 "description": "scale * leaky_relu(x + bias).",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -1835,7 +1879,7 @@ SPECS: list[Spec] = [
                 "shape": ["A", "C", "B", "D"],
                 "dtype": "float32",
                 "description": "input.transpose(dim1, dim2).",
-            }
+            },
         },
         reference=(
             "def run(input, dim1, dim2):\n"
@@ -1844,19 +1888,35 @@ SPECS: list[Spec] = [
         workloads=[
             _wl(
                 {"A": 4, "B": 8, "C": 16, "D": 32},
-                {"input": "random", "dim1": {"scalar": 1}, "dim2": {"scalar": 2}},
+                {
+                    "input": "random",
+                    "dim1": {"scalar": 1},
+                    "dim2": {"scalar": 2},
+                },
             ),
             _wl(
                 {"A": 8, "B": 16, "C": 32, "D": 64},
-                {"input": "random", "dim1": {"scalar": 1}, "dim2": {"scalar": 2}},
+                {
+                    "input": "random",
+                    "dim1": {"scalar": 1},
+                    "dim2": {"scalar": 2},
+                },
             ),
             _wl(
                 {"A": 2, "B": 64, "C": 128, "D": 16},
-                {"input": "random", "dim1": {"scalar": 1}, "dim2": {"scalar": 2}},
+                {
+                    "input": "random",
+                    "dim1": {"scalar": 1},
+                    "dim2": {"scalar": 2},
+                },
             ),
             _wl(
                 {"A": 16, "B": 32, "C": 48, "D": 24},
-                {"input": "random", "dim1": {"scalar": 1}, "dim2": {"scalar": 2}},
+                {
+                    "input": "random",
+                    "dim1": {"scalar": 1},
+                    "dim2": {"scalar": 2},
+                },
             ),
         ],
     ),
@@ -1878,14 +1938,18 @@ SPECS: list[Spec] = [
                 "dtype": "float32",
                 "description": "Input cube (N, N, N).",
             },
-            "axis": {"shape": None, "dtype": "float32", "description": "Softmax axis."},
+            "axis": {
+                "shape": None,
+                "dtype": "float32",
+                "description": "Softmax axis.",
+            },
         },
         outputs={
             "output": {
                 "shape": ["N", "N", "N"],
                 "dtype": "float32",
                 "description": "softmax(v, dim=axis).",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -1952,7 +2016,7 @@ SPECS: list[Spec] = [
                 "shape": ["OB", "1"],
                 "dtype": "float32",
                 "description": "sigmoid(linear2(relu(linear1(vstack(x,y))))).",
-            }
+            },
         },
         reference=(
             "import torch\nimport torch.nn.functional as F\n\n"
@@ -2079,7 +2143,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "S", "C"],
                 "dtype": "float32",
                 "description": "FFN block output (B, S, C).",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -2197,7 +2261,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "IN4"],
                 "dtype": "float32",
                 "description": "MLP output (B, 4).",
-            }
+            },
         },
         reference=(
             "import torch.nn.functional as F\n\n"
@@ -2347,7 +2411,7 @@ SPECS: list[Spec] = [
                 "shape": ["B"],
                 "dtype": "float32",
                 "description": "Reduced output (B,).",
-            }
+            },
         },
         reference=(
             "import torch\nimport torch.nn.functional as F\n\n"
@@ -2438,7 +2502,7 @@ SPECS: list[Spec] = [
                 "shape": ["B"],
                 "dtype": "float32",
                 "description": "Reduced output (B,).",
-            }
+            },
         },
         reference=(
             "import torch\nimport torch.nn.functional as F\n\n"
@@ -2500,7 +2564,10 @@ SPECS: list[Spec] = [
             "C": _ax_const(768, "Model dimension."),
             "C3": _ax_expr("3 * C", "QKV projection output (3*C)."),
             "C4": _ax_expr("4 * C", "MLP hidden (4*C)."),
-            "MT": _ax_const(1024, "Max sequence length (causal-mask buffer edge)."),
+            "MT": _ax_const(
+                1024,
+                "Max sequence length (causal-mask buffer edge).",
+            ),
         },
         inputs={
             "x": {
@@ -2589,7 +2656,7 @@ SPECS: list[Spec] = [
                 "shape": ["B", "S", "C"],
                 "dtype": "float32",
                 "description": "Block output (B, S, C).",
-            }
+            },
         },
         reference=(
             "import math\nimport torch\nimport torch.nn.functional as F\n\n"
@@ -2765,11 +2832,16 @@ def _write_problem(
             try:
                 tolerance = calibrated[uuid]
             except KeyError as exc:
-                raise ValueError(f"missing calibrated tolerance for {uuid}") from exc
+                raise ValueError(
+                    f"missing calibrated tolerance for {uuid}",
+                ) from exc
         inputs_payload: dict[str, Any] = {}
         for name, meta in wl["inputs"].items():
             if isinstance(meta, dict) and "scalar" in meta:
-                inputs_payload[name] = {"type": "scalar", "value": meta["scalar"]}
+                inputs_payload[name] = {
+                    "type": "scalar",
+                    "value": meta["scalar"],
+                }
             else:
                 inputs_payload[name] = {"type": "random"}
         record = {
@@ -2797,11 +2869,13 @@ def _write_problem(
     reference_path = problem_dir / "reference.py"
     definition_path.write_text(json.dumps(definition_payload, indent=2) + "\n")
     workload_path.write_text(
-        "".join(json.dumps(item, sort_keys=True) + "\n" for item in workload_records)
+        "".join(
+            json.dumps(item, sort_keys=True) + "\n" for item in workload_records
+        ),
     )
     reference_path.write_text(
         f'"""Standalone PyTorch reference for {spec.name} (debug mirror)."""\n'
-        + spec.reference
+        + spec.reference,
     )
     return {
         "path": f"{spec.suite}/{spec.name}",
@@ -2819,9 +2893,12 @@ def _format_authored_references(
     """Ruff-format debug mirrors and bind the same source into Definitions."""
     ruff = resolve_tool_path("ruff")
     if ruff is None:
-        raise RuntimeError("Ruff is required to author canonical AKA references")
+        raise RuntimeError(
+            "Ruff is required to author canonical AKA references",
+        )
     reference_paths = [
-        problems_root / spec.suite / spec.name / "reference.py" for spec in specs
+        problems_root / spec.suite / spec.name / "reference.py"
+        for spec in specs
     ]
     completed = run_in_process_group_bounded(
         [str(ruff), "format", *map(str, reference_paths)],
@@ -2833,15 +2910,24 @@ def _format_authored_references(
         detail = (completed.stderr or completed.stdout or "Ruff failed").strip()
         raise RuntimeError(f"could not format AKA references: {detail}")
     for spec, record, reference_path in zip(
-        specs, records, reference_paths, strict=True
+        specs,
+        records,
+        reference_paths,
+        strict=True,
     ):
         header = f'"""Standalone PyTorch reference for {spec.name} (debug mirror)."""'
         mirror = reference_path.read_text(encoding="utf-8")
         if not mirror.startswith(header):
-            raise ValueError(f"formatted AKA reference lost its header: {spec.name}")
+            raise ValueError(
+                f"formatted AKA reference lost its header: {spec.name}",
+            )
         reference = mirror[len(header) :].lstrip("\n")
-        if ast.dump(ast.parse(reference)) != ast.dump(ast.parse(spec.reference)):
-            raise ValueError(f"Ruff changed AKA reference semantics: {spec.name}")
+        if ast.dump(ast.parse(reference)) != ast.dump(
+            ast.parse(spec.reference),
+        ):
+            raise ValueError(
+                f"Ruff changed AKA reference semantics: {spec.name}",
+            )
         definition_path = reference_path.with_name("definition.json")
         payload = json.loads(definition_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
@@ -2860,7 +2946,8 @@ def _rebind_format_only_calibration(
     """Rebind calibration contracts after AST-equivalent reference formatting."""
     payload = load_tolerance_calibration(calibration_path)
     raw_records = payload["records"]
-    assert isinstance(raw_records, list)
+    if not isinstance(raw_records, list):
+        raise ValueError("calibration records must be a list")
     records = {
         str(record["workload_uuid"]): record
         for record in raw_records
@@ -2872,7 +2959,7 @@ def _rebind_format_only_calibration(
     for spec in SPECS:
         problem_dir = problems_root / spec.suite / spec.name
         definition = Definition.model_validate_json(
-            (problem_dir / "definition.json").read_text(encoding="utf-8")
+            (problem_dir / "definition.json").read_text(encoding="utf-8"),
         )
         workloads = [
             Workload.model_validate_json(line)
@@ -2885,7 +2972,10 @@ def _rebind_format_only_calibration(
             record = records.get(workload.uuid)
             if record is None:
                 raise ValueError(f"missing calibration record: {workload.uuid}")
-            record["contract_sha256"] = workload_contract_sha256(definition, workload)
+            record["contract_sha256"] = workload_contract_sha256(
+                definition,
+                workload,
+            )
             observed.add(workload.uuid)
     if observed != set(records):
         raise ValueError("calibration contains records outside the AKA corpus")
@@ -2910,19 +3000,13 @@ def _coverage_axes(specs: list[Spec]) -> dict[str, dict[str, int]]:
     }
 
 
-def _write_manifest(
+def _manifest_entries(
     specs: list[Spec],
-    records: list[dict[str, str]],
     aka_artifacts: dict[str, list[dict[str, str]]],
-    aka_commit: str,
-    *,
-    problems_root: Path = PROBLEMS_ROOT,
-    manifest_path: Path = MANIFEST_PATH,
-    calibration_path: Path = CALIBRATION_PATH,
-) -> None:
-    entries = []
-    for spec, record in zip(specs, records, strict=True):
-        entry = {
+) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    for spec in specs:
+        entry: dict[str, object] = {
             "slot": spec.name,
             "task_path": spec.task_path,
             "problem_name": spec.name,
@@ -2942,8 +3026,77 @@ def _write_manifest(
         if spec.exclusion_reason_code:
             entry["exclusion_reason_code"] = spec.exclusion_reason_code
         entries.append(entry)
+    return entries
 
-    payload = {
+
+def _formal_coverage_combinations() -> list[dict[str, object]]:
+    return [
+        {
+            "operation": str(AkaOperation.MATMUL),
+            "dtype": str(DType.FLOAT32),
+            "pass": str(AkaPassKind.FORWARD),
+            "min_count": 1,
+        },
+        {
+            "operation": str(AkaOperation.MATMUL),
+            "dtype": str(DType.BFLOAT16),
+            "pass": str(AkaPassKind.FORWARD),
+            "min_count": 1,
+        },
+        {
+            "operation": str(AkaOperation.SOFTMAX),
+            "dtype": str(DType.FLOAT32),
+            "pass": str(AkaPassKind.FORWARD),
+            "min_count": 1,
+        },
+        {
+            "operation": str(AkaOperation.NORM),
+            "dtype": str(DType.BFLOAT16),
+            "pass": str(AkaPassKind.FORWARD),
+            "min_count": 1,
+        },
+        {
+            "operation": str(AkaOperation.CONV),
+            "dtype": str(DType.FLOAT32),
+            "pass": str(AkaPassKind.FORWARD),
+            "min_count": 1,
+        },
+        {
+            "operation": str(AkaOperation.ELEMENTWISE),
+            "dtype": str(DType.FLOAT16),
+            "pass": str(AkaPassKind.FORWARD),
+            "min_count": 1,
+        },
+        {
+            "operation": str(AkaOperation.ATTENTION),
+            "pass": str(AkaPassKind.FORWARD),
+            "min_count": 1,
+        },
+        {
+            "operation": str(AkaOperation.NORM),
+            "pass": str(AkaPassKind.FORWARD),
+            "min_count": 2,
+        },
+        {"pass": str(AkaPassKind.BACKWARD), "min_count": 1},
+        {
+            "dtype": str(DType.FLOAT8_E4M3FN),
+            "pass": str(AkaPassKind.FORWARD),
+            "min_count": 1,
+        },
+        {"fusion_depth": str(AkaFusionDepth.FUSED), "min_count": 1},
+    ]
+
+
+def _manifest_payload(
+    specs: list[Spec],
+    records: list[dict[str, str]],
+    entries: list[dict[str, object]],
+    aka_commit: str,
+    *,
+    problems_root: Path,
+    calibration_path: Path,
+) -> dict[str, object]:
+    return {
         "schema_version": AKA_MANIFEST_SCHEMA_VERSION,
         "source": {
             "repository": AKA_REPOSITORY,
@@ -2972,7 +3125,9 @@ def _write_manifest(
         },
         "official_scoring": {
             "status": str(AkaOfficialScoringStatus.AVAILABLE),
-            "release_policy": str(AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1),
+            "release_policy": str(
+                AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1,
+            ),
             "baseline_id": AKA_OFFICIAL_BASELINE_ID,
             "required_evidence": [
                 str(evidence) for evidence in AKA_REQUIRED_RELEASE_EVIDENCE
@@ -2980,87 +3135,50 @@ def _write_manifest(
         },
         "formal_coverage_requirements": {
             "axes": _coverage_axes(specs),
-            "combinations": [
-                {
-                    "operation": str(AkaOperation.MATMUL),
-                    "dtype": str(DType.FLOAT32),
-                    "pass": str(AkaPassKind.FORWARD),
-                    "min_count": 1,
-                },
-                {
-                    "operation": str(AkaOperation.MATMUL),
-                    "dtype": str(DType.BFLOAT16),
-                    "pass": str(AkaPassKind.FORWARD),
-                    "min_count": 1,
-                },
-                {
-                    "operation": str(AkaOperation.SOFTMAX),
-                    "dtype": str(DType.FLOAT32),
-                    "pass": str(AkaPassKind.FORWARD),
-                    "min_count": 1,
-                },
-                {
-                    "operation": str(AkaOperation.NORM),
-                    "dtype": str(DType.BFLOAT16),
-                    "pass": str(AkaPassKind.FORWARD),
-                    "min_count": 1,
-                },
-                {
-                    "operation": str(AkaOperation.CONV),
-                    "dtype": str(DType.FLOAT32),
-                    "pass": str(AkaPassKind.FORWARD),
-                    "min_count": 1,
-                },
-                {
-                    "operation": str(AkaOperation.ELEMENTWISE),
-                    "dtype": str(DType.FLOAT16),
-                    "pass": str(AkaPassKind.FORWARD),
-                    "min_count": 1,
-                },
-                # --- Expansion floor constraints (friendliness categories) ---
-                # Cat1 coverage breadth: the attention op family is present.
-                {
-                    "operation": str(AkaOperation.ATTENTION),
-                    "pass": str(AkaPassKind.FORWARD),
-                    "min_count": 1,
-                },
-                # At least two norm problems so a norm variant (group/batch/instance)
-                # is represented alongside the baseline layernorm/rmsnorm.
-                {
-                    "operation": str(AkaOperation.NORM),
-                    "pass": str(AkaPassKind.FORWARD),
-                    "min_count": 2,
-                },
-                # Cat2 backward pass (instruction2triton rmsnorm_bwd).
-                {"pass": str(AkaPassKind.BACKWARD), "min_count": 1},
-                # Cat2 FP8 compatibility sentinel (float8_e4m3fn).
-                {
-                    "dtype": str(DType.FLOAT8_E4M3FN),
-                    "pass": str(AkaPassKind.FORWARD),
-                    "min_count": 1,
-                },
-                # Fused-op depth is represented.
-                {"fusion_depth": str(AkaFusionDepth.FUSED), "min_count": 1},
-            ],
+            "combinations": _formal_coverage_combinations(),
         },
         "materialized_problems": [
             {
-                "path": r["path"],
-                "task_path": s.task_path,
-                "definition_sha256": r["definition_sha256"],
-                "workload_sha256": r["workload_sha256"],
+                "path": record["path"],
+                "task_path": spec.task_path,
+                "definition_sha256": record["definition_sha256"],
+                "workload_sha256": record["workload_sha256"],
             }
-            for s, r in zip(specs, records, strict=True)
+            for spec, record in zip(specs, records, strict=True)
         ],
         "entries": entries,
     }
+
+
+def _write_manifest(
+    specs: list[Spec],
+    records: list[dict[str, str]],
+    aka_artifacts: dict[str, list[dict[str, str]]],
+    aka_commit: str,
+    *,
+    problems_root: Path = PROBLEMS_ROOT,
+    manifest_path: Path = MANIFEST_PATH,
+    calibration_path: Path = CALIBRATION_PATH,
+) -> None:
+    entries = _manifest_entries(specs, aka_artifacts)
+    payload = _manifest_payload(
+        specs,
+        records,
+        entries,
+        aka_commit,
+        problems_root=problems_root,
+        calibration_path=calibration_path,
+    )
     manifest_path.write_text(yaml.safe_dump(payload, sort_keys=False))
 
 
 def main() -> None:
+    """Materialize the authored AKA corpus and its manifest."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--aka-root", type=Path, default=REPO_ROOT / "data" / "AgentKernelArena"
+        "--aka-root",
+        type=Path,
+        default=REPO_ROOT / "data" / "AgentKernelArena",
     )
     parser.add_argument(
         "--problems-root",
@@ -3089,7 +3207,7 @@ def main() -> None:
     if not aka_root.is_dir():
         raise FileNotFoundError(
             "the pinned AKA clone is required to author provenance bindings: "
-            f"{aka_root}"
+            f"{aka_root}",
         )
 
     if args.bootstrap_calibration:
@@ -3097,7 +3215,7 @@ def main() -> None:
     else:
         if not calibration_path.is_file():
             raise FileNotFoundError(
-                "run scripts/internal/aka_calibrate_tolerances.py first"
+                "run scripts/internal/aka_calibrate_tolerances.py first",
             )
         calibrated = calibration_tolerances(calibration_path)
 

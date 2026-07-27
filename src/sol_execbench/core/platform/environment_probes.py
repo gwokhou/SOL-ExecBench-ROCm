@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from .environment_models import (
+from sol_execbench.core.platform.environment_models import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
     EnvironmentEvidenceStatus,
     ProbeRunner,
@@ -18,8 +18,11 @@ from .environment_models import (
     ToolProbeResult,
     Which,
 )
-from .runtime import resolve_rocm_tool, resolve_tool_path
-from ..text_utils import text_tail
+from sol_execbench.core.platform.runtime import (
+    resolve_rocm_tool,
+    resolve_tool_path,
+)
+from sol_execbench.core.text_utils import text_tail
 
 
 def probe_tool(
@@ -31,7 +34,6 @@ def probe_tool(
     timeout_seconds: float = DEFAULT_PROBE_TIMEOUT_SECONDS,
 ) -> ToolProbeResult:
     """Run one bounded environment probe."""
-
     # Environment doctor must use the same ROCm-root-aware lookup as the
     # collectors.  ROCm packages are commonly installed under a versioned
     # /opt/rocm-* root without adding every utility to PATH.
@@ -75,7 +77,9 @@ def probe_tool(
             timeout_seconds=timeout_seconds,
         )
 
-    output = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
+    output = "\n".join(
+        part for part in (completed.stdout, completed.stderr) if part
+    )
     return ToolProbeResult(
         tool=tool,
         command=effective_command,
@@ -95,7 +99,6 @@ def probe_tool(
 
 def collect_pytorch_rocm_summary() -> PytorchRocmSummary:
     """Collect PyTorch ROCm metadata without requiring PyTorch at import time."""
-
     try:
         import torch
     except ImportError as exc:
@@ -113,7 +116,9 @@ def collect_pytorch_rocm_summary() -> PytorchRocmSummary:
         if device_count:
             props = torch.cuda.get_device_properties(0)
             raw_arch = getattr(props, "gcnArchName", "") or getattr(
-                props, "gfx_arch_name", ""
+                props,
+                "gfx_arch_name",
+                "",
             )
             gfx_target = str(raw_arch).split(":", maxsplit=1)[0] or None
         return PytorchRocmSummary(
@@ -136,6 +141,7 @@ def collect_pytorch_rocm_summary() -> PytorchRocmSummary:
 
 
 def parse_probe_output(output: str) -> dict[str, Any]:
+    """Extract stable facts from a bounded tool probe output."""
     # ROCm 7.2 emits generic labels such as ``gfx12`` in addition to concrete
     # ISA targets.  Only the latter identify a device architecture.
     gfx_targets = sorted(set(re.findall(r"\bgfx[0-9a-fA-F]{3,}\b", output)))
@@ -162,7 +168,7 @@ def parse_probe_output(output: str) -> dict[str, Any]:
                     rf"(?m)^\s*{field}:\s*(0x[0-9a-fA-F]+)\s*$",
                     output,
                 )
-            }
+            },
         )
         if values:
             parsed[key] = values

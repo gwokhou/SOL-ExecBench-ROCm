@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 import torch
 
@@ -49,6 +49,7 @@ class ShiftingMemoryPoolAllocator:
     total_iterations : int
         Total number of :meth:`get_unique_args` calls expected
         (warmup + timed iterations).
+
     """
 
     # Tensor alignment in bytes – shift data_ptr by this much each iteration
@@ -56,24 +57,29 @@ class ShiftingMemoryPoolAllocator:
 
     def __init__(
         self,
-        inputs: List[Any],
-        outputs: List[torch.Tensor],
+        inputs: list[Any],
+        outputs: list[torch.Tensor],
         total_iterations: int,
     ) -> None:
+        """Allocate shifted storage for all planned benchmark iterations."""
         self._call_idx = 0
         self._total_iterations = total_iterations
-        self._input_entries: List[Dict[str, Any]] = []
-        self._output_entries: List[Dict[str, Any]] = []
+        self._input_entries: list[dict[str, Any]] = []
+        self._output_entries: list[dict[str, Any]] = []
 
         for inp in inputs:
             if not isinstance(inp, torch.Tensor):
                 self._input_entries.append({"scalar": inp})
                 continue
 
-            self._input_entries.append(self._make_pool_entry(inp, total_iterations))
+            self._input_entries.append(
+                self._make_pool_entry(inp, total_iterations),
+            )
 
         for out in outputs:
-            self._output_entries.append(self._make_pool_entry(out, total_iterations))
+            self._output_entries.append(
+                self._make_pool_entry(out, total_iterations),
+            )
 
     @staticmethod
     def _storage_span(tensor: torch.Tensor) -> int:
@@ -86,15 +92,17 @@ class ShiftingMemoryPoolAllocator:
         if tensor.numel() == 0:
             return 0
         span = 1
-        for s, st in zip(tensor.shape, tensor.stride()):
+        for s, st in zip(tensor.shape, tensor.stride(), strict=True):
             if s > 1:
                 span += (s - 1) * st
         return span
 
     @classmethod
     def _make_pool_entry(
-        cls, tensor: torch.Tensor, total_iterations: int
-    ) -> Dict[str, Any]:
+        cls,
+        tensor: torch.Tensor,
+        total_iterations: int,
+    ) -> dict[str, Any]:
         # Negative strides (e.g. from flip()) make storage span math
         # ambiguous — materialise to contiguous up front.
         if any(st < 0 for st in tensor.stride()):
@@ -124,7 +132,7 @@ class ShiftingMemoryPoolAllocator:
             "stride_numel": stride_numel,
         }
 
-    def get_unique_args(self) -> List[Any]:
+    def get_unique_args(self) -> list[Any]:
         """Copy source data into the next pool offset and return views.
 
         Returns inputs followed by zero-filled outputs (for DPS kernels).
@@ -135,10 +143,10 @@ class ShiftingMemoryPoolAllocator:
         if self._call_idx >= self._total_iterations:
             raise RuntimeError(
                 f"ShiftingMemoryPoolAllocator exhausted: called {self._call_idx + 1} "
-                f"times but was allocated for {self._total_iterations} iterations"
+                f"times but was allocated for {self._total_iterations} iterations",
             )
 
-        result: List[Any] = []
+        result: list[Any] = []
         idx = self._call_idx
 
         for entry in self._input_entries:
@@ -147,16 +155,26 @@ class ShiftingMemoryPoolAllocator:
                 continue
 
             start = idx * entry["stride_numel"]
-            entry["pool"].narrow(0, start, entry["storage_span"]).copy_(entry["source"])
+            entry["pool"].narrow(0, start, entry["storage_span"]).copy_(
+                entry["source"],
+            )
             result.append(
-                entry["pool"].as_strided(entry["shape"], entry["strides"], start)
+                entry["pool"].as_strided(
+                    entry["shape"],
+                    entry["strides"],
+                    start,
+                ),
             )
 
         for entry in self._output_entries:
             start = idx * entry["stride_numel"]
             entry["pool"].narrow(0, start, entry["storage_span"]).zero_()
             result.append(
-                entry["pool"].as_strided(entry["shape"], entry["strides"], start)
+                entry["pool"].as_strided(
+                    entry["shape"],
+                    entry["strides"],
+                    start,
+                ),
             )
 
         self._call_idx += 1

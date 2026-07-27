@@ -47,7 +47,6 @@ def build_decision_sidecar(
     Derives hints via :func:`derive_decision_hints` and aggregates them into a
     ``sol_execbench.decision.v2`` sidecar. Never re-asserts benchmark authority.
     """
-
     hints = derive_decision_hints(footprints, budget)
     status, reason_code = _aggregate(footprints, budget)
     architecture = budget.architecture if budget is not None else None
@@ -88,14 +87,23 @@ def _aggregate(
             DecisionReasonCode.NO_DECISION_INPUTS,
         )
     if budget is None:
-        return DiagnosticSidecarStatus.PARTIAL, DecisionReasonCode.PARTIAL_DECISION
-    return DiagnosticSidecarStatus.AVAILABLE, DecisionReasonCode.DECISION_RENDERED
+        return (
+            DiagnosticSidecarStatus.PARTIAL,
+            DecisionReasonCode.PARTIAL_DECISION,
+        )
+    return (
+        DiagnosticSidecarStatus.AVAILABLE,
+        DecisionReasonCode.DECISION_RENDERED,
+    )
 
 
 def _source_refs(budget: ArchIsaBudget | None) -> list[DiagnosticSourceRef]:
     budget_status = "available" if budget is not None else "unavailable"
     return [
-        DiagnosticSourceRef(kind="static_evidence", label="static_resource_footprints"),
+        DiagnosticSourceRef(
+            kind="static_evidence",
+            label="static_resource_footprints",
+        ),
         DiagnosticSourceRef(
             kind="environment",
             label="arch_capability_budget",
@@ -113,11 +121,11 @@ def _limitations(budget: ArchIsaBudget | None) -> list[str]:
     if budget is not None and budget.register_allocation_model == "dynamic":
         limitations.append(
             f"Static Layer R derivation unavailable on {budget.architecture} "
-            "(dynamic register allocation); profile at runtime for resource limits."
+            "(dynamic register allocation); profile at runtime for resource limits.",
         )
     if budget is None:
         limitations.append(
             "No arch capability budget matched the detected gfx target; only "
-            "spill signals are derived."
+            "spill signals are derived.",
         )
     return limitations

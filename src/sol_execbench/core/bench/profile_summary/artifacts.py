@@ -12,7 +12,9 @@ from pathlib import Path
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.bench.profile_summary.hints import derive_bottleneck_hints
+from sol_execbench.core.bench.profile_summary.hints import (
+    derive_bottleneck_hints,
+)
 from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryBottleneckHint,
     ProfileSummaryKernelMetric,
@@ -24,7 +26,6 @@ from sol_execbench.core.bench.rocm_profiler import (
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
-
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 _PROFILE_SUMMARY_MAX_PARSE_BYTES = 1_000_000
 _PROFILE_SUMMARY_MAX_ROWS = 10_000
@@ -35,9 +36,15 @@ class StructuredProfileEvidence(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    workload_metrics: list[ProfileSummaryStructuredMetric] = Field(default_factory=list)
-    kernel_metrics: list[ProfileSummaryKernelMetric] = Field(default_factory=list)
-    bottleneck_hints: list[ProfileSummaryBottleneckHint] = Field(default_factory=list)
+    workload_metrics: list[ProfileSummaryStructuredMetric] = Field(
+        default_factory=list,
+    )
+    kernel_metrics: list[ProfileSummaryKernelMetric] = Field(
+        default_factory=list,
+    )
+    bottleneck_hints: list[ProfileSummaryBottleneckHint] = Field(
+        default_factory=list,
+    )
     parse_warnings: list[str] = Field(default_factory=list)
 
 
@@ -45,7 +52,6 @@ def structured_profile_evidence(
     profile_result: Rocprofv3ProfileResult,
 ) -> StructuredProfileEvidence:
     """Parse bounded structured profile evidence from registered artifacts."""
-
     workload_id = _metadata_workload_id(profile_result)
     workload_metrics = [
         ProfileSummaryStructuredMetric(
@@ -54,7 +60,7 @@ def structured_profile_evidence(
             source="rocprofv3_profile_metadata",
             workload_id=workload_id,
             parse_status="available",
-        )
+        ),
     ]
     kernel_metrics: list[ProfileSummaryKernelMetric] = []
     parse_warnings: list[str] = []
@@ -65,7 +71,9 @@ def structured_profile_evidence(
             kernel_metrics.extend(parsed_metrics)
             parse_warnings.extend(warnings)
         elif artifact.kind is Rocprofv3ArtifactKind.COUNTER_CSV:
-            parsed_metrics, warnings = _parse_counter_csv_artifact(artifact.path)
+            parsed_metrics, warnings = _parse_counter_csv_artifact(
+                artifact.path,
+            )
             kernel_metrics.extend(parsed_metrics)
             parse_warnings.extend(warnings)
         elif artifact.kind is Rocprofv3ArtifactKind.AGENT_INFO_CSV:
@@ -86,11 +94,11 @@ def structured_profile_evidence(
         }:
             parse_warnings.append(
                 f"{artifact.path.name}: {artifact.kind} artifacts are "
-                "citation-only in sol_execbench.profile_summary.v3"
+                "citation-only in sol_execbench.profile_summary.v3",
             )
         elif artifact.kind is Rocprofv3ArtifactKind.OTHER:
             parse_warnings.append(
-                f"{artifact.path.name}: unsupported profiler artifact kind other"
+                f"{artifact.path.name}: unsupported profiler artifact kind other",
             )
 
     return StructuredProfileEvidence(
@@ -155,7 +163,7 @@ def _parse_trace_csv_artifact(
                 unit="ms",
                 source=path.name,
                 artifact=path.name,
-            )
+            ),
         )
     return metrics, warnings
 
@@ -172,7 +180,9 @@ def _parse_counter_csv_artifact(
         if name is None or value is None:
             continue
         unit = _first_text(normalized, "unit", "units")
-        kernel_name = _first_text(normalized, "kernel", "kernelname") or path.stem
+        kernel_name = (
+            _first_text(normalized, "kernel", "kernelname") or path.stem
+        )
         metrics.append(
             ProfileSummaryKernelMetric(
                 kernel_name=kernel_name,
@@ -181,7 +191,7 @@ def _parse_counter_csv_artifact(
                 unit=unit,
                 source=path.name,
                 artifact=path.name,
-            )
+            ),
         )
     return metrics, warnings
 
@@ -222,7 +232,7 @@ def _parse_metadata_json_artifact(
                     workload_id=source_workload_id,
                     artifact=path.name,
                     parse_status="available",
-                )
+                ),
             )
             break
     return metrics, []
@@ -243,7 +253,7 @@ def _parse_limited_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
                             f"{path.name}: CSV row limit reached; metrics are "
                             f"derived from the first {_PROFILE_SUMMARY_MAX_ROWS} "
                             f"rows only and may be incomplete"
-                        )
+                        ),
                     ]
                 rows.append({key or "": value for key, value in row.items()})
             return rows, []
@@ -285,7 +295,6 @@ def _first_number(row: dict[str, str], *keys: str) -> int | float | None:
 
 def _finite_or_none(value: int | float) -> int | float | None:
     """Pass through finite numbers; reject NaN/Inf so they never reach sidecar JSON."""
-
     return value if math.isfinite(value) else None
 
 

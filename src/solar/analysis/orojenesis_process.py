@@ -52,7 +52,8 @@ def run_mapper_process(
     _bound_log(stderr_path)
     if timeout_error is not None:
         raise subprocess.TimeoutExpired(command, timeout) from timeout_error
-    assert returncode is not None
+    if returncode is None:
+        raise RuntimeError("mapper process ended without a return code")
     return subprocess.CompletedProcess(list(command), returncode, None, None)
 
 

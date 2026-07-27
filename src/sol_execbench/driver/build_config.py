@@ -42,7 +42,7 @@ def get_local_gfx(
         target = first_gfx_target(out.splitlines())
         if target:
             return target
-    except Exception:
+    except Exception:  # noqa: BLE001 -- injectable probe fallback
         pass
 
     rocminfo = resolve_tool("rocminfo")
@@ -53,7 +53,7 @@ def get_local_gfx(
             stderr=subprocess.DEVNULL,
         )
         return first_gfx_target(out.splitlines())
-    except Exception:
+    except Exception:  # noqa: BLE001 -- injectable probe fallback
         return None
 
 

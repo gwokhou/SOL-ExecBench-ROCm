@@ -16,6 +16,6 @@
 
 """Benchmark configuration for SOL ExecBench evaluation."""
 
-from .benchmark_config import BenchmarkConfig
+from sol_execbench.core.bench.config.benchmark_config import BenchmarkConfig
 
 __all__ = ["BenchmarkConfig"]

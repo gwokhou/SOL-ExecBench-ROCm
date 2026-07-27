@@ -8,7 +8,7 @@ import torch
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.solar_bridge import analyzer
+from sol_execbench.core.solar_bridge import analyzer, workload_context
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
@@ -16,8 +16,9 @@ from sol_execbench.core.solar_bridge.models import (
     SolarWorkerRequest,
     formal_precision_for_definition,
 )
-from sol_execbench.core.solar_bridge.workload_context import SolarWorkloadContext
-from sol_execbench.core.solar_bridge import workload_context
+from sol_execbench.core.solar_bridge.workload_context import (
+    SolarWorkloadContext,
+)
 from solar.api import AnalysisFailure, AnalysisResult, ArtifactRef, SolBound
 
 _FORMAL_ARTIFACTS = tuple(
@@ -53,7 +54,10 @@ def _workload() -> Workload:
         max_error_cap=None,
         allow_negative_inf=False,
     )
-    return cast(Workload, SimpleNamespace(uuid="workload-1", tolerance=tolerance))
+    return cast(
+        Workload,
+        SimpleNamespace(uuid="workload-1", tolerance=tolerance),
+    )
 
 
 def _context() -> SolarWorkloadContext:
@@ -65,7 +69,10 @@ def _context() -> SolarWorkloadContext:
     )
 
 
-def test_analyze_workload_adapts_outer_models_to_solar(tmp_path, monkeypatch) -> None:
+def test_analyze_workload_adapts_outer_models_to_solar(
+    tmp_path,
+    monkeypatch,
+) -> None:
     problem = tmp_path / "problem"
     problem.mkdir()
     (problem / "definition.json").write_text("{}")
@@ -86,7 +93,12 @@ def test_analyze_workload_adapts_outer_models_to_solar(tmp_path, monkeypatch) ->
     observed: dict[str, object] = {}
 
     monkeypatch.setattr(analyzer, "_require_formal_device", lambda device: None)
-    context = SolarWorkloadContext(definition, workload, reference, input_factory)
+    context = SolarWorkloadContext(
+        definition,
+        workload,
+        reference,
+        input_factory,
+    )
     monkeypatch.setattr(
         analyzer,
         "load_solar_workload_context",
@@ -112,10 +124,13 @@ def test_analyze_workload_adapts_outer_models_to_solar(tmp_path, monkeypatch) ->
 
 
 def test_invoke_solar_maps_failure_without_claiming_bound(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        analyzer, "formal_precision_for_definition", lambda value: "fp16"
+        analyzer,
+        "formal_precision_for_definition",
+        lambda value: "fp16",
     )
     monkeypatch.setattr(
         "solar.api.analyze",
@@ -141,11 +156,14 @@ def test_invoke_solar_maps_failure_without_claiming_bound(
 
 
 def test_invoke_solar_maps_successful_bound_and_artifacts(
-    tmp_path, monkeypatch
+    tmp_path,
+    monkeypatch,
 ) -> None:
     result_dir = tmp_path / "result"
     monkeypatch.setattr(
-        analyzer, "formal_precision_for_definition", lambda value: "fp16"
+        analyzer,
+        "formal_precision_for_definition",
+        lambda value: "fp16",
     )
 
     def fake_analyze(request):
@@ -156,7 +174,11 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
             output_dir=result_dir,
             architecture_sha256="a" * 64,
             artifacts=_FORMAL_ARTIFACTS,
-            bound=SolBound(0.001, "capacity_constrained_tile_aware_v1", "memory"),
+            bound=SolBound(
+                0.001,
+                "capacity_constrained_tile_aware_v1",
+                "memory",
+            ),
         )
 
     monkeypatch.setattr("solar.api.analyze", fake_analyze)
@@ -181,7 +203,9 @@ def test_invoke_solar_rejects_non_formal_result(tmp_path, monkeypatch) -> None:
     result_dir = tmp_path / "result"
     result_dir.mkdir()
     monkeypatch.setattr(
-        analyzer, "formal_precision_for_definition", lambda value: "fp16"
+        analyzer,
+        "formal_precision_for_definition",
+        lambda value: "fp16",
     )
     monkeypatch.setattr(
         "solar.api.analyze",
@@ -211,7 +235,10 @@ def test_invoke_solar_rejects_non_formal_result(tmp_path, monkeypatch) -> None:
 def test_select_workload_requires_exact_uuid_match() -> None:
     workload = _workload()
 
-    assert workload_context._select_workload([workload], "workload-1") == (0, workload)
+    assert workload_context._select_workload([workload], "workload-1") == (
+        0,
+        workload,
+    )
     with pytest.raises(ValueError, match="match exactly once"):
         workload_context._select_workload([workload, workload], "workload-1")
 

@@ -22,24 +22,26 @@ import sys
 from pathlib import Path
 
 import pytest
-
-from sol_execbench.core.bench import clock_lock as clock_lock_module
-from sol_execbench.core.bench.clock_lock import ClockLockLease
-from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
-from sol_execbench.core import (
-    BenchmarkConfig,
-    Definition,
-    Solution,
-    Trace,
-    Workload,
-)
-from sol_execbench.driver import problem_packager
-from sol_execbench.driver.problem_packager import ProblemPackager, _get_local_gfx
 from sol_execbench_type_helpers import (
     JsonDict,
     make_definition,
     make_solution,
     make_workload,
+)
+
+from sol_execbench.core import (
+    BenchmarkConfig,
+    Definition,
+    Solution,
+    Workload,
+)
+from sol_execbench.core.bench import clock_lock as clock_lock_module
+from sol_execbench.core.bench.clock_lock import ClockLockLease
+from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
+from sol_execbench.driver import problem_packager
+from sol_execbench.driver.problem_packager import (
+    ProblemPackager,
+    _get_local_gfx,
 )
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -78,7 +80,9 @@ _PYTHON_SOLUTION_DICT: JsonDict = {
         "target_hardware": ["LOCAL"],
         "entry_point": "kernel.py::run",
     },
-    "sources": [{"path": "kernel.py", "content": "def run(x, y):\n    return x + y\n"}],
+    "sources": [
+        {"path": "kernel.py", "content": "def run(x, y):\n    return x + y\n"},
+    ],
 }
 
 _HIP_SOLUTION_DICT: JsonDict = {
@@ -145,67 +149,138 @@ def _make_packager(
 
 class TestInit:
     def test_definition_json_redacts_worker_only_reference(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
         path = pkg.output_dir / "definition.json"
         assert path.exists()
         candidate_definition = json.loads(path.read_text())
         trusted_definition = json.loads(
-            (pkg.output_dir / TRUSTED_DEFINITION_FILE).read_text()
+            (pkg.output_dir / TRUSTED_DEFINITION_FILE).read_text(),
         )
         assert candidate_definition["name"] == "test_vecadd"
         assert candidate_definition["reference"] != definition.reference
         assert trusted_definition["reference"] == definition.reference
 
     def test_workload_jsonl_written(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
         path = pkg.output_dir / "workload.jsonl"
         assert path.exists()
         lines = [l for l in path.read_text().splitlines() if l.strip()]
         assert len(lines) == 2
 
     def test_solution_json_written(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
         path = pkg.output_dir / "solution.json"
         assert path.exists()
         assert json.loads(path.read_text())["name"] == "vecadd_python"
 
     def test_config_json_written(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
         path = pkg.output_dir / "config.json"
         assert path.exists()
         parsed = json.loads(path.read_text())
         assert parsed["lock_clocks"] is False
 
     def test_python_sources_written(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
         kernel = pkg.output_dir / "kernel.py"
         assert kernel.exists()
         assert "def run(x, y):" in kernel.read_text()
 
     def test_hip_sources_written(
-        self, tmp_path, definition, workloads, hip_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        hip_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            hip_solution,
+            config,
+        )
         kernel = pkg.output_dir / "kernel.hip"
         assert kernel.exists()
         assert "HIP kernel" in kernel.read_text()
 
     def test_safetensors_blob_staged_from_repo_root(
-        self, tmp_path, definition, python_solution, config, monkeypatch
+        self,
+        tmp_path,
+        definition,
+        python_solution,
+        config,
+        monkeypatch,
     ):
         repo_root = tmp_path / "repo"
         blob_path = Path(
-            "data/flashinfer-trace/blob/workloads/gqa_paged/example.safetensors"
+            "data/flashinfer-trace/blob/workloads/gqa_paged/example.safetensors",
         )
         source = repo_root / blob_path
         source.parent.mkdir(parents=True)
@@ -224,26 +299,41 @@ class TestInit:
                     },
                     "y": {"type": "random"},
                 },
-            )
+            ),
         ]
 
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
 
         staged = pkg.output_dir / blob_path
         assert staged.exists()
         assert staged.read_bytes() == b"blob"
 
     def test_safetensors_blob_staged_from_flashinfer_trace_env(
-        self, tmp_path, definition, python_solution, config, monkeypatch
+        self,
+        tmp_path,
+        definition,
+        python_solution,
+        config,
+        monkeypatch,
     ):
         trace_root = tmp_path / "flashinfer-trace"
         blob_path = Path(
-            "data/flashinfer-trace/blob/workloads/gqa_paged/example.safetensors"
+            "data/flashinfer-trace/blob/workloads/gqa_paged/example.safetensors",
         )
         source = trace_root / "blob/workloads/gqa_paged/example.safetensors"
         source.parent.mkdir(parents=True)
         source.write_bytes(b"env-blob")
-        monkeypatch.setattr(problem_packager, "_repo_root", lambda: tmp_path / "repo")
+        monkeypatch.setattr(
+            problem_packager,
+            "_repo_root",
+            lambda: tmp_path / "repo",
+        )
         monkeypatch.setenv("FLASHINFER_TRACE_DIR", trace_root.as_posix())
 
         workloads = [
@@ -258,21 +348,36 @@ class TestInit:
                     },
                     "y": {"type": "random"},
                 },
-            )
+            ),
         ]
 
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
 
         staged = pkg.output_dir / blob_path
         assert staged.exists()
         assert staged.read_bytes() == b"env-blob"
 
     def test_missing_safetensors_blob_does_not_block_packaging(
-        self, tmp_path, definition, python_solution, config, monkeypatch
+        self,
+        tmp_path,
+        definition,
+        python_solution,
+        config,
+        monkeypatch,
     ):
-        monkeypatch.setattr(problem_packager, "_repo_root", lambda: tmp_path / "repo")
+        monkeypatch.setattr(
+            problem_packager,
+            "_repo_root",
+            lambda: tmp_path / "repo",
+        )
         blob_path = Path(
-            "data/flashinfer-trace/blob/workloads/gqa_paged/missing.safetensors"
+            "data/flashinfer-trace/blob/workloads/gqa_paged/missing.safetensors",
         )
         workloads = [
             make_workload(
@@ -286,17 +391,28 @@ class TestInit:
                     },
                     "y": {"type": "random"},
                 },
-            )
+            ),
         ]
 
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
 
         assert not (pkg.output_dir / blob_path).exists()
 
 
 class TestCleanup:
     def test_close_removes_staging_when_not_kept(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
         pkg = _make_packager(
             tmp_path,
@@ -314,7 +430,12 @@ class TestCleanup:
         assert not output_dir.exists()
 
     def test_close_is_idempotent(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
         pkg = _make_packager(
             tmp_path,
@@ -331,7 +452,12 @@ class TestCleanup:
         assert not pkg.output_dir.exists()
 
     def test_close_preserves_staging_when_kept(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
         pkg = _make_packager(
             tmp_path,
@@ -348,7 +474,12 @@ class TestCleanup:
         assert output_dir.exists()
 
     def test_context_manager_cleans_up(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
         output_dir = tmp_path / "staging"
 
@@ -370,26 +501,59 @@ class TestCleanup:
 
 class TestCompile:
     def test_returns_command_and_artifact_path(
-        self, tmp_path, definition, workloads, hip_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        hip_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            hip_solution,
+            config,
+        )
         cmd, artifact_path = pkg.compile()
         assert cmd == [sys.executable, "build_ext.py"]
         assert artifact_path.endswith("benchmark_kernel.so")
 
     def test_build_ext_staged(
-        self, tmp_path, definition, workloads, hip_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        hip_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            hip_solution,
+            config,
+        )
         pkg.compile()
         build_ext = pkg.output_dir / "build_ext.py"
         assert build_ext.exists()
         ast.parse(build_ext.read_text())
 
     def test_offload_arch_injected_for_gfx1200(
-        self, tmp_path, definition, workloads, hip_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        hip_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            hip_solution,
+            config,
+        )
         pkg.compile()
         sol = json.loads((pkg.output_dir / "solution.json").read_text())
         hip_cflags = sol["spec"]["compile_options"]["hip_cflags"]
@@ -397,7 +561,12 @@ class TestCompile:
 
     @pytest.mark.parametrize("target", ["gfx940", "gfx941", "gfx942"])
     def test_offload_arch_injected_for_cdna3_targets(
-        self, tmp_path, definition, workloads, config, target
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        config,
+        target,
     ):
         sol_dict = {
             **_HIP_SOLUTION_DICT,
@@ -414,7 +583,11 @@ class TestCompile:
         assert hip_cflags == [f"--offload-arch={target}", "-O3"]
 
     def test_offload_arch_injected_for_multiple_explicit_amd_targets(
-        self, tmp_path, definition, workloads, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        config,
     ):
         sol_dict = {
             **_HIP_SOLUTION_DICT,
@@ -428,10 +601,18 @@ class TestCompile:
         pkg.compile()
         sol = json.loads((pkg.output_dir / "solution.json").read_text())
         hip_cflags = sol["spec"]["compile_options"]["hip_cflags"]
-        assert hip_cflags == ["--offload-arch=gfx1200", "--offload-arch=gfx942", "-O3"]
+        assert hip_cflags == [
+            "--offload-arch=gfx1200",
+            "--offload-arch=gfx942",
+            "-O3",
+        ]
 
     def test_offload_arch_not_duplicated_when_explicit(
-        self, tmp_path, definition, workloads, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        config,
     ):
         sol_dict = {
             **_HIP_SOLUTION_DICT,
@@ -448,7 +629,12 @@ class TestCompile:
         assert hip_cflags == ["--offload-arch=gfx1200"]
 
     def test_offload_arch_injected_for_local_target(
-        self, tmp_path, definition, workloads, config, monkeypatch
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        config,
+        monkeypatch,
     ):
         sol_dict = {
             **_HIP_SOLUTION_DICT,
@@ -457,7 +643,11 @@ class TestCompile:
                 "target_hardware": ["LOCAL"],
             },
         }
-        monkeypatch.setattr(problem_packager, "_get_local_gfx", lambda: "gfx1200")
+        monkeypatch.setattr(
+            problem_packager,
+            "_get_local_gfx",
+            lambda: "gfx1200",
+        )
         solution = make_solution(**sol_dict)
         pkg = _make_packager(tmp_path, definition, workloads, solution, config)
         pkg.compile()
@@ -465,11 +655,22 @@ class TestCompile:
         hip_cflags = sol["spec"]["compile_options"]["hip_cflags"]
         assert hip_cflags == ["--offload-arch=gfx1200", "-O3"]
 
-    def test_asserts_on_python_solution(
-        self, tmp_path, definition, workloads, python_solution, config
+    def test_rejects_python_solution(
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
-        with pytest.raises(AssertionError, match="HIP/C\\+\\+"):
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
+        with pytest.raises(ValueError, match="HIP/C\\+\\+"):
             pkg.compile()
 
 
@@ -478,16 +679,38 @@ class TestCompile:
 
 class TestExecute:
     def test_returns_command(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
         cmd = pkg.execute()
         assert cmd == [sys.executable, "evaluation_orchestrator.py"]
 
     def test_eval_driver_staged(
-        self, tmp_path, definition, workloads, python_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
         pkg.execute()
         driver = pkg.output_dir / "eval_driver.py"
         assert driver.exists()
@@ -498,7 +721,12 @@ class TestExecute:
             ast.parse(template.read_text())
 
     def test_lock_clocks_is_managed_for_evaluator_lifecycle(
-        self, tmp_path, definition, workloads, python_solution, monkeypatch
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        monkeypatch,
     ):
         calls: list[str] = []
         monkeypatch.setattr(
@@ -528,7 +756,12 @@ class TestExecute:
         assert "SOL_EXECBENCH_CLOCKS_LOCKED" not in problem_packager.os.environ
 
     def test_preserves_prelocked_clocks_for_evaluator_lifecycle(
-        self, tmp_path, definition, workloads, python_solution, monkeypatch
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        monkeypatch,
     ):
         calls: list[str] = []
         monkeypatch.setattr(
@@ -558,13 +791,21 @@ class TestExecute:
         assert "SOL_EXECBENCH_CLOCKS_LOCKED" not in problem_packager.os.environ
 
     def test_repeated_execute_keeps_original_lock_ownership(
-        self, tmp_path, definition, workloads, python_solution, monkeypatch
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        monkeypatch,
     ):
         calls: list[str] = []
         monkeypatch.setattr(
             problem_packager,
             "acquire_clock_lock",
-            lambda: calls.append("lock") or ClockLockLease(locked=True, acquired=True),
+            lambda: (
+                calls.append("lock")
+                or ClockLockLease(locked=True, acquired=True)
+            ),
         )
         monkeypatch.setattr(
             clock_lock_module,
@@ -586,7 +827,12 @@ class TestExecute:
         assert calls == ["lock", "unlock"]
 
     def test_failed_reset_is_reported_and_close_can_retry(
-        self, tmp_path, definition, workloads, python_solution, monkeypatch
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        monkeypatch,
     ):
         monkeypatch.setattr(
             problem_packager,
@@ -594,7 +840,11 @@ class TestExecute:
             lambda: ClockLockLease(locked=True, acquired=True),
         )
         outcomes = iter((False, True))
-        monkeypatch.setattr(clock_lock_module, "unlock_clocks", lambda: next(outcomes))
+        monkeypatch.setattr(
+            clock_lock_module,
+            "unlock_clocks",
+            lambda: next(outcomes),
+        )
         pkg = _make_packager(
             tmp_path,
             definition,
@@ -609,16 +859,38 @@ class TestExecute:
         pkg.close()
 
     def test_raises_without_so_for_cpp(
-        self, tmp_path, definition, workloads, hip_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        hip_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            hip_solution,
+            config,
+        )
         with pytest.raises(FileNotFoundError, match="benchmark_kernel.so"):
             pkg.execute()
 
     def test_succeeds_with_so_for_cpp(
-        self, tmp_path, definition, workloads, hip_solution, config
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        hip_solution,
+        config,
     ):
-        pkg = _make_packager(tmp_path, definition, workloads, hip_solution, config)
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            hip_solution,
+            config,
+        )
         # Simulate a compiled artifact.
         (pkg.output_dir / "benchmark_kernel.so").write_bytes(b"\x00")
         cmd = pkg.execute()
@@ -633,10 +905,13 @@ class TestLocalGfxDetection:
             return "gfx000\ngfx1200\n"
 
         monkeypatch.setattr(
-            problem_packager.subprocess, "check_output", fake_check_output
+            problem_packager.subprocess,
+            "check_output",
+            fake_check_output,
         )
         monkeypatch.setattr(
-            "sol_execbench.driver.build_config.resolve_rocm_tool", lambda _tool: None
+            "sol_execbench.driver.build_config.resolve_rocm_tool",
+            lambda _tool: None,
         )
         assert _get_local_gfx() == "gfx1200"
 
@@ -648,10 +923,13 @@ class TestLocalGfxDetection:
             return "Agent 2\n  Name:                    gfx1200\n"
 
         monkeypatch.setattr(
-            problem_packager.subprocess, "check_output", fake_check_output
+            problem_packager.subprocess,
+            "check_output",
+            fake_check_output,
         )
         monkeypatch.setattr(
-            "sol_execbench.driver.build_config.resolve_rocm_tool", lambda _tool: None
+            "sol_execbench.driver.build_config.resolve_rocm_tool",
+            lambda _tool: None,
         )
         assert _get_local_gfx() == "gfx1200"
 
@@ -662,76 +940,12 @@ class TestLocalGfxDetection:
             return "Name: CPU\n"
 
         monkeypatch.setattr(
-            problem_packager.subprocess, "check_output", fake_check_output
+            problem_packager.subprocess,
+            "check_output",
+            fake_check_output,
         )
         monkeypatch.setattr(
-            "sol_execbench.driver.build_config.resolve_rocm_tool", lambda _tool: None
+            "sol_execbench.driver.build_config.resolve_rocm_tool",
+            lambda _tool: None,
         )
         assert _get_local_gfx() is None
-
-
-# ── convert_stdout_to_traces() ────────────────────────────────────────────────
-
-
-class TestConvertStdoutToTraces:
-    def _make_trace_json(self, uuid: str = "wkl-0001") -> str:
-        return json.dumps(
-            {
-                "definition": "test_vecadd",
-                "workload": {
-                    "axes": {},
-                    "inputs": {"x": {"type": "random"}, "y": {"type": "random"}},
-                    "uuid": uuid,
-                },
-                "solution": "vecadd_python",
-                "evaluation": {
-                    "status": "PASSED",
-                    "environment": {"hardware": "AMD Instinct MI300X (gfx942)"},
-                    "timestamp": "2026-01-01T00:00:00",
-                    "correctness": {
-                        "max_absolute_error": 0.0,
-                        "max_relative_error": 0.0,
-                    },
-                    "performance": {
-                        "latency_ms": 0.1,
-                        "reference_latency_ms": 0.2,
-                        "speedup_factor": 2.0,
-                    },
-                },
-            }
-        )
-
-    def test_parses_single_trace(
-        self, tmp_path, definition, workloads, python_solution, config
-    ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
-        stdout = self._make_trace_json()
-        traces = pkg.convert_stdout_to_traces(stdout)
-        assert len(traces) == 1
-        assert isinstance(traces[0], Trace)
-        assert traces[0].definition == "test_vecadd"
-
-    def test_parses_multiple_traces(
-        self, tmp_path, definition, workloads, python_solution, config
-    ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
-        stdout = (
-            self._make_trace_json("wkl-0001") + "\n" + self._make_trace_json("wkl-0002")
-        )
-        traces = pkg.convert_stdout_to_traces(stdout)
-        assert len(traces) == 2
-
-    def test_skips_non_json_lines(
-        self, tmp_path, definition, workloads, python_solution, config
-    ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
-        stdout = "some library noise\n" + self._make_trace_json() + "\nmore noise\n"
-        traces = pkg.convert_stdout_to_traces(stdout)
-        assert len(traces) == 1
-
-    def test_returns_empty_for_no_traces(
-        self, tmp_path, definition, workloads, python_solution, config
-    ):
-        pkg = _make_packager(tmp_path, definition, workloads, python_solution, config)
-        traces = pkg.convert_stdout_to_traces("no json here\njust noise\n")
-        assert traces == []

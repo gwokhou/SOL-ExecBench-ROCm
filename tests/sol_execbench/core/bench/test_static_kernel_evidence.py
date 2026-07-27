@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -26,18 +26,17 @@ from sol_execbench.core.bench.static_kernel.evidence import (
     collect_static_kernel_artifacts,
     run_static_kernel_extractors,
 )
+from sol_execbench.core.bench.static_kernel.extractor_routing import (
+    extractor_command,
+    static_extractor_tool_ids,
+)
 from sol_execbench.core.bench.static_kernel.status import (
     ExtractorReasonVocabulary,
     ExtractorStatusVocabulary,
     aggregate_extractor_reason_value,
     aggregate_extractor_status_value,
 )
-from sol_execbench.core.bench.static_kernel.extractor_routing import (
-    extractor_command,
-    static_extractor_tool_ids,
-)
 from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
-
 
 EXPECTED_STATUSES = {
     "collected",
@@ -148,7 +147,7 @@ def _representative_sidecar() -> StaticKernelEvidenceSidecar:
                     detected_architectures=["gfx1200", "gfx942"],
                     symbol_count=3,
                 ),
-            )
+            ),
         ],
         tool_runs=[
             StaticKernelEvidenceToolRun(
@@ -158,7 +157,7 @@ def _representative_sidecar() -> StaticKernelEvidenceSidecar:
                 reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
                 returncode=0,
                 stdout_tail="kernel symbols",
-            )
+            ),
         ],
     )
 
@@ -168,7 +167,9 @@ def test_static_kernel_evidence_round_trips_strict_json_payload():
     payload = sidecar.model_dump(mode="json")
 
     assert payload["schema_version"] == STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
-    assert payload["schema_version"] == "sol_execbench.static_kernel_evidence.v3"
+    assert (
+        payload["schema_version"] == "sol_execbench.static_kernel_evidence.v3"
+    )
     assert StaticKernelEvidenceSidecar.model_validate(payload) == sidecar
 
 
@@ -187,7 +188,9 @@ def test_static_kernel_evidence_rejects_unknown_top_level_and_nested_fields():
 
 
 def test_status_and_reason_code_vocabularies_are_locked():
-    assert {status.value for status in StaticKernelEvidenceStatus} == EXPECTED_STATUSES
+    assert {
+        status.value for status in StaticKernelEvidenceStatus
+    } == EXPECTED_STATUSES
     assert {reason.value for reason in StaticKernelEvidenceReasonCode} == (
         EXPECTED_REASON_CODES
     )
@@ -212,10 +215,21 @@ def test_static_extractor_status_helpers_cover_aggregate_outcomes():
         command=[],
     )
 
-    assert _aggregate_status([collected]) == StaticKernelEvidenceStatus.COLLECTED
-    assert _aggregate_status([collected, failed]) == StaticKernelEvidenceStatus.PARTIAL
-    assert _aggregate_status([failed, timeout]) == StaticKernelEvidenceStatus.FAILED
-    assert _aggregate_status([unavailable]) == StaticKernelEvidenceStatus.UNAVAILABLE
+    assert (
+        _aggregate_status([collected]) == StaticKernelEvidenceStatus.COLLECTED
+    )
+    assert (
+        _aggregate_status([collected, failed])
+        == StaticKernelEvidenceStatus.PARTIAL
+    )
+    assert (
+        _aggregate_status([failed, timeout])
+        == StaticKernelEvidenceStatus.FAILED
+    )
+    assert (
+        _aggregate_status([unavailable])
+        == StaticKernelEvidenceStatus.UNAVAILABLE
+    )
     assert _aggregate_reason([collected, failed]) == (
         StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA
     )
@@ -225,10 +239,10 @@ def test_static_extractor_status_helpers_cover_aggregate_outcomes():
 
 
 def test_aggregate_does_not_mask_failure_when_mixed_with_unavailable():
-    """A real extractor failure (command ran, failed) mixed with a run whose
-    toolchain was unavailable must surface as FAILED -- not be masked as
-    UNAVAILABLE. The unavailable run here carries a command (executable) but
-    its toolchain was reported missing, mirroring _tool_run_from_route_decision.
+    """Keep a real extractor failure visible beside an unavailable tool.
+
+    The unavailable run carries a command but reports a missing toolchain,
+    mirroring the route-decision conversion.
     """
     failed = _tool_run(
         StaticKernelEvidenceStatus.FAILED,
@@ -257,8 +271,8 @@ def test_aggregate_does_not_mask_failure_when_mixed_with_unavailable():
                     StaticKernelEvidenceStatus.UNAVAILABLE,
                     StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
                     command=[],
-                )
-            ]
+                ),
+            ],
         )
         == StaticKernelEvidenceStatus.UNAVAILABLE
     )
@@ -295,7 +309,11 @@ def test_authority_fields_are_diagnostic_only_and_false_for_benchmark_truth():
             "unsupported_solution_type",
         ),
         (build_static_kernel_evidence_failed, "failed", "extractor_failed"),
-        (build_static_kernel_evidence_partial, "partial", "partial_artifact_metadata"),
+        (
+            build_static_kernel_evidence_partial,
+            "partial",
+            "partial_artifact_metadata",
+        ),
     ],
 )
 def test_non_collected_helpers_return_full_sidecars_with_stable_empty_sections(
@@ -355,7 +373,9 @@ def test_static_artifact_collection_persists_current_build_manifest(tmp_path):
 
     assert payload["status"] == "collected"
     assert payload["reason_code"] == "static_evidence_collected"
-    artifacts = {artifact["source_path"]: artifact for artifact in payload["artifacts"]}
+    artifacts = {
+        artifact["source_path"]: artifact for artifact in payload["artifacts"]
+    }
     assert set(artifacts) == set(files)
     assert artifacts["benchmark_kernel.so"]["artifact_type"] == "shared_library"
     assert artifacts["kernel.hsaco"]["artifact_type"] == "hsaco"
@@ -372,7 +392,9 @@ def test_static_artifact_collection_persists_current_build_manifest(tmp_path):
         assert artifact["producer"] == "hip_cpp_build"
         assert artifact["target_architecture"] == "gfx1200"
         assert artifact["classification"]["metadata_present"] is True
-        assert artifact["classification"]["detected_architectures"] == ["gfx1200"]
+        assert artifact["classification"]["detected_architectures"] == [
+            "gfx1200",
+        ]
         assert artifact["persisted_path"].startswith("artifacts/")
 
     assert artifacts["benchmark_kernel.so"]["inspectable"] is True
@@ -433,11 +455,13 @@ def test_static_artifact_collection_skips_nested_evidence_directory(tmp_path):
     )
 
     assert [artifact.source_path for artifact in sidecar.artifacts] == [
-        "benchmark_kernel.so"
+        "benchmark_kernel.so",
     ]
 
 
-def test_static_artifact_collection_can_use_explicit_artifact_manifest(tmp_path):
+def test_static_artifact_collection_can_use_explicit_artifact_manifest(
+    tmp_path,
+):
     build_dir = tmp_path / "staging"
     evidence_dir = tmp_path / "evidence"
     build_dir.mkdir()
@@ -462,7 +486,7 @@ def test_static_artifact_collection_can_use_explicit_artifact_manifest(tmp_path)
                     {"path": "notes.md"},
                     {"path": "../outside.hsaco"},
                 ],
-            }
+            },
         ),
         encoding="utf-8",
     )
@@ -486,7 +510,7 @@ def test_static_artifact_collection_can_use_explicit_artifact_manifest(tmp_path)
             "description": (
                 "Build artifact manifest used to select current-build static artifacts."
             ),
-        }
+        },
     ]
     assert payload["score_authority"] is False
     assert not (evidence_dir / "artifacts" / "unlisted" / "kernel.o").exists()
@@ -503,7 +527,7 @@ def test_static_artifact_manifest_rejects_unsupported_schema(tmp_path):
             {
                 "schema_version": "unsupported",
                 "artifacts": [{"path": "benchmark_kernel.so"}],
-            }
+            },
         ),
         encoding="utf-8",
     )
@@ -558,7 +582,9 @@ def _which(binary: str) -> str | None:
     }.get(binary)
 
 
-def test_static_extractor_runs_routed_objdump_and_readelf_with_raw_outputs(tmp_path):
+def test_static_extractor_runs_routed_objdump_and_readelf_with_raw_outputs(
+    tmp_path,
+):
     artifacts, evidence_dir = _collected_artifacts(tmp_path)
     probe_commands: list[list[str]] = []
     extractor_commands: list[list[str]] = []
@@ -566,7 +592,10 @@ def test_static_extractor_runs_routed_objdump_and_readelf_with_raw_outputs(tmp_p
     def probe_runner(command: list[str], timeout_seconds: float):
         probe_commands.append(command)
         assert timeout_seconds == 7.0
-        return ProbeCompletedProcess(returncode=0, stdout=f"{command[0]} version")
+        return ProbeCompletedProcess(
+            returncode=0,
+            stdout=f"{command[0]} version",
+        )
 
     def extractor_runner(command: list[str], timeout_seconds: float):
         extractor_commands.append(command)
@@ -600,7 +629,8 @@ def test_static_extractor_runs_routed_objdump_and_readelf_with_raw_outputs(tmp_p
         for command in probe_commands
     )
     assert any(
-        Path(command[0]).name.endswith("readelf") and command[1:] == ["--version"]
+        Path(command[0]).name.endswith("readelf")
+        and command[1:] == ["--version"]
         for command in probe_commands
     )
     assert extractor_commands == [
@@ -623,7 +653,7 @@ def test_static_extractor_runs_routed_objdump_and_readelf_with_raw_outputs(tmp_p
     assert "Disassembly" in tool_runs["llvm-objdump"]["stdout_tail"]
     assert tool_runs["llvm-objdump"]["stderr_tail"] == "objdump note"
     assert tool_runs["llvm-objdump"]["raw_output_path"].endswith(
-        "extractors/artifact-benchmark_kernel.so/llvm-objdump.txt"
+        "extractors/artifact-benchmark_kernel.so/llvm-objdump.txt",
     )
     assert tool_runs["readelf"]["status"] == "collected"
     assert "ELF Header" in tool_runs["readelf"]["stdout_tail"]
@@ -641,7 +671,10 @@ def test_static_extractor_returns_partial_when_one_tool_fails(tmp_path):
     artifacts, evidence_dir = _collected_artifacts(tmp_path)
 
     def probe_runner(command: list[str], timeout_seconds: float):
-        return ProbeCompletedProcess(returncode=0, stdout=f"{command[0]} version")
+        return ProbeCompletedProcess(
+            returncode=0,
+            stdout=f"{command[0]} version",
+        )
 
     def extractor_runner(command: list[str], timeout_seconds: float):
         if command[0] == "llvm-objdump":
@@ -659,7 +692,8 @@ def test_static_extractor_returns_partial_when_one_tool_fails(tmp_path):
 
     assert sidecar.status == StaticKernelEvidenceStatus.PARTIAL
     assert (
-        sidecar.reason_code == StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA
+        sidecar.reason_code
+        == StaticKernelEvidenceReasonCode.PARTIAL_ARTIFACT_METADATA
     )
     assert tool_runs["llvm-objdump"].status == StaticKernelEvidenceStatus.FAILED
     assert tool_runs["llvm-objdump"].reason_code == (
@@ -678,23 +712,34 @@ def test_static_extractor_returns_unavailable_when_tools_are_missing(tmp_path):
     )
 
     assert sidecar.status == StaticKernelEvidenceStatus.UNAVAILABLE
-    assert sidecar.reason_code == StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE
+    assert (
+        sidecar.reason_code
+        == StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE
+    )
     assert {run.status for run in sidecar.tool_runs} == {
-        StaticKernelEvidenceStatus.UNAVAILABLE
+        StaticKernelEvidenceStatus.UNAVAILABLE,
     }
     assert {run.reason_code for run in sidecar.tool_runs} == {
-        StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE
+        StaticKernelEvidenceReasonCode.TOOLCHAIN_UNAVAILABLE,
     }
 
 
-def test_static_extractor_returns_failed_when_all_attempted_tools_fail(tmp_path):
+def test_static_extractor_returns_failed_when_all_attempted_tools_fail(
+    tmp_path,
+):
     artifacts, evidence_dir = _collected_artifacts(tmp_path)
 
     def probe_runner(command: list[str], timeout_seconds: float):
-        return ProbeCompletedProcess(returncode=0, stdout=f"{command[0]} version")
+        return ProbeCompletedProcess(
+            returncode=0,
+            stdout=f"{command[0]} version",
+        )
 
     def extractor_runner(command: list[str], timeout_seconds: float):
-        return ProbeCompletedProcess(returncode=2, stderr=f"{command[0]} failed")
+        return ProbeCompletedProcess(
+            returncode=2,
+            stderr=f"{command[0]} failed",
+        )
 
     sidecar = run_static_kernel_extractors(
         artifacts=artifacts,
@@ -705,9 +750,11 @@ def test_static_extractor_returns_failed_when_all_attempted_tools_fail(tmp_path)
     )
 
     assert sidecar.status == StaticKernelEvidenceStatus.FAILED
-    assert sidecar.reason_code == StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED
+    assert (
+        sidecar.reason_code == StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED
+    )
     assert {run.reason_code for run in sidecar.tool_runs} == {
-        StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED
+        StaticKernelEvidenceReasonCode.EXTRACTOR_FAILED,
     }
 
 
@@ -715,7 +762,10 @@ def test_static_extractor_records_timeout_as_nonfatal_failure(tmp_path):
     artifacts, evidence_dir = _collected_artifacts(tmp_path)
 
     def probe_runner(command: list[str], timeout_seconds: float):
-        return ProbeCompletedProcess(returncode=0, stdout=f"{command[0]} version")
+        return ProbeCompletedProcess(
+            returncode=0,
+            stdout=f"{command[0]} version",
+        )
 
     def extractor_runner(command: list[str], timeout_seconds: float):
         raise subprocess.TimeoutExpired(
@@ -734,9 +784,11 @@ def test_static_extractor_records_timeout_as_nonfatal_failure(tmp_path):
     )
 
     assert sidecar.status == StaticKernelEvidenceStatus.FAILED
-    assert sidecar.reason_code == StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT
+    assert (
+        sidecar.reason_code == StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT
+    )
     assert {run.reason_code for run in sidecar.tool_runs} == {
-        StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT
+        StaticKernelEvidenceReasonCode.EXTRACTOR_TIMEOUT,
     }
     for run in sidecar.tool_runs:
         assert run.raw_output_path is not None

@@ -72,7 +72,9 @@ def test_temporary_stream_path_sanitizes_name_and_supports_prefix(
         path.unlink(missing_ok=True)
 
 
-def test_run_command_to_files_mirrors_output_from_test_runner(tmp_path: Path) -> None:
+def test_run_command_to_files_mirrors_output_from_test_runner(
+    tmp_path: Path,
+) -> None:
     stdout_path = tmp_path / "stdout.log"
     stderr_path = tmp_path / "stderr.log"
 

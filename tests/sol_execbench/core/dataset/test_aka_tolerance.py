@@ -25,7 +25,7 @@ def _definition() -> Definition:
                     "shape": ["N"],
                     "dtype": "float32",
                     "description": "input",
-                }
+                },
             },
             "outputs": {
                 "fp32": {
@@ -40,7 +40,7 @@ def _definition() -> Definition:
                 },
             },
             "reference": "def run(x):\n    return x, x.to(torch.bfloat16)\n",
-        }
+        },
     )
 
 
@@ -51,7 +51,7 @@ def _workload(tolerance: ToleranceSpec) -> Workload:
             "inputs": {"x": {"type": "random"}},
             "uuid": "calibration-test",
             "tolerance": tolerance.model_dump(mode="json"),
-        }
+        },
     )
 
 
@@ -72,6 +72,10 @@ def test_workload_contract_hash_excludes_only_tolerance():
     first = _workload(ToleranceSpec(max_atol=1e-5, max_rtol=1e-5))
     second = _workload(ToleranceSpec(max_atol=1e-1, max_rtol=1e-1))
 
-    assert workload_contract_sha256(definition, first) == workload_contract_sha256(
-        definition, second
+    assert workload_contract_sha256(
+        definition,
+        first,
+    ) == workload_contract_sha256(
+        definition,
+        second,
     )

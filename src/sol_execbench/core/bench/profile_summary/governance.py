@@ -27,16 +27,28 @@ def validate_profile_summary_freshness(
     run_id: str | None = None,
 ) -> DiagnosticFreshnessValidation:
     """Classify whether a profile summary identity matches expected run identity."""
-
     reasons: list[str] = []
     identity = sidecar.identity
-    match_required_optional(reasons, "sol_version", identity.sol_version, sol_version)
-    match_optional(reasons, "trace_path", identity.trace_path, compact_path(trace_path))
+    match_required_optional(
+        reasons,
+        "sol_version",
+        identity.sol_version,
+        sol_version,
+    )
+    match_optional(
+        reasons,
+        "trace_path",
+        identity.trace_path,
+        compact_path(trace_path),
+    )
     match_optional(reasons, "run_id", identity.run_id, run_id)
     any_expected = (
         trace_path is not None or run_id is not None or sol_version is not None
     )
-    status, reason_codes = classify_freshness(reasons, any_expected=any_expected)
+    status, reason_codes = classify_freshness(
+        reasons,
+        any_expected=any_expected,
+    )
     return DiagnosticFreshnessValidation(
         status=status,
         reason_codes=reason_codes,
@@ -50,7 +62,6 @@ def evaluate_profile_summary_governance(
     parse_error: str | None = None,
 ) -> DiagnosticGovernanceGuardrail:
     """Return diagnostic-only governance state for an optional profile summary."""
-
     status, reason_codes = classify_diagnostic_governance(
         sidecar_present=sidecar is not None,
         freshness_status=freshness.status if freshness is not None else None,

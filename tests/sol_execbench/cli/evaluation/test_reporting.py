@@ -103,13 +103,18 @@ def test_print_traces_table_outputs_pass_count_and_speedup_for_passed_and_incorr
     assert "1/2 workloads passed" in output
 
 
-def test_print_traces_table_emits_runtime_logs_only_for_runtime_failures() -> None:
+def test_print_traces_table_emits_runtime_logs_only_for_runtime_failures() -> (
+    None
+):
     traces = [
         _trace(
             "incorrect",
             _evaluation(
                 EvaluationStatus.INCORRECT_NUMERICAL,
-                correctness=Correctness(max_absolute_error=1.0, max_relative_error=1.0),
+                correctness=Correctness(
+                    max_absolute_error=1.0,
+                    max_relative_error=1.0,
+                ),
                 log="numerical drift details\n",
             ),
         ),

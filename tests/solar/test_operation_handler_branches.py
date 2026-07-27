@@ -43,25 +43,33 @@ CONV_CASES = (
         "conv1d",
         [[2, 4, 16], [4, 1, 3]],
         "BO(P+R),OCR->BOP",
-        kwargs={"module_args": {"groups": 4, "in_channels": 4, "out_channels": 4}},
+        kwargs={
+            "module_args": {"groups": 4, "in_channels": 4, "out_channels": 4},
+        },
     ),
     OperationCase(
         "conv1d",
         [[2, 4, 16], [8, 2, 3]],
         "BGI(P+R),GOIR->BGOP",
-        kwargs={"module_args": {"groups": 2, "in_channels": 4, "out_channels": 8}},
+        kwargs={
+            "module_args": {"groups": 2, "in_channels": 4, "out_channels": 8},
+        },
     ),
     OperationCase(
         "conv2d",
         [[2, 4, 16, 16], [4, 1, 3, 3]],
         "BO(P+R)(Q+S),OCRS->BOPQ",
-        kwargs={"module_args": {"groups": 4, "in_channels": 4, "out_channels": 4}},
+        kwargs={
+            "module_args": {"groups": 4, "in_channels": 4, "out_channels": 4},
+        },
     ),
     OperationCase(
         "conv2d",
         [[2, 4, 16, 16], [8, 2, 3, 3]],
         "BGI(P+R)(Q+S),GOIRS->BGOPQ",
-        kwargs={"module_args": {"groups": 2, "in_channels": 4, "out_channels": 8}},
+        kwargs={
+            "module_args": {"groups": 2, "in_channels": 4, "out_channels": 8},
+        },
     ),
     OperationCase(
         "conv3d",
@@ -159,7 +167,9 @@ def test_handlers_reject_missing_required_shapes(
 
 
 def test_attention_handlers_cover_fused_and_composite_contracts() -> None:
-    shapes = TensorShapes(inputs=[[2, 4, 8, 16], [2, 4, 10, 16], [2, 4, 10, 32]])
+    shapes = TensorShapes(
+        inputs=[[2, 4, 8, 16], [2, 4, 10, 16], [2, 4, 10, 32]],
+    )
     flex = EinsumAnalyzer().get_einsum_op("flex_attention", shapes)
     mha = EinsumAnalyzer().get_einsum_op(
         "multi_head_attention_forward",
@@ -191,7 +201,9 @@ def test_sdpa_subgraph_has_reviewable_shapes_and_connections(
         "attention.av_matmul",
     ]
     assert subgraph["attention.qk_matmul"]["output_shapes"] == [[2, 4, 8, 10]]
-    assert subgraph["attention.scale"]["module_args"] == {"scale_factor": "1/sqrt(16)"}
+    assert subgraph["attention.scale"]["module_args"] == {
+        "scale_factor": "1/sqrt(16)",
+    }
     assert subgraph["attention.av_matmul"]["output_shapes"] == [[2, 4, 8, 32]]
     assert handler.get_subgraph_input_mapping("attention") == {
         "attention.qk_matmul": [0, 1],
@@ -202,5 +214,6 @@ def test_sdpa_subgraph_has_reviewable_shapes_and_connections(
 def test_sdpa_subgraph_rejects_missing_inputs() -> None:
     with pytest.raises(ValueError, match="SDPA requires 3 inputs"):
         ScaledDotProductAttentionHandler().create_subgraph(
-            "attention", {"input_shapes": [[2, 4, 8, 16]]}
+            "attention",
+            {"input_shapes": [[2, 4, 8, 16]]},
         )

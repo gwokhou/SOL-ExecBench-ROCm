@@ -10,10 +10,9 @@ from pathlib import Path
 
 from rich.console import Console
 
-from sol_execbench.core.integrity.checksums import sha256_file
+from sol_execbench.cli.evaluation import reporting as cli_reporting
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
-
-from . import reporting as cli_reporting
+from sol_execbench.core.integrity.checksums import sha256_file
 
 
 def write_trace_output(
@@ -22,13 +21,16 @@ def write_trace_output(
     traces: list[Trace],
     console: Console,
 ) -> str | None:
+    """Write traces to JSONL and return the output digest."""
     if output_file:
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w") as f:
             for trace in traces:
                 payload = trace.model_dump(mode="json")
                 f.write(json.dumps(payload) + "\n")
-        console.print(f"[green]Saved {len(traces)} traces to {output_file}[/green]")
+        console.print(
+            f"[green]Saved {len(traces)} traces to {output_file}[/green]",
+        )
 
     return (
         sha256_file(output_file)
@@ -38,6 +40,7 @@ def write_trace_output(
 
 
 def emit_trace_output(*, traces: list[Trace], json_output: bool) -> None:
+    """Render traces to standard output in text or JSON form."""
     if json_output:
         for trace in traces:
             print(json.dumps(trace.model_dump(mode="json")))
@@ -46,6 +49,7 @@ def emit_trace_output(*, traces: list[Trace], json_output: bool) -> None:
 
 
 def all_traces_passed(traces: list[Trace]) -> bool:
+    """Return whether every trace has a passing evaluation."""
     return all(
         trace.evaluation and trace.evaluation.status == EvaluationStatus.PASSED
         for trace in traces

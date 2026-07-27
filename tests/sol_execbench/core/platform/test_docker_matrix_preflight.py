@@ -19,7 +19,6 @@ from sol_execbench.core.platform.docker_matrix import (
     select_docker_target,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
 
@@ -79,10 +78,14 @@ def test_preflight_unavailable_cases_block_benchmark_before_execution(
 
 
 def test_preflight_records_requested_image_and_nullable_digest() -> None:
-    result = classify_docker_preflight(_default_observation(dev_dri_present=False))
+    result = classify_docker_preflight(
+        _default_observation(dev_dri_present=False),
+    )
 
     assert result.entry.observed.container is not None
-    assert result.entry.observed.container.image_repository == ("rocm/dev-ubuntu-24.04")
+    assert result.entry.observed.container.image_repository == (
+        "rocm/dev-ubuntu-24.04"
+    )
     assert result.entry.observed.container.image_tag == "7.2-complete"
     assert result.entry.observed.container.image_digest is None
 
@@ -92,7 +95,7 @@ def test_preflight_records_device_nodes_and_visible_gpu_environment() -> None:
         _default_observation(
             dev_kfd_present=False,
             visible_device_environment={"HIP_VISIBLE_DEVICES": "0"},
-        )
+        ),
     )
 
     assert result.entry.observed.host is not None
@@ -100,12 +103,16 @@ def test_preflight_records_device_nodes_and_visible_gpu_environment() -> None:
     assert result.entry.observed.host.source == "docker_preflight"
     assert result.entry.observed.gpu is not None
     assert result.entry.observed.gpu.visible_device_environment == {
-        "HIP_VISIBLE_DEVICES": "0"
+        "HIP_VISIBLE_DEVICES": "0",
     }
 
 
-def test_preflight_result_payload_contains_build_args_and_decision_flags() -> None:
-    result = classify_docker_preflight(_default_observation(gpu_accessible=False))
+def test_preflight_result_payload_contains_build_args_and_decision_flags() -> (
+    None
+):
+    result = classify_docker_preflight(
+        _default_observation(gpu_accessible=False),
+    )
     payload = result.to_preview_payload()
 
     assert payload["target_id"]
@@ -167,7 +174,9 @@ def test_module_main_emits_preflight_json_from_explicit_observations() -> None:
     assert payload["leaderboard_authority"] is False
 
 
-def test_module_main_rejects_invalid_preflight_boolean_without_traceback() -> None:
+def test_module_main_rejects_invalid_preflight_boolean_without_traceback() -> (
+    None
+):
     completed = subprocess.run(
         [
             sys.executable,

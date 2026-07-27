@@ -34,7 +34,10 @@ def test_environment_snapshot_sidecar_disabled_by_default(
     assert not output.with_name("trace.jsonl.environment.json").exists()
 
 
-def test_environment_snapshot_sidecar_uses_explicit_path(tmp_path: Path, monkeypatch):
+def test_environment_snapshot_sidecar_uses_explicit_path(
+    tmp_path: Path,
+    monkeypatch,
+):
     sidecar = tmp_path / "run" / "env.json"
     monkeypatch.setenv(cli_environment.ENV_SNAPSHOT_PATH_ENV, str(sidecar))
     monkeypatch.delenv(cli_environment.ENV_SNAPSHOT_ENABLE_ENV, raising=False)
@@ -68,7 +71,9 @@ def test_environment_snapshot_sidecar_can_be_derived_from_trace_output(
     assert json.loads(written.read_text())["collection_status"] == "available"
 
 
-def test_environment_snapshot_request_without_output_path_is_nonfatal(monkeypatch):
+def test_environment_snapshot_request_without_output_path_is_nonfatal(
+    monkeypatch,
+):
     calls = 0
 
     def collector() -> EnvironmentSnapshot:
@@ -80,7 +85,8 @@ def test_environment_snapshot_request_without_output_path_is_nonfatal(monkeypatc
     monkeypatch.delenv(cli_environment.ENV_SNAPSHOT_PATH_ENV, raising=False)
 
     written = cli_environment._write_environment_snapshot_sidecar(
-        None, collector=collector
+        None,
+        collector=collector,
     )
 
     assert written is None
@@ -88,7 +94,8 @@ def test_environment_snapshot_request_without_output_path_is_nonfatal(monkeypatc
 
 
 def test_environment_snapshot_collection_failure_is_nonfatal(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path,
+    monkeypatch,
 ):
     sidecar = tmp_path / "env.json"
     monkeypatch.setenv(cli_environment.ENV_SNAPSHOT_PATH_ENV, str(sidecar))

@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Lazy public entry point for the SOL ExecBench CLI."""
+
 from __future__ import annotations
 
 from importlib import import_module
@@ -21,7 +23,7 @@ from importlib import import_module
 __all__ = ["cli"]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> object:
     if name == "cli":
         value = getattr(import_module("sol_execbench.cli.main"), name)
         globals()[name] = value

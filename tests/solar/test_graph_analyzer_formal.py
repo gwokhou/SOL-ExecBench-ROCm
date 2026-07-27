@@ -12,7 +12,11 @@ from solar.analysis.graph_analyzer import (
     _GraphTopology,
     _PreparedAnalysis,
 )
-from solar.analysis.graph_models import AnalysisAccumulator, FormalAnalysis, FusionPlan
+from solar.analysis.graph_models import (
+    AnalysisAccumulator,
+    FormalAnalysis,
+    FusionPlan,
+)
 from solar.analysis.orojenesis import OrojenesisRunner
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
 
@@ -28,7 +32,11 @@ def _einsum_layer(
 ) -> dict:
     return {
         "type": "matmul",
-        "semantic_op": {"kind": "einsum", "equation": "MK,KN->MN", "effects": {}},
+        "semantic_op": {
+            "kind": "einsum",
+            "equation": "MK,KN->MN",
+            "effects": {},
+        },
         "tensor_names": {
             "inputs": [input_name, weight_name],
             "outputs": [output_name],
@@ -66,8 +74,22 @@ def _formal_plan() -> tuple[FusionPlan, dict]:
         "kind": "broadcast_batch_linear_matmul",
         "composition": "broadcast_batch_linear_tile_shape_v1",
         "nodes": [
-            {"id": "r0", "kind": "matmul", "m": 2, "k": 3, "n": 4, "dtype": "float16"},
-            {"id": "r1", "kind": "matmul", "m": 2, "k": 4, "n": 6, "dtype": "float16"},
+            {
+                "id": "r0",
+                "kind": "matmul",
+                "m": 2,
+                "k": 3,
+                "n": 4,
+                "dtype": "float16",
+            },
+            {
+                "id": "r1",
+                "kind": "matmul",
+                "m": 2,
+                "k": 4,
+                "n": 6,
+                "dtype": "float16",
+            },
         ],
         "edges": [
             {
@@ -75,7 +97,7 @@ def _formal_plan() -> tuple[FusionPlan, dict]:
                 "consumer": "r1",
                 "axis_map": [0, 1],
                 "layer_path": ["r0", "r1"],
-            }
+            },
         ],
         "roots": ["r0"],
         "leaves": ["r1"],
@@ -101,7 +123,10 @@ def _formal_plan() -> tuple[FusionPlan, dict]:
 
 
 class _FakeRunner:
-    toolchain_identity: dict[str, str] | None = {"verification_mode": "fake"}
+    def __init__(self) -> None:
+        self.toolchain_identity: dict[str, str] | None = {
+            "verification_mode": "fake"
+        }
 
     @staticmethod
     def _base(problem: dict, word_bits: int, output_dir: Path) -> dict:
@@ -119,16 +144,24 @@ class _FakeRunner:
                 "raw": {
                     "path": raw.name,
                     "sha256": hashlib.sha256(raw.read_bytes()).hexdigest(),
-                }
+                },
             },
         }
 
     def run_multi_chain(self, layers, output_dir, *, word_bits):
         descriptors = []
         dimensions = [(2, 3, 4), (2, 4, 5)]
-        for (layer_id, _), (m, k, n) in zip(layers, dimensions):
+        for (layer_id, _), (m, k, n) in zip(
+            layers,
+            dimensions,
+            strict=True,
+        ):
             descriptors.append({"id": layer_id, "m": m, "k": k, "n": n})
-        return self._base({"chain": {"layers": descriptors}}, word_bits, output_dir)
+        return self._base(
+            {"chain": {"layers": descriptors}},
+            word_bits,
+            output_dir,
+        )
 
     def run_multi_region(self, problem, output_dir, *, word_bits):
         return self._base(problem, word_bits, output_dir)
@@ -148,7 +181,9 @@ def _empty_orojenesis() -> dict:
     }
 
 
-def test_runner_evidence_and_audit_cover_chain_region_and_single(tmp_path: Path):
+def test_runner_evidence_and_audit_cover_chain_region_and_single(
+    tmp_path: Path,
+):
     analyzer = EinsumGraphAnalyzer()
     plan, all_layers = _formal_plan()
     profile = SimpleNamespace(
@@ -156,7 +191,7 @@ def test_runner_evidence_and_audit_cover_chain_region_and_single(tmp_path: Path)
             MemoryLevel("l1", "cu", 32),
             MemoryLevel("l2", "device", 128),
             MemoryLevel("vram", "device", 4096),
-        )
+        ),
     )
     prepared = SimpleNamespace(
         output_dir=tmp_path,
@@ -180,7 +215,9 @@ def test_runner_evidence_and_audit_cover_chain_region_and_single(tmp_path: Path)
     for category in ("chains", "regions", "layers"):
         for result in evidence[category].values():
             assert result["selected_capacity"]["point"]["buffer_bytes"] == 64
-            assert result["evidence_files"]["raw"]["path"].startswith("orojenesis/")
+            assert result["evidence_files"]["raw"]["path"].startswith(
+                "orojenesis/",
+            )
 
     audited, formal = analyzer._audit_orojenesis_evidence(
         plan,
@@ -190,7 +227,10 @@ def test_runner_evidence_and_audit_cover_chain_region_and_single(tmp_path: Path)
     )
     assert audited >= 48.0
     assert formal is True
-    assert evidence["formal_coverage"] == {"applicable_layers": 5, "total_layers": 5}
+    assert evidence["formal_coverage"] == {
+        "applicable_layers": 5,
+        "total_layers": 5,
+    }
     assert evidence["layers"]["single"]["formal_applicability"]["applicable"]
     assert evidence["chains"]["chain_0"]["formal_applicability"]["applicable"]
     assert evidence["regions"]["region_0"]["formal_applicability"]["applicable"]
@@ -206,9 +246,16 @@ def test_runner_evidence_and_audit_cover_chain_region_and_single(tmp_path: Path)
 
 
 def test_evidence_selection_handles_no_cache_and_strict_capacity_failure():
-    result = {"curve": [{"buffer_bytes": 64, "dram_bytes": 10}], "evidence_files": {}}
+    result = {
+        "curve": [{"buffer_bytes": 64, "dram_bytes": 10}],
+        "evidence_files": {},
+    }
     EinsumGraphAnalyzer._select_capacity_and_rewrite_evidence(
-        result, None, False, "missing", Path("root")
+        result,
+        None,
+        False,
+        "missing",
+        Path("root"),
     )
     assert "selected_capacity" not in result
     with pytest.raises(ValueError, match="missing"):
@@ -220,10 +267,18 @@ def test_evidence_selection_handles_no_cache_and_strict_capacity_failure():
             Path("root"),
         )
     assert EinsumGraphAnalyzer._last_cache(None) is None
-    empty = SimpleNamespace(memory_hierarchy=(MemoryLevel("vram", "device", 100),))
-    assert EinsumGraphAnalyzer._last_cache(cast(ArchitectureProfile, empty)) is None
+    empty = SimpleNamespace(
+        memory_hierarchy=(MemoryLevel("vram", "device", 100),),
+    )
+    assert (
+        EinsumGraphAnalyzer._last_cache(cast(ArchitectureProfile, empty))
+        is None
+    )
     assert EinsumGraphAnalyzer._word_bits([], 4.0) == 32
-    assert EinsumGraphAnalyzer._word_bits(["torch.float16", "torch.float32"], 4.0) == 16
+    assert (
+        EinsumGraphAnalyzer._word_bits(["torch.float16", "torch.float32"], 4.0)
+        == 16
+    )
 
 
 def test_strict_runner_requires_toolchain_identity(tmp_path: Path):
@@ -260,19 +315,31 @@ def test_evidence_audits_fail_closed_on_mismatch():
     }
     assert (
         EinsumGraphAnalyzer._audit_layer_evidence(
-            plan, evidence, region_by_layer, all_layers
+            plan,
+            evidence,
+            region_by_layer,
+            all_layers,
         )
         == []
     )
-    assert not evidence["layers"]["single"]["formal_applicability"]["applicable"]
+    assert not evidence["layers"]["single"]["formal_applicability"][
+        "applicable"
+    ]
 
     evidence["chains"]["bad"] = {
         "word_bits": 16,
         "selected_capacity": {"point": {"dram_bytes": 10}},
-        "problem": {"chain": {"layers": [{"id": "missing", "m": 1, "k": 1, "n": 1}]}},
+        "problem": {
+            "chain": {"layers": [{"id": "missing", "m": 1, "k": 1, "n": 1}]},
+        },
     }
     assert (
-        EinsumGraphAnalyzer._audit_chain_evidence(plan, evidence, region_by_layer) == []
+        EinsumGraphAnalyzer._audit_chain_evidence(
+            plan,
+            evidence,
+            region_by_layer,
+        )
+        == []
     )
     assert not evidence["chains"]["bad"]["formal_applicability"]["applicable"]
 
@@ -286,20 +353,26 @@ def test_evidence_audits_fail_closed_on_mismatch():
         },
     }
     assert (
-        EinsumGraphAnalyzer._audit_region_evidence(plan, evidence, region_by_layer)
+        EinsumGraphAnalyzer._audit_region_evidence(
+            plan,
+            evidence,
+            region_by_layer,
+        )
         == []
     )
     assert not evidence["regions"]["bad"]["formal_applicability"]["applicable"]
 
 
-def test_tile_aware_bound_requires_complete_contraction_coverage(tmp_path: Path):
+def test_tile_aware_bound_requires_complete_contraction_coverage(
+    tmp_path: Path,
+):
     plan, all_layers = _formal_plan()
     evidence = _empty_orojenesis()
     evidence.update(
         {
             "status": "complete",
             "toolchain": {"verification_mode": "fake"},
-        }
+        },
     )
     evidence["layers"]["single"] = {
         "word_bits": 16,
@@ -317,7 +390,10 @@ def test_tile_aware_bound_requires_complete_contraction_coverage(tmp_path: Path)
 
     assert audited >= 48.0
     assert formal is False
-    assert evidence["formal_coverage"] == {"applicable_layers": 1, "total_layers": 5}
+    assert evidence["formal_coverage"] == {
+        "applicable_layers": 1,
+        "total_layers": 5,
+    }
 
 
 class _Profile:
@@ -331,7 +407,9 @@ class _Profile:
 
 def test_lower_bound_combines_compute_and_prefetched_memory():
     prepared = SimpleNamespace(
-        profile=_Profile(), semantic_graph=True, semantic_complete=True
+        profile=_Profile(),
+        semantic_graph=True,
+        semantic_complete=True,
     )
     accumulator = SimpleNamespace(resource_work={"valu": {"fp32": 2}})
     formal = FormalAnalysis(None, {}, 50.0, 300.0, True)
@@ -352,7 +430,9 @@ def test_lower_bound_combines_compute_and_prefetched_memory():
             cast(
                 _PreparedAnalysis,
                 SimpleNamespace(
-                    profile=None, semantic_graph=False, semantic_complete=False
+                    profile=None,
+                    semantic_graph=False,
+                    semantic_complete=False,
                 ),
             ),
             cast(AnalysisAccumulator, accumulator),
@@ -447,13 +527,35 @@ def test_dequantized_payload_precision_traces_casts_passthrough_and_mul():
             }[dtype]
 
     profile = cast(ArchitectureProfile, Profile())
-    assert topology.dequantized_payload_precision("cast_out", profile, "fp32") == "fp8"
-    assert topology.dequantized_payload_precision("pass_out", profile, "fp32") == "fp8"
-    assert topology.dequantized_payload_precision("mul_out", profile, "fp32") == "fp8"
-    assert topology.dequantized_payload_precision("same_out", profile, "fp32") is None
-    assert topology.dequantized_payload_precision("missing", profile, "fp32") is None
-    assert topology.dequantized_payload_precision("cast_out", None, "fp32") is None
     assert (
-        topology.dequantized_payload_precision("cast_out", profile, "fp32", {"cast"})
+        topology.dequantized_payload_precision("cast_out", profile, "fp32")
+        == "fp8"
+    )
+    assert (
+        topology.dequantized_payload_precision("pass_out", profile, "fp32")
+        == "fp8"
+    )
+    assert (
+        topology.dequantized_payload_precision("mul_out", profile, "fp32")
+        == "fp8"
+    )
+    assert (
+        topology.dequantized_payload_precision("same_out", profile, "fp32")
+        is None
+    )
+    assert (
+        topology.dequantized_payload_precision("missing", profile, "fp32")
+        is None
+    )
+    assert (
+        topology.dequantized_payload_precision("cast_out", None, "fp32") is None
+    )
+    assert (
+        topology.dequantized_payload_precision(
+            "cast_out",
+            profile,
+            "fp32",
+            {"cast"},
+        )
         is None
     )

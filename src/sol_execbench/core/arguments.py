@@ -10,7 +10,6 @@ import argparse
 
 def parse_bool(value: str) -> bool:
     """Convert common boolean spellings to bool for argparse."""
-
     normalized = value.lower()
     if normalized in {"1", "true", "yes"}:
         return True
@@ -21,7 +20,6 @@ def parse_bool(value: str) -> bool:
 
 def none_if_requested(value: str | None) -> str | None:
     """Normalize empty/none/null CLI values to ``None``."""
-
     if value is None:
         return None
     if value.lower() in {"", "none", "null"}:

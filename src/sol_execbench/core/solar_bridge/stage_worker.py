@@ -20,6 +20,7 @@ from sol_execbench.core.solar_bridge.worker_io import write_worker_response
 
 
 def main() -> None:
+    """Run one isolated stage-readiness worker request."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("request", type=Path)
     parser.add_argument("response", type=Path)
@@ -32,7 +33,7 @@ def main() -> None:
             output_dir=request.output_dir,
             device=request.device,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- isolated worker boundary
         outcome = SolarStageAuditOutcome(
             status=SolarReadinessStatus.FAILED,
             analysis_id=request.workload_uuid,
@@ -48,7 +49,9 @@ def main() -> None:
         message="worker response serialization failed",
     )
     written = write_worker_response(
-        args.response, outcome.to_dict(), fallback.to_dict()
+        args.response,
+        outcome.to_dict(),
+        fallback.to_dict(),
     )
     raise SystemExit(0 if written else 1)
 

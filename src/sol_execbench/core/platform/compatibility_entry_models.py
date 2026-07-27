@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.platform.compatibility_enums import (
     MATRIX_MODEL_CONFIG,
     ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
@@ -22,7 +23,6 @@ from sol_execbench.core.platform.compatibility_evidence_models import (
     MatrixObservedEvidence,
     MatrixTarget,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 
 class MatrixClaimBoundary(BaseModelWithDocstrings):
@@ -85,19 +85,22 @@ class MatrixEntry(BaseModelWithDocstrings):
 
 def _validate_container_scope(entry: MatrixEntry) -> None:
     """Reject host claims that contradict a container-only validation scope."""
-    if entry.target.validation_scope is not MatrixValidationScope.CONTAINER_USER_SPACE:
+    if (
+        entry.target.validation_scope
+        is not MatrixValidationScope.CONTAINER_USER_SPACE
+    ):
         return
     claims = entry.claim_boundary
     if entry.status is MatrixCompatibilityStatus.HOST_VALIDATED:
         raise ValueError(
             "Docker/container scoped Matrix Entries cannot use "
             "status=host_validated; use container_validated for container ROCm "
-            "user-space validation."
+            "user-space validation.",
         )
     if claims.native_host_validated:
         raise ValueError(
             "Docker/container scoped Matrix Entries cannot set "
-            "native_host_validated=true."
+            "native_host_validated=true.",
         )
     if (
         entry.status is MatrixCompatibilityStatus.CONTAINER_VALIDATED
@@ -105,7 +108,7 @@ def _validate_container_scope(entry: MatrixEntry) -> None:
     ):
         raise ValueError(
             "container_validated Docker/container scoped Matrix Entries must set "
-            "container_user_space_validated=true."
+            "container_user_space_validated=true.",
         )
 
 
@@ -114,18 +117,25 @@ def _validate_container_validation(entry: MatrixEntry) -> None:
     if entry.status is not MatrixCompatibilityStatus.CONTAINER_VALIDATED:
         return
     claims = entry.claim_boundary
-    if entry.target.validation_scope is not MatrixValidationScope.CONTAINER_USER_SPACE:
+    if (
+        entry.target.validation_scope
+        is not MatrixValidationScope.CONTAINER_USER_SPACE
+    ):
         raise ValueError(
-            "container_validated requires container_user_space validation scope."
+            "container_validated requires container_user_space validation scope.",
         )
     if entry.observed.container is None:
-        raise ValueError("container_validated requires observed container evidence.")
+        raise ValueError(
+            "container_validated requires observed container evidence.",
+        )
     if not claims.container_user_space_validated:
         raise ValueError(
-            "container_validated requires container_user_space_validated=true."
+            "container_validated requires container_user_space_validated=true.",
         )
     if claims.native_host_validated:
-        raise ValueError("container_validated cannot set native_host_validated=true.")
+        raise ValueError(
+            "container_validated cannot set native_host_validated=true.",
+        )
 
 
 def _validate_host_validation(entry: MatrixEntry) -> None:
@@ -135,37 +145,44 @@ def _validate_host_validation(entry: MatrixEntry) -> None:
     claims = entry.claim_boundary
     host = entry.observed.host
     has_direct_host_evidence = host is not None and bool(
-        host.rocm_version or host.driver_version
+        host.rocm_version or host.driver_version,
     )
     if entry.target.validation_scope is not MatrixValidationScope.NATIVE_HOST:
-        raise ValueError("host_validated requires native_host validation scope.")
+        raise ValueError(
+            "host_validated requires native_host validation scope.",
+        )
     if not claims.native_host_validated:
         raise ValueError("host_validated requires native_host_validated=true.")
     if not has_direct_host_evidence:
         raise ValueError(
             "host_validated requires direct native-host evidence with a ROCm or "
-            "driver version."
+            "driver version.",
         )
     if entry.observed.container is not None:
         raise ValueError(
             "host_validated requires direct native-host evidence, not Docker/container "
-            "validation evidence."
+            "validation evidence.",
         )
     if claims.container_user_space_validated:
         raise ValueError(
-            "host_validated cannot set container_user_space_validated=true."
+            "host_validated cannot set container_user_space_validated=true.",
         )
 
 
 def _validate_claim_evidence(entry: MatrixEntry) -> None:
     """Ensure positive evidence claim flags have their matching observations."""
     claims = entry.claim_boundary
-    if claims.container_user_space_validated and entry.observed.container is None:
+    if (
+        claims.container_user_space_validated
+        and entry.observed.container is None
+    ):
         raise ValueError(
-            "container_user_space_validated requires observed container evidence."
+            "container_user_space_validated requires observed container evidence.",
         )
     if claims.native_host_validated and entry.observed.host is None:
-        raise ValueError("native_host_validated requires observed host evidence.")
+        raise ValueError(
+            "native_host_validated requires observed host evidence.",
+        )
 
 
 class MatrixExecutionDecision(BaseModelWithDocstrings):
@@ -213,7 +230,7 @@ class RocmCompatibilityMatrixReport(BaseModelWithDocstrings):
     entries: list[MatrixEntry] = Field(default_factory=list)
     """Compatibility Matrix Entry objects."""
     status_counts: dict[MatrixCompatibilityStatusField, int] = Field(
-        default_factory=dict
+        default_factory=dict,
     )
     """Aggregate counts by bounded compatibility status."""
 
@@ -225,7 +242,9 @@ class RocmCompatibilityMatrixReport(BaseModelWithDocstrings):
     def _validate_status_counts(self) -> RocmCompatibilityMatrixReport:
         expected_counts: dict[MatrixCompatibilityStatus, int] = {}
         for entry in self.entries:
-            expected_counts[entry.status] = expected_counts.get(entry.status, 0) + 1
+            expected_counts[entry.status] = (
+                expected_counts.get(entry.status, 0) + 1
+            )
 
         if any(count < 0 for count in self.status_counts.values()):
             raise ValueError("status_counts cannot contain negative counts.")

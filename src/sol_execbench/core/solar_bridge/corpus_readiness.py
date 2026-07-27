@@ -20,7 +20,10 @@ from sol_execbench.core.data.json_utils import (
 )
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusEntry, AkaCorpusManifest
+from sol_execbench.core.dataset.aka_corpus import (
+    AkaCorpusEntry,
+    AkaCorpusManifest,
+)
 from sol_execbench.core.integrity import (
     sha256_bytes,
     sha256_file,
@@ -40,9 +43,9 @@ from sol_execbench.core.solar_bridge.models import (
     READINESS_STAGES,
     SolarReadinessStatus,
     SolarStage,
-    SolarStageStatus,
     SolarStageAuditOutcome,
     SolarStageAuditRequest,
+    SolarStageStatus,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_stage_worker
 from sol_execbench.core.timestamps import utc_timestamp
@@ -79,9 +82,11 @@ class CorpusStageAuditResult:
 
     @property
     def ready(self) -> bool:
+        """Return whether the complete corpus readiness audit passed."""
         return self.status is CorpusReadinessStatus.READY
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible corpus audit result."""
         value = asdict(self)
         value["status"] = self.status
         value["matrix_path"] = str(self.matrix_path)
@@ -133,7 +138,9 @@ def _audit_corpus_stage_readiness_locked(
 ) -> CorpusStageAuditResult:
     corpus = AkaCorpusManifest.load(manifest_path)
     if output.exists() and not resume:
-        raise FileExistsError(f"corpus readiness output already exists: {output}")
+        raise FileExistsError(
+            f"corpus readiness output already exists: {output}",
+        )
     output.mkdir(parents=True, exist_ok=True)
     context = _CorpusAuditContext(
         corpus=corpus,
@@ -160,14 +167,17 @@ def _audit_entry(
     problem_path = entry.relative_problem_dir.as_posix()
     problem_dir = corpus.authored_root / entry.relative_problem_dir
     definition = Definition.model_validate_json(
-        (problem_dir / "definition.json").read_text(encoding="utf-8")
+        (problem_dir / "definition.json").read_text(encoding="utf-8"),
     )
     workloads = _workloads(problem_dir / "workload.jsonl")
     records: list[dict[str, Any]] = []
     for workload_uuid in entry.workload_uuids:
         workload = workloads[workload_uuid]
         workload_output = (
-            context.output / "workloads" / entry.relative_problem_dir / workload_uuid
+            context.output
+            / "workloads"
+            / entry.relative_problem_dir
+            / workload_uuid
         )
         result_path = workload_output / _RESULT_FILENAME
         identity = _identity(
@@ -275,7 +285,9 @@ def _record(
 
 
 def _rebase_stage(
-    stage: dict[str, Any], workload_output: Path, audit_root: Path
+    stage: dict[str, Any],
+    workload_output: Path,
+    audit_root: Path,
 ) -> dict[str, Any]:
     artifact = stage.get("artifact")
     if not isinstance(artifact, dict):
@@ -288,12 +300,17 @@ def _rebase_stage(
 
 
 def _load_resumed_record(
-    result_path: Path, output: Path, identity: dict[str, Any]
+    result_path: Path,
+    output: Path,
+    identity: dict[str, Any],
 ) -> dict[str, Any]:
     record = load_json_value(result_path)
     if not isinstance(record, dict):
         raise ValueError(f"invalid resumed readiness record: {result_path}")
-    if record.get("schema_version") != CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION:
+    if (
+        record.get("schema_version")
+        != CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION
+    ):
         raise ValueError("resumed readiness record schema mismatch")
     if any(record.get(key) != value for key, value in identity.items()):
         raise ValueError("resumed readiness record identity mismatch")
@@ -316,8 +333,12 @@ def _verify_record_artifacts(record: dict[str, Any], output: Path) -> None:
             resolved = path.resolve()
             resolved.relative_to(output)
         except (OSError, ValueError) as exc:
-            raise ValueError("readiness artifact escapes the audit root") from exc
-        if not resolved.is_file() or sha256_file(resolved) != artifact.get("sha256"):
+            raise ValueError(
+                "readiness artifact escapes the audit root",
+            ) from exc
+        if not resolved.is_file() or sha256_file(resolved) != artifact.get(
+            "sha256",
+        ):
             raise ValueError("readiness artifact identity mismatch")
 
 
@@ -389,20 +410,24 @@ def _summary(
     by_problem: dict[str, list[bool]] = defaultdict(list)
     for record in records:
         by_problem[str(record["problem_path"])].append(
-            record["status"] == SolarReadinessStatus.READY
+            record["status"] == SolarReadinessStatus.READY,
         )
     ready = all(_record_ready(record) for record in records)
     return {
         "schema_version": CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION,
         "generated_at": utc_timestamp(),
         "status": (
-            CorpusReadinessStatus.READY if ready else CorpusReadinessStatus.INCOMPLETE
+            CorpusReadinessStatus.READY
+            if ready
+            else CorpusReadinessStatus.INCOMPLETE
         ),
         "corpus_manifest_sha256": context.manifest_sha256,
         "gfx_target": FORMAL_GFX_TARGET,
         "problem_count": len(by_problem),
         "workload_count": len(records),
-        "fully_ready_problem_count": sum(all(values) for values in by_problem.values()),
+        "fully_ready_problem_count": sum(
+            all(values) for values in by_problem.values()
+        ),
         "stage_counts": stage_counts,
         "failure_counts": dict(
             sorted(
@@ -410,8 +435,8 @@ def _summary(
                     str(record.get("reason_code") or "unknown")
                     for record in records
                     if record["status"] != SolarReadinessStatus.READY
-                ).items()
-            )
+                ).items(),
+            ),
         ),
         "matrix": {
             "path": _MATRIX_FILENAME,

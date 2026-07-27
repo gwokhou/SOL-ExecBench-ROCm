@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-from io import StringIO
 import json
-from pathlib import Path
 import signal
 import subprocess
 import threading
+from io import StringIO
+from pathlib import Path
 
 import pytest
 
@@ -20,7 +20,9 @@ from sol_execbench.tools.amd_isa.errors import IsaDecodeError, IsaProtocolError
 class _Process:
     def __init__(self, *responses: str) -> None:
         self.stdin = StringIO()
-        self.stdout = StringIO("".join(f"{response}\n" for response in responses))
+        self.stdout = StringIO(
+            "".join(f"{response}\n" for response in responses),
+        )
         self.stderr = StringIO()
         self.pid = 1234
         self.returncode: int | None = None
@@ -55,12 +57,15 @@ def _client(process: _Process) -> AmdIsa:
 @pytest.fixture(autouse=True)
 def _make_stdout_readable(monkeypatch) -> None:
     monkeypatch.setattr(
-        client_module.select, "select", lambda *_args: ([object()], [], [])
+        client_module.select,
+        "select",
+        lambda *_args: ([object()], [], []),
     )
 
 
 def test_client_initializes_namespaces_and_merges_provenance(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     process = _Process(
         _response(1, ok=True, result={"protocol": 1}),
@@ -68,7 +73,9 @@ def test_client_initializes_namespaces_and_merges_provenance(
         _response(3, ok=True, result={"name": "s_add_u32"}),
     )
     monkeypatch.setattr(
-        client_module.subprocess, "Popen", lambda *_args, **_kwargs: process
+        client_module.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: process,
     )
 
     client = AmdIsa(
@@ -81,7 +88,9 @@ def test_client_initializes_namespaces_and_merges_provenance(
     assert client.provenance == {"release": "fixture", "spec": "loaded"}
     assert client.explorer.get_instruction("s_add_u32") == {"name": "s_add_u32"}
     assert client._timeout_seconds == 7
-    requests = [json.loads(line) for line in process.stdin.getvalue().splitlines()]
+    requests = [
+        json.loads(line) for line in process.stdin.getvalue().splitlines()
+    ]
     assert [request["method"] for request in requests] == [
         "hello",
         "load",
@@ -127,7 +136,7 @@ def test_call_rejects_oversized_response(monkeypatch) -> None:
 
 def test_call_maps_helper_error_to_decode_error() -> None:
     process = _Process(
-        _response(1, ok=False, error={"code": "decode", "message": "bad word"})
+        _response(1, ok=False, error={"code": "decode", "message": "bad word"}),
     )
 
     with pytest.raises(IsaDecodeError, match="bad word"):
@@ -136,7 +145,11 @@ def test_call_maps_helper_error_to_decode_error() -> None:
 
 def test_call_reports_timeout_and_io_failure(monkeypatch) -> None:
     process = _Process()
-    monkeypatch.setattr(client_module.select, "select", lambda *_args: ([], [], []))
+    monkeypatch.setattr(
+        client_module.select,
+        "select",
+        lambda *_args: ([], [], []),
+    )
     with pytest.raises(IsaProtocolError, match="timed out"):
         _client(process)._call("hello", {})
 

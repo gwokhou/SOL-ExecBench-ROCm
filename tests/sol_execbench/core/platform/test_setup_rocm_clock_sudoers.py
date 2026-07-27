@@ -11,7 +11,10 @@ import pytest
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[4] / "scripts/setup_rocm_clock_sudoers.py"
 )
-SPEC = importlib.util.spec_from_file_location("setup_rocm_clock_sudoers", SCRIPT_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "setup_rocm_clock_sudoers",
+    SCRIPT_PATH,
+)
 assert SPEC is not None
 assert SPEC.loader is not None
 sudoers = importlib.util.module_from_spec(SPEC)
@@ -111,7 +114,9 @@ def test_verify_live_always_restores_auto_after_lock_failure():
         MagicMock(returncode=0, stderr=""),
     ]
     with patch.object(sudoers.subprocess, "run", side_effect=responses) as run:
-        checks = sudoers.verify_passwordless_coverage_live("/opt/rocm/bin/amd-smi")
+        checks = sudoers.verify_passwordless_coverage_live(
+            "/opt/rocm/bin/amd-smi",
+        )
 
     assert [check.status for check in checks] == [
         "covered",
@@ -130,9 +135,11 @@ def test_validate_sudoers_content_fails_closed_without_visudo(monkeypatch):
 
 def test_install_requires_root(tmp_path):
     target = tmp_path / "sudoers"
-    with patch.object(sudoers.os, "geteuid", return_value=1000):
-        with pytest.raises(PermissionError):
-            sudoers.install_sudoers("runner ALL=(root) /bin/true\n", target)
+    with (
+        patch.object(sudoers.os, "geteuid", return_value=1000),
+        pytest.raises(PermissionError),
+    ):
+        sudoers.install_sudoers("runner ALL=(root) /bin/true\n", target)
 
 
 def test_install_atomically_validates_and_writes_0440_file(tmp_path):

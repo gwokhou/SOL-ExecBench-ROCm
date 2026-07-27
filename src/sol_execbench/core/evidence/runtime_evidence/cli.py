@@ -4,17 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
-from sol_execbench.core.platform.compatibility import (
-    MatrixContainerEvidence,
-    MatrixEntry,
+from sol_execbench.core.arguments import (
+    none_if_requested as _none_if_requested,
 )
-from sol_execbench.core.platform.dependency_matrix import PytorchDependencyObservation
-from sol_execbench.core.platform.docker_matrix import (
-    DEFAULT_DOCKER_TARGET_MANIFEST,
-    select_docker_target,
+from sol_execbench.core.arguments import (
+    parse_bool as _parse_bool,
 )
 from sol_execbench.core.evidence.runtime_evidence.builders import (
     build_aggregate_report,
@@ -34,14 +31,21 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeFailureCategory,
     RuntimeFailureEvidence,
 )
-from sol_execbench.core.arguments import (
-    none_if_requested as _none_if_requested,
-    parse_bool as _parse_bool,
+from sol_execbench.core.platform.compatibility import (
+    MatrixContainerEvidence,
+    MatrixEntry,
+)
+from sol_execbench.core.platform.dependency_matrix import (
+    PytorchDependencyObservation,
+)
+from sol_execbench.core.platform.docker_matrix import (
+    DEFAULT_DOCKER_TARGET_MANIFEST,
+    select_docker_target,
 )
 
-
 DependencyObservationBuilder = Callable[
-    [PytorchDependencyObservation], PytorchDependencyObservation
+    [PytorchDependencyObservation],
+    PytorchDependencyObservation,
 ]
 
 
@@ -52,7 +56,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     collect = subparsers.add_parser("collect-target")
     collect.add_argument(
-        "--manifest", type=Path, default=DEFAULT_DOCKER_TARGET_MANIFEST
+        "--manifest",
+        type=Path,
+        default=DEFAULT_DOCKER_TARGET_MANIFEST,
     )
     collect.add_argument("--target")
     collect.add_argument("--output", type=Path, required=True)
@@ -108,7 +114,7 @@ def visible_env_from_args(values: list[str]) -> dict[str, str]:
     for value in values:
         if "=" not in value:
             raise argparse.ArgumentTypeError(
-                f"expected NAME=VALUE visible device env, got {value!r}"
+                f"expected NAME=VALUE visible device env, got {value!r}",
             )
         key, env_value = value.split("=", maxsplit=1)
         result[key] = env_value
@@ -135,7 +141,7 @@ def collect_target(
     dependency_observation = build_dependency_observation(
         PytorchDependencyObservation(
             torch_distribution_version=_none_if_requested(
-                args.torch_distribution_version
+                args.torch_distribution_version,
             ),
             torch_version=_none_if_requested(args.torch_version),
             torch_local_version=_none_if_requested(args.torch_local_version),
@@ -145,18 +151,20 @@ def collect_target(
             torch_device_available=args.torch_device_available,
             torch_import_error=_none_if_requested(args.torch_import_error),
             torchvision_distribution_version=_none_if_requested(
-                args.torchvision_distribution_version
+                args.torchvision_distribution_version,
             ),
             triton_rocm_distribution_version=_none_if_requested(
-                args.triton_rocm_distribution_version
+                args.triton_rocm_distribution_version,
             ),
             triton_rocm_status=_none_if_requested(args.triton_rocm_status),
             container_rocm_user_space_version=_none_if_requested(
-                args.container_rocm_user_space_version
+                args.container_rocm_user_space_version,
             ),
             hipcc_version=_none_if_requested(args.hipcc_version),
-            toolchain_rocm_version=_none_if_requested(args.toolchain_rocm_version),
-        )
+            toolchain_rocm_version=_none_if_requested(
+                args.toolchain_rocm_version,
+            ),
+        ),
     )
     return build_runtime_matrix_entry(
         target=selection.target,
@@ -179,9 +187,13 @@ def collect_target(
             device_count=args.device_count,
             device_name=_none_if_requested(args.device_name),
             gfx_architecture=_none_if_requested(args.gfx_architecture),
-            visible_device_environment=visible_env_from_args(args.visible_device_env),
+            visible_device_environment=visible_env_from_args(
+                args.visible_device_env,
+            ),
         ),
-        runtime_unavailable_reason=_none_if_requested(args.runtime_unavailable_reason),
+        runtime_unavailable_reason=_none_if_requested(
+            args.runtime_unavailable_reason,
+        ),
         failure_evidence=failure_evidence_from_args(args.failure_category),
         allow_mixed_version_debug=args.allow_mixed_version_debug,
         container_validated=args.container_validated,
@@ -197,14 +209,15 @@ def main(
     args = build_parser().parse_args(argv)
     if args.command == "collect-target":
         entry = collect_target(
-            args, build_dependency_observation=build_dependency_observation
+            args,
+            build_dependency_observation=build_dependency_observation,
         )
         write_matrix_entry(args.output, entry)
         print(json.dumps(entry.model_dump(mode="json"), sort_keys=True))
         return 0
     if args.command == "aggregate":
         report = build_aggregate_report(
-            [load_matrix_entry(path) for path in args.entries]
+            [load_matrix_entry(path) for path in args.entries],
         )
         write_json_payload(args.output, report)
         print(json.dumps(report.model_dump(mode="json"), sort_keys=True))

@@ -5,21 +5,24 @@ from __future__ import annotations
 import importlib.metadata
 import subprocess
 
-from sol_execbench.core.platform.runtime import detect_rocm_version, resolve_rocm_tool
-
 from sol_execbench.core.platform.dependency_matrix.models import (
     PytorchDependencyObservation,
+)
+from sol_execbench.core.platform.runtime import (
+    detect_rocm_version,
+    resolve_rocm_tool,
 )
 
 
 def collect_pytorch_dependency_observation() -> PytorchDependencyObservation:
     """Collect lightweight dependency observations without requiring ROCm hardware."""
-
     torch_distribution_version = _distribution_version("torch")
     torchvision_distribution_version = _distribution_version("torchvision")
     triton_rocm_distribution_version = _distribution_version("triton-rocm")
     triton_rocm_status = (
-        "installed" if triton_rocm_distribution_version is not None else "missing"
+        "installed"
+        if triton_rocm_distribution_version is not None
+        else "missing"
     )
     try:
         import torch

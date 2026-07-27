@@ -40,13 +40,21 @@ def _profile_result(
     )
     return Rocprofv3ProfileResult(
         status=status,
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        command=(
+            "rocprofv3",
+            "--kernel-trace",
+            "--",
+            "python",
+            "eval_driver.py",
+        ),
         output_directory=tmp_path,
         output_file="profile",
         artifacts=artifacts if status is Rocprofv3ProfileStatus.SUCCESS else (),
         returncode=0 if status is Rocprofv3ProfileStatus.SUCCESS else 1,
         failed_reason=(
-            None if status is Rocprofv3ProfileStatus.SUCCESS else "rocprofv3 failed"
+            None
+            if status is Rocprofv3ProfileStatus.SUCCESS
+            else "rocprofv3 failed"
         ),
         profiler_available=True,
         artifact_coverage_status=(
@@ -86,7 +94,7 @@ def test_profile_summary_identity_rejects_sol_contract_version_alias() -> None:
                 "sol_contract_version": "v3.0.0",
                 "trace_path": "trace.jsonl",
                 "run_id": "run-1",
-            }
+            },
         )
 
 
@@ -119,7 +127,9 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     assert payload["authority"] == "diagnostic"
     assert payload["summary"]["profiler_status"] == "success"
     assert payload["summary"]["artifact_coverage_status"] == "complete"
-    assert payload["summary"]["reason_codes"] == ["rocprof_artifacts_registered"]
+    assert payload["summary"]["reason_codes"] == [
+        "rocprof_artifacts_registered",
+    ]
     assert payload["summary"]["warnings"] == []
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["artifact_kinds"] == {"rocpd": 1}
@@ -181,10 +191,18 @@ def test_profile_summary_sidecar_includes_structured_artifact_evidence(
     tmp_path: Path,
 ) -> None:
     trace_csv = tmp_path / "profile_kernel_trace.csv"
-    trace_csv.write_text("Domain,Name,Duration(ns)\nKERNEL_DISPATCH,kernel,1000000\n")
+    trace_csv.write_text(
+        "Domain,Name,Duration(ns)\nKERNEL_DISPATCH,kernel,1000000\n",
+    )
     profile = Rocprofv3ProfileResult(
         status=Rocprofv3ProfileStatus.SUCCESS,
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        command=(
+            "rocprofv3",
+            "--kernel-trace",
+            "--",
+            "python",
+            "eval_driver.py",
+        ),
         output_directory=tmp_path,
         output_file="profile",
         artifacts=(
@@ -201,7 +219,7 @@ def test_profile_summary_sidecar_includes_structured_artifact_evidence(
     )
 
     payload = build_profile_summary_sidecar(profile_result=profile).model_dump(
-        mode="json"
+        mode="json",
     )
 
     assert payload["summary"]["kernel_metrics"] == [
@@ -213,7 +231,7 @@ def test_profile_summary_sidecar_includes_structured_artifact_evidence(
             "source": "profile_kernel_trace.csv",
             "artifact": "profile_kernel_trace.csv",
             "parse_status": "available",
-        }
+        },
     ]
     assert payload["summary"]["bottleneck_hints"] == [
         {
@@ -223,7 +241,7 @@ def test_profile_summary_sidecar_includes_structured_artifact_evidence(
             "message": "No bounded counter artifact was available for bottleneck classification.",
             "source_metrics": [],
             "evidence_artifacts": [],
-        }
+        },
     ]
 
 
@@ -234,7 +252,10 @@ def test_profile_summary_sidecar_handles_unavailable_inputs(tmp_path: Path):
         generated_at="2026-06-16T00:00:00Z",
     )
     failed = build_profile_summary_sidecar(
-        profile_result=_profile_result(tmp_path, status=Rocprofv3ProfileStatus.FAILED),
+        profile_result=_profile_result(
+            tmp_path,
+            status=Rocprofv3ProfileStatus.FAILED,
+        ),
         trace_path="trace.jsonl",
         generated_at="2026-06-16T00:00:00Z",
     )
@@ -255,7 +276,13 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
     diagnostic.write_text('{"status":"no_profiler_data_artifacts"}\n')
     success_empty = Rocprofv3ProfileResult(
         status=Rocprofv3ProfileStatus.PARTIAL,
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        command=(
+            "rocprofv3",
+            "--kernel-trace",
+            "--",
+            "python",
+            "eval_driver.py",
+        ),
         output_directory=tmp_path,
         output_file="profile",
         artifacts=(
@@ -268,7 +295,9 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
         returncode=0,
         profiler_available=True,
         timeout_seconds=60,
-        artifact_coverage_status=(Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY),
+        artifact_coverage_status=(
+            Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY
+        ),
         reason_codes=(
             "rocprof_no_registered_artifacts",
             "rocprof_diagnostic_log_registered",
@@ -288,7 +317,9 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
     assert payload["status"] == "partial"
     assert payload["reason_code"] == "profile_partial"
     assert payload["summary"]["profiler_status"] == "partial"
-    assert payload["summary"]["artifact_coverage_status"] == "diagnostic_logs_only"
+    assert (
+        payload["summary"]["artifact_coverage_status"] == "diagnostic_logs_only"
+    )
     assert payload["summary"]["reason_codes"] == [
         "rocprof_no_registered_artifacts",
         "rocprof_diagnostic_log_registered",
@@ -296,7 +327,7 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["artifact_kinds"] == {"diagnostic_json": 1}
     assert payload["summary"]["parse_warnings"] == [
-        "profile.diagnostics.json: diagnostic_json artifacts are citation-only in sol_execbench.profile_summary.v3"
+        "profile.diagnostics.json: diagnostic_json artifacts are citation-only in sol_execbench.profile_summary.v3",
     ]
     assert any(
         "diagnostic logs but no profiler data artifacts" in limitation
@@ -311,7 +342,13 @@ def test_profile_summary_success_with_only_diagnostic_json_is_partial(
     diagnostic.write_text('{"status":"no_profiler_data_artifacts"}\n')
     profile = Rocprofv3ProfileResult(
         status=Rocprofv3ProfileStatus.SUCCESS,
-        command=("rocprofv3", "--kernel-trace", "--", "python", "eval_driver.py"),
+        command=(
+            "rocprofv3",
+            "--kernel-trace",
+            "--",
+            "python",
+            "eval_driver.py",
+        ),
         output_directory=tmp_path,
         output_file="profile",
         artifacts=(
@@ -323,7 +360,9 @@ def test_profile_summary_success_with_only_diagnostic_json_is_partial(
         ),
         returncode=0,
         profiler_available=True,
-        artifact_coverage_status=(Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY),
+        artifact_coverage_status=(
+            Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY
+        ),
         reason_codes=(
             "rocprof_no_registered_artifacts",
             "rocprof_diagnostic_log_registered",
@@ -336,7 +375,9 @@ def test_profile_summary_success_with_only_diagnostic_json_is_partial(
     assert payload["status"] == "partial"
     assert payload["reason_code"] == "profile_partial"
     assert payload["summary"]["profiler_status"] == "success"
-    assert payload["summary"]["artifact_coverage_status"] == "diagnostic_logs_only"
+    assert (
+        payload["summary"]["artifact_coverage_status"] == "diagnostic_logs_only"
+    )
     assert payload["summary"]["artifact_kinds"] == {"diagnostic_json": 1}
     assert any(
         "diagnostic logs but no profiler data artifacts" in limitation
@@ -381,7 +422,10 @@ def test_profile_summary_freshness_and_governance(tmp_path: Path):
         ).status
         == "stale_diagnostic"
     )
-    assert evaluate_profile_summary_governance(sidecar=None).status == "unavailable"
+    assert (
+        evaluate_profile_summary_governance(sidecar=None).status
+        == "unavailable"
+    )
     assert (
         evaluate_profile_summary_governance(
             sidecar=None,
@@ -392,7 +436,9 @@ def test_profile_summary_freshness_and_governance(tmp_path: Path):
 
 
 def test_profile_summary_rejects_authority_override(tmp_path: Path):
-    sidecar = build_profile_summary_sidecar(profile_result=_profile_result(tmp_path))
+    sidecar = build_profile_summary_sidecar(
+        profile_result=_profile_result(tmp_path),
+    )
     payload = sidecar.model_dump(mode="json")
     payload["authority"] = "score"
 

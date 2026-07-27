@@ -86,7 +86,8 @@ def test_run_layer_emits_auditable_evidence(tmp_path, monkeypatch):
     def fake_run(args, *, cwd, **kwargs):
         del args, kwargs
         Path(cwd, "timeloop-mapper.oaves.csv").write_text(
-            "64,1.0,12\n128,2.0,8\n", encoding="utf-8"
+            "64,1.0,12\n128,2.0,8\n",
+            encoding="utf-8",
         )
         return SimpleNamespace(returncode=0, stdout="stdout", stderr="stderr")
 
@@ -129,7 +130,11 @@ def test_run_layer_reports_process_failures(tmp_path, monkeypatch, failure):
 
 def test_run_multi_chain_composes_sweeps(tmp_path, monkeypatch):
     runner = _runner(tmp_path)
-    monkeypatch.setattr(orojenesis, "_default_mapper_runner", _mapping_subprocess)
+    monkeypatch.setattr(
+        orojenesis,
+        "_default_mapper_runner",
+        _mapping_subprocess,
+    )
     chain = [
         ("mm0", _matmul("x", "w0", "hidden", m=2, k=3, n=4)),
         ("mm1", _matmul("hidden", "w1", "result", m=2, k=4, n=5)),
@@ -142,7 +147,8 @@ def test_run_multi_chain_composes_sweeps(tmp_path, monkeypatch):
     ]
     assert {item["row_tile"] for item in result["curve"]} == {1}
     parsed = orojenesis.parse_multi_einsum_curve(
-        tmp_path / "chain" / "multi-einsum-curve.csv", word_bytes=2
+        tmp_path / "chain" / "multi-einsum-curve.csv",
+        word_bytes=2,
     )
     assert parsed == result["curve"]
 
@@ -160,7 +166,9 @@ def test_run_multi_chain_validates_width_and_process(tmp_path, monkeypatch):
         orojenesis,
         "_default_mapper_runner",
         lambda *args, **kwargs: SimpleNamespace(
-            returncode=9, stdout="", stderr="failure"
+            returncode=9,
+            stdout="",
+            stderr="failure",
         ),
     )
     with pytest.raises(orojenesis.OrojenesisError, match="status 9"):
@@ -185,7 +193,7 @@ def _batched_region() -> dict:
                 "bridges": [],
                 "axis_map": [0, 1],
                 "layer_path": ["mm0", "mm1"],
-            }
+            },
         ],
         "roots": ["mm0"],
         "leaves": ["mm1"],
@@ -196,16 +204,23 @@ def _batched_region() -> dict:
 
 def test_run_multi_region_composes_sweeps(tmp_path, monkeypatch):
     runner = _runner(tmp_path)
-    monkeypatch.setattr(orojenesis, "_default_mapper_runner", _mapping_subprocess)
+    monkeypatch.setattr(
+        orojenesis,
+        "_default_mapper_runner",
+        _mapping_subprocess,
+    )
     result = runner.run_multi_region(
-        _batched_region(), tmp_path / "region", word_bits=16
+        _batched_region(),
+        tmp_path / "region",
+        word_bits=16,
     )
     assert result["composition"] == orojenesis.MULTI_EINSUM_BATCH_COMPOSITION
     assert len(result["sweeps"]) == 2
     assert result["curve"]
     assert (
         orojenesis.parse_multi_einsum_region_curve(
-            tmp_path / "region" / "multi-einsum-region-curve.csv", word_bytes=2
+            tmp_path / "region" / "multi-einsum-region-curve.csv",
+            word_bytes=2,
         )
         == result["curve"]
     )
@@ -214,7 +229,11 @@ def test_run_multi_region_composes_sweeps(tmp_path, monkeypatch):
 def test_run_multi_region_reports_process_failures(tmp_path, monkeypatch):
     runner = _runner(tmp_path)
     with pytest.raises(orojenesis.OrojenesisError, match="byte aligned"):
-        runner.run_multi_region(_batched_region(), tmp_path / "width", word_bits=0)
+        runner.run_multi_region(
+            _batched_region(),
+            tmp_path / "width",
+            word_bits=0,
+        )
 
     def fake_run(*args, **kwargs):
         del args, kwargs
@@ -222,7 +241,11 @@ def test_run_multi_region_reports_process_failures(tmp_path, monkeypatch):
 
     monkeypatch.setattr(orojenesis, "_default_mapper_runner", fake_run)
     with pytest.raises(orojenesis.OrojenesisError, match="execution failed"):
-        runner.run_multi_region(_batched_region(), tmp_path / "failed", word_bits=16)
+        runner.run_multi_region(
+            _batched_region(),
+            tmp_path / "failed",
+            word_bits=16,
+        )
 
 
 @pytest.mark.requires_linux

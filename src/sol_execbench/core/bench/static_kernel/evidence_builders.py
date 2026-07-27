@@ -8,10 +8,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from sol_execbench.core.bench.static_kernel.evidence_models import (
+    StaticIsaAnalysis,
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceClassification,
     StaticKernelEvidenceKernel,
-    StaticIsaAnalysis,
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceSidecar,
     StaticKernelEvidenceSourceReference,
@@ -36,7 +36,6 @@ def build_static_kernel_evidence_sidecar(
     source_references: Sequence[StaticKernelEvidenceSourceReference] = (),
 ) -> StaticKernelEvidenceSidecar:
     """Build a strict static evidence sidecar without collecting artifacts."""
-
     return StaticKernelEvidenceSidecar(
         status=StaticKernelEvidenceStatus(status),
         reason_code=StaticKernelEvidenceReasonCode(reason_code),
@@ -57,7 +56,6 @@ def build_static_kernel_evidence_skipped(
     ),
 ) -> StaticKernelEvidenceSidecar:
     """Build a skipped sidecar for unrequested static evidence."""
-
     return build_static_kernel_evidence_sidecar(
         status=StaticKernelEvidenceStatus.SKIPPED,
         reason_code=reason_code,
@@ -70,7 +68,6 @@ def build_static_kernel_evidence_unavailable(
     ),
 ) -> StaticKernelEvidenceSidecar:
     """Build an unavailable sidecar for missing optional tooling or artifacts."""
-
     return build_static_kernel_evidence_sidecar(
         status=StaticKernelEvidenceStatus.UNAVAILABLE,
         reason_code=reason_code,
@@ -83,7 +80,6 @@ def build_static_kernel_evidence_unsupported(
     ),
 ) -> StaticKernelEvidenceSidecar:
     """Build an unsupported sidecar for unsupported solution or artifact classes."""
-
     return build_static_kernel_evidence_sidecar(
         status=StaticKernelEvidenceStatus.UNSUPPORTED,
         reason_code=reason_code,
@@ -96,7 +92,6 @@ def build_static_kernel_evidence_failed(
     ),
 ) -> StaticKernelEvidenceSidecar:
     """Build a failed sidecar for failed optional evidence extraction."""
-
     return build_static_kernel_evidence_sidecar(
         status=StaticKernelEvidenceStatus.FAILED,
         reason_code=reason_code,
@@ -109,7 +104,6 @@ def build_static_kernel_evidence_partial(
     ),
 ) -> StaticKernelEvidenceSidecar:
     """Build a partial sidecar for incomplete optional static evidence."""
-
     return build_static_kernel_evidence_sidecar(
         status=StaticKernelEvidenceStatus.PARTIAL,
         reason_code=reason_code,

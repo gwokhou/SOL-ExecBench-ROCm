@@ -8,32 +8,36 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from .environment_models import (
+from sol_execbench.core.platform.environment_models import (
     EnvironmentCheckResult,
     EnvironmentDiagnostics,
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
 )
-from .environment_snapshot import collect_environment_snapshot
+from sol_execbench.core.platform.environment_snapshot import (
+    collect_environment_snapshot,
+)
 
 
 def build_environment_diagnostics(
     *,
     snapshot_collector: Callable[
-        [], EnvironmentSnapshot
+        [],
+        EnvironmentSnapshot,
     ] = collect_environment_snapshot,
     smoke_checker: Callable[[], list[EnvironmentCheckResult]] | None = None,
     now: Callable[[], datetime] | None = None,
 ) -> EnvironmentDiagnostics:
     """Build diagnostics for ``sol-execbench environment doctor``."""
-
     snapshot = snapshot_collector()
     checks = tool_checks(snapshot)
     checks.extend(
-        smoke_checker() if smoke_checker is not None else run_pytorch_smoke_checks()
+        smoke_checker()
+        if smoke_checker is not None
+        else run_pytorch_smoke_checks(),
     )
     status = aggregate_check_status(
-        [snapshot.collection_status, *(check.status for check in checks)]
+        [snapshot.collection_status, *(check.status for check in checks)],
     )
     generated_at = (now or (lambda: datetime.now(UTC)))().isoformat()
     return EnvironmentDiagnostics(
@@ -46,7 +50,6 @@ def build_environment_diagnostics(
 
 def run_pytorch_smoke_checks() -> list[EnvironmentCheckResult]:
     """Run lightweight PyTorch ROCm smoke checks for diagnostics only."""
-
     try:
         import torch
     except ImportError as exc:
@@ -137,7 +140,7 @@ def _device_memory_copy_check() -> EnvironmentCheckResult:
             status=EnvironmentEvidenceStatus.FAILED,
             message="Device memory copy returned an unexpected value",
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- diagnostic check result boundary
         return EnvironmentCheckResult(
             name="device_memory_copy",
             status=EnvironmentEvidenceStatus.FAILED,
@@ -161,7 +164,7 @@ def _event_timing_check() -> EnvironmentCheckResult:
             status=EnvironmentEvidenceStatus.AVAILABLE,
             message="HIP-backed PyTorch event timing succeeded",
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- diagnostic check result boundary
         return EnvironmentCheckResult(
             name="event_timing",
             status=EnvironmentEvidenceStatus.FAILED,
@@ -170,6 +173,7 @@ def _event_timing_check() -> EnvironmentCheckResult:
 
 
 def tool_checks(snapshot: EnvironmentSnapshot) -> list[EnvironmentCheckResult]:
+    """Convert tool probes into environment diagnostic checks."""
     checks: list[EnvironmentCheckResult] = []
     for name, result in snapshot.tools.items():
         unavailable = result.status == EnvironmentEvidenceStatus.UNAVAILABLE
@@ -187,7 +191,7 @@ def tool_checks(snapshot: EnvironmentSnapshot) -> list[EnvironmentCheckResult]:
                     if unavailable
                     else None
                 ),
-            )
+            ),
         )
     return checks
 
@@ -195,12 +199,17 @@ def tool_checks(snapshot: EnvironmentSnapshot) -> list[EnvironmentCheckResult]:
 def aggregate_check_status(
     statuses: list[EnvironmentEvidenceStatus],
 ) -> EnvironmentEvidenceStatus:
+    """Aggregate individual diagnostic checks into one status."""
     if any(status == EnvironmentEvidenceStatus.FAILED for status in statuses):
         return EnvironmentEvidenceStatus.FAILED
     if any(status == EnvironmentEvidenceStatus.TIMEOUT for status in statuses):
         return EnvironmentEvidenceStatus.TIMEOUT
-    if any(status == EnvironmentEvidenceStatus.AVAILABLE for status in statuses):
+    if any(
+        status == EnvironmentEvidenceStatus.AVAILABLE for status in statuses
+    ):
         return EnvironmentEvidenceStatus.AVAILABLE
-    if any(status == EnvironmentEvidenceStatus.UNAVAILABLE for status in statuses):
+    if any(
+        status == EnvironmentEvidenceStatus.UNAVAILABLE for status in statuses
+    ):
         return EnvironmentEvidenceStatus.UNAVAILABLE
     return EnvironmentEvidenceStatus.SKIPPED

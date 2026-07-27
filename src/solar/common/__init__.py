@@ -15,21 +15,21 @@
 
 """Common utilities and types for the Solar package."""
 
-from solar.common.types import (
-    NodeInfo,
-    GraphInfo,
-    AnalysisResult,
-    EinsumOperation,
-    TensorShape,
-)
 from solar.common.constants import (
     DEFAULT_PRECISION,
     SUPPORTED_OPERATIONS,
 )
+from solar.common.types import (
+    AnalysisResult,
+    EinsumOperation,
+    GraphInfo,
+    NodeInfo,
+    TensorShape,
+)
 from solar.common.utils import (
     format_number,
-    setup_safe_environment,
     load_module_from_file,
+    setup_safe_environment,
 )
 
 __all__ = [

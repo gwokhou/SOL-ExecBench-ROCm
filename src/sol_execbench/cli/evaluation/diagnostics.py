@@ -46,10 +46,15 @@ def _no_trace_diagnostics_sidecar_path(
 ) -> Path:
     """Return a persisted diagnostic sidecar path for no-trace outcomes."""
     if output_file is not None:
-        return output_file.with_name(f"{output_file.name}.no-trace-diagnostics.json")
+        return output_file.with_name(
+            f"{output_file.name}.no-trace-diagnostics.json",
+        )
     if keep_staging:
         return staging_dir / "no-trace-diagnostics.json"
-    return Path(tempfile.gettempdir()) / f"{staging_dir.name}.no-trace-diagnostics.json"
+    return (
+        Path(tempfile.gettempdir())
+        / f"{staging_dir.name}.no-trace-diagnostics.json"
+    )
 
 
 def _write_no_trace_diagnostics_sidecar(
@@ -83,5 +88,7 @@ def _write_no_trace_diagnostics_sidecar(
         write_json_payload(sidecar_path, payload)
         return sidecar_path
     except OSError as exc:
-        console.print(f"[yellow]Failed to write no-trace diagnostics: {exc}[/yellow]")
+        console.print(
+            f"[yellow]Failed to write no-trace diagnostics: {exc}[/yellow]",
+        )
         return None

@@ -1,6 +1,7 @@
 """Standalone PyTorch reference for l3n44_mingpt_block (debug mirror)."""
 
 import math
+
 import torch
 import torch.nn.functional as F
 
@@ -11,7 +12,9 @@ def _new_gelu(z):
         * z
         * (
             1.0
-            + torch.tanh(math.sqrt(2.0 / math.pi) * (z + 0.044715 * torch.pow(z, 3.0)))
+            + torch.tanh(
+                math.sqrt(2.0 / math.pi) * (z + 0.044715 * torch.pow(z, 3.0)),
+            )
         )
     )
 

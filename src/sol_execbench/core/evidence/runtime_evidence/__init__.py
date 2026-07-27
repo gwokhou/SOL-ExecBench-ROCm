@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-from sol_execbench.core.platform.dependency_matrix import (
-    PytorchDependencyObservation,
-    collect_pytorch_dependency_observation,
-)
+import argparse
+
 from sol_execbench.core.evidence.runtime_evidence.builders import (
     build_aggregate_report,
     build_runtime_matrix_entry,
 )
 from sol_execbench.core.evidence.runtime_evidence.cli import (
     collect_target as _collect_target_impl,
+)
+from sol_execbench.core.evidence.runtime_evidence.cli import (
     main as _main,
 )
 from sol_execbench.core.evidence.runtime_evidence.collectors import (
     build_dependency_observation as _build_dependency_observation,
+)
+from sol_execbench.core.evidence.runtime_evidence.collectors import (
     build_host_evidence,
     collect_gpu_evidence,
     collect_visible_device_environment,
@@ -30,6 +32,11 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeFailureCategory,
     RuntimeFailureEvidence,
 )
+from sol_execbench.core.platform.compatibility import MatrixEntry
+from sol_execbench.core.platform.dependency_matrix import (
+    PytorchDependencyObservation,
+    collect_pytorch_dependency_observation,
+)
 
 
 def build_dependency_observation(
@@ -42,15 +49,19 @@ def build_dependency_observation(
     )
 
 
-def _collect_target(args):
+def _collect_target(args: argparse.Namespace) -> MatrixEntry:
     return _collect_target_impl(
-        args, build_dependency_observation=build_dependency_observation
+        args,
+        build_dependency_observation=build_dependency_observation,
     )
 
 
 def main(argv: list[str] | None = None) -> int:
     """Emit runtime evidence sidecars and aggregate reports."""
-    return _main(argv, build_dependency_observation=build_dependency_observation)
+    return _main(
+        argv,
+        build_dependency_observation=build_dependency_observation,
+    )
 
 
 __all__ = [

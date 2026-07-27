@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import subprocess
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
 PATCH_DIR = ROOT / "scripts/patches/gfx1200_sq_wave_cycles"
@@ -17,7 +16,11 @@ def _write_executable(path: Path, content: str) -> None:
     path.chmod(0o755)
 
 
-def _fake_environment(tmp_path: Path, *, initial: str = "AUTO") -> dict[str, str]:
+def _fake_environment(
+    tmp_path: Path,
+    *,
+    initial: str = "AUTO",
+) -> dict[str, str]:
     state = tmp_path / "perf-level"
     state.write_text(initial, encoding="utf-8")
     amd_smi = tmp_path / "amd-smi"
@@ -95,7 +98,11 @@ def test_wrapper_preserves_external_stable_peak(tmp_path: Path) -> None:
     env = _fake_environment(tmp_path, initial="STABLE_PEAK")
 
     result = subprocess.run(
-        [WRAPPER, "--version"], env=env, text=True, capture_output=True, check=False
+        [WRAPPER, "--version"],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
     )
 
     assert result.returncode == 0
@@ -107,18 +114,28 @@ def test_wrapper_restores_auto_after_profiler_failure(tmp_path: Path) -> None:
     env = {**_fake_environment(tmp_path), "FAKE_ROCPROF_EXIT": "23"}
 
     result = subprocess.run(
-        [WRAPPER, "--version"], env=env, text=True, capture_output=True, check=False
+        [WRAPPER, "--version"],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
     )
 
     assert result.returncode == 23
     assert Path(env["STATE_PATH"]).read_text(encoding="utf-8") == "AUTO"
 
 
-def test_wrapper_rejects_manual_state_without_changing_it(tmp_path: Path) -> None:
+def test_wrapper_rejects_manual_state_without_changing_it(
+    tmp_path: Path,
+) -> None:
     env = _fake_environment(tmp_path, initial="MANUAL")
 
     result = subprocess.run(
-        [WRAPPER, "--version"], env=env, text=True, capture_output=True, check=False
+        [WRAPPER, "--version"],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
     )
 
     assert result.returncode == 78
@@ -130,14 +147,20 @@ def test_wrapper_rejects_mixed_multi_gpu_state(tmp_path: Path) -> None:
     env = {**_fake_environment(tmp_path), "PERF_LEVEL_OVERRIDE": "MIXED"}
 
     result = subprocess.run(
-        [WRAPPER, "--version"], env=env, text=True, capture_output=True, check=False
+        [WRAPPER, "--version"],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
     )
 
     assert result.returncode == 78
     assert "patch_error=unsupported_initial_perf_level" in result.stderr
 
 
-def test_embedded_help_is_complete_and_has_no_gpu_side_effect(tmp_path: Path) -> None:
+def test_embedded_help_is_complete_and_has_no_gpu_side_effect(
+    tmp_path: Path,
+) -> None:
     env = {
         **_fake_environment(tmp_path),
         "SOL_EXECBENCH_PATCH_HOME": str(tmp_path / "home"),
@@ -174,10 +197,16 @@ def test_install_and_checksum_guarded_rollback(tmp_path: Path) -> None:
         "SUDO_LOG": str(sudo_log),
     }
     install_result = subprocess.run(
-        [INSTALL], env=env, text=True, capture_output=True, check=False
+        [INSTALL],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
     )
     installed = tmp_path / "home/.local/bin/rocprofv3-gfx1200-patched"
-    installed_rollback = tmp_path / "home/.local/bin/rollback-rocprofv3-gfx1200-patch"
+    installed_rollback = (
+        tmp_path / "home/.local/bin/rollback-rocprofv3-gfx1200-patch"
+    )
 
     assert install_result.returncode == 0
     assert installed.is_file()
@@ -190,7 +219,11 @@ def test_install_and_checksum_guarded_rollback(tmp_path: Path) -> None:
     ]
 
     rollback_result = subprocess.run(
-        [ROLLBACK], env=env, text=True, capture_output=True, check=False
+        [ROLLBACK],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
     )
 
     assert rollback_result.returncode == 0
@@ -209,7 +242,11 @@ def test_rollback_refuses_to_remove_modified_wrapper(tmp_path: Path) -> None:
         stream.write("# local modification\n")
 
     result = subprocess.run(
-        [ROLLBACK], env=env, text=True, capture_output=True, check=False
+        [ROLLBACK],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
     )
 
     assert result.returncode == 65
@@ -217,7 +254,9 @@ def test_rollback_refuses_to_remove_modified_wrapper(tmp_path: Path) -> None:
     assert installed.exists()
 
 
-def test_rollback_resets_stable_peak_before_removing_patch(tmp_path: Path) -> None:
+def test_rollback_resets_stable_peak_before_removing_patch(
+    tmp_path: Path,
+) -> None:
     env = {
         **_fake_environment(tmp_path),
         "SOL_EXECBENCH_PATCH_HOME": str(tmp_path / "home"),
@@ -226,7 +265,11 @@ def test_rollback_resets_stable_peak_before_removing_patch(tmp_path: Path) -> No
     Path(env["STATE_PATH"]).write_text("STABLE_PEAK", encoding="utf-8")
 
     result = subprocess.run(
-        [ROLLBACK], env=env, text=True, capture_output=True, check=False
+        [ROLLBACK],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
     )
 
     assert result.returncode == 0

@@ -8,7 +8,6 @@ from pydantic import ConfigDict
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
-
 MODEL_CONFIG = ConfigDict(
     extra="forbid",
     frozen=True,
@@ -25,7 +24,11 @@ RuntimeFailureCategory = Literal[
 
 
 class ModelDumpable(Protocol):
-    def model_dump(self, *, mode: str) -> dict[str, Any]: ...
+    """Minimal Pydantic-compatible serialization protocol."""
+
+    def model_dump(self, *, mode: str) -> dict[str, Any]:
+        """Serialize the model using the requested Pydantic mode."""
+        ...
 
 
 class RuntimeFailureEvidence(BaseModelWithDocstrings):

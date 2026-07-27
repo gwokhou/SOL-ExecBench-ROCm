@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "src" / "sol_execbench"
+SCRIPT_ROOT = ROOT / "scripts"
 SOLAR_ROOT = ROOT / "src" / "solar"
 TEST_ROOT = ROOT / "tests"
 BASELINE_PATH = ROOT / "scripts" / "readability_baseline.json"
@@ -29,6 +30,8 @@ REFACTORED_MODULES = {
 
 @dataclass(frozen=True)
 class Metrics:
+    """Repository readability metrics collected from Python ASTs."""
+
     long_functions: int = 0
     wide_functions: int = 0
     production_any_modules: int = 0
@@ -50,9 +53,14 @@ def _parameter_count(node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
 
 
 def collect_metrics() -> tuple[Metrics, list[str]]:
-    counts = {field: 0 for field in Metrics.__dataclass_fields__}
+    """Collect readability metrics for package sources and maintenance scripts."""
+    counts = dict.fromkeys(Metrics.__dataclass_fields__, 0)
     strict_failures: list[str] = []
-    for path in _python_files(SOURCE_ROOT):
+    production_paths = [
+        *_python_files(SOURCE_ROOT),
+        *_python_files(SCRIPT_ROOT),
+    ]
+    for path in sorted(production_paths):
         relative = path.relative_to(ROOT).as_posix()
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
@@ -64,10 +72,12 @@ def collect_metrics() -> tuple[Metrics, list[str]]:
                 counts["long_functions"] += span > 80
                 counts["wide_functions"] += width > 10
                 if relative in REFACTORED_MODULES and span > 80:
-                    strict_failures.append(f"{relative}:{node.lineno} has {span} lines")
+                    strict_failures.append(
+                        f"{relative}:{node.lineno} has {span} lines",
+                    )
                 if relative in REFACTORED_MODULES and width > 10:
                     strict_failures.append(
-                        f"{relative}:{node.lineno} has {width} parameters"
+                        f"{relative}:{node.lineno} has {width} parameters",
                     )
             elif isinstance(node, ast.ImportFrom) and any(
                 alias.name == "*" for alias in node.names
@@ -75,7 +85,8 @@ def collect_metrics() -> tuple[Metrics, list[str]]:
                 counts["wildcard_imports"] += 1
             elif isinstance(node, ast.Name) and node.id == "Any":
                 has_any = True
-        counts["production_any_modules"] += has_any
+        if path.is_relative_to(SOURCE_ROOT):
+            counts["production_any_modules"] += has_any
     for path in _python_files(TEST_ROOT):
         line_count = len(path.read_text(encoding="utf-8").splitlines())
         counts["oversized_test_modules"] += line_count > 1000
@@ -85,14 +96,19 @@ def collect_metrics() -> tuple[Metrics, list[str]]:
 class _QualifiedFunctionVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
         self.stack: list[str] = []
-        self.functions: list[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]] = []
+        self.functions: list[
+            tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]
+        ] = []
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self.stack.append(node.name)
         self.generic_visit(node)
         self.stack.pop()
 
-    def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+    def _visit_function(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> None:
         qualified = ".".join((*self.stack, node.name))
         self.functions.append((qualified, node))
         self.stack.append(node.name)
@@ -158,31 +174,37 @@ def check_solar_debt(current: dict[str, object]) -> list[str]:
     for category in ("long_functions", "wide_functions", "oversized_modules"):
         actual = current[category]
         expected = baseline[category]
-        assert isinstance(actual, dict) and isinstance(expected, dict)
+        if not isinstance(actual, dict) or not isinstance(expected, dict):
+            raise TypeError(
+                f"readability debt category {category} must map keys"
+            )
         for key in sorted(set(actual) | set(expected)):
             if key not in actual:
                 failures.append(
-                    f"SOLAR {category} removed without baseline update: {key}"
+                    f"SOLAR {category} removed without baseline update: {key}",
                 )
             elif key not in expected:
                 failures.append(f"SOLAR {category} added: {key}={actual[key]}")
             elif int(actual[key]) != int(expected[key]):
                 failures.append(
                     f"SOLAR {category} changed without baseline update: "
-                    f"{key}={actual[key]} != {expected[key]}"
+                    f"{key}={actual[key]} != {expected[key]}",
                 )
     for category in ("any_modules", "wildcard_imports"):
         actual_items = set(current[category])
         expected_items = set(baseline[category])
         for item in sorted(actual_items ^ expected_items):
             change = (
-                "added" if item in actual_items else "removed without baseline update"
+                "added"
+                if item in actual_items
+                else "removed without baseline update"
             )
             failures.append(f"SOLAR {category} {change}: {item}")
     return failures
 
 
 def main() -> int:
+    """Check current readability metrics against repository policy."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--no-baseline", action="store_true")
@@ -199,7 +221,7 @@ def main() -> int:
             if value != int(baseline[name]):
                 failures.append(
                     f"{name} changed without baseline update: "
-                    f"{value} != {baseline[name]}"
+                    f"{value} != {baseline[name]}",
                 )
         failures.extend(check_solar_debt(solar_debt))
     payload = {

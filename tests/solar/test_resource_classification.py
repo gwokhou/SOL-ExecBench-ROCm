@@ -68,7 +68,7 @@ def test_attention_rule_accounts_for_all_compute_resources() -> None:
             output_shapes=[[2, 4, 8]],
             input_dtypes=["fp16", "fp16"],
             output_dtypes=["fp16"],
-        )
+        ),
     )
 
     assert result["work"] == {
@@ -106,7 +106,10 @@ def test_attention_rule_accounts_for_all_compute_resources() -> None:
         ),
     ],
 )
-def test_exempt_rules_return_stable_reason(layer: dict[str, Any], reason: str) -> None:
+def test_exempt_rules_return_stable_reason(
+    layer: dict[str, Any],
+    reason: str,
+) -> None:
     assert _classify(layer) == {
         "model_version": RESOURCE_MODEL_VERSION,
         "work": {},
@@ -124,7 +127,7 @@ def test_atomic_rule_counts_source_values_and_uses_source_dtype() -> None:
             output_shapes=[[2, 4]],
             input_dtypes=["fp32", "int64", "fp16"],
             output_dtypes=["fp32"],
-        )
+        ),
     )
 
     assert result["work"] == {"atomic": {"fp16": 8}}
@@ -139,7 +142,7 @@ def test_softmax_rule_uses_recorded_reduction_dimension() -> None:
             input_dtypes=["fp32"],
             output_dtypes=["fp32"],
             semantic_extras={"kwargs": {"dim": 1}},
-        )
+        ),
     )
 
     assert result["work"] == {
@@ -155,7 +158,9 @@ def test_unknown_operation_falls_back_to_macs_when_available() -> None:
     assert result["work"] == {"mfma": {"fp32->fp32": 6}}
 
 
-def test_unknown_operation_is_explicitly_unclassified_outside_strict_mode() -> None:
+def test_unknown_operation_is_explicitly_unclassified_outside_strict_mode() -> (
+    None
+):
     result = _classify(_layer("custom_operation"), strict=False)
 
     assert result["classification"] == "unclassified"

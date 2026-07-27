@@ -55,10 +55,9 @@ class ProfileSummarySidecar(DiagnosticSidecarEnvelope):
     summary: ProfileSummaryContent
     limitations: list[str] = Field(default_factory=list)
     artifact_citations: list[SizedDiagnosticArtifactCitation] = Field(
-        default_factory=list
+        default_factory=list,
     )
 
     def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible sidecar payload."""
-
         return self.model_dump(mode="json")

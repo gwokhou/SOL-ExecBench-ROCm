@@ -31,7 +31,7 @@ SOLAR_LIMITS = {
 }
 EXACT_IMPORTS = {
     "sol_execbench.driver.templates.eval_driver": [
-        "sol_execbench.driver.eval_runtime_api"
+        "sol_execbench.driver.eval_runtime_api",
     ],
 }
 FORBIDDEN_DEPENDENCIES = {
@@ -60,7 +60,9 @@ def internal_modules() -> dict[str, Path]:
     modules: dict[str, Path] = {}
     for package_root in PACKAGE_ROOTS:
         for path in sorted(package_root.rglob("*.py")):
-            module = ".".join(path.relative_to(SOURCE_ROOT).with_suffix("").parts)
+            module = ".".join(
+                path.relative_to(SOURCE_ROOT).with_suffix("").parts,
+            )
             if module.endswith(".__init__"):
                 module = module.removesuffix(".__init__")
             modules[module] = path
@@ -77,7 +79,9 @@ def resolve_import_from_base(
         package_parts = module.split(".")[:-1]
         if modules[module].name == "__init__.py":
             package_parts = module.split(".")
-        base_parts = package_parts[: max(0, len(package_parts) - node.level + 1)]
+        base_parts = package_parts[
+            : max(0, len(package_parts) - node.level + 1)
+        ]
         if node.module:
             base_parts.extend(node.module.split("."))
         return ".".join(base_parts)
@@ -230,7 +234,10 @@ def facade_import_violations(modules: dict[str, Path]) -> list[tuple[str, str]]:
                     for alias in node.names
                     if alias.name in {"dataset", "scoring"}
                 )
-            if base in {"sol_execbench.core.dataset", "sol_execbench.core.scoring"}:
+            if base in {
+                "sol_execbench.core.dataset",
+                "sol_execbench.core.scoring",
+            }:
                 for alias in node.names:
                     imported = f"{base}.{alias.name}"
                     if imported not in modules:
@@ -244,12 +251,14 @@ def cross_package_violations(
     """Reject benchmark concepts in SOLAR and bypasses around the bridge."""
     violations: list[tuple[str, str]] = []
     for source, target in edges:
-        if source.startswith("solar") and target.startswith("sol_execbench"):
-            violations.append((source, target))
-        elif (
-            source.startswith("sol_execbench")
-            and target.startswith("solar")
-            and not is_under(source, "sol_execbench.core.solar_bridge")
+        if (
+            source.startswith("solar")
+            and target.startswith("sol_execbench")
+            or (
+                source.startswith("sol_execbench")
+                and target.startswith("solar")
+                and not is_under(source, "sol_execbench.core.solar_bridge")
+            )
         ):
             violations.append((source, target))
     return sorted(violations)
@@ -262,7 +271,9 @@ def layer_violations(edges: set[tuple[str, str]]) -> list[tuple[str, str]]:
         for source, target in edges
         for source_root, forbidden_targets in FORBIDDEN_DEPENDENCIES.items()
         if is_under(source, source_root)
-        and any(is_under(target, target_root) for target_root in forbidden_targets)
+        and any(
+            is_under(target, target_root) for target_root in forbidden_targets
+        )
     )
 
 
@@ -273,13 +284,17 @@ def check_limits(stats: dict[str, ModuleStats]) -> list[str]:
     for module, (line_limit, fanout_limit) in limits.items():
         stat = stats[module]
         if stat.line_count > line_limit:
-            failures.append(f"{module}: line_count {stat.line_count} > {line_limit}")
+            failures.append(
+                f"{module}: line_count {stat.line_count} > {line_limit}",
+            )
         if stat.fanout > fanout_limit:
             failures.append(f"{module}: fanout {stat.fanout} > {fanout_limit}")
     for module, expected_imports in EXACT_IMPORTS.items():
         imports = stats[module].imports
         if imports != expected_imports:
-            failures.append(f"{module}: imports {imports} != {expected_imports}")
+            failures.append(
+                f"{module}: imports {imports} != {expected_imports}",
+            )
     return failures
 
 
@@ -323,7 +338,9 @@ def main() -> int:
         print(f"layer violations: {result['layer_violations']}")
         print(f"limit failures: {result['limit_failures']}")
         for module, stat in result["stats"].items():
-            print(f"{module}: lines={stat['line_count']} fanout={stat['fanout']}")
+            print(
+                f"{module}: lines={stat['line_count']} fanout={stat['fanout']}",
+            )
     if (
         result["cycles"]
         or result["cross_package_violations"]

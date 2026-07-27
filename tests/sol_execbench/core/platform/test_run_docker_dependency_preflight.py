@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
 RUN_DOCKER_SCRIPT = REPO_ROOT / "scripts" / "run_docker.sh"
 
@@ -24,7 +23,9 @@ def _matching_default_dependency_env() -> dict[str, str]:
         "SOL_EXECBENCH_DEPENDENCY_TORCH_HIP_VERSION": "7.2.0",
         "SOL_EXECBENCH_DEPENDENCY_TORCH_CUDA_VERSION": "none",
         "SOL_EXECBENCH_DEPENDENCY_TORCH_DEVICE_AVAILABLE": "true",
-        "SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION": ("0.26.0+rocm7.2"),
+        "SOL_EXECBENCH_DEPENDENCY_TORCHVISION_DISTRIBUTION_VERSION": (
+            "0.26.0+rocm7.2"
+        ),
         "SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_DISTRIBUTION_VERSION": "3.6.0",
         "SOL_EXECBENCH_DEPENDENCY_TRITON_ROCM_STATUS": "installed",
         "SOL_EXECBENCH_DEPENDENCY_CONTAINER_ROCM_USER_SPACE_VERSION": "7.2.0",
@@ -74,13 +75,17 @@ def test_mixed_dependency_state_blocks_before_docker_command_text() -> None:
     assert "docker run" not in completed.stdout
 
 
-def test_missing_required_dependency_blocks_before_docker_command_text() -> None:
+def test_missing_required_dependency_blocks_before_docker_command_text() -> (
+    None
+):
     completed = _run_docker_dependency_preflight(
         "--preflight-only",
         **{
             **_matching_default_dependency_env(),
             "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "none",
-            "SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR": ("No module named 'torch'"),
+            "SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR": (
+                "No module named 'torch'"
+            ),
         },
     )
 
@@ -113,7 +118,9 @@ def test_matching_default_dependency_stack_stops_only_on_clean_validation_policy
     assert "docker run" not in completed.stdout
 
 
-def test_help_documents_dependency_override_separately_from_unknown_target() -> None:
+def test_help_documents_dependency_override_separately_from_unknown_target() -> (
+    None
+):
     script = RUN_DOCKER_SCRIPT.read_text()
 
     assert "--allow-mixed-version-dependencies" in script
@@ -151,7 +158,9 @@ def test_unknown_target_override_does_not_allow_mixed_dependencies() -> None:
     assert "docker run" not in completed.stdout
 
 
-def test_dependency_override_reports_probe_smoke_only_without_authority() -> None:
+def test_dependency_override_reports_probe_smoke_only_without_authority() -> (
+    None
+):
     completed = _run_docker_dependency_preflight(
         "--preflight-only",
         "--target",
@@ -180,7 +189,9 @@ def test_dependency_override_reports_probe_smoke_only_without_authority() -> Non
     assert "docker run" not in completed.stdout
 
 
-def test_dependency_env_override_reports_probe_smoke_only_without_authority() -> None:
+def test_dependency_env_override_reports_probe_smoke_only_without_authority() -> (
+    None
+):
     completed = _run_docker_dependency_preflight(
         "--preflight-only",
         "--target",
@@ -205,7 +216,9 @@ def test_dependency_env_override_reports_probe_smoke_only_without_authority() ->
     assert "docker run" not in completed.stdout
 
 
-def test_dependency_override_allows_normal_dry_run_smoke_without_authority() -> None:
+def test_dependency_override_allows_normal_dry_run_smoke_without_authority() -> (
+    None
+):
     completed = _run_docker_dependency_preflight(
         "--target",
         "rocm-7.1.1-ubuntu-24.04-container",
@@ -226,7 +239,9 @@ def test_dependency_override_allows_normal_dry_run_smoke_without_authority() -> 
     assert "sol-execbench problems/local/AMD_AKA" in completed.stdout
 
 
-def test_missing_required_dependency_still_blocks_normal_dry_run_smoke() -> None:
+def test_missing_required_dependency_still_blocks_normal_dry_run_smoke() -> (
+    None
+):
     completed = _run_docker_dependency_preflight(
         "--allow-mixed-version-dependencies",
         "--",
@@ -235,7 +250,9 @@ def test_missing_required_dependency_still_blocks_normal_dry_run_smoke() -> None
         **{
             **_matching_default_dependency_env(),
             "SOL_EXECBENCH_DEPENDENCY_TORCH_DISTRIBUTION_VERSION": "none",
-            "SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR": ("No module named 'torch'"),
+            "SOL_EXECBENCH_DEPENDENCY_TORCH_IMPORT_ERROR": (
+                "No module named 'torch'"
+            ),
         },
     )
 
@@ -245,7 +262,9 @@ def test_missing_required_dependency_still_blocks_normal_dry_run_smoke() -> None
     assert "docker run" not in completed.stdout
 
 
-def test_record_container_validation_allows_matching_not_tested_dry_run() -> None:
+def test_record_container_validation_allows_matching_not_tested_dry_run() -> (
+    None
+):
     completed = _run_docker_dependency_preflight(
         "--record-container-validation",
         "--",

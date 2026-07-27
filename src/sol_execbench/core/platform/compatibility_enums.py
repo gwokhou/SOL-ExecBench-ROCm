@@ -14,7 +14,6 @@ from sol_execbench.core.integrity.schema_versions import (
     ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
 )
 
-
 MATRIX_ENTRY_JSON_SCHEMA_ID = (
     "https://sol-execbench.local/schemas/"
     f"{ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION}.matrix_entry.schema.json"

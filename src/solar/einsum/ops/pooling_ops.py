@@ -23,21 +23,21 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any, Optional, Tuple
+from typing import Any
 
+from solar.common.types import TensorShape, TensorShapes
 from solar.einsum.ops.base import (
-    EinsumOpHandler,
     EinsumOp,
     EinsumOperand,
+    EinsumOpHandler,
 )
 from solar.einsum.ops.registry import get_global_registry
-from solar.common.types import TensorShape, TensorShapes
 
 
 class PoolingHandler(EinsumOpHandler):
     """Handler for pooling operations."""
 
-    supported_ops = [
+    supported_ops = (
         "max_pool1d",
         "max_pool2d",
         "max_pool3d",
@@ -50,10 +50,13 @@ class PoolingHandler(EinsumOpHandler):
         "adaptive_avg_pool1d",
         "adaptive_avg_pool2d",
         "adaptive_avg_pool3d",
-    ]
+    )
 
     def generate_einsum(
-        self, op_name: str, tensor_shapes: TensorShapes, **kwargs: Any
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
     ) -> EinsumOp:
         """Generate einsum for pooling operation."""
         if tensor_shapes.num_inputs < 1:
@@ -64,14 +67,19 @@ class PoolingHandler(EinsumOpHandler):
         kernel_size = kwargs.get("kernel_size", (2, 2))
         stride = kwargs.get("stride")
 
-        return self._generate_pooling_einsum(input_shape, op_name, kernel_size, stride)
+        return self._generate_pooling_einsum(
+            input_shape,
+            op_name,
+            kernel_size,
+            stride,
+        )
 
     def _generate_pooling_einsum(
         self,
         input_shape: TensorShape,
         pool_type: str,
-        kernel_size: Tuple[int, ...] = (2, 2),
-        stride: Optional[Tuple[int, ...]] = None,
+        kernel_size: tuple[int, ...] = (2, 2),
+        stride: tuple[int, ...] | None = None,
     ) -> EinsumOp:
         """Generate einsum for pooling operations.
 
@@ -88,11 +96,8 @@ class PoolingHandler(EinsumOpHandler):
 
         equation = f"{labels}->{labels}"
 
-        # Determine reduction op based on pool type
-        if "max" in pool_type.lower():
-            reduction_op = "max"
-        else:  # avg_pool
-            reduction_op = "add"  # avg = sum / count
+        # Average pooling uses additive reduction before normalization.
+        reduction_op = "max" if "max" in pool_type.lower() else "add"
 
         return EinsumOp(
             operands=operands,
