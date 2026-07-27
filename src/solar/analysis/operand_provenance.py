@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from solar.analysis.graph_rules import (
     LOW_PRECISION_DEQUANT_DTYPES,
@@ -45,7 +47,9 @@ class _OperandSourceTracer:
         return self.trace(str(input_names[input_index]), visited)
 
     @staticmethod
-    def _is_recomputable(semantic: NodeDict, effects: NodeDict) -> bool:
+    def _is_recomputable(
+        semantic: Mapping[str, Any], effects: NodeDict
+    ) -> bool:
         return bool(
             semantic.get("kind") not in {INPUT_KIND, CONTRACTION_KIND}
             and semantic.get("target") in RECOMPUTABLE_OPERAND_TARGETS
@@ -75,7 +79,7 @@ class _OperandSourceTracer:
     def _trace_recomputation(
         self,
         producer: NodeDict,
-        semantic: NodeDict,
+        semantic: Mapping[str, Any],
         input_names: list[str],
         visited: set[str],
     ) -> SourceTrace | None:

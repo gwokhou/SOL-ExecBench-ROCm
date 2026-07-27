@@ -8,6 +8,8 @@ changes outside ``IRKind`` plus the registry.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -51,14 +53,14 @@ def _stub_graph() -> dict[str, Any]:
 def test_registry_drives_backend_lookup(monkeypatch) -> None:
     seen: dict[str, bool] = {}
 
-    def stub_validate(graph: dict[str, Any]) -> None:
+    def stub_validate(graph: Mapping[str, Any]) -> None:
         seen["validate"] = True
 
     def stub_execute(
         layer_id: str,
-        layer: dict[str, Any],
-        operands: tuple[Any, ...],
-        output_shapes: tuple[tuple[int, ...], ...],
+        layer: Mapping[str, Any],
+        operands: Sequence[Any],
+        output_shapes: Sequence[tuple[int, ...]],
     ) -> Any:
         seen["execute"] = True
         return operands[0]
@@ -66,7 +68,7 @@ def test_registry_drives_backend_lookup(monkeypatch) -> None:
     stub = IRBackend(
         IRKind.EXTENDED_EINSUM,
         validate=stub_validate,
-        convert=lambda operator, output_dir: None,
+        convert=lambda operator, output_dir: Path(output_dir),
         execute=stub_execute,
     )
     monkeypatch.setitem(

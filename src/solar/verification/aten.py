@@ -164,7 +164,7 @@ def _execute_exact_aten(
     kwargs: dict[str, DynamicValue],
     semantic: Mapping[str, DynamicValue],
     layer_id: str,
-    output_shapes: list[tuple[int, ...]],
+    output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
     del target, layer_id, output_shapes
     import torch
@@ -188,7 +188,7 @@ def _execute_mutation(
     kwargs: dict[str, DynamicValue],
     semantic: Mapping[str, DynamicValue],
     layer_id: str,
-    output_shapes: list[tuple[int, ...]],
+    output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
     del output_shapes
     if not (semantic.get("effects") or {}).get("mutates"):
@@ -211,7 +211,7 @@ def _execute_arithmetic(
     kwargs: dict[str, DynamicValue],
     semantic: Mapping[str, DynamicValue],
     layer_id: str,
-    output_shapes: list[tuple[int, ...]],
+    output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
     del semantic, layer_id, output_shapes
     import torch
@@ -297,7 +297,7 @@ def _execute_shape(
     kwargs: dict[str, DynamicValue],
     semantic: Mapping[str, DynamicValue],
     layer_id: str,
-    output_shapes: list[tuple[int, ...]],
+    output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
     del semantic
     import torch
@@ -353,7 +353,7 @@ def _execute_indexing(
     kwargs: dict[str, DynamicValue],
     semantic: Mapping[str, DynamicValue],
     layer_id: str,
-    output_shapes: list[tuple[int, ...]],
+    output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
     del semantic, layer_id, output_shapes
     import torch
@@ -386,7 +386,7 @@ def _execute_functional(
     kwargs: dict[str, DynamicValue],
     semantic: Mapping[str, DynamicValue],
     layer_id: str,
-    output_shapes: list[tuple[int, ...]],
+    output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
     del semantic, layer_id, output_shapes
     import torch.nn.functional as functional
@@ -417,7 +417,7 @@ def _execute_quantized(
     kwargs: dict[str, DynamicValue],
     semantic: Mapping[str, DynamicValue],
     layer_id: str,
-    output_shapes: list[tuple[int, ...]],
+    output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
     del semantic, layer_id, output_shapes
     import torch
@@ -444,7 +444,7 @@ def _execute_aten_fallback(
     kwargs: dict[str, DynamicValue],
     semantic: Mapping[str, DynamicValue],
     layer_id: str,
-    output_shapes: list[tuple[int, ...]],
+    output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
     del layer_id, output_shapes
     import torch
