@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from sol_execbench.tools.amd_isa import client as client_module
-from sol_execbench.tools.amd_isa.client import AmdIsa, Decoder
-from sol_execbench.tools.amd_isa.errors import IsaDecodeError, IsaProtocolError
+from sol_execbench.tools.amd_isa.client import AMDIsa, Decoder
+from sol_execbench.tools.amd_isa.errors import ISADecodeError, ISAProtocolError
 
 
 class _Process:
@@ -44,8 +44,8 @@ def _response(request_id: int, **payload: object) -> str:
     return json.dumps({"id": request_id, **payload})
 
 
-def _client(process: _Process) -> AmdIsa:
-    client = AmdIsa.__new__(AmdIsa)
+def _client(process: _Process) -> AMDIsa:
+    client = AMDIsa.__new__(AMDIsa)
     client._process = process
     client._lock = threading.Lock()
     client._next_id = 1
@@ -78,7 +78,7 @@ def test_client_initializes_namespaces_and_merges_provenance(
         lambda *_args, **_kwargs: process,
     )
 
-    client = AmdIsa(
+    client = AMDIsa(
         tmp_path / "helper",
         tmp_path / "spec.xml",
         timeout_seconds=7,
@@ -102,7 +102,7 @@ def test_call_rejects_stopped_helper() -> None:
     process = _Process()
     process.returncode = 1
 
-    with pytest.raises(IsaProtocolError, match="not running"):
+    with pytest.raises(ISAProtocolError, match="not running"):
         _client(process)._call("hello", {})
 
 
@@ -122,7 +122,7 @@ def test_call_rejects_oversized_request(monkeypatch) -> None:
     ],
 )
 def test_call_rejects_invalid_responses(raw: str, message: str) -> None:
-    with pytest.raises(IsaProtocolError, match=message):
+    with pytest.raises(ISAProtocolError, match=message):
         _client(_Process(raw) if raw else _Process())._call("hello", {})
 
 
@@ -130,7 +130,7 @@ def test_call_rejects_oversized_response(monkeypatch) -> None:
     process = _Process(_response(1, ok=True, result="x" * 100))
     monkeypatch.setattr(client_module, "_MAX_MESSAGE_BYTES", 64)
 
-    with pytest.raises(IsaProtocolError, match="response exceeds"):
+    with pytest.raises(ISAProtocolError, match="response exceeds"):
         _client(process)._call("hello", {})
 
 
@@ -139,7 +139,7 @@ def test_call_maps_helper_error_to_decode_error() -> None:
         _response(1, ok=False, error={"code": "decode", "message": "bad word"}),
     )
 
-    with pytest.raises(IsaDecodeError, match="bad word"):
+    with pytest.raises(ISADecodeError, match="bad word"):
         _client(process)._call("decoder.decode_stream", {"words": [1]})
 
 
@@ -150,7 +150,7 @@ def test_call_reports_timeout_and_io_failure(monkeypatch) -> None:
         "select",
         lambda *_args: ([], [], []),
     )
-    with pytest.raises(IsaProtocolError, match="timed out"):
+    with pytest.raises(ISAProtocolError, match="timed out"):
         _client(process)._call("hello", {})
 
     class _BrokenInput(StringIO):
@@ -159,7 +159,7 @@ def test_call_reports_timeout_and_io_failure(monkeypatch) -> None:
 
     process = _Process()
     process.stdin = _BrokenInput()
-    with pytest.raises(IsaProtocolError, match="communication failed"):
+    with pytest.raises(ISAProtocolError, match="communication failed"):
         _client(process)._call("hello", {})
 
 

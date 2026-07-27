@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from solar.verification.errors import IrExecutionError
+from solar.verification.errors import IRExecutionError
 
 
 def execute_extended_layer(
@@ -38,7 +38,7 @@ def _decode(value: Any, operands: Sequence[Any], layer_id: str) -> Any:
     if "operand" in value:
         index = int(value["operand"])
         if index not in range(len(operands)):
-            raise IrExecutionError(
+            raise IRExecutionError(
                 f"layer {layer_id} references missing extended operand {index}",
             )
         return operands[index]
@@ -49,7 +49,7 @@ def _decode(value: Any, operands: Sequence[Any], layer_id: str) -> Any:
 
         dtype = getattr(torch, str(value["dtype"]), None)
         if not isinstance(dtype, torch.dtype):
-            raise IrExecutionError(
+            raise IRExecutionError(
                 f"layer {layer_id} references invalid dtype {value['dtype']!r}",
             )
         return dtype
@@ -62,7 +62,7 @@ def _decode(value: Any, operands: Sequence[Any], layer_id: str) -> Any:
 
         layout = getattr(torch, str(value["layout"]), None)
         if not isinstance(layout, torch.layout):
-            raise IrExecutionError(
+            raise IRExecutionError(
                 f"layer {layer_id} references invalid layout {value['layout']!r}",
             )
         return layout
@@ -70,7 +70,7 @@ def _decode(value: Any, operands: Sequence[Any], layer_id: str) -> Any:
         return slice(
             *[_decode(item, operands, layer_id) for item in value["slice"]]
         )
-    raise IrExecutionError(f"layer {layer_id} has an invalid extended argument")
+    raise IRExecutionError(f"layer {layer_id} has an invalid extended argument")
 
 
 def _run(
@@ -89,7 +89,7 @@ def _run(
     result = _tensor_operation(name, arguments, kwargs)
     if result is not _UNHANDLED:
         return result
-    raise IrExecutionError(
+    raise IRExecutionError(
         f"extended-einsum operation {name!r} at {layer_id} is not executable",
     )
 

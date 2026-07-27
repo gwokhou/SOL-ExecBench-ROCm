@@ -19,7 +19,7 @@ import yaml
 from solar.analysis.graph_analyzer import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
     ArchitectureProfile,
-    IrGraphAnalyzer,
+    IRGraphAnalyzer,
     OrojenesisError,
     OrojenesisRunner,
 )
@@ -142,7 +142,7 @@ def _run_analysis(
         if request.require_orojenesis or request.orojenesis_home is not None
         else None
     )
-    result = IrGraphAnalyzer().analyze_graph(
+    result = IRGraphAnalyzer().analyze_graph(
         graph_path,
         staging,
         precision=request.precision,

@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from sol_execbench.core.dataset.aka_contract import (
-    AkaOfficialScoringStatus,
-    AkaReleasePolicy,
+    AKAOfficialScoringStatus,
+    AKAReleasePolicy,
 )
 from sol_execbench.core.dataset.aka_corpus import (
-    AkaCorpusManifest as CorpusManifest,
+    AKACorpusManifest as CorpusManifest,
 )
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
@@ -38,13 +38,13 @@ def official_score_availability(corpus_manifest: str | Path) -> dict[str, Any]:
     )
     policy_authorized = (
         manifest_pinned
-        and manifest_status == AkaOfficialScoringStatus.AVAILABLE
+        and manifest_status == AKAOfficialScoringStatus.AVAILABLE
         and scoring.get("release_policy")
-        == AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1
+        == AKAReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1
     )
     if not manifest_pinned:
         policy_reason = "corpus_manifest_not_repository_pinned"
-    elif manifest_status != AkaOfficialScoringStatus.AVAILABLE:
+    elif manifest_status != AKAOfficialScoringStatus.AVAILABLE:
         policy_reason = str(
             scoring.get("reason_code")
             or "official_scoring_policy_not_authorized",

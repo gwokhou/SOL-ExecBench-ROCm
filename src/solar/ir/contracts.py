@@ -15,14 +15,14 @@ if TYPE_CHECKING:
     from solar.graph.extraction import OperatorGraphArtifact
 
 
-class IrKind(StrEnum):
+class IRKind(StrEnum):
     """The IR dialects accepted by SOLAR's analysis pipeline."""
 
     ATEN = "aten"
     EXTENDED_EINSUM = "extended_einsum"
 
 
-DEFAULT_IR_KIND = IrKind.EXTENDED_EINSUM
+DEFAULT_IR_KIND = IRKind.EXTENDED_EINSUM
 
 # Semantic ``layer_operation`` kind values shared across every IR dialect.
 # Analysis code branches on these instead of enumerating dialect-specific
@@ -32,15 +32,15 @@ CONTRACTION_KIND = "einsum"
 
 
 @dataclass(frozen=True)
-class IrGraphArtifact:
+class IRGraphArtifact:
     """One validated IR graph produced from a traced operator artifact."""
 
     path: Path
-    kind: IrKind = DEFAULT_IR_KIND
+    kind: IRKind = DEFAULT_IR_KIND
 
 
 @dataclass(frozen=True)
-class IrBackend:
+class IRBackend:
     """Uniform interface implemented by every SOLAR IR backend.
 
     Each backend binds its dialect ``kind`` to the full IR lifecycle --
@@ -49,10 +49,10 @@ class IrBackend:
     and a new IR plugs in without touching the pipeline call sites. The IR
     selection switch itself converges on :func:`convert_operator_graph`: every
     later stage reads the ``ir_kind`` recorded on the graph (or the
-    :class:`IrGraphArtifact` it produced) instead of re-deriving the dialect.
+    :class:`IRGraphArtifact` it produced) instead of re-deriving the dialect.
     """
 
-    kind: IrKind
+    kind: IRKind
     validate: Callable[[Mapping[str, Any]], None]
     convert: Callable[[OperatorGraphArtifact, str | Path], Path]
     execute: Callable[
@@ -61,21 +61,21 @@ class IrBackend:
     ]
 
 
-def normalize_ir_kind(value: IrKind | str) -> IrKind:
+def normalize_ir_kind(value: IRKind | str) -> IRKind:
     """Return one supported IR kind from a public option value."""
     try:
-        return IrKind(value)
+        return IRKind(value)
     except ValueError as exc:
-        choices = ", ".join(item.value for item in IrKind)
+        choices = ", ".join(item.value for item in IRKind)
         raise ValueError(
             f"unsupported SOLAR IR {value!r}; choose: {choices}"
         ) from exc
 
 
-def graph_kind(graph: Mapping[str, Any]) -> IrKind:
+def graph_kind(graph: Mapping[str, Any]) -> IRKind:
     """Read an explicit IR discriminator, preserving legacy ATen graphs."""
     value = graph.get("ir_kind")
-    return IrKind.ATEN if value is None else normalize_ir_kind(str(value))
+    return IRKind.ATEN if value is None else normalize_ir_kind(str(value))
 
 
 def validate_ir_graph(graph: Mapping[str, Any]) -> None:
@@ -83,30 +83,30 @@ def validate_ir_graph(graph: Mapping[str, Any]) -> None:
     ir_backend(graph_kind(graph)).validate(graph)
 
 
-def _load_aten_backend() -> IrBackend:
+def _load_aten_backend() -> IRBackend:
     from solar.ir.aten import backend
 
     return backend
 
 
-def _load_extended_einsum_backend() -> IrBackend:
+def _load_extended_einsum_backend() -> IRBackend:
     from solar.ir.extended_einsum import backend
 
     return backend
 
 
-_BACKEND_LOADERS: dict[IrKind, Callable[[], IrBackend]] = {
-    IrKind.ATEN: _load_aten_backend,
-    IrKind.EXTENDED_EINSUM: _load_extended_einsum_backend,
+_BACKEND_LOADERS: dict[IRKind, Callable[[], IRBackend]] = {
+    IRKind.ATEN: _load_aten_backend,
+    IRKind.EXTENDED_EINSUM: _load_extended_einsum_backend,
 }
 
 
-def ir_backend(kind: IrKind | str) -> IrBackend:
+def ir_backend(kind: IRKind | str) -> IRBackend:
     """Return the backend implementing the requested IR dialect."""
     return _BACKEND_LOADERS[normalize_ir_kind(kind)]()
 
 
-def ir_backends() -> tuple[IrBackend, ...]:
+def ir_backends() -> tuple[IRBackend, ...]:
     """Return every registered IR backend for comparative evaluation."""
     return tuple(loader() for loader in _BACKEND_LOADERS.values())
 
@@ -169,9 +169,9 @@ __all__ = [
     "CONTRACTION_KIND",
     "DEFAULT_IR_KIND",
     "INPUT_KIND",
-    "IrBackend",
-    "IrGraphArtifact",
-    "IrKind",
+    "IRBackend",
+    "IRGraphArtifact",
+    "IRKind",
     "LayerAnalysis",
     "graph_kind",
     "ir_backend",

@@ -24,7 +24,7 @@ from sol_execbench.core.bench.reference_protocol import (
 from sol_execbench.core.bench.reference_service import ReferenceService
 from sol_execbench.core.bench.utils import call_and_collect_outputs
 from sol_execbench.core.dataset.aka_compatibility import PROBE_RESULT_PREFIX
-from sol_execbench.core.dataset.aka_contract import AkaProbeStatus
+from sol_execbench.core.dataset.aka_contract import AKAProbeStatus
 from sol_execbench.core.platform.runtime import (
     cache_clear_policy_for_device,
     detect_rocm_device,
@@ -32,7 +32,7 @@ from sol_execbench.core.platform.runtime import (
 
 
 def _emit(
-    status: AkaProbeStatus,
+    status: AKAProbeStatus,
     reason_code: str,
     detail: str = "",
     **metrics: int,
@@ -64,7 +64,7 @@ def _run_probe(args: argparse.Namespace) -> None:
         input_bytes = reference_values_storage_bytes(inputs)
         if input_bytes > MAX_REFERENCE_TENSOR_STORAGE_BYTES:
             _emit(
-                AkaProbeStatus.INCOMPATIBLE,
+                AKAProbeStatus.INCOMPATIBLE,
                 "reference_ipc_payload_limit",
                 "input payload exceeds the trusted reference IPC limit",
                 input_storage_bytes=input_bytes,
@@ -90,7 +90,7 @@ def _run_probe(args: argparse.Namespace) -> None:
         )
         if case_bytes > MAX_REFERENCE_TENSOR_STORAGE_BYTES:
             _emit(
-                AkaProbeStatus.INCOMPATIBLE,
+                AKAProbeStatus.INCOMPATIBLE,
                 "reference_ipc_payload_limit",
                 "reference case exceeds the trusted reference IPC limit",
                 reference_case_bytes=case_bytes,
@@ -108,14 +108,14 @@ def _run_probe(args: argparse.Namespace) -> None:
         cache.zero_()
         torch.cuda.synchronize(args.device)
         _emit(
-            AkaProbeStatus.COMPATIBLE,
+            AKAProbeStatus.COMPATIBLE,
             "probe_passed",
             input_storage_bytes=input_bytes,
             reference_case_bytes=case_bytes,
             cache_clear_bytes=cache_policy.clear_buffer_bytes,
         )
     except torch.cuda.OutOfMemoryError as exc:
-        _emit(AkaProbeStatus.INCOMPATIBLE, "probe_oom", str(exc))
+        _emit(AKAProbeStatus.INCOMPATIBLE, "probe_oom", str(exc))
     except (RuntimeError, ValueError, TypeError) as exc:
         _emit_reference_failure(exc)
 
@@ -124,11 +124,11 @@ def _device_matches(args: argparse.Namespace) -> bool:
     try:
         device_info = detect_rocm_device(args.device)
     except Exception as exc:  # noqa: BLE001 -- isolated hardware probe boundary
-        _emit(AkaProbeStatus.INFRASTRUCTURE_ERROR, "gpu_unavailable", str(exc))
+        _emit(AKAProbeStatus.INFRASTRUCTURE_ERROR, "gpu_unavailable", str(exc))
         return False
     if device_info.gfx_target != args.expected_arch:
         _emit(
-            AkaProbeStatus.INFRASTRUCTURE_ERROR,
+            AKAProbeStatus.INFRASTRUCTURE_ERROR,
             "target_arch_mismatch",
             f"detected {device_info.gfx_target}, expected {args.expected_arch}",
         )
@@ -137,7 +137,7 @@ def _device_matches(args: argparse.Namespace) -> bool:
 
 
 def _emit_reference_failure(exc: Exception) -> None:
-    _emit(AkaProbeStatus.INCOMPATIBLE, "reference_execution_failed", str(exc))
+    _emit(AKAProbeStatus.INCOMPATIBLE, "reference_execution_failed", str(exc))
 
 
 def main() -> None:

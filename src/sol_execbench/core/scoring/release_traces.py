@@ -18,10 +18,10 @@ from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.solution_models import SupportedHardware
 from sol_execbench.core.data.trace import Environment, EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import (
-    AkaCorpusEntry,
-    AkaCorpusManifest,
+    AKACorpusEntry,
+    AKACorpusManifest,
 )
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 from sol_execbench.core.platform.rdna4_validation import (
@@ -80,7 +80,7 @@ def verify_release_run(
     statement: ReleaseRunStatement,
     *,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     require_passed: bool,
     require_reference_baseline: bool = False,
 ) -> VerifiedRun:
@@ -119,7 +119,7 @@ def verify_release_run(
 def _verify_corpus_and_environment(
     statement: ReleaseRunStatement,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
 ) -> ReleaseRunEnvironmentIdentity:
     bundled_manifest = verify_artifact_file(
         bundle_root,
@@ -145,11 +145,11 @@ def _verify_corpus_and_environment(
     )
 
 
-def _scored_entries(corpus: AkaCorpusManifest) -> dict[str, AkaCorpusEntry]:
+def _scored_entries(corpus: AKACorpusManifest) -> dict[str, AKACorpusEntry]:
     entries = {
         item.relative_problem_dir.as_posix(): item
         for item in corpus.entries
-        if item.role is AkaCorpusRole.SCORED
+        if item.role is AKACorpusRole.SCORED
     }
     if not entries:
         raise ValueError("release corpus contains no scored problems")
@@ -158,8 +158,8 @@ def _scored_entries(corpus: AkaCorpusManifest) -> dict[str, AkaCorpusEntry]:
 
 def _verify_problem_identity(
     evidence: ProblemRunEvidence,
-    entry: AkaCorpusEntry,
-    corpus: AkaCorpusManifest,
+    entry: AKACorpusEntry,
+    corpus: AKACorpusManifest,
 ) -> None:
     expected = corpus.materialized_problem_sha256[evidence.problem_path]
     if (
@@ -178,7 +178,7 @@ def _verify_problem_identity(
 def _verify_reference_baseline(
     evidence: ProblemRunEvidence,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
 ) -> None:
     solution_path = verify_artifact_file(
         bundle_root,
@@ -206,9 +206,9 @@ def _verify_reference_baseline(
 def _verify_problem_trace(
     evidence: ProblemRunEvidence,
     *,
-    entry: AkaCorpusEntry,
+    entry: AKACorpusEntry,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     require_passed: bool,
     release_environment: ReleaseRunEnvironmentIdentity,
 ) -> dict[tuple[str, str], VerifiedWorkloadRun]:

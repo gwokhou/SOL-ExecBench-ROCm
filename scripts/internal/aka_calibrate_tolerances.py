@@ -17,7 +17,7 @@ import torch
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import (
     AKA_REVISION,
     FORMAL_GFX_TARGET,
@@ -171,7 +171,7 @@ def _records(args: argparse.Namespace) -> list[dict[str, Any]]:
                     workload,
                 ),
             }
-            if spec.role is AkaCorpusRole.TARGET_INCOMPATIBLE:
+            if spec.role is AKACorpusRole.TARGET_INCOMPATIBLE:
                 result = {
                     "status": CalibrationStatus.EXCLUDED,
                     "reason_code": spec.exclusion_reason_code,

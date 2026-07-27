@@ -24,7 +24,7 @@ from sol_execbench.core.bench.static_kernel.evidence import (
 from sol_execbench.core.evidence.runtime_evidence import write_json_payload
 from sol_execbench.core.platform.arch_capabilities import (
     ArchCapabilityBudgetStatus,
-    ArchIsaBudget,
+    ArchISABudget,
     arch_capability_budget_from_dict,
 )
 
@@ -38,7 +38,7 @@ def _load_budget_from_environment(
     environment_sidecar_path: Path | None,
     *,
     target_architecture: str | None = None,
-) -> ArchIsaBudget | None:
+) -> ArchISABudget | None:
     """Read the arch capability budget from an environment sidecar.
 
     When ``target_architecture`` is set (the static-evidence detected gfx), the

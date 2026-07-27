@@ -6,7 +6,7 @@ import os
 import pytest
 
 from sol_execbench.core.bench.gpu_lock import (
-    GpuLockVerificationError,
+    GPULockVerificationError,
     acquire_evaluation_gpu_lock,
     acquire_gpu_lock,
     gpu_lock_directory,
@@ -65,7 +65,7 @@ def test_evaluation_rejects_unheld_host_managed_lock(tmp_path, monkeypatch):
     monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST", "1")
 
     with (
-        pytest.raises(GpuLockVerificationError, match="is not held"),
+        pytest.raises(GPULockVerificationError, match="is not held"),
         acquire_evaluation_gpu_lock(timeout_seconds=0.01),
     ):
         pass

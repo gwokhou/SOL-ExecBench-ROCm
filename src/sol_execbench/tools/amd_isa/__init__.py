@@ -8,31 +8,31 @@ when callers explicitly open a specification.  Importing this module never
 downloads data, compiles C++, or needs a ROCm GPU.
 """
 
-from sol_execbench.tools.amd_isa.client import AmdIsa, open_isa
+from sol_execbench.tools.amd_isa.client import AMDIsa, open_isa
 from sol_execbench.tools.amd_isa.errors import (
-    IsaDecodeError,
-    IsaDownloadError,
-    IsaError,
-    IsaHelperBuildError,
-    IsaIntegrityError,
-    IsaProtocolError,
-    IsaSpecUnavailableError,
+    ISADecodeError,
+    ISADownloadError,
+    ISAError,
+    ISAHelperBuildError,
+    ISAIntegrityError,
+    ISAProtocolError,
+    ISASpecUnavailableError,
 )
 from sol_execbench.tools.amd_isa.repository import (
-    IsaSpecDescriptor,
-    IsaSpecRepository,
+    ISASpecDescriptor,
+    ISASpecRepository,
 )
 
 __all__ = [
-    "AmdIsa",
-    "IsaDecodeError",
-    "IsaDownloadError",
-    "IsaError",
-    "IsaHelperBuildError",
-    "IsaIntegrityError",
-    "IsaProtocolError",
-    "IsaSpecRepository",
-    "IsaSpecDescriptor",
-    "IsaSpecUnavailableError",
+    "AMDIsa",
+    "ISADecodeError",
+    "ISADownloadError",
+    "ISAError",
+    "ISAHelperBuildError",
+    "ISAIntegrityError",
+    "ISAProtocolError",
+    "ISASpecRepository",
+    "ISASpecDescriptor",
+    "ISASpecUnavailableError",
     "open_isa",
 ]

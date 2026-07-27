@@ -183,7 +183,7 @@ class StaticKernelEvidenceKernel(BaseModelWithDocstrings):
     """Per-kernel resource footprint when routed extractors produced one."""
 
 
-class StaticIsaAnalysis(BaseModelWithDocstrings):
+class StaticISAAnalysis(BaseModelWithDocstrings):
     """Diagnostic AMD ISA analysis for one persisted target code object."""
 
     model_config = _STATIC_MODEL_CONFIG
@@ -299,7 +299,7 @@ class StaticKernelEvidenceSidecar(DiagnosticSidecarAuthority):
     """Conservative kernel metadata entries."""
     footprints: list[StaticResourceFootprint] = Field(default_factory=list)
     """Per-kernel resource footprints when routed extractors produced them."""
-    isa_analyses: list[StaticIsaAnalysis] = Field(default_factory=list)
+    isa_analyses: list[StaticISAAnalysis] = Field(default_factory=list)
     """Per-artifact machine-readable AMD ISA analysis when available."""
     warnings: list[StaticKernelEvidenceWarning] = Field(default_factory=list)
     """Nonfatal static evidence warnings."""

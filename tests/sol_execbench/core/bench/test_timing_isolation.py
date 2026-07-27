@@ -18,7 +18,7 @@ from sol_execbench.core.bench.timing_isolation import (
 )
 
 
-class TestDetectConcurrentGpuProcesses:
+class TestDetectConcurrentGPUProcesses:
     """Test concurrent GPU process detection."""
 
     def test_no_processes_running(self, caplog):
@@ -155,7 +155,7 @@ class TestVerifyClockStateWithWarning:
             assert "problem_42" in caplog.text
 
 
-class TestValidateGpuDeviceIsolation:
+class TestValidateGPUDeviceIsolation:
     """Test GPU device isolation validation."""
 
     def test_detect_gpu_count_counts_unique_amd_smi_gpu_ids(self):

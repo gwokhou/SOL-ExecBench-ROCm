@@ -28,9 +28,9 @@ from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
 from solar.verification.aten import (
     torch_equation as _torch_equation,
 )
-from solar.verification.errors import IrExecutionError, VerificationError
+from solar.verification.errors import IRExecutionError, VerificationError
 from solar.verification.executor import (
-    IrGraphExecutor,
+    IRGraphExecutor,
 )
 from solar.verification.numerics import (
     alias_relation as _alias_relation,
@@ -168,7 +168,7 @@ def _prepare_case(
 
 def _verify_case(
     reference: Callable[..., Any],
-    executor: IrGraphExecutor,
+    executor: IRGraphExecutor,
     graph: Mapping[str, Any],
     prepared: _PreparedCase,
     policy: TolerancePolicy,
@@ -248,7 +248,7 @@ def _run_cases(
 ) -> list[dict[str, Any]]:
     import torch
 
-    executor = IrGraphExecutor(graph, check_shapes=check_shapes)
+    executor = IRGraphExecutor(graph, check_shapes=check_shapes)
     results: list[dict[str, Any]] = []
     for case in cases:
         prepared = _prepare_case(input_factory, graph, case, device)
@@ -312,7 +312,7 @@ def _einsum_roundoff_equivalent(
             torch_equation,
             *(value.abs() for value in precise),
         )
-    except (RuntimeError, IrExecutionError):
+    except (RuntimeError, IRExecutionError):
         return False
     gamma = (
         reduction_size * unit_roundoff / (1.0 - reduction_size * unit_roundoff)

@@ -5,9 +5,9 @@
 
 from solar.ir.contracts import (
     DEFAULT_IR_KIND,
-    IrBackend,
-    IrGraphArtifact,
-    IrKind,
+    IRBackend,
+    IRGraphArtifact,
+    IRKind,
     LayerAnalysis,
     graph_kind,
     ir_backend,
@@ -18,9 +18,9 @@ from solar.ir.contracts import (
 
 __all__ = [
     "DEFAULT_IR_KIND",
-    "IrBackend",
-    "IrGraphArtifact",
-    "IrKind",
+    "IRBackend",
+    "IRGraphArtifact",
+    "IRKind",
     "LayerAnalysis",
     "graph_kind",
     "ir_backend",

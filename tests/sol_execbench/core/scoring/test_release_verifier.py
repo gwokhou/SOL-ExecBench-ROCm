@@ -37,16 +37,16 @@ from sol_execbench.core.data.trace import (
 )
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_contract import (
-    AkaFusionDepth,
-    AkaOperation,
-    AkaPassKind,
-    AkaReleasePolicy,
-    AkaSourceFamily,
-    AkaSuite,
+    AKAFusionDepth,
+    AKAOperation,
+    AKAPassKind,
+    AKAReleasePolicy,
+    AKASourceFamily,
+    AKASuite,
 )
 from sol_execbench.core.dataset.aka_corpus import (
-    AkaCorpusEntry,
-    AkaCorpusManifest,
+    AKACorpusEntry,
+    AKACorpusManifest,
 )
 from sol_execbench.core.integrity import sha256_bytes, sha256_file
 from sol_execbench.core.integrity.schema_versions import (
@@ -96,7 +96,7 @@ def test_caller_authored_manifest_cannot_publish_scoring_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     corpus, _ = _release_fixture(tmp_path)
-    monkeypatch.setattr(AkaCorpusManifest, "load", lambda _path: corpus)
+    monkeypatch.setattr(AKACorpusManifest, "load", lambda _path: corpus)
 
     report = official_score_availability(corpus.path)
 
@@ -384,16 +384,16 @@ def test_release_bundle_schema_rejects_legacy_signature_fields(
 
 def _trust_fixture(
     monkeypatch: pytest.MonkeyPatch,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
 ) -> None:
-    monkeypatch.setattr(AkaCorpusManifest, "load", lambda _path: corpus)
+    monkeypatch.setattr(AKACorpusManifest, "load", lambda _path: corpus)
     monkeypatch.setattr(
         "sol_execbench.core.scoring.release_verifier.OFFICIAL_CORPUS_MANIFEST_SHA256",
         sha256_file(corpus.path),
     )
 
 
-def _release_fixture(tmp_path: Path) -> tuple[AkaCorpusManifest, Path]:
+def _release_fixture(tmp_path: Path) -> tuple[AKACorpusManifest, Path]:
     authored = tmp_path / "authored"
     workspace = tmp_path / "workspace"
     problem = authored / _PROBLEM_PATH
@@ -406,19 +406,19 @@ def _release_fixture(tmp_path: Path) -> tuple[AkaCorpusManifest, Path]:
     (workspace / "corpus").mkdir()
     shutil.copyfile(manifest_path, workspace / "corpus" / "manifest.yaml")
     workloads = load_jsonl_file(Workload, problem / "workload.jsonl")
-    entry = AkaCorpusEntry(
+    entry = AKACorpusEntry(
         slot="3267_doubled_matmul",
         task_path="tasks/test",
         problem_name="3267_doubled_matmul",
-        operation=AkaOperation.MATMUL,
+        operation=AKAOperation.MATMUL,
         dtype=DType.FLOAT32,
-        pass_kind=AkaPassKind.FORWARD,
-        fusion_depth=AkaFusionDepth.FUSED,
-        source_family=AkaSourceFamily.GPUMODE,
-        suite=AkaSuite.TORCH2HIP,
+        pass_kind=AKAPassKind.FORWARD,
+        fusion_depth=AKAFusionDepth.FUSED,
+        source_family=AKASourceFamily.GPUMODE,
+        suite=AKASuite.TORCH2HIP,
         workload_uuids=tuple(item.uuid for item in workloads),
     )
-    corpus = AkaCorpusManifest(
+    corpus = AKACorpusManifest(
         path=manifest_path,
         source={"revision": "b" * 40},
         execution_targets={},
@@ -434,7 +434,7 @@ def _release_fixture(tmp_path: Path) -> tuple[AkaCorpusManifest, Path]:
         official_scoring={
             "status": "available",
             "release_policy": str(
-                AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1,
+                AKAReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1,
             ),
             "baseline_id": _BASELINE_ID,
         },
@@ -449,7 +449,7 @@ def _write_corpus_manifest(authored: Path, problem: Path) -> Path:
         "official_scoring": {
             "status": "available",
             "release_policy": str(
-                AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1,
+                AKAReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1,
             ),
             "baseline_id": _BASELINE_ID,
         },
@@ -460,7 +460,7 @@ def _write_corpus_manifest(authored: Path, problem: Path) -> Path:
     return path
 
 
-def _write_run_artifacts(corpus: AkaCorpusManifest, workspace: Path) -> None:
+def _write_run_artifacts(corpus: AKACorpusManifest, workspace: Path) -> None:
     problem = corpus.authored_root / _PROBLEM_PATH
     definition = Definition.model_validate_json(
         (problem / "definition.json").read_text(encoding="utf-8"),
@@ -595,7 +595,7 @@ def _environment_evidence() -> dict[str, object]:
     }
 
 
-def _write_solar_artifacts(corpus: AkaCorpusManifest, workspace: Path) -> None:
+def _write_solar_artifacts(corpus: AKACorpusManifest, workspace: Path) -> None:
     problem = corpus.authored_root / _PROBLEM_PATH
     definition = Definition.model_validate_json(
         (problem / "definition.json").read_text(encoding="utf-8"),
@@ -636,7 +636,7 @@ def _write_solar_artifacts(corpus: AkaCorpusManifest, workspace: Path) -> None:
         )
 
 
-def _write_bundle(corpus: AkaCorpusManifest, workspace: Path) -> Path:
+def _write_bundle(corpus: AKACorpusManifest, workspace: Path) -> Path:
     return _write_bundle_from_statements(
         workspace,
         _write_statements(corpus, workspace),
@@ -671,7 +671,7 @@ def _write_bundle_from_statements(
 
 
 def _write_statements(
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     workspace: Path,
     *,
     baseline_id: str = _BASELINE_ID,
@@ -716,7 +716,7 @@ def _write_statements(
 
 
 def _run_statement(
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     workspace: Path,
     *,
     kind: ReleaseArtifactKind,
@@ -758,7 +758,7 @@ def _run_statement(
 
 
 def _solar_statement(
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     workspace: Path,
     corpus_ref: ArtifactReference,
 ) -> SolarIndexStatement:

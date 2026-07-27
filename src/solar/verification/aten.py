@@ -10,7 +10,7 @@ import string
 from collections.abc import Callable, Mapping, Sequence
 
 from solar.common.types import DynamicValue
-from solar.verification.errors import IrExecutionError
+from solar.verification.errors import IRExecutionError
 
 _TOKEN = re.compile(r"[A-Za-z][0-9]*")
 _UNHANDLED = object()
@@ -24,7 +24,7 @@ def torch_equation(equation: str) -> str:
         or "->" not in equation
         or any(character in ranks_only for character in "()+-")
     ):
-        raise IrExecutionError(
+        raise IRExecutionError(
             f"unsupported extended einsum equation: {equation!r}",
         )
     tokens: list[str] = []
@@ -33,7 +33,7 @@ def torch_equation(equation: str) -> str:
             tokens.append(token)
     alphabet = string.ascii_letters
     if len(tokens) > len(alphabet):
-        raise IrExecutionError(
+        raise IRExecutionError(
             "einsum uses more ranks than torch can represent",
         )
     mapping = dict(zip(tokens, alphabet, strict=False))
@@ -85,7 +85,7 @@ def execute_aten_layer(
         )
         if result is not _UNHANDLED:
             return result
-    raise IrExecutionError(
+    raise IRExecutionError(
         f"operation {target!r} at {layer_id} is not executable exactly",
     )
 
@@ -116,14 +116,14 @@ def _decode_semantic_argument(
     if "tensor" in argument:
         index = int(argument["tensor"])
         if index < 0 or index >= len(operands):
-            raise IrExecutionError(
+            raise IRExecutionError(
                 f"layer {layer_id} references missing tensor argument {index}",
             )
         return operands[index]
     if "dtype" in argument:
         dtype = getattr(torch, str(argument["dtype"]), None)
         if not isinstance(dtype, torch.dtype):
-            raise IrExecutionError(
+            raise IRExecutionError(
                 f"layer {layer_id} references invalid dtype "
                 f"{argument['dtype']!r}",
             )
@@ -133,7 +133,7 @@ def _decode_semantic_argument(
     if "layout" in argument:
         layout = getattr(torch, str(argument["layout"]), None)
         if not isinstance(layout, torch.layout):
-            raise IrExecutionError(
+            raise IRExecutionError(
                 f"layer {layer_id} references invalid layout "
                 f"{argument['layout']!r}",
             )
@@ -153,7 +153,7 @@ def _decode_semantic_argument(
             for item in argument["slice"]
         ]
         return slice(*values)
-    raise IrExecutionError(
+    raise IRExecutionError(
         f"layer {layer_id} has an invalid semantic argument",
     )
 
@@ -176,7 +176,7 @@ def _execute_exact_aten(
     overload_name = str(semantic.get("overload", "default"))
     overload = getattr(packet, overload_name, None) if packet else None
     if overload is None:
-        raise IrExecutionError(
+        raise IRExecutionError(
             f"ATen operation {exact_target}.{overload_name} is unavailable",
         )
     return overload(*arguments, **kwargs)
@@ -194,12 +194,12 @@ def _execute_mutation(
     if not (semantic.get("effects") or {}).get("mutates"):
         return _UNHANDLED
     if not arguments:
-        raise IrExecutionError(
+        raise IRExecutionError(
             f"mutating operation {target!r} at {layer_id} has no receiver",
         )
     method = getattr(arguments[0], f"{target}_", None)
     if method is None:
-        raise IrExecutionError(
+        raise IRExecutionError(
             f"mutating operation {target!r} at {layer_id} is unavailable",
         )
     return method(*arguments[1:], **kwargs)
@@ -331,7 +331,7 @@ def _execute_shape(
     if target == "transpose":
         if len(arguments) == 1 and not kwargs:
             if arguments[0].ndim != 2:
-                raise IrExecutionError(
+                raise IRExecutionError(
                     f"layer {layer_id} requires explicit transpose dimensions",
                 )
             return arguments[0].t()
@@ -455,7 +455,7 @@ def _execute_aten_fallback(
     overload_name = str(semantic.get("overload", "default"))
     overload = getattr(packet, overload_name, None)
     if overload is None:
-        raise IrExecutionError(
+        raise IRExecutionError(
             f"ATen operation {target}.{overload_name} is unavailable",
         )
     return overload(*arguments, **kwargs)

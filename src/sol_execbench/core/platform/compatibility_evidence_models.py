@@ -161,7 +161,7 @@ class MatrixToolchainEvidence(BaseModelWithDocstrings):
     """Per-tool availability or probe status values."""
 
 
-class MatrixGpuEvidence(BaseModelWithDocstrings):
+class MatrixGPUEvidence(BaseModelWithDocstrings):
     """Observed GPU evidence for a compatibility Matrix Entry."""
 
     model_config = MATRIX_MODEL_CONFIG
@@ -191,5 +191,5 @@ class MatrixObservedEvidence(BaseModelWithDocstrings):
     """Declared PyTorch ROCm dependency policy for the selected Target."""
     toolchain: MatrixToolchainEvidence | None = None
     """Observed ROCm toolchain evidence."""
-    gpu: MatrixGpuEvidence | None = None
+    gpu: MatrixGPUEvidence | None = None
     """Observed GPU evidence."""

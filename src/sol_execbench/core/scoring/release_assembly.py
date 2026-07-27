@@ -10,10 +10,10 @@ from typing import TypeVar
 
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.dataset.aka_contract import (
-    AkaCorpusRole,
-    AkaOfficialScoringStatus,
+    AKACorpusRole,
+    AKAOfficialScoringStatus,
 )
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.integrity import verify_artifact_file
 from sol_execbench.core.scoring.release_builders import (
     artifact_reference,
@@ -53,7 +53,7 @@ def build_run_statement(
     _require_missing(output)
     workspace = plan_path.resolve().parents[1]
     plan = load_execution_plan(plan_path, workspace_root=workspace)
-    corpus = AkaCorpusManifest.load(corpus_manifest_path)
+    corpus = AKACorpusManifest.load(corpus_manifest_path)
     evidence = tuple(
         ProblemRunEvidence(
             problem_path=item.problem_path,
@@ -95,7 +95,7 @@ def build_solar_index(
     workspace = workspace_root.resolve()
     output = output_path.resolve()
     _require_missing(output)
-    corpus = AkaCorpusManifest.load(corpus_manifest_path)
+    corpus = AKACorpusManifest.load(corpus_manifest_path)
     entries = tuple(
         SolarManifestEvidence(
             problem_path=entry.relative_problem_dir.as_posix(),
@@ -111,7 +111,7 @@ def build_solar_index(
             ),
         )
         for entry in corpus.entries
-        if entry.role is AkaCorpusRole.SCORED
+        if entry.role is AKACorpusRole.SCORED
         for workload_uuid in entry.workload_uuids
     )
     index = SolarIndexStatement(
@@ -139,7 +139,7 @@ def assemble_release_bundle(
     workspace = workspace_root.resolve()
     output = output_path.resolve()
     _require_missing(output)
-    corpus = AkaCorpusManifest.load(corpus_manifest_path)
+    corpus = AKACorpusManifest.load(corpus_manifest_path)
     references = {
         kind: artifact_reference(workspace, statement_paths[kind])
         for kind in ReleaseArtifactKind
@@ -182,7 +182,7 @@ def assemble_release_bundle(
         raise ValueError("release runs use different environment identities")
     scoring = corpus.official_scoring
     if (
-        scoring.get("status") != AkaOfficialScoringStatus.AVAILABLE
+        scoring.get("status") != AKAOfficialScoringStatus.AVAILABLE
         or scoring.get("baseline_id") != baseline.baseline_id
     ):
         raise ValueError("release baseline is not authorized by the corpus")

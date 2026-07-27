@@ -7,7 +7,7 @@ from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityStatus,
     MatrixContainerEvidence,
-    MatrixGpuEvidence,
+    MatrixGPUEvidence,
     MatrixHostEvidence,
     MatrixObservedEvidence,
     build_matrix_entry,
@@ -92,7 +92,7 @@ def classify_docker_preflight(
                 image_tag=observation.image_tag,
                 image_digest=observation.image_digest,
             ),
-            gpu=MatrixGpuEvidence(
+            gpu=MatrixGPUEvidence(
                 device_count=1 if observation.gpu_accessible else None,
                 visible_device_environment=observation.visible_device_environment,
             ),

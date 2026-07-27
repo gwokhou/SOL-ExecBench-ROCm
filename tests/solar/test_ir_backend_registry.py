@@ -3,7 +3,7 @@
 These tests monkeypatch the backend registry to prove that validation,
 conversion, and execution all route through :func:`ir_backend` rather than any
 hardcoded ``if ir_kind is ...`` branch. A newly registered dialect needs no
-changes outside ``IrKind`` plus the registry.
+changes outside ``IRKind`` plus the registry.
 """
 
 from __future__ import annotations
@@ -14,13 +14,13 @@ import torch
 
 from solar.ir import contracts as ir_contracts
 from solar.ir.contracts import (
-    IrBackend,
-    IrKind,
+    IRBackend,
+    IRKind,
     ir_backend,
     ir_backends,
     validate_ir_graph,
 )
-from solar.verification.executor import IrGraphExecutor
+from solar.verification.executor import IRGraphExecutor
 
 
 def _stub_graph() -> dict[str, Any]:
@@ -63,32 +63,32 @@ def test_registry_drives_backend_lookup(monkeypatch) -> None:
         seen["execute"] = True
         return operands[0]
 
-    stub = IrBackend(
-        IrKind.EXTENDED_EINSUM,
+    stub = IRBackend(
+        IRKind.EXTENDED_EINSUM,
         validate=stub_validate,
         convert=lambda operator, output_dir: None,
         execute=stub_execute,
     )
     monkeypatch.setitem(
         ir_contracts._BACKEND_LOADERS,
-        IrKind.EXTENDED_EINSUM,
+        IRKind.EXTENDED_EINSUM,
         lambda: stub,
     )
 
-    assert ir_backend(IrKind.EXTENDED_EINSUM) is stub
+    assert ir_backend(IRKind.EXTENDED_EINSUM) is stub
     assert stub in ir_backends()
 
     graph = _stub_graph()
     validate_ir_graph(graph)
     assert seen["validate"]
 
-    result = IrGraphExecutor(graph)(torch.ones(2, 2))
+    result = IRGraphExecutor(graph)(torch.ones(2, 2))
     assert seen["execute"]
     torch.testing.assert_close(result, torch.ones(2, 2))
 
 
 def test_registry_lists_every_registered_dialect() -> None:
     kinds = {backend.kind for backend in ir_backends()}
-    assert IrKind.ATEN in kinds
-    assert IrKind.EXTENDED_EINSUM in kinds
-    assert all(isinstance(backend, IrBackend) for backend in ir_backends())
+    assert IRKind.ATEN in kinds
+    assert IRKind.EXTENDED_EINSUM in kinds
+    assert all(isinstance(backend, IRBackend) for backend in ir_backends())

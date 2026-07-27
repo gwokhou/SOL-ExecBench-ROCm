@@ -14,7 +14,7 @@ from pathlib import Path
 import yaml
 
 from solar.common.types import DynamicValue
-from solar.ir.contracts import DEFAULT_IR_KIND, IrKind, normalize_ir_kind
+from solar.ir.contracts import DEFAULT_IR_KIND, IRKind, normalize_ir_kind
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 InputFactory = Callable[[int], Sequence[DynamicValue]]
@@ -69,7 +69,7 @@ class AnalysisRequest:
     reference_sha256: str
     architecture: str | Path | Mapping[str, DynamicValue]
     output_dir: Path
-    representation: IrKind | str = DEFAULT_IR_KIND
+    representation: IRKind | str = DEFAULT_IR_KIND
     device: str = "cpu"
     precision: str = "fp16"
     require_orojenesis: bool = False
@@ -221,7 +221,7 @@ __all__ = [
     "AnalysisRequest",
     "AnalysisResult",
     "ArtifactRef",
-    "IrKind",
+    "IRKind",
     "SolBound",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",

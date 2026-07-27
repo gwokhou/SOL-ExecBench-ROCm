@@ -39,9 +39,9 @@ from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_compatibility import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
-    AkaCorpusSelection,
-    AkaExecutionTarget,
-    AkaMaterializationTarget,
+    AKACorpusSelection,
+    AKAExecutionTarget,
+    AKAMaterializationTarget,
     Probe,
     load_execution_targets,
     select_corpus_for_target,
@@ -51,15 +51,15 @@ from sol_execbench.core.dataset.aka_contract import (
     AKA_MANIFEST_SCHEMA_VERSION,
     AKA_OFFICIAL_BASELINE_ID,
     AKA_REQUIRED_RELEASE_EVIDENCE,
-    AkaArtifactRole,
-    AkaCorpusRole,
-    AkaFusionDepth,
-    AkaOfficialScoringStatus,
-    AkaOperation,
-    AkaPassKind,
-    AkaReleasePolicy,
-    AkaSourceFamily,
-    AkaSuite,
+    AKAArtifactRole,
+    AKACorpusRole,
+    AKAFusionDepth,
+    AKAOfficialScoringStatus,
+    AKAOperation,
+    AKAPassKind,
+    AKAReleasePolicy,
+    AKASourceFamily,
+    AKASuite,
 )
 from sol_execbench.core.dataset.aka_tolerance import (
     validate_calibration_binding,
@@ -91,31 +91,31 @@ SEED_SET_MAX_PROBLEMS = 48
 
 
 @dataclass(frozen=True)
-class AkaArtifactBinding:
+class AKAArtifactBinding:
     """One content-addressed file within an AKA task."""
 
-    role: AkaArtifactRole
+    role: AKAArtifactRole
     path: str
     sha256: str
 
 
 @dataclass(frozen=True)
-class AkaCorpusEntry:
+class AKACorpusEntry:
     """One AKA-derived problem selected into the seed set."""
 
     slot: str
     task_path: str
     problem_name: str
-    operation: AkaOperation
+    operation: AKAOperation
     dtype: DType
-    pass_kind: AkaPassKind
-    fusion_depth: AkaFusionDepth
-    source_family: AkaSourceFamily
-    suite: AkaSuite
-    role: AkaCorpusRole = AkaCorpusRole.SCORED
+    pass_kind: AKAPassKind
+    fusion_depth: AKAFusionDepth
+    source_family: AKASourceFamily
+    suite: AKASuite
+    role: AKACorpusRole = AKACorpusRole.SCORED
     exclusion_reason_code: str = ""
     workload_uuids: tuple[str, ...] = ()
-    aka_artifacts: tuple[AkaArtifactBinding, ...] = ()
+    aka_artifacts: tuple[AKAArtifactBinding, ...] = ()
     golden: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -125,14 +125,14 @@ class AkaCorpusEntry:
 
 
 @dataclass(frozen=True)
-class AkaCorpusManifest:
+class AKACorpusManifest:
     """Validated AKA-derived corpus manifest."""
 
     path: Path
     source: dict[str, Any]
-    execution_targets: dict[str, AkaExecutionTarget]
+    execution_targets: dict[str, AKAExecutionTarget]
     formal_analysis: dict[str, Any]
-    entries: tuple[AkaCorpusEntry, ...]
+    entries: tuple[AKACorpusEntry, ...]
     materialized_problem_sha256: dict[str, dict[str, str]]
     formal_coverage_requirements: dict[str, Any]
     official_scoring: dict[str, Any]
@@ -144,7 +144,7 @@ class AkaCorpusManifest:
         return self.path.parent
 
     @classmethod
-    def load(cls, path: str | Path) -> AkaCorpusManifest:
+    def load(cls, path: str | Path) -> AKACorpusManifest:
         """Load and validate a corpus manifest."""
         manifest_path = Path(path).resolve()
         data = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
@@ -195,7 +195,7 @@ class AkaCorpusManifest:
         self,
         output_root: str | Path,
         *,
-        target: AkaMaterializationTarget,
+        target: AKAMaterializationTarget,
         probe_timeout_seconds: float = DEFAULT_PROBE_TIMEOUT_SECONDS,
         probe: Probe | None = None,
     ) -> Path:
@@ -291,14 +291,14 @@ class AkaCorpusManifest:
                 not bool(item.get("included")) for item in decisions
             ),
             "scored": sum(
-                entry.role == AkaCorpusRole.SCORED for entry in selected_entries
+                entry.role == AKACorpusRole.SCORED for entry in selected_entries
             ),
             "compatibility_sentinels": sum(
-                entry.role == AkaCorpusRole.COMPATIBILITY_SENTINEL
+                entry.role == AKACorpusRole.COMPATIBILITY_SENTINEL
                 for entry in selected_entries
             ),
             "target_incompatible": sum(
-                entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE
+                entry.role == AKACorpusRole.TARGET_INCOMPATIBLE
                 for entry in self.entries
             ),
             "gfx_target": target,
@@ -375,19 +375,19 @@ def _validate_manifest_header(data: Mapping[str, Any]) -> None:
         raise ValueError("formal architecture profile identity changed")
     scoring = data.get("official_scoring") or {}
     try:
-        status = AkaOfficialScoringStatus(str(scoring.get("status")))
+        status = AKAOfficialScoringStatus(str(scoring.get("status")))
     except ValueError:
         raise ValueError(
             "official scoring availability must be explicit",
         ) from None
-    if status is AkaOfficialScoringStatus.AVAILABLE:
+    if status is AKAOfficialScoringStatus.AVAILABLE:
         try:
-            policy = AkaReleasePolicy(str(scoring.get("release_policy")))
+            policy = AKAReleasePolicy(str(scoring.get("release_policy")))
         except ValueError:
             raise ValueError(
                 "official scoring release policy is invalid",
             ) from None
-        if policy is not AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1:
+        if policy is not AKAReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1:
             raise ValueError("official scoring release policy is unsupported")
         if scoring.get("baseline_id") != AKA_OFFICIAL_BASELINE_ID:
             raise ValueError(
@@ -401,26 +401,26 @@ def _validate_manifest_header(data: Mapping[str, Any]) -> None:
             raise ValueError("official scoring evidence denominator is invalid")
 
 
-def _load_entry(data: Mapping[str, Any]) -> AkaCorpusEntry:
+def _load_entry(data: Mapping[str, Any]) -> AKACorpusEntry:
     artifacts = tuple(
-        AkaArtifactBinding(
-            role=AkaArtifactRole(str(item["role"])),
+        AKAArtifactBinding(
+            role=AKAArtifactRole(str(item["role"])),
             path=str(item["path"]),
             sha256=str(item["sha256"]),
         )
         for item in (data.get("aka_artifacts") or ())
     )
-    return AkaCorpusEntry(
+    return AKACorpusEntry(
         slot=str(data["slot"]),
         task_path=str(data["task_path"]),
         problem_name=str(data["problem_name"]),
-        operation=AkaOperation(str(data["operation"])),
+        operation=AKAOperation(str(data["operation"])),
         dtype=DType(str(data["dtype"])),
-        pass_kind=AkaPassKind(str(data["pass_kind"])),
-        fusion_depth=AkaFusionDepth(str(data["fusion_depth"])),
-        source_family=AkaSourceFamily(str(data["source_family"])),
-        suite=AkaSuite(str(data["suite"])),
-        role=AkaCorpusRole(str(data.get("role", AkaCorpusRole.SCORED))),
+        pass_kind=AKAPassKind(str(data["pass_kind"])),
+        fusion_depth=AKAFusionDepth(str(data["fusion_depth"])),
+        source_family=AKASourceFamily(str(data["source_family"])),
+        suite=AKASuite(str(data["suite"])),
+        role=AKACorpusRole(str(data.get("role", AKACorpusRole.SCORED))),
         exclusion_reason_code=str(data.get("exclusion_reason_code", "")),
         workload_uuids=tuple(
             str(u) for u in (data.get("workload_uuids") or ())
@@ -431,7 +431,7 @@ def _load_entry(data: Mapping[str, Any]) -> AkaCorpusEntry:
 
 
 def _validate_entries(
-    entries: tuple[AkaCorpusEntry, ...],
+    entries: tuple[AKACorpusEntry, ...],
     coverage: Mapping[str, Any],
 ) -> None:
     if not (SEED_SET_MIN_PROBLEMS <= len(entries) <= SEED_SET_MAX_PROBLEMS):
@@ -452,14 +452,14 @@ def _validate_entries(
         validate_relative_artifact_path(entry.task_path, "AKA task path")
         _validate_artifact_bindings(entry)
     unknown_roles = sorted(
-        {str(entry.role) for entry in entries} - set(AkaCorpusRole),
+        {str(entry.role) for entry in entries} - set(AKACorpusRole),
     )
     if unknown_roles:
         raise ValueError(
             f"AKA corpus entries use unknown roles: {unknown_roles}",
         )
     for entry in entries:
-        if entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE:
+        if entry.role == AKACorpusRole.TARGET_INCOMPATIBLE:
             if not entry.exclusion_reason_code:
                 raise ValueError(
                     "target-incompatible corpus entries require an exclusion reason",
@@ -471,7 +471,7 @@ def _validate_entries(
     sentinels = [
         entry
         for entry in entries
-        if entry.role == AkaCorpusRole.COMPATIBILITY_SENTINEL
+        if entry.role == AKACorpusRole.COMPATIBILITY_SENTINEL
     ]
     # The DType enum names OCP FP8 as "float8_e4m3fn" / "float8_e5m2", so accept
     # Accept either the "fp8" or "float8" prefix for the FP8 sentinel.
@@ -479,14 +479,14 @@ def _validate_entries(
         entry.dtype.startswith(("fp8", "float8")) for entry in sentinels
     ):
         raise ValueError("compatibility sentinels must be FP8 AKA tasks")
-    if sum(entry.role == AkaCorpusRole.SCORED for entry in entries) == 0:
+    if sum(entry.role == AKACorpusRole.SCORED for entry in entries) == 0:
         raise ValueError("AKA corpus must contain at least one scored entry")
     _validate_coverage_truth(entries, coverage)
 
 
-def _validate_artifact_bindings(entry: AkaCorpusEntry) -> None:
+def _validate_artifact_bindings(entry: AKACorpusEntry) -> None:
     roles = [artifact.role for artifact in entry.aka_artifacts]
-    required_roles = set(AkaArtifactRole)
+    required_roles = set(AKAArtifactRole)
     if set(roles) != required_roles or len(roles) != len(required_roles):
         raise ValueError(
             f"AKA entry {entry.problem_name} must bind exactly one artifact for "
@@ -501,7 +501,7 @@ def _validate_artifact_bindings(entry: AkaCorpusEntry) -> None:
 
 
 def _validate_coverage_truth(
-    entries: tuple[AkaCorpusEntry, ...],
+    entries: tuple[AKACorpusEntry, ...],
     coverage: Mapping[str, Any],
 ) -> None:
     """The declared coverage axes must truthfully aggregate the entries."""
@@ -541,7 +541,7 @@ def _validate_coverage_truth(
 
 
 def _entry_matches_combo(
-    entry: AkaCorpusEntry,
+    entry: AKACorpusEntry,
     combo: Mapping[str, Any],
 ) -> bool:
     mapping = {
@@ -582,7 +582,7 @@ def _canonical_workload_lines(path: Path) -> tuple[list[str], dict[str, str]]:
 def _mirror_selection(
     authored_root: Path,
     staging: Path,
-    selection: AkaCorpusSelection,
+    selection: AKACorpusSelection,
 ) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for problem in selection.problems:
@@ -616,11 +616,11 @@ def _mirror_selection(
 
 
 def _write_materialization_manifest(
-    manifest: AkaCorpusManifest,
+    manifest: AKACorpusManifest,
     staging: Path,
     records: list[dict[str, Any]],
-    selection: AkaCorpusSelection,
-    target: AkaMaterializationTarget,
+    selection: AKACorpusSelection,
+    target: AKAMaterializationTarget,
     probe_timeout_seconds: float,
 ) -> None:
     payload = {
@@ -651,7 +651,7 @@ def _write_materialization_manifest(
 
 
 def _validate_canonical_problem_inventory(
-    entries: tuple[AkaCorpusEntry, ...],
+    entries: tuple[AKACorpusEntry, ...],
     problems: Any,
 ) -> None:
     """Require the local record to name every corpus problem exactly once."""
@@ -678,7 +678,7 @@ def _validate_canonical_problem_inventory(
 
 def _validate_authored_problems(
     authored_root: Path,
-    entries: tuple[AkaCorpusEntry, ...],
+    entries: tuple[AKACorpusEntry, ...],
     sha256_record: Mapping[str, Mapping[str, str]],
 ) -> None:
     """Authored problems must exist, match manifest checksums, and validate."""
@@ -715,13 +715,13 @@ def _validate_authored_problems(
             > MAX_REFERENCE_TENSOR_STORAGE_BYTES
             for workload in workloads
         )
-        if any(payload_incompatibility) and entry.role == AkaCorpusRole.SCORED:
+        if any(payload_incompatibility) and entry.role == AKACorpusRole.SCORED:
             raise ValueError(
                 "scored AKA problem exceeds the static trusted-reference IPC "
                 f"limit: {entry.relative_problem_dir}",
             )
         if (
-            entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE
+            entry.role == AKACorpusRole.TARGET_INCOMPATIBLE
             and entry.exclusion_reason_code == "reference_ipc_payload_limit"
             and (
                 not payload_incompatibility or not all(payload_incompatibility)
@@ -747,8 +747,8 @@ def _verify_workload_uuid_present(workload_path: Path, uuid: str) -> None:
 
 
 def _selection_coverage(
-    manifest: AkaCorpusManifest,
-    selection: AkaCorpusSelection,
+    manifest: AKACorpusManifest,
+    selection: AKACorpusSelection,
 ) -> dict[str, Any]:
     selected_entries = tuple(problem.entry for problem in selection.problems)
     return _coverage_report(
@@ -759,8 +759,8 @@ def _selection_coverage(
 
 
 def _coverage_report(
-    manifest: AkaCorpusManifest,
-    selected_entries: tuple[AkaCorpusEntry, ...],
+    manifest: AKACorpusManifest,
+    selected_entries: tuple[AKACorpusEntry, ...],
     workload_count: int,
 ) -> dict[str, Any]:
     axes: dict[str, dict[str, int]] = {}
@@ -797,7 +797,7 @@ def _coverage_report(
 
 def _canonical_workload_inventory(
     authored_root: Path,
-    entries: tuple[AkaCorpusEntry, ...],
+    entries: tuple[AKACorpusEntry, ...],
 ) -> dict[tuple[str, str], str]:
     inventory: dict[tuple[str, str], str] = {}
     for entry in entries:
@@ -810,7 +810,7 @@ def _canonical_workload_inventory(
     return inventory
 
 
-def _audit_materialization_target(raw: Any, manifest: AkaCorpusManifest) -> str:
+def _audit_materialization_target(raw: Any, manifest: AKACorpusManifest) -> str:
     if not isinstance(raw, Mapping):
         raise ValueError("materialization target evidence must be an object")
     gfx_target = str(raw.get("gfx_target") or "")
@@ -837,7 +837,7 @@ def _audit_materialization_target(raw: Any, manifest: AkaCorpusManifest) -> str:
 
 def _audit_decision_partition(
     authored_root: Path,
-    entries: tuple[AkaCorpusEntry, ...],
+    entries: tuple[AKACorpusEntry, ...],
     raw: Any,
 ) -> list[Mapping[str, Any]]:
     if not isinstance(raw, list) or any(
@@ -870,7 +870,7 @@ def _audit_decision_partition(
 
 
 def _audit_selected_inventory(
-    entries: tuple[AkaCorpusEntry, ...],
+    entries: tuple[AKACorpusEntry, ...],
     problems: Any,
     decisions: list[Mapping[str, Any]],
 ) -> None:
@@ -968,6 +968,6 @@ __all__ = [
     "FORMAL_GFX_TARGET",
     "SEED_SET_MAX_PROBLEMS",
     "SEED_SET_MIN_PROBLEMS",
-    "AkaCorpusEntry",
-    "AkaCorpusManifest",
+    "AKACorpusEntry",
+    "AKACorpusManifest",
 ]

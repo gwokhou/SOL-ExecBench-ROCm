@@ -51,7 +51,7 @@ from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.platform.amdgpu_code_object import extract_code_object
 from sol_execbench.core.platform.environment import collect_pytorch_rocm_summary
 from sol_execbench.core.platform.isa_validation import (
-    IsaInstructionRequirement,
+    ISAInstructionRequirement,
     analyze_isa_disassembly,
     inspect_isa_requirements,
 )
@@ -627,19 +627,19 @@ def _numeric_summary(values: tuple[float, ...]) -> dict[str, float] | None:
 
 
 # Instructions that distinguish every non-exempt native compute path on RDNA4.
-CALIBRATION_ISA_CHECKS: tuple[IsaInstructionRequirement, ...] = (
-    IsaInstructionRequirement("V_FMA_F32", "-"),
-    IsaInstructionRequirement("V_FMAAK_F32", "-"),
-    IsaInstructionRequirement("V_DUAL_FMAC_F32", "-"),
-    IsaInstructionRequirement("V_PK_FMA_F16", "-"),
-    IsaInstructionRequirement("V_PK_FMAC_F16", "-"),
-    IsaInstructionRequirement("V_PK_FMA_BF16", "-"),
-    IsaInstructionRequirement("V_PK_FMAC_BF16", "-"),
-    IsaInstructionRequirement("V_PK_FMA_F32", "-"),
-    IsaInstructionRequirement("V_WMMA_F32_16X16X16_F16", "WMMA"),
-    IsaInstructionRequirement("V_WMMA_F32_16X16X16_BF16", "WMMA"),
-    IsaInstructionRequirement("V_WMMA_F32_16X16X16_FP8_FP8", "WMMA"),
-    IsaInstructionRequirement("V_WMMA_I32_16X16X16_IU8", "WMMA"),
+CALIBRATION_ISA_CHECKS: tuple[ISAInstructionRequirement, ...] = (
+    ISAInstructionRequirement("V_FMA_F32", "-"),
+    ISAInstructionRequirement("V_FMAAK_F32", "-"),
+    ISAInstructionRequirement("V_DUAL_FMAC_F32", "-"),
+    ISAInstructionRequirement("V_PK_FMA_F16", "-"),
+    ISAInstructionRequirement("V_PK_FMAC_F16", "-"),
+    ISAInstructionRequirement("V_PK_FMA_BF16", "-"),
+    ISAInstructionRequirement("V_PK_FMAC_BF16", "-"),
+    ISAInstructionRequirement("V_PK_FMA_F32", "-"),
+    ISAInstructionRequirement("V_WMMA_F32_16X16X16_F16", "WMMA"),
+    ISAInstructionRequirement("V_WMMA_F32_16X16X16_BF16", "WMMA"),
+    ISAInstructionRequirement("V_WMMA_F32_16X16X16_FP8_FP8", "WMMA"),
+    ISAInstructionRequirement("V_WMMA_I32_16X16X16_IU8", "WMMA"),
 )
 CALIBRATION_INSTRUCTION_NAMES: tuple[str, ...] = tuple(
     requirement.instruction for requirement in CALIBRATION_ISA_CHECKS

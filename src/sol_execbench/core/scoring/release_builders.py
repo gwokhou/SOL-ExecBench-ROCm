@@ -18,8 +18,8 @@ from sol_execbench.core.data.solution_models import (
     SupportedHardware,
     SupportedLanguages,
 )
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 from sol_execbench.core.scoring.release_models import (
     ArtifactReference,
@@ -39,7 +39,7 @@ def materialize_release_baseline(
     source_revision: str,
 ) -> Path:
     """Create an immutable trusted-reference baseline execution plan."""
-    corpus = AkaCorpusManifest.load(manifest_path)
+    corpus = AKACorpusManifest.load(manifest_path)
     output = output_root.resolve()
     if output.exists():
         raise FileExistsError(f"release workspace already exists: {output}")
@@ -73,7 +73,7 @@ def materialize_release_candidate(
     source_revision: str,
 ) -> Path:
     """Ingest one exact full-corpus candidate set into a release workspace."""
-    corpus = AkaCorpusManifest.load(manifest_path)
+    corpus = AKACorpusManifest.load(manifest_path)
     workspace = workspace_root.resolve()
     destination = workspace / "candidate"
     if destination.exists():
@@ -158,7 +158,7 @@ def artifact_reference(root: Path, path: Path) -> ArtifactReference:
 
 
 def _copy_corpus_manifest(
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     workspace: Path,
 ) -> ArtifactReference:
     destination = workspace / "corpus" / "manifest.yaml"
@@ -168,7 +168,7 @@ def _copy_corpus_manifest(
 
 
 def _verify_workspace_corpus(
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     workspace: Path,
 ) -> None:
     bundled = workspace / "corpus" / "manifest.yaml"
@@ -179,7 +179,7 @@ def _verify_workspace_corpus(
 
 
 def _copy_candidate_solutions(
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     *,
     workspace: Path,
     staging: Path,
@@ -187,7 +187,7 @@ def _copy_candidate_solutions(
 ) -> tuple[ExecutionPlanProblem, ...]:
     problems: list[ExecutionPlanProblem] = []
     for entry in corpus.entries:
-        if entry.role is not AkaCorpusRole.SCORED:
+        if entry.role is not AKACorpusRole.SCORED:
             continue
         problem_path = entry.relative_problem_dir.as_posix()
         source = candidate_root / problem_path / "solution.json"
@@ -232,12 +232,12 @@ def _copy_candidate_solutions(
 
 
 def _materialize_baseline_solutions(
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     workspace: Path,
 ) -> tuple[ExecutionPlanProblem, ...]:
     problems: list[ExecutionPlanProblem] = []
     for entry in corpus.entries:
-        if entry.role is not AkaCorpusRole.SCORED:
+        if entry.role is not AKACorpusRole.SCORED:
             continue
         problem_path = entry.relative_problem_dir.as_posix()
         identity = corpus.materialized_problem_sha256[problem_path]

@@ -41,6 +41,33 @@ and Pydantic models. Keep focused changes local to the affected subsystem; avoid
 unrelated refactors. Name tests descriptively, for example
 `test_rejects_invalid_solution_schema`.
 
+### Acronyms in Identifiers
+
+Acronyms are written in ALL-CAPS inside `PascalCase` identifiers, never
+title-cased. Prefer `IRBackend` / `IRKind`, `AKACorpusManifest` /
+`AKACorpusRole`, `GPUEvidence`, `ISAInstructionRequirement`, `AMDSmiProcess`,
+and `JSONDict` — not `IrBackend`, `AkaCorpusManifest`, `GpuEvidence`,
+`IsaInstructionRequirement`, `AmdSmiProcess`, or `JsonDict`. Canonical acronyms
+already in use:
+
+| Acronym | Identifier examples                         | Module / file name      |
+|---------|---------------------------------------------|-------------------------|
+| IR      | `IRBackend`, `IRKind`, `IRGraphArtifact`    | `ir/`                   |
+| AKA     | `AKACorpusManifest`, `AKACorpusRole`        | `aka_contract.py`       |
+| GPU     | `GPUEvidence`, `GPULockVerificationError`   | `gpu_lock.py`           |
+| ISA     | `ISABudget`, `ISAInstructionRequirement`    | `isa_validation.py`, `amd_isa/` |
+| AMD     | `AMDSmiProcess`, `AMDSmiGpuIdentity`        | `amd_smi.py`, `amd_isa/`|
+| JSON    | `JSONDict`, `JSONSchema`                    | `json_utils`            |
+
+In `snake_case` names (modules, functions, variables, constants) the acronym
+stays lowercase, matching the module name: `DEFAULT_IR_KIND`, `json_dict()`,
+`ir_backend()`. Docstrings, comments, and prose use the full all-caps form
+("SOLAR IR", "AMD AgentKernelArena (AKA)"). Brand names keep their official
+casing (`ROCm`, not `ROCM` or `Rocm`), and third-party namespace symbols keep
+their original casing (for example `amdisa::IsaDecoder`). When introducing a
+new acronym-typed identifier, apply this table rather than coining a fresh
+title-case spelling.
+
 In production code, do not embed large HIP or C++ source files directly in
 Python string literals. Store them as package resources and load them through
 `importlib.resources`. Tests may embed source snippets or fixtures directly when

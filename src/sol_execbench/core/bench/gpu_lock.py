@@ -15,7 +15,7 @@ from pathlib import Path
 _HOST_MANAGED_ENV = "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST"
 
 
-class GpuLockVerificationError(RuntimeError):
+class GPULockVerificationError(RuntimeError):
     """Raised when a claimed external GPU lock cannot be observed."""
 
 
@@ -77,7 +77,7 @@ def acquire_evaluation_gpu_lock(
             yield
         return
     if not _external_gpu_lock_is_held(device_index):
-        raise GpuLockVerificationError(
+        raise GPULockVerificationError(
             f"host-managed GPU {device_index} lock is not held",
         )
     yield
@@ -119,7 +119,7 @@ def _reuse_inherited_lock(lock_path: Path) -> bool:
 
 
 __all__ = [
-    "GpuLockVerificationError",
+    "GPULockVerificationError",
     "acquire_evaluation_gpu_lock",
     "acquire_gpu_lock",
     "gpu_lock_directory",

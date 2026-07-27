@@ -6,7 +6,7 @@
 from enum import StrEnum
 
 
-class AkaCorpusRole(StrEnum):
+class AKACorpusRole(StrEnum):
     """Scoring treatment for one authored AKA problem."""
 
     SCORED = "scored"
@@ -14,7 +14,7 @@ class AkaCorpusRole(StrEnum):
     TARGET_INCOMPATIBLE = "target_incompatible"
 
 
-class AkaArtifactRole(StrEnum):
+class AKAArtifactRole(StrEnum):
     """Semantic role of one content-addressed upstream AKA file."""
 
     CONFIG = "config"
@@ -22,7 +22,7 @@ class AkaArtifactRole(StrEnum):
     CORRECTNESS_RUNNER = "correctness_runner"
 
 
-class AkaSuite(StrEnum):
+class AKASuite(StrEnum):
     """AKA suites admitted by the corpus conversion policy."""
 
     TORCH2HIP = "torch2hip"
@@ -30,21 +30,21 @@ class AkaSuite(StrEnum):
     INSTRUCTION2TRITON = "instruction2triton"
 
 
-class AkaPassKind(StrEnum):
+class AKAPassKind(StrEnum):
     """Execution direction represented by an authored problem."""
 
     FORWARD = "forward"
     BACKWARD = "backward"
 
 
-class AkaFusionDepth(StrEnum):
+class AKAFusionDepth(StrEnum):
     """Whether a problem is a primitive or fused computation."""
 
     SINGLE = "single"
     FUSED = "fused"
 
 
-class AkaSourceFamily(StrEnum):
+class AKASourceFamily(StrEnum):
     """Upstream AKA source family represented in this corpus."""
 
     KERNELBENCH = "kernelbench"
@@ -53,7 +53,7 @@ class AkaSourceFamily(StrEnum):
     FLYDSL = "flydsl"
 
 
-class AkaOperation(StrEnum):
+class AKAOperation(StrEnum):
     """Operation strata used by the AKA corpus coverage policy."""
 
     MATMUL = "matmul"
@@ -64,14 +64,14 @@ class AkaOperation(StrEnum):
     ATTENTION = "attention"
 
 
-class AkaOfficialScoringStatus(StrEnum):
+class AKAOfficialScoringStatus(StrEnum):
     """Publication state of the official AKA scoring contract."""
 
     AVAILABLE = "available"
     UNAVAILABLE = "unavailable"
 
 
-class AkaRequiredEvidenceKind(StrEnum):
+class AKARequiredEvidenceKind(StrEnum):
     """Content-addressed evidence classes required for an official score."""
 
     RELEASE_BASELINE = "content_addressed_release_baseline"
@@ -79,20 +79,20 @@ class AkaRequiredEvidenceKind(StrEnum):
     SOLAR_MANIFESTS = "pinned_solar_manifests"
 
 
-class AkaReleasePolicy(StrEnum):
+class AKAReleasePolicy(StrEnum):
     """Closed publication policies admitted by the AKA scorer."""
 
     CONTENT_ADDRESSED_PUBLISHER_V1 = "content_addressed_publisher_v1"
 
 
-class AkaCompatibilityStage(StrEnum):
+class AKACompatibilityStage(StrEnum):
     """Stages that may include or exclude one AKA workload."""
 
     STATIC = "static"
     LIVE_PROBE = "live_probe"
 
 
-class AkaProbeStatus(StrEnum):
+class AKAProbeStatus(StrEnum):
     """Closed worker response states for a live compatibility probe."""
 
     COMPATIBLE = "compatible"
@@ -100,7 +100,7 @@ class AkaProbeStatus(StrEnum):
     INFRASTRUCTURE_ERROR = "infrastructure_error"
 
 
-class AkaTargetGeneration(StrEnum):
+class AKATargetGeneration(StrEnum):
     """GPU generations admitted by the authored AKA target catalog."""
 
     CDNA3 = "cdna3"
@@ -111,24 +111,24 @@ class AkaTargetGeneration(StrEnum):
 AKA_MANIFEST_SCHEMA_VERSION = 5
 AKA_TOLERANCE_CALIBRATION_FILENAME = "tolerance-calibration.json"
 AKA_OFFICIAL_BASELINE_ID = "rx9060xt-gfx1200-reference-v1"
-AKA_REQUIRED_RELEASE_EVIDENCE = tuple(AkaRequiredEvidenceKind)
+AKA_REQUIRED_RELEASE_EVIDENCE = tuple(AKARequiredEvidenceKind)
 
 __all__ = [
     "AKA_MANIFEST_SCHEMA_VERSION",
     "AKA_OFFICIAL_BASELINE_ID",
     "AKA_REQUIRED_RELEASE_EVIDENCE",
     "AKA_TOLERANCE_CALIBRATION_FILENAME",
-    "AkaArtifactRole",
-    "AkaCompatibilityStage",
-    "AkaCorpusRole",
-    "AkaFusionDepth",
-    "AkaOfficialScoringStatus",
-    "AkaOperation",
-    "AkaPassKind",
-    "AkaProbeStatus",
-    "AkaRequiredEvidenceKind",
-    "AkaReleasePolicy",
-    "AkaSourceFamily",
-    "AkaSuite",
-    "AkaTargetGeneration",
+    "AKAArtifactRole",
+    "AKACompatibilityStage",
+    "AKACorpusRole",
+    "AKAFusionDepth",
+    "AKAOfficialScoringStatus",
+    "AKAOperation",
+    "AKAPassKind",
+    "AKAProbeStatus",
+    "AKARequiredEvidenceKind",
+    "AKAReleasePolicy",
+    "AKASourceFamily",
+    "AKASuite",
+    "AKATargetGeneration",
 ]

@@ -7,13 +7,13 @@ from sol_execbench.core.data.solution import BuildSpec, Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 
-JsonDict = dict[str, Any]
+JSONDict = dict[str, Any]
 
 _T = TypeVar("_T")
 
 
-def json_dict(value: object) -> JsonDict:
-    return cast(JsonDict, value)
+def json_dict(value: object) -> JSONDict:
+    return cast(JSONDict, value)
 
 
 def typed(value: object, typ: type[_T]) -> _T:

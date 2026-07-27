@@ -7,7 +7,7 @@ import pytest
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.solution_instance import Solution
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.scoring.release_builders import (
     load_execution_plan,
@@ -30,7 +30,7 @@ def test_release_baseline_materializes_exact_scored_corpus(
         baseline_id="rx9060xt-baseline-test",
         source_revision=SOURCE_REVISION,
     )
-    corpus = AkaCorpusManifest.load(MANIFEST)
+    corpus = AKACorpusManifest.load(MANIFEST)
     baseline = load_execution_plan(workspace / "baseline" / "plan.json")
 
     expected = {

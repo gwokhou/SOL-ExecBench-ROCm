@@ -11,7 +11,7 @@ from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityStatus,
     MatrixContainerEvidence,
     MatrixEntry,
-    MatrixGpuEvidence,
+    MatrixGPUEvidence,
     MatrixHostEvidence,
     MatrixObservedEvidence,
     MatrixPythonDependencyEvidence,
@@ -65,7 +65,7 @@ def _representative_entry() -> MatrixEntry:
                 hipcc_version="HIP version: 7.1.0",
                 rocm_agent_enumerator_version="1.0.0",
             ),
-            gpu=MatrixGpuEvidence(
+            gpu=MatrixGPUEvidence(
                 device_count=1,
                 device_name="AMD Radeon RX 9070 XT",
                 gfx_architecture="gfx1200",

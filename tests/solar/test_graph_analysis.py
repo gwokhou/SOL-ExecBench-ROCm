@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 import yaml
 
-from solar.analysis.graph_analyzer import IrGraphAnalyzer
+from solar.analysis.graph_analyzer import IRGraphAnalyzer
 from solar.analysis.operand_provenance import (
     contraction_external_source_dtypes,
     contraction_operands_are_graph_external,
@@ -64,7 +64,7 @@ def _analyze(
         yaml.safe_dump({"schema_version": schema_version, "layers": layers}),
     )
     output_dir = tmp_path / "analysis"
-    result = IrGraphAnalyzer().analyze_graph(
+    result = IRGraphAnalyzer().analyze_graph(
         graph_path,
         output_dir,
         copy_graph=False,

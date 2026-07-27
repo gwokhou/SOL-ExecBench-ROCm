@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.evaluator_contract import build_evaluator_contract
 from sol_execbench.core.scoring.aggregation import (
     WorkloadScore,
@@ -42,7 +42,7 @@ def test_suite_aggregation_weights_problems_equally_and_excludes_sentinel():
                 "sentinel",
                 "s1",
                 0.0,
-                AkaCorpusRole.COMPATIBILITY_SENTINEL,
+                AKACorpusRole.COMPATIBILITY_SENTINEL,
             ),
         ],
     )

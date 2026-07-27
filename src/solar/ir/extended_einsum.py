@@ -23,7 +23,7 @@ from solar.einsum.operation_conversion import (
 from solar.einsum.operation_policy import SUPPORTABLE_OPERATIONS
 from solar.graph.extraction import OperatorGraphArtifact
 from solar.ir.bindings import bind_graph
-from solar.ir.contracts import IrBackend, IrKind, validate_ir_graph
+from solar.ir.contracts import IRBackend, IRKind, validate_ir_graph
 from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
 from solar.verification.extended_einsum import execute_extended_layer
 
@@ -49,7 +49,7 @@ _PASSTHROUGH_OPERATIONS = frozenset(
 )
 
 
-class ExtendedEinsumIrError(ValueError):
+class ExtendedEinsumIRError(ValueError):
     """An extended-einsum IR graph is malformed or not supportable exactly."""
 
 
@@ -70,15 +70,15 @@ def convert_operator_graph(
 def validate_extended_einsum_graph(graph: Mapping[str, Any]) -> None:
     """Validate an extended-einsum graph without accepting embedded ATen IR."""
     if graph.get("ir_kind") != "extended_einsum":
-        raise ExtendedEinsumIrError("graph is not extended_einsum IR")
+        raise ExtendedEinsumIRError("graph is not extended_einsum IR")
     if int(graph.get("schema_version", 0)) != IR_GRAPH_SCHEMA_VERSION:
-        raise ExtendedEinsumIrError(
+        raise ExtendedEinsumIRError(
             "extended-einsum graph must use current "
             f"schema_version={IR_GRAPH_SCHEMA_VERSION}",
         )
     layers = graph.get("layers")
     if not isinstance(layers, Mapping) or not layers:
-        raise ExtendedEinsumIrError("extended-einsum graph has no layers")
+        raise ExtendedEinsumIRError("extended-einsum graph has no layers")
     for layer_id, layer in layers.items():
         _validate_layer(str(layer_id), layer)
 
@@ -149,7 +149,7 @@ def _operation_name(target: str, source: Mapping[str, Any]) -> str:
         return target
     if str(source.get("type", "")).lower() == "start":
         return "input"
-    raise ExtendedEinsumIrError("operation has no canonical target")
+    raise ExtendedEinsumIRError("operation has no canonical target")
 
 
 def _representation(
@@ -161,7 +161,7 @@ def _representation(
         return default_operation_representation()
     handler_operation = _HANDLER_ALIASES.get(operation, operation)
     if not _is_supportable(handler_operation):
-        raise ExtendedEinsumIrError(
+        raise ExtendedEinsumIRError(
             f"layer {layer_id} uses unsupported extended-einsum operation "
             f"{operation!r}",
         )
@@ -297,27 +297,27 @@ def _encode_argument(value: Any) -> Any:
 
 def _validate_layer(layer_id: str, layer: Any) -> None:
     if not isinstance(layer, Mapping):
-        raise ExtendedEinsumIrError(f"layer {layer_id} is not a mapping")
+        raise ExtendedEinsumIRError(f"layer {layer_id} is not a mapping")
     if "semantic_op" in layer:
-        raise ExtendedEinsumIrError(
+        raise ExtendedEinsumIRError(
             f"layer {layer_id} embeds ATen semantic_op in extended-einsum IR",
         )
     _validate_tensor_metadata(layer_id, layer)
     operation = layer.get("extended_op")
     if not isinstance(operation, Mapping):
-        raise ExtendedEinsumIrError(f"layer {layer_id} has no extended_op")
+        raise ExtendedEinsumIRError(f"layer {layer_id} has no extended_op")
     if not str(operation.get("operation", "")):
-        raise ExtendedEinsumIrError(f"layer {layer_id} has no operation name")
+        raise ExtendedEinsumIRError(f"layer {layer_id} has no operation name")
     if not isinstance(operation.get("arguments"), list):
-        raise ExtendedEinsumIrError(f"layer {layer_id} has invalid arguments")
+        raise ExtendedEinsumIRError(f"layer {layer_id} has invalid arguments")
     if not isinstance(operation.get("kwargs"), Mapping):
-        raise ExtendedEinsumIrError(
+        raise ExtendedEinsumIRError(
             f"layer {layer_id} has invalid keyword arguments"
         )
     if bool(operation.get("is_real_einsum")) and "->" not in str(
         operation.get("equation", ""),
     ):
-        raise ExtendedEinsumIrError(
+        raise ExtendedEinsumIRError(
             f"layer {layer_id} has no extended-einsum equation",
         )
 
@@ -332,13 +332,13 @@ def _validate_tensor_metadata(layer_id: str, layer: Mapping[str, Any]) -> None:
             len(names.get(side) or []) != arity
             or len(dtypes.get(side) or []) != arity
         ):
-            raise ExtendedEinsumIrError(
+            raise ExtendedEinsumIRError(
                 f"layer {layer_id} lacks explicit {side} name/shape/dtype metadata",
             )
 
 
-backend = IrBackend(
-    IrKind.EXTENDED_EINSUM,
+backend = IRBackend(
+    IRKind.EXTENDED_EINSUM,
     validate_extended_einsum_graph,
     convert_operator_graph,
     execute_extended_layer,
@@ -346,7 +346,7 @@ backend = IrBackend(
 
 
 __all__ = [
-    "ExtendedEinsumIrError",
+    "ExtendedEinsumIRError",
     "backend",
     "convert_operator_graph",
     "validate_extended_einsum_graph",

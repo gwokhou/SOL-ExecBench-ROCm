@@ -19,10 +19,10 @@ from sol_execbench.core.data.json_utils import (
     load_json_value,
 )
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import (
-    AkaCorpusEntry,
-    AkaCorpusManifest,
+    AKACorpusEntry,
+    AKACorpusManifest,
 )
 from sol_execbench.core.integrity import (
     sha256_bytes,
@@ -98,7 +98,7 @@ class CorpusStageAuditResult:
 class _CorpusAuditContext:
     """Immutable inputs shared by every workload in one corpus audit."""
 
-    corpus: AkaCorpusManifest
+    corpus: AKACorpusManifest
     output: Path
     manifest_sha256: str
     architecture_sha256: str
@@ -136,7 +136,7 @@ def _audit_corpus_stage_readiness_locked(
     timeout_seconds: float,
     resume: bool,
 ) -> CorpusStageAuditResult:
-    corpus = AkaCorpusManifest.load(manifest_path)
+    corpus = AKACorpusManifest.load(manifest_path)
     if output.exists() and not resume:
         raise FileExistsError(
             f"corpus readiness output already exists: {output}",
@@ -153,7 +153,7 @@ def _audit_corpus_stage_readiness_locked(
     )
     records: list[dict[str, Any]] = []
     for entry in corpus.entries:
-        if entry.role is not AkaCorpusRole.SCORED:
+        if entry.role is not AKACorpusRole.SCORED:
             continue
         records.extend(_audit_entry(context, entry))
     return _finish_audit(context, records)
@@ -161,7 +161,7 @@ def _audit_corpus_stage_readiness_locked(
 
 def _audit_entry(
     context: _CorpusAuditContext,
-    entry: AkaCorpusEntry,
+    entry: AKACorpusEntry,
 ) -> list[dict[str, Any]]:
     corpus = context.corpus
     problem_path = entry.relative_problem_dir.as_posix()
@@ -368,7 +368,7 @@ def _finish_audit(
     expected = sum(
         len(entry.workload_uuids)
         for entry in corpus.entries
-        if entry.role is AkaCorpusRole.SCORED
+        if entry.role is AKACorpusRole.SCORED
     )
     if not records or len(records) != expected:
         raise ValueError("corpus readiness workload denominator mismatch")

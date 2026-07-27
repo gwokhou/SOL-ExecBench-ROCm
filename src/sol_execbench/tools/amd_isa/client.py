@@ -16,15 +16,15 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.tools.amd_isa.errors import IsaDecodeError, IsaProtocolError
+from sol_execbench.tools.amd_isa.errors import ISADecodeError, ISAProtocolError
 from sol_execbench.tools.amd_isa.helper import ensure_helper
-from sol_execbench.tools.amd_isa.repository import IsaSpecRepository
+from sol_execbench.tools.amd_isa.repository import ISASpecRepository
 
 _MAX_MESSAGE_BYTES = 64 * 1024 * 1024
 
 
 class _Endpoint:
-    def __init__(self, client: AmdIsa, prefix: str) -> None:
+    def __init__(self, client: AMDIsa, prefix: str) -> None:
         self._client = client
         self._prefix = prefix
 
@@ -107,7 +107,7 @@ class Explorer(_Endpoint):
         return self._call("get_functional_group", name=name)
 
 
-class AmdIsa:
+class AMDIsa:
     """A loaded ISA specification with decoder and explorer namespaces."""
 
     def __init__(
@@ -159,7 +159,7 @@ class AmdIsa:
                 or self._process.stdin is None
                 or self._process.stdout is None
             ):
-                raise IsaProtocolError("AMD ISA helper is not running")
+                raise ISAProtocolError("AMD ISA helper is not running")
             request_id = self._next_id
             self._next_id += 1
             request = {
@@ -181,41 +181,41 @@ class AmdIsa:
                     self._timeout_seconds,
                 )
                 if not readable:
-                    raise IsaProtocolError("AMD ISA helper response timed out")
+                    raise ISAProtocolError("AMD ISA helper response timed out")
                 raw = self._process.stdout.readline()
             except OSError as exc:
-                raise IsaProtocolError(
+                raise ISAProtocolError(
                     "AMD ISA helper communication failed",
                 ) from exc
             if not raw:
-                raise IsaProtocolError(
+                raise ISAProtocolError(
                     "AMD ISA helper closed its response stream",
                 )
             if len(raw.encode("utf-8")) > _MAX_MESSAGE_BYTES:
-                raise IsaProtocolError(
+                raise ISAProtocolError(
                     "AMD ISA helper response exceeds protocol size limit",
                 )
             try:
                 response = json.loads(raw)
             except json.JSONDecodeError as exc:
-                raise IsaProtocolError(
+                raise ISAProtocolError(
                     "AMD ISA helper returned invalid JSON",
                 ) from exc
             if response.get("id") != request_id:
-                raise IsaProtocolError(
+                raise ISAProtocolError(
                     "AMD ISA helper response id does not match request",
                 )
             if response.get("ok") is True:
                 return response.get("result")
             error = response.get("error", {})
-            raise IsaDecodeError(
+            raise ISADecodeError(
                 str(error.get("message", "AMD ISA operation failed")),
             )
 
     def close(self) -> None:
         """Shut down the helper process and release its resources."""
         if self._process.poll() is None:
-            with contextlib.suppress(IsaDecodeError, IsaProtocolError):
+            with contextlib.suppress(ISADecodeError, ISAProtocolError):
                 self._call("shutdown", {})
             try:
                 self._process.wait(timeout=2)
@@ -231,7 +231,7 @@ class AmdIsa:
         with contextlib.suppress(ProcessLookupError):
             os.killpg(self._process.pid, signal_number)
 
-    def __enter__(self) -> AmdIsa:
+    def __enter__(self) -> AMDIsa:
         """Return this client for context-managed use."""
         return self
 
@@ -243,14 +243,14 @@ class AmdIsa:
 def open_isa(
     architecture: str,
     *,
-    repository: IsaSpecRepository | None = None,
+    repository: ISASpecRepository | None = None,
     allow_download: bool = True,
     timeout_seconds: float = 120.0,
-) -> AmdIsa:
+) -> AMDIsa:
     """Open one architecture's specification, building/downloading on demand."""
-    repository = repository or IsaSpecRepository()
+    repository = repository or ISASpecRepository()
     descriptor = repository.resolve(architecture, allow_download=allow_download)
-    return AmdIsa(
+    return AMDIsa(
         ensure_helper(repository.cache_root),
         descriptor.path,
         timeout_seconds=timeout_seconds,

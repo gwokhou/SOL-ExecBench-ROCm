@@ -6,7 +6,7 @@ import os
 from collections.abc import Callable
 
 from sol_execbench.core.platform.compatibility import (
-    MatrixGpuEvidence,
+    MatrixGPUEvidence,
     MatrixHostEvidence,
 )
 from sol_execbench.core.platform.dependency_matrix import (
@@ -56,7 +56,7 @@ def collect_gpu_evidence(
     device_name: str | None = None,
     gfx_architecture: str | None = None,
     visible_device_environment: dict[str, str] | None = None,
-) -> MatrixGpuEvidence:
+) -> MatrixGPUEvidence:
     """Collect or build GPU evidence without requiring ROCm hardware."""
     if device_count is None or device_name is None or gfx_architecture is None:
         try:
@@ -92,7 +92,7 @@ def collect_gpu_evidence(
             except (AttributeError, RuntimeError):
                 pass
 
-    return MatrixGpuEvidence(
+    return MatrixGPUEvidence(
         device_count=device_count,
         device_name=device_name,
         gfx_architecture=gfx_architecture,

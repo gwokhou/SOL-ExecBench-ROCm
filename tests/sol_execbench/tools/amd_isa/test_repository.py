@@ -9,8 +9,8 @@ from io import BytesIO
 
 import pytest
 
-from sol_execbench.tools.amd_isa.errors import IsaSpecUnavailableError
-from sol_execbench.tools.amd_isa.repository import IsaSpecRepository
+from sol_execbench.tools.amd_isa.errors import ISASpecUnavailableError
+from sol_execbench.tools.amd_isa.repository import ISASpecRepository
 
 
 def _entry(payload: bytes) -> dict[str, object]:
@@ -31,14 +31,14 @@ def _entry(payload: bytes) -> dict[str, object]:
 
 
 def test_architecture_family_normalizes_gfx_features() -> None:
-    assert IsaSpecRepository.architecture_family("gfx1200:xnack-") == "rdna4"
-    assert IsaSpecRepository.architecture_family("gfx942") == "cdna3"
-    assert IsaSpecRepository.architecture_family("rdna4") == "rdna4"
+    assert ISASpecRepository.architecture_family("gfx1200:xnack-") == "rdna4"
+    assert ISASpecRepository.architecture_family("gfx942") == "cdna3"
+    assert ISASpecRepository.architecture_family("rdna4") == "rdna4"
 
 
 def test_unknown_architecture_is_explicitly_unavailable() -> None:
-    with pytest.raises(IsaSpecUnavailableError, match="no machine-readable"):
-        IsaSpecRepository.architecture_family("gfx9999")
+    with pytest.raises(ISASpecUnavailableError, match="no machine-readable"):
+        ISASpecRepository.architecture_family("gfx9999")
 
 
 def test_repository_downloads_once_and_checks_extracted_files(
@@ -61,7 +61,7 @@ def test_repository_downloads_once_and_checks_extracted_files(
         "sol_execbench.tools.amd_isa.repository.urlopen",
         open_fixture,
     )
-    repository = IsaSpecRepository(cache_root=tmp_path / "cache")
+    repository = ISASpecRepository(cache_root=tmp_path / "cache")
     repository._releases = {"fixture": entry}
     repository._default_release = "fixture"
 
@@ -71,9 +71,9 @@ def test_repository_downloads_once_and_checks_extracted_files(
 
 
 def test_offline_repository_never_downloads(tmp_path) -> None:
-    repository = IsaSpecRepository(cache_root=tmp_path / "cache")
+    repository = ISASpecRepository(cache_root=tmp_path / "cache")
 
-    with pytest.raises(IsaSpecUnavailableError, match="downloads are disabled"):
+    with pytest.raises(ISASpecUnavailableError, match="downloads are disabled"):
         repository.spec_path("gfx1200", allow_download=False)
 
 
@@ -90,7 +90,7 @@ def test_resolved_spec_carries_release_family_and_checksum(
         "sol_execbench.tools.amd_isa.repository.urlopen",
         lambda *_args, **_kwargs: BytesIO(archive.getvalue()),
     )
-    repository = IsaSpecRepository(cache_root=tmp_path / "cache")
+    repository = ISASpecRepository(cache_root=tmp_path / "cache")
     repository._releases = {"fixture": entry}
     repository._default_release = "fixture"
 

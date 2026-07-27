@@ -18,7 +18,7 @@ from sol_execbench.core.integrity.schema_versions import (
 )
 from sol_execbench.core.platform.arch_capabilities import (
     ArchCapabilityBudgetStatus,
-    ArchIsaBudget,
+    ArchISABudget,
 )
 from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
@@ -60,7 +60,7 @@ class ToolProbeResult(BaseModelWithDocstrings):
     """Conservative parsed fields derived from probe output."""
 
 
-class GpuEnvironmentSummary(BaseModelWithDocstrings):
+class GPUEnvironmentSummary(BaseModelWithDocstrings):
     """Best-effort summary for one detected AMD GPU agent."""
 
     model_config = ConfigDict(use_attribute_docstrings=True)
@@ -128,7 +128,7 @@ class EnvironmentCapabilityBudget(BaseModelWithDocstrings):
     """gfx architecture the budget was derived for when known."""
     reason_code: str | None = None
     """Stable reason code when status is not available."""
-    budget: ArchIsaBudget | None = None
+    budget: ArchISABudget | None = None
     """Derived ISA resource budget when available."""
     source: str
     """Source of the derivation, such as the packaged budget catalog."""
@@ -149,7 +149,7 @@ class EnvironmentSnapshot(BaseModelWithDocstrings):
     """Aggregate status for the snapshot."""
     tools: dict[str, ToolProbeResult] = Field(default_factory=dict)
     """Per-tool probe evidence."""
-    gpus: list[GpuEnvironmentSummary] = Field(default_factory=list)
+    gpus: list[GPUEnvironmentSummary] = Field(default_factory=list)
     """Best-effort detected GPU summaries."""
     capability_budgets: list[EnvironmentCapabilityBudget] = Field(
         default_factory=list,

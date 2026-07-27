@@ -38,7 +38,7 @@ _MODEL_CONFIG = ConfigDict(
 )
 
 
-class ArchIsaBudget(BaseModelWithDocstrings):
+class ArchISABudget(BaseModelWithDocstrings):
     """Arch-level ISA resource budget; diagnostic only, never an authority."""
 
     model_config = _MODEL_CONFIG
@@ -132,7 +132,7 @@ def arch_capability_budget_from_dict(
     *,
     source: str | None = None,
     expected_architecture: str | None = None,
-) -> ArchIsaBudget:
+) -> ArchISABudget:
     """Create an arch capability budget from a parsed JSON payload."""
     if not isinstance(payload, dict):
         raise ValueError("arch capability budget payload must be a JSON object")
@@ -163,7 +163,7 @@ def arch_capability_budget_from_dict(
             f"'{payload['confidence']}', expected one of: {valid}",
         ) from exc
     try:
-        return ArchIsaBudget.model_validate(enriched)
+        return ArchISABudget.model_validate(enriched)
     except (
         Exception
     ) as exc:  # pragma: no cover - re-raised as ValueError for callers
@@ -172,7 +172,7 @@ def arch_capability_budget_from_dict(
         ) from exc
 
 
-def load_packaged_arch_capability_budget(architecture: str) -> ArchIsaBudget:
+def load_packaged_arch_capability_budget(architecture: str) -> ArchISABudget:
     """Load a packaged arch capability budget resource by architecture token."""
     path = resources.files(
         "sol_execbench.data.arch_capability_budgets",
@@ -191,7 +191,7 @@ def load_packaged_arch_capability_budget(architecture: str) -> ArchIsaBudget:
     )
 
 
-def default_arch_capability_budgets() -> dict[str, ArchIsaBudget]:
+def default_arch_capability_budgets() -> dict[str, ArchISABudget]:
     """Return the built-in arch capability budget catalog."""
     return {
         arch: load_packaged_arch_capability_budget(arch)
@@ -202,8 +202,8 @@ def default_arch_capability_budgets() -> dict[str, ArchIsaBudget]:
 def derive_arch_capability_budget(
     gfx_target: str | None,
     *,
-    catalog: dict[str, ArchIsaBudget] | None = None,
-) -> ArchIsaBudget | None:
+    catalog: dict[str, ArchISABudget] | None = None,
+) -> ArchISABudget | None:
     """Return the arch capability budget for a gfx target, or ``None`` if uncovered.
 
     Uncovered architectures return ``None`` so callers can downgrade rather than

@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 
 from solar.common.types import DynamicValue
 from solar.ir.contracts import graph_kind, ir_backend, validate_ir_graph
-from solar.verification.errors import IrExecutionError
+from solar.verification.errors import IRExecutionError
 
 
 def _shapes(layer: Mapping[str, DynamicValue]) -> list[tuple[int, ...]]:
@@ -14,7 +14,7 @@ def _shapes(layer: Mapping[str, DynamicValue]) -> list[tuple[int, ...]]:
     return [tuple(int(dimension) for dimension in shape) for shape in outputs]
 
 
-class IrGraphExecutor:
+class IRGraphExecutor:
     """Execute the exact subset of SOLAR IR understood by the built-in verifier."""
 
     def __init__(
@@ -27,12 +27,12 @@ class IrGraphExecutor:
         try:
             validate_ir_graph(graph)
         except ValueError as exc:
-            raise IrExecutionError(str(exc)) from exc
+            raise IRExecutionError(str(exc)) from exc
         self.ir_kind = graph_kind(graph)
         self.backend = ir_backend(self.ir_kind)
         layers = graph.get("layers") or {}
         if not isinstance(layers, Mapping) or not layers:
-            raise IrExecutionError("IR graph has no layers")
+            raise IRExecutionError("IR graph has no layers")
         self.layers = dict(layers)
         declared_outputs = graph.get("outputs")
         if declared_outputs is None:
@@ -50,14 +50,14 @@ class IrGraphExecutor:
     def _validate_layers(self) -> None:
         for layer_id, layer in self.layers.items():
             if not isinstance(layer, Mapping):
-                raise IrExecutionError(f"layer {layer_id} is not a mapping")
+                raise IRExecutionError(f"layer {layer_id} is not a mapping")
             if str(layer.get("type", "")).lower() == "start":
                 continue
             dtypes = layer.get("tensor_dtypes") or {}
             shapes = layer.get("tensor_shapes") or {}
             for side in ("inputs", "outputs"):
                 if len(dtypes.get(side) or []) != len(shapes.get(side) or []):
-                    raise IrExecutionError(
+                    raise IRExecutionError(
                         f"layer {layer_id} lacks explicit per-tensor "
                         "dtype metadata",
                     )
@@ -75,7 +75,7 @@ class IrGraphExecutor:
             values,
         )
         if input_index != len(inputs):
-            raise IrExecutionError(
+            raise IRExecutionError(
                 f"graph consumes {input_index} inputs but reference supplied "
                 f"{len(inputs)}",
             )
@@ -109,7 +109,7 @@ class IrGraphExecutor:
             ) or []
             for name in names:
                 if input_index >= len(inputs):
-                    raise IrExecutionError(
+                    raise IRExecutionError(
                         "not enough inputs for graph start tensors",
                     )
                 values[str(name)] = inputs[input_index]
@@ -137,7 +137,7 @@ class IrGraphExecutor:
                     external_names.append(str(name))
         for name in external_names:
             if input_index >= len(inputs):
-                raise IrExecutionError(f"missing external tensor {name}")
+                raise IRExecutionError(f"missing external tensor {name}")
             values[name] = inputs[input_index]
             input_index += 1
         return input_index
@@ -177,7 +177,7 @@ class IrGraphExecutor:
                     ]
                     for layer_id, layer in pending.items()
                 }
-                raise IrExecutionError(
+                raise IRExecutionError(
                     f"unresolvable graph dependencies: {missing}",
                 )
         return consumed
@@ -196,7 +196,7 @@ class IrGraphExecutor:
             list(result) if isinstance(result, (tuple, list)) else [result]
         )
         if len(output_names) != len(results):
-            raise IrExecutionError(
+            raise IRExecutionError(
                 f"layer {layer_id} returned {len(results)} outputs, "
                 f"expected {len(output_names)}",
             )
@@ -205,14 +205,14 @@ class IrGraphExecutor:
             zip(output_names, results, strict=True),
         ):
             if not isinstance(output, torch.Tensor):
-                raise IrExecutionError(
+                raise IRExecutionError(
                     f"layer {layer_id} output {index} is not a tensor",
                 )
             if (
                 self.check_shapes
                 and tuple(output.shape) != expected_shapes[index]
             ):
-                raise IrExecutionError(
+                raise IRExecutionError(
                     f"layer {layer_id} output {index} produced "
                     f"{tuple(output.shape)}, expected {expected_shapes[index]}",
                 )
@@ -229,7 +229,7 @@ class IrGraphExecutor:
                 name for name in self.declared_outputs if name not in values
             ]
             if missing:
-                raise IrExecutionError(
+                raise IRExecutionError(
                     f"graph declares unavailable outputs: {missing}",
                 )
             ordered = self.declared_outputs
@@ -246,7 +246,7 @@ class IrGraphExecutor:
                 if name in terminal
             ]
         if not ordered:
-            raise IrExecutionError("IR graph has no terminal output")
+            raise IRExecutionError("IR graph has no terminal output")
         outputs = tuple(values[name] for name in ordered)
         return outputs[0] if len(outputs) == 1 else outputs
 

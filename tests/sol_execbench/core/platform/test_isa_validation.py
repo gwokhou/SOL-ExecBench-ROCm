@@ -6,7 +6,7 @@ from __future__ import annotations
 from types import MappingProxyType
 
 from sol_execbench.core.platform.isa_validation import (
-    IsaInstructionRequirement,
+    ISAInstructionRequirement,
     analyze_isa_disassembly,
     inspect_isa_requirements,
 )
@@ -57,7 +57,7 @@ def _open(*_: object, **__: object) -> _Isa:
 
 
 def test_requirement_inspection_records_integrity_provenance() -> None:
-    requirement = IsaInstructionRequirement("V_WMMA_F32_16X16X16_BF16", "WMMA")
+    requirement = ISAInstructionRequirement("V_WMMA_F32_16X16X16_BF16", "WMMA")
 
     report = inspect_isa_requirements("gfx1200", [requirement], opener=_open)
 

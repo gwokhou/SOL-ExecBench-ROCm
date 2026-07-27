@@ -13,7 +13,7 @@ from solar.analysis.orojenesis import OrojenesisError
 from solar.api import AnalysisFailure, AnalysisRequest, AnalysisResult
 from solar.contracts import SolarStage
 from solar.graph.extraction import OperatorGraphArtifact
-from solar.ir.conversion import IrGraphArtifact
+from solar.ir.conversion import IRGraphArtifact
 from solar.verification import VerificationError
 
 
@@ -108,7 +108,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         del operator, representation
         einsum = Path(output_dir) / "einsum_graph.yaml"
         einsum.write_text("layers: {}\n")
-        return IrGraphArtifact(einsum)
+        return IRGraphArtifact(einsum)
 
     def verify(**kwargs):
         Path(kwargs["output_path"]).write_text("predicate: passed\n")
@@ -471,7 +471,7 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
             AssertionError("runner must not be constructed"),
         ),
     )
-    monkeypatch.setattr(api, "IrGraphAnalyzer", FakeAnalyzer)
+    monkeypatch.setattr(api, "IRGraphAnalyzer", FakeAnalyzer)
 
     result = api._run_analysis(
         _request(tmp_path / "result"),

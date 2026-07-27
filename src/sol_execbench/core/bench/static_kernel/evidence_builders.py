@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from sol_execbench.core.bench.static_kernel.evidence_models import (
-    StaticIsaAnalysis,
+    StaticISAAnalysis,
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceClassification,
     StaticKernelEvidenceKernel,
@@ -31,7 +31,7 @@ def build_static_kernel_evidence_sidecar(
     tool_runs: Sequence[StaticKernelEvidenceToolRun] = (),
     kernels: Sequence[StaticKernelEvidenceKernel] = (),
     footprints: Sequence[StaticResourceFootprint] = (),
-    isa_analyses: Sequence[StaticIsaAnalysis] = (),
+    isa_analyses: Sequence[StaticISAAnalysis] = (),
     warnings: Sequence[StaticKernelEvidenceWarning] = (),
     source_references: Sequence[StaticKernelEvidenceSourceReference] = (),
 ) -> StaticKernelEvidenceSidecar:

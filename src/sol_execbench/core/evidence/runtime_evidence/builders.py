@@ -14,7 +14,7 @@ from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityStatus,
     MatrixContainerEvidence,
     MatrixEntry,
-    MatrixGpuEvidence,
+    MatrixGPUEvidence,
     MatrixHostEvidence,
     MatrixObservedEvidence,
     MatrixToolchainEvidence,
@@ -43,7 +43,7 @@ def build_runtime_matrix_entry(
     host: MatrixHostEvidence | None = None,
     container: MatrixContainerEvidence | None = None,
     toolchain: MatrixToolchainEvidence | None = None,
-    gpu: MatrixGpuEvidence | None = None,
+    gpu: MatrixGPUEvidence | None = None,
     runtime_unavailable_reason: str | None = None,
     failure_evidence: list[RuntimeFailureEvidence] | None = None,
     allow_mixed_version_debug: bool = False,
@@ -121,7 +121,7 @@ def _observed_evidence(
     host: MatrixHostEvidence | None,
     container: MatrixContainerEvidence | None,
     toolchain: MatrixToolchainEvidence | None,
-    gpu: MatrixGpuEvidence | None,
+    gpu: MatrixGPUEvidence | None,
 ) -> MatrixObservedEvidence:
     return MatrixObservedEvidence(
         host=host,

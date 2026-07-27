@@ -10,8 +10,8 @@ from sol_execbench.core.bench.static_kernel.isa_analysis import (
 )
 from sol_execbench.core.platform.amdgpu_code_object import ExtractedCodeObject
 from sol_execbench.core.platform.isa_validation import (
-    IsaDisassemblyAnalysis,
-    IsaSpecProvenance,
+    ISADisassemblyAnalysis,
+    ISASpecProvenance,
 )
 
 
@@ -42,7 +42,7 @@ def test_collect_static_isa_analysis_emits_structured_diagnostics(
         disassembly="v_wmma_f32_16x16x16_bf16",
         disassembly_sha256="b" * 64,
     )
-    provenance = IsaSpecProvenance(
+    provenance = ISASpecProvenance(
         architecture="gfx1200",
         family="rdna4",
         release="test",
@@ -56,7 +56,7 @@ def test_collect_static_isa_analysis_emits_structured_diagnostics(
     )
     monkeypatch.setattr(
         "sol_execbench.core.bench.static_kernel.isa_analysis.analyze_isa_disassembly",
-        lambda *_, **__: IsaDisassemblyAnalysis(
+        lambda *_, **__: ISADisassemblyAnalysis(
             architecture="gfx1200",
             decoded_instruction_count=1,
             functional_group_counts={"VectorALU": 1},

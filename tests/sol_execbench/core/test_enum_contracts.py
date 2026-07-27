@@ -9,8 +9,8 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ArtifactKind,
 )
 from sol_execbench.core.dataset.aka_contract import (
-    AkaCompatibilityStage,
-    AkaCorpusRole,
+    AKACompatibilityStage,
+    AKACorpusRole,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -99,8 +99,8 @@ def test_strenum_members_are_unique_literal_strings() -> None:
 
 def test_strenum_members_serialize_without_value_extraction() -> None:
     payload = {
-        "role": AkaCorpusRole.SCORED,
-        "compatibility_stage": AkaCompatibilityStage.LIVE_PROBE,
+        "role": AKACorpusRole.SCORED,
+        "compatibility_stage": AKACompatibilityStage.LIVE_PROBE,
         "artifact_kind": Rocprofv3ArtifactKind.ROCPD,
         "artifact_coverage": Rocprofv3ArtifactCoverageStatus.COMPLETE,
     }

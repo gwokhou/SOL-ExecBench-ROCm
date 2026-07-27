@@ -16,19 +16,19 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset import aka_corpus
 from sol_execbench.core.dataset.aka_compatibility import (
-    AkaWorkloadDecision,
+    AKAWorkloadDecision,
     StaticReferenceStorage,
     materialization_target,
 )
 from sol_execbench.core.dataset.aka_contract import (
-    AkaArtifactRole,
-    AkaCompatibilityStage,
-    AkaCorpusRole,
-    AkaOfficialScoringStatus,
-    AkaOperation,
-    AkaPassKind,
-    AkaRequiredEvidenceKind,
-    AkaSuite,
+    AKAArtifactRole,
+    AKACompatibilityStage,
+    AKACorpusRole,
+    AKAOfficialScoringStatus,
+    AKAOperation,
+    AKAPassKind,
+    AKARequiredEvidenceKind,
+    AKASuite,
 )
 from sol_execbench.core.dataset.aka_corpus import (
     AKA_LICENSE,
@@ -36,7 +36,7 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKA_REVISION,
     SEED_SET_MAX_PROBLEMS,
     SEED_SET_MIN_PROBLEMS,
-    AkaCorpusManifest,
+    AKACorpusManifest,
 )
 from sol_execbench.core.platform.runtime import RocmDeviceInfo
 from sol_execbench.core.scoring.official_scoring import (
@@ -60,11 +60,11 @@ TEST_TARGET = materialization_target(
 
 
 def _passing_probe(problem_dir, _row_index, workload, _target, _timeout):
-    return AkaWorkloadDecision(
+    return AKAWorkloadDecision(
         problem_path=f"{problem_dir.parent.name}/{problem_dir.name}",
         workload_uuid=workload.uuid,
         included=True,
-        stage=AkaCompatibilityStage.LIVE_PROBE,
+        stage=AKACompatibilityStage.LIVE_PROBE,
         reason_code="probe_passed",
     )
 
@@ -80,7 +80,7 @@ def _materialize_for_test(manifest, output):
 # Three AKA suites carry a liftable PyTorch oracle (Cat1/Cat2). Five
 # structurally hostile suites are rejected outright (Cat3); see
 # docs/internal/aka-expansion-friendliness.md.
-CONVERTIBLE_SUITES = set(AkaSuite)
+CONVERTIBLE_SUITES = set(AKASuite)
 CAT3_SUITES = {
     "hip2hip",
     "triton2triton",
@@ -91,7 +91,7 @@ CAT3_SUITES = {
 
 
 def test_aka_manifest_loads_and_pins_revision():
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
 
     assert manifest.source["revision"] == AKA_REVISION
     assert manifest.source["license"] == AKA_LICENSE
@@ -102,7 +102,7 @@ def test_aka_manifest_loads_and_pins_revision():
     )
     assert (
         manifest.official_scoring["status"]
-        == AkaOfficialScoringStatus.AVAILABLE
+        == AKAOfficialScoringStatus.AVAILABLE
     )
     assert set(manifest.execution_targets) == {"gfx942", "gfx1150", "gfx1200"}
     assert manifest.formal_analysis["formal_gfx_target"] == "gfx1200"
@@ -121,7 +121,7 @@ def test_corpus_architecture_identity_matches_packaged_solar_profile():
 
 
 def test_every_entry_references_aka_task_path():
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
 
     for entry in manifest.entries:
         assert entry.task_path.startswith("tasks/"), entry.task_path
@@ -129,25 +129,25 @@ def test_every_entry_references_aka_task_path():
 
 
 def test_every_entry_binds_all_aka_provenance_roles():
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
 
     for entry in manifest.entries:
         assert {artifact.role for artifact in entry.aka_artifacts} == set(
-            AkaArtifactRole,
+            AKAArtifactRole,
         )
-        assert len(entry.aka_artifacts) == len(AkaArtifactRole)
+        assert len(entry.aka_artifacts) == len(AKAArtifactRole)
 
 
 def test_no_entry_references_a_cat3_suite():
     """No problem may derive from a kernel-to-kernel / FlyDSL-target / repo suite."""
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
 
     for entry in manifest.entries:
         assert entry.suite not in CAT3_SUITES, entry.task_path
 
 
 def test_entries_are_unique_with_fp8_sentinel_policy():
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
 
     names = [entry.problem_name for entry in manifest.entries]
     assert len(names) == len(set(names))
@@ -155,14 +155,14 @@ def test_entries_are_unique_with_fp8_sentinel_policy():
     sentinels = [
         entry
         for entry in manifest.entries
-        if entry.role is AkaCorpusRole.COMPATIBILITY_SENTINEL
+        if entry.role is AKACorpusRole.COMPATIBILITY_SENTINEL
     ]
     assert all(entry.dtype.startswith(("fp8", "float8")) for entry in sentinels)
     assert (
         sum(
             1
             for entry in manifest.entries
-            if entry.role is AkaCorpusRole.SCORED
+            if entry.role is AKACorpusRole.SCORED
         )
         >= 1
     )
@@ -170,25 +170,25 @@ def test_entries_are_unique_with_fp8_sentinel_policy():
 
 def test_expansion_coverage_breadth():
     """The expansion added attention, norm variants, a backward pass, and an FP8 sentinel."""
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
 
     operations = Counter(entry.operation for entry in manifest.entries)
     passes = Counter(entry.pass_kind for entry in manifest.entries)
-    assert operations[AkaOperation.ATTENTION] >= 1
-    assert operations[AkaOperation.NORM] >= 2
-    assert passes[AkaPassKind.BACKWARD] >= 1
+    assert operations[AKAOperation.ATTENTION] >= 1
+    assert operations[AKAOperation.NORM] >= 2
+    assert passes[AKAPassKind.BACKWARD] >= 1
     fp8 = [
         entry
         for entry in manifest.entries
         if entry.dtype.startswith(("fp8", "float8"))
     ]
     assert len(fp8) == 1
-    assert fp8[0].role is AkaCorpusRole.COMPATIBILITY_SENTINEL
+    assert fp8[0].role is AKACorpusRole.COMPATIBILITY_SENTINEL
 
     incompatible = [
         entry
         for entry in manifest.entries
-        if entry.role is AkaCorpusRole.TARGET_INCOMPATIBLE
+        if entry.role is AKACorpusRole.TARGET_INCOMPATIBLE
     ]
     assert [entry.problem_name for entry in incompatible] == [
         "l2n55_matmul_maxpool_sum_scale",
@@ -202,7 +202,7 @@ def test_expansion_coverage_breadth():
 
 
 def test_coverage_axes_truthfully_aggregate_entries():
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     axes = manifest.formal_coverage_requirements["axes"]
 
     for field in (
@@ -221,7 +221,7 @@ def test_coverage_axes_truthfully_aggregate_entries():
 
 
 def test_round_trip_every_authored_problem_through_the_schema():
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
 
     for entry in manifest.entries:
         root = REPO_ROOT / "problems" / "AMD_AKA" / entry.relative_problem_dir
@@ -232,7 +232,7 @@ def test_round_trip_every_authored_problem_through_the_schema():
 
 
 def test_static_oversized_problem_cannot_be_restored_to_scored_role():
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     entry = next(
         item
         for item in manifest.entries
@@ -249,7 +249,7 @@ def test_static_oversized_problem_cannot_be_restored_to_scored_role():
             (
                 replace(
                     entry,
-                    role=AkaCorpusRole.SCORED,
+                    role=AKACorpusRole.SCORED,
                     exclusion_reason_code="",
                 ),
             ),
@@ -260,7 +260,7 @@ def test_static_oversized_problem_cannot_be_restored_to_scored_role():
 def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     entry = next(
         item
         for item in manifest.entries
@@ -292,7 +292,7 @@ def test_official_score_reports_published_policy_without_accepting_raw_inputs():
     assert report["policy"]["authorized"] is True
     assert (
         report["policy"]["manifest_status"]
-        == AkaOfficialScoringStatus.AVAILABLE
+        == AKAOfficialScoringStatus.AVAILABLE
     )
     assert report["verifier"]["available"] is True
     assert report["verifier"]["accepts_caller_authored_inputs"] is False
@@ -310,13 +310,13 @@ def test_official_score_reports_published_policy_without_accepting_raw_inputs():
         "path": None,
     }
     assert (
-        AkaRequiredEvidenceKind.RELEASE_BASELINE
+        AKARequiredEvidenceKind.RELEASE_BASELINE
         in report["policy"]["required_evidence"]
     )
 
 
 def test_audit_rejects_incomplete_local_problem_inventory(tmp_path):
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     output = _materialize_for_test(manifest, tmp_path / "materialized")
     path = output / "materialization-manifest.yaml"
     record = yaml.safe_load(path.read_text())
@@ -328,7 +328,7 @@ def test_audit_rejects_incomplete_local_problem_inventory(tmp_path):
 
 
 def test_audit_rejects_wrong_pinned_revision(tmp_path):
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     output = _materialize_for_test(manifest, tmp_path / "materialized")
     path = output / "materialization-manifest.yaml"
     record = yaml.safe_load(path.read_text())
@@ -340,16 +340,16 @@ def test_audit_rejects_wrong_pinned_revision(tmp_path):
 
 
 def test_materialization_records_and_audits_excluded_workload(tmp_path):
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     excluded_uuid = manifest.entries[0].workload_uuids[0]
 
     def selective_probe(problem_dir, _row_index, workload, _target, _timeout):
         included = workload.uuid != excluded_uuid
-        return AkaWorkloadDecision(
+        return AKAWorkloadDecision(
             problem_path=f"{problem_dir.parent.name}/{problem_dir.name}",
             workload_uuid=workload.uuid,
             included=included,
-            stage=AkaCompatibilityStage.LIVE_PROBE,
+            stage=AKACompatibilityStage.LIVE_PROBE,
             reason_code="probe_passed" if included else "probe_oom",
         )
 
@@ -382,7 +382,7 @@ def test_materialize_is_atomic_and_records_selected_problems(
     tmp_path,
     monkeypatch,
 ):
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     output = tmp_path / "materialized"
     observed: dict[str, object] = {}
 
@@ -415,13 +415,13 @@ def test_materialize_is_atomic_and_records_selected_problems(
     )
     assert record["source"]["revision"] == AKA_REVISION
     assert len(record["problems"]) == sum(
-        entry.role is not AkaCorpusRole.TARGET_INCOMPATIBLE
+        entry.role is not AKACorpusRole.TARGET_INCOMPATIBLE
         for entry in manifest.entries
     )
 
 
 def test_materialize_cleans_staging_after_failure(tmp_path, monkeypatch):
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     output = tmp_path / "materialized"
 
     def fail(*args):
@@ -441,7 +441,7 @@ def test_materialize_cleans_staging_after_failure(tmp_path, monkeypatch):
     reason="requires a local AKA clone pinned via scripts/fetch_aka_source.sh",
 )
 def test_audit_aka_provenance_binds_to_pinned_commit():
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     aka_root = REPO_ROOT / "data" / "AgentKernelArena"
 
     report = manifest.audit_aka_provenance(aka_root)

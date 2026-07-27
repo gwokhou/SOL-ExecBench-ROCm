@@ -15,8 +15,8 @@ from sol_execbench_type_helpers import (
 from sol_execbench.cli.protocol import CliFailure, CliResult
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.scoring import release_runner
 from sol_execbench.core.scoring.release_models import (
     ExecutionPlanProblem,
@@ -69,7 +69,7 @@ def test_execute_release_plan_summarizes_candidate_results(
         lambda *_a, **_k: plan,
     )
     monkeypatch.setattr(
-        release_runner.AkaCorpusManifest,
+        release_runner.AKACorpusManifest,
         "load",
         staticmethod(lambda _path: object()),
     )
@@ -113,7 +113,7 @@ def test_execute_release_plan_rejects_incomplete_baseline(
         lambda *_a, **_k: plan,
     )
     monkeypatch.setattr(
-        release_runner.AkaCorpusManifest,
+        release_runner.AKACorpusManifest,
         "load",
         staticmethod(lambda _path: object()),
     )
@@ -145,7 +145,7 @@ def test_execute_release_plan_rejects_incomplete_baseline(
 
 def _contract_objects(
     tmp_path: Path,
-) -> tuple[ReleaseExecutionPlan, AkaCorpusManifest]:
+) -> tuple[ReleaseExecutionPlan, AKACorpusManifest]:
     problem = SimpleNamespace(
         problem_path="suite/problem",
         definition_sha256="d" * 64,
@@ -160,7 +160,7 @@ def _contract_objects(
         ),
     )
     entry = SimpleNamespace(
-        role=AkaCorpusRole.SCORED,
+        role=AKACorpusRole.SCORED,
         relative_problem_dir=Path("suite/problem"),
     )
     corpus = SimpleNamespace(
@@ -174,7 +174,7 @@ def _contract_objects(
         },
         authored_root=tmp_path / "source/problems",
     )
-    return plan, cast(AkaCorpusManifest, corpus)
+    return plan, cast(AKACorpusManifest, corpus)
 
 
 def _stub_contract_io(monkeypatch, tmp_path: Path) -> None:
@@ -311,7 +311,7 @@ def test_environment_evidence_is_written_and_resume_validated(
 
 def _problem(
     tmp_path: Path,
-) -> tuple[ExecutionPlanProblem, AkaCorpusManifest, Path]:
+) -> tuple[ExecutionPlanProblem, AKACorpusManifest, Path]:
     solution_path = tmp_path / "solution.json"
     solution_path.write_text("{}")
     problem = SimpleNamespace(
@@ -326,7 +326,7 @@ def _problem(
     corpus = SimpleNamespace(authored_root=tmp_path / "authored")
     return (
         cast(ExecutionPlanProblem, problem),
-        cast(AkaCorpusManifest, corpus),
+        cast(AKACorpusManifest, corpus),
         solution_path,
     )
 

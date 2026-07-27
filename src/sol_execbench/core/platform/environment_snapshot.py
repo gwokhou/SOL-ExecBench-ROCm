@@ -19,7 +19,7 @@ from sol_execbench.core.platform.environment_models import (
     EnvironmentCapabilityBudget,
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
-    GpuEnvironmentSummary,
+    GPUEnvironmentSummary,
     ProbeRunner,
     PytorchRocmSummary,
     RocmEnvironmentSummary,
@@ -113,9 +113,9 @@ def aggregate_status(
 def summarize_gpus(
     tools: dict[str, ToolProbeResult],
     pytorch: PytorchRocmSummary | None,
-) -> list[GpuEnvironmentSummary]:
+) -> list[GPUEnvironmentSummary]:
     """Merge tool and PyTorch GPU observations without duplicates."""
-    gpus: list[GpuEnvironmentSummary] = []
+    gpus: list[GPUEnvironmentSummary] = []
     # Probe tools expose ISA targets rather than device IDs.  If PyTorch sees a
     # single device, a matching tool target is evidence for that device,
     # not an additional GPU.
@@ -128,7 +128,7 @@ def summarize_gpus(
     )
     if pytorch and (pytorch.device_name or pytorch.gfx_target):
         gpus.append(
-            GpuEnvironmentSummary(
+            GPUEnvironmentSummary(
                 source="pytorch",
                 index=0,
                 name=pytorch.device_name,
@@ -142,7 +142,7 @@ def summarize_gpus(
                 if str(gfx_target).lower() in pytorch_targets:
                     continue
                 gpus.append(
-                    GpuEnvironmentSummary(
+                    GPUEnvironmentSummary(
                         source=tool_name,
                         index=index,
                         gfx_target=str(gfx_target),
@@ -152,7 +152,7 @@ def summarize_gpus(
 
 
 def derive_capability_budgets(
-    gpus: list[GpuEnvironmentSummary],
+    gpus: list[GPUEnvironmentSummary],
 ) -> list[EnvironmentCapabilityBudget]:
     """Derive arch capability budgets for detected GPUs.
 
