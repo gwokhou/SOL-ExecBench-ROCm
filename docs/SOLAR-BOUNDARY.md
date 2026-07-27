@@ -45,11 +45,14 @@ the paper and accepts the Eq. 1 roofline. Either way this is a release-evidence
 policy of this port, not an expansion of SOLAR into benchmark evaluation or a
 claim of universal paper parity.
 
-The benchmark-agnostic Python API retains that diagnostic default. The outer
-`sol-execbench solar analyze` bridge is stricter: it always requires
-Orojenesis and rejects any worker response that is not an explicitly
-publication-eligible `capacity_constrained_tile_aware_v1` result with the
-complete artifact set. The request manifest records the policy and result.
+The benchmark-agnostic Python API emits that paper-defined default as
+`roofline_eq1_v1`; it is a valid `T_SOL` and is marked `sol_score_eligible`.
+The outer `sol-execbench solar analyze` bridge applies a stricter port-specific
+release policy: it always requires Orojenesis and rejects any worker response
+that is not an explicitly publication-eligible
+`capacity_constrained_tile_aware_v1` result with the complete artifact set.
+The request manifest records both the paper-level eligibility and the stricter
+release decision.
 Formal toolchain verification requires a reviewed binary allowlist entry and
 the pinned provenance/build identity; there is no git-checkout fallback.
 
@@ -64,4 +67,4 @@ probes. Packed-BF16 VALU is separately proven absent with an emitted FP32
 fallback. Passing this architecture gate
 allows SOLAR analysis to proceed; it does not publish the canonical baseline,
 candidate execution, or per-workload SOLAR evidence required for an official
-SOL ExecBench score. Generic candidate evaluation remains diagnostic.
+SOL ExecBench score. Generic candidate evaluation remains outside SOLAR.

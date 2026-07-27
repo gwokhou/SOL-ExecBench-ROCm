@@ -29,7 +29,7 @@
     "src/solar/verification/einsum.py"
   ],
   "long_functions": {
-    "src/solar/analysis/fusion.py:FusionPlanner.plan": 191,
+    "src/solar/analysis/fusion.py:FusionPlanner.plan": 182,
     "src/solar/analysis/orojenesis.py:OrojenesisRunner.run_multi_chain": 128,
     "src/solar/analysis/orojenesis.py:OrojenesisRunner.run_multi_region": 127,
     "src/solar/analysis/orojenesis.py:_internal_zero_copy_view": 100,
@@ -51,7 +51,7 @@
     "src/solar/verification/einsum.py:replay_verification_artifact": 129
   },
   "oversized_modules": {
-    "src/solar/analysis/graph_analyzer.py": 1726,
+    "src/solar/analysis/graph_analyzer.py": 1725,
     "src/solar/analysis/orojenesis.py": 2027,
     "src/solar/verification/einsum.py": 1113
   },

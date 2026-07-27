@@ -17,7 +17,9 @@ from solar.common.types import DynamicValue
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 InputFactory = Callable[[int], Sequence[DynamicValue]]
+ROOFLINE_BOUND_KIND = "roofline_eq1_v1"
 FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
+SOL_BOUND_KINDS = frozenset({ROOFLINE_BOUND_KIND, FORMAL_BOUND_KIND})
 
 
 class SolarAnalysisStatus(StrEnum):
@@ -131,6 +133,11 @@ class AnalysisResult:
         """Whether this result satisfies the port's formal-bound policy."""
         return self.bound.kind == FORMAL_BOUND_KIND
 
+    @property
+    def sol_score_eligible(self) -> bool:
+        """Whether this result is a paper-defined SOL bound usable by SOL Score."""
+        return self.bound.kind in SOL_BOUND_KINDS
+
 
 @dataclass(frozen=True)
 class AnalysisFailure:
@@ -177,6 +184,7 @@ def write_request_manifest(
             "allow_negative_inf": request.allow_negative_inf,
             "require_orojenesis": request.require_orojenesis,
         },
+        "sol_score_eligible": bound.kind in SOL_BOUND_KINDS,
         "publication_eligible": bound.kind == formal_bound_kind,
         "artifacts": [
             {"path": artifact.path, "sha256": artifact.sha256} for artifact in artifacts
@@ -192,6 +200,8 @@ def write_request_manifest(
 
 __all__ = [
     "FORMAL_BOUND_KIND",
+    "ROOFLINE_BOUND_KIND",
+    "SOL_BOUND_KINDS",
     "AnalysisFailure",
     "AnalysisRequest",
     "AnalysisResult",

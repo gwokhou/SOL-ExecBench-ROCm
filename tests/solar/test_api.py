@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
+import torch
 import yaml
 
 import solar.api as api
@@ -29,6 +31,54 @@ def _request(output: Path) -> AnalysisRequest:
         reference_sha256="a" * 64,
         architecture="RX_9060_XT",
         output_dir=output,
+    )
+
+
+def _matmul_request(
+    output: Path,
+    *,
+    require_orojenesis: bool = False,
+    orojenesis_home: str | None = None,
+) -> AnalysisRequest:
+    def reference(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
+        return left @ right
+
+    def input_factory(seed: int) -> tuple[torch.Tensor, torch.Tensor]:
+        left = torch.full((2, 3), float(seed % 5 + 1))
+        return left, torch.arange(12.0).reshape(3, 4)
+
+    return AnalysisRequest(
+        analysis_id="matmul:formal-policy",
+        reference=reference,
+        input_factory=input_factory,
+        reference_name="tests.test_api#matmul",
+        reference_sha256="b" * 64,
+        architecture="RX_9060_XT",
+        output_dir=output,
+        device="cpu",
+        require_orojenesis=require_orojenesis,
+        orojenesis_home=orojenesis_home,
+    )
+
+
+def _conv_request(output: Path, *, require_orojenesis: bool = True) -> AnalysisRequest:
+    def reference(value: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
+        return torch.nn.functional.conv2d(value, weight, padding=1)
+
+    def input_factory(seed: int) -> tuple[torch.Tensor, torch.Tensor]:
+        value = torch.full((1, 2, 4, 4), float(seed % 5 + 1))
+        return value, torch.ones(3, 2, 3, 3)
+
+    return AnalysisRequest(
+        analysis_id="conv2d:formal-policy",
+        reference=reference,
+        input_factory=input_factory,
+        reference_name="tests.test_api#conv2d",
+        reference_sha256="c" * 64,
+        architecture="RX_9060_XT",
+        output_dir=output,
+        device="cpu",
+        require_orojenesis=require_orojenesis,
     )
 
 
@@ -79,6 +129,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(tmp_path, monkeypat
     assert "score" not in manifest
     assert manifest["analysis_contract"]["precision"] == "fp16"
     assert manifest["analysis_contract"]["require_orojenesis"] is False
+    assert manifest["sol_score_eligible"] is True
     assert manifest["publication_eligible"] is True
 
 
@@ -193,7 +244,7 @@ def test_bound_and_reason_code_helpers_fail_closed():
                     "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
                 }
             )
-    with pytest.raises(ValueError, match="non-formal"):
+    with pytest.raises(ValueError, match="non-tile-aware"):
         api._extract_bound(
             {
                 "schema_version": 3,
@@ -219,6 +270,133 @@ def test_analysis_request_defaults_to_eq1_roofline_bound():
     """Eq.1 roofline is the default bound policy (paper-aligned); Orojenesis is opt-in."""
     request = _request(Path("/tmp/solar-default"))
     assert request.require_orojenesis is False
+
+
+def test_default_api_matmul_is_paper_roofline_without_orojenesis(tmp_path):
+    result = api.analyze(_matmul_request(tmp_path / "result"))
+
+    assert isinstance(result, AnalysisResult)
+    assert result.bound.kind == "roofline_eq1_v1"
+    assert result.sol_score_eligible is True
+    assert result.publication_eligible is False
+    analysis = yaml.safe_load((result.output_dir / "solar-analysis.yaml").read_text())
+    evidence = analysis["metadata"]["orojenesis"]
+    assert evidence["status"] == "not_requested"
+    assert evidence["formal_coverage"] == {
+        "applicable_layers": 0,
+        "total_layers": 1,
+    }
+    manifest = yaml.safe_load((result.output_dir / "manifest.yaml").read_text())
+    assert manifest["sol_score_eligible"] is True
+    assert manifest["publication_eligible"] is False
+
+
+def test_formal_api_matmul_requires_and_records_orojenesis_evidence(
+    tmp_path, monkeypatch
+):
+    calls: list[str] = []
+
+    class FakeRunner:
+        toolchain_identity = {"verification_mode": "fake"}
+
+        def run_layer(self, layer, output_dir, *, word_bits):
+            calls.append(layer["semantic_op"]["equation"])
+            output_dir.mkdir(parents=True, exist_ok=True)
+            raw = output_dir / "raw.csv"
+            raw.write_text("64,80\n")
+            return {
+                "word_bits": word_bits,
+                "curve": [{"buffer_bytes": 64, "dram_bytes": 80.0}],
+                "evidence_files": {
+                    "raw": {
+                        "path": raw.name,
+                        "sha256": hashlib.sha256(raw.read_bytes()).hexdigest(),
+                    }
+                },
+            }
+
+    runner = FakeRunner()
+    monkeypatch.setattr(api, "OrojenesisRunner", lambda home: runner)
+
+    result = api.analyze(_matmul_request(tmp_path / "result", require_orojenesis=True))
+
+    assert isinstance(result, AnalysisResult)
+    assert result.bound.kind == "capacity_constrained_tile_aware_v1"
+    assert result.sol_score_eligible is True
+    assert result.publication_eligible is True
+    assert calls == ["MK,KN->MN"]
+    analysis = yaml.safe_load((result.output_dir / "solar-analysis.yaml").read_text())
+    evidence = analysis["metadata"]["orojenesis"]
+    assert evidence["status"] == "complete"
+    assert evidence["formal_coverage"] == {
+        "applicable_layers": 1,
+        "total_layers": 1,
+    }
+    assert set(evidence["layers"]) == {"mm"}
+
+
+def test_incomplete_optional_orojenesis_evidence_falls_back_to_eq1(
+    tmp_path, monkeypatch
+):
+    class FakeRunner:
+        toolchain_identity = {"verification_mode": "fake"}
+
+        def run_layer(self, layer, output_dir, *, word_bits):
+            del layer, output_dir
+            return {
+                "word_bits": word_bits,
+                "curve": [{"buffer_bytes": 64, "dram_bytes": 8_000.0}],
+                "evidence_files": {},
+            }
+
+    monkeypatch.setattr(api, "OrojenesisRunner", lambda home: FakeRunner())
+
+    result = api.analyze(
+        _matmul_request(
+            tmp_path / "result",
+            orojenesis_home="configured-but-incomplete",
+        )
+    )
+
+    assert isinstance(result, AnalysisResult)
+    assert result.bound.kind == "roofline_eq1_v1"
+    analysis = yaml.safe_load((result.output_dir / "solar-analysis.yaml").read_text())
+    assert analysis["metadata"]["orojenesis"]["status"] == "incomplete"
+    assert analysis["total"]["prefetched_bytes"] == analysis["total"]["fused_bytes"]
+
+
+def test_default_api_keeps_unmodeled_contraction_on_paper_roofline(tmp_path):
+    result = api.analyze(_conv_request(tmp_path / "result", require_orojenesis=False))
+
+    assert isinstance(result, AnalysisResult)
+    assert result.bound.kind == "roofline_eq1_v1"
+    assert result.sol_score_eligible is True
+    analysis = yaml.safe_load((result.output_dir / "solar-analysis.yaml").read_text())
+    evidence = analysis["metadata"]["orojenesis"]
+    assert evidence["status"] == "not_requested"
+    assert evidence["formal_coverage"] == {
+        "applicable_layers": 0,
+        "total_layers": 1,
+    }
+
+
+def test_strict_api_rejects_contraction_without_exact_orojenesis_proof(
+    tmp_path, monkeypatch
+):
+    class FakeRunner:
+        toolchain_identity = {"verification_mode": "fake"}
+
+    monkeypatch.setattr(api, "OrojenesisRunner", lambda home: FakeRunner())
+    output = tmp_path / "result"
+
+    result = api.analyze(_conv_request(output))
+
+    assert isinstance(result, AnalysisFailure)
+    assert result.stage == SolarStage.FORMAL_ANALYSIS
+    assert result.reason_code == "formal_analysis_failed"
+    assert "exact Orojenesis proof representation" in result.message
+    assert "convolution" in result.message
+    assert not output.exists()
 
 
 def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
@@ -249,27 +427,27 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
     assert observed["require_orojenesis"] is False
 
 
-def test_extract_bound_accepts_diagnostic_eq1_when_orojenesis_not_required():
+def test_extract_bound_accepts_paper_roofline_when_orojenesis_not_required():
     bound = api._extract_bound(
         {
             "schema_version": 3,
             "total": {"lower_bound_seconds": 1.5, "compute_resource": "mfma"},
-            "metadata": {"bound_kind": "diagnostic"},
+            "metadata": {"bound_kind": "roofline_eq1_v1"},
         },
         require_orojenesis=False,
     )
     assert bound.seconds == 1.5
-    assert bound.kind == "diagnostic"
+    assert bound.kind == "roofline_eq1_v1"
     assert bound.limiting_resource == "mfma"
 
 
-def test_extract_bound_rejects_diagnostic_when_orojenesis_required():
-    with pytest.raises(ValueError, match="non-formal"):
+def test_extract_bound_rejects_roofline_when_tile_evidence_is_required():
+    with pytest.raises(ValueError, match="non-tile-aware"):
         api._extract_bound(
             {
                 "schema_version": 3,
                 "total": {"lower_bound_seconds": 1.5},
-                "metadata": {"bound_kind": "diagnostic"},
+                "metadata": {"bound_kind": "roofline_eq1_v1"},
             },
             require_orojenesis=True,
         )

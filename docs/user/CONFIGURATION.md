@@ -104,8 +104,9 @@ uv run sol-execbench solar analyze PROBLEM_DIR \
 
 Options are `--device` (default `cuda:0`), `--timeout` (default 14400 seconds)
 and `--orojenesis-home`. The CLI always requires the formal
-capacity-constrained Orojenesis bound. It rejects diagnostic Eq. 1 results at
-the worker, bridge, and CLI boundaries. Formal analysis is currently
+capacity-constrained Orojenesis bound. It rejects paper-valid
+`roofline_eq1_v1` results at the worker, bridge, and CLI boundaries as an
+additional port release policy. Formal analysis is currently
 constrained by the pinned gfx1200 architecture audit and the repository-owned
 Orojenesis binary allowlist; the allowlist is empty until a reviewed
 reproducible mapper artifact is published.

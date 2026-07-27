@@ -36,7 +36,7 @@ The paper (§4.2) treats Orojenesis as an optional tighter-bound path that
 lives inside the SOL Analyzer; the Eq. 1 roofline bound alone is the SOL
 Analyzer's default formal output. This port follows the paper by default:
 `AnalysisRequest.require_orojenesis` defaults to `False`, so `solar.api.analyze`
-accepts the Eq. 1 roofline (`bound_kind == "diagnostic"`,
+accepts the Eq. 1 roofline (`bound_kind == "roofline_eq1_v1"`,
 `T_SOL = max(compute, fused_bytes / bandwidth)`) as the bound. Setting
 `require_orojenesis=True` restores the port's stricter release-evidence policy,
 which requires the capacity-constrained / Orojenesis tile-aware bound
@@ -46,12 +46,15 @@ The outer `sol-execbench solar analyze` command is the formal publication
 surface and always sets `require_orojenesis=True`. Its worker IPC, bridge, and
 CLI independently reject an analyzed response unless it carries the exact
 capacity-constrained bound, a positive finite lower bound, the complete
-content-addressed artifact set, and `publication_eligible=true`. A diagnostic
-Eq. 1 result remains available through the benchmark-agnostic Python API, but
-cannot cross the formal bridge.
+content-addressed artifact set, and `publication_eligible=true`. The paper-level
+Eq. 1 result remains available through the benchmark-agnostic Python API and
+has `sol_score_eligible=true`, but cannot cross this port's stricter formal
+bridge.
 
-`solar_request_manifest` schema 2 records both `require_orojenesis` and
-`publication_eligible`. Formal Orojenesis acceptance requires the
+`solar_request_manifest` schema 2 records `require_orojenesis`,
+`sol_score_eligible`, and `publication_eligible`. The first eligibility flag
+tracks the paper's SOL Score semantics; the second tracks this port's stricter
+release policy. Formal Orojenesis acceptance requires the
 repository-allowlisted mapper binary plus the pinned provenance manifest,
 source archive/tree, builder image, compiler-wrapper digest, and compiler
 identity. A git checkout without the provenance manifest is not accepted.

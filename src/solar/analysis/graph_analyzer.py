@@ -58,6 +58,8 @@ from solar.einsum.semantics import (
     SemanticGraphError,
     validate_semantic_graph,
 )
+from solar.analysis.contraction_proofs import build_orojenesis_proof_graph
+from solar.analysis import formal_evidence
 from solar.analysis.fusion import FusionPlanner
 from solar.analysis.graph_rules import (
     BOOL_DTYPES,
@@ -1091,12 +1093,18 @@ class EinsumGraphAnalyzer:
             ),
         )
 
-    @staticmethod
     def _plan_fusion(
-        prepared: _PreparedAnalysis, topology: _GraphTopology
+        self, prepared: _PreparedAnalysis, topology: _GraphTopology
     ) -> _FusionPlan:
-        chains = find_multi_einsum_chains(prepared.all_layers)
-        regions = find_multi_einsum_regions(prepared.all_layers)
+        proof_graph_layers, proof_layers, unsupported_contractions = (
+            build_orojenesis_proof_graph(
+                prepared.all_layers,
+                topology.layers,
+                analyzer=self.einsum_analyzer,
+            )
+        )
+        chains = find_multi_einsum_chains(proof_graph_layers)
+        regions = find_multi_einsum_regions(proof_graph_layers)
         region_paths = [
             path for region in regions for path in region.get("physical_paths") or []
         ]
@@ -1123,11 +1131,8 @@ class EinsumGraphAnalyzer:
             ).plan(hierarchy),
             chains=chains,
             regions=regions,
-            einsum_layers={
-                layer_id: layer
-                for layer_id, layer in topology.layers.items()
-                if (layer.get("semantic_op") or {}).get("kind") == "einsum"
-            },
+            proof_layers=proof_layers,
+            unsupported_contraction_layers=unsupported_contractions,
         )
 
     @staticmethod
@@ -1185,9 +1190,7 @@ class EinsumGraphAnalyzer:
         require_orojenesis: bool,
     ) -> None:
         for index, layer_ids in enumerate(plan.chains):
-            layers = [
-                (layer_id, plan.einsum_layers[layer_id]) for layer_id in layer_ids
-            ]
+            layers = [(layer_id, plan.proof_layers[layer_id]) for layer_id in layer_ids]
             dtypes = [
                 str(dtype)
                 for _, layer in layers
@@ -1227,7 +1230,7 @@ class EinsumGraphAnalyzer:
                 for layer_id in layer_ids
                 for side in ("inputs", "outputs")
                 for dtype in (
-                    (plan.einsum_layers[layer_id].get("tensor_dtypes") or {}).get(side)
+                    (plan.proof_layers[layer_id].get("tensor_dtypes") or {}).get(side)
                     or []
                 )
             ]
@@ -1261,7 +1264,7 @@ class EinsumGraphAnalyzer:
             for region in plan.regions
             for layer_id in region.get("schedule") or []
         )
-        for layer_id, layer in plan.einsum_layers.items():
+        for layer_id, layer in plan.proof_layers.items():
             if layer_id in multi_member_ids:
                 continue
             tensor_dtypes = layer.get("tensor_dtypes") or {}
@@ -1338,7 +1341,7 @@ class EinsumGraphAnalyzer:
     ) -> List[float]:
         excesses: List[float] = []
         for layer_id, result in orojenesis["layers"].items():
-            layer = plan.einsum_layers[layer_id]
+            layer = plan.proof_layers[layer_id]
             point = (result.get("selected_capacity") or {}).get("point")
             region = region_by_layer[layer_id]
             external = contraction_operands_are_graph_external(layer, all_layers)
@@ -1398,7 +1401,7 @@ class EinsumGraphAnalyzer:
                 point
                 and len(layer_ids) >= 2
                 and len(region_ids) == 1
-                and all(layer_id in plan.einsum_layers for layer_id in layer_ids)
+                and all(layer_id in plan.proof_layers for layer_id in layer_ids)
             )
             result["formal_applicability"] = {
                 "applicable": applicable,
@@ -1450,7 +1453,7 @@ class EinsumGraphAnalyzer:
                 point
                 and len(layer_ids) >= 2
                 and len(region_ids) == 1
-                and all(layer_id in plan.einsum_layers for layer_id in layer_ids)
+                and all(layer_id in plan.proof_layers for layer_id in layer_ids)
             )
             result["formal_applicability"] = {
                 "applicable": applicable,
@@ -1489,24 +1492,6 @@ class EinsumGraphAnalyzer:
             excesses.append(max(0.0, solver_bytes - compulsory_bytes))
         return excesses
 
-    @staticmethod
-    def _formal_coverage(plan: _FusionPlan, orojenesis: Dict[str, Any]) -> int:
-        applicable_layers = sum(
-            bool((result.get("formal_applicability") or {}).get("applicable"))
-            for result in orojenesis["layers"].values()
-        )
-        for category in ("chains", "regions"):
-            applicable_layers += sum(
-                len((result.get("formal_applicability") or {}).get("layer_ids") or [])
-                for result in orojenesis[category].values()
-                if (result.get("formal_applicability") or {}).get("applicable")
-            )
-        orojenesis["formal_coverage"] = {
-            "applicable_layers": applicable_layers,
-            "total_layers": len(plan.einsum_layers),
-        }
-        return applicable_layers
-
     def _audit_orojenesis_evidence(
         self,
         plan: _FusionPlan,
@@ -1524,17 +1509,13 @@ class EinsumGraphAnalyzer:
         )
         excesses.extend(self._audit_chain_evidence(plan, orojenesis, region_by_layer))
         excesses.extend(self._audit_region_evidence(plan, orojenesis, region_by_layer))
-        self._formal_coverage(plan, orojenesis)
-        results = [
-            *orojenesis["layers"].values(),
-            *orojenesis["chains"].values(),
-            *orojenesis["regions"].values(),
-        ]
-        formal_bound = bool(excesses) and all(
-            (result.get("selected_capacity") or {}).get("point") is not None
-            for result in results
+        tile_aware_bound = formal_evidence.audit_tile_evidence_contract(
+            orojenesis,
+            evidence_root=prepared.output_dir,
+            proof_layer_count=len(plan.proof_layers),
+            unsupported_layer_count=len(plan.unsupported_contraction_layers),
         )
-        return audited_fused_bytes + max(excesses, default=0.0), formal_bound
+        return audited_fused_bytes + max(excesses, default=0.0), tile_aware_bound
 
     def _run_formal_analysis(
         self,
@@ -1545,16 +1526,10 @@ class EinsumGraphAnalyzer:
         *,
         require_orojenesis: bool,
     ) -> _FormalAnalysis:
-        orojenesis: Dict[str, Any] = {
-            "schema_version": OROJENESIS_ANALYSIS_SCHEMA_VERSION,
-            "status": (
-                "not_applicable" if not prepared.semantic_graph else "not_requested"
-            ),
-            "toolchain": None,
-            "layers": {},
-            "chains": {},
-            "regions": {},
-        }
+        orojenesis = formal_evidence.new_orojenesis_record(
+            semantic_graph=prepared.semantic_graph,
+            schema_version=OROJENESIS_ANALYSIS_SCHEMA_VERSION,
+        )
         if not (prepared.semantic_graph and prepared.semantic_complete):
             return _FormalAnalysis(
                 None,
@@ -1564,11 +1539,25 @@ class EinsumGraphAnalyzer:
                 False,
             )
         plan = self._plan_fusion(prepared, topology)
-        if plan.einsum_layers and runner is None and require_orojenesis:
+        orojenesis["unsupported_contraction_layers"] = list(
+            plan.unsupported_contraction_layers
+        )
+        orojenesis["formal_coverage"] = {
+            "applicable_layers": 0,
+            "total_layers": len(plan.proof_layers)
+            + len(plan.unsupported_contraction_layers),
+        }
+        if plan.unsupported_contraction_layers and require_orojenesis:
+            unsupported = ", ".join(plan.unsupported_contraction_layers)
+            raise ValueError(
+                "strict formal analysis lacks an exact Orojenesis proof "
+                f"representation for contraction layers: {unsupported}"
+            )
+        if plan.proof_layers and runner is None and require_orojenesis:
             raise ValueError(
                 "strict formal analysis requires the pinned Orojenesis toolchain"
             )
-        if runner is not None and plan.einsum_layers:
+        if runner is not None and plan.proof_layers:
             self._run_orojenesis_evidence(
                 plan,
                 runner,
@@ -1576,23 +1565,33 @@ class EinsumGraphAnalyzer:
                 orojenesis,
                 require_orojenesis=require_orojenesis,
             )
-        elif not plan.einsum_layers:
-            orojenesis["status"] = "not_applicable"
-        audited_prefetched_bytes = io_totals.fused_bytes
-        formal_bound = not plan.einsum_layers
-        if plan.einsum_layers and orojenesis["status"] == "complete":
-            audited_prefetched_bytes, formal_bound = self._audit_orojenesis_evidence(
-                plan,
-                orojenesis,
-                prepared,
-                io_totals.fused_bytes,
+        elif not plan.proof_layers:
+            orojenesis["status"] = formal_evidence.status_without_proof(
+                unsupported_contractions=bool(plan.unsupported_contraction_layers),
+                runner_configured=runner is not None,
             )
+        audited_prefetched_bytes = io_totals.fused_bytes
+        tile_aware_bound = bool(
+            require_orojenesis
+            and not plan.proof_layers
+            and not plan.unsupported_contraction_layers
+        )
+        if plan.proof_layers and orojenesis["status"] == "complete":
+            candidate_prefetched_bytes, tile_aware_bound = (
+                self._audit_orojenesis_evidence(
+                    plan, orojenesis, prepared, io_totals.fused_bytes
+                )
+            )
+            if tile_aware_bound:
+                audited_prefetched_bytes = candidate_prefetched_bytes
+            else:
+                orojenesis["status"] = "incomplete"
         return _FormalAnalysis(
             fusion=plan.fusion,
             orojenesis=orojenesis,
             audited_fused_bytes=io_totals.fused_bytes,
             audited_prefetched_bytes=audited_prefetched_bytes,
-            formal_bound=formal_bound,
+            tile_aware_bound=tile_aware_bound,
         )
 
     @staticmethod
@@ -1638,9 +1637,9 @@ class EinsumGraphAnalyzer:
                 "prefetched_memory_seconds": prefetched_memory_seconds,
                 "prefetched_overlapped_seconds": seconds,
             }
-        if require_orojenesis and not formal.formal_bound:
+        if require_orojenesis and not formal.tile_aware_bound:
             raise ValueError(
-                "formal analysis did not produce a complete tile-aware bound"
+                "strict analysis did not produce a complete tile-aware bound"
             )
         return _LowerBound(seconds, resource_seconds, compute_resource, components)
 
