@@ -9,10 +9,10 @@ import torch
 import torch.nn.functional as functional
 import yaml
 
-from solar.analysis.graph_analyzer import EinsumGraphAnalyzer
-from solar.einsum.conversion import convert_operator_graph
+from solar.analysis.graph_analyzer import IrGraphAnalyzer
 from solar.graph.extraction import extract_operator_graph
-from solar.verification.einsum import EinsumGraphExecutor
+from solar.ir.conversion import convert_operator_graph
+from solar.verification.verify import IrGraphExecutor
 
 
 def _add_relu(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
@@ -199,14 +199,14 @@ def test_cpu_pipeline_preserves_reference_semantics(
     converted = convert_operator_graph(operator, output_dir=output)
     graph = yaml.safe_load(converted.path.read_text())
 
-    actual = EinsumGraphExecutor(graph)(*inputs)
+    actual = IrGraphExecutor(graph)(*inputs)
 
     torch.testing.assert_close(actual, reference(*inputs), equal_nan=True)
     assert sorted(graph["source_input_indices"]) == sorted(
         operator.used_source_indices,
     )
     assert graph["outputs"]
-    analysis = EinsumGraphAnalyzer().analyze_graph(
+    analysis = IrGraphAnalyzer().analyze_graph(
         converted.path,
         output / "analysis",
         copy_graph=False,
@@ -292,5 +292,5 @@ def test_canonical_extraction_preserves_explicit_backward_reference(
     assert any(
         layer.get("phase") == "reference" for layer in graph["layers"].values()
     )
-    actual = EinsumGraphExecutor(graph)(*inputs)
+    actual = IrGraphExecutor(graph)(*inputs)
     torch.testing.assert_close(actual, reference(*inputs))

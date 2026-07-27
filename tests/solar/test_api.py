@@ -12,8 +12,8 @@ import solar.api as api
 from solar.analysis.orojenesis import OrojenesisError
 from solar.api import AnalysisFailure, AnalysisRequest, AnalysisResult
 from solar.contracts import SolarStage
-from solar.einsum.conversion import EinsumGraphArtifact
 from solar.graph.extraction import OperatorGraphArtifact
+from solar.ir.conversion import IrGraphArtifact
 from solar.verification import VerificationError
 
 
@@ -104,11 +104,11 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         operator.write_text("layers: {}\n")
         return OperatorGraphArtifact(operator, (), (), ())
 
-    def convert(operator, *, output_dir):
-        del operator
+    def convert(operator, *, output_dir, representation=None):
+        del operator, representation
         einsum = Path(output_dir) / "einsum_graph.yaml"
         einsum.write_text("layers: {}\n")
-        return EinsumGraphArtifact(einsum)
+        return IrGraphArtifact(einsum)
 
     def verify(**kwargs):
         Path(kwargs["output_path"]).write_text("predicate: passed\n")
@@ -124,7 +124,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
     monkeypatch.setattr(
         api,
         "_run_analysis",
-        lambda request, profile, root: analysis,
+        lambda request, profile, root, graph_path: analysis,
     )
 
     result = api.analyze(_request(output))
@@ -197,8 +197,8 @@ def test_conversion_failure_has_its_own_stable_stage(tmp_path, monkeypatch):
     result = api.analyze(_request(output))
 
     assert isinstance(result, AnalysisFailure)
-    assert result.stage == "einsum_conversion"
-    assert result.reason_code == "einsum_conversion_failed"
+    assert result.stage == "ir_conversion"
+    assert result.reason_code == "ir_conversion_failed"
     assert not output.exists()
 
 
@@ -337,7 +337,7 @@ def test_formal_api_matmul_requires_and_records_orojenesis_evidence(
             self.toolchain_identity = {"verification_mode": "fake"}
 
         def run_layer(self, layer, output_dir, *, word_bits):
-            calls.append(layer["semantic_op"]["equation"])
+            calls.append(layer["extended_op"]["equation"])
             output_dir.mkdir(parents=True, exist_ok=True)
             raw = output_dir / "raw.csv"
             raw.write_text("64,80\n")
@@ -471,12 +471,13 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
             AssertionError("runner must not be constructed"),
         ),
     )
-    monkeypatch.setattr(api, "EinsumGraphAnalyzer", FakeAnalyzer)
+    monkeypatch.setattr(api, "IrGraphAnalyzer", FakeAnalyzer)
 
     result = api._run_analysis(
         _request(tmp_path / "result"),
         cast(Any, _Profile()),
         tmp_path,
+        tmp_path / "ir_graph.yaml",
     )
 
     assert result == {"schema_version": 3}

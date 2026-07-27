@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Fail-closed execution and numerical verification of SOLAR einsum graphs."""
+"""Fail-closed execution and numerical verification of SOLAR IR graphs."""
 
 # The executor intentionally mirrors semantic operation classifications.
 # Its intentionally self-contained replay routines also import optional torch
@@ -23,13 +23,14 @@ from typing import Any
 
 import yaml
 
-from solar.schema_versions import EINSUM_VERIFICATION_SCHEMA_VERSION
-from solar.verification.errors import EinsumExecutionError, VerificationError
-from solar.verification.executor import (
-    EinsumGraphExecutor,
-)
-from solar.verification.executor import (
+from solar.ir.contracts import layer_operation
+from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
+from solar.verification.aten import (
     torch_equation as _torch_equation,
+)
+from solar.verification.errors import IrExecutionError, VerificationError
+from solar.verification.executor import (
+    IrGraphExecutor,
 )
 from solar.verification.numerics import (
     alias_relation as _alias_relation,
@@ -167,7 +168,7 @@ def _prepare_case(
 
 def _verify_case(
     reference: Callable[..., Any],
-    executor: EinsumGraphExecutor,
+    executor: IrGraphExecutor,
     graph: Mapping[str, Any],
     prepared: _PreparedCase,
     policy: TolerancePolicy,
@@ -247,7 +248,7 @@ def _run_cases(
 ) -> list[dict[str, Any]]:
     import torch
 
-    executor = EinsumGraphExecutor(graph, check_shapes=check_shapes)
+    executor = IrGraphExecutor(graph, check_shapes=check_shapes)
     results: list[dict[str, Any]] = []
     for case in cases:
         prepared = _prepare_case(input_factory, graph, case, device)
@@ -295,7 +296,7 @@ def _einsum_roundoff_equivalent(
         )
     ):
         return False
-    semantic = operations[0].get("semantic_op") or {}
+    semantic = layer_operation(operations[0])
     if semantic.get("kind") != "einsum":
         return False
     equation = str(semantic.get("equation", ""))
@@ -311,7 +312,7 @@ def _einsum_roundoff_equivalent(
             torch_equation,
             *(value.abs() for value in precise),
         )
-    except (RuntimeError, EinsumExecutionError):
+    except (RuntimeError, IrExecutionError):
         return False
     gamma = (
         reduction_size * unit_roundoff / (1.0 - reduction_size * unit_roundoff)
@@ -463,7 +464,7 @@ def _file_attestation(
         ),
         "predicate": {
             "status": "passed",
-            "verifier": EINSUM_VERIFICATION_SCHEMA_VERSION,
+            "verifier": IR_VERIFICATION_SCHEMA_VERSION,
             "reference": {
                 "entry_point": reference_entry_point,
                 "input_factory": input_factory_name,
@@ -544,7 +545,7 @@ def _callable_attestation(
         "predicateType": "https://solar-rocm.dev/attestations/callable-to-einsum/v1",
         "predicate": {
             "status": "passed",
-            "verifier": EINSUM_VERIFICATION_SCHEMA_VERSION,
+            "verifier": IR_VERIFICATION_SCHEMA_VERSION,
             "tolerance": dict(tolerance),
             "execution": dict(execution),
             "cases": list(cases),
@@ -621,7 +622,7 @@ def _validated_replay_predicate(
     predicate = artifact.get("predicate") or {}
     if (
         predicate.get("status") != "passed"
-        or predicate.get("verifier") != EINSUM_VERIFICATION_SCHEMA_VERSION
+        or predicate.get("verifier") != IR_VERIFICATION_SCHEMA_VERSION
     ):
         raise VerificationError(
             "verification artifact is not a trusted passing result",

@@ -21,7 +21,7 @@ def _ready_outcome(request) -> SolarStageAuditOutcome:
     output.mkdir(parents=True)
     names = {
         "graph_extraction": "operator_graph.yaml",
-        "einsum_conversion": "einsum_graph.yaml",
+        "ir_conversion": "einsum_graph.yaml",
         "conversion_verification": "conversion-attestation.yaml",
     }
     stages = []
@@ -102,7 +102,7 @@ def test_corpus_audit_keeps_failed_workload_in_the_matrix(
         return SolarStageAuditOutcome(
             status=SolarReadinessStatus.FAILED,
             analysis_id=request.workload_uuid,
-            failure_stage=SolarStage.EINSUM_CONVERSION,
+            failure_stage=SolarStage.IR_CONVERSION,
             reason_code="source_input_binding_failed",
             message="binding mismatch",
             stages=(
@@ -112,7 +112,7 @@ def test_corpus_audit_keeps_failed_workload_in_the_matrix(
                     "artifact": None,
                 },
                 {
-                    "stage": "einsum_conversion",
+                    "stage": "ir_conversion",
                     "status": "failed",
                     "reason_code": "source_input_binding_failed",
                 },

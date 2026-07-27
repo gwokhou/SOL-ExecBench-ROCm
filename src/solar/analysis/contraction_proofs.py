@@ -11,6 +11,7 @@ from copy import deepcopy
 from solar.analysis.resources import is_mfma_operation
 from solar.common.types import GraphValue, NodeDict, TensorShapes
 from solar.einsum.analyzer import EinsumAnalyzer
+from solar.ir.contracts import layer_operation
 
 _PROOF_INPUTS: dict[str, tuple[str, tuple[int, ...]]] = {
     "addmm": ("matmul", (1, 2)),
@@ -23,7 +24,7 @@ _PROOF_INPUTS: dict[str, tuple[str, tuple[int, ...]]] = {
 
 def requires_tile_evidence(layer: Mapping[str, GraphValue]) -> bool:
     """Return whether a layer contains contraction work needing tile evidence."""
-    semantic = layer.get("semantic_op") or {}
+    semantic = layer_operation(layer)
     target = str(semantic.get("target") or layer.get("type") or "").lower()
     return (
         semantic.get("kind") == "einsum"
@@ -77,7 +78,7 @@ def build_orojenesis_proof_layer(
     analyzer: EinsumAnalyzer,
 ) -> NodeDict | None:
     """Return an exact einsum proof view for a supported contraction layer."""
-    semantic = layer.get("semantic_op") or {}
+    semantic = layer_operation(layer)
     if semantic.get("kind") == "einsum":
         equation = str(semantic.get("equation", ""))
         return deepcopy(dict(layer)) if "->" in equation else None

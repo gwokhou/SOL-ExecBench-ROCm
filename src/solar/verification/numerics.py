@@ -158,12 +158,12 @@ def _tensor_close_stats(
         raise TypeError("tensor comparison requires tensor operands")
     if actual.shape != expected.shape:
         raise VerificationError(
-            f"output shape mismatch: einsum={tuple(actual.shape)}, "
+            f"output shape mismatch: actual={tuple(actual.shape)}, "
             f"reference={tuple(expected.shape)}",
         )
     if actual.dtype != expected.dtype:
         raise VerificationError(
-            f"output dtype mismatch: einsum={actual.dtype}, reference={expected.dtype}",
+            f"output dtype mismatch: actual={actual.dtype}, reference={expected.dtype}",
         )
     if not (actual.is_floating_point() or actual.is_complex()):
         if not torch.equal(actual, expected):

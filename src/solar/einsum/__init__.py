@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Internal conversion stage; use :func:`solar.api.analyze` publicly."""
+"""Extended-einsum operation analysis backing the extended-einsum IR backend.
 
-from solar.einsum.conversion import EinsumGraphArtifact, convert_operator_graph
+This package holds the einsum operation handlers and analyzer. The
+representation-neutral IR conversion facade lives in
+:mod:`solar.ir.conversion`; use :func:`solar.api.analyze` publicly.
+"""
 
-__all__ = ["EinsumGraphArtifact", "convert_operator_graph"]
+__all__: list[str] = []

@@ -35,7 +35,7 @@ def test_audit_conversion_records_all_passing_stage_digests(
     assert result.ready
     assert [item.stage for item in result.stages] == [
         "graph_extraction",
-        "einsum_conversion",
+        "ir_conversion",
         "conversion_verification",
     ]
     assert all(item.status == "passed" for item in result.stages)
@@ -60,7 +60,7 @@ def test_audit_conversion_retains_passed_artifacts_on_failure(
     )
 
     assert not result.ready
-    assert result.failure_stage == "einsum_conversion"
+    assert result.failure_stage == "ir_conversion"
     assert result.reason_code == "source_input_binding_failed"
     assert result.stages[0].artifact is not None
     assert (tmp_path / "failed" / "operator_graph.yaml").is_file()

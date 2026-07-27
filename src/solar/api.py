@@ -19,7 +19,7 @@ import yaml
 from solar.analysis.graph_analyzer import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
     ArchitectureProfile,
-    EinsumGraphAnalyzer,
+    IrGraphAnalyzer,
     OrojenesisError,
     OrojenesisRunner,
 )
@@ -36,8 +36,8 @@ from solar.contracts import (
     SolBound,
     write_request_manifest,
 )
-from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import extract_operator_graph
+from solar.ir.conversion import convert_operator_graph
 from solar.readiness import (
     ConversionReadinessRequest,
     ConversionReadinessResult,
@@ -81,15 +81,19 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             output_dir=staging,
             name=request.analysis_id,
         )
-        stage = SolarStage.EINSUM_CONVERSION
-        einsum = convert_operator_graph(operator, output_dir=staging)
+        stage = SolarStage.IR_CONVERSION
+        ir_graph = convert_operator_graph(
+            operator,
+            output_dir=staging,
+            representation=request.representation,
+        )
         stage = SolarStage.CONVERSION_VERIFICATION
         verify_callable_conversion(
             reference=request.reference,
             input_factory=request.input_factory,
             reference_name=request.reference_name,
             reference_sha256=request.reference_sha256,
-            graph_path=einsum.path,
+            graph_path=ir_graph.path,
             output_path=staging / "conversion-attestation.yaml",
             policy=VerificationPolicy(
                 atol=request.atol,
@@ -102,9 +106,9 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             ),
         )
         stage = SolarStage.FORMAL_ANALYSIS
-        analysis = _run_analysis(request, profile, staging)
+        analysis = _run_analysis(request, profile, staging, ir_graph.path)
         bound = _extract_bound(analysis, request.require_orojenesis)
-        artifacts = _finish_artifacts(staging, analysis)
+        artifacts = _finish_artifacts(staging, analysis, ir_graph.path.name)
         write_request_manifest(
             request,
             staging,
@@ -131,14 +135,15 @@ def _run_analysis(
     request: AnalysisRequest,
     profile: ArchitectureProfile,
     staging: Path,
+    graph_path: Path,
 ) -> dict[str, Any]:
     runner = (
         OrojenesisRunner(request.orojenesis_home)
         if request.require_orojenesis or request.orojenesis_home is not None
         else None
     )
-    result = EinsumGraphAnalyzer().analyze_graph(
-        staging / "einsum_graph.yaml",
+    result = IrGraphAnalyzer().analyze_graph(
+        graph_path,
         staging,
         precision=request.precision,
         copy_graph=False,
@@ -182,9 +187,10 @@ def _extract_bound(
 def _finish_artifacts(
     staging: Path,
     analysis: dict[str, Any],
+    graph_name: str,
 ) -> tuple[ArtifactRef, ...]:
     metadata = analysis.get("metadata") or {}
-    metadata["source_graph"] = "einsum_graph.yaml"
+    metadata["source_graph"] = graph_name
     analysis["metadata"] = metadata
     old_path = staging / "analysis.yaml"
     analysis_path = staging / "solar-analysis.yaml"
@@ -192,7 +198,7 @@ def _finish_artifacts(
     analysis_path.write_text(yaml.safe_dump(analysis, sort_keys=False))
     names = (
         "operator_graph.yaml",
-        "einsum_graph.yaml",
+        graph_name,
         "conversion-attestation.yaml",
         "solar-analysis.yaml",
     )

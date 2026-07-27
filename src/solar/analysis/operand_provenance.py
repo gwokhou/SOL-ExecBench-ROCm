@@ -12,6 +12,7 @@ from solar.analysis.graph_rules import (
     RECOMPUTABLE_OPERAND_TARGETS,
 )
 from solar.common.types import NodeDict
+from solar.ir.contracts import CONTRACTION_KIND, INPUT_KIND, layer_operation
 
 type SourceTrace = tuple[set[str], bool, bool]
 
@@ -46,7 +47,7 @@ class _OperandSourceTracer:
     @staticmethod
     def _is_recomputable(semantic: NodeDict, effects: NodeDict) -> bool:
         return bool(
-            semantic.get("kind") == "aten"
+            semantic.get("kind") not in {INPUT_KIND, CONTRACTION_KIND}
             and semantic.get("target") in RECOMPUTABLE_OPERAND_TARGETS
             and not effects.get("mutates")
             and not effects.get("atomic")
@@ -107,7 +108,7 @@ class _OperandSourceTracer:
             if produced.output_index not in range(len(output_dtypes)):
                 return None
             return {str(output_dtypes[produced.output_index])}, False, False
-        semantic = producer.get("semantic_op") or {}
+        semantic = layer_operation(producer)
         effects = semantic.get("effects") or {}
         aliases = [
             alias

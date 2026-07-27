@@ -5,11 +5,11 @@
 
 
 class VerificationError(ValueError):
-    """The reference and einsum graph could not be proven equivalent."""
+    """The reference and IR graph could not be proven equivalent."""
 
 
-class EinsumExecutionError(VerificationError):
-    """An einsum graph cannot be executed exactly by the built-in verifier."""
+class IrExecutionError(VerificationError):
+    """An IR graph cannot be executed exactly by the built-in verifier."""
 
 
-__all__ = ["EinsumExecutionError", "VerificationError"]
+__all__ = ["IrExecutionError", "VerificationError"]

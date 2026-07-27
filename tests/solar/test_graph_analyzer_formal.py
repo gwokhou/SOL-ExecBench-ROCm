@@ -8,7 +8,7 @@ from typing import cast
 import pytest
 
 from solar.analysis.graph_analyzer import (
-    EinsumGraphAnalyzer,
+    IrGraphAnalyzer,
     _GraphTopology,
     _PreparedAnalysis,
 )
@@ -187,7 +187,7 @@ def _empty_orojenesis() -> dict:
 def test_runner_evidence_and_audit_cover_chain_region_and_single(
     tmp_path: Path,
 ):
-    analyzer = EinsumGraphAnalyzer()
+    analyzer = IrGraphAnalyzer()
     plan, all_layers = _formal_plan()
     profile = SimpleNamespace(
         memory_hierarchy=(
@@ -253,7 +253,7 @@ def test_evidence_selection_handles_no_cache_and_strict_capacity_failure():
         "curve": [{"buffer_bytes": 64, "dram_bytes": 10}],
         "evidence_files": {},
     }
-    EinsumGraphAnalyzer._select_capacity_and_rewrite_evidence(
+    IrGraphAnalyzer._select_capacity_and_rewrite_evidence(
         result,
         None,
         False,
@@ -262,24 +262,21 @@ def test_evidence_selection_handles_no_cache_and_strict_capacity_failure():
     )
     assert "selected_capacity" not in result
     with pytest.raises(ValueError, match="missing"):
-        EinsumGraphAnalyzer._select_capacity_and_rewrite_evidence(
+        IrGraphAnalyzer._select_capacity_and_rewrite_evidence(
             result,
             MemoryLevel("tiny", "cu", 1),
             True,
             "missing",
             Path("root"),
         )
-    assert EinsumGraphAnalyzer._last_cache(None) is None
+    assert IrGraphAnalyzer._last_cache(None) is None
     empty = SimpleNamespace(
         memory_hierarchy=(MemoryLevel("vram", "device", 100),),
     )
+    assert IrGraphAnalyzer._last_cache(cast(ArchitectureProfile, empty)) is None
+    assert IrGraphAnalyzer._word_bits([], 4.0) == 32
     assert (
-        EinsumGraphAnalyzer._last_cache(cast(ArchitectureProfile, empty))
-        is None
-    )
-    assert EinsumGraphAnalyzer._word_bits([], 4.0) == 32
-    assert (
-        EinsumGraphAnalyzer._word_bits(["torch.float16", "torch.float32"], 4.0)
+        IrGraphAnalyzer._word_bits(["torch.float16", "torch.float32"], 4.0)
         == 16
     )
 
@@ -295,7 +292,7 @@ def test_strict_runner_requires_toolchain_identity(tmp_path: Path):
         all_layers=all_layers,
     )
     with pytest.raises(ValueError, match="toolchain identity"):
-        EinsumGraphAnalyzer()._run_orojenesis_evidence(
+        IrGraphAnalyzer()._run_orojenesis_evidence(
             plan,
             cast(OrojenesisRunner, runner),
             cast(_PreparedAnalysis, prepared),
@@ -317,7 +314,7 @@ def test_evidence_audits_fail_closed_on_mismatch():
         "selected_capacity": {"point": None},
     }
     assert (
-        EinsumGraphAnalyzer._audit_layer_evidence(
+        IrGraphAnalyzer._audit_layer_evidence(
             plan,
             evidence,
             region_by_layer,
@@ -337,7 +334,7 @@ def test_evidence_audits_fail_closed_on_mismatch():
         },
     }
     assert (
-        EinsumGraphAnalyzer._audit_chain_evidence(
+        IrGraphAnalyzer._audit_chain_evidence(
             plan,
             evidence,
             region_by_layer,
@@ -356,7 +353,7 @@ def test_evidence_audits_fail_closed_on_mismatch():
         },
     }
     assert (
-        EinsumGraphAnalyzer._audit_region_evidence(
+        IrGraphAnalyzer._audit_region_evidence(
             plan,
             evidence,
             region_by_layer,
@@ -384,7 +381,7 @@ def test_tile_aware_bound_requires_complete_contraction_coverage(
     }
     prepared = SimpleNamespace(all_layers=all_layers, output_dir=tmp_path)
 
-    audited, formal = EinsumGraphAnalyzer()._audit_orojenesis_evidence(
+    audited, formal = IrGraphAnalyzer()._audit_orojenesis_evidence(
         plan,
         evidence,
         cast(_PreparedAnalysis, prepared),
@@ -416,7 +413,7 @@ def test_lower_bound_combines_compute_and_prefetched_memory():
     )
     accumulator = SimpleNamespace(resource_work={"valu": {"fp32": 2}})
     formal = FormalAnalysis(None, {}, 50.0, 300.0, True)
-    lower = EinsumGraphAnalyzer._lower_bound(
+    lower = IrGraphAnalyzer._lower_bound(
         cast(_PreparedAnalysis, prepared),
         cast(AnalysisAccumulator, accumulator),
         formal,
@@ -429,7 +426,7 @@ def test_lower_bound_combines_compute_and_prefetched_memory():
 
     incomplete = FormalAnalysis(None, {}, 50.0, 50.0, False)
     with pytest.raises(ValueError, match="complete tile-aware"):
-        EinsumGraphAnalyzer._lower_bound(
+        IrGraphAnalyzer._lower_bound(
             cast(
                 _PreparedAnalysis,
                 SimpleNamespace(

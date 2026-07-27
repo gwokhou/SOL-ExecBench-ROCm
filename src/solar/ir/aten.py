@@ -1,34 +1,26 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Versioned, fail-closed semantics for executable SOLAR graphs."""
-
-# Semantic target classifications deliberately mirror the executor dispatch.
-# pylint: disable=duplicate-code,too-many-locals,import-outside-toplevel,too-many-branches
+"""Exact ATen intermediate representation backend."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
+from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
-from solar.schema_versions import EINSUM_GRAPH_SCHEMA_VERSION
+import yaml
+
+from solar.graph.extraction import OperatorGraphArtifact
+from solar.ir.bindings import bind_graph
+from solar.ir.contracts import IrBackend, IrKind
+from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
+from solar.verification.aten import execute_aten_layer
 
 
-class SemanticGraphError(ValueError):
-    """A graph does not contain complete, executable operation semantics."""
-
-
-def _collect_tensor_references(value: Any, references: set[int]) -> None:
-    """Add every serialized tensor reference nested under ``value``."""
-    if isinstance(value, Mapping):
-        if "tensor" in value:
-            references.add(int(value["tensor"]))
-            return
-        for item in value.values():
-            _collect_tensor_references(item, references)
-    elif isinstance(value, (list, tuple)):
-        for item in value:
-            _collect_tensor_references(item, references)
+class AtenIrError(ValueError):
+    """An ATen IR graph is incomplete or cannot replay its source exactly."""
 
 
 SUPPORTED_ATEN_TARGETS = frozenset(
@@ -141,57 +133,76 @@ SUPPORTED_ATEN_TARGETS = frozenset(
 )
 
 
-def validate_semantic_graph(graph: Mapping[str, Any]) -> None:
-    """Validate the latest graph contract without accepting legacy schemas."""
-    if int(graph.get("schema_version", 0)) != EINSUM_GRAPH_SCHEMA_VERSION:
-        raise SemanticGraphError(
-            "einsum graph must use current "
-            f"schema_version={EINSUM_GRAPH_SCHEMA_VERSION}",
+def convert_operator_graph(
+    operator: OperatorGraphArtifact,
+    output_dir: str | Path,
+) -> Path:
+    """Persist the canonical operator graph as one validated ATen IR artifact."""
+    traced = _load_operator_graph(operator)
+    converted = deepcopy(dict(traced))
+    converted["ir_kind"] = "aten"
+    bind_graph(converted, operator)
+    validate_aten_graph(converted)
+    path = Path(output_dir) / "aten_graph.yaml"
+    path.write_text(yaml.safe_dump(converted, sort_keys=False))
+    return path
+
+
+def validate_aten_graph(graph: Mapping[str, Any]) -> None:
+    """Validate one exact ATen IR graph without accepting legacy schemas."""
+    if int(graph.get("schema_version", 0)) != IR_GRAPH_SCHEMA_VERSION:
+        raise AtenIrError(
+            "ATen graph must use current "
+            f"schema_version={IR_GRAPH_SCHEMA_VERSION}",
         )
     layers = graph.get("layers")
     if not isinstance(layers, Mapping) or not layers:
-        raise SemanticGraphError("einsum graph has no layers")
+        raise AtenIrError("ATen graph has no layers")
     for layer_id, layer in layers.items():
-        _validate_semantic_layer(str(layer_id), layer)
+        _validate_aten_layer(str(layer_id), layer)
 
 
-def _validate_semantic_layer(layer_id: str, layer: Any) -> None:
+def _load_operator_graph(operator: OperatorGraphArtifact) -> Mapping[str, Any]:
+    traced = yaml.safe_load(operator.path.read_text()) or {}
+    if traced.get("extraction_kind") != "make_fx_reference_v1":
+        raise RuntimeError("ATen graph provenance is not trusted")
+    validate_aten_graph(traced)
+    return traced
+
+
+def _validate_aten_layer(layer_id: str, layer: Any) -> None:
     if not isinstance(layer, Mapping):
-        raise SemanticGraphError(f"layer {layer_id} is not a mapping")
+        raise AtenIrError(f"layer {layer_id} is not a mapping")
+    names = layer.get("tensor_names") or {}
     shapes = layer.get("tensor_shapes") or {}
     dtypes = layer.get("tensor_dtypes") or {}
-    names = layer.get("tensor_names") or {}
     for side in ("inputs", "outputs"):
         arity = len(shapes.get(side) or [])
         if (
             len(dtypes.get(side) or []) != arity
             or len(names.get(side) or []) != arity
         ):
-            raise SemanticGraphError(
+            raise AtenIrError(
                 f"layer {layer_id} lacks explicit {side} "
                 "name/shape/dtype metadata",
             )
     semantic = layer.get("semantic_op")
     if not isinstance(semantic, Mapping):
-        raise SemanticGraphError(f"layer {layer_id} has no semantic_op")
+        raise AtenIrError(f"layer {layer_id} has no semantic_op")
     kind = str(semantic.get("kind", ""))
     if kind == "input":
         return
     if kind == "einsum":
         equation = str(semantic.get("equation", ""))
         if not equation or "->" not in equation:
-            raise SemanticGraphError(
-                f"layer {layer_id} has no exact einsum equation",
-            )
+            raise AtenIrError(f"layer {layer_id} has no exact einsum equation")
         return
     if kind != "aten":
-        raise SemanticGraphError(
-            f"layer {layer_id} is not executable exactly",
-        )
-    _validate_aten_semantics(layer_id, semantic, names)
+        raise AtenIrError(f"layer {layer_id} is not executable exactly")
+    _validate_aten_operation(layer_id, semantic, names)
 
 
-def _validate_aten_semantics(
+def _validate_aten_operation(
     layer_id: str,
     semantic: Mapping[str, Any],
     names: Mapping[str, Any],
@@ -201,38 +212,41 @@ def _validate_aten_semantics(
         import torch
 
         if not target.isidentifier() or not hasattr(torch.ops.aten, target):
-            raise SemanticGraphError(
+            raise AtenIrError(
                 f"layer {layer_id} uses unsupported exact operation {target!r}",
             )
-    if not isinstance(semantic.get("arguments"), list):
-        raise SemanticGraphError(
-            f"layer {layer_id} lacks explicit arguments",
-        )
-    arguments = semantic.get("arguments") or []
+    arguments = semantic.get("arguments")
+    if not isinstance(arguments, list):
+        raise AtenIrError(f"layer {layer_id} lacks explicit arguments")
     kwargs = semantic.get("kwargs") or {}
     if not isinstance(kwargs, Mapping):
-        raise SemanticGraphError(
-            f"layer {layer_id} has invalid keyword arguments",
-        )
+        raise AtenIrError(f"layer {layer_id} has invalid keyword arguments")
     input_arity = len(names.get("inputs") or [])
-    referenced_tensors: set[int] = set()
-    _collect_tensor_references(arguments, referenced_tensors)
-    _collect_tensor_references(kwargs, referenced_tensors)
-    if any(index < 0 or index >= input_arity for index in referenced_tensors):
-        raise SemanticGraphError(
+    references: set[int] = set()
+    _collect_tensor_references(arguments, references)
+    _collect_tensor_references(kwargs, references)
+    if any(index < 0 or index >= input_arity for index in references):
+        raise AtenIrError(
             f"layer {layer_id} references a tensor outside its input metadata",
         )
-    if input_arity and referenced_tensors != set(range(input_arity)):
-        raise SemanticGraphError(
+    if input_arity and references != set(range(input_arity)):
+        raise AtenIrError(
             f"layer {layer_id} does not preserve every ordered tensor argument",
         )
     _validate_effects(layer_id, semantic, names, input_arity)
-    _validate_required_parameters(
-        layer_id,
-        target,
-        arguments,
-        kwargs,
-    )
+    _validate_required_parameters(layer_id, target, arguments, kwargs)
+
+
+def _collect_tensor_references(value: Any, references: set[int]) -> None:
+    if isinstance(value, Mapping):
+        if "tensor" in value:
+            references.add(int(value["tensor"]))
+            return
+        for item in value.values():
+            _collect_tensor_references(item, references)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _collect_tensor_references(item, references)
 
 
 def _validate_effects(
@@ -243,17 +257,15 @@ def _validate_effects(
 ) -> None:
     effects = semantic.get("effects")
     if not isinstance(effects, Mapping):
-        raise SemanticGraphError(f"layer {layer_id} lacks explicit effects")
+        raise AtenIrError(f"layer {layer_id} lacks explicit effects")
     mutations = effects.get("mutates")
     aliases = effects.get("aliases")
     if not isinstance(mutations, list) or not isinstance(aliases, list):
-        raise SemanticGraphError(
+        raise AtenIrError(
             f"layer {layer_id} has invalid mutation/alias effects",
         )
     if any(int(index) < 0 or int(index) >= input_arity for index in mutations):
-        raise SemanticGraphError(
-            f"layer {layer_id} has invalid mutation target",
-        )
+        raise AtenIrError(f"layer {layer_id} has invalid mutation target")
     output_arity = len(names.get("outputs") or [])
     for alias in aliases:
         if (
@@ -261,9 +273,7 @@ def _validate_effects(
             or int(alias.get("input", -1)) not in range(input_arity)
             or int(alias.get("output", -1)) not in range(output_arity)
         ):
-            raise SemanticGraphError(
-                f"layer {layer_id} has invalid alias effect",
-            )
+            raise AtenIrError(f"layer {layer_id} has invalid alias effect")
 
 
 def _validate_required_parameters(
@@ -272,7 +282,7 @@ def _validate_required_parameters(
     arguments: list[Any],
     kwargs: Mapping[str, Any],
 ) -> None:
-    required_parameters = {
+    required = {
         "chunk": (("chunks", 2),),
         "expand": (("sizes", 2),),
         "gather": (("dim", 3),),
@@ -291,8 +301,8 @@ def _validate_required_parameters(
     }
     missing = [
         key
-        for key, positional_arity in required_parameters.get(target, ())
-        if key not in kwargs and len(arguments) < positional_arity
+        for key, arity in required.get(target, ())
+        if key not in kwargs and len(arguments) < arity
     ]
     if target == "slice" and not (
         "dim" in kwargs
@@ -300,15 +310,24 @@ def _validate_required_parameters(
     ):
         missing.append("explicit slice bounds")
     if missing:
-        raise SemanticGraphError(
+        raise AtenIrError(
             f"layer {layer_id} lacks exact {target} parameters: "
             + ", ".join(missing),
         )
 
 
+backend = IrBackend(
+    IrKind.ATEN,
+    validate_aten_graph,
+    convert_operator_graph,
+    execute_aten_layer,
+)
+
+
 __all__ = [
-    "EINSUM_GRAPH_SCHEMA_VERSION",
+    "AtenIrError",
     "SUPPORTED_ATEN_TARGETS",
-    "SemanticGraphError",
-    "validate_semantic_graph",
+    "backend",
+    "convert_operator_graph",
+    "validate_aten_graph",
 ]

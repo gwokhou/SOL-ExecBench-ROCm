@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from solar.analysis.orojenesis_common import OrojenesisError
 from solar.common.types import DynamicValue
+from solar.ir.contracts import layer_operation
 
 _TOKEN = re.compile(r"[A-Za-z][0-9]*")
 
@@ -39,7 +40,7 @@ def problem_for_layer(
     layer: Mapping[str, DynamicValue],
 ) -> dict[str, DynamicValue]:
     """Translate one exact einsum layer into a Timeloop problem."""
-    semantic = layer.get("semantic_op") or {}
+    semantic = layer_operation(layer)
     if semantic.get("kind") != "einsum":
         raise OrojenesisError("Orojenesis accepts exact einsum layers only")
     left_hand_side, right_hand_side = str(

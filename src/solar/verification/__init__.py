@@ -3,9 +3,9 @@
 
 """Numerical verification for the source-to-SOL trust chain."""
 
-from solar.verification.einsum import (
-    EinsumExecutionError,
-    EinsumGraphExecutor,
+from solar.verification.verify import (
+    IrExecutionError,
+    IrGraphExecutor,
     TolerancePolicy,
     VerificationError,
     VerificationPolicy,
@@ -15,8 +15,8 @@ from solar.verification.einsum import (
 )
 
 __all__ = [
-    "EinsumExecutionError",
-    "EinsumGraphExecutor",
+    "IrExecutionError",
+    "IrGraphExecutor",
     "TolerancePolicy",
     "VerificationPolicy",
     "VerificationError",

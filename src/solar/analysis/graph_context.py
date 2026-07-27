@@ -12,6 +12,7 @@ from solar.analysis.graph_rules import (
     TRANSPARENT_OPS,
 )
 from solar.common.types import DynamicValue
+from solar.ir.contracts import layer_operation
 from solar.rocm.architecture import ArchitectureProfile
 
 PathLike = Union[str, Path]
@@ -59,7 +60,7 @@ class PreparedAnalysis:
 
 @dataclass(frozen=True, slots=True)
 class GraphTopology:
-    """Producer, consumer, and layer classifications for an einsum graph."""
+    """Producer, consumer, and layer classifications for an IR graph."""
 
     layers: dict[str, DynamicValue]
     start_node_ids: set[str]
@@ -135,7 +136,7 @@ class GraphTopology:
             return None
         seen.add(producer_id)
         producer = self.layers[producer_id]
-        semantic = producer.get("semantic_op") or {}
+        semantic = layer_operation(producer)
         target = str(semantic.get("target", ""))
         names = (producer.get("tensor_names") or {}).get("inputs") or []
         dtypes = producer.get("tensor_dtypes") or {}

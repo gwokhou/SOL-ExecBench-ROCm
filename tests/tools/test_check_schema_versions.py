@@ -52,7 +52,7 @@ def test_accepts_current_solar_schema_identifier():
 
 
 def test_rejects_retired_solar_schema_identifier():
-    retired = "solar.verification.einsum." + "v1"
+    retired = "solar.verification.ir." + "v1"
 
     findings, _ = audit_text(Path("attestation.yaml"), retired)
 

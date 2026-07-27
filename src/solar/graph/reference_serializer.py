@@ -22,7 +22,7 @@ from typing import Any
 
 import torch
 
-from solar.schema_versions import EINSUM_GRAPH_SCHEMA_VERSION
+from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
 
 
 class ReferenceGraphSerializer:
@@ -481,7 +481,8 @@ class ReferenceGraphSerializer:
             node_output_names[node] = output_tensor_names
             layers[node.name] = layer
         result = {
-            "schema_version": EINSUM_GRAPH_SCHEMA_VERSION,
+            "schema_version": IR_GRAPH_SCHEMA_VERSION,
+            "ir_kind": "aten",
             "model_name": model_name,
             "extraction_kind": "make_fx_reference_v1",
             "joint_graph": False,
@@ -489,7 +490,7 @@ class ReferenceGraphSerializer:
             "layers": layers,
             "graph_signature": self._graph_signature(nodes, output_names),
         }
-        from solar.einsum.semantics import validate_semantic_graph
+        from solar.ir.contracts import validate_ir_graph
 
-        validate_semantic_graph(result)
+        validate_ir_graph(result)
         return result

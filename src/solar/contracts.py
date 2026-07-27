@@ -14,6 +14,7 @@ from pathlib import Path
 import yaml
 
 from solar.common.types import DynamicValue
+from solar.ir.contracts import DEFAULT_IR_KIND, IrKind, normalize_ir_kind
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 InputFactory = Callable[[int], Sequence[DynamicValue]]
@@ -50,7 +51,7 @@ class SolarStage(StrEnum):
     PREPARE = "prepare"
     ARCHITECTURE = "architecture"
     GRAPH_EXTRACTION = "graph_extraction"
-    EINSUM_CONVERSION = "einsum_conversion"
+    IR_CONVERSION = "ir_conversion"
     CONVERSION_VERIFICATION = "conversion_verification"
     FORMAL_ANALYSIS = "formal_analysis"
     OUTER_BRIDGE = "outer_bridge"
@@ -68,6 +69,7 @@ class AnalysisRequest:
     reference_sha256: str
     architecture: str | Path | Mapping[str, DynamicValue]
     output_dir: Path
+    representation: IrKind | str = DEFAULT_IR_KIND
     device: str = "cpu"
     precision: str = "fp16"
     require_orojenesis: bool = False
@@ -82,6 +84,11 @@ class AnalysisRequest:
 
     def __post_init__(self) -> None:
         """Validate request identity, paths, and analysis options."""
+        object.__setattr__(
+            self,
+            "representation",
+            normalize_ir_kind(self.representation),
+        )
         if not self.analysis_id.strip() or not self.reference_name.strip():
             raise ValueError("analysis_id and reference_name must be non-empty")
         if len(self.reference_sha256) != 64 or any(
@@ -179,6 +186,7 @@ def write_request_manifest(
         },
         "analysis_contract": {
             "precision": request.precision,
+            "representation": request.representation.value,
             "trace_seed": request.trace_seed,
             "verification_seeds": list(request.verification_seeds),
             "atol": request.atol,
@@ -213,6 +221,7 @@ __all__ = [
     "AnalysisRequest",
     "AnalysisResult",
     "ArtifactRef",
+    "IrKind",
     "SolBound",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",

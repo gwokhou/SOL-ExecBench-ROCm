@@ -17,7 +17,7 @@ import networkx as nx
 
 from solar.analysis.contraction_proofs import requires_tile_evidence
 from solar.common.constants import dtype_bytes
-from solar.einsum.semantics import validate_semantic_graph
+from solar.ir.contracts import layer_operation, validate_ir_graph
 from solar.rocm.architecture import MemoryLevel
 
 
@@ -68,7 +68,7 @@ class FusionPlanner:
         verified_view_nodes: Sequence[str] = (),
     ) -> None:
         """Initialize a planner from validated semantic graph metadata."""
-        validate_semantic_graph(graph)
+        validate_ir_graph(graph)
         self.graph = graph
         self.layers = {
             str(key): value
@@ -83,7 +83,7 @@ class FusionPlanner:
         self.verified_view_nodes = {str(item) for item in verified_view_nodes}
 
     def _barrier(self, layer_id: str, layer: Mapping[str, Any]) -> str | None:
-        semantic = layer["semantic_op"]
+        semantic = layer_operation(layer)
         effects = semantic.get("effects") or {}
         target = str(semantic.get("target", ""))
         if layer_id in self.verified_view_nodes:
