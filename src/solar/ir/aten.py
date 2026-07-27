@@ -14,12 +14,12 @@ import yaml
 
 from solar.graph.extraction import OperatorGraphArtifact
 from solar.ir.bindings import bind_graph
-from solar.ir.contracts import IrBackend, IrKind
+from solar.ir.contracts import IRBackend, IRKind
 from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
 from solar.verification.aten import execute_aten_layer
 
 
-class AtenIrError(ValueError):
+class AtenIRError(ValueError):
     """An ATen IR graph is incomplete or cannot replay its source exactly."""
 
 
@@ -151,13 +151,13 @@ def convert_operator_graph(
 def validate_aten_graph(graph: Mapping[str, Any]) -> None:
     """Validate one exact ATen IR graph without accepting legacy schemas."""
     if int(graph.get("schema_version", 0)) != IR_GRAPH_SCHEMA_VERSION:
-        raise AtenIrError(
+        raise AtenIRError(
             "ATen graph must use current "
             f"schema_version={IR_GRAPH_SCHEMA_VERSION}",
         )
     layers = graph.get("layers")
     if not isinstance(layers, Mapping) or not layers:
-        raise AtenIrError("ATen graph has no layers")
+        raise AtenIRError("ATen graph has no layers")
     for layer_id, layer in layers.items():
         _validate_aten_layer(str(layer_id), layer)
 
@@ -172,7 +172,7 @@ def _load_operator_graph(operator: OperatorGraphArtifact) -> Mapping[str, Any]:
 
 def _validate_aten_layer(layer_id: str, layer: Any) -> None:
     if not isinstance(layer, Mapping):
-        raise AtenIrError(f"layer {layer_id} is not a mapping")
+        raise AtenIRError(f"layer {layer_id} is not a mapping")
     names = layer.get("tensor_names") or {}
     shapes = layer.get("tensor_shapes") or {}
     dtypes = layer.get("tensor_dtypes") or {}
@@ -182,23 +182,23 @@ def _validate_aten_layer(layer_id: str, layer: Any) -> None:
             len(dtypes.get(side) or []) != arity
             or len(names.get(side) or []) != arity
         ):
-            raise AtenIrError(
+            raise AtenIRError(
                 f"layer {layer_id} lacks explicit {side} "
                 "name/shape/dtype metadata",
             )
     semantic = layer.get("semantic_op")
     if not isinstance(semantic, Mapping):
-        raise AtenIrError(f"layer {layer_id} has no semantic_op")
+        raise AtenIRError(f"layer {layer_id} has no semantic_op")
     kind = str(semantic.get("kind", ""))
     if kind == "input":
         return
     if kind == "einsum":
         equation = str(semantic.get("equation", ""))
         if not equation or "->" not in equation:
-            raise AtenIrError(f"layer {layer_id} has no exact einsum equation")
+            raise AtenIRError(f"layer {layer_id} has no exact einsum equation")
         return
     if kind != "aten":
-        raise AtenIrError(f"layer {layer_id} is not executable exactly")
+        raise AtenIRError(f"layer {layer_id} is not executable exactly")
     _validate_aten_operation(layer_id, semantic, names)
 
 
@@ -212,25 +212,25 @@ def _validate_aten_operation(
         import torch
 
         if not target.isidentifier() or not hasattr(torch.ops.aten, target):
-            raise AtenIrError(
+            raise AtenIRError(
                 f"layer {layer_id} uses unsupported exact operation {target!r}",
             )
     arguments = semantic.get("arguments")
     if not isinstance(arguments, list):
-        raise AtenIrError(f"layer {layer_id} lacks explicit arguments")
+        raise AtenIRError(f"layer {layer_id} lacks explicit arguments")
     kwargs = semantic.get("kwargs") or {}
     if not isinstance(kwargs, Mapping):
-        raise AtenIrError(f"layer {layer_id} has invalid keyword arguments")
+        raise AtenIRError(f"layer {layer_id} has invalid keyword arguments")
     input_arity = len(names.get("inputs") or [])
     references: set[int] = set()
     _collect_tensor_references(arguments, references)
     _collect_tensor_references(kwargs, references)
     if any(index < 0 or index >= input_arity for index in references):
-        raise AtenIrError(
+        raise AtenIRError(
             f"layer {layer_id} references a tensor outside its input metadata",
         )
     if input_arity and references != set(range(input_arity)):
-        raise AtenIrError(
+        raise AtenIRError(
             f"layer {layer_id} does not preserve every ordered tensor argument",
         )
     _validate_effects(layer_id, semantic, names, input_arity)
@@ -257,15 +257,15 @@ def _validate_effects(
 ) -> None:
     effects = semantic.get("effects")
     if not isinstance(effects, Mapping):
-        raise AtenIrError(f"layer {layer_id} lacks explicit effects")
+        raise AtenIRError(f"layer {layer_id} lacks explicit effects")
     mutations = effects.get("mutates")
     aliases = effects.get("aliases")
     if not isinstance(mutations, list) or not isinstance(aliases, list):
-        raise AtenIrError(
+        raise AtenIRError(
             f"layer {layer_id} has invalid mutation/alias effects",
         )
     if any(int(index) < 0 or int(index) >= input_arity for index in mutations):
-        raise AtenIrError(f"layer {layer_id} has invalid mutation target")
+        raise AtenIRError(f"layer {layer_id} has invalid mutation target")
     output_arity = len(names.get("outputs") or [])
     for alias in aliases:
         if (
@@ -273,7 +273,7 @@ def _validate_effects(
             or int(alias.get("input", -1)) not in range(input_arity)
             or int(alias.get("output", -1)) not in range(output_arity)
         ):
-            raise AtenIrError(f"layer {layer_id} has invalid alias effect")
+            raise AtenIRError(f"layer {layer_id} has invalid alias effect")
 
 
 def _validate_required_parameters(
@@ -310,14 +310,14 @@ def _validate_required_parameters(
     ):
         missing.append("explicit slice bounds")
     if missing:
-        raise AtenIrError(
+        raise AtenIRError(
             f"layer {layer_id} lacks exact {target} parameters: "
             + ", ".join(missing),
         )
 
 
-backend = IrBackend(
-    IrKind.ATEN,
+backend = IRBackend(
+    IRKind.ATEN,
     validate_aten_graph,
     convert_operator_graph,
     execute_aten_layer,
@@ -325,7 +325,7 @@ backend = IrBackend(
 
 
 __all__ = [
-    "AtenIrError",
+    "AtenIRError",
     "SUPPORTED_ATEN_TARGETS",
     "backend",
     "convert_operator_graph",

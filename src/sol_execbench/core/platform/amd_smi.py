@@ -7,7 +7,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, RootModel
 
 
-class AmdSmiPerformanceLevel(BaseModel):
+class AMDSmiPerformanceLevel(BaseModel):
     """Performance-level record for one GPU."""
 
     model_config = ConfigDict(extra="ignore")
@@ -16,15 +16,15 @@ class AmdSmiPerformanceLevel(BaseModel):
     perf_level: str
 
 
-class AmdSmiPerformancePayload(BaseModel):
+class AMDSmiPerformancePayload(BaseModel):
     """Top-level AMD SMI performance-level response."""
 
     model_config = ConfigDict(extra="ignore")
 
-    gpu_data: list[AmdSmiPerformanceLevel]
+    gpu_data: list[AMDSmiPerformanceLevel]
 
 
-class AmdSmiProcess(BaseModel):
+class AMDSmiProcess(BaseModel):
     """Process record reported by AMD SMI."""
 
     model_config = ConfigDict(extra="ignore")
@@ -34,20 +34,20 @@ class AmdSmiProcess(BaseModel):
     process_name: str | None = None
 
 
-class AmdSmiGpuProcesses(BaseModel):
+class AMDSmiGPUProcesses(BaseModel):
     """Processes associated with one GPU."""
 
     model_config = ConfigDict(extra="ignore")
 
     gpu: int | str
-    process_list: list[AmdSmiProcess]
+    process_list: list[AMDSmiProcess]
 
 
-class AmdSmiProcessPayload(RootModel[list[AmdSmiGpuProcesses]]):
+class AMDSmiProcessPayload(RootModel[list[AMDSmiGPUProcesses]]):
     """Root list of per-GPU process records."""
 
 
-class AmdSmiGpuIdentity(BaseModel):
+class AMDSmiGPUIdentity(BaseModel):
     """Minimal identity record for one GPU."""
 
     model_config = ConfigDict(extra="ignore")
@@ -55,13 +55,13 @@ class AmdSmiGpuIdentity(BaseModel):
     gpu: int | str
 
 
-class AmdSmiListPayload(RootModel[list[AmdSmiGpuIdentity]]):
+class AMDSmiListPayload(RootModel[list[AMDSmiGPUIdentity]]):
     """Root list returned by the AMD SMI list command."""
 
 
 def parse_performance_levels(raw: str) -> tuple[str, ...]:
     """Return normalized, non-empty levels for every reported GPU."""
-    payload = AmdSmiPerformancePayload.model_validate_json(raw)
+    payload = AMDSmiPerformancePayload.model_validate_json(raw)
     if not payload.gpu_data:
         raise ValueError("amd-smi returned no GPU performance-level data")
     levels = tuple(
@@ -74,7 +74,7 @@ def parse_performance_levels(raw: str) -> tuple[str, ...]:
 
 def parse_processes(raw: str) -> list[dict[str, int | str]]:
     """Return the stable process fields used by isolation snapshots."""
-    payload = AmdSmiProcessPayload.model_validate_json(raw)
+    payload = AMDSmiProcessPayload.model_validate_json(raw)
     processes: list[dict[str, int | str]] = []
     for gpu_entry in payload.root:
         for process in gpu_entry.process_list:
@@ -92,5 +92,5 @@ def parse_processes(raw: str) -> list[dict[str, int | str]]:
 
 def parse_gpu_count(raw: str) -> int:
     """Return the number of unique GPU identifiers in ``amd-smi list`` JSON."""
-    payload = AmdSmiListPayload.model_validate_json(raw)
+    payload = AMDSmiListPayload.model_validate_json(raw)
     return len({str(entry.gpu) for entry in payload.root})

@@ -7,12 +7,12 @@ from __future__ import annotations
 
 from sol_execbench.core.platform.arch_capabilities import (
     ArchCapabilityBudgetStatus,
-    ArchIsaBudget,
+    ArchISABudget,
     default_arch_capability_budgets,
     derive_arch_capability_budget,
     load_packaged_arch_capability_budget,
 )
-from sol_execbench.core.platform.environment_models import GpuEnvironmentSummary
+from sol_execbench.core.platform.environment_models import GPUEnvironmentSummary
 from sol_execbench.core.platform.environment_snapshot import (
     derive_capability_budgets,
 )
@@ -22,7 +22,7 @@ def test_default_catalog_covers_validated_archs():
     catalog = default_arch_capability_budgets()
     assert set(catalog) == {"gfx942", "gfx1150", "gfx1200"}
     for budget in catalog.values():
-        assert isinstance(budget, ArchIsaBudget)
+        assert isinstance(budget, ArchISABudget)
 
 
 def test_gfx942_budget_values():
@@ -97,12 +97,12 @@ def test_derive_none_target_returns_none():
 def test_derive_capability_budgets_available_and_unsupported():
     budgets = derive_capability_budgets(
         [
-            GpuEnvironmentSummary(
+            GPUEnvironmentSummary(
                 source="rocminfo",
                 index=0,
                 gfx_target="gfx942",
             ),
-            GpuEnvironmentSummary(
+            GPUEnvironmentSummary(
                 source="rocminfo",
                 index=1,
                 gfx_target="gfx1100",
@@ -123,12 +123,12 @@ def test_derive_capability_budgets_available_and_unsupported():
 def test_derive_capability_budgets_dedupes_repeated_arch():
     budgets = derive_capability_budgets(
         [
-            GpuEnvironmentSummary(
+            GPUEnvironmentSummary(
                 source="rocminfo",
                 index=0,
                 gfx_target="gfx942",
             ),
-            GpuEnvironmentSummary(
+            GPUEnvironmentSummary(
                 source="pytorch",
                 index=0,
                 gfx_target="gfx942",

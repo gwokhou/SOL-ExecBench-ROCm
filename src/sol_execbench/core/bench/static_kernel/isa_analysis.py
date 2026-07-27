@@ -17,7 +17,7 @@ from sol_execbench.core.bench.static_kernel.artifacts import (
     display_artifact_path,
 )
 from sol_execbench.core.bench.static_kernel.evidence_models import (
-    StaticIsaAnalysis,
+    StaticISAAnalysis,
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceClassification,
     StaticKernelEvidenceReasonCode,
@@ -45,12 +45,12 @@ def collect_static_isa_analyses(
     sidecar_base: Path,
     timeout_seconds: float,
 ) -> tuple[
-    list[StaticIsaAnalysis],
+    list[StaticISAAnalysis],
     list[StaticKernelEvidenceToolRun],
     list[StaticKernelEvidenceArtifact],
 ]:
     """Decode all discoverable AMDGPU targets without affecting benchmark authority."""
-    analyses: list[StaticIsaAnalysis] = []
+    analyses: list[StaticISAAnalysis] = []
     tool_runs: list[StaticKernelEvidenceToolRun] = []
     generated: list[StaticKernelEvidenceArtifact] = []
     seen: set[tuple[str, str]] = set()
@@ -107,7 +107,7 @@ def _collect_architecture(
     seen: set[tuple[str, str]],
 ) -> (
     tuple[
-        StaticIsaAnalysis,
+        StaticISAAnalysis,
         StaticKernelEvidenceToolRun,
         list[StaticKernelEvidenceArtifact],
     ]
@@ -135,7 +135,7 @@ def _collect_architecture(
         extracted.disassembly,
         allow_download=True,
     )
-    analysis = StaticIsaAnalysis(
+    analysis = StaticISAAnalysis(
         artifact_id=artifact.artifact_id,
         architecture=architecture,
         status=StaticKernelEvidenceStatus.COLLECTED,
@@ -240,8 +240,8 @@ def _failed_analysis(
     artifact_id: str,
     exc: Exception,
     architecture: str = "unknown",
-) -> StaticIsaAnalysis:
-    return StaticIsaAnalysis(
+) -> StaticISAAnalysis:
+    return StaticISAAnalysis(
         artifact_id=artifact_id,
         architecture=architecture,
         status=StaticKernelEvidenceStatus.UNAVAILABLE,
@@ -267,12 +267,12 @@ def _failed_tool_run(
 def _reason_code(exc: Exception) -> str:
     name = type(exc).__name__
     return {
-        "IsaSpecUnavailableError": "isa_spec_unavailable",
-        "IsaDownloadError": "isa_download_failed",
-        "IsaIntegrityError": "isa_integrity_failed",
-        "IsaHelperBuildError": "isa_helper_build_failed",
-        "IsaDecodeError": "isa_decode_failed",
-        "IsaProtocolError": "isa_protocol_failed",
+        "ISASpecUnavailableError": "isa_spec_unavailable",
+        "ISADownloadError": "isa_download_failed",
+        "ISAIntegrityError": "isa_integrity_failed",
+        "ISAHelperBuildError": "isa_helper_build_failed",
+        "ISADecodeError": "isa_decode_failed",
+        "ISAProtocolError": "isa_protocol_failed",
         "FileNotFoundError": "isa_artifact_tool_unavailable",
     }.get(name, "isa_artifact_extraction_failed")
 

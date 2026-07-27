@@ -19,11 +19,11 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_contract import (
-    AkaArtifactRole,
-    AkaCorpusRole,
-    AkaSuite,
+    AKAArtifactRole,
+    AKACorpusRole,
+    AKASuite,
 )
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusEntry
+from sol_execbench.core.dataset.aka_corpus import AKACorpusEntry
 from sol_execbench.core.dataset.aka_task import function_arg_names
 
 Oracle = Callable[[Mapping[str, object]], object]
@@ -38,7 +38,7 @@ class CrosscheckStatus(StrEnum):
 
 
 @dataclass(frozen=True)
-class AkaEquivalenceReport:
+class AKAEquivalenceReport:
     """Result for one authored problem."""
 
     problem_name: str
@@ -182,16 +182,16 @@ def _validate_output_tensor(
         raise ValueError(f"{label} contains disallowed non-finite values")
 
 
-def load_aka_oracle(entry: AkaCorpusEntry, aka_root: Path) -> Oracle | None:
+def load_aka_oracle(entry: AKACorpusEntry, aka_root: Path) -> Oracle | None:
     """Load a provenance-bound AKA semantic oracle for an entry."""
-    if entry.role is AkaCorpusRole.COMPATIBILITY_SENTINEL:
+    if entry.role is AKACorpusRole.COMPATIBILITY_SENTINEL:
         return None
     source = _artifact_path(
         entry,
         aka_root,
-        AkaArtifactRole.SEMANTIC_REFERENCE,
+        AKAArtifactRole.SEMANTIC_REFERENCE,
     )
-    if entry.suite is AkaSuite.TORCH2HIP:
+    if entry.suite is AKASuite.TORCH2HIP:
         return _load_torch2hip_oracle(entry, source)
     if entry.problem_name == "rmsnorm_bwd":
         return _load_rmsnorm_backward_oracle(source)
@@ -201,9 +201,9 @@ def load_aka_oracle(entry: AkaCorpusEntry, aka_root: Path) -> Oracle | None:
 
 
 def _artifact_path(
-    entry: AkaCorpusEntry,
+    entry: AKACorpusEntry,
     aka_root: Path,
-    role: AkaArtifactRole,
+    role: AKAArtifactRole,
 ) -> Path:
     artifact = next(
         (item for item in entry.aka_artifacts if item.role == role),
@@ -216,7 +216,7 @@ def _artifact_path(
     return aka_root / entry.task_path / artifact.path
 
 
-def _load_torch2hip_oracle(entry: AkaCorpusEntry, source: Path) -> Oracle:
+def _load_torch2hip_oracle(entry: AKACorpusEntry, source: Path) -> Oracle:
     text = source.read_text(encoding="utf-8")
     namespace: dict[str, object] = {"torch": torch}
     exec(compile(text, str(source), "exec"), namespace)  # noqa: S102
@@ -362,18 +362,18 @@ def _top_level_function_source(text: str, name: str) -> str:
 
 
 def check_problem_equivalence(
-    entry: AkaCorpusEntry,
+    entry: AKACorpusEntry,
     problem_dir: Path,
     aka_root: Path,
     *,
     device: torch.device,
     seed: int = 2000,
     max_workloads: int | None = None,
-) -> AkaEquivalenceReport:
+) -> AKAEquivalenceReport:
     """Validate every selected workload/output against the bound AKA oracle."""
     definition, workloads = load_problem(problem_dir)
-    if entry.role is AkaCorpusRole.TARGET_INCOMPATIBLE:
-        return AkaEquivalenceReport(
+    if entry.role is AKACorpusRole.TARGET_INCOMPATIBLE:
+        return AKAEquivalenceReport(
             entry.problem_name,
             True,
             CrosscheckStatus.NOT_APPLICABLE,
@@ -394,7 +394,7 @@ def check_problem_equivalence(
             seed=seed,
         )
     except Exception as exc:  # noqa: BLE001 -- convert to a complete corpus report
-        return AkaEquivalenceReport(
+        return AKAEquivalenceReport(
             entry.problem_name,
             False,
             CrosscheckStatus.FAILED,
@@ -405,14 +405,14 @@ def check_problem_equivalence(
 
 
 def _check_executable_problem(
-    entry: AkaCorpusEntry,
+    entry: AKACorpusEntry,
     definition: Definition,
     workloads: Sequence[Workload],
     aka_root: Path,
     *,
     device: torch.device,
     seed: int,
-) -> AkaEquivalenceReport:
+) -> AKAEquivalenceReport:
     authored = execute_reference(definition.reference)
     oracle = load_aka_oracle(entry, aka_root)
     output_count = 0
@@ -443,7 +443,7 @@ def _check_executable_problem(
         if oracle is not None
         else CrosscheckStatus.NOT_APPLICABLE
     )
-    return AkaEquivalenceReport(
+    return AKAEquivalenceReport(
         entry.problem_name,
         True,
         crosscheck,
@@ -475,7 +475,7 @@ def _compare_outputs(
 
 
 __all__ = [
-    "AkaEquivalenceReport",
+    "AKAEquivalenceReport",
     "CrosscheckStatus",
     "check_problem_equivalence",
     "execute_reference",

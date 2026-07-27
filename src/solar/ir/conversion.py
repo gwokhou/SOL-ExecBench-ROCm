@@ -10,8 +10,8 @@ from pathlib import Path
 from solar.graph.extraction import OperatorGraphArtifact
 from solar.ir.contracts import (
     DEFAULT_IR_KIND,
-    IrGraphArtifact,
-    IrKind,
+    IRGraphArtifact,
+    IRKind,
     ir_backend,
     normalize_ir_kind,
 )
@@ -21,12 +21,12 @@ def convert_operator_graph(
     operator: OperatorGraphArtifact,
     *,
     output_dir: str | Path,
-    representation: IrKind | str = DEFAULT_IR_KIND,
-) -> IrGraphArtifact:
+    representation: IRKind | str = DEFAULT_IR_KIND,
+) -> IRGraphArtifact:
     """Convert one operator graph through the selected uniform IR backend."""
     kind = normalize_ir_kind(representation)
     path = ir_backend(kind).convert(operator, output_dir)
-    return IrGraphArtifact(path=path, kind=kind)
+    return IRGraphArtifact(path=path, kind=kind)
 
 
-__all__ = ["IrGraphArtifact", "convert_operator_graph"]
+__all__ = ["IRGraphArtifact", "convert_operator_graph"]

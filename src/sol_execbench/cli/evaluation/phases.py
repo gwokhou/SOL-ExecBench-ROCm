@@ -25,7 +25,7 @@ from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import EXIT_EXECUTION, CliFailure
 from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
 from sol_execbench.core.bench.gpu_lock import (
-    GpuLockVerificationError,
+    GPULockVerificationError,
     acquire_evaluation_gpu_lock,
 )
 from sol_execbench.core.bench.static_kernel.evidence import (
@@ -115,7 +115,7 @@ def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
             code="gpu_lock_timeout",
             hint="Wait for the active benchmark to finish, then retry.",
         ) from exc
-    except GpuLockVerificationError as exc:
+    except GPULockVerificationError as exc:
         raise CliFailure(
             str(exc),
             code="gpu_lock_unverified",

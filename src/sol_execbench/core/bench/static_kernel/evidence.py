@@ -18,7 +18,7 @@ from sol_execbench.core.bench.static_kernel.evidence_builders import (
 )
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
-    StaticIsaAnalysis,
+    StaticISAAnalysis,
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceClassification,
     StaticKernelEvidenceKernel,
@@ -38,7 +38,7 @@ __all__ = [
     "StaticKernelEvidenceArtifact",
     "StaticKernelEvidenceClassification",
     "StaticKernelEvidenceKernel",
-    "StaticIsaAnalysis",
+    "StaticISAAnalysis",
     "StaticKernelEvidenceReasonCode",
     "StaticKernelEvidenceSidecar",
     "StaticKernelEvidenceSourceReference",

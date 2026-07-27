@@ -12,8 +12,8 @@ from typing import Any
 import yaml
 
 from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.integrity import (
     sha256_bytes,
     sha256_file,
@@ -38,7 +38,7 @@ def verify_solar_index(
     index: SolarIndexStatement,
     *,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
 ) -> dict[tuple[str, str], float]:
     """Verify exact formal-manifest coverage and return each SOL bound in ms."""
     _verify_corpus_reference(index.corpus_manifest, bundle_root, corpus)
@@ -64,7 +64,7 @@ def verify_solar_index(
 def _verify_corpus_reference(
     reference: ArtifactReference,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
 ) -> None:
     bundled = verify_artifact_file(
         bundle_root,
@@ -76,11 +76,11 @@ def _verify_corpus_reference(
         raise ValueError("release SOLAR index corpus identity mismatch")
 
 
-def _expected_workloads(corpus: AkaCorpusManifest) -> set[tuple[str, str]]:
+def _expected_workloads(corpus: AKACorpusManifest) -> set[tuple[str, str]]:
     return {
         (entry.relative_problem_dir.as_posix(), workload_uuid)
         for entry in corpus.entries
-        if entry.role is AkaCorpusRole.SCORED
+        if entry.role is AKACorpusRole.SCORED
         for workload_uuid in entry.workload_uuids
     }
 
@@ -89,7 +89,7 @@ def _verify_solar_manifest(
     reference: ArtifactReference,
     *,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     problem_path: str,
     workload_uuid: str,
 ) -> float:

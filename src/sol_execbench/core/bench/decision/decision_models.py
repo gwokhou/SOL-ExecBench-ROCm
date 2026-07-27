@@ -3,7 +3,7 @@
 
 """Pydantic models and enums for decision sidecars.
 
-The Decision sidecar turns decision-ready data-layer facts (an ``ArchIsaBudget``
+The Decision sidecar turns decision-ready data-layer facts (an ``ArchISABudget``
 plus per-kernel ``StaticResourceFootprint`` records) into confidence-weighted
 Layer R optimization hints. It is diagnostic-only and never re-asserts benchmark
 authority. See ``docs/user/decision_sidecar_contract.md`` and

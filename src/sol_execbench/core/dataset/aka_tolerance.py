@@ -13,7 +13,7 @@ from typing import Protocol, cast
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import ToleranceSpec, Workload
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
@@ -59,7 +59,7 @@ class CalibrationEntry(Protocol):
     """Corpus-entry fields needed to validate calibration coverage."""
 
     @property
-    def role(self) -> AkaCorpusRole: ...
+    def role(self) -> AKACorpusRole: ...
 
     @property
     def exclusion_reason_code(self) -> str: ...
@@ -301,7 +301,7 @@ def _validate_workload_record(
         )
     expected_status = (
         CalibrationStatus.EXCLUDED
-        if entry.role == AkaCorpusRole.TARGET_INCOMPATIBLE
+        if entry.role == AKACorpusRole.TARGET_INCOMPATIBLE
         else CalibrationStatus.CALIBRATED
     )
     if record.get("status") != expected_status:

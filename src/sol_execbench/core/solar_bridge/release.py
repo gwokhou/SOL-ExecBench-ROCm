@@ -8,8 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.scoring.release_assembly import build_solar_index
 from sol_execbench.core.scoring.release_builders import load_execution_plan
 from sol_execbench.core.scoring.release_environment import (
@@ -43,7 +43,7 @@ def build_release_solar_manifests(
 ) -> SolarReleaseResult:
     """Generate and index every scored workload's formal SOLAR artifacts."""
     workspace = workspace_root.resolve()
-    corpus = AkaCorpusManifest.load(corpus_manifest_path)
+    corpus = AKACorpusManifest.load(corpus_manifest_path)
     baseline_plan = load_execution_plan(
         workspace / "baseline" / "plan.json",
         workspace_root=workspace,
@@ -55,7 +55,7 @@ def build_release_solar_manifests(
     generated = resumed = workloads = 0
     problems = 0
     for entry in corpus.entries:
-        if entry.role is not AkaCorpusRole.SCORED:
+        if entry.role is not AKACorpusRole.SCORED:
             continue
         problems += 1
         for workload_uuid in entry.workload_uuids:
@@ -114,7 +114,7 @@ def build_release_solar_manifests(
 def _finish_index(
     workspace: Path,
     *,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     source_revision: str,
     index_path: Path,
     resume: bool,

@@ -20,7 +20,7 @@ def test_solar_public_api_exposes_only_atomic_pipeline() -> None:
     with pytest.raises(AttributeError):
         getattr(solar, "PyTorchToEinsum")  # noqa: B009 -- Assert absence
     with pytest.raises(AttributeError):
-        getattr(solar, "IrGraphAnalyzer")  # noqa: B009 -- Assert absence
+        getattr(solar, "IRGraphAnalyzer")  # noqa: B009 -- Assert absence
 
 
 def test_stage_packages_do_not_advertise_legacy_bypass_apis() -> None:

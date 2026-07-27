@@ -8,8 +8,8 @@ class VerificationError(ValueError):
     """The reference and IR graph could not be proven equivalent."""
 
 
-class IrExecutionError(VerificationError):
+class IRExecutionError(VerificationError):
     """An IR graph cannot be executed exactly by the built-in verifier."""
 
 
-__all__ = ["IrExecutionError", "VerificationError"]
+__all__ = ["IRExecutionError", "VerificationError"]

@@ -7,7 +7,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.scoring.formula import sol_score
 
 OFFICIAL_AGGREGATION_POLICY = (
@@ -22,11 +22,11 @@ class WorkloadScore:
     problem: str
     workload_uuid: str
     score: float
-    role: AkaCorpusRole = AkaCorpusRole.SCORED
+    role: AKACorpusRole = AKACorpusRole.SCORED
 
     def __post_init__(self) -> None:
         """Normalize public constructor input and reject unknown corpus roles."""
-        object.__setattr__(self, "role", AkaCorpusRole(self.role))
+        object.__setattr__(self, "role", AKACorpusRole(self.role))
 
 
 @dataclass(frozen=True)
@@ -42,9 +42,9 @@ def aggregate_suite_scores(values: Iterable[WorkloadScore]) -> SuiteScore:
     """Average workloads within each problem, then problems equally."""
     grouped: dict[str, list[float]] = defaultdict(list)
     for value in values:
-        if value.role is AkaCorpusRole.COMPATIBILITY_SENTINEL:
+        if value.role is AKACorpusRole.COMPATIBILITY_SENTINEL:
             continue
-        if value.role is not AkaCorpusRole.SCORED:
+        if value.role is not AKACorpusRole.SCORED:
             raise ValueError(f"unknown corpus role: {value.role}")
         if not 0 <= value.score <= 1:
             raise ValueError("workload SOL scores must lie in [0, 1]")
@@ -93,7 +93,7 @@ def diagnostic_workload_score(
         problem=problem,
         workload_uuid=workload_uuid,
         score=score,
-        role=AkaCorpusRole.SCORED,
+        role=AKACorpusRole.SCORED,
     )
 
 

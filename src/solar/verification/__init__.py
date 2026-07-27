@@ -4,8 +4,8 @@
 """Numerical verification for the source-to-SOL trust chain."""
 
 from solar.verification.verify import (
-    IrExecutionError,
-    IrGraphExecutor,
+    IRExecutionError,
+    IRGraphExecutor,
     TolerancePolicy,
     VerificationError,
     VerificationPolicy,
@@ -15,8 +15,8 @@ from solar.verification.verify import (
 )
 
 __all__ = [
-    "IrExecutionError",
-    "IrGraphExecutor",
+    "IRExecutionError",
+    "IRGraphExecutor",
     "TolerancePolicy",
     "VerificationPolicy",
     "VerificationError",

@@ -16,7 +16,7 @@ import yaml
 from solar.graph.extraction import extract_operator_graph
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.extended_einsum import (
-    ExtendedEinsumIrError,
+    ExtendedEinsumIRError,
     validate_extended_einsum_graph,
 )
 
@@ -60,7 +60,7 @@ def test_validate_rejects_graph_not_marked_extended_einsum(
 ) -> None:
     graph = _extended_graph(tmp_path)
     graph["ir_kind"] = "aten"
-    with pytest.raises(ExtendedEinsumIrError, match="not extended_einsum IR"):
+    with pytest.raises(ExtendedEinsumIRError, match="not extended_einsum IR"):
         validate_extended_einsum_graph(graph)
 
 
@@ -69,7 +69,7 @@ def test_validate_rejects_embedded_aten_semantic_op(tmp_path: Path) -> None:
     graph = _extended_graph(tmp_path)
     layer_id, _ = _operation_layer(graph)
     graph["layers"][layer_id]["semantic_op"] = {"kind": "aten", "target": "add"}
-    with pytest.raises(ExtendedEinsumIrError, match="embeds ATen semantic_op"):
+    with pytest.raises(ExtendedEinsumIRError, match="embeds ATen semantic_op"):
         validate_extended_einsum_graph(graph)
 
 
@@ -77,7 +77,7 @@ def test_validate_rejects_layer_without_extended_op(tmp_path: Path) -> None:
     graph = _extended_graph(tmp_path)
     layer_id, _ = _operation_layer(graph)
     del graph["layers"][layer_id]["extended_op"]
-    with pytest.raises(ExtendedEinsumIrError, match="no extended_op"):
+    with pytest.raises(ExtendedEinsumIRError, match="no extended_op"):
         validate_extended_einsum_graph(graph)
 
 
@@ -85,7 +85,7 @@ def test_validate_rejects_operation_without_name(tmp_path: Path) -> None:
     graph = _extended_graph(tmp_path)
     _, layer = _operation_layer(graph)
     layer["extended_op"]["operation"] = ""
-    with pytest.raises(ExtendedEinsumIrError, match="no operation name"):
+    with pytest.raises(ExtendedEinsumIRError, match="no operation name"):
         validate_extended_einsum_graph(graph)
 
 
@@ -101,7 +101,7 @@ def test_validate_rejects_real_einsum_without_arrow_equation(
     else:  # pragma: no cover - matmul always converts to a real einsum
         raise AssertionError("extended-einsum matmul graph lacks a real einsum")
     with pytest.raises(
-        ExtendedEinsumIrError, match="no extended-einsum equation"
+        ExtendedEinsumIRError, match="no extended-einsum equation"
     ):
         validate_extended_einsum_graph(graph)
 
@@ -110,5 +110,5 @@ def test_validate_rejects_invalid_arguments_container(tmp_path: Path) -> None:
     graph = _extended_graph(tmp_path)
     _, layer = _operation_layer(graph)
     layer["extended_op"]["arguments"] = "not-a-list"
-    with pytest.raises(ExtendedEinsumIrError, match="invalid arguments"):
+    with pytest.raises(ExtendedEinsumIRError, match="invalid arguments"):
         validate_extended_einsum_graph(graph)

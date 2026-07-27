@@ -15,7 +15,7 @@ import yaml
 
 
 @dataclass(frozen=True)
-class AkaTask:
+class AKATask:
     """A resolved handle to an AKA task on disk."""
 
     aka_root: Path
@@ -40,17 +40,17 @@ class AkaTask:
         )
 
 
-def read_task(aka_root: str | Path, task_path: str) -> AkaTask:
+def read_task(aka_root: str | Path, task_path: str) -> AKATask:
     """Parse the ``config.yaml`` of an AKA task."""
     root = Path(aka_root).resolve()
     config_path = root / task_path / "config.yaml"
     if not config_path.is_file():
         raise FileNotFoundError(f"AKA task config not found: {config_path}")
     config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    return AkaTask(root, task_path, config)
+    return AKATask(root, task_path, config)
 
 
-def functional_reference_path(task: AkaTask) -> Path:
+def functional_reference_path(task: AKATask) -> Path:
     """Resolve the functional PyTorch reference for a torch2hip task."""
     candidate = _py_func_file_from_config(task)
     if candidate is None:
@@ -64,7 +64,7 @@ def functional_reference_path(task: AkaTask) -> Path:
     return candidate if candidate.is_absolute() else (task.root / candidate)
 
 
-def correctness_runner_path(task: AkaTask) -> Path:
+def correctness_runner_path(task: AKATask) -> Path:
     """Resolve the Python file named by a task's correctness command."""
     commands = task.config.get("correctness_command") or []
     for command in commands:
@@ -85,7 +85,7 @@ def correctness_runner_path(task: AkaTask) -> Path:
     )
 
 
-def _py_func_file_from_config(task: AkaTask) -> Path | None:
+def _py_func_file_from_config(task: AKATask) -> Path | None:
     for command in task.config.get("correctness_command") or []:
         try:
             tokens = shlex.split(str(command))
@@ -110,7 +110,7 @@ def function_arg_names(text: str, function_name: str) -> list[str]:
 
 
 __all__ = [
-    "AkaTask",
+    "AKATask",
     "correctness_runner_path",
     "function_arg_names",
     "functional_reference_path",

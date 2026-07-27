@@ -12,7 +12,7 @@ from pathlib import Path
 
 import torch
 
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.dataset.aka_equivalence import (
     CrosscheckStatus,
     check_problem_equivalence,
@@ -66,7 +66,7 @@ def main() -> int:
         )
     if args.max_workloads is not None and args.max_workloads <= 0:
         raise ValueError("--max-workloads must be positive")
-    manifest = AkaCorpusManifest.load(args.manifest)
+    manifest = AKACorpusManifest.load(args.manifest)
     manifest.audit_aka_provenance(args.aka_root)
     reports = [
         check_problem_equivalence(

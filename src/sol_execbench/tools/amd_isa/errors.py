@@ -4,29 +4,29 @@
 """Stable failures exposed by the AMD ISA tool layer."""
 
 
-class IsaError(RuntimeError):
+class ISAError(RuntimeError):
     """Base class for all project-owned AMD ISA tool failures."""
 
 
-class IsaSpecUnavailableError(IsaError):
+class ISASpecUnavailableError(ISAError):
     """A required local ISA specification is unavailable."""
 
 
-class IsaDownloadError(IsaError):
+class ISADownloadError(ISAError):
     """The pinned ISA archive could not be downloaded."""
 
 
-class IsaIntegrityError(IsaError):
+class ISAIntegrityError(ISAError):
     """Downloaded ISA data did not satisfy the release lock."""
 
 
-class IsaHelperBuildError(IsaError):
+class ISAHelperBuildError(ISAError):
     """The vendored C++ JSON helper could not be built."""
 
 
-class IsaProtocolError(IsaError):
+class ISAProtocolError(ISAError):
     """The helper returned malformed or incompatible protocol output."""
 
 
-class IsaDecodeError(IsaError):
+class ISADecodeError(ISAError):
     """The loaded ISA specification could not decode a requested input."""

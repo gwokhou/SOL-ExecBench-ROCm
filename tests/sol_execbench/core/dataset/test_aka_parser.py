@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from sol_execbench.core.dataset.aka_task import (
-    AkaTask,
+    AKATask,
     correctness_runner_path,
     function_arg_names,
     functional_reference_path,
@@ -35,7 +35,7 @@ def test_function_arg_names_rejects_missing_function():
         function_arg_names(FIXTURE.read_text(), "does_not_exist")
 
 
-def _task(tmp_path: Path, config: dict[str, object]) -> AkaTask:
+def _task(tmp_path: Path, config: dict[str, object]) -> AKATask:
     root = tmp_path / "tasks/torch2hip/example"
     root.mkdir(parents=True)
     (root / "config.yaml").write_text(yaml.safe_dump(config))

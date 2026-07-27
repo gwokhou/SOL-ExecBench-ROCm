@@ -13,10 +13,10 @@ from typing import Any, TypeVar
 from pydantic import ValidationError
 
 from sol_execbench.core.dataset.aka_contract import (
-    AkaOfficialScoringStatus,
-    AkaReleasePolicy,
+    AKAOfficialScoringStatus,
+    AKAReleasePolicy,
 )
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 from sol_execbench.core.scoring.aggregation import (
     SuiteScore,
@@ -77,7 +77,7 @@ def verify_and_score_release(
     bundle_file = bundle_path.resolve()
     bundle_root = bundle_file.parent
     bundle = _load_model(bundle_file, ReleaseBundle)
-    corpus = AkaCorpusManifest.load(corpus_manifest_path)
+    corpus = AKACorpusManifest.load(corpus_manifest_path)
     if sha256_file(corpus.path) != OFFICIAL_CORPUS_MANIFEST_SHA256:
         raise ValueError("official corpus manifest is not repository-pinned")
     _verify_bundle_corpus(bundle, bundle_root, corpus)
@@ -108,7 +108,7 @@ def verify_and_score_release(
 def _verify_bundle_corpus(
     bundle: ReleaseBundle,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
 ) -> None:
     bundled = verify_artifact_file(
         bundle_root,
@@ -153,17 +153,17 @@ def _load_statements(
 
 
 def _verify_release_pins(
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     baseline: BaselineStatement,
     candidate: CandidateStatement,
     solar: SolarIndexStatement,
 ) -> None:
     scoring = corpus.official_scoring
-    if scoring.get("status") != AkaOfficialScoringStatus.AVAILABLE:
+    if scoring.get("status") != AKAOfficialScoringStatus.AVAILABLE:
         raise ValueError("corpus manifest does not authorize official scoring")
     if (
         scoring.get("release_policy")
-        != AkaReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1
+        != AKAReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1
     ):
         raise ValueError("corpus manifest uses an unsupported release policy")
     if scoring.get("baseline_id") != baseline.baseline_id:
@@ -181,7 +181,7 @@ def _verify_runs(
     candidate: CandidateStatement,
     *,
     bundle_root: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
 ) -> tuple[VerifiedRun, VerifiedRun]:
     verified = (
         verify_release_run(

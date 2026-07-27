@@ -25,14 +25,14 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
 )
 from sol_execbench.core.evaluator_contract import SOL_EXECBENCH_RELEASE
-from sol_execbench.core.platform.arch_capabilities import ArchIsaBudget
+from sol_execbench.core.platform.arch_capabilities import ArchISABudget
 from sol_execbench.core.timestamps import utc_timestamp
 
 
 def build_decision_sidecar(
     *,
     footprints: Sequence[StaticResourceFootprint],
-    budget: ArchIsaBudget | None = None,
+    budget: ArchISABudget | None = None,
     trace_path: str | None = None,
     target_id: str | None = None,
     run_id: str | None = None,
@@ -79,7 +79,7 @@ def build_decision_sidecar(
 
 def _aggregate(
     footprints: Sequence[StaticResourceFootprint],
-    budget: ArchIsaBudget | None,
+    budget: ArchISABudget | None,
 ) -> tuple[DiagnosticSidecarStatus, DecisionReasonCode]:
     if not footprints:
         return (
@@ -97,7 +97,7 @@ def _aggregate(
     )
 
 
-def _source_refs(budget: ArchIsaBudget | None) -> list[DiagnosticSourceRef]:
+def _source_refs(budget: ArchISABudget | None) -> list[DiagnosticSourceRef]:
     budget_status = "available" if budget is not None else "unavailable"
     return [
         DiagnosticSourceRef(
@@ -112,7 +112,7 @@ def _source_refs(budget: ArchIsaBudget | None) -> list[DiagnosticSourceRef]:
     ]
 
 
-def _limitations(budget: ArchIsaBudget | None) -> list[str]:
+def _limitations(budget: ArchISABudget | None) -> list[str]:
     limitations = [
         "Decision hints are diagnostic resource-risk signals, not benchmark authority.",
         "Static hints are most actionable for latency-bound kernels; confirm via "

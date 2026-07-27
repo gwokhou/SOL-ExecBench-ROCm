@@ -16,11 +16,11 @@ from pathlib import Path
 from solar.common.types import DynamicValue
 from solar.contracts import SolarReadinessStatus, SolarStage, SolarStageStatus
 from solar.graph.extraction import extract_operator_graph
-from solar.ir.contracts import DEFAULT_IR_KIND, IrKind, normalize_ir_kind
+from solar.ir.contracts import DEFAULT_IR_KIND, IRKind, normalize_ir_kind
 from solar.ir.conversion import convert_operator_graph
 from solar.rocm.architecture import ArchitectureProfile
 from solar.verification import (
-    IrExecutionError,
+    IRExecutionError,
     VerificationError,
     VerificationPolicy,
     verify_callable_conversion,
@@ -45,7 +45,7 @@ class ConversionReadinessRequest:
     reference_sha256: str
     architecture: str | Path | Mapping[str, DynamicValue]
     output_dir: Path
-    representation: IrKind | str = DEFAULT_IR_KIND
+    representation: IRKind | str = DEFAULT_IR_KIND
     device: str = "cpu"
     trace_seed: int = 200
     verification_seeds: tuple[int, ...] = (11, 29, 47)
@@ -311,7 +311,7 @@ def readiness_reason_code(stage: SolarStage, exc: Exception) -> str:
             return "exact_operation_unsupported"
         return "strict_conversion_failed"
     if stage is SolarStage.CONVERSION_VERIFICATION:
-        if isinstance(exc, IrExecutionError):
+        if isinstance(exc, IRExecutionError):
             return "exact_replay_failed"
         if (
             isinstance(exc, VerificationError)

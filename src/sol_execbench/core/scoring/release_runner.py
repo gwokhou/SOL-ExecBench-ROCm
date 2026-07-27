@@ -25,8 +25,8 @@ from sol_execbench.core.data.json_utils import (
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.dataset.aka_contract import AkaCorpusRole
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_contract import AKACorpusRole
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
 from sol_execbench.core.platform.environment_diagnostics import (
     build_environment_diagnostics,
@@ -70,7 +70,7 @@ def execute_release_plan(
     plan_file = plan_path.resolve()
     workspace = plan_file.parents[1]
     plan = load_execution_plan(plan_file, workspace_root=workspace)
-    corpus = AkaCorpusManifest.load(corpus_manifest_path)
+    corpus = AKACorpusManifest.load(corpus_manifest_path)
     _verify_plan_contract(plan, workspace, corpus)
     _write_environment_evidence(plan, workspace, resume=resume)
     passed = 0
@@ -101,7 +101,7 @@ def execute_release_plan(
 def _verify_plan_contract(
     plan: ReleaseExecutionPlan,
     workspace: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
 ) -> None:
     bundled = verify_artifact_file(
         workspace,
@@ -114,7 +114,7 @@ def _verify_plan_contract(
     expected = {
         entry.relative_problem_dir.as_posix(): entry
         for entry in corpus.entries
-        if entry.role is AkaCorpusRole.SCORED
+        if entry.role is AKACorpusRole.SCORED
     }
     observed = {item.problem_path: item for item in plan.problems}
     if set(observed) != set(expected):
@@ -166,7 +166,7 @@ def _execute_problem(
     problem: ExecutionPlanProblem,
     *,
     workspace: Path,
-    corpus: AkaCorpusManifest,
+    corpus: AKACorpusManifest,
     timeout_seconds: int,
     resume: bool,
     device: str,

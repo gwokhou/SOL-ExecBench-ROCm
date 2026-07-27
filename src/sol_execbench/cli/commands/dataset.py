@@ -26,12 +26,12 @@ from sol_execbench.cli.protocol import (
 from sol_execbench.core.dataset.aka_compatibility import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
     SUPPORTED_AKA_GFX_TARGETS,
-    AkaProbeInfrastructureError,
+    AKAProbeInfrastructureError,
     materialization_target,
 )
 from sol_execbench.core.dataset.aka_corpus import (
     AKA_REVISION,
-    AkaCorpusManifest,
+    AKACorpusManifest,
 )
 from sol_execbench.core.platform.runtime import detect_rocm_device
 
@@ -131,7 +131,7 @@ def materialize_cli(
             target=target,
             probe_timeout_seconds=probe_timeout_seconds,
         )
-    except AkaProbeInfrastructureError as exc:
+    except AKAProbeInfrastructureError as exc:
         raise CliFailure(
             str(exc),
             code="aka_probe_infrastructure_error",
@@ -205,9 +205,9 @@ def audit_cli(
     return CliResult(data={"problem_root": str(problem_root), **report})
 
 
-def _load_manifest(path: Path) -> AkaCorpusManifest:
+def _load_manifest(path: Path) -> AKACorpusManifest:
     try:
-        return AkaCorpusManifest.load(path)
+        return AKACorpusManifest.load(path)
     except (OSError, ValueError) as exc:
         raise CliFailure(str(exc), code="invalid_aka_manifest") from exc
 

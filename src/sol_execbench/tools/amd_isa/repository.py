@@ -22,9 +22,9 @@ from urllib.request import Request, urlopen
 from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.tools.amd_isa.errors import (
-    IsaDownloadError,
-    IsaIntegrityError,
-    IsaSpecUnavailableError,
+    ISADownloadError,
+    ISAIntegrityError,
+    ISASpecUnavailableError,
 )
 
 _MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
@@ -33,7 +33,7 @@ _LOCK_NAME = ".lock"
 
 
 @dataclass(frozen=True)
-class IsaSpecDescriptor:
+class ISASpecDescriptor:
     """Integrity-bound identity for one resolved ISA specification."""
 
     architecture: str
@@ -68,7 +68,7 @@ def _file_lock(path: Path) -> Iterator[None]:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-class IsaSpecRepository:
+class ISASpecRepository:
     """Resolve project-supported gfx targets to downloaded, locked XML specs."""
 
     _GFX_PREFIXES = (
@@ -94,7 +94,7 @@ class IsaSpecRepository:
             payload.get("schema_version")
             != SCHEMA_VERSIONS["amd_isa_release_lock"]
         ):
-            raise IsaIntegrityError("unsupported AMD ISA release-lock schema")
+            raise ISAIntegrityError("unsupported AMD ISA release-lock schema")
         self._releases: dict[str, dict[str, Any]] = payload["releases"]
         self._default_release = str(payload["default_release"])
         self.cache_root = cache_root or _cache_root()
@@ -108,7 +108,7 @@ class IsaSpecRepository:
         for prefix, family in cls._GFX_PREFIXES:
             if token.startswith(prefix):
                 return family
-        raise IsaSpecUnavailableError(
+        raise ISASpecUnavailableError(
             f"no machine-readable AMD ISA family is declared for '{architecture}'",
         )
 
@@ -144,7 +144,7 @@ class IsaSpecRepository:
         *,
         release: str | None = None,
         allow_download: bool = True,
-    ) -> IsaSpecDescriptor:
+    ) -> ISASpecDescriptor:
         """Resolve an architecture to an integrity-bound local spec."""
         selected_release = release or self._default_release
         family = self.architecture_family(architecture)
@@ -153,7 +153,7 @@ class IsaSpecRepository:
             allow_download=allow_download,
         )
         spec = self._release(selected_release)["files"][family]
-        return IsaSpecDescriptor(
+        return ISASpecDescriptor(
             architecture=architecture.lower().split(":", maxsplit=1)[0].strip(),
             family=family,
             release=selected_release,
@@ -177,7 +177,7 @@ class IsaSpecRepository:
             not allow_download
             or os.environ.get("SOL_EXECBENCH_AMD_ISA_OFFLINE") == "1"
         ):
-            raise IsaSpecUnavailableError(
+            raise ISASpecUnavailableError(
                 f"AMD ISA release {release} is absent from {root}; downloads are disabled",
             )
         with _file_lock(root.parent / _LOCK_NAME):
@@ -197,7 +197,7 @@ class IsaSpecRepository:
         try:
             return self._releases[release]
         except KeyError as exc:
-            raise IsaSpecUnavailableError(
+            raise ISASpecUnavailableError(
                 f"unknown AMD ISA release '{release}'",
             ) from exc
 
@@ -230,16 +230,16 @@ class IsaSpecRepository:
                     while chunk := response.read(1024 * 1024):
                         total += len(chunk)
                         if total > _MAX_ARCHIVE_BYTES:
-                            raise IsaIntegrityError(
+                            raise ISAIntegrityError(
                                 "AMD ISA archive exceeds size limit",
                             )
                         output.write(chunk)
             except URLError as exc:
-                raise IsaDownloadError(
+                raise ISADownloadError(
                     f"unable to download AMD ISA archive: {exc}",
                 ) from exc
             if sha256_file(archive) != entry["archive_sha256"]:
-                raise IsaIntegrityError(
+                raise ISAIntegrityError(
                     "AMD ISA archive checksum does not match release lock",
                 )
             expected = {
@@ -252,14 +252,14 @@ class IsaSpecRepository:
                 if names != set(expected) or any(
                     item.is_dir() for item in bundle.infolist()
                 ):
-                    raise IsaIntegrityError(
+                    raise ISAIntegrityError(
                         "AMD ISA archive has unexpected members",
                     )
                 if (
                     sum(item.file_size for item in bundle.infolist())
                     > _MAX_EXTRACTED_BYTES
                 ):
-                    raise IsaIntegrityError(
+                    raise ISAIntegrityError(
                         "AMD ISA archive exceeds extracted size limit",
                     )
                 for name, checksum in expected.items():
@@ -270,7 +270,7 @@ class IsaSpecRepository:
                     ):
                         shutil.copyfileobj(source, output)
                     if sha256_file(target) != checksum:
-                        raise IsaIntegrityError(
+                        raise ISAIntegrityError(
                             f"AMD ISA XML checksum mismatch: {name}",
                         )
             if root.exists():

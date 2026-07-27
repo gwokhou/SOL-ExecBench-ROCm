@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 from sol_execbench_type_helpers import (
-    JsonDict,
+    JSONDict,
     make_definition,
     make_solution,
     make_workload,
@@ -71,7 +71,7 @@ _WORKLOAD_DICTS = [
     },
 ]
 
-_PYTHON_SOLUTION_DICT: JsonDict = {
+_PYTHON_SOLUTION_DICT: JSONDict = {
     "name": "vecadd_python",
     "definition": "test_vecadd",
     "author": "test",
@@ -85,7 +85,7 @@ _PYTHON_SOLUTION_DICT: JsonDict = {
     ],
 }
 
-_HIP_SOLUTION_DICT: JsonDict = {
+_HIP_SOLUTION_DICT: JSONDict = {
     "name": "vecadd_hip",
     "definition": "test_vecadd",
     "author": "test",

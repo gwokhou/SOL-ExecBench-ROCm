@@ -80,7 +80,7 @@ depends on. The official reference is the HIP _Hardware Implementation_ chapter.
 
 **Implication**: the CDNA3 closed-form occupancy formula cannot be transplanted
 to RDNA unchanged. The divergence axes (matrix unit, register-allocation model,
-CU/WGP grouping) are exactly what the `ArchIsaBudget` schema now exposes so the
+CU/WGP grouping) are exactly what the `ArchISABudget` schema now exposes so the
 decision layer can select the right formula tier (§8, §9).
 
 ## 5. Static-Inferable vs Runtime-Only Boundary
@@ -221,7 +221,7 @@ on conflict, the static hint is demoted into limitations[] and never overrides r
 ## 9. Data Layer Alignment
 
 The data layer (commits on `feat/decision-ready-data-layer`) now exposes the
-fields the decision formulas need. `ArchIsaBudget` (`arch_capability_budget.v1`)
+fields the decision formulas need. `ArchISABudget` (`arch_capability_budget.v1`)
 carries 18 keys, organized by the invariant/dialect/divergence split:
 
 | Tier | Fields |
@@ -328,7 +328,7 @@ rather than silently dropped.
   the HIP Hardware Implementation chapter supplies the RDNA/CDNA divergence.
 - The static path emits **Layer R resource signals only**, at `inferred_*`
   confidence, never a compute/memory-bound verdict.
-- The data layer is decision-ready: the `ArchIsaBudget` divergence fields let
+- The data layer is decision-ready: the `ArchISABudget` divergence fields let
   the formula pick a tier, and `register_allocation_model` gates RDNA4 dynamic
   fallback.
 - **Resolved — implemented in `src/sol_execbench/core/bench/decision/` (quick

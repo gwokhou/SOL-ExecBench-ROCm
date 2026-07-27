@@ -11,17 +11,17 @@ import yaml
 
 from sol_execbench.core.dataset.aka_compatibility import (
     PROBE_RESULT_PREFIX,
-    AkaProbeInfrastructureError,
-    AkaWorkloadDecision,
+    AKAProbeInfrastructureError,
+    AKAWorkloadDecision,
     _parse_probe_output,
     materialization_target,
     select_corpus_for_target,
 )
 from sol_execbench.core.dataset.aka_contract import (
-    AkaCompatibilityStage,
-    AkaProbeStatus,
+    AKACompatibilityStage,
+    AKAProbeStatus,
 )
-from sol_execbench.core.dataset.aka_corpus import AkaCorpusManifest
+from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.platform.runtime import RocmDeviceInfo
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -47,11 +47,11 @@ def test_unknown_gfx_target_fails_closed() -> None:
 
 
 def test_workload_decision_payload_is_yaml_safe() -> None:
-    decision = AkaWorkloadDecision(
+    decision = AKAWorkloadDecision(
         problem_path="torch2hip/example",
         workload_uuid="workload-1",
         included=True,
-        stage=AkaCompatibilityStage.LIVE_PROBE,
+        stage=AKACompatibilityStage.LIVE_PROBE,
         reason_code="probe_passed",
     )
 
@@ -61,12 +61,12 @@ def test_workload_decision_payload_is_yaml_safe() -> None:
 @pytest.mark.parametrize(
     ("status", "included"),
     [
-        (AkaProbeStatus.COMPATIBLE, True),
-        (AkaProbeStatus.INCOMPATIBLE, False),
+        (AKAProbeStatus.COMPATIBLE, True),
+        (AKAProbeStatus.INCOMPATIBLE, False),
     ],
 )
 def test_probe_statuses_map_to_closed_decisions(
-    status: AkaProbeStatus,
+    status: AKAProbeStatus,
     included: bool,
 ) -> None:
     stdout = PROBE_RESULT_PREFIX + json.dumps(
@@ -84,19 +84,19 @@ def test_probe_statuses_map_to_closed_decisions(
     )
 
     assert decision.included is included
-    assert decision.stage is AkaCompatibilityStage.LIVE_PROBE
+    assert decision.stage is AKACompatibilityStage.LIVE_PROBE
 
 
 def test_probe_infrastructure_status_fails_closed() -> None:
     stdout = PROBE_RESULT_PREFIX + json.dumps(
         {
-            "status": AkaProbeStatus.INFRASTRUCTURE_ERROR,
+            "status": AKAProbeStatus.INFRASTRUCTURE_ERROR,
             "detail": "worker setup failed",
         },
     )
 
     with pytest.raises(
-        AkaProbeInfrastructureError,
+        AKAProbeInfrastructureError,
         match="worker setup failed",
     ):
         _parse_probe_output(
@@ -107,7 +107,7 @@ def test_probe_infrastructure_status_fails_closed() -> None:
 
 
 def test_gfx942_static_filter_excludes_fp8_without_live_probe() -> None:
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     entry = next(
         item for item in manifest.entries if item.dtype == "float8_e4m3fn"
     )
@@ -136,7 +136,7 @@ def test_gfx942_static_filter_excludes_fp8_without_live_probe() -> None:
 def test_static_storage_filter_excludes_oversized_reference_without_probe() -> (
     None
 ):
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     entry = next(
         item
         for item in manifest.entries
@@ -175,18 +175,18 @@ def test_static_storage_filter_excludes_oversized_reference_without_probe() -> (
 
 
 def test_live_probe_decisions_partition_workloads() -> None:
-    manifest = AkaCorpusManifest.load(MANIFEST)
+    manifest = AKACorpusManifest.load(MANIFEST)
     entry = manifest.entries[0]
     seen: list[str] = []
 
     def alternating_probe(problem_dir, _row_index, workload, _target, _timeout):
         seen.append(workload.uuid)
         included = len(seen) % 2 == 1
-        return AkaWorkloadDecision(
+        return AKAWorkloadDecision(
             problem_path=f"{problem_dir.parent.name}/{problem_dir.name}",
             workload_uuid=workload.uuid,
             included=included,
-            stage=AkaCompatibilityStage.LIVE_PROBE,
+            stage=AKACompatibilityStage.LIVE_PROBE,
             reason_code="probe_passed" if included else "probe_oom",
         )
 

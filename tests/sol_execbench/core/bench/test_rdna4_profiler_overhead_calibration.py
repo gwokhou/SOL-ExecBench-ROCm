@@ -319,7 +319,7 @@ class TestCalibrationScriptArgs:
         assert args.source_revision == "a" * 40
 
 
-class TestCalibrationJsonSchema:
+class TestCalibrationJSONSchema:
     """Test calibration JSON output schema validation."""
 
     def test_schema_version_constant(self):

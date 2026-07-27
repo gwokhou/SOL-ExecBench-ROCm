@@ -146,7 +146,7 @@ from solar.schema_versions import (
 )
 
 
-class IrGraphAnalyzer:
+class IRGraphAnalyzer:
     """Analyze a SOLAR IR graph and write `analysis.yaml`."""
 
     def __init__(self, debug: bool = False) -> None:
@@ -507,7 +507,7 @@ class IrGraphAnalyzer:
             writes = [0] * len(data.output_sizes)
             other_ops = 0
         elif data.op_type in SCATTER_OPS:
-            slice_elements = IrGraphAnalyzer._scatter_write_elements(data)
+            slice_elements = IRGraphAnalyzer._scatter_write_elements(data)
             reads = [0] * len(data.input_sizes)
             writes = [slice_elements] if data.output_sizes else []
             writes += [0] * max(0, len(data.output_sizes) - 1)
@@ -1716,4 +1716,4 @@ class IrGraphAnalyzer:
         return None
 
 
-__all__ = ["IrGraphAnalyzer"]
+__all__ = ["IRGraphAnalyzer"]

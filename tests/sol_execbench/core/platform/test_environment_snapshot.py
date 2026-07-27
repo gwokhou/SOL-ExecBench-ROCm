@@ -10,7 +10,7 @@ from sol_execbench.core.platform.environment import (
     EnvironmentDiagnostics,
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
-    GpuEnvironmentSummary,
+    GPUEnvironmentSummary,
     PytorchRocmSummary,
     ToolProbeResult,
     build_environment_diagnostics,
@@ -149,7 +149,7 @@ def test_summarize_gpus_deduplicates_single_pytorch_device_from_tools():
     )
 
     assert summarize_gpus(tools, pytorch) == [
-        GpuEnvironmentSummary(
+        GPUEnvironmentSummary(
             source="pytorch",
             index=0,
             name="AMD Radeon RX 9060 XT",

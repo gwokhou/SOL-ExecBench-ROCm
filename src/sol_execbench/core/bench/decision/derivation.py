@@ -28,7 +28,7 @@ from sol_execbench.core.bench.decision.decision_models import (
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
 )
-from sol_execbench.core.platform.arch_capabilities import ArchIsaBudget
+from sol_execbench.core.platform.arch_capabilities import ArchISABudget
 
 # Heuristic ratios. Resource pressure is flagged when usage crosses 80% of the
 # architected budget; occupancy corroboration uses the AMD SOL yellow threshold
@@ -76,7 +76,7 @@ def _hint_identity(
 
 def _occupancy_low(
     footprint: StaticResourceFootprint,
-    budget: ArchIsaBudget,
+    budget: ArchISABudget,
 ) -> bool:
     """Whether the reported occupancy is below 50% of the architectural ceiling."""
     occ = footprint.occupancy_estimate_waves_per_cu
@@ -110,7 +110,7 @@ def _make_hint(
 
 def _derive_for_footprint(
     footprint: StaticResourceFootprint,
-    budget: ArchIsaBudget | None,
+    budget: ArchISABudget | None,
     *,
     pressure_derivable: bool = True,
 ) -> list[DecisionHint]:
@@ -201,7 +201,7 @@ def _spill_hint(
 
 def derive_decision_hints(
     footprints: Sequence[StaticResourceFootprint],
-    budget: ArchIsaBudget | None = None,
+    budget: ArchISABudget | None = None,
 ) -> list[DecisionHint]:
     """Derive Layer R decision hints from static footprints and an arch budget.
 

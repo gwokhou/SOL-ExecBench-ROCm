@@ -13,7 +13,7 @@ from importlib import resources
 from pathlib import Path
 
 from sol_execbench.core.process.subprocesses import run_in_process_group
-from sol_execbench.tools.amd_isa.errors import IsaHelperBuildError
+from sol_execbench.tools.amd_isa.errors import ISAHelperBuildError
 from sol_execbench.tools.amd_isa.repository import _cache_root, _file_lock
 
 
@@ -74,7 +74,7 @@ def ensure_helper(cache_root: Path | None = None) -> Path:
                 timeout=120,
             )
             if configure.returncode != 0:
-                raise IsaHelperBuildError(
+                raise ISAHelperBuildError(
                     (configure.stderr or configure.stdout)[-4000:],
                 )
             build = run_in_process_group(
@@ -82,17 +82,17 @@ def ensure_helper(cache_root: Path | None = None) -> Path:
                 timeout=300,
             )
             if build.returncode != 0:
-                raise IsaHelperBuildError(
+                raise ISAHelperBuildError(
                     (build.stderr or build.stdout)[-4000:],
                 )
         except FileNotFoundError as exc:
-            raise IsaHelperBuildError(
+            raise ISAHelperBuildError(
                 "cmake and a C++14 compiler are required for AMD ISA support",
             ) from exc
         except subprocess.TimeoutExpired as exc:
-            raise IsaHelperBuildError("AMD ISA helper build timed out") from exc
+            raise ISAHelperBuildError("AMD ISA helper build timed out") from exc
         if not executable.is_file() or not os.access(executable, os.X_OK):
-            raise IsaHelperBuildError(
+            raise ISAHelperBuildError(
                 "AMD ISA helper build finished without an executable",
             )
     return executable

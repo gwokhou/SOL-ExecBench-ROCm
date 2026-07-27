@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from solar.ir.aten import AtenIrError, validate_aten_graph
+from solar.ir.aten import AtenIRError, validate_aten_graph
 from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
 
 
@@ -175,14 +175,14 @@ def test_validate_rejects_incomplete_aten_contracts(
     graph = _graph()
     graph["layers"]["operation"]["semantic_op"] = _aten_semantic()
     mutate(graph)
-    with pytest.raises(AtenIrError, match=message):
+    with pytest.raises(AtenIRError, match=message):
         validate_aten_graph(graph)
 
 
 def test_validate_rejects_bad_einsum_and_missing_required_parameters() -> None:
     einsum = _layer("matmul")
     einsum["semantic_op"] = {"kind": "einsum", "equation": "AB"}
-    with pytest.raises(AtenIrError, match="no exact einsum equation"):
+    with pytest.raises(AtenIRError, match="no exact einsum equation"):
         validate_aten_graph(_graph(einsum))
 
     softmax = _layer("softmax", inputs=1)
@@ -193,7 +193,7 @@ def test_validate_rejects_bad_einsum_and_missing_required_parameters() -> None:
         "kwargs": {},
         "effects": {"mutates": [], "aliases": []},
     }
-    with pytest.raises(AtenIrError, match="lacks exact softmax parameters"):
+    with pytest.raises(AtenIRError, match="lacks exact softmax parameters"):
         validate_aten_graph(_graph(softmax))
 
     sliced = _layer("slice", inputs=1)
@@ -204,5 +204,5 @@ def test_validate_rejects_bad_einsum_and_missing_required_parameters() -> None:
         "kwargs": {"dim": 0},
         "effects": {"mutates": [], "aliases": []},
     }
-    with pytest.raises(AtenIrError, match="explicit slice bounds"):
+    with pytest.raises(AtenIRError, match="explicit slice bounds"):
         validate_aten_graph(_graph(sliced))

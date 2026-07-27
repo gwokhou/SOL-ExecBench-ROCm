@@ -8,7 +8,7 @@ from click.testing import CliRunner
 from sol_execbench.cli.commands import dataset as cli_dataset
 from sol_execbench.cli.main import cli
 from sol_execbench.core.dataset.aka_compatibility import (
-    AkaMaterializationTarget,
+    AKAMaterializationTarget,
 )
 from sol_execbench.core.platform.runtime import RocmDeviceInfo
 
@@ -50,7 +50,7 @@ def test_materialize_detects_target_and_uses_target_specific_default(
         },
     )
     monkeypatch.setattr(
-        cli_dataset.AkaCorpusManifest,
+        cli_dataset.AKACorpusManifest,
         "load",
         lambda _path: manifest,
     )
@@ -81,13 +81,13 @@ def test_materialize_detects_target_and_uses_target_specific_default(
     assert str(observed["output"]) == "problems/local/AMD_AKA/gfx1150"
     assert observed["probe_timeout_seconds"] == 120.0
     target = observed["target"]
-    assert isinstance(target, AkaMaterializationTarget)
+    assert isinstance(target, AKAMaterializationTarget)
     assert target.cache_clear.clear_buffer_bytes == 32 * 1024**2
 
 
 def test_materialize_rejects_detected_target_mismatch(monkeypatch) -> None:
     monkeypatch.setattr(
-        cli_dataset.AkaCorpusManifest,
+        cli_dataset.AKACorpusManifest,
         "load",
         lambda _path: SimpleNamespace(),
     )
