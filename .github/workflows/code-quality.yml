@@ -48,6 +48,7 @@ jobs:
         run: |
           uv run --no-sync python scripts/check_coupling.py
           uv run --no-sync python scripts/check_readability.py
+          uv run --no-sync python scripts/check_production_reachability.py
           uv run --no-sync python scripts/check_current_docs.py
           uv run --no-sync python scripts/check_schema_versions.py
 
@@ -71,11 +72,15 @@ jobs:
         run: uv sync --locked --all-groups
       - name: Run sol-execbench tests
         run: |
-          uv run --no-sync pytest tests/sol_execbench \
-            --ignore=tests/sol_execbench/driver/test_eval_driver.py \
-            --ignore=tests/sol_execbench/test_e2e.py
+          uv run --no-sync coverage erase
+          uv run --no-sync coverage run -m pytest -n 0 tests/sol_execbench
+          uv run --no-sync coverage combine
+          uv run --no-sync coverage json -o sol-execbench-coverage.json
+          uv run --no-sync python scripts/check_solar_coverage.py \
+            sol-execbench-coverage.json \
+            --policy scripts/sol_execbench_coverage_policy.json
       - name: Run tools tests
-        run: uv run --no-sync pytest tests/tools
+        run: uv run --no-sync pytest tests/tools tests/scripts
 
   solar-tests:
     name: Solar tests and coverage
@@ -99,5 +104,6 @@ jobs:
         run: |
           uv run --no-sync coverage erase
           uv run --no-sync coverage run -m pytest -n 0 tests/solar
+          uv run --no-sync coverage combine
           uv run --no-sync coverage json -o coverage.json
           uv run --no-sync python scripts/check_solar_coverage.py coverage.json

@@ -5,9 +5,11 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticGovernanceGuardrail,
+    DiagnosticIdentity,
+)
 from sol_execbench.core.bench.profile_summary import (
-    ProfileSummaryGovernanceGuardrail,
-    ProfileSummaryIdentity,
     ProfileSummarySidecar,
     build_profile_summary_sidecar,
     evaluate_profile_summary_governance,
@@ -62,7 +64,7 @@ def _profile_result(
 
 
 def test_profile_summary_identity_uses_sol_version_only() -> None:
-    identity = ProfileSummaryIdentity(
+    identity = DiagnosticIdentity(
         generated_at="2026-01-01T00:00:00Z",
         sol_version="v3.0.0",
         trace_path="trace.jsonl",
@@ -77,7 +79,7 @@ def test_profile_summary_identity_uses_sol_version_only() -> None:
 
 def test_profile_summary_identity_rejects_sol_contract_version_alias() -> None:
     with pytest.raises(ValidationError, match="sol_contract_version"):
-        ProfileSummaryIdentity.model_validate(
+        DiagnosticIdentity.model_validate(
             {
                 "generated_at": "2026-01-01T00:00:00Z",
                 "sol_version": "v3.0.0",
@@ -402,4 +404,4 @@ def test_profile_summary_rejects_authority_override(tmp_path: Path):
     guardrail_payload["score_authority"] = True
 
     with pytest.raises(ValidationError):
-        ProfileSummaryGovernanceGuardrail.model_validate(guardrail_payload)
+        DiagnosticGovernanceGuardrail.model_validate(guardrail_payload)

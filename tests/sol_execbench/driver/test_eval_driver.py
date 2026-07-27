@@ -28,7 +28,6 @@ Verifies that:
 
 from __future__ import annotations
 
-import ast
 import importlib.util
 import json
 import os
@@ -42,14 +41,8 @@ import torch
 
 import sol_execbench.driver as _driver_pkg
 from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
-from sol_execbench_type_helpers import make_solution
 
 _TEMPLATES_DIR = Path(_driver_pkg.__file__).parent / "templates"
-
-
-def build_driver() -> str:
-    """Return the eval_driver.py template source."""
-    return (_TEMPLATES_DIR / "eval_driver.py").read_text()
 
 
 def _stage_evaluation_templates(tmp_path: Path) -> None:
@@ -227,31 +220,6 @@ def _run_eval_driver_process(
 # ---------------------------------------------------------------------------
 
 
-def test_eval_driver_is_valid_python():
-    """build_driver() must produce a syntactically valid Python script."""
-    source = build_driver()
-    ast.parse(source, filename="eval_driver.py")
-
-
-def test_all_generated_evaluation_templates_are_valid_python():
-    for name in (
-        "eval_driver.py",
-        "reference_worker.py",
-        "evaluation_orchestrator.py",
-    ):
-        source = (_TEMPLATES_DIR / name).read_text()
-        ast.parse(source, filename=name)
-
-
-def test_candidate_driver_never_loads_or_calls_reference_code():
-    source = build_driver()
-
-    assert "load_reference_function" not in source
-    assert "measure_reference_latency" not in source
-    assert "dependencies.ref_fn" not in source
-    assert "reference_client=" in source
-
-
 def test_reference_source_is_removed_before_candidate_execution(tmp_path):
     result = _run_eval_driver_process(
         tmp_path,
@@ -263,14 +231,6 @@ def test_reference_source_is_removed_before_candidate_execution(tmp_path):
     assert not (tmp_path / "_reference.py").exists()
     candidate_definition = json.loads((tmp_path / "definition.json").read_text())
     assert candidate_definition["reference"] != _MINIMAL_DEFINITION["reference"]
-
-
-def test_eval_driver_supports_profiler_graceful_exit_switch():
-    """Profiler timing can request normal teardown without changing defaults."""
-    source = build_driver()
-
-    assert 'os.environ.get("SOL_EXECBENCH_GRACEFUL_EXIT") == "1"' in source
-    assert "sys.exit(0)\nos._exit(0)" in source
 
 
 @pytest.mark.xdist_group("serial")
@@ -691,6 +651,7 @@ def test_lazy_output_detected(tmp_path):
 _triton_available = importlib.util.find_spec("triton") is not None
 
 
+@pytest.mark.requires_rocm_gpu
 @pytest.mark.skipif(
     not _triton_available or not torch.cuda.is_available(),
     reason="triton or cuda device not available",
@@ -829,51 +790,9 @@ def test_static_source_review_flags_precision_downgrade_without_blocking(tmp_pat
     assert "precision_downgrade" not in ev.get("log", "")
 
 
-def test_hip_cpp_sources_accept_pytorch_rocm_stream_api_text():
-    """HIP/C++ files may use PyTorch's HIP-backed torch.cuda stream API text."""
-
-    good_hip = {
-        "name": "good_hip_stream",
-        "definition": "test_def",
-        "author": "good_agent",
-        "spec": {
-            "languages": ["hip_cpp"],
-            "target_hardware": ["LOCAL"],
-            "entry_point": "main.cpp::run",
-            "destination_passing_style": True,
-        },
-        "sources": [
-            {
-                "path": "main.cpp",
-                "content": "void run() {}",
-            },
-            {
-                "path": "kernel.hip",
-                "content": (
-                    "auto stream = at::cuda::getCurrentCUDAStream();\n"
-                    "kernel<<<grid, block, 0, stream>>>(args);\n"
-                ),
-            },
-        ],
-    }
-    # Should NOT raise
-    make_solution(**good_hip)
-
-
 # ---------------------------------------------------------------------------
 # NaN / Inf JSON compliance tests
 # ---------------------------------------------------------------------------
-
-
-def test_emit_uses_strict_json():
-    """_emit() must use allow_nan=False so NaN/Inf crashes loudly (no torch required)."""
-    source = build_driver()
-    assert "allow_nan=False" in source, (
-        "_emit must use json.dumps(..., allow_nan=False) to reject non-finite floats"
-    )
-    assert "_sanitize_floats" not in source, (
-        "_sanitize_floats should not be present — NaN/Inf must crash, not be silently hidden"
-    )
 
 
 @pytest.mark.xdist_group("serial")

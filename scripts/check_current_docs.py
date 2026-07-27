@@ -13,7 +13,6 @@ CURRENT_DOCS = (
     ROOT / "SECURITY.md",
     *sorted((ROOT / "docs").rglob("*.md")),
     ROOT / "scripts" / "internal" / "README.md",
-    ROOT / "src" / "solar" / "handlers" / "README.md",
 )
 RETIRED_REFERENCES = (
     "docs/internal/solar-three-stage-readiness.md",

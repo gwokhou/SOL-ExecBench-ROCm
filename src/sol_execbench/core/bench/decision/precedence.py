@@ -16,8 +16,8 @@ from sol_execbench.core.bench.decision.decision_models import (
     DecisionBottleneckClass,
     DecisionConfidence,
     DecisionSidecar,
-    DecisionStatus,
 )
+from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
 
 _RUNTIME_PRECEDENCE_NOTE = (
     "Runtime profile takes precedence over static decision hints; static hints "
@@ -54,7 +54,7 @@ def apply_runtime_precedence(
 
     if not runtime_profile_available:
         return sidecar
-    if sidecar.status == DecisionStatus.UNAVAILABLE:
+    if sidecar.status == DiagnosticSidecarStatus.UNAVAILABLE:
         return sidecar
     limitations = list(sidecar.limitations)
     if _RUNTIME_PRECEDENCE_NOTE not in limitations:

@@ -98,6 +98,7 @@ from solar.analysis.orojenesis import (
 from solar.analysis.resources import (
     RESOURCE_MODEL_VERSION,
     classify_layer_resources,
+    is_mfma_operation,
     merge_resource_work,
 )
 from solar.analysis.reporting import build_analysis_result, write_analysis
@@ -613,26 +614,34 @@ class EinsumGraphAnalyzer:
 
     def _compute_layer(self, data: _LayerData) -> _LayerCompute:
         shapes = TensorShapes(inputs=data.input_shapes, outputs=data.output_shapes)
+        operation = data.op_type
+        if operation == "addmm" and len(data.input_shapes) >= 3:
+            operation = "matmul"
+            shapes = TensorShapes(
+                inputs=data.input_shapes[1:3],
+                outputs=data.output_shapes,
+            )
         try:
             if data.is_real_einsum and data.equation:
                 cost = int(
                     self.einsum_analyzer.get_compute_cost(
-                        data.op_type, shapes, equation=data.equation
+                        operation, shapes, equation=data.equation
                     )
                 )
             else:
-                cost = int(self.einsum_analyzer.get_compute_cost(data.op_type, shapes))
+                cost = int(self.einsum_analyzer.get_compute_cost(operation, shapes))
         except Exception:
             cost = 0
         is_real_einsum = data.is_real_einsum
         if data.op_type in ZERO_COMPUTE_OPS:
             cost = 0
             is_real_einsum = False
-        macs = cost if is_real_einsum else 0
+        contraction = is_real_einsum or is_mfma_operation(data.op_type)
+        macs = cost if contraction else 0
         return _LayerCompute(
             is_real_einsum=is_real_einsum,
             macs=macs,
-            other_ops=0 if is_real_einsum else cost,
+            other_ops=0 if contraction else cost,
             flops=2 * macs,
         )
 

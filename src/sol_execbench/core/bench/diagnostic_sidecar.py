@@ -15,7 +15,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
@@ -62,6 +62,77 @@ class DiagnosticSidecarAuthority(BaseModelWithDocstrings):
     score_authority: Literal[False] = False
     paper_parity_authority: Literal[False] = False
     leaderboard_authority: Literal[False] = False
+
+
+class DiagnosticSidecarEnvelope(BaseModelWithDocstrings):
+    """Shared wire envelope for every derived diagnostic sidecar."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    authority: Literal["diagnostic"] = "diagnostic"
+
+
+class DiagnosticSourceRef(BaseModelWithDocstrings):
+    """Compact reference to source evidence used by a diagnostic sidecar."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: str
+    label: str
+    status: str | None = None
+
+
+class DiagnosticArtifactCitation(BaseModelWithDocstrings):
+    """Compact citation for an artifact consumed by a diagnostic sidecar."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: str
+    label: str
+    path: str | None = None
+    sha256: str | None = None
+    status: str | None = None
+
+
+class SizedDiagnosticArtifactCitation(DiagnosticArtifactCitation):
+    """Diagnostic artifact citation that also records its bounded byte size."""
+
+    size_bytes: int | None = Field(default=None, ge=0)
+
+
+class DiagnosticIdentity(BaseModelWithDocstrings):
+    """Shared producer and trace identity for a derived diagnostic sidecar."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    generated_at: str
+    sol_version: str
+    trace_path: str | None = None
+    run_id: str | None = None
+
+
+class ExtendedDiagnosticIdentity(DiagnosticIdentity):
+    """Diagnostic identity extended with target and candidate source identity."""
+
+    target_id: str | None = None
+    candidate_id: str | None = None
+    source_sha256: str | None = None
+
+
+class DiagnosticFreshnessValidation(BaseModelWithDocstrings):
+    """Result of matching a diagnostic identity to expected run identity."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: DiagnosticFreshnessStatus
+    reason_codes: list[str] = Field(default_factory=list)
+
+
+class DiagnosticGovernanceGuardrail(DiagnosticSidecarAuthority):
+    """Authority result after freshness and parse checks."""
+
+    status: DiagnosticGovernanceStatus
+    reason_codes: list[str] = Field(default_factory=list)
 
 
 def compact_path(path: str | None) -> str | None:

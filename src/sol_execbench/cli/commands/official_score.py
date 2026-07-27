@@ -12,7 +12,6 @@ from rich.console import Console
 
 from sol_execbench.cli.protocol import EXIT_RESULT_FAILED, CliFailure, CliResult
 from sol_execbench.cli.protocol import artifact
-from sol_execbench.core.dataset.aka_contract import AkaOfficialScoringStatus
 from sol_execbench.core.scoring.release_assembly import (
     assemble_release_bundle,
     build_run_statement,
@@ -39,13 +38,26 @@ def score_cli() -> None:
     show_default=True,
 )
 def official_score_status_cli(manifest_path: Path) -> CliResult:
-    """Report whether this corpus has a pinned official-scoring contract."""
+    """Report official-score verifier, policy, producer, and release state."""
     report = official_score_availability(manifest_path)
-    if report["status"] == AkaOfficialScoringStatus.AVAILABLE:
-        console.print("[green]Official scoring is available.[/green]")
+    if not report["policy"]["authorized"]:
+        console.print(
+            "[yellow]Official-score policy is not authorized: "
+            f"{report['policy']['reason_code']}.[/yellow]"
+        )
+    elif not report["producer"]["ready"]:
+        console.print(
+            "[yellow]Official-score verifier is available, but release production "
+            f"is blocked: {report['producer']['reason_code']}.[/yellow]"
+        )
+    elif not report["published_release"]["available"]:
+        console.print(
+            "[yellow]Official-score verifier and producer are ready, but no "
+            "repository release bundle is published.[/yellow]"
+        )
     else:
         console.print(
-            f"[yellow]Official scoring unavailable: {report['reason_code']}.[/yellow]"
+            "[green]A repository official-score release is published.[/green]"
         )
     return CliResult(data=report)
 

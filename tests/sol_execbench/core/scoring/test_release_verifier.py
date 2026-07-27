@@ -95,9 +95,9 @@ def test_caller_authored_manifest_cannot_publish_scoring_policy(
 
     report = official_score_availability(corpus.path)
 
-    assert report["status"] == "unavailable"
-    assert report["reason_code"] == "corpus_manifest_not_repository_pinned"
-    assert report["requires_signatures"] is False
+    assert report["policy"]["authorized"] is False
+    assert report["policy"]["reason_code"] == "corpus_manifest_not_repository_pinned"
+    assert report["verifier"]["requires_signatures"] is False
 
 
 def test_content_addressed_release_bundle_verifies_and_scores(

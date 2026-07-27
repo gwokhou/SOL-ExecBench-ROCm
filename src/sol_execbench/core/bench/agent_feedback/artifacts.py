@@ -7,9 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sol_execbench.core.bench.agent_feedback.models import (
-    AgentFeedbackArtifactCitation,
-)
+from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticArtifactCitation
 from sol_execbench.core.integrity.checksums import sha256_file
 
 
@@ -20,7 +18,7 @@ def artifact_citation_from_path(
     label: str | None = None,
     status: str | None = None,
     sha256: str | None = None,
-) -> AgentFeedbackArtifactCitation:
+) -> DiagnosticArtifactCitation:
     """Build a compact citation from an artifact path."""
 
     checksum = (
@@ -28,7 +26,7 @@ def artifact_citation_from_path(
         if sha256 is not None
         else (sha256_file(path) if path.is_file() else None)
     )
-    return AgentFeedbackArtifactCitation(
+    return DiagnosticArtifactCitation(
         kind=kind,
         label=label or path.name,
         path=path.name,

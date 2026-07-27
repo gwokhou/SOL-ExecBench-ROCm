@@ -6,24 +6,21 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
 
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
-    DiagnosticFreshnessStatus,
-    DiagnosticGovernanceStatus,
-    DiagnosticSidecarAuthority,
+    DiagnosticIdentity,
+    DiagnosticSidecarEnvelope,
     DiagnosticSidecarStatus,
+    SizedDiagnosticArtifactCitation,
 )
 from sol_execbench.core.bench.profile_summary.models import (
-    ProfileSummaryArtifactCitation,
     ProfileSummaryBottleneckHint,
     ProfileSummaryContent,
     ProfileSummaryKernelMetric,
     ProfileSummaryStructuredMetric,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import (
     PROFILE_SUMMARY_SCHEMA_VERSION,
     ProfileSummarySchemaVersion,
@@ -36,11 +33,6 @@ _PROFILE_SUMMARY_MODEL_EXPORTS = (
     ProfileSummaryStructuredMetric,
 )
 
-# Public compatibility names for this sidecar's contract vocabulary.
-ProfileSummaryStatus = DiagnosticSidecarStatus
-ProfileSummaryFreshnessStatus = DiagnosticFreshnessStatus
-ProfileSummaryGovernanceStatus = DiagnosticGovernanceStatus
-
 
 class ProfileSummaryReasonCode(StrEnum):
     """Stable reason-code vocabulary for profile summary generation."""
@@ -51,54 +43,18 @@ class ProfileSummaryReasonCode(StrEnum):
     NO_PROFILE_RESULT = "no_profile_result"
 
 
-class ProfileSummaryIdentity(BaseModelWithDocstrings):
-    """Freshness identity for a generated profile summary sidecar."""
-
-    model_config = _MODEL_CONFIG
-
-    generated_at: str
-    """UTC timestamp when the sidecar was generated."""
-    sol_version: str
-    """Producer/runtime SOL version or HIP-facing supported SOL tag."""
-    trace_path: str | None = None
-    """Compact trace path or file name when available."""
-    run_id: str | None = None
-    """Optional run identity."""
-
-
-class ProfileSummaryFreshnessValidation(BaseModelWithDocstrings):
-    """Result of validating profile summary freshness identity."""
-
-    model_config = _MODEL_CONFIG
-
-    status: ProfileSummaryFreshnessStatus
-    """Freshness result."""
-    reason_codes: list[str] = Field(default_factory=list)
-    """Stable reason codes explaining stale or unknown status."""
-
-
-class ProfileSummaryGovernanceGuardrail(DiagnosticSidecarAuthority):
-    """Authority boundary after optional profile-summary governance checks."""
-
-    status: ProfileSummaryGovernanceStatus
-    """Diagnostic governance status."""
-    reason_codes: list[str] = Field(default_factory=list)
-    """Stable reason codes for unavailable, stale, or invalid states."""
-
-
-class ProfileSummarySidecar(BaseModelWithDocstrings):
+class ProfileSummarySidecar(DiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for normalized profiler metadata."""
 
     model_config = _MODEL_CONFIG
 
     schema_version: ProfileSummarySchemaVersion = PROFILE_SUMMARY_SCHEMA_VERSION
-    status: ProfileSummaryStatus
+    status: DiagnosticSidecarStatus
     reason_code: ProfileSummaryReasonCode
-    identity: ProfileSummaryIdentity
-    authority: Literal["diagnostic"] = "diagnostic"
+    identity: DiagnosticIdentity
     summary: ProfileSummaryContent
     limitations: list[str] = Field(default_factory=list)
-    artifact_citations: list[ProfileSummaryArtifactCitation] = Field(
+    artifact_citations: list[SizedDiagnosticArtifactCitation] = Field(
         default_factory=list
     )
 

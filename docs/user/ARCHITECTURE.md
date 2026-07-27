@@ -89,7 +89,8 @@ complete staging directory into place.
 The converter implementation remains large, but its public flow is
 split into load, semantic conversion and artifact publication. The analyzer
 accepts a typed internal job. Existing SOLAR readability debt is inventoried in
-`scripts/solar_readability_debt.json`; it may shrink but cannot gain new items
+`scripts/solar_readability_debt.json`; every shrink must update the snapshot and
+it cannot gain new items
 or larger functions/modules.
 
 ## Scoring boundary
@@ -161,6 +162,7 @@ uv run --with ruff ruff check .
 uv run ty check
 uv run python scripts/check_coupling.py
 uv run python scripts/check_readability.py
+uv run python scripts/check_production_reachability.py
 uv run python scripts/check_current_docs.py
 uv run pytest tests/solar tests/sol_execbench/driver tests/sol_execbench/core -q
 ```

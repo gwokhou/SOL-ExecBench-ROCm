@@ -48,7 +48,10 @@ from sol_execbench.core.bench.static_kernel.extractor_routing import (
 from sol_execbench.core.bench.static_kernel.isa_analysis import (
     collect_static_isa_analyses,
 )
-from sol_execbench.core.platform.environment import ProbeCompletedProcess
+from sol_execbench.core.process.subprocesses import (
+    ProbeCompletedProcess,
+    run_bounded_probe,
+)
 from sol_execbench.core.platform.toolchain import (
     ProbeRunner,
     ToolchainArtifactType,
@@ -56,7 +59,6 @@ from sol_execbench.core.platform.toolchain import (
     ToolchainStatus,
     Which,
 )
-from sol_execbench.core.platform.toolchain.probes import run_probe
 
 
 _FOOTPRINT_EXTRACTOR_TOOL_IDS = ("roc-objdump",)
@@ -101,7 +103,7 @@ def _memoize_probe_runner(runner: ProbeRunner | None) -> ProbeRunner:
     def resolved(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
         key = tuple(command)
         if key not in cache:
-            cache[key] = (runner or run_probe)(command, timeout_seconds)
+            cache[key] = (runner or run_bounded_probe)(command, timeout_seconds)
         return cache[key]
 
     return resolved

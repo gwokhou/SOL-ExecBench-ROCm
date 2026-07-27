@@ -18,6 +18,8 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+import select
 import subprocess
 import sys
 
@@ -29,6 +31,53 @@ from sol_execbench.core.bench.pid_lock import (
 )
 
 _MODULE = "sol_execbench.core.bench.pid_lock"
+
+_HOLDER_SCRIPT = """
+from pathlib import Path
+import sys
+
+from sol_execbench.core.bench.pid_lock import acquire_pid_lock
+
+with acquire_pid_lock(Path(sys.argv[1])):
+    print("READY", flush=True)
+    sys.stdin.read(1)
+"""
+
+
+def _start_lock_holder(output_dir: Path) -> subprocess.Popen[str]:
+    holder = subprocess.Popen(
+        [sys.executable, "-c", _HOLDER_SCRIPT, str(output_dir)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+    assert holder.stdout is not None
+    readable, _, _ = select.select([holder.stdout], [], [], 5)
+    if not readable:
+        holder.kill()
+        _stdout, stderr = holder.communicate()
+        raise AssertionError(f"lock holder did not become ready: {stderr}")
+    ready = holder.stdout.readline().strip()
+    if ready != "READY":
+        holder.kill()
+        _stdout, stderr = holder.communicate()
+        raise AssertionError(f"lock holder failed before readiness: {ready} {stderr}")
+    return holder
+
+
+def _stop_lock_holder(holder: subprocess.Popen[str]) -> None:
+    if holder.poll() is not None:
+        return
+    assert holder.stdin is not None
+    holder.stdin.write("\n")
+    holder.stdin.flush()
+    try:
+        holder.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        holder.kill()
+        holder.wait(timeout=5)
 
 
 class TestProcessLock:
@@ -56,29 +105,7 @@ class TestProcessLock:
 
     def test_contention_exits_with_diagnostic(self, tmp_path):
         """Test that subprocess exits with code 1 and prints diagnostic when lock is held."""
-        # Spawn a subprocess that holds the lock
-        holder_script = f"""
-import tempfile
-from pathlib import Path
-from sol_execbench.core.bench.pid_lock import acquire_pid_lock
-import time
-
-output_dir = Path("{tmp_path}")
-with acquire_pid_lock(output_dir):
-    time.sleep(10)  # Hold lock for 10 seconds
-"""
-
-        # Spawn holder process
-        holder = subprocess.Popen(
-            [sys.executable, "-c", holder_script],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        # Give holder time to acquire lock
-        import time
-
-        time.sleep(1)
+        holder = _start_lock_holder(tmp_path)
 
         # Try to acquire lock in another subprocess
         contender_script = f"""
@@ -90,15 +117,14 @@ with acquire_pid_lock(output_dir):
     pass
 """
 
-        result = subprocess.run(
-            [sys.executable, "-c", contender_script],
-            capture_output=True,
-            text=True,
-        )
-
-        # Clean up holder process
-        holder.kill()
-        holder.wait()
+        try:
+            result = subprocess.run(
+                [sys.executable, "-c", contender_script],
+                capture_output=True,
+                text=True,
+            )
+        finally:
+            _stop_lock_holder(holder)
 
         # Verify contender exited with error code 1
         assert result.returncode == 1
@@ -144,31 +170,11 @@ with acquire_pid_lock(output_dir):
 
     def test_auto_release_on_sigkill(self, tmp_path):
         """Test that lock is released after SIGKILL."""
-        # Spawn a subprocess that holds the lock
-        holder_script = f"""
-from pathlib import Path
-from sol_execbench.core.bench.pid_lock import acquire_pid_lock
-import time
-
-output_dir = Path("{tmp_path}")
-with acquire_pid_lock(output_dir):
-    time.sleep(10)  # Hold lock for 10 seconds
-"""
-
-        holder = subprocess.Popen(
-            [sys.executable, "-c", holder_script],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        # Give holder time to acquire lock
-        import time
-
-        time.sleep(1)
+        holder = _start_lock_holder(tmp_path)
 
         # Send SIGKILL
         holder.kill()
-        holder.wait()
+        holder.wait(timeout=5)
 
         # Next subprocess should be able to acquire lock
         next_script = f"""

@@ -9,7 +9,6 @@ import torch
 import torch.nn.functional as functional
 import yaml
 
-from solar.graph import extraction
 from solar.analysis.graph_analyzer import EinsumGraphAnalyzer
 from solar.einsum.conversion import convert_operator_graph
 from solar.graph.extraction import extract_operator_graph
@@ -193,7 +192,6 @@ def test_cpu_pipeline_preserves_reference_semantics(
     torch.testing.assert_close(actual, reference(*inputs), equal_nan=True)
     assert sorted(graph["source_input_indices"]) == sorted(operator.used_source_indices)
     assert graph["outputs"]
-    assert (output / "af_einsum_graph.yaml").is_file()
     analysis = EinsumGraphAnalyzer().analyze_graph(
         converted.path,
         output / "analysis",
@@ -252,25 +250,21 @@ def test_extraction_rejects_non_tensor_reference_output(tmp_path: Path) -> None:
         )
 
 
-def test_make_fx_fallback_preserves_explicit_backward_reference(
-    tmp_path: Path, monkeypatch
+def test_canonical_extraction_preserves_explicit_backward_reference(
+    tmp_path: Path,
 ) -> None:
-    def fail_torchview(*_args, **_kwargs):
-        raise RuntimeError("torchview cannot trace backward")
-
     def reference(value: torch.Tensor, grad_output: torch.Tensor):
         tracked = value.clone().detach().requires_grad_()
         (tracked.square()).backward(grad_output)
         return tracked.grad
 
-    monkeypatch.setattr(extraction, "draw_graph_with_verified_coverage", fail_torchview)
     inputs = (torch.arange(4.0), torch.ones(4))
     operator = extract_operator_graph(
         reference,
         inputs,
         device="cpu",
         output_dir=tmp_path,
-        name="backward-fallback",
+        name="backward-reference",
     )
     converted = convert_operator_graph(operator, output_dir=tmp_path)
     graph = yaml.safe_load(converted.path.read_text())

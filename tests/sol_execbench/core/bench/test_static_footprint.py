@@ -100,7 +100,7 @@ def test_extractor_collects_footprint_without_downgrading_base_status(tmp_path):
     from sol_execbench.core.bench.static_kernel.extractors import (
         run_static_kernel_extractors,
     )
-    from sol_execbench.core.platform.environment import ProbeCompletedProcess
+    from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
     shared_object = tmp_path / "k.so"
     shared_object.write_bytes(b"\x7fELF dummy")
@@ -152,7 +152,7 @@ def test_extractor_skips_footprint_when_roc_objdump_missing(tmp_path):
     from sol_execbench.core.bench.static_kernel.extractors import (
         run_static_kernel_extractors,
     )
-    from sol_execbench.core.platform.environment import ProbeCompletedProcess
+    from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
     shared_object = tmp_path / "k.so"
     shared_object.write_bytes(b"\x7fELF dummy")

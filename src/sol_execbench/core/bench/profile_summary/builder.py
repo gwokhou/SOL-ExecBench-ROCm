@@ -7,20 +7,22 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sol_execbench.core.bench.diagnostic_sidecar import compact_path
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticIdentity,
+    DiagnosticSidecarStatus,
+    SizedDiagnosticArtifactCitation,
+    compact_path,
+)
 from sol_execbench.core.bench.profile_summary.artifacts import (
     structured_profile_evidence,
 )
 from sol_execbench.core.bench.profile_summary.models import (
-    ProfileSummaryArtifactCitation,
     ProfileSummaryContent,
     ProfileSummaryMetric,
 )
 from sol_execbench.core.bench.profile_summary.sidecar_models import (
-    ProfileSummaryIdentity,
     ProfileSummaryReasonCode,
     ProfileSummarySidecar,
-    ProfileSummaryStatus,
 )
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ArtifactCoverageStatus,
@@ -38,7 +40,7 @@ def build_profile_summary_sidecar(
     run_id: str | None = None,
     sol_version: str | None = None,
     generated_at: str | None = None,
-    artifact_citations: Sequence[ProfileSummaryArtifactCitation] = (),
+    artifact_citations: Sequence[SizedDiagnosticArtifactCitation] = (),
 ) -> ProfileSummarySidecar:
     """Build a bounded diagnostic profile summary from rocprofv3 metadata."""
 
@@ -47,7 +49,7 @@ def build_profile_summary_sidecar(
     return ProfileSummarySidecar(
         status=status,
         reason_code=reason_code,
-        identity=ProfileSummaryIdentity(
+        identity=DiagnosticIdentity(
             generated_at=generated_at or utc_timestamp(),
             sol_version=sol_version or SOL_EXECBENCH_RELEASE,
             trace_path=compact_path(trace_path),
@@ -61,38 +63,38 @@ def build_profile_summary_sidecar(
 
 def _status_for_profile_result(
     profile_result: Rocprofv3ProfileResult | None,
-) -> ProfileSummaryStatus:
+) -> DiagnosticSidecarStatus:
     if profile_result is None:
-        return ProfileSummaryStatus.UNAVAILABLE
+        return DiagnosticSidecarStatus.UNAVAILABLE
     if (
         profile_result.status is Rocprofv3ProfileStatus.SUCCESS
         and profile_result.has_profiler_data
     ):
-        return ProfileSummaryStatus.AVAILABLE
+        return DiagnosticSidecarStatus.AVAILABLE
     if profile_result.status in {
         Rocprofv3ProfileStatus.SUCCESS,
         Rocprofv3ProfileStatus.PARTIAL,
     }:
         # Successful process execution without profiler data is partial diagnostics,
         # not missing and not full profile availability.
-        return ProfileSummaryStatus.PARTIAL
+        return DiagnosticSidecarStatus.PARTIAL
     if profile_result.status in {
         Rocprofv3ProfileStatus.FAILED,
         Rocprofv3ProfileStatus.UNAVAILABLE,
     }:
-        return ProfileSummaryStatus.PARTIAL
-    return ProfileSummaryStatus.UNAVAILABLE
+        return DiagnosticSidecarStatus.PARTIAL
+    return DiagnosticSidecarStatus.UNAVAILABLE
 
 
 def _reason_code_for_profile_result(
     profile_result: Rocprofv3ProfileResult | None,
-    status: ProfileSummaryStatus,
+    status: DiagnosticSidecarStatus,
 ) -> ProfileSummaryReasonCode:
     if profile_result is None:
         return ProfileSummaryReasonCode.NO_PROFILE_RESULT
-    if status == ProfileSummaryStatus.AVAILABLE:
+    if status == DiagnosticSidecarStatus.AVAILABLE:
         return ProfileSummaryReasonCode.PROFILE_SUMMARY_GENERATED
-    if status == ProfileSummaryStatus.PARTIAL:
+    if status == DiagnosticSidecarStatus.PARTIAL:
         return ProfileSummaryReasonCode.PROFILE_PARTIAL
     return ProfileSummaryReasonCode.PROFILE_UNAVAILABLE
 

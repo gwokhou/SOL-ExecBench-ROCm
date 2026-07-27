@@ -99,17 +99,9 @@ manifest and writes a content-addressed `matrix.jsonl` plus `summary.json`.
 Failures remain in the matrix with stable stage and reason codes; `--resume`
 continues only when all recorded identities and artifact hashes still match.
 
-Unknown operations fail closed during formal analysis. Offline learning writes
-a verified but untrusted candidate outside the formal lookup table:
-
-```bash
-OPENAI_API_KEY=... uv run sol-execbench solar learn-handler OP sample-node.yaml \
-  --output out/handler-candidates/OP
-```
-
-Formal use remains forbidden until the generated source and proofs are reviewed
-and committed under `src/solar/handlers/` with an approved formal-review record
-and matching source SHA-256.
+Graph extraction emits one exact `make_fx` ATen schema. Unsupported tracing,
+execution, or resource-accounting operations fail closed; there is no generated
+handler or alternate conversion path in formal analysis.
 
 ## Official score
 

@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import ctypes.util
 import subprocess
+from pathlib import Path
 
 import pytest
 
-from sol_execbench.core.platform.diagnostics import rocm_library_diagnostics
+from sol_execbench.core.platform.runtime import rocm_search_roots
 
 pytestmark = [
     pytest.mark.docker_dependency,
@@ -44,13 +45,22 @@ def test_selected_rocm_libraries_available():
         assert resolved, f"Missing ROCm library: {name}"
 
 
-def test_rocm_library_example_dependencies_available():
-    diagnostics = rocm_library_diagnostics()
-    missing = [
-        diagnostic.format()
-        for diagnostic in diagnostics
-        if diagnostic.status != "available"
+@pytest.mark.parametrize(
+    "header",
+    (
+        "hipblas/hipblas.h",
+        "miopen/miopen.h",
+        "ck/ck.hpp",
+        "rocwmma/rocwmma.hpp",
+    ),
+)
+def test_rocm_example_headers_available(header: str):
+    candidates = [
+        candidate
+        for root in rocm_search_roots()
+        for candidate in (root / "include" / header, root / header)
     ]
-    assert not missing, "Missing ROCm library example dependencies:\n" + "\n".join(
-        missing
+
+    assert any(Path(candidate).is_file() for candidate in candidates), (
+        f"Missing ROCm header: {header}"
     )

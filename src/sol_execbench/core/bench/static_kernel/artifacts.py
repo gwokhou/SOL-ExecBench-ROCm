@@ -210,7 +210,7 @@ def _artifact_manifest_source_references(
     return [
         StaticKernelEvidenceSourceReference(
             kind="artifact_manifest",
-            value=_relative_path_string(artifact_manifest_path, sidecar_base),
+            value=display_artifact_path(artifact_manifest_path, sidecar_base),
             description="Build artifact manifest used to select current-build static artifacts.",
         )
     ]
@@ -236,9 +236,9 @@ def _persist_static_artifact(
         status=StaticKernelEvidenceStatus.COLLECTED,
         reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
         source_path=source_relative_path.as_posix(),
-        persisted_path=_relative_path_string(persisted_path, sidecar_base),
+        persisted_path=display_artifact_path(persisted_path, sidecar_base),
         size_bytes=persisted_path.stat().st_size,
-        sha256=_sha256_file(persisted_path),
+        sha256=sha256_file(persisted_path),
         producer=producer,
         target_architecture=target_architecture,
         inspectable=_is_inspectable_artifact(source_path),
@@ -290,15 +290,12 @@ def _artifact_id(relative_path: Path) -> str:
     return f"artifact-{normalized}"
 
 
-def _relative_path_string(path: Path, base: Path) -> str:
+def display_artifact_path(path: Path, base: Path) -> str:
+    """Return a relative path when possible, otherwise a resolved path."""
     try:
         return path.resolve().relative_to(base).as_posix()
     except ValueError:
         return path.resolve().as_posix()
-
-
-def _sha256_file(path: Path) -> str:
-    return sha256_file(path)
 
 
 def _is_inspectable_artifact(path: Path) -> bool:

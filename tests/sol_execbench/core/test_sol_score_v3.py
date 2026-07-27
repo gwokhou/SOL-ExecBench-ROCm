@@ -91,7 +91,11 @@ def test_machine_readable_contract_publishes_the_implemented_formula():
     contract = build_evaluator_contract()
 
     assert contract.scoring["formula"] == ("1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))")
-    assert contract.scoring["scorer_implemented"] is True
+    assert contract.scoring["official_verifier_available"] is True
+    assert contract.scoring["official_policy_source"] == "pinned_corpus_manifest"
+    assert contract.scoring["official_producer_gate"] == (
+        "reviewed_orojenesis_mapper_allowlist"
+    )
     assert contract.capabilities["corpus.construction"] == (
         "aka_derived_authored_problem_set"
     )

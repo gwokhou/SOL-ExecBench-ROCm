@@ -10,6 +10,7 @@ import shutil
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from ..process.subprocesses import run_bounded_probe
 from .arch_capabilities import (
     ArchCapabilityBudgetStatus,
     derive_arch_capability_budget,
@@ -26,7 +27,7 @@ from .environment_models import (
     ToolProbeResult,
     Which,
 )
-from .environment_probes import collect_pytorch_rocm_summary, probe_tool, run_probe
+from .environment_probes import collect_pytorch_rocm_summary, probe_tool
 from .runtime import detect_rocm_version
 
 
@@ -40,7 +41,7 @@ def collect_environment_snapshot(
 ) -> EnvironmentSnapshot:
     """Collect optional ROCm environment evidence."""
 
-    effective_runner = runner or run_probe
+    effective_runner = runner or run_bounded_probe
     generated_at = (now or (lambda: datetime.now(UTC)))().isoformat()
     tools = {
         "amd-smi": probe_tool(

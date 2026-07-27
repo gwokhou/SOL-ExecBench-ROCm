@@ -259,13 +259,25 @@ def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
 def test_official_score_reports_published_policy_without_accepting_raw_inputs():
     report = official_score_availability(MANIFEST)
 
-    assert report["status"] == AkaOfficialScoringStatus.AVAILABLE
-    assert report["manifest_status"] == AkaOfficialScoringStatus.AVAILABLE
-    assert report["scorer_implemented"] is True
-    assert report["accepts_caller_authored_inputs"] is False
-    assert report["requires_signatures"] is False
-    assert report["accepts_content_addressed_release_bundle"] is True
-    assert AkaRequiredEvidenceKind.RELEASE_BASELINE in report["required_evidence"]
+    assert report["policy"]["authorized"] is True
+    assert report["policy"]["manifest_status"] == AkaOfficialScoringStatus.AVAILABLE
+    assert report["verifier"]["available"] is True
+    assert report["verifier"]["accepts_caller_authored_inputs"] is False
+    assert report["verifier"]["requires_signatures"] is False
+    assert report["verifier"]["accepts_content_addressed_release_bundle"] is True
+    assert report["producer"] == {
+        "ready": False,
+        "reason_code": "formal_mapper_not_allowlisted",
+    }
+    assert report["published_release"] == {
+        "available": False,
+        "reason_code": "repository_release_not_published",
+        "path": None,
+    }
+    assert (
+        AkaRequiredEvidenceKind.RELEASE_BASELINE
+        in report["policy"]["required_evidence"]
+    )
 
 
 def test_audit_rejects_incomplete_local_problem_inventory(tmp_path):

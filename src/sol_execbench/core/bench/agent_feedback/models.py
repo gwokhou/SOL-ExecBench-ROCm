@@ -6,15 +6,15 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
 
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
-    DiagnosticFreshnessStatus,
-    DiagnosticGovernanceStatus,
-    DiagnosticSidecarAuthority,
+    DiagnosticArtifactCitation,
+    DiagnosticSidecarEnvelope,
     DiagnosticSidecarStatus,
+    DiagnosticSourceRef,
+    ExtendedDiagnosticIdentity,
 )
 from sol_execbench.core.bench.rocm_profiler.models import Rocprofv3ProfileStatus
 from sol_execbench.core.bench.static_kernel.evidence_models import (
@@ -27,11 +27,6 @@ from sol_execbench.core.integrity.schema_versions import (
 )
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
-
-# Public compatibility names for this sidecar's contract vocabulary.
-AgentFeedbackStatus = DiagnosticSidecarStatus
-AgentFeedbackFreshnessStatus = DiagnosticFreshnessStatus
-AgentFeedbackGovernanceStatus = DiagnosticGovernanceStatus
 
 
 class AgentFeedbackReasonCode(StrEnum):
@@ -63,77 +58,6 @@ class AgentFeedbackBottleneck(StrEnum):
     REFERENCE_FAILURE = "reference_failure"
 
 
-class AgentFeedbackSourceRef(BaseModelWithDocstrings):
-    """Compact reference to source evidence used by the feedback sidecar."""
-
-    model_config = _MODEL_CONFIG
-
-    kind: str
-    """Evidence kind such as trace, profile, or static_evidence."""
-    label: str
-    """Stable compact label for the evidence source."""
-    status: str | None = None
-    """Optional source status."""
-
-
-class AgentFeedbackArtifactCitation(BaseModelWithDocstrings):
-    """Compact sidecar artifact citation."""
-
-    model_config = _MODEL_CONFIG
-
-    kind: str
-    """Artifact kind such as trace, profile, or static_evidence."""
-    label: str
-    """Compact artifact label."""
-    path: str | None = None
-    """Compact path, normally a file name or relative path."""
-    sha256: str | None = None
-    """Artifact checksum when available."""
-    status: str | None = None
-    """Optional source status."""
-
-
-class AgentFeedbackIdentity(BaseModelWithDocstrings):
-    """Freshness identity for a generated feedback sidecar."""
-
-    model_config = _MODEL_CONFIG
-
-    generated_at: str
-    """UTC timestamp when the sidecar was generated."""
-    sol_version: str
-    """Producer/runtime SOL version or HIP-facing supported SOL tag."""
-    trace_path: str | None = None
-    """Compact trace path or file name when available."""
-    target_id: str | None = None
-    """Optional target/run denominator identity."""
-    run_id: str | None = None
-    """Optional run identity."""
-    candidate_id: str | None = None
-    """Canonical candidate identity."""
-    source_sha256: str | None = None
-    """Canonical source-content SHA256 identity."""
-
-
-class AgentFeedbackFreshnessValidation(BaseModelWithDocstrings):
-    """Result of validating sidecar freshness identity."""
-
-    model_config = _MODEL_CONFIG
-
-    status: AgentFeedbackFreshnessStatus
-    """Freshness result."""
-    reason_codes: list[str] = Field(default_factory=list)
-    """Stable reason codes explaining stale or unknown status."""
-
-
-class AgentFeedbackGovernanceGuardrail(DiagnosticSidecarAuthority):
-    """Authority boundary after optional sidecar governance checks."""
-
-    status: AgentFeedbackGovernanceStatus
-    """Diagnostic governance status."""
-    reason_codes: list[str] = Field(default_factory=list)
-    """Stable reason codes for unavailable, stale, or invalid states."""
-
-
 class AgentFeedbackItem(BaseModelWithDocstrings):
     """One prompt-safe feedback item."""
 
@@ -149,7 +73,7 @@ class AgentFeedbackItem(BaseModelWithDocstrings):
     """Bounded diagnostic message."""
     recommendation: str | None = None
     """Bounded next-experiment recommendation."""
-    source_refs: list[AgentFeedbackSourceRef] = Field(default_factory=list)
+    source_refs: list[DiagnosticSourceRef] = Field(default_factory=list)
     """Compact source references supporting this item."""
 
 
@@ -170,23 +94,20 @@ class AgentFeedbackSummary(BaseModelWithDocstrings):
     """Optional static evidence sidecar status."""
 
 
-class AgentFeedbackSidecar(BaseModelWithDocstrings):
+class AgentFeedbackSidecar(DiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for agent next-experiment guidance."""
 
     model_config = _MODEL_CONFIG
 
     schema_version: AgentFeedbackSchemaVersion = AGENT_FEEDBACK_SCHEMA_VERSION
-    status: AgentFeedbackStatus
+    status: DiagnosticSidecarStatus
     reason_code: AgentFeedbackReasonCode
-    identity: AgentFeedbackIdentity
-    authority: Literal["diagnostic"] = "diagnostic"
+    identity: ExtendedDiagnosticIdentity
     summary: AgentFeedbackSummary
     items: list[AgentFeedbackItem] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
-    source_refs: list[AgentFeedbackSourceRef] = Field(default_factory=list)
-    artifact_citations: list[AgentFeedbackArtifactCitation] = Field(
-        default_factory=list
-    )
+    source_refs: list[DiagnosticSourceRef] = Field(default_factory=list)
+    artifact_citations: list[DiagnosticArtifactCitation] = Field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible sidecar payload."""

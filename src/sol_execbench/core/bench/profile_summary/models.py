@@ -124,25 +124,6 @@ class ProfileSummaryBottleneckHint(BaseModelWithDocstrings):
     """Compact artifact labels supporting the hint."""
 
 
-class ProfileSummaryArtifactCitation(BaseModelWithDocstrings):
-    """Compact profile-summary artifact citation."""
-
-    model_config = _MODEL_CONFIG
-
-    kind: str
-    """Artifact kind such as trace, profile_metadata, or profiler_artifact."""
-    label: str
-    """Compact artifact label."""
-    path: str | None = None
-    """Compact path, normally a file name."""
-    sha256: str | None = None
-    """Artifact checksum when available."""
-    status: str | None = None
-    """Optional artifact status."""
-    size_bytes: int | None = Field(default=None, ge=0)
-    """Artifact size in bytes when available."""
-
-
 class ProfileSummaryContent(BaseModelWithDocstrings):
     """Compact normalized profiler metadata summary."""
 

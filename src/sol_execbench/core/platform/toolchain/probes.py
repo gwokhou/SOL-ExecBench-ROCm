@@ -8,7 +8,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 
-from ..environment import ProbeCompletedProcess
+from ...process.subprocesses import run_bounded_probe
 from ..runtime import resolve_tool_path
 from ...text_utils import text_tail
 from .models import (
@@ -41,7 +41,7 @@ def probe_toolchain_tool(
             timeout_seconds=timeout_seconds,
         )
     effective_command = [path, *command[1:]]
-    effective_runner = runner or run_probe
+    effective_runner = runner or run_bounded_probe
     try:
         completed = effective_runner(effective_command, timeout_seconds)
     except subprocess.TimeoutExpired as exc:
@@ -77,19 +77,4 @@ def probe_toolchain_tool(
         stdout_tail=text_tail(completed.stdout),
         stderr_tail=text_tail(completed.stderr),
         timeout_seconds=timeout_seconds,
-    )
-
-
-def run_probe(command: list[str], timeout_seconds: float) -> ProbeCompletedProcess:
-    completed = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-    )
-    return ProbeCompletedProcess(
-        returncode=completed.returncode,
-        stdout=completed.stdout or "",
-        stderr=completed.stderr or "",
     )

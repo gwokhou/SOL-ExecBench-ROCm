@@ -17,7 +17,7 @@ ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
     "sol_execbench.environment_diagnostics.v1"
 )
 ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION: Final = "sol_execbench.environment_snapshot.v2"
-EVALUATOR_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.evaluator_contract.v3"
+EVALUATOR_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.evaluator_contract.v4"
 ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION: Final = (
     "sol_execbench.rocm_compatibility_matrix.v1"
 )
@@ -65,7 +65,7 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "evaluator_contract": EVALUATOR_CONTRACT_SCHEMA_VERSION,
     "gpu_device_isolation": "sol_execbench.gpu_device_isolation.v1",
     "no_trace_diagnostics": "sol_execbench.no_trace_diagnostics.v1",
-    "official_score_availability": "sol_execbench.official_score_availability.v2",
+    "official_score_availability": "sol_execbench.official_score_availability.v3",
     "pid_lock_contention": "sol_execbench.pid_lock_contention.v1",
     "reference_ipc": "sol_execbench.reference_ipc.v1",
     "rocm_compatibility_matrix": ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,

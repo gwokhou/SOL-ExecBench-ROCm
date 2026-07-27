@@ -14,10 +14,22 @@ import pytest
 from sol_execbench.core.process import subprocesses
 from sol_execbench.core.process.subprocesses import (
     run_attached_process_group,
+    run_bounded_probe,
     run_in_process_group,
     run_in_process_group_bounded,
     run_in_process_group_to_files,
 )
+
+
+def test_bounded_probe_returns_the_shared_injectable_result() -> None:
+    result = run_bounded_probe(
+        [sys.executable, "-c", "print('probe')"],
+        2,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == "probe\n"
+    assert result.stderr == ""
 
 
 def test_attached_process_group_returns_child_status(tmp_path):

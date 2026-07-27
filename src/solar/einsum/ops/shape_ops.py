@@ -94,9 +94,9 @@ class TensorManipulationHandler(EinsumOpHandler):
     }
 
     # Operations that reorder dimensions (same ranks, different order)
-    # torchview records the Tensor.T descriptor as ``__get__``.  It carries
-    # one tensor argument and reverses the dimensions, including for square
-    # matrices where shape equality alone cannot reveal the transpose.
+    # Tensor.T carries one tensor argument and reverses the dimensions,
+    # including for square matrices where shape equality alone cannot reveal
+    # the transpose.
     TRANSPOSE_OPS = {"transpose", "permute", "t", "__get__", "contiguous"}
 
     supported_ops = list(RESHAPE_OPS | TRANSPOSE_OPS)

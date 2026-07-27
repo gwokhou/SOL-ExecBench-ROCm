@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -241,3 +243,22 @@ def test_runtime_evidence_cli_rejects_invalid_boolean(tmp_path, capsys) -> None:
         )
 
     assert "expected boolean value" in capsys.readouterr().err
+
+
+def test_runtime_evidence_module_entrypoint_exposes_cli_help() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "sol_execbench.core.evidence.runtime_evidence",
+            "--help",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "collect-target" in result.stdout
+    assert "aggregate" in result.stdout

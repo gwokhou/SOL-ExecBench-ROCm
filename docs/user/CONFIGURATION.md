@@ -129,10 +129,8 @@ trace seed. A failed or interrupted run can be checked and continued with
 `--resume`; existing identities and artifact hashes must still match.
 Concurrent writers to the same audit root are rejected before GPU work starts.
 
-`solar learn-handler` is an offline candidate-generation workflow. Its output
-is forbidden in formal analysis until reviewed and committed under
-`src/solar/handlers` with `verification: passed`, `formal_review: approved`, and
-matching source SHA-256 metadata.
+SOLAR graph extraction uses one exact `make_fx` ATen path. Operations without
+complete tracing, replay, and resource-model support fail closed.
 
 ## Official score
 
@@ -164,7 +162,6 @@ uv run sol-execbench --format json score official RELEASE/release-bundle.json
 | `SOLEXECBENCH_ENV_SNAPSHOT` | write an environment sidecar when set to `1` |
 | `SOLEXECBENCH_ENV_SNAPSHOT_PATH` | explicit environment sidecar path |
 | `SOLAR_OROJENESIS_HOME` | default Orojenesis toolchain directory |
-| `OPENAI_API_KEY` | optional offline handler-learning client credential |
 | `SOL_EXECBENCH_AMD_ISA_CACHE` | static ISA tool/spec cache |
 | `SOL_EXECBENCH_AMD_ISA_OFFLINE` | forbid static ISA downloads when `1` |
 | `HIP_VISIBLE_DEVICES`, `ROCR_VISIBLE_DEVICES` | ROCm device visibility |

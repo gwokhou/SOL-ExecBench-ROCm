@@ -10,6 +10,7 @@ from typing import Annotated, Literal
 
 from pydantic import BeforeValidator, ConfigDict, Field
 
+from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarAuthority
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import (
     STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
@@ -131,7 +132,7 @@ class StaticResourceFootprintIdentity(BaseModelWithDocstrings):
     """UTC timestamp when the footprint was generated, when available."""
 
 
-class StaticResourceFootprint(BaseModelWithDocstrings):
+class StaticResourceFootprint(DiagnosticSidecarAuthority):
     """Per-kernel resource footprint derived from routed static extractors."""
 
     model_config = _STATIC_MODEL_CONFIG
@@ -156,20 +157,6 @@ class StaticResourceFootprint(BaseModelWithDocstrings):
     """Tool that produced this footprint, such as ``roc-objdump``."""
     source_confidence: str | None = None
     """Confidence of the footprint values when known."""
-    diagnostic_only: Literal[True] = True
-    """Resource footprint is diagnostic metadata only."""
-    correctness_authority: Literal[False] = False
-    """Resource footprint never proves correctness."""
-    performance_authority: Literal[False] = False
-    """Resource footprint never proves performance."""
-    timing_authority: Literal[False] = False
-    """Resource footprint never proves benchmark timing."""
-    score_authority: Literal[False] = False
-    """Resource footprint never proves score validity."""
-    paper_parity_authority: Literal[False] = False
-    """Resource footprint never proves paper parity."""
-    leaderboard_authority: Literal[False] = False
-    """Resource footprint never proves leaderboard readiness."""
     source_references: list[StaticKernelEvidenceSourceReference] = Field(
         default_factory=list
     )
@@ -286,7 +273,7 @@ class StaticKernelEvidenceToolRun(BaseModelWithDocstrings):
     """Sidecar-relative bounded raw output artifact path when preserved."""
 
 
-class StaticKernelEvidenceSidecar(BaseModelWithDocstrings):
+class StaticKernelEvidenceSidecar(DiagnosticSidecarAuthority):
     """Strict diagnostic-only static kernel evidence sidecar."""
 
     model_config = _STATIC_MODEL_CONFIG
@@ -299,20 +286,6 @@ class StaticKernelEvidenceSidecar(BaseModelWithDocstrings):
     """Aggregate static evidence status."""
     reason_code: StaticKernelEvidenceReasonCodeField
     """Aggregate reason code."""
-    diagnostic_only: Literal[True] = True
-    """Static evidence is diagnostic metadata only."""
-    correctness_authority: Literal[False] = False
-    """Static evidence never proves correctness."""
-    performance_authority: Literal[False] = False
-    """Static evidence never proves performance."""
-    timing_authority: Literal[False] = False
-    """Static evidence never proves benchmark timing."""
-    score_authority: Literal[False] = False
-    """Static evidence never proves score validity."""
-    paper_parity_authority: Literal[False] = False
-    """Static evidence never proves paper parity."""
-    leaderboard_authority: Literal[False] = False
-    """Static evidence never proves leaderboard readiness."""
     classification: StaticKernelEvidenceClassification = Field(
         default_factory=StaticKernelEvidenceClassification
     )

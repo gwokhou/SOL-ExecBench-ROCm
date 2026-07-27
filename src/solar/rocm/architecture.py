@@ -15,7 +15,6 @@ from typing import Any, Mapping, cast
 import yaml
 
 from solar.common.constants import normalize_dtype
-from solar.common.integrity import sha256_file
 from solar.rocm.audit_validation import (
     audit_mapping as _audit_mapping,
     audit_nonnegative_int as _audit_nonnegative_int,
@@ -86,7 +85,9 @@ def verify_resource_peak_audit(
         raise ValueError(f"architecture audit evidence file is missing: {path}")
     if path.stat().st_size > _MAX_AUDIT_BYTES:
         raise ValueError("architecture audit evidence exceeds the size limit")
-    if sha256_file(path) != expected_sha256:
+    with path.open("rb") as audit:
+        observed_sha256 = hashlib.file_digest(audit, "sha256").hexdigest()
+    if observed_sha256 != expected_sha256:
         raise ValueError("architecture audit evidence identity mismatch")
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))

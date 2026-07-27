@@ -10,8 +10,8 @@ from pathlib import Path
 
 from rich.console import Console
 
+from ...core.bench.diagnostic_sidecar import SizedDiagnosticArtifactCitation
 from ...core.bench.profile_summary import (
-    ProfileSummaryArtifactCitation,
     build_profile_summary_sidecar,
     profile_summary_artifact_citation_from_path,
 )
@@ -115,7 +115,7 @@ def _profile_summary_artifact_citations(
     profile_result: Rocprofv3ProfileResult | None,
     profile_sidecar_path: Path | None,
     trace_sha256: str | None = None,
-) -> list[ProfileSummaryArtifactCitation]:
+) -> list[SizedDiagnosticArtifactCitation]:
     """Return compact citations for profile-summary evidence inputs."""
 
     citations = [

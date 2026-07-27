@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from sol_execbench.core.bench.profile_summary import (
-    ProfileSummaryArtifactCitation as FacadeArtifactCitation,
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    SizedDiagnosticArtifactCitation,
 )
 from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryBottleneckHint as FacadeBottleneckHint,
@@ -22,7 +22,6 @@ from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryStructuredMetric as FacadeStructuredMetric,
 )
 from sol_execbench.core.bench.profile_summary.models import (
-    ProfileSummaryArtifactCitation,
     ProfileSummaryBottleneckHint,
     ProfileSummaryContent,
     ProfileSummaryHintCategory,
@@ -39,7 +38,6 @@ def test_profile_summary_model_names_remain_reexported_from_facade() -> None:
     assert FacadeStructuredMetric is ProfileSummaryStructuredMetric
     assert FacadeKernelMetric is ProfileSummaryKernelMetric
     assert FacadeBottleneckHint is ProfileSummaryBottleneckHint
-    assert FacadeArtifactCitation is ProfileSummaryArtifactCitation
     assert FacadeContent is ProfileSummaryContent
 
 
@@ -87,7 +85,7 @@ def test_profile_summary_model_names_remain_reexported_from_facade() -> None:
             "message",
         ),
         (
-            ProfileSummaryArtifactCitation,
+            SizedDiagnosticArtifactCitation,
             {
                 "kind": "trace",
                 "label": "trace.csv",

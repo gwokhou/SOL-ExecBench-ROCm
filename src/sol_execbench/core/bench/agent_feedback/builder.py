@@ -11,15 +11,17 @@ from dataclasses import dataclass
 
 from sol_execbench.core.bench.agent_feedback.items import trace_feedback_items
 from sol_execbench.core.bench.agent_feedback.models import (
-    AgentFeedbackArtifactCitation,
-    AgentFeedbackIdentity,
     AgentFeedbackReasonCode,
     AgentFeedbackSidecar,
-    AgentFeedbackSourceRef,
-    AgentFeedbackStatus,
     AgentFeedbackSummary,
 )
-from sol_execbench.core.bench.diagnostic_sidecar import compact_path
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticArtifactCitation,
+    DiagnosticSidecarStatus,
+    DiagnosticSourceRef,
+    ExtendedDiagnosticIdentity,
+    compact_path,
+)
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
@@ -54,7 +56,7 @@ class AgentFeedbackBuildRequest:
     profile_result: Rocprofv3ProfileResult | None = None
     static_evidence: StaticKernelEvidenceSidecar | None = None
     identity: AgentFeedbackBuildIdentity = AgentFeedbackBuildIdentity()
-    artifact_citations: Sequence[AgentFeedbackArtifactCitation] = ()
+    artifact_citations: Sequence[DiagnosticArtifactCitation] = ()
 
 
 def build_agent_feedback_sidecar(
@@ -75,7 +77,7 @@ def build_agent_feedback_sidecar(
         if not evaluated
         else (
             AgentFeedbackReasonCode.PARTIAL_DIAGNOSTICS
-            if status == AgentFeedbackStatus.PARTIAL
+            if status == DiagnosticSidecarStatus.PARTIAL
             else AgentFeedbackReasonCode.FEEDBACK_GENERATED
         )
     )
@@ -83,7 +85,7 @@ def build_agent_feedback_sidecar(
     return AgentFeedbackSidecar(
         status=status,
         reason_code=reason_code,
-        identity=AgentFeedbackIdentity(
+        identity=ExtendedDiagnosticIdentity(
             generated_at=identity.generated_at or utc_timestamp(),
             sol_version=identity.sol_version or SOL_EXECBENCH_RELEASE,
             trace_path=compact_path(identity.trace_path),
@@ -114,9 +116,9 @@ def _aggregate_status(
     traces: Sequence[Trace],
     profile_result: Rocprofv3ProfileResult | None,
     static_evidence: StaticKernelEvidenceSidecar | None,
-) -> AgentFeedbackStatus:
+) -> DiagnosticSidecarStatus:
     if not traces:
-        return AgentFeedbackStatus.UNAVAILABLE
+        return DiagnosticSidecarStatus.UNAVAILABLE
     optional_unavailable = (
         profile_result is not None
         and profile_result.status is not Rocprofv3ProfileStatus.SUCCESS
@@ -129,18 +131,18 @@ def _aggregate_status(
         }
     )
     if optional_unavailable:
-        return AgentFeedbackStatus.PARTIAL
-    return AgentFeedbackStatus.AVAILABLE
+        return DiagnosticSidecarStatus.PARTIAL
+    return DiagnosticSidecarStatus.AVAILABLE
 
 
 def _source_refs(
     profile_result: Rocprofv3ProfileResult | None,
     static_evidence: StaticKernelEvidenceSidecar | None,
-) -> list[AgentFeedbackSourceRef]:
-    refs = [AgentFeedbackSourceRef(kind="trace", label="canonical_trace_jsonl")]
+) -> list[DiagnosticSourceRef]:
+    refs = [DiagnosticSourceRef(kind="trace", label="canonical_trace_jsonl")]
     if profile_result is not None:
         refs.append(
-            AgentFeedbackSourceRef(
+            DiagnosticSourceRef(
                 kind="profile",
                 label="rocprofv3_profile",
                 status=profile_result.status,
@@ -148,7 +150,7 @@ def _source_refs(
         )
     if static_evidence is not None:
         refs.append(
-            AgentFeedbackSourceRef(
+            DiagnosticSourceRef(
                 kind="static_evidence",
                 label="static_kernel_evidence",
                 status=static_evidence.status,

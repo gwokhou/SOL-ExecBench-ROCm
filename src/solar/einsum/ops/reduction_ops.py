@@ -93,8 +93,8 @@ class ReductionHandler(EinsumOpHandler):
 
         # Pass the observed output shape so the handler can distinguish the
         # binary elementwise overloads of min/max (`torch.min(x, other)`),
-        # which torchview labels as "min"/"max" but whose output rank matches
-        # the input, from the genuine reduce-all case. Without this, dims=None
+        # whose output rank matches the input, from the genuine reduce-all
+        # case. Without this, dims=None
         # would unconditionally collapse to a scalar — see kbl_l2/{83,93}.
         out_shape = tensor_shapes.outputs[0] if tensor_shapes.num_outputs > 0 else None
         return self._generate_reduction_einsum(

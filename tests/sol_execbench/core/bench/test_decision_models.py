@@ -6,25 +6,28 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from sol_execbench.core.bench.decision.decision_models import (
     DECISION_SCHEMA_VERSION,
     DecisionBottleneckClass,
     DecisionConfidence,
     DecisionHint,
-    DecisionIdentity,
     DecisionReasonCode,
     DecisionSidecar,
-    DecisionStatus,
     DecisionSummary,
+)
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticSidecarStatus,
+    ExtendedDiagnosticIdentity,
 )
 
 
 def _sidecar(**overrides) -> DecisionSidecar:
     sidecar = DecisionSidecar(
-        status=DecisionStatus.AVAILABLE,
+        status=DiagnosticSidecarStatus.AVAILABLE,
         reason_code=DecisionReasonCode.DECISION_RENDERED,
-        identity=DecisionIdentity(
+        identity=ExtendedDiagnosticIdentity(
             generated_at="2026-07-10T00:00:00Z", sol_version="v3.0.0"
         ),
         summary=DecisionSummary(hint_count=1, footprint_count=1, architecture="gfx942"),
@@ -60,16 +63,16 @@ def test_sidecar_round_trip():
 
 
 def test_sidecar_rejects_unknown_field():
-    with pytest.raises(Exception):
-        DecisionIdentity.model_validate(
+    with pytest.raises(ValidationError, match="bogus"):
+        ExtendedDiagnosticIdentity.model_validate(
             {"generated_at": "x", "sol_version": "y", "bogus": 1}
         )
 
 
 def test_sidecar_is_frozen():
     sidecar = _sidecar()
-    with pytest.raises(Exception):
-        sidecar.status = DecisionStatus.PARTIAL
+    with pytest.raises(ValidationError, match="frozen"):
+        setattr(sidecar, "status", DiagnosticSidecarStatus.PARTIAL)
 
 
 def test_bottleneck_class_is_closed_layer_r():

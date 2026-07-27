@@ -11,8 +11,8 @@ from sol_execbench.core.bench.agent_feedback.models import (
     AgentFeedbackBottleneck,
     AgentFeedbackItem,
     AgentFeedbackSeverity,
-    AgentFeedbackSourceRef,
 )
+from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSourceRef
 from sol_execbench.core.data.trace import EvaluationStatus
 
 
@@ -39,7 +39,7 @@ def trace_feedback_items(
                     "performance diagnosis."
                 ),
                 source_refs=[
-                    AgentFeedbackSourceRef(kind="trace", label="canonical_trace_jsonl")
+                    DiagnosticSourceRef(kind="trace", label="canonical_trace_jsonl")
                 ],
             )
         )
@@ -134,5 +134,5 @@ def _action_item(
     )
 
 
-def _trace_source_refs() -> list[AgentFeedbackSourceRef]:
-    return [AgentFeedbackSourceRef(kind="trace", label="canonical_trace_jsonl")]
+def _trace_source_refs() -> list[DiagnosticSourceRef]:
+    return [DiagnosticSourceRef(kind="trace", label="canonical_trace_jsonl")]

@@ -23,6 +23,13 @@ publisher release bundle that binds the canonical baseline run, candidate run,
 per-workload SOLAR manifests, public corpus, and architecture identities. It
 does not accept caller-supplied runtime JSON.
 
+`score status` reports four separate states instead of a single overloaded
+availability flag: verifier availability, corpus-policy authorization, formal
+producer readiness, and whether a repository release bundle is published. In
+the current tree the verifier and policy are ready, but the formal producer is
+blocked by the empty reviewed-mapper allowlist and no repository release bundle
+is published.
+
 ## SOLAR bound policy
 
 The paper (§4.2) treats Orojenesis as an optional tighter-bound path that
