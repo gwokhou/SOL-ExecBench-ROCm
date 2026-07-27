@@ -20,6 +20,7 @@ from solar.analysis.graph_models import (
 from solar.analysis.resources import RESOURCE_MODEL_VERSION
 from solar.common.types import NodeDict
 from solar.common.utils import NoAliasDumper
+from solar.contracts import FORMAL_BOUND_KIND, ROOFLINE_BOUND_KIND
 from solar.rocm.architecture import ArchitectureProfile
 from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
 
@@ -30,6 +31,9 @@ class PreparedAnalysisView(Protocol):
 
     @property
     def semantic_graph(self) -> bool: ...
+
+    @property
+    def semantic_complete(self) -> bool: ...
 
     @property
     def requested_precision(self) -> str: ...
@@ -122,9 +126,17 @@ def _analysis_metadata(
         "fusion": formal.fusion,
         "orojenesis": formal.orojenesis,
         "bound_kind": (
-            "capacity_constrained_tile_aware_v1"
-            if formal.formal_bound and prepared.profile is not None
-            else "diagnostic"
+            FORMAL_BOUND_KIND
+            if formal.tile_aware_bound and prepared.profile is not None
+            else (
+                ROOFLINE_BOUND_KIND
+                if (
+                    prepared.profile is not None
+                    and prepared.semantic_graph
+                    and prepared.semantic_complete
+                )
+                else "diagnostic"
+            )
         ),
         "architecture": (
             prepared.profile.to_dict() if prepared.profile is not None else None

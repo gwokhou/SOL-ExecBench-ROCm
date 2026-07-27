@@ -123,9 +123,11 @@ uv run sol-execbench solar analyze PROBLEM_DIR \
 The command reports the exact failed stage when architecture evidence,
 extraction, conversion, verification or formal analysis cannot complete. It
 publishes no partial output directory on failure. The CLI requires the
-capacity-constrained Orojenesis bound and cannot publish the diagnostic Eq. 1
-result accepted by the lower-level Python API. No reviewed mapper digest is
-currently allowlisted, so a locally self-declared toolchain fails closed.
+capacity-constrained Orojenesis bound and cannot publish the paper-valid
+`roofline_eq1_v1` result accepted by the lower-level Python API. This is an
+additional port release policy, not a requirement of the SOL-ExecBench paper.
+No reviewed mapper digest is currently allowlisted, so a locally self-declared
+toolchain fails closed.
 
 ## Docker
 

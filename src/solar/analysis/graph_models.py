@@ -148,7 +148,8 @@ class FusionPlan:
     fusion: NodeDict
     chains: list[list[str]]
     regions: list[NodeDict]
-    einsum_layers: dict[str, NodeDict]
+    proof_layers: dict[str, NodeDict]
+    unsupported_contraction_layers: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +158,7 @@ class FormalAnalysis:
     orojenesis: NodeDict
     audited_fused_bytes: float
     audited_prefetched_bytes: float
-    formal_bound: bool
+    tile_aware_bound: bool
 
 
 @dataclass(frozen=True, slots=True)

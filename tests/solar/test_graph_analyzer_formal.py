@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -89,7 +90,7 @@ def _formal_plan() -> tuple[FusionPlan, dict]:
         fusion={"regions": fusion_regions},
         chains=[["c0", "c1"]],
         regions=[region_problem],
-        einsum_layers=layers,
+        proof_layers=layers,
     )
     all_layers = {
         **layers,
@@ -103,7 +104,10 @@ class _FakeRunner:
     toolchain_identity: dict[str, str] | None = {"verification_mode": "fake"}
 
     @staticmethod
-    def _base(problem: dict, word_bits: int) -> dict:
+    def _base(problem: dict, word_bits: int, output_dir: Path) -> dict:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        raw = output_dir / "raw.csv"
+        raw.write_text("64,160\n256,80\n")
         return {
             "word_bits": word_bits,
             "problem": problem,
@@ -111,24 +115,27 @@ class _FakeRunner:
                 {"buffer_bytes": 64, "dram_bytes": 160.0},
                 {"buffer_bytes": 256, "dram_bytes": 80.0},
             ],
-            "evidence_files": {"raw": {"path": "raw.csv", "sha256": "digest"}},
+            "evidence_files": {
+                "raw": {
+                    "path": raw.name,
+                    "sha256": hashlib.sha256(raw.read_bytes()).hexdigest(),
+                }
+            },
         }
 
     def run_multi_chain(self, layers, output_dir, *, word_bits):
-        del output_dir
         descriptors = []
         dimensions = [(2, 3, 4), (2, 4, 5)]
         for (layer_id, _), (m, k, n) in zip(layers, dimensions):
             descriptors.append({"id": layer_id, "m": m, "k": k, "n": n})
-        return self._base({"chain": {"layers": descriptors}}, word_bits)
+        return self._base({"chain": {"layers": descriptors}}, word_bits, output_dir)
 
     def run_multi_region(self, problem, output_dir, *, word_bits):
-        del output_dir
-        return self._base(problem, word_bits)
+        return self._base(problem, word_bits, output_dir)
 
     def run_layer(self, layer, output_dir, *, word_bits):
-        del layer, output_dir
-        return self._base({}, word_bits)
+        del layer
+        return self._base({}, word_bits, output_dir)
 
 
 def _empty_orojenesis() -> dict:
@@ -187,6 +194,15 @@ def test_runner_evidence_and_audit_cover_chain_region_and_single(tmp_path: Path)
     assert evidence["layers"]["single"]["formal_applicability"]["applicable"]
     assert evidence["chains"]["chain_0"]["formal_applicability"]["applicable"]
     assert evidence["regions"]["region_0"]["formal_applicability"]["applicable"]
+
+    evidence["layers"]["single"]["evidence_files"]["raw"]["sha256"] = "0" * 64
+    _, missing_artifact_is_tile_aware = analyzer._audit_orojenesis_evidence(
+        plan,
+        evidence,
+        cast(_PreparedAnalysis, prepared),
+        audited_fused_bytes=48.0,
+    )
+    assert missing_artifact_is_tile_aware is False
 
 
 def test_evidence_selection_handles_no_cache_and_strict_capacity_failure():
@@ -274,6 +290,34 @@ def test_evidence_audits_fail_closed_on_mismatch():
         == []
     )
     assert not evidence["regions"]["bad"]["formal_applicability"]["applicable"]
+
+
+def test_tile_aware_bound_requires_complete_contraction_coverage(tmp_path: Path):
+    plan, all_layers = _formal_plan()
+    evidence = _empty_orojenesis()
+    evidence.update(
+        {
+            "status": "complete",
+            "toolchain": {"verification_mode": "fake"},
+        }
+    )
+    evidence["layers"]["single"] = {
+        "word_bits": 16,
+        "selected_capacity": {"point": {"dram_bytes": 80.0}},
+        "evidence_files": {"raw": {"path": "raw.csv", "sha256": "digest"}},
+    }
+    prepared = SimpleNamespace(all_layers=all_layers, output_dir=tmp_path)
+
+    audited, formal = EinsumGraphAnalyzer()._audit_orojenesis_evidence(
+        plan,
+        evidence,
+        cast(_PreparedAnalysis, prepared),
+        audited_fused_bytes=48.0,
+    )
+
+    assert audited >= 48.0
+    assert formal is False
+    assert evidence["formal_coverage"] == {"applicable_layers": 1, "total_layers": 5}
 
 
 class _Profile:

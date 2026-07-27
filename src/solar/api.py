@@ -25,6 +25,8 @@ from solar.analysis.graph_analyzer import (
 )
 from solar.contracts import (
     FORMAL_BOUND_KIND,
+    ROOFLINE_BOUND_KIND,
+    SOL_BOUND_KINDS,
     AnalysisFailure,
     AnalysisRequest,
     AnalysisResult,
@@ -153,8 +155,10 @@ def _extract_bound(
         raise ValueError("formal analysis lacks a finite lower bound")
     if require_orojenesis:
         if kind != FORMAL_BOUND_KIND:
-            raise ValueError(f"formal analysis returned non-formal bound kind {kind!r}")
-    elif kind not in (FORMAL_BOUND_KIND, "diagnostic"):
+            raise ValueError(
+                f"strict analysis returned non-tile-aware bound kind {kind!r}"
+            )
+    elif kind not in SOL_BOUND_KINDS:
         raise ValueError(f"analysis returned unsupported bound kind {kind!r}")
     resource = total.get("compute_resource")
     return SolBound(float(seconds), kind, str(resource) if resource else None)
@@ -221,6 +225,8 @@ __all__ = [
     "ConversionReadinessRequest",
     "ConversionReadinessResult",
     "FORMAL_BOUND_KIND",
+    "ROOFLINE_BOUND_KIND",
+    "SOL_BOUND_KINDS",
     "ReadinessArtifact",
     "ReadinessStage",
     "SolarAnalysisStatus",

@@ -15,6 +15,7 @@ from typing import Any
 
 import networkx as nx
 
+from solar.analysis.contraction_proofs import requires_tile_evidence
 from solar.common.constants import dtype_bytes
 from solar.einsum.semantics import validate_semantic_graph
 from solar.rocm.architecture import MemoryLevel
@@ -104,10 +105,7 @@ class FusionPlanner:
 
         parent = {node: node for node in dag.nodes}
         contractions = {
-            node: int(
-                (self.layers[node].get("semantic_op") or {}).get("kind") == "einsum"
-            )
-            for node in dag.nodes
+            node: int(requires_tile_evidence(self.layers[node])) for node in dag.nodes
         }
 
         def find(node: str) -> str:
@@ -129,16 +127,10 @@ class FusionPlanner:
             consumer_reason = self._barrier(consumer, self.layers[consumer])
             reason = producer_reason or consumer_reason
             producer_root, consumer_root = find(producer), find(consumer)
-            producer_kind = str(
-                (self.layers[producer].get("semantic_op") or {}).get("kind", "")
-            )
-            consumer_kind = str(
-                (self.layers[consumer].get("semantic_op") or {}).get("kind", "")
-            )
             if (
                 reason is None
-                and consumer_kind == "einsum"
-                and producer_kind != "einsum"
+                and requires_tile_evidence(self.layers[consumer])
+                and not requires_tile_evidence(self.layers[producer])
                 and (producer, consumer) not in self.multi_einsum_edges
             ):
                 # The single-einsum OAVES proof assumes its operands enter the
