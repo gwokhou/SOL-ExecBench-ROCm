@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
+#
+# DEPRECATED: the SOL ExecBench harness now acquires the STABLE_PEAK clock lock
+# inside its rocprofv3 profiling path (command.py::_run_profiled_evaluation), so
+# harness profiling no longer needs this wrapper. It is retained only for
+# standalone rocprofv3 use. See README.md and ROCm issue #8523:
+# https://github.com/ROCm/rocm-systems/issues/8523
 
 set -euo pipefail
 
@@ -13,6 +19,12 @@ readonly LOCK_PATH="${LOCK_ROOT}/sol-execbench-${PATCH_ID}-${UID}.lock"
 
 usage() {
   cat <<'EOF'
+DEPRECATED — retained only for standalone rocprofv3 use.
+The SOL ExecBench harness now locks STABLE_PEAK automatically during rocprofv3
+profiling (command.py::_run_profiled_evaluation), so harness runs no longer
+need this wrapper. See README.md and ROCm issue #8523:
+https://github.com/ROCm/rocm-systems/issues/8523
+
 Run rocprofv3 with the gfx1200 SQ_WAVE_CYCLES power-state workaround.
 
 Usage:

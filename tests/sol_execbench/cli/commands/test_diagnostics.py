@@ -5,6 +5,34 @@ import subprocess
 from pathlib import Path
 
 from sol_execbench.cli import evaluation as cli_evaluation
+from sol_execbench.core.bench.clock_lock import ClockLockLease
+
+
+class _FakeClockLease(ClockLockLease):
+    """Clock-lease double that records entry/release without touching sudo.
+
+    Subclasses ``ClockLockLease`` so it satisfies the ``ClockLocker`` callable
+    type; ``__exit__`` detaches instead of releasing so no ``amd-smi`` call is
+    made and the destructor's leaked-lease guard stays quiet.
+    """
+
+    def __init__(self, locked: bool, acquired: bool) -> None:
+        super().__init__(locked=locked, acquired=acquired)
+        self.enter_count = 0
+        self.release_count = 0
+
+    def __enter__(self) -> "_FakeClockLease":
+        self.enter_count += 1
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: object,
+    ) -> None:
+        self.release_count += 1
+        self.detach()
 
 
 def test_run_evaluation_command_passes_flashinfer_env(
@@ -80,6 +108,7 @@ def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
         env_builder=fake_env,
         subprocess_run=fake_run,
         rocprofv3_available=True,
+        clock_locker=lambda: _FakeClockLease(locked=True, acquired=False),
     )
 
     assert profiled_proc is not None
@@ -88,6 +117,66 @@ def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
     assert captured_env["PYTORCH_ALLOC_CONF"] == "expandable_segments:True"
     assert captured_env["FLASHINFER_TRACE_DIR"] == "/repo"
     assert captured_env["SOL_EXECBENCH_GRACEFUL_EXIT"] == "1"
+
+
+def _fake_profile_run_succeed(command, **kwargs):
+    """Write a placeholder profile artifact and return a successful result."""
+    output_dir = Path(command[command.index("--output-directory") + 1])
+    output_file = command[command.index("--output-file") + 1]
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / f"{output_file}_results.db").write_text("profile db")
+    return subprocess.CompletedProcess(
+        args=command,
+        returncode=0,
+        stdout='{"definition": "demo"}\n',
+        stderr="",
+    )
+
+
+def test_run_profiled_evaluation_acquires_and_releases_clock_lock(
+    tmp_path: Path,
+):
+    lease = _FakeClockLease(locked=True, acquired=True)
+
+    _, profile_result = cli_evaluation._run_profiled_evaluation(
+        ["python", "eval_driver.py"],
+        staging_dir=tmp_path,
+        output_file=tmp_path / "trace.jsonl",
+        timeout=30,
+        subprocess_run=_fake_profile_run_succeed,
+        rocprofv3_available=True,
+        clock_locker=lambda: lease,
+    )
+
+    assert profile_result.succeeded is True
+    assert lease.enter_count == 1
+    assert lease.release_count == 1
+
+
+def test_run_profiled_evaluation_runs_unlocked_when_lock_unavailable(
+    tmp_path: Path,
+    caplog,
+):
+    lease = _FakeClockLease(locked=False, acquired=False)
+
+    with caplog.at_level(
+        "WARNING",
+        logger="sol_execbench.cli.evaluation.command",
+    ):
+        _, profile_result = cli_evaluation._run_profiled_evaluation(
+            ["python", "eval_driver.py"],
+            staging_dir=tmp_path,
+            output_file=tmp_path / "trace.jsonl",
+            timeout=30,
+            subprocess_run=_fake_profile_run_succeed,
+            rocprofv3_available=True,
+            clock_locker=lambda: lease,
+        )
+
+    # Profiling still runs even when the clock lock cannot be acquired.
+    assert profile_result.succeeded is True
+    assert lease.enter_count == 1
+    assert any("STABLE_PEAK" in record.message for record in caplog.records)
 
 
 def test_no_trace_diagnostics_sidecar_uses_trace_output_path(tmp_path: Path):
