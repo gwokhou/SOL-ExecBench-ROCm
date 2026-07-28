@@ -1293,7 +1293,7 @@ def _write_artifact(args: argparse.Namespace, artifact: dict[str, Any]) -> None:
         else "instruction_and_runtime_corroboration_only"
     )
     print(
-        "\n# ---- patch for src/solar/configs/arch/RX_9060_XT.yaml ----",
+        "\n# ---- patch for src/solar/rocm/profiles/RX_9060_XT.yaml ----",
         file=sys.stderr,
     )
     print(

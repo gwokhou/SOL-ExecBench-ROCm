@@ -1,6 +1,6 @@
 # Current Claim Boundaries
 
-SOL ExecBench 3.0 evaluates current Definition, Workload, Solution, and Trace
+SOL ExecBench 4.0 evaluates current Definition, Workload, Solution, and Trace
 contracts on AMD ROCm. The canonical benchmark result is Trace JSONL. Optional
 environment, profiler, static-kernel, agent-feedback, profile-summary, and
 decision artifacts are diagnostic and cannot grant correctness, timing, score,

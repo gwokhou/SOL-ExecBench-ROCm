@@ -32,21 +32,21 @@ public `solar.api` types (`AnalysisResult`, `AnalysisFailure`, `ArtifactRef`,
 `SolBound`) to verify the outcome-mapping logic.
 
 Formal conversion is offline and fail-closed. Graph extraction is a declared
-route choice: `nvlabs` uses the reviewed Torchview extractor and `mainline`
-uses `make_fx`. Both emit the typed operator-artifact contract with exact source
-argument indices, tensor metadata, effects, and outputs; the requested IR
-representation remains a separate choice. Conversion validates the recorded
-extraction provenance and rejects unsupported route/backend pairings before
-replay or analysis. Unsupported tracing, conversion, execution, or resource
-accounting stops publication.
+`ExtractionKind`: `torchview_v1` uses the reviewed Torchview extractor and
+`make_fx_reference_v1` uses `make_fx`. Both emit operator-graph schema v1 with
+exact source argument indices, tensor metadata, effects, and outputs. The
+requested `IRKind` remains a separate choice. Conversion validates recorded
+extraction provenance and rejects unsupported extractor/IR pairings before
+replay or analysis.
 
-The maintained NVLABS-derived graph and IR code lives in the first-party
-`solar.nvlabs` namespace. It is a deeply adapted implementation, not an
-untouched third-party snapshot; `solar._vendor` is reserved for dependencies
-that remain vendored.
+The maintained extended-einsum implementation lives under
+`solar.ir.extended_einsum`. It owns one canonical reviewed handler registry;
+the retired `solar.nvlabs` and `solar.einsum` duplicate namespaces no longer
+exist. `solar._vendor` remains reserved for dependencies retained as vendored
+snapshots.
 
 `AnalysisRequest` composes the same `ConversionRequest` used by readiness
-auditing. That conversion request owns one `VerificationPolicy`, so the route,
+auditing. That conversion request owns one `VerificationPolicy`, so the extractor,
 IR, replay device, seeds, input patterns, and numerical tolerances cannot drift
 between the readiness and formal-analysis entry points.
 

@@ -25,7 +25,7 @@ from sol_execbench.core.solar_bridge.workload_context import (
     SolarWorkloadContext,
     load_solar_workload_context,
 )
-from solar.routes import DEFAULT_ROUTE, Route
+from solar.graph.contracts import DEFAULT_EXTRACTION_KIND, ExtractionKind
 
 if TYPE_CHECKING:
     from solar.api import ConversionRequest
@@ -33,21 +33,19 @@ if TYPE_CHECKING:
 
 def formal_producer_readiness() -> tuple[bool, str]:
     """Report whether this release can produce publication-grade SOLAR bounds."""
-    from solar.analysis.orojenesis import OROJENESIS_TRUSTED_MAPPER_SHA256
+    from solar.api import formal_producer_readiness as solar_readiness
 
-    if not OROJENESIS_TRUSTED_MAPPER_SHA256:
-        return False, "formal_mapper_not_allowlisted"
-    return True, "ready"
+    readiness = solar_readiness()
+    return readiness.ready, readiness.reason_code
 
 
 def formal_architecture_profile_hash(
     architecture: str = FORMAL_ARCHITECTURE,
 ) -> str:
     """Return the canonical hash of a packaged SOLAR architecture profile."""
-    from solar.api import _profile_hash
-    from solar.rocm.architecture import ArchitectureProfile
+    from solar.api import architecture_profile_sha256
 
-    return _profile_hash(ArchitectureProfile.load(architecture))
+    return architecture_profile_sha256(architecture)
 
 
 def analyze_workload(
@@ -57,7 +55,7 @@ def analyze_workload(
     output_dir: str | Path,
     device: str,
     orojenesis_home: str | Path | None,
-    route: Route | str = DEFAULT_ROUTE,
+    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
 ) -> SolarAnalysisOutcome:
     """Adapt one workload and invoke SOLAR's benchmark-agnostic API."""
     require_formal_device(device)
@@ -67,7 +65,7 @@ def analyze_workload(
         output_dir=Path(output_dir),
         device=device,
         orojenesis_home=orojenesis_home,
-        route=route,
+        extraction_kind=extraction_kind,
     )
 
 
@@ -77,7 +75,7 @@ def audit_workload_stages(
     workload_uuid: str,
     output_dir: str | Path,
     device: str,
-    route: Route | str = DEFAULT_ROUTE,
+    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
 ) -> SolarStageAuditOutcome:
     """Run the exact extraction/conversion/replay gate for one corpus workload."""
     from solar.api import (
@@ -89,7 +87,7 @@ def audit_workload_stages(
     context = load_solar_workload_context(problem_dir, workload_uuid, device)
     result = audit_conversion(
         ConversionReadinessRequest(
-            conversion=_conversion_request(context, device, route),
+            conversion=_conversion_request(context, device, extraction_kind),
             architecture=FORMAL_ARCHITECTURE,
             output_dir=Path(output_dir),
         ),
@@ -103,7 +101,7 @@ def _invoke_solar(
     output_dir: Path,
     device: str,
     orojenesis_home: str | Path | None,
-    route: Route | str = DEFAULT_ROUTE,
+    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
 ) -> SolarAnalysisOutcome:
     from solar.api import (
         AnalysisFailure,
@@ -113,7 +111,7 @@ def _invoke_solar(
 
     definition = context.definition
     request = AnalysisRequest(
-        conversion=_conversion_request(context, device, route),
+        conversion=_conversion_request(context, device, extraction_kind),
         architecture=FORMAL_ARCHITECTURE,
         output_dir=output_dir,
         precision=formal_precision_for_definition(definition),
@@ -155,7 +153,7 @@ def _invoke_solar(
 def _conversion_request(
     context: SolarWorkloadContext,
     device: str,
-    route: Route | str,
+    extraction_kind: ExtractionKind | str,
 ) -> ConversionRequest:
     from solar.api import ConversionRequest, VerificationPolicy
 
@@ -167,7 +165,7 @@ def _conversion_request(
         input_factory=context.input_factory,
         reference_name=f"{definition.name}/definition.json#reference",
         reference_sha256=sha256_bytes(definition.reference.encode()),
-        route=route,
+        extraction_kind=extraction_kind,
         verification=VerificationPolicy(
             atol=tolerance.max_atol,
             rtol=tolerance.max_rtol,

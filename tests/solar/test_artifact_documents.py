@@ -18,6 +18,7 @@ def test_operator_artifact_loads_once_and_exposes_typed_provenance(
     path.write_text(
         yaml.safe_dump(
             {
+                "schema_version": 1,
                 "extraction_kind": ExtractionKind.MAKE_FX_REFERENCE.value,
                 "layers": {},
             },
@@ -35,7 +36,7 @@ def test_ir_artifact_rejects_a_mismatched_discriminator(
 ) -> None:
     path = tmp_path / "graph.yaml"
     path.write_text("ir_kind: aten\n", encoding="utf-8")
-    artifact = IRGraphArtifact(path, IRKind.NVLABS_EINSUM)
+    artifact = IRGraphArtifact(path, IRKind.EXTENDED_EINSUM)
 
     with pytest.raises(ValueError, match="does not match"):
         _ = artifact.document

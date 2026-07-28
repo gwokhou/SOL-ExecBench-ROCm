@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from solar.analysis import orojenesis
+from solar.analysis.orojenesis import runner as orojenesis_runner
 from solar.schema_versions import OROJENESIS_IDENTITY_SCHEMA_VERSION
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -89,7 +90,7 @@ def test_compiler_wrapper_digest_matches_repository_file():
 def test_provenance_must_match_pinned_source_archive(tmp_path, monkeypatch):
     home, mapper_sha256 = _write_toolchain(tmp_path, archive_sha256="a" * 64)
     monkeypatch.setattr(
-        orojenesis,
+        orojenesis_runner,
         "OROJENESIS_TRUSTED_MAPPER_SHA256",
         frozenset({mapper_sha256}),
     )
@@ -124,7 +125,7 @@ def test_valid_provenance_manifest_is_returned_as_identity(
         archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256,
     )
     monkeypatch.setattr(
-        orojenesis,
+        orojenesis_runner,
         "OROJENESIS_TRUSTED_MAPPER_SHA256",
         frozenset({mapper_sha256}),
     )
@@ -207,7 +208,7 @@ def test_provenance_manifest_rejects_identity_drift(
         archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256,
     )
     monkeypatch.setattr(
-        orojenesis,
+        orojenesis_runner,
         "OROJENESIS_TRUSTED_MAPPER_SHA256",
         frozenset({mapper_sha256}),
     )
@@ -226,7 +227,7 @@ def test_provenance_manifest_must_be_an_object(tmp_path, monkeypatch, content):
         archive_sha256=orojenesis.OROJENESIS_SOURCE_ARCHIVE_SHA256,
     )
     monkeypatch.setattr(
-        orojenesis,
+        orojenesis_runner,
         "OROJENESIS_TRUSTED_MAPPER_SHA256",
         frozenset({mapper_sha256}),
     )
@@ -249,7 +250,7 @@ def test_missing_provenance_cannot_fall_back_to_git_checkout(
     mapper.chmod(0o755)
     mapper_sha256 = hashlib.sha256(mapper.read_bytes()).hexdigest()
     monkeypatch.setattr(
-        orojenesis,
+        orojenesis_runner,
         "OROJENESIS_TRUSTED_MAPPER_SHA256",
         frozenset({mapper_sha256}),
     )

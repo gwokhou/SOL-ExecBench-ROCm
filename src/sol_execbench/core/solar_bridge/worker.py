@@ -34,7 +34,7 @@ def main() -> None:
             output_dir=request.output_dir,
             device=request.device,
             orojenesis_home=request.orojenesis_home,
-            route=request.route,
+            extraction_kind=request.extraction_kind,
         )
     except Exception as exc:  # noqa: BLE001 -- isolated worker boundary
         outcome = SolarAnalysisOutcome(

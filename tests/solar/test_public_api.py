@@ -4,8 +4,8 @@ import pytest
 
 import solar
 import solar.analysis
-import solar.einsum
 import solar.graph
+import solar.ir.extended_einsum
 
 
 def test_solar_public_api_exposes_only_atomic_pipeline() -> None:
@@ -15,9 +15,14 @@ def test_solar_public_api_exposes_only_atomic_pipeline() -> None:
         "AnalysisResult",
         "ArtifactRef",
         "ConversionRequest",
+        "ExtractionKind",
+        "FormalProducerReadiness",
+        "IRKind",
         "SolBound",
         "VerificationPolicy",
         "analyze",
+        "architecture_profile_sha256",
+        "formal_producer_readiness",
     }
     with pytest.raises(AttributeError):
         getattr(solar, "PyTorchToEinsum")  # noqa: B009 -- Assert absence
@@ -27,7 +32,11 @@ def test_solar_public_api_exposes_only_atomic_pipeline() -> None:
 
 def test_stage_packages_do_not_advertise_legacy_bypass_apis() -> None:
     assert solar.analysis.__all__ == []
-    assert solar.einsum.__all__ == []
+    assert solar.ir.extended_einsum.__all__ == [
+        "convert_operator_graph",
+        "lifecycle",
+        "validate_extended_einsum_graph",
+    ]
     assert solar.graph.__all__ == [
         "ExtractionKind",
         "OperatorGraphArtifact",

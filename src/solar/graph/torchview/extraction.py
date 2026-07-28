@@ -10,14 +10,15 @@ from pathlib import Path
 
 import yaml
 
-from solar.common.types import DynamicValue
 from solar.graph.contracts import (
     ExtractionKind,
     GraphBackend,
     OperatorGraphArtifact,
     TensorSignature,
 )
-from solar.nvlabs.graph.torchview_processor import TorchviewProcessor
+from solar.graph.torchview.processor import TorchviewProcessor
+from solar.schema_versions import OPERATOR_GRAPH_SCHEMA_VERSION
+from solar.types import DynamicValue
 
 
 def extract_operator_graph(
@@ -38,6 +39,7 @@ def extract_operator_graph(
     operator_path = output / "operator_graph.yaml"
     traced_path.replace(operator_path)
     graph = yaml.safe_load(operator_path.read_text()) or {}
+    graph["schema_version"] = OPERATOR_GRAPH_SCHEMA_VERSION
     graph["extraction_kind"] = ExtractionKind.TORCHVIEW.value
     operator_path.write_text(yaml.safe_dump(graph, sort_keys=False))
     return OperatorGraphArtifact(

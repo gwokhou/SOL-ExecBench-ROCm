@@ -10,9 +10,9 @@ from solar.analysis.graph_rules import (
     QUANTIZED_PAYLOAD_PASSTHROUGH,
     TRANSPARENT_OPS,
 )
-from solar.common.types import DynamicValue
 from solar.ir.contracts import layer_operation
 from solar.rocm.architecture import ArchitectureProfile
+from solar.types import DynamicValue
 
 PathLike = str | Path
 

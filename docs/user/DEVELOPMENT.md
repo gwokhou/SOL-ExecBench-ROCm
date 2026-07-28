@@ -51,7 +51,7 @@ uv run sol-execbench evaluate tests/sol_execbench/samples/custom_inputs_matmul \
 | `src/sol_execbench/core/solar_bridge` | only benchmark-to-SOLAR adapter |
 | `src/sol_execbench/driver` | staging and generated process templates |
 | `src/solar/graph` | operator graph extraction |
-| `src/solar/einsum` | strict executable-einsum conversion |
+| `src/solar/ir/extended_einsum` | strict executable extended-einsum conversion |
 | `src/solar/verification` | conversion proof |
 | `src/solar/analysis` | formal resource/lower-bound analysis |
 

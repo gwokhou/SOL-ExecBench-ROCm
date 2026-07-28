@@ -12,6 +12,7 @@ from functools import cached_property
 from pathlib import Path
 
 from solar.artifacts import ArtifactDocument, load_yaml_artifact
+from solar.schema_versions import OPERATOR_GRAPH_SCHEMA_VERSION
 
 
 class ExtractionKind(StrEnum):
@@ -21,7 +22,7 @@ class ExtractionKind(StrEnum):
     TORCHVIEW = "torchview_v1"
 
 
-DEFAULT_EXTRACTION_KIND = ExtractionKind.MAKE_FX_REFERENCE
+DEFAULT_EXTRACTION_KIND = ExtractionKind.TORCHVIEW
 
 
 @dataclass(frozen=True)
@@ -44,7 +45,13 @@ class OperatorGraphArtifact:
     @cached_property
     def document(self) -> ArtifactDocument:
         """Load and cache the validated operator-graph document."""
-        return load_yaml_artifact(self.path)
+        document = load_yaml_artifact(self.path)
+        if document.data.get("schema_version") != OPERATOR_GRAPH_SCHEMA_VERSION:
+            raise ValueError(
+                "operator graph must use current "
+                f"schema_version={OPERATOR_GRAPH_SCHEMA_VERSION}",
+            )
+        return document
 
     @property
     def extraction_kind(self) -> ExtractionKind:

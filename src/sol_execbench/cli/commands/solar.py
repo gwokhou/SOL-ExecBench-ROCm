@@ -31,7 +31,14 @@ from sol_execbench.core.solar_bridge.release import (
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
 
 console = Console(stderr=True)
-_ROUTE_CHOICE = click.Choice(["nvlabs", "mainline"], case_sensitive=True)
+_EXTRACTOR_KINDS = {
+    "torchview": "torchview_v1",
+    "make-fx": "make_fx_reference_v1",
+}
+_EXTRACTOR_CHOICE = click.Choice(
+    list(_EXTRACTOR_KINDS),
+    case_sensitive=True,
+)
 
 
 @click.group("solar", context_settings={"help_option_names": ["-h", "--help"]})
@@ -52,7 +59,10 @@ def solar_cli() -> None:
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
-    "--route", type=_ROUTE_CHOICE, default="nvlabs", show_default=True
+    "--extractor",
+    type=_EXTRACTOR_CHOICE,
+    default="torchview",
+    show_default=True,
 )
 @click.option(
     "--orojenesis-home",
@@ -70,7 +80,7 @@ def analyze_cli(
     workload_uuid: str,
     output: Path,
     device: str,
-    route: str,
+    extractor: str,
     orojenesis_home: Path | None,
     timeout_seconds: float,
 ) -> CliResult:
@@ -80,7 +90,7 @@ def analyze_cli(
         workload_uuid=workload_uuid,
         output_dir=str(output.resolve()),
         device=device,
-        route=route,
+        extraction_kind=_EXTRACTOR_KINDS[extractor],
         orojenesis_home=(str(orojenesis_home) if orojenesis_home else None),
     )
     try:
@@ -143,7 +153,10 @@ def analyze_cli(
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
-    "--route", type=_ROUTE_CHOICE, default="nvlabs", show_default=True
+    "--extractor",
+    type=_EXTRACTOR_CHOICE,
+    default="torchview",
+    show_default=True,
 )
 @click.option(
     "--timeout",
@@ -157,7 +170,7 @@ def release_build_cli(
     manifest_path: Path,
     orojenesis_home: Path,
     device: str,
-    route: str,
+    extractor: str,
     timeout_seconds: float,
     resume: bool,
 ) -> CliResult:
@@ -170,7 +183,7 @@ def release_build_cli(
             timeout_seconds=timeout_seconds,
             resume=resume,
             device=device,
-            route=route,
+            extraction_kind=_EXTRACTOR_KINDS[extractor],
         )
     except (OSError, RuntimeError, ValueError) as exc:
         raise CliFailure(
@@ -212,7 +225,10 @@ def release_build_cli(
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
-    "--route", type=_ROUTE_CHOICE, default="nvlabs", show_default=True
+    "--extractor",
+    type=_EXTRACTOR_CHOICE,
+    default="torchview",
+    show_default=True,
 )
 @click.option(
     "--timeout",
@@ -225,7 +241,7 @@ def corpus_audit_cli(
     output: Path,
     manifest_path: Path,
     device: str,
-    route: str,
+    extractor: str,
     timeout_seconds: float,
     resume: bool,
 ) -> CliResult:
@@ -235,7 +251,7 @@ def corpus_audit_cli(
             manifest_path,
             output,
             device=device,
-            route=route,
+            extraction_kind=_EXTRACTOR_KINDS[extractor],
             timeout_seconds=timeout_seconds,
             resume=resume,
         )

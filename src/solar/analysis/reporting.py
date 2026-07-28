@@ -18,11 +18,11 @@ from solar.analysis.graph_models import (
     LowerBound,
 )
 from solar.analysis.resources import RESOURCE_MODEL_VERSION
-from solar.common.types import NodeDict
-from solar.common.utils import NoAliasDumper
+from solar.artifacts.yaml import NoAliasDumper
 from solar.contracts import FORMAL_BOUND_KIND, ROOFLINE_BOUND_KIND
 from solar.rocm.architecture import ArchitectureProfile
 from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
+from solar.types import NodeDict
 
 
 class PreparedAnalysisView(Protocol):

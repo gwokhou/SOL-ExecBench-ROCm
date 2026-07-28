@@ -49,7 +49,11 @@ from sol_execbench.core.solar_bridge.models import (
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_stage_worker
 from sol_execbench.core.timestamps import utc_timestamp
-from solar.routes import DEFAULT_ROUTE, Route, normalize_route
+from solar.graph.contracts import (
+    DEFAULT_EXTRACTION_KIND,
+    ExtractionKind,
+    normalize_extraction_kind,
+)
 
 _RESULT_FILENAME = "stage-result.json"
 _MATRIX_FILENAME = "matrix.jsonl"
@@ -106,7 +110,7 @@ class _CorpusAuditContext:
     device: str
     timeout_seconds: float
     resume: bool
-    route: Route
+    extraction_kind: ExtractionKind
 
 
 def audit_corpus_stage_readiness(
@@ -116,7 +120,7 @@ def audit_corpus_stage_readiness(
     device: str = "cuda:0",
     timeout_seconds: float = 14_400,
     resume: bool = False,
-    route: Route | str = DEFAULT_ROUTE,
+    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
 ) -> CorpusStageAuditResult:
     """Audit every scored workload and publish a deterministic status matrix."""
     output = output_root.resolve()
@@ -128,7 +132,7 @@ def audit_corpus_stage_readiness(
             device=device,
             timeout_seconds=timeout_seconds,
             resume=resume,
-            route=route,
+            extraction_kind=extraction_kind,
         )
 
 
@@ -139,7 +143,7 @@ def _audit_corpus_stage_readiness_locked(
     device: str,
     timeout_seconds: float,
     resume: bool,
-    route: Route | str,
+    extraction_kind: ExtractionKind | str,
 ) -> CorpusStageAuditResult:
     corpus = AKACorpusManifest.load(manifest_path)
     if output.exists() and not resume:
@@ -155,7 +159,7 @@ def _audit_corpus_stage_readiness_locked(
         device=device,
         timeout_seconds=timeout_seconds,
         resume=resume,
-        route=normalize_route(route),
+        extraction_kind=normalize_extraction_kind(extraction_kind),
     )
     records: list[dict[str, Any]] = []
     for entry in corpus.entries:
@@ -202,7 +206,7 @@ def _audit_entry(
                     workload_uuid=workload_uuid,
                     output_dir=str(workload_output),
                     device=context.device,
-                    route=context.route,
+                    extraction_kind=context.extraction_kind,
                 ),
                 timeout_seconds=context.timeout_seconds,
             )
@@ -238,7 +242,7 @@ def _identity(
         "trace_seed": 200,
         "verification_seeds": [11, 29, 47],
         "verification_patterns": ["random", "zeros", "boundary"],
-        "route": context.route,
+        "extraction_kind": context.extraction_kind,
     }
     trace_contract = {
         "schema_version": CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION,
@@ -253,7 +257,7 @@ def _identity(
                 "gfx_target",
                 "architecture_sha256",
                 "trace_seed",
-                "route",
+                "extraction_kind",
             )
         },
     }

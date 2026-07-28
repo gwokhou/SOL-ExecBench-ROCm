@@ -19,7 +19,7 @@ from sol_execbench.core.scoring.release_models import SolarIndexStatement
 from sol_execbench.core.scoring.release_solar import verify_solar_index
 from sol_execbench.core.solar_bridge.models import SolarWorkerRequest
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
-from solar.routes import DEFAULT_ROUTE, Route
+from solar.graph.contracts import DEFAULT_EXTRACTION_KIND, ExtractionKind
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +41,7 @@ def build_release_solar_manifests(
     timeout_seconds: float = 14_400,
     resume: bool = False,
     device: str = "cuda:0",
-    route: Route | str = DEFAULT_ROUTE,
+    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
 ) -> SolarReleaseResult:
     """Generate and index every scored workload's formal SOLAR artifacts."""
     workspace = workspace_root.resolve()
@@ -87,7 +87,7 @@ def build_release_solar_manifests(
                     output_dir=str(output),
                     device=device,
                     orojenesis_home=str(orojenesis_home.resolve()),
-                    route=route,
+                    extraction_kind=extraction_kind,
                 ),
                 timeout_seconds=timeout_seconds,
             )

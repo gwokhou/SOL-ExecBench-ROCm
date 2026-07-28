@@ -9,7 +9,7 @@ import hashlib
 import re
 from pathlib import Path
 
-from solar.common.types import NodeDict
+from solar.types import NodeDict
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 

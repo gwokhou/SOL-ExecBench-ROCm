@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 
-from solar.common.types import DynamicValue
+from solar.types import DynamicValue
 from solar.verification.errors import IRExecutionError
 from solar.verification.numerics import torch_equation
 

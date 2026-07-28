@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from solar.ir.aten import AtenIRError, validate_aten_graph
-from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
+from solar.ir.aten.conversion import AtenIRError, validate_aten_graph
+from solar.schema_versions import ATEN_IR_SCHEMA_VERSION
 
 
 def _layer(operation: str = "add", *, inputs: int = 2, outputs: int = 1):
@@ -27,7 +27,7 @@ def _layer(operation: str = "add", *, inputs: int = 2, outputs: int = 1):
 
 def _graph(layer=None):
     return {
-        "schema_version": IR_GRAPH_SCHEMA_VERSION,
+        "schema_version": ATEN_IR_SCHEMA_VERSION,
         "ir_kind": "aten",
         "layers": {"operation": layer or _layer()},
     }
@@ -73,7 +73,7 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
         "effects": {"mutates": [], "aliases": [], "atomic": False},
     }
     graph = {
-        "schema_version": IR_GRAPH_SCHEMA_VERSION,
+        "schema_version": ATEN_IR_SCHEMA_VERSION,
         "ir_kind": "aten",
         "layers": {"start": start, "einsum": einsum, "dynamic": dynamic},
     }
@@ -84,7 +84,7 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
     ("mutate", "message"),
     [
         (
-            lambda graph: graph.update(ir_kind="nvlabs_einsum"),
+            lambda graph: graph.update(ir_kind="extended_einsum"),
             "not ATen IR",
         ),
         (

@@ -15,11 +15,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from solar.artifacts import ArtifactDocument, load_yaml_artifact
-from solar.common.types import DynamicValue
 from solar.errors import StrictConversionError, UnsupportedOperationError
 from solar.graph.contracts import ExtractionKind, OperatorGraphArtifact
-from solar.routes import Route
-from solar.verification_policy import VerificationPolicy
+from solar.types import DynamicValue
+from solar.verification.contracts import VerificationPolicy
 
 if TYPE_CHECKING:
     from solar.rocm.architecture import ArchitectureProfile
@@ -29,10 +28,10 @@ class IRKind(StrEnum):
     """The IR dialects accepted by SOLAR's analysis pipeline."""
 
     ATEN = "aten"
-    NVLABS_EINSUM = "nvlabs_einsum"
+    EXTENDED_EINSUM = "extended_einsum"
 
 
-DEFAULT_IR_KIND = IRKind.NVLABS_EINSUM
+DEFAULT_IR_KIND = IRKind.EXTENDED_EINSUM
 
 # Semantic ``layer_operation`` kind values shared across every IR dialect.
 # Analysis code branches on these instead of enumerating dialect-specific
@@ -81,10 +80,10 @@ class IRConversionRequest(Protocol):
     def reference_sha256(self) -> str: ...
 
     @property
-    def route(self) -> Route | str: ...
+    def extraction_kind(self) -> ExtractionKind | str: ...
 
     @property
-    def representation(self) -> IRKind | str: ...
+    def ir_kind(self) -> IRKind | str: ...
 
     @property
     def device(self) -> str: ...

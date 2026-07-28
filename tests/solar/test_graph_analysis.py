@@ -9,6 +9,9 @@ from solar.analysis.operand_provenance import (
     contraction_external_source_dtypes,
     contraction_operands_are_graph_external,
 )
+from solar.ir.extended_einsum.conversion import (
+    validate_extended_einsum_graph,
+)
 
 
 def _start(output_name: str = "start.Output", dtype: str = "torch.float32"):
@@ -140,13 +143,15 @@ def test_transparent_view_preserves_internal_io_and_shared_input_deduplication(
     assert result["total"]["intermediate_elements"] == 4
 
 
-@pytest.mark.parametrize("strict", [False, True])
-def test_analysis_rejects_unsupported_schema(
-    tmp_path: Path,
-    strict: bool,
-) -> None:
-    with pytest.raises(ValueError, match="schema_version=3"):
-        _analyze(tmp_path, {"start": _start()}, strict=strict, schema_version=0)
+def test_ir_lifecycle_rejects_unsupported_schema() -> None:
+    with pytest.raises(ValueError, match="schema_version=4"):
+        validate_extended_einsum_graph(
+            {
+                "schema_version": 0,
+                "ir_kind": "extended_einsum",
+                "layers": {"start": _start()},
+            },
+        )
 
 
 def test_low_precision_dequantization_is_proven_recomputable() -> None:

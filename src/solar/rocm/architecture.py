@@ -16,7 +16,7 @@ from typing import Any, cast
 import yaml
 
 from solar import schema_versions
-from solar.common.constants import normalize_dtype
+from solar.precision import normalize_dtype
 from solar.rocm.audit_validation import (
     audit_mapping,
     audit_nonnegative_int,
@@ -55,12 +55,8 @@ _VENDOR_SPECIFIC_DTYPES = frozenset(
 
 
 def _packaged_profile_path(name: str) -> Path:
-    return (
-        Path(__file__).resolve().parents[1]
-        / "configs"
-        / "arch"
-        / f"{name}.yaml"
-    )
+    resource = resources.files("solar.rocm.profiles").joinpath(f"{name}.yaml")
+    return Path(str(resource))
 
 
 def resource_peak_payload_sha256(payload: Mapping[str, Any]) -> str:
@@ -474,12 +470,9 @@ def _load_profile_data(
     if isinstance(value, Mapping):
         return {str(key): item for key, item in value.items()}, None
     path = Path(value)
-    if not path.exists():
-        root = Path(__file__).resolve().parents[2]
-        path = root / "configs" / "arch" / f"{value}.yaml"
     if path.exists():
         return yaml.safe_load(path.read_text()) or {}, str(path)
-    resource = resources.files("solar.configs.arch").joinpath(f"{value}.yaml")
+    resource = resources.files("solar.rocm.profiles").joinpath(f"{value}.yaml")
     if not resource.is_file():
         raise FileNotFoundError(f"Architecture profile not found: {value}")
     return yaml.safe_load(resource.read_text()) or {}, str(resource)
@@ -732,7 +725,13 @@ class ArchitectureProfile:
                 "verified architecture audit evidence lacks a path",
             )
         profile_path = _packaged_profile_path(self.name)
-        evidence_path = profile_path.parents[2] / path_value
+        try:
+            profile_root = profile_path.parents[2]
+        except IndexError as exc:
+            raise ValueError(
+                "architecture profile path cannot resolve audit evidence",
+            ) from exc
+        evidence_path = profile_root / path_value
         verify_resource_peak_audit(
             evidence_path,
             expected_sha256=str(self.audit_evidence["sha256"]),

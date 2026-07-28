@@ -25,10 +25,10 @@ def extract_operator_graph(
     device: str,
     output_dir: str | Path,
     name: str,
-    extraction: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
+    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
 ) -> OperatorGraphArtifact:
     """Trace ``reference`` through the selected extraction backend."""
-    return extraction_backend(extraction).extract(
+    return extraction_backend(extraction_kind).extract(
         reference,
         inputs,
         device=device,

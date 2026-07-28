@@ -10,24 +10,38 @@
     "src/solar/graph/extraction.py": {"line": 80.0, "branch": 65.0},
     "src/solar/graph/contracts.py": {"line": 80.0, "branch": 65.0},
     "src/solar/graph/reference_serializer.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/einsum/operation_conversion.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/ir/aten.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/ir/extended_einsum/operations/conversion.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/ir/aten/conversion.py": {"line": 80.0, "branch": 65.0},
     "src/solar/ir/conversion.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/ir/nvlabs_einsum/conversion.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/ir/extended_einsum/conversion.py": {"line": 80.0, "branch": 65.0},
     "src/solar/ir/registry.py": {"line": 80.0, "branch": 65.0},
     "src/solar/verification/aten.py": {"line": 80.0, "branch": 65.0},
     "src/solar/verification/verify.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/analysis/graph_analyzer.py": {"line": 80.0, "branch": 65.0},
     "src/solar/analysis/fusion.py": {"line": 80.0, "branch": 65.0},
     "src/solar/analysis/resources.py": {"line": 80.0, "branch": 65.0},
     "src/solar/analysis/operand_provenance.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/analysis/orojenesis.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/analysis/orojenesis/runner.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/analysis/orojenesis/multi_einsum.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/analysis/orojenesis/regions.py": {"line": 80.0, "branch": 65.0},
     "src/solar/rocm/architecture.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/common/utils.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/einsum/ops/base.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/einsum/ops/attention_ops.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/einsum/ops/conv_ops.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/einsum/ops/matmul_ops.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/einsum/ops/misc_ops.py": {"line": 80.0, "branch": 65.0}
+    "src/solar/ir/extended_einsum/equations.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/ir/extended_einsum/operations/handlers/base.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/ir/extended_einsum/operations/handlers/attention_ops.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/ir/extended_einsum/operations/handlers/conv_ops.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/ir/extended_einsum/operations/handlers/matmul_ops.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/ir/extended_einsum/operations/handlers/misc_ops.py": {"line": 80.0, "branch": 65.0}
+  },
+  "groups": {
+    "solar analysis graph": {
+      "paths": [
+        "src/solar/analysis/graph_analyzer.py",
+        "src/solar/analysis/formal_analysis.py",
+        "src/solar/analysis/graph_accounting.py",
+        "src/solar/analysis/graph_loading.py",
+        "src/solar/analysis/orojenesis_evidence.py"
+      ],
+      "line": 80.0,
+      "branch": 65.0
+    }
   }
 }

@@ -9,9 +9,9 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 
 from solar.analysis.resources import is_mfma_operation
-from solar.common.types import GraphValue, NodeDict, TensorShapes
-from solar.einsum.analyzer import EinsumAnalyzer
 from solar.ir.contracts import layer_operation
+from solar.ir.extended_einsum.operations.analyzer import EinsumAnalyzer
+from solar.types import GraphValue, NodeDict, TensorShapes
 
 _PROOF_INPUTS: dict[str, tuple[str, tuple[int, ...]]] = {
     "addmm": ("matmul", (1, 2)),

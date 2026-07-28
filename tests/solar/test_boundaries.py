@@ -26,17 +26,14 @@ def test_solar_never_imports_outer_benchmark_package():
     assert offenders == []
 
 
-def test_nvlabs_implementation_uses_first_party_namespace():
+def test_retired_duplicate_namespaces_are_absent():
     source_root = REPO_ROOT / "src" / "solar"
-    assert (source_root / "nvlabs").is_dir()
-    assert not (source_root / "_vendor" / "nvlabs").exists()
-
-    offenders = [
-        path
-        for path in source_root.rglob("*.py")
-        if "solar._vendor.nvlabs" in path.read_text()
-    ]
-    assert offenders == []
+    assert not tuple((source_root / "nvlabs").rglob("*.py"))
+    assert not tuple((source_root / "einsum").rglob("*.py"))
+    assert not (source_root / "routes.py").exists()
+    assert (
+        source_root / "ir" / "extended_einsum" / "operations" / "handlers"
+    ).is_dir()
 
 
 def test_only_solar_bridge_imports_solar_from_outer_package():
@@ -62,9 +59,12 @@ def test_only_solar_bridge_imports_solar_from_outer_package():
 
 def test_ir_backends_are_independent_implementations():
     backend_modules = {
-        "aten.py": ("solar.ir.aten", "solar.verification.aten"),
-        "nvlabs_einsum/backend.py": (
-            "solar.ir.nvlabs_einsum.backend",
+        "aten/lifecycle.py": (
+            "solar.ir.aten.conversion",
+            "solar.verification.aten",
+        ),
+        "extended_einsum/lifecycle.py": (
+            "solar.ir.extended_einsum.lifecycle",
             "solar.verification.aten",
         ),
     }
@@ -94,25 +94,25 @@ def test_public_workflows_do_not_import_concrete_route_implementations():
     forbidden = (
         "solar.analysis.nvlabs",
         "solar.graph.torchview",
-        "solar.ir.aten",
-        "solar.ir.nvlabs_einsum",
+        "solar.ir.aten.conversion",
+        "solar.ir.extended_einsum",
         "solar.verification.aten",
-        "solar.verification.nvlabs_einsum",
+        "solar.verification.extended_einsum",
     )
-    for relative_path in ("pipeline.py", "readiness.py"):
+    for relative_path in ("pipeline/analysis.py", "pipeline/readiness.py"):
         imports = _imports(REPO_ROOT / "src" / "solar" / relative_path)
         assert not {
             imported for imported in imports if imported.startswith(forbidden)
         }
-        assert "solar.workflow" in imports
+        assert "solar.pipeline.stages" in imports
 
 
 def test_public_common_identifiers_are_route_and_backend_neutral():
     public_modules = (
         "contracts.py",
-        "pipeline.py",
-        "readiness.py",
-        "workflow.py",
+        "pipeline/analysis.py",
+        "pipeline/readiness.py",
+        "pipeline/stages.py",
         "graph/contracts.py",
         "graph/extraction.py",
         "ir/contracts.py",
@@ -127,7 +127,10 @@ def test_public_common_identifiers_are_route_and_backend_neutral():
         for node in tree.body:
             if not isinstance(node, ast.ClassDef | ast.FunctionDef):
                 continue
-            if node.name.startswith("_") or node.name in {"IRKind", "Route"}:
+            if node.name.startswith("_") or node.name in {
+                "IRKind",
+                "ExtractionKind",
+            }:
                 continue
             if any(token in node.name.lower() for token in forbidden):
                 offenders.append((relative_path, node.name))

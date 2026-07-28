@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from solar.einsum.analyzer import normalize_operation_name
+from solar.ir.extended_einsum.operations.analyzer import (
+    normalize_operation_name,
+)
 
 
 @pytest.mark.parametrize(

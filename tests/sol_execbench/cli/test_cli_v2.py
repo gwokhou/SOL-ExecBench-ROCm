@@ -25,7 +25,7 @@ def test_root_help_and_version_are_stable() -> None:
         "solar",
         "score",
     }.issubset(set(no_args.output.split()))
-    assert version.output == "sol-execbench, version 3.0.0\n"
+    assert version.output == "sol-execbench, version 4.0.0\n"
 
 
 def test_unknown_command_has_suggestion_and_json_error() -> None:

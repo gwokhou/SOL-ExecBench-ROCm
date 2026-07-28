@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Representation-neutral conversion boundary, defaulting to NVLabs einsum."""
+"""Representation-neutral conversion boundary."""
 
 from __future__ import annotations
 
@@ -26,11 +26,11 @@ def convert_operator_graph(
     operator: OperatorGraphArtifact,
     *,
     output_dir: str | Path,
-    representation: IRKind | str = DEFAULT_IR_KIND,
+    ir_kind: IRKind | str = DEFAULT_IR_KIND,
 ) -> IRGraphArtifact:
     """Convert one operator graph through the selected uniform IR lifecycle."""
     extraction = _operator_extraction(operator)
-    kind = normalize_ir_kind(representation)
+    kind = normalize_ir_kind(ir_kind)
     lifecycle = ir_lifecycle(kind)
     if extraction not in lifecycle.extractions:
         raise UnsupportedOperationError(
@@ -48,12 +48,7 @@ def convert_operator_graph(
 
 def _operator_extraction(operator: OperatorGraphArtifact) -> ExtractionKind:
     """Return the registered extraction provenance for an operator graph."""
-    try:
-        return operator.extraction_kind
-    except ValueError as exc:
-        raise StrictConversionError(
-            "operator graph provenance is not trusted",
-        ) from exc
+    return operator.extraction_kind
 
 
 __all__ = ["IRGraphArtifact", "convert_operator_graph"]

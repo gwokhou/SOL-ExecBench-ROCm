@@ -17,7 +17,7 @@ def test_make_fx_reference_records_strict_conversion_provenance() -> None:
         "reference",
     )
 
-    assert result["schema_version"] == 3
+    assert result["schema_version"] == 1
     assert result["extraction_kind"] == "make_fx_reference_v1"
     assert result["joint_graph"] is False
     assert any(

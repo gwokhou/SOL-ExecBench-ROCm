@@ -22,7 +22,7 @@ REFACTORED_MODULES = {
     "src/sol_execbench/core/scoring/amd_bound_sanity/builder.py",
     "src/sol_execbench/core/scoring/amd_bound_sanity/pipeline.py",
     "src/solar/api.py",
-    "src/solar/einsum/operation_conversion.py",
+    "src/solar/ir/extended_einsum/operations/conversion.py",
     "src/solar/graph/extraction.py",
     "src/solar/ir/conversion.py",
 }

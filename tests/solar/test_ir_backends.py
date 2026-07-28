@@ -6,6 +6,7 @@ import torch
 import yaml
 
 from solar.contracts import AnalysisRequest, ConversionRequest
+from solar.graph.contracts import DEFAULT_EXTRACTION_KIND, ExtractionKind
 from solar.graph.extraction import extract_operator_graph
 from solar.ir.contracts import (
     DEFAULT_IR_KIND,
@@ -14,7 +15,6 @@ from solar.ir.contracts import (
 )
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.registry import ir_lifecycle, ir_lifecycles
-from solar.routes import DEFAULT_ROUTE, Route
 from solar.verification.verify import IRGraphExecutor
 
 
@@ -22,7 +22,7 @@ def _matmul(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
     return left @ right
 
 
-def test_nvlabs_einsum_is_default_and_aten_remains_interchangeable(
+def test_extended_einsum_is_default_and_aten_remains_interchangeable(
     tmp_path: Path,
 ) -> None:
     inputs = (
@@ -35,28 +35,32 @@ def test_nvlabs_einsum_is_default_and_aten_remains_interchangeable(
         device="cpu",
         output_dir=tmp_path,
         name="matmul",
+        extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
     )
 
-    nvlabs = convert_operator_graph(operator, output_dir=tmp_path)
+    extended_einsum = convert_operator_graph(operator, output_dir=tmp_path)
     aten = convert_operator_graph(
         operator,
         output_dir=tmp_path,
-        representation=IRKind.ATEN,
+        ir_kind=IRKind.ATEN,
     )
-    nvlabs_graph = yaml.safe_load(nvlabs.path.read_text())
+    extended_einsum_graph = yaml.safe_load(extended_einsum.path.read_text())
     aten_graph = yaml.safe_load(aten.path.read_text())
 
-    assert nvlabs.kind is IRKind.NVLABS_EINSUM
-    assert nvlabs.path.name == "einsum_graph.yaml"
-    assert nvlabs_graph["ir_kind"] == IRKind.NVLABS_EINSUM
+    assert extended_einsum.kind is IRKind.EXTENDED_EINSUM
+    assert extended_einsum.path.name == "einsum_graph.yaml"
+    assert extended_einsum_graph["ir_kind"] == IRKind.EXTENDED_EINSUM
     assert all(
-        "semantic_op" in layer for layer in nvlabs_graph["layers"].values()
+        "semantic_op" in layer
+        for layer in extended_einsum_graph["layers"].values()
     )
     assert all(
-        "extended_op" not in layer for layer in nvlabs_graph["layers"].values()
+        "extended_op" not in layer
+        for layer in extended_einsum_graph["layers"].values()
     )
     assert any(
-        layer.get("is_real_einsum") for layer in nvlabs_graph["layers"].values()
+        layer.get("is_real_einsum")
+        for layer in extended_einsum_graph["layers"].values()
     )
     assert aten.kind is IRKind.ATEN
     assert aten.path.name == "aten_graph.yaml"
@@ -66,14 +70,14 @@ def test_nvlabs_einsum_is_default_and_aten_remains_interchangeable(
     )
 
     expected = _matmul(*inputs)
-    for graph in (nvlabs_graph, aten_graph):
+    for graph in (extended_einsum_graph, aten_graph):
         torch.testing.assert_close(
             IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs),
             expected,
         )
 
 
-def test_analysis_request_defaults_to_nvlabs_einsum(tmp_path: Path) -> None:
+def test_analysis_request_defaults_to_extended_einsum(tmp_path: Path) -> None:
     request = AnalysisRequest(
         conversion=ConversionRequest(
             analysis_id="ir-default",
@@ -86,23 +90,23 @@ def test_analysis_request_defaults_to_nvlabs_einsum(tmp_path: Path) -> None:
         output_dir=tmp_path / "result",
     )
 
-    assert DEFAULT_IR_KIND is IRKind.NVLABS_EINSUM
-    assert DEFAULT_ROUTE is Route.NVLABS
-    assert request.route is Route.NVLABS
-    assert request.representation is IRKind.NVLABS_EINSUM
-    mainline = AnalysisRequest(
+    assert DEFAULT_IR_KIND is IRKind.EXTENDED_EINSUM
+    assert DEFAULT_EXTRACTION_KIND is ExtractionKind.TORCHVIEW
+    assert request.extraction_kind is ExtractionKind.TORCHVIEW
+    assert request.ir_kind is IRKind.EXTENDED_EINSUM
+    make_fx = AnalysisRequest(
         conversion=ConversionRequest(
-            analysis_id="ir-mainline-default",
+            analysis_id="ir-make-fx-default",
             reference=lambda value: value,
             input_factory=lambda seed: (torch.tensor(float(seed)),),
             reference_name="tests#identity",
             reference_sha256="b" * 64,
-            route=Route.MAINLINE,
+            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
         ),
         architecture={},
-        output_dir=tmp_path / "mainline",
+        output_dir=tmp_path / "make-fx",
     )
-    assert mainline.representation is IRKind.NVLABS_EINSUM
+    assert make_fx.ir_kind is IRKind.EXTENDED_EINSUM
 
 
 def test_every_lifecycle_shares_one_interface_on_the_same_data(
@@ -112,10 +116,10 @@ def test_every_lifecycle_shares_one_interface_on_the_same_data(
     lifecycles = ir_lifecycles()
     assert {lifecycle.kind for lifecycle in lifecycles} == {
         IRKind.ATEN,
-        IRKind.NVLABS_EINSUM,
+        IRKind.EXTENDED_EINSUM,
     }
     assert all(isinstance(lifecycle, IRLifecycle) for lifecycle in lifecycles)
-    assert ir_lifecycle(DEFAULT_IR_KIND).kind is IRKind.NVLABS_EINSUM
+    assert ir_lifecycle(DEFAULT_IR_KIND).kind is IRKind.EXTENDED_EINSUM
 
     inputs = (
         torch.arange(6.0).reshape(2, 3),
@@ -127,6 +131,7 @@ def test_every_lifecycle_shares_one_interface_on_the_same_data(
         device="cpu",
         output_dir=tmp_path,
         name="matmul",
+        extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
     )
     expected = _matmul(*inputs)
     for lifecycle in lifecycles:

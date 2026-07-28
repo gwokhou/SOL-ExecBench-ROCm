@@ -25,20 +25,20 @@ def validate_ir_graph(graph: Mapping[str, Any]) -> None:
 
 
 def _load_aten_lifecycle() -> IRLifecycle:
-    from solar.ir.aten_lifecycle import lifecycle
+    from solar.ir.aten.lifecycle import lifecycle
 
     return lifecycle
 
 
-def _load_nvlabs_einsum_lifecycle() -> IRLifecycle:
-    from solar.ir.nvlabs_einsum.backend import lifecycle
+def _load_extended_einsum_lifecycle() -> IRLifecycle:
+    from solar.ir.extended_einsum.lifecycle import lifecycle
 
     return lifecycle
 
 
 _LIFECYCLE_LOADERS: dict[IRKind, Callable[[], IRLifecycle]] = {
     IRKind.ATEN: _load_aten_lifecycle,
-    IRKind.NVLABS_EINSUM: _load_nvlabs_einsum_lifecycle,
+    IRKind.EXTENDED_EINSUM: _load_extended_einsum_lifecycle,
 }
 
 
