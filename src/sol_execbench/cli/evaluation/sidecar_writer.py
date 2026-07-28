@@ -11,10 +11,10 @@ from pathlib import Path
 from sol_execbench.cli.commands import environment as cli_environment
 from sol_execbench.cli.sidecars import (
     agent_feedback as cli_agent_feedback_sidecar,
+    decision as cli_decision_sidecar,
+    profile as cli_profile_sidecars,
+    static_evidence as cli_static_evidence,
 )
-from sol_execbench.cli.sidecars import decision as cli_decision_sidecar
-from sol_execbench.cli.sidecars import profile as cli_profile_sidecars
-from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,

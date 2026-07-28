@@ -10,7 +10,7 @@ import yaml
 
 from solar.ir.contracts import IRKind
 from solar.ir.registry import ir_lifecycle
-from solar.verification import verify as verification
+from solar.verification import numerics, verify as verification
 from solar.verification.verify import VerificationError
 
 REFERENCE_SOURCE = """
@@ -253,10 +253,10 @@ def test_pattern_inputs_cover_float_bool_integer_and_unknown() -> None:
         torch.tensor([1, 2, 3]),
         "value",
     )
-    assert verification._pattern_inputs(source, "random") == source
-    zeros = verification._pattern_inputs(source, "zeros")
+    assert numerics.pattern_inputs(source, "random") == source
+    zeros = numerics.pattern_inputs(source, "zeros")
     assert torch.equal(zeros[0], torch.zeros(3))
-    boundary = verification._pattern_inputs(source, "boundary")
+    boundary = numerics.pattern_inputs(source, "boundary")
     assert boundary[0].tolist() == [-1.0, 0.0, 1.0]
     assert boundary[1].tolist() == [False, True, False]
     assert boundary[2].tolist() == [0, 0, 0]
@@ -265,16 +265,16 @@ def test_pattern_inputs_cover_float_bool_integer_and_unknown() -> None:
         VerificationError,
         match="unknown verification input pattern",
     ):
-        verification._pattern_inputs(source, "missing")
+        numerics.pattern_inputs(source, "missing")
 
 
 def test_assert_close_reports_success_and_all_failure_modes() -> None:
-    assert verification._assert_close(torch.ones(2), torch.ones(2), 0, 0) == {
+    assert numerics.assert_close(torch.ones(2), torch.ones(2), 0, 0) == {
         "max_abs_error": 0.0,
         "matched_ratio": 1.0,
     }
     assert (
-        verification._assert_close(
+        numerics.assert_close(
             torch.tensor([-torch.inf]),
             torch.tensor([-torch.inf]),
             0,
@@ -283,7 +283,7 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
         )["matched_ratio"]
         == 1.0
     )
-    matching_nan = verification._assert_close(
+    matching_nan = numerics.assert_close(
         torch.tensor([torch.nan]),
         torch.tensor([torch.nan]),
         0,
@@ -292,13 +292,13 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
     )
     assert matching_nan["matching_nan_count"] == 1.0
     assert (
-        verification._assert_close((torch.ones(1),), (torch.ones(1),), 0, 0)[
+        numerics.assert_close((torch.ones(1),), (torch.ones(1),), 0, 0)[
             "max_abs_error"
         ]
         == 0.0
     )
     assert (
-        verification._assert_close(
+        numerics.assert_close(
             {"x": torch.ones(1)},
             {"x": torch.ones(1)},
             0,
@@ -306,7 +306,7 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
         )["max_abs_error"]
         == 0.0
     )
-    assert verification._assert_close("x", "x", 0, 0)["max_abs_error"] == 0.0
+    assert numerics.assert_close("x", "x", 0, 0)["max_abs_error"] == 0.0
 
     cases = [
         (torch.ones(2), torch.ones(3), "shape mismatch"),
@@ -324,11 +324,11 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
     ]
     for actual, expected, message in cases:
         with pytest.raises(VerificationError, match=message):
-            verification._assert_close(actual, expected, 0, 0)
+            numerics.assert_close(actual, expected, 0, 0)
     with pytest.raises(VerificationError, match="numerical mismatch"):
-        verification._assert_close(torch.ones(2), torch.full((2,), 2.0), 0, 0)
+        numerics.assert_close(torch.ones(2), torch.full((2,), 2.0), 0, 0)
     with pytest.raises(VerificationError, match="exceeds cap"):
-        verification._assert_close(
+        numerics.assert_close(
             torch.tensor([1.1]),
             torch.tensor([1.0]),
             1,

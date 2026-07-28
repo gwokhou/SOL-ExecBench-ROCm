@@ -39,11 +39,8 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ProfileStatus,
     has_profiler_data_artifact,
 )
-from sol_execbench.core.bench.rocm_profiler.models import (
-    _tail as tail,
-)
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
-from sol_execbench.core.text_utils import subprocess_text
+from sol_execbench.core.text_utils import subprocess_text, text_tail
 
 
 def collect_rocprofv3_profile(
@@ -343,8 +340,8 @@ def write_rocprofv3_diagnostic_artifact(
         "output_directory_listing": profile_output_directory_listing(
             request.output_directory,
         ),
-        "stdout_tail": tail(completed.stdout or ""),
-        "stderr_tail": tail(completed.stderr or ""),
+        "stdout_tail": text_tail(completed.stdout or "", limit=4096),
+        "stderr_tail": text_tail(completed.stderr or "", limit=4096),
         "reason_codes": [
             ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
             ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,

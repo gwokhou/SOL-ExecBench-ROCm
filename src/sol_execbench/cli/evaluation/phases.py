@@ -17,10 +17,12 @@ from typing import NoReturn
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from sol_execbench.cli.evaluation import command as cli_evaluation
-from sol_execbench.cli.evaluation import compilation as cli_compilation
-from sol_execbench.cli.evaluation import profile_mode
-from sol_execbench.cli.evaluation import runtime as cli_evaluation_runtime
+from sol_execbench.cli.evaluation import (
+    command as cli_evaluation,
+    compilation as cli_compilation,
+    profile_mode,
+    runtime as cli_evaluation_runtime,
+)
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import EXIT_EXECUTION, CliFailure
 from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence

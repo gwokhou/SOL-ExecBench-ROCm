@@ -28,31 +28,19 @@ from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     NonEmptyString,
 )
-from sol_execbench.core.data.definition_axes import const_axes as _const_axes
-from sol_execbench.core.data.definition_axes import expr_axes as _expr_axes
 from sol_execbench.core.data.definition_axes import (
+    const_axes as _const_axes,
+    expr_axes as _expr_axes,
     get_axes_values as _get_axes_values,
-)
-from sol_execbench.core.data.definition_axes import (
     get_axes_values_from_inputs as _get_axes_values_from_inputs,
-)
-from sol_execbench.core.data.definition_axes import (
     get_input_shapes as _get_input_shapes,
-)
-from sol_execbench.core.data.definition_axes import (
     get_output_shapes as _get_output_shapes,
-)
-from sol_execbench.core.data.definition_axes import (
     get_resolved_axes_values as _get_resolved_axes_values,
-)
-from sol_execbench.core.data.definition_axes import get_shapes as _get_shapes
-from sol_execbench.core.data.definition_axes import (
+    get_shapes as _get_shapes,
     torch_input_dtypes as _torch_input_dtypes,
-)
-from sol_execbench.core.data.definition_axes import (
     torch_output_dtypes as _torch_output_dtypes,
+    var_axes as _var_axes,
 )
-from sol_execbench.core.data.definition_axes import var_axes as _var_axes
 from sol_execbench.core.data.definition_models import (
     AxisConst,
     AxisExpr,

@@ -10,16 +10,10 @@ import statistics
 from collections.abc import Mapping, Sequence
 
 from solar.rocm.audit_validation import (
-    audit_mapping as _audit_mapping,
-)
-from solar.rocm.audit_validation import (
-    audit_nonnegative_int as _audit_nonnegative_int,
-)
-from solar.rocm.audit_validation import (
-    audit_sha256 as _audit_sha256,
-)
-from solar.rocm.audit_validation import (
-    audit_string_set as _audit_string_set,
+    audit_mapping,
+    audit_nonnegative_int,
+    audit_sha256,
+    audit_string_set,
 )
 
 _NOMINAL_TOLERANCE = 1.001
@@ -70,7 +64,7 @@ def verify_resource_peak_measurements(
 def _verify_experiment_protocol(
     value: object,
 ) -> tuple[int, int, int, int, int]:
-    protocol = _audit_mapping(value, "experiment_protocol")
+    protocol = audit_mapping(value, "experiment_protocol")
     if protocol.get("design") != "two_phase_tuning_then_held_out_measurement":
         raise ValueError("architecture audit experiment design mismatch")
     if protocol.get("primary_statistic") != "median_of_process_batch_medians":
@@ -123,7 +117,7 @@ def _verify_execution_order(
     probes: set[str],
     expected_batches: int,
 ) -> None:
-    protocol = _audit_mapping(value, "experiment_protocol")
+    protocol = audit_mapping(value, "experiment_protocol")
     raw_order = protocol.get("held_out_execution_order")
     if not isinstance(raw_order, list):
         raise ValueError(
@@ -137,12 +131,12 @@ def _verify_execution_order(
     observed: set[tuple[int, str]] = set()
     observed_positions: set[tuple[int, int]] = set()
     for raw in raw_order:
-        entry = _audit_mapping(raw, "held-out execution order entry")
-        process_batch = _audit_nonnegative_int(
+        entry = audit_mapping(raw, "held-out execution order entry")
+        process_batch = audit_nonnegative_int(
             entry.get("process_batch"),
             "process batch",
         )
-        position = _audit_nonnegative_int(
+        position = audit_nonnegative_int(
             entry.get("position"),
             "probe position",
         )
@@ -189,7 +183,7 @@ def _verify_measurements(
     covered_resources: set[str] = set()
     measurements: dict[str, Mapping[str, object]] = {}
     for raw in value:
-        measurement = _audit_mapping(raw, "measurement")
+        measurement = audit_mapping(raw, "measurement")
         probe = str(measurement.get("probe", "")).strip()
         if not probe or probe in measurements:
             raise ValueError(
@@ -197,13 +191,13 @@ def _verify_measurements(
             )
         measurements[probe] = measurement
         covered_precisions.update(
-            _audit_string_set(
+            audit_string_set(
                 measurement.get("covers_precisions"),
                 "covers_precisions",
             ),
         )
         covered_resources.update(
-            _audit_string_set(
+            audit_string_set(
                 measurement.get("covers_resource_modes"),
                 "covers_resource_modes",
             ),
@@ -293,7 +287,7 @@ def _verify_held_out_measurement(
     _close(measurement.get("minimum_result"), min(samples), "minimum result")
     _close(measurement.get("peak_result"), max(samples), "peak result")
     _verify_statistics(
-        _audit_mapping(measurement.get("statistics"), "measurement statistics"),
+        audit_mapping(measurement.get("statistics"), "measurement statistics"),
         samples=samples,
         batch_medians=batch_medians,
         expected_bootstrap_replicates=expected_bootstrap_replicates,
@@ -362,7 +356,7 @@ def _raw_batches(
     batches: list[tuple[float, ...]] = []
     telemetry: list[Mapping[str, object]] = []
     for expected_index, raw in enumerate(value):
-        batch = _audit_mapping(raw, "raw process batch")
+        batch = audit_mapping(raw, "raw process batch")
         if batch.get("process_batch") != expected_index:
             raise ValueError("architecture audit process batch index mismatch")
         samples = _number_sequence(batch.get("samples"), "raw samples")
@@ -393,7 +387,7 @@ def _verify_telemetry(
     *,
     require_unthrottled: bool,
 ) -> Mapping[str, object]:
-    snapshot = _audit_mapping(value, "telemetry snapshot")
+    snapshot = audit_mapping(value, "telemetry snapshot")
     if not str(snapshot.get("captured_at", "")).strip():
         raise ValueError("architecture audit telemetry timestamp is missing")
     for field_name in _TELEMETRY_NUMERIC_FIELDS:
@@ -428,7 +422,7 @@ def _verify_telemetry_summary(
     value: object,
     snapshots: tuple[Mapping[str, object], ...],
 ) -> None:
-    summary = _audit_mapping(value, "telemetry_summary")
+    summary = audit_mapping(value, "telemetry_summary")
     if summary.get("snapshot_count") != len(snapshots):
         raise ValueError("architecture audit telemetry summary count mismatch")
     expected_sets = {
@@ -441,17 +435,17 @@ def _verify_telemetry_summary(
         },
     }
     for field_name, expected in expected_sets.items():
-        observed = _audit_string_set(summary.get(field_name), field_name)
+        observed = audit_string_set(summary.get(field_name), field_name)
         if observed != expected:
             raise ValueError(
                 "architecture audit telemetry summary state mismatch",
             )
-    numeric = _audit_mapping(
+    numeric = audit_mapping(
         summary.get("numeric"),
         "telemetry numeric summary",
     )
     for field_name in _TELEMETRY_NUMERIC_FIELDS:
-        statistics_payload = _audit_mapping(
+        statistics_payload = audit_mapping(
             numeric.get(field_name),
             f"telemetry {field_name} summary",
         )
@@ -534,7 +528,7 @@ def _verify_confidence_interval(
     expected_replicates: int,
     expected_seed: int,
 ) -> None:
-    interval = _audit_mapping(value, "bootstrap confidence interval")
+    interval = audit_mapping(value, "bootstrap confidence interval")
     lower = _positive_number(interval.get("lower"), "confidence lower bound")
     upper = _positive_number(interval.get("upper"), "confidence upper bound")
     if (
@@ -553,8 +547,8 @@ def _verify_measurement_tuning(
     *,
     expected_tuning_batches: int,
 ) -> None:
-    tuning = _audit_mapping(measurement.get("tuning"), "measurement tuning")
-    selected = _audit_mapping(
+    tuning = audit_mapping(measurement.get("tuning"), "measurement tuning")
+    selected = audit_mapping(
         measurement.get("selected_configuration"),
         "selected configuration",
     )
@@ -642,8 +636,8 @@ def _verify_tuning_candidate(
     expected_tuning_batches: int,
     expected_samples_per_batch: int,
 ) -> tuple[float, int, Mapping[str, object], str]:
-    candidate = _audit_mapping(value, "tuning candidate")
-    configuration = _audit_mapping(
+    candidate = audit_mapping(value, "tuning candidate")
+    configuration = audit_mapping(
         candidate.get("configuration"),
         "tuning candidate configuration",
     )
@@ -689,7 +683,7 @@ def _verify_tuning_candidate(
         candidate.get("compiler_defines"),
         candidate_value,
     )
-    binary_sha256 = _audit_sha256(
+    binary_sha256 = audit_sha256(
         candidate.get("binary_sha256"),
         "tuning binary SHA-256",
     )
@@ -700,7 +694,7 @@ def _verify_candidate_defines(
     value: object,
     candidate_value: int,
 ) -> Mapping[str, object]:
-    compiler_defines = _audit_mapping(value, "tuning compiler defines")
+    compiler_defines = audit_mapping(value, "tuning compiler defines")
     if (
         len(compiler_defines) != 1
         or not all(str(name).strip() for name in compiler_defines)
@@ -737,7 +731,7 @@ def _verify_tuning_execution_order(
             expected_order,
             strict=True,
         ):
-            entry = _audit_mapping(raw_entry, "tuning execution order entry")
+            entry = audit_mapping(raw_entry, "tuning execution order entry")
             if (
                 entry.get("tuning_round") != tuning_round
                 or entry.get(parameter) != expected_value
@@ -763,7 +757,7 @@ def _verify_frozen_tuning(
         raise ValueError(
             "architecture audit frozen tuning configuration mismatch",
         )
-    compiler_defines = _audit_mapping(
+    compiler_defines = audit_mapping(
         measurement.get("compiler_defines"),
         "compiler defines",
     )
@@ -774,7 +768,7 @@ def _verify_frozen_tuning(
 
 
 def _positive_int(value: object, field: str) -> int:
-    numeric = _audit_nonnegative_int(value, field)
+    numeric = audit_nonnegative_int(value, field)
     if numeric == 0:
         raise ValueError(
             f"architecture audit evidence {field} must be a positive integer",

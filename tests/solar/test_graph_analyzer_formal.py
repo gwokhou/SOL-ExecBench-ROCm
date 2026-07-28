@@ -7,11 +7,8 @@ from typing import cast
 
 import pytest
 
-from solar.analysis.graph_analyzer import (
-    IRGraphAnalyzer,
-    _GraphTopology,
-    _PreparedAnalysis,
-)
+from solar.analysis.graph_analyzer import IRGraphAnalyzer
+from solar.analysis.graph_context import GraphTopology, PreparedAnalysis
 from solar.analysis.graph_models import (
     AnalysisAccumulator,
     FormalAnalysis,
@@ -206,7 +203,7 @@ def test_runner_evidence_and_audit_cover_chain_region_and_single(
     analyzer._run_orojenesis_evidence(
         plan,
         cast(OrojenesisRunner, _FakeRunner()),
-        cast(_PreparedAnalysis, prepared),
+        cast(PreparedAnalysis, prepared),
         evidence,
         require_orojenesis=True,
     )
@@ -225,7 +222,7 @@ def test_runner_evidence_and_audit_cover_chain_region_and_single(
     audited, formal = analyzer._audit_orojenesis_evidence(
         plan,
         evidence,
-        cast(_PreparedAnalysis, prepared),
+        cast(PreparedAnalysis, prepared),
         audited_fused_bytes=48.0,
     )
     assert audited >= 48.0
@@ -242,7 +239,7 @@ def test_runner_evidence_and_audit_cover_chain_region_and_single(
     _, missing_artifact_is_tile_aware = analyzer._audit_orojenesis_evidence(
         plan,
         evidence,
-        cast(_PreparedAnalysis, prepared),
+        cast(PreparedAnalysis, prepared),
         audited_fused_bytes=48.0,
     )
     assert missing_artifact_is_tile_aware is False
@@ -295,7 +292,7 @@ def test_strict_runner_requires_toolchain_identity(tmp_path: Path):
         IRGraphAnalyzer()._run_orojenesis_evidence(
             plan,
             cast(OrojenesisRunner, runner),
-            cast(_PreparedAnalysis, prepared),
+            cast(PreparedAnalysis, prepared),
             _empty_orojenesis(),
             require_orojenesis=True,
         )
@@ -384,7 +381,7 @@ def test_tile_aware_bound_requires_complete_contraction_coverage(
     audited, formal = IRGraphAnalyzer()._audit_orojenesis_evidence(
         plan,
         evidence,
-        cast(_PreparedAnalysis, prepared),
+        cast(PreparedAnalysis, prepared),
         audited_fused_bytes=48.0,
     )
 
@@ -414,7 +411,7 @@ def test_lower_bound_combines_compute_and_prefetched_memory():
     accumulator = SimpleNamespace(resource_work={"valu": {"fp32": 2}})
     formal = FormalAnalysis(None, {}, 50.0, 300.0, True)
     lower = IRGraphAnalyzer._lower_bound(
-        cast(_PreparedAnalysis, prepared),
+        cast(PreparedAnalysis, prepared),
         cast(AnalysisAccumulator, accumulator),
         formal,
         require_orojenesis=True,
@@ -428,7 +425,7 @@ def test_lower_bound_combines_compute_and_prefetched_memory():
     with pytest.raises(ValueError, match="complete tile-aware"):
         IRGraphAnalyzer._lower_bound(
             cast(
-                _PreparedAnalysis,
+                PreparedAnalysis,
                 SimpleNamespace(
                     profile=None,
                     semantic_graph=False,
@@ -449,7 +446,7 @@ def test_graph_topology_traces_views_consumers_and_orphans():
         "consumer": {"connections": {"inputs": ["view2"], "outputs": []}},
         "lonely": {"connections": {"inputs": [], "outputs": []}},
     }
-    topology = _GraphTopology(
+    topology = GraphTopology(
         layers=layers,
         start_node_ids={"start"},
         bool_start_node_ids=set(),
@@ -499,7 +496,7 @@ def test_dequantized_payload_precision_traces_casts_passthrough_and_mul():
             },
         },
     }
-    topology = _GraphTopology(
+    topology = GraphTopology(
         layers=layers,
         start_node_ids=set(),
         bool_start_node_ids=set(),

@@ -15,8 +15,10 @@ from multiprocessing.connection import Connection
 from typing import Any
 
 import torch
-from safetensors.torch import load as load_safetensors_bytes
-from safetensors.torch import save as save_safetensors_bytes
+from safetensors.torch import (
+    load as load_safetensors_bytes,
+    save as save_safetensors_bytes,
+)
 
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 

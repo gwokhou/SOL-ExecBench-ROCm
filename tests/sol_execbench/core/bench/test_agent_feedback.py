@@ -12,11 +12,9 @@ from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackBuildRequest,
     AgentFeedbackSidecar,
     artifact_citation_from_path,
+    build_agent_feedback_sidecar as _build_agent_feedback_sidecar,
     evaluate_agent_feedback_governance,
     validate_agent_feedback_freshness,
-)
-from sol_execbench.core.bench.agent_feedback import (
-    build_agent_feedback_sidecar as _build_agent_feedback_sidecar,
 )
 from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticArtifactCitation,

@@ -7,7 +7,7 @@ import torch
 import torch.nn.functional as functional
 
 from solar.ir.registry import ir_lifecycle
-from solar.verification import verify as verification
+from solar.verification import numerics
 from solar.verification.verify import IRExecutionError, IRGraphExecutor
 
 
@@ -594,7 +594,7 @@ def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
         IRExecutionError,
         match="unsupported NVLabs einsum",
     ):
-        verification._torch_equation("A(P+R)->A")
+        numerics.torch_equation("A(P+R)->A")
     with pytest.raises(
         IRExecutionError,
         match="explicit transpose dimensions",

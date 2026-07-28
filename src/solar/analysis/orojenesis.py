@@ -22,16 +22,13 @@ from typing import Any
 
 import yaml
 
-from solar import schema_versions as _schemas
 from solar.analysis.orojenesis_common import OrojenesisError
 from solar.analysis.orojenesis_curves import (
     compose_multi_einsum_curve,
+    compose_multi_einsum_region_curve as _compose_multi_einsum_region_curve,
     parse_multi_einsum_curve,
     parse_multi_einsum_region_curve,
     parse_multi_mapping_records,
-)
-from solar.analysis.orojenesis_curves import (
-    compose_multi_einsum_region_curve as _compose_multi_einsum_region_curve,
 )
 from solar.analysis.orojenesis_identity import (
     OrojenesisIdentityPolicy,
@@ -39,26 +36,21 @@ from solar.analysis.orojenesis_identity import (
 )
 from solar.analysis.orojenesis_problem import (
     architecture as _build_architecture,
-)
-from solar.analysis.orojenesis_problem import (
     mapper_config as _build_mapper_config,
-)
-from solar.analysis.orojenesis_problem import (
     multi_architecture as _build_multi_architecture,
-)
-from solar.analysis.orojenesis_problem import (
     multi_mapper_config as _build_multi_mapper_config,
-)
-from solar.analysis.orojenesis_problem import (
     problem_for_layer as _build_problem_for_layer,
 )
 from solar.analysis.orojenesis_process import (
     invoke_mapper_process,
-)
-from solar.analysis.orojenesis_process import (
     run_mapper_process as _default_mapper_runner,
 )
 from solar.ir.contracts import CONTRACTION_KIND, INPUT_KIND, layer_operation
+from solar.schema_versions import (
+    OROJENESIS_IDENTITY_SCHEMA_VERSION,
+    OROJENESIS_MULTI_EINSUM_PROBLEM_SCHEMA_VERSION,
+    OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
+)
 
 OROJENESIS_COMMIT = "97d52178bf9a9c209bf79be96b87c164bcd35625"
 OROJENESIS_REPOSITORY = "https://github.com/NVlabs/timeloop.git"
@@ -93,7 +85,7 @@ MULTI_EINSUM_BATCH_COMPOSITION = "broadcast_batch_linear_tile_shape_v1"
 MULTI_EINSUM_FANOUT_COMPOSITION = "matmul_fanout_tree_tile_shape_v1"
 _TOKEN = re.compile(r"[A-Za-z][0-9]*")
 _IDENTITY_POLICY = OrojenesisIdentityPolicy(
-    schema_version=_schemas.OROJENESIS_IDENTITY_SCHEMA_VERSION,
+    schema_version=OROJENESIS_IDENTITY_SCHEMA_VERSION,
     repository=OROJENESIS_REPOSITORY,
     commit=OROJENESIS_COMMIT,
     tree_oid=OROJENESIS_TREE_OID,
@@ -778,9 +770,7 @@ def multi_einsum_problem(
                 "multi-einsum chain M dimension or dtype drifted",
             )
     return {
-        "schema_version": (
-            _schemas.OROJENESIS_MULTI_EINSUM_PROBLEM_SCHEMA_VERSION
-        ),
+        "schema_version": (OROJENESIS_MULTI_EINSUM_PROBLEM_SCHEMA_VERSION),
         "chain": {"kind": "linear_matmul", "layers": descriptors},
     }
 
@@ -1469,9 +1459,7 @@ def _component_region(
         and str(edge["consumer"]) == consumer
     ]
     return {
-        "schema_version": (
-            _schemas.OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION
-        ),
+        "schema_version": (OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION),
         "kind": kind,
         "composition": composition,
         "nodes": [discovery.descriptors[node] for node in schedule],
@@ -1521,7 +1509,7 @@ def find_multi_einsum_regions(
 
 def multi_einsum_region_problem(region: Mapping[str, Any]) -> dict[str, Any]:
     """Validate and canonicalize a supported extended MatMul region."""
-    schema_version = _schemas.OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION
+    schema_version = OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION
     try:
         descriptor = json.loads(json.dumps(region, sort_keys=True))
     except (TypeError, ValueError) as exc:

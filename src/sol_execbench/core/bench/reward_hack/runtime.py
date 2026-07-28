@@ -35,9 +35,9 @@ from sol_execbench.core.bench.reward_hack.models import RewardHackError
 _ELAPSED_TIME_ADDR: int | None = None
 
 try:
-    import torch.cuda as _tc_init
+    import torch.cuda
 
-    _ELAPSED_TIME_ADDR = id(_tc_init.Event.elapsed_time)
+    _ELAPSED_TIME_ADDR = id(torch.cuda.Event.elapsed_time)
 except (AttributeError, RuntimeError):
     pass
 
@@ -53,11 +53,11 @@ def check_monkey_patch() -> None:
 
     """
     try:
-        import torch.cuda as _tc
+        import torch.cuda
 
         if (
             _ELAPSED_TIME_ADDR is not None
-            and id(_tc.Event.elapsed_time) != _ELAPSED_TIME_ADDR
+            and id(torch.cuda.Event.elapsed_time) != _ELAPSED_TIME_ADDR
         ):
             raise RewardHackError(
                 "torch.cuda.Event.elapsed_time has been monkey-patched",
