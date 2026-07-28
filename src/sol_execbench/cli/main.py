@@ -124,6 +124,7 @@ class RootGroup(LazyGroup):
         json_mode = _requested_json(raw_args)
         captured_stdout = io.StringIO()
         captured_stderr = io.StringIO()
+        result: Any = None
         try:
             result = self._invoke(
                 raw_args,

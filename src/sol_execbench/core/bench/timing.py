@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import statistics
 from collections.abc import Callable
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 import torch
 
@@ -34,7 +34,7 @@ from sol_execbench.core.platform.runtime import (
 def _summarize_statistics(
     times: list[float],
     return_mode: Literal["mean", "median", "all"],
-) -> Union[float, list[float]]:
+) -> float | list[float]:
     """Summarize timing statistics based on return mode."""
     if return_mode == "all":
         return times
@@ -153,8 +153,8 @@ def bench_time_with_device_events(
 
 def time_runnable(
     fn: Any,
-    inputs: list,
-    outputs: list,
+    inputs: list[Any],
+    outputs: list[Any],
     device: str,
     warmup: int = 10,
     rep: int = 50,
@@ -163,7 +163,7 @@ def time_runnable(
     methodology: Literal["events"] = "events",
     validator: Callable[[list[Any], Any], None] | None = None,
     cache_clear_policy: CacheClearPolicy | None = None,
-) -> Union[float, list[float]]:
+) -> float | list[float]:
     """Time a callable using ROCm-compatible PyTorch device events.
 
     Creates a :class:`ShiftingMemoryPoolAllocator` from *inputs* and *outputs*

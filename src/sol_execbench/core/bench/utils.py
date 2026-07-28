@@ -18,7 +18,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 import torch
@@ -32,6 +31,7 @@ from sol_execbench.core.data.trace import (
 )
 from sol_execbench.core.platform.runtime import env_snapshot
 from sol_execbench.core.process.stdio import flush_stdio_streams
+from sol_execbench.core.timestamps import utc_timestamp
 
 _MAX_EMBEDDED_LOG_BYTES = 64 * 1024
 
@@ -86,7 +86,7 @@ def make_eval(
             clocks_locked=clocks_locked,
             timing_protocol=timing_protocol,
         ),
-        timestamp=datetime.now().isoformat(),
+        timestamp=utc_timestamp(),
         correctness=correctness,
         performance=performance,
     )

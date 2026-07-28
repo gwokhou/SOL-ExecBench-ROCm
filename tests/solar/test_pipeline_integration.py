@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 import torch
-import torch.nn.functional as functional
 import yaml
+from torch.nn import functional
 
 from solar.analysis.graph_analyzer import IRGraphAnalyzer
 from solar.graph.extraction import extract_operator_graph

@@ -293,7 +293,7 @@ class TensorManipulationHandler(EinsumOpHandler):
 
         """
         # Build a mapping of shape value -> list of (index, label) pairs
-        shape_to_labels: dict[int, list[tuple]] = {}
+        shape_to_labels: dict[int, list[tuple[int, str]]] = {}
         for i, (size, label) in enumerate(
             zip(input_shape, in_labels, strict=True)
         ):
@@ -357,7 +357,7 @@ class TensorManipulationHandler(EinsumOpHandler):
 
         # Initialize output labels as None (to be filled)
         out_labels: list[str | None] = [None] * out_dims
-        used_in_labels: set = set()
+        used_in_labels: set[str] = set()
 
         # Match from the start
         start_match = 0
@@ -523,4 +523,4 @@ _registry.register_handler(TensorManipulationHandler)
 _registry.register_handler(MatrixStructureHandler)
 
 
-__all__ = ["TensorManipulationHandler", "MatrixStructureHandler"]
+__all__ = ["MatrixStructureHandler", "TensorManipulationHandler"]

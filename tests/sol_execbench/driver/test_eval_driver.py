@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import os
 import subprocess
 import sys
@@ -211,6 +212,7 @@ def _run_eval_driver_process(
         cwd=tmp_path,
         env=env,
         capture_output=True,
+        check=False,
         text=True,
         timeout=60,
     )
@@ -527,6 +529,7 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
             "SOL_EXECBENCH_ALLOW_CPU_TIMING": "1",
         },
         capture_output=True,
+        check=False,
         text=True,
         timeout=60,
     )
@@ -882,10 +885,10 @@ def test_nan_correctness_fields_are_finite_with_flags(tmp_path):
     # Error values must be finite (not NaN/Inf)
     max_abs = correctness.get("max_absolute_error", 0.0)
     max_rel = correctness.get("max_relative_error", 0.0)
-    assert isinstance(max_abs, (int, float)) and max_abs == max_abs, (
+    assert isinstance(max_abs, (int, float)) and math.isfinite(max_abs), (
         f"max_absolute_error should be finite, got {max_abs!r}"
     )
-    assert isinstance(max_rel, (int, float)) and max_rel == max_rel, (
+    assert isinstance(max_rel, (int, float)) and math.isfinite(max_rel), (
         f"max_relative_error should be finite, got {max_rel!r}"
     )
 
@@ -909,9 +912,9 @@ def test_passing_trace_correctness_unchanged(tmp_path):
     max_rel = correctness.get("max_relative_error")
 
     # For a correct kernel, error values must be finite numbers (not null)
-    assert isinstance(max_abs, (int, float)) and max_abs == max_abs, (
+    assert isinstance(max_abs, (int, float)) and math.isfinite(max_abs), (
         f"Expected finite max_absolute_error for PASSED trace, got {max_abs!r}"
     )
-    assert isinstance(max_rel, (int, float)) and max_rel == max_rel, (
+    assert isinstance(max_rel, (int, float)) and math.isfinite(max_rel), (
         f"Expected finite max_relative_error for PASSED trace, got {max_rel!r}"
     )

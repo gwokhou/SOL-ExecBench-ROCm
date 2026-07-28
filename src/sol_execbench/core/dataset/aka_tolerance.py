@@ -339,10 +339,10 @@ def _record_list(data: Mapping[str, object]) -> list[object]:
 __all__ = [
     "CALIBRATION_METHOD",
     "CALIBRATION_SCHEMA_VERSION",
-    "CalibrationStatus",
     "DEFAULT_MARGIN",
     "DEFAULT_REPEATS_PER_SEED",
     "DEFAULT_SEED_COUNT",
+    "CalibrationStatus",
     "calibrate_tolerance",
     "calibration_tolerances",
     "dtype_default_tolerance",

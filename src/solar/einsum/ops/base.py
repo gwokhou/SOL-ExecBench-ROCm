@@ -333,8 +333,8 @@ class EinsumOpHandler(ABC):
 
 
 __all__ = [
-    "EinsumOperand",
     "EinsumOp",
     "EinsumOpHandler",
+    "EinsumOperand",
     "compute_cost_from_equation",
 ]

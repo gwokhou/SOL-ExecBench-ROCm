@@ -21,7 +21,7 @@ This module provides utility functions following Google's Python style guide.
 import importlib.util
 import os
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import yaml
 
@@ -74,7 +74,7 @@ def load_module_from_file(file_path: str | Path) -> Any:
     return module
 
 
-def ensure_directory(path: Union[str, Path]) -> Path:
+def ensure_directory(path: str | Path) -> Path:
     """Ensure a directory exists, creating it if necessary.
 
     Args:
@@ -207,7 +207,9 @@ def validate_dim_tokens(
     return False
 
 
-def parse_einsum_equation(equation: str) -> tuple:
+def parse_einsum_equation(
+    equation: str,
+) -> tuple[list[list[str]], list[str]]:
     """Parse an einsum equation into input operand tokens and output tokens.
 
     Tokens are in the format: single capital letter optionally followed by digit(s).
@@ -267,9 +269,14 @@ def validate_einsum_ranks_match_shapes(
         Tuple of (is_valid, error_message). If valid, error_message is empty.
 
     Examples:
-        >>> validate_einsum_ranks_match_shapes("AB,BC->AC", {"inputs": [[32, 64], [64, 128]], "outputs": [[32, 128]]})
+        >>> validate_einsum_ranks_match_shapes(
+        ...     "AB,BC->AC",
+        ...     {"inputs": [[32, 64], [64, 128]], "outputs": [[32, 128]]},
+        ... )
         (True, "")
-        >>> validate_einsum_ranks_match_shapes("AB,AB->AB", {"inputs": [[32, 64], [64]], "outputs": [[32, 64]]})
+        >>> validate_einsum_ranks_match_shapes(
+        ...     "AB,AB->AB", {"inputs": [[32, 64], [64]], "outputs": [[32, 64]]}
+        ... )
         (False, "Einsum input operand 1 has 2 dims (AB) but tensor has shape [64] (1 dims)")
 
     """
@@ -343,12 +350,12 @@ def validate_tensor_names_match_shapes(
     Examples:
         >>> validate_tensor_names_match_shapes(
         ...     {"inputs": ["A", "B"], "outputs": ["C"]},
-        ...     {"inputs": [[32, 64], [64, 128]], "outputs": [[32, 128]]}
+        ...     {"inputs": [[32, 64], [64, 128]], "outputs": [[32, 128]]},
         ... )
         (True, "")
         >>> validate_tensor_names_match_shapes(
         ...     {"inputs": ["A", "B"], "outputs": ["C"]},
-        ...     {"inputs": [[32, 64]], "outputs": [[32, 128]]}
+        ...     {"inputs": [[32, 64]], "outputs": [[32, 128]]},
         ... )
         (False, "Input tensor_names has 2 entries but tensor_shapes has 1")
 

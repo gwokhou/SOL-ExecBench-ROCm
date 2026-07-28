@@ -188,10 +188,8 @@ class BinaryElementwiseHandler(EinsumOpHandler):
 
         # Normalize op name (remove underscores and dunder)
         op_type = op_name.lower().rstrip("_")
-        if op_type.startswith("__"):
-            op_type = op_type[2:]
-        if op_type.startswith("r"):
-            op_type = op_type[1:]  # __radd__ -> add
+        op_type = op_type.removeprefix("__")
+        op_type = op_type.removeprefix("r")  # __radd__ -> add
 
         output_shape = (
             tensor_shapes.outputs[0] if tensor_shapes.num_outputs > 0 else None
@@ -322,4 +320,4 @@ _registry.register_handler(UnaryElementwiseHandler)
 _registry.register_handler(BinaryElementwiseHandler)
 
 
-__all__ = ["UnaryElementwiseHandler", "BinaryElementwiseHandler"]
+__all__ = ["BinaryElementwiseHandler", "UnaryElementwiseHandler"]

@@ -318,8 +318,8 @@ def _validate_required_parameters(
 
 
 __all__ = [
-    "AtenIRError",
     "SUPPORTED_ATEN_TARGETS",
+    "AtenIRError",
     "convert_operator_graph",
     "validate_aten_graph",
 ]

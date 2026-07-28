@@ -78,7 +78,7 @@ def _trace_reference(
     name: str,
 ) -> tuple[DynamicValue, dict[int, DynamicValue], set[int]]:
     import torch
-    import torch.nn as nn
+    from torch import nn
     from torch.utils._python_dispatch import TorchDispatchMode
 
     from solar._vendor import torchview
@@ -149,8 +149,8 @@ backend = GraphBackend(
 
 
 __all__ = [
-    "backend",
     "OperatorGraphArtifact",
     "TensorSignature",
+    "backend",
     "extract_operator_graph",
 ]

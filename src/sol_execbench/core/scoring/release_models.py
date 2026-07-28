@@ -284,11 +284,11 @@ def release_model_payload(model: ReleaseModel) -> dict[str, Any]:
 
 
 __all__ = [
+    "MAX_RELEASE_STATEMENT_BYTES",
     "ArtifactReference",
     "BaselineStatement",
     "CandidateStatement",
     "ExecutionPlanProblem",
-    "MAX_RELEASE_STATEMENT_BYTES",
     "ProblemRunEvidence",
     "ReleaseArtifactKind",
     "ReleaseBundle",

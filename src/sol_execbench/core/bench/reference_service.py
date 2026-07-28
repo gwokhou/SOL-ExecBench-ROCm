@@ -138,7 +138,7 @@ class ReferenceService:
                 f"{exc}\n{exc.provenance.log_text()}",
                 failure_class=exc.failure_class,
             ) from exc
-        except Exception as exc:  # noqa: BLE001 -- trusted request isolation
+        except Exception as exc:
             raise InputGenerationError(
                 str(exc),
                 failure_class=GEN_INPUTS_ERROR,

@@ -27,10 +27,10 @@ from solar.einsum.ops.registry import (
 )
 
 __all__ = [
-    "EinsumOpRegistry",
-    "register_einsum_op",
-    "get_global_registry",
-    "EinsumOpHandler",
     "EinsumOp",
+    "EinsumOpHandler",
+    "EinsumOpRegistry",
     "EinsumOperand",
+    "get_global_registry",
+    "register_einsum_op",
 ]

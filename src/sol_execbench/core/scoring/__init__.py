@@ -19,13 +19,13 @@ from sol_execbench.core.scoring.release_verifier import (
 )
 
 __all__ = [
+    "OfficialScoreResult",
+    "SolScoreAuditError",
     "SuiteScore",
     "WorkloadScore",
-    "SolScoreAuditError",
     "aggregate_suite_scores",
     "diagnostic_workload_score",
     "official_score_availability",
     "sol_score",
-    "OfficialScoreResult",
     "verify_and_score_release",
 ]

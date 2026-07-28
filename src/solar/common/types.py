@@ -20,7 +20,7 @@ following Google's Python style guide for type annotations.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Union
+from typing import Any
 
 # Type aliases for better readability
 DynamicValue = Any
@@ -168,7 +168,7 @@ class AnalysisResult:
     """
 
     layers: dict[str, dict[str, Any]]
-    total: dict[str, Union[int, float]]
+    total: dict[str, int | float]
     fusion_analysis: dict[str, Any] | None = None
     roofline_performance: dict[str, Any] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)

@@ -24,7 +24,7 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, ClassVar
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.nvlabs.ir.ops.base import (
@@ -35,7 +35,7 @@ from solar.nvlabs.ir.ops.base import (
 from solar.nvlabs.ir.ops.registry import get_global_registry
 
 
-def generate_dim_labels(num_dims: int, prefix: str = "") -> List[str]:
+def generate_dim_labels(num_dims: int, prefix: str = "") -> list[str]:
     """Generate dimension labels that support more than 26 dimensions.
 
     Uses a char+number scheme:
@@ -139,7 +139,7 @@ class TensorManipulationHandler(EinsumOpHandler):
         input_shape: TensorShape,
         output_shape: TensorShape,
         operation_name: str,
-        module_args: Optional[Dict[str, Any]] = None,
+        module_args: dict[str, Any] | None = None,
     ) -> EinsumOp:
         """Generate einsum for transpose/permute operations.
 
@@ -170,7 +170,7 @@ class TensorManipulationHandler(EinsumOpHandler):
         # Tensor.T is recorded as ``__get__`` without explicit dimensions.
         # Its contract is to reverse every dimension, which must win over
         # shape matching for square or repeated-size tensors.
-        out_label_list: Optional[List[str]]
+        out_label_list: list[str] | None
         if operation_name.lower() == "__get__":
             out_label_list = list(reversed(in_label_list))
         else:
@@ -207,9 +207,9 @@ class TensorManipulationHandler(EinsumOpHandler):
 
     def _apply_permutation_from_args(
         self,
-        in_labels: List[str],
-        module_args: Optional[Dict[str, Any]] = None,
-    ) -> Optional[List[str]]:
+        in_labels: list[str],
+        module_args: dict[str, Any] | None = None,
+    ) -> list[str] | None:
         """Apply explicit permutation from module_args if available.
 
         Args:
@@ -259,8 +259,8 @@ class TensorManipulationHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         output_shape: TensorShape,
-        in_labels: List[str],
-    ) -> List[str]:
+        in_labels: list[str],
+    ) -> list[str]:
         """Match output dimensions to input dimensions by shape values.
 
         This infers the permutation by matching shape values.
@@ -275,7 +275,7 @@ class TensorManipulationHandler(EinsumOpHandler):
             Labels for output dimensions (reordered input labels)
         """
         # Build a mapping of shape value -> list of (index, label) pairs
-        shape_to_labels: Dict[int, List[tuple]] = {}
+        shape_to_labels: dict[int, list[tuple[int, str]]] = {}
         for i, (size, label) in enumerate(
             zip(input_shape, in_labels, strict=False)
         ):
@@ -284,7 +284,7 @@ class TensorManipulationHandler(EinsumOpHandler):
             shape_to_labels[size].append((i, label))
 
         # Track which input labels have been used
-        used_counts: Dict[int, int] = dict.fromkeys(shape_to_labels, 0)
+        used_counts: dict[int, int] = dict.fromkeys(shape_to_labels, 0)
 
         # Build output labels by matching shapes
         out_labels = []
@@ -313,8 +313,8 @@ class TensorManipulationHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         output_shape: TensorShape,
-        in_labels: List[str],
-    ) -> List[str]:
+        in_labels: list[str],
+    ) -> list[str]:
         """Match output dimensions to input dimensions for reshape/view operations.
 
         Preserves dimension labels where the size is unchanged at the same position
@@ -337,8 +337,8 @@ class TensorManipulationHandler(EinsumOpHandler):
         out_dims = len(output_shape)
 
         # Initialize output labels as None (to be filled)
-        out_labels: List[Optional[str]] = [None] * out_dims
-        used_in_labels: set = set()
+        out_labels: list[str | None] = [None] * out_dims
+        used_in_labels: set[str] = set()
 
         # Match from the start
         start_match = 0
@@ -388,7 +388,7 @@ class TensorManipulationHandler(EinsumOpHandler):
         input_shape: TensorShape,
         output_shape: TensorShape,
         operation_name: str,
-        module_args: Optional[Dict[str, Any]] = None,
+        module_args: dict[str, Any] | None = None,
     ) -> EinsumOp:
         """Generate einsum for reshape/view operations.
 
@@ -496,4 +496,4 @@ _registry.register_handler(TensorManipulationHandler)
 _registry.register_handler(MatrixStructureHandler)
 
 
-__all__ = ["TensorManipulationHandler", "MatrixStructureHandler"]
+__all__ = ["MatrixStructureHandler", "TensorManipulationHandler"]

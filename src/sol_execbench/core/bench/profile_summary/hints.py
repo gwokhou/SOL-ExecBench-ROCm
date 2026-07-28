@@ -127,7 +127,7 @@ def _normalize_key(value: str | None) -> str:
     return "".join(ch for ch in (value or "").lower() if ch.isalnum())
 
 
-def _finite_or_none(value: int | float) -> int | float | None:
+def _finite_or_none(value: float) -> int | float | None:
     """Pass through finite numbers; reject NaN/Inf so they never reach sidecar JSON."""
     return value if math.isfinite(value) else None
 

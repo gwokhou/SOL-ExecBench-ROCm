@@ -130,7 +130,7 @@ def test_global_registry_loads_every_builtin_handler_family(
 
     assert all(
         registry.has_handler(operation)
-        for operation in {
+        for operation in (
             "add",
             "conv2d",
             "cumsum",
@@ -142,7 +142,7 @@ def test_global_registry_loads_every_builtin_handler_family(
             "reshape",
             "scaled_dot_product_attention",
             "sum",
-        }
+        )
     )
 
 

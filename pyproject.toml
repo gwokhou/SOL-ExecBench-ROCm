@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "safetensors>=0.7.0",
     "click>=8.0",
+    "graphviz>=0.21",
     "rich>=13.0",
     "triton-rocm==3.6.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "networkx>=3.0",
@@ -55,8 +56,8 @@ dev = [
     "pre-commit>=4.6.0",
     "pytest>=9.0.2",
     "pytest-xdist>=3.5",
-    "ruff>=0.4",
-    "ty>=0.0.39",
+    "ruff>=0.16.0,<0.17.0",
+    "ty>=0.0.64,<0.0.65",
 ]
 
 [tool.pytest.ini_options]
@@ -101,6 +102,7 @@ skip_covered = false
 # names, which the guide treats as practical exceptions.
 force-exclude = true
 line-length = 80
+required-version = ">=0.16.0,<0.17.0"
 target-version = "py312"
 exclude = [
     ".git",
@@ -114,6 +116,9 @@ exclude = [
     "/data",
     "/examples",
 ]
+
+[tool.ruff.format]
+docstring-code-format = true
 
 [tool.ruff.lint]
 extend-select = [
@@ -136,6 +141,7 @@ extend-select = [
 ignore = [
     "ANN401", # Dynamic external payload boundaries are inventoried separately.
     "E741",   # Mathematical kernels use conventional short dimension names.
+    "TRY004", # External payload validators intentionally use a ValueError contract.
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -169,6 +175,26 @@ ban-relative-imports = "all"
 [tool.ty.src]
 include = ["src", "tests"]
 exclude = ["src/solar/_vendor"]
+
+[tool.ty.analysis]
+strict-equality-semantics = true
+
+[tool.ty.rules]
+blanket-ignore-comment = "error"
+missing-type-argument = "error"
+possibly-unresolved-reference = "warn"
+unsupported-dynamic-base = "warn"
+
+[[tool.ty.overrides]]
+include = ["tests/**"]
+
+[tool.ty.overrides.rules]
+# Tests intentionally use lightweight JSON-shaped fixtures; production code
+# retains the stricter generic-argument requirement.
+missing-type-argument = "ignore"
+
+[tool.ty.terminal]
+error-on-warning = true
 
 [[tool.uv.index]]
 name = "pypi"

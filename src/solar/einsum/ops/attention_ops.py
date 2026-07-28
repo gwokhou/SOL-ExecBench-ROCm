@@ -228,7 +228,7 @@ _registry.register_handler(MultiHeadAttentionHandler)
 
 
 __all__ = [
-    "ScaledDotProductAttentionHandler",
     "FlexAttentionHandler",
     "MultiHeadAttentionHandler",
+    "ScaledDotProductAttentionHandler",
 ]

@@ -174,7 +174,7 @@ def test_problem_architecture_mapper_and_capacity_helpers():
     ]
     assert roles == ["first", "second", "middle", "middle", "last"]
     assert orojenesis.multi_einsum_mapper_role(1, 2) == "second_last"
-    for role in {"first", "second", "middle", "last", "second_last"}:
+    for role in ("first", "second", "middle", "last", "second_last"):
         config = orojenesis.OrojenesisRunner.multi_mapper_config(2, role=role)
         assert config["mapspace_constraints"][-1]["factors"] == "M=2"
 

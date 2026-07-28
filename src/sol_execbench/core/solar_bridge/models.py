@@ -279,18 +279,18 @@ def formal_precision_for_definition(definition: Any) -> str:
 
 
 __all__ = [
-    "SolarAnalysisOutcome",
-    "SolarStageAuditOutcome",
-    "SolarStageAuditRequest",
-    "SolarWorkerRequest",
     "FORMAL_ARTIFACT_PATHS",
     "FORMAL_BOUND_KIND",
-    "READINESS_STAGE_ARTIFACTS",
     "READINESS_STAGES",
+    "READINESS_STAGE_ARTIFACTS",
     "SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION",
+    "SolarAnalysisOutcome",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",
     "SolarStage",
+    "SolarStageAuditOutcome",
+    "SolarStageAuditRequest",
     "SolarStageStatus",
+    "SolarWorkerRequest",
     "formal_precision_for_definition",
 ]

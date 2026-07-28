@@ -29,6 +29,7 @@ def test_aka_equivalence_check_passes_for_the_corpus():
         [sys.executable, str(SCRIPT)],
         cwd=REPO_ROOT,
         capture_output=True,
+        check=False,
         text=True,
         timeout=600,
     )

@@ -489,11 +489,11 @@ _registry.register_handler(TrivialOpsHandler)
 
 
 __all__ = [
+    "CrossEntropyHandler",
     "EmbeddingHandler",
     "GRUHandler",
     "LSTMHandler",
-    "RNNHandler",
-    "CrossEntropyHandler",
     "PairwiseLossHandler",
+    "RNNHandler",
     "TrivialOpsHandler",
 ]

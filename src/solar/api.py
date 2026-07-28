@@ -226,6 +226,9 @@ def _failure(
 
 
 __all__ = [
+    "FORMAL_BOUND_KIND",
+    "ROOFLINE_BOUND_KIND",
+    "SOL_BOUND_KINDS",
     "AnalysisFailure",
     "AnalysisRequest",
     "AnalysisResult",
@@ -233,14 +236,11 @@ __all__ = [
     "ConversionReadinessRequest",
     "ConversionReadinessResult",
     "ConversionRequest",
-    "FORMAL_BOUND_KIND",
-    "ROOFLINE_BOUND_KIND",
-    "SOL_BOUND_KINDS",
     "ReadinessArtifact",
     "ReadinessStage",
+    "SolBound",
     "SolarAnalysisStatus",
     "SolarStage",
-    "SolBound",
     "VerificationPolicy",
     "analyze",
     "audit_conversion",

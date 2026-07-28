@@ -19,18 +19,13 @@
 from __future__ import annotations
 
 from functools import cache
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import torch
 
 
-_DTYPE_LOOKUP_T = TypeVar("_DTYPE_LOOKUP_T")
-
-
-def _resolve_dtype(
-    dtype_str: str, mapping: dict[str, _DTYPE_LOOKUP_T]
-) -> _DTYPE_LOOKUP_T:
+def _resolve_dtype[T](dtype_str: str, mapping: dict[str, T]) -> T:
     """Resolve a dtype string via *mapping*, raising a consistent error."""
     if not dtype_str:
         raise ValueError("dtype is None or empty")

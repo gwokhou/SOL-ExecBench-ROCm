@@ -23,7 +23,7 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any, ClassVar, Optional, Tuple
+from typing import Any, ClassVar
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.nvlabs.ir.ops.base import (
@@ -72,8 +72,8 @@ class PoolingHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         pool_type: str,
-        kernel_size: Tuple[int, ...] = (2, 2),
-        stride: Optional[Tuple[int, ...]] = None,
+        kernel_size: tuple[int, ...] = (2, 2),
+        stride: tuple[int, ...] | None = None,
     ) -> EinsumOp:
         """Generate einsum for pooling operations.
 

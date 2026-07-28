@@ -24,7 +24,7 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.nvlabs.ir.ops.base import (
@@ -281,7 +281,7 @@ class CrossEntropyHandler(EinsumOpHandler):
     def _generate_cross_entropy_einsum(
         self,
         predictions_shape: TensorShape,
-        targets_shape: Optional[TensorShape],
+        targets_shape: TensorShape | None,
         reduction: str = "mean",
     ) -> EinsumOp:
         """Generate einsum for cross-entropy loss."""
@@ -357,7 +357,7 @@ class PairwiseLossHandler(EinsumOpHandler):
     def _generate_pairwise_loss_einsum(
         self,
         predictions_shape: TensorShape,
-        targets_shape: Optional[TensorShape],
+        targets_shape: TensorShape | None,
         reduction: str,
         op_name: str,
     ) -> EinsumOp:
@@ -461,11 +461,11 @@ _registry.register_handler(TrivialOpsHandler)
 
 
 __all__ = [
+    "CrossEntropyHandler",
     "EmbeddingHandler",
     "GRUHandler",
     "LSTMHandler",
-    "RNNHandler",
-    "CrossEntropyHandler",
     "PairwiseLossHandler",
+    "RNNHandler",
     "TrivialOpsHandler",
 ]

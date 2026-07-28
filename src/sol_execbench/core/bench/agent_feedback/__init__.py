@@ -41,9 +41,9 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
 __all__ = [
     "AGENT_FEEDBACK_SCHEMA_VERSION",
     "_MODEL_CONFIG",
+    "AgentFeedbackBottleneck",
     "AgentFeedbackBuildIdentity",
     "AgentFeedbackBuildRequest",
-    "AgentFeedbackBottleneck",
     "AgentFeedbackItem",
     "AgentFeedbackReasonCode",
     "AgentFeedbackSeverity",

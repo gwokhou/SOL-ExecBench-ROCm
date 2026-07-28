@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypeVar
 
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.dataset.aka_contract import (
@@ -38,8 +37,6 @@ from sol_execbench.core.scoring.release_models import (
 from sol_execbench.core.scoring.release_solar import verify_solar_index
 from sol_execbench.core.scoring.release_traces import verify_release_run
 from sol_execbench.core.timestamps import utc_timestamp
-
-_ReleaseArtifact = TypeVar("_ReleaseArtifact", bound=ReleaseModel)
 
 
 def build_run_statement(
@@ -228,11 +225,11 @@ def _run_statement(
     raise ValueError("unknown release execution-plan kind")
 
 
-def _load_statement(
+def _load_statement[ReleaseArtifact: ReleaseModel](
     root: Path,
     reference: ArtifactReference,
-    model: type[_ReleaseArtifact],
-) -> _ReleaseArtifact:
+    model: type[ReleaseArtifact],
+) -> ReleaseArtifact:
     if reference.size_bytes > MAX_RELEASE_STATEMENT_BYTES:
         raise ValueError("release statement exceeds the size limit")
     path = verify_artifact_file(

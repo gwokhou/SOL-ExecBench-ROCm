@@ -23,7 +23,7 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.nvlabs.ir.ops.base import (
@@ -109,9 +109,9 @@ class ReductionHandler(EinsumOpHandler):
         self,
         shape: TensorShape,
         op_type: str = "sum",
-        dims: Optional[List[int]] = None,
+        dims: list[int] | None = None,
         keepdim: bool = False,
-        output_shape: Optional[TensorShape] = None,
+        output_shape: TensorShape | None = None,
     ) -> EinsumOp:
         """Generate einsum for reduction operations.
 

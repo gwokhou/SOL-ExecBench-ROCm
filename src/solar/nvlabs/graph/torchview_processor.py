@@ -36,7 +36,7 @@ The output format matches the original process_torchview_graph.py output:
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import torch
 import yaml
@@ -66,20 +66,19 @@ class TorchviewProcessor:
             debug: Enable debug output for troubleshooting.
         """
         self.debug = debug
-        self._processed_nodes: set = set()
-        self._matched_modules: set = set()
-        self._node_counter: Dict[str, int] = {}
-        # Mapping from original node object id to clean node_id
-        self._original_to_clean_id: Dict[str, str] = {}
-        self._cached_default_dtype: Optional[str] = None
+        self._processed_nodes: set[str] = set()
+        self._matched_modules: set[str] = set()
+        self._node_counter: dict[str, int] = {}
+        self._original_to_clean_id: dict[str, str] = {}
+        self._cached_default_dtype: str | None = None
 
     def process_graph(
         self,
         computation_graph: Any,
         output_dir: str,
         kernel_name: str,
-        original_model: Optional[nn.Module] = None,
-    ) -> List[NodeInfo]:
+        original_model: nn.Module | None = None,
+    ) -> list[NodeInfo]:
         """Process a torchview ComputationGraph and save extracted layer nodes.
 
         Args:
@@ -94,10 +93,8 @@ class TorchviewProcessor:
         if self.debug:
             print(f"Processing torchview graph for {kernel_name}...")
 
-        # Reset state for new graph
         self._reset_state()
 
-        # Extract layer nodes
         layer_nodes = self._extract_layer_nodes(
             computation_graph, original_model
         )
@@ -122,17 +119,15 @@ class TorchviewProcessor:
         self._matched_modules.clear()
         self._node_counter.clear()
         self._original_to_clean_id.clear()
-        # Reset module index tracker for hierarchical naming
-        self._module_index_tracker: Dict[Tuple[str, str], Dict[int, int]] = {}
-        self._module_has_duplicates: set = set()
-        self._names_repeated_in_any_path: set = set()
-        self._hierarchical_counter: Dict[str, int] = {}
-        # Mapping from original node id to hierarchical name
-        self._original_to_hierarchical: Dict[str, str] = {}
+        self._module_index_tracker: dict[tuple[str, str], dict[int, int]] = {}
+        self._module_has_duplicates: set[tuple[str, str]] = set()
+        self._names_repeated_in_any_path: set[str] = set()
+        self._hierarchical_counter: dict[str, int] = {}
+        self._original_to_hierarchical: dict[str, str] = {}
 
     def _extract_layer_nodes(
-        self, computation_graph: Any, original_model: Optional[nn.Module] = None
-    ) -> List[NodeInfo]:
+        self, computation_graph: Any, original_model: nn.Module | None = None
+    ) -> list[NodeInfo]:
         """Extract layer nodes from the computation graph.
 
         Args:
@@ -142,7 +137,6 @@ class TorchviewProcessor:
         Returns:
             List of NodeInfo objects.
         """
-        # Try different extraction methods in order of preference
         layer_nodes = []
 
         # Note: node_hierarchy contains hierarchical ModuleNode info (e.g., nn.Linear
@@ -188,7 +182,7 @@ class TorchviewProcessor:
         self,
         node: Any,
         node_id: str,
-        original_model: Optional[nn.Module] = None,
+        original_model: nn.Module | None = None,
     ) -> NodeInfo:
         """Extract information from a single node.
 
@@ -251,7 +245,7 @@ class TorchviewProcessor:
 
     def _extract_shapes(
         self, node: Any, node_type: str
-    ) -> Tuple[List[TensorShape], List[TensorShape]]:
+    ) -> tuple[list[TensorShape], list[TensorShape]]:
         """Extract input and output shapes from a node.
 
         Args:
@@ -335,7 +329,7 @@ class TorchviewProcessor:
     @staticmethod
     def _classify_tensor_node_dtype(
         node_type: str, tensor_dtype: str
-    ) -> Tuple[List[str], List[str]]:
+    ) -> tuple[list[str], list[str]]:
         """Place a TensorNode dtype on the same sides as its tensor shape."""
         node_name = node_type.lower() if node_type else ""
         if node_name in {
@@ -352,10 +346,10 @@ class TorchviewProcessor:
         self,
         node: Any,
         node_type: str,
-        original_model: Optional[nn.Module] = None,
-        input_shapes: Optional[List[TensorShape]] = None,
-        output_shapes: Optional[List[TensorShape]] = None,
-    ) -> Tuple[List[str], List[str]]:
+        original_model: nn.Module | None = None,
+        input_shapes: list[TensorShape] | None = None,
+        output_shapes: list[TensorShape] | None = None,
+    ) -> tuple[list[str], list[str]]:
         """Extract input and output dtypes from a node.
 
         Args:
@@ -373,7 +367,7 @@ class TorchviewProcessor:
         node_class = type(node).__name__
 
         # Helper function to extract dtype from a tensor-like object
-        def get_dtype(obj: Any) -> Optional[str]:
+        def get_dtype(obj: Any) -> str | None:
             """Extract dtype string from a tensor-like object."""
             if obj is None:
                 return None
@@ -508,7 +502,7 @@ class TorchviewProcessor:
 
         return input_dtypes, output_dtypes
 
-    def _extract_module_info(self, node: Any) -> Dict[str, Any]:
+    def _extract_module_info(self, node: Any) -> dict[str, Any]:
         """Extract module argument information from a node.
 
         Args:
@@ -517,7 +511,7 @@ class TorchviewProcessor:
         Returns:
             Dictionary with module_args.
         """
-        module_info: Dict[str, Any] = {"module_args": {}}
+        module_info: dict[str, Any] = {"module_args": {}}
 
         node_class = type(node).__name__
 
@@ -529,7 +523,7 @@ class TorchviewProcessor:
         return module_info
 
     def _extract_module_node_info(
-        self, node: Any, module_info: Dict[str, Any]
+        self, node: Any, module_info: dict[str, Any]
     ) -> None:
         """Extract information from a ModuleNode.
 
@@ -549,7 +543,7 @@ class TorchviewProcessor:
                 if parsed:
                     module_info["module_args"] = parsed
 
-    def _get_pytorch_module(self, node: Any) -> Optional[nn.Module]:
+    def _get_pytorch_module(self, node: Any) -> nn.Module | None:
         """Get the PyTorch module from a node object.
 
         Args:
@@ -566,7 +560,7 @@ class TorchviewProcessor:
                     return attr_value
         return None
 
-    def _extract_module_arguments(self, module: nn.Module) -> Dict[str, Any]:
+    def _extract_module_arguments(self, module: nn.Module) -> dict[str, Any]:
         """Extract module configuration arguments.
 
         Args:
@@ -575,7 +569,7 @@ class TorchviewProcessor:
         Returns:
             Dictionary of module arguments.
         """
-        args: Dict[str, Any] = {"module_type": type(module).__name__}
+        args: dict[str, Any] = {"module_type": type(module).__name__}
 
         # Extract common attributes based on module type
         for attr_name in dir(module):
@@ -597,14 +591,14 @@ class TorchviewProcessor:
                 elif attr_name == "bias":
                     args[attr_name] = value is not None
 
-            except Exception:  # noqa: BLE001 - optional backend fallback
+            except Exception:  # noqa: BLE001,S112 - optional backend fallback
                 continue
 
         return args
 
     def _parse_module_attributes_string(
         self, attributes: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Parse torchview ModuleNode attributes string.
 
         Format: "Linear(training=False, in_features=64, out_features=64)"
@@ -615,7 +609,7 @@ class TorchviewProcessor:
         Returns:
             Dictionary of parsed module arguments.
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         if not attributes:
             return result
@@ -672,7 +666,7 @@ class TorchviewProcessor:
         return result
 
     def _extract_function_node_info(
-        self, node: Any, module_info: Dict[str, Any]
+        self, node: Any, module_info: dict[str, Any]
     ) -> None:
         """Extract information from a FunctionNode.
 
@@ -706,7 +700,7 @@ class TorchviewProcessor:
         self,
         attributes: str,
         node_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Parse torchview stringified attributes to extract function arguments.
 
         torchview's stringify_attributes() produces strings like:
@@ -722,7 +716,7 @@ class TorchviewProcessor:
         Returns:
             Dictionary of parsed arguments.
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         if not attributes:
             return result
@@ -924,7 +918,7 @@ class TorchviewProcessor:
     def _eval_attributes_string(
         self,
         attributes: str,
-    ) -> Tuple[Optional[List[Any]], Optional[Dict[str, Any]]]:
+    ) -> tuple[list[Any] | None, dict[str, Any] | None]:
         """Safely evaluate torchview attributes string.
 
         Replaces Tensor(...) and slice(...) with placeholders, quotes bare
@@ -982,8 +976,8 @@ class TorchviewProcessor:
             return None, None
 
     def _extract_from_edge_list(
-        self, computation_graph: Any, original_model: Optional[nn.Module] = None
-    ) -> List[NodeInfo]:
+        self, computation_graph: Any, original_model: nn.Module | None = None
+    ) -> list[NodeInfo]:
         """Extract nodes from the edge_list of the computation graph.
 
         This method properly tracks node relationships (input_nodes, output_nodes)
@@ -1174,7 +1168,7 @@ class TorchviewProcessor:
             )
 
     def _prescan_module_hierarchy(
-        self, computation_nodes: Dict[str, Any], node_order: List[str]
+        self, computation_nodes: dict[str, Any], node_order: list[str]
     ) -> None:
         """Pre-scan all nodes to discover which module names have duplicates.
 
@@ -1190,7 +1184,7 @@ class TorchviewProcessor:
             node_order: List of original_ids in discovery order.
         """
         # Temporary tracker to count unique instances at each level
-        temp_tracker: Dict[Tuple[str, str], set] = {}
+        temp_tracker: dict[tuple[str, str], set[int]] = {}
 
         # Track module names that appear multiple times in any single hierarchy
         # (e.g., EncoderLayer appears 3 times in EncoderLayer.EncoderLayer.EncoderLayer)
@@ -1202,7 +1196,7 @@ class TorchviewProcessor:
             hierarchy_with_ids = self._get_module_hierarchy_with_ids(node)
 
             # Check if any module name appears multiple times in this hierarchy
-            name_counts: Dict[str, int] = {}
+            name_counts: dict[str, int] = {}
             for module_name, _ in hierarchy_with_ids:
                 name_counts[module_name] = name_counts.get(module_name, 0) + 1
 
@@ -1295,8 +1289,10 @@ class TorchviewProcessor:
         return f"{base_path}.{op_name_indexed}"
 
     def _get_module_hierarchy_with_ids(
-        self, node: Any, visited: Optional[set] = None
-    ) -> List[Tuple[str, int]]:
+        self,
+        node: Any,
+        visited: set[int] | None = None,
+    ) -> list[tuple[str, int]]:
         """Trace up parent chain to find ModuleNode hierarchy with object IDs.
 
         Args:
@@ -1344,8 +1340,8 @@ class TorchviewProcessor:
         return []
 
     def _index_hierarchy(
-        self, hierarchy_with_ids: List[Tuple[str, int]]
-    ) -> List[str]:
+        self, hierarchy_with_ids: list[tuple[str, int]]
+    ) -> list[str]:
         """Convert hierarchy with IDs to indexed names.
 
         Tracks module names at each level and assigns indices when names repeat.
@@ -1379,7 +1375,7 @@ class TorchviewProcessor:
 
         # Track indices for names that repeat across any hierarchy path
         # This ensures consistent indexing even for nodes at different depths
-        path_name_indices: Dict[str, int] = {}
+        path_name_indices: dict[str, int] = {}
 
         for module_name, obj_id in hierarchy_with_ids:
             key = (parent_path, module_name)
@@ -1417,7 +1413,7 @@ class TorchviewProcessor:
 
         return result
 
-    def _extract_from_visual_graph(self, visual_graph: Any) -> List[NodeInfo]:
+    def _extract_from_visual_graph(self, visual_graph: Any) -> list[NodeInfo]:
         """Extract nodes from the visual graph representation.
 
         Args:
@@ -1429,8 +1425,8 @@ class TorchviewProcessor:
         if not hasattr(visual_graph, "source"):
             return []
 
-        nodes: Dict[str, NodeInfo] = {}
-        edges: List[Tuple[str, str]] = []
+        nodes: dict[str, NodeInfo] = {}
+        edges: list[tuple[str, str]] = []
 
         # Parse graphviz source
         self._parse_graphviz_source(visual_graph.source, nodes, edges)
@@ -1446,8 +1442,8 @@ class TorchviewProcessor:
     def _parse_graphviz_source(
         self,
         source: str,
-        nodes: Dict[str, NodeInfo],
-        edges: List[Tuple[str, str]],
+        nodes: dict[str, NodeInfo],
+        edges: list[tuple[str, str]],
     ) -> None:
         """Parse graphviz source to extract nodes and edges.
 
@@ -1459,6 +1455,7 @@ class TorchviewProcessor:
         lines = source.split("\n")
         current_node_def = ""
         in_node_definition = False
+        node_id: str | None = None
 
         for raw_line in lines:
             line = raw_line.strip()
@@ -1474,6 +1471,9 @@ class TorchviewProcessor:
             elif in_node_definition and line.endswith("]"):
                 current_node_def += " " + line
                 in_node_definition = False
+                if node_id is None:
+                    current_node_def = ""
+                    continue
 
                 # Parse node definition
                 node_info = self._parse_node_definition(
@@ -1493,7 +1493,7 @@ class TorchviewProcessor:
 
     def _parse_node_definition(
         self, node_id: str, node_def: str
-    ) -> Optional[NodeInfo]:
+    ) -> NodeInfo | None:
         """Parse a node definition from graphviz source.
 
         Args:
@@ -1530,8 +1530,8 @@ class TorchviewProcessor:
             hierarchical_id = f"Model.{node_type}_{node_id}"
 
             # Extract dtypes (empty for visual graph extraction)
-            input_dtypes: List[str] = []
-            output_dtypes: List[str] = []
+            input_dtypes: list[str] = []
+            output_dtypes: list[str] = []
 
             return NodeInfo(
                 node_id=hierarchical_id,
@@ -1549,9 +1549,9 @@ class TorchviewProcessor:
 
     def _apply_model_parameters(
         self,
-        layer_nodes: List[NodeInfo],
+        layer_nodes: list[NodeInfo],
         model: nn.Module,
-        computation_nodes: Optional[Dict[str, Any]] = None,
+        computation_nodes: dict[str, Any] | None = None,
     ) -> None:
         """Apply parameters from the original model to extracted nodes.
 
@@ -1591,7 +1591,7 @@ class TorchviewProcessor:
                                     )
 
         # Collect all modules from the model
-        modules_by_type: Dict[str, List[Tuple[str, nn.Module]]] = {}
+        modules_by_type: dict[str, list[tuple[str, nn.Module]]] = {}
         for name, module in model.named_modules():
             if name == "":  # Skip root
                 continue
@@ -1650,8 +1650,8 @@ class TorchviewProcessor:
 
     def _match_linear_modules_by_shape(
         self,
-        modules_list: List[Tuple[str, nn.Module]],
-        candidate_nodes: List[NodeInfo],
+        modules_list: list[tuple[str, nn.Module]],
+        candidate_nodes: list[NodeInfo],
     ) -> None:
         """Match Linear modules to nodes using shape-based matching.
 
@@ -1707,7 +1707,7 @@ class TorchviewProcessor:
 
     def _save_pytorch_graph_yaml(
         self,
-        layer_nodes: List[NodeInfo],
+        layer_nodes: list[NodeInfo],
         filename: Path,
         *,
         model_name: str,
@@ -1735,7 +1735,7 @@ class TorchviewProcessor:
             filename: Output YAML path.
             model_name: Human-readable model name.
         """
-        graph_dict: Dict[str, Any] = {
+        graph_dict: dict[str, Any] = {
             "model_name": model_name,
             "layers": {},
         }
@@ -1757,7 +1757,7 @@ class TorchviewProcessor:
         if self.debug:
             print(f"PyTorch graph YAML saved to {filename}")
 
-    def _print_layer_summary(self, layer_nodes: List[NodeInfo]) -> None:
+    def _print_layer_summary(self, layer_nodes: list[NodeInfo]) -> None:
         """Print summary of extracted layer nodes.
 
         Args:

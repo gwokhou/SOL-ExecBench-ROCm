@@ -27,6 +27,7 @@ import os
 import subprocess
 import time
 from dataclasses import dataclass, field
+from typing import Self
 
 from pydantic import ValidationError
 
@@ -118,11 +119,11 @@ class ClockLockLease:
                     "gpu_clock_lease_leaked: owned STABLE_PEAK lease was "
                     "garbage-collected without release or detach",
                 )
-        except BaseException:  # noqa: BLE001 -- destructor must not escape
+        except BaseException:  # noqa: BLE001,S110 -- destructor must not escape
             # Destructors must never turn observability into shutdown failure.
             pass
 
-    def __enter__(self) -> ClockLockLease:
+    def __enter__(self) -> Self:
         """Return this lease for context-managed use."""
         return self
 
@@ -171,7 +172,7 @@ def _amd_smi_executable() -> str:
 
 
 def _has_command_failure(
-    result: subprocess.CompletedProcess,
+    result: subprocess.CompletedProcess[str],
     markers: tuple[str, ...],
 ) -> str | None:
     output_parts = []
@@ -190,7 +191,9 @@ def _has_command_failure(
     return None
 
 
-def _run_checked_amd_smi(command: list[str]) -> subprocess.CompletedProcess:
+def _run_checked_amd_smi(
+    command: list[str],
+) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         command,
         check=True,

@@ -58,7 +58,7 @@ class OperationRepresentation:
     is_einsum_supportable: bool
 
     @classmethod
-    def from_einsum_op(cls, operation: EinsumOp) -> "OperationRepresentation":
+    def from_einsum_op(cls, operation: EinsumOp) -> OperationRepresentation:
         """Copy stable IR fields from a registered operation handler result."""
         return cls(
             equation=operation.equation,

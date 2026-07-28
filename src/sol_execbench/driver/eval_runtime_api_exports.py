@@ -40,8 +40,8 @@ from sol_execbench.core.data.workload import Workload
 __all__ = [
     "BenchmarkConfig",
     "Definition",
-    "EvaluationStatus",
     "EvaluationDependencies",
+    "EvaluationStatus",
     "Solution",
     "Trace",
     "Workload",

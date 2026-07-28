@@ -28,13 +28,13 @@ from solar.common.types import (
 )
 
 __all__ = [
-    # Types
-    "NodeInfo",
-    "GraphInfo",
-    "AnalysisResult",
-    "EinsumOperation",
-    "TensorShape",
     # Constants
     "DEFAULT_PRECISION",
     "SUPPORTED_OPERATIONS",
+    "AnalysisResult",
+    "EinsumOperation",
+    "GraphInfo",
+    # Types
+    "NodeInfo",
+    "TensorShape",
 ]

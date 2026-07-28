@@ -35,7 +35,7 @@ https://docs.pytorch.org/docs/stable/nn.functional.html#loss-functions
 
 import re
 import string
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.nvlabs.ir.ops.base import (
@@ -140,7 +140,7 @@ class LossHandler(EinsumOpHandler):
     def _generate_loss_einsum(
         self,
         input_shape: TensorShape,
-        output_shape: Optional[TensorShape],
+        output_shape: TensorShape | None,
         op_type: str = "mse_loss",
         reduction: str = "mean",
     ) -> EinsumOp:

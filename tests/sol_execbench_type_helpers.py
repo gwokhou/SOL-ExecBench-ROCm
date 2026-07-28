@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, TypeVar, cast
+from typing import Any, cast
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.solution import BuildSpec, Solution
@@ -9,16 +9,14 @@ from sol_execbench.core.data.workload import Workload
 
 JSONDict = dict[str, Any]
 
-_T = TypeVar("_T")
-
 
 def json_dict(value: object) -> JSONDict:
     return cast(JSONDict, value)
 
 
-def typed(value: object, typ: type[_T]) -> _T:
+def typed[T](value: object, typ: type[T]) -> T:
     del typ
-    return cast(_T, value)
+    return cast(T, value)
 
 
 def make_definition(**kwargs: Any) -> Definition:

@@ -75,7 +75,7 @@ def detect_rocm_device(
 ) -> RocmDeviceInfo:
     """Detect one concrete PyTorch ROCm device and its execution capacities."""
     if torch_module is None:
-        import torch as torch_module  # noqa: PLC0415
+        import torch as torch_module
 
     parsed = torch_module.device(device)
     if parsed.type != "cuda":

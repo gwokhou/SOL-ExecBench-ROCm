@@ -63,8 +63,9 @@ From a dict (typical solar internal use)::
 
 From an einsum_graph.yaml on disk::
 
-    af = build_af_graph_from_yaml("einsum_graph.yaml",
-                                   output_path="af_einsum_graph.yaml")
+    af = build_af_graph_from_yaml(
+        "einsum_graph.yaml", output_path="af_einsum_graph.yaml"
+    )
 """
 
 from __future__ import annotations
@@ -74,13 +75,11 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 import yaml
 
-# ---------------------------------------------------------------------------
 # Op-type classification
-# ---------------------------------------------------------------------------
 
 # Solar layer-types treated as explicit copy operations in the AF graph.
 # Only used to fast-path the "start" entry-point pseudo-node here — non-start
@@ -101,7 +100,7 @@ def _is_input_role(role: str) -> bool:
     return bool(_INPUT_ROLE_PATTERN.match(role))
 
 
-def _parse_atoms(label: str) -> List[str]:
+def _parse_atoms(label: str) -> list[str]:
     """Split a (possibly-composite) dim label like ``P+R`` into atoms ``[P, R]``."""
     if "+" not in label:
         return [label]
@@ -124,7 +123,7 @@ def _sanitize(name: str) -> str:
     return s
 
 
-def _bits_from_dtype(dtype_str: str) -> Optional[int]:
+def _bits_from_dtype(dtype_str: str) -> int | None:
     """Translate a torch dtype string (e.g. ``'torch.float16'``) to bit width."""
     if not isinstance(dtype_str, str):
         return None
@@ -153,9 +152,7 @@ def _bits_from_dtype(dtype_str: str) -> Optional[int]:
     return mapping.get(s)
 
 
-# ---------------------------------------------------------------------------
 # Data model
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -176,9 +173,7 @@ class Axis:
     size: int
 
 
-# ---------------------------------------------------------------------------
 # Union-find with size-checked unions
-# ---------------------------------------------------------------------------
 
 
 class UnionFind:
@@ -186,8 +181,8 @@ class UnionFind:
 
     def __init__(self) -> None:
         """Initialize an empty disjoint-set structure."""
-        self._parent: Dict[AxisKey, AxisKey] = {}
-        self._first_seen_order: Dict[AxisKey, int] = {}
+        self._parent: dict[AxisKey, AxisKey] = {}
+        self._first_seen_order: dict[AxisKey, int] = {}
         self._counter = 0
 
     def add(self, x: AxisKey) -> None:
@@ -223,40 +218,39 @@ class UnionFind:
         return ry
 
 
-# ---------------------------------------------------------------------------
 # Builder
-# ---------------------------------------------------------------------------
 
 
 @dataclass
 class BuildContext:
     """Mutable state shared by AF graph construction phases."""
 
-    layers: Dict[str, dict]
+    layers: dict[str, dict[str, Any]]
     """Topologically-ordered dict from einsum_graph stage-2 output."""
 
-    axes: Dict[AxisKey, Axis] = field(default_factory=dict)
+    axes: dict[AxisKey, Axis] = field(default_factory=dict)
     """All (layer, role, pos) → Axis."""
 
     uf: UnionFind = field(default_factory=UnionFind)
     """Union-find over AxisKey."""
 
-    canonical_name: Dict[AxisKey, str] = field(default_factory=dict)
+    canonical_name: dict[AxisKey, str] = field(default_factory=dict)
     """Axis → canonical name (R0, R1, ...)."""
 
-    rank_sizes: Dict[str, int] = field(default_factory=dict)
+    rank_sizes: dict[str, int] = field(default_factory=dict)
     """canonical_name → size."""
 
-    role_to_shape_index: Dict[Tuple[str, str], Tuple[str, int]] = field(
+    role_to_shape_index: dict[tuple[str, str], tuple[str, int]] = field(
         default_factory=dict
     )
     """(layer, role) → ('inputs' or 'outputs', index)."""
 
-    diagnostics: List[str] = field(default_factory=list)
+    diagnostics: list[str] = field(default_factory=list)
 
 
 def _build_role_to_shape_index(
-    layers: Dict[str, dict], ctx: BuildContext
+    layers: dict[str, dict[str, Any]],
+    ctx: BuildContext,
 ) -> None:
     """Map (layer, role) → (which-tensor-shapes-list, index-into-list).
 
@@ -274,7 +268,7 @@ def _build_role_to_shape_index(
         next_in = 0
         next_out = 0
         for role in operands:
-            kind: Optional[str] = None
+            kind: str | None = None
             if _is_output_role(role):
                 kind = "outputs"
             elif _is_input_role(role):
@@ -318,7 +312,7 @@ def _collect_axes(ctx: BuildContext) -> None:
         shapes_in = layer.get("tensor_shapes", {}).get("inputs") or []
         shapes_out = layer.get("tensor_shapes", {}).get("outputs") or []
 
-        label_size: Dict[str, int] = {}
+        label_size: dict[str, int] = {}
         for role, dims in operands.items():
             ki = ctx.role_to_shape_index.get((layer_name, role))
             if ki is None:
@@ -336,14 +330,14 @@ def _collect_axes(ctx: BuildContext) -> None:
 
         for role, dims in operands.items():
             key_to_kind = ctx.role_to_shape_index.get((layer_name, role))
-            shape: Optional[List[int]] = None
+            shape: list[int] | None = None
             if key_to_kind is not None:
                 kind, idx = key_to_kind
                 shapes_list = shapes_in if kind == "inputs" else shapes_out
                 if idx < len(shapes_list):
                     shape = shapes_list[idx]
             if shape is None:
-                inferred: List[Optional[int]] = []
+                inferred: list[int | None] = []
                 for label in dims:
                     if "+" in label:
                         inferred.append(None)
@@ -384,26 +378,26 @@ def _within_layer_union(ctx: BuildContext) -> None:
     "B"-labeled positions with sizes ``[64, 1, 64]``, the two size-64
     entries unify even though they're not adjacent in YAML order.
     """
-    by_layer: Dict[str, List[AxisKey]] = defaultdict(list)
+    by_layer: dict[str, list[AxisKey]] = defaultdict(list)
     for k in ctx.axes:
         by_layer[k.layer].append(k)
-    for _layer, keys in by_layer.items():
-        groups: Dict[Tuple[str, int], List[AxisKey]] = defaultdict(list)
+    for keys in by_layer.values():
+        groups: dict[tuple[str, int], list[AxisKey]] = defaultdict(list)
         for k in keys:
             ax = ctx.axes[k]
             groups[(ax.label, ax.size)].append(k)
-        for _key, group in groups.items():
+        for group in groups.values():
             for a in group[1:]:
                 ctx.uf.union(group[0], a)
 
 
 def _input_like_roles_in_order(
-    operands: dict,
+    operands: dict[str, Any],
     layer_name: str,
-    role_to_shape_index: dict,
-    tensor_types_inputs: Optional[List[str]] = None,
+    role_to_shape_index: dict[tuple[str, str], tuple[str, int]],
+    tensor_types_inputs: list[str] | None = None,
     skip_weight_typed: bool = False,
-) -> List[str]:
+) -> list[str]:
     """Ordered list of input-like roles (those mapping to tensor_shapes.inputs).
 
     Catches solar's custom input roles (``Target`` for loss functions,
@@ -440,8 +434,10 @@ def _input_like_roles_in_order(
 
 
 def _primary_output_role(
-    pred_operands: dict, role_to_shape_index: dict, pred_name: str
-) -> Optional[str]:
+    pred_operands: dict[str, Any],
+    role_to_shape_index: dict[tuple[str, str], tuple[str, int]],
+    pred_name: str,
+) -> str | None:
     """Return the predecessor's primary output role name."""
     for cand in pred_operands:
         if _is_output_role(cand):
@@ -503,7 +499,7 @@ def _cross_layer_union(ctx: BuildContext) -> None:
 def _assign_canonical_names(ctx: BuildContext) -> None:
     """Phase 3: assign R0, R1, ... to equivalence classes in topological order."""
     counter = 0
-    seen_roots: Dict[AxisKey, str] = {}
+    seen_roots: dict[AxisKey, str] = {}
     for layer_name, layer in ctx.layers.items():
         operands = layer.get("operands") or {}
         for role, dims in operands.items():
@@ -527,21 +523,19 @@ def _assign_canonical_names(ctx: BuildContext) -> None:
                 ctx.canonical_name[key] = seen_roots[root]
 
 
-# ---------------------------------------------------------------------------
 # AF YAML emission
-# ---------------------------------------------------------------------------
 
 
 def _build_iter_expr_for_layer(
     ctx: BuildContext, layer_name: str
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Per-layer ``atom_letter → lowercase canonical_iter_var`` map.
 
     Used by ``_projection_for_axis`` to rewrite composite labels (``P+R``)
     into iterator expressions over canonical rank names (e.g. ``r5+r7``).
     """
     operands = ctx.layers[layer_name].get("operands") or {}
-    atomic_to_iter: Dict[str, str] = {}
+    atomic_to_iter: dict[str, str] = {}
     for role, dims in operands.items():
         for pos, label in enumerate(dims):
             atoms = _parse_atoms(label)
@@ -551,9 +545,8 @@ def _build_iter_expr_for_layer(
                 canonical = ctx.canonical_name.get(key)
                 if canonical is not None and atom not in atomic_to_iter:
                     atomic_to_iter[atom] = canonical.lower()
-    # Second pass: atoms only referenced inside composites without an
-    # atomic anchor — synthesize a fallback iterator name.
-    for _role, dims in operands.items():
+    # Synthesize names for atoms referenced only inside composites.
+    for dims in operands.values():
         for _pos, label in enumerate(dims):
             atoms = _parse_atoms(label)
             for atom in atoms:
@@ -569,7 +562,7 @@ def _build_iter_expr_for_layer(
 
 
 def _projection_for_axis(
-    ctx: BuildContext, key: AxisKey, atomic_iter_map: Dict[str, str]
+    ctx: BuildContext, key: AxisKey, atomic_iter_map: dict[str, str]
 ) -> str:
     """Iterator expression for one operand position."""
     label = ctx.axes[key].label
@@ -580,8 +573,10 @@ def _projection_for_axis(
 
 
 def _bits_for_role(
-    layer: dict, role: str, ctx_idx: Optional[Tuple[str, int]] = None
-) -> Optional[int]:
+    layer: dict[str, Any],
+    role: str,
+    ctx_idx: tuple[str, int] | None = None,
+) -> int | None:
     """Return bits-per-value for one operand role with sensible fallbacks."""
     dtypes = layer.get("tensor_dtypes") or {}
     if ctx_idx is None:
@@ -603,8 +598,8 @@ def _bits_for_role(
     return None
 
 
-def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
-    einsums: List[dict] = []
+def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict[str, Any]:
+    einsums: list[dict[str, Any]] = []
     weight_counter = [0]
 
     def next_weight_name() -> str:
@@ -618,9 +613,9 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
         sanitized_name = _sanitize(layer_name)
         preds = (layer.get("connections") or {}).get("inputs") or []
         atomic_iter_map = _build_iter_expr_for_layer(ctx, layer_name)
-        tensor_accesses: List[dict] = []
+        tensor_accesses: list[dict[str, Any]] = []
 
-        rename_target: Dict[str, str] = {}
+        rename_target: dict[str, str] = {}
         primary_input_set = False
         primary_weight_set = False
 
@@ -642,7 +637,7 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
             ctx_idx = ctx.role_to_shape_index.get((layer_name, role))
             tensor_name: str
             is_output_access = False
-            af_rename_key: Optional[str] = None
+            af_rename_key: str | None = None
             role_kind = ctx_idx[0] if ctx_idx is not None else None
             if role_kind == "outputs":
                 is_output_access = True
@@ -683,7 +678,7 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
                 is_output_access = True
                 af_rename_key = "output"
 
-            projection: Dict[str, str] = {}
+            projection: dict[str, str] = {}
             for pos in range(len(dims)):
                 key = AxisKey(layer_name, role, pos)
                 if key not in ctx.axes:
@@ -695,7 +690,7 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
                 isinstance(v, str) and v.isidentifier() and k == v.upper()
                 for k, v in projection.items()
             )
-            access: Dict[str, Any] = {
+            access: dict[str, Any] = {
                 "name": tensor_name,
                 "projection": (
                     list(projection.values())
@@ -724,8 +719,8 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
         # an einsum's tensor_accesses, and reading the same tensor twice
         # with the same projection has the same memory cost as reading it
         # once — keep one access. Output accesses are never deduped.
-        seen_in: set = set()
-        deduped: list = []
+        seen_in: set[tuple[Any, ...]] = set()
+        deduped: list[dict[str, Any]] = []
         for ta in tensor_accesses:
             if ta.get("output"):
                 deduped.append(ta)
@@ -755,7 +750,7 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
         if is_entry_point:
             out_ta = next(ta for ta in tensor_accesses if ta.get("output"))
             synth_name = f"{sanitized_name}_in"
-            synth: Dict[str, Any] = {
+            synth: dict[str, Any] = {
                 "name": synth_name,
                 "projection": (
                     out_ta["projection"]
@@ -780,7 +775,7 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
                 "weight": rename_target.get("weight", "Nothing()"),
             }
 
-        einsum_entry: Dict[str, Any] = {
+        einsum_entry: dict[str, Any] = {
             "name": sanitized_name,
             "tensor_accesses": tensor_accesses,
             "renames": einsum_renames,
@@ -793,7 +788,7 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
     # IDENTITY is consistent across multiple accesses of the same tensor,
     # but the order in the projection may differ if Solar wrote different
     # operand orderings. Pin the first occurrence and rewrite mismatches.
-    canonical_rank_order: Dict[str, List[str]] = {}
+    canonical_rank_order: dict[str, list[str]] = {}
     for e in einsums:
         for ta in e["tensor_accesses"]:
             name = str(ta["name"])
@@ -809,7 +804,7 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
             else:
                 target_ranks = canonical_rank_order[name]
                 if ranks != target_ranks:
-                    iter_map: Dict[str, str] = {}
+                    iter_map: dict[str, str] = {}
                     if isinstance(proj, list):
                         for r, v in zip(ranks, proj, strict=False):
                             iter_map[str(r)] = str(v)
@@ -862,7 +857,7 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict:
     return {"workload": workload, "renames": renames}
 
 
-def _ghost_scalar_outputs(af: dict) -> None:
+def _ghost_scalar_outputs(af: dict[str, Any]) -> None:
     """Give TERMINAL reduction-to-scalar outputs one bounded rank.
 
     Solar emits ops like ``Model.cross_entropy``, ``Model.mean``,
@@ -936,7 +931,7 @@ def _ghost_scalar_outputs(af: dict) -> None:
 # Solar layer types that are pure shape views — no actual compute / memory
 # traffic. When ``is_real_einsum: false`` co-occurs with one of these types
 # we drop the op and rewire downstream readers to access the physical root.
-_SHAPE_OP_TYPES: Set[str] = {
+_SHAPE_OP_TYPES: set[str] = {
     "transpose",
     "permute",
     "contiguous",
@@ -961,13 +956,13 @@ class _Alias:
     root_role: str
     """Role under which ``root_layer`` exposes ``root_tensor`` (typically 'Output')."""
 
-    root_dims: List[str]
+    root_dims: list[str]
     """Operand labels of the root producer's output, in order."""
 
-    root_shape: List[int]
+    root_shape: list[int]
     """Shape of the root producer's output, in order."""
 
-    in_to_out: List[List[int]]
+    in_to_out: list[list[int]]
     """For each input position of the elided shape-op, the list of output
     positions it maps to. Empty list means the input position was dropped
     (squeeze); multiple means it was broadcast (expand). Lengths and
@@ -975,19 +970,19 @@ class _Alias:
     physical root's (those are reachable transitively via this struct's
     ``root_dims``)."""
 
-    out_to_in: List[Optional[int]]
+    out_to_in: list[int | None]
     """For each output position of the elided shape-op, the input position
     it came from, or None if introduced (unsqueeze)."""
 
 
 def _derive_pos_mapping(
     layer_name: str,
-    layer: dict,
-    in_dims: List[str],
-    in_shape: List[int],
-    out_dims: List[str],
-    out_shape: List[int],
-) -> Optional[Tuple[List[Optional[int]], List[List[int]]]]:
+    layer: dict[str, Any],
+    in_dims: list[str],
+    in_shape: list[int],
+    out_dims: list[str],
+    out_shape: list[int],
+) -> tuple[list[int | None], list[list[int]]] | None:
     """Return (out_to_in, in_to_out) for an elide-able shape op.
 
     Returns None when the rewrite is not safe (e.g. genuine reshape, or
@@ -1009,8 +1004,8 @@ def _derive_pos_mapping(
         # Try label-based permutation first when the labels are a true
         # multiset permutation distinct from identity.
         if sorted(in_dims) == sorted(out_dims) and in_dims != out_dims:
-            used: Set[int] = set()
-            o2i: Optional[List[Optional[int]]] = []
+            used: set[int] = set()
+            o2i: list[int | None] | None = []
             for j, lbl in enumerate(out_dims):
                 hit = None
                 for i, ilbl in enumerate(in_dims):
@@ -1025,7 +1020,7 @@ def _derive_pos_mapping(
                 used.add(hit)
                 o2i.append(hit)
             if o2i is not None:
-                i2o: List[List[int]] = [[] for _ in range(n_in)]
+                i2o: list[list[int]] = [[] for _ in range(n_in)]
                 for j, i in enumerate(o2i):
                     if i is not None:
                         i2o[i].append(j)
@@ -1033,8 +1028,8 @@ def _derive_pos_mapping(
         # Shape-based positional permutation. Greedy unique match by size;
         # bail out if sizes aren't unique enough to derive an unambiguous
         # permutation (caller will emit the op normally).
-        used2: Set[int] = set()
-        o2i2: List[Optional[int]] = []
+        used2: set[int] = set()
+        o2i2: list[int | None] = []
         ok = True
         for j in range(n_out):
             hit = None
@@ -1060,8 +1055,8 @@ def _derive_pos_mapping(
     # squeeze: input has size-1 dims that are dropped in output.
     if op_type == "squeeze" and n_out <= n_in:
         ok = True
-        used3: Set[int] = set()
-        o2i3: List[Optional[int]] = []
+        used3: set[int] = set()
+        o2i3: list[int | None] = []
         for j in range(n_out):
             hit = None
             for i in range(n_in):
@@ -1087,8 +1082,8 @@ def _derive_pos_mapping(
     # unsqueeze: output has size-1 dims that aren't in input.
     if op_type == "unsqueeze" and n_in <= n_out:
         ok = True
-        used4: Set[int] = set()
-        o2i4: List[Optional[int]] = []
+        used4: set[int] = set()
+        o2i4: list[int | None] = []
         for j in range(n_out):
             if out_shape[j] == 1:
                 # Either it's a true unsqueeze-introduced axis, or a
@@ -1129,16 +1124,16 @@ def _derive_pos_mapping(
 
     # expand: a size-1 input dim is broadcast to a larger output dim.
     if op_type == "expand" and n_in == n_out:
-        o2i5: List[Optional[int]] = list(range(n_in))
-        i2o: List[List[int]] = [[j] for j in range(n_in)]
+        o2i5: list[int | None] = list(range(n_in))
+        i2o: list[list[int]] = [[j] for j in range(n_in)]
         return o2i5, i2o
 
     # torchview emits Tensor.T as ``__get__``.  Tensor.T reverses dimensions;
     # do this before the exact-shape branch because a square transpose has the
     # same shape but is not an identity mapping.
     if op_type == "__get__" and n_in == n_out and in_shape[::-1] == out_shape:
-        o2i_get: List[Optional[int]] = list(reversed(range(n_in)))
-        i2o_get: List[List[int]] = [[] for _ in range(n_in)]
+        o2i_get: list[int | None] = list(reversed(range(n_in)))
+        i2o_get: list[list[int]] = [[] for _ in range(n_in)]
         for output_axis, input_axis in enumerate(o2i_get):
             if input_axis is None:
                 raise ValueError("getitem axis mapping is incomplete")
@@ -1166,8 +1161,8 @@ def _derive_pos_mapping(
             and n_in == n_out
             and sorted(in_shape) == sorted(out_shape)
         ):
-            used5: Set[int] = set()
-            o2i6: List[Optional[int]] = []
+            used5: set[int] = set()
+            o2i6: list[int | None] = []
             ok = True
             for j in range(n_out):
                 hit = None
@@ -1205,7 +1200,7 @@ def _derive_pos_mapping(
         if len(in_nonunit) == len(out_nonunit) and all(
             a[1] == b[1] for a, b in zip(in_nonunit, out_nonunit, strict=False)
         ):
-            o2i7: List[Optional[int]] = [None] * n_out
+            o2i7: list[int | None] = [None] * n_out
             for (i, _), (j, _) in zip(in_nonunit, out_nonunit, strict=False):
                 o2i7[j] = i
             # Pair leftover size-1 input dims to leftover size-1 output
@@ -1235,8 +1230,8 @@ def _derive_pos_mapping(
 
 
 def _build_shape_op_aliases(
-    layers: Dict[str, dict],
-) -> Tuple[Dict[str, _Alias], Set[str], List[str]]:
+    layers: dict[str, dict[str, Any]],
+) -> tuple[dict[str, _Alias], set[str], list[str]]:
     """Return (alias_table, elided_set, diagnostics).
 
     Walks layers in topological order and records, for each elide-able
@@ -1245,9 +1240,9 @@ def _build_shape_op_aliases(
     an op's predecessor is itself elided, we look up the predecessor's
     alias and propagate the root forward.
     """
-    aliases: Dict[str, _Alias] = {}
-    elided: Set[str] = set()
-    diagnostics: List[str] = []
+    aliases: dict[str, _Alias] = {}
+    elided: set[str] = set()
+    diagnostics: list[str] = []
 
     for name, layer in layers.items():
         if layer.get("is_real_einsum", True):
@@ -1325,7 +1320,7 @@ def _build_shape_op_aliases(
         if pred_layer is None:
             continue
         pred_operands = pred_layer.get("operands") or {}
-        pred_out_role: Optional[str] = None
+        pred_out_role: str | None = None
         for cand in pred_operands:
             if _is_output_role(cand):
                 pred_out_role = cand
@@ -1361,7 +1356,7 @@ def _build_shape_op_aliases(
             up = aliases[pred_output_tensor_name]
             # Compose: out_to_in points at our input positions; those map
             # via the predecessor's alias.out_to_in to the chain root.
-            composed: List[Optional[int]] = []
+            composed: list[int | None] = []
             for j in range(len(out_to_in)):
                 k = out_to_in[j]
                 if k is None:
@@ -1371,7 +1366,7 @@ def _build_shape_op_aliases(
                         composed.append(up.out_to_in[k])
                     else:
                         composed.append(None)
-            composed_i2o: List[List[int]] = [
+            composed_i2o: list[list[int]] = [
                 [] for _ in range(len(up.root_dims))
             ]
             for j, i in enumerate(composed):
@@ -1402,8 +1397,8 @@ def _build_shape_op_aliases(
 
 
 def _apply_shape_op_elision(
-    layers: Dict[str, dict],
-) -> Tuple[Dict[str, dict], List[str]]:
+    layers: dict[str, dict[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """Return a rewritten layers dict with shape ops elided.
 
     For each elide-able layer S:
@@ -1420,7 +1415,7 @@ def _apply_shape_op_elision(
     if not elided:
         return layers, diags
 
-    new_layers: Dict[str, dict] = {}
+    new_layers: dict[str, dict[str, Any]] = {}
     rewrite_seq = 0
 
     for name, layer in layers.items():
@@ -1467,7 +1462,7 @@ def _apply_shape_op_elision(
                         f"width {len(alias.out_to_in)}."
                     )
                     continue
-                new_dims: List[Optional[str]] = [None] * len(alias.root_dims)
+                new_dims: list[str | None] = [None] * len(alias.root_dims)
                 for j, i in enumerate(alias.out_to_in):
                     if i is None or i < 0 or i >= len(new_dims):
                         continue
@@ -1514,7 +1509,7 @@ def _apply_shape_op_elision(
 # ---------------------------------------------------------------------------
 
 
-def _normalize_operands(layers: Dict[str, dict]) -> List[str]:
+def _normalize_operands(layers: dict[str, dict[str, Any]]) -> list[str]:
     """Make ``operands`` reflect the true tensor slot count per layer.
 
     Solar's shape-handlers sometimes emit a single ``Input`` operand role
@@ -1544,7 +1539,7 @@ def _normalize_operands(layers: Dict[str, dict]) -> List[str]:
     Mutates ``layers`` in place. Returns diagnostic strings for the
     synthesized roles.
     """
-    diags: List[str] = []
+    diags: list[str] = []
 
     for name, layer in layers.items():
         operands = layer.get("operands")
@@ -1558,8 +1553,8 @@ def _normalize_operands(layers: Dict[str, dict]) -> List[str]:
         # ``_build_role_to_shape_index`` uses, so unconventionally-named
         # roles like the entry-point ``start`` (which functions as an
         # output) are recognized and don't trigger spurious synthesis.
-        in_roles_existing: List[str] = []
-        out_roles_existing: List[str] = []
+        in_roles_existing: list[str] = []
+        out_roles_existing: list[str] = []
         n_in_max = max(len(in_shapes), len(in_types))
         for role in operands:
             if _is_output_role(role):
@@ -1578,9 +1573,9 @@ def _normalize_operands(layers: Dict[str, dict]) -> List[str]:
         def _synthesize(
             slot: int,
             role_name: str,
-            slot_shape: List[int],
-            tmpl_dims: List[str],
-            tmpl_shape: List[int],
+            slot_shape: list[int],
+            tmpl_dims: list[str],
+            tmpl_shape: list[int],
             suffix: str,
             layer_operands: dict[str, Any],
             layer_name: str,
@@ -1669,7 +1664,10 @@ def _normalize_operands(layers: Dict[str, dict]) -> List[str]:
 # ---------------------------------------------------------------------------
 
 
-def _validate_af_coverage(af: dict, layers: Dict[str, dict]) -> None:
+def _validate_af_coverage(
+    af: dict[str, Any],
+    layers: dict[str, dict[str, Any]],
+) -> None:
     """Assert every non-weight Solar pred appears in its consumer's AF einsum.
 
     Walks ``tensor_types.inputs`` to determine which preds correspond to
@@ -1683,7 +1681,7 @@ def _validate_af_coverage(af: dict, layers: Dict[str, dict]) -> None:
     emit silently drops the extra preds.
     """
     einsums_by_name = {e["name"]: e for e in af["workload"]["einsums"]}
-    errors: List[str] = []
+    errors: list[str] = []
     for layer_name, layer in layers.items():
         sanitized = _sanitize(layer_name)
         e = einsums_by_name.get(sanitized)
@@ -1696,7 +1694,7 @@ def _validate_af_coverage(af: dict, layers: Dict[str, dict]) -> None:
         # Walk slots: pred_index advances only for non-weight slots, mirroring
         # the AF emit's pred-consumption rule. Each non-weight pred must
         # appear by its sanitized name in the consumer's reads.
-        expected: List[str] = []
+        expected: list[str] = []
         pred_index = 0
         for _slot, slot_type in enumerate(in_types):
             if slot_type == "weight":
@@ -1724,7 +1722,7 @@ def _validate_af_coverage(af: dict, layers: Dict[str, dict]) -> None:
         )
 
 
-def _ranks_of_projection(proj: Any) -> Tuple[str, ...]:
+def _ranks_of_projection(proj: Any) -> tuple[str, ...]:
     """Ordered uppercase canonical-rank names referenced by a projection."""
     if isinstance(proj, list):
         return tuple(str(v).upper() for v in proj)
@@ -1733,7 +1731,7 @@ def _ranks_of_projection(proj: Any) -> Tuple[str, ...]:
     return ()
 
 
-def _validate_graph_invariants(af: dict) -> None:
+def _validate_graph_invariants(af: dict[str, Any]) -> None:
     """Hard-fail correctness gate on the emitted AF workload.
 
     Checks the invariants the union-find construction is supposed to
@@ -1755,10 +1753,10 @@ def _validate_graph_invariants(af: dict) -> None:
     workload = af["workload"]
     einsums = workload["einsums"]
     rank_sizes = workload.get("rank_sizes") or {}
-    errors: List[str] = []
+    errors: list[str] = []
 
-    tuples_by_name: Dict[str, Set[Tuple[str, ...]]] = defaultdict(set)
-    producers: Set[str] = set()
+    tuples_by_name: dict[str, set[tuple[str, ...]]] = defaultdict(set)
+    producers: set[str] = set()
     for e in einsums:
         for ta in e["tensor_accesses"]:
             tuples_by_name[ta["name"]].add(
@@ -1815,7 +1813,9 @@ def _validate_graph_invariants(af: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _topological_sort_layers(layers: Dict[str, dict]) -> Dict[str, dict]:
+def _topological_sort_layers(
+    layers: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
     """Return ``layers`` in topological order (Kahn's algorithm).
 
     Solar's stage-2 output isn't always topo-sorted — e.g. RMSNorm emits
@@ -1823,9 +1823,9 @@ def _topological_sort_layers(layers: Dict[str, dict]) -> Dict[str, dict]:
     AF requires producer-before-consumer order; we enforce it here.
     Ties broken by insertion order — stable & deterministic.
     """
-    in_deg: Dict[str, int] = dict.fromkeys(layers, 0)
-    deps_of: Dict[str, Set[str]] = {name: set() for name in layers}
-    successors_of: Dict[str, List[str]] = {name: [] for name in layers}
+    in_deg: dict[str, int] = dict.fromkeys(layers, 0)
+    deps_of: dict[str, set[str]] = {name: set() for name in layers}
+    successors_of: dict[str, list[str]] = {name: [] for name in layers}
     for name, layer in layers.items():
         preds = (layer.get("connections") or {}).get("inputs") or []
         for p in preds:
@@ -1834,7 +1834,7 @@ def _topological_sort_layers(layers: Dict[str, dict]) -> Dict[str, dict]:
                 successors_of[p].append(name)
                 in_deg[name] += 1
     ready = [n for n in layers if in_deg[n] == 0]
-    result: Dict[str, dict] = {}
+    result: dict[str, dict[str, Any]] = {}
     while ready:
         cur = ready.pop(0)
         result[cur] = layers[cur]
@@ -1844,9 +1844,9 @@ def _topological_sort_layers(layers: Dict[str, dict]) -> Dict[str, dict]:
                 ready.append(succ)
     # Cycle / missing node fallback — keep all data, surface to AF.
     if len(result) != len(layers):
-        for name in layers:
+        for name, layer in layers.items():
             if name not in result:
-                result[name] = layers[name]
+                result[name] = layer
     return result
 
 
@@ -1855,7 +1855,7 @@ def _topological_sort_layers(layers: Dict[str, dict]) -> Dict[str, dict]:
 # ---------------------------------------------------------------------------
 
 
-def build_af_graph_from_dict(einsum_graph: Dict[str, Any]) -> Dict[str, Any]:
+def build_af_graph_from_dict(einsum_graph: dict[str, Any]) -> dict[str, Any]:
     """Build the AccelForge einsum graph from an in-memory stage-2 dict.
 
     The expected input shape is what ``PyTorchToEinsum._build_einsum_graph``
@@ -1914,9 +1914,9 @@ def build_af_graph_from_dict(einsum_graph: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def build_af_graph_from_yaml(
-    einsum_graph_yaml: Union[Path, str],
-    output_path: Optional[Union[Path, str]] = None,
-) -> Dict[str, Any]:
+    einsum_graph_yaml: Path | str,
+    output_path: Path | str | None = None,
+) -> dict[str, Any]:
     """Build the AccelForge einsum graph from a stage-2 YAML on disk.
 
     Args:

@@ -24,10 +24,10 @@ from solar.graph.extraction import (
 from solar.graph.registry import extraction_backend, extraction_backends
 
 __all__ = [
+    "ExtractionKind",
     "OperatorGraphArtifact",
     "TensorSignature",
-    "ExtractionKind",
+    "extract_operator_graph",
     "extraction_backend",
     "extraction_backends",
-    "extract_operator_graph",
 ]

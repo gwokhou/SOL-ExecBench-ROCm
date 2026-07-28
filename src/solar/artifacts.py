@@ -113,10 +113,10 @@ def _artifact_value(value: object, *, location: str) -> ArtifactValue:
 
 
 __all__ = [
+    "MAX_ARTIFACT_BYTES",
     "ArtifactDocument",
     "ArtifactMap",
     "ArtifactScalar",
     "ArtifactValue",
-    "MAX_ARTIFACT_BYTES",
     "load_yaml_artifact",
 ]

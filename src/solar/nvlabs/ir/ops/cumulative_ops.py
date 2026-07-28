@@ -30,7 +30,7 @@ For example, cumsum on input of size N returns output of size N:
 """
 
 import string
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.nvlabs.ir.ops.base import (
@@ -100,7 +100,7 @@ class CumulativeHandler(EinsumOpHandler):
         self,
         shape: TensorShape,
         op_type: str = "cumsum",
-        dim: Optional[int] = None,
+        dim: int | None = None,
     ) -> EinsumOp:
         """Generate einsum for cumulative operations.
 

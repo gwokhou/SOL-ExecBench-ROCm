@@ -29,10 +29,10 @@ def test_stage_packages_do_not_advertise_legacy_bypass_apis() -> None:
     assert solar.analysis.__all__ == []
     assert solar.einsum.__all__ == []
     assert solar.graph.__all__ == [
+        "ExtractionKind",
         "OperatorGraphArtifact",
         "TensorSignature",
-        "ExtractionKind",
+        "extract_operator_graph",
         "extraction_backend",
         "extraction_backends",
-        "extract_operator_graph",
     ]

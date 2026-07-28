@@ -32,12 +32,12 @@ from sol_execbench.core.bench.timing import (
 )
 
 
-def _scalar_ms(value: int | float | list[int | float]) -> float:
+def _scalar_ms(value: float | list[int | float]) -> float:
     assert isinstance(value, (int, float))
     return float(value)
 
 
-def _series_ms(value: int | float | list[int | float]) -> list[float]:
+def _series_ms(value: float | list[int | float]) -> list[float]:
     assert isinstance(value, list)
     return [float(item) for item in value]
 

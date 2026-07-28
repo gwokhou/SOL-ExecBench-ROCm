@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -40,8 +40,6 @@ from sol_execbench.core.scoring.release_traces import (
     VerifiedRun,
     verify_release_run,
 )
-
-_Statement = TypeVar("_Statement", bound=ReleaseModel)
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,7 +241,9 @@ def _score_workload(
     return WorkloadScore(identity[0], identity[1], score)
 
 
-def _load_model(path: Path, model: type[_Statement]) -> _Statement:
+def _load_model[Statement: ReleaseModel](
+    path: Path, model: type[Statement]
+) -> Statement:
     if not path.is_file() or path.stat().st_size > MAX_RELEASE_STATEMENT_BYTES:
         raise ValueError(
             "release statement is missing or exceeds the size limit",

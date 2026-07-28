@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 import torch
-import torch.nn.functional as functional
+from torch.nn import functional
 
 from solar.ir.registry import ir_lifecycle
 from solar.verification import numerics

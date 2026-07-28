@@ -6,9 +6,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TypeVar
-
-_T = TypeVar("_T")
 
 
 def subprocess_text(value: str | bytes | None) -> str:
@@ -31,6 +28,6 @@ def text_tail(value: object, *, limit: int = 4000) -> str:
     return text[-limit:]
 
 
-def ordered_unique(values: Iterable[_T]) -> list[_T]:
+def ordered_unique[T](values: Iterable[T]) -> list[T]:
     """Return values with duplicates removed while preserving first-seen order."""
     return list(dict.fromkeys(values))

@@ -47,12 +47,12 @@ from sol_execbench.core.bench.reward_hack.static_review import (
 )
 
 __all__ = [
+    "_ELAPSED_TIME_ADDR",
     "RewardHackError",
     "SourceReview",
     "SourceReviewIssue",
     "SourceReviewSeverity",
     "ThreadInjectionMonitor",
-    "_ELAPSED_TIME_ADDR",
     "check_eval_integrity",
     "check_lazy_outputs",
     "check_monkey_patch",
