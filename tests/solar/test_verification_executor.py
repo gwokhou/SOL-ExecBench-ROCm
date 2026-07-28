@@ -79,6 +79,7 @@ def _execute(
     }
     graph = {
         "schema_version": 3,
+        "ir_kind": "aten",
         "layers": {**starts, "operation": operation},
         "outputs": output_names,
     }
@@ -187,7 +188,11 @@ def test_einsum_and_matrix_dispatch() -> None:
             "tensor_shapes": {"inputs": [], "outputs": [list(tensor.shape)]},
             "tensor_dtypes": {"inputs": [], "outputs": [str(tensor.dtype)]},
         }
-    graph = {"schema_version": 3, "layers": {**starts, "op": layer}}
+    graph = {
+        "schema_version": 3,
+        "ir_kind": "aten",
+        "layers": {**starts, "op": layer},
+    }
     torch.testing.assert_close(
         IRGraphExecutor(graph)(left, right),
         expected,
@@ -569,10 +574,12 @@ def test_library_quantization_and_aten_fallback_dispatch() -> None:
 
 def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
     with pytest.raises(IRExecutionError, match="schema_version"):
-        IRGraphExecutor({"schema_version": 0, "layers": {}})
+        IRGraphExecutor(
+            {"schema_version": 0, "ir_kind": "aten", "layers": {}},
+        )
     with pytest.raises(
         IRExecutionError,
-        match="unsupported extended einsum",
+        match="unsupported NVLabs einsum",
     ):
         verification._torch_equation("A(P+R)->A")
     with pytest.raises(

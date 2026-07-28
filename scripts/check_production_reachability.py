@@ -18,6 +18,7 @@ ENTRY_MODULES = {
     "solar.api",
 }
 DYNAMIC_PACKAGE_ROOTS = {
+    "solar._vendor.nvlabs.ir.ops",
     "solar.einsum.ops",
     "sol_execbench.driver.templates",
 }

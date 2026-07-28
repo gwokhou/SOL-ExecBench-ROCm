@@ -19,6 +19,7 @@ from sol_execbench.core.scoring.release_models import SolarIndexStatement
 from sol_execbench.core.scoring.release_solar import verify_solar_index
 from sol_execbench.core.solar_bridge.models import SolarWorkerRequest
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
+from solar.routes import DEFAULT_ROUTE, Route
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +41,7 @@ def build_release_solar_manifests(
     timeout_seconds: float = 14_400,
     resume: bool = False,
     device: str = "cuda:0",
+    route: Route | str = DEFAULT_ROUTE,
 ) -> SolarReleaseResult:
     """Generate and index every scored workload's formal SOLAR artifacts."""
     workspace = workspace_root.resolve()
@@ -85,6 +87,7 @@ def build_release_solar_manifests(
                     output_dir=str(output),
                     device=device,
                     orojenesis_home=str(orojenesis_home.resolve()),
+                    route=route,
                 ),
                 timeout_seconds=timeout_seconds,
             )

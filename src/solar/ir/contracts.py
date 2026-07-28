@@ -9,26 +9,26 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from solar.graph.contracts import OperatorGraphArtifact
+from solar.graph.contracts import ExtractionKind, OperatorGraphArtifact
 
 
 class IRKind(StrEnum):
     """The IR dialects accepted by SOLAR's analysis pipeline."""
 
     ATEN = "aten"
-    EXTENDED_EINSUM = "extended_einsum"
+    NVLABS_EINSUM = "nvlabs_einsum"
 
 
-DEFAULT_IR_KIND = IRKind.EXTENDED_EINSUM
+DEFAULT_IR_KIND = IRKind.NVLABS_EINSUM
 
 # Semantic ``layer_operation`` kind values shared across every IR dialect.
 # Analysis code branches on these instead of enumerating dialect-specific
 # ``kind`` strings, so a newly registered IR needs no analysis-side changes.
 INPUT_KIND = "input"
 CONTRACTION_KIND = "einsum"
+OPERATION_KIND = "operation"
 
 
 @dataclass(frozen=True)
@@ -53,8 +53,9 @@ class IRBackend:
     """
 
     kind: IRKind
+    extractions: frozenset[ExtractionKind]
     validate: Callable[[Mapping[str, Any]], None]
-    convert: Callable[[OperatorGraphArtifact, str | Path], Path]
+    convert: Callable[[OperatorGraphArtifact, str | Path], IRGraphArtifact]
     execute: Callable[
         [str, Mapping[str, Any], Sequence[Any], Sequence[tuple[int, ...]]],
         Any,
@@ -73,30 +74,15 @@ def normalize_ir_kind(value: IRKind | str) -> IRKind:
 
 
 def layer_operation(layer: Mapping[str, Any]) -> Mapping[str, Any]:
-    """Expose analysis-relevant operation facts without coupling IR dialects.
-
-    Recognizes the ``extended_op`` and ``semantic_op`` payloads directly; any
-    other dialect falls back to the shared analysis surface so a newly added
-    IR backend that emits those fields needs no change here.
-    """
-    extended = layer.get("extended_op")
-    if isinstance(extended, Mapping):
-        return {
-            "kind": (
-                CONTRACTION_KIND
-                if extended.get("is_real_einsum")
-                else "extended"
-            ),
-            "target": str(extended.get("operation", "")),
-            "equation": str(extended.get("equation", "")),
-            "effects": extended.get("effects") or {},
-        }
+    """Expose the representation-neutral semantic operation for one layer."""
     semantic = layer.get("semantic_op")
     if isinstance(semantic, Mapping):
         return semantic
-    analysis = layer_analysis(layer)
+    analysis = layer_contraction_analysis(layer)
     return {
-        "kind": CONTRACTION_KIND if analysis.is_real_einsum else "extended",
+        "kind": (
+            CONTRACTION_KIND if analysis.is_contraction else OPERATION_KIND
+        ),
         "target": str(layer.get("type", "")),
         "equation": analysis.equation,
         "effects": layer.get("effects") or {},
@@ -104,24 +90,25 @@ def layer_operation(layer: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 @dataclass(frozen=True)
-class LayerAnalysis:
-    """Dialect-agnostic analysis surface carried by every IR layer.
+class LayerContractionAnalysis:
+    """Contraction analysis facts carried consistently by every IR layer.
 
-    Both IR backends emit these facts on the layer so the analysis pipeline
-    can read them through one named contract instead of poking at ad-hoc
-    top-level fields that differ per representation.
+    General operation semantics live in ``semantic_op``; this smaller contract
+    carries only representation-independent contraction classification.
     """
 
-    is_real_einsum: bool
-    is_einsum_supportable: bool
+    is_contraction: bool
+    is_supported: bool
     equation: str
 
 
-def layer_analysis(layer: Mapping[str, Any]) -> LayerAnalysis:
-    """Return the shared analysis facts for one layer, independent of dialect."""
-    return LayerAnalysis(
-        is_real_einsum=bool(layer.get("is_real_einsum", False)),
-        is_einsum_supportable=bool(layer.get("is_einsum_supportable", False)),
+def layer_contraction_analysis(
+    layer: Mapping[str, Any],
+) -> LayerContractionAnalysis:
+    """Return the shared contraction-analysis facts for one IR layer."""
+    return LayerContractionAnalysis(
+        is_contraction=bool(layer.get("is_real_einsum", False)),
+        is_supported=bool(layer.get("is_einsum_supportable", False)),
         equation=str(layer.get("einsum_equation") or ""),
     )
 
@@ -130,11 +117,12 @@ __all__ = [
     "CONTRACTION_KIND",
     "DEFAULT_IR_KIND",
     "INPUT_KIND",
+    "OPERATION_KIND",
     "IRBackend",
     "IRGraphArtifact",
     "IRKind",
-    "LayerAnalysis",
-    "layer_analysis",
+    "LayerContractionAnalysis",
+    "layer_contraction_analysis",
     "layer_operation",
     "normalize_ir_kind",
 ]

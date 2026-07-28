@@ -18,10 +18,14 @@
 This module provides utility functions following Google's Python style guide.
 """
 
+import importlib.util
+import os
 from pathlib import Path
 from typing import Any, Union
 
 import yaml
+
+from solar.common.constants import SAFE_ENV_VARS
 
 
 class NoAliasDumper(yaml.SafeDumper):
@@ -49,6 +53,25 @@ class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data: Any) -> bool:
         """Disable YAML anchors and aliases for every represented value."""
         return True
+
+
+def setup_safe_environment() -> None:
+    """Configure the upstream extractor's bounded CPU-only environment."""
+    for variable, value in SAFE_ENV_VARS.items():
+        os.environ[variable] = value
+
+
+def load_module_from_file(file_path: str | Path) -> Any:
+    """Load a Python module from an explicit source path."""
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"module file not found: {path}")
+    spec = importlib.util.spec_from_file_location("solar_dynamic_module", path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load module from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def ensure_directory(path: Union[str, Path]) -> Path:

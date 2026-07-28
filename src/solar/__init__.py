@@ -15,7 +15,7 @@
 
 """Paper-aligned Speed-of-Light analysis for PyTorch programs.
 
-The package owns graph extraction, executable extended-einsum conversion,
+The package owns graph extraction, executable NVLabs einsum conversion,
 conversion verification, and hardware-grounded SOL bound derivation.  Dataset
 handling, candidate evaluation, timing, baselines, and scoring intentionally
 live in :mod:`sol_execbench`.

@@ -5,6 +5,8 @@ from pathlib import Path
 import torch
 
 from solar.api import ConversionReadinessRequest, audit_conversion
+from solar.ir.contracts import IRKind
+from solar.routes import Route
 
 
 def _request(
@@ -22,6 +24,8 @@ def _request(
         architecture=architecture,
         output_dir=output,
         device="cpu",
+        representation=IRKind.ATEN,
+        route=Route.MAINLINE,
     )
 
 
@@ -41,7 +45,7 @@ def test_audit_conversion_records_all_passing_stage_digests(
     assert all(item.status == "passed" for item in result.stages)
     assert {item.artifact.path for item in result.stages if item.artifact} == {
         "operator_graph.yaml",
-        "einsum_graph.yaml",
+        "aten_graph.yaml",
         "conversion-attestation.yaml",
     }
 
@@ -54,7 +58,7 @@ def test_audit_conversion_retains_passed_artifacts_on_failure(
         del args, kwargs
         raise RuntimeError("cannot bind source arguments to graph inputs")
 
-    monkeypatch.setattr("solar.readiness.convert_operator_graph", fail)
+    monkeypatch.setattr("solar.readiness.convert_request_graph", fail)
     result = audit_conversion(
         _request(tmp_path / "failed", lambda value: value + 1),
     )

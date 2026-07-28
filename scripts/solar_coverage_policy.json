@@ -13,7 +13,7 @@
     "src/solar/einsum/operation_conversion.py": {"line": 80.0, "branch": 65.0},
     "src/solar/ir/aten.py": {"line": 80.0, "branch": 65.0},
     "src/solar/ir/conversion.py": {"line": 80.0, "branch": 65.0},
-    "src/solar/ir/extended_einsum.py": {"line": 80.0, "branch": 65.0},
+    "src/solar/ir/nvlabs_einsum/conversion.py": {"line": 80.0, "branch": 65.0},
     "src/solar/ir/registry.py": {"line": 80.0, "branch": 65.0},
     "src/solar/verification/aten.py": {"line": 80.0, "branch": 65.0},
     "src/solar/verification/verify.py": {"line": 80.0, "branch": 65.0},

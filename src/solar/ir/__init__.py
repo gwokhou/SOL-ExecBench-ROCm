@@ -8,8 +8,8 @@ from solar.ir.contracts import (
     IRBackend,
     IRGraphArtifact,
     IRKind,
-    LayerAnalysis,
-    layer_analysis,
+    LayerContractionAnalysis,
+    layer_contraction_analysis,
 )
 from solar.ir.registry import (
     graph_kind,
@@ -23,10 +23,10 @@ __all__ = [
     "IRBackend",
     "IRGraphArtifact",
     "IRKind",
-    "LayerAnalysis",
+    "LayerContractionAnalysis",
     "graph_kind",
     "ir_backend",
     "ir_backends",
-    "layer_analysis",
+    "layer_contraction_analysis",
     "validate_ir_graph",
 ]

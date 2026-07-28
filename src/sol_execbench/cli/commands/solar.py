@@ -31,6 +31,7 @@ from sol_execbench.core.solar_bridge.release import (
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
 
 console = Console(stderr=True)
+_ROUTE_CHOICE = click.Choice(["nvlabs", "mainline"], case_sensitive=True)
 
 
 @click.group("solar", context_settings={"help_option_names": ["-h", "--help"]})
@@ -51,6 +52,9 @@ def solar_cli() -> None:
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
+    "--route", type=_ROUTE_CHOICE, default="nvlabs", show_default=True
+)
+@click.option(
     "--orojenesis-home",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     envvar="SOLAR_OROJENESIS_HOME",
@@ -66,6 +70,7 @@ def analyze_cli(
     workload_uuid: str,
     output: Path,
     device: str,
+    route: str,
     orojenesis_home: Path | None,
     timeout_seconds: float,
 ) -> CliResult:
@@ -75,6 +80,7 @@ def analyze_cli(
         workload_uuid=workload_uuid,
         output_dir=str(output.resolve()),
         device=device,
+        route=route,
         orojenesis_home=(str(orojenesis_home) if orojenesis_home else None),
     )
     try:
@@ -137,6 +143,9 @@ def analyze_cli(
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
+    "--route", type=_ROUTE_CHOICE, default="nvlabs", show_default=True
+)
+@click.option(
     "--timeout",
     "timeout_seconds",
     default=14_400.0,
@@ -148,6 +157,7 @@ def release_build_cli(
     manifest_path: Path,
     orojenesis_home: Path,
     device: str,
+    route: str,
     timeout_seconds: float,
     resume: bool,
 ) -> CliResult:
@@ -160,6 +170,7 @@ def release_build_cli(
             timeout_seconds=timeout_seconds,
             resume=resume,
             device=device,
+            route=route,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         raise CliFailure(
@@ -201,6 +212,9 @@ def release_build_cli(
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
+    "--route", type=_ROUTE_CHOICE, default="nvlabs", show_default=True
+)
+@click.option(
     "--timeout",
     "timeout_seconds",
     default=14_400.0,
@@ -211,6 +225,7 @@ def corpus_audit_cli(
     output: Path,
     manifest_path: Path,
     device: str,
+    route: str,
     timeout_seconds: float,
     resume: bool,
 ) -> CliResult:
@@ -220,6 +235,7 @@ def corpus_audit_cli(
             manifest_path,
             output,
             device=device,
+            route=route,
             timeout_seconds=timeout_seconds,
             resume=resume,
         )

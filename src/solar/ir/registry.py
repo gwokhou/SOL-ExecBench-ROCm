@@ -12,9 +12,11 @@ from solar.ir.contracts import IRBackend, IRKind, normalize_ir_kind
 
 
 def graph_kind(graph: Mapping[str, Any]) -> IRKind:
-    """Read an explicit IR discriminator, preserving legacy ATen graphs."""
+    """Read the required IR discriminator from a validated graph."""
     value = graph.get("ir_kind")
-    return IRKind.ATEN if value is None else normalize_ir_kind(str(value))
+    if value is None:
+        raise ValueError("IR graph has no explicit ir_kind discriminator")
+    return normalize_ir_kind(str(value))
 
 
 def validate_ir_graph(graph: Mapping[str, Any]) -> None:
@@ -28,15 +30,15 @@ def _load_aten_backend() -> IRBackend:
     return backend
 
 
-def _load_extended_einsum_backend() -> IRBackend:
-    from solar.ir.extended_einsum import backend
+def _load_nvlabs_einsum_backend() -> IRBackend:
+    from solar.ir.nvlabs_einsum.backend import backend
 
     return backend
 
 
 _BACKEND_LOADERS: dict[IRKind, Callable[[], IRBackend]] = {
     IRKind.ATEN: _load_aten_backend,
-    IRKind.EXTENDED_EINSUM: _load_extended_einsum_backend,
+    IRKind.NVLABS_EINSUM: _load_nvlabs_einsum_backend,
 }
 
 

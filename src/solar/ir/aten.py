@@ -12,9 +12,9 @@ from typing import Any
 
 import yaml
 
-from solar.graph.contracts import OperatorGraphArtifact
+from solar.graph.contracts import ExtractionKind, OperatorGraphArtifact
 from solar.ir.bindings import bind_graph
-from solar.ir.contracts import IRBackend, IRKind
+from solar.ir.contracts import IRBackend, IRGraphArtifact, IRKind
 from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
 from solar.verification.aten import execute_aten_layer
 
@@ -136,7 +136,7 @@ SUPPORTED_ATEN_TARGETS = frozenset(
 def convert_operator_graph(
     operator: OperatorGraphArtifact,
     output_dir: str | Path,
-) -> Path:
+) -> IRGraphArtifact:
     """Persist the canonical operator graph as one validated ATen IR artifact."""
     traced = _load_operator_graph(operator)
     converted = deepcopy(dict(traced))
@@ -145,12 +145,12 @@ def convert_operator_graph(
     validate_aten_graph(converted)
     path = Path(output_dir) / "aten_graph.yaml"
     path.write_text(yaml.safe_dump(converted, sort_keys=False))
-    return path
+    return IRGraphArtifact(path, IRKind.ATEN)
 
 
 def validate_aten_graph(graph: Mapping[str, Any]) -> None:
     """Validate one exact ATen IR graph without accepting legacy schemas."""
-    if graph.get("ir_kind") not in {None, "aten"}:
+    if graph.get("ir_kind") != IRKind.ATEN.value:
         raise AtenIRError("graph is not ATen IR")
     if int(graph.get("schema_version", 0)) != IR_GRAPH_SCHEMA_VERSION:
         raise AtenIRError(
@@ -319,10 +319,11 @@ def _validate_required_parameters(
 
 
 backend = IRBackend(
-    IRKind.ATEN,
-    validate_aten_graph,
-    convert_operator_graph,
-    execute_aten_layer,
+    kind=IRKind.ATEN,
+    extractions=frozenset({ExtractionKind.MAKE_FX_REFERENCE}),
+    validate=validate_aten_graph,
+    convert=convert_operator_graph,
+    execute=execute_aten_layer,
 )
 
 

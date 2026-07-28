@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Operation classification policy for strict extended-einsum conversion."""
+"""Operation classification policy for strict NVLabs einsum conversion."""
 
 _REAL_EINSUM = {
     "matmul",

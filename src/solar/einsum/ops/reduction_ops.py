@@ -120,7 +120,7 @@ class ReductionHandler(EinsumOpHandler):
         keepdim: bool = False,
         output_shape: TensorShape | None = None,
     ) -> EinsumOp:
-        """Generate extended einsum notation for a reduction."""
+        """Generate NVLabs einsum notation for a reduction."""
         ndims = len(shape)
         input_labels = list(string.ascii_uppercase[:ndims])
         normalized_dims = _normalized_dims(dims, ndims)

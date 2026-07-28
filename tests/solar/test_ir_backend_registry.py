@@ -12,17 +12,24 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+import pytest
 import torch
 
+from solar.graph.contracts import ExtractionKind
 from solar.ir import registry as ir_registry
-from solar.ir.contracts import IRBackend, IRKind
-from solar.ir.registry import ir_backend, ir_backends, validate_ir_graph
+from solar.ir.contracts import IRBackend, IRGraphArtifact, IRKind
+from solar.ir.registry import (
+    graph_kind,
+    ir_backend,
+    ir_backends,
+    validate_ir_graph,
+)
 from solar.verification.executor import IRGraphExecutor
 
 
 def _stub_graph() -> dict[str, Any]:
     return {
-        "ir_kind": "extended_einsum",
+        "ir_kind": "nvlabs_einsum",
         "schema_version": 999,
         "layers": {
             "x": {
@@ -61,18 +68,22 @@ def test_registry_drives_backend_lookup(monkeypatch) -> None:
         return operands[0]
 
     stub = IRBackend(
-        IRKind.EXTENDED_EINSUM,
+        kind=IRKind.NVLABS_EINSUM,
+        extractions=frozenset(ExtractionKind),
         validate=stub_validate,
-        convert=lambda operator, output_dir: Path(output_dir),
+        convert=lambda operator, output_dir: IRGraphArtifact(
+            Path(output_dir),
+            IRKind.NVLABS_EINSUM,
+        ),
         execute=stub_execute,
     )
     monkeypatch.setitem(
         ir_registry._BACKEND_LOADERS,
-        IRKind.EXTENDED_EINSUM,
+        IRKind.NVLABS_EINSUM,
         lambda: stub,
     )
 
-    assert ir_backend(IRKind.EXTENDED_EINSUM) is stub
+    assert ir_backend(IRKind.NVLABS_EINSUM) is stub
     assert stub in ir_backends()
 
     graph = _stub_graph()
@@ -87,5 +98,10 @@ def test_registry_drives_backend_lookup(monkeypatch) -> None:
 def test_registry_lists_every_registered_dialect() -> None:
     kinds = {backend.kind for backend in ir_backends()}
     assert IRKind.ATEN in kinds
-    assert IRKind.EXTENDED_EINSUM in kinds
+    assert IRKind.NVLABS_EINSUM in kinds
     assert all(isinstance(backend, IRBackend) for backend in ir_backends())
+
+
+def test_graph_dispatch_requires_an_explicit_ir_kind() -> None:
+    with pytest.raises(ValueError, match="explicit ir_kind"):
+        graph_kind({"layers": {}})

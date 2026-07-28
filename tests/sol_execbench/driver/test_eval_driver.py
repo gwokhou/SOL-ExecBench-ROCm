@@ -607,8 +607,8 @@ def test_thread_injection_detected(tmp_path):
 def test_torch_compile_no_reward_hack(tmp_path):
     """@torch.compile must not trigger thread injection false positive.
 
-    TorchInductor's trusted compiler workers are initialized before the thread
-    baseline, while the baseline itself still precedes all candidate calls.
+    Candidate compilation is synchronous, while the thread monitor remains
+    strict for every candidate-created worker during timing.
     """
     kernel = (
         "import torch\n"
@@ -625,6 +625,29 @@ def test_torch_compile_no_reward_hack(tmp_path):
     ev = traces[0]["evaluation"]
     assert ev["status"] == "PASSED", (
         f"Expected PASSED (torch.compile false positive fixed), "
+        f"got {ev['status']}; log={ev.get('log')}"
+    )
+
+
+def test_candidate_forces_synchronous_inductor_compilation(tmp_path):
+    """The candidate process overrides inherited async-compile settings."""
+    kernel = (
+        "import os\n"
+        "\n"
+        "def run(x, y):\n"
+        "    assert os.environ['TORCHINDUCTOR_COMPILE_THREADS'] == '1'\n"
+        "    return x + y\n"
+    )
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        extra_env={"TORCHINDUCTOR_COMPILE_THREADS": "8"},
+    )
+
+    assert len(traces) == 1
+    ev = traces[0]["evaluation"]
+    assert ev["status"] == "PASSED", (
+        f"Expected synchronous compilation policy; "
         f"got {ev['status']}; log={ev.get('log')}"
     )
 

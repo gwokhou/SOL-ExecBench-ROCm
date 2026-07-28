@@ -50,16 +50,16 @@ def test_only_solar_bridge_imports_solar_from_outer_package():
 def test_ir_backends_are_independent_implementations():
     backend_modules = {
         "aten.py": ("solar.ir.aten", "solar.verification.aten"),
-        "extended_einsum.py": (
-            "solar.ir.extended_einsum",
-            "solar.verification.extended_einsum",
+        "nvlabs_einsum/backend.py": (
+            "solar.ir.nvlabs_einsum.backend",
+            "solar.verification.nvlabs_einsum",
         ),
     }
     ir_root = REPO_ROOT / "src" / "solar" / "ir"
     backend_names = {item[0] for item in backend_modules.values()}
     executor_names = {item[1] for item in backend_modules.values()}
-    for filename, (own_module, own_executor) in backend_modules.items():
-        imports = _imports(ir_root / filename)
+    for relative_path, (own_module, own_executor) in backend_modules.items():
+        imports = _imports(ir_root / relative_path)
         assert not (imports & (backend_names - {own_module}))
         assert not (imports & (executor_names - {own_executor}))
         assert "solar.ir.registry" not in imports
@@ -75,3 +75,60 @@ def test_ir_backends_are_independent_implementations():
         REPO_ROOT / "src" / "solar" / "verification" / "verify.py",
     )
     assert not (orchestration_imports & executor_names)
+
+
+def test_public_workflows_do_not_import_concrete_route_implementations():
+    forbidden = (
+        "solar.analysis.nvlabs",
+        "solar.graph.torchview",
+        "solar.ir.aten",
+        "solar.ir.nvlabs_einsum",
+        "solar.verification.aten",
+        "solar.verification.nvlabs_einsum",
+    )
+    for relative_path in ("pipeline.py", "readiness.py"):
+        imports = _imports(REPO_ROOT / "src" / "solar" / relative_path)
+        assert not {
+            imported for imported in imports if imported.startswith(forbidden)
+        }
+        assert "solar.workflow" in imports
+
+
+def test_public_common_identifiers_are_route_and_backend_neutral():
+    public_modules = (
+        "contracts.py",
+        "pipeline.py",
+        "readiness.py",
+        "workflow.py",
+        "graph/contracts.py",
+        "graph/extraction.py",
+        "ir/contracts.py",
+        "ir/conversion.py",
+        "ir/registry.py",
+    )
+    forbidden = ("nvlabs", "mainline", "extended", "aten", "einsum")
+    offenders: list[tuple[str, str]] = []
+    for relative_path in public_modules:
+        path = REPO_ROOT / "src" / "solar" / relative_path
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef | ast.FunctionDef):
+                continue
+            if node.name.startswith("_") or node.name in {"IRKind", "Route"}:
+                continue
+            if any(token in node.name.lower() for token in forbidden):
+                offenders.append((relative_path, node.name))
+    assert offenders == []
+
+
+def test_common_dispatch_has_no_route_specific_fallbacks():
+    extraction = (
+        REPO_ROOT / "src" / "solar" / "graph" / "extraction.py"
+    ).read_text()
+    conversion = (
+        REPO_ROOT / "src" / "solar" / "ir" / "conversion.py"
+    ).read_text()
+
+    assert "if kind is" not in extraction
+    assert "make_fx_reference_v1" not in conversion
+    assert "IRKind.ATEN" not in conversion
