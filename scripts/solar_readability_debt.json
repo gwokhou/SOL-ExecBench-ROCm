@@ -81,8 +81,8 @@
     "src/solar/nvlabs/ir/semantics.py:validate_semantic_graph": 147
   },
   "oversized_modules": {
-    "src/solar/analysis/graph_analyzer.py": 1703,
-    "src/solar/analysis/orojenesis.py": 1773,
+    "src/solar/analysis/graph_analyzer.py": 1656,
+    "src/solar/analysis/orojenesis.py": 1761,
     "src/solar/nvlabs/graph/torchview_processor.py": 1783,
     "src/solar/nvlabs/ir/af_graph_builder.py": 1944,
     "src/solar/nvlabs/ir/pytorch_to_einsum.py": 4086

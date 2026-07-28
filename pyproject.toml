@@ -141,6 +141,9 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 

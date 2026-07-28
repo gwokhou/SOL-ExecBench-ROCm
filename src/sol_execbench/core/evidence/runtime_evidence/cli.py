@@ -8,10 +8,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from sol_execbench.core.arguments import (
-    none_if_requested as _none_if_requested,
-)
-from sol_execbench.core.arguments import (
-    parse_bool as _parse_bool,
+    none_if_requested,
+    parse_bool,
 )
 from sol_execbench.core.evidence.runtime_evidence.builders import (
     build_aggregate_report,
@@ -65,10 +63,10 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--allow-mixed-version-debug", action="store_true")
     collect.add_argument("--host-rocm-version")
     collect.add_argument("--host-driver-version")
-    collect.add_argument("--dev-kfd-present", type=_parse_bool)
-    collect.add_argument("--dev-kfd-accessible", type=_parse_bool)
-    collect.add_argument("--dev-dri-present", type=_parse_bool)
-    collect.add_argument("--dev-dri-accessible", type=_parse_bool)
+    collect.add_argument("--dev-kfd-present", type=parse_bool)
+    collect.add_argument("--dev-kfd-accessible", type=parse_bool)
+    collect.add_argument("--dev-dri-present", type=parse_bool)
+    collect.add_argument("--dev-dri-accessible", type=parse_bool)
     collect.add_argument("--image-digest")
     collect.add_argument("--torch-distribution-version")
     collect.add_argument("--torch-version")
@@ -76,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--torch-rocm-target")
     collect.add_argument("--torch-hip-version")
     collect.add_argument("--torch-cuda-version")
-    collect.add_argument("--torch-device-available", type=_parse_bool)
+    collect.add_argument("--torch-device-available", type=parse_bool)
     collect.add_argument("--torch-import-error")
     collect.add_argument("--torchvision-distribution-version")
     collect.add_argument("--triton-rocm-distribution-version")
@@ -140,28 +138,28 @@ def collect_target(
     selection = select_docker_target(args.target, manifest_path=args.manifest)
     dependency_observation = build_dependency_observation(
         PytorchDependencyObservation(
-            torch_distribution_version=_none_if_requested(
+            torch_distribution_version=none_if_requested(
                 args.torch_distribution_version,
             ),
-            torch_version=_none_if_requested(args.torch_version),
-            torch_local_version=_none_if_requested(args.torch_local_version),
-            torch_rocm_target=_none_if_requested(args.torch_rocm_target),
-            torch_hip_version=_none_if_requested(args.torch_hip_version),
-            torch_cuda_version=_none_if_requested(args.torch_cuda_version),
+            torch_version=none_if_requested(args.torch_version),
+            torch_local_version=none_if_requested(args.torch_local_version),
+            torch_rocm_target=none_if_requested(args.torch_rocm_target),
+            torch_hip_version=none_if_requested(args.torch_hip_version),
+            torch_cuda_version=none_if_requested(args.torch_cuda_version),
             torch_device_available=args.torch_device_available,
-            torch_import_error=_none_if_requested(args.torch_import_error),
-            torchvision_distribution_version=_none_if_requested(
+            torch_import_error=none_if_requested(args.torch_import_error),
+            torchvision_distribution_version=none_if_requested(
                 args.torchvision_distribution_version,
             ),
-            triton_rocm_distribution_version=_none_if_requested(
+            triton_rocm_distribution_version=none_if_requested(
                 args.triton_rocm_distribution_version,
             ),
-            triton_rocm_status=_none_if_requested(args.triton_rocm_status),
-            container_rocm_user_space_version=_none_if_requested(
+            triton_rocm_status=none_if_requested(args.triton_rocm_status),
+            container_rocm_user_space_version=none_if_requested(
                 args.container_rocm_user_space_version,
             ),
-            hipcc_version=_none_if_requested(args.hipcc_version),
-            toolchain_rocm_version=_none_if_requested(
+            hipcc_version=none_if_requested(args.hipcc_version),
+            toolchain_rocm_version=none_if_requested(
                 args.toolchain_rocm_version,
             ),
         ),
@@ -170,8 +168,8 @@ def collect_target(
         target=selection.target,
         dependency_observation=dependency_observation,
         host=build_host_evidence(
-            rocm_version=_none_if_requested(args.host_rocm_version),
-            driver_version=_none_if_requested(args.host_driver_version),
+            rocm_version=none_if_requested(args.host_rocm_version),
+            driver_version=none_if_requested(args.host_driver_version),
             dev_kfd_present=args.dev_kfd_present,
             dev_kfd_accessible=args.dev_kfd_accessible,
             dev_dri_present=args.dev_dri_present,
@@ -181,17 +179,17 @@ def collect_target(
             rocm_user_space_version=dependency_observation.container_rocm_user_space_version,
             image_repository=selection.target.docker_image_repository,
             image_tag=selection.target.docker_image_tag,
-            image_digest=_none_if_requested(args.image_digest),
+            image_digest=none_if_requested(args.image_digest),
         ),
         gpu=collect_gpu_evidence(
             device_count=args.device_count,
-            device_name=_none_if_requested(args.device_name),
-            gfx_architecture=_none_if_requested(args.gfx_architecture),
+            device_name=none_if_requested(args.device_name),
+            gfx_architecture=none_if_requested(args.gfx_architecture),
             visible_device_environment=visible_env_from_args(
                 args.visible_device_env,
             ),
         ),
-        runtime_unavailable_reason=_none_if_requested(
+        runtime_unavailable_reason=none_if_requested(
             args.runtime_unavailable_reason,
         ),
         failure_evidence=failure_evidence_from_args(args.failure_category),

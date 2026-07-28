@@ -10,14 +10,10 @@ from sol_execbench.core.evidence.runtime_evidence.builders import (
 )
 from sol_execbench.core.evidence.runtime_evidence.cli import (
     collect_target as _collect_target_impl,
-)
-from sol_execbench.core.evidence.runtime_evidence.cli import (
     main as _main,
 )
 from sol_execbench.core.evidence.runtime_evidence.collectors import (
     build_dependency_observation as _build_dependency_observation,
-)
-from sol_execbench.core.evidence.runtime_evidence.collectors import (
     build_host_evidence,
     collect_gpu_evidence,
     collect_visible_device_environment,

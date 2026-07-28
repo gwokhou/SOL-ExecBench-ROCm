@@ -31,9 +31,7 @@ from sol_execbench.core.bench.reward_hack.models import (
     SourceReviewSeverity,
 )
 from sol_execbench.core.bench.reward_hack.runtime import (
-    _ELAPSED_TIME_ADDR as _ELAPSED_TIME_ADDR,
-)
-from sol_execbench.core.bench.reward_hack.runtime import (
+    _ELAPSED_TIME_ADDR,
     ThreadInjectionMonitor,
     check_eval_integrity,
     check_lazy_outputs,

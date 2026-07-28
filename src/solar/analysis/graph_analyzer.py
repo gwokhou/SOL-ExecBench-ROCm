@@ -34,64 +34,28 @@ from solar.analysis import formal_evidence
 from solar.analysis.contraction_proofs import build_orojenesis_proof_graph
 from solar.analysis.fusion import FusionPlanner
 from solar.analysis.graph_context import (
-    AnalysisJob as _AnalysisJob,
-)
-from solar.analysis.graph_context import (
-    GraphTopology as _GraphTopology,
-)
-from solar.analysis.graph_context import (
+    AnalysisJob,
+    GraphTopology,
     PathLike,
-)
-from solar.analysis.graph_context import (
-    PreparedAnalysis as _PreparedAnalysis,
-)
-from solar.analysis.graph_context import (
-    build_graph_topology as _build_graph_topology_data,
-)
-from solar.analysis.graph_context import (
-    product as _product,
+    PreparedAnalysis,
+    build_graph_topology,
+    product,
 )
 from solar.analysis.graph_models import (
-    AnalysisAccumulator as _AnalysisAccumulator,
-)
-from solar.analysis.graph_models import (
-    AnalyzedLayer as _AnalyzedLayer,
-)
-from solar.analysis.graph_models import (
-    FormalAnalysis as _FormalAnalysis,
-)
-from solar.analysis.graph_models import (
-    FusionPlan as _FusionPlan,
-)
-from solar.analysis.graph_models import (
-    GraphIoTotals as _GraphIoTotals,
-)
-from solar.analysis.graph_models import (
-    InputIo as _InputIo,
-)
-from solar.analysis.graph_models import (
-    LayerCompute as _LayerCompute,
-)
-from solar.analysis.graph_models import (
-    LayerData as _LayerData,
-)
-from solar.analysis.graph_models import (
-    LayerIo as _LayerIo,
-)
-from solar.analysis.graph_models import (
-    LowerBound as _LowerBound,
-)
-from solar.analysis.graph_models import (
-    MemoryBytes as _MemoryBytes,
-)
-from solar.analysis.graph_models import (
-    MemoryElements as _MemoryElements,
-)
-from solar.analysis.graph_models import (
-    OutputIo as _OutputIo,
-)
-from solar.analysis.graph_models import (
-    ResourceAccounting as _ResourceAccounting,
+    AnalysisAccumulator,
+    AnalyzedLayer,
+    FormalAnalysis,
+    FusionPlan,
+    GraphIoTotals,
+    InputIo,
+    LayerCompute,
+    LayerData,
+    LayerIo,
+    LowerBound,
+    MemoryBytes,
+    MemoryElements,
+    OutputIo,
+    ResourceAccounting,
 )
 from solar.analysis.graph_rules import (
     SCATTER_OPS,
@@ -107,9 +71,6 @@ from solar.analysis.graph_validation import (
 from solar.analysis.operand_provenance import (
     contraction_external_source_dtypes,
     contraction_operands_are_graph_external,
-)
-from solar.analysis.orojenesis import (
-    OrojenesisError as OrojenesisError,
 )
 from solar.analysis.orojenesis import (
     OrojenesisRunner,
@@ -135,15 +96,7 @@ from solar.common.utils import ensure_directory
 from solar.einsum.analyzer import EinsumAnalyzer
 from solar.ir.contracts import layer_contraction_analysis, layer_operation
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
-from solar.schema_versions import (
-    OROJENESIS_ANALYSIS_SCHEMA_VERSION,
-)
-from solar.schema_versions import (
-    SOLAR_ANALYSIS_SCHEMA_VERSION as SOLAR_ANALYSIS_SCHEMA_VERSION,
-)
-from solar.schema_versions import (
-    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION as SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
-)
+from solar.schema_versions import OROJENESIS_ANALYSIS_SCHEMA_VERSION
 
 
 class IRGraphAnalyzer:
@@ -190,7 +143,7 @@ class IRGraphAnalyzer:
 
         """
         return self._analyze_job(
-            _AnalysisJob(
+            AnalysisJob(
                 graph_path=graph_path,
                 output_dir=output_dir,
                 precision=precision,
@@ -204,7 +157,7 @@ class IRGraphAnalyzer:
 
     def _resolve_analysis_paths(
         self,
-        job: _AnalysisJob,
+        job: AnalysisJob,
     ) -> tuple[Path, Path] | None:
         source = Path(job.graph_path)
         reordered = source.parent / f"{source.stem}_reordered.yaml"
@@ -304,7 +257,7 @@ class IRGraphAnalyzer:
                         f"tensor dtype: {dtype}",
                     ) from exc
 
-    def _prepare_analysis(self, job: _AnalysisJob) -> _PreparedAnalysis | None:
+    def _prepare_analysis(self, job: AnalysisJob) -> PreparedAnalysis | None:
         paths = self._resolve_analysis_paths(job)
         if paths is None:
             return None
@@ -329,7 +282,7 @@ class IRGraphAnalyzer:
                 profile,
                 requested_precision,
             )
-        return _PreparedAnalysis(
+        return PreparedAnalysis(
             source=source,
             output_dir=output_dir,
             graph=graph,
@@ -351,12 +304,12 @@ class IRGraphAnalyzer:
     def _build_graph_topology(
         self,
         all_layers: dict[str, Any],
-    ) -> _GraphTopology:
-        topology = _build_graph_topology_data(all_layers)
+    ) -> GraphTopology:
+        topology = build_graph_topology(all_layers)
         self._debug_topology(topology)
         return topology
 
-    def _debug_topology(self, topology: _GraphTopology) -> None:
+    def _debug_topology(self, topology: GraphTopology) -> None:
         if not self.debug:
             return
         print(f"Debug: Filtered out {len(topology.start_node_ids)} start nodes")
@@ -382,7 +335,7 @@ class IRGraphAnalyzer:
             )
 
     @staticmethod
-    def _parse_layer(layer_id: str, layer: dict[str, Any]) -> _LayerData:
+    def _parse_layer(layer_id: str, layer: dict[str, Any]) -> LayerData:
         op_type = str(layer.get("type", "unknown"))
         analysis = layer_contraction_analysis(layer)
         shapes = layer.get("tensor_shapes") or {}
@@ -392,7 +345,7 @@ class IRGraphAnalyzer:
         connections = layer.get("connections") or {}
         input_shapes = list(shapes.get("inputs") or [])
         output_shapes = list(shapes.get("outputs") or [])
-        return _LayerData(
+        return LayerData(
             layer_id=layer_id,
             layer=layer,
             op_type=op_type,
@@ -409,16 +362,16 @@ class IRGraphAnalyzer:
             input_names=list(names.get("inputs") or []),
             output_names=list(names.get("outputs") or []),
             input_sizes=[
-                _product(shape) if isinstance(shape, list) else 0
+                product(shape) if isinstance(shape, list) else 0
                 for shape in input_shapes
             ],
             output_sizes=[
-                _product(shape) if isinstance(shape, list) else 0
+                product(shape) if isinstance(shape, list) else 0
                 for shape in output_shapes
             ],
         )
 
-    def _compute_layer(self, data: _LayerData) -> _LayerCompute:
+    def _compute_layer(self, data: LayerData) -> LayerCompute:
         shapes = TensorShapes(
             inputs=data.input_shapes,
             outputs=data.output_shapes,
@@ -451,7 +404,7 @@ class IRGraphAnalyzer:
             is_real_einsum = False
         contraction = is_real_einsum or is_mfma_operation(data.op_type)
         macs = cost if contraction else 0
-        return _LayerCompute(
+        return LayerCompute(
             is_real_einsum=is_real_einsum,
             macs=macs,
             other_ops=0 if contraction else cost,
@@ -459,7 +412,7 @@ class IRGraphAnalyzer:
         )
 
     @staticmethod
-    def _scatter_write_elements(data: _LayerData) -> int:
+    def _scatter_write_elements(data: LayerData) -> int:
         if len(data.input_sizes) >= 2:
             return max(sorted(data.input_sizes)[:-1])
         if data.input_sizes:
@@ -468,10 +421,10 @@ class IRGraphAnalyzer:
 
     @staticmethod
     def _memory_elements(
-        data: _LayerData,
-        compute: _LayerCompute,
-        topology: _GraphTopology,
-    ) -> _MemoryElements:
+        data: LayerData,
+        compute: LayerCompute,
+        topology: GraphTopology,
+    ) -> MemoryElements:
         reads = list(data.input_sizes)
         writes = list(data.output_sizes)
         other_ops = compute.other_ops
@@ -511,14 +464,14 @@ class IRGraphAnalyzer:
             reads = [0] * len(data.input_sizes)
             writes = [0] * len(data.output_sizes)
             other_ops = 0
-        return _MemoryElements(reads, writes, other_ops, orphaned)
+        return MemoryElements(reads, writes, other_ops, orphaned)
 
     @staticmethod
     def _memory_bytes(
-        data: _LayerData,
-        memory: _MemoryElements,
+        data: LayerData,
+        memory: MemoryElements,
         fallback_precision: str,
-    ) -> _MemoryBytes:
+    ) -> MemoryBytes:
         input_elems = int(sum(memory.reads))
         output_elems = int(sum(memory.writes))
         used_fallback = any(
@@ -548,7 +501,7 @@ class IRGraphAnalyzer:
             )
             for index, count in enumerate(memory.writes)
         ]
-        return _MemoryBytes(
+        return MemoryBytes(
             input_elems=input_elems,
             output_elems=output_elems,
             unfused_elems=input_elems + output_elems,
@@ -560,14 +513,14 @@ class IRGraphAnalyzer:
 
     def _account_layer_resources(
         self,
-        data: _LayerData,
-        compute: _LayerCompute,
-        topology: _GraphTopology,
-        prepared: _PreparedAnalysis,
-        accumulator: _AnalysisAccumulator,
+        data: LayerData,
+        compute: LayerCompute,
+        topology: GraphTopology,
+        prepared: PreparedAnalysis,
+        accumulator: AnalysisAccumulator,
         *,
         orphaned: bool,
-    ) -> _ResourceAccounting:
+    ) -> ResourceAccounting:
         compute_precision, resource_precision = self._resource_precision(
             data,
             compute,
@@ -603,14 +556,14 @@ class IRGraphAnalyzer:
             cast(Mapping[str, Mapping[str, Any]], layer_work),
         )
         accumulator.resource_coverage[str(resources["classification"])] += 1
-        return _ResourceAccounting(compute_precision, resources)
+        return ResourceAccounting(compute_precision, resources)
 
     @staticmethod
     def _resource_precision(
-        data: _LayerData,
-        compute: _LayerCompute,
-        topology: _GraphTopology,
-        prepared: _PreparedAnalysis,
+        data: LayerData,
+        compute: LayerCompute,
+        topology: GraphTopology,
+        prepared: PreparedAnalysis,
     ) -> tuple[str, str | None]:
         compute_precisions = [
             normalized
@@ -660,12 +613,12 @@ class IRGraphAnalyzer:
 
     @staticmethod
     def _classify_layer_inputs(
-        data: _LayerData,
-        memory: _MemoryElements,
-        byte_counts: _MemoryBytes,
-        topology: _GraphTopology,
-        accumulator: _AnalysisAccumulator,
-    ) -> _InputIo:
+        data: LayerData,
+        memory: MemoryElements,
+        byte_counts: MemoryBytes,
+        topology: GraphTopology,
+        accumulator: AnalysisAccumulator,
+    ) -> InputIo:
         intermediate_elems = 0
         model_elems = 0
         intermediate_bytes = 0.0
@@ -710,7 +663,7 @@ class IRGraphAnalyzer:
                     ),
                     byte_counts.input_bytes[index],
                 )
-        return _InputIo(
+        return InputIo(
             intermediate_elems,
             model_elems,
             intermediate_bytes,
@@ -719,13 +672,13 @@ class IRGraphAnalyzer:
 
     @staticmethod
     def _classify_layer_outputs(
-        data: _LayerData,
-        memory: _MemoryElements,
-        byte_counts: _MemoryBytes,
-        topology: _GraphTopology,
+        data: LayerData,
+        memory: MemoryElements,
+        byte_counts: MemoryBytes,
+        topology: GraphTopology,
         declared_outputs: set[str],
-        accumulator: _AnalysisAccumulator,
-    ) -> _OutputIo:
+        accumulator: AnalysisAccumulator,
+    ) -> OutputIo:
         intermediate_flags = [
             any(
                 consumer not in topology.transparent_layer_ids
@@ -789,7 +742,7 @@ class IRGraphAnalyzer:
                 accumulator.unique_external_output_bytes.get(name, 0.0),
                 bytes_,
             )
-        return _OutputIo(
+        return OutputIo(
             intermediate_elems,
             model_elems,
             intermediate_bytes,
@@ -799,13 +752,13 @@ class IRGraphAnalyzer:
 
     def _classify_layer_io(
         self,
-        data: _LayerData,
-        memory: _MemoryElements,
-        byte_counts: _MemoryBytes,
-        topology: _GraphTopology,
-        prepared: _PreparedAnalysis,
-        accumulator: _AnalysisAccumulator,
-    ) -> _LayerIo:
+        data: LayerData,
+        memory: MemoryElements,
+        byte_counts: MemoryBytes,
+        topology: GraphTopology,
+        prepared: PreparedAnalysis,
+        accumulator: AnalysisAccumulator,
+    ) -> LayerIo:
         inputs = self._classify_layer_inputs(
             data,
             memory,
@@ -821,7 +774,7 @@ class IRGraphAnalyzer:
             prepared.declared_graph_outputs,
             accumulator,
         )
-        return _LayerIo(
+        return LayerIo(
             intermediate_elems=inputs.intermediate_elems
             + outputs.intermediate_elems,
             intermediate_bytes=inputs.intermediate_bytes
@@ -834,13 +787,13 @@ class IRGraphAnalyzer:
 
     @staticmethod
     def _serialize_analyzed_layer(
-        data: _LayerData,
-        compute: _LayerCompute,
-        memory: _MemoryElements,
-        byte_counts: _MemoryBytes,
-        resources: _ResourceAccounting,
-        io: _LayerIo,
-    ) -> _AnalyzedLayer:
+        data: LayerData,
+        compute: LayerCompute,
+        memory: MemoryElements,
+        byte_counts: MemoryBytes,
+        resources: ResourceAccounting,
+        io: LayerIo,
+    ) -> AnalyzedLayer:
         payload: dict[str, Any] = {
             "type": data.op_type,
             "einsum_equation": data.equation,
@@ -903,7 +856,7 @@ class IRGraphAnalyzer:
                 "outputs": data.output_layer_ids,
             },
         }
-        return _AnalyzedLayer(
+        return AnalyzedLayer(
             payload=payload,
             macs=compute.macs,
             other_ops=memory.other_ops,
@@ -918,9 +871,9 @@ class IRGraphAnalyzer:
         self,
         layer_id: str,
         layer: dict[str, Any],
-        topology: _GraphTopology,
-        prepared: _PreparedAnalysis,
-        accumulator: _AnalysisAccumulator,
+        topology: GraphTopology,
+        prepared: PreparedAnalysis,
+        accumulator: AnalysisAccumulator,
     ) -> None:
         data = self._parse_layer(layer_id, layer)
         compute = self._compute_layer(data)
@@ -962,7 +915,7 @@ class IRGraphAnalyzer:
         )
 
     @staticmethod
-    def _graph_io_totals(accumulator: _AnalysisAccumulator) -> _GraphIoTotals:
+    def _graph_io_totals(accumulator: AnalysisAccumulator) -> GraphIoTotals:
         fused_elements = int(
             sum(accumulator.unique_external_inputs.values())
             + sum(accumulator.unique_external_outputs.values()),
@@ -971,7 +924,7 @@ class IRGraphAnalyzer:
             sum(accumulator.unique_external_input_bytes.values())
             + sum(accumulator.unique_external_output_bytes.values()),
         )
-        return _GraphIoTotals(
+        return GraphIoTotals(
             fused_elements=fused_elements,
             fused_bytes=fused_bytes,
             model_io_elements=sum(
@@ -988,9 +941,9 @@ class IRGraphAnalyzer:
 
     def _plan_fusion(
         self,
-        prepared: _PreparedAnalysis,
-        topology: _GraphTopology,
-    ) -> _FusionPlan:
+        prepared: PreparedAnalysis,
+        topology: GraphTopology,
+    ) -> FusionPlan:
         proof_graph_layers, proof_layers, unsupported_contractions = (
             build_orojenesis_proof_graph(
                 prepared.all_layers,
@@ -1022,7 +975,7 @@ class IRGraphAnalyzer:
             if prepared.profile is not None
             else ()
         )
-        return _FusionPlan(
+        return FusionPlan(
             fusion=FusionPlanner(
                 prepared.graph,
                 multi_einsum_chains=[*chains, *region_paths],
@@ -1082,9 +1035,9 @@ class IRGraphAnalyzer:
 
     def _run_chain_evidence(
         self,
-        plan: _FusionPlan,
+        plan: FusionPlan,
         runner: OrojenesisRunner,
-        prepared: _PreparedAnalysis,
+        prepared: PreparedAnalysis,
         last_cache: MemoryLevel | None,
         orojenesis: dict[str, Any],
         require_orojenesis: bool,
@@ -1120,9 +1073,9 @@ class IRGraphAnalyzer:
 
     def _run_region_evidence(
         self,
-        plan: _FusionPlan,
+        plan: FusionPlan,
         runner: OrojenesisRunner,
-        prepared: _PreparedAnalysis,
+        prepared: PreparedAnalysis,
         last_cache: MemoryLevel | None,
         orojenesis: dict[str, Any],
         require_orojenesis: bool,
@@ -1158,9 +1111,9 @@ class IRGraphAnalyzer:
 
     def _run_layer_evidence(
         self,
-        plan: _FusionPlan,
+        plan: FusionPlan,
         runner: OrojenesisRunner,
-        prepared: _PreparedAnalysis,
+        prepared: PreparedAnalysis,
         last_cache: MemoryLevel | None,
         orojenesis: dict[str, Any],
         require_orojenesis: bool,
@@ -1202,9 +1155,9 @@ class IRGraphAnalyzer:
 
     def _run_orojenesis_evidence(
         self,
-        plan: _FusionPlan,
+        plan: FusionPlan,
         runner: OrojenesisRunner,
-        prepared: _PreparedAnalysis,
+        prepared: PreparedAnalysis,
         orojenesis: dict[str, Any],
         *,
         require_orojenesis: bool,
@@ -1243,7 +1196,7 @@ class IRGraphAnalyzer:
 
     @staticmethod
     def _audit_layer_evidence(
-        plan: _FusionPlan,
+        plan: FusionPlan,
         orojenesis: dict[str, Any],
         region_by_layer: dict[str, Any],
         all_layers: dict[str, Any],
@@ -1292,7 +1245,7 @@ class IRGraphAnalyzer:
                 )
             }
             compulsory_bytes = float(
-                sum(_product(shape) for shape in modeled_tensors.values())
+                sum(product(shape) for shape in modeled_tensors.values())
                 * word_bytes,
             )
             solver_bytes = float(point["dram_bytes"])
@@ -1303,7 +1256,7 @@ class IRGraphAnalyzer:
 
     @staticmethod
     def _audit_chain_evidence(
-        plan: _FusionPlan,
+        plan: FusionPlan,
         orojenesis: dict[str, Any],
         region_by_layer: dict[str, Any],
     ) -> list[float]:
@@ -1363,7 +1316,7 @@ class IRGraphAnalyzer:
 
     @staticmethod
     def _audit_region_evidence(
-        plan: _FusionPlan,
+        plan: FusionPlan,
         orojenesis: dict[str, Any],
         region_by_layer: dict[str, Any],
     ) -> list[float]:
@@ -1428,9 +1381,9 @@ class IRGraphAnalyzer:
 
     def _audit_orojenesis_evidence(
         self,
-        plan: _FusionPlan,
+        plan: FusionPlan,
         orojenesis: dict[str, Any],
-        prepared: _PreparedAnalysis,
+        prepared: PreparedAnalysis,
         audited_fused_bytes: float,
     ) -> tuple[float, bool]:
         region_by_layer = {
@@ -1463,19 +1416,19 @@ class IRGraphAnalyzer:
 
     def _run_formal_analysis(
         self,
-        prepared: _PreparedAnalysis,
-        topology: _GraphTopology,
-        io_totals: _GraphIoTotals,
+        prepared: PreparedAnalysis,
+        topology: GraphTopology,
+        io_totals: GraphIoTotals,
         runner: OrojenesisRunner | None,
         *,
         require_orojenesis: bool,
-    ) -> _FormalAnalysis:
+    ) -> FormalAnalysis:
         orojenesis = formal_evidence.new_orojenesis_record(
             semantic_graph=prepared.semantic_graph,
             schema_version=OROJENESIS_ANALYSIS_SCHEMA_VERSION,
         )
         if not (prepared.semantic_graph and prepared.semantic_complete):
-            return _FormalAnalysis(
+            return FormalAnalysis(
                 None,
                 orojenesis,
                 io_totals.fused_bytes,
@@ -1530,7 +1483,7 @@ class IRGraphAnalyzer:
                 audited_prefetched_bytes = candidate_prefetched_bytes
             else:
                 orojenesis["status"] = "incomplete"
-        return _FormalAnalysis(
+        return FormalAnalysis(
             fusion=plan.fusion,
             orojenesis=orojenesis,
             audited_fused_bytes=io_totals.fused_bytes,
@@ -1540,7 +1493,7 @@ class IRGraphAnalyzer:
 
     @staticmethod
     def _validate_proof_requirements(
-        plan: _FusionPlan,
+        plan: FusionPlan,
         runner: OrojenesisRunner | None,
         *,
         require_orojenesis: bool,
@@ -1558,12 +1511,12 @@ class IRGraphAnalyzer:
 
     @staticmethod
     def _lower_bound(
-        prepared: _PreparedAnalysis,
-        accumulator: _AnalysisAccumulator,
-        formal: _FormalAnalysis,
+        prepared: PreparedAnalysis,
+        accumulator: AnalysisAccumulator,
+        formal: FormalAnalysis,
         *,
         require_orojenesis: bool,
-    ) -> _LowerBound:
+    ) -> LowerBound:
         seconds: float | None = None
         resource_seconds: dict[str, float] = {}
         compute_resource: str | None = None
@@ -1605,20 +1558,20 @@ class IRGraphAnalyzer:
             raise ValueError(
                 "strict analysis did not produce a complete tile-aware bound",
             )
-        return _LowerBound(
+        return LowerBound(
             seconds,
             resource_seconds,
             compute_resource,
             components,
         )
 
-    def _analyze_job(self, job: _AnalysisJob) -> dict[str, Any] | None:
+    def _analyze_job(self, job: AnalysisJob) -> dict[str, Any] | None:
         """Run validated graph analysis through explicit accounting stages."""
         prepared = self._prepare_analysis(job)
         if prepared is None:
             return None
         topology = self._build_graph_topology(prepared.all_layers)
-        accumulator = _AnalysisAccumulator()
+        accumulator = AnalysisAccumulator()
         for layer_id, layer in topology.layers.items():
             self._analyze_layer(
                 layer_id,

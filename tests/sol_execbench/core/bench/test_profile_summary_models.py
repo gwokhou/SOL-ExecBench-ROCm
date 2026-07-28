@@ -8,17 +8,9 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
 )
 from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryBottleneckHint as FacadeBottleneckHint,
-)
-from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryContent as FacadeContent,
-)
-from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryKernelMetric as FacadeKernelMetric,
-)
-from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryMetric as FacadeMetric,
-)
-from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryStructuredMetric as FacadeStructuredMetric,
 )
 from sol_execbench.core.bench.profile_summary.models import (

@@ -28,37 +28,19 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
 )
 from sol_execbench.core.bench.static_kernel.extractor_execution import (
     ExtractorRunner,
-)
-from sol_execbench.core.bench.static_kernel.extractor_execution import (
-    run_static_extractor as _run_static_extractor,
+    run_static_extractor,
 )
 from sol_execbench.core.bench.static_kernel.extractor_routing import (
-    aggregate_extractor_reason as _aggregate_extractor_reason,
-)
-from sol_execbench.core.bench.static_kernel.extractor_routing import (
-    aggregate_extractor_status as _aggregate_extractor_status,
-)
-from sol_execbench.core.bench.static_kernel.extractor_routing import (
-    artifact_persisted_path as _artifact_persisted_path,
-)
-from sol_execbench.core.bench.static_kernel.extractor_routing import (
-    classification_from_tool_runs as _classification_from_tool_runs,
-)
-from sol_execbench.core.bench.static_kernel.extractor_routing import (
-    extractor_command as _extractor_command,
-)
-from sol_execbench.core.bench.static_kernel.extractor_routing import (
-    reason_for_route_status as _reason_for_route_status,
-)
-from sol_execbench.core.bench.static_kernel.extractor_routing import (
-    route_static_tool as _route_static_tool,
-)
-from sol_execbench.core.bench.static_kernel.extractor_routing import (
+    aggregate_extractor_reason,
+    aggregate_extractor_status,
+    artifact_persisted_path,
+    classification_from_tool_runs,
+    extractor_command,
+    reason_for_route_status,
+    route_static_tool,
     static_extractor_tool_ids,
+    tool_run_from_route_decision,
     toolchain_artifact_type_for_static_artifact,
-)
-from sol_execbench.core.bench.static_kernel.extractor_routing import (
-    tool_run_from_route_decision as _tool_run_from_route_decision,
 )
 from sol_execbench.core.bench.static_kernel.footprint_parsers import (
     parse_roc_objdump_resource_usage,
@@ -178,14 +160,14 @@ def run_static_kernel_extractors(
         output_artifacts.extend(isa_artifacts)
     all_artifacts = list(artifacts) + output_artifacts
     return build_static_kernel_evidence_sidecar(
-        status=_aggregate_extractor_status(tool_runs),
-        reason_code=_aggregate_extractor_reason(tool_runs),
+        status=aggregate_extractor_status(tool_runs),
+        reason_code=aggregate_extractor_reason(tool_runs),
         artifacts=all_artifacts,
         tool_runs=tool_runs,
         footprints=footprints,
         isa_analyses=isa_analyses,
         warnings=warnings,
-        classification=_classification_from_tool_runs(tool_runs, artifacts),
+        classification=classification_from_tool_runs(tool_runs, artifacts),
     )
 
 
@@ -223,7 +205,7 @@ def _run_extractors_for_artifact(
     artifact_type = toolchain_artifact_type_for_static_artifact(artifact)
     if artifact_type is None:
         return [_unsupported_artifact_run(artifact, context)], [], []
-    artifact_path = _artifact_persisted_path(artifact, context.sidecar_base)
+    artifact_path = artifact_persisted_path(artifact, context.sidecar_base)
     if artifact_path is None or not artifact_path.is_file():
         return [_missing_artifact_run(artifact, context)], [], []
 
@@ -287,7 +269,7 @@ def _run_routed_tool(
     StaticKernelEvidenceWarning | None,
     StaticKernelEvidenceArtifact | None,
 ]:
-    route_decision = _route_static_tool(
+    route_decision = route_static_tool(
         tool_id=tool_id,
         artifact_type=artifact_type,
         registry=context.registry,
@@ -297,7 +279,7 @@ def _run_routed_tool(
     )
     if route_decision is None:
         return (
-            _tool_run_from_route_decision(
+            tool_run_from_route_decision(
                 tool_id=tool_id,
                 command=[],
                 decision_status=ToolchainStatus.UNAVAILABLE,
@@ -308,9 +290,9 @@ def _run_routed_tool(
             None,
             None,
         )
-    command = _extractor_command(tool_id, artifact_path)
+    command = extractor_command(tool_id, artifact_path)
     if route_decision.status == ToolchainStatus.AVAILABLE:
-        tool_run, raw_artifact = _run_static_extractor(
+        tool_run, raw_artifact = run_static_extractor(
             tool_id=tool_id,
             command=command,
             artifact=artifact,
@@ -330,11 +312,11 @@ def _run_routed_tool(
         ),
     )
     return (
-        _tool_run_from_route_decision(
+        tool_run_from_route_decision(
             tool_id=tool_id,
             command=command,
             decision_status=route_decision.status,
-            reason_code=_reason_for_route_status(route_decision.status),
+            reason_code=reason_for_route_status(route_decision.status),
             reason=route_decision.reason,
             timeout_seconds=context.timeout_seconds,
         ),
@@ -363,7 +345,7 @@ def _collect_resource_footprints(
         artifact_type = toolchain_artifact_type_for_static_artifact(artifact)
         if artifact_type is None:
             continue
-        artifact_path = _artifact_persisted_path(artifact, context.sidecar_base)
+        artifact_path = artifact_persisted_path(artifact, context.sidecar_base)
         if artifact_path is None or not artifact_path.is_file():
             continue
         routed_footprints, raw_artifacts = _collect_routed_footprints(
@@ -397,7 +379,7 @@ def _collect_routed_footprints(
     footprints: list[StaticResourceFootprint] = []
     raw_artifacts: list[StaticKernelEvidenceArtifact] = []
     for tool_id in _FOOTPRINT_EXTRACTOR_TOOL_IDS:
-        route_decision = _route_static_tool(
+        route_decision = route_static_tool(
             tool_id=tool_id,
             artifact_type=artifact_type,
             registry=context.registry,
@@ -410,9 +392,9 @@ def _collect_routed_footprints(
             or route_decision.status != ToolchainStatus.AVAILABLE
         ):
             continue
-        tool_run, raw_artifact = _run_static_extractor(
+        tool_run, raw_artifact = run_static_extractor(
             tool_id=tool_id,
-            command=_extractor_command(tool_id, artifact_path),
+            command=extractor_command(tool_id, artifact_path),
             artifact=artifact,
             evidence_root=context.evidence_root,
             sidecar_base=context.sidecar_base,
@@ -443,7 +425,7 @@ def _footprint_from_collected_output(
         or raw_artifact is None
     ):
         return None
-    raw_path = _artifact_persisted_path(raw_artifact, sidecar_base)
+    raw_path = artifact_persisted_path(raw_artifact, sidecar_base)
     if raw_path is None or not raw_path.is_file():
         return None
     return parse_roc_objdump_resource_usage(

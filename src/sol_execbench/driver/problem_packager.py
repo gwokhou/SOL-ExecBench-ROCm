@@ -31,13 +31,9 @@ from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES
 from sol_execbench.driver.build_config import (
     first_gfx_target as _first_gfx_target_core,
-)
-from sol_execbench.driver.build_config import (
     get_local_gfx,
-    inject_offload_arch_flags,
-)
-from sol_execbench.driver.build_config import (
     gfx_to_offload_arch as _gfx_to_offload_arch_core,
+    inject_offload_arch_flags,
 )
 from sol_execbench.driver.problem_packager_lifecycle import (
     ProblemPackagerLifecycle,

@@ -11,8 +11,6 @@ from solar.einsum.ops.registry import EinsumOpRegistry, get_global_registry
 from solar.nvlabs.ir.analyzer import EinsumAnalyzer as NVLABSEinsumAnalyzer
 from solar.nvlabs.ir.ops.registry import (
     EinsumOpRegistry as NVLABSEinsumOpRegistry,
-)
-from solar.nvlabs.ir.ops.registry import (
     get_global_registry as get_nvlabs_global_registry,
 )
 

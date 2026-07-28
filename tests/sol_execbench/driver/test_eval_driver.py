@@ -38,10 +38,10 @@ from pathlib import Path
 import pytest
 import torch
 
-import sol_execbench.driver as _driver_pkg
+from sol_execbench import driver
 from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
 
-_TEMPLATES_DIR = Path(_driver_pkg.__file__).parent / "templates"
+_TEMPLATES_DIR = Path(driver.__file__).parent / "templates"
 
 
 def _stage_evaluation_templates(tmp_path: Path) -> None:

@@ -13,7 +13,7 @@ from sol_execbench.core.dataset.aka_contract import (
     AKAReleasePolicy,
 )
 from sol_execbench.core.dataset.aka_corpus import (
-    AKACorpusManifest as CorpusManifest,
+    AKACorpusManifest,
 )
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
@@ -28,7 +28,7 @@ _PUBLISHED_RELEASE_BUNDLE = _REPOSITORY_ROOT / "RELEASE" / "release-bundle.json"
 
 def official_score_availability(corpus_manifest: str | Path) -> dict[str, Any]:
     """Report verifier, policy, producer, and published-release state separately."""
-    corpus = CorpusManifest.load(corpus_manifest)
+    corpus = AKACorpusManifest.load(corpus_manifest)
     scoring = corpus.official_scoring
     manifest_status = str(scoring.get("status"))
     required = [str(item) for item in scoring.get("required_evidence") or []]

@@ -267,9 +267,9 @@ def env_snapshot(
 
     libs: dict[str, str] = {"torch": torch.__version__}
     try:
-        import triton as _tr
+        import triton
 
-        libs["triton"] = getattr(_tr, "__version__", "unknown")
+        libs["triton"] = getattr(triton, "__version__", "unknown")
     except ImportError:
         pass
 

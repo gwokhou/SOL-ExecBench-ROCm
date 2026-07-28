@@ -8,13 +8,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from solar.analysis.graph_analyzer import (
-    SOLAR_ANALYSIS_SCHEMA_VERSION,
-    ArchitectureProfile,
-)
 from solar.common.types import DynamicValue
 from solar.contracts import AnalysisRequest, SolarStage
 from solar.ir.contracts import IRGraphArtifact
+from solar.rocm.architecture import ArchitectureProfile
+from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
 from solar.workflow import (
     analyze_request_graph,
     convert_request_graph,

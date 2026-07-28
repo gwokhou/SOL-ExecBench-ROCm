@@ -5,9 +5,9 @@ from pathlib import Path
 
 from sol_execbench_type_helpers import make_solution
 
-import sol_execbench.driver as _driver_pkg
+from sol_execbench import driver
 
-_TEMPLATES_DIR = Path(_driver_pkg.__file__).parent / "templates"
+_TEMPLATES_DIR = Path(driver.__file__).parent / "templates"
 
 
 def _driver_source() -> str:

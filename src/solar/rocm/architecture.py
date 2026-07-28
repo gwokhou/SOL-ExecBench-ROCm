@@ -15,23 +15,20 @@ from typing import Any, cast
 
 import yaml
 
+from solar import schema_versions
 from solar.common.constants import normalize_dtype
 from solar.rocm.audit_validation import (
-    audit_mapping as _audit_mapping,
-)
-from solar.rocm.audit_validation import (
-    audit_nonnegative_int as _audit_nonnegative_int,
-)
-from solar.rocm.audit_validation import (
-    audit_sha256 as _audit_sha256,
-)
-from solar.rocm.audit_validation import (
-    audit_string_set as _audit_string_set,
-)
-from solar.schema_versions import (
-    RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION as RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
+    audit_mapping,
+    audit_nonnegative_int,
+    audit_sha256,
+    audit_string_set,
 )
 
+# The hash-bound calibration script imports this legacy path. Keep the explicit
+# compatibility binding until a new calibration artifact is published.
+RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION = (
+    schema_versions.RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION
+)
 RESOURCE_PEAK_TIMING_PROFILE = "official"
 UNTHROTTLED_RESOURCE_PEAK_SCOPE = "unthrottled_resource_peak"
 INSTRUCTION_RUNTIME_AUDIT_SCOPE = "instruction_and_runtime_corroboration_only"
@@ -166,12 +163,12 @@ def _verify_audit_contract(
         raise ValueError("architecture audit evidence schema mismatch")
     if payload.get("timing_profile") != expected_timing_profile:
         raise ValueError("architecture audit evidence timing profile mismatch")
-    device = _audit_mapping(payload.get("device"), "device")
+    device = audit_mapping(payload.get("device"), "device")
     if device.get("gfx_target") != expected_gfx_target:
         raise ValueError("architecture audit evidence gfx target mismatch")
     if not str(device.get("device_name", "")).strip():
         raise ValueError("architecture audit evidence lacks a GPU identity")
-    clock_setup = _audit_mapping(payload.get("clock_setup"), "clock_setup")
+    clock_setup = audit_mapping(payload.get("clock_setup"), "clock_setup")
     if bool(clock_setup.get("clock_locked_verified")) != expected_clocks_locked:
         raise ValueError(
             "architecture audit evidence clock-lock state mismatch",
@@ -183,10 +180,10 @@ def _verify_audit_isa_spec(
     *,
     expected_gfx_target: str,
 ) -> tuple[Mapping[str, bool], str]:
-    evidence = _audit_mapping(value, "isa_spec_evidence")
+    evidence = audit_mapping(value, "isa_spec_evidence")
     if evidence.get("architecture") != expected_gfx_target:
         raise ValueError("architecture audit ISA evidence target mismatch")
-    provenance = _audit_mapping(evidence.get("provenance"), "ISA provenance")
+    provenance = audit_mapping(evidence.get("provenance"), "ISA provenance")
     spec_sha256 = str(provenance.get("spec_sha256", ""))
     if (
         provenance.get("architecture") != expected_gfx_target
@@ -194,7 +191,7 @@ def _verify_audit_isa_spec(
         or not str(provenance.get("release", "")).strip()
     ):
         raise ValueError("architecture audit ISA provenance is incomplete")
-    raw_presence = _audit_mapping(
+    raw_presence = audit_mapping(
         evidence.get("instruction_presence"),
         "instruction presence",
     )
@@ -215,7 +212,7 @@ def _verify_audit_coverage(
     covered_precisions: set[str],
     covered_resource_modes: set[str],
 ) -> None:
-    coverage = _audit_mapping(value, "calibration_coverage")
+    coverage = audit_mapping(value, "calibration_coverage")
     if coverage.get("status") != "passed":
         raise ValueError("architecture audit calibration coverage did not pass")
     comparisons = (
@@ -225,7 +222,7 @@ def _verify_audit_coverage(
         ("covered_resource_modes", covered_resource_modes),
     )
     for field_name, expected in comparisons:
-        if _audit_string_set(coverage.get(field_name), field_name) != expected:
+        if audit_string_set(coverage.get(field_name), field_name) != expected:
             raise ValueError(f"architecture audit {field_name} mismatch")
     if covered_precisions != set(expected_precisions):
         raise ValueError(
@@ -245,12 +242,12 @@ def _verify_audit_instruction_checks(
     instruction_presence: Mapping[str, bool],
     isa_spec_sha256: str,
 ) -> None:
-    validation = _audit_mapping(value, "instruction_validation")
+    validation = audit_mapping(value, "instruction_validation")
     if validation.get("status") != "passed":
         raise ValueError(
             "architecture audit instruction validation did not pass",
         )
-    required = _audit_string_set(
+    required = audit_string_set(
         validation.get("required_checks"),
         "instruction required_checks",
     )
@@ -258,12 +255,12 @@ def _verify_audit_instruction_checks(
         raise ValueError(
             "architecture audit required instruction checks mismatch",
         )
-    checks = _audit_mapping(validation.get("checks"), "instruction checks")
+    checks = audit_mapping(validation.get("checks"), "instruction checks")
     if set(checks) != required:
         raise ValueError("architecture audit instruction check set mismatch")
     for name in sorted(required):
         _verify_audit_instruction_check(
-            _audit_mapping(checks[name], f"instruction check {name}"),
+            audit_mapping(checks[name], f"instruction check {name}"),
             measurements=measurements,
             instruction_presence=instruction_presence,
             isa_spec_sha256=isa_spec_sha256,
@@ -288,11 +285,11 @@ def _verify_audit_instruction_check(
         raise ValueError(
             "architecture audit instruction check references unknown probe",
         )
-    compiler_isa = _audit_mapping(
+    compiler_isa = audit_mapping(
         measurement.get("compiler_isa"),
         "measurement compiler_isa",
     )
-    compiler_provenance = _audit_mapping(
+    compiler_provenance = audit_mapping(
         compiler_isa.get("spec_provenance"),
         "compiler ISA provenance",
     )
@@ -300,11 +297,11 @@ def _verify_audit_instruction_check(
         raise ValueError(
             "architecture audit compiler ISA specification mismatch",
         )
-    counts = _audit_mapping(
+    counts = audit_mapping(
         compiler_isa.get("matched_instruction_counts"),
         "matched instruction counts",
     )
-    instructions = _audit_string_set(check.get("instructions"), "instructions")
+    instructions = audit_string_set(check.get("instructions"), "instructions")
     if not instructions.issubset(instruction_presence):
         raise ValueError(
             "architecture audit instruction is absent from ISA evidence",
@@ -313,10 +310,10 @@ def _verify_audit_instruction_check(
     if declared is not check.get("isa_declared"):
         raise ValueError("architecture audit ISA declaration mismatch")
     emitted = sum(
-        _audit_nonnegative_int(counts.get(name), "instruction count")
+        audit_nonnegative_int(counts.get(name), "instruction count")
         for name in instructions
     )
-    claimed_emitted = _audit_nonnegative_int(
+    claimed_emitted = audit_nonnegative_int(
         check.get("compiler_emitted_count"),
         "compiler emitted count",
     )
@@ -355,7 +352,7 @@ def _verify_instruction_expectation(
         raise ValueError(
             "architecture audit instruction expectation is invalid",
         )
-    fallback_names = _audit_string_set(
+    fallback_names = audit_string_set(
         check.get("fallback_instructions"),
         "fallback instructions",
     )
@@ -366,7 +363,7 @@ def _verify_instruction_expectation(
             "architecture audit fallback is absent from ISA evidence",
         )
     fallback_count = sum(
-        _audit_nonnegative_int(counts.get(name), "fallback instruction count")
+        audit_nonnegative_int(counts.get(name), "fallback instruction count")
         for name in fallback_names
     )
     if (
@@ -374,7 +371,7 @@ def _verify_instruction_expectation(
         or emitted != 0
         or fallback_count <= 0
         or fallback_count
-        != _audit_nonnegative_int(
+        != audit_nonnegative_int(
             check.get("fallback_emitted_count"),
             "fallback emitted count",
         )
@@ -394,7 +391,7 @@ def _validate_audit_evidence_config(evidence: Mapping[str, Any]) -> None:
     evidence_sha = str(evidence.get("sha256", ""))
     if evidence_sha:
         try:
-            _audit_sha256(evidence_sha, "audit_evidence.sha256")
+            audit_sha256(evidence_sha, "audit_evidence.sha256")
         except ValueError as exc:
             raise ValueError(
                 "audit_evidence.sha256 must be a lowercase SHA-256",

@@ -41,6 +41,20 @@ and Pydantic models. Keep focused changes local to the affected subsystem; avoid
 unrelated refactors. Name tests descriptively, for example
 `test_rejects_invalid_solution_schema`.
 
+### Import Aliases
+
+- Import canonical symbol names directly. Do not add aliases solely to make an
+  imported name private or silence lint, such as `GraphIoTotals as
+  _GraphIoTotals`, and never write a self-alias such as `Schema as Schema`.
+- Use an alias only when it resolves a real local name collision, gives a module
+  a clear role-specific name, or follows a conventional third-party spelling
+  such as `numpy as np`. Prefer a qualified module import when many symbols
+  would otherwise need aliases.
+- Import shared types and helpers from their defining module. Public facades may
+  re-export intentionally through `__all__`; do not create incidental
+  compatibility re-exports through aliasing. When moving a symbol, update
+  callers and tests to its canonical owner.
+
 ### Acronyms in Identifiers
 
 Acronyms are written in ALL-CAPS inside `PascalCase` identifiers, never

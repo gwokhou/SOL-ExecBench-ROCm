@@ -30,19 +30,11 @@ from solar.verification.executor import (
     IRGraphExecutor,
 )
 from solar.verification.numerics import (
-    alias_relation as _alias_relation,
-)
-from solar.verification.numerics import (
-    assert_close as _assert_close,
-)
-from solar.verification.numerics import (
-    clone as _clone,
-)
-from solar.verification.numerics import (
-    pattern_inputs as _pattern_inputs,
-)
-from solar.verification.numerics import (
-    torch_equation as _torch_equation,
+    alias_relation,
+    assert_close,
+    clone,
+    pattern_inputs,
+    torch_equation,
 )
 from solar.verification_policy import TolerancePolicy, VerificationPolicy
 
@@ -114,7 +106,7 @@ def _prepare_case(
         if isinstance(generated, (tuple, list))
         else (generated,)
     )
-    reference_inputs = _clone(_pattern_inputs(inputs, pattern))
+    reference_inputs = clone(pattern_inputs(inputs, pattern))
     source_indices = graph.get("source_input_indices")
     if source_indices is None:
         reference_tensor_inputs = tuple(
@@ -143,7 +135,7 @@ def _prepare_case(
         pattern,
         reference_inputs,
         reference_tensor_inputs,
-        _clone(reference_tensor_inputs),
+        clone(reference_tensor_inputs),
     )
 
 
@@ -174,7 +166,7 @@ def _verify_case(
     with torch.inference_mode():
         actual = executor(*executor_inputs)
         try:
-            stats = _assert_close(
+            stats = assert_close(
                 actual,
                 expected,
                 atol,
@@ -196,7 +188,7 @@ def _verify_case(
                 )
             ):
                 raise
-            stats = _assert_close(
+            stats = assert_close(
                 actual,
                 expected,
                 atol,
@@ -206,8 +198,8 @@ def _verify_case(
                 allow_matching_nan=pattern in {"zeros", "boundary"},
             )
             stats["roundoff_bound_verified"] = 1.0
-        _assert_close(executor_inputs, reference_tensor_inputs, atol, rtol)
-        if _alias_relation(actual, executor_inputs) != _alias_relation(
+        assert_close(executor_inputs, reference_tensor_inputs, atol, rtol)
+        if alias_relation(actual, executor_inputs) != alias_relation(
             expected,
             reference_tensor_inputs,
         ):
@@ -291,11 +283,11 @@ def _einsum_roundoff_equivalent(
     if reduction_size is None or reduction_size * unit_roundoff >= 1.0:
         return False
     try:
-        torch_equation = _torch_equation(equation)
+        normalized_equation = torch_equation(equation)
         precise = [value.double() for value in operands]
-        oracle = torch.einsum(torch_equation, *precise)
+        oracle = torch.einsum(normalized_equation, *precise)
         absolute_sum = torch.einsum(
-            torch_equation,
+            normalized_equation,
             *(value.abs() for value in precise),
         )
     except (RuntimeError, IRExecutionError):
