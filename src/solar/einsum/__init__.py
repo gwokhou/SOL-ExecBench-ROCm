@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Extended-einsum operation analysis backing the extended-einsum IR backend.
+"""Operation analysis backing the NVLabs einsum IR backend.
 
 This package holds the einsum operation handlers and analyzer. The
 representation-neutral IR conversion facade lives in

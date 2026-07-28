@@ -16,13 +16,6 @@ from typing import Any
 
 import yaml
 
-from solar.analysis.graph_analyzer import (
-    SOLAR_ANALYSIS_SCHEMA_VERSION,
-    ArchitectureProfile,
-    IRGraphAnalyzer,
-    OrojenesisError,
-    OrojenesisRunner,
-)
 from solar.contracts import (
     FORMAL_BOUND_KIND,
     ROOFLINE_BOUND_KIND,
@@ -36,19 +29,19 @@ from solar.contracts import (
     SolBound,
     write_request_manifest,
 )
-from solar.graph.extraction import extract_operator_graph
-from solar.ir.conversion import convert_operator_graph
+from solar.pipeline import (
+    SOLAR_ANALYSIS_SCHEMA_VERSION,
+    ArchitectureProfile,
+    PipelineStageError,
+    pipeline_reason_code,
+    run_route_pipeline,
+)
 from solar.readiness import (
     ConversionReadinessRequest,
     ConversionReadinessResult,
     ReadinessArtifact,
     ReadinessStage,
     audit_conversion,
-)
-from solar.verification import (
-    VerificationError,
-    VerificationPolicy,
-    verify_callable_conversion,
 )
 
 
@@ -72,41 +65,8 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         if isinstance(profile, ArchitectureProfile):
             profile.require_verified_audit_evidence()
         architecture_sha256 = _profile_hash(profile)
-        stage = SolarStage.GRAPH_EXTRACTION
-        inputs = tuple(request.input_factory(request.trace_seed))
-        operator = extract_operator_graph(
-            request.reference,
-            inputs,
-            device=request.device,
-            output_dir=staging,
-            name=request.analysis_id,
-        )
-        stage = SolarStage.IR_CONVERSION
-        ir_graph = convert_operator_graph(
-            operator,
-            output_dir=staging,
-            representation=request.representation,
-        )
-        stage = SolarStage.CONVERSION_VERIFICATION
-        verify_callable_conversion(
-            reference=request.reference,
-            input_factory=request.input_factory,
-            reference_name=request.reference_name,
-            reference_sha256=request.reference_sha256,
-            graph_path=ir_graph.path,
-            output_path=staging / "conversion-attestation.yaml",
-            policy=VerificationPolicy(
-                atol=request.atol,
-                rtol=request.rtol,
-                required_matched_ratio=request.required_matched_ratio,
-                max_error_cap=request.max_error_cap,
-                allow_negative_inf=request.allow_negative_inf,
-                seeds=request.verification_seeds,
-                device=request.device,
-            ),
-        )
-        stage = SolarStage.FORMAL_ANALYSIS
-        analysis = _run_analysis(request, profile, staging, ir_graph.path)
+        pipeline = run_route_pipeline(request, profile, staging)
+        ir_graph, analysis = pipeline.ir_graph, pipeline.analysis
         bound = _extract_bound(analysis, request.require_orojenesis)
         artifacts = _finish_artifacts(staging, analysis, ir_graph.path.name)
         write_request_manifest(
@@ -127,34 +87,12 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             bound=bound,
         )
     except Exception as exc:  # noqa: BLE001 -- fail-closed public boundary
+        if isinstance(exc, PipelineStageError):
+            stage, exc = exc.stage, exc.error
         shutil.rmtree(staging, ignore_errors=True)
-        return _failure(request, stage, _reason_code(stage, exc), str(exc))
-
-
-def _run_analysis(
-    request: AnalysisRequest,
-    profile: ArchitectureProfile,
-    staging: Path,
-    graph_path: Path,
-) -> dict[str, Any]:
-    runner = (
-        OrojenesisRunner(request.orojenesis_home)
-        if request.require_orojenesis or request.orojenesis_home is not None
-        else None
-    )
-    result = IRGraphAnalyzer().analyze_graph(
-        graph_path,
-        staging,
-        precision=request.precision,
-        copy_graph=False,
-        strict=True,
-        architecture=profile,
-        orojenesis_runner=runner,
-        require_orojenesis=request.require_orojenesis,
-    )
-    if result is None:
-        raise RuntimeError("strict graph analysis produced no artifact")
-    return result
+        return _failure(
+            request, stage, pipeline_reason_code(stage, exc), str(exc)
+        )
 
 
 def _extract_bound(
@@ -217,14 +155,6 @@ def _profile_hash(profile: ArchitectureProfile) -> str:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _reason_code(stage: SolarStage, exc: Exception) -> str:
-    if isinstance(exc, OrojenesisError):
-        return "toolchain_unavailable"
-    if isinstance(exc, VerificationError):
-        return "conversion_not_proven"
-    return f"{stage}_failed"
 
 
 def _failure(

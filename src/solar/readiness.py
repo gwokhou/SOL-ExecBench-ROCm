@@ -15,15 +15,21 @@ from pathlib import Path
 
 from solar.common.types import DynamicValue
 from solar.contracts import SolarReadinessStatus, SolarStage, SolarStageStatus
-from solar.graph.extraction import extract_operator_graph
-from solar.ir.contracts import DEFAULT_IR_KIND, IRKind, normalize_ir_kind
-from solar.ir.conversion import convert_operator_graph
+from solar.ir.contracts import (
+    DEFAULT_IR_KIND,
+    IRKind,
+    normalize_ir_kind,
+)
 from solar.rocm.architecture import ArchitectureProfile
+from solar.routes import DEFAULT_ROUTE, Route, normalize_route
 from solar.verification import (
     IRExecutionError,
     VerificationError,
-    VerificationPolicy,
-    verify_callable_conversion,
+)
+from solar.workflow import (
+    convert_request_graph,
+    extract_request_graph,
+    verify_request_graph,
 )
 
 InputFactory = Callable[[int], Sequence[DynamicValue]]
@@ -46,6 +52,7 @@ class ConversionReadinessRequest:
     architecture: str | Path | Mapping[str, DynamicValue]
     output_dir: Path
     representation: IRKind | str = DEFAULT_IR_KIND
+    route: Route | str = DEFAULT_ROUTE
     device: str = "cpu"
     trace_seed: int = 200
     verification_seeds: tuple[int, ...] = (11, 29, 47)
@@ -57,6 +64,7 @@ class ConversionReadinessRequest:
 
     def __post_init__(self) -> None:
         """Validate stable request identity fields."""
+        object.__setattr__(self, "route", normalize_route(self.route))
         object.__setattr__(
             self,
             "representation",
@@ -175,24 +183,14 @@ def audit_conversion(
             profile.require_verified_audit_evidence()
         architecture_sha256 = _profile_hash(profile)
         stage = SolarStage.GRAPH_EXTRACTION
-        operator = extract_operator_graph(
-            request.reference,
-            tuple(request.input_factory(request.trace_seed)),
-            device=request.device,
-            output_dir=staging,
-            name=request.analysis_id,
-        )
+        operator = extract_request_graph(request, staging)
         passed.append(_passed_stage(stage, operator.path))
         stage = SolarStage.IR_CONVERSION
-        einsum = convert_operator_graph(
-            operator,
-            output_dir=staging,
-            representation=request.representation,
-        )
-        passed.append(_passed_stage(stage, einsum.path))
+        ir_graph = convert_request_graph(request, operator, staging)
+        passed.append(_passed_stage(stage, ir_graph.path))
         stage = SolarStage.CONVERSION_VERIFICATION
         attestation = staging / "conversion-attestation.yaml"
-        _verify(request, einsum.path, attestation)
+        verify_request_graph(request, ir_graph, attestation)
         passed.append(_passed_stage(stage, attestation))
     except Exception as exc:  # noqa: BLE001 -- retain staged failure evidence
         failure = exc
@@ -210,30 +208,6 @@ def audit_conversion(
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
-
-
-def _verify(
-    request: ConversionReadinessRequest,
-    graph_path: Path,
-    output_path: Path,
-) -> None:
-    verify_callable_conversion(
-        reference=request.reference,
-        input_factory=request.input_factory,
-        reference_name=request.reference_name,
-        reference_sha256=request.reference_sha256,
-        graph_path=graph_path,
-        output_path=output_path,
-        policy=VerificationPolicy(
-            atol=request.atol,
-            rtol=request.rtol,
-            required_matched_ratio=request.required_matched_ratio,
-            max_error_cap=request.max_error_cap,
-            allow_negative_inf=request.allow_negative_inf,
-            seeds=request.verification_seeds,
-            device=request.device,
-        ),
-    )
 
 
 def _passed_stage(stage: SolarStage, path: Path) -> ReadinessStage:

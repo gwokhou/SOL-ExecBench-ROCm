@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Stable operation facts used by extended-einsum IR conversion."""
+"""Stable operation facts used by NVLabs einsum IR conversion."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ FORCE_ATEN_SEMANTICS_OPS = frozenset(
 
 @dataclass(frozen=True, slots=True)
 class OperationRepresentation:
-    """One handler-derived extended-einsum operation representation."""
+    """One handler-derived NVLabs einsum operation representation."""
 
     equation: str
     operands: dict[str, list[str]]

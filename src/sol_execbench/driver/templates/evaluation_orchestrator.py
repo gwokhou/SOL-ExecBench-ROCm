@@ -59,6 +59,12 @@ try:
     _candidate_environment[REFERENCE_RESPONSE_FD_ENV] = str(_response_read)
     _candidate_environment[REFERENCE_TOKEN_ENV] = _token
     _candidate_environment[REFERENCE_PID_ENV] = str(_worker.pid)
+    # Candidate compilation is deliberately synchronous.  TorchInductor grows
+    # its trusted compile thread pool lazily, which can otherwise cross the
+    # timing boundary under host contention and become indistinguishable from
+    # a candidate-created worker.  Set this before eval_driver imports torch;
+    # the strict timing-region thread monitor therefore needs no allowlist.
+    _candidate_environment["TORCHINDUCTOR_COMPILE_THREADS"] = "1"
     os.execve(
         sys.executable,
         [sys.executable, "eval_driver.py"],

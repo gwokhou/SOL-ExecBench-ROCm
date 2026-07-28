@@ -28,6 +28,7 @@ def _layer(operation: str = "add", *, inputs: int = 2, outputs: int = 1):
 def _graph(layer=None):
     return {
         "schema_version": IR_GRAPH_SCHEMA_VERSION,
+        "ir_kind": "aten",
         "layers": {"operation": layer or _layer()},
     }
 
@@ -73,6 +74,7 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
     }
     graph = {
         "schema_version": IR_GRAPH_SCHEMA_VERSION,
+        "ir_kind": "aten",
         "layers": {"start": start, "einsum": einsum, "dynamic": dynamic},
     }
     validate_aten_graph(graph)
@@ -82,7 +84,7 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
     ("mutate", "message"),
     [
         (
-            lambda graph: graph.update(ir_kind="extended_einsum"),
+            lambda graph: graph.update(ir_kind="nvlabs_einsum"),
             "not ATen IR",
         ),
         (

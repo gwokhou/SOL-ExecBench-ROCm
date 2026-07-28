@@ -15,14 +15,19 @@
 
 """Internal graph stage; use :func:`solar.api.analyze` for public analysis."""
 
+from solar.graph.contracts import ExtractionKind
 from solar.graph.extraction import (
     OperatorGraphArtifact,
     TensorSignature,
     extract_operator_graph,
 )
+from solar.graph.registry import extraction_backend, extraction_backends
 
 __all__ = [
     "OperatorGraphArtifact",
     "TensorSignature",
+    "ExtractionKind",
+    "extraction_backend",
+    "extraction_backends",
     "extract_operator_graph",
 ]

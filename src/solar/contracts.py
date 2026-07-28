@@ -15,6 +15,11 @@ import yaml
 
 from solar.common.types import DynamicValue
 from solar.ir.contracts import DEFAULT_IR_KIND, IRKind, normalize_ir_kind
+from solar.routes import (
+    DEFAULT_ROUTE,
+    Route,
+    normalize_route,
+)
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 InputFactory = Callable[[int], Sequence[DynamicValue]]
@@ -70,6 +75,7 @@ class AnalysisRequest:
     architecture: str | Path | Mapping[str, DynamicValue]
     output_dir: Path
     representation: IRKind | str = DEFAULT_IR_KIND
+    route: Route | str = DEFAULT_ROUTE
     device: str = "cpu"
     precision: str = "fp16"
     require_orojenesis: bool = False
@@ -84,6 +90,7 @@ class AnalysisRequest:
 
     def __post_init__(self) -> None:
         """Validate request identity, paths, and analysis options."""
+        object.__setattr__(self, "route", normalize_route(self.route))
         object.__setattr__(
             self,
             "representation",
@@ -185,6 +192,7 @@ def write_request_manifest(
             "sha256": request.reference_sha256,
         },
         "analysis_contract": {
+            "route": normalize_route(request.route).value,
             "precision": request.precision,
             "representation": normalize_ir_kind(request.representation).value,
             "trace_seed": request.trace_seed,
@@ -222,6 +230,7 @@ __all__ = [
     "AnalysisResult",
     "ArtifactRef",
     "IRKind",
+    "Route",
     "SolBound",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",

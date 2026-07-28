@@ -46,7 +46,7 @@ class EinsumOperand:
 class EinsumOp:
     """Represents an einsum operation.
 
-    The extended einsum representation supports different elementwise and reduction
+    The NVLabs einsum representation supports different elementwise and reduction
     operations beyond the standard multiply-add semantics:
 
     - elementwise_op: The operation applied element-wise (default: 'mul')
@@ -54,7 +54,7 @@ class EinsumOp:
     - reduction_op: The operation used to reduce/aggregate (default: 'add')
       Examples: 'add' for sum, 'max' for max reduction, 'none' for no reduction
     - is_real_einsum: True if this is a standard tensor contraction (mul+add)
-    - is_einsum_supportable: True if the operation can be expressed with extended einsum
+    - is_einsum_supportable: True if the operation can be expressed with NVLabs einsum
 
     Standard einsum (matmul): elementwise_op='mul', reduction_op='add'
     Element-wise add:        elementwise_op='add', reduction_op='none'
@@ -70,7 +70,7 @@ class EinsumOp:
     )
     reduction_op: str = "add"  # 'add', 'max', 'min', 'mul', 'none'
     is_einsum_supportable: bool = (
-        True  # Can this op be expressed with extended einsum?
+        True  # Can this op be expressed with NVLabs einsum?
     )
 
     def get_compute_cost(self, tensor_shapes: TensorShapes) -> int:

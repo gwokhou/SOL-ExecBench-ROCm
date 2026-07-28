@@ -128,7 +128,7 @@ from solar.common.constants import (
 from solar.common.types import TensorShapes
 from solar.common.utils import ensure_directory
 from solar.einsum.analyzer import EinsumAnalyzer
-from solar.ir.contracts import layer_analysis, layer_operation
+from solar.ir.contracts import layer_contraction_analysis, layer_operation
 from solar.ir.registry import validate_ir_graph
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
 from solar.schema_versions import (
@@ -265,8 +265,8 @@ class IRGraphAnalyzer:
         for layer_id, layer in all_layers.items():
             layer_type = str(layer.get("type", "")).lower()
             if layer_type != "start":
-                analysis = layer_analysis(layer)
-                if not analysis.is_einsum_supportable:
+                analysis = layer_contraction_analysis(layer)
+                if not analysis.is_supported:
                     failures.append(f"{layer_id}: unsupported operation")
                 if (
                     layer_operation(layer).get("kind") == "einsum"
@@ -397,7 +397,7 @@ class IRGraphAnalyzer:
     @staticmethod
     def _parse_layer(layer_id: str, layer: dict[str, Any]) -> _LayerData:
         op_type = str(layer.get("type", "unknown"))
-        analysis = layer_analysis(layer)
+        analysis = layer_contraction_analysis(layer)
         shapes = layer.get("tensor_shapes") or {}
         types = layer.get("tensor_types") or {}
         dtypes = layer.get("tensor_dtypes") or {}
@@ -410,7 +410,7 @@ class IRGraphAnalyzer:
             layer=layer,
             op_type=op_type,
             equation=analysis.equation,
-            is_real_einsum=analysis.is_real_einsum,
+            is_real_einsum=analysis.is_contraction,
             input_layer_ids=list(connections.get("inputs") or []),
             output_layer_ids=list(connections.get("outputs") or []),
             input_shapes=input_shapes,

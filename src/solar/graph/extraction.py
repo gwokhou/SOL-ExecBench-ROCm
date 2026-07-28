@@ -9,8 +9,13 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
-from solar.graph.contracts import OperatorGraphArtifact, TensorSignature
-from solar.graph.make_fx_extraction import trace_make_fx_reference
+from solar.graph.contracts import (
+    DEFAULT_EXTRACTION_KIND,
+    ExtractionKind,
+    OperatorGraphArtifact,
+    TensorSignature,
+)
+from solar.graph.registry import extraction_backend
 
 
 def extract_operator_graph(
@@ -20,61 +25,16 @@ def extract_operator_graph(
     device: str,
     output_dir: str | Path,
     name: str,
+    extraction: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
 ) -> OperatorGraphArtifact:
-    """Trace ``reference`` into the canonical exact ATen operator graph."""
-    del device
-    output = Path(output_dir)
-    output.mkdir(parents=True, exist_ok=True)
-    source_inputs = tuple(inputs)
-    observed = reference(*source_inputs)
-    reference_outputs = tuple(
-        _tensor_signature(value) for value in _outputs(observed)
-    )
-    tensor_inputs, used_indices, operator_path = trace_make_fx_reference(
+    """Trace ``reference`` through the selected extraction backend."""
+    return extraction_backend(extraction).extract(
         reference,
-        source_inputs,
-        output=output,
+        inputs,
+        device=device,
+        output_dir=output_dir,
         name=name,
     )
-    return _artifact(
-        operator_path,
-        reference_outputs,
-        tensor_inputs,
-        used_indices,
-    )
-
-
-def _artifact(
-    operator_path: Path,
-    reference_outputs: tuple[TensorSignature, ...],
-    tensor_inputs: dict[int, Any],
-    used_indices: Sequence[int],
-) -> OperatorGraphArtifact:
-    return OperatorGraphArtifact(
-        path=operator_path,
-        source_inputs=tuple(
-            (index, _tensor_signature(value))
-            for index, value in sorted(tensor_inputs.items())
-        ),
-        used_source_indices=tuple(used_indices),
-        reference_outputs=reference_outputs,
-    )
-
-
-def _outputs(observed: Any) -> tuple[Any, ...]:
-    return (
-        tuple(observed) if isinstance(observed, (tuple, list)) else (observed,)
-    )
-
-
-def _tensor_signature(value: Any) -> TensorSignature:
-    import torch
-
-    if not isinstance(value, torch.Tensor):
-        raise RuntimeError(
-            "SOLAR operator graphs require tensor reference inputs and outputs",
-        )
-    return TensorSignature(tuple(value.shape), str(value.dtype))
 
 
 __all__ = [

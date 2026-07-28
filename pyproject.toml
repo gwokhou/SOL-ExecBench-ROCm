@@ -110,6 +110,7 @@ exclude = [
     "dist",
     "*.egg-info",
     ".ruff_cache",
+    "src/solar/_vendor",
     "/data",
     "/examples",
 ]

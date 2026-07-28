@@ -26,6 +26,7 @@ def make_inputs(parameters, device):
 def _identity_graph() -> dict:
     return {
         "schema_version": 3,
+        "ir_kind": "aten",
         "layers": {
             "start": {
                 "type": "start",

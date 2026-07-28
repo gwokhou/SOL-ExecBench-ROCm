@@ -9,11 +9,15 @@ import torch
 import yaml
 
 import solar.api as api
+import solar.pipeline as pipeline
+import solar.workflow as workflow
 from solar.analysis.orojenesis import OrojenesisError
 from solar.api import AnalysisFailure, AnalysisRequest, AnalysisResult
 from solar.contracts import SolarStage
 from solar.graph.extraction import OperatorGraphArtifact
+from solar.ir.contracts import IRKind
 from solar.ir.conversion import IRGraphArtifact
+from solar.routes import Route
 from solar.verification import VerificationError
 
 
@@ -31,6 +35,8 @@ def _request(output: Path) -> AnalysisRequest:
         reference_sha256="a" * 64,
         architecture="RX_9060_XT",
         output_dir=output,
+        representation=IRKind.ATEN,
+        route=Route.MAINLINE,
     )
 
 
@@ -55,6 +61,8 @@ def _matmul_request(
         reference_sha256="b" * 64,
         architecture="RX_9060_XT",
         output_dir=output,
+        representation=IRKind.ATEN,
+        route=Route.MAINLINE,
         device="cpu",
         require_orojenesis=require_orojenesis,
         orojenesis_home=orojenesis_home,
@@ -81,6 +89,8 @@ def _conv_request(
         reference_sha256="c" * 64,
         architecture="RX_9060_XT",
         output_dir=output,
+        representation=IRKind.ATEN,
+        route=Route.MAINLINE,
         device="cpu",
         require_orojenesis=require_orojenesis,
     )
@@ -97,8 +107,16 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         lambda value: _Profile(),
     )
 
-    def extract(reference, inputs, *, device, output_dir, name):
-        del reference, inputs, device, name
+    def extract(
+        reference,
+        inputs,
+        *,
+        device,
+        output_dir,
+        name,
+        extraction,
+    ):
+        del reference, inputs, device, name, extraction
         root = Path(output_dir)
         operator = root / "operator_graph.yaml"
         operator.write_text("layers: {}\n")
@@ -108,7 +126,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         del operator, representation
         einsum = Path(output_dir) / "einsum_graph.yaml"
         einsum.write_text("layers: {}\n")
-        return IRGraphArtifact(einsum)
+        return IRGraphArtifact(einsum, IRKind.ATEN)
 
     def verify(**kwargs):
         Path(kwargs["output_path"]).write_text("predicate: passed\n")
@@ -118,13 +136,36 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         "total": {"lower_bound_seconds": 0.001, "compute_resource": "mfma"},
         "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
     }
-    monkeypatch.setattr(api, "extract_operator_graph", extract)
-    monkeypatch.setattr(api, "convert_operator_graph", convert)
-    monkeypatch.setattr(api, "verify_callable_conversion", verify)
     monkeypatch.setattr(
-        api,
-        "_run_analysis",
-        lambda request, profile, root, graph_path: analysis,
+        pipeline,
+        "extract_request_graph",
+        lambda request, root: extract(
+            request.reference,
+            tuple(request.input_factory(request.trace_seed)),
+            device=request.device,
+            output_dir=root,
+            name=request.analysis_id,
+            extraction="make_fx_reference_v1",
+        ),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "convert_request_graph",
+        lambda request, operator, root: convert(
+            operator,
+            output_dir=root,
+            representation=request.representation,
+        ),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "verify_request_graph",
+        lambda request, graph, output_path: verify(output_path=output_path),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "analyze_request_graph",
+        lambda request, profile, root, graph: analysis,
     )
 
     result = api.analyze(_request(output))
@@ -139,7 +180,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         "manifest.yaml",
     }
     manifest = yaml.safe_load((output / "manifest.yaml").read_text())
-    assert manifest["schema_version"] == 2
+    assert manifest["schema_version"] == 3
     assert "candidate_runtime" not in manifest
     assert "score" not in manifest
     assert manifest["analysis_contract"]["precision"] == "fp16"
@@ -156,8 +197,8 @@ def test_analyze_failure_leaves_no_partial_output(tmp_path, monkeypatch):
         lambda value: _Profile(),
     )
     monkeypatch.setattr(
-        api,
-        "extract_operator_graph",
+        pipeline,
+        "extract_request_graph",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("unsupported"),
         ),
@@ -179,16 +220,35 @@ def test_conversion_failure_has_its_own_stable_stage(tmp_path, monkeypatch):
         lambda value: _Profile(),
     )
 
-    def extract(reference, inputs, *, device, output_dir, name):
-        del reference, inputs, device, name
+    def extract(
+        reference,
+        inputs,
+        *,
+        device,
+        output_dir,
+        name,
+        extraction,
+    ):
+        del reference, inputs, device, name, extraction
         operator = Path(output_dir) / "operator_graph.yaml"
         operator.write_text("layers: {}\n")
         return OperatorGraphArtifact(operator, (), (), ())
 
-    monkeypatch.setattr(api, "extract_operator_graph", extract)
     monkeypatch.setattr(
-        api,
-        "convert_operator_graph",
+        pipeline,
+        "extract_request_graph",
+        lambda request, root: extract(
+            request.reference,
+            tuple(request.input_factory(request.trace_seed)),
+            device=request.device,
+            output_dir=root,
+            name=request.analysis_id,
+            extraction="make_fx_reference_v1",
+        ),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "convert_request_graph",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("unsupported op"),
         ),
@@ -283,20 +343,20 @@ def test_bound_and_reason_code_helpers_fail_closed():
         )
     with pytest.raises(ValueError, match="unsupported schema"):
         api._extract_bound({"schema_version": 0})
-    assert api._reason_code(
+    assert pipeline.pipeline_reason_code(
         SolarStage.FORMAL_ANALYSIS,
         OrojenesisError("missing"),
     ) == ("toolchain_unavailable")
     assert (
-        api._reason_code(
+        pipeline.pipeline_reason_code(
             SolarStage.CONVERSION_VERIFICATION,
             VerificationError("bad"),
         )
         == "conversion_not_proven"
     )
-    assert api._reason_code(SolarStage.GRAPH_EXTRACTION, RuntimeError()) == (
-        "graph_extraction_failed"
-    )
+    assert pipeline.pipeline_reason_code(
+        SolarStage.GRAPH_EXTRACTION, RuntimeError()
+    ) == ("graph_extraction_failed")
 
 
 def test_analysis_request_defaults_to_eq1_roofline_bound():
@@ -337,7 +397,7 @@ def test_formal_api_matmul_requires_and_records_orojenesis_evidence(
             self.toolchain_identity = {"verification_mode": "fake"}
 
         def run_layer(self, layer, output_dir, *, word_bits):
-            calls.append(layer["extended_op"]["equation"])
+            calls.append(layer["semantic_op"]["equation"])
             output_dir.mkdir(parents=True, exist_ok=True)
             raw = output_dir / "raw.csv"
             raw.write_text("64,80\n")
@@ -353,7 +413,10 @@ def test_formal_api_matmul_requires_and_records_orojenesis_evidence(
             }
 
     runner = FakeRunner()
-    monkeypatch.setattr(api, "OrojenesisRunner", lambda home: runner)
+    monkeypatch.setattr(
+        "solar.analysis.graph_analyzer.OrojenesisRunner",
+        lambda home: runner,
+    )
 
     result = api.analyze(
         _matmul_request(tmp_path / "result", require_orojenesis=True),
@@ -392,7 +455,10 @@ def test_incomplete_optional_orojenesis_evidence_falls_back_to_eq1(
                 "evidence_files": {},
             }
 
-    monkeypatch.setattr(api, "OrojenesisRunner", lambda home: FakeRunner())
+    monkeypatch.setattr(
+        "solar.analysis.graph_analyzer.OrojenesisRunner",
+        lambda home: FakeRunner(),
+    )
 
     result = api.analyze(
         _matmul_request(
@@ -440,7 +506,10 @@ def test_strict_api_rejects_contraction_without_exact_orojenesis_proof(
         def __init__(self) -> None:
             self.toolchain_identity = {"verification_mode": "fake"}
 
-    monkeypatch.setattr(api, "OrojenesisRunner", lambda home: FakeRunner())
+    monkeypatch.setattr(
+        "solar.analysis.graph_analyzer.OrojenesisRunner",
+        lambda home: FakeRunner(),
+    )
     output = tmp_path / "result"
 
     result = api.analyze(_conv_request(output))
@@ -465,15 +534,17 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
             return {"schema_version": 3}
 
     monkeypatch.setattr(
-        api,
-        "OrojenesisRunner",
+        "solar.analysis.graph_analyzer.OrojenesisRunner",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("runner must not be constructed"),
         ),
     )
-    monkeypatch.setattr(api, "IRGraphAnalyzer", FakeAnalyzer)
+    monkeypatch.setattr(
+        "solar.analysis.graph_analyzer.IRGraphAnalyzer",
+        FakeAnalyzer,
+    )
 
-    result = api._run_analysis(
+    result = workflow._analyze_aten(
         _request(tmp_path / "result"),
         cast(Any, _Profile()),
         tmp_path,

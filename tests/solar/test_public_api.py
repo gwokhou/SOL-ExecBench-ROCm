@@ -29,5 +29,8 @@ def test_stage_packages_do_not_advertise_legacy_bypass_apis() -> None:
     assert solar.graph.__all__ == [
         "OperatorGraphArtifact",
         "TensorSignature",
+        "ExtractionKind",
+        "extraction_backend",
+        "extraction_backends",
         "extract_operator_graph",
     ]

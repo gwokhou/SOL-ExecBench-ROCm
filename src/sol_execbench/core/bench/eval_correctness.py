@@ -52,7 +52,7 @@ def _prepare_framework_thread_baseline(
     user_fn: Callable[..., Any],
     device: str,
 ) -> None:
-    """Start trusted compiler workers before sampling candidate threads."""
+    """Prime trusted compiler state before sampling candidate threads."""
     if not hasattr(user_fn, "_torchdynamo_orig_callable"):
         return
     try:

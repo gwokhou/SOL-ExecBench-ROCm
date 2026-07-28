@@ -28,10 +28,8 @@
     "src/solar/ir/aten.py",
     "src/solar/ir/bindings.py",
     "src/solar/ir/contracts.py",
-    "src/solar/ir/extended_einsum.py",
     "src/solar/ir/registry.py",
     "src/solar/rocm/architecture.py",
-    "src/solar/verification/extended_einsum.py",
     "src/solar/verification/verify.py"
   ],
   "long_functions": {},

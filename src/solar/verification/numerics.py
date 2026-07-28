@@ -24,7 +24,7 @@ def torch_equation(equation: str) -> str:
         or any(character in ranks_only for character in "()+-")
     ):
         raise IRExecutionError(
-            f"unsupported extended einsum equation: {equation!r}",
+            f"unsupported NVLabs einsum equation: {equation!r}",
         )
     tokens: list[str] = []
     for token in _EINSUM_TOKEN.findall(equation):
