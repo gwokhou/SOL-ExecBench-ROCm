@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import itertools
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -77,7 +78,7 @@ class FusionPlanner:
         self.multi_einsum_edges = {
             (str(producer), str(consumer))
             for chain in multi_einsum_chains
-            for producer, consumer in zip(chain, chain[1:], strict=False)
+            for producer, consumer in itertools.pairwise(chain)
         }
         self.verified_view_nodes = {str(item) for item in verified_view_nodes}
 

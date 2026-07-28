@@ -35,10 +35,10 @@ from sol_execbench.core.bench.static_kernel.extractors import (
 
 __all__ = [
     "STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION",
+    "StaticISAAnalysis",
     "StaticKernelEvidenceArtifact",
     "StaticKernelEvidenceClassification",
     "StaticKernelEvidenceKernel",
-    "StaticISAAnalysis",
     "StaticKernelEvidenceReasonCode",
     "StaticKernelEvidenceSidecar",
     "StaticKernelEvidenceSourceReference",

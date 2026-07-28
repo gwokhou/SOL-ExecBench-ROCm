@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal, Union
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -91,5 +91,5 @@ class TensorSpec(BaseModelWithDocstrings):
     """An optional human-readable description of this tensor's purpose and usage."""
 
 
-AxisSpec = Union[AxisConst, AxisVar, AxisExpr]
+AxisSpec = AxisConst | AxisVar | AxisExpr
 """Union type representing all possible axis specifications."""

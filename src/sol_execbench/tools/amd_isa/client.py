@@ -14,7 +14,7 @@ import subprocess
 import threading
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from sol_execbench.tools.amd_isa.errors import ISADecodeError, ISAProtocolError
 from sol_execbench.tools.amd_isa.helper import ensure_helper
@@ -231,7 +231,7 @@ class AMDIsa:
         with contextlib.suppress(ProcessLookupError):
             os.killpg(self._process.pid, signal_number)
 
-    def __enter__(self) -> AMDIsa:
+    def __enter__(self) -> Self:
         """Return this client for context-managed use."""
         return self
 

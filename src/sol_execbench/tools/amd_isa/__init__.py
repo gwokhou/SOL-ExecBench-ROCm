@@ -31,8 +31,8 @@ __all__ = [
     "ISAHelperBuildError",
     "ISAIntegrityError",
     "ISAProtocolError",
-    "ISASpecRepository",
     "ISASpecDescriptor",
+    "ISASpecRepository",
     "ISASpecUnavailableError",
     "open_isa",
 ]

@@ -69,7 +69,7 @@ def test_run_evaluation_runtime_returns_success_for_parseable_traces(
 ) -> None:
     packager = _FakePackager(traces=[_trace()])
 
-    def _run_command(eval_cmd, *, staging_dir, timeout):  # noqa: ANN001, ARG001
+    def _run_command(eval_cmd, *, staging_dir, timeout):
         return subprocess.CompletedProcess(
             args=eval_cmd,
             returncode=0,
@@ -137,7 +137,7 @@ def test_run_evaluation_runtime_classifies_timeout(
 ) -> None:
     packager = _FakePackager()
 
-    def _raise_timeout(eval_cmd, *, staging_dir, timeout):  # noqa: ANN001, ARG001
+    def _raise_timeout(eval_cmd, *, staging_dir, timeout):
         raise subprocess.TimeoutExpired(
             cmd=eval_cmd,
             timeout=timeout,
@@ -178,7 +178,7 @@ def test_run_evaluation_runtime_classifies_failure_without_stdout(
 ) -> None:
     packager = _FakePackager()
 
-    def _run_command(eval_cmd, *, staging_dir, timeout):  # noqa: ANN001, ARG001
+    def _run_command(eval_cmd, *, staging_dir, timeout):
         return subprocess.CompletedProcess(
             args=eval_cmd,
             returncode=2,
@@ -215,7 +215,7 @@ def test_run_evaluation_runtime_classifies_no_parseable_traces(
 ) -> None:
     packager = _FakePackager(traces=[])
 
-    def _run_command(eval_cmd, *, staging_dir, timeout):  # noqa: ANN001, ARG001
+    def _run_command(eval_cmd, *, staging_dir, timeout):
         return subprocess.CompletedProcess(
             args=eval_cmd,
             returncode=0,
@@ -259,10 +259,10 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
         skipped_reason="rocprofv3 unavailable",
     )
 
-    def _run_profiled(eval_cmd, *, staging_dir, output_file, timeout):  # noqa: ANN001, ARG001
+    def _run_profiled(eval_cmd, *, staging_dir, output_file, timeout):
         return None, profile_result
 
-    def _run_command(eval_cmd, *, staging_dir, timeout):  # noqa: ANN001, ARG001
+    def _run_command(eval_cmd, *, staging_dir, timeout):
         return subprocess.CompletedProcess(
             args=eval_cmd,
             returncode=0,

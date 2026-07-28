@@ -269,9 +269,9 @@ def _sha256(path: Path) -> str:
 
 
 __all__ = [
+    "READINESS_STAGES",
     "ConversionReadinessRequest",
     "ConversionReadinessResult",
-    "READINESS_STAGES",
     "ReadinessArtifact",
     "ReadinessStage",
     "audit_conversion",

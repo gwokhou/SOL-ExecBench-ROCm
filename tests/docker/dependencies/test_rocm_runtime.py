@@ -24,7 +24,13 @@ def run_command(
     args: list[str],
     timeout: int = 30,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    return subprocess.run(
+        args,
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=timeout,
+    )
 
 
 def command_output(result: subprocess.CompletedProcess[str]) -> str:

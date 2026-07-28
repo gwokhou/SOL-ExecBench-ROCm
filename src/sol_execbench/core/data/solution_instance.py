@@ -117,7 +117,7 @@ class Solution(BaseModelWithDocstrings):
         """
         return self.spec.entry_point.split("::")[-1]
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, __context: Any, /) -> None:
         """Cache the deterministic content hash after model validation."""
         # Precompute hash once since the model is frozen/immutable.
         object.__setattr__(self, "_hash_cache", self._compute_hash())

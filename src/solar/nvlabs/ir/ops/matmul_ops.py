@@ -314,4 +314,4 @@ _registry.register_handler(LinearHandler)
 _registry.register_handler(BmmHandler)
 
 
-__all__ = ["MatmulHandler", "LinearHandler", "BmmHandler"]
+__all__ = ["BmmHandler", "LinearHandler", "MatmulHandler"]

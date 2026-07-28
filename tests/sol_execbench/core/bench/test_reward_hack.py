@@ -239,14 +239,14 @@ class TestEvalIntegrity:
         assert "missing" not in snap
 
     def test_passes_when_namespace_unchanged(self):
-        fn_a = lambda: None  # noqa: E731
-        fn_b = lambda: None  # noqa: E731
+        fn_a = lambda: None
+        fn_b = lambda: None
         ns = {"fn_a": fn_a, "fn_b": fn_b}
         snap = snapshot_critical_functions(ns, ["fn_a", "fn_b"])
         check_eval_integrity(snap, ns)  # must not raise
 
     def test_raises_when_function_replaced(self):
-        original = lambda: None  # noqa: E731
+        original = lambda: None
         ns: dict[str, Any] = {"time_runnable": original}
         snap = snapshot_critical_functions(ns, ["time_runnable"])
         ns["time_runnable"] = lambda *a, **kw: 0.001  # attacker replaces it
@@ -264,7 +264,7 @@ class TestEvalIntegrity:
             check_eval_integrity(snap, ns)
 
     def test_reports_first_violated_name(self):
-        fn = lambda: None  # noqa: E731
+        fn = lambda: None
         ns = {"a": fn, "b": fn}
         snap = snapshot_critical_functions(ns, ["a", "b"])
         ns["b"] = lambda: None  # replace only b

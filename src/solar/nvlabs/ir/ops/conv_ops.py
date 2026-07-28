@@ -20,7 +20,7 @@ This module provides einsum handlers for:
 - convtranspose1d, convtranspose2d, convtranspose3d
 """
 
-from typing import Any, ClassVar, Tuple
+from typing import Any, ClassVar
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.nvlabs.ir.ops.base import (
@@ -79,9 +79,9 @@ class Conv1dHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        stride: Tuple[int] = (1,),
-        padding: Tuple[int] = (0,),
-        dilation: Tuple[int] = (1,),
+        stride: tuple[int] = (1,),
+        padding: tuple[int] = (0,),
+        dilation: tuple[int] = (1,),
         groups: int = 1,
         in_channels: int = 0,
         out_channels: int = 0,
@@ -172,9 +172,9 @@ class Conv2dHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        stride: Tuple[int, int] = (1, 1),
-        padding: Tuple[int, int] = (0, 0),
-        dilation: Tuple[int, int] = (1, 1),
+        stride: tuple[int, int] = (1, 1),
+        padding: tuple[int, int] = (0, 0),
+        dilation: tuple[int, int] = (1, 1),
         groups: int = 1,
         in_channels: int = 0,
         out_channels: int = 0,
@@ -256,9 +256,9 @@ class Conv3dHandler(EinsumOpHandler):
         self,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        stride: Tuple[int, int, int] = (1, 1, 1),
-        padding: Tuple[int, int, int] = (0, 0, 0),
-        dilation: Tuple[int, int, int] = (1, 1, 1),
+        stride: tuple[int, int, int] = (1, 1, 1),
+        padding: tuple[int, int, int] = (0, 0, 0),
+        dilation: tuple[int, int, int] = (1, 1, 1),
     ) -> EinsumOp:
         """Generate einsum for 3D convolution.
 

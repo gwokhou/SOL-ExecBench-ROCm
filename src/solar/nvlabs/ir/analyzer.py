@@ -21,7 +21,7 @@ operation handlers to convert PyTorch operations to einsum notation.
 
 import re
 from collections.abc import Callable
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.nvlabs.ir.ops.base import (
@@ -264,7 +264,7 @@ class EinsumAnalyzer:
         einsum_op = self.get_einsum_op(op_name, ts, **kwargs)
         return einsum_op.get_compute_cost(ts)
 
-    def get_memory_cost(self, shapes: Dict[str, TensorShape]) -> Dict[str, int]:
+    def get_memory_cost(self, shapes: dict[str, TensorShape]) -> dict[str, int]:
         """Calculate memory cost for tensors.
 
         Args:
@@ -273,7 +273,7 @@ class EinsumAnalyzer:
         Returns:
             Dictionary mapping tensor names to element counts.
         """
-        memory_cost: Dict[str, int] = {}
+        memory_cost: dict[str, int] = {}
         for name, shape in shapes.items():
             elements = 1
             for dim in shape:
@@ -316,7 +316,7 @@ class EinsumAnalyzer:
         self,
         op_name: str,
         shapes: TensorShapes,
-        reduce_dims: Optional[List[int]] = None,
+        reduce_dims: list[int] | None = None,
         keepdim: bool = False,
     ) -> EinsumOp:
         """Get an einsum op for a reduction (sum/mean/prod)."""
@@ -331,7 +331,7 @@ class EinsumAnalyzer:
         input_shape: TensorShape,
         weight_shape: TensorShape,
         **kwargs: Any,
-    ) -> Optional[TensorShape]:
+    ) -> TensorShape | None:
         """Infer output shape for conv ops when not provided."""
         try:
             if op_norm == "conv1d":
@@ -379,7 +379,7 @@ class EinsumAnalyzer:
             return None
 
     def get_torch_einsum_equation(
-        self, op_name: str, shapes: Optional[TensorShapes] = None
+        self, op_name: str, shapes: TensorShapes | None = None
     ) -> str:
         """Get torch einsum equation string for an operation.
 
@@ -431,9 +431,9 @@ class EinsumAnalyzer:
         self,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        stride: Tuple[int, int] = (1, 1),
-        padding: Tuple[int, int] = (0, 0),
-        dilation: Tuple[int, int] = (1, 1),
+        stride: tuple[int, int] = (1, 1),
+        padding: tuple[int, int] = (0, 0),
+        dilation: tuple[int, int] = (1, 1),
     ) -> EinsumOp:
         """Generate einsum for 2D convolution (backward compatibility)."""
         return self.get_einsum_op(
@@ -448,9 +448,9 @@ class EinsumAnalyzer:
         self,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        stride: Tuple[int] = (1,),
-        padding: Tuple[int] = (0,),
-        dilation: Tuple[int] = (1,),
+        stride: tuple[int] = (1,),
+        padding: tuple[int] = (0,),
+        dilation: tuple[int] = (1,),
     ) -> EinsumOp:
         """Generate einsum for 1D convolution (backward compatibility)."""
         return self.get_einsum_op(
@@ -465,9 +465,9 @@ class EinsumAnalyzer:
         self,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        stride: Tuple[int, int, int] = (1, 1, 1),
-        padding: Tuple[int, int, int] = (0, 0, 0),
-        dilation: Tuple[int, int, int] = (1, 1, 1),
+        stride: tuple[int, int, int] = (1, 1, 1),
+        padding: tuple[int, int, int] = (0, 0, 0),
+        dilation: tuple[int, int, int] = (1, 1, 1),
     ) -> EinsumOp:
         """Generate einsum for 3D convolution (backward compatibility)."""
         return self.get_einsum_op(
@@ -499,7 +499,7 @@ class EinsumAnalyzer:
         self,
         shape: TensorShape,
         op_type: str = "sum",
-        dims: Optional[List[int]] = None,
+        dims: list[int] | None = None,
         keepdim: bool = False,
     ) -> EinsumOp:
         """Generate einsum for reduction operations (backward compatibility)."""

@@ -8,8 +8,7 @@ import pytest
 import torch
 import yaml
 
-import solar.api as api
-import solar.pipeline as pipeline
+from solar import api, pipeline
 from solar.analysis.orojenesis import OrojenesisError
 from solar.api import (
     AnalysisFailure,

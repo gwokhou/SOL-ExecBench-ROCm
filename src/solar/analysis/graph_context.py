@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Union
 
 from solar.analysis.graph_rules import (
     BOOL_DTYPES,
@@ -15,7 +14,7 @@ from solar.common.types import DynamicValue
 from solar.ir.contracts import layer_operation
 from solar.rocm.architecture import ArchitectureProfile
 
-PathLike = Union[str, Path]
+PathLike = str | Path
 
 
 def product(shape: list[int]) -> int:

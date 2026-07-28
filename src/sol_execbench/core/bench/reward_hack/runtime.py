@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import _thread
 import threading
-from typing import Any
+from typing import Any, Self
 
 import torch
 
@@ -117,7 +117,7 @@ class ThreadInjectionMonitor:
         self._original_threading_raw_start: Any = None
         self._thread_start_wrapper: Any = None
 
-    def __enter__(self) -> ThreadInjectionMonitor:
+    def __enter__(self) -> Self:
         """Install thread-start guards and begin sampling."""
         # Baseline is captured before the monitor thread starts, so it does not
         # include the monitor itself.
@@ -212,8 +212,7 @@ class ThreadInjectionMonitor:
         while not self._stop.is_set():
             # Exclude this monitor thread from the count.
             current = threading.active_count() - 1
-            if current > self._peak:
-                self._peak = current
+            self._peak = max(self._peak, current)
             self._ready.set()
             if self._stop.wait(self._interval):
                 break
@@ -284,7 +283,7 @@ def check_lazy_outputs(outputs: list[Any]) -> None:
 
 
 def snapshot_critical_functions(
-    namespace: dict,
+    namespace: dict[str, Any],
     names: list[str],
 ) -> dict[str, int]:
     """Capture ``id()`` of named functions from a namespace.
@@ -303,7 +302,10 @@ def snapshot_critical_functions(
     return {name: id(namespace[name]) for name in names if name in namespace}
 
 
-def check_eval_integrity(snapshot: dict[str, int], namespace: dict) -> None:
+def check_eval_integrity(
+    snapshot: dict[str, int],
+    namespace: dict[str, Any],
+) -> None:
     """Verify that critical eval-driver functions have not been replaced.
 
     Compares the current ``id()`` of each snapshotted name against the

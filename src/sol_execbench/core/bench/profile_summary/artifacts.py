@@ -293,7 +293,7 @@ def _first_number(row: dict[str, str], *keys: str) -> int | float | None:
     return None
 
 
-def _finite_or_none(value: int | float) -> int | float | None:
+def _finite_or_none(value: float) -> int | float | None:
     """Pass through finite numbers; reject NaN/Inf so they never reach sidecar JSON."""
     return value if math.isfinite(value) else None
 

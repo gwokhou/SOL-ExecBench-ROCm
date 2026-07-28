@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
@@ -49,7 +49,7 @@ class ScalarInput(BaseModelWithDocstrings):
 
     type: Literal["scalar"] = "scalar"
     """The input type identifier for scalar values."""
-    value: Union[int, float, bool]
+    value: int | float | bool
     """The scalar value to be used as input. Must be int, float, or bool."""
 
 
@@ -80,7 +80,7 @@ class CustomInput(BaseModelWithDocstrings):
 
 
 InputSpec = Annotated[
-    Union[RandomInput, SafetensorsInput, ScalarInput, CustomInput],
+    RandomInput | SafetensorsInput | ScalarInput | CustomInput,
     Field(discriminator="type"),
 ]
 """Discriminated union representing all possible input specification types."""

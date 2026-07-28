@@ -248,6 +248,7 @@ def _run_subprocess(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess:
         cmd,
         cwd=cwd,
         capture_output=True,
+        check=False,
         text=True,
         timeout=300,
         env={
@@ -457,6 +458,7 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
             str(output_file),
         ],
         capture_output=True,
+        check=False,
         text=True,
         timeout=300,
         env={

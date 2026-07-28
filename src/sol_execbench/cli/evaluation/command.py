@@ -48,8 +48,8 @@ from sol_execbench.core.process.subprocesses import (
 
 __all__ = [
     "NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION",
-    "NoTraceDiagnostics",
     "_DIAGNOSTIC_TAIL_LIMIT",
+    "NoTraceDiagnostics",
     "_diagnostic_tail",
     "_no_trace_diagnostics_sidecar_path",
     "_run_evaluation_command",

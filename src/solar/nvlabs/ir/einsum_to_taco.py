@@ -28,7 +28,10 @@ For convolution operations, spatial indices use + notation to show the
 sliding window relationship (e.g., p+r instead of p,r).
 
 Examples:
-    >>> from solar.nvlabs.ir.einsum_to_taco import EinsumToTaco, generate_taco_expression
+    >>> from solar.nvlabs.ir.einsum_to_taco import (
+    ...     EinsumToTaco,
+    ...     generate_taco_expression,
+    ... )
     >>> # Matrix multiplication: MK,KN->MN with reduction over K
     >>> expr = generate_taco_expression("MK,KN->MN", "mul", "add")
     >>> print(expr)
@@ -49,7 +52,7 @@ Examples:
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, ClassVar
 
 from solar.common.utils import parse_einsum_equation
 
@@ -157,9 +160,9 @@ class EinsumToTaco:
     def convert(
         self,
         einsum_equation: str,
-        elementwise_op: Optional[str] = "mul",
-        reduction_op: Optional[str] = "add",
-        input_names: Optional[List[str]] = None,
+        elementwise_op: str | None = "mul",
+        reduction_op: str | None = "add",
+        input_names: list[str] | None = None,
         output_name: str = "O0",
     ) -> str:
         """Convert an einsum equation to TACO expression.
@@ -211,7 +214,7 @@ class EinsumToTaco:
             has_contraction=bool(contracted_dims),
         )
 
-    def _dims_to_indices(self, dims: List[str]) -> str:
+    def _dims_to_indices(self, dims: list[str]) -> str:
         """Convert dimension tokens to TACO index string.
 
         Handles grouped dimensions with + notation (e.g., "(P+R)" -> "p+r").
@@ -241,10 +244,10 @@ class EinsumToTaco:
         self,
         output_name: str,
         output_indices: str,
-        input_names: List[str],
-        input_indices_list: List[str],
-        elementwise_op: Optional[str],
-        reduction_op: Optional[str],
+        input_names: list[str],
+        input_indices_list: list[str],
+        elementwise_op: str | None,
+        reduction_op: str | None,
         has_contraction: bool,
     ) -> str:
         """Build the TACO expression string.
@@ -301,8 +304,8 @@ class EinsumToTaco:
         self,
         output_tensor: str,
         input_expr: str,
-        elementwise_op: Optional[str],
-        reduction_op: Optional[str],
+        elementwise_op: str | None,
+        reduction_op: str | None,
         has_contraction: bool,
     ) -> str:
         """Build TACO expression for unary operations.
@@ -331,9 +334,9 @@ class EinsumToTaco:
     def _build_binary_expression(
         self,
         output_tensor: str,
-        input_exprs: List[str],
-        elementwise_op: Optional[str],
-        reduction_op: Optional[str],
+        input_exprs: list[str],
+        elementwise_op: str | None,
+        reduction_op: str | None,
         has_contraction: bool,
     ) -> str:
         """Build TACO expression for binary/multi-input operations.
@@ -375,7 +378,7 @@ class EinsumToTaco:
 
         return f"{output_tensor} = {rhs}"
 
-    def convert_layer(self, layer_data: Dict[str, Any]) -> str:
+    def convert_layer(self, layer_data: dict[str, Any]) -> str:
         """Convert a layer dictionary to TACO expression.
 
         Args:
@@ -404,7 +407,7 @@ class EinsumToTaco:
 
         return taco_expr
 
-    def add_taco_to_graph(self, graph_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def add_taco_to_graph(self, graph_dict: dict[str, Any]) -> dict[str, Any]:
         """Add TACO expressions to all layers in an einsum graph.
 
         Args:
@@ -416,7 +419,7 @@ class EinsumToTaco:
         if "layers" not in graph_dict:
             return graph_dict
 
-        for _layer_id, layer_data in graph_dict["layers"].items():
+        for layer_data in graph_dict["layers"].values():
             if "einsum_equation" in layer_data:
                 taco_expr = self.convert_layer(layer_data)
                 if taco_expr:
@@ -427,8 +430,8 @@ class EinsumToTaco:
 
 def generate_taco_expression(
     einsum_equation: str,
-    elementwise_op: Optional[str] = "mul",
-    reduction_op: Optional[str] = "add",
+    elementwise_op: str | None = "mul",
+    reduction_op: str | None = "add",
 ) -> str:
     """Convenience function to generate a TACO expression.
 
@@ -444,7 +447,7 @@ def generate_taco_expression(
     return converter.convert(einsum_equation, elementwise_op, reduction_op)
 
 
-def add_taco_expressions(graph_dict: Dict[str, Any]) -> Dict[str, Any]:
+def add_taco_expressions(graph_dict: dict[str, Any]) -> dict[str, Any]:
     """Convenience function to add TACO expressions to an einsum graph.
 
     Args:
@@ -459,6 +462,6 @@ def add_taco_expressions(graph_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 __all__ = [
     "EinsumToTaco",
-    "generate_taco_expression",
     "add_taco_expressions",
+    "generate_taco_expression",
 ]

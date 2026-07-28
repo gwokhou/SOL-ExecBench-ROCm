@@ -115,8 +115,10 @@ def _source_refs(budget: ArchISABudget | None) -> list[DiagnosticSourceRef]:
 def _limitations(budget: ArchISABudget | None) -> list[str]:
     limitations = [
         "Decision hints are diagnostic resource-risk signals, not benchmark authority.",
-        "Static hints are most actionable for latency-bound kernels; confirm via "
-        "runtime profiling before acting (occupancy != performance).",
+        (
+            "Static hints are most actionable for latency-bound kernels; confirm via "
+            "runtime profiling before acting (occupancy != performance)."
+        ),
     ]
     if budget is not None and budget.register_allocation_model == "dynamic":
         limitations.append(

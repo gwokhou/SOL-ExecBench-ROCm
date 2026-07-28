@@ -7,10 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Generic, Protocol, TypeVar
-
-_StatusT = TypeVar("_StatusT")
-_ReasonT = TypeVar("_ReasonT")
+from typing import Protocol
 
 
 class StaticToolRunLike(Protocol):
@@ -33,34 +30,34 @@ class StaticToolRunLike(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class ExtractorStatusVocabulary(Generic[_StatusT]):
+class ExtractorStatusVocabulary[StatusT]:
     """Domain status values used by the generic extractor aggregator."""
 
-    collected: _StatusT
-    partial: _StatusT
-    failed: _StatusT
-    unavailable: _StatusT
+    collected: StatusT
+    partial: StatusT
+    failed: StatusT
+    unavailable: StatusT
 
 
 @dataclass(frozen=True, slots=True)
-class ExtractorReasonVocabulary(Generic[_StatusT, _ReasonT]):
+class ExtractorReasonVocabulary[StatusT, ReasonT]:
     """Status-to-reason vocabulary for one extractor evidence schema."""
 
-    collected_status: _StatusT
-    partial_status: _StatusT
-    failed_status: _StatusT
-    collected_reason: _ReasonT
-    partial_reason: _ReasonT
-    partial_disassembly_reason: _ReasonT
-    failed_reason: _ReasonT
-    timeout_reason: _ReasonT
-    unavailable_reason: _ReasonT
+    collected_status: StatusT
+    partial_status: StatusT
+    failed_status: StatusT
+    collected_reason: ReasonT
+    partial_reason: ReasonT
+    partial_disassembly_reason: ReasonT
+    failed_reason: ReasonT
+    timeout_reason: ReasonT
+    unavailable_reason: ReasonT
 
 
-def aggregate_extractor_status_value(
+def aggregate_extractor_status_value[StatusT](
     tool_runs: Sequence[StaticToolRunLike],
-    vocabulary: ExtractorStatusVocabulary[_StatusT],
-) -> _StatusT:
+    vocabulary: ExtractorStatusVocabulary[StatusT],
+) -> StatusT:
     """Return aggregate extractor status from individual tool runs."""
     executable_runs = [run for run in tool_runs if run.command]
     successes = [
@@ -81,11 +78,11 @@ def aggregate_extractor_status_value(
     return vocabulary.unavailable
 
 
-def aggregate_extractor_reason_value(
+def aggregate_extractor_reason_value[StatusT, ReasonT](
     tool_runs: Sequence[StaticToolRunLike],
-    status: _StatusT,
-    vocabulary: ExtractorReasonVocabulary[_StatusT, _ReasonT],
-) -> _ReasonT:
+    status: StatusT,
+    vocabulary: ExtractorReasonVocabulary[StatusT, ReasonT],
+) -> ReasonT:
     """Return aggregate extractor reason from aggregate status and tool runs."""
     if status == vocabulary.collected_status:
         return vocabulary.collected_reason

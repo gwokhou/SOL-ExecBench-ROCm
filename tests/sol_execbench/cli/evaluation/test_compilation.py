@@ -23,7 +23,7 @@ def _env_builder(env):
 def test_run_compile_phase_skips_non_cpp_solution(tmp_path: Path) -> None:
     called = False
 
-    def _runner(*args, **kwargs):  # noqa: ARG001
+    def _runner(*args, **kwargs):
         nonlocal called
         called = True
         raise AssertionError("runner should not be called")
@@ -94,7 +94,7 @@ def test_run_compile_phase_executes_compile_command_for_cpp_solution(
 
 
 def test_run_compile_phase_filters_benign_rocm_stderr(tmp_path: Path) -> None:
-    def _runner(*args, **kwargs):  # noqa: ARG001
+    def _runner(*args, **kwargs):
         return subprocess.CompletedProcess(
             args=args[0],
             returncode=1,

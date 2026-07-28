@@ -9,6 +9,7 @@ import subprocess
 import threading
 from io import StringIO
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -46,7 +47,7 @@ def _response(request_id: int, **payload: object) -> str:
 
 def _client(process: _Process) -> AMDIsa:
     client = AMDIsa.__new__(AMDIsa)
-    client._process = process
+    client._process = cast(subprocess.Popen[str], process)
     client._lock = threading.Lock()
     client._next_id = 1
     client._timeout_seconds = 1.0

@@ -8,7 +8,7 @@ identifiers intentionally do not live in this module or anywhere else in the
 working tree; Git history is the only archive for superseded contracts.
 """
 
-from typing import Final, Literal, TypeAlias
+from typing import Final, Literal
 
 AGENT_FEEDBACK_SCHEMA_VERSION: Final = "sol_execbench.agent_feedback.v3"
 DECISION_SCHEMA_VERSION: Final = "sol_execbench.decision.v2"
@@ -97,13 +97,9 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "rocm_event_timing_paper_counts": "sol_execbench.rocm_event_timing.paper_counts.v3",
 }
 
-AgentFeedbackSchemaVersion: TypeAlias = Literal[
-    "sol_execbench.agent_feedback.v3"
-]
-DecisionSchemaVersion: TypeAlias = Literal["sol_execbench.decision.v2"]
-ProfileSummarySchemaVersion: TypeAlias = Literal[
-    "sol_execbench.profile_summary.v3"
-]
+type AgentFeedbackSchemaVersion = Literal["sol_execbench.agent_feedback.v3"]
+type DecisionSchemaVersion = Literal["sol_execbench.decision.v2"]
+type ProfileSummarySchemaVersion = Literal["sol_execbench.profile_summary.v3"]
 
 CURRENT_SCHEMA_VERSIONS: Final[frozenset[str]] = frozenset(
     SCHEMA_VERSIONS.values(),
@@ -120,7 +116,6 @@ __all__ = [
     "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION",
     "EVALUATOR_CONTRACT_SCHEMA_VERSION",
     "PROFILE_SUMMARY_SCHEMA_VERSION",
-    "ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION",
     "RDNA4_VALIDATION_SCHEMA_VERSION",
     "RELEASE_BASELINE_SCHEMA_VERSION",
     "RELEASE_BUNDLE_SCHEMA_VERSION",
@@ -128,6 +123,7 @@ __all__ = [
     "RELEASE_ENVIRONMENT_SCHEMA_VERSION",
     "RELEASE_EXECUTION_PLAN_SCHEMA_VERSION",
     "RELEASE_SOLAR_INDEX_SCHEMA_VERSION",
+    "ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION",
     "ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION",
     "SCHEMA_VERSIONS",
     "STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION",

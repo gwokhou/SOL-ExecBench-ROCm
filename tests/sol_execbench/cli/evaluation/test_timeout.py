@@ -49,7 +49,7 @@ def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
     problem_dir = _stage_pytorch_problem(tmp_path)
     trace_path = tmp_path / "linear_backward.trace.jsonl"
 
-    def _raise_timeout(eval_cmd, *, staging_dir, timeout):  # noqa: ARG001
+    def _raise_timeout(eval_cmd, *, staging_dir, timeout):
         raise subprocess.TimeoutExpired(cmd=eval_cmd, timeout=timeout)
 
     monkeypatch.setattr(

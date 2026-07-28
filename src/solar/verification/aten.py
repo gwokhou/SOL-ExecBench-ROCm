@@ -189,7 +189,7 @@ def _execute_arithmetic(
 ) -> DynamicValue:
     del semantic, layer_id, output_shapes
     import torch
-    import torch.nn.functional as functional
+    from torch.nn import functional
 
     operations = {**_binary_operations(), **_unary_operations()}
     if target in operations:
@@ -239,7 +239,7 @@ def _binary_operations() -> dict[str, Callable[..., DynamicValue]]:
 
 def _unary_operations() -> dict[str, Callable[..., DynamicValue]]:
     import torch
-    import torch.nn.functional as functional
+    from torch.nn import functional
 
     return {
         "abs": torch.abs,
@@ -363,7 +363,7 @@ def _execute_functional(
     output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
     del semantic, layer_id, output_shapes
-    import torch.nn.functional as functional
+    from torch.nn import functional
 
     if target == "linear" or target.startswith("conv_transpose"):
         return getattr(functional, target)(*arguments, **kwargs)

@@ -48,7 +48,7 @@ import string
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, ClassVar
 
 import networkx as nx
 import yaml
@@ -79,7 +79,7 @@ from solar.nvlabs.ir.semantics import (
     validate_semantic_graph,
 )
 
-PathLike = Union[str, Path]
+PathLike = str | Path
 
 
 class ConversionError(ValueError):
@@ -88,16 +88,16 @@ class ConversionError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class _ConvertedTensorMetadata:
-    tensor_names: Dict[str, List[str]]
-    tensor_types: Dict[str, List[str]]
-    tensor_shapes: Dict[str, List[List[int]]]
-    tensor_dtypes: Dict[str, Any]
-    activation_connections: List[str]
-    output_connections: List[str]
-    additional_info: Dict[str, Any]
+    tensor_names: dict[str, list[str]]
+    tensor_types: dict[str, list[str]]
+    tensor_shapes: dict[str, list[list[int]]]
+    tensor_dtypes: dict[str, Any]
+    activation_connections: list[str]
+    output_connections: list[str]
+    additional_info: dict[str, Any]
 
 
-def _product(shape: List[int]) -> int:
+def _product(shape: list[int]) -> int:
     """Compute product of dimensions in a shape.
 
     Args:
@@ -129,7 +129,7 @@ class PyTorchToEinsum:
         self,
         debug: bool = False,
         enable_agent: bool = False,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         cache_dir: str = "./solar_handlers_cache",
         strict: bool = False,
     ) -> None:
@@ -161,8 +161,8 @@ class PyTorchToEinsum:
 
     def _parse_einsum_from_raw_attributes(
         self,
-        module_args: Dict[str, Any],
-    ) -> Optional[str]:
+        module_args: dict[str, Any],
+    ) -> str | None:
         r"""Parse einsum equation from raw_attributes in module_args.
 
         For torch.einsum operations, the raw_attributes field contains the
@@ -181,18 +181,15 @@ class PyTorchToEinsum:
         if not raw_attrs:
             return None
 
-        # Try to extract the einsum equation string from raw_attributes
         # Pattern: first string argument in the list, e.g., 'bijl,lk->bijk'
         import re
 
         # Match quoted string that looks like an einsum equation (contains -> and comma)
-        # Handles both single and double quotes
         pattern = r"['\"]([a-zA-Z0-9,\s]+->[\s]*[a-zA-Z0-9]+)['\"]"
         match = re.search(pattern, raw_attrs)
 
         if match:
             equation = match.group(1).strip()
-            # Convert to Solar format (uppercase)
             return self._convert_einsum_to_solar_format(equation)
 
         return None
@@ -222,14 +219,12 @@ class PyTorchToEinsum:
 
         lhs, rhs = parts[0].strip(), parts[1].strip()
 
-        # Collect all unique dimension letters
         all_dims = set()
         for char in lhs + rhs:
             if char.isalpha():
                 all_dims.add(char.lower())
 
-        # Create mapping: lowercase letter -> uppercase with optional number
-        # We'll use simple uppercase for now, but could add batch numbering
+        # Map lowercase dimensions to Solar's uppercase convention.
         dim_map = {d: d.upper() for d in sorted(all_dims)}
 
         # Apply mapping to equation
@@ -251,8 +246,8 @@ class PyTorchToEinsum:
 
     def _parse_reduction_args_from_raw_attributes(
         self,
-        module_args: Dict[str, Any],
-    ) -> Tuple[Optional[List[int]], bool]:
+        module_args: dict[str, Any],
+    ) -> tuple[list[int] | None, bool]:
         """Parse reduction arguments (dim, keepdim) from raw_attributes.
 
         For reduction operations like sum/mean/max/min, the raw_attributes field
@@ -269,7 +264,7 @@ class PyTorchToEinsum:
         Returns:
             Tuple of (reduction_dims, keepdim). reduction_dims is a list of ints or None.
         """
-        reduce_dims: Optional[List[int]]
+        reduce_dims: list[int] | None
         # First check parsed dim/keepdim fields (from _parse_torchview_attributes)
         if "dim" in module_args:
             dim_val = module_args["dim"]
@@ -310,14 +305,19 @@ class PyTorchToEinsum:
 
     def _tensor_arg_shapes_from_raw(
         self,
-        module_args: Dict[str, Any],
-    ) -> List[Optional[Tuple[int, ...]]]:
+        module_args: dict[str, Any],
+    ) -> list[tuple[int, ...] | None]:
         """Shapes of the positional ``Tensor`` arguments recorded by torchview.
 
         torchview stores the real call signature in ``raw_attributes``, e.g.::
 
-            [[Tensor(shape=(112, 64, 512, 512), dtype=torch.float32),
-              Tensor(shape=(), dtype=torch.float32)], {p: 'fro'}]
+            [
+                [
+                    Tensor(shape=(112, 64, 512, 512), dtype=torch.float32),
+                    Tensor(shape=(), dtype=torch.float32),
+                ],
+                {p: "fro"},
+            ]
 
         Returns the shape tuple of every ``Tensor(shape=(...))`` occurrence in
         order; a scalar tensor yields ``()`` and an unparseable shape yields
@@ -329,7 +329,7 @@ class PyTorchToEinsum:
         raw = module_args.get("raw_attributes", "") if module_args else ""
         if not raw:
             return []
-        shapes: List[Optional[Tuple[int, ...]]] = []
+        shapes: list[tuple[int, ...] | None] = []
         for m in re.finditer(r"Tensor\(shape=\(([^)]*)\)", raw):
             body = m.group(1).strip().rstrip(",").strip()
             if not body:
@@ -344,7 +344,7 @@ class PyTorchToEinsum:
         return shapes
 
     @staticmethod
-    def _tensor_arg_dtypes_from_raw(module_args: Dict[str, Any]) -> List[str]:
+    def _tensor_arg_dtypes_from_raw(module_args: dict[str, Any]) -> list[str]:
         """Return exact positional tensor dtypes recorded by torchview."""
         raw = module_args.get("raw_attributes", "") if module_args else ""
         return [
@@ -449,7 +449,7 @@ class PyTorchToEinsum:
     }
 
     @classmethod
-    def _bits_of_dtype(cls, dtype_str: Optional[str]) -> int:
+    def _bits_of_dtype(cls, dtype_str: str | None) -> int:
         if not dtype_str:
             return 32
         return cls._DTYPE_BITS.get(
@@ -458,9 +458,9 @@ class PyTorchToEinsum:
 
     def _repair_torchview_quirks(
         self,
-        layers: Dict[str, Any],
-        op_ids: List[str],
-        tensor_ids: List[str],
+        layers: dict[str, Any],
+        op_ids: list[str],
+        tensor_ids: list[str],
     ) -> None:
         """Single pass repairing every known torchview tracing quirk.
 
@@ -578,14 +578,14 @@ class PyTorchToEinsum:
         # ``hidden-tensor`` placeholder records empty lists for both, so we
         # fall back to the producer's ``output_shapes[0]`` when the tensor
         # itself has no shape recorded.
-        orphans_by_key: Dict[Tuple[Tuple[int, ...], str], List[str]] = (
+        orphans_by_key: dict[tuple[tuple[int, ...], str], list[str]] = (
             defaultdict(list)
         )
-        dangling_by_key: Dict[
-            Tuple[Tuple[int, ...], str], List[Tuple[str, str]]
+        dangling_by_key: dict[
+            tuple[tuple[int, ...], str], list[tuple[str, str]]
         ] = defaultdict(list)
-        hidden_dangling_by_shape: Dict[
-            Tuple[int, ...], List[Tuple[str, str, str]]
+        hidden_dangling_by_shape: dict[
+            tuple[int, ...], list[tuple[str, str, str]]
         ] = defaultdict(list)
         for tensor_id in tensor_ids:
             tdata = layers.get(tensor_id) or {}
@@ -621,7 +621,7 @@ class PyTorchToEinsum:
                     )
 
         # --- (A) Dropped scalar-tensor edges ------------------------------
-        consumed: Set[Tuple[str, str]] = set()
+        consumed: set[tuple[str, str]] = set()
         for op_id in op_ids:
             odata = layers.get(op_id) or {}
             arg_shapes = [
@@ -762,7 +762,7 @@ class PyTorchToEinsum:
         # ``_partition_nodes`` splits these into three lists; iterate every
         # non-op layer (anything in ``layers`` that's not in ``op_id_set``)
         # so we don't miss auxiliary/parameter tensors.
-        corrected_dtype: Dict[str, str] = {}
+        corrected_dtype: dict[str, str] = {}
         for layer_id, ldata in layers.items():
             if layer_id in op_id_set:
                 continue
@@ -864,7 +864,7 @@ class PyTorchToEinsum:
 
     def _validate_tensor_shape_consistency(
         self,
-        einsum_graph: Dict[str, Any],
+        einsum_graph: dict[str, Any],
     ) -> None:
         """Assert that every tensor name reused across einsums has a single shape.
 
@@ -879,7 +879,7 @@ class PyTorchToEinsum:
         einsum that referenced the conflicting tensor) rather than letting
         the inconsistency propagate to AccelForge.
         """
-        shapes_by_name: Dict[str, Dict[Tuple[int, ...], List[str]]] = (
+        shapes_by_name: dict[str, dict[tuple[int, ...], list[str]]] = (
             defaultdict(lambda: defaultdict(list))
         )
         for layer_name, m in (einsum_graph.get("layers") or {}).items():
@@ -896,7 +896,7 @@ class PyTorchToEinsum:
                     shapes_by_name[names[i]][key].append(
                         f"{layer_name}.{side}[{i}]"
                     )
-        conflicts: List[str] = []
+        conflicts: list[str] = []
         for name, by_shape in shapes_by_name.items():
             if len(by_shape) > 1:
                 listed = "; ".join(
@@ -920,7 +920,7 @@ class PyTorchToEinsum:
         copy_graph: bool = True,
         expand_complex_ops: bool = True,
         enable_rename: bool = False,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Convert a PyTorch graph to einsum representation.
 
         This method:
@@ -965,10 +965,10 @@ class PyTorchToEinsum:
 
     def _convert_loaded_graph(
         self,
-        pytorch_graph: Dict[str, Any],
+        pytorch_graph: dict[str, Any],
         *,
         expand_complex_ops: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Convert a validated in-memory operator graph to semantic einsum."""
         op_graph, start_nodes_info, param_nodes_info = self._build_op_graph(
             pytorch_graph
@@ -992,7 +992,7 @@ class PyTorchToEinsum:
 
     def _publish_einsum_graph(
         self,
-        einsum_graph: Dict[str, Any],
+        einsum_graph: dict[str, Any],
         out_dir: Path,
         *,
         enable_rename: bool,
@@ -1044,7 +1044,7 @@ class PyTorchToEinsum:
 
     @staticmethod
     def _write_yaml(
-        path: Path, value: Dict[str, Any], *, no_aliases: bool
+        path: Path, value: dict[str, Any], *, no_aliases: bool
     ) -> None:
         """Serialize one graph with PyYAML's safe repository dumper."""
         dumper = NoAliasDumper if no_aliases else yaml.SafeDumper
@@ -1061,7 +1061,7 @@ class PyTorchToEinsum:
         self,
         src: Path,
         out_dir: Path,
-        pytorch_graph: Dict[str, Any],
+        pytorch_graph: dict[str, Any],
     ) -> None:
         """Copy input graph to output directory."""
         try:
@@ -1084,7 +1084,7 @@ class PyTorchToEinsum:
                     "Debug: Failed to copy/write canonical pytorch_graph.yaml"
                 )
 
-    def _load_pytorch_graph(self, path: Path) -> Optional[Dict[str, Any]]:
+    def _load_pytorch_graph(self, path: Path) -> dict[str, Any] | None:
         """Load PyTorch graph from YAML or JSON file.
 
         Args:
@@ -1123,12 +1123,12 @@ class PyTorchToEinsum:
 
     def _convert_node_list(
         self,
-        nodes: List[Dict[str, Any]],
+        nodes: list[dict[str, Any]],
         *,
         model_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Convert legacy node list format to structured graph dictionary."""
-        layers: Dict[str, Any] = {}
+        layers: dict[str, Any] = {}
         for node in nodes:
             node_id = node.get("node_id") or node.get("name") or "unknown"
             layers[node_id] = {
@@ -1148,8 +1148,8 @@ class PyTorchToEinsum:
 
     def _build_op_graph(
         self,
-        pytorch_graph: Dict[str, Any],
-    ) -> Tuple[nx.DiGraph, List[Dict[str, Any]], List[Dict[str, Any]]]:
+        pytorch_graph: dict[str, Any],
+    ) -> tuple[nx.DiGraph, list[dict[str, Any]], list[dict[str, Any]]]:
         """Build operation-only graph by collapsing tensor nodes.
 
         The input PyTorch graph is typically bipartite (TensorNodes and
@@ -1225,8 +1225,8 @@ class PyTorchToEinsum:
 
     def _partition_nodes(
         self,
-        layers: Dict[str, Any],
-    ) -> Tuple[List[str], List[str], List[str], List[str]]:
+        layers: dict[str, Any],
+    ) -> tuple[list[str], list[str], list[str], list[str]]:
         """Partition nodes into tensor, operation, and auxiliary categories.
 
         Args:
@@ -1235,11 +1235,11 @@ class PyTorchToEinsum:
         Returns:
             Tuple of (tensor_ids, op_ids, auxiliary_tensor_ids, parameter_tensor_ids).
         """
-        tensor_ids: List[str] = []
-        op_ids: List[str] = []
-        auxiliary_ids: List[str] = []
+        tensor_ids: list[str] = []
+        op_ids: list[str] = []
+        auxiliary_ids: list[str] = []
 
-        parameter_ids: List[str] = []
+        parameter_ids: list[str] = []
 
         for node_id, data in (layers or {}).items():
             node_class = (data.get("node_class") or "").lower()
@@ -1261,12 +1261,12 @@ class PyTorchToEinsum:
 
     def _collect_start_node_info(
         self,
-        layers: Dict[str, Any],
-        auxiliary_ids: List[str],
-        op_ids: List[str],
-    ) -> List[Dict[str, Any]]:
+        layers: dict[str, Any],
+        auxiliary_ids: list[str],
+        op_ids: list[str],
+    ) -> list[dict[str, Any]]:
         """Collect information about auxiliary tensors to create start nodes."""
-        start_nodes_info: List[Dict[str, Any]] = []
+        start_nodes_info: list[dict[str, Any]] = []
 
         for idx, aux_id in enumerate(auxiliary_ids):
             aux_data = layers.get(aux_id) or {}
@@ -1309,7 +1309,7 @@ class PyTorchToEinsum:
                 fail_closed=self._strict,
             )
             return expander.expand(graph)
-        except Exception as exc:  # noqa: BLE001 - optional backend fallback
+        except Exception as exc:
             if self._strict:
                 raise ConversionError(
                     f"complex-operation expansion failed: {exc}"
@@ -1324,15 +1324,15 @@ class PyTorchToEinsum:
                 handler_directory=self._cache_dir,
                 debug=self._debug,
             )
-        except Exception as exc:  # noqa: BLE001 - optional backend fallback
+        except Exception as exc:
             raise ConversionError(
                 f"reviewed handler expansion failed: {exc}"
             ) from exc
 
     @staticmethod
-    def _validate_exact_graph(einsum_graph: Dict[str, Any]) -> None:
+    def _validate_exact_graph(einsum_graph: dict[str, Any]) -> None:
         """Reject every incomplete or approximate layer in official mode."""
-        failures: List[str] = []
+        failures: list[str] = []
         for layer_id, layer in (einsum_graph.get("layers") or {}).items():
             if str(layer.get("type", "")).lower() == "start":
                 dtypes = (layer.get("tensor_dtypes") or {}).get("outputs") or []
@@ -1362,13 +1362,13 @@ class PyTorchToEinsum:
 
     def _build_einsum_graph(
         self,
-        pytorch_graph: Dict[str, Any],
+        pytorch_graph: dict[str, Any],
         op_graph: nx.DiGraph,
-        start_nodes_info: List[Dict[str, Any]],
-        param_nodes_info: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        start_nodes_info: list[dict[str, Any]],
+        param_nodes_info: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Build einsum graph dictionary from operation graph."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "model_name": pytorch_graph.get("model_name", "pytorch_model"),
             "layers": {},
         }
@@ -1395,11 +1395,11 @@ class PyTorchToEinsum:
 
         # Track node ID remapping for split/expanded operations
         # Maps original node_id -> final output node_id
-        node_id_remap: Dict[str, str] = {}
+        node_id_remap: dict[str, str] = {}
 
         # Track expanded nodes' input mappings
         # Maps original node_id -> {input_index -> subgraph_node_id}
-        expanded_input_map: Dict[str, Dict[int, str]] = {}
+        expanded_input_map: dict[str, dict[int, str]] = {}
 
         # Convert each operation to einsum representation
         for node_id in op_graph.nodes():
@@ -1518,7 +1518,7 @@ class PyTorchToEinsum:
 
         return result
 
-    def _should_expand_mha(self, node_data: Dict[str, Any]) -> bool:
+    def _should_expand_mha(self, node_data: dict[str, Any]) -> bool:
         """Check if this is a multi_head_attention_forward that should be expanded."""
         node_type = node_data.get("type", "")
         if isinstance(node_type, str):
@@ -1531,7 +1531,7 @@ class PyTorchToEinsum:
             "multihead_attention",
         }
 
-    def _should_expand_sdpa(self, node_data: Dict[str, Any]) -> bool:
+    def _should_expand_sdpa(self, node_data: dict[str, Any]) -> bool:
         """Check if this is a scaled_dot_product_attention that should be expanded."""
         node_type = node_data.get("type", "")
         if isinstance(node_type, str):
@@ -1545,7 +1545,7 @@ class PyTorchToEinsum:
             "attention",
         }
 
-    def _should_expand_lstm(self, node_data: Dict[str, Any]) -> bool:
+    def _should_expand_lstm(self, node_data: dict[str, Any]) -> bool:
         """Check if this is an LSTM that should be expanded."""
         node_type = node_data.get("type", "")
         if isinstance(node_type, str):
@@ -1555,7 +1555,7 @@ class PyTorchToEinsum:
 
         return node_type in {"lstm"}
 
-    def _should_expand_gru(self, node_data: Dict[str, Any]) -> bool:
+    def _should_expand_gru(self, node_data: dict[str, Any]) -> bool:
         """Check if this is a GRU that should be expanded."""
         node_type = node_data.get("type", "")
         if isinstance(node_type, str):
@@ -1568,11 +1568,11 @@ class PyTorchToEinsum:
     def _expand_sdpa(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
+        node_data: dict[str, Any],
         op_graph: nx.DiGraph,
-        start_nodes_info: List[Dict[str, Any]],
-        start_node_id_map: Dict[str, str],
-    ) -> Tuple[Dict[str, Dict[str, Any]], str, Dict[int, str]]:
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
         """Expand scaled_dot_product_attention into a subgraph of operations.
 
         Based on PyTorch's reference implementation:
@@ -1627,7 +1627,7 @@ class PyTorchToEinsum:
 
         output_connections = sorted(op_graph.successors(node_id))
 
-        subgraph: Dict[str, Dict[str, Any]] = {}
+        subgraph: dict[str, dict[str, Any]] = {}
 
         # Node IDs for subgraph
         qk_node_id = f"{node_id}.qk_matmul"
@@ -1639,7 +1639,7 @@ class PyTorchToEinsum:
         # Q (input 0) -> qk_matmul
         # K (input 1) -> qk_matmul
         # V (input 2) -> av_matmul
-        input_mapping: Dict[int, str] = {
+        input_mapping: dict[int, str] = {
             0: qk_node_id,  # Q -> qk_matmul
             1: qk_node_id,  # K -> qk_matmul
             2: av_node_id,  # V -> av_matmul
@@ -1819,7 +1819,7 @@ class PyTorchToEinsum:
 
         return subgraph, av_node_id, input_mapping
 
-    def _should_expand_groupwise_conv(self, node_data: Dict[str, Any]) -> bool:
+    def _should_expand_groupwise_conv(self, node_data: dict[str, Any]) -> bool:
         """Check if this is a group-wise convolution that needs reshape expansion.
 
         Currently only conv1d / conv2d are expanded via the reshape pass.
@@ -1864,11 +1864,11 @@ class PyTorchToEinsum:
     def _expand_groupwise_conv(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
-        op_graph: "nx.DiGraph",
-        start_nodes_info: List[Dict[str, Any]],
-        start_node_id_map: Dict[str, str],
-    ) -> Tuple[Dict[str, Dict[str, Any]], str, Dict[int, str]]:
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
         """Expand group-wise conv into input view, grouped conv, and output view."""
         module_args = node_data.get("module_args") or {}
         groups = int(module_args.get("groups", 1))
@@ -1945,9 +1945,9 @@ class PyTorchToEinsum:
         # slots — raise on ambiguity rather than silently positional-guess.
         tensor_to_producer = getattr(self, "_tensor_to_producer_op", {})
         op_predecessors = list(op_graph.predecessors(node_id))
-        input_connections: List[Optional[str]] = []
-        assigned_preds: set = set()
-        deferred_indices: List[int] = []
+        input_connections: list[str | None] = []
+        assigned_preds: set[str] = set()
+        deferred_indices: list[int] = []
         input_types_raw = list(node_data.get("input_types") or [])
         for idx, conn_id in enumerate(raw_input_connections):
             mapped = start_node_id_map.get(conn_id, conn_id)
@@ -2187,7 +2187,7 @@ class PyTorchToEinsum:
         return subgraph, reshape_out_id, input_mapping
 
     @staticmethod
-    def _as_list(value: Any, default: List[int]) -> List[Any]:
+    def _as_list(value: Any, default: list[int]) -> list[Any]:
         """Normalize scalar/list convolution args to a list."""
         if value is None:
             return list(default)
@@ -2198,11 +2198,11 @@ class PyTorchToEinsum:
     def _expand_mha(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
-        op_graph: "nx.DiGraph",
-        start_nodes_info: List[Dict[str, Any]],
-        start_node_id_map: Dict[str, str],
-    ) -> Tuple[Dict[str, Dict[str, Any]], str, Dict[int, str]]:
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
         """Expand multi_head_attention_forward into a subgraph.
 
         MHA decomposes into:
@@ -2273,7 +2273,7 @@ class PyTorchToEinsum:
         input_connections = sorted(input_connections)
         output_connections = sorted(op_graph.successors(node_id))
 
-        subgraph: Dict[str, Dict[str, Any]] = {}
+        subgraph: dict[str, dict[str, Any]] = {}
 
         in_proj_id = f"{node_id}.in_proj"
         qk_id = f"{node_id}.qk_matmul"
@@ -2282,7 +2282,7 @@ class PyTorchToEinsum:
         av_id = f"{node_id}.av_matmul"
         out_proj_id = f"{node_id}.out_proj"
 
-        input_mapping: Dict[int, str] = {0: in_proj_id}
+        input_mapping: dict[int, str] = {0: in_proj_id}
         if len(input_connections) > 1:
             input_mapping[1] = in_proj_id
         if len(input_connections) > 2:
@@ -2534,11 +2534,11 @@ class PyTorchToEinsum:
     def _expand_lstm(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
-        op_graph: "nx.DiGraph",
-        start_nodes_info: List[Dict[str, Any]],
-        start_node_id_map: Dict[str, str],
-    ) -> Tuple[Dict[str, Dict[str, Any]], str, Dict[int, str]]:
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
         """Expand LSTM into a subgraph of linear operations.
 
         LSTM decomposes into (per timestep, summed over S steps):
@@ -2596,13 +2596,13 @@ class PyTorchToEinsum:
         input_connections = sorted(input_connections)
         output_connections = sorted(op_graph.successors(node_id))
 
-        subgraph: Dict[str, Dict[str, Any]] = {}
+        subgraph: dict[str, dict[str, Any]] = {}
 
         ih_id = f"{node_id}.ih_linear"
         hh_id = f"{node_id}.hh_linear"
         gates_id = f"{node_id}.gates"
 
-        input_mapping: Dict[int, str] = {0: ih_id}
+        input_mapping: dict[int, str] = {0: ih_id}
         if len(input_connections) > 1:
             input_mapping[1] = hh_id
 
@@ -2742,11 +2742,11 @@ class PyTorchToEinsum:
     def _expand_gru(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
-        op_graph: "nx.DiGraph",
-        start_nodes_info: List[Dict[str, Any]],
-        start_node_id_map: Dict[str, str],
-    ) -> Tuple[Dict[str, Dict[str, Any]], str, Dict[int, str]]:
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
         """Expand GRU into a subgraph of linear operations.
 
         GRU decomposes into (per timestep, summed over S steps):
@@ -2803,13 +2803,13 @@ class PyTorchToEinsum:
         input_connections = sorted(input_connections)
         output_connections = sorted(op_graph.successors(node_id))
 
-        subgraph: Dict[str, Dict[str, Any]] = {}
+        subgraph: dict[str, dict[str, Any]] = {}
 
         ih_id = f"{node_id}.ih_linear"
         hh_id = f"{node_id}.hh_linear"
         gates_id = f"{node_id}.gates"
 
-        input_mapping: Dict[int, str] = {0: ih_id}
+        input_mapping: dict[int, str] = {0: ih_id}
         if len(input_connections) > 1:
             input_mapping[1] = hh_id
 
@@ -2944,7 +2944,7 @@ class PyTorchToEinsum:
         final_node_id = gates_id
         return subgraph, final_node_id, input_mapping
 
-    def _should_split_linear_with_bias(self, node_data: Dict[str, Any]) -> bool:
+    def _should_split_linear_with_bias(self, node_data: dict[str, Any]) -> bool:
         """Check if this is a linear layer with bias that should be split."""
         node_type = node_data.get("type", "")
         if isinstance(node_type, str):
@@ -3012,7 +3012,7 @@ class PyTorchToEinsum:
         return "bias" in notes_blob
 
     def _validate_input_types_alignment(
-        self, node_id: str, node_data: Dict[str, Any]
+        self, node_id: str, node_data: dict[str, Any]
     ) -> None:
         """Ensure input_types aligns 1:1 with input_shapes for op nodes.
 
@@ -3044,11 +3044,11 @@ class PyTorchToEinsum:
     def _split_linear_with_bias(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
+        node_data: dict[str, Any],
         op_graph: nx.DiGraph,
-        start_nodes_info: List[Dict[str, Any]],
-        start_node_id_map: Dict[str, str],
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Split a linear layer with bias into matmul + add operations.
 
         Returns:
@@ -3098,14 +3098,14 @@ class PyTorchToEinsum:
         out_dtype = output_dtypes[0] if output_dtypes else act_dtype
 
         # Infer x/weight/bias from ordered inputs + input_shapes.
-        typed_inputs: List[Tuple[int, str, Any, str]] = []
+        typed_inputs: list[tuple[int, str, Any, str]] = []
         for idx, conn in enumerate(input_connections):
             ishape = input_shapes[idx] if idx < len(input_shapes) else None
             itype = input_types[idx] if idx < len(input_types) else "input"
             typed_inputs.append((idx, conn, ishape, str(itype)))
 
-        activation_entry: Optional[Tuple[int, str, Any, str]] = None
-        weight_entries: List[Tuple[int, str, Any, str]] = []
+        activation_entry: tuple[int, str, Any, str] | None = None
+        weight_entries: list[tuple[int, str, Any, str]] = []
         for entry in typed_inputs:
             _, conn, _, itype = entry
             if itype == "weight" or "parameter-tensor" in conn:
@@ -3117,7 +3117,7 @@ class PyTorchToEinsum:
             activation_entry = typed_inputs[0]
 
         # Bias is normally rank-1 among weight inputs.
-        bias_entry: Optional[Tuple[int, str, Any, str]] = None
+        bias_entry: tuple[int, str, Any, str] | None = None
         for entry in weight_entries:
             ishape = entry[2]
             if isinstance(ishape, list) and len(ishape) == 1:
@@ -3129,7 +3129,7 @@ class PyTorchToEinsum:
             bias_entry = weight_entries[-1]
 
         # Weight matrix is a non-bias weight, preferring rank-2.
-        weight_entry: Optional[Tuple[int, str, Any, str]] = None
+        weight_entry: tuple[int, str, Any, str] | None = None
         for entry in weight_entries:
             if bias_entry is not None and entry[1] == bias_entry[1]:
                 continue
@@ -3159,7 +3159,7 @@ class PyTorchToEinsum:
 
         # === MATMUL LAYER ===
         # Get einsum equation for matmul
-        matmul_input_shapes_for_equation: List[List[Any]] = []
+        matmul_input_shapes_for_equation: list[list[Any]] = []
         if activation_entry and isinstance(activation_entry[2], list):
             matmul_input_shapes_for_equation.append(list(activation_entry[2]))
         if weight_entry and isinstance(weight_entry[2], list):
@@ -3183,7 +3183,7 @@ class PyTorchToEinsum:
 
             # Parse the fallback equation back into the operand structure.
             # Tokens are an uppercase letter optionally followed by digits (e.g. B0).
-            def _toks(s: str) -> List[str]:
+            def _toks(s: str) -> list[str]:
                 return re.findall(r"[A-Z]\d*", s)
 
             matmul_operands = {
@@ -3194,9 +3194,9 @@ class PyTorchToEinsum:
 
         add_node_id = f"{node_id}.bias_add"
 
-        matmul_input_names: List[str] = []
-        matmul_input_shapes_list: List[List[Any]] = []
-        matmul_connection_inputs: List[str] = []
+        matmul_input_names: list[str] = []
+        matmul_input_shapes_list: list[list[Any]] = []
+        matmul_connection_inputs: list[str] = []
 
         if activation_entry:
             activation_conn_id = activation_entry[1]
@@ -3233,7 +3233,7 @@ class PyTorchToEinsum:
             else [],
         }
 
-        matmul_layer: Dict[str, Any] = {
+        matmul_layer: dict[str, Any] = {
             # Keep type as linear so MACs are computed by LinearHandler.
             "type": "linear",
             "einsum_equation": matmul_equation,
@@ -3313,7 +3313,7 @@ class PyTorchToEinsum:
             "outputs": [list(output_shapes[0])] if output_shapes else [],
         }
 
-        add_layer: Dict[str, Any] = {
+        add_layer: dict[str, Any] = {
             "type": "add",
             "einsum_equation": add_equation,
             "elementwise_op": "add",
@@ -3344,9 +3344,9 @@ class PyTorchToEinsum:
 
     def _fix_split_connections(
         self,
-        result: Dict[str, Any],
-        node_id_remap: Dict[str, str],
-        expanded_input_map: Optional[Dict[str, Dict[int, str]]] = None,
+        result: dict[str, Any],
+        node_id_remap: dict[str, str],
+        expanded_input_map: dict[str, dict[int, str]] | None = None,
     ) -> None:
         """Fix connections for layers that reference split/expanded operations.
 
@@ -3433,10 +3433,10 @@ class PyTorchToEinsum:
 
     def _find_entry_node_for_predecessor(
         self,
-        result: Dict[str, Any],
+        result: dict[str, Any],
         predecessor_id: str,
         original_node_id: str,
-        input_mapping: Dict[int, str],
+        input_mapping: dict[int, str],
     ) -> str:
         """Find which subgraph entry node a predecessor should connect to.
 
@@ -3461,17 +3461,17 @@ class PyTorchToEinsum:
 
         # Default: return the first entry node (qk_matmul for SDPA)
         if input_mapping:
-            return input_mapping.get(0, list(input_mapping.values())[0])
+            return input_mapping.get(0, next(iter(input_mapping.values())))
 
         return original_node_id
 
     def _add_start_nodes(
         self,
-        result: Dict[str, Any],
-        start_nodes_info: List[Dict[str, Any]],
-    ) -> Dict[str, str]:
+        result: dict[str, Any],
+        start_nodes_info: list[dict[str, Any]],
+    ) -> dict[str, str]:
         """Add start nodes to the einsum graph."""
-        start_node_id_map: Dict[str, str] = {}
+        start_node_id_map: dict[str, str] = {}
 
         for info in start_nodes_info:
             idx = info["index"]
@@ -3507,7 +3507,7 @@ class PyTorchToEinsum:
                 equation = f"->{''.join(labels)}"
                 operands = {start_id: labels}
 
-            layer_dict: Dict[str, Any] = {
+            layer_dict: dict[str, Any] = {
                 "type": "start",
                 "source_tensor_id": original_id,
                 "source_binding": (
@@ -3549,7 +3549,7 @@ class PyTorchToEinsum:
         self,
         node_id: str,
         shapes: TensorShapes,
-        module_args: Dict[str, Any],
+        module_args: dict[str, Any],
     ) -> OperationRepresentation:
         parsed_equation = self._parse_einsum_from_raw_attributes(module_args)
         if parsed_equation:
@@ -3570,7 +3570,7 @@ class PyTorchToEinsum:
             operation = self._einsum_analyzer.get_einsum_op(
                 "einsum", shapes, module_args=module_args
             )
-        except Exception as exc:  # noqa: BLE001 - optional backend fallback
+        except Exception as exc:
             if self._strict:
                 raise ConversionError(
                     f"cannot convert einsum layer {node_id}: {exc}"
@@ -3579,9 +3579,9 @@ class PyTorchToEinsum:
         return OperationRepresentation.from_einsum_op(operation)
 
     def _prepare_reduction_arguments(
-        self, node_type: str, module_args: Dict[str, Any]
-    ) -> Tuple[Optional[List[int]], bool]:
-        reduce_dims: Optional[List[int]] = None
+        self, node_type: str, module_args: dict[str, Any]
+    ) -> tuple[list[int] | None, bool]:
+        reduce_dims: list[int] | None = None
         keepdim = False
         if node_type in REDUCTION_OPS_WITH_DIM:
             reduce_dims, keepdim = (
@@ -3649,7 +3649,7 @@ class PyTorchToEinsum:
         node_id: str,
         node_type: str,
         shapes: TensorShapes,
-        module_args: Dict[str, Any],
+        module_args: dict[str, Any],
     ) -> OperationRepresentation:
         reduce_dims, keepdim = self._prepare_reduction_arguments(
             node_type, module_args
@@ -3681,7 +3681,7 @@ class PyTorchToEinsum:
         node_id: str,
         node_type: str,
         shapes: TensorShapes,
-        module_args: Dict[str, Any],
+        module_args: dict[str, Any],
     ) -> OperationRepresentation:
         if node_type == "einsum":
             return self._explicit_einsum_representation(
@@ -3694,10 +3694,10 @@ class PyTorchToEinsum:
     @staticmethod
     def _collect_raw_input_connections(
         node_id: str,
-        node_data: Dict[str, Any],
+        node_data: dict[str, Any],
         op_graph: nx.DiGraph,
-        start_nodes_info: List[Dict[str, Any]],
-    ) -> List[str]:
+        start_nodes_info: list[dict[str, Any]],
+    ) -> list[str]:
         connections = list(
             (node_data.get("connections") or {}).get("inputs") or []
         )
@@ -3713,11 +3713,11 @@ class PyTorchToEinsum:
     @staticmethod
     def _fill_deferred_input_connections(
         node_id: str,
-        connections: List[Optional[str]],
-        deferred_indices: List[int],
-        raw_connections: List[str],
-        unmatched_predecessors: List[str],
-        start_node_id_map: Dict[str, str],
+        connections: list[str | None],
+        deferred_indices: list[int],
+        raw_connections: list[str],
+        unmatched_predecessors: list[str],
+        start_node_id_map: dict[str, str],
     ) -> None:
         if len(unmatched_predecessors) == len(deferred_indices):
             for index, predecessor in zip(
@@ -3744,16 +3744,16 @@ class PyTorchToEinsum:
     def _resolve_input_connections(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
+        node_data: dict[str, Any],
         op_graph: nx.DiGraph,
-        raw_connections: List[str],
-        start_node_id_map: Dict[str, str],
-    ) -> List[str]:
+        raw_connections: list[str],
+        start_node_id_map: dict[str, str],
+    ) -> list[str]:
         tensor_to_producer = getattr(self, "_tensor_to_producer_op", {})
         input_types = list(node_data.get("input_types") or [])
-        connections: List[Optional[str]] = []
-        assigned_predecessors: Set[str] = set()
-        deferred_indices: List[int] = []
+        connections: list[str | None] = []
+        assigned_predecessors: set[str] = set()
+        deferred_indices: list[int] = []
         for index, connection_id in enumerate(raw_connections):
             mapped = start_node_id_map.get(connection_id, connection_id)
             input_type = (
@@ -3800,9 +3800,9 @@ class PyTorchToEinsum:
     def _build_converted_tensor_metadata(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
+        node_data: dict[str, Any],
         op_graph: nx.DiGraph,
-        input_connections: List[str],
+        input_connections: list[str],
     ) -> _ConvertedTensorMetadata:
         input_types = list(node_data.get("input_types") or [])
         if len(input_types) < len(input_connections):
@@ -3847,7 +3847,7 @@ class PyTorchToEinsum:
                 and str(input_types[index]).lower() == "weight"
             )
         ]
-        tensor_dtypes: Dict[str, Any] = {}
+        tensor_dtypes: dict[str, Any] = {}
         if input_dtypes := list(node_data.get("input_dtypes") or []):
             tensor_dtypes["inputs"] = input_dtypes
         if output_dtypes := list(node_data.get("output_dtypes") or []):
@@ -3866,11 +3866,11 @@ class PyTorchToEinsum:
         self,
         node_type_raw: Any,
         node_type: str,
-        module_args: Dict[str, Any],
+        module_args: dict[str, Any],
         representation: OperationRepresentation,
         metadata: _ConvertedTensorMetadata,
-    ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "type": node_type,
             "einsum_equation": representation.equation,
             "elementwise_op": representation.elementwise_op,
@@ -3912,11 +3912,11 @@ class PyTorchToEinsum:
     def _convert_operation(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
+        node_data: dict[str, Any],
         op_graph: nx.DiGraph,
-        start_nodes_info: List[Dict[str, Any]],
-        start_node_id_map: Dict[str, str],
-    ) -> Dict[str, Any]:
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> dict[str, Any]:
         """Convert a single operation through explicit typed stages."""
         node_type_raw = node_data.get("type", "unknown")
         node_type = self._einsum_analyzer._get_operation_from_name(
@@ -3948,17 +3948,17 @@ class PyTorchToEinsum:
     def _build_tensor_names(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
-        input_connections: List[str],
-        output_connections: List[str],
-    ) -> Dict[str, List[str]]:
+        node_data: dict[str, Any],
+        input_connections: list[str],
+        output_connections: list[str],
+    ) -> dict[str, list[str]]:
         """Build tensor names matching input_shapes/output_shapes order.
 
         Uses input_types to name weight inputs as <node_id>.Weight
         and activation inputs as <predecessor_id>.Output.
         """
-        input_names: List[str] = []
-        output_names: List[str] = []
+        input_names: list[str] = []
+        output_names: list[str] = []
         input_types = node_data.get("input_types") or []
 
         weight_idx = 0
@@ -3988,8 +3988,8 @@ class PyTorchToEinsum:
 
     def _build_tensor_shapes(
         self,
-        node_data: Dict[str, Any],
-    ) -> Dict[str, List[List[int]]]:
+        node_data: dict[str, Any],
+    ) -> dict[str, list[list[int]]]:
         """Build tensor shapes matching input_shapes/output_shapes order.
 
         All inputs (activation + weight) are already in input_shapes in arg order.
@@ -4004,10 +4004,10 @@ class PyTorchToEinsum:
 
     def _align_tensor_names_and_shapes(
         self,
-        tensor_names: Dict[str, List[str]],
-        tensor_shapes: Dict[str, List[List[int]]],
-        node_data: Dict[str, Any],
-    ) -> Tuple[Dict[str, List[str]], Dict[str, List[List[int]]]]:
+        tensor_names: dict[str, list[str]],
+        tensor_shapes: dict[str, list[list[int]]],
+        node_data: dict[str, Any],
+    ) -> tuple[dict[str, list[str]], dict[str, list[list[int]]]]:
         """Align tensor_names and tensor_shapes to have matching counts.
 
         When there's a mismatch (e.g., weight_nodes vs weight_shapes have different lengths),
@@ -4047,8 +4047,8 @@ class PyTorchToEinsum:
 
     def _build_additional_info(
         self,
-        node_data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        node_data: dict[str, Any],
+    ) -> dict[str, Any]:
         """Build additional_info metadata (weight info is in tensor_names/tensor_shapes)."""
         return {}
 
@@ -4081,6 +4081,6 @@ PyTorchEinsumConverter = PyTorchToEinsum
 
 
 __all__ = [
-    "PyTorchToEinsum",
     "PyTorchEinsumConverter",  # Backward compatibility
+    "PyTorchToEinsum",
 ]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from typing import Self
 
 from sol_execbench.cli import evaluation as cli_evaluation
 from sol_execbench.core.bench.clock_lock import ClockLockLease
@@ -21,7 +22,7 @@ class _FakeClockLease(ClockLockLease):
         self.enter_count = 0
         self.release_count = 0
 
-    def __enter__(self) -> "_FakeClockLease":
+    def __enter__(self) -> Self:
         self.enter_count += 1
         return self
 

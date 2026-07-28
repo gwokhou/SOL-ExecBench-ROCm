@@ -42,14 +42,14 @@ sys.stdout = open(  # noqa: SIM115 -- process-lifetime stream replacement
     closefd=False,
 )
 
-import torch  # noqa: E402 — must come after redirect
+import torch
 
 # ── Staging directory ────────────────────────────────────────────────────────
 STAGING_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(STAGING_DIR))
 
 # ── Imports from sol_execbench runtime API ───────────────────────────────────
-from sol_execbench.driver.eval_runtime_api import (  # noqa: E402,F401
+from sol_execbench.driver.eval_runtime_api import (  # noqa: F401
     BenchmarkConfig,
     Definition,
     EvaluationDependencies,

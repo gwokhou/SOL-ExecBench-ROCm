@@ -120,6 +120,7 @@ with acquire_pid_lock(output_dir):
             result = subprocess.run(
                 [sys.executable, "-c", contender_script],
                 capture_output=True,
+                check=False,
                 text=True,
             )
         finally:
@@ -146,6 +147,7 @@ with acquire_pid_lock(output_dir):
         result1 = subprocess.run(
             [sys.executable, "-c", first_script],
             capture_output=True,
+            check=False,
             text=True,
         )
         assert result1.returncode == 0
@@ -163,6 +165,7 @@ with acquire_pid_lock(output_dir):
         result2 = subprocess.run(
             [sys.executable, "-c", second_script],
             capture_output=True,
+            check=False,
             text=True,
         )
         assert result2.returncode == 0
@@ -188,6 +191,7 @@ with acquire_pid_lock(output_dir):
         result = subprocess.run(
             [sys.executable, "-c", next_script],
             capture_output=True,
+            check=False,
             text=True,
         )
         assert result.returncode == 0

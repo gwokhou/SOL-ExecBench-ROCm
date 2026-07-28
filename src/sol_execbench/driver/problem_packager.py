@@ -25,6 +25,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import TracebackType
+from typing import Self
 
 from sol_execbench.core.bench.clock_lock import acquire_clock_lock
 from sol_execbench.core.bench.config import BenchmarkConfig
@@ -110,7 +111,7 @@ class ProblemPackager:
         if lifecycle is not None:
             lifecycle.close_safely()
 
-    def __enter__(self) -> ProblemPackager:
+    def __enter__(self) -> Self:
         """Return this packager for context-managed use."""
         return self
 

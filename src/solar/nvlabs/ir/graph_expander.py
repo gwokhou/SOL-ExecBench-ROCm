@@ -26,7 +26,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import networkx as nx
 
@@ -52,7 +52,7 @@ class GraphExpander:
         self,
         debug: bool = False,
         enable_agent: bool = False,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         cache_dir: str = "./solar_handlers_cache",
         fail_closed: bool = False,
         register_builtins: bool = True,
@@ -212,7 +212,7 @@ class GraphExpander:
         return self._expand_nodes(graph, nodes)
 
     def _expand_nodes(
-        self, graph: nx.DiGraph, nodes_to_expand: List[str]
+        self, graph: nx.DiGraph, nodes_to_expand: list[str]
     ) -> nx.DiGraph:
         """Replace selected nodes with validated handler subgraphs."""
         expanded_graph = graph.copy()
@@ -245,7 +245,7 @@ class GraphExpander:
         self,
         graph: nx.DiGraph,
         node_id: str,
-        subgraph: Dict[str, Dict[str, Any]],
+        subgraph: dict[str, dict[str, Any]],
     ) -> None:
         """Replace one operation while preserving its external topology."""
         predecessors = list(graph.predecessors(node_id))
@@ -265,8 +265,8 @@ class GraphExpander:
     def _expand_node(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
-    ) -> Optional[Dict[str, Dict[str, Any]]]:
+        node_data: dict[str, Any],
+    ) -> dict[str, dict[str, Any]] | None:
         """Expand a single node into a subgraph.
 
         Args:
@@ -294,8 +294,8 @@ class GraphExpander:
     def _handle_unknown_node_type(
         self,
         node_type: str,
-        node_data: Dict[str, Any],
-    ) -> Optional[Dict[str, Dict[str, Any]]]:
+        node_data: dict[str, Any],
+    ) -> dict[str, dict[str, Any]] | None:
         """Handle unknown node type using LLM agent.
 
         Args:
@@ -343,9 +343,9 @@ class GraphExpander:
     def _connect_subgraph(
         self,
         graph: nx.DiGraph,
-        subgraph: Dict[str, Dict[str, Any]],
-        predecessors: List[str],
-        successors: List[str],
+        subgraph: dict[str, dict[str, Any]],
+        predecessors: list[str],
+        successors: list[str],
     ) -> None:
         """Connect a subgraph to the main graph.
 

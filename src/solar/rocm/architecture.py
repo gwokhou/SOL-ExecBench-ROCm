@@ -794,8 +794,7 @@ class ArchitectureProfile:
     ) -> str:
         """Resolve a tensor dtype without merging incompatible vendor formats."""
         key = str(dtype or "").strip().lower()
-        if key.startswith("torch."):
-            key = key[6:]
+        key = key.removeprefix("torch.")
         if key in _VENDOR_SPECIFIC_DTYPES:
             precision = self.normalize_precision(key)
             if precision == key or precision not in self.peak_ops_per_second:

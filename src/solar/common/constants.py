@@ -68,8 +68,7 @@ _DTYPE_ALIASES = {
 def normalize_dtype(dtype: object, fallback: str | None = None) -> str:
     """Normalize torch and YAML dtype spellings to SOLAR precision names."""
     value = str(dtype or "").strip().lower()
-    if value.startswith("torch."):
-        value = value[6:]
+    value = value.removeprefix("torch.")
     value = _DTYPE_ALIASES.get(value, value)
     if value in BYTES_PER_ELEMENT:
         return value

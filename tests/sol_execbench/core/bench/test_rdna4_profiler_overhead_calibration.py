@@ -438,7 +438,7 @@ class TestCalibrationClockSetup:
 
     def test_run_with_rocprofv3_passes_output_file(self, monkeypatch, tmp_path):
         mod = self._load_script()
-        import sol_execbench.core.bench.rocm_profiler as rocm_profiler
+        from sol_execbench.core.bench import rocm_profiler
 
         captured: dict[str, object] = {}
 

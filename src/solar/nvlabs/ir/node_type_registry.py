@@ -21,9 +21,10 @@ supporting both built-in and dynamically generated handlers.
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any
 
 
 @dataclass
@@ -39,10 +40,10 @@ class NodeTypeHandler:
     """
 
     node_type: str
-    create_subgraph_func: Optional[Callable] = None
-    generate_einsum_func: Optional[Callable] = None
+    create_subgraph_func: Callable[..., Any] | None = None
+    generate_einsum_func: Callable[..., Any] | None = None
     is_generated: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def can_expand(self) -> bool:
         """Check if this handler can expand nodes."""
@@ -76,7 +77,7 @@ class NodeTypeRegistry:
             create_cache_dir: Create the cache directory for learning flows.
                 Formal read-only lookup leaves missing directories untouched.
         """
-        self._handlers: Dict[str, NodeTypeHandler] = {}
+        self._handlers: dict[str, NodeTypeHandler] = {}
         self.cache_dir = Path(cache_dir)
         self._fail_closed = fail_closed
         if create_cache_dir:
@@ -92,7 +93,7 @@ class NodeTypeRegistry:
         """
         self._handlers[node_type.lower()] = handler
 
-    def get_handler(self, node_type: str) -> Optional[NodeTypeHandler]:
+    def get_handler(self, node_type: str) -> NodeTypeHandler | None:
         """Get handler for a node type.
 
         Args:
@@ -114,7 +115,7 @@ class NodeTypeRegistry:
         """
         return node_type.lower() in self._handlers
 
-    def list_handlers(self) -> List[str]:
+    def list_handlers(self) -> list[str]:
         """List all registered node types.
 
         Returns:
@@ -122,7 +123,7 @@ class NodeTypeRegistry:
         """
         return sorted(self._handlers.keys())
 
-    def list_expandable(self) -> List[str]:
+    def list_expandable(self) -> list[str]:
         """List node types that can be expanded.
 
         Returns:
@@ -136,7 +137,7 @@ class NodeTypeRegistry:
             ]
         )
 
-    def list_einsum_capable(self) -> List[str]:
+    def list_einsum_capable(self) -> list[str]:
         """List node types that can generate einsum.
 
         Returns:
@@ -252,7 +253,7 @@ class NodeTypeHandlerFactory:
     def create_handler_from_code(
         node_type: str,
         source_code: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> NodeTypeHandler:
         """Create a handler from source code.
 
@@ -282,8 +283,12 @@ class NodeTypeHandlerFactory:
             "tuple": tuple,
             "zip": zip,
         }
-        local_vars = {"__builtins__": safe_builtins, "Dict": Dict, "Any": Any}
-        exec(source_code, local_vars, local_vars)  # pylint: disable=exec-used
+        local_vars = {"__builtins__": safe_builtins, "Dict": dict, "Any": Any}
+        exec(  # noqa: S102 -- execute generated code with restricted builtins
+            source_code,
+            local_vars,
+            local_vars,
+        )
 
         # Look for the create function
         create_func = None
@@ -310,9 +315,9 @@ class NodeTypeHandlerFactory:
     @staticmethod
     def create_handler_from_methods(
         node_type: str,
-        create_subgraph_method: Optional[Callable] = None,
-        generate_einsum_method: Optional[Callable] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        create_subgraph_method: Callable[..., Any] | None = None,
+        generate_einsum_method: Callable[..., Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> NodeTypeHandler:
         """Create a handler from existing methods.
 
@@ -337,7 +342,7 @@ class NodeTypeHandlerFactory:
 class NodeExpansionStrategy:
     """Strategy for determining which nodes should be expanded."""
 
-    def should_expand(self, node_id: str, node_data: Dict[str, Any]) -> bool:
+    def should_expand(self, node_id: str, node_data: dict[str, Any]) -> bool:
         """Determine if a node should be expanded.
 
         Args:
@@ -356,8 +361,8 @@ class DefaultNodeExpansionStrategy(NodeExpansionStrategy):
     def __init__(
         self,
         registry: NodeTypeRegistry,
-        always_expand: Optional[Set[str]] = None,
-        never_expand: Optional[Set[str]] = None,
+        always_expand: set[str] | None = None,
+        never_expand: set[str] | None = None,
         debug: bool = False,
     ) -> None:
         """Initialize the strategy.
@@ -412,7 +417,7 @@ class DefaultNodeExpansionStrategy(NodeExpansionStrategy):
             "flatten",
         }
 
-    def should_expand(self, node_id: str, node_data: Dict[str, Any]) -> bool:
+    def should_expand(self, node_id: str, node_data: dict[str, Any]) -> bool:
         """Determine if a node should be expanded.
 
         Args:

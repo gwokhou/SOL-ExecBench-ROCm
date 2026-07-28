@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import csv
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -758,7 +759,7 @@ def multi_einsum_problem(
         raise OrojenesisError("multi-einsum proof requires at least two layers")
     first_m = descriptors[0]["m"]
     dtype = descriptors[0]["dtype"]
-    for previous, current in zip(descriptors, descriptors[1:], strict=False):
+    for previous, current in itertools.pairwise(descriptors):
         if previous["output"] != current["input"]:
             raise OrojenesisError(
                 "multi-einsum layers are not a producer-consumer chain",
@@ -1698,9 +1699,8 @@ def find_multi_einsum_chains(
             chain.append(successor[chain[-1]])
         if len(chain) < 2:
             continue
-        # The official composition drops intermediate traffic.  Restrict it
-        # to complete graph endpoints and graph-input weights so that every
-        # dropped access has an explicit producer-consumer witness.
+        # Restrict dropped intermediate traffic to complete graph endpoints
+        # and graph-input weights with a producer-consumer witness.
         first = einsums[chain[0]]
         last = einsums[chain[-1]]
         external_names = [
@@ -1726,22 +1726,22 @@ def find_multi_einsum_chains(
 
 
 __all__ = [
-    "MULTI_EINSUM_COMPOSITION",
     "MULTI_EINSUM_BATCH_COMPOSITION",
+    "MULTI_EINSUM_COMPOSITION",
     "MULTI_EINSUM_FANOUT_COMPOSITION",
     "MULTI_EINSUM_LAYOUT_COMPOSITION",
     "MULTI_EINSUM_SOLVER",
-    "OROJENESIS_COMMIT",
     "OROJENESIS_BUILDER_IMAGE",
     "OROJENESIS_CA_CERTIFICATES_BOOTSTRAP_SHA256",
+    "OROJENESIS_COMMIT",
     "OROJENESIS_COMPILER_WRAPPER_SHA256",
     "OROJENESIS_OPENSSL_BOOTSTRAP_SHA256",
     "OROJENESIS_PROVENANCE_FILENAME",
     "OROJENESIS_REPOSITORY",
     "OROJENESIS_SOURCE_ARCHIVE_SHA256",
+    "OROJENESIS_SOURCE_DATE_EPOCH",
     "OROJENESIS_TREE_OID",
     "OROJENESIS_TRUSTED_MAPPER_SHA256",
-    "OROJENESIS_SOURCE_DATE_EPOCH",
     "OROJENESIS_UBUNTU_SNAPSHOT",
     "OrojenesisError",
     "OrojenesisRunner",

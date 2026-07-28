@@ -104,7 +104,7 @@ def _exec_build_ext(
     previous_cxx = os.environ.get("CXX")
     try:
         os.chdir(cwd)
-        exec(
+        exec(  # noqa: S102 -- exercise the generated build script
             compile(script, "build_ext.py", "exec"),
             {"__builtins__": __builtins__},
         )

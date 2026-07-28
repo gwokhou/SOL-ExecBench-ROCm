@@ -214,8 +214,8 @@ def _run_evaluation_phases(
 
 
 __all__ = [
-    "EvaluationRequest",
     "PROFILE_NONE",
     "PROFILE_ROCPROFV3",
+    "EvaluationRequest",
     "run_evaluation_cli",
 ]

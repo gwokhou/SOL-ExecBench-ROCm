@@ -170,8 +170,8 @@ def _is_amdgpu_elf(path: Path) -> bool:
 
 
 __all__ = [
-    "ExtractedCodeObject",
     "MAX_DISASSEMBLY_BYTES",
+    "ExtractedCodeObject",
     "bundled_architectures",
     "extract_code_object",
 ]

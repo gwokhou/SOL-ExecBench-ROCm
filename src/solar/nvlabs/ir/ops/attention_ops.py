@@ -30,7 +30,7 @@ The SDPA operation is expanded into a subgraph of simpler operations:
 4. weights @ V (matmul) -> output
 """
 
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar
 
 from solar.common.types import TensorShape, TensorShapes
 from solar.nvlabs.ir.ops.base import (
@@ -132,8 +132,8 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
     def create_subgraph(
         self,
         node_id: str,
-        node_data: Dict[str, Any],
-    ) -> Dict[str, Dict[str, Any]]:
+        node_data: dict[str, Any],
+    ) -> dict[str, dict[str, Any]]:
         """Expand SDPA into a subgraph of simpler operations.
 
         Based on PyTorch's reference implementation:
@@ -179,7 +179,7 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
         # Intermediate shapes
         scores_shape = [B, H, Q, K]  # Q @ K^T
 
-        subgraph: Dict[str, Dict[str, Any]] = {}
+        subgraph: dict[str, dict[str, Any]] = {}
 
         # 1. Q @ K^T -> attention scores
         # Einsum: BHQD,BHKD->BHQK (K is transposed, so D is contracted)
@@ -270,7 +270,7 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
     def get_subgraph_input_mapping(
         self,
         node_id: str,
-    ) -> Dict[str, List[int]]:
+    ) -> dict[str, list[int]]:
         """Get mapping of subgraph nodes to original input indices.
 
         For SDPA:
@@ -381,7 +381,7 @@ _registry.register_handler(MultiHeadAttentionHandler)
 
 
 __all__ = [
-    "ScaledDotProductAttentionHandler",
     "FlexAttentionHandler",
     "MultiHeadAttentionHandler",
+    "ScaledDotProductAttentionHandler",
 ]

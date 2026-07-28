@@ -147,7 +147,9 @@ random tensors for inputs marked `"type": "custom"` in a Workload.
 **Function signature:**
 
 ```python
-def fn(axes_and_scalars: dict[str, int | float | bool], device: torch.device) -> dict[str, torch.Tensor | int | float | bool]:
+def fn(
+    axes_and_scalars: dict[str, int | float | bool], device: torch.device
+) -> dict[str, torch.Tensor | int | float | bool]:
     """
     Args:
         axes_and_scalars: Resolved const, var, and expr axes plus scalar inputs

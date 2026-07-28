@@ -43,6 +43,7 @@ def test_hipcc_compile_and_run():
         result = subprocess.run(
             ["hipcc", src, "-o", exe],
             capture_output=True,
+            check=False,
             text=True,
             timeout=120,
         )
@@ -54,6 +55,7 @@ def test_hipcc_compile_and_run():
         result = subprocess.run(
             [exe],
             capture_output=True,
+            check=False,
             text=True,
             timeout=30,
         )
