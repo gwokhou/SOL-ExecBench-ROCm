@@ -99,6 +99,11 @@ from solar.analysis.graph_rules import (
     ZERO_COMPUTE_OPS,
     ZERO_COPY_VIEW_OPS,
 )
+from solar.analysis.graph_validation import (
+    GraphValidator,
+    accept_prevalidated_graph,
+    validate_graph_semantics,
+)
 from solar.analysis.operand_provenance import (
     contraction_external_source_dtypes,
     contraction_operands_are_graph_external,
@@ -129,10 +134,8 @@ from solar.common.types import TensorShapes
 from solar.common.utils import ensure_directory
 from solar.einsum.analyzer import EinsumAnalyzer
 from solar.ir.contracts import layer_contraction_analysis, layer_operation
-from solar.ir.registry import validate_ir_graph
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
 from solar.schema_versions import (
-    IR_GRAPH_SCHEMA_VERSION,
     OROJENESIS_ANALYSIS_SCHEMA_VERSION,
 )
 from solar.schema_versions import (
@@ -146,9 +149,15 @@ from solar.schema_versions import (
 class IRGraphAnalyzer:
     """Analyze a SOLAR IR graph and write `analysis.yaml`."""
 
-    def __init__(self, debug: bool = False) -> None:
+    def __init__(
+        self,
+        debug: bool = False,
+        *,
+        validator: GraphValidator = accept_prevalidated_graph,
+    ) -> None:
         """Initialize graph analysis and operation-cost helpers."""
         self.debug = debug
+        self.validator = validator
         self.einsum_analyzer = EinsumAnalyzer(debug=debug)
 
     def analyze_graph(
@@ -218,29 +227,6 @@ class IRGraphAnalyzer:
             if self.debug:
                 print(f"Debug: failed reading IR graph: {exc}")
             return None
-
-    @staticmethod
-    def _validate_graph_semantics(
-        graph: dict[str, Any],
-        strict: bool,
-    ) -> tuple[bool, bool]:
-        semantic_graph = (
-            int(graph.get("schema_version", 0)) == IR_GRAPH_SCHEMA_VERSION
-        )
-        if not semantic_graph:
-            raise ValueError(
-                "analysis requires executable semantics: IR graph must use "
-                f"schema_version={IR_GRAPH_SCHEMA_VERSION}",
-            )
-        try:
-            validate_ir_graph(graph)
-        except ValueError as exc:
-            if strict:
-                raise ValueError(
-                    f"strict analysis requires executable semantics: {exc}",
-                ) from exc
-            return True, False
-        return True, True
 
     def _copy_source_graph(
         self,
@@ -326,9 +312,10 @@ class IRGraphAnalyzer:
         graph = self._load_graph(source)
         if graph is None:
             return None
-        semantic_graph, semantic_complete = self._validate_graph_semantics(
+        semantic_graph, semantic_complete = validate_graph_semantics(
             graph,
-            job.strict,
+            strict=job.strict,
+            validator=self.validator,
         )
         self._copy_source_graph(source, output_dir, enabled=job.copy_graph)
         all_layers: dict[str, Any] = graph.get("layers") or {}

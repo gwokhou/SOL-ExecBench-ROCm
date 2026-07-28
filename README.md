@@ -80,10 +80,13 @@ uv run sol-execbench solar analyze \
   --output out/solar/norm_forward_bf16
 ```
 
-The isolated worker publishes an atomic directory containing only:
-`operator_graph.yaml`, `einsum_graph.yaml`,
+The isolated worker publishes an atomic directory whose canonical top-level
+files are `operator_graph.yaml`, the selected IR graph,
 `conversion-attestation.yaml`, `solar-analysis.yaml`, and `manifest.yaml`.
-It never receives candidate runtimes or computes scores.
+When tile-aware analysis runs, the directory also contains the recursively
+content-addressed Orojenesis evidence referenced by the manifest; successful
+mapper logs are not published. The worker never receives candidate runtimes or
+computes scores.
 
 Audit extraction, strict conversion, and replay over every scored workload
 without running the formal bound:
@@ -99,9 +102,12 @@ manifest and writes a content-addressed `matrix.jsonl` plus `summary.json`.
 Failures remain in the matrix with stable stage and reason codes; `--resume`
 continues only when all recorded identities and artifact hashes still match.
 
-Graph extraction emits one exact `make_fx` ATen schema. Unsupported tracing,
-execution, or resource-accounting operations fail closed; there is no generated
-handler or alternate conversion path in formal analysis.
+Graph extraction is selected explicitly by route. The default `nvlabs` route
+uses the reviewed Torchview extractor, while `mainline` uses `make_fx` to emit
+the ATen-oriented operator schema. The requested IR representation is selected
+independently, and every route/backend pairing must preserve exact source-input,
+output, tensor-metadata, and effect provenance. Unsupported tracing, conversion,
+execution, or resource accounting fails closed.
 
 ## Official score
 

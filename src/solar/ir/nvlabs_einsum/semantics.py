@@ -3,7 +3,7 @@
 
 """Stable semantic validation boundary for NVLabs einsum IR."""
 
-from solar._vendor.nvlabs.ir.semantics import (
+from solar.nvlabs.ir.semantics import (
     SemanticGraphError,
     annotate_semantics,
     build_semantic_operation,

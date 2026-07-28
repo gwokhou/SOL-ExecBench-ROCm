@@ -10,7 +10,6 @@ from pathlib import Path
 
 import yaml
 
-from solar._vendor.nvlabs.graph.torchview_processor import TorchviewProcessor
 from solar.common.types import DynamicValue
 from solar.graph.contracts import (
     ExtractionKind,
@@ -18,6 +17,7 @@ from solar.graph.contracts import (
     OperatorGraphArtifact,
     TensorSignature,
 )
+from solar.nvlabs.graph.torchview_processor import TorchviewProcessor
 
 
 def extract_operator_graph(

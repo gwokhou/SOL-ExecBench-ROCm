@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Backend registry and graph dispatch for SOLAR IR dialects."""
+"""Lifecycle registry and graph dispatch for SOLAR IR dialects."""
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from solar.ir.contracts import IRBackend, IRKind, normalize_ir_kind
+from solar.ir.contracts import IRKind, IRLifecycle, normalize_ir_kind
 
 
 def graph_kind(graph: Mapping[str, Any]) -> IRKind:
@@ -21,40 +21,40 @@ def graph_kind(graph: Mapping[str, Any]) -> IRKind:
 
 def validate_ir_graph(graph: Mapping[str, Any]) -> None:
     """Dispatch validation to the selected representation backend."""
-    ir_backend(graph_kind(graph)).validate(graph)
+    ir_lifecycle(graph_kind(graph)).validate(graph)
 
 
-def _load_aten_backend() -> IRBackend:
-    from solar.ir.aten import backend
+def _load_aten_lifecycle() -> IRLifecycle:
+    from solar.ir.aten_lifecycle import lifecycle
 
-    return backend
-
-
-def _load_nvlabs_einsum_backend() -> IRBackend:
-    from solar.ir.nvlabs_einsum.backend import backend
-
-    return backend
+    return lifecycle
 
 
-_BACKEND_LOADERS: dict[IRKind, Callable[[], IRBackend]] = {
-    IRKind.ATEN: _load_aten_backend,
-    IRKind.NVLABS_EINSUM: _load_nvlabs_einsum_backend,
+def _load_nvlabs_einsum_lifecycle() -> IRLifecycle:
+    from solar.ir.nvlabs_einsum.backend import lifecycle
+
+    return lifecycle
+
+
+_LIFECYCLE_LOADERS: dict[IRKind, Callable[[], IRLifecycle]] = {
+    IRKind.ATEN: _load_aten_lifecycle,
+    IRKind.NVLABS_EINSUM: _load_nvlabs_einsum_lifecycle,
 }
 
 
-def ir_backend(kind: IRKind | str) -> IRBackend:
-    """Return the backend implementing the requested IR dialect."""
-    return _BACKEND_LOADERS[normalize_ir_kind(kind)]()
+def ir_lifecycle(kind: IRKind | str) -> IRLifecycle:
+    """Return the complete lifecycle for the requested IR dialect."""
+    return _LIFECYCLE_LOADERS[normalize_ir_kind(kind)]()
 
 
-def ir_backends() -> tuple[IRBackend, ...]:
-    """Return every registered IR backend for comparative evaluation."""
-    return tuple(loader() for loader in _BACKEND_LOADERS.values())
+def ir_lifecycles() -> tuple[IRLifecycle, ...]:
+    """Return every registered IR lifecycle for comparative evaluation."""
+    return tuple(loader() for loader in _LIFECYCLE_LOADERS.values())
 
 
 __all__ = [
     "graph_kind",
-    "ir_backend",
-    "ir_backends",
+    "ir_lifecycle",
+    "ir_lifecycles",
     "validate_ir_graph",
 ]

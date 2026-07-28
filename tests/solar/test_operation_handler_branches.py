@@ -7,6 +7,9 @@ import pytest
 
 from solar.common.types import TensorShapes
 from solar.einsum.analyzer import EinsumAnalyzer
+from solar.nvlabs.ir.analyzer import EinsumAnalyzer as NVLABSEinsumAnalyzer
+
+ANALYZERS = (EinsumAnalyzer, NVLABSEinsumAnalyzer)
 
 
 @dataclass(frozen=True)
@@ -128,10 +131,16 @@ MISC_CASES = (
     MATMUL_CASES + CONV_CASES + MISC_CASES,
     ids=lambda case: f"{case.name}-{case.equation}",
 )
+@pytest.mark.parametrize(
+    "analyzer_cls",
+    ANALYZERS,
+    ids=("shared", "nvlabs"),
+)
 def test_handler_shape_branches_generate_expected_equation(
     case: OperationCase,
+    analyzer_cls,
 ) -> None:
-    operation = EinsumAnalyzer().get_einsum_op(
+    operation = analyzer_cls().get_einsum_op(
         case.name,
         TensorShapes(inputs=case.inputs, outputs=case.outputs or []),
         **(case.kwargs or {}),
@@ -156,21 +165,37 @@ def test_handler_shape_branches_generate_expected_equation(
         ("multihead_attention", [], "Missing Input"),
     ),
 )
+@pytest.mark.parametrize(
+    "analyzer_cls",
+    ANALYZERS,
+    ids=("shared", "nvlabs"),
+)
 def test_handlers_reject_missing_required_shapes(
     operation: str,
     inputs: list[list[int]],
     message: str,
+    analyzer_cls,
 ) -> None:
     with pytest.raises(ValueError, match=message):
-        EinsumAnalyzer().get_einsum_op(operation, TensorShapes(inputs=inputs))
+        analyzer_cls().get_einsum_op(
+            operation,
+            TensorShapes(inputs=inputs),
+        )
 
 
-def test_attention_handlers_cover_fused_and_composite_contracts() -> None:
+@pytest.mark.parametrize(
+    "analyzer_cls",
+    ANALYZERS,
+    ids=("shared", "nvlabs"),
+)
+def test_attention_handlers_cover_fused_and_composite_contracts(
+    analyzer_cls,
+) -> None:
     shapes = TensorShapes(
         inputs=[[2, 4, 8, 16], [2, 4, 10, 16], [2, 4, 10, 32]],
     )
-    flex = EinsumAnalyzer().get_einsum_op("flex_attention", shapes)
-    mha = EinsumAnalyzer().get_einsum_op(
+    flex = analyzer_cls().get_einsum_op("flex_attention", shapes)
+    mha = analyzer_cls().get_einsum_op(
         "multi_head_attention_forward",
         TensorShapes(inputs=[[2, 8, 16]]),
     )

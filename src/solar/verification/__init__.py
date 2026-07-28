@@ -6,13 +6,12 @@
 from solar.verification.verify import (
     IRExecutionError,
     IRGraphExecutor,
-    TolerancePolicy,
     VerificationError,
-    VerificationPolicy,
     create_verification_artifact,
     replay_verification_artifact,
     verify_callable_conversion,
 )
+from solar.verification_policy import TolerancePolicy, VerificationPolicy
 
 __all__ = [
     "IRExecutionError",

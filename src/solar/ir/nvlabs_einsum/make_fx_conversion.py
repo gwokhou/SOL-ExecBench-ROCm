@@ -9,8 +9,6 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import replace
 
-import yaml
-
 from solar.common.types import DynamicValue, TensorShapes
 from solar.einsum.analyzer import EinsumAnalyzer
 from solar.einsum.operation_conversion import (
@@ -19,6 +17,7 @@ from solar.einsum.operation_conversion import (
     default_operation_representation,
 )
 from solar.einsum.operation_policy import SUPPORTABLE_OPERATIONS
+from solar.errors import UnsupportedOperationError
 from solar.graph.contracts import ExtractionKind, OperatorGraphArtifact
 from solar.ir.bindings import bind_graph
 from solar.ir.contracts import IRKind
@@ -46,7 +45,7 @@ _PASSTHROUGH_OPERATIONS = frozenset(
 _MISSING = object()
 
 
-class MakeFXNVLabsConversionError(ValueError):
+class MakeFXNVLabsConversionError(UnsupportedOperationError):
     """A make_fx layer cannot be represented in the NVLabs analysis schema."""
 
 
@@ -54,15 +53,20 @@ def convert_make_fx_graph(
     operator: OperatorGraphArtifact,
 ) -> dict[str, DynamicValue]:
     """Convert one trusted make_fx operator artifact without losing ATen replay."""
-    traced = yaml.safe_load(operator.path.read_text()) or {}
+    document = operator.document
+    traced = document.data
     if traced.get("extraction_kind") != ExtractionKind.MAKE_FX_REFERENCE.value:
         raise RuntimeError("make_fx graph provenance is not trusted")
-    converted = deepcopy(dict(traced))
-    converted["ir_kind"] = IRKind.NVLABS_EINSUM.value
-    converted["layers"] = {
-        str(layer_id): _convert_layer(str(layer_id), layer)
-        for layer_id, layer in (traced.get("layers") or {}).items()
+    converted: dict[str, DynamicValue] = {
+        key: deepcopy(value) for key, value in traced.items()
     }
+    converted["ir_kind"] = IRKind.NVLABS_EINSUM.value
+    converted_layers = {}
+    for layer_id, layer in document.require_mapping("layers").items():
+        if not isinstance(layer, dict):
+            raise ValueError(f"operator layer {layer_id!r} is not a mapping")
+        converted_layers[layer_id] = _convert_layer(layer_id, layer)
+    converted["layers"] = converted_layers
     bind_graph(converted, operator)
     return converted
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from solar.common.types import DynamicValue
-from solar.ir.registry import graph_kind, ir_backend, validate_ir_graph
+from solar.ir.contracts import IRLifecycle, normalize_ir_kind
 from solar.verification.errors import IRExecutionError
 
 
@@ -20,16 +20,27 @@ class IRGraphExecutor:
     def __init__(
         self,
         graph: Mapping[str, DynamicValue],
+        lifecycle: IRLifecycle,
         *,
         check_shapes: bool = True,
     ) -> None:
         """Validate and configure an executable semantic graph."""
         try:
-            validate_ir_graph(graph)
+            lifecycle.validate(graph)
         except ValueError as exc:
             raise IRExecutionError(str(exc)) from exc
-        self.ir_kind = graph_kind(graph)
-        self.backend = ir_backend(self.ir_kind)
+        discriminator = graph.get("ir_kind")
+        if discriminator is None:
+            raise IRExecutionError(
+                "IR graph has no explicit ir_kind discriminator",
+            )
+        self.ir_kind = normalize_ir_kind(str(discriminator))
+        if self.ir_kind is not lifecycle.kind:
+            raise IRExecutionError(
+                f"IR lifecycle {lifecycle.kind.value!r} cannot execute "
+                f"{self.ir_kind.value!r}",
+            )
+        self.lifecycle = lifecycle
         layers = graph.get("layers") or {}
         if not isinstance(layers, Mapping) or not layers:
             raise IRExecutionError("IR graph has no layers")
@@ -256,7 +267,7 @@ class IRGraphExecutor:
         layer: Mapping[str, DynamicValue],
         operands: Sequence[DynamicValue],
     ) -> DynamicValue:
-        return self.backend.execute(layer_id, layer, operands, _shapes(layer))
+        return self.lifecycle.execute(layer_id, layer, operands, _shapes(layer))
 
 
 def _tensor_names(

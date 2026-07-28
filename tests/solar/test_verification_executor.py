@@ -6,8 +6,21 @@ import pytest
 import torch
 import torch.nn.functional as functional
 
+from solar.ir.registry import ir_lifecycle
 from solar.verification import verify as verification
 from solar.verification.verify import IRExecutionError, IRGraphExecutor
+
+
+def _graph_executor(
+    graph: dict[str, Any],
+    *,
+    check_shapes: bool = True,
+) -> IRGraphExecutor:
+    return IRGraphExecutor(
+        graph,
+        ir_lifecycle(str(graph["ir_kind"])),
+        check_shapes=check_shapes,
+    )
 
 
 def _metadata(value: Any) -> tuple[list[list[int]], list[str]]:
@@ -83,7 +96,7 @@ def _execute(
         "layers": {**starts, "operation": operation},
         "outputs": output_names,
     }
-    return IRGraphExecutor(graph, check_shapes=check_shapes)(
+    return _graph_executor(graph, check_shapes=check_shapes)(
         *[tensor.clone() for tensor in tensors],
     )
 
@@ -194,7 +207,7 @@ def test_einsum_and_matrix_dispatch() -> None:
         "layers": {**starts, "op": layer},
     }
     torch.testing.assert_close(
-        IRGraphExecutor(graph)(left, right),
+        _graph_executor(graph)(left, right),
         expected,
     )
     torch.testing.assert_close(
@@ -574,7 +587,7 @@ def test_library_quantization_and_aten_fallback_dispatch() -> None:
 
 def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
     with pytest.raises(IRExecutionError, match="schema_version"):
-        IRGraphExecutor(
+        _graph_executor(
             {"schema_version": 0, "ir_kind": "aten", "layers": {}},
         )
     with pytest.raises(

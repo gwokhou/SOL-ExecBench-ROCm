@@ -18,7 +18,6 @@ import networkx as nx
 from solar.analysis.contraction_proofs import requires_tile_evidence
 from solar.common.constants import dtype_bytes
 from solar.ir.contracts import layer_operation
-from solar.ir.registry import validate_ir_graph
 from solar.rocm.architecture import MemoryLevel
 
 
@@ -69,7 +68,6 @@ class FusionPlanner:
         verified_view_nodes: Sequence[str] = (),
     ) -> None:
         """Initialize a planner from validated semantic graph metadata."""
-        validate_ir_graph(graph)
         self.graph = graph
         self.layers = {
             str(key): value

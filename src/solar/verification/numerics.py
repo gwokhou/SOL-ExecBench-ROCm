@@ -10,7 +10,8 @@ import string
 from collections.abc import Iterable
 
 from solar.common.types import DynamicValue
-from solar.verification.errors import IRExecutionError, VerificationError
+from solar.errors import NumericalEquivalenceError
+from solar.verification.errors import IRExecutionError
 
 _EINSUM_TOKEN = re.compile(r"[A-Za-z][0-9]*")
 
@@ -122,17 +123,17 @@ def assert_close(
         (tuple, list),
     ):
         if len(actual) != len(expected):
-            raise VerificationError("output arity mismatch")
+            raise NumericalEquivalenceError("output arity mismatch")
         return _nested_close_stats(zip(actual, expected, strict=True), policy)
     if isinstance(actual, dict) and isinstance(expected, dict):
         if actual.keys() != expected.keys():
-            raise VerificationError("output mapping keys differ")
+            raise NumericalEquivalenceError("output mapping keys differ")
         return _nested_close_stats(
             ((actual[key], expected[key]) for key in actual),
             policy,
         )
     if actual != expected:
-        raise VerificationError(
+        raise NumericalEquivalenceError(
             f"non-tensor output mismatch: {actual!r} != {expected!r}",
         )
     return {"max_abs_error": 0.0, "matched_ratio": 1.0}
@@ -185,17 +186,19 @@ def _tensor_close_stats(
     ):
         raise TypeError("tensor comparison requires tensor operands")
     if actual.shape != expected.shape:
-        raise VerificationError(
+        raise NumericalEquivalenceError(
             f"output shape mismatch: actual={tuple(actual.shape)}, "
             f"reference={tuple(expected.shape)}",
         )
     if actual.dtype != expected.dtype:
-        raise VerificationError(
+        raise NumericalEquivalenceError(
             f"output dtype mismatch: actual={actual.dtype}, reference={expected.dtype}",
         )
     if not (actual.is_floating_point() or actual.is_complex()):
         if not torch.equal(actual, expected):
-            raise VerificationError("integer/bool tensor values differ")
+            raise NumericalEquivalenceError(
+                "integer/bool tensor values differ",
+            )
         return {"max_abs_error": 0.0}
     return _floating_close_stats(
         actual,
@@ -249,7 +252,9 @@ def _floating_close_stats(
             ((~torch.isfinite(out)) & ~matching_nonfinite).any()
             or ((~torch.isfinite(ref)) & ~matching_nonfinite).any(),
         ):
-            raise VerificationError("non-finite tensor values are not allowed")
+            raise NumericalEquivalenceError(
+                "non-finite tensor values are not allowed",
+            )
         if bool(matching_nonfinite.any()):
             finite = ~matching_nonfinite
             out, ref = out[finite], ref[finite]
@@ -262,15 +267,17 @@ def _floating_close_stats(
             max_abs = max(max_abs, float(difference.max().item()))
         matching_nan_count += int(matching_nan.sum().item())
     if reference_nonzero and not output_nonzero:
-        raise VerificationError("all-zero output disagrees with reference")
+        raise NumericalEquivalenceError(
+            "all-zero output disagrees with reference",
+        )
     matched_ratio = matched_count / finite_count if finite_count else 1.0
     if matched_ratio < required_matched_ratio:
-        raise VerificationError(
+        raise NumericalEquivalenceError(
             f"numerical mismatch: matched_ratio={matched_ratio:.6g}, "
             f"required={required_matched_ratio:.6g}, max_abs={max_abs:.6g}",
         )
     if max_error_cap is not None and max_abs > max_error_cap:
-        raise VerificationError(
+        raise NumericalEquivalenceError(
             f"maximum error {max_abs:.6g} exceeds cap {max_error_cap:.6g}",
         )
     stats = {"max_abs_error": max_abs, "matched_ratio": matched_ratio}
@@ -305,7 +312,7 @@ def pattern_inputs(
                 )
                 return (flat % 2).bool()
             return torch.zeros_like(value)
-        raise VerificationError(
+        raise NumericalEquivalenceError(
             f"unknown verification input pattern: {pattern}",
         )
 

@@ -86,12 +86,12 @@ deletes its staging directory and publishes no partial result directory. A
 successful run writes a content-addressed manifest and atomically renames the
 complete staging directory into place.
 
-The canonical source is always the exact ATen operator graph emitted by
-`make_fx`. `solar.ir.conversion` validates that source before selecting a target
-backend. The ATen and extended-einsum backends independently implement their
-own validation, conversion, and execution callbacks; neither backend imports
-the other or the registry. Analysis reads only the shared IR contracts, so
-adding a backend changes the registry but not an existing backend.
+The source operator artifact records its extraction route. `nvlabs` uses the
+reviewed Torchview extractor and `mainline` uses `make_fx`;
+`solar.ir.conversion` validates that provenance before selecting a target IR
+lifecycle. Route selection and IR selection are independent, while each
+lifecycle declares the extraction kinds it accepts. Existing backends remain
+independent implementations and share only the typed lifecycle contracts.
 
 The analyzer accepts a typed internal job. Existing SOLAR readability debt is
 inventoried in `scripts/solar_readability_debt.json`; every shrink must update
@@ -135,11 +135,16 @@ src/
     driver/              staging and generated process templates
   solar/
     graph/               operator graph extraction
-    einsum/              strict executable-einsum conversion
+    ir/                  typed lifecycle and IR conversion
+    nvlabs/              maintained NVLABS-derived graph and IR implementation
     verification/        callable-versus-graph proof
     analysis/            formal resource/lower-bound analysis
     rocm/                architecture profiles
 ```
+
+`solar.nvlabs` is first-party maintained code because its graph and IR behavior
+has diverged materially from the source project. The `_vendor` namespace is
+reserved for dependencies retained as vendored snapshots.
 
 Shared evidence identifiers live below both producers and reports. Platform
 modules do not import scoring, and benchmark runtime modules do not import

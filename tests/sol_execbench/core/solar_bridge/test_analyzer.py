@@ -92,7 +92,7 @@ def test_analyze_workload_adapts_outer_models_to_solar(
     )
     observed: dict[str, object] = {}
 
-    monkeypatch.setattr(analyzer, "_require_formal_device", lambda device: None)
+    monkeypatch.setattr(analyzer, "require_formal_device", lambda device: None)
     context = SolarWorkloadContext(
         definition,
         workload,
@@ -254,7 +254,7 @@ def test_formal_device_requires_rocm_gfx1200(monkeypatch) -> None:
     )
 
     with pytest.raises(RuntimeError, match="requires gfx1200"):
-        analyzer._require_formal_device("cuda")
+        analyzer.require_formal_device("cuda")
 
 
 @pytest.mark.parametrize(

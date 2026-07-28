@@ -12,11 +12,10 @@ from typing import Any
 
 import yaml
 
-from solar.graph.contracts import ExtractionKind, OperatorGraphArtifact
+from solar.graph.contracts import OperatorGraphArtifact
 from solar.ir.bindings import bind_graph
-from solar.ir.contracts import IRBackend, IRGraphArtifact, IRKind
+from solar.ir.contracts import IRGraphArtifact, IRKind
 from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
-from solar.verification.aten import execute_aten_layer
 
 
 class AtenIRError(ValueError):
@@ -165,7 +164,7 @@ def validate_aten_graph(graph: Mapping[str, Any]) -> None:
 
 
 def _load_operator_graph(operator: OperatorGraphArtifact) -> Mapping[str, Any]:
-    traced = yaml.safe_load(operator.path.read_text()) or {}
+    traced = operator.document.data
     if traced.get("extraction_kind") != "make_fx_reference_v1":
         raise RuntimeError("ATen graph provenance is not trusted")
     validate_aten_graph(traced)
@@ -318,19 +317,9 @@ def _validate_required_parameters(
         )
 
 
-backend = IRBackend(
-    kind=IRKind.ATEN,
-    extractions=frozenset({ExtractionKind.MAKE_FX_REFERENCE}),
-    validate=validate_aten_graph,
-    convert=convert_operator_graph,
-    execute=execute_aten_layer,
-)
-
-
 __all__ = [
     "AtenIRError",
     "SUPPORTED_ATEN_TARGETS",
-    "backend",
     "convert_operator_graph",
     "validate_aten_graph",
 ]

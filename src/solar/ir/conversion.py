@@ -7,20 +7,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
-
 from solar.graph.contracts import (
     ExtractionKind,
     OperatorGraphArtifact,
-    normalize_extraction_kind,
 )
 from solar.ir.contracts import (
     DEFAULT_IR_KIND,
     IRGraphArtifact,
     IRKind,
+    StrictConversionError,
+    UnsupportedOperationError,
     normalize_ir_kind,
 )
-from solar.ir.registry import ir_backend
+from solar.ir.registry import ir_lifecycle
 
 
 def convert_operator_graph(
@@ -29,19 +28,19 @@ def convert_operator_graph(
     output_dir: str | Path,
     representation: IRKind | str = DEFAULT_IR_KIND,
 ) -> IRGraphArtifact:
-    """Convert one operator graph through the selected uniform IR backend."""
+    """Convert one operator graph through the selected uniform IR lifecycle."""
     extraction = _operator_extraction(operator)
     kind = normalize_ir_kind(representation)
-    backend = ir_backend(kind)
-    if extraction not in backend.extractions:
-        raise RuntimeError(
-            f"IR backend {kind.value!r} does not support "
+    lifecycle = ir_lifecycle(kind)
+    if extraction not in lifecycle.extractions:
+        raise UnsupportedOperationError(
+            f"IR lifecycle {kind.value!r} does not support "
             f"extraction {extraction.value!r}",
         )
-    artifact = backend.convert(operator, output_dir)
+    artifact = lifecycle.convert(operator, output_dir)
     if artifact.kind is not kind:
-        raise RuntimeError(
-            f"IR backend {kind.value!r} returned "
+        raise StrictConversionError(
+            f"IR lifecycle {kind.value!r} returned "
             f"{artifact.kind.value!r} artifact",
         )
     return artifact
@@ -49,13 +48,12 @@ def convert_operator_graph(
 
 def _operator_extraction(operator: OperatorGraphArtifact) -> ExtractionKind:
     """Return the registered extraction provenance for an operator graph."""
-    graph = yaml.safe_load(operator.path.read_text()) or {}
     try:
-        return normalize_extraction_kind(
-            str(graph.get("extraction_kind", "")),
-        )
+        return operator.extraction_kind
     except ValueError as exc:
-        raise RuntimeError("operator graph provenance is not trusted") from exc
+        raise StrictConversionError(
+            "operator graph provenance is not trusted",
+        ) from exc
 
 
 __all__ = ["IRGraphArtifact", "convert_operator_graph"]
