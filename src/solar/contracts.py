@@ -3,11 +3,13 @@
 
 """Typed contracts shared across SOLAR process boundaries."""
 
+# ruff: noqa: D102
+
 from __future__ import annotations
 
-import math
+import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
@@ -21,6 +23,7 @@ from solar.routes import (
     normalize_route,
 )
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
+from solar.verification_policy import VerificationPolicy
 
 InputFactory = Callable[[int], Sequence[DynamicValue]]
 ROOFLINE_BOUND_KIND = "roofline_eq1_v1"
@@ -64,32 +67,23 @@ class SolarStage(StrEnum):
 
 
 @dataclass(frozen=True)
-class AnalysisRequest:
-    """All inputs required by SOLAR, without benchmark or scoring concepts."""
+class ConversionRequest:
+    """Shared graph extraction, conversion, and verification request."""
 
     analysis_id: str
     reference: Callable[..., DynamicValue]
     input_factory: InputFactory
     reference_name: str
     reference_sha256: str
-    architecture: str | Path | Mapping[str, DynamicValue]
-    output_dir: Path
     representation: IRKind | str = DEFAULT_IR_KIND
     route: Route | str = DEFAULT_ROUTE
-    device: str = "cpu"
-    precision: str = "fp16"
-    require_orojenesis: bool = False
-    orojenesis_home: str | Path | None = None
     trace_seed: int = 200
-    verification_seeds: tuple[int, ...] = (11, 29, 47)
-    atol: float = 1e-2
-    rtol: float = 1e-2
-    required_matched_ratio: float = 1.0
-    max_error_cap: float | None = None
-    allow_negative_inf: bool = False
+    verification: VerificationPolicy = field(
+        default_factory=lambda: VerificationPolicy(atol=1e-2, rtol=1e-2),
+    )
 
     def __post_init__(self) -> None:
-        """Validate request identity, paths, and analysis options."""
+        """Validate request identity and normalize declarative selectors."""
         object.__setattr__(self, "route", normalize_route(self.route))
         object.__setattr__(
             self,
@@ -98,20 +92,90 @@ class AnalysisRequest:
         )
         if not self.analysis_id.strip() or not self.reference_name.strip():
             raise ValueError("analysis_id and reference_name must be non-empty")
-        if len(self.reference_sha256) != 64 or any(
-            character not in "0123456789abcdef"
-            for character in self.reference_sha256
-        ):
+        if re.fullmatch(r"[0-9a-f]{64}", self.reference_sha256) is None:
             raise ValueError("reference_sha256 must be a lowercase SHA-256")
-        values = [self.atol, self.rtol, self.required_matched_ratio]
-        if self.max_error_cap is not None:
-            values.append(self.max_error_cap)
-        if not all(math.isfinite(value) and value >= 0 for value in values):
-            raise ValueError(
-                "verification tolerances must be finite and non-negative",
-            )
-        if self.required_matched_ratio > 1:
-            raise ValueError("required_matched_ratio cannot exceed one")
+
+
+class ConversionRequestEnvelope:
+    """Property view shared by requests that compose a conversion request."""
+
+    conversion: ConversionRequest
+
+    @property
+    def analysis_id(self) -> str:
+        return self.conversion.analysis_id
+
+    @property
+    def reference(self) -> Callable[..., DynamicValue]:
+        return self.conversion.reference
+
+    @property
+    def input_factory(self) -> InputFactory:
+        return self.conversion.input_factory
+
+    @property
+    def reference_name(self) -> str:
+        return self.conversion.reference_name
+
+    @property
+    def reference_sha256(self) -> str:
+        return self.conversion.reference_sha256
+
+    @property
+    def representation(self) -> IRKind | str:
+        return self.conversion.representation
+
+    @property
+    def route(self) -> Route | str:
+        return self.conversion.route
+
+    @property
+    def device(self) -> str:
+        return self.conversion.verification.device
+
+    @property
+    def trace_seed(self) -> int:
+        return self.conversion.trace_seed
+
+    @property
+    def verification_seeds(self) -> tuple[int, ...]:
+        return tuple(self.conversion.verification.seeds)
+
+    @property
+    def atol(self) -> float:
+        return self.conversion.verification.atol
+
+    @property
+    def rtol(self) -> float:
+        return self.conversion.verification.rtol
+
+    @property
+    def required_matched_ratio(self) -> float:
+        return self.conversion.verification.required_matched_ratio
+
+    @property
+    def max_error_cap(self) -> float | None:
+        return self.conversion.verification.max_error_cap
+
+    @property
+    def allow_negative_inf(self) -> bool:
+        return self.conversion.verification.allow_negative_inf
+
+    @property
+    def verification(self) -> VerificationPolicy:
+        return self.conversion.verification
+
+
+@dataclass(frozen=True)
+class AnalysisRequest(ConversionRequestEnvelope):
+    """Formal-analysis inputs composed around one conversion request."""
+
+    conversion: ConversionRequest
+    architecture: str | Path | Mapping[str, DynamicValue]
+    output_dir: Path
+    precision: str = "fp16"
+    require_orojenesis: bool = False
+    orojenesis_home: str | Path | None = None
 
 
 @dataclass(frozen=True)
@@ -229,6 +293,8 @@ __all__ = [
     "AnalysisRequest",
     "AnalysisResult",
     "ArtifactRef",
+    "ConversionRequest",
+    "ConversionRequestEnvelope",
     "IRKind",
     "Route",
     "SolBound",
@@ -236,5 +302,6 @@ __all__ = [
     "SolarReadinessStatus",
     "SolarStage",
     "SolarStageStatus",
+    "VerificationPolicy",
     "write_request_manifest",
 ]

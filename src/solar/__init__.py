@@ -31,7 +31,9 @@ _LAZY_IMPORTS = {
     "AnalysisRequest": ("solar.api", "AnalysisRequest"),
     "AnalysisResult": ("solar.api", "AnalysisResult"),
     "ArtifactRef": ("solar.api", "ArtifactRef"),
+    "ConversionRequest": ("solar.api", "ConversionRequest"),
     "SolBound": ("solar.api", "SolBound"),
+    "VerificationPolicy": ("solar.api", "VerificationPolicy"),
     "analyze": ("solar.api", "analyze"),
 }
 
@@ -52,6 +54,8 @@ __all__ = [
     "AnalysisRequest",
     "AnalysisResult",
     "ArtifactRef",
+    "ConversionRequest",
     "SolBound",
+    "VerificationPolicy",
     "analyze",
 ]

@@ -26,6 +26,19 @@ def test_solar_never_imports_outer_benchmark_package():
     assert offenders == []
 
 
+def test_nvlabs_implementation_uses_first_party_namespace():
+    source_root = REPO_ROOT / "src" / "solar"
+    assert (source_root / "nvlabs").is_dir()
+    assert not (source_root / "_vendor" / "nvlabs").exists()
+
+    offenders = [
+        path
+        for path in source_root.rglob("*.py")
+        if "solar._vendor.nvlabs" in path.read_text()
+    ]
+    assert offenders == []
+
+
 def test_only_solar_bridge_imports_solar_from_outer_package():
     offenders = []
     roots = [
@@ -52,7 +65,7 @@ def test_ir_backends_are_independent_implementations():
         "aten.py": ("solar.ir.aten", "solar.verification.aten"),
         "nvlabs_einsum/backend.py": (
             "solar.ir.nvlabs_einsum.backend",
-            "solar.verification.nvlabs_einsum",
+            "solar.verification.aten",
         ),
     }
     ir_root = REPO_ROOT / "src" / "solar" / "ir"

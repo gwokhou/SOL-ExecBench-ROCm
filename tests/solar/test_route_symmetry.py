@@ -10,6 +10,7 @@ from solar.api import (
     AnalysisRequest,
     AnalysisResult,
     ConversionReadinessRequest,
+    ConversionRequest,
     analyze,
     audit_conversion,
 )
@@ -23,8 +24,9 @@ from solar.graph.extraction import extract_operator_graph
 from solar.graph.registry import extraction_backends
 from solar.ir.contracts import DEFAULT_IR_KIND, IRKind
 from solar.ir.conversion import convert_operator_graph
-from solar.ir.registry import ir_backends
+from solar.ir.registry import ir_lifecycle, ir_lifecycles
 from solar.routes import DEFAULT_ROUTE, Route, route_spec
+from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
 
 
 def _matmul(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
@@ -41,15 +43,16 @@ def _inputs(seed: int) -> tuple[torch.Tensor, torch.Tensor]:
 
 def _analysis_request(output: Path, route: Route) -> AnalysisRequest:
     return AnalysisRequest(
-        analysis_id=f"route:{route}:matmul",
-        reference=_matmul,
-        input_factory=_inputs,
-        reference_name="tests.test_route_symmetry#matmul",
-        reference_sha256="a" * 64,
+        conversion=ConversionRequest(
+            analysis_id=f"route:{route}:matmul",
+            reference=_matmul,
+            input_factory=_inputs,
+            reference_name="tests.test_route_symmetry#matmul",
+            reference_sha256="a" * 64,
+            route=route,
+        ),
         architecture="RX_9060_XT",
         output_dir=output,
-        route=route,
-        device="cpu",
     )
 
 
@@ -71,11 +74,17 @@ def test_routes_publish_symmetric_nvlabs_artifacts(
     assert result.sol_score_eligible
     assert not result.publication_eligible
     assert result.bound.kind == "roofline_eq1_v1"
-    assert {artifact.path for artifact in result.artifacts} == {
+    artifact_paths = {artifact.path for artifact in result.artifacts}
+    assert {
         "operator_graph.yaml",
         "einsum_graph.yaml",
         "conversion-attestation.yaml",
         "solar-analysis.yaml",
+    } <= artifact_paths
+    assert artifact_paths == {
+        path.relative_to(result.output_dir).as_posix()
+        for path in result.output_dir.rglob("*")
+        if path.is_file() and path.name != "manifest.yaml"
     }
     operator = yaml.safe_load(
         (result.output_dir / "operator_graph.yaml").read_text(),
@@ -91,8 +100,8 @@ def test_routes_publish_symmetric_nvlabs_artifacts(
     )
     assert operator["extraction_kind"] == extraction.value
     assert graph["ir_kind"] == IRKind.NVLABS_EINSUM.value
-    assert attestation["predicate"]["verifier"] == (
-        "solar.verification.einsum.v2"
+    assert (
+        attestation["predicate"]["verifier"] == IR_VERIFICATION_SCHEMA_VERSION
     )
     assert manifest["schema_version"] == 3
     assert manifest["analysis_contract"]["route"] == route.value
@@ -109,15 +118,16 @@ def test_readiness_passes_for_both_routes(
 ) -> None:
     result = audit_conversion(
         ConversionReadinessRequest(
-            analysis_id=f"readiness:{route}",
-            reference=_matmul,
-            input_factory=_inputs,
-            reference_name="tests.test_route_symmetry#matmul",
-            reference_sha256="b" * 64,
+            conversion=ConversionRequest(
+                analysis_id=f"readiness:{route}",
+                reference=_matmul,
+                input_factory=_inputs,
+                reference_name="tests.test_route_symmetry#matmul",
+                reference_sha256="b" * 64,
+                route=route,
+            ),
             architecture="RX_9060_XT",
             output_dir=tmp_path / f"readiness-{route}",
-            route=route,
-            device="cpu",
         ),
     )
 
@@ -132,16 +142,12 @@ def test_nvlabs_is_the_default_and_backends_are_first_class(
     tmp_path: Path,
 ) -> None:
     request = _analysis_request(tmp_path / "default", DEFAULT_ROUTE)
-    source = (
-        Path(__file__).parents[2]
-        / "src/solar/_vendor/nvlabs/verification/nvlabs_einsum.py"
-    ).read_text()
 
     assert DEFAULT_ROUTE is Route.NVLABS
     assert DEFAULT_IR_KIND is IRKind.NVLABS_EINSUM
     assert request.route is Route.NVLABS
     assert request.representation is IRKind.NVLABS_EINSUM
-    assert {backend.kind for backend in ir_backends()} == {
+    assert {lifecycle.kind for lifecycle in ir_lifecycles()} == {
         IRKind.ATEN,
         IRKind.NVLABS_EINSUM,
     }
@@ -149,8 +155,9 @@ def test_nvlabs_is_the_default_and_backends_are_first_class(
         ExtractionKind.MAKE_FX_REFERENCE,
         ExtractionKind.TORCHVIEW,
     }
-    assert "solar.verification.einsum.v2" in source
-    assert "solar.generated_handler.v1" in source
+    assert ir_lifecycle(DEFAULT_IR_KIND).verify.__module__ == (
+        "solar.ir.nvlabs_einsum.backend"
+    )
 
 
 def test_route_profiles_only_select_extraction_strategy() -> None:
@@ -161,7 +168,9 @@ def test_route_profiles_only_select_extraction_strategy() -> None:
     )
 
 
-def test_ir_backend_rejects_an_incompatible_extraction(tmp_path: Path) -> None:
+def test_ir_lifecycle_rejects_an_incompatible_extraction(
+    tmp_path: Path,
+) -> None:
     operator = extract_operator_graph(
         _matmul,
         _inputs(5),

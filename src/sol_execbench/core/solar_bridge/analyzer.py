@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from sol_execbench.core.integrity import sha256_bytes
 from sol_execbench.core.solar_bridge.formal_device import (
     FORMAL_ARCHITECTURE,
-)
-from sol_execbench.core.solar_bridge.formal_device import (
-    require_formal_device as _require_formal_device,
+    require_formal_device,
 )
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
@@ -27,6 +26,9 @@ from sol_execbench.core.solar_bridge.workload_context import (
     load_solar_workload_context,
 )
 from solar.routes import DEFAULT_ROUTE, Route
+
+if TYPE_CHECKING:
+    from solar.api import ConversionRequest
 
 
 def formal_producer_readiness() -> tuple[bool, str]:
@@ -58,7 +60,7 @@ def analyze_workload(
     route: Route | str = DEFAULT_ROUTE,
 ) -> SolarAnalysisOutcome:
     """Adapt one workload and invoke SOLAR's benchmark-agnostic API."""
-    _require_formal_device(device)
+    require_formal_device(device)
     context = load_solar_workload_context(problem_dir, workload_uuid, device)
     return _invoke_solar(
         context=context,
@@ -78,27 +80,18 @@ def audit_workload_stages(
     route: Route | str = DEFAULT_ROUTE,
 ) -> SolarStageAuditOutcome:
     """Run the exact extraction/conversion/replay gate for one corpus workload."""
-    from solar.api import ConversionReadinessRequest, audit_conversion
+    from solar.api import (
+        ConversionReadinessRequest,
+        audit_conversion,
+    )
 
-    _require_formal_device(device)
+    require_formal_device(device)
     context = load_solar_workload_context(problem_dir, workload_uuid, device)
-    definition, workload = context.definition, context.workload
     result = audit_conversion(
         ConversionReadinessRequest(
-            analysis_id=f"{definition.name}:{workload.uuid}",
-            reference=context.reference,
-            input_factory=context.input_factory,
-            reference_name=f"{definition.name}/definition.json#reference",
-            reference_sha256=sha256_bytes(definition.reference.encode()),
+            conversion=_conversion_request(context, device, route),
             architecture=FORMAL_ARCHITECTURE,
             output_dir=Path(output_dir),
-            device=device,
-            route=route,
-            atol=workload.tolerance.max_atol,
-            rtol=workload.tolerance.max_rtol,
-            required_matched_ratio=workload.tolerance.required_matched_ratio,
-            max_error_cap=workload.tolerance.max_error_cap,
-            allow_negative_inf=workload.tolerance.allow_negative_inf,
         ),
     )
     return SolarStageAuditOutcome.from_dict(result.to_dict())
@@ -112,28 +105,20 @@ def _invoke_solar(
     orojenesis_home: str | Path | None,
     route: Route | str = DEFAULT_ROUTE,
 ) -> SolarAnalysisOutcome:
-    from solar.api import AnalysisFailure, AnalysisRequest, analyze
+    from solar.api import (
+        AnalysisFailure,
+        AnalysisRequest,
+        analyze,
+    )
 
-    definition, workload = context.definition, context.workload
-    tolerance = workload.tolerance
+    definition = context.definition
     request = AnalysisRequest(
-        analysis_id=f"{definition.name}:{workload.uuid}",
-        reference=context.reference,
-        input_factory=context.input_factory,
-        reference_name=f"{definition.name}/definition.json#reference",
-        reference_sha256=sha256_bytes(definition.reference.encode()),
+        conversion=_conversion_request(context, device, route),
         architecture=FORMAL_ARCHITECTURE,
         output_dir=output_dir,
-        route=route,
-        device=device,
         precision=formal_precision_for_definition(definition),
         require_orojenesis=True,
         orojenesis_home=orojenesis_home,
-        atol=tolerance.max_atol,
-        rtol=tolerance.max_rtol,
-        required_matched_ratio=tolerance.required_matched_ratio,
-        max_error_cap=tolerance.max_error_cap,
-        allow_negative_inf=tolerance.allow_negative_inf,
     )
     result = analyze(request)
     if isinstance(result, AnalysisFailure):
@@ -165,3 +150,30 @@ def _invoke_solar(
             message="SOLAR formal bridge rejected a non-publication result",
         )
     return outcome
+
+
+def _conversion_request(
+    context: SolarWorkloadContext,
+    device: str,
+    route: Route | str,
+) -> ConversionRequest:
+    from solar.api import ConversionRequest, VerificationPolicy
+
+    definition, workload = context.definition, context.workload
+    tolerance = workload.tolerance
+    return ConversionRequest(
+        analysis_id=f"{definition.name}:{workload.uuid}",
+        reference=context.reference,
+        input_factory=context.input_factory,
+        reference_name=f"{definition.name}/definition.json#reference",
+        reference_sha256=sha256_bytes(definition.reference.encode()),
+        route=route,
+        verification=VerificationPolicy(
+            atol=tolerance.max_atol,
+            rtol=tolerance.max_rtol,
+            required_matched_ratio=tolerance.required_matched_ratio,
+            max_error_cap=tolerance.max_error_cap,
+            allow_negative_inf=tolerance.allow_negative_inf,
+            device=device,
+        ),
+    )

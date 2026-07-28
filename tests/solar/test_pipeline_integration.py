@@ -12,6 +12,7 @@ import yaml
 from solar.analysis.graph_analyzer import IRGraphAnalyzer
 from solar.graph.extraction import extract_operator_graph
 from solar.ir.conversion import convert_operator_graph
+from solar.ir.registry import ir_lifecycle
 from solar.verification.verify import IRGraphExecutor
 
 
@@ -199,14 +200,16 @@ def test_cpu_pipeline_preserves_reference_semantics(
     converted = convert_operator_graph(operator, output_dir=output)
     graph = yaml.safe_load(converted.path.read_text())
 
-    actual = IRGraphExecutor(graph)(*inputs)
+    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
 
     torch.testing.assert_close(actual, reference(*inputs), equal_nan=True)
     assert sorted(graph["source_input_indices"]) == sorted(
         operator.used_source_indices,
     )
     assert graph["outputs"]
-    analysis = IRGraphAnalyzer().analyze_graph(
+    analysis = IRGraphAnalyzer(
+        validator=ir_lifecycle(graph["ir_kind"]).validate,
+    ).analyze_graph(
         converted.path,
         output / "analysis",
         copy_graph=False,
@@ -292,5 +295,5 @@ def test_canonical_extraction_preserves_explicit_backward_reference(
     assert any(
         layer.get("phase") == "reference" for layer in graph["layers"].values()
     )
-    actual = IRGraphExecutor(graph)(*inputs)
+    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
     torch.testing.assert_close(actual, reference(*inputs))

@@ -10,8 +10,12 @@ from pathlib import Path
 
 import yaml
 
-from solar._vendor.nvlabs.ir.pytorch_to_einsum import PyTorchToEinsum
 from solar.common.types import DynamicValue
+from solar.errors import (
+    ReferenceOutputBindingError,
+    SourceInputBindingError,
+    StrictConversionError,
+)
 from solar.graph.contracts import (
     ExtractionKind,
     OperatorGraphArtifact,
@@ -20,6 +24,7 @@ from solar.graph.contracts import (
 from solar.ir.contracts import IRGraphArtifact, IRKind
 from solar.ir.nvlabs_einsum.make_fx_conversion import convert_make_fx_graph
 from solar.ir.nvlabs_einsum.semantics import validate_semantic_graph
+from solar.nvlabs.ir.pytorch_to_einsum import PyTorchToEinsum
 
 _REVIEWED_HANDLERS = Path(__file__).parent / "handlers"
 
@@ -30,12 +35,12 @@ def convert_operator_graph(
 ) -> IRGraphArtifact:
     """Convert one operator artifact and preserve exact argument/output bindings."""
     output = Path(output_dir)
-    traced = yaml.safe_load(operator.path.read_text()) or {}
+    traced = operator.document.data
     try:
         extraction = ExtractionKind(str(traced.get("extraction_kind", "")))
         converter = _SOURCE_CONVERTERS[extraction]
     except (KeyError, ValueError) as exc:
-        raise RuntimeError(
+        raise StrictConversionError(
             "unsupported operator graph provenance "
             f"{traced.get('extraction_kind')!r}",
         ) from exc
@@ -64,7 +69,9 @@ def _convert_torchview_graph(
         strict=True, cache_dir=str(_REVIEWED_HANDLERS)
     ).convert(operator.path, output, copy_graph=False, enable_rename=False)
     if converted is None:
-        raise RuntimeError("strict graph conversion produced no einsum graph")
+        raise StrictConversionError(
+            "strict graph conversion produced no einsum graph",
+        )
     converted["ir_kind"] = IRKind.NVLABS_EINSUM.value
     converted["source_input_indices"] = _bind_inputs(converted, operator)
     converted["outputs"] = _bind_outputs(
@@ -112,7 +119,7 @@ def _bind_inputs(
     starts = _start_layers(graph)
     ordered = list(operator.used_source_indices)
     if len(starts) != len(ordered):
-        raise RuntimeError(
+        raise SourceInputBindingError(
             "cannot bind source arguments to graph inputs: "
             f"observed={ordered}, starts={len(starts)}"
         )
@@ -124,7 +131,9 @@ def _bind_inputs(
     _search_bindings(starts, candidates, 0, [], set(ordered), -1, bindings)
     if len(bindings) != 1:
         reason = "no" if not bindings else "ambiguous"
-        raise RuntimeError(f"{reason} exact source-to-graph input binding")
+        raise SourceInputBindingError(
+            f"{reason} exact source-to-graph input binding",
+        )
     return bindings[0]
 
 
@@ -136,7 +145,9 @@ def _input_candidates(
     shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
     dtypes = (layer.get("tensor_dtypes") or {}).get("outputs") or []
     if len(shapes) != 1 or len(dtypes) != 1:
-        raise RuntimeError("graph input lacks exact shape/dtype metadata")
+        raise SourceInputBindingError(
+            "graph input lacks exact shape/dtype metadata",
+        )
     return [
         index
         for index in indices
@@ -187,7 +198,9 @@ def _bind_outputs(
 ) -> list[str]:
     candidates = _output_candidates(graph, traced)
     if len(candidates) != len(expected):
-        raise RuntimeError("cannot preserve exact reference output arity")
+        raise ReferenceOutputBindingError(
+            "cannot preserve exact reference output arity",
+        )
     declared: list[str] = []
     for value in expected:
         matches = [
@@ -196,7 +209,7 @@ def _bind_outputs(
             if tuple(shape) == value.shape and dtype == value.dtype
         ]
         if not matches:
-            raise RuntimeError(
+            raise ReferenceOutputBindingError(
                 "traced output metadata does not match reference"
             )
         declared.append(candidates.pop(matches[0])[0])
@@ -216,13 +229,15 @@ def _output_candidates(
     for output in output_nodes:
         producers = (output.get("connections") or {}).get("inputs") or []
         if len(producers) != 1 or producers[0] not in layers:
-            raise RuntimeError("cannot bind exact traced graph output")
+            raise ReferenceOutputBindingError(
+                "cannot bind exact traced graph output",
+            )
         producer = layers[producers[0]]
         names = (producer.get("tensor_names") or {}).get("outputs") or []
         shapes = (producer.get("tensor_shapes") or {}).get("outputs") or []
         dtypes = (producer.get("tensor_dtypes") or {}).get("outputs") or []
         if len(names) != 1 or len(shapes) != 1 or len(dtypes) != 1:
-            raise RuntimeError(
+            raise ReferenceOutputBindingError(
                 "traced graph output producer is not single-output"
             )
         result.append((str(names[0]), list(shapes[0]), str(dtypes[0])))

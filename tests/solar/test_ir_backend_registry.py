@@ -1,30 +1,30 @@
-"""Registry-driven dispatch is what makes a third IR backend plug in cleanly.
+"""Registry-driven dispatch is what makes a third IR lifecycle plug in cleanly.
 
-These tests monkeypatch the backend registry to prove that validation,
-conversion, and execution all route through :func:`ir_backend` rather than any
-hardcoded ``if ir_kind is ...`` branch. A newly registered dialect needs no
-changes outside ``IRKind`` plus the registry.
+These tests monkeypatch the lifecycle registry to prove that every stage routes
+through :func:`ir_lifecycle` rather than a parallel hardcoded registry.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import torch
+import yaml
 
 from solar.graph.contracts import ExtractionKind
 from solar.ir import registry as ir_registry
-from solar.ir.contracts import IRBackend, IRGraphArtifact, IRKind
+from solar.ir.contracts import IRGraphArtifact, IRKind, IRLifecycle
 from solar.ir.registry import (
     graph_kind,
-    ir_backend,
-    ir_backends,
+    ir_lifecycle,
+    ir_lifecycles,
     validate_ir_graph,
 )
 from solar.verification.executor import IRGraphExecutor
+from solar.workflow import analyze_request_graph, verify_request_graph
 
 
 def _stub_graph() -> dict[str, Any]:
@@ -52,7 +52,10 @@ def _stub_graph() -> dict[str, Any]:
     }
 
 
-def test_registry_drives_backend_lookup(monkeypatch) -> None:
+def test_registry_drives_complete_lifecycle_lookup(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     seen: dict[str, bool] = {}
 
     def stub_validate(graph: Mapping[str, Any]) -> None:
@@ -67,7 +70,16 @@ def test_registry_drives_backend_lookup(monkeypatch) -> None:
         seen["execute"] = True
         return operands[0]
 
-    stub = IRBackend(
+    def stub_verify(request, graph_path, output_path) -> None:
+        del request, graph_path, output_path
+        seen["verify"] = True
+
+    def stub_analyze(request, profile, staging, graph_path) -> dict:
+        del request, profile, staging, graph_path
+        seen["analyze"] = True
+        return {"status": "passed"}
+
+    stub = IRLifecycle(
         kind=IRKind.NVLABS_EINSUM,
         extractions=frozenset(ExtractionKind),
         validate=stub_validate,
@@ -76,30 +88,52 @@ def test_registry_drives_backend_lookup(monkeypatch) -> None:
             IRKind.NVLABS_EINSUM,
         ),
         execute=stub_execute,
+        verify=stub_verify,
+        analyze=stub_analyze,
     )
     monkeypatch.setitem(
-        ir_registry._BACKEND_LOADERS,
+        ir_registry._LIFECYCLE_LOADERS,
         IRKind.NVLABS_EINSUM,
         lambda: stub,
     )
 
-    assert ir_backend(IRKind.NVLABS_EINSUM) is stub
-    assert stub in ir_backends()
+    assert ir_lifecycle(IRKind.NVLABS_EINSUM) is stub
+    assert stub in ir_lifecycles()
 
     graph = _stub_graph()
     validate_ir_graph(graph)
     assert seen["validate"]
 
-    result = IRGraphExecutor(graph)(torch.ones(2, 2))
+    result = IRGraphExecutor(graph, stub)(torch.ones(2, 2))
     assert seen["execute"]
     torch.testing.assert_close(result, torch.ones(2, 2))
 
+    graph_path = tmp_path / "graph.yaml"
+    graph_path.write_text(yaml.safe_dump(graph), encoding="utf-8")
+    artifact = IRGraphArtifact(graph_path, IRKind.NVLABS_EINSUM)
+    verify_request_graph(
+        cast(Any, object()),
+        artifact,
+        Path("verification.json"),
+    )
+    analysis = analyze_request_graph(
+        cast(Any, object()),
+        cast(Any, object()),
+        Path("staging"),
+        artifact,
+    )
+    assert seen["verify"]
+    assert seen["analyze"]
+    assert analysis == {"status": "passed"}
+
 
 def test_registry_lists_every_registered_dialect() -> None:
-    kinds = {backend.kind for backend in ir_backends()}
+    kinds = {lifecycle.kind for lifecycle in ir_lifecycles()}
     assert IRKind.ATEN in kinds
     assert IRKind.NVLABS_EINSUM in kinds
-    assert all(isinstance(backend, IRBackend) for backend in ir_backends())
+    assert all(
+        isinstance(lifecycle, IRLifecycle) for lifecycle in ir_lifecycles()
+    )
 
 
 def test_graph_dispatch_requires_an_explicit_ir_kind() -> None:

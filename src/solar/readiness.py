@@ -6,33 +6,28 @@
 from __future__ import annotations
 
 import hashlib
-import re
 import shutil
 import tempfile
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from solar.common.types import DynamicValue
-from solar.contracts import SolarReadinessStatus, SolarStage, SolarStageStatus
-from solar.ir.contracts import (
-    DEFAULT_IR_KIND,
-    IRKind,
-    normalize_ir_kind,
+from solar.contracts import (
+    ConversionRequest,
+    ConversionRequestEnvelope,
+    SolarReadinessStatus,
+    SolarStage,
+    SolarStageStatus,
 )
+from solar.errors import SolarError
 from solar.rocm.architecture import ArchitectureProfile
-from solar.routes import DEFAULT_ROUTE, Route, normalize_route
-from solar.verification import (
-    IRExecutionError,
-    VerificationError,
-)
 from solar.workflow import (
     convert_request_graph,
     extract_request_graph,
     verify_request_graph,
 )
 
-InputFactory = Callable[[int], Sequence[DynamicValue]]
 READINESS_STAGES = (
     SolarStage.GRAPH_EXTRACTION,
     SolarStage.IR_CONVERSION,
@@ -41,39 +36,12 @@ READINESS_STAGES = (
 
 
 @dataclass(frozen=True)
-class ConversionReadinessRequest:
+class ConversionReadinessRequest(ConversionRequestEnvelope):
     """Inputs for the graph extraction, conversion, and replay readiness gate."""
 
-    analysis_id: str
-    reference: Callable[..., DynamicValue]
-    input_factory: InputFactory
-    reference_name: str
-    reference_sha256: str
+    conversion: ConversionRequest
     architecture: str | Path | Mapping[str, DynamicValue]
     output_dir: Path
-    representation: IRKind | str = DEFAULT_IR_KIND
-    route: Route | str = DEFAULT_ROUTE
-    device: str = "cpu"
-    trace_seed: int = 200
-    verification_seeds: tuple[int, ...] = (11, 29, 47)
-    atol: float = 1e-2
-    rtol: float = 1e-2
-    required_matched_ratio: float = 1.0
-    max_error_cap: float | None = None
-    allow_negative_inf: bool = False
-
-    def __post_init__(self) -> None:
-        """Validate stable request identity fields."""
-        object.__setattr__(self, "route", normalize_route(self.route))
-        object.__setattr__(
-            self,
-            "representation",
-            normalize_ir_kind(self.representation),
-        )
-        if not self.analysis_id.strip() or not self.reference_name.strip():
-            raise ValueError("analysis_id and reference_name must be non-empty")
-        if re.fullmatch(r"[0-9a-f]{64}", self.reference_sha256) is None:
-            raise ValueError("reference_sha256 must be a lowercase SHA-256")
 
 
 @dataclass(frozen=True)
@@ -264,34 +232,15 @@ def _result(
 
 def readiness_reason_code(stage: SolarStage, exc: Exception) -> str:
     """Map implementation details to stable corpus-readiness reason codes."""
-    message = str(exc).lower()
+    if isinstance(exc, SolarError):
+        return exc.reason_code
     if stage is SolarStage.ARCHITECTURE:
         return "architecture_profile_invalid"
     if stage is SolarStage.GRAPH_EXTRACTION:
-        if "solar_graph_untracked_dispatch" in message:
-            return "tensor_dispatch_lineage_lost"
         return "graph_extraction_failed"
     if stage is SolarStage.IR_CONVERSION:
-        if any(
-            token in message for token in ("source-to-graph", "graph input")
-        ):
-            return "source_input_binding_failed"
-        if "reference output" in message or "traced graph output" in message:
-            return "reference_output_binding_failed"
-        if any(
-            token in message
-            for token in ("unsupported", "no handler", "vstack")
-        ):
-            return "exact_operation_unsupported"
         return "strict_conversion_failed"
     if stage is SolarStage.CONVERSION_VERIFICATION:
-        if isinstance(exc, IRExecutionError):
-            return "exact_replay_failed"
-        if (
-            isinstance(exc, VerificationError)
-            and "numerical mismatch" in message
-        ):
-            return "numerical_equivalence_failed"
         return "conversion_not_proven"
     return "readiness_audit_failed"
 

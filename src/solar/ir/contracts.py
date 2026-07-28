@@ -3,15 +3,26 @@
 
 """Shared contracts for independently implemented SOLAR IR backends."""
 
+# ruff: noqa: D102
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol
 
+from solar.artifacts import ArtifactDocument, load_yaml_artifact
+from solar.common.types import DynamicValue
+from solar.errors import StrictConversionError, UnsupportedOperationError
 from solar.graph.contracts import ExtractionKind, OperatorGraphArtifact
+from solar.routes import Route
+from solar.verification_policy import VerificationPolicy
+
+if TYPE_CHECKING:
+    from solar.rocm.architecture import ArchitectureProfile
 
 
 class IRKind(StrEnum):
@@ -38,18 +49,91 @@ class IRGraphArtifact:
     path: Path
     kind: IRKind = DEFAULT_IR_KIND
 
+    @cached_property
+    def document(self) -> ArtifactDocument:
+        """Load, cache, and verify the typed IR graph document."""
+        document = load_yaml_artifact(self.path)
+        observed = normalize_ir_kind(document.require_str("ir_kind"))
+        if observed is not self.kind:
+            raise ValueError(
+                f"IR artifact kind {observed.value!r} does not match "
+                f"{self.kind.value!r}",
+            )
+        return document
+
+
+class IRConversionRequest(Protocol):
+    """Read-only request boundary used by IR conversion and verification."""
+
+    @property
+    def analysis_id(self) -> str: ...
+
+    @property
+    def reference(self) -> Callable[..., DynamicValue]: ...
+
+    @property
+    def input_factory(self) -> Callable[[int], Sequence[DynamicValue]]: ...
+
+    @property
+    def reference_name(self) -> str: ...
+
+    @property
+    def reference_sha256(self) -> str: ...
+
+    @property
+    def route(self) -> Route | str: ...
+
+    @property
+    def representation(self) -> IRKind | str: ...
+
+    @property
+    def device(self) -> str: ...
+
+    @property
+    def trace_seed(self) -> int: ...
+
+    @property
+    def verification_seeds(self) -> tuple[int, ...]: ...
+
+    @property
+    def atol(self) -> float: ...
+
+    @property
+    def rtol(self) -> float: ...
+
+    @property
+    def required_matched_ratio(self) -> float: ...
+
+    @property
+    def max_error_cap(self) -> float | None: ...
+
+    @property
+    def allow_negative_inf(self) -> bool: ...
+
+    @property
+    def verification(self) -> VerificationPolicy: ...
+
+
+class IRAnalysisRequest(IRConversionRequest, Protocol):
+    """Read-only request boundary used by an IR's analysis stage."""
+
+    @property
+    def precision(self) -> str: ...
+
+    @property
+    def require_orojenesis(self) -> bool: ...
+
+    @property
+    def orojenesis_home(self) -> str | Path | None: ...
+
 
 @dataclass(frozen=True)
-class IRBackend:
-    """Uniform interface implemented by every SOLAR IR backend.
+class IRLifecycle:
+    """Complete interface implemented by every SOLAR IR dialect.
 
-    Each backend binds its dialect ``kind`` to the full IR lifecycle --
-    validation, conversion, and execution -- so the same operator data can be
-    routed through any registered representation for like-for-like comparison,
-    and a new IR plugs in without touching the pipeline call sites. The IR
-    selection switch itself converges on :func:`convert_operator_graph`: every
-    later stage reads the ``ir_kind`` recorded on the graph (or the
-    :class:`IRGraphArtifact` it produced) instead of re-deriving the dialect.
+    The lifecycle owns validation, conversion, execution, verification, and
+    formal analysis. Registering a dialect therefore has exactly one dispatch
+    boundary and does not require parallel workflow registries.
     """
 
     kind: IRKind
@@ -59,6 +143,16 @@ class IRBackend:
     execute: Callable[
         [str, Mapping[str, Any], Sequence[Any], Sequence[tuple[int, ...]]],
         Any,
+    ]
+    verify: Callable[[IRConversionRequest, IRGraphArtifact, Path], None]
+    analyze: Callable[
+        [
+            IRAnalysisRequest,
+            ArchitectureProfile,
+            Path,
+            IRGraphArtifact,
+        ],
+        dict[str, DynamicValue],
     ]
 
 
@@ -118,10 +212,14 @@ __all__ = [
     "DEFAULT_IR_KIND",
     "INPUT_KIND",
     "OPERATION_KIND",
-    "IRBackend",
+    "IRAnalysisRequest",
+    "IRConversionRequest",
     "IRGraphArtifact",
     "IRKind",
+    "IRLifecycle",
     "LayerContractionAnalysis",
+    "StrictConversionError",
+    "UnsupportedOperationError",
     "layer_contraction_analysis",
     "layer_operation",
     "normalize_ir_kind",

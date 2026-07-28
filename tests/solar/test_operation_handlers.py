@@ -8,6 +8,17 @@ import pytest
 from solar.common.types import TensorShapes
 from solar.einsum.analyzer import EinsumAnalyzer
 from solar.einsum.ops.registry import EinsumOpRegistry, get_global_registry
+from solar.nvlabs.ir.analyzer import EinsumAnalyzer as NVLABSEinsumAnalyzer
+from solar.nvlabs.ir.ops.registry import (
+    EinsumOpRegistry as NVLABSEinsumOpRegistry,
+)
+from solar.nvlabs.ir.ops.registry import (
+    get_global_registry as get_nvlabs_global_registry,
+)
+
+ANALYZERS = (EinsumAnalyzer, NVLABSEinsumAnalyzer)
+REGISTRIES = (EinsumOpRegistry, NVLABSEinsumOpRegistry)
+GLOBAL_REGISTRIES = (get_global_registry, get_nvlabs_global_registry)
 
 
 @dataclass(frozen=True)
@@ -109,8 +120,15 @@ CASES = (
 )
 
 
-def test_global_registry_loads_every_builtin_handler_family() -> None:
-    registry = get_global_registry()
+@pytest.mark.parametrize(
+    "registry_factory",
+    GLOBAL_REGISTRIES,
+    ids=("shared", "nvlabs"),
+)
+def test_global_registry_loads_every_builtin_handler_family(
+    registry_factory,
+) -> None:
+    registry = registry_factory()
 
     assert all(
         registry.has_handler(operation)
@@ -130,11 +148,17 @@ def test_global_registry_loads_every_builtin_handler_family() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "analyzer_cls",
+    ANALYZERS,
+    ids=("shared", "nvlabs"),
+)
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.operation)
 def test_builtin_handlers_generate_reviewable_operation_contracts(
     case: HandlerCase,
+    analyzer_cls,
 ) -> None:
-    operation = EinsumAnalyzer().get_einsum_op(
+    operation = analyzer_cls().get_einsum_op(
         case.operation,
         TensorShapes(inputs=case.inputs, outputs=case.outputs),
         **case.kwargs,
@@ -147,8 +171,13 @@ def test_builtin_handlers_generate_reviewable_operation_contracts(
         assert operation.reduction_op == case.reduction_op
 
 
-def test_registry_rejects_unknown_operation() -> None:
-    registry = EinsumOpRegistry()
+@pytest.mark.parametrize(
+    "registry_cls",
+    REGISTRIES,
+    ids=("shared", "nvlabs"),
+)
+def test_registry_rejects_unknown_operation(registry_cls) -> None:
+    registry = registry_cls()
 
     with pytest.raises(ValueError, match="No handler registered"):
         registry.get_einsum_op("unknown", TensorShapes(inputs=[[2]]))

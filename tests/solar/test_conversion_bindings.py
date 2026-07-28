@@ -81,5 +81,6 @@ def test_conversion_requires_canonical_schema_and_provenance(
         ),
         encoding="utf-8",
     )
+    operator = _operator(operator_path)
     with pytest.raises(ValueError, match="schema_version"):
         convert_operator_graph(operator, output_dir=tmp_path)

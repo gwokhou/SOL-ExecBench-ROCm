@@ -23,7 +23,7 @@ from typing import Any
 
 import yaml
 
-from solar.ir.contracts import layer_operation
+from solar.ir.contracts import IRLifecycle, layer_operation
 from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
 from solar.verification.errors import IRExecutionError, VerificationError
 from solar.verification.executor import (
@@ -44,6 +44,7 @@ from solar.verification.numerics import (
 from solar.verification.numerics import (
     torch_equation as _torch_equation,
 )
+from solar.verification_policy import TolerancePolicy, VerificationPolicy
 
 
 def _canonical_hash(value: Mapping[str, Any]) -> str:
@@ -82,26 +83,6 @@ _PreparedCase = tuple[
     tuple[Any, ...],
     tuple[Any, ...],
 ]
-
-
-@dataclass(frozen=True)
-class TolerancePolicy:
-    """Numerical acceptance policy for graph verification."""
-
-    atol: float
-    rtol: float
-    required_matched_ratio: float = 1.0
-    max_error_cap: float | None = None
-    allow_negative_inf: bool = False
-
-
-@dataclass(frozen=True)
-class VerificationPolicy(TolerancePolicy):
-    """Case generation and execution policy for graph verification."""
-
-    seeds: Sequence[int] = (11, 29, 47)
-    patterns: Sequence[str] = ("random", "zeros", "boundary")
-    device: str = "cpu"
 
 
 @dataclass(frozen=True)
@@ -240,6 +221,7 @@ def _run_cases(
     reference: Callable[..., Any],
     input_factory: Callable[..., Any],
     graph: Mapping[str, Any],
+    lifecycle: IRLifecycle,
     cases: Sequence[Mapping[str, Any]],
     *,
     tolerance: TolerancePolicy,
@@ -248,7 +230,11 @@ def _run_cases(
 ) -> list[dict[str, Any]]:
     import torch
 
-    executor = IRGraphExecutor(graph, check_shapes=check_shapes)
+    executor = IRGraphExecutor(
+        graph,
+        lifecycle,
+        check_shapes=check_shapes,
+    )
     results: list[dict[str, Any]] = []
     for case in cases:
         prepared = _prepare_case(input_factory, graph, case, device)
@@ -399,6 +385,7 @@ def create_verification_artifact(
     workload_parameters: Mapping[str, Any],
     output_path: str | Path,
     policy: VerificationPolicy,
+    lifecycle: IRLifecycle,
 ) -> dict[str, Any]:
     """Verify and write a deterministic, hash-bound ``verification.yaml``."""
     reference_path = Path(reference_path).resolve()
@@ -413,6 +400,7 @@ def create_verification_artifact(
         reference,
         input_factory,
         graph,
+        lifecycle,
         cases,
         tolerance=policy,
         device=policy.device,
@@ -490,6 +478,8 @@ def verify_callable_conversion(
     graph_path: str | Path,
     output_path: str | Path,
     policy: VerificationPolicy,
+    lifecycle: IRLifecycle,
+    graph: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Verify a callable reference and write a hash-bound attestation.
 
@@ -499,12 +489,14 @@ def verify_callable_conversion(
     if not re.fullmatch(r"[0-9a-f]{64}", reference_sha256):
         raise VerificationError("reference_sha256 must be a lowercase SHA-256")
     graph_path = Path(graph_path).resolve()
-    graph = yaml.safe_load(graph_path.read_text()) or {}
+    if graph is None:
+        graph = yaml.safe_load(graph_path.read_text()) or {}
     cases = _verification_cases({}, policy)
     results = _run_cases(
         reference,
         _CallableInputFactory(input_factory),
         graph,
+        lifecycle,
         cases,
         tolerance=policy,
         device=policy.device,
@@ -562,6 +554,7 @@ def replay_verification_artifact(
     workload_name: str,
     workload_parameters: Mapping[str, Any],
     required_tolerance: TolerancePolicy,
+    lifecycle: IRLifecycle,
     device: str | None = None,
 ) -> None:
     """Validate every binding and numerically replay a verification artifact."""
@@ -593,6 +586,7 @@ def replay_verification_artifact(
         getattr(module, str(reference_data["entry_point"])),
         getattr(module, str(reference_data["input_factory"])),
         graph,
+        lifecycle,
         cases,
         tolerance=recorded_tolerance,
         device=replay_device,

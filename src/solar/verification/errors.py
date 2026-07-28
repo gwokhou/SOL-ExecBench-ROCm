@@ -3,12 +3,13 @@
 
 """Stable failure types for strict SOLAR conversion verification."""
 
+from solar.errors import ConversionVerificationError, IRReplayError
 
-class VerificationError(ValueError):
-    """The reference and IR graph could not be proven equivalent."""
+# Kept as the public compatibility name for the typed verification base.
+VerificationError = ConversionVerificationError
 
 
-class IRExecutionError(VerificationError):
+class IRExecutionError(IRReplayError):
     """An IR graph cannot be executed exactly by the built-in verifier."""
 
 

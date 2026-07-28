@@ -604,12 +604,12 @@ class ArchitectureProfile:
             raise ValueError(
                 "at least one positive peak throughput is required",
             )
-        from solar.analysis.resources import RESOURCE_MODEL_VERSION
+        from solar.schema_versions import AMD_RESOURCE_MODEL_VERSION
 
-        if self.resource_model_version != RESOURCE_MODEL_VERSION:
+        if self.resource_model_version != AMD_RESOURCE_MODEL_VERSION:
             raise ValueError(
                 "architecture resource_model_version must be "
-                f"{RESOURCE_MODEL_VERSION}",
+                f"{AMD_RESOURCE_MODEL_VERSION}",
             )
         self._validate_resource_limits()
         self._validate_precision_support()

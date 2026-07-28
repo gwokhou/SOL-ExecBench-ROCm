@@ -24,9 +24,11 @@ from solar.contracts import (
     AnalysisRequest,
     AnalysisResult,
     ArtifactRef,
+    ConversionRequest,
     SolarAnalysisStatus,
     SolarStage,
     SolBound,
+    VerificationPolicy,
     write_request_manifest,
 )
 from solar.pipeline import (
@@ -77,6 +79,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             bound,
             formal_bound_kind=FORMAL_BOUND_KIND,
         )
+        _verify_publication_tree(staging, artifacts)
         staging.replace(output)
         return AnalysisResult(
             status=SolarAnalysisStatus.ANALYZED,
@@ -134,13 +137,63 @@ def _finish_artifacts(
     analysis_path = staging / "solar-analysis.yaml"
     old_path.unlink(missing_ok=True)
     analysis_path.write_text(yaml.safe_dump(analysis, sort_keys=False))
-    names = (
+    required = {
         "operator_graph.yaml",
         graph_name,
         "conversion-attestation.yaml",
         "solar-analysis.yaml",
+    }
+    paths = _publication_files(staging)
+    missing = sorted(
+        required - {path.relative_to(staging).as_posix() for path in paths}
     )
-    return tuple(ArtifactRef(name, _sha256(staging / name)) for name in names)
+    if missing:
+        raise ValueError(f"analysis is missing required artifacts: {missing}")
+    return tuple(
+        ArtifactRef(path.relative_to(staging).as_posix(), _sha256(path))
+        for path in paths
+    )
+
+
+def _publication_files(staging: Path) -> tuple[Path, ...]:
+    entries = tuple(staging.rglob("*"))
+    symlinks = sorted(
+        path.relative_to(staging).as_posix()
+        for path in entries
+        if path.is_symlink()
+    )
+    if symlinks:
+        raise ValueError(
+            f"analysis staging tree contains symbolic links: {symlinks}",
+        )
+    return tuple(
+        sorted(
+            (
+                path
+                for path in entries
+                if path.is_file() and path.name != "manifest.yaml"
+            ),
+            key=lambda path: path.relative_to(staging).as_posix(),
+        ),
+    )
+
+
+def _verify_publication_tree(
+    staging: Path,
+    artifacts: tuple[ArtifactRef, ...],
+) -> None:
+    manifest_path = staging / "manifest.yaml"
+    if not manifest_path.is_file() or manifest_path.is_symlink():
+        raise ValueError("analysis staging tree lacks a regular manifest")
+    expected = {artifact.path for artifact in artifacts} | {"manifest.yaml"}
+    actual = {
+        path.relative_to(staging).as_posix()
+        for path in _publication_files(staging)
+    } | {"manifest.yaml"}
+    if actual != expected:
+        raise ValueError(
+            "analysis staging tree changed after artifact hashing",
+        )
 
 
 def _profile_hash(profile: ArchitectureProfile) -> str:
@@ -179,6 +232,7 @@ __all__ = [
     "ArtifactRef",
     "ConversionReadinessRequest",
     "ConversionReadinessResult",
+    "ConversionRequest",
     "FORMAL_BOUND_KIND",
     "ROOFLINE_BOUND_KIND",
     "SOL_BOUND_KINDS",
@@ -187,6 +241,7 @@ __all__ = [
     "SolarAnalysisStatus",
     "SolarStage",
     "SolBound",
+    "VerificationPolicy",
     "analyze",
     "audit_conversion",
 ]

@@ -14,7 +14,9 @@ def test_solar_public_api_exposes_only_atomic_pipeline() -> None:
         "AnalysisRequest",
         "AnalysisResult",
         "ArtifactRef",
+        "ConversionRequest",
         "SolBound",
+        "VerificationPolicy",
         "analyze",
     }
     with pytest.raises(AttributeError):

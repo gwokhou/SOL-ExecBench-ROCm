@@ -8,7 +8,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import cached_property
 from pathlib import Path
+
+from solar.artifacts import ArtifactDocument, load_yaml_artifact
 
 
 class ExtractionKind(StrEnum):
@@ -37,6 +40,18 @@ class OperatorGraphArtifact:
     source_inputs: tuple[tuple[int, TensorSignature], ...]
     used_source_indices: tuple[int, ...]
     reference_outputs: tuple[TensorSignature, ...]
+
+    @cached_property
+    def document(self) -> ArtifactDocument:
+        """Load and cache the validated operator-graph document."""
+        return load_yaml_artifact(self.path)
+
+    @property
+    def extraction_kind(self) -> ExtractionKind:
+        """Return the document's required extraction provenance."""
+        return normalize_extraction_kind(
+            self.document.require_str("extraction_kind"),
+        )
 
 
 @dataclass(frozen=True)

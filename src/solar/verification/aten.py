@@ -24,7 +24,7 @@ def execute_aten_layer(
     import torch
 
     semantic = layer["semantic_op"]
-    if semantic["kind"] == "einsum":
+    if semantic["kind"] == "einsum" and not semantic.get("exact_target"):
         return torch.einsum(
             torch_equation(str(semantic["equation"])),
             *operands,
@@ -144,7 +144,7 @@ def _execute_exact_aten(
     import torch
 
     exact_target = semantic.get("exact_target")
-    if semantic.get("kind") != "aten" or not isinstance(exact_target, str):
+    if not isinstance(exact_target, str):
         return _UNHANDLED
     packet = getattr(torch.ops.aten, exact_target, None)
     overload_name = str(semantic.get("overload", "default"))

@@ -10,13 +10,19 @@ import yaml
 
 import solar.api as api
 import solar.pipeline as pipeline
-import solar.workflow as workflow
 from solar.analysis.orojenesis import OrojenesisError
-from solar.api import AnalysisFailure, AnalysisRequest, AnalysisResult
+from solar.api import (
+    AnalysisFailure,
+    AnalysisRequest,
+    AnalysisResult,
+    ConversionRequest,
+    VerificationPolicy,
+)
 from solar.contracts import SolarStage
 from solar.graph.extraction import OperatorGraphArtifact
 from solar.ir.contracts import IRKind
 from solar.ir.conversion import IRGraphArtifact
+from solar.ir.registry import ir_lifecycle
 from solar.routes import Route
 from solar.verification import VerificationError
 
@@ -28,15 +34,17 @@ class _Profile:
 
 def _request(output: Path) -> AnalysisRequest:
     return AnalysisRequest(
-        analysis_id="problem:workload",
-        reference=lambda value: value,
-        input_factory=lambda seed: (seed,),
-        reference_name="definition.json#reference",
-        reference_sha256="a" * 64,
+        conversion=ConversionRequest(
+            analysis_id="problem:workload",
+            reference=lambda value: value,
+            input_factory=lambda seed: (seed,),
+            reference_name="definition.json#reference",
+            reference_sha256="a" * 64,
+            representation=IRKind.ATEN,
+            route=Route.MAINLINE,
+        ),
         architecture="RX_9060_XT",
         output_dir=output,
-        representation=IRKind.ATEN,
-        route=Route.MAINLINE,
     )
 
 
@@ -54,16 +62,17 @@ def _matmul_request(
         return left, torch.arange(12.0).reshape(3, 4)
 
     return AnalysisRequest(
-        analysis_id="matmul:formal-policy",
-        reference=reference,
-        input_factory=input_factory,
-        reference_name="tests.test_api#matmul",
-        reference_sha256="b" * 64,
+        conversion=ConversionRequest(
+            analysis_id="matmul:formal-policy",
+            reference=reference,
+            input_factory=input_factory,
+            reference_name="tests.test_api#matmul",
+            reference_sha256="b" * 64,
+            representation=IRKind.ATEN,
+            route=Route.MAINLINE,
+        ),
         architecture="RX_9060_XT",
         output_dir=output,
-        representation=IRKind.ATEN,
-        route=Route.MAINLINE,
-        device="cpu",
         require_orojenesis=require_orojenesis,
         orojenesis_home=orojenesis_home,
     )
@@ -82,16 +91,17 @@ def _conv_request(
         return value, torch.ones(3, 2, 3, 3)
 
     return AnalysisRequest(
-        analysis_id="conv2d:formal-policy",
-        reference=reference,
-        input_factory=input_factory,
-        reference_name="tests.test_api#conv2d",
-        reference_sha256="c" * 64,
+        conversion=ConversionRequest(
+            analysis_id="conv2d:formal-policy",
+            reference=reference,
+            input_factory=input_factory,
+            reference_name="tests.test_api#conv2d",
+            reference_sha256="c" * 64,
+            representation=IRKind.ATEN,
+            route=Route.MAINLINE,
+        ),
         architecture="RX_9060_XT",
         output_dir=output,
-        representation=IRKind.ATEN,
-        route=Route.MAINLINE,
-        device="cpu",
         require_orojenesis=require_orojenesis,
     )
 
@@ -289,18 +299,30 @@ def test_packaged_profile_audit_artifact_unblocks_architecture_stage(tmp_path):
     ],
 )
 def test_analysis_request_rejects_invalid_contract_fields(tmp_path, changes):
-    values: dict[str, Any] = {
+    conversion_values: dict[str, Any] = {
         "analysis_id": "analysis",
         "reference": lambda value: value,
         "input_factory": lambda seed: (seed,),
         "reference_name": "reference",
         "reference_sha256": "a" * 64,
-        "architecture": {},
-        "output_dir": tmp_path / "result",
     }
-    values.update(changes)
+    policy_values: dict[str, Any] = {"atol": 1e-2, "rtol": 1e-2}
+    if set(changes) <= set(policy_values) | {
+        "max_error_cap",
+        "required_matched_ratio",
+    }:
+        policy_values.update(changes)
+    else:
+        conversion_values.update(changes)
     with pytest.raises(ValueError):
-        AnalysisRequest(**values)
+        AnalysisRequest(
+            conversion=ConversionRequest(
+                **conversion_values,
+                verification=VerificationPolicy(**policy_values),
+            ),
+            architecture={},
+            output_dir=tmp_path / "result",
+        )
 
 
 def test_analyze_refuses_to_overwrite_existing_output(tmp_path):
@@ -437,6 +459,14 @@ def test_formal_api_matmul_requires_and_records_orojenesis_evidence(
         "total_layers": 1,
     }
     assert set(evidence["layers"]) == {"mm"}
+    artifact_paths = {artifact.path for artifact in result.artifacts}
+    assert "orojenesis/mm/raw.csv" in artifact_paths
+    manifest = yaml.safe_load(
+        (result.output_dir / "manifest.yaml").read_text(),
+    )
+    assert "orojenesis/mm/raw.csv" in {
+        artifact["path"] for artifact in manifest["artifacts"]
+    }
 
 
 def test_incomplete_optional_orojenesis_evidence_falls_back_to_eq1(
@@ -529,6 +559,9 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
     observed: dict[str, object] = {}
 
     class FakeAnalyzer:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
         def analyze_graph(self, *args, **kwargs):
             observed.update(kwargs)
             return {"schema_version": 3}
@@ -544,11 +577,11 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
         FakeAnalyzer,
     )
 
-    result = workflow._analyze_aten(
+    result = ir_lifecycle(IRKind.ATEN).analyze(
         _request(tmp_path / "result"),
         cast(Any, _Profile()),
         tmp_path,
-        tmp_path / "ir_graph.yaml",
+        IRGraphArtifact(tmp_path / "ir_graph.yaml", IRKind.ATEN),
     )
 
     assert result == {"schema_version": 3}

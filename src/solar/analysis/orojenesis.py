@@ -53,6 +53,9 @@ from solar.analysis.orojenesis_problem import (
     problem_for_layer as _build_problem_for_layer,
 )
 from solar.analysis.orojenesis_process import (
+    invoke_mapper_process,
+)
+from solar.analysis.orojenesis_process import (
     run_mapper_process as _default_mapper_runner,
 )
 from solar.ir.contracts import CONTRACTION_KIND, INPUT_KIND, layer_operation
@@ -194,26 +197,13 @@ class OrojenesisRunner:
         env: Mapping[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         runner = getattr(self, "_process_runner", _default_mapper_runner)
-        completed = runner(
+        return invoke_mapper_process(
+            runner,
             command,
             cwd=cwd,
-            capture_output=True,
-            text=True,
             timeout=self.timeout_seconds,
-            check=False,
             env=env,
         )
-        if completed.stdout is not None:
-            (cwd / "stdout.log").write_text(
-                str(completed.stdout),
-                encoding="utf-8",
-            )
-        if completed.stderr is not None:
-            (cwd / "stderr.log").write_text(
-                str(completed.stderr),
-                encoding="utf-8",
-            )
-        return completed
 
     def _validate_toolchain(self) -> dict[str, Any]:
         policy = replace(
@@ -612,7 +602,7 @@ class OrojenesisRunner:
                     str(sweep_dir),
                 ],
                 cwd=sweep_dir,
-                env={**os.environ, **environment},
+                env=environment,
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise OrojenesisError(

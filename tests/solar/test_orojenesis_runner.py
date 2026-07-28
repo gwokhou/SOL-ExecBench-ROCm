@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from solar.analysis import orojenesis
+from solar.analysis import orojenesis, orojenesis_process
 from solar.schema_versions import (
     OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
 )
@@ -108,7 +108,8 @@ def test_run_layer_emits_auditable_evidence(tmp_path, monkeypatch):
         "mapper.yaml",
         "curve",
     }
-    assert (tmp_path / "layer" / "stdout.log").read_text() == "stdout"
+    assert not (tmp_path / "layer" / "stdout.log").exists()
+    assert not (tmp_path / "layer" / "stderr.log").exists()
 
 
 @pytest.mark.parametrize("failure", ["raise", "returncode"])
@@ -276,6 +277,60 @@ def test_default_mapper_runner_kills_timed_out_process_group(tmp_path):
     while time.monotonic() < deadline and _process_is_running(child_pid):
         time.sleep(0.05)
     assert not _process_is_running(child_pid)
+
+
+@pytest.mark.requires_linux
+def test_default_mapper_runner_sanitizes_environment_and_logs(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("SOLAR_TEST_API_TOKEN", "environment-secret")
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import os; "
+            "print(os.getenv('SOLAR_TEST_API_TOKEN', 'not-inherited')); "
+            "print('AUTHORIZATION: Bearer logged-secret')"
+        ),
+    ]
+
+    completed = orojenesis._default_mapper_runner(
+        command,
+        cwd=tmp_path,
+        timeout=2,
+    )
+
+    assert completed.returncode == 0
+    stdout = (tmp_path / "stdout.log").read_text()
+    assert "not-inherited" in stdout
+    assert "environment-secret" not in stdout
+    assert "logged-secret" not in stdout
+    assert "AUTHORIZATION: Bearer <redacted>" in stdout
+
+
+@pytest.mark.requires_linux
+def test_default_mapper_runner_bounds_output_while_running(tmp_path):
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import os; "
+            f"chunk=b'x'*{orojenesis_process.MAPPER_LOG_MAX_BYTES + 4096}; "
+            "os.write(1, chunk)"
+        ),
+    ]
+
+    completed = orojenesis._default_mapper_runner(
+        command,
+        cwd=tmp_path,
+        timeout=2,
+    )
+
+    assert completed.returncode == 0
+    stdout = tmp_path / "stdout.log"
+    assert stdout.stat().st_size <= orojenesis_process.MAPPER_LOG_MAX_BYTES
+    assert stdout.read_bytes().startswith(b"[output truncated")
 
 
 def _process_is_running(pid: int) -> bool:

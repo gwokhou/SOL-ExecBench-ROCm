@@ -8,6 +8,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from solar.errors import (
+    ReferenceOutputBindingError,
+    SourceInputBindingError,
+)
 from solar.graph.contracts import OperatorGraphArtifact, TensorSignature
 
 
@@ -19,20 +23,26 @@ def bind_inputs(
     starts = _start_layers(graph)
     expected = list(operator.used_source_indices)
     if len(starts) != len(expected):
-        raise RuntimeError("make_fx graph input arity does not match reference")
+        raise SourceInputBindingError(
+            "make_fx graph input arity does not match reference",
+        )
     signatures = dict(operator.source_inputs)
     result: list[int] = []
     for layer in starts:
         source_index = layer.get("source_input_index")
         if source_index is None:
-            raise RuntimeError("make_fx input provenance is incomplete")
+            raise SourceInputBindingError(
+                "make_fx input provenance is incomplete",
+            )
         source_index = int(source_index)
         if source_index not in expected or source_index in result:
-            raise RuntimeError("make_fx input provenance is invalid")
+            raise SourceInputBindingError("make_fx input provenance is invalid")
         _validate_input_signature(layer, source_index, signatures)
         result.append(source_index)
     if set(result) != set(expected):
-        raise RuntimeError("make_fx input provenance is incomplete")
+        raise SourceInputBindingError(
+            "make_fx input provenance is incomplete",
+        )
     return result
 
 
@@ -43,7 +53,7 @@ def validate_declared_outputs(
     """Ensure the graph outputs retain traced reference metadata exactly."""
     declared = graph.get("outputs")
     if not isinstance(declared, list) or len(declared) != len(expected):
-        raise RuntimeError(
+        raise ReferenceOutputBindingError(
             "make_fx graph output arity does not match reference"
         )
     metadata: dict[str, TensorSignature] = {}
@@ -52,7 +62,9 @@ def validate_declared_outputs(
         shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
         dtypes = (layer.get("tensor_dtypes") or {}).get("outputs") or []
         if len(names) != len(shapes) or len(names) != len(dtypes):
-            raise RuntimeError("make_fx graph output metadata is incomplete")
+            raise ReferenceOutputBindingError(
+                "make_fx graph output metadata is incomplete",
+            )
         metadata.update(
             {
                 str(name): TensorSignature(tuple(shape), str(dtype))
@@ -65,7 +77,7 @@ def validate_declared_outputs(
         metadata.get(str(name)) != signature
         for name, signature in zip(declared, expected, strict=True)
     ):
-        raise RuntimeError(
+        raise ReferenceOutputBindingError(
             "make_fx graph outputs do not match reference metadata"
         )
 
@@ -103,7 +115,7 @@ def _validate_input_signature(
         or tuple(shapes[0]) != signature.shape
         or str(dtypes[0]) != signature.dtype
     ):
-        raise RuntimeError(
+        raise SourceInputBindingError(
             "make_fx input provenance does not match graph metadata",
         )
 
