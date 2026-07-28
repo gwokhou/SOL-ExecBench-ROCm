@@ -68,3 +68,18 @@ def test_conversion_requires_canonical_schema_and_provenance(
 
     with pytest.raises(RuntimeError, match="provenance is not trusted"):
         convert_operator_graph(operator, output_dir=tmp_path)
+
+    operator_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 0,
+                "ir_kind": "aten",
+                "extraction_kind": "make_fx_reference_v1",
+                "layers": {},
+                "outputs": [],
+            },
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="schema_version"):
+        convert_operator_graph(operator, output_dir=tmp_path)

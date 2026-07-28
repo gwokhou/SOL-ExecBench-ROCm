@@ -26,8 +26,8 @@ does not accept caller-supplied runtime JSON.
 `score status` reports four separate states instead of a single overloaded
 availability flag: verifier availability, corpus-policy authorization, formal
 producer readiness, and whether a repository release bundle is published. In
-the current tree the verifier and policy are ready, but the formal producer is
-blocked by the empty reviewed-mapper allowlist and no repository release bundle
+the current tree the verifier, policy, and formal producer are ready because a
+reproducibly built mapper digest is allowlisted. No repository release bundle
 is published.
 
 ## SOLAR bound policy
@@ -58,9 +58,9 @@ release policy. Formal Orojenesis acceptance requires the
 repository-allowlisted mapper binary plus the pinned provenance manifest,
 source archive/tree, builder image, compiler-wrapper digest, and compiler
 identity. A git checkout without the provenance manifest is not accepted.
-There is no git-checkout fallback.
-The current mapper allowlist is empty, so the formal CLI fails closed until a
-reviewed reproducible artifact is published.
+There is no git-checkout fallback. The current allowlist contains the digest
+produced identically by two no-cache builds from the pinned source and build
+environment. Any other mapper still fails closed.
 
 Regardless of this flag, formal publication is *additionally* gated by verified
 architecture audit evidence (`ArchitectureProfile.require_verified_audit_evidence`),

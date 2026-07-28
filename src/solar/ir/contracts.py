@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from solar.graph.extraction import OperatorGraphArtifact
+    from solar.graph.contracts import OperatorGraphArtifact
 
 
 class IRKind(StrEnum):
@@ -70,45 +70,6 @@ def normalize_ir_kind(value: IRKind | str) -> IRKind:
         raise ValueError(
             f"unsupported SOLAR IR {value!r}; choose: {choices}"
         ) from exc
-
-
-def graph_kind(graph: Mapping[str, Any]) -> IRKind:
-    """Read an explicit IR discriminator, preserving legacy ATen graphs."""
-    value = graph.get("ir_kind")
-    return IRKind.ATEN if value is None else normalize_ir_kind(str(value))
-
-
-def validate_ir_graph(graph: Mapping[str, Any]) -> None:
-    """Dispatch validation to the selected representation backend."""
-    ir_backend(graph_kind(graph)).validate(graph)
-
-
-def _load_aten_backend() -> IRBackend:
-    from solar.ir.aten import backend
-
-    return backend
-
-
-def _load_extended_einsum_backend() -> IRBackend:
-    from solar.ir.extended_einsum import backend
-
-    return backend
-
-
-_BACKEND_LOADERS: dict[IRKind, Callable[[], IRBackend]] = {
-    IRKind.ATEN: _load_aten_backend,
-    IRKind.EXTENDED_EINSUM: _load_extended_einsum_backend,
-}
-
-
-def ir_backend(kind: IRKind | str) -> IRBackend:
-    """Return the backend implementing the requested IR dialect."""
-    return _BACKEND_LOADERS[normalize_ir_kind(kind)]()
-
-
-def ir_backends() -> tuple[IRBackend, ...]:
-    """Return every registered IR backend for comparative evaluation."""
-    return tuple(loader() for loader in _BACKEND_LOADERS.values())
 
 
 def layer_operation(layer: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -173,11 +134,7 @@ __all__ = [
     "IRGraphArtifact",
     "IRKind",
     "LayerAnalysis",
-    "graph_kind",
-    "ir_backend",
-    "ir_backends",
     "layer_analysis",
     "layer_operation",
     "normalize_ir_kind",
-    "validate_ir_graph",
 ]

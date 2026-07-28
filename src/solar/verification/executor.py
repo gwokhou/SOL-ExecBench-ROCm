@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from solar.common.types import DynamicValue
-from solar.ir.contracts import graph_kind, ir_backend, validate_ir_graph
+from solar.ir.registry import graph_kind, ir_backend, validate_ir_graph
 from solar.verification.errors import IRExecutionError
 
 

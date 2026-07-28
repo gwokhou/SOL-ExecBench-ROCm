@@ -68,8 +68,15 @@ def test_self_declared_mapper_digest_is_not_a_trust_anchor(tmp_path):
         orojenesis.OrojenesisRunner(home)
 
 
-def test_current_release_has_no_trusted_mapper_artifact():
-    assert frozenset() == orojenesis.OROJENESIS_TRUSTED_MAPPER_SHA256
+def test_current_release_pins_reproducible_mapper_artifact():
+    assert (
+        frozenset(
+            {
+                "18591892b1ecec3264ec729b0e457ec9f22422993f656ece40dba809c032d77a",
+            },
+        )
+        == orojenesis.OROJENESIS_TRUSTED_MAPPER_SHA256
+    )
 
 
 def test_compiler_wrapper_digest_matches_repository_file():

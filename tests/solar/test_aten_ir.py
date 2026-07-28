@@ -82,6 +82,10 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
     ("mutate", "message"),
     [
         (
+            lambda graph: graph.update(ir_kind="extended_einsum"),
+            "not ATen IR",
+        ),
+        (
             lambda graph: graph.update(schema_version=0),
             "current schema_version",
         ),

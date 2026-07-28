@@ -25,9 +25,6 @@ import yaml
 
 from solar.ir.contracts import layer_operation
 from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
-from solar.verification.aten import (
-    torch_equation as _torch_equation,
-)
 from solar.verification.errors import IRExecutionError, VerificationError
 from solar.verification.executor import (
     IRGraphExecutor,
@@ -43,6 +40,9 @@ from solar.verification.numerics import (
 )
 from solar.verification.numerics import (
     pattern_inputs as _pattern_inputs,
+)
+from solar.verification.numerics import (
+    torch_equation as _torch_equation,
 )
 
 

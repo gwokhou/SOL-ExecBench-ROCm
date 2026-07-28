@@ -17,7 +17,8 @@ import networkx as nx
 
 from solar.analysis.contraction_proofs import requires_tile_evidence
 from solar.common.constants import dtype_bytes
-from solar.ir.contracts import layer_operation, validate_ir_graph
+from solar.ir.contracts import layer_operation
+from solar.ir.registry import validate_ir_graph
 from solar.rocm.architecture import MemoryLevel
 
 

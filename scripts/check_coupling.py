@@ -26,8 +26,9 @@ P1_LIMITS = {
 }
 SOLAR_LIMITS = {
     "solar.api": (300, 6),
-    "solar.einsum.conversion": (240, 2),
+    "solar.einsum.operation_conversion": (180, 3),
     "solar.graph.extraction": (180, 3),
+    "solar.ir.conversion": (180, 3),
 }
 EXACT_IMPORTS = {
     "sol_execbench.driver.templates.eval_driver": [

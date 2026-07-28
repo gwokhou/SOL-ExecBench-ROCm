@@ -128,11 +128,8 @@ from solar.common.constants import (
 from solar.common.types import TensorShapes
 from solar.common.utils import ensure_directory
 from solar.einsum.analyzer import EinsumAnalyzer
-from solar.ir.contracts import (
-    layer_analysis,
-    layer_operation,
-    validate_ir_graph,
-)
+from solar.ir.contracts import layer_analysis, layer_operation
+from solar.ir.registry import validate_ir_graph
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
 from solar.schema_versions import (
     IR_GRAPH_SCHEMA_VERSION,

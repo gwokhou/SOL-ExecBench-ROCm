@@ -490,7 +490,7 @@ class ReferenceGraphSerializer:
             "layers": layers,
             "graph_signature": self._graph_signature(nodes, output_names),
         }
-        from solar.ir.contracts import validate_ir_graph
+        from solar.ir.registry import validate_ir_graph
 
         validate_ir_graph(result)
         return result

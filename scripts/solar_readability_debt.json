@@ -2,6 +2,7 @@
   "any_modules": [
     "src/solar/analysis/fusion.py",
     "src/solar/analysis/graph_analyzer.py",
+    "src/solar/analysis/operand_provenance.py",
     "src/solar/analysis/orojenesis.py",
     "src/solar/analysis/resources.py",
     "src/solar/api.py",
@@ -21,17 +22,22 @@
     "src/solar/einsum/ops/reduction_ops.py",
     "src/solar/einsum/ops/registry.py",
     "src/solar/einsum/ops/shape_ops.py",
-    "src/solar/einsum/semantics.py",
     "src/solar/graph/extraction.py",
     "src/solar/graph/make_fx_extraction.py",
     "src/solar/graph/reference_serializer.py",
+    "src/solar/ir/aten.py",
+    "src/solar/ir/bindings.py",
+    "src/solar/ir/contracts.py",
+    "src/solar/ir/extended_einsum.py",
+    "src/solar/ir/registry.py",
     "src/solar/rocm/architecture.py",
-    "src/solar/verification/einsum.py"
+    "src/solar/verification/extended_einsum.py",
+    "src/solar/verification/verify.py"
   ],
   "long_functions": {},
   "oversized_modules": {
-    "src/solar/analysis/graph_analyzer.py": 1725,
-    "src/solar/analysis/orojenesis.py": 1782
+    "src/solar/analysis/graph_analyzer.py": 1716,
+    "src/solar/analysis/orojenesis.py": 1783
   },
   "wide_functions": {},
   "wildcard_imports": []

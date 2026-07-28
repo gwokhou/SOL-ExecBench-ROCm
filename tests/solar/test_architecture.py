@@ -293,6 +293,11 @@ def test_packaged_rx9060xt_audit_pins_corrected_probe_semantics():
     for probe in (
         "matrix_fp16_fp16_wmma.hip",
         "matrix_bf16_bf16_wmma.hip",
+    ):
+        assert measurements[probe]["selected_configuration"] == {
+            "waves_per_reported_wgp": 128,
+        }
+    for probe in (
         "matrix_fp8_fp8_wmma.hip",
         "matrix_int8_int8_wmma.hip",
     ):

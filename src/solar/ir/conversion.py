@@ -7,14 +7,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from solar.graph.extraction import OperatorGraphArtifact
+import yaml
+
+from solar.graph.contracts import OperatorGraphArtifact
 from solar.ir.contracts import (
     DEFAULT_IR_KIND,
     IRGraphArtifact,
     IRKind,
-    ir_backend,
     normalize_ir_kind,
 )
+from solar.ir.registry import ir_backend
 
 
 def convert_operator_graph(
@@ -24,9 +26,18 @@ def convert_operator_graph(
     representation: IRKind | str = DEFAULT_IR_KIND,
 ) -> IRGraphArtifact:
     """Convert one operator graph through the selected uniform IR backend."""
+    _validate_operator_graph(operator)
     kind = normalize_ir_kind(representation)
     path = ir_backend(kind).convert(operator, output_dir)
     return IRGraphArtifact(path=path, kind=kind)
+
+
+def _validate_operator_graph(operator: OperatorGraphArtifact) -> None:
+    """Validate the canonical exact-ATen source before backend selection."""
+    graph = yaml.safe_load(operator.path.read_text()) or {}
+    if graph.get("extraction_kind") != "make_fx_reference_v1":
+        raise RuntimeError("operator graph provenance is not trusted")
+    ir_backend(IRKind.ATEN).validate(graph)
 
 
 __all__ = ["IRGraphArtifact", "convert_operator_graph"]

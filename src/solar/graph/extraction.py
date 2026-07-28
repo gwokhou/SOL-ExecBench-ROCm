@@ -6,29 +6,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from solar.graph.contracts import OperatorGraphArtifact, TensorSignature
 from solar.graph.make_fx_extraction import trace_make_fx_reference
-
-
-@dataclass(frozen=True)
-class TensorSignature:
-    """Shape and dtype evidence needed by the conversion boundary."""
-
-    shape: tuple[int, ...]
-    dtype: str
-
-
-@dataclass(frozen=True)
-class OperatorGraphArtifact:
-    """Operator graph plus exact source/output binding evidence."""
-
-    path: Path
-    source_inputs: tuple[tuple[int, TensorSignature], ...]
-    used_source_indices: tuple[int, ...]
-    reference_outputs: tuple[TensorSignature, ...]
 
 
 def extract_operator_graph(

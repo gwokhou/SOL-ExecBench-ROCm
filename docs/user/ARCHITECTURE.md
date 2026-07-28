@@ -77,7 +77,7 @@ an appropriate device and filesystem policy.
 | --- | --- | --- | --- |
 | `architecture` | `solar.rocm` | pinned architecture profile | verified architecture identity |
 | `graph_extraction` | `solar.graph.extraction` | reference callable and trace inputs | `operator_graph.yaml` |
-| `einsum_conversion` | `solar.einsum.conversion` | typed operator artifact | `einsum_graph.yaml` |
+| `ir_conversion` | `solar.ir.conversion` | typed operator artifact | selected IR graph artifact |
 | `conversion_verification` | `solar.verification` | reference and executable graph | `conversion-attestation.yaml` |
 | `formal_analysis` | `solar.analysis` | verified graph and architecture | `solar-analysis.yaml` |
 
@@ -86,12 +86,16 @@ deletes its staging directory and publishes no partial result directory. A
 successful run writes a content-addressed manifest and atomically renames the
 complete staging directory into place.
 
-The converter implementation remains large, but its public flow is
-split into load, semantic conversion and artifact publication. The analyzer
-accepts a typed internal job. Existing SOLAR readability debt is inventoried in
-`scripts/solar_readability_debt.json`; every shrink must update the snapshot and
-it cannot gain new items
-or larger functions/modules.
+The canonical source is always the exact ATen operator graph emitted by
+`make_fx`. `solar.ir.conversion` validates that source before selecting a target
+backend. The ATen and extended-einsum backends independently implement their
+own validation, conversion, and execution callbacks; neither backend imports
+the other or the registry. Analysis reads only the shared IR contracts, so
+adding a backend changes the registry but not an existing backend.
+
+The analyzer accepts a typed internal job. Existing SOLAR readability debt is
+inventoried in `scripts/solar_readability_debt.json`; every shrink must update
+the snapshot and it cannot gain new items or larger functions/modules.
 
 ## Scoring boundary
 
