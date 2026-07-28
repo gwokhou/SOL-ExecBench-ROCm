@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from solar.analysis import orojenesis
+from solar.analysis.orojenesis import multi_einsum
 
 
 def _start(output: str) -> dict:
@@ -209,7 +210,7 @@ def test_problem_for_layer_rejects_invalid_metadata(mutation, message):
 
 def test_mapper_and_divisor_validation():
     with pytest.raises(orojenesis.OrojenesisError, match="positive"):
-        orojenesis._divisors(0)
+        multi_einsum._divisors(0)
     with pytest.raises(orojenesis.OrojenesisError, match="chain position"):
         orojenesis.multi_einsum_mapper_role(0, 1)
     with pytest.raises(orojenesis.OrojenesisError, match="row tile"):

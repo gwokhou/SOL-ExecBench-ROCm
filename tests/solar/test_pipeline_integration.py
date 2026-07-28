@@ -10,6 +10,7 @@ import yaml
 from torch.nn import functional
 
 from solar.analysis.graph_analyzer import IRGraphAnalyzer
+from solar.graph.contracts import ExtractionKind
 from solar.graph.extraction import extract_operator_graph
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.registry import ir_lifecycle
@@ -196,6 +197,7 @@ def test_cpu_pipeline_preserves_reference_semantics(
         device="cpu",
         output_dir=output,
         name=name,
+        extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
     )
     converted = convert_operator_graph(operator, output_dir=output)
     graph = yaml.safe_load(converted.path.read_text())
@@ -287,6 +289,7 @@ def test_canonical_extraction_preserves_explicit_backward_reference(
         device="cpu",
         output_dir=tmp_path,
         name="backward-reference",
+        extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
     )
     converted = convert_operator_graph(operator, output_dir=tmp_path)
     graph = yaml.safe_load(converted.path.read_text())

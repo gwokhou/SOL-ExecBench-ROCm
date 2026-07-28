@@ -25,6 +25,9 @@ from solar.contracts import (
     AnalysisResult,
     ArtifactRef,
     ConversionRequest,
+    ExtractionKind,
+    FormalProducerReadiness,
+    IRKind,
     SolarAnalysisStatus,
     SolarStage,
     SolBound,
@@ -32,19 +35,19 @@ from solar.contracts import (
     write_request_manifest,
 )
 from solar.pipeline import (
-    SOLAR_ANALYSIS_SCHEMA_VERSION,
-    ArchitectureProfile,
     PipelineStageError,
     pipeline_reason_code,
-    run_route_pipeline,
+    run_pipeline,
 )
-from solar.readiness import (
+from solar.pipeline.readiness import (
     ConversionReadinessRequest,
     ConversionReadinessResult,
     ReadinessArtifact,
     ReadinessStage,
     audit_conversion,
 )
+from solar.rocm.architecture import ArchitectureProfile
+from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
 
 
 def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
@@ -67,7 +70,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         if isinstance(profile, ArchitectureProfile):
             profile.require_verified_audit_evidence()
         architecture_sha256 = _profile_hash(profile)
-        pipeline = run_route_pipeline(request, profile, staging)
+        pipeline = run_pipeline(request, profile, staging)
         ir_graph, analysis = pipeline.ir_graph, pipeline.analysis
         bound = _extract_bound(analysis, request.require_orojenesis)
         artifacts = _finish_artifacts(staging, analysis, ir_graph.path.name)
@@ -96,6 +99,22 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         return _failure(
             request, stage, pipeline_reason_code(stage, exc), str(exc)
         )
+
+
+def formal_producer_readiness() -> FormalProducerReadiness:
+    """Return whether the reviewed formal mapper is allowlisted."""
+    from solar.analysis.orojenesis import OROJENESIS_TRUSTED_MAPPER_SHA256
+
+    if not OROJENESIS_TRUSTED_MAPPER_SHA256:
+        return FormalProducerReadiness(False, "formal_mapper_not_allowlisted")
+    return FormalProducerReadiness(True, "ready")
+
+
+def architecture_profile_sha256(
+    architecture: str | Path | Mapping[str, Any],
+) -> str:
+    """Return the canonical identity of a packaged architecture profile."""
+    return _profile_hash(ArchitectureProfile.load(architecture))
 
 
 def _extract_bound(
@@ -236,6 +255,9 @@ __all__ = [
     "ConversionReadinessRequest",
     "ConversionReadinessResult",
     "ConversionRequest",
+    "ExtractionKind",
+    "FormalProducerReadiness",
+    "IRKind",
     "ReadinessArtifact",
     "ReadinessStage",
     "SolBound",
@@ -243,5 +265,7 @@ __all__ = [
     "SolarStage",
     "VerificationPolicy",
     "analyze",
+    "architecture_profile_sha256",
     "audit_conversion",
+    "formal_producer_readiness",
 ]

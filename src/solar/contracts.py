@@ -15,15 +15,15 @@ from pathlib import Path
 
 import yaml
 
-from solar.common.types import DynamicValue
-from solar.ir.contracts import DEFAULT_IR_KIND, IRKind, normalize_ir_kind
-from solar.routes import (
-    DEFAULT_ROUTE,
-    Route,
-    normalize_route,
+from solar.graph.contracts import (
+    DEFAULT_EXTRACTION_KIND,
+    ExtractionKind,
+    normalize_extraction_kind,
 )
+from solar.ir.contracts import DEFAULT_IR_KIND, IRKind, normalize_ir_kind
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
-from solar.verification_policy import VerificationPolicy
+from solar.types import DynamicValue
+from solar.verification.contracts import VerificationPolicy
 
 InputFactory = Callable[[int], Sequence[DynamicValue]]
 ROOFLINE_BOUND_KIND = "roofline_eq1_v1"
@@ -75,8 +75,8 @@ class ConversionRequest:
     input_factory: InputFactory
     reference_name: str
     reference_sha256: str
-    representation: IRKind | str = DEFAULT_IR_KIND
-    route: Route | str = DEFAULT_ROUTE
+    ir_kind: IRKind | str = DEFAULT_IR_KIND
+    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND
     trace_seed: int = 200
     verification: VerificationPolicy = field(
         default_factory=lambda: VerificationPolicy(atol=1e-2, rtol=1e-2),
@@ -84,11 +84,15 @@ class ConversionRequest:
 
     def __post_init__(self) -> None:
         """Validate request identity and normalize declarative selectors."""
-        object.__setattr__(self, "route", normalize_route(self.route))
         object.__setattr__(
             self,
-            "representation",
-            normalize_ir_kind(self.representation),
+            "extraction_kind",
+            normalize_extraction_kind(self.extraction_kind),
+        )
+        object.__setattr__(
+            self,
+            "ir_kind",
+            normalize_ir_kind(self.ir_kind),
         )
         if not self.analysis_id.strip() or not self.reference_name.strip():
             raise ValueError("analysis_id and reference_name must be non-empty")
@@ -122,12 +126,12 @@ class ConversionRequestEnvelope:
         return self.conversion.reference_sha256
 
     @property
-    def representation(self) -> IRKind | str:
-        return self.conversion.representation
+    def ir_kind(self) -> IRKind | str:
+        return self.conversion.ir_kind
 
     @property
-    def route(self) -> Route | str:
-        return self.conversion.route
+    def extraction_kind(self) -> ExtractionKind | str:
+        return self.conversion.extraction_kind
 
     @property
     def device(self) -> str:
@@ -237,6 +241,14 @@ class AnalysisFailure:
         object.__setattr__(self, "stage", SolarStage(self.stage))
 
 
+@dataclass(frozen=True)
+class FormalProducerReadiness:
+    """Whether the pinned formal-analysis producer is available."""
+
+    ready: bool
+    reason_code: str
+
+
 def write_request_manifest(
     request: AnalysisRequest,
     staging: Path,
@@ -256,9 +268,11 @@ def write_request_manifest(
             "sha256": request.reference_sha256,
         },
         "analysis_contract": {
-            "route": normalize_route(request.route).value,
+            "extraction_kind": normalize_extraction_kind(
+                request.extraction_kind,
+            ).value,
             "precision": request.precision,
-            "representation": normalize_ir_kind(request.representation).value,
+            "ir_kind": normalize_ir_kind(request.ir_kind).value,
             "trace_seed": request.trace_seed,
             "verification_seeds": list(request.verification_seeds),
             "atol": request.atol,
@@ -295,8 +309,9 @@ __all__ = [
     "ArtifactRef",
     "ConversionRequest",
     "ConversionRequestEnvelope",
+    "ExtractionKind",
+    "FormalProducerReadiness",
     "IRKind",
-    "Route",
     "SolBound",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",

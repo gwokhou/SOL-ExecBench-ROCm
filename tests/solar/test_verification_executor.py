@@ -7,6 +7,7 @@ import torch
 from torch.nn import functional
 
 from solar.ir.registry import ir_lifecycle
+from solar.schema_versions import ATEN_IR_SCHEMA_VERSION
 from solar.verification import numerics
 from solar.verification.verify import IRExecutionError, IRGraphExecutor
 
@@ -91,7 +92,7 @@ def _execute(
         },
     }
     graph = {
-        "schema_version": 3,
+        "schema_version": ATEN_IR_SCHEMA_VERSION,
         "ir_kind": "aten",
         "layers": {**starts, "operation": operation},
         "outputs": output_names,
@@ -202,7 +203,7 @@ def test_einsum_and_matrix_dispatch() -> None:
             "tensor_dtypes": {"inputs": [], "outputs": [str(tensor.dtype)]},
         }
     graph = {
-        "schema_version": 3,
+        "schema_version": ATEN_IR_SCHEMA_VERSION,
         "ir_kind": "aten",
         "layers": {**starts, "op": layer},
     }
@@ -592,7 +593,7 @@ def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
         )
     with pytest.raises(
         IRExecutionError,
-        match="unsupported NVLabs einsum",
+        match="unsupported extended-einsum",
     ):
         numerics.torch_equation("A(P+R)->A")
     with pytest.raises(

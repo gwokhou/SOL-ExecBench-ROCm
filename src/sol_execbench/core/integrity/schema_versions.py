@@ -24,13 +24,13 @@ ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION: Final = (
     "sol_execbench.rocm_compatibility_matrix.v1"
 )
 CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION: Final = (
-    "sol_execbench.corpus_stage_readiness_record.v2"
+    "sol_execbench.corpus_stage_readiness_record.v3"
 )
 CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION: Final = (
     "sol_execbench.corpus_stage_readiness_summary.v1"
 )
 CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION: Final = (
-    "sol_execbench.corpus_stage_trace_identity.v1"
+    "sol_execbench.corpus_stage_trace_identity.v2"
 )
 RDNA4_VALIDATION_SCHEMA_VERSION: Final = "sol_execbench.rdna4_validation.v2"
 RELEASE_BASELINE_SCHEMA_VERSION: Final = "sol_execbench.release_baseline.v1"

@@ -79,6 +79,91 @@ def test_enforces_file_line_and_branch_floors_independently() -> None:
     ]
 
 
+def test_enforces_group_floors_over_refactored_modules() -> None:
+    policy = _policy()
+    policy["groups"] = {
+        "refactored subsystem": {
+            "paths": [
+                "src/example/weak.py",
+                "src/example/strong.py",
+            ],
+            "line": 80.0,
+            "branch": 65.0,
+        },
+    }
+    report = {
+        "files": {
+            "src/example/critical.py": _entry(),
+            "src/example/weak.py": _entry(
+                covered_lines=6,
+                covered_branches=4,
+            ),
+            "src/example/strong.py": _entry(
+                covered_lines=10,
+                covered_branches=8,
+            ),
+        },
+    }
+
+    assert coverage_policy.check_report(report, policy) == []
+
+
+def test_reports_missing_group_entries() -> None:
+    policy = _policy()
+    policy["groups"] = {
+        "refactored subsystem": {
+            "paths": [
+                "src/example/weak.py",
+                "src/example/missing.py",
+            ],
+            "line": 80.0,
+            "branch": 65.0,
+        },
+    }
+    report = {
+        "files": {
+            "src/example/critical.py": _entry(),
+            "src/example/weak.py": _entry(),
+        },
+    }
+
+    assert coverage_policy.check_report(report, policy) == [
+        (
+            "refactored subsystem: missing or ambiguous coverage entry: "
+            "src/example/missing.py"
+        ),
+    ]
+
+
+def test_reports_group_line_and_branch_floors() -> None:
+    policy = _policy()
+    policy["groups"] = {
+        "refactored subsystem": {
+            "paths": [
+                "src/example/weak.py",
+                "src/example/strong.py",
+            ],
+            "line": 80.0,
+            "branch": 65.0,
+        },
+    }
+    report = {
+        "files": {
+            "src/example/critical.py": _entry(),
+            "src/example/weak.py": _entry(
+                covered_lines=6,
+                covered_branches=4,
+            ),
+            "src/example/strong.py": _entry(),
+        },
+    }
+
+    assert coverage_policy.check_report(report, policy) == [
+        "refactored subsystem: line 70.00% < 80.00%",
+        "refactored subsystem: branch 62.50% < 65.00%",
+    ]
+
+
 def test_enforces_package_totals_without_counting_vendor_or_other_packages() -> (
     None
 ):

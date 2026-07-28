@@ -17,7 +17,11 @@ from solar.contracts import (
     SolarStage,
     SolarStageStatus,
 )
-from solar.routes import DEFAULT_ROUTE, Route, normalize_route
+from solar.graph.contracts import (
+    DEFAULT_EXTRACTION_KIND,
+    ExtractionKind,
+    normalize_extraction_kind,
+)
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
@@ -46,11 +50,15 @@ class SolarWorkerRequest:
     output_dir: str
     device: str
     orojenesis_home: str | None
-    route: Route | str = DEFAULT_ROUTE
+    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND
 
     def __post_init__(self) -> None:
-        """Normalize the route at the process boundary."""
-        object.__setattr__(self, "route", normalize_route(self.route))
+        """Normalize the extraction_kind at the process boundary."""
+        object.__setattr__(
+            self,
+            "extraction_kind",
+            normalize_extraction_kind(self.extraction_kind),
+        )
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarWorkerRequest:
@@ -65,7 +73,9 @@ class SolarWorkerRequest:
                 if value.get("orojenesis_home")
                 else None
             ),
-            route=normalize_route(value.get("route", DEFAULT_ROUTE)),
+            extraction_kind=normalize_extraction_kind(
+                value.get("extraction_kind", DEFAULT_EXTRACTION_KIND)
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -81,11 +91,15 @@ class SolarStageAuditRequest:
     workload_uuid: str
     output_dir: str
     device: str
-    route: Route | str = DEFAULT_ROUTE
+    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND
 
     def __post_init__(self) -> None:
-        """Normalize the route at the process boundary."""
-        object.__setattr__(self, "route", normalize_route(self.route))
+        """Normalize the extraction_kind at the process boundary."""
+        object.__setattr__(
+            self,
+            "extraction_kind",
+            normalize_extraction_kind(self.extraction_kind),
+        )
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarStageAuditRequest:
@@ -95,7 +109,9 @@ class SolarStageAuditRequest:
             workload_uuid=str(value["workload_uuid"]),
             output_dir=str(value["output_dir"]),
             device=str(value["device"]),
-            route=normalize_route(value.get("route", DEFAULT_ROUTE)),
+            extraction_kind=normalize_extraction_kind(
+                value.get("extraction_kind", DEFAULT_EXTRACTION_KIND)
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:

@@ -1,4 +1,4 @@
-# SOL ExecBench ROCm 3.0
+# SOL ExecBench ROCm 4.0
 
 SOL ExecBench ROCm evaluates GPU kernel candidates and derives formal
 Speed-of-Light bounds for the AMD Radeon RX 9060 XT. The distribution contains
@@ -102,12 +102,14 @@ manifest and writes a content-addressed `matrix.jsonl` plus `summary.json`.
 Failures remain in the matrix with stable stage and reason codes; `--resume`
 continues only when all recorded identities and artifact hashes still match.
 
-Graph extraction is selected explicitly by route. The default `nvlabs` route
-uses the reviewed Torchview extractor, while `mainline` uses `make_fx` to emit
-the ATen-oriented operator schema. The requested IR representation is selected
-independently, and every route/backend pairing must preserve exact source-input,
-output, tensor-metadata, and effect provenance. Unsupported tracing, conversion,
-execution, or resource accounting fails closed.
+Graph extraction is selected explicitly with `--extractor`. The default
+`torchview` extractor uses the reviewed Torchview path, while `make-fx`
+(`make_fx_reference_v1` in the API) emits
+the exact ATen-oriented operator schema. The requested `ir_kind` is selected
+independently through the Python API. Every supported extractor/IR pairing must
+preserve exact source-input, output, tensor-metadata, and effect provenance.
+Unsupported tracing, conversion, execution, or resource accounting fails
+closed.
 
 ## Official score
 

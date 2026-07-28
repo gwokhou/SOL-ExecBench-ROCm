@@ -15,13 +15,13 @@
 
 """Paper-aligned Speed-of-Light analysis for PyTorch programs.
 
-The package owns graph extraction, executable NVLabs einsum conversion,
+The package owns graph extraction, executable extended-einsum conversion,
 conversion verification, and hardware-grounded SOL bound derivation.  Dataset
 handling, candidate evaluation, timing, baselines, and scoring intentionally
 live in :mod:`sol_execbench`.
 """
 
-__version__ = "3.0.0"
+__version__ = "4.0.0"
 
 # The supported public surface is the atomic pipeline. Stage implementations
 # remain importable for in-repository development, but are deliberately not
@@ -32,9 +32,20 @@ _LAZY_IMPORTS = {
     "AnalysisResult": ("solar.api", "AnalysisResult"),
     "ArtifactRef": ("solar.api", "ArtifactRef"),
     "ConversionRequest": ("solar.api", "ConversionRequest"),
+    "ExtractionKind": ("solar.api", "ExtractionKind"),
+    "FormalProducerReadiness": ("solar.api", "FormalProducerReadiness"),
+    "IRKind": ("solar.api", "IRKind"),
     "SolBound": ("solar.api", "SolBound"),
     "VerificationPolicy": ("solar.api", "VerificationPolicy"),
     "analyze": ("solar.api", "analyze"),
+    "architecture_profile_sha256": (
+        "solar.api",
+        "architecture_profile_sha256",
+    ),
+    "formal_producer_readiness": (
+        "solar.api",
+        "formal_producer_readiness",
+    ),
 }
 
 
@@ -55,7 +66,12 @@ __all__ = [
     "AnalysisResult",
     "ArtifactRef",
     "ConversionRequest",
+    "ExtractionKind",
+    "FormalProducerReadiness",
+    "IRKind",
     "SolBound",
     "VerificationPolicy",
     "analyze",
+    "architecture_profile_sha256",
+    "formal_producer_readiness",
 ]

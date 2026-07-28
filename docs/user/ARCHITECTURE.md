@@ -86,12 +86,11 @@ deletes its staging directory and publishes no partial result directory. A
 successful run writes a content-addressed manifest and atomically renames the
 complete staging directory into place.
 
-The source operator artifact records its extraction route. `nvlabs` uses the
-reviewed Torchview extractor and `mainline` uses `make_fx`;
-`solar.ir.conversion` validates that provenance before selecting a target IR
-lifecycle. Route selection and IR selection are independent, while each
-lifecycle declares the extraction kinds it accepts. Existing backends remain
-independent implementations and share only the typed lifecycle contracts.
+The source operator artifact records its `extraction_kind`. `torchview_v1`
+uses the reviewed Torchview extractor and `make_fx_reference_v1` uses
+`make_fx`; `solar.ir.conversion` validates that provenance before selecting a
+target IR lifecycle. Extraction and IR selection are independent, while each
+lifecycle declares the extraction kinds it accepts.
 
 The analyzer accepts a typed internal job. Existing SOLAR readability debt is
 inventoried in `scripts/solar_readability_debt.json`; every shrink must update
@@ -135,16 +134,21 @@ src/
     driver/              staging and generated process templates
   solar/
     graph/               operator graph extraction
-    ir/                  typed lifecycle and IR conversion
-    nvlabs/              maintained NVLABS-derived graph and IR implementation
+    ir/
+      aten/              exact ATen IR lifecycle
+      extended_einsum/   canonical reviewed extended-einsum lifecycle
     verification/        callable-versus-graph proof
-    analysis/            formal resource/lower-bound analysis
-    rocm/                architecture profiles
+    analysis/
+      orojenesis/        pinned mapper integration and region analysis
+    pipeline/            atomic analysis and readiness workflows
+    rocm/
+      profiles/          packaged architecture profiles
+      audits/            content-addressed calibration evidence
 ```
 
-`solar.nvlabs` is first-party maintained code because its graph and IR behavior
-has diverged materially from the source project. The `_vendor` namespace is
-reserved for dependencies retained as vendored snapshots.
+`solar.ir.extended_einsum` is first-party maintained code with one strict
+reviewed handler stack. The `_vendor` namespace is reserved for dependencies
+retained as vendored snapshots.
 
 Shared evidence identifiers live below both producers and reports. Platform
 modules do not import scoring, and benchmark runtime modules do not import

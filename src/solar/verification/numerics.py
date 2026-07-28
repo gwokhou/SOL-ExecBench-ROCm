@@ -9,8 +9,8 @@ import re
 import string
 from collections.abc import Iterable
 
-from solar.common.types import DynamicValue
 from solar.errors import NumericalEquivalenceError
+from solar.types import DynamicValue
 from solar.verification.errors import IRExecutionError
 
 _EINSUM_TOKEN = re.compile(r"[A-Za-z][0-9]*")
@@ -25,7 +25,7 @@ def torch_equation(equation: str) -> str:
         or any(character in ranks_only for character in "()+-")
     ):
         raise IRExecutionError(
-            f"unsupported NVLabs einsum equation: {equation!r}",
+            f"unsupported extended-einsum equation: {equation!r}",
         )
     tokens: list[str] = []
     for token in _EINSUM_TOKEN.findall(equation):

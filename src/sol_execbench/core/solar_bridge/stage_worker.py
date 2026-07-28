@@ -32,7 +32,7 @@ def main() -> None:
             workload_uuid=request.workload_uuid,
             output_dir=request.output_dir,
             device=request.device,
-            route=request.route,
+            extraction_kind=request.extraction_kind,
         )
     except Exception as exc:  # noqa: BLE001 -- isolated worker boundary
         outcome = SolarStageAuditOutcome(

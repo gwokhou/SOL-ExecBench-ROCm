@@ -13,8 +13,8 @@ from solar.analysis.graph_rules import (
     LOW_PRECISION_DEQUANT_DTYPES,
     RECOMPUTABLE_OPERAND_TARGETS,
 )
-from solar.common.types import NodeDict
 from solar.ir.contracts import CONTRACTION_KIND, INPUT_KIND, layer_operation
+from solar.types import NodeDict
 
 type SourceTrace = tuple[set[str], bool, bool]
 

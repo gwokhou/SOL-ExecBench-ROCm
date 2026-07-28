@@ -8,7 +8,6 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 from solar.artifacts import ArtifactValue
-from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
 
 type GraphValidator = Callable[[Mapping[str, ArtifactValue]], None]
 
@@ -25,17 +24,7 @@ def validate_graph_semantics(
     strict: bool,
     validator: GraphValidator,
 ) -> tuple[bool, bool]:
-    """Return schema/semantic completeness after dialect validation."""
-    version = graph.get("schema_version")
-    if (
-        not isinstance(version, int)
-        or isinstance(version, bool)
-        or version != IR_GRAPH_SCHEMA_VERSION
-    ):
-        raise ValueError(
-            "analysis requires executable semantics: IR graph must use "
-            f"schema_version={IR_GRAPH_SCHEMA_VERSION}",
-        )
+    """Return semantic completeness after dialect-owned validation."""
     try:
         validator(graph)
     except ValueError as exc:

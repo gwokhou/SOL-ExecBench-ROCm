@@ -18,11 +18,12 @@ from solar.api import (
     VerificationPolicy,
 )
 from solar.contracts import SolarStage
+from solar.graph.contracts import ExtractionKind
 from solar.graph.extraction import OperatorGraphArtifact
 from solar.ir.contracts import IRKind
 from solar.ir.conversion import IRGraphArtifact
 from solar.ir.registry import ir_lifecycle
-from solar.routes import Route
+from solar.pipeline import analysis as analysis_pipeline
 from solar.verification import VerificationError
 
 
@@ -39,8 +40,8 @@ def _request(output: Path) -> AnalysisRequest:
             input_factory=lambda seed: (seed,),
             reference_name="definition.json#reference",
             reference_sha256="a" * 64,
-            representation=IRKind.ATEN,
-            route=Route.MAINLINE,
+            ir_kind=IRKind.ATEN,
+            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
         ),
         architecture="RX_9060_XT",
         output_dir=output,
@@ -67,8 +68,8 @@ def _matmul_request(
             input_factory=input_factory,
             reference_name="tests.test_api#matmul",
             reference_sha256="b" * 64,
-            representation=IRKind.ATEN,
-            route=Route.MAINLINE,
+            ir_kind=IRKind.ATEN,
+            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
         ),
         architecture="RX_9060_XT",
         output_dir=output,
@@ -96,8 +97,8 @@ def _conv_request(
             input_factory=input_factory,
             reference_name="tests.test_api#conv2d",
             reference_sha256="c" * 64,
-            representation=IRKind.ATEN,
-            route=Route.MAINLINE,
+            ir_kind=IRKind.ATEN,
+            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
         ),
         architecture="RX_9060_XT",
         output_dir=output,
@@ -123,16 +124,16 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         device,
         output_dir,
         name,
-        extraction,
+        extraction_kind,
     ):
-        del reference, inputs, device, name, extraction
+        del reference, inputs, device, name, extraction_kind
         root = Path(output_dir)
         operator = root / "operator_graph.yaml"
         operator.write_text("layers: {}\n")
         return OperatorGraphArtifact(operator, (), (), ())
 
-    def convert(operator, *, output_dir, representation=None):
-        del operator, representation
+    def convert(operator, *, output_dir, ir_kind=None):
+        del operator, ir_kind
         einsum = Path(output_dir) / "einsum_graph.yaml"
         einsum.write_text("layers: {}\n")
         return IRGraphArtifact(einsum, IRKind.ATEN)
@@ -146,7 +147,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
     }
     monkeypatch.setattr(
-        pipeline,
+        analysis_pipeline,
         "extract_request_graph",
         lambda request, root: extract(
             request.reference,
@@ -154,25 +155,25 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
             device=request.device,
             output_dir=root,
             name=request.analysis_id,
-            extraction="make_fx_reference_v1",
+            extraction_kind="make_fx_reference_v1",
         ),
     )
     monkeypatch.setattr(
-        pipeline,
+        analysis_pipeline,
         "convert_request_graph",
         lambda request, operator, root: convert(
             operator,
             output_dir=root,
-            representation=request.representation,
+            ir_kind=request.ir_kind,
         ),
     )
     monkeypatch.setattr(
-        pipeline,
+        analysis_pipeline,
         "verify_request_graph",
         lambda request, graph, output_path: verify(output_path=output_path),
     )
     monkeypatch.setattr(
-        pipeline,
+        analysis_pipeline,
         "analyze_request_graph",
         lambda request, profile, root, graph: analysis,
     )
@@ -189,7 +190,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         "manifest.yaml",
     }
     manifest = yaml.safe_load((output / "manifest.yaml").read_text())
-    assert manifest["schema_version"] == 3
+    assert manifest["schema_version"] == 4
     assert "candidate_runtime" not in manifest
     assert "score" not in manifest
     assert manifest["analysis_contract"]["precision"] == "fp16"
@@ -206,7 +207,7 @@ def test_analyze_failure_leaves_no_partial_output(tmp_path, monkeypatch):
         lambda value: _Profile(),
     )
     monkeypatch.setattr(
-        pipeline,
+        analysis_pipeline,
         "extract_request_graph",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("unsupported"),
@@ -236,15 +237,15 @@ def test_conversion_failure_has_its_own_stable_stage(tmp_path, monkeypatch):
         device,
         output_dir,
         name,
-        extraction,
+        extraction_kind,
     ):
-        del reference, inputs, device, name, extraction
+        del reference, inputs, device, name, extraction_kind
         operator = Path(output_dir) / "operator_graph.yaml"
         operator.write_text("layers: {}\n")
         return OperatorGraphArtifact(operator, (), (), ())
 
     monkeypatch.setattr(
-        pipeline,
+        analysis_pipeline,
         "extract_request_graph",
         lambda request, root: extract(
             request.reference,
@@ -252,11 +253,11 @@ def test_conversion_failure_has_its_own_stable_stage(tmp_path, monkeypatch):
             device=request.device,
             output_dir=root,
             name=request.analysis_id,
-            extraction="make_fx_reference_v1",
+            extraction_kind="make_fx_reference_v1",
         ),
     )
     monkeypatch.setattr(
-        pipeline,
+        analysis_pipeline,
         "convert_request_graph",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             RuntimeError("unsupported op"),

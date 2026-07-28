@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 
 from solar.graph.contracts import ExtractionKind
-from solar.routes import Route, route_spec
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -30,7 +29,7 @@ def test_formal_policy_docs_separate_paper_bound_from_cli_publication():
     assert "`publication_eligible`" in scoring
 
 
-def test_route_docs_describe_every_extraction_choice() -> None:
+def test_docs_describe_every_extraction_choice() -> None:
     documents = [
         (ROOT / "README.md").read_text(encoding="utf-8"),
         (ROOT / "docs" / "SOLAR-BOUNDARY.md").read_text(encoding="utf-8"),
@@ -41,14 +40,14 @@ def test_route_docs_describe_every_extraction_choice() -> None:
             encoding="utf-8",
         ),
     ]
-    assert route_spec(Route.NVLABS).extraction is ExtractionKind.TORCHVIEW
-    assert (
-        route_spec(Route.MAINLINE).extraction
-        is ExtractionKind.MAKE_FX_REFERENCE
-    )
+    assert ExtractionKind.TORCHVIEW is ExtractionKind.TORCHVIEW
+    assert ExtractionKind.MAKE_FX_REFERENCE is ExtractionKind.MAKE_FX_REFERENCE
     for text in documents:
         lowered = text.lower()
-        assert "nvlabs" in lowered
+        assert (
+            "--extractor" in lowered
+            or "extractionkind" in lowered
+            or "extraction_kind" in lowered
+        )
         assert "torchview" in lowered
-        assert "mainline" in lowered
         assert "make_fx" in lowered

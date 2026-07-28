@@ -23,13 +23,13 @@ from solar.ir.registry import (
     ir_lifecycles,
     validate_ir_graph,
 )
+from solar.pipeline.stages import analyze_request_graph, verify_request_graph
 from solar.verification.executor import IRGraphExecutor
-from solar.workflow import analyze_request_graph, verify_request_graph
 
 
 def _stub_graph() -> dict[str, Any]:
     return {
-        "ir_kind": "nvlabs_einsum",
+        "ir_kind": "extended_einsum",
         "schema_version": 999,
         "layers": {
             "x": {
@@ -80,12 +80,12 @@ def test_registry_drives_complete_lifecycle_lookup(
         return {"status": "passed"}
 
     stub = IRLifecycle(
-        kind=IRKind.NVLABS_EINSUM,
+        kind=IRKind.EXTENDED_EINSUM,
         extractions=frozenset(ExtractionKind),
         validate=stub_validate,
         convert=lambda operator, output_dir: IRGraphArtifact(
             Path(output_dir),
-            IRKind.NVLABS_EINSUM,
+            IRKind.EXTENDED_EINSUM,
         ),
         execute=stub_execute,
         verify=stub_verify,
@@ -93,11 +93,11 @@ def test_registry_drives_complete_lifecycle_lookup(
     )
     monkeypatch.setitem(
         ir_registry._LIFECYCLE_LOADERS,
-        IRKind.NVLABS_EINSUM,
+        IRKind.EXTENDED_EINSUM,
         lambda: stub,
     )
 
-    assert ir_lifecycle(IRKind.NVLABS_EINSUM) is stub
+    assert ir_lifecycle(IRKind.EXTENDED_EINSUM) is stub
     assert stub in ir_lifecycles()
 
     graph = _stub_graph()
@@ -110,7 +110,7 @@ def test_registry_drives_complete_lifecycle_lookup(
 
     graph_path = tmp_path / "graph.yaml"
     graph_path.write_text(yaml.safe_dump(graph), encoding="utf-8")
-    artifact = IRGraphArtifact(graph_path, IRKind.NVLABS_EINSUM)
+    artifact = IRGraphArtifact(graph_path, IRKind.EXTENDED_EINSUM)
     verify_request_graph(
         cast(Any, object()),
         artifact,
@@ -130,7 +130,7 @@ def test_registry_drives_complete_lifecycle_lookup(
 def test_registry_lists_every_registered_dialect() -> None:
     kinds = {lifecycle.kind for lifecycle in ir_lifecycles()}
     assert IRKind.ATEN in kinds
-    assert IRKind.NVLABS_EINSUM in kinds
+    assert IRKind.EXTENDED_EINSUM in kinds
     assert all(
         isinstance(lifecycle, IRLifecycle) for lifecycle in ir_lifecycles()
     )

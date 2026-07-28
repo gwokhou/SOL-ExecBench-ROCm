@@ -61,12 +61,12 @@ def test_conversion_requires_canonical_schema_and_provenance(
 ) -> None:
     operator_path = tmp_path / "operator_graph.yaml"
     operator_path.write_text(
-        yaml.safe_dump({"schema_version": 3, "layers": {}, "outputs": []}),
+        yaml.safe_dump({"schema_version": 1, "layers": {}, "outputs": []}),
         encoding="utf-8",
     )
     operator = _operator(operator_path)
 
-    with pytest.raises(RuntimeError, match="provenance is not trusted"):
+    with pytest.raises(ValueError, match="extraction_kind"):
         convert_operator_graph(operator, output_dir=tmp_path)
 
     operator_path.write_text(

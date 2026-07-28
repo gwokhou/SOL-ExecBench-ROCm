@@ -26,7 +26,7 @@ P1_LIMITS = {
 }
 SOLAR_LIMITS = {
     "solar.api": (300, 6),
-    "solar.einsum.operation_conversion": (180, 3),
+    "solar.ir.extended_einsum.operations.conversion": (180, 3),
     "solar.graph.extraction": (180, 3),
     "solar.ir.conversion": (180, 3),
 }

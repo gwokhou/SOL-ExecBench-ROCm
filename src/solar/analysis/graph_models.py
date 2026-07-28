@@ -6,7 +6,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from solar.common.types import GraphValue, NodeDict
+from solar.types import GraphValue, NodeDict
 
 
 @dataclass(frozen=True, slots=True)

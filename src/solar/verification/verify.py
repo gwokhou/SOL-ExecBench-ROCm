@@ -25,6 +25,7 @@ import yaml
 
 from solar.ir.contracts import IRLifecycle, layer_operation
 from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
+from solar.verification.contracts import TolerancePolicy, VerificationPolicy
 from solar.verification.errors import IRExecutionError, VerificationError
 from solar.verification.executor import (
     IRGraphExecutor,
@@ -36,7 +37,6 @@ from solar.verification.numerics import (
     pattern_inputs,
     torch_equation,
 )
-from solar.verification_policy import TolerancePolicy, VerificationPolicy
 
 
 def _canonical_hash(value: Mapping[str, Any]) -> str:

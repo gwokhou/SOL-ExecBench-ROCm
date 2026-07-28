@@ -8,7 +8,6 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from solar.common.types import DynamicValue
 from solar.graph.contracts import (
     ExtractionKind,
     GraphBackend,
@@ -16,6 +15,7 @@ from solar.graph.contracts import (
     TensorSignature,
 )
 from solar.graph.make_fx_extraction import trace_make_fx_reference
+from solar.types import DynamicValue
 
 
 def extract_operator_graph(

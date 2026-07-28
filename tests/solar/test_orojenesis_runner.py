@@ -9,7 +9,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from solar.analysis import orojenesis, orojenesis_process
+from solar.analysis import orojenesis
+from solar.analysis.orojenesis import (
+    multi_einsum,
+    process as orojenesis_process,
+    runner as orojenesis_runner,
+)
 from solar.schema_versions import (
     OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
 )
@@ -94,7 +99,7 @@ def test_run_layer_emits_auditable_evidence(tmp_path, monkeypatch):
         )
         return SimpleNamespace(returncode=0, stdout="stdout", stderr="stderr")
 
-    monkeypatch.setattr(orojenesis, "_default_mapper_runner", fake_run)
+    monkeypatch.setattr(orojenesis_runner, "_default_mapper_runner", fake_run)
     result = runner.run_layer(
         _matmul("x", "w", "y", m=2, k=3, n=4),
         tmp_path / "layer",
@@ -122,7 +127,7 @@ def test_run_layer_reports_process_failures(tmp_path, monkeypatch, failure):
             raise OSError("cannot execute")
         return SimpleNamespace(returncode=7, stdout="", stderr="failed")
 
-    monkeypatch.setattr(orojenesis, "_default_mapper_runner", fake_run)
+    monkeypatch.setattr(orojenesis_runner, "_default_mapper_runner", fake_run)
     message = "execution failed" if failure == "raise" else "status 7"
     with pytest.raises(orojenesis.OrojenesisError, match=message):
         runner.run_layer(
@@ -135,7 +140,7 @@ def test_run_layer_reports_process_failures(tmp_path, monkeypatch, failure):
 def test_run_multi_chain_composes_sweeps(tmp_path, monkeypatch):
     runner = _runner(tmp_path)
     monkeypatch.setattr(
-        orojenesis,
+        orojenesis_runner,
         "_default_mapper_runner",
         _mapping_subprocess,
     )
@@ -167,7 +172,7 @@ def test_run_multi_chain_validates_width_and_process(tmp_path, monkeypatch):
         runner.run_multi_chain(chain, tmp_path / "width", word_bits=7)
 
     monkeypatch.setattr(
-        orojenesis,
+        orojenesis_runner,
         "_default_mapper_runner",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=9,
@@ -182,8 +187,8 @@ def test_run_multi_chain_validates_width_and_process(tmp_path, monkeypatch):
 def _batched_region() -> dict:
     first_layer = _matmul("x", "w0", "hidden", m=3, k=4, n=5, batch=2)
     second_layer = _matmul("hidden", "w1", "result", m=3, k=5, n=6, batch=2)
-    first = orojenesis._region_matmul_descriptor("mm0", first_layer)
-    second = orojenesis._region_matmul_descriptor("mm1", second_layer)
+    first = multi_einsum._region_matmul_descriptor("mm0", first_layer)
+    second = multi_einsum._region_matmul_descriptor("mm1", second_layer)
     return {
         "schema_version": OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
         "kind": "broadcast_batch_linear_matmul",
@@ -209,7 +214,7 @@ def _batched_region() -> dict:
 def test_run_multi_region_composes_sweeps(tmp_path, monkeypatch):
     runner = _runner(tmp_path)
     monkeypatch.setattr(
-        orojenesis,
+        orojenesis_runner,
         "_default_mapper_runner",
         _mapping_subprocess,
     )
@@ -243,7 +248,7 @@ def test_run_multi_region_reports_process_failures(tmp_path, monkeypatch):
         del args, kwargs
         raise subprocess.SubprocessError("failed")
 
-    monkeypatch.setattr(orojenesis, "_default_mapper_runner", fake_run)
+    monkeypatch.setattr(orojenesis_runner, "_default_mapper_runner", fake_run)
     with pytest.raises(orojenesis.OrojenesisError, match="execution failed"):
         runner.run_multi_region(
             _batched_region(),
@@ -266,7 +271,7 @@ def test_default_mapper_runner_kills_timed_out_process_group(tmp_path):
     ]
 
     with pytest.raises(subprocess.TimeoutExpired):
-        orojenesis._default_mapper_runner(
+        orojenesis_runner._default_mapper_runner(
             command,
             cwd=tmp_path,
             timeout=0.2,
@@ -295,7 +300,7 @@ def test_default_mapper_runner_sanitizes_environment_and_logs(
         ),
     ]
 
-    completed = orojenesis._default_mapper_runner(
+    completed = orojenesis_runner._default_mapper_runner(
         command,
         cwd=tmp_path,
         timeout=2,
@@ -321,7 +326,7 @@ def test_default_mapper_runner_bounds_output_while_running(tmp_path):
         ),
     ]
 
-    completed = orojenesis._default_mapper_runner(
+    completed = orojenesis_runner._default_mapper_runner(
         command,
         cwd=tmp_path,
         timeout=2,

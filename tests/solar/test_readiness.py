@@ -19,9 +19,9 @@ from solar.errors import (
     SourceInputBindingError,
     UnsupportedOperationError,
 )
+from solar.graph.contracts import ExtractionKind
 from solar.ir.contracts import IRKind
-from solar.readiness import readiness_reason_code
-from solar.routes import Route
+from solar.pipeline.readiness import readiness_reason_code
 
 
 def _request(
@@ -37,8 +37,8 @@ def _request(
             input_factory=lambda seed: (torch.tensor([float(seed % 3)]),),
             reference_name="test_readiness.reference",
             reference_sha256="a" * 64,
-            representation=IRKind.ATEN,
-            route=Route.MAINLINE,
+            ir_kind=IRKind.ATEN,
+            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
         ),
         architecture=architecture,
         output_dir=output,
@@ -127,7 +127,7 @@ def test_audit_conversion_retains_passed_artifacts_on_failure(
             "cannot bind source arguments to graph inputs",
         )
 
-    monkeypatch.setattr("solar.readiness.convert_request_graph", fail)
+    monkeypatch.setattr("solar.pipeline.readiness.convert_request_graph", fail)
     result = audit_conversion(
         _request(tmp_path / "failed", lambda value: value + 1),
     )

@@ -6,7 +6,7 @@ from solar.analysis.contraction_proofs import (
     build_orojenesis_proof_layer,
     requires_tile_evidence,
 )
-from solar.einsum.analyzer import EinsumAnalyzer
+from solar.ir.extended_einsum.operations.analyzer import EinsumAnalyzer
 
 
 def _aten_layer(

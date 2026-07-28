@@ -1,33 +1,27 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import cast
 
 import pytest
 import yaml
 
-from solar.common.types import TensorShapes
-from solar.common.utils import (
-    NoAliasDumper,
-    ensure_directory,
+from solar.artifacts.yaml import NoAliasDumper
+from solar.ir.extended_einsum.equations import (
     parse_dim_tokens,
     parse_einsum_equation,
     validate_dim_tokens,
     validate_einsum_ranks_match_shapes,
     validate_tensor_names_match_shapes,
 )
-from solar.einsum.ops.base import (
+from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     compute_cost_from_equation,
 )
-from solar.einsum.ops.matmul_ops import MatmulHandler
-
-
-def test_ensure_directory_creates_parents(tmp_path: Path) -> None:
-    directory = ensure_directory(tmp_path / "nested" / "output")
-
-    assert directory.is_dir()
+from solar.ir.extended_einsum.operations.handlers.matmul_ops import (
+    MatmulHandler,
+)
+from solar.types import TensorShapes
 
 
 def test_dimension_token_parsing_handles_numbered_and_compound_ranks() -> None:

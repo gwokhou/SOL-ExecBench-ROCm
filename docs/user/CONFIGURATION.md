@@ -130,11 +130,11 @@ trace seed. A failed or interrupted run can be checked and continued with
 `--resume`; existing identities and artifact hashes must still match.
 Concurrent writers to the same audit root are rejected before GPU work starts.
 
-SOLAR graph extraction is selected with `--route`. The default `nvlabs` route
-uses the reviewed Torchview extractor; `mainline` uses `make_fx`. Route and IR
-representation are independent, but only explicitly supported pairings may
-proceed. Operations without complete provenance, tracing, conversion, replay,
-and resource-model support fail closed.
+SOLAR graph extraction is selected with `--extractor`. The default `torchview`
+choice uses the reviewed Torchview path; `make-fx` uses `make_fx`. Extraction
+and IR selection are independent in the Python API, but only explicitly
+supported pairings may proceed. Operations without complete provenance,
+tracing, conversion, replay, and resource-model support fail closed.
 
 ## Official score
 

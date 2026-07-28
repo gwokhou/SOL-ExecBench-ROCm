@@ -10,6 +10,7 @@ import yaml
 
 from solar.ir.contracts import IRKind
 from solar.ir.registry import ir_lifecycle
+from solar.schema_versions import ATEN_IR_SCHEMA_VERSION
 from solar.verification import numerics, verify as verification
 from solar.verification.verify import VerificationError
 
@@ -28,7 +29,7 @@ def make_inputs(parameters, device):
 
 def _identity_graph() -> dict:
     return {
-        "schema_version": 3,
+        "schema_version": ATEN_IR_SCHEMA_VERSION,
         "ir_kind": "aten",
         "layers": {
             "start": {

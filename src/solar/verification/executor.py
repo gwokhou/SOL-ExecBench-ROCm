@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from solar.common.types import DynamicValue
 from solar.ir.contracts import IRLifecycle, normalize_ir_kind
+from solar.types import DynamicValue
 from solar.verification.errors import IRExecutionError
 
 

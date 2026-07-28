@@ -15,8 +15,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from solar.common.constants import normalize_dtype
 from solar.ir.contracts import layer_operation
+from solar.precision import normalize_dtype
 from solar.schema_versions import AMD_RESOURCE_MODEL_VERSION
 
 RESOURCE_MODEL_VERSION = AMD_RESOURCE_MODEL_VERSION

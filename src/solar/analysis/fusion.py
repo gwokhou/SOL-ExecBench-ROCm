@@ -17,8 +17,8 @@ from typing import Any
 import networkx as nx
 
 from solar.analysis.contraction_proofs import requires_tile_evidence
-from solar.common.constants import dtype_bytes
 from solar.ir.contracts import layer_operation
+from solar.precision import dtype_bytes
 from solar.rocm.architecture import MemoryLevel
 
 

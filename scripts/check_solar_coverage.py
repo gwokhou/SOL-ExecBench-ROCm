@@ -38,6 +38,22 @@ def _resolve_file(
     return matches[0] if len(matches) == 1 else None
 
 
+def _combined_percentages(
+    entries: list[dict[str, Any]],
+) -> tuple[float, float]:
+    summaries = [entry["summary"] for entry in entries]
+    totals = {
+        key: sum(int(summary.get(key, 0)) for summary in summaries)
+        for key in (
+            "covered_lines",
+            "num_statements",
+            "covered_branches",
+            "num_branches",
+        )
+    }
+    return _summary_percentages(totals)
+
+
 def check_report(report: dict[str, Any], policy: dict[str, Any]) -> list[str]:
     """Return human-readable policy violations for one coverage JSON report."""
     files = report.get("files")
@@ -57,6 +73,28 @@ def check_report(report: dict[str, Any], policy: dict[str, Any]) -> list[str]:
                 f"{path}: branch {branch:.2f}% < {floors['branch']:.2f}%",
             )
 
+    for name, group in policy.get("groups", {}).items():
+        entries: list[dict[str, Any]] = []
+        for path in group["paths"]:
+            entry = _resolve_file(files, path)
+            if entry is None:
+                failures.append(
+                    f"{name}: missing or ambiguous coverage entry: {path}",
+                )
+            else:
+                entries.append(entry)
+        if len(entries) != len(group["paths"]):
+            continue
+        line, branch = _combined_percentages(entries)
+        if line < float(group["line"]):
+            failures.append(
+                f"{name}: line {line:.2f}% < {group['line']:.2f}%",
+            )
+        if branch < float(group["branch"]):
+            failures.append(
+                f"{name}: branch {branch:.2f}% < {group['branch']:.2f}%",
+            )
+
     package = str(policy.get("package", "solar"))
     source_prefix = f"src/{package}/"
     vendor_prefix = f"src/{package}/_vendor/"
@@ -68,16 +106,9 @@ def check_report(report: dict[str, Any], policy: dict[str, Any]) -> list[str]:
     if not package_summaries:
         failures.append(f"coverage report has no project-owned {package} files")
         return failures
-    totals = {
-        key: sum(int(summary.get(key, 0)) for summary in package_summaries)
-        for key in (
-            "covered_lines",
-            "num_statements",
-            "covered_branches",
-            "num_branches",
-        )
-    }
-    line, branch = _summary_percentages(totals)
+    line, branch = _combined_percentages(
+        [{"summary": summary} for summary in package_summaries],
+    )
     global_floors = policy["global"]
     if line < float(global_floors["line"]):
         failures.append(

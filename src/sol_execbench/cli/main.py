@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""SOL ExecBench 3.0 command-line interface."""
+"""SOL ExecBench 4.0 command-line interface."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from sol_execbench.cli.protocol import (
     response_success,
 )
 
-VERSION = "3.0.0"
+VERSION = "4.0.0"
 
 
 class LazyGroup(click.Group):
