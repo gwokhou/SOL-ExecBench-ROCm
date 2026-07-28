@@ -12,7 +12,7 @@ from typing import Any
 
 import yaml
 
-from solar.graph.extraction import OperatorGraphArtifact
+from solar.graph.contracts import OperatorGraphArtifact
 from solar.ir.bindings import bind_graph
 from solar.ir.contracts import IRBackend, IRKind
 from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
@@ -150,6 +150,8 @@ def convert_operator_graph(
 
 def validate_aten_graph(graph: Mapping[str, Any]) -> None:
     """Validate one exact ATen IR graph without accepting legacy schemas."""
+    if graph.get("ir_kind") not in {None, "aten"}:
+        raise AtenIRError("graph is not ATen IR")
     if int(graph.get("schema_version", 0)) != IR_GRAPH_SCHEMA_VERSION:
         raise AtenIRError(
             "ATen graph must use current "

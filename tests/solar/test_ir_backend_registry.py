@@ -14,14 +14,9 @@ from typing import Any
 
 import torch
 
-from solar.ir import contracts as ir_contracts
-from solar.ir.contracts import (
-    IRBackend,
-    IRKind,
-    ir_backend,
-    ir_backends,
-    validate_ir_graph,
-)
+from solar.ir import registry as ir_registry
+from solar.ir.contracts import IRBackend, IRKind
+from solar.ir.registry import ir_backend, ir_backends, validate_ir_graph
 from solar.verification.executor import IRGraphExecutor
 
 
@@ -72,7 +67,7 @@ def test_registry_drives_backend_lookup(monkeypatch) -> None:
         execute=stub_execute,
     )
     monkeypatch.setitem(
-        ir_contracts._BACKEND_LOADERS,
+        ir_registry._BACKEND_LOADERS,
         IRKind.EXTENDED_EINSUM,
         lambda: stub,
     )

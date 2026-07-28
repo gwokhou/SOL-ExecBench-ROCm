@@ -78,10 +78,10 @@ OROJENESIS_SOURCE_DATE_EPOCH = 1753058729
 OROJENESIS_COMPILER_WRAPPER_SHA256 = (
     "04363ce239f76a4763490c049de1d69e2265d59578d51bed753f688c6f75278d"
 )
-# No reviewed mapper artifact has been published for this release. Keeping the
-# repository-owned allowlist empty makes formal bounds fail closed until a
-# reproducible artifact digest is reviewed and added here.
-OROJENESIS_TRUSTED_MAPPER_SHA256: frozenset[str] = frozenset()
+# Reproduced by two no-cache builds from the pinned source and toolchain.
+OROJENESIS_TRUSTED_MAPPER_SHA256: frozenset[str] = frozenset(
+    {"18591892b1ecec3264ec729b0e457ec9f22422993f656ece40dba809c032d77a"},
+)
 OROJENESIS_PROVENANCE_FILENAME = "orojenesis-provenance.json"
 MULTI_EINSUM_SOLVER = "NVlabs/Orojenesis tiled-fusion"
 MULTI_EINSUM_COMPOSITION = "linear_matmul_compatible_tiles_sum_capacity_v1"

@@ -9,10 +9,12 @@ from solar.ir.contracts import (
     IRGraphArtifact,
     IRKind,
     LayerAnalysis,
+    layer_analysis,
+)
+from solar.ir.registry import (
     graph_kind,
     ir_backend,
     ir_backends,
-    layer_analysis,
     validate_ir_graph,
 )
 

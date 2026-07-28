@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from solar.graph.extraction import OperatorGraphArtifact, TensorSignature
+from solar.graph.contracts import OperatorGraphArtifact, TensorSignature
 
 
 def bind_inputs(

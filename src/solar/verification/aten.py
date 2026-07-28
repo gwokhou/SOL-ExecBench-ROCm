@@ -5,39 +5,13 @@
 
 from __future__ import annotations
 
-import re
-import string
 from collections.abc import Callable, Mapping, Sequence
 
 from solar.common.types import DynamicValue
 from solar.verification.errors import IRExecutionError
+from solar.verification.numerics import torch_equation
 
-_TOKEN = re.compile(r"[A-Za-z][0-9]*")
 _UNHANDLED = object()
-
-
-def torch_equation(equation: str) -> str:
-    """Map SOLAR rank tokens, including ``A0``, to PyTorch rank letters."""
-    ranks_only = equation.replace("->", "")
-    if (
-        not equation
-        or "->" not in equation
-        or any(character in ranks_only for character in "()+-")
-    ):
-        raise IRExecutionError(
-            f"unsupported extended einsum equation: {equation!r}",
-        )
-    tokens: list[str] = []
-    for token in _TOKEN.findall(equation):
-        if token not in tokens:
-            tokens.append(token)
-    alphabet = string.ascii_letters
-    if len(tokens) > len(alphabet):
-        raise IRExecutionError(
-            "einsum uses more ranks than torch can represent",
-        )
-    mapping = dict(zip(tokens, alphabet, strict=False))
-    return _TOKEN.sub(lambda match: mapping[match.group(0)], equation)
 
 
 def execute_aten_layer(

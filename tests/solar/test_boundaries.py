@@ -45,3 +45,33 @@ def test_only_solar_bridge_imports_solar_from_outer_package():
             ):
                 offenders.append(path)
     assert offenders == []
+
+
+def test_ir_backends_are_independent_implementations():
+    backend_modules = {
+        "aten.py": ("solar.ir.aten", "solar.verification.aten"),
+        "extended_einsum.py": (
+            "solar.ir.extended_einsum",
+            "solar.verification.extended_einsum",
+        ),
+    }
+    ir_root = REPO_ROOT / "src" / "solar" / "ir"
+    backend_names = {item[0] for item in backend_modules.values()}
+    executor_names = {item[1] for item in backend_modules.values()}
+    for filename, (own_module, own_executor) in backend_modules.items():
+        imports = _imports(ir_root / filename)
+        assert not (imports & (backend_names - {own_module}))
+        assert not (imports & (executor_names - {own_executor}))
+        assert "solar.ir.registry" not in imports
+
+    analysis_imports = {
+        imported
+        for path in (REPO_ROOT / "src" / "solar" / "analysis").rglob("*.py")
+        for imported in _imports(path)
+    }
+    assert not (analysis_imports & backend_names)
+
+    orchestration_imports = _imports(
+        REPO_ROOT / "src" / "solar" / "verification" / "verify.py",
+    )
+    assert not (orchestration_imports & executor_names)

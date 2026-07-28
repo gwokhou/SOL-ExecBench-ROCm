@@ -126,8 +126,8 @@ publishes no partial output directory on failure. The CLI requires the
 capacity-constrained Orojenesis bound and cannot publish the paper-valid
 `roofline_eq1_v1` result accepted by the lower-level Python API. This is an
 additional port release policy, not a requirement of the SOL-ExecBench paper.
-No reviewed mapper digest is currently allowlisted, so a locally self-declared
-toolchain fails closed.
+A reviewed reproducible mapper digest is allowlisted. A locally substituted or
+self-declared toolchain still fails closed.
 
 ## Docker
 

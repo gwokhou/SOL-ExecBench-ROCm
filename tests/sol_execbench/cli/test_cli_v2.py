@@ -179,8 +179,8 @@ def test_score_exposes_publisher_policy_without_score_inputs() -> None:
     )
     assert payload["data"]["verifier"]["requires_signatures"] is False
     assert payload["data"]["producer"] == {
-        "ready": False,
-        "reason_code": "formal_mapper_not_allowlisted",
+        "ready": True,
+        "reason_code": "ready",
     }
     assert payload["data"]["published_release"]["available"] is False
 

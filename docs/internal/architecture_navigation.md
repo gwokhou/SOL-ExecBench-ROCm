@@ -14,7 +14,7 @@ models or typed request/result objects.
 | SOLAR public pipeline | `src/solar/api.py` | architecture → extraction → conversion → verification → analysis | exact stage code; no partial publish | `tests/solar/test_api.py` |
 | Corpus readiness | `src/sol_execbench/core/solar_bridge/corpus_readiness.py` | pinned scored denominator → three-stage workers → matrix/summary | every workload stays visible; identities and artifacts are hash-bound | `tests/sol_execbench/core/solar_bridge/test_corpus_readiness.py` |
 | Graph extraction | `src/solar/graph/extraction.py` | callable trace → typed operator artifact | no einsum converter dependency | SOLAR boundary and API tests |
-| Einsum conversion | `src/solar/einsum/conversion.py` | operator artifact → strict semantic graph | exact input/output bindings | SOLAR tests and readability gate |
+| IR conversion | `src/solar/ir/conversion.py` | operator artifact → selected strict IR backend | exact input/output bindings | SOLAR tests and readability gate |
 | Formal analysis | `src/solar/analysis/graph_analyzer.py` | typed analysis job → resource proof | Eq. 1 is paper-score eligible; the outer release bridge may require Orojenesis | SOLAR/Orojenesis tests |
 | Scoring formula | `src/sol_execbench/core/scoring/formula.py` | audited runtimes → workload score | no clipping/substitution | `tests/sol_execbench/core/test_sol_score_v3.py` |
 | Release planning/execution | `src/sol_execbench/core/scoring/release_builders.py`, `release_runner.py` | pinned corpus → baseline/candidate plans → complete traces | clean source and one immutable environment identity | `tests/sol_execbench/core/scoring/test_release_builders.py` |

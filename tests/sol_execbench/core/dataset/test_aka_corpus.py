@@ -301,8 +301,8 @@ def test_official_score_reports_published_policy_without_accepting_raw_inputs():
         report["verifier"]["accepts_content_addressed_release_bundle"] is True
     )
     assert report["producer"] == {
-        "ready": False,
-        "reason_code": "formal_mapper_not_allowlisted",
+        "ready": True,
+        "reason_code": "ready",
     }
     assert report["published_release"] == {
         "available": False,

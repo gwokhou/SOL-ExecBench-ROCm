@@ -12,10 +12,9 @@ from solar.ir.contracts import (
     DEFAULT_IR_KIND,
     IRBackend,
     IRKind,
-    ir_backend,
-    ir_backends,
 )
 from solar.ir.conversion import convert_operator_graph
+from solar.ir.registry import ir_backend, ir_backends
 from solar.verification.verify import IRGraphExecutor
 
 

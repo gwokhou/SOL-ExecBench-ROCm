@@ -22,6 +22,6 @@ def test_formal_policy_docs_separate_paper_bound_from_cli_publication():
         assert "no git-checkout fallback" in text.lower()
 
     assert "always requires the formal" in configuration
-    assert "allowlist is empty" in configuration
+    assert "reviewed reproducible mapper digest" in configuration
     assert re.search(r"worker IPC, bridge, and\s+CLI", scoring)
     assert "`publication_eligible`" in scoring

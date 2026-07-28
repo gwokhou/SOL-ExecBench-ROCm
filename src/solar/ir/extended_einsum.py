@@ -21,9 +21,9 @@ from solar.einsum.operation_conversion import (
     default_operation_representation,
 )
 from solar.einsum.operation_policy import SUPPORTABLE_OPERATIONS
-from solar.graph.extraction import OperatorGraphArtifact
+from solar.graph.contracts import OperatorGraphArtifact
 from solar.ir.bindings import bind_graph
-from solar.ir.contracts import IRBackend, IRKind, validate_ir_graph
+from solar.ir.contracts import IRBackend, IRKind
 from solar.schema_versions import IR_GRAPH_SCHEMA_VERSION
 from solar.verification.extended_einsum import execute_extended_layer
 
@@ -87,7 +87,6 @@ def _load_operator_graph(operator: OperatorGraphArtifact) -> Mapping[str, Any]:
     traced = yaml.safe_load(operator.path.read_text()) or {}
     if traced.get("extraction_kind") != "make_fx_reference_v1":
         raise RuntimeError("extended-einsum source provenance is not trusted")
-    validate_ir_graph(traced)
     return traced
 
 

@@ -5,10 +5,38 @@
 
 from __future__ import annotations
 
+import re
+import string
 from collections.abc import Iterable
 
 from solar.common.types import DynamicValue
-from solar.verification.errors import VerificationError
+from solar.verification.errors import IRExecutionError, VerificationError
+
+_EINSUM_TOKEN = re.compile(r"[A-Za-z][0-9]*")
+
+
+def torch_equation(equation: str) -> str:
+    """Map SOLAR rank tokens, including ``A0``, to PyTorch rank letters."""
+    ranks_only = equation.replace("->", "")
+    if (
+        not equation
+        or "->" not in equation
+        or any(character in ranks_only for character in "()+-")
+    ):
+        raise IRExecutionError(
+            f"unsupported extended einsum equation: {equation!r}",
+        )
+    tokens: list[str] = []
+    for token in _EINSUM_TOKEN.findall(equation):
+        if token not in tokens:
+            tokens.append(token)
+    alphabet = string.ascii_letters
+    if len(tokens) > len(alphabet):
+        raise IRExecutionError(
+            "einsum uses more ranks than torch can represent",
+        )
+    mapping = dict(zip(tokens, alphabet, strict=False))
+    return _EINSUM_TOKEN.sub(lambda match: mapping[match.group(0)], equation)
 
 
 def clone(value: DynamicValue) -> DynamicValue:
@@ -284,4 +312,10 @@ def pattern_inputs(
     return tuple(transform(value) for value in inputs)
 
 
-__all__ = ["alias_relation", "assert_close", "clone", "pattern_inputs"]
+__all__ = [
+    "alias_relation",
+    "assert_close",
+    "clone",
+    "pattern_inputs",
+    "torch_equation",
+]
