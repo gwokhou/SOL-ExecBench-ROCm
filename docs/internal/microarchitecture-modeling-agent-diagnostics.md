@@ -148,6 +148,48 @@ R = T_measured / T_pred(HW)
 - `C` 明显偏离 1：编译器分解、融合、padding 或计数口径问题；
 - `C≈1`、`R` 明显偏离 1：微架构模型缺项。
 
+#### 2.1.1 指标的责任边界
+
+三个指标分别监控不同的责任边界，不应全部直接归因给 GPU Kernel Agent：
+
+| 指标 | 主要责任角色 | 主要检查对象 | 对 Agent 的意义 |
+| --- | --- | --- | --- |
+| `L = T_frontier / T_SOL` | SOLAR 形式模型开发者、benchmark curator 和评测维护者 | 正式下界与可信 frontier 之间的距离，以及下界是否遗漏不可避免约束 | 作为潜在优化空间和停止条件的参考，不能把全部差距直接算作 Agent 的优化责任 |
+| `C = T_pred(HW) / T_pred(IR)` | GPU Kernel Agent、kernel 作者、编译器后端和 ISA/static characterization 维护者 | 语义工作量落到 dispatch 和 ISA 后引入的额外计算、流量与资源代价 | 是最适合归因给实现和 codegen 的指标，可直接指导下一轮代码修改 |
+| `R = T_measured / T_pred(HW)` | 微架构性能模型、profiler/TraceLens 类工具和 GPU 性能工程师 | 在已知实际硬件工作量后，模型仍未解释的运行时间 | Agent 消费诊断结果，但在确认模型可信前不应被要求直接“优化残差” |
+
+`L` 较大可能表示当前 frontier 仍弱，也可能表示 `T_SOL` 虽然合法但过松。
+区分两者需要 benchmark curator 提供可信的 frontier 和跨实现证据；在完成
+这一步之前，Agent 不应以关闭整个 `T_frontier - T_SOL` 差距为目标。
+
+`C` 较大通常对应实现层引入的额外代价，例如重复计算、padding、尾块浪费、
+spill、未兑现的 WMMA 映射、过多 barrier、中间结果物化、融合不足或额外
+dispatch。因此 `C` 是 Kernel Agent 和编译器后端最主要的行动指标。
+
+`R` 较大表示 ISA、dispatch 和 profiler 计数已经纳入预测后，仍有实际效应
+没有被模型解释。候选原因包括 cache miss、工作集转折、occupancy、wave
+调度、LDS bank conflict、访存合并、指令依赖、pipeline stall、launch/
+synchronization 和 kernel 间干扰。此时主责是补充微基准、counter 或模型，
+而不是默认继续改写 kernel。
+
+可以将首要排查对象概括为：
+
+```text
+L 高 → 检查 SOLAR 下界是否足够紧，以及 frontier 是否可信
+C 高 → 检查 kernel 设计、编译器 lowering 和硬件工作量表征
+R 高 → 检查微架构预测、profiler 证据和标定参数
+```
+
+责任归属不等于信息隔离。Benchmark 和 Agent 评测系统必须同时保存三个指标，
+以避免把形式模型误差或预测模型误差写入 Agent reward。GPU Kernel Agent
+主要对 `C` 采取行动，也可以消费 `L` 作为停止信号、消费 `R` 的已验证诊断
+作为优化提示，但不应自动为 `L` 或未经验证的 `R` 承担性能信用。
+
+在时间口径和证据身份一致时，三个比值通常应不小于 1。若某个比值明显小于
+1，不应先解释为“性能超越模型”，而应检查 workload/shape、warm-up 和统计
+口径、artifact 身份、dispatch/ISA 对齐、工作量计数以及标定版本。只有排除
+这些一致性问题后，才能将其视为需要修正模型的新证据。
+
 ### 2.2 小 Sigmoid：识别 launch-bound 下界松弛
 
 `problems/AMD_AKA/torch2hip/gpumode_sigmoid` 的 `w1` 只有 65,536 个
