@@ -85,7 +85,9 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "maximum",
         "matmul",
         "masked_fill",
+        "max",
         "mean",
+        "min",
         "minimum",
         "mish",
         "mm",
@@ -221,6 +223,12 @@ def _canonical_target(layer: Mapping[str, Any]) -> str:
     # Dunder names carry semantic trailing underscores, whereas a trailing
     # underscore on an ATen operator denotes mutation.  Resolve aliases before
     # removing the latter so ``__getitem__`` cannot become ``__getitem``.
+    if target in {"max", "min"}:
+        output_count = len(
+            (layer.get("tensor_names") or {}).get("outputs") or [],
+        )
+        if output_count == 2:
+            return target
     if target in aliases:
         return aliases[target]
     return aliases.get(target.rstrip("_"), target.rstrip("_"))

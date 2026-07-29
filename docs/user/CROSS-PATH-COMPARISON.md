@@ -55,8 +55,8 @@ authoritative accounting.
 
 ## Focused dual-path result
 
-The post-fix 41-workload focused matrix has 32 workloads ready on both paths.
-For those 32:
+The reviewed accounting comparison covers 32 workloads that were ready on both
+paths when it was generated. For those 32:
 
 | Dimension | Mismatches |
 | --- | ---: |
@@ -82,8 +82,14 @@ Three generic fixes established that result:
 - a Torchview dtype-view preserves its explicit destination dtype instead of
   being normalized as a shape-only view.
 
-The focused matrix still has nine Torchview coverage failures: four exact source
-input binding failures and five graph extraction failures. They remain
-fail-closed and keep the corpus comparison status `incomplete`; improving that
-coverage is separate from explaining accounting for dual-ready workloads.
+Those nine Torchview conversion/replay failures have since been fixed through
+generic scalar-edge, tensor-keyword, and root-identity handling. The current
+focused readiness matrix is 41/41 on both paths, and the complete Torchview
+matrix is 159/163. The nine newly ready workloads have not yet been reanalyzed
+and added to a repository-owned accounting comparison, so the 32-workload
+accounting result above must not be generalized to all 41 workloads.
 
+The four remaining full-corpus Torchview failures are explicit backward
+references in `instruction2triton/rmsnorm_bwd`. They remain fail-closed at graph
+extraction because a forward-only Torchview trace cannot represent their
+upstream-gradient dependency or gradient outputs.

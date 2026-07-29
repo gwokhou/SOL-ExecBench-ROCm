@@ -151,6 +151,15 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
             input_types=[],  # populated later from connection node types
             output_types=[],  # populated later from connection node types
             module_args=module_info["module_args"],
+            source_input_index=getattr(
+                node,
+                "source_input_index",
+                getattr(
+                    getattr(node, "main_node", None),
+                    "source_input_index",
+                    None,
+                ),
+            ),
         )
 
     def _get_node_type(self, node: Any, node_class: str) -> str:
@@ -880,9 +889,11 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
                 processed,
                 {"__builtins__": {}},
                 {
+                    "inf": float("inf"),
+                    "nan": float("nan"),
                     "slice": lambda start=None, stop=None, step=None: {
                         "slice": [start, stop, step]
-                    }
+                    },
                 },
             )
 

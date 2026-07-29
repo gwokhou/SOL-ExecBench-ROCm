@@ -291,8 +291,9 @@ class RecorderTensor(torch.Tensor):
         input_context = next(iter(recorder_nodes)).context
         collect_attributes = next(iter(recorder_nodes)).collect_attributes
 
-        # Build ordered_input_nodes in positional arg order.
-        # For each tensor arg:
+        # Build ordered_input_nodes in call-signature order: positional
+        # arguments first, then keyword arguments in insertion order.
+        # For each tensor argument:
         #   - RecorderTensor -> use its existing TensorNode
         #   - plain torch.Tensor (nn.Parameter) -> create a parameter-tensor TensorNode
         # This preserves arg order so torch.matmul(x, w) vs torch.matmul(w, x) are distinct.
@@ -300,11 +301,10 @@ class RecorderTensor(torch.Tensor):
         all_input_shapes: list[tuple[int, ...]] = []
         _seen_param_ids: set[int] = set()
 
-        for arg in _flatten_args(args):
+        for arg in _flatten_args((args, kwargs)):
             if (
                 not isinstance(arg, torch.Tensor)
                 or not hasattr(arg, "shape")
-                or len(arg.shape) == 0
             ):
                 continue
 
@@ -376,9 +376,12 @@ class RecorderTensor(torch.Tensor):
 
 
 def _flatten_args(args: Any) -> list[Any]:
-    """Flatten nested args (tuples/lists) into a flat list of leaf values."""
+    """Flatten nested call arguments without losing mapping insertion order."""
     result: list[Any] = []
-    if isinstance(args, (tuple, list)):
+    if isinstance(args, dict):
+        for item in args.values():
+            result.extend(_flatten_args(item))
+    elif isinstance(args, (tuple, list)):
         for item in args:
             result.extend(_flatten_args(item))
     else:

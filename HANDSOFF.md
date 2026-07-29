@@ -4,18 +4,16 @@
 
 Handoff date: 2026-07-29
 
-The implementation is complete through these two DCO commits:
+The dual-path implementation baseline is recorded by these DCO commits:
 
 ```text
+35e0f836 Add fail-closed SOLAR path comparison
 24dfe9d6 Enable fixed dual-path SOLAR analysis
 c5510916 Expand AKA workload and correctness contracts
 ```
 
-Both commits contain `Signed-off-by: Guohao Zhang
+The commits contain `Signed-off-by: Guohao Zhang
 <akidezhang@outlook.com>`.
-
-The worktree was clean at `24dfe9d6` before this handoff document was added.
-`HANDSOFF.md` is therefore the only expected uncommitted file.
 
 ## What is implemented
 
@@ -87,34 +85,41 @@ gfx1200
 ROCm device cuda:0
 ```
 
-Final-code focused results for the eight new problems and 41 workloads:
+Current focused conversion/replay results for the eight new problems and 41
+workloads:
 
-| Path | Conversion/replay | Strict resource analysis |
-| --- | ---: | ---: |
-| `make_fx_aten` | 41/41 ready | 41/41 analyzed |
-| `torchview_extended_einsum` | 32/41 ready | 32/41 analyzed |
+| Path | Conversion/replay |
+| --- | ---: |
+| `make_fx_aten` | 41/41 ready |
+| `torchview_extended_einsum` | 41/41 ready |
 
-The nine Torchview failures are intentional fail-closed results:
+The previous nine Torchview failures were fixed generically:
 
-- `torch2hip/14007_kd_loss`: four workloads fail at `ir_conversion` with
-  `source_input_binding_failed`. Torchview omits scalar dependencies, leaving
-  more reconstructed starts than uniquely observed source indices.
-- `torch2hip/l2n52_conv_activation_batchnorm`: five workloads fail at
-  `graph_extraction` with `graph_extraction_failed`. The trace does not expose
-  enough root tensor identities to bind all tensor arguments exactly.
+- 0-D RecorderTensor edges now retain their exact producer identity;
+- positional and keyword tensor arguments share one ordered trace contract;
+- root TensorNodes carry their exact reference source indices.
 
-Do not fix these with problem-name special cases or shape/dtype guessing.
+No problem-name special cases or shape/dtype source-binding guesses were added.
+Strict resource analysis and cross-path accounting have not been rerun for the
+nine newly ready workloads, so 41-workload accounting equivalence is not
+established.
 
-The full scored-corpus audits produced:
+The current full scored-corpus conversion audit produces:
 
 | Path | Ready | Failure summary |
 | --- | ---: | --- |
 | `make_fx_aten` | 163/163 | none |
-| `torchview_extended_einsum` | 116/163 | 23 extraction, 4 source binding, 20 strict conversion |
+| `torchview_extended_einsum` | 159/163 | 4 graph extraction |
 
-The full audits were run immediately before the final type-only IRPath boundary
-cleanup and helper extraction. The final 41-workload matrix was rerun after
-that cleanup. Rerun the full matrix before publishing evidence.
+The four remaining failures are every workload in
+`instruction2triton/rmsnorm_bwd`. Vendored Torchview executes its trace under
+`torch.no_grad()` and cannot represent the reference's explicit autograd
+backward graph. Enabling gradients only records the forward graph and omits
+`grad_output` plus both gradient outputs, so that is not a valid coverage fix.
+These workloads remain fail-closed at `graph_extraction`.
+
+The current 159/163 result is development evidence. Rerun the complete matrix
+on the exact reviewed source before publishing evidence.
 
 Temporary evidence currently exists at:
 
@@ -125,7 +130,7 @@ Temporary evidence currently exists at:
 /tmp/solar-analysis-torchview-new41-final/analysis-summary.json
 /tmp/solar-dual-path-comparison-final.json
 /tmp/solar-corpus-audit-makefx-full-v1/summary.json
-/tmp/solar-corpus-audit-torchview-full-v1/summary.json
+/tmp/solar-corpus-audit-torchview-coverage-v6/summary.json
 ```
 
 These files are not committed and may disappear. They are development evidence,
@@ -269,19 +274,21 @@ proof of equal resource work.
 
 ### P2: Improve Torchview coverage generically
 
-Use the complete Torchview matrix as the work queue. Prioritize failures by
-reason code rather than problem name:
+The generic source-binding, tensor-kwargs, functional-linear, multi-output
+reduction, and non-finite scalar gaps are closed. The complete matrix is
+159/163. The remaining work is explicit backward-reference support:
 
-1. Recover exact source indices only when trace identity proves them.
-2. Preserve scalar-tensor and multi-output topology without matching solely by
-   shape/dtype.
-3. Add exact operation semantics and resource rules together.
-4. Add focused unit tests before rerunning the affected GPU rows.
-5. Keep every unresolved ambiguity at its existing failure stage.
+1. Define a reviewed Torchview-path contract that represents backward
+   operations, upstream gradients, and ordered gradient outputs explicitly.
+2. Do not reuse the MakeFX extractor or restore a prohibited cross-path
+   extractor/IR combination.
+3. Add focused CPU exact-replay tests for explicit backward references.
+4. Rerun all four `rmsnorm_bwd` GPU rows, then the complete 163-workload matrix.
+5. Keep the current graph-extraction failures until the full dependency graph
+   is represented and exact replay succeeds.
 
-The current new-workload failures are useful regression sentinels. A future
-change should only turn them green when the general graph contract proves the
-binding/topology.
+Do not count a forward-only trace as improvement: it omits the defining
+backward work and is not equivalent to the reference.
 
 ## Important invariants
 
