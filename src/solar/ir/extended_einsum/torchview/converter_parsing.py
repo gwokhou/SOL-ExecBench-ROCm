@@ -616,7 +616,7 @@ class ConverterParsingMixin(ConverterMixinContract):
                     if in_dtypes
                     else (odata.get("output_dtypes") or ["torch.bool"])[0]
                 )
-            elif layer_type == "to":
+            elif layer_type in {"to", "view"}:
                 requested_dtype = next(
                     (
                         argument["dtype"]
