@@ -95,6 +95,7 @@ def _prepare_case(
     graph: Mapping[str, Any],
     case: Mapping[str, Any],
     device: str,
+    preserved_input_indices: Sequence[int],
 ) -> _PreparedCase:
     import torch
 
@@ -106,7 +107,17 @@ def _prepare_case(
         if isinstance(generated, (tuple, list))
         else (generated,)
     )
-    reference_inputs = clone(pattern_inputs(inputs, pattern))
+    if any(index >= len(inputs) for index in preserved_input_indices):
+        raise VerificationError(
+            "preserved_input_indices select unavailable reference arguments",
+        )
+    reference_inputs = clone(
+        pattern_inputs(
+            inputs,
+            pattern,
+            preserved_input_indices=preserved_input_indices,
+        ),
+    )
     source_indices = graph.get("source_input_indices")
     if source_indices is None:
         reference_tensor_inputs = tuple(
@@ -229,7 +240,13 @@ def _run_cases(
     )
     results: list[dict[str, Any]] = []
     for case in cases:
-        prepared = _prepare_case(input_factory, graph, case, device)
+        prepared = _prepare_case(
+            input_factory,
+            graph,
+            case,
+            device,
+            tuple(getattr(tolerance, "preserved_input_indices", ())),
+        )
         parameters, seed, pattern, *_ = prepared
         stats = _verify_case(reference, executor, graph, prepared, tolerance)
         results.append(
@@ -367,6 +384,15 @@ def _tolerance_record(policy: TolerancePolicy) -> dict[str, Any]:
     }
 
 
+def _verification_policy_record(
+    policy: VerificationPolicy,
+) -> dict[str, Any]:
+    return {
+        **_tolerance_record(policy),
+        "preserved_input_indices": list(policy.preserved_input_indices),
+    }
+
+
 def create_verification_artifact(
     *,
     reference_path: str | Path,
@@ -405,7 +431,7 @@ def create_verification_artifact(
         graph_path=graph_path,
         workload_name=workload_name,
         workload_parameters=workload_parameters,
-        tolerance=_tolerance_record(policy),
+        tolerance=_verification_policy_record(policy),
         execution=execution,
         cases=cases,
         results=results,
@@ -498,7 +524,7 @@ def verify_callable_conversion(
         reference_name=reference_name,
         reference_sha256=reference_sha256,
         graph_path=graph_path,
-        tolerance=_tolerance_record(policy),
+        tolerance=_verification_policy_record(policy),
         execution=_execution_identity(policy.device),
         cases=cases,
         results=results,
@@ -635,7 +661,7 @@ def _validated_recorded_tolerance(
     tolerance: Mapping[str, Any],
     required: TolerancePolicy,
 ) -> TolerancePolicy:
-    recorded = TolerancePolicy(
+    recorded = VerificationPolicy(
         atol=float(tolerance.get("atol", math.inf)),
         rtol=float(tolerance.get("rtol", math.inf)),
         required_matched_ratio=float(
@@ -648,6 +674,10 @@ def _validated_recorded_tolerance(
         ),
         allow_negative_inf=bool(
             tolerance.get("allow_negative_inf", False),
+        ),
+        preserved_input_indices=tuple(
+            int(index)
+            for index in tolerance.get("preserved_input_indices") or ()
         ),
     )
     cap_is_weaker = required.max_error_cap is not None and (
@@ -664,6 +694,9 @@ def _validated_recorded_tolerance(
         or cap_is_weaker
         or recorded.allow_negative_inf
         and not required.allow_negative_inf
+        or isinstance(required, VerificationPolicy)
+        and recorded.preserved_input_indices
+        != tuple(required.preserved_input_indices)
     ):
         raise VerificationError(
             "verification tolerance is weaker than benchmark tolerance",

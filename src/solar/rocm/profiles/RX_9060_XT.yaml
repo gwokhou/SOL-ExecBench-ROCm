@@ -4,7 +4,7 @@
 name: Radeon_RX_9060_XT
 vendor: AMD
 gfx_target: gfx1200
-profile_revision: rx9060xt-amd-resource-v4
+profile_revision: rx9060xt-amd-resource-v5
 compute_units: 32
 memory_capacity_bytes: 17179869184
 memory_bandwidth_bytes_per_second: 320000000000
@@ -46,7 +46,7 @@ peak_ops_per_second:
   fp8: 205000000000000
   int8: 205000000000000
   int4: 410000000000000
-resource_model_version: amd_resource_v1
+resource_model_version: amd_resource_v2
 # MFMA rates use the published FP16/FP8/INT8 matrix throughput; BF16 uses the
 # matching gfx12 FP16/BF16 WMMA issue shape because AMD publishes no RX 9060 XT
 # BF16 figure.  VALU fp32/fp16 use the published Vector peaks (25.6 TFLOPs

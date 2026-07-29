@@ -87,8 +87,10 @@ _INDEXED_WRITES = {
 }
 _MATH_OPERATIONS = {
     "abs",
+    "exp2",
     "neg",
     "exp",
+    "floor",
     "log",
     "log2",
     "log10",
@@ -145,6 +147,8 @@ def _normalize_structural_operation(operation: str) -> str | None:
 
 
 def _normalize_suffix_operation(operation: str) -> str | None:
+    if operation == "multiply" or operation.endswith(".multiply"):
+        return "mul"
     for canonical in ("add", "sub", "mul", "div"):
         if operation == canonical or operation.endswith(
             (f".{canonical}", f"_{canonical}"),

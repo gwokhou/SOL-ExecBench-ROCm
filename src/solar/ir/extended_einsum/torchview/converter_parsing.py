@@ -307,6 +307,7 @@ class ConverterParsingMixin(ConverterMixinContract):
         left untouched.
         """
         self._tensor_to_producer_op = {}
+        self._tensor_to_producer_slot = {}
         op_id_set = set(op_ids)
 
         # torchview may omit module parameters from the bipartite graph even
@@ -386,9 +387,6 @@ class ConverterParsingMixin(ConverterMixinContract):
         orphans_by_key: dict[tuple[tuple[int, ...], str], list[str]] = (
             defaultdict(list)
         )
-        dangling_by_key: dict[
-            tuple[tuple[int, ...], str], list[tuple[str, str]]
-        ] = defaultdict(list)
         hidden_dangling_by_shape: dict[
             tuple[int, ...], list[tuple[str, str, str]]
         ] = defaultdict(list)
@@ -418,12 +416,14 @@ class ConverterParsingMixin(ConverterMixinContract):
             key = (sh, dt)
             if not producers_ and consumers_:
                 orphans_by_key[key].append(tensor_id)
-            elif len(producers_) == 1 and not consumers_:
-                dangling_by_key[key].append((tensor_id, producers_[0]))
-                if (tdata.get("type") or "").lower() == "hidden-tensor":
-                    hidden_dangling_by_shape[sh].append(
-                        (tensor_id, producers_[0], dt)
-                    )
+            elif (
+                len(producers_) == 1
+                and not consumers_
+                and (tdata.get("type") or "").lower() == "hidden-tensor"
+            ):
+                hidden_dangling_by_shape[sh].append(
+                    (tensor_id, producers_[0], dt)
+                )
 
         # --- (A) Dropped scalar-tensor edges ------------------------------
         consumed: set[tuple[str, str]] = set()
@@ -539,11 +539,11 @@ class ConverterParsingMixin(ConverterMixinContract):
 
         # --- (B) Split tensor-node pairs ----------------------------------
         for key, orphan_ids in orphans_by_key.items():
-            de_list = [
-                (t, p)
-                for (t, p) in dangling_by_key.get(key, [])
-                if (t, p) not in consumed
-            ]
+            de_list = self._matching_hidden_dangling(
+                key,
+                hidden_dangling_by_shape,
+                consumed,
+            )
             if len(orphan_ids) != 1 or len(de_list) != 1:
                 continue
             orphan_id = orphan_ids[0]
@@ -559,14 +559,8 @@ class ConverterParsingMixin(ConverterMixinContract):
                 ocon_in.append(producer_op)
 
         # --- (C) Output-dtype correction ----------------------------------
-        # Seed the corrected-dtype map from every NON-OP node's declared
-        # dtype: regular tensor nodes (intermediates), auxiliary-tensor
-        # nodes (model inputs), and parameter-tensor nodes (weights). These
-        # are ground truth, recorded by torchview at trace time. Op-output
-        # dtypes get overwritten below as we walk the graph in topo order.
-        # ``_partition_nodes`` splits these into three lists; iterate every
-        # non-op layer (anything in ``layers`` that's not in ``op_id_set``)
-        # so we don't miss auxiliary/parameter tensors.
+        # Seed from every non-operation node; operation outputs are corrected
+        # below in topological order.
         corrected_dtype: dict[str, str] = {}
         for layer_id, ldata in layers.items():
             if layer_id in op_id_set:
@@ -586,6 +580,12 @@ class ConverterParsingMixin(ConverterMixinContract):
             if in_dtypes:
                 odata["input_dtypes"] = in_dtypes
             layer_type = (odata.get("type") or "").lower()
+            if self._correct_topk_output_dtypes(
+                layers,
+                odata,
+                corrected_dtype,
+            ):
+                continue
             dtype_methods = {
                 "bfloat16": "torch.bfloat16",
                 "float": "torch.float32",
@@ -666,6 +666,47 @@ class ConverterParsingMixin(ConverterMixinContract):
                     n = len(tdata.get("output_dtypes") or []) or 1
                     tdata["output_dtypes"] = [widest] * n
                 corrected_dtype[tid] = widest
+
+    @staticmethod
+    def _matching_hidden_dangling(
+        key: tuple[tuple[int, ...], str],
+        candidates: dict[tuple[int, ...], list[tuple[str, str, str]]],
+        consumed: set[tuple[str, str]],
+    ) -> list[tuple[str, str]]:
+        """Return hidden producer tensors matching one orphan exactly."""
+        shape, dtype = key
+        return [
+            (tensor_id, producer)
+            for tensor_id, producer, candidate_dtype in candidates.get(
+                shape,
+                [],
+            )
+            if candidate_dtype == dtype
+            if (tensor_id, producer) not in consumed
+        ]
+
+    @staticmethod
+    def _correct_topk_output_dtypes(
+        layers: dict[str, Any],
+        operation: dict[str, Any],
+        corrected_dtype: dict[str, str],
+    ) -> bool:
+        """Preserve distinct values/index dtypes for a top-k operation."""
+        if (operation.get("type") or "").lower() != "topk":
+            return False
+        slot_dtypes = list(operation.get("output_dtypes") or [])
+        outputs = list(
+            (operation.get("connections") or {}).get("outputs") or [],
+        )
+        if len(slot_dtypes) != 2 or len(outputs) != 2:
+            raise ValueError("topk requires two exact output dtype slots")
+        for index, tensor_id in enumerate(outputs):
+            if tensor_id in layers:
+                tensor_data = layers[tensor_id]
+                count = len(tensor_data.get("output_dtypes") or []) or 1
+                tensor_data["output_dtypes"] = [slot_dtypes[index]] * count
+            corrected_dtype[tensor_id] = slot_dtypes[index]
+        return True
 
     def _validate_tensor_shape_consistency(
         self,

@@ -212,3 +212,49 @@ def test_validate_rejects_bad_einsum_and_missing_required_parameters() -> None:
     }
     with pytest.raises(AtenIRError, match="explicit slice bounds"):
         validate_aten_graph(_graph(sliced))
+
+
+def test_validate_accepts_positional_slice_parameters() -> None:
+    sliced = _layer("slice", inputs=1)
+    sliced["semantic_op"] = {
+        "kind": "aten",
+        "target": "slice",
+        "exact_target": "aten.slice.Tensor",
+        "overload": "Tensor",
+        "arguments": [
+            {"tensor": 0},
+            {"value": 1},
+            {"value": 0},
+            {"value": 2},
+            {"value": 1},
+        ],
+        "kwargs": {},
+        "effects": {
+            "mutates": [],
+            "aliases": [{"input": 0, "output": 0}],
+            "atomic": False,
+        },
+    }
+
+    validate_aten_graph(_graph(sliced))
+
+
+def test_validate_requires_topk_parameters_and_two_output_slots() -> None:
+    topk = _layer("topk", inputs=1)
+    topk["semantic_op"] = {
+        "kind": "aten",
+        "target": "topk",
+        "exact_target": "aten.topk.default",
+        "overload": "default",
+        "arguments": [{"tensor": 0}, {"value": 2}],
+        "kwargs": {"dim": -1},
+        "effects": {"mutates": [], "aliases": [], "atomic": False},
+    }
+
+    with pytest.raises(AtenIRError, match="two output slots"):
+        validate_aten_graph(_graph(topk))
+
+    topk["tensor_names"]["outputs"] = ["values", "indices"]
+    topk["tensor_shapes"]["outputs"] = [[2], [2]]
+    topk["tensor_dtypes"]["outputs"] = ["torch.float32", "torch.int64"]
+    validate_aten_graph(_graph(topk))

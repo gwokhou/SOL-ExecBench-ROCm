@@ -18,9 +18,8 @@ from solar.api import (
     VerificationPolicy,
 )
 from solar.contracts import SolarStage
-from solar.graph.contracts import ExtractionKind
 from solar.graph.extraction import OperatorGraphArtifact
-from solar.ir.contracts import IRKind
+from solar.ir.contracts import IRKind, IRPath
 from solar.ir.conversion import IRGraphArtifact
 from solar.ir.registry import ir_lifecycle
 from solar.pipeline import analysis as analysis_pipeline
@@ -40,8 +39,7 @@ def _request(output: Path) -> AnalysisRequest:
             input_factory=lambda seed: (seed,),
             reference_name="definition.json#reference",
             reference_sha256="a" * 64,
-            ir_kind=IRKind.ATEN,
-            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
+            ir_path=IRPath.MAKE_FX_ATEN,
         ),
         architecture="RX_9060_XT",
         output_dir=output,
@@ -68,8 +66,7 @@ def _matmul_request(
             input_factory=input_factory,
             reference_name="tests.test_api#matmul",
             reference_sha256="b" * 64,
-            ir_kind=IRKind.ATEN,
-            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
+            ir_path=IRPath.MAKE_FX_ATEN,
         ),
         architecture="RX_9060_XT",
         output_dir=output,
@@ -97,8 +94,7 @@ def _conv_request(
             input_factory=input_factory,
             reference_name="tests.test_api#conv2d",
             reference_sha256="c" * 64,
-            ir_kind=IRKind.ATEN,
-            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
+            ir_path=IRPath.MAKE_FX_ATEN,
         ),
         architecture="RX_9060_XT",
         output_dir=output,
@@ -190,7 +186,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         "manifest.yaml",
     }
     manifest = yaml.safe_load((output / "manifest.yaml").read_text())
-    assert manifest["schema_version"] == 4
+    assert manifest["schema_version"] == 5
     assert "candidate_runtime" not in manifest
     assert "score" not in manifest
     assert manifest["analysis_contract"]["precision"] == "fp16"

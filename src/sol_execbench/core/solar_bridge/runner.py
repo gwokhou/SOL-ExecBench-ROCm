@@ -47,6 +47,8 @@ def run_solar_worker(
         return _failed_outcome(request, *failure)
     try:
         outcome = SolarAnalysisOutcome.from_dict(payload or {})
+        if outcome.ir_path is not request.ir_path:
+            raise ValueError("SOLAR worker IR path mismatch")
         if (
             outcome.status is SolarAnalysisStatus.ANALYZED
             and not outcome.is_formal_publication
@@ -74,6 +76,8 @@ def run_solar_stage_worker(
         return _failed_stage_outcome(request, *failure)
     try:
         outcome = SolarStageAuditOutcome.from_dict(payload or {})
+        if outcome.ir_path is not request.ir_path:
+            raise ValueError("SOLAR stage worker IR path mismatch")
         if outcome.status is SolarReadinessStatus.READY and not outcome.ready:
             raise ValueError(
                 "SOLAR stage worker returned invalid ready evidence",
@@ -146,6 +150,7 @@ def _failed_outcome(
     return SolarAnalysisOutcome(
         status=SolarAnalysisStatus.FAILED,
         analysis_id=request.workload_uuid,
+        ir_path=request.ir_path,
         stage=SolarStage.OUTER_BRIDGE,
         reason_code=reason_code,
         message=message[:4096],
@@ -160,6 +165,7 @@ def _failed_stage_outcome(
     return SolarStageAuditOutcome(
         status=SolarReadinessStatus.FAILED,
         analysis_id=request.workload_uuid,
+        ir_path=request.ir_path,
         failure_stage=SolarStage.OUTER_BRIDGE,
         reason_code=reason_code,
         message=message[:4096],

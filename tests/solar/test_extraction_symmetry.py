@@ -23,7 +23,7 @@ from solar.graph.contracts import (
 )
 from solar.graph.extraction import extract_operator_graph
 from solar.graph.registry import extraction_backends
-from solar.ir.contracts import DEFAULT_IR_KIND, IRKind
+from solar.ir.contracts import DEFAULT_IR_KIND, DEFAULT_IR_PATH, IRKind, IRPath
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.registry import ir_lifecycle, ir_lifecycles
 from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
@@ -41,17 +41,15 @@ def _inputs(seed: int) -> tuple[torch.Tensor, torch.Tensor]:
     )
 
 
-def _analysis_request(
-    output: Path, extraction_kind: ExtractionKind
-) -> AnalysisRequest:
+def _analysis_request(output: Path, ir_path: IRPath) -> AnalysisRequest:
     return AnalysisRequest(
         conversion=ConversionRequest(
-            analysis_id=f"extraction_kind:{extraction_kind}:matmul",
+            analysis_id=f"ir_path:{ir_path}:matmul",
             reference=_matmul,
             input_factory=_inputs,
             reference_name="tests.test_extraction_symmetry#matmul",
             reference_sha256="a" * 64,
-            extraction_kind=extraction_kind,
+            ir_path=ir_path,
         ),
         architecture="RX_9060_XT",
         output_dir=output,
@@ -59,19 +57,14 @@ def _analysis_request(
 
 
 @pytest.mark.parametrize(
-    "extraction_kind",
-    [
-        ExtractionKind.TORCHVIEW,
-        ExtractionKind.MAKE_FX_REFERENCE,
-    ],
+    "ir_path",
+    list(IRPath),
 )
-def test_extractions_publish_symmetric_extended_einsum_artifacts(
+def test_fixed_paths_publish_their_canonical_ir_artifacts(
     tmp_path: Path,
-    extraction_kind: ExtractionKind,
+    ir_path: IRPath,
 ) -> None:
-    result = analyze(
-        _analysis_request(tmp_path / extraction_kind.value, extraction_kind)
-    )
+    result = analyze(_analysis_request(tmp_path / ir_path.value, ir_path))
 
     assert isinstance(result, AnalysisResult)
     assert result.sol_score_eligible
@@ -80,7 +73,7 @@ def test_extractions_publish_symmetric_extended_einsum_artifacts(
     artifact_paths = {artifact.path for artifact in result.artifacts}
     assert {
         "operator_graph.yaml",
-        "einsum_graph.yaml",
+        ir_path.graph_filename,
         "conversion-attestation.yaml",
         "solar-analysis.yaml",
     } <= artifact_paths
@@ -93,7 +86,7 @@ def test_extractions_publish_symmetric_extended_einsum_artifacts(
         (result.output_dir / "operator_graph.yaml").read_text(),
     )
     graph = yaml.safe_load(
-        (result.output_dir / "einsum_graph.yaml").read_text(),
+        (result.output_dir / ir_path.graph_filename).read_text(),
     )
     attestation = yaml.safe_load(
         (result.output_dir / "conversion-attestation.yaml").read_text(),
@@ -101,56 +94,56 @@ def test_extractions_publish_symmetric_extended_einsum_artifacts(
     manifest = yaml.safe_load(
         (result.output_dir / "manifest.yaml").read_text(),
     )
-    assert operator["extraction_kind"] == extraction_kind.value
-    assert graph["ir_kind"] == IRKind.EXTENDED_EINSUM.value
+    assert operator["extraction_kind"] == ir_path.extraction_kind.value
+    assert graph["ir_kind"] == ir_path.ir_kind.value
     assert (
         attestation["predicate"]["verifier"] == IR_VERIFICATION_SCHEMA_VERSION
     )
-    assert manifest["schema_version"] == 4
+    assert manifest["analysis_contract"]["ir_path"] == ir_path.value
     assert (
         manifest["analysis_contract"]["extraction_kind"]
-        == extraction_kind.value
+        == ir_path.extraction_kind.value
     )
-    assert manifest["analysis_contract"]["ir_kind"] == (
-        IRKind.EXTENDED_EINSUM.value
-    )
+    assert manifest["analysis_contract"]["ir_kind"] == ir_path.ir_kind.value
     assert manifest["sol_score_eligible"] is True
 
 
-@pytest.mark.parametrize("extraction_kind", list(ExtractionKind))
-def test_readiness_passes_for_both_extractions(
+@pytest.mark.parametrize("ir_path", list(IRPath))
+def test_readiness_passes_for_both_fixed_paths(
     tmp_path: Path,
-    extraction_kind: ExtractionKind,
+    ir_path: IRPath,
 ) -> None:
     result = audit_conversion(
         ConversionReadinessRequest(
             conversion=ConversionRequest(
-                analysis_id=f"readiness:{extraction_kind}",
+                analysis_id=f"readiness:{ir_path}",
                 reference=_matmul,
                 input_factory=_inputs,
                 reference_name="tests.test_extraction_symmetry#matmul",
                 reference_sha256="b" * 64,
-                extraction_kind=extraction_kind,
+                ir_path=ir_path,
             ),
             architecture="RX_9060_XT",
-            output_dir=tmp_path / f"readiness-{extraction_kind}",
+            output_dir=tmp_path / f"readiness-{ir_path}",
         ),
     )
 
     assert result.ready
     graph = yaml.safe_load(
-        (Path(result.output_dir) / "einsum_graph.yaml").read_text(),
+        (Path(result.output_dir) / ir_path.graph_filename).read_text(),
     )
-    assert graph["ir_kind"] == IRKind.EXTENDED_EINSUM.value
+    assert graph["ir_kind"] == ir_path.ir_kind.value
 
 
 def test_extended_einsum_is_default_and_backends_are_first_class(
     tmp_path: Path,
 ) -> None:
-    request = _analysis_request(tmp_path / "default", DEFAULT_EXTRACTION_KIND)
+    request = _analysis_request(tmp_path / "default", DEFAULT_IR_PATH)
 
     assert DEFAULT_EXTRACTION_KIND is ExtractionKind.TORCHVIEW
     assert DEFAULT_IR_KIND is IRKind.EXTENDED_EINSUM
+    assert DEFAULT_IR_PATH is IRPath.TORCHVIEW_EXTENDED_EINSUM
+    assert request.ir_path is IRPath.TORCHVIEW_EXTENDED_EINSUM
     assert request.extraction_kind is ExtractionKind.TORCHVIEW
     assert request.ir_kind is IRKind.EXTENDED_EINSUM
     assert {lifecycle.kind for lifecycle in ir_lifecycles()} == {
@@ -171,8 +164,17 @@ def test_extraction_kinds_are_distinct() -> None:
     assert ExtractionKind.MAKE_FX_REFERENCE is ExtractionKind.MAKE_FX_REFERENCE
 
 
-def test_ir_lifecycle_rejects_an_incompatible_extraction(
+@pytest.mark.parametrize(
+    ("extraction_kind", "ir_kind"),
+    [
+        (ExtractionKind.TORCHVIEW, IRKind.ATEN),
+        (ExtractionKind.MAKE_FX_REFERENCE, IRKind.EXTENDED_EINSUM),
+    ],
+)
+def test_ir_lifecycle_rejects_cross_path_combinations(
     tmp_path: Path,
+    extraction_kind: ExtractionKind,
+    ir_kind: IRKind,
 ) -> None:
     operator = extract_operator_graph(
         _matmul,
@@ -180,39 +182,45 @@ def test_ir_lifecycle_rejects_an_incompatible_extraction(
         device="cpu",
         output_dir=tmp_path,
         name="incompatible",
-        extraction_kind=ExtractionKind.TORCHVIEW,
+        extraction_kind=extraction_kind,
     )
 
     with pytest.raises(
         RuntimeError,
-        match="'aten' does not support extraction 'torchview_v1'",
+        match=(
+            f"{ir_kind.value!r} does not support extraction "
+            f"{extraction_kind.value!r}"
+        ),
     ):
         convert_operator_graph(
             operator,
             output_dir=tmp_path,
-            ir_kind=IRKind.ATEN,
+            ir_kind=ir_kind,
         )
 
 
-def test_extractions_emit_equivalent_contraction_semantics(
+def test_fixed_paths_emit_equivalent_contraction_semantics(
     tmp_path: Path,
 ) -> None:
-    signatures: dict[ExtractionKind, list[tuple[object, ...]]] = {}
-    for extraction_kind in ExtractionKind:
-        output = tmp_path / extraction_kind.value
+    signatures: dict[IRPath, list[tuple[object, ...]]] = {}
+    for ir_path in IRPath:
+        output = tmp_path / ir_path.value
         operator = extract_operator_graph(
             _matmul,
             _inputs(7),
             device="cpu",
             output_dir=output,
-            name=f"{extraction_kind.value}-matmul",
-            extraction_kind=extraction_kind,
+            name=f"{ir_path.value}-matmul",
+            extraction_kind=ir_path.extraction_kind,
         )
-        artifact = convert_operator_graph(operator, output_dir=output)
+        artifact = convert_operator_graph(
+            operator,
+            output_dir=output,
+            ir_kind=ir_path.ir_kind,
+        )
         graph = yaml.safe_load(artifact.path.read_text())
-        signatures[extraction_kind] = sorted(
+        signatures[ir_path] = sorted(
             (
-                semantic["equation"],
                 tuple(
                     tuple(shape) for shape in layer["tensor_shapes"]["inputs"]
                 ),
@@ -221,13 +229,14 @@ def test_extractions_emit_equivalent_contraction_semantics(
                 ),
             )
             for layer in graph["layers"].values()
-            if (semantic := layer.get("semantic_op") or {}).get("kind")
-            == "einsum"
+            if layer.get("is_real_einsum")
+            or (layer.get("semantic_op") or {}).get("target")
+            in {"matmul", "mm"}
         )
 
     assert (
-        signatures[ExtractionKind.TORCHVIEW]
-        == signatures[ExtractionKind.MAKE_FX_REFERENCE]
+        signatures[IRPath.TORCHVIEW_EXTENDED_EINSUM]
+        == signatures[IRPath.MAKE_FX_ATEN]
     )
 
 

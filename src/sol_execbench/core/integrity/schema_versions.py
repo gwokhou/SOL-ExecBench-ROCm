@@ -24,13 +24,13 @@ ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION: Final = (
     "sol_execbench.rocm_compatibility_matrix.v1"
 )
 CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION: Final = (
-    "sol_execbench.corpus_stage_readiness_record.v3"
+    "sol_execbench.corpus_stage_readiness_record.v4"
 )
 CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION: Final = (
-    "sol_execbench.corpus_stage_readiness_summary.v1"
+    "sol_execbench.corpus_stage_readiness_summary.v2"
 )
 CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION: Final = (
-    "sol_execbench.corpus_stage_trace_identity.v2"
+    "sol_execbench.corpus_stage_trace_identity.v3"
 )
 RDNA4_VALIDATION_SCHEMA_VERSION: Final = "sol_execbench.rdna4_validation.v2"
 RELEASE_BASELINE_SCHEMA_VERSION: Final = "sol_execbench.release_baseline.v1"
@@ -43,7 +43,7 @@ RELEASE_EXECUTION_PLAN_SCHEMA_VERSION: Final = (
     "sol_execbench.release_execution_plan.v2"
 )
 RELEASE_SOLAR_INDEX_SCHEMA_VERSION: Final = (
-    "sol_execbench.release_solar_index.v1"
+    "sol_execbench.release_solar_index.v2"
 )
 ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION: Final = (
     "sol_execbench.rocprofv3_overhead_calibration.v2"

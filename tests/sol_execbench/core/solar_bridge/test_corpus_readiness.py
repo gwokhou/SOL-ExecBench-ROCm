@@ -21,7 +21,7 @@ def _ready_outcome(request) -> SolarStageAuditOutcome:
     output.mkdir(parents=True)
     names = {
         "graph_extraction": "operator_graph.yaml",
-        "ir_conversion": "einsum_graph.yaml",
+        "ir_conversion": request.ir_path.graph_filename,
         "conversion_verification": "conversion-attestation.yaml",
     }
     stages = []
@@ -40,10 +40,32 @@ def _ready_outcome(request) -> SolarStageAuditOutcome:
     return SolarStageAuditOutcome(
         status=SolarReadinessStatus.READY,
         analysis_id=request.workload_uuid,
+        ir_path=request.ir_path,
         output_dir=str(output),
         architecture_sha256=corpus_readiness.formal_architecture_profile_hash(),
         stages=tuple(stages),
     )
+
+
+def test_corpus_audit_rejects_worker_ir_path_drift(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def wrong_path(request, **_kwargs):
+        outcome = _ready_outcome(request)
+        return replace(outcome, ir_path="make_fx_aten")
+
+    monkeypatch.setattr(corpus_readiness, "run_solar_stage_worker", wrong_path)
+
+    try:
+        corpus_readiness.audit_corpus_stage_readiness(
+            MANIFEST,
+            tmp_path / "audit",
+        )
+    except ValueError as exc:
+        assert str(exc) == "readiness worker IR path mismatch"
+    else:
+        raise AssertionError("IR path drift was accepted")
 
 
 def test_corpus_audit_derives_and_addresses_the_full_scored_denominator(

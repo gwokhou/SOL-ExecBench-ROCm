@@ -289,11 +289,17 @@ def _floating_close_stats(
 def pattern_inputs(
     inputs: tuple[DynamicValue, ...],
     pattern: str,
+    *,
+    preserved_input_indices: Iterable[int] = (),
 ) -> tuple[DynamicValue, ...]:
     """Apply a deterministic verification pattern to tensor inputs."""
     import torch
 
-    def transform(value: DynamicValue) -> DynamicValue:
+    preserved = set(preserved_input_indices)
+
+    def transform(index: int, value: DynamicValue) -> DynamicValue:
+        if index in preserved:
+            return value
         if not isinstance(value, torch.Tensor):
             return value
         if pattern == "random":
@@ -316,7 +322,7 @@ def pattern_inputs(
             f"unknown verification input pattern: {pattern}",
         )
 
-    return tuple(transform(value) for value in inputs)
+    return tuple(transform(index, value) for index, value in enumerate(inputs))
 
 
 __all__ = [

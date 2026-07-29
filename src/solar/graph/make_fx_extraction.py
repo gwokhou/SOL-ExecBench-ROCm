@@ -42,6 +42,8 @@ def trace_make_fx_reference(
 
     try:
         graph_module = make_fx(tensor_reference)(*tensor_inputs.values())
+        graph_module.graph.eliminate_dead_code()
+        graph_module.recompile()
         placeholders = [
             node
             for node in graph_module.graph.nodes

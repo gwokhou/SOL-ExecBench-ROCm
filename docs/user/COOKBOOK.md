@@ -115,8 +115,10 @@ uv run sol-execbench solar analyze PROBLEM_DIR \
   --orojenesis-home /path/to/orojenesis
 ```
 
-SOLAR publishes operator graph, einsum graph, conversion attestation, formal
-analysis and manifest only when all stages pass. The CLI accepts only the
+SOLAR publishes an operator graph, the selected path's `einsum_graph.yaml` or
+`aten_graph.yaml`, conversion attestation, formal analysis, and manifest only
+when all stages pass. Select `--backend make_fx_aten` explicitly when required;
+the default is `torchview_extended_einsum`, and there is no fallback. The CLI accepts only the
 publication-eligible capacity-constrained Orojenesis bound; the current empty
 reviewed-mapper allowlist intentionally blocks formal publication.
 

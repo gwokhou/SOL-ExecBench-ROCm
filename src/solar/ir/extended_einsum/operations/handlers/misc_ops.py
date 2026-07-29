@@ -419,6 +419,40 @@ class PairwiseLossHandler(EinsumOpHandler):
         )
 
 
+class TopKHandler(EinsumOpHandler):
+    """Represent top-k selection while retaining both exact output slots."""
+
+    supported_ops = ("topk",)
+
+    def generate_einsum(
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
+    ) -> EinsumOp:
+        """Build a non-contraction representation for exact ATen replay."""
+        del kwargs
+        if tensor_shapes.num_inputs < 1 or tensor_shapes.num_outputs != 2:
+            raise ValueError("topk requires one input and two tensor outputs")
+        input_labels = list(
+            string.ascii_uppercase[: len(tensor_shapes.inputs[0])],
+        )
+        output_labels = list(
+            string.ascii_uppercase[: len(tensor_shapes.outputs[0])],
+        )
+        return EinsumOp(
+            operands=[
+                EinsumOperand("Input", input_labels, is_output=False),
+                EinsumOperand("Output", output_labels, is_output=True),
+            ],
+            equation=(f"{''.join(input_labels)}->{''.join(output_labels)}"),
+            name=op_name,
+            is_real_einsum=False,
+            elementwise_op="topk",
+            reduction_op="none",
+        )
+
+
 class TrivialOpsHandler(EinsumOpHandler):
     """Handler for trivial/identity operations."""
 
@@ -487,6 +521,7 @@ _registry.register_handler(LSTMHandler)
 _registry.register_handler(RNNHandler)
 _registry.register_handler(CrossEntropyHandler)
 _registry.register_handler(PairwiseLossHandler)
+_registry.register_handler(TopKHandler)
 _registry.register_handler(TrivialOpsHandler)
 
 
@@ -497,5 +532,6 @@ __all__ = [
     "LSTMHandler",
     "PairwiseLossHandler",
     "RNNHandler",
+    "TopKHandler",
     "TrivialOpsHandler",
 ]

@@ -262,6 +262,14 @@ def test_pattern_inputs_cover_float_bool_integer_and_unknown() -> None:
     assert boundary[1].tolist() == [False, True, False]
     assert boundary[2].tolist() == [0, 0, 0]
     assert boundary[3] == "value"
+    protected = numerics.pattern_inputs(
+        source,
+        "boundary",
+        preserved_input_indices=(0, 2),
+    )
+    assert protected[0] is source[0]
+    assert protected[2] is source[2]
+    assert protected[1].tolist() == [False, True, False]
     with pytest.raises(
         VerificationError,
         match="unknown verification input pattern",

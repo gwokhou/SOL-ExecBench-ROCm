@@ -26,7 +26,7 @@ from sol_execbench.core.solar_bridge.workload_context import (
     SolarWorkloadContext,
     load_solar_workload_context,
 )
-from solar.graph.contracts import DEFAULT_EXTRACTION_KIND, ExtractionKind
+from solar.ir.contracts import DEFAULT_IR_PATH, IRPath, normalize_ir_path
 
 if TYPE_CHECKING:
     from solar.api import ConversionRequest
@@ -56,7 +56,7 @@ def analyze_workload(
     output_dir: str | Path,
     device: str,
     orojenesis_home: str | Path | None,
-    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
+    ir_path: IRPath | str = DEFAULT_IR_PATH,
 ) -> SolarAnalysisOutcome:
     """Adapt one workload and invoke SOLAR's benchmark-agnostic API."""
     require_formal_device(device)
@@ -66,7 +66,7 @@ def analyze_workload(
         output_dir=Path(output_dir),
         device=device,
         orojenesis_home=orojenesis_home,
-        extraction_kind=extraction_kind,
+        ir_path=normalize_ir_path(ir_path),
     )
 
 
@@ -76,19 +76,17 @@ def audit_workload_stages(
     workload_uuid: str,
     output_dir: str | Path,
     device: str,
-    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
+    ir_path: IRPath | str = DEFAULT_IR_PATH,
 ) -> SolarStageAuditOutcome:
     """Run the exact extraction/conversion/replay gate for one corpus workload."""
-    from solar.api import (
-        ConversionReadinessRequest,
-        audit_conversion,
-    )
+    from solar.api import ConversionReadinessRequest, audit_conversion
 
     require_formal_device(device)
+    selected_path = normalize_ir_path(ir_path)
     context = load_solar_workload_context(problem_dir, workload_uuid, device)
     result = audit_conversion(
         ConversionReadinessRequest(
-            conversion=_conversion_request(context, device, extraction_kind),
+            conversion=_conversion_request(context, device, selected_path),
             architecture=FORMAL_ARCHITECTURE,
             output_dir=Path(output_dir),
         ),
@@ -102,17 +100,13 @@ def _invoke_solar(
     output_dir: Path,
     device: str,
     orojenesis_home: str | Path | None,
-    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
+    ir_path: IRPath = DEFAULT_IR_PATH,
 ) -> SolarAnalysisOutcome:
-    from solar.api import (
-        AnalysisFailure,
-        AnalysisRequest,
-        analyze,
-    )
+    from solar.api import AnalysisFailure, AnalysisRequest, analyze
 
     definition = context.definition
     request = AnalysisRequest(
-        conversion=_conversion_request(context, device, extraction_kind),
+        conversion=_conversion_request(context, device, ir_path),
         architecture=FORMAL_ARCHITECTURE,
         output_dir=output_dir,
         precision=formal_precision_for_definition(definition),
@@ -124,6 +118,7 @@ def _invoke_solar(
         return SolarAnalysisOutcome(
             status=result.status,
             analysis_id=result.analysis_id,
+            ir_path=result.ir_path,
             stage=result.stage,
             reason_code=result.reason_code,
             message=result.message,
@@ -131,6 +126,7 @@ def _invoke_solar(
     outcome = SolarAnalysisOutcome(
         status=result.status,
         analysis_id=result.analysis_id,
+        ir_path=result.ir_path,
         output_dir=str(result.output_dir),
         architecture_sha256=result.architecture_sha256,
         lower_bound_seconds=result.bound.seconds,
@@ -144,6 +140,7 @@ def _invoke_solar(
         return SolarAnalysisOutcome(
             status=SolarAnalysisStatus.FAILED,
             analysis_id=result.analysis_id,
+            ir_path=request.ir_path,
             stage=SolarStage.FORMAL_ACCEPTANCE,
             reason_code="non_formal_bound",
             message="SOLAR formal bridge rejected a non-publication result",
@@ -154,7 +151,7 @@ def _invoke_solar(
 def _conversion_request(
     context: SolarWorkloadContext,
     device: str,
-    extraction_kind: ExtractionKind | str,
+    ir_path: IRPath,
 ) -> ConversionRequest:
     from solar.api import ConversionRequest, VerificationPolicy
 
@@ -166,7 +163,7 @@ def _conversion_request(
         input_factory=context.input_factory,
         reference_name=f"{definition.name}/definition.json#reference",
         reference_sha256=sha256_bytes(definition.reference.encode()),
-        extraction_kind=extraction_kind,
+        ir_path=ir_path,
         verification=VerificationPolicy(
             atol=tolerance.max_atol,
             rtol=tolerance.max_rtol,
@@ -174,5 +171,6 @@ def _conversion_request(
             max_error_cap=tolerance.max_error_cap,
             allow_negative_inf=tolerance.allow_negative_inf,
             device=device,
+            preserved_input_indices=context.preserved_input_indices,
         ),
     )

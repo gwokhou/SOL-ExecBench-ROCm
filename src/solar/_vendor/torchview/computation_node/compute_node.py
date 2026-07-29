@@ -37,6 +37,7 @@ class TensorNode(Node):
         )
         self.tensor_id = id(tensor)
         self.tensor_shape = tuple(tensor.shape)
+        self.tensor_dtype = tensor.dtype
         self.name = name
         self.is_aux = is_aux
         self.main_node = self if main_node is None else main_node

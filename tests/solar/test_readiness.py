@@ -19,8 +19,7 @@ from solar.errors import (
     SourceInputBindingError,
     UnsupportedOperationError,
 )
-from solar.graph.contracts import ExtractionKind
-from solar.ir.contracts import IRKind
+from solar.ir.contracts import IRPath
 from solar.pipeline.readiness import readiness_reason_code
 
 
@@ -37,8 +36,7 @@ def _request(
             input_factory=lambda seed: (torch.tensor([float(seed % 3)]),),
             reference_name="test_readiness.reference",
             reference_sha256="a" * 64,
-            ir_kind=IRKind.ATEN,
-            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
+            ir_path=IRPath.MAKE_FX_ATEN,
         ),
         architecture=architecture,
         output_dir=output,

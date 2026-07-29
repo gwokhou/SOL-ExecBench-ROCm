@@ -103,7 +103,8 @@ uv run sol-execbench solar analyze PROBLEM_DIR \
 ```
 
 Options are `--device` (default `cuda:0`), `--timeout` (default 14400 seconds)
-and `--orojenesis-home`. The CLI always requires the formal
+`--orojenesis-home`, and `--backend` (default
+`torchview_extended_einsum`). The CLI always requires the formal
 capacity-constrained Orojenesis bound. It rejects paper-valid
 `roofline_eq1_v1` results at the worker, bridge, and CLI boundaries as an
 additional port release policy. Formal analysis is constrained by the pinned
@@ -130,11 +131,12 @@ trace seed. A failed or interrupted run can be checked and continued with
 `--resume`; existing identities and artifact hashes must still match.
 Concurrent writers to the same audit root are rejected before GPU work starts.
 
-SOLAR graph extraction is selected with `--extractor`. The default `torchview`
-choice uses the reviewed Torchview path; `make-fx` uses `make_fx`. Extraction
-and IR selection are independent in the Python API, but only explicitly
-supported pairings may proceed. Operations without complete provenance,
-tracing, conversion, replay, and resource-model support fail closed.
+SOLAR supports only the fixed `torchview_extended_einsum` and `make_fx_aten`
+paths. `--backend make_fx_aten` selects the latter explicitly; extractor and IR
+dialect cannot be selected independently. One audit or release build uses the
+same path for every workload, with no cross-path fallback. Operations without
+complete provenance, tracing, conversion, replay, and resource-model support
+fail closed.
 
 ## Official score
 

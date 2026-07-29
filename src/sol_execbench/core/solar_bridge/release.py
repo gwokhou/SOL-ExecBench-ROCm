@@ -19,7 +19,7 @@ from sol_execbench.core.scoring.release_models import SolarIndexStatement
 from sol_execbench.core.scoring.release_solar import verify_solar_index
 from sol_execbench.core.solar_bridge.models import SolarWorkerRequest
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
-from solar.graph.contracts import DEFAULT_EXTRACTION_KIND, ExtractionKind
+from solar.ir.contracts import DEFAULT_IR_PATH, IRPath, normalize_ir_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +31,7 @@ class SolarReleaseResult:
     generated: int
     resumed: int
     index_path: Path
+    ir_path: IRPath = DEFAULT_IR_PATH
 
 
 def build_release_solar_manifests(
@@ -41,10 +42,11 @@ def build_release_solar_manifests(
     timeout_seconds: float = 14_400,
     resume: bool = False,
     device: str = "cuda:0",
-    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
+    ir_path: IRPath | str = DEFAULT_IR_PATH,
 ) -> SolarReleaseResult:
     """Generate and index every scored workload's formal SOLAR artifacts."""
     workspace = workspace_root.resolve()
+    selected_path = normalize_ir_path(ir_path)
     corpus = AKACorpusManifest.load(corpus_manifest_path)
     baseline_plan = load_execution_plan(
         workspace / "baseline" / "plan.json",
@@ -54,20 +56,18 @@ def build_release_solar_manifests(
         corpus.authored_root.parents[1],
         expected_revision=baseline_plan.source_revision,
     )
-    generated = resumed = workloads = 0
-    problems = 0
+    generated = resumed = workloads = problems = 0
     for entry in corpus.entries:
         if entry.role is not AKACorpusRole.SCORED:
             continue
         problems += 1
         for workload_uuid in entry.workload_uuids:
             workloads += 1
-            output = (
-                workspace
-                / "solar"
-                / "manifests"
-                / entry.relative_problem_dir
-                / workload_uuid
+            output = workspace.joinpath(
+                "solar",
+                "manifests",
+                entry.relative_problem_dir,
+                workload_uuid,
             )
             if output.exists():
                 if not resume:
@@ -87,7 +87,7 @@ def build_release_solar_manifests(
                     output_dir=str(output),
                     device=device,
                     orojenesis_home=str(orojenesis_home.resolve()),
-                    extraction_kind=extraction_kind,
+                    ir_path=selected_path,
                 ),
                 timeout_seconds=timeout_seconds,
             )
@@ -104,12 +104,14 @@ def build_release_solar_manifests(
         source_revision=baseline_plan.source_revision,
         index_path=index_path,
         resume=resume,
+        ir_path=selected_path,
     )
     return SolarReleaseResult(
         problems=problems,
         workloads=workloads,
         generated=generated,
         resumed=resumed,
+        ir_path=selected_path,
         index_path=index_path,
     )
 
@@ -121,6 +123,7 @@ def _finish_index(
     source_revision: str,
     index_path: Path,
     resume: bool,
+    ir_path: IRPath,
 ) -> None:
     if not index_path.exists():
         build_solar_index(
@@ -128,6 +131,7 @@ def _finish_index(
             corpus_manifest_path=corpus.path,
             source_revision=source_revision,
             output_path=index_path,
+            ir_path=ir_path,
         )
         return
     if not resume:
@@ -139,6 +143,8 @@ def _finish_index(
     )
     if index.source_revision != source_revision:
         raise ValueError("resumed SOLAR release index source revision mismatch")
+    if index.ir_path is not ir_path:
+        raise ValueError("resumed SOLAR release index IR path mismatch")
     verify_solar_index(index, bundle_root=workspace, corpus=corpus)
 
 

@@ -75,12 +75,25 @@ _SFU_OPS = frozenset(
     {
         "cos",
         "exp",
+        "exp2",
+        "floor",
         "log",
+        "log2",
         "pow",
         "rsqrt",
         "sin",
         "sqrt",
         "tanh",
+    },
+)
+_LOSS_OPS = frozenset(
+    {
+        "cross_entropy",
+        "cross_entropy_loss",
+        "kl_div",
+        "nll_loss",
+        "nll_loss_forward",
+        "xlogy",
     },
 )
 _COMPOSITE_SFU_OPS = frozenset(
@@ -274,6 +287,12 @@ class _ResourceContext:
         target = target.rsplit(".", maxsplit=1)[-1]
         if target.endswith("_") and not target.endswith("__"):
             target = target[:-1]
+        target = {
+            "_to_copy": "to",
+            "miopen_batch_norm": "batch_norm",
+            "native_batch_norm": "batch_norm",
+            "split_with_sizes": "split",
+        }.get(target, target)
         shapes = layer.get("tensor_shapes") or {}
         input_shapes = list(shapes.get("inputs") or [])
         output_shapes = list(shapes.get("outputs") or [])
@@ -567,6 +586,85 @@ def _normalization_rule(
     return _MATCHED
 
 
+def _loss_rule(
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
+) -> _RuleResult:
+    if context.target not in _LOSS_OPS:
+        return _NO_MATCH
+    output_items = max(1, context.output_n)
+    if context.target in {"nll_loss", "nll_loss_forward"}:
+        labels = (
+            context.input_elements[1]
+            if len(context.input_elements) > 1
+            else output_items
+        )
+        accumulator.add(
+            "valu",
+            context.mode,
+            labels,
+            "one selected negative log-likelihood value per label",
+        )
+        accumulator.add(
+            "valu",
+            "integer",
+            labels,
+            "one class-index selection per label",
+        )
+        accumulator.add(
+            "reduction",
+            context.mode,
+            max(0, labels - output_items),
+            "loss values minus reduction outputs",
+        )
+        return _MATCHED
+    if context.target in {"cross_entropy", "cross_entropy_loss"}:
+        labels = (
+            context.input_elements[1]
+            if len(context.input_elements) > 1
+            else output_items
+        )
+        rows = max(1, labels)
+        accumulator.add(
+            "reduction",
+            context.mode,
+            2 * max(0, context.input_n - rows) + max(0, rows - output_items),
+            "log-softmax max/sum and loss reduction combines",
+        )
+        accumulator.add(
+            "sfu",
+            context.mode,
+            context.input_n,
+            "one log-softmax exponential/logarithm per logit",
+        )
+        accumulator.add(
+            "valu",
+            context.mode,
+            2 * context.input_n + labels,
+            "log-softmax normalization and selected loss values",
+        )
+        accumulator.add(
+            "valu",
+            "integer",
+            labels,
+            "one class-index selection per label",
+        )
+        return _MATCHED
+    accumulator.add(
+        "sfu",
+        context.mode,
+        context.output_n,
+        "one logarithm per KL/xlogy output element",
+    )
+    accumulator.add(
+        "valu",
+        context.mode,
+        (3 if context.target == "kl_div" else 1) * context.output_n,
+        "KL/xlogy mandatory multiply/subtract arithmetic",
+    )
+    return _MATCHED
+
+
 def _variance_rule(
     context: _ResourceContext,
     accumulator: _ResourceAccumulator,
@@ -735,6 +833,7 @@ _RESOURCE_RULES: tuple[_ResourceRule, ...] = (
     _scan_sort_rule,
     _conversion_rule,
     _normalization_rule,
+    _loss_rule,
     _variance_rule,
     _reduction_rule,
     _sfu_rule,

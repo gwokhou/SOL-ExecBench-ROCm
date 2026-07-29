@@ -86,11 +86,11 @@ deletes its staging directory and publishes no partial result directory. A
 successful run writes a content-addressed manifest and atomically renames the
 complete staging directory into place.
 
-The source operator artifact records its `extraction_kind`. `torchview_v1`
-uses the reviewed Torchview extractor and `make_fx_reference_v1` uses
-`make_fx`; `solar.ir.conversion` validates that provenance before selecting a
-target IR lifecycle. Extraction and IR selection are independent, while each
-lifecycle declares the extraction kinds it accepts.
+The source operator artifact records its `extraction_kind`, while every request
+records one fixed `IRPath`. `torchview_extended_einsum` binds `torchview_v1` to
+extended-einsum; `make_fx_aten` binds `make_fx_reference_v1` to exact ATen.
+`solar.ir.conversion` rejects both cross combinations, and no stage falls back
+to another path.
 
 The analyzer accepts a typed internal job. Existing SOLAR readability debt is
 inventoried in `scripts/solar_readability_debt.json`; every shrink must update

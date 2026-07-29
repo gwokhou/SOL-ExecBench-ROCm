@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from solar.graph.contracts import ExtractionKind
+from solar.ir.contracts import IRPath
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -29,7 +29,7 @@ def test_formal_policy_docs_separate_paper_bound_from_cli_publication():
     assert "`publication_eligible`" in scoring
 
 
-def test_docs_describe_every_extraction_choice() -> None:
+def test_docs_describe_every_fixed_ir_path() -> None:
     documents = [
         (ROOT / "README.md").read_text(encoding="utf-8"),
         (ROOT / "docs" / "SOLAR-BOUNDARY.md").read_text(encoding="utf-8"),
@@ -40,14 +40,9 @@ def test_docs_describe_every_extraction_choice() -> None:
             encoding="utf-8",
         ),
     ]
-    assert ExtractionKind.TORCHVIEW is ExtractionKind.TORCHVIEW
-    assert ExtractionKind.MAKE_FX_REFERENCE is ExtractionKind.MAKE_FX_REFERENCE
     for text in documents:
         lowered = text.lower()
-        assert (
-            "--extractor" in lowered
-            or "extractionkind" in lowered
-            or "extraction_kind" in lowered
-        )
-        assert "torchview" in lowered
-        assert "make_fx" in lowered
+        assert "--backend" in lowered or "irpath" in lowered
+        for ir_path in IRPath:
+            assert ir_path.value in lowered
+        assert "fallback" in lowered or "falls back" in lowered

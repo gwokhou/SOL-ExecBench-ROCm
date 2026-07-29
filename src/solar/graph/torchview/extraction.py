@@ -41,6 +41,7 @@ def extract_operator_graph(
     graph = yaml.safe_load(operator_path.read_text()) or {}
     graph["schema_version"] = OPERATOR_GRAPH_SCHEMA_VERSION
     graph["extraction_kind"] = ExtractionKind.TORCHVIEW.value
+    _record_source_input_indices(graph, used_indices)
     operator_path.write_text(yaml.safe_dump(graph, sort_keys=False))
     return OperatorGraphArtifact(
         path=operator_path,
@@ -69,6 +70,28 @@ def _tensor_signature(value: DynamicValue) -> TensorSignature:
             "SOLAR operator graphs require tensor reference inputs and outputs"
         )
     return TensorSignature(tuple(value.shape), str(value.dtype))
+
+
+def _record_source_input_indices(
+    graph: dict[str, DynamicValue],
+    used_indices: set[int],
+) -> None:
+    """Bind Torchview root tensors to exact reference argument positions."""
+    source_layers = [
+        layer
+        for layer in (graph.get("layers") or {}).values()
+        if str(layer.get("type", "")).lower() == "auxiliary-tensor"
+        and not (layer.get("connections") or {}).get("inputs")
+    ]
+    ordered = sorted(used_indices)
+    if len(source_layers) != len(ordered):
+        raise RuntimeError(
+            "Torchview source topology does not uniquely match used "
+            "reference tensor arguments",
+        )
+    for layer, source_index in zip(source_layers, ordered, strict=True):
+        layer["source_input_index"] = source_index
+    graph["source_input_indices"] = ordered
 
 
 def _trace_reference(

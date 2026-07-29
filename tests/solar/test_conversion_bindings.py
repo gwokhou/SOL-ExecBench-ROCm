@@ -6,6 +6,7 @@ import yaml
 from solar.graph.extraction import OperatorGraphArtifact, TensorSignature
 from solar.ir.bindings import bind_inputs
 from solar.ir.conversion import convert_operator_graph
+from solar.schema_versions import OPERATOR_GRAPH_SCHEMA_VERSION
 
 
 def _start(name: str, shape: list[int], source_input_index: int) -> dict:
@@ -61,7 +62,13 @@ def test_conversion_requires_canonical_schema_and_provenance(
 ) -> None:
     operator_path = tmp_path / "operator_graph.yaml"
     operator_path.write_text(
-        yaml.safe_dump({"schema_version": 1, "layers": {}, "outputs": []}),
+        yaml.safe_dump(
+            {
+                "schema_version": OPERATOR_GRAPH_SCHEMA_VERSION,
+                "layers": {},
+                "outputs": [],
+            }
+        ),
         encoding="utf-8",
     )
     operator = _operator(operator_path)

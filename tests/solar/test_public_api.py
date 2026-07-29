@@ -18,6 +18,7 @@ def test_solar_public_api_exposes_only_atomic_pipeline() -> None:
         "ExtractionKind",
         "FormalProducerReadiness",
         "IRKind",
+        "IRPath",
         "SolBound",
         "VerificationPolicy",
         "analyze",

@@ -126,6 +126,9 @@ publishes no partial output directory on failure. The CLI requires the
 capacity-constrained Orojenesis bound and cannot publish the paper-valid
 `roofline_eq1_v1` result accepted by the lower-level Python API. This is an
 additional port release policy, not a requirement of the SOL-ExecBench paper.
+A run selects exactly one `--backend`: the default
+`torchview_extended_einsum` or explicit `make_fx_aten`. These bind extraction
+and IR dialect and never fall back across paths.
 A reviewed reproducible mapper digest is allowlisted. A locally substituted or
 self-declared toolchain still fails closed.
 

@@ -102,14 +102,13 @@ manifest and writes a content-addressed `matrix.jsonl` plus `summary.json`.
 Failures remain in the matrix with stable stage and reason codes; `--resume`
 continues only when all recorded identities and artifact hashes still match.
 
-Graph extraction is selected explicitly with `--extractor`. The default
-`torchview` extractor uses the reviewed Torchview path, while `make-fx`
-(`make_fx_reference_v1` in the API) emits
-the exact ATen-oriented operator schema. The requested `ir_kind` is selected
-independently through the Python API. Every supported extractor/IR pairing must
-preserve exact source-input, output, tensor-metadata, and effect provenance.
-Unsupported tracing, conversion, execution, or resource accounting fails
-closed.
+SOLAR exposes exactly two fixed paths through `--backend`:
+`torchview_extended_einsum` (the default) and `make_fx_aten`. Extraction and IR
+selection cannot be combined independently, a run never falls back to the
+other path, and a corpus audit or release build uses one path for its complete
+denominator. Both paths preserve exact source-input, output, tensor-metadata,
+and effect provenance; unsupported tracing, conversion, replay, or resource
+accounting fails closed.
 
 ## Official score
 

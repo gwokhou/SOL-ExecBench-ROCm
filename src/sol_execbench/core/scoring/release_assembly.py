@@ -36,6 +36,11 @@ from sol_execbench.core.scoring.release_models import (
 )
 from sol_execbench.core.scoring.release_solar import verify_solar_index
 from sol_execbench.core.scoring.release_traces import verify_release_run
+from sol_execbench.core.solar_bridge.models import (
+    DEFAULT_IR_PATH,
+    IRPath,
+    normalize_ir_path,
+)
 from sol_execbench.core.timestamps import utc_timestamp
 
 
@@ -87,12 +92,14 @@ def build_solar_index(
     corpus_manifest_path: Path,
     source_revision: str,
     output_path: Path,
+    ir_path: IRPath | str = DEFAULT_IR_PATH,
 ) -> Path:
     """Verify and index the exact per-workload formal manifest denominator."""
     workspace = workspace_root.resolve()
     output = output_path.resolve()
     _require_missing(output)
     corpus = AKACorpusManifest.load(corpus_manifest_path)
+    selected_path = normalize_ir_path(ir_path)
     entries = tuple(
         SolarManifestEvidence(
             problem_path=entry.relative_problem_dir.as_posix(),
@@ -114,6 +121,7 @@ def build_solar_index(
     index = SolarIndexStatement(
         generated_at=utc_timestamp(),
         source_revision=source_revision,
+        ir_path=selected_path,
         corpus_manifest=artifact_reference(
             workspace,
             workspace / "corpus" / "manifest.yaml",

@@ -200,6 +200,8 @@ def _execute_arithmetic(
         return arguments[0].masked_fill(*arguments[1:], **kwargs)
     if target == "cumsum":
         return torch.cumsum(*arguments, **kwargs)
+    if target == "topk":
+        return torch.topk(*arguments, **kwargs)
     if target in {"softmax", "log_softmax"}:
         return getattr(functional, target)(*arguments, **kwargs)
     if target in {
@@ -247,11 +249,14 @@ def _unary_operations() -> dict[str, Callable[..., DynamicValue]]:
         "cos": torch.cos,
         "elu": functional.elu,
         "exp": torch.exp,
+        "exp2": torch.exp2,
+        "floor": torch.floor,
         "gelu": functional.gelu,
         "hardsigmoid": functional.hardsigmoid,
         "hardswish": functional.hardswish,
         "leaky_relu": functional.leaky_relu,
         "log": torch.log,
+        "log2": torch.log2,
         "mish": functional.mish,
         "neg": torch.neg,
         "relu": functional.relu,
@@ -262,6 +267,7 @@ def _unary_operations() -> dict[str, Callable[..., DynamicValue]]:
         "sqrt": torch.sqrt,
         "square": torch.square,
         "tanh": torch.tanh,
+        "xlogy": torch.xlogy,
     }
 
 
@@ -375,6 +381,9 @@ def _execute_functional(
         "group_norm",
         "instance_norm",
         "layer_norm",
+        "cross_entropy",
+        "kl_div",
+        "nll_loss",
         "embedding",
         "embedding_bag",
         "dropout",

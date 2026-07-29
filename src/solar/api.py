@@ -28,6 +28,7 @@ from solar.contracts import (
     ExtractionKind,
     FormalProducerReadiness,
     IRKind,
+    IRPath,
     SolarAnalysisStatus,
     SolarStage,
     SolBound,
@@ -89,6 +90,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             analysis_id=request.analysis_id,
             output_dir=output,
             architecture_sha256=architecture_sha256,
+            ir_path=request.ir_path,
             artifacts=artifacts,
             bound=bound,
         )
@@ -238,6 +240,7 @@ def _failure(
     return AnalysisFailure(
         status=SolarAnalysisStatus.FAILED,
         analysis_id=request.analysis_id,
+        ir_path=request.ir_path,
         stage=stage,
         reason_code=reason_code,
         message=message,
@@ -258,6 +261,7 @@ __all__ = [
     "ExtractionKind",
     "FormalProducerReadiness",
     "IRKind",
+    "IRPath",
     "ReadinessArtifact",
     "ReadinessStage",
     "SolBound",

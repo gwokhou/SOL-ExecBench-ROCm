@@ -16,11 +16,15 @@ from pathlib import Path
 import yaml
 
 from solar.graph.contracts import (
-    DEFAULT_EXTRACTION_KIND,
     ExtractionKind,
     normalize_extraction_kind,
 )
-from solar.ir.contracts import DEFAULT_IR_KIND, IRKind, normalize_ir_kind
+from solar.ir.contracts import (
+    DEFAULT_IR_PATH,
+    IRKind,
+    IRPath,
+    normalize_ir_path,
+)
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 from solar.types import DynamicValue
 from solar.verification.contracts import VerificationPolicy
@@ -75,25 +79,16 @@ class ConversionRequest:
     input_factory: InputFactory
     reference_name: str
     reference_sha256: str
-    ir_kind: IRKind | str = DEFAULT_IR_KIND
-    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND
+    ir_path: IRPath = DEFAULT_IR_PATH
     trace_seed: int = 200
     verification: VerificationPolicy = field(
         default_factory=lambda: VerificationPolicy(atol=1e-2, rtol=1e-2),
     )
 
     def __post_init__(self) -> None:
-        """Validate request identity and normalize declarative selectors."""
-        object.__setattr__(
-            self,
-            "extraction_kind",
-            normalize_extraction_kind(self.extraction_kind),
-        )
-        object.__setattr__(
-            self,
-            "ir_kind",
-            normalize_ir_kind(self.ir_kind),
-        )
+        """Validate request identity and its already-normalized IR path."""
+        if not isinstance(self.ir_path, IRPath):
+            raise TypeError("ir_path must be an IRPath")
         if not self.analysis_id.strip() or not self.reference_name.strip():
             raise ValueError("analysis_id and reference_name must be non-empty")
         if re.fullmatch(r"[0-9a-f]{64}", self.reference_sha256) is None:
@@ -126,12 +121,16 @@ class ConversionRequestEnvelope:
         return self.conversion.reference_sha256
 
     @property
-    def ir_kind(self) -> IRKind | str:
-        return self.conversion.ir_kind
+    def ir_kind(self) -> IRKind:
+        return self.conversion.ir_path.ir_kind
 
     @property
-    def extraction_kind(self) -> ExtractionKind | str:
-        return self.conversion.extraction_kind
+    def extraction_kind(self) -> ExtractionKind:
+        return self.conversion.ir_path.extraction_kind
+
+    @property
+    def ir_path(self) -> IRPath:
+        return self.conversion.ir_path
 
     @property
     def device(self) -> str:
@@ -209,10 +208,12 @@ class AnalysisResult:
     architecture_sha256: str
     artifacts: tuple[ArtifactRef, ...]
     bound: SolBound
+    ir_path: IRPath = DEFAULT_IR_PATH
 
     def __post_init__(self) -> None:
         """Normalize boundary input and reject unknown result states."""
         object.__setattr__(self, "status", SolarAnalysisStatus(self.status))
+        object.__setattr__(self, "ir_path", normalize_ir_path(self.ir_path))
 
     @property
     def publication_eligible(self) -> bool:
@@ -234,10 +235,12 @@ class AnalysisFailure:
     stage: SolarStage
     reason_code: str
     message: str
+    ir_path: IRPath = DEFAULT_IR_PATH
 
     def __post_init__(self) -> None:
         """Normalize boundary input and reject unknown failure stages."""
         object.__setattr__(self, "status", SolarAnalysisStatus(self.status))
+        object.__setattr__(self, "ir_path", normalize_ir_path(self.ir_path))
         object.__setattr__(self, "stage", SolarStage(self.stage))
 
 
@@ -268,11 +271,12 @@ def write_request_manifest(
             "sha256": request.reference_sha256,
         },
         "analysis_contract": {
+            "ir_path": request.ir_path.value,
             "extraction_kind": normalize_extraction_kind(
                 request.extraction_kind,
             ).value,
             "precision": request.precision,
-            "ir_kind": normalize_ir_kind(request.ir_kind).value,
+            "ir_kind": request.ir_kind.value,
             "trace_seed": request.trace_seed,
             "verification_seeds": list(request.verification_seeds),
             "atol": request.atol,
@@ -280,6 +284,9 @@ def write_request_manifest(
             "required_matched_ratio": request.required_matched_ratio,
             "max_error_cap": request.max_error_cap,
             "allow_negative_inf": request.allow_negative_inf,
+            "preserved_input_indices": list(
+                request.verification.preserved_input_indices,
+            ),
             "require_orojenesis": request.require_orojenesis,
         },
         "sol_score_eligible": bound.kind in SOL_BOUND_KINDS,
@@ -312,6 +319,7 @@ __all__ = [
     "ExtractionKind",
     "FormalProducerReadiness",
     "IRKind",
+    "IRPath",
     "SolBound",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",

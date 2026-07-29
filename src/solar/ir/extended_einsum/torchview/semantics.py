@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from solar.schema_versions import EXTENDED_EINSUM_IR_SCHEMA_VERSION
@@ -45,6 +45,7 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "conv_transpose2d",
         "conv_transpose3d",
         "cos",
+        "cross_entropy",
         "cumsum",
         "dequantize",
         "detach",
@@ -53,6 +54,8 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "embedding",
         "embedding_bag",
         "exp",
+        "exp2",
+        "floor",
         "expand",
         "fake_quantize_per_channel_affine",
         "fake_quantize_per_tensor_affine",
@@ -71,9 +74,11 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "index_put",
         "index_select",
         "int",
+        "kl_div",
         "layer_norm",
         "linear",
         "log",
+        "log2",
         "log_softmax",
         "logsumexp",
         "long",
@@ -88,6 +93,7 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "mul",
         "narrow",
         "neg",
+        "nll_loss",
         "ones_like",
         "permute",
         "pow",
@@ -107,8 +113,8 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "silu",
         "sin",
         "slice",
-        "softmax",
         "split",
+        "softmax",
         "sqrt",
         "square",
         "squeeze",
@@ -116,12 +122,14 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "sub",
         "sum",
         "tanh",
+        "topk",
         "transpose",
         "to",
         "type_as",
         "unsqueeze",
         "view",
         "where",
+        "xlogy",
         "zeros_like",
     }
 )
@@ -206,6 +214,7 @@ def _canonical_target(layer: Mapping[str, Any]) -> str:
         "__getitem__": "getitem",
         "max": "amax",
         "min": "amin",
+        "multiply": "mul",
         "t": "transpose",
         "type": "to",
     }
@@ -217,6 +226,26 @@ def _canonical_target(layer: Mapping[str, Any]) -> str:
     return aliases.get(target.rstrip("_"), target.rstrip("_"))
 
 
+def _split_aliases(layer: Mapping[str, Any]) -> list[dict[str, int]]:
+    """Return exact output-to-input aliases for split-like operations."""
+    output_count = len(
+        (layer.get("tensor_names") or {}).get("outputs") or [],
+    )
+    return [{"output": output, "input": 0} for output in range(output_count)]
+
+
+def _has_slice_bounds(
+    arguments: Sequence[Any],
+    kwargs: Mapping[str, Any],
+) -> bool:
+    """Return whether ordered arguments preserve an exact slice contract."""
+    has_dim = len(arguments) >= 2 or "dim" in kwargs
+    has_bounds = len(arguments) >= 3 or any(
+        key in kwargs for key in ("start", "end", "step")
+    )
+    return has_dim and has_bounds
+
+
 def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
     """Build the executable operation record for one cost-model layer."""
     if str(layer.get("type", "")).lower() == "start":
@@ -226,7 +255,6 @@ def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
             "arguments": [],
             "kwargs": {},
         }
-
     names = (layer.get("tensor_names") or {}).get("inputs") or []
     module_args = layer.get("module_args") or {}
     recorded_arguments = module_args.get("call_arguments")
@@ -254,7 +282,6 @@ def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
                 "opaque_library_call": False,
             },
         }
-
     target = _canonical_target(layer)
     raw_target = str(layer.get("type", "")).lower().rsplit(".", maxsplit=1)[-1]
     if raw_target in {
@@ -307,7 +334,9 @@ def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
         or layer.get("mutates_inputs") is True
     )
     aliases = list(_plain_value(layer.get("aliases") or []))
-    if target in _ALIASING_TARGETS and arguments and not aliases:
+    if target in {"chunk", "split"} and arguments and not aliases:
+        aliases = _split_aliases(layer)
+    elif target in _ALIASING_TARGETS and arguments and not aliases:
         aliases = [
             {
                 "output": 0,
@@ -491,6 +520,7 @@ def validate_semantic_graph(graph: Mapping[str, Any]) -> None:
             "select": (("dim", 3), ("index", 3)),
             "softmax": (("dim", 2),),
             "split": (("split_size_or_sections", 2),),
+            "topk": (("k", 2),),
             "unsqueeze": (("dim", 2),),
         }
         missing = [
@@ -498,11 +528,10 @@ def validate_semantic_graph(graph: Mapping[str, Any]) -> None:
             for key, positional_arity in required_parameters.get(target, ())
             if key not in kwargs and len(arguments) < positional_arity
         ]
-        if target == "slice" and not (
-            "dim" in kwargs
-            and any(key in kwargs for key in ("start", "end", "step"))
-        ):
+        if target == "slice" and not _has_slice_bounds(arguments, kwargs):
             missing.append("explicit slice bounds")
+        if target == "topk" and output_arity != 2:
+            missing.append("two output slots")
         if missing:
             raise SemanticGraphError(
                 f"layer {layer_id} lacks exact {target} parameters: "
