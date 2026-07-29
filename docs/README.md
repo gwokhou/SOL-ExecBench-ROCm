@@ -14,6 +14,7 @@ requirements.
   [Evaluator contract](user/EVALUATOR-CONTRACT.md) describe strict parsing and
   the machine-readable capability surface.
 - [Architecture](user/ARCHITECTURE.md), [Configuration](user/CONFIGURATION.md),
+  [Cross-path comparison](user/CROSS-PATH-COMPARISON.md),
   and the [SOLAR boundary](SOLAR-BOUNDARY.md) describe process ownership and
   formal analysis.
 - [Scoring contract](SCORING-V3.md) and

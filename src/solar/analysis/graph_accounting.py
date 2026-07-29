@@ -174,19 +174,11 @@ class GraphAccountingMixin(AnalysisMixinContract):
         for index, memory_read in enumerate(memory.reads):
             if memory_read <= 0:
                 continue
-            input_type = (
-                data.input_types[index]
-                if index < len(data.input_types)
-                else "weight"
-            )
             input_name = (
                 data.input_names[index] if index < len(data.input_names) else ""
             )
             graph_internal = False
-            if (
-                input_type != "weight"
-                and input_name in topology.tensor_producers
-            ):
+            if input_name in topology.tensor_producers:
                 producer_id = topology.tensor_producers[input_name]
                 source_id = topology.trace_source_through_views(producer_id)
                 graph_internal = (
@@ -235,12 +227,11 @@ class GraphAccountingMixin(AnalysisMixinContract):
             )
             for name in data.output_names
         ]
-        external_flags = [
-            str(name) in declared_outputs or not intermediate
-            for name, intermediate in zip(
-                data.output_names, intermediate_flags, strict=True
-            )
-        ]
+        external_flags = (
+            [str(name) in declared_outputs for name in data.output_names]
+            if declared_outputs
+            else [not intermediate for intermediate in intermediate_flags]
+        )
         intermediate_elems = sum(
             value
             for value, intermediate in zip(

@@ -457,6 +457,7 @@ def test_graph_topology_traces_views_consumers_and_orphans():
         intermediate_tensors=set(),
         bool_layers=set(),
         dead_end_layers=set(),
+        live_layer_ids=set(layers),
     )
     assert topology.trace_source_through_views("view2") == "real"
     assert topology.trace_source_through_views("lonely") == "lonely"
@@ -512,6 +513,7 @@ def test_dequantized_payload_precision_traces_casts_passthrough_and_mul():
         intermediate_tensors=set(),
         bool_layers=set(),
         dead_end_layers=set(),
+        live_layer_ids=set(layers),
     )
 
     class Profile:

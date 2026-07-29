@@ -96,6 +96,13 @@ The analyzer accepts a typed internal job. Existing SOLAR readability debt is
 inventoried in `scripts/solar_readability_debt.json`; every shrink must update
 the snapshot and it cannot gain new items or larger functions/modules.
 
+`sol-execbench solar compare-paths` is the repository-owned dual-path review
+boundary. It validates content-addressed analysis trees and separates external
+reference identity, model I/O, mandatory resource work, fusion/intermediate
+accounting, and the final formal bound. Unequal path coverage and authoritative
+accounting differences remain fail-closed. See
+[Cross-Path SOLAR Comparison](CROSS-PATH-COMPARISON.md).
+
 ## Scoring boundary
 
 `sol_execbench.core.scoring` has three focused responsibilities:

@@ -71,6 +71,7 @@ class GraphTopology:
     intermediate_tensors: set[str]
     bool_layers: set[str]
     dead_end_layers: set[str]
+    live_layer_ids: set[str]
 
     def trace_source_through_views(self, layer_id: str) -> str:
         """Trace backward through transparent view layers to the real source."""
@@ -180,6 +181,7 @@ class GraphTopology:
 
 def build_graph_topology(
     all_layers: dict[str, DynamicValue],
+    declared_graph_outputs: set[str] | None = None,
 ) -> GraphTopology:
     """Build immutable producer and consumer indices for graph layers."""
     layers, start_ids, bool_start_ids = _partition_graph_layers(all_layers)
@@ -190,6 +192,11 @@ def build_graph_topology(
         if str(layer.get("type", "")).lower() in TRANSPARENT_OPS
     }
     producers, consumers = _build_tensor_indices(layers)
+    live_layer_ids = _live_layers(
+        layers,
+        producers,
+        declared_graph_outputs or set(),
+    )
     topology = GraphTopology(
         layers=layers,
         start_node_ids=start_ids,
@@ -203,6 +210,7 @@ def build_graph_topology(
         },
         bool_layers=_propagate_bool_layers(layers, bool_start_ids),
         dead_end_layers=set(),
+        live_layer_ids=live_layer_ids,
     )
     return replace(
         topology,
@@ -212,6 +220,37 @@ def build_graph_topology(
             if not topology.has_real_consumer(layer_id)
         },
     )
+
+
+def _live_layers(
+    layers: dict[str, DynamicValue],
+    producers: dict[str, str],
+    declared_outputs: set[str],
+) -> set[str]:
+    """Return layers that contribute to a declared graph output."""
+    if not declared_outputs:
+        return set(layers)
+    roots = {
+        producer
+        for output in declared_outputs
+        if (producer := producers.get(output)) is not None
+    }
+    if len(roots) != len(declared_outputs):
+        missing = sorted(declared_outputs - producers.keys())
+        raise ValueError(
+            "declared graph outputs have no exact producer: "
+            + ", ".join(missing),
+        )
+    live: set[str] = set()
+    pending = list(roots)
+    while pending:
+        layer_id = pending.pop()
+        if layer_id in live:
+            continue
+        live.add(layer_id)
+        inputs = (layers[layer_id].get("connections") or {}).get("inputs") or []
+        pending.extend(item for item in inputs if item in layers)
+    return live
 
 
 def _partition_graph_layers(

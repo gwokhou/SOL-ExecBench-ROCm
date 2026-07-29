@@ -122,7 +122,10 @@ class IRGraphAnalyzer(
         prepared = self._prepare_analysis(job)
         if prepared is None:
             return None
-        topology = self._build_graph_topology(prepared.all_layers)
+        topology = self._build_graph_topology(
+            prepared.all_layers,
+            prepared.declared_graph_outputs,
+        )
         accumulator = AnalysisAccumulator()
         for layer_id, layer in topology.layers.items():
             self._analyze_layer(

@@ -61,10 +61,14 @@ def _analyze(
     *,
     strict: bool = False,
     schema_version: int = 3,
+    outputs: list[str] | None = None,
 ):
     graph_path = tmp_path / "einsum_graph.yaml"
+    graph = {"schema_version": schema_version, "layers": layers}
+    if outputs is not None:
+        graph["outputs"] = outputs
     graph_path.write_text(
-        yaml.safe_dump({"schema_version": schema_version, "layers": layers}),
+        yaml.safe_dump(graph),
     )
     output_dir = tmp_path / "analysis"
     result = IRGraphAnalyzer().analyze_graph(
@@ -141,6 +145,69 @@ def test_transparent_view_preserves_internal_io_and_shared_input_deduplication(
     assert result["layers"]["consumer"]["input_is_intermediate"] is True
     assert result["total"]["fused_elements"] == 6
     assert result["total"]["intermediate_elements"] == 4
+
+
+def test_topology_proves_internal_io_without_tensor_role_metadata(
+    tmp_path: Path,
+) -> None:
+    producer = _operation(
+        "add",
+        input_names=["start.Output", "bias"],
+        output_name="producer.Output",
+        input_layers=["start", "bias"],
+        output_layers=["consumer"],
+        input_types=["input", "weight"],
+    )
+    consumer = _operation(
+        "mul",
+        input_names=["producer.Output", "start.Output"],
+        output_name="result",
+        input_layers=["producer", "start"],
+        output_layers=[],
+    )
+    producer.pop("tensor_types")
+    consumer.pop("tensor_types")
+
+    result, _ = _analyze(
+        tmp_path,
+        {"start": _start(), "producer": producer, "consumer": consumer},
+        outputs=["result"],
+    )
+
+    assert result["layers"]["consumer"]["input_is_intermediate"] is True
+    assert result["total"]["fused_elements"] == 6
+    assert result["total"]["model_io_elements"] == 8
+
+
+def test_declared_outputs_exclude_unreachable_trace_dead_ends(
+    tmp_path: Path,
+) -> None:
+    result, _ = _analyze(
+        tmp_path,
+        {
+            "start": _start(),
+            "result": _operation(
+                "add",
+                input_names=["start.Output", "bias"],
+                output_name="result.Output",
+                input_layers=["start", "bias"],
+                output_layers=[],
+                input_types=["input", "weight"],
+            ),
+            "trace_noise": _operation(
+                "sub",
+                input_names=["start.Output"],
+                output_name="trace_noise.Output",
+                input_layers=["start"],
+                output_layers=[],
+            ),
+        },
+        outputs=["result.Output"],
+    )
+
+    assert result["layers"]["trace_noise"]["is_orphaned"] is True
+    assert result["layers"]["trace_noise"]["resources"]["work"] == {}
+    assert result["total"]["resource_work"] == {"valu": {"fp32": 2}}
 
 
 def test_ir_lifecycle_rejects_unsupported_schema() -> None:

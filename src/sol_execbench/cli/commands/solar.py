@@ -27,6 +27,12 @@ from sol_execbench.core.solar_bridge.models import (
     SolarStage,
     SolarWorkerRequest,
 )
+from sol_execbench.core.solar_bridge.path_comparison import (
+    compare_solar_ir_paths,
+)
+from sol_execbench.core.solar_bridge.path_comparison_models import (
+    PathComparisonStatus,
+)
 from sol_execbench.core.solar_bridge.release import (
     build_release_solar_manifests,
 )
@@ -42,6 +48,61 @@ _BACKEND_CHOICE = click.Choice(
 @click.group("solar", context_settings={"help_option_names": ["-h", "--help"]})
 def solar_cli() -> None:
     """Build formal SOLAR artifacts; never time or score candidates."""
+
+
+@solar_cli.command("compare-paths")
+@click.argument(
+    "make_fx_root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@click.argument(
+    "torchview_root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@click.option(
+    "--output",
+    required=True,
+    type=click.Path(dir_okay=False, path_type=Path),
+)
+def compare_paths_cli(
+    make_fx_root: Path,
+    torchview_root: Path,
+    output: Path,
+) -> CliResult:
+    """Compare dual-ready accounting without choosing a preferred path."""
+    try:
+        result = compare_solar_ir_paths(
+            make_fx_root,
+            torchview_root,
+            output,
+        )
+    except (OSError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="solar_path_comparison_failed",
+            exit_code=EXIT_RESULT_FAILED,
+            hint="Use intact content-addressed outputs from both fixed paths.",
+        ) from exc
+    data = {
+        "status": result.status,
+        "coverage_complete": result.coverage_complete,
+        "authoritative_match_on_dual_ready": result.authoritative_match,
+        "dual_ready": len(result.comparisons),
+    }
+    failed = result.status in {
+        PathComparisonStatus.DIFFERENT,
+        PathComparisonStatus.INCOMPLETE,
+    }
+    color = "red" if failed else "green"
+    console.print(
+        f"[{color}]Cross-path comparison: {result.status.value}"
+        f" ({len(result.comparisons)} dual-ready workloads).[/{color}]",
+    )
+    return CliResult(
+        data=data,
+        artifacts=(artifact(output, "json_file"),),
+        exit_code=EXIT_RESULT_FAILED if failed else 0,
+    )
 
 
 @solar_cli.command("analyze")

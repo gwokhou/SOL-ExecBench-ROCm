@@ -217,8 +217,12 @@ class GraphLoadingMixin(AnalysisMixinContract):
     def _build_graph_topology(
         self,
         all_layers: dict[str, Any],
+        declared_graph_outputs: set[str] | None = None,
     ) -> GraphTopology:
-        topology = build_graph_topology(all_layers)
+        topology = build_graph_topology(
+            all_layers,
+            declared_graph_outputs,
+        )
         self._debug_topology(topology)
         return topology
 
@@ -362,9 +366,9 @@ class GraphLoadingMixin(AnalysisMixinContract):
             writes = [slice_elements] if data.output_sizes else []
             writes += [0] * max(0, len(data.output_sizes) - 1)
             other_ops = 0
-        orphaned = False
+        orphaned = data.layer_id not in topology.live_layer_ids
         if data.layer_id in topology.dead_end_layers and data.input_layer_ids:
-            orphaned = all(
+            orphaned |= all(
                 topology.source_is_orphan(item) for item in data.input_layer_ids
             )
             if (
