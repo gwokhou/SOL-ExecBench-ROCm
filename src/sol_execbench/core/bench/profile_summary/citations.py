@@ -21,6 +21,7 @@ def profile_summary_artifact_citation_from_path(
     status: str | None = None,
     sha256: str | None = None,
     size_bytes: int | None = None,
+    citation_path: str | None = None,
 ) -> SizedDiagnosticArtifactCitation:
     """Build a compact citation from a profile-summary artifact path."""
     checksum = (
@@ -31,7 +32,7 @@ def profile_summary_artifact_citation_from_path(
     return SizedDiagnosticArtifactCitation(
         kind=kind,
         label=label or path.name,
-        path=path.name,
+        path=citation_path or path.name,
         sha256=checksum,
         status=status,
         size_bytes=size_bytes,

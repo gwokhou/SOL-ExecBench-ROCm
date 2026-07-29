@@ -19,6 +19,7 @@ from sol_execbench.core.bench.profile_summary import (
 )
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.evidence.runtime_evidence import write_json_payload
+from sol_execbench.core.integrity import validate_relative_artifact_path
 from sol_execbench.core.integrity.checksums import sha256_file
 
 console = Console(stderr=True)
@@ -146,6 +147,15 @@ def _profile_summary_artifact_citations(
                     path=artifact.path,
                     status=profile_result.status,
                     size_bytes=artifact.size_bytes,
+                    citation_path=_profile_artifact_relative_path(
+                        artifact.path,
+                        profile_result.output_directory,
+                    ),
                 ),
             )
     return citations
+
+
+def _profile_artifact_relative_path(path: Path, root: Path) -> str:
+    relative = path.resolve().relative_to(root.resolve()).as_posix()
+    return validate_relative_artifact_path(relative, "profiler artifact path")
