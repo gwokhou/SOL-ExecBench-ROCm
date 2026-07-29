@@ -144,15 +144,14 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
         if citation["kind"] == "profiler_artifact"
     ]
     assert {citation["path"] for citation in profiler_citations} == {
-        "trace.rocpd",
-        "trace_counters.csv",
+        "trace/trace.rocpd",
+        "trace/trace_counters.csv",
     }
     assert {citation["size_bytes"] for citation in profiler_citations} == {
         profile_artifact.stat().st_size,
         counter_artifact.stat().st_size,
     }
     for citation in payload["artifact_citations"]:
-        assert "/" not in citation["path"]
         assert citation["sha256"] is not None
         assert len(citation["sha256"]) == 64
     assert "profile artifact" not in json.dumps(payload)

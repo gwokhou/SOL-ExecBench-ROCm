@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import re
 import statistics
 from dataclasses import dataclass
 from functools import reduce
@@ -29,6 +28,7 @@ from sol_execbench.core.bench.performance_model.models import (
     PerformancePrediction,
     PredictionKind,
     ResourceFootprint,
+    SemanticCharacterization,
     WorkloadPerformanceDiagnostic,
 )
 from sol_execbench.core.bench.performance_model.prediction import (
@@ -43,6 +43,7 @@ from sol_execbench.core.bench.profile_summary import (
 )
 from sol_execbench.core.bench.rocm_profiler.counters import (
     CounterPassCSV,
+    counter_pass_index,
     parse_and_align_counter_passes,
 )
 from sol_execbench.core.bench.static_kernel.evidence import (
@@ -56,7 +57,11 @@ from sol_execbench.core.data.json_utils import (
     load_jsonl_file,
 )
 from sol_execbench.core.data.trace import Trace
-from sol_execbench.core.integrity import sha256_file, stable_json_checksum
+from sol_execbench.core.integrity import (
+    sha256_file,
+    stable_json_checksum,
+    verify_artifact_file,
+)
 from sol_execbench.core.solar_bridge.performance import (
     load_semantic_characterization,
 )
@@ -129,7 +134,12 @@ def build_performance_diagnostic(
         )
         for workload_uuid in sorted(by_workload)
     ]
-    reasons = [*identity_reasons, *dispatch_reasons]
+    reasons = [
+        *identity_reasons,
+        *dispatch_reasons,
+        *(reason for workload in workloads for reason in workload.reason_codes),
+    ]
+    reasons = list(dict.fromkeys(reasons))
     status = _sidecar_status(workloads, reasons)
     return PerformanceDiagnosticSidecar(
         status=status,
@@ -139,7 +149,7 @@ def build_performance_diagnostic(
         calibration_identity=calibration.identity if calibration else None,
         workloads=workloads,
         evidence=_input_references(request),
-        reason_codes=list(dict.fromkeys(reasons)),
+        reason_codes=reasons,
         limitations=[
             "Performance predictions are diagnostic-only and do not affect SOL Score.",
             "Canonical Trace JSONL remains timing and correctness authority.",
@@ -261,39 +271,98 @@ def _compiled_characterizations(
         StaticKernelEvidenceKernel(name=analysis.artifact_id)
         for analysis in analyses
     ]
-    return (
-        [
+    compiled: list[CompiledCharacterization] = []
+    for kernel in kernels:
+        analysis = _kernel_isa_analysis(kernel, kernels, analyses)
+        compiled.append(
             _compiled_kernel(
                 kernel,
-                analyses[0] if analyses else None,
+                analysis,
                 candidate_sha256,
-                code_hashes[0],
+                _kernel_code_object_sha256(kernel, analyses, code_hashes),
                 gpu_architecture,
                 source,
-            )
-            for kernel in kernels
-        ],
-        candidate_sha256,
+                isa_mapping_ambiguous=bool(analyses) and analysis is None,
+            ),
+        )
+    return compiled, candidate_sha256
+
+
+def _kernel_isa_analysis(
+    kernel: StaticKernelEvidenceKernel,
+    kernels: list[StaticKernelEvidenceKernel],
+    analyses: list[StaticISAAnalysis],
+) -> StaticISAAnalysis | None:
+    if len(kernels) == 1 and len(analyses) == 1:
+        return analyses[0]
+    artifact_id = _kernel_mapping_artifact_id(kernel, analyses)
+    matches = [
+        analysis for analysis in analyses if analysis.artifact_id == artifact_id
+    ]
+    kernels_for_artifact = sum(
+        _kernel_mapping_artifact_id(item, analyses) == artifact_id
+        for item in kernels
     )
+    if len(matches) == 1 and kernels_for_artifact == 1:
+        return matches[0]
+    return None
+
+
+def _kernel_mapping_artifact_id(
+    kernel: StaticKernelEvidenceKernel,
+    analyses: list[StaticISAAnalysis],
+) -> str | None:
+    artifact_id = _kernel_artifact_id(kernel)
+    if artifact_id is not None:
+        return artifact_id
+    if any(analysis.artifact_id == kernel.name for analysis in analyses):
+        return kernel.name
+    return None
+
+
+def _kernel_artifact_id(
+    kernel: StaticKernelEvidenceKernel,
+) -> str | None:
+    footprint = kernel.footprint
+    if footprint is None or footprint.identity is None:
+        return None
+    return footprint.identity.artifact_id
+
+
+def _kernel_code_object_sha256(
+    kernel: StaticKernelEvidenceKernel,
+    analyses: list[StaticISAAnalysis],
+    code_hashes: list[str],
+) -> str | None:
+    artifact_id = _kernel_mapping_artifact_id(kernel, analyses)
+    matches = [
+        analysis.code_object_sha256
+        for analysis in analyses
+        if analysis.artifact_id == artifact_id
+        and analysis.code_object_sha256 is not None
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(code_hashes) == 1:
+        return code_hashes[0]
+    return None
 
 
 def _compiled_kernel(
     kernel: StaticKernelEvidenceKernel,
     analysis: object,
     candidate_sha256: str,
-    code_object_sha256: str,
+    code_object_sha256: str | None,
     gpu_architecture: str,
     source: EvidenceReference,
+    *,
+    isa_mapping_ambiguous: bool,
 ) -> CompiledCharacterization:
     isa = analysis if isinstance(analysis, StaticISAAnalysis) else None
     footprint = kernel.footprint
     return CompiledCharacterization(
         candidate_sha256=candidate_sha256,
-        code_object_sha256=(
-            isa.code_object_sha256
-            if isa is not None and isa.code_object_sha256 is not None
-            else code_object_sha256
-        ),
+        code_object_sha256=code_object_sha256,
         gpu_architecture=gpu_architecture,
         kernel_symbol=kernel.name,
         functional_group_counts=(
@@ -312,6 +381,11 @@ def _compiled_kernel(
             scratch_bytes=footprint.scratch_bytes if footprint else None,
         ),
         source=source,
+        reason_codes=(
+            ["static_isa_kernel_mapping_ambiguous"]
+            if isa_mapping_ambiguous
+            else []
+        ),
     )
 
 
@@ -423,10 +497,12 @@ def _dispatch_evidence(
     counter_paths = _counter_artifact_paths(profile, profile_path)
     if not counter_paths:
         return {}, ["counter_csv_missing"]
-    passes = [
-        CounterPassCSV(_counter_pass_index(path, index), path)
-        for index, path in enumerate(counter_paths, start=1)
-    ]
+    passes = []
+    for path in counter_paths:
+        pass_index = counter_pass_index(path)
+        if pass_index is None:
+            raise ValueError(f"counter_csv_pass_identity_missing:{path.name}")
+        passes.append(CounterPassCSV(pass_index, path))
     dispatches = parse_and_align_counter_passes(
         passes,
         workload_uuid=workload_uuid,
@@ -573,32 +649,36 @@ def _counter_artifact_paths(
     profile: ProfileSummarySidecar,
     profile_path: Path,
 ) -> list[Path]:
-    names = {
-        citation.path
+    citations = [
+        citation
         for citation in profile.artifact_citations
         if citation.label == "counter_csv" and citation.path is not None
-    }
-    roots = [profile_path.parent]
+    ]
+    if not citations:
+        return []
     trace_name = profile.identity.trace_path
-    if trace_name:
-        roots.append(profile_path.parent / f"{trace_name}.rocprofv3")
-    found = {
-        path.resolve()
-        for root in roots
-        if root.exists()
-        for name in names
-        for path in root.rglob(name)
-        if path.is_file()
-    }
-    return sorted(found)
-
-
-def _counter_pass_index(path: Path, fallback: int) -> int:
-    for part in path.parts:
-        match = re.fullmatch(r"(?:pass|pmc)[_-](\d+)", part)
-        if match:
-            return int(match.group(1))
-    return fallback
+    if not trace_name:
+        raise ValueError("profile_summary_trace_path_missing")
+    root = profile_path.parent / f"{trace_name}.rocprofv3"
+    verified: list[Path] = []
+    for citation in citations:
+        if (
+            citation.path is None
+            or citation.sha256 is None
+            or citation.size_bytes is None
+        ):
+            raise ValueError("counter_csv_citation_integrity_missing")
+        verified.append(
+            verify_artifact_file(
+                root,
+                citation.path,
+                expected_sha256=citation.sha256,
+                expected_size_bytes=citation.size_bytes,
+            ),
+        )
+    if len(verified) != len(set(verified)):
+        raise ValueError("counter_csv_citation_duplicate")
+    return sorted(verified)
 
 
 def _workload_diagnostic(
@@ -616,34 +696,26 @@ def _workload_diagnostic(
         solar_path,
         workload_uuid=trace.workload.uuid,
     )
-    if calibration is None:
-        ir = _unavailable_prediction(
-            PredictionKind.IR,
-            ["calibration_profile_missing"],
-        )
-        hw = _unavailable_prediction(
-            PredictionKind.HW,
-            ["calibration_profile_missing"],
-        )
-    else:
-        ir = predict_ir(
-            semantic,
-            calibration,
-            identity_reason_codes=identity_reasons,
-        )
-        hw = predict_hw(
-            compiled,
-            dispatches,
-            calibration,
-            identity_reason_codes=[*identity_reasons, *extra_reasons],
-        )
+    ir, hw = _workload_predictions(
+        semantic=semantic,
+        compiled=compiled,
+        dispatches=dispatches,
+        calibration=calibration,
+        identity_reasons=identity_reasons,
+        extra_reasons=extra_reasons,
+    )
     evaluation = trace.evaluation
     if evaluation is None or evaluation.performance is None:
         raise ValueError(
             f"workload {trace.workload.uuid} lacks canonical performance timing",
         )
     measured = evaluation.performance.latency_ms
-    frontier = _frontier_time(frontier_path, trace.workload.uuid)
+    frontier, frontier_reasons = _frontier_time(
+        frontier_path,
+        trace.workload.uuid,
+        trace,
+    )
+    compiled_reasons = _compiled_reason_codes(compiled)
     ratios = calculate_ratios(
         t_pred_ir=ir,
         t_pred_hw=hw,
@@ -651,6 +723,7 @@ def _workload_diagnostic(
         timing_noise_ms=max(measured * 0.02, 0.0001),
         t_sol_ms=semantic.t_sol_ms,
         t_frontier_ms=frontier,
+        frontier_reason_codes=frontier_reasons,
     )
     return WorkloadPerformanceDiagnostic(
         workload_uuid=trace.workload.uuid,
@@ -670,13 +743,64 @@ def _workload_diagnostic(
             t_pred_hw=hw,
             ratios=ratios,
         ),
-        reason_codes=[*identity_reasons, *extra_reasons],
+        reason_codes=[
+            *identity_reasons,
+            *extra_reasons,
+            *compiled_reasons,
+            *frontier_reasons,
+        ],
     )
 
 
-def _frontier_time(path: Path | None, workload_uuid: str) -> float | None:
+def _workload_predictions(
+    *,
+    semantic: SemanticCharacterization,
+    compiled: list[CompiledCharacterization],
+    dispatches: list[DispatchEvidence],
+    calibration: DiagnosticCalibrationProfile | None,
+    identity_reasons: list[str],
+    extra_reasons: list[str],
+) -> tuple[PerformancePrediction, PerformancePrediction]:
+    if calibration is None:
+        reasons = ["calibration_profile_missing"]
+        return (
+            _unavailable_prediction(PredictionKind.IR, reasons),
+            _unavailable_prediction(PredictionKind.HW, reasons),
+        )
+    return (
+        predict_ir(
+            semantic,
+            calibration,
+            identity_reason_codes=identity_reasons,
+        ),
+        predict_hw(
+            compiled,
+            dispatches,
+            calibration,
+            identity_reason_codes=[*identity_reasons, *extra_reasons],
+        ),
+    )
+
+
+def _compiled_reason_codes(
+    compiled: list[CompiledCharacterization],
+) -> list[str]:
+    return list(
+        dict.fromkeys(
+            reason
+            for characterization in compiled
+            for reason in characterization.reason_codes
+        ),
+    )
+
+
+def _frontier_time(
+    path: Path | None,
+    workload_uuid: str,
+    canonical: Trace,
+) -> tuple[float | None, list[str]]:
     if path is None:
-        return None
+        return None, []
     traces = load_jsonl_file(Trace, path)
     matches = [
         trace
@@ -692,7 +816,57 @@ def _frontier_time(path: Path | None, workload_uuid: str) -> float | None:
     evaluation = matches[0].evaluation
     if evaluation is None or evaluation.performance is None:
         raise ValueError(f"frontier trace lacks timing for {workload_uuid}")
-    return evaluation.performance.latency_ms
+    reasons = _frontier_identity_reasons(canonical, matches[0])
+    if reasons:
+        return None, reasons
+    return evaluation.performance.latency_ms, []
+
+
+def _frontier_identity_reasons(
+    canonical: Trace,
+    frontier: Trace,
+) -> list[str]:
+    if canonical.evaluation is None or frontier.evaluation is None:
+        return ["frontier_evaluation_identity_missing"]
+    expected = canonical.evaluation.environment
+    observed = frontier.evaluation.environment
+    reasons: list[str] = []
+    if expected.hardware != observed.hardware:
+        reasons.append("frontier_gpu_architecture_mismatch")
+    reasons.extend(
+        _identity_field_reasons(
+            "rocm_version",
+            _rocm_version(canonical),
+            _rocm_version(frontier),
+        ),
+    )
+    reasons.extend(
+        _identity_field_reasons(
+            "clock_state",
+            expected.clocks_locked,
+            observed.clocks_locked,
+        ),
+    )
+    reasons.extend(
+        _identity_field_reasons(
+            "timing_protocol",
+            expected.timing_protocol,
+            observed.timing_protocol,
+        ),
+    )
+    return reasons
+
+
+def _identity_field_reasons(
+    name: str,
+    expected: object,
+    observed: object,
+) -> list[str]:
+    if expected is None or observed is None:
+        return [f"frontier_{name}_unverified"]
+    if expected != observed:
+        return [f"frontier_{name}_mismatch"]
+    return []
 
 
 def _unavailable_prediction(
@@ -714,7 +888,8 @@ def _sidecar_status(
     if not workloads:
         return DiagnosticSidecarStatus.UNAVAILABLE
     if reasons or any(
-        workload.t_pred_ir.status is not DiagnosticSidecarStatus.AVAILABLE
+        workload.reason_codes
+        or workload.t_pred_ir.status is not DiagnosticSidecarStatus.AVAILABLE
         or workload.t_pred_hw.status is not DiagnosticSidecarStatus.AVAILABLE
         for workload in workloads
     ):

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Sequence
 from importlib.resources import as_file, files
 from pathlib import Path
 
@@ -21,7 +22,10 @@ from sol_execbench.core.bench.rocm_profiler.commands import (
 from sol_execbench.core.bench.rocm_profiler.counters import (
     ROCPROFV3_AVAIL_EXECUTABLE,
     build_rocprofv3_counter_command,
+    counter_names_in_csv,
+    counter_pass_index,
     load_counter_manifest,
+    normalize_counter_name,
     parse_available_architectures,
     parse_available_counters,
     select_counter_groups,
@@ -32,9 +36,12 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     ROCPROF_REASON_COMMAND_TIMEOUT,
     ROCPROF_REASON_UNAVAILABLE,
     Rocprofv3ArtifactCoverageStatus,
+    Rocprofv3ArtifactKind,
+    Rocprofv3ProfileArtifact,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
+    has_profiler_data_artifact,
 )
 from sol_execbench.core.bench.rocm_profiler.profile import (
     prepare_profile_output_directory,
@@ -54,6 +61,7 @@ from sol_execbench.core.text_utils import subprocess_text
 COUNTER_REASON_AVAIL_FAILED = "rocprof_counter_availability_failed"
 COUNTER_REASON_UNSUPPORTED = "rocprof_required_counters_unsupported"
 COUNTER_REASON_COLLECTED = "rocprof_counters_collected"
+COUNTER_REASON_ARTIFACT_INCOMPLETE = "rocprof_counter_artifact_incomplete"
 
 
 def collect_rocprofv3_counters(
@@ -170,7 +178,13 @@ def _collect_selected(
         manifest_path=manifest_path,
         availability=availability,
     )
-    return _counter_completed(request, command, completed, provenance)
+    return _counter_completed(
+        request,
+        command,
+        completed,
+        provenance,
+        groups=groups,
+    )
 
 
 def _write_provenance(
@@ -219,6 +233,8 @@ def _counter_completed(
     command: list[str],
     completed: subprocess.CompletedProcess[str],
     provenance: dict[str, str],
+    *,
+    groups: Sequence[Sequence[str]],
 ) -> Rocprofv3ProfileResult:
     artifacts = discover_rocprofv3_artifacts(
         request.output_directory,
@@ -228,13 +244,19 @@ def _counter_completed(
         artifacts,
         command_succeeded=completed.returncode == 0,
     )
+    artifact_reasons = _counter_artifact_reasons(artifacts, groups)
     success = (
         completed.returncode == 0
         and coverage is Rocprofv3ArtifactCoverageStatus.COMPLETE
+        and not artifact_reasons
     )
     failed_reason = None
     if not success:
-        failed_reason = "rocprofv3 counter collection did not produce complete profiler data"
+        detail = ",".join(artifact_reasons)
+        failed_reason = (
+            "rocprofv3 counter collection did not produce complete profiler data"
+            + (f": {detail}" if detail else "")
+        )
     return Rocprofv3ProfileResult(
         status=(
             Rocprofv3ProfileStatus.SUCCESS
@@ -256,16 +278,82 @@ def _counter_completed(
         reason_codes=(
             (COUNTER_REASON_COLLECTED, *coverage_reasons)
             if success
-            else (ROCPROF_REASON_COMMAND_FAILED, *coverage_reasons)
+            else (
+                ROCPROF_REASON_COMMAND_FAILED,
+                *(
+                    (COUNTER_REASON_ARTIFACT_INCOMPLETE,)
+                    if artifact_reasons
+                    else ()
+                ),
+                *coverage_reasons,
+            )
         ),
         warnings=warnings,
         output_format="csv,rocpd",
-        profiler_data_artifacts=bool(artifacts),
+        profiler_data_artifacts=has_profiler_data_artifact(artifacts),
         output_directory_listing=profile_output_directory_listing(
             request.output_directory,
         ),
         provenance=provenance,
     )
+
+
+def _counter_artifact_reasons(
+    artifacts: Sequence[Rocprofv3ProfileArtifact],
+    groups: Sequence[Sequence[str]],
+) -> list[str]:
+    csv_by_pass = _artifacts_by_pass(
+        artifacts,
+        Rocprofv3ArtifactKind.COUNTER_CSV,
+    )
+    expected_passes = set(range(1, len(groups) + 1))
+    observed_passes = set(csv_by_pass)
+    reasons = [
+        f"unexpected_counter_pass:{index}"
+        for index in sorted(observed_passes - expected_passes)
+    ]
+    for pass_index, group in enumerate(groups, start=1):
+        csv_artifacts = csv_by_pass.get(pass_index, [])
+        if len(csv_artifacts) != 1:
+            reasons.append(f"counter_pass_csv_count:{pass_index}")
+        else:
+            reasons.extend(
+                _counter_csv_reasons(csv_artifacts[0].path, group, pass_index),
+            )
+    if not any(
+        artifact.kind is Rocprofv3ArtifactKind.ROCPD for artifact in artifacts
+    ):
+        reasons.append("counter_rocpd_missing")
+    return reasons
+
+
+def _artifacts_by_pass(
+    artifacts: Sequence[Rocprofv3ProfileArtifact],
+    kind: Rocprofv3ArtifactKind,
+) -> dict[int, list[Rocprofv3ProfileArtifact]]:
+    result: dict[int, list[Rocprofv3ProfileArtifact]] = {}
+    for artifact in artifacts:
+        if artifact.kind is not kind:
+            continue
+        index = counter_pass_index(artifact.path)
+        if index is not None:
+            result.setdefault(index, []).append(artifact)
+    return result
+
+
+def _counter_csv_reasons(
+    path: Path,
+    requested: Sequence[str],
+    pass_index: int,
+) -> list[str]:
+    try:
+        observed = counter_names_in_csv(path)
+    except (OSError, ValueError):
+        return [f"counter_pass_csv_invalid:{pass_index}"]
+    expected = {normalize_counter_name(name) for name in requested}
+    if expected <= observed:
+        return []
+    return [f"counter_pass_counter_missing:{pass_index}"]
 
 
 def _counter_timeout(
@@ -372,6 +460,7 @@ def _failed(
 
 
 __all__ = [
+    "COUNTER_REASON_ARTIFACT_INCOMPLETE",
     "COUNTER_REASON_AVAIL_FAILED",
     "COUNTER_REASON_COLLECTED",
     "COUNTER_REASON_UNSUPPORTED",

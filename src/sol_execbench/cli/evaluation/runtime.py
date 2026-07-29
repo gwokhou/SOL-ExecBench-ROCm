@@ -123,13 +123,16 @@ def _run_profiled_or_none(
     if profile not in {PROFILE_ROCPROFV3, PROFILE_ROCPROFV3_COUNTERS}:
         return None, None
     if profile == PROFILE_ROCPROFV3_COUNTERS:
-        return cli_evaluation._run_profiled_evaluation(
+        _, profile_result = cli_evaluation._run_profiled_evaluation(
             eval_cmd,
             staging_dir=staging_dir,
             output_file=output_file,
             timeout=timeout,
             counter_mode=True,
         )
+        # Counter jobs replay the application once per pass. Their stdout is
+        # profiler evidence, never the canonical evaluation result.
+        return None, profile_result
     return cli_evaluation._run_profiled_evaluation(
         eval_cmd,
         staging_dir=staging_dir,

@@ -7,6 +7,7 @@ import yaml
 
 from sol_execbench.core.bench.rocm_profiler import counter_collection
 from sol_execbench.core.bench.rocm_profiler.counter_collection import (
+    COUNTER_REASON_ARTIFACT_INCOMPLETE,
     COUNTER_REASON_COLLECTED,
     COUNTER_REASON_UNSUPPORTED,
     collect_rocprofv3_counters,
@@ -59,15 +60,17 @@ def test_counter_collection_discovers_availability_and_hashes_inputs(
             )
         job = yaml.safe_load(Path(command[2]).read_text(encoding="utf-8"))
         assert all(len(entry["pmc"]) == 1 for entry in job["jobs"])
-        pass_dir = request.output_directory / "pass_1"
-        pass_dir.mkdir(parents=True)
-        (pass_dir / "1_counter_collection.csv").write_text(
-            "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,"
-            "Counter_Name,Counter_Value\n"
-            "1,kernel,1,1,SQ_WAVES,1\n",
-            encoding="utf-8",
-        )
-        (pass_dir / "1_results.rocpd").write_bytes(b"audit")
+        for index, entry in enumerate(job["jobs"], start=1):
+            pass_dir = request.output_directory / f"pass_{index}"
+            pass_dir.mkdir(parents=True)
+            counter = entry["pmc"][0]
+            (pass_dir / f"{index}_counter_collection.csv").write_text(
+                "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,"
+                "Counter_Name,Counter_Value\n"
+                f"1,kernel,1,1,{counter},1\n",
+                encoding="utf-8",
+            )
+            (pass_dir / f"{index}_results.rocpd").write_bytes(b"audit")
         return subprocess.CompletedProcess(command, 0, "", "")
 
     result = collect_rocprofv3_counters(request, runner=runner)
@@ -138,4 +141,36 @@ def test_counter_collection_rejects_non_gfx1200_device(
     assert (
         result.skipped_reason
         == "required counters are unsupported: architecture:gfx1200"
+    )
+
+
+def test_counter_collection_rejects_incomplete_successful_run(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    tool = tmp_path / "rocprofv3"
+    tool.write_text("fake executable", encoding="utf-8")
+    monkeypatch.setattr(
+        counter_collection,
+        "resolve_rocm_tool",
+        lambda _name: tool,
+    )
+
+    def runner(command, _cwd, _timeout):
+        if "info" in command:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                _REQUIRED_COUNTERS,
+                "",
+            )
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    result = collect_rocprofv3_counters(_request(tmp_path), runner=runner)
+
+    assert result.status is Rocprofv3ProfileStatus.FAILED
+    assert COUNTER_REASON_ARTIFACT_INCOMPLETE in result.reason_codes
+    assert not any(
+        artifact.kind is Rocprofv3ArtifactKind.COUNTER_CSV
+        for artifact in result.artifacts
     )

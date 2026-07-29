@@ -297,6 +297,12 @@ def test_counter_profile_routes_to_explicit_counter_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[bool] = []
+    profile_result = Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.SUCCESS,
+        command=("rocprofv3",),
+        output_directory=tmp_path,
+        output_file="profile",
+    )
 
     def _run_profiled(
         eval_cmd,
@@ -307,7 +313,15 @@ def test_counter_profile_routes_to_explicit_counter_mode(
         counter_mode=False,
     ):
         calls.append(counter_mode)
-        return None, None
+        return (
+            subprocess.CompletedProcess(
+                args=["rocprofv3"],
+                returncode=0,
+                stdout="replayed evaluation output",
+                stderr="",
+            ),
+            profile_result,
+        )
 
     monkeypatch.setattr(
         cli_evaluation,
@@ -315,7 +329,7 @@ def test_counter_profile_routes_to_explicit_counter_mode(
         _run_profiled,
     )
 
-    evaluation_runtime._run_profiled_or_none(
+    profiled_proc, observed_result = evaluation_runtime._run_profiled_or_none(
         ["python", "candidate.py"],
         staging_dir=tmp_path,
         output_file=None,
@@ -324,3 +338,54 @@ def test_counter_profile_routes_to_explicit_counter_mode(
     )
 
     assert calls == [True]
+    assert profiled_proc is None
+    assert observed_result is profile_result
+
+
+def test_counter_profile_replay_stdout_is_not_canonical(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packager = _FakePackager(traces=[_trace()])
+    profile_result = Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.SUCCESS,
+        command=("rocprofv3",),
+        output_directory=tmp_path,
+        output_file="profile",
+    )
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_profiled_evaluation",
+        lambda *args, **kwargs: (
+            subprocess.CompletedProcess(
+                args=["rocprofv3"],
+                returncode=0,
+                stdout="replay-1\nreplay-2\n",
+                stderr="",
+            ),
+            profile_result,
+        ),
+    )
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_evaluation_command",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=["python"],
+            returncode=0,
+            stdout="canonical\n",
+            stderr="",
+        ),
+    )
+
+    result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=["python", "candidate.py"],
+        staging_dir=tmp_path,
+        output_file=tmp_path / "trace.jsonl",
+        timeout=5,
+        profile="rocprofv3-counters",
+    )
+
+    assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
+    assert packager.converted_stdout == "canonical\n"
+    assert result.profile_result is profile_result

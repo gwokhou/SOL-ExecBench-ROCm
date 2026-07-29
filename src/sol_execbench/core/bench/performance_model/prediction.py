@@ -134,7 +134,7 @@ def predict_hw(
     components = [component for group in modeled for component in group]
     estimates = [_combine_components(group) for group in modeled]
     predicted, lower, upper = _combine_dispatches(valid, estimates)
-    reasons = _hardware_reason_codes(dispatches, components)
+    reasons = _hardware_reason_codes(compiled, dispatches, components)
     status = (
         DiagnosticSidecarStatus.PARTIAL
         if reasons
@@ -564,10 +564,15 @@ def _overlaps(left: DispatchEvidence, right: DispatchEvidence) -> bool:
 
 
 def _hardware_reason_codes(
+    compiled: Sequence[CompiledCharacterization],
     dispatches: Sequence[DispatchEvidence],
     components: Sequence[PredictionComponent],
 ) -> list[str]:
-    reasons: list[str] = []
+    reasons = [
+        reason
+        for characterization in compiled
+        for reason in characterization.reason_codes
+    ]
     if any(not dispatch.valid for dispatch in dispatches):
         reasons.append("invalid_dispatch_evidence_excluded")
     component_dispatches = {
@@ -576,7 +581,7 @@ def _hardware_reason_codes(
     valid_ids = {item.dispatch_id for item in dispatches if item.valid}
     if component_dispatches != valid_ids:
         reasons.append("missing_dynamic_resource_counters")
-    return reasons
+    return list(dict.fromkeys(reasons))
 
 
 def _resource_total(

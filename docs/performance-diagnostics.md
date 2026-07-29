@@ -16,8 +16,9 @@ The mode checks device-0 counter availability and its `gfx1200` identity with
 `rocprofv3-avail`. It replays the candidate in fail-safe single-counter passes,
 uses CSV as normalized input, retains ROCPD/SQLite output for audit, and hashes
 the profiler, application executable, command, counter manifest, generated
-configuration, and availability report. Profiler duration is not a prediction
-input.
+configuration, availability report, and every cited counter artifact. Counter
+replay stdout and timing are discarded; one separate, unprofiled evaluation
+produces the canonical Trace. Profiler duration is not a prediction input.
 
 Build the governed diagnostic sidecar with:
 
@@ -39,7 +40,8 @@ must be supplied explicitly as
 `--frontier-trace WORKLOAD_UUID=TRACE.jsonl`. Missing or mismatched GPU,
 ROCm, compiler, clock, power, candidate, workload, run, hash, counter, or
 cross-pass identity yields `partial`/`unavailable` with reason codes; the model
-does not invent fallback evidence.
+does not invent fallback evidence. Frontier traces must also match the canonical
+GPU architecture, ROCm version, clock state, and timing protocol.
 
 All public examples use the root `--format json` option, which must precede the
 subcommand. Stdout is one versioned JSON response. Human progress messages do

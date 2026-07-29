@@ -116,15 +116,16 @@ class CompiledCharacterization(BaseModelWithDocstrings):
     model_config = _MODEL_CONFIG
 
     candidate_sha256: SHA256Digest
-    code_object_sha256: SHA256Digest
     gpu_architecture: str
     kernel_symbol: str
+    code_object_sha256: SHA256Digest | None = None
     functional_group_counts: dict[str, int] = Field(default_factory=dict)
     functional_subgroup_counts: dict[str, int] = Field(default_factory=dict)
     observed_matrix_units: list[str] = Field(default_factory=list)
     valu_types: list[str] = Field(default_factory=list)
     footprint: ResourceFootprint = Field(default_factory=ResourceFootprint)
     source: EvidenceReference
+    reason_codes: list[str] = Field(default_factory=list)
 
 
 class DispatchEvidence(BaseModelWithDocstrings):

@@ -226,6 +226,39 @@ def parse_and_align_counter_passes(
     return _align_passes(parsed, set(required_counters))
 
 
+def counter_names_in_csv(path: str | Path) -> frozenset[str]:
+    """Return normalized counter names from one bounded counter CSV."""
+    source = Path(path)
+    if source.stat().st_size > MAX_COUNTER_CSV_BYTES:
+        raise ValueError("counter_csv_too_large")
+    names: set[str] = set()
+    with source.open(newline="", encoding="utf-8-sig") as handle:
+        for raw in csv.DictReader(handle):
+            row = {_normalize_field(key): value for key, value in raw.items()}
+            names.add(
+                normalize_counter_name(
+                    _required_field(row, "countername", "counter"),
+                ),
+            )
+    if not names:
+        raise ValueError("counter_csv_contains_no_counters")
+    return frozenset(names)
+
+
+def counter_pass_index(path: str | Path) -> int | None:
+    """Return the pass/PMC index encoded in an artifact path."""
+    for part in Path(path).parts:
+        match = re.fullmatch(r"(?:pass|pmc)[_-](\d+)", part.lower())
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def normalize_counter_name(value: str) -> str:
+    """Normalize a rocprof counter name to the model's canonical spelling."""
+    return _COUNTER_TOKEN.sub("_", value).strip("_").upper()
+
+
 def _parse_counter_pass(
     counter_pass: CounterPassCSV,
     *,
@@ -284,7 +317,7 @@ def _dispatch_from_rows(
     counters: dict[str, float] = {}
     for row in rows:
         name = _required_field(row, "countername", "counter")
-        normalized_name = _normalize_counter(name)
+        normalized_name = normalize_counter_name(name)
         value = _counter_value(
             _required_field(row, "countervalue", "value"),
             counter_name=normalized_name,
@@ -335,7 +368,8 @@ def _align_passes(
         first = concrete[0]
         counters = _merged_counters(concrete)
         missing = sorted(
-            {_normalize_counter(name) for name in required} - counters.keys(),
+            {normalize_counter_name(name) for name in required}
+            - counters.keys(),
         )
         reasons: list[str] = []
         if mismatch:
@@ -407,10 +441,6 @@ def _merged_counters(
 
 def _normalize_field(value: str | None) -> str:
     return _FIELD_TOKEN.sub("", value.lower()) if value else ""
-
-
-def _normalize_counter(value: str) -> str:
-    return _COUNTER_TOKEN.sub("_", value).strip("_").upper()
 
 
 def _field(row: Mapping[str, str], *names: str) -> str | None:
@@ -490,7 +520,10 @@ __all__ = [
     "CounterManifest",
     "CounterPassCSV",
     "build_rocprofv3_counter_command",
+    "counter_names_in_csv",
+    "counter_pass_index",
     "load_counter_manifest",
+    "normalize_counter_name",
     "parse_and_align_counter_passes",
     "parse_available_architectures",
     "parse_available_counters",

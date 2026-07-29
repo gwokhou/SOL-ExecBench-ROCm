@@ -35,10 +35,15 @@ def calculate_ratios(
     timing_noise_ms: float,
     t_sol_ms: float,
     t_frontier_ms: float | None,
+    frontier_reason_codes: Sequence[str] = (),
 ) -> list[DiagnosticRatio]:
     """Calculate L/C/R with conservative interval propagation."""
     return [
-        _frontier_ratio(t_frontier_ms, t_sol_ms),
+        _frontier_ratio(
+            t_frontier_ms,
+            t_sol_ms,
+            reason_codes=frontier_reason_codes,
+        ),
         _prediction_ratio(RatioKind.C, t_pred_hw, t_pred_ir),
         _measured_ratio(t_measured_ms, timing_noise_ms, t_pred_hw),
     ]
@@ -93,9 +98,12 @@ def derive_attributions(
 def _frontier_ratio(
     frontier_ms: float | None,
     t_sol_ms: float,
+    *,
+    reason_codes: Sequence[str] = (),
 ) -> DiagnosticRatio:
     if frontier_ms is None:
-        return _ratio_unavailable(RatioKind.L, "trusted_frontier_unavailable")
+        reasons = list(reason_codes) or ["trusted_frontier_unavailable"]
+        return _ratio_unavailable(RatioKind.L, *reasons)
     if t_sol_ms <= 0:
         return _ratio_unavailable(RatioKind.L, "t_sol_is_zero")
     value = frontier_ms / t_sol_ms
@@ -181,11 +189,11 @@ def _ratio_status(
     return DiagnosticSidecarStatus.PARTIAL
 
 
-def _ratio_unavailable(kind: RatioKind, reason: str) -> DiagnosticRatio:
+def _ratio_unavailable(kind: RatioKind, *reasons: str) -> DiagnosticRatio:
     return DiagnosticRatio(
         kind=kind,
         status=DiagnosticSidecarStatus.UNAVAILABLE,
-        reason_codes=[reason],
+        reason_codes=list(reasons),
     )
 
 
@@ -253,8 +261,10 @@ def _codegen_actions(
                 evidence=["dispatch_count", "solar_fusion_regions"],
             ),
         )
-    if semantic.workload_kind is WorkloadKind.MATMUL and not _has_matrix_isa(
-        compiled,
+    if (
+        semantic.workload_kind is WorkloadKind.MATMUL
+        and not _has_matrix_isa(compiled)
+        and not _static_isa_mapping_ambiguous(compiled)
     ):
         actions.append(
             PerformanceAttribution(
@@ -363,6 +373,15 @@ def _unverified_runtime_action(
 
 def _has_matrix_isa(compiled: Sequence[CompiledCharacterization]) -> bool:
     return any(item.observed_matrix_units for item in compiled)
+
+
+def _static_isa_mapping_ambiguous(
+    compiled: Sequence[CompiledCharacterization],
+) -> bool:
+    return any(
+        "static_isa_kernel_mapping_ambiguous" in item.reason_codes
+        for item in compiled
+    )
 
 
 def _spill_detected(
