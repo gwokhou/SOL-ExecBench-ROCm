@@ -160,8 +160,13 @@ class ConverterPipelineMixin(ConverterMixinContract):
         enable_rename: bool,
     ) -> None:
         """Publish semantic and optional AccelForge artifacts."""
+        published_graph = {
+            key: value
+            for key, value in einsum_graph.items()
+            if not key.startswith("_")
+        }
         out_path = out_dir / "einsum_graph.yaml"
-        self._write_yaml(out_path, einsum_graph, no_aliases=True)
+        self._write_yaml(out_path, published_graph, no_aliases=True)
         if self._debug:
             print(f"✅ Wrote einsum graph: {out_path}")
         renamed_path = out_dir / "einsum_graph_renamed.yaml"
@@ -174,7 +179,7 @@ class ConverterPipelineMixin(ConverterMixinContract):
             )
             print(f"✅ Copied einsum graph as renamed ({mode}): {renamed_path}")
         try:
-            af_graph = build_af_graph_from_dict(einsum_graph)
+            af_graph = build_af_graph_from_dict(published_graph)
         except (RuntimeError, ValueError) as exc:
             if not self._strict:
                 raise
@@ -184,13 +189,15 @@ class ConverterPipelineMixin(ConverterMixinContract):
             # strict validator above, so retain it and record that the
             # secondary AF projection is unavailable instead of inventing a
             # copy/einsum surrogate.
-            einsum_graph["af_emission"] = {
+            af_emission = {
                 "status": "not_applicable",
                 "reason": "extended_semantics_not_representable",
                 "error_type": type(exc).__name__,
                 "message": str(exc),
             }
-            self._write_yaml(out_path, einsum_graph, no_aliases=True)
+            einsum_graph["af_emission"] = af_emission
+            published_graph["af_emission"] = af_emission
+            self._write_yaml(out_path, published_graph, no_aliases=True)
             shutil.copy2(out_path, renamed_path)
             return
         af_to_write = {
@@ -693,7 +700,7 @@ class ConverterPipelineMixin(ConverterMixinContract):
                 )
                 result["layers"][node_id] = layer_dict
 
-        # Fix connections for split/expanded operations
         self._fix_split_connections(result, node_id_remap, expanded_input_map)
+        result["_source_node_remap"] = node_id_remap
 
         return result

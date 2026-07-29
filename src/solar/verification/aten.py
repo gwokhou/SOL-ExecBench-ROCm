@@ -207,6 +207,8 @@ def _execute_arithmetic(
     if target in {
         "sum",
         "mean",
+        "max",
+        "min",
         "prod",
         "amax",
         "amin",

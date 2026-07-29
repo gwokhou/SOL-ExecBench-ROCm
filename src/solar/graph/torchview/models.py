@@ -26,10 +26,11 @@ class NodeInfo:
     output_types: list[str] = field(default_factory=list)
     output_slots: list[dict[str, Any]] = field(default_factory=list)
     module_args: dict[str, Any] = field(default_factory=dict)
+    source_input_index: int | None = None
 
     def to_dict(self) -> NodeDict:
         """Return the canonical operator-graph node mapping."""
-        return {
+        result: NodeDict = {
             "type": self.type,
             "node_class": self.node_class,
             "input_shapes": self.input_shapes,
@@ -45,6 +46,9 @@ class NodeInfo:
                 "outputs": self.output_nodes,
             },
         }
+        if self.source_input_index is not None:
+            result["source_input_index"] = self.source_input_index
+        return result
 
 
 __all__ = ["NodeInfo"]

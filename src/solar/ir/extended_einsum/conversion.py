@@ -62,10 +62,14 @@ def _convert_torchview_graph(
         raise StrictConversionError(
             "strict graph conversion produced no einsum graph",
         )
+    source_node_remap = converted.pop("_source_node_remap", {})
     converted["ir_kind"] = IRKind.EXTENDED_EINSUM.value
     converted["source_input_indices"] = _bind_inputs(converted, operator)
     converted["outputs"] = _bind_outputs(
-        converted, traced, operator.reference_outputs
+        converted,
+        traced,
+        operator.reference_outputs,
+        source_node_remap,
     )
     return converted
 
@@ -160,8 +164,9 @@ def _bind_outputs(
     graph: Mapping[str, DynamicValue],
     traced: Mapping[str, DynamicValue],
     expected: Sequence[TensorSignature],
+    source_node_remap: Mapping[str, DynamicValue] | None = None,
 ) -> list[str]:
-    candidates = _output_candidates(graph, traced)
+    candidates = _output_candidates(graph, traced, source_node_remap)
     if len(candidates) != len(expected):
         raise ReferenceOutputBindingError(
             "cannot preserve exact reference output arity",
@@ -182,9 +187,12 @@ def _bind_outputs(
 
 
 def _output_candidates(
-    graph: Mapping[str, DynamicValue], traced: Mapping[str, DynamicValue]
+    graph: Mapping[str, DynamicValue],
+    traced: Mapping[str, DynamicValue],
+    source_node_remap: Mapping[str, DynamicValue] | None = None,
 ) -> list[tuple[str, list[int], str]]:
     layers = graph.get("layers") or {}
+    source_node_remap = source_node_remap or {}
     output_nodes = [
         layer
         for layer in (traced.get("layers") or {}).values()
@@ -193,11 +201,16 @@ def _output_candidates(
     result: list[tuple[str, list[int], str]] = []
     for output in output_nodes:
         producers = (output.get("connections") or {}).get("inputs") or []
-        if len(producers) != 1 or producers[0] not in layers:
+        if len(producers) != 1:
             raise ReferenceOutputBindingError(
                 "cannot bind exact traced graph output",
             )
-        producer = layers[producers[0]]
+        producer_id = source_node_remap.get(producers[0], producers[0])
+        if producer_id not in layers:
+            raise ReferenceOutputBindingError(
+                "cannot bind exact traced graph output",
+            )
+        producer = layers[producer_id]
         names = (producer.get("tensor_names") or {}).get("outputs") or []
         shapes = (producer.get("tensor_shapes") or {}).get("outputs") or []
         dtypes = (producer.get("tensor_dtypes") or {}).get("outputs") or []

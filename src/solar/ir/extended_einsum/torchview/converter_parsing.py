@@ -580,7 +580,7 @@ class ConverterParsingMixin(ConverterMixinContract):
             if in_dtypes:
                 odata["input_dtypes"] = in_dtypes
             layer_type = (odata.get("type") or "").lower()
-            if self._correct_topk_output_dtypes(
+            if self._correct_multi_output_reduction_dtypes(
                 layers,
                 odata,
                 corrected_dtype,
@@ -686,20 +686,23 @@ class ConverterParsingMixin(ConverterMixinContract):
         ]
 
     @staticmethod
-    def _correct_topk_output_dtypes(
+    def _correct_multi_output_reduction_dtypes(
         layers: dict[str, Any],
         operation: dict[str, Any],
         corrected_dtype: dict[str, str],
     ) -> bool:
-        """Preserve distinct values/index dtypes for a top-k operation."""
-        if (operation.get("type") or "").lower() != "topk":
+        """Preserve distinct values/index dtypes for reduction result pairs."""
+        operation_type = (operation.get("type") or "").lower()
+        if operation_type not in {"max", "min", "topk"}:
             return False
         slot_dtypes = list(operation.get("output_dtypes") or [])
         outputs = list(
             (operation.get("connections") or {}).get("outputs") or [],
         )
         if len(slot_dtypes) != 2 or len(outputs) != 2:
-            raise ValueError("topk requires two exact output dtype slots")
+            raise ValueError(
+                f"{operation_type} requires two exact output dtype slots",
+            )
         for index, tensor_id in enumerate(outputs):
             if tensor_id in layers:
                 tensor_data = layers[tensor_id]

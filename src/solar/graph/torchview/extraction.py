@@ -83,15 +83,31 @@ def _record_source_input_indices(
         if str(layer.get("type", "")).lower() == "auxiliary-tensor"
         and not (layer.get("connections") or {}).get("inputs")
     ]
-    ordered = sorted(used_indices)
-    if len(source_layers) != len(ordered):
+    observed = [layer.get("source_input_index") for layer in source_layers]
+    if (
+        any(not isinstance(index, int) for index in observed)
+        or len(observed) != len(set(observed))
+        or set(observed) != used_indices
+    ):
         raise RuntimeError(
             "Torchview source topology does not uniquely match used "
             "reference tensor arguments",
         )
-    for layer, source_index in zip(source_layers, ordered, strict=True):
-        layer["source_input_index"] = source_index
-    graph["source_input_indices"] = ordered
+    graph["source_input_indices"] = sorted(used_indices)
+
+
+def _record_root_source_identity(
+    computation_graph: DynamicValue,
+    source_indices: Sequence[int],
+) -> None:
+    """Attach exact reference positions to Torchview root TensorNodes."""
+    roots = list(computation_graph.root_container)
+    if len(roots) != len(source_indices):
+        raise RuntimeError(
+            "Torchview roots do not match reference tensor arguments",
+        )
+    for root, source_index in zip(roots, source_indices, strict=True):
+        root.source_input_index = source_index
 
 
 def _trace_reference(
@@ -163,6 +179,7 @@ def _trace_reference(
         strict=True,
         collect_attributes=True,
     )
+    _record_root_source_identity(graph, tuple(sorted(tensor_inputs)))
     TorchviewProcessor().process_graph(graph, str(output), name, module)
     return observed, tensor_inputs, used_indices
 

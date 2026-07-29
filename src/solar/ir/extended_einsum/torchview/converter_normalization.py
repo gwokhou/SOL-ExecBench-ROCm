@@ -156,6 +156,73 @@ class ConverterNormalizationMixin(ConverterMixinContract):
                 "This indicates a graph construction bug."
             )
 
+    def _linear_typed_inputs(
+        self,
+        connections: list[str],
+        shapes: list[Any],
+        input_types: list[Any],
+    ) -> list[tuple[int, str, Any, str]]:
+        """Apply the reviewed functional-linear tensor roles."""
+        parameter_indices = self._PARAMETER_TENSOR_INDICES["linear"]
+        return [
+            (
+                index,
+                connection,
+                shapes[index] if index < len(shapes) else None,
+                (
+                    "weight"
+                    if index in parameter_indices
+                    else str(input_types[index])
+                    if index < len(input_types)
+                    else "input"
+                ),
+            )
+            for index, connection in enumerate(connections)
+        ]
+
+    @staticmethod
+    def _canonical_linear_input(
+        entry: tuple[int, str, Any, str],
+        start_node_id_map: dict[str, str],
+    ) -> str:
+        """Resolve one traced tensor node to its emitted start/op ID."""
+        return start_node_id_map.get(entry[1], entry[1])
+
+    @staticmethod
+    def _synthetic_tensor_call(input_count: int) -> dict[str, Any]:
+        """Return exact positional semantics for a synthetic tensor operation."""
+        return {
+            "call_arguments": [
+                {"tensor": index} for index in range(input_count)
+            ],
+            "call_kwargs": {},
+        }
+
+    @staticmethod
+    def _linear_input_connections(
+        node_id: str,
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> list[str]:
+        """Collect ordered tensor/start connections for functional linear."""
+        connections = list(
+            (node_data.get("connections") or {}).get("inputs") or [],
+        )
+        for predecessor in op_graph.predecessors(node_id):
+            if predecessor not in connections:
+                connections.append(predecessor)
+        for info in start_nodes_info:
+            start_id = start_node_id_map.get(info["original_id"])
+            if (
+                node_id in info.get("consumers", [])
+                and start_id
+                and start_id not in connections
+            ):
+                connections.append(start_id)
+        return connections
+
     def _split_linear_with_bias(
         self,
         node_id: str,
@@ -172,19 +239,13 @@ class ConverterNormalizationMixin(ConverterMixinContract):
         input_shapes = node_data.get("input_shapes") or []
         output_shapes = node_data.get("output_shapes") or []
 
-        # Keep original input order from PyTorch graph; don't sort.
-        node_connections = (node_data.get("connections") or {}).get(
-            "inputs"
-        ) or []
-        input_connections = list(node_connections)
-        for pred in op_graph.predecessors(node_id):
-            if pred not in input_connections:
-                input_connections.append(pred)
-        for info in start_nodes_info:
-            if node_id in info.get("consumers", []):
-                start_id = start_node_id_map.get(info["original_id"])
-                if start_id and start_id not in input_connections:
-                    input_connections.append(start_id)
+        input_connections = self._linear_input_connections(
+            node_id,
+            node_data,
+            op_graph,
+            start_nodes_info,
+            start_node_id_map,
+        )
 
         # Use collapsed op-graph successors so tensor nodes (e.g. hidden-tensor)
         # are not emitted in einsum connections.
@@ -212,12 +273,11 @@ class ConverterNormalizationMixin(ConverterMixinContract):
         )
         out_dtype = output_dtypes[0] if output_dtypes else act_dtype
 
-        # Infer x/weight/bias from ordered inputs + input_shapes.
-        typed_inputs: list[tuple[int, str, Any, str]] = []
-        for idx, conn in enumerate(input_connections):
-            ishape = input_shapes[idx] if idx < len(input_shapes) else None
-            itype = input_types[idx] if idx < len(input_types) else "input"
-            typed_inputs.append((idx, conn, ishape, str(itype)))
+        typed_inputs = self._linear_typed_inputs(
+            input_connections,
+            input_shapes,
+            input_types,
+        )
 
         activation_entry: tuple[int, str, Any, str] | None = None
         weight_entries: list[tuple[int, str, Any, str]] = []
@@ -314,21 +374,23 @@ class ConverterNormalizationMixin(ConverterMixinContract):
         matmul_connection_inputs: list[str] = []
 
         if activation_entry:
-            activation_conn_id = activation_entry[1]
-            # Activation tensors should reference the canonical start node IDs
-            # (e.g. start/start_1) after tensor-node collapse.
-            activation_einsum_id = start_node_id_map.get(
-                activation_conn_id, activation_conn_id
+            activation_einsum_id = self._canonical_linear_input(
+                activation_entry,
+                start_node_id_map,
             )
             matmul_input_names.append(f"{activation_einsum_id}.Output")
             if isinstance(activation_entry[2], list):
                 matmul_input_shapes_list.append(list(activation_entry[2]))
             matmul_connection_inputs.append(activation_einsum_id)
         if weight_entry:
-            matmul_input_names.append(f"{weight_entry[1]}.Output")
+            weight_einsum_id = self._canonical_linear_input(
+                weight_entry,
+                start_node_id_map,
+            )
+            matmul_input_names.append(f"{weight_einsum_id}.Output")
             if isinstance(weight_entry[2], list):
                 matmul_input_shapes_list.append(list(weight_entry[2]))
-            matmul_connection_inputs.append(weight_entry[1])
+            matmul_connection_inputs.append(weight_einsum_id)
 
         matmul_tensor_names = {
             "inputs": matmul_input_names,
@@ -410,9 +472,13 @@ class ConverterNormalizationMixin(ConverterMixinContract):
         add_connection_inputs = [node_id]
 
         if bias_entry and bias_shape:
-            add_input_names.append(f"{bias_entry[1]}.Output")
+            bias_einsum_id = self._canonical_linear_input(
+                bias_entry,
+                start_node_id_map,
+            )
+            add_input_names.append(f"{bias_einsum_id}.Output")
             add_input_shapes_list.append(list(bias_shape))
-            add_connection_inputs.append(bias_entry[1])
+            add_connection_inputs.append(bias_einsum_id)
 
         add_tensor_names = {
             "inputs": add_input_names,
@@ -447,6 +513,7 @@ class ConverterNormalizationMixin(ConverterMixinContract):
                 "inputs": add_connection_inputs,
                 "outputs": output_connections,  # Original outputs
             },
+            "module_args": self._synthetic_tensor_call(len(add_input_names)),
         }
 
         # Add bias info

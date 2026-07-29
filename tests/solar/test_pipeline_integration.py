@@ -54,6 +54,13 @@ def _masked_fill(value: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     return value.masked_fill(mask, -1.0)
 
 
+def _masked_fill_negative_inf(
+    value: torch.Tensor,
+    mask: torch.Tensor,
+) -> torch.Tensor:
+    return value.masked_fill(mask, float("-inf"))
+
+
 def _where(
     mask: torch.Tensor,
     left: torch.Tensor,
@@ -113,6 +120,32 @@ def _topk_outputs(
     value: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     return torch.topk(value, 3, dim=1)
+
+
+def _scalar_tensor_chain(
+    value: torch.Tensor,
+    target: torch.Tensor,
+    scale: float,
+) -> torch.Tensor:
+    reduced = functional.kl_div(value / scale, target, reduction="sum")
+    return reduced * (scale * scale) / value.shape[0]
+
+
+def _batch_norm_with_tensor_kwargs(
+    value: torch.Tensor,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+    running_mean: torch.Tensor,
+    running_var: torch.Tensor,
+) -> torch.Tensor:
+    return functional.batch_norm(
+        value,
+        running_mean,
+        running_var,
+        weight=weight,
+        bias=bias,
+        training=False,
+    )
 
 
 def _cases() -> list[tuple[str, Callable[..., torch.Tensor], tuple[Any, ...]]]:
@@ -275,6 +308,13 @@ def test_extraction_preserves_source_positions_when_use_order_differs(
     )
 
     assert artifact.used_source_indices == (0, 1)
+    converted = convert_operator_graph(artifact, output_dir=tmp_path)
+    graph = yaml.safe_load(converted.path.read_text())
+    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(
+        torch.ones(2),
+        torch.full((2,), 3.0),
+    )
+    torch.testing.assert_close(actual, torch.full((2,), 2.0))
 
 
 def test_torchview_preserves_repeated_use_of_one_source_input(
@@ -304,6 +344,146 @@ def test_torchview_preserves_repeated_use_of_one_source_input(
     assert add["tensor_names"]["inputs"][0] == add["tensor_names"]["inputs"][1]
     actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
     torch.testing.assert_close(actual, reference(*inputs))
+
+
+def test_torchview_preserves_internal_scalar_tensor_edges(
+    tmp_path: Path,
+) -> None:
+    inputs = (
+        torch.randn(2, 3),
+        torch.softmax(torch.randn(2, 3), dim=1),
+        4.0,
+    )
+    operator = extract_operator_graph(
+        _scalar_tensor_chain,
+        inputs,
+        device="cpu",
+        output_dir=tmp_path,
+        name="scalar-tensor-chain",
+        extraction_kind=ExtractionKind.TORCHVIEW,
+    )
+    converted = convert_operator_graph(operator, output_dir=tmp_path)
+    graph = yaml.safe_load(converted.path.read_text())
+
+    assert graph["source_input_indices"] == [0, 1]
+    assert (
+        len(
+            [
+                layer
+                for layer in graph["layers"].values()
+                if layer.get("type") == "start"
+            ],
+        )
+        == 2
+    )
+    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(
+        *inputs[:2],
+    )
+    torch.testing.assert_close(actual, _scalar_tensor_chain(*inputs))
+
+
+def test_torchview_binds_tensor_keyword_arguments_to_source_positions(
+    tmp_path: Path,
+) -> None:
+    inputs = (
+        torch.randn(2, 3, 4, 4),
+        torch.ones(3),
+        torch.zeros(3),
+        torch.zeros(3),
+        torch.ones(3),
+    )
+    operator = extract_operator_graph(
+        _batch_norm_with_tensor_kwargs,
+        inputs,
+        device="cpu",
+        output_dir=tmp_path,
+        name="tensor-keyword-arguments",
+        extraction_kind=ExtractionKind.TORCHVIEW,
+    )
+    converted = convert_operator_graph(operator, output_dir=tmp_path)
+    graph = yaml.safe_load(converted.path.read_text())
+
+    assert graph["source_input_indices"] == [0, 1, 2, 3, 4]
+    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    torch.testing.assert_close(
+        actual,
+        _batch_norm_with_tensor_kwargs(*inputs),
+    )
+
+
+def test_torchview_linear_preserves_external_weight_and_bias(
+    tmp_path: Path,
+) -> None:
+    inputs = (
+        torch.randn(2, 3),
+        torch.randn(4, 3),
+        torch.randn(4),
+    )
+    operator = extract_operator_graph(
+        _linear,
+        inputs,
+        device="cpu",
+        output_dir=tmp_path,
+        name="linear-external-weights",
+        extraction_kind=ExtractionKind.TORCHVIEW,
+    )
+    converted = convert_operator_graph(operator, output_dir=tmp_path)
+    graph = yaml.safe_load(converted.path.read_text())
+    renamed_graph = yaml.safe_load(
+        (tmp_path / "einsum_graph_renamed.yaml").read_text(),
+    )
+
+    assert graph["source_input_indices"] == [0, 1, 2]
+    assert "source_node_remap" not in graph
+    assert "_source_node_remap" not in graph
+    assert "_source_node_remap" not in renamed_graph
+    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    torch.testing.assert_close(actual, _linear(*inputs))
+
+
+@pytest.mark.parametrize(
+    ("name", "reference", "inputs"),
+    [
+        (
+            "max-value-slot",
+            _max_values,
+            (torch.arange(6.0).reshape(2, 3),),
+        ),
+        (
+            "masked-fill-negative-inf",
+            _masked_fill_negative_inf,
+            (
+                torch.arange(6.0).reshape(2, 3),
+                torch.tensor(
+                    [[True, False, False], [False, True, False]],
+                ),
+            ),
+        ),
+    ],
+)
+def test_torchview_preserves_exact_reduction_and_nonfinite_semantics(
+    tmp_path: Path,
+    name: str,
+    reference: Callable[..., torch.Tensor],
+    inputs: tuple[torch.Tensor, ...],
+) -> None:
+    operator = extract_operator_graph(
+        reference,
+        inputs,
+        device="cpu",
+        output_dir=tmp_path,
+        name=name,
+        extraction_kind=ExtractionKind.TORCHVIEW,
+    )
+    converted = convert_operator_graph(operator, output_dir=tmp_path)
+    graph = yaml.safe_load(converted.path.read_text())
+
+    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    torch.testing.assert_close(
+        actual,
+        reference(*inputs),
+        equal_nan=True,
+    )
 
 
 @pytest.mark.parametrize(
