@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from collections.abc import Sequence
@@ -310,6 +311,10 @@ def prepare_profile_output_directory(
             output_file in relative_parts
             or path.name.startswith(output_file)
             or bool(normalized_parts & PROFILE_OUTPUT_DIR_NAMES)
+            or any(
+                re.fullmatch(r"(?:pass|pmc)-\d+", part)
+                for part in normalized_parts
+            )
         ):
             shutil.rmtree(path, ignore_errors=True)
 

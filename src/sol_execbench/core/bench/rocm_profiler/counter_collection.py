@@ -1,0 +1,379 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
+"""Explicit rocprofv3 counter-mode collection lifecycle."""
+
+from __future__ import annotations
+
+import subprocess
+from importlib.resources import as_file, files
+from pathlib import Path
+
+from sol_execbench.core.bench.rocm_profiler.artifacts import (
+    discover_rocprofv3_artifacts,
+    profile_artifact_coverage_metadata,
+    profile_output_directory_listing,
+)
+from sol_execbench.core.bench.rocm_profiler.commands import (
+    ProfileRunner,
+    default_profile_runner,
+)
+from sol_execbench.core.bench.rocm_profiler.counters import (
+    ROCPROFV3_AVAIL_EXECUTABLE,
+    build_rocprofv3_counter_command,
+    load_counter_manifest,
+    parse_available_architectures,
+    parse_available_counters,
+    select_counter_groups,
+    write_counter_job,
+)
+from sol_execbench.core.bench.rocm_profiler.models import (
+    ROCPROF_REASON_COMMAND_FAILED,
+    ROCPROF_REASON_COMMAND_TIMEOUT,
+    ROCPROF_REASON_UNAVAILABLE,
+    Rocprofv3ArtifactCoverageStatus,
+    Rocprofv3ProfileRequest,
+    Rocprofv3ProfileResult,
+    Rocprofv3ProfileStatus,
+)
+from sol_execbench.core.bench.rocm_profiler.profile import (
+    prepare_profile_output_directory,
+)
+from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.integrity import (
+    sha256_bytes,
+    sha256_file,
+    stable_json_checksum,
+)
+from sol_execbench.core.platform.runtime import (
+    resolve_rocm_tool,
+    resolve_tool_path,
+)
+from sol_execbench.core.text_utils import subprocess_text
+
+COUNTER_REASON_AVAIL_FAILED = "rocprof_counter_availability_failed"
+COUNTER_REASON_UNSUPPORTED = "rocprof_required_counters_unsupported"
+COUNTER_REASON_COLLECTED = "rocprof_counters_collected"
+
+
+def collect_rocprofv3_counters(
+    request: Rocprofv3ProfileRequest,
+    *,
+    rocprofv3_available: bool = True,
+    runner: ProfileRunner | None = None,
+) -> Rocprofv3ProfileResult:
+    """Collect controlled gfx1200 counter passes and audit provenance."""
+    run = runner or default_profile_runner
+    if not rocprofv3_available:
+        return _unavailable(request, "rocprofv3 is not available")
+    avail_path = resolve_rocm_tool(ROCPROFV3_AVAIL_EXECUTABLE)
+    if avail_path is None:
+        return _unavailable(request, "rocprofv3-avail is not available")
+    availability = _run_availability(request, run, str(avail_path))
+    if isinstance(availability, Rocprofv3ProfileResult):
+        return availability
+    resource = files("sol_execbench.data.rocprofv3_counters").joinpath(
+        "gfx1200_v1.yaml",
+    )
+    with as_file(resource) as manifest_path:
+        manifest = load_counter_manifest(manifest_path)
+        architectures = parse_available_architectures(availability.stdout)
+        if manifest.architecture not in architectures:
+            return _unsupported(
+                request,
+                [f"architecture:{manifest.architecture}"],
+                availability,
+            )
+        groups, missing = select_counter_groups(
+            manifest,
+            parse_available_counters(availability.stdout),
+        )
+        if missing:
+            return _unsupported(request, missing, availability)
+        return _collect_selected(
+            request,
+            groups=groups,
+            manifest_path=manifest_path,
+            availability=availability,
+            runner=run,
+        )
+
+
+def _run_availability(
+    request: Rocprofv3ProfileRequest,
+    runner: ProfileRunner,
+    executable: str,
+) -> subprocess.CompletedProcess[str] | Rocprofv3ProfileResult:
+    command = [executable, "-d", "0", "info", "--pmc"]
+    try:
+        completed = runner(
+            command,
+            request.working_directory,
+            request.timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as error:
+        return _failed(
+            request,
+            tuple(command),
+            COUNTER_REASON_AVAIL_FAILED,
+            f"rocprofv3-avail timed out after {request.timeout_seconds} seconds",
+            stdout=subprocess_text(error.stdout),
+            stderr=subprocess_text(error.stderr),
+        )
+    if completed.returncode != 0:
+        return _failed(
+            request,
+            tuple(command),
+            COUNTER_REASON_AVAIL_FAILED,
+            f"rocprofv3-avail failed with exit code {completed.returncode}",
+            completed=completed,
+        )
+    return completed
+
+
+def _collect_selected(
+    request: Rocprofv3ProfileRequest,
+    *,
+    groups: list[list[str]],
+    manifest_path: Path,
+    availability: subprocess.CompletedProcess[str],
+    runner: ProfileRunner,
+) -> Rocprofv3ProfileResult:
+    prepare_profile_output_directory(
+        request.output_directory,
+        request.output_file,
+    )
+    config_path = (
+        request.output_directory / f"{request.output_file}.counters.yaml"
+    )
+    write_counter_job(
+        config_path,
+        groups,
+        output_directory=str(request.output_directory),
+    )
+    command = build_rocprofv3_counter_command(
+        request.application_command,
+        input_path=config_path,
+        executable=request.executable,
+    )
+    try:
+        completed = runner(
+            command,
+            request.working_directory,
+            request.timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as error:
+        return _counter_timeout(request, command, error)
+    provenance = _write_provenance(
+        request,
+        config_path=config_path,
+        manifest_path=manifest_path,
+        availability=availability,
+    )
+    return _counter_completed(request, command, completed, provenance)
+
+
+def _write_provenance(
+    request: Rocprofv3ProfileRequest,
+    *,
+    config_path: Path,
+    manifest_path: Path,
+    availability: subprocess.CompletedProcess[str],
+) -> dict[str, str]:
+    executable = resolve_rocm_tool(request.executable)
+    application_executable = resolve_tool_path(request.application_command[0])
+    provenance = {
+        "profiler_sha256": (
+            sha256_file(executable) if executable is not None else "unresolved"
+        ),
+        "counter_definition_sha256": sha256_file(manifest_path),
+        "configuration_sha256": sha256_file(config_path),
+        "availability_sha256": sha256_bytes(availability.stdout.encode()),
+        "application_executable_sha256": (
+            sha256_file(application_executable)
+            if application_executable is not None
+            else "unresolved"
+        ),
+        "application_command_sha256": stable_json_checksum(
+            list(request.application_command),
+        ),
+    }
+    path = (
+        request.output_directory
+        / f"{request.output_file}.counter-metadata.json"
+    )
+    atomic_write_json_value(
+        path,
+        {
+            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v1",
+            "diagnostic_only": True,
+            "score_authority": False,
+            **provenance,
+        },
+    )
+    return provenance
+
+
+def _counter_completed(
+    request: Rocprofv3ProfileRequest,
+    command: list[str],
+    completed: subprocess.CompletedProcess[str],
+    provenance: dict[str, str],
+) -> Rocprofv3ProfileResult:
+    artifacts = discover_rocprofv3_artifacts(
+        request.output_directory,
+        request.output_file,
+    )
+    coverage, coverage_reasons, warnings = profile_artifact_coverage_metadata(
+        artifacts,
+        command_succeeded=completed.returncode == 0,
+    )
+    success = (
+        completed.returncode == 0
+        and coverage is Rocprofv3ArtifactCoverageStatus.COMPLETE
+    )
+    failed_reason = None
+    if not success:
+        failed_reason = "rocprofv3 counter collection did not produce complete profiler data"
+    return Rocprofv3ProfileResult(
+        status=(
+            Rocprofv3ProfileStatus.SUCCESS
+            if success
+            else Rocprofv3ProfileStatus.FAILED
+        ),
+        command=tuple(command),
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        artifacts=artifacts,
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+        failed_reason=failed_reason,
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=True,
+        artifact_coverage_status=coverage,
+        reason_codes=(
+            (COUNTER_REASON_COLLECTED, *coverage_reasons)
+            if success
+            else (ROCPROF_REASON_COMMAND_FAILED, *coverage_reasons)
+        ),
+        warnings=warnings,
+        output_format="csv,rocpd",
+        profiler_data_artifacts=bool(artifacts),
+        output_directory_listing=profile_output_directory_listing(
+            request.output_directory,
+        ),
+        provenance=provenance,
+    )
+
+
+def _counter_timeout(
+    request: Rocprofv3ProfileRequest,
+    command: list[str],
+    error: subprocess.TimeoutExpired,
+) -> Rocprofv3ProfileResult:
+    artifacts = discover_rocprofv3_artifacts(
+        request.output_directory,
+        request.output_file,
+    )
+    return Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.FAILED,
+        command=tuple(command),
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        artifacts=artifacts,
+        stdout=subprocess_text(error.stdout),
+        stderr=subprocess_text(error.stderr),
+        failed_reason=(
+            "rocprofv3 counter command timed out after "
+            f"{request.timeout_seconds} seconds"
+        ),
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=True,
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.PARTIAL,
+        reason_codes=(ROCPROF_REASON_COMMAND_TIMEOUT,),
+        output_format="csv,rocpd",
+        profiler_data_artifacts=bool(artifacts),
+        output_directory_listing=profile_output_directory_listing(
+            request.output_directory,
+        ),
+    )
+
+
+def _unavailable(
+    request: Rocprofv3ProfileRequest,
+    reason: str,
+) -> Rocprofv3ProfileResult:
+    return Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.UNAVAILABLE,
+        command=(),
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        skipped_reason=reason,
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=False,
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.UNAVAILABLE,
+        reason_codes=(ROCPROF_REASON_UNAVAILABLE,),
+        output_format="csv,rocpd",
+    )
+
+
+def _unsupported(
+    request: Rocprofv3ProfileRequest,
+    missing: list[str],
+    availability: subprocess.CompletedProcess[str],
+) -> Rocprofv3ProfileResult:
+    return Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.UNAVAILABLE,
+        command=tuple(str(item) for item in availability.args),
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        stdout=availability.stdout,
+        stderr=availability.stderr,
+        skipped_reason=f"required counters are unsupported: {', '.join(missing)}",
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=True,
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.UNAVAILABLE,
+        reason_codes=(COUNTER_REASON_UNSUPPORTED,),
+        output_format="csv,rocpd",
+    )
+
+
+def _failed(
+    request: Rocprofv3ProfileRequest,
+    command: tuple[str, ...],
+    reason_code: str,
+    message: str,
+    *,
+    completed: subprocess.CompletedProcess[str] | None = None,
+    stdout: str = "",
+    stderr: str = "",
+) -> Rocprofv3ProfileResult:
+    return Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.FAILED,
+        command=command,
+        output_directory=request.output_directory,
+        output_file=request.output_file,
+        returncode=completed.returncode if completed else None,
+        stdout=completed.stdout if completed else stdout,
+        stderr=completed.stderr if completed else stderr,
+        failed_reason=message,
+        working_directory=request.working_directory,
+        timeout_seconds=request.timeout_seconds,
+        profiler_available=True,
+        artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.NONE,
+        reason_codes=(reason_code,),
+        output_format="csv,rocpd",
+    )
+
+
+__all__ = [
+    "COUNTER_REASON_AVAIL_FAILED",
+    "COUNTER_REASON_COLLECTED",
+    "COUNTER_REASON_UNSUPPORTED",
+    "collect_rocprofv3_counters",
+]

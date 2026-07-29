@@ -161,6 +161,7 @@ class Rocprofv3ProfileResult:
     output_format: str | None = None
     profiler_data_artifacts: bool = False
     output_directory_listing: tuple[str, ...] = ()
+    provenance: dict[str, str] = field(default_factory=dict)
     schema_version: str = field(
         init=False,
         default=ROCPROFV3_PROFILE_SCHEMA_VERSION,
@@ -234,6 +235,7 @@ class Rocprofv3ProfileResult:
             "output_format": self.output_format,
             "profiler_data_artifacts": self.profiler_data_artifacts,
             "output_directory_listing": list(self.output_directory_listing),
+            "provenance": dict(self.provenance),
             "reason_codes": list(self.reason_codes),
             "warnings": list(self.warnings),
             "returncode": self.returncode,

@@ -13,10 +13,17 @@ class ProfileMode(StrEnum):
 
     NONE = "none"
     ROCPROFV3 = "rocprofv3"
+    ROCPROFV3_COUNTERS = "rocprofv3-counters"
 
 
 # Click choices require exact built-in strings rather than StrEnum instances.
 PROFILE_NONE = str(ProfileMode.NONE)
 PROFILE_ROCPROFV3 = str(ProfileMode.ROCPROFV3)
+PROFILE_ROCPROFV3_COUNTERS = str(ProfileMode.ROCPROFV3_COUNTERS)
 
-__all__ = ["PROFILE_NONE", "PROFILE_ROCPROFV3", "ProfileMode"]
+__all__ = [
+    "PROFILE_NONE",
+    "PROFILE_ROCPROFV3",
+    "PROFILE_ROCPROFV3_COUNTERS",
+    "ProfileMode",
+]

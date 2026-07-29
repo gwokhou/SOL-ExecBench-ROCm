@@ -87,7 +87,9 @@ def is_profile_artifact_candidate(
     }
     if output_file in relative_parts:
         return True
-    return bool(normalized_parts & PROFILE_OUTPUT_DIR_NAMES)
+    return bool(normalized_parts & PROFILE_OUTPUT_DIR_NAMES) or any(
+        re.fullmatch(r"(?:pass|pmc)-\d+", part) for part in normalized_parts
+    )
 
 
 def is_known_profile_artifact_name(path: Path) -> bool:

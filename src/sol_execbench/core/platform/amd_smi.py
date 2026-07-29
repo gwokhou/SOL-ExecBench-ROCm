@@ -53,6 +53,8 @@ class AMDSmiGPUIdentity(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     gpu: int | str
+    bdf: str | None = None
+    uuid: str | None = None
 
 
 class AMDSmiListPayload(RootModel[list[AMDSmiGPUIdentity]]):
@@ -94,3 +96,21 @@ def parse_gpu_count(raw: str) -> int:
     """Return the number of unique GPU identifiers in ``amd-smi list`` JSON."""
     payload = AMDSmiListPayload.model_validate_json(raw)
     return len({str(entry.gpu) for entry in payload.root})
+
+
+def parse_gpu_identity(raw: str, gpu_index: int) -> AMDSmiGPUIdentity:
+    """Return one exact GPU list identity with required UUID and BDF."""
+    payload = AMDSmiListPayload.model_validate_json(raw)
+    matches = [
+        identity
+        for identity in payload.root
+        if str(identity.gpu) == str(gpu_index)
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"amd-smi returned no unique identity for GPU {gpu_index}"
+        )
+    identity = matches[0]
+    if not identity.uuid or not identity.bdf:
+        raise ValueError("amd-smi GPU identity lacks UUID or BDF")
+    return identity
