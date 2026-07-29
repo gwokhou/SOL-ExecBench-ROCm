@@ -56,6 +56,7 @@ class AgentFeedbackBottleneck(StrEnum):
     INTERFACE_CORRECTNESS = "interface_correctness"
     POLICY_VIOLATION = "policy_violation"
     REFERENCE_FAILURE = "reference_failure"
+    PERFORMANCE = "performance"
 
 
 class AgentFeedbackItem(BaseModelWithDocstrings):
@@ -92,6 +93,8 @@ class AgentFeedbackSummary(BaseModelWithDocstrings):
     """Optional rocprofv3 profile sidecar status."""
     static_evidence_status: StaticKernelEvidenceStatus | None = None
     """Optional static evidence sidecar status."""
+    performance_diagnostic_status: DiagnosticSidecarStatus | None = None
+    """Optional governed performance diagnostic status."""
 
 
 class AgentFeedbackSidecar(DiagnosticSidecarEnvelope):

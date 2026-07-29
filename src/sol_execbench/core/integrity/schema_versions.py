@@ -13,6 +13,9 @@ from typing import Final, Literal
 AGENT_FEEDBACK_SCHEMA_VERSION: Final = "sol_execbench.agent_feedback.v3"
 DECISION_SCHEMA_VERSION: Final = "sol_execbench.decision.v2"
 PROFILE_SUMMARY_SCHEMA_VERSION: Final = "sol_execbench.profile_summary.v3"
+PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION: Final = (
+    "sol_execbench.performance_diagnostic.v1"
+)
 ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
     "sol_execbench.environment_diagnostics.v1"
 )
@@ -60,6 +63,7 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "agent_feedback": AGENT_FEEDBACK_SCHEMA_VERSION,
     "decision": DECISION_SCHEMA_VERSION,
     "profile_summary": PROFILE_SUMMARY_SCHEMA_VERSION,
+    "performance_diagnostic": PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION,
     "amd_isa_release_lock": "sol_execbench.amd_isa_release_lock.v1",
     "arch_capability_budget": "sol_execbench.arch_capability_budget.v1",
     "cli_contract": "sol_execbench.cli_contract.v1",
@@ -115,6 +119,7 @@ __all__ = [
     "ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION",
     "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION",
     "EVALUATOR_CONTRACT_SCHEMA_VERSION",
+    "PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION",
     "PROFILE_SUMMARY_SCHEMA_VERSION",
     "RDNA4_VALIDATION_SCHEMA_VERSION",
     "RELEASE_BASELINE_SCHEMA_VERSION",

@@ -42,6 +42,7 @@ from sol_execbench.driver import ProblemPackager
 
 PROFILE_NONE = profile_mode.PROFILE_NONE
 PROFILE_ROCPROFV3 = profile_mode.PROFILE_ROCPROFV3
+PROFILE_ROCPROFV3_COUNTERS = profile_mode.PROFILE_ROCPROFV3_COUNTERS
 _EXECUTION_ENV_LOCK = threading.RLock()
 
 
@@ -200,9 +201,14 @@ def run_evaluation_phase(
     workload_count: int,
 ) -> cli_evaluation_runtime.EvaluationRuntimeResult:
     """Execute the staged solution and parse its runtime result."""
-    if profile == PROFILE_ROCPROFV3:
+    if profile in {PROFILE_ROCPROFV3, PROFILE_ROCPROFV3_COUNTERS}:
+        description = (
+            "rocprofv3 counter"
+            if profile == PROFILE_ROCPROFV3_COUNTERS
+            else "rocprofv3"
+        )
         context.console.print(
-            "[dim]Collecting optional rocprofv3 profiling evidence...[/dim]",
+            f"[dim]Collecting optional {description} profiling evidence...[/dim]",
         )
 
     with Progress(

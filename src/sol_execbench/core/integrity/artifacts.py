@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Annotated
+
+from pydantic import AfterValidator
 
 from sol_execbench.core.integrity.checksums import sha256_file
 
@@ -19,6 +22,9 @@ def validate_sha256(value: object, field: str = "SHA-256") -> str:
     if _SHA256.fullmatch(digest) is None:
         raise ValueError(f"{field} must be a lowercase SHA-256")
     return digest
+
+
+SHA256Digest = Annotated[str, AfterValidator(validate_sha256)]
 
 
 def validate_relative_artifact_path(value: object, field: str = "path") -> str:
@@ -63,6 +69,7 @@ def verify_artifact_file(
 
 
 __all__ = [
+    "SHA256Digest",
     "validate_relative_artifact_path",
     "validate_sha256",
     "verify_artifact_file",

@@ -11,6 +11,7 @@ import sol_execbench.cli.sidecars.static_evidence as cli_static_evidence
 from sol_execbench.cli.evaluation.evaluator import (
     PROFILE_NONE,
     PROFILE_ROCPROFV3,
+    PROFILE_ROCPROFV3_COUNTERS,
     run_evaluation_cli,
 )
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
@@ -79,7 +80,9 @@ from sol_execbench.cli.protocol import CliFailure, CliResult, output_format
 @click.option("--keep-staging", is_flag=True)
 @click.option(
     "--profile",
-    type=click.Choice([PROFILE_NONE, PROFILE_ROCPROFV3]),
+    type=click.Choice(
+        [PROFILE_NONE, PROFILE_ROCPROFV3, PROFILE_ROCPROFV3_COUNTERS],
+    ),
     default=PROFILE_NONE,
     show_default=True,
 )

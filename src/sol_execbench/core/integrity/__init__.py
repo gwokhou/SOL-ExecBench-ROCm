@@ -4,6 +4,7 @@
 """Content-integrity primitives shared across SOL ExecBench."""
 
 from sol_execbench.core.integrity.artifacts import (
+    SHA256Digest,
     validate_relative_artifact_path,
     validate_sha256,
     verify_artifact_file,
@@ -22,6 +23,7 @@ from sol_execbench.core.integrity.source_state import (
 __all__ = [
     "CURRENT_SCHEMA_VERSIONS",
     "GitSourceState",
+    "SHA256Digest",
     "sha256_bytes",
     "sha256_file",
     "stable_json_checksum",

@@ -13,7 +13,10 @@ from pathlib import Path
 from typing import ClassVar, Protocol
 
 from sol_execbench.cli.evaluation import command as cli_evaluation
-from sol_execbench.cli.evaluation.profile_mode import PROFILE_ROCPROFV3
+from sol_execbench.cli.evaluation.profile_mode import (
+    PROFILE_ROCPROFV3,
+    PROFILE_ROCPROFV3_COUNTERS,
+)
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
 from sol_execbench.core.data.trace import Trace
@@ -117,8 +120,16 @@ def _run_profiled_or_none(
     subprocess.CompletedProcess[str] | None,
     Rocprofv3ProfileResult | None,
 ]:
-    if profile != PROFILE_ROCPROFV3:
+    if profile not in {PROFILE_ROCPROFV3, PROFILE_ROCPROFV3_COUNTERS}:
         return None, None
+    if profile == PROFILE_ROCPROFV3_COUNTERS:
+        return cli_evaluation._run_profiled_evaluation(
+            eval_cmd,
+            staging_dir=staging_dir,
+            output_file=output_file,
+            timeout=timeout,
+            counter_mode=True,
+        )
     return cli_evaluation._run_profiled_evaluation(
         eval_cmd,
         staging_dir=staging_dir,

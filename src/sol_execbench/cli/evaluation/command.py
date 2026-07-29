@@ -34,6 +34,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     ProfileRunner,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
+    collect_rocprofv3_counters,
     collect_rocprofv3_profile,
 )
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
@@ -156,23 +157,16 @@ def _run_profiled_evaluation(
     subprocess_run: TextSubprocessRunner | None = None,
     rocprofv3_available: bool | None = None,
     profile_collector: ProfileCollector = collect_rocprofv3_profile,
+    counter_mode: bool = False,
     clock_locker: ClockLocker = acquire_clock_lock,
 ) -> tuple[subprocess.CompletedProcess[str] | None, Rocprofv3ProfileResult]:
     """Run evaluation under `rocprofv3`, returning normal execution on failure.
 
     The rocprofv3 collection is wrapped in a best-effort STABLE_PEAK clock lock.
 
-    Why we lock the clock: on gfx1200 (RDNA4) the SQ perf counter
-    ``SQ_WAVE_CYCLES`` (event 24) reads exactly zero under the default ``AUTO``
-    power policy, because the dVFS shader-clock transitions suppress its
-    increment. That silently corrupts every derived occupancy/stall metric
-    (``MeanOccupancyPerCU``, ``OccupancyPercent``, ``WAVE_DEP_WAIT``,
-    ``WAVE_ISSUE_WAIT``). Holding a stable power state removes the transitions
-    so the counter accumulates normally; ``STABLE_PEAK`` is chosen over AMD's
-    ``STABLE_STD`` because it keeps a representative high SCLK/MCLK mix, whereas
-    STD collapses MCLK and bandwidth-starves the kernel (see issue for data).
-    Background: https://github.com/ROCm/rocm-systems/issues/8523 and AMD's
-    stable-power-state guidance in the rocprofiler-sdk limitations doc.
+    On gfx1200, ``SQ_WAVE_CYCLES`` reads zero under ``AUTO`` dVFS and corrupts
+    derived occupancy metrics. ``STABLE_PEAK`` removes those transitions while
+    retaining a representative high SCLK/MCLK mix. See ROCm issue #8523.
 
     The lock comes from :func:`acquire_clock_lock`: idempotent (an outer
     STABLE_PEAK is preserved, never released by this inner acquire) and
@@ -203,7 +197,10 @@ def _run_profiled_evaluation(
                 "lock; on gfx1200 SQ_WAVE_CYCLES and derived occupancy/stall "
                 "metrics may read zero (ROCm issue #8523).",
             )
-        profile_result = profile_collector(
+        collector = (
+            collect_rocprofv3_counters if counter_mode else profile_collector
+        )
+        profile_result = collector(
             request,
             rocprofv3_available=rocprofv3_available,
             runner=lambda command, cwd, timeout_seconds: _run_command(

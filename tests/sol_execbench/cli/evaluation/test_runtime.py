@@ -290,3 +290,37 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
     assert result.profile_result is profile_result
     assert result.profile_fallback_reason == "rocprofv3 unavailable"
+
+
+def test_counter_profile_routes_to_explicit_counter_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[bool] = []
+
+    def _run_profiled(
+        eval_cmd,
+        *,
+        staging_dir,
+        output_file,
+        timeout,
+        counter_mode=False,
+    ):
+        calls.append(counter_mode)
+        return None, None
+
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_profiled_evaluation",
+        _run_profiled,
+    )
+
+    evaluation_runtime._run_profiled_or_none(
+        ["python", "candidate.py"],
+        staging_dir=tmp_path,
+        output_file=None,
+        timeout=5,
+        profile="rocprofv3-counters",
+    )
+
+    assert calls == [True]

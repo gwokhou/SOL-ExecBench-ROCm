@@ -11,16 +11,26 @@ from dataclasses import dataclass
 
 from sol_execbench.core.bench.agent_feedback.items import trace_feedback_items
 from sol_execbench.core.bench.agent_feedback.models import (
+    AgentFeedbackBottleneck,
+    AgentFeedbackItem,
     AgentFeedbackReasonCode,
+    AgentFeedbackSeverity,
     AgentFeedbackSidecar,
     AgentFeedbackSummary,
 )
 from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticArtifactCitation,
+    DiagnosticGovernanceGuardrail,
+    DiagnosticGovernanceStatus,
     DiagnosticSidecarStatus,
     DiagnosticSourceRef,
     ExtendedDiagnosticIdentity,
     compact_path,
+)
+from sol_execbench.core.bench.performance_model.models import (
+    DiagnosticConfidence,
+    PerformanceAttribution,
+    PerformanceDiagnosticSidecar,
 )
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
@@ -57,6 +67,8 @@ class AgentFeedbackBuildRequest:
     static_evidence: StaticKernelEvidenceSidecar | None = None
     identity: AgentFeedbackBuildIdentity = AgentFeedbackBuildIdentity()
     artifact_citations: Sequence[DiagnosticArtifactCitation] = ()
+    performance_diagnostic: PerformanceDiagnosticSidecar | None = None
+    performance_governance: DiagnosticGovernanceGuardrail | None = None
 
 
 def build_agent_feedback_sidecar(
@@ -66,13 +78,20 @@ def build_agent_feedback_sidecar(
     traces = request.traces
     profile_result = request.profile_result
     static_evidence = request.static_evidence
+    performance_diagnostic = request.performance_diagnostic
     identity = request.identity
     evaluations = [
         trace.evaluation for trace in traces if trace.evaluation is not None
     ]
     evaluated = [trace for trace in traces if trace.evaluation is not None]
     status_counter = Counter(evaluation.status for evaluation in evaluations)
-    status = _aggregate_status(evaluated, profile_result, static_evidence)
+    status = _aggregate_status(
+        evaluated,
+        profile_result,
+        static_evidence,
+        performance_diagnostic,
+        request.performance_governance,
+    )
     reason_code = (
         AgentFeedbackReasonCode.NO_EVALUATION_TRACES
         if not evaluated
@@ -107,10 +126,28 @@ def build_agent_feedback_sidecar(
             static_evidence_status=(
                 static_evidence.status if static_evidence else None
             ),
+            performance_diagnostic_status=(
+                performance_diagnostic.status
+                if performance_diagnostic
+                else None
+            ),
         ),
-        items=trace_feedback_items(status_counter),
-        limitations=_limitations(traces, profile_result, static_evidence),
-        source_refs=_source_refs(profile_result, static_evidence),
+        items=[
+            *trace_feedback_items(status_counter),
+            *_performance_feedback_items(request),
+        ],
+        limitations=_limitations(
+            traces,
+            profile_result,
+            static_evidence,
+            performance_diagnostic,
+            request.performance_governance,
+        ),
+        source_refs=_source_refs(
+            profile_result,
+            static_evidence,
+            performance_diagnostic,
+        ),
         artifact_citations=list(request.artifact_citations),
     )
 
@@ -119,19 +156,32 @@ def _aggregate_status(
     traces: Sequence[Trace],
     profile_result: Rocprofv3ProfileResult | None,
     static_evidence: StaticKernelEvidenceSidecar | None,
+    performance_diagnostic: PerformanceDiagnosticSidecar | None,
+    performance_governance: DiagnosticGovernanceGuardrail | None,
 ) -> DiagnosticSidecarStatus:
     if not traces:
         return DiagnosticSidecarStatus.UNAVAILABLE
     optional_unavailable = (
-        profile_result is not None
-        and profile_result.status is not Rocprofv3ProfileStatus.SUCCESS
-    ) or (
-        static_evidence is not None
-        and static_evidence.status
-        not in {
-            StaticKernelEvidenceStatus.COLLECTED,
-            StaticKernelEvidenceStatus.PARTIAL,
-        }
+        (
+            profile_result is not None
+            and profile_result.status is not Rocprofv3ProfileStatus.SUCCESS
+        )
+        or (
+            static_evidence is not None
+            and static_evidence.status
+            not in {
+                StaticKernelEvidenceStatus.COLLECTED,
+                StaticKernelEvidenceStatus.PARTIAL,
+            }
+        )
+        or (
+            performance_diagnostic is not None
+            and (
+                performance_governance is None
+                or performance_governance.status
+                is not DiagnosticGovernanceStatus.USABLE_DIAGNOSTIC
+            )
+        )
     )
     if optional_unavailable:
         return DiagnosticSidecarStatus.PARTIAL
@@ -141,6 +191,7 @@ def _aggregate_status(
 def _source_refs(
     profile_result: Rocprofv3ProfileResult | None,
     static_evidence: StaticKernelEvidenceSidecar | None,
+    performance_diagnostic: PerformanceDiagnosticSidecar | None,
 ) -> list[DiagnosticSourceRef]:
     refs = [DiagnosticSourceRef(kind="trace", label="canonical_trace_jsonl")]
     if profile_result is not None:
@@ -159,6 +210,14 @@ def _source_refs(
                 status=static_evidence.status,
             ),
         )
+    if performance_diagnostic is not None:
+        refs.append(
+            DiagnosticSourceRef(
+                kind="performance_diagnostic",
+                label="performance_diagnostic",
+                status=performance_diagnostic.status,
+            ),
+        )
     return refs
 
 
@@ -166,6 +225,8 @@ def _limitations(
     traces: Sequence[Trace],
     profile_result: Rocprofv3ProfileResult | None,
     static_evidence: StaticKernelEvidenceSidecar | None,
+    performance_diagnostic: PerformanceDiagnosticSidecar | None,
+    performance_governance: DiagnosticGovernanceGuardrail | None,
 ) -> list[str]:
     limitations: list[str] = [
         "Agent feedback is diagnostic next-experiment guidance only.",
@@ -190,4 +251,82 @@ def _limitations(
         limitations.append(
             f"Static evidence status is {static_evidence.status}.",
         )
+    if performance_diagnostic is not None and (
+        performance_governance is None
+        or performance_governance.status
+        is not DiagnosticGovernanceStatus.USABLE_DIAGNOSTIC
+    ):
+        limitations.append(
+            "Performance diagnostic was not consumed because governance did "
+            "not establish current, usable identity.",
+        )
     return limitations
+
+
+_PERFORMANCE_ACTION_CODES = frozenset(
+    {
+        "stop_launch_bound_search",
+        "reduce_dispatch_count",
+        "restore_wmma_path",
+        "remove_extra_traffic",
+        "improve_coalescing",
+        "reduce_lds_barriers",
+        "reprofile_missing_counters",
+        "model_gap_no_kernel_action",
+    },
+)
+
+
+def _performance_feedback_items(
+    request: AgentFeedbackBuildRequest,
+) -> list[AgentFeedbackItem]:
+    diagnostic = request.performance_diagnostic
+    governance = request.performance_governance
+    if (
+        diagnostic is None
+        or governance is None
+        or governance.status is not DiagnosticGovernanceStatus.USABLE_DIAGNOSTIC
+    ):
+        return []
+    items: list[AgentFeedbackItem] = []
+    for workload in diagnostic.workloads:
+        for attribution in workload.attributions:
+            if not _usable_performance_attribution(attribution):
+                continue
+            action_code = attribution.action_code
+            if action_code is None:
+                continue
+            items.append(
+                AgentFeedbackItem(
+                    code=action_code,
+                    severity=AgentFeedbackSeverity.ACTION,
+                    bottleneck=AgentFeedbackBottleneck.PERFORMANCE,
+                    message=attribution.message,
+                    recommendation=action_code,
+                    source_refs=[
+                        DiagnosticSourceRef(
+                            kind="performance_diagnostic",
+                            label=workload.workload_uuid,
+                            status=diagnostic.status,
+                        ),
+                    ],
+                ),
+            )
+    return items
+
+
+def _usable_performance_attribution(
+    attribution: PerformanceAttribution,
+) -> bool:
+    action = attribution.action_code
+    if action not in _PERFORMANCE_ACTION_CODES:
+        return False
+    if action in {
+        "reprofile_missing_counters",
+        "model_gap_no_kernel_action",
+    }:
+        return True
+    return attribution.confidence in {
+        DiagnosticConfidence.MEDIUM,
+        DiagnosticConfidence.HIGH,
+    }

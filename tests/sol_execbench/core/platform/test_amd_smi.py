@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from sol_execbench.core.platform.amd_smi import (
     parse_gpu_count,
+    parse_gpu_identity,
     parse_performance_levels,
     parse_processes,
 )
@@ -50,3 +51,12 @@ def test_parse_processes_normalizes_stable_fields() -> None:
 
 def test_parse_gpu_count_counts_unique_ids() -> None:
     assert parse_gpu_count('[{"gpu": 0}, {"gpu": 1}, {"gpu": 1}]') == 2
+
+
+def test_parse_gpu_identity_requires_exact_uuid_and_bdf() -> None:
+    identity = parse_gpu_identity(
+        '[{"gpu":0,"bdf":"0000:03:00.0","uuid":"gpu-uuid"}]',
+        0,
+    )
+
+    assert (identity.uuid, identity.bdf) == ("gpu-uuid", "0000:03:00.0")

@@ -30,6 +30,7 @@ console = Console(stderr=True)
 # canonical definitions live in ``profile_mode`` and are re-exported by phases.
 PROFILE_NONE = cli_phases.PROFILE_NONE
 PROFILE_ROCPROFV3 = cli_phases.PROFILE_ROCPROFV3
+PROFILE_ROCPROFV3_COUNTERS = cli_phases.PROFILE_ROCPROFV3_COUNTERS
 
 
 def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
@@ -216,6 +217,7 @@ def _run_evaluation_phases(
 __all__ = [
     "PROFILE_NONE",
     "PROFILE_ROCPROFV3",
+    "PROFILE_ROCPROFV3_COUNTERS",
     "EvaluationRequest",
     "run_evaluation_cli",
 ]
