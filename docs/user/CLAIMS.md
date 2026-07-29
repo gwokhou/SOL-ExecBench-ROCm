@@ -11,9 +11,11 @@ dataset. Raw upstream field names are normalized only while importing that
 corpus; public models accept only the current field names.
 
 SOLAR owns graph extraction, conversion verification, and formal lower-bound
-analysis. Current einsum graphs and analysis artifacts use schema 3. Formal ROCm
-bounds fail closed unless the configured architecture and pinned Orojenesis
-evidence satisfy the current contract.
+analysis. Its fixed `torchview_extended_einsum` and `make_fx_aten` paths use
+separately versioned graph schemas and the `amd_resource_v2` mandatory-work
+model. Formal ROCm bounds fail closed unless the selected path, configured
+architecture, exact operations, resource rules, and pinned Orojenesis evidence
+satisfy the current contract.
 
 The repository exposes a fail-closed official scorer and machine-readable
 availability. The checked-in corpus publishes a content-addressed release

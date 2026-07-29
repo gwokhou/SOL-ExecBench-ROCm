@@ -158,10 +158,11 @@ class ConverterLayersMixin(ConverterMixinContract):
             layer_dict: dict[str, Any] = {
                 "type": "start",
                 "source_tensor_id": original_id,
+                "source_input_index": info.get("source_input_index"),
                 "source_binding": (
-                    "recovered_keyword_tensor"
-                    if info.get("recovered_from") == "exact_call_signature"
-                    else "torchview_input_order"
+                    "exact_source_index"
+                    if info.get("source_input_index") is not None
+                    else "unbound"
                 ),
                 "einsum_equation": equation,
                 "elementwise_op": "copy",
@@ -451,6 +452,7 @@ class ConverterLayersMixin(ConverterMixinContract):
         node_data: dict[str, Any],
         op_graph: nx.DiGraph,
         input_connections: list[str],
+        raw_connections: list[str],
     ) -> ConvertedTensorMetadata:
         input_types = list(node_data.get("input_types") or [])
         if len(input_types) < len(input_connections):
@@ -463,6 +465,7 @@ class ConverterLayersMixin(ConverterMixinContract):
             node_id,
             typed_node_data,
             input_connections,
+            raw_connections,
             output_connections,
         )
         output_types = list(node_data.get("output_types") or [])
@@ -587,7 +590,11 @@ class ConverterLayersMixin(ConverterMixinContract):
             node_id, node_data, op_graph, raw_connections, start_node_id_map
         )
         metadata = self._build_converted_tensor_metadata(
-            node_id, node_data, op_graph, input_connections
+            node_id,
+            node_data,
+            op_graph,
+            input_connections,
+            raw_connections,
         )
         return self._build_converted_layer(
             node_type_raw, node_type, module_args, representation, metadata
@@ -598,6 +605,7 @@ class ConverterLayersMixin(ConverterMixinContract):
         node_id: str,
         node_data: dict[str, Any],
         input_connections: list[str],
+        raw_connections: list[str],
         output_connections: list[str],
     ) -> dict[str, list[str]]:
         """Build tensor names matching input_shapes/output_shapes order.
@@ -621,7 +629,16 @@ class ConverterLayersMixin(ConverterMixinContract):
                 input_names.append(name)
                 weight_idx += 1
             else:
-                input_names.append(f"{pred_id}.Output")
+                raw_id = (
+                    raw_connections[i] if i < len(raw_connections) else pred_id
+                )
+                producer = self._tensor_to_producer_op.get(raw_id)
+                if producer is None:
+                    input_names.append(f"{pred_id}.Output")
+                else:
+                    slot = self._tensor_to_producer_slot.get(raw_id, 0)
+                    suffix = "" if slot == 0 else f"_{slot}"
+                    input_names.append(f"{producer}.Output{suffix}")
 
         # Output tensors
         output_names.append(f"{node_id}.Output")

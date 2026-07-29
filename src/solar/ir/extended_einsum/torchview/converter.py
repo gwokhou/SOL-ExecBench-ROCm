@@ -182,6 +182,7 @@ class PyTorchToEinsum(
         "complex128": 128,
     }
     _OUTPUT_DTYPE_INPUT_INDEX: ClassVar[dict[str, int]] = {
+        "cross_entropy": 0,
         "embedding": 1,
         "embedding_bag": 1,
         "gather": 0,
@@ -191,11 +192,14 @@ class PyTorchToEinsum(
         "index_copy_": 0,
         "index_put": 0,
         "index_put_": 0,
+        "kl_div": 0,
+        "nll_loss": 0,
         "scatter": 0,
         "scatter_": 0,
         "scatter_add": 0,
         "scatter_add_": 0,
         "where": 1,
+        "xlogy": 0,
     }
     _PARAMETER_TENSOR_INDICES: ClassVar[dict[str, set[int]]] = {
         "batch_norm": {1, 2, 3, 4},

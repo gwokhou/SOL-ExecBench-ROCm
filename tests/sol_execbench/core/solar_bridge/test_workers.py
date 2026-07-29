@@ -111,6 +111,7 @@ def test_analysis_worker_converts_exception_to_stable_failure(
         "bound_kind": None,
         "limiting_resource": None,
         "lower_bound_seconds": None,
+        "ir_path": "torchview_extended_einsum",
         "message": "analysis exploded",
         "output_dir": None,
         "publication_eligible": False,

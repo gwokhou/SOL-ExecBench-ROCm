@@ -48,12 +48,11 @@ from sol_execbench.core.solar_bridge.models import (
     SolarStageStatus,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_stage_worker
-from sol_execbench.core.timestamps import utc_timestamp
-from solar.graph.contracts import (
-    DEFAULT_EXTRACTION_KIND,
-    ExtractionKind,
-    normalize_extraction_kind,
+from sol_execbench.core.solar_bridge.workload_context import (
+    structured_input_indices,
 )
+from sol_execbench.core.timestamps import utc_timestamp
+from solar.ir.contracts import DEFAULT_IR_PATH, IRPath, normalize_ir_path
 
 _RESULT_FILENAME = "stage-result.json"
 _MATRIX_FILENAME = "matrix.jsonl"
@@ -80,6 +79,7 @@ class CorpusStageAuditResult:
     fully_ready_problems: int
     matrix_path: Path
     summary_path: Path
+    ir_path: IRPath = DEFAULT_IR_PATH
 
     def __post_init__(self) -> None:
         """Normalize constructor input and reject unknown corpus states."""
@@ -110,7 +110,7 @@ class _CorpusAuditContext:
     device: str
     timeout_seconds: float
     resume: bool
-    extraction_kind: ExtractionKind
+    ir_path: IRPath
 
 
 def audit_corpus_stage_readiness(
@@ -120,7 +120,7 @@ def audit_corpus_stage_readiness(
     device: str = "cuda:0",
     timeout_seconds: float = 14_400,
     resume: bool = False,
-    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND,
+    ir_path: IRPath | str = DEFAULT_IR_PATH,
 ) -> CorpusStageAuditResult:
     """Audit every scored workload and publish a deterministic status matrix."""
     output = output_root.resolve()
@@ -132,7 +132,7 @@ def audit_corpus_stage_readiness(
             device=device,
             timeout_seconds=timeout_seconds,
             resume=resume,
-            extraction_kind=extraction_kind,
+            ir_path=ir_path,
         )
 
 
@@ -143,7 +143,7 @@ def _audit_corpus_stage_readiness_locked(
     device: str,
     timeout_seconds: float,
     resume: bool,
-    extraction_kind: ExtractionKind | str,
+    ir_path: IRPath | str,
 ) -> CorpusStageAuditResult:
     corpus = AKACorpusManifest.load(manifest_path)
     if output.exists() and not resume:
@@ -159,7 +159,7 @@ def _audit_corpus_stage_readiness_locked(
         device=device,
         timeout_seconds=timeout_seconds,
         resume=resume,
-        extraction_kind=normalize_extraction_kind(extraction_kind),
+        ir_path=normalize_ir_path(ir_path),
     )
     records: list[dict[str, Any]] = []
     for entry in corpus.entries:
@@ -206,7 +206,7 @@ def _audit_entry(
                     workload_uuid=workload_uuid,
                     output_dir=str(workload_output),
                     device=context.device,
-                    extraction_kind=context.extraction_kind,
+                    ir_path=context.ir_path,
                 ),
                 timeout_seconds=context.timeout_seconds,
             )
@@ -229,6 +229,9 @@ def _identity(
         sort_keys=True,
         separators=(",", ":"),
     ).encode()
+    preserved_input_indices = list(
+        structured_input_indices(definition, workload),
+    )
     identity = {
         "problem_path": problem_path,
         "workload_uuid": workload.uuid,
@@ -242,7 +245,10 @@ def _identity(
         "trace_seed": 200,
         "verification_seeds": [11, 29, 47],
         "verification_patterns": ["random", "zeros", "boundary"],
-        "extraction_kind": context.extraction_kind,
+        "preserved_input_indices": preserved_input_indices,
+        "ir_path": context.ir_path,
+        "extraction_kind": context.ir_path.extraction_kind,
+        "ir_kind": context.ir_path.ir_kind,
     }
     trace_contract = {
         "schema_version": CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION,
@@ -257,7 +263,10 @@ def _identity(
                 "gfx_target",
                 "architecture_sha256",
                 "trace_seed",
+                "preserved_input_indices",
+                "ir_path",
                 "extraction_kind",
+                "ir_kind",
             )
         },
     }
@@ -272,6 +281,8 @@ def _record(
     outcome: SolarStageAuditOutcome,
     output: Path,
 ) -> dict[str, Any]:
+    if outcome.ir_path != identity["ir_path"]:
+        raise ValueError("readiness worker IR path mismatch")
     if (
         outcome.architecture_sha256 is not None
         and outcome.architecture_sha256 != identity["architecture_sha256"]
@@ -399,6 +410,7 @@ def _finish_audit(
         conversion_passed=int(counts["ir_conversion"]),
         verification_passed=int(counts["conversion_verification"]),
         fully_ready_problems=int(summary["fully_ready_problem_count"]),
+        ir_path=context.ir_path,
         matrix_path=matrix_path,
         summary_path=summary_path,
     )
@@ -436,6 +448,7 @@ def _summary(
         ),
         "corpus_manifest_sha256": context.manifest_sha256,
         "gfx_target": FORMAL_GFX_TARGET,
+        "ir_path": context.ir_path,
         "problem_count": len(by_problem),
         "workload_count": len(records),
         "fully_ready_problem_count": sum(

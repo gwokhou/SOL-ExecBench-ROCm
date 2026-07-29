@@ -20,6 +20,7 @@ from sol_execbench.core.solar_bridge.workload_context import (
     SolarWorkloadContext,
 )
 from solar.api import AnalysisFailure, AnalysisResult, ArtifactRef, SolBound
+from solar.ir.contracts import IRPath
 
 _FORMAL_ARTIFACTS = tuple(
     ArtifactRef(path, "b" * 64)
@@ -280,6 +281,8 @@ def test_worker_request_round_trips_optional_home() -> None:
         output_dir="output",
         device="hip:0",
         orojenesis_home="orojenesis",
+        ir_path=IRPath.MAKE_FX_ATEN,
     )
 
     assert SolarWorkerRequest.from_dict(request.to_dict()) == request
+    assert request.to_dict()["ir_path"] == "make_fx_aten"

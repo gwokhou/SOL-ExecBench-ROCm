@@ -33,6 +33,37 @@ class IRKind(StrEnum):
 
 DEFAULT_IR_KIND = IRKind.EXTENDED_EINSUM
 
+
+class IRPath(StrEnum):
+    """Reviewed fixed extraction-to-IR paths exposed by SOLAR."""
+
+    TORCHVIEW_EXTENDED_EINSUM = "torchview_extended_einsum"
+    MAKE_FX_ATEN = "make_fx_aten"
+
+    @property
+    def extraction_kind(self) -> ExtractionKind:
+        """Return the only extractor permitted for this path."""
+        if self is IRPath.TORCHVIEW_EXTENDED_EINSUM:
+            return ExtractionKind.TORCHVIEW
+        return ExtractionKind.MAKE_FX_REFERENCE
+
+    @property
+    def ir_kind(self) -> IRKind:
+        """Return the only IR dialect permitted for this path."""
+        if self is IRPath.TORCHVIEW_EXTENDED_EINSUM:
+            return IRKind.EXTENDED_EINSUM
+        return IRKind.ATEN
+
+    @property
+    def graph_filename(self) -> str:
+        """Return the canonical IR artifact filename for this path."""
+        if self is IRPath.TORCHVIEW_EXTENDED_EINSUM:
+            return "einsum_graph.yaml"
+        return "aten_graph.yaml"
+
+
+DEFAULT_IR_PATH = IRPath.TORCHVIEW_EXTENDED_EINSUM
+
 # Semantic ``layer_operation`` kind values shared across every IR dialect.
 # Analysis code branches on these instead of enumerating dialect-specific
 # ``kind`` strings, so a newly registered IR needs no analysis-side changes.
@@ -78,6 +109,9 @@ class IRConversionRequest(Protocol):
 
     @property
     def reference_sha256(self) -> str: ...
+
+    @property
+    def ir_path(self) -> IRPath: ...
 
     @property
     def extraction_kind(self) -> ExtractionKind | str: ...
@@ -166,6 +200,17 @@ def normalize_ir_kind(value: IRKind | str) -> IRKind:
         ) from exc
 
 
+def normalize_ir_path(value: IRPath | str) -> IRPath:
+    """Return one reviewed fixed extraction-to-IR path."""
+    try:
+        return IRPath(value)
+    except ValueError as exc:
+        choices = ", ".join(item.value for item in IRPath)
+        raise ValueError(
+            f"unsupported SOLAR IR path {value!r}; choose: {choices}"
+        ) from exc
+
+
 def layer_operation(layer: Mapping[str, Any]) -> Mapping[str, Any]:
     """Expose the representation-neutral semantic operation for one layer."""
     semantic = layer.get("semantic_op")
@@ -209,6 +254,7 @@ def layer_contraction_analysis(
 __all__ = [
     "CONTRACTION_KIND",
     "DEFAULT_IR_KIND",
+    "DEFAULT_IR_PATH",
     "INPUT_KIND",
     "OPERATION_KIND",
     "IRAnalysisRequest",
@@ -216,10 +262,12 @@ __all__ = [
     "IRGraphArtifact",
     "IRKind",
     "IRLifecycle",
+    "IRPath",
     "LayerContractionAnalysis",
     "StrictConversionError",
     "UnsupportedOperationError",
     "layer_contraction_analysis",
     "layer_operation",
     "normalize_ir_kind",
+    "normalize_ir_path",
 ]

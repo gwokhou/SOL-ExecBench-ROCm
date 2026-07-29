@@ -20,6 +20,8 @@ from sol_execbench.core.solar_bridge.corpus_readiness import (
     audit_corpus_stage_readiness,
 )
 from sol_execbench.core.solar_bridge.models import (
+    DEFAULT_IR_PATH,
+    IRPath,
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
     SolarStage,
@@ -31,12 +33,8 @@ from sol_execbench.core.solar_bridge.release import (
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
 
 console = Console(stderr=True)
-_EXTRACTOR_KINDS = {
-    "torchview": "torchview_v1",
-    "make-fx": "make_fx_reference_v1",
-}
-_EXTRACTOR_CHOICE = click.Choice(
-    list(_EXTRACTOR_KINDS),
+_BACKEND_CHOICE = click.Choice(
+    [path.value for path in IRPath],
     case_sensitive=True,
 )
 
@@ -59,9 +57,9 @@ def solar_cli() -> None:
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
-    "--extractor",
-    type=_EXTRACTOR_CHOICE,
-    default="torchview",
+    "--backend",
+    type=_BACKEND_CHOICE,
+    default=DEFAULT_IR_PATH.value,
     show_default=True,
 )
 @click.option(
@@ -80,7 +78,7 @@ def analyze_cli(
     workload_uuid: str,
     output: Path,
     device: str,
-    extractor: str,
+    backend: str,
     orojenesis_home: Path | None,
     timeout_seconds: float,
 ) -> CliResult:
@@ -90,7 +88,7 @@ def analyze_cli(
         workload_uuid=workload_uuid,
         output_dir=str(output.resolve()),
         device=device,
-        extraction_kind=_EXTRACTOR_KINDS[extractor],
+        ir_path=IRPath(backend),
         orojenesis_home=(str(orojenesis_home) if orojenesis_home else None),
     )
     try:
@@ -99,6 +97,7 @@ def analyze_cli(
         outcome = SolarAnalysisOutcome(
             status=SolarAnalysisStatus.FAILED,
             analysis_id=workload_uuid,
+            ir_path=IRPath(backend),
             stage=SolarStage.OUTER_BRIDGE,
             reason_code="worker_execution_failed",
             message=str(exc)[:4096],
@@ -110,6 +109,7 @@ def analyze_cli(
         outcome = SolarAnalysisOutcome(
             status=SolarAnalysisStatus.FAILED,
             analysis_id=outcome.analysis_id,
+            ir_path=outcome.ir_path,
             stage=SolarStage.FORMAL_ACCEPTANCE,
             reason_code="non_formal_bound",
             message="SOLAR CLI rejected a non-publication result",
@@ -153,9 +153,9 @@ def analyze_cli(
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
-    "--extractor",
-    type=_EXTRACTOR_CHOICE,
-    default="torchview",
+    "--backend",
+    type=_BACKEND_CHOICE,
+    default=DEFAULT_IR_PATH.value,
     show_default=True,
 )
 @click.option(
@@ -170,7 +170,7 @@ def release_build_cli(
     manifest_path: Path,
     orojenesis_home: Path,
     device: str,
-    extractor: str,
+    backend: str,
     timeout_seconds: float,
     resume: bool,
 ) -> CliResult:
@@ -183,7 +183,7 @@ def release_build_cli(
             timeout_seconds=timeout_seconds,
             resume=resume,
             device=device,
-            extraction_kind=_EXTRACTOR_KINDS[extractor],
+            ir_path=backend,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         raise CliFailure(
@@ -200,6 +200,7 @@ def release_build_cli(
         "workloads": result.workloads,
         "generated": result.generated,
         "resumed": result.resumed,
+        "ir_path": result.ir_path,
         "index": str(result.index_path),
     }
     console.print(
@@ -225,9 +226,9 @@ def release_build_cli(
 )
 @click.option("--device", default="cuda:0", show_default=True)
 @click.option(
-    "--extractor",
-    type=_EXTRACTOR_CHOICE,
-    default="torchview",
+    "--backend",
+    type=_BACKEND_CHOICE,
+    default=DEFAULT_IR_PATH.value,
     show_default=True,
 )
 @click.option(
@@ -241,7 +242,7 @@ def corpus_audit_cli(
     output: Path,
     manifest_path: Path,
     device: str,
-    extractor: str,
+    backend: str,
     timeout_seconds: float,
     resume: bool,
 ) -> CliResult:
@@ -251,7 +252,7 @@ def corpus_audit_cli(
             manifest_path,
             output,
             device=device,
-            extraction_kind=_EXTRACTOR_KINDS[extractor],
+            ir_path=backend,
             timeout_seconds=timeout_seconds,
             resume=resume,
         )

@@ -40,6 +40,19 @@ class VerificationPolicy(TolerancePolicy):
     seeds: Sequence[int] = (11, 29, 47)
     patterns: Sequence[str] = ("random", "zeros", "boundary")
     device: str = "cpu"
+    preserved_input_indices: Sequence[int] = ()
+
+    def __post_init__(self) -> None:
+        """Validate tolerances and structured-input protection indices."""
+        super().__post_init__()
+        indices = tuple(int(index) for index in self.preserved_input_indices)
+        if any(index < 0 for index in indices) or len(indices) != len(
+            set(indices)
+        ):
+            raise ValueError(
+                "preserved_input_indices must be unique and non-negative",
+            )
+        object.__setattr__(self, "preserved_input_indices", indices)
 
 
 __all__ = ["TolerancePolicy", "VerificationPolicy"]

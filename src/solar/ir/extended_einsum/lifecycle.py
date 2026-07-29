@@ -74,7 +74,7 @@ def _analyze(
 
 lifecycle = IRLifecycle(
     kind=IRKind.EXTENDED_EINSUM,
-    extractions=frozenset(ExtractionKind),
+    extractions=frozenset({ExtractionKind.TORCHVIEW}),
     validate=validate_extended_einsum_graph,
     convert=convert_operator_graph,
     execute=execute_aten_layer,

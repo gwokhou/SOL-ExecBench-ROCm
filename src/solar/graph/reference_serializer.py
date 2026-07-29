@@ -90,15 +90,18 @@ class ReferenceGraphSerializer:
         input_nodes: list[Any],
     ) -> str:
         aliases = {
+            "_to_copy": "to",
             "_log_softmax": "log_softmax",
             "_safe_softmax": "softmax",
             "_softmax": "softmax",
             "_unsafe_view": "view",
             "max": "amax",
+            "miopen_batch_norm": "batch_norm",
             "min": "amin",
             "native_batch_norm": "batch_norm",
             "native_group_norm": "group_norm",
             "native_layer_norm": "layer_norm",
+            "split_with_sizes": "split",
             "t": "transpose",
         }
         if target_name != "convolution":
@@ -113,8 +116,9 @@ class ReferenceGraphSerializer:
         prefix = "conv_transpose" if transposed else "conv"
         return f"{prefix}{dimensions}d"
 
-    @staticmethod
+    @classmethod
     def _schema_effects(
+        cls,
         node: Any,
         input_nodes: list[Any],
         *,
@@ -129,23 +133,6 @@ class ReferenceGraphSerializer:
                 f"AOT target has no FunctionSchema: {node.target}",
             )
 
-        def tensor_indices(value: Any) -> set[int]:
-            import torch.fx
-
-            if isinstance(value, torch.fx.Node):
-                return {input_nodes.index(value)}
-            if isinstance(value, (tuple, list)):
-                return {
-                    index for item in value for index in tensor_indices(item)
-                }
-            if isinstance(value, dict):
-                return {
-                    index
-                    for item in value.values()
-                    for index in tensor_indices(item)
-                }
-            return set()
-
         positional = list(node.args)
         aliases_by_input: dict[int, set[str]] = {}
         mutations: set[int] = set()
@@ -156,7 +143,7 @@ class ReferenceGraphSerializer:
                 value = node.kwargs[argument.name]
             else:
                 continue
-            indices = tensor_indices(value)
+            indices = cls._tensor_input_indices(value, input_nodes)
             alias_info = argument.alias_info
             if alias_info is None:
                 continue
@@ -171,7 +158,10 @@ class ReferenceGraphSerializer:
                     mutations.add(index)
 
         aliases: list[dict[str, int]] = []
-        for output_index, returned in enumerate(schema.returns):
+        returned_values = list(schema.returns)
+        if len(returned_values) == 1 and output_arity > 1:
+            returned_values *= output_arity
+        for output_index, returned in enumerate(returned_values):
             if output_index >= output_arity or returned.alias_info is None:
                 continue
             returned_sets = {
@@ -183,6 +173,15 @@ class ReferenceGraphSerializer:
                     aliases.append(
                         {"output": output_index, "input": input_index},
                     )
+        if (
+            not aliases
+            and target_name in {"chunk", "split", "split_with_sizes"}
+            and 0 in aliases_by_input
+        ):
+            aliases = [
+                {"output": output_index, "input": 0}
+                for output_index in range(output_arity)
+            ]
 
         if target_name.endswith("_") and not mutations and input_nodes:
             raise RuntimeError(
@@ -194,6 +193,33 @@ class ReferenceGraphSerializer:
             "atomic": exact_target in {"scatter", "index_put", "index_add"},
             "opaque_library_call": False,
         }
+
+    @staticmethod
+    def _tensor_input_indices(value: Any, input_nodes: list[Any]) -> set[int]:
+        """Collect ordered tensor-input indices from one schema argument."""
+        import torch.fx
+
+        if isinstance(value, torch.fx.Node):
+            return {input_nodes.index(value)}
+        if isinstance(value, (tuple, list)):
+            return {
+                index
+                for item in value
+                for index in ReferenceGraphSerializer._tensor_input_indices(
+                    item,
+                    input_nodes,
+                )
+            }
+        if isinstance(value, dict):
+            return {
+                index
+                for item in value.values()
+                for index in ReferenceGraphSerializer._tensor_input_indices(
+                    item,
+                    input_nodes,
+                )
+            }
+        return set()
 
     @staticmethod
     def _start_layer(

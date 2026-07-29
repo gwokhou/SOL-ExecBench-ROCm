@@ -9,6 +9,7 @@ from solar.graph.contracts import (
     OperatorGraphArtifact,
 )
 from solar.ir.contracts import IRGraphArtifact, IRKind
+from solar.schema_versions import OPERATOR_GRAPH_SCHEMA_VERSION
 
 
 def test_operator_artifact_loads_once_and_exposes_typed_provenance(
@@ -18,7 +19,7 @@ def test_operator_artifact_loads_once_and_exposes_typed_provenance(
     path.write_text(
         yaml.safe_dump(
             {
-                "schema_version": 1,
+                "schema_version": OPERATOR_GRAPH_SCHEMA_VERSION,
                 "extraction_kind": ExtractionKind.MAKE_FX_REFERENCE.value,
                 "layers": {},
             },

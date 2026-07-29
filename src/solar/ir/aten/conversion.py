@@ -22,6 +22,11 @@ class AtenIRError(ValueError):
     """An ATen IR graph is incomplete or cannot replay its source exactly."""
 
 
+_UNINITIALIZED_ALLOCATION_TARGETS = frozenset(
+    {"empty", "empty_like", "empty_strided", "new_empty"},
+)
+
+
 SUPPORTED_ATEN_TARGETS = frozenset(
     {
         "__and__",
@@ -120,6 +125,7 @@ SUPPORTED_ATEN_TARGETS = frozenset(
         "sub",
         "sum",
         "tanh",
+        "topk",
         "transpose",
         "to",
         "type_as",
@@ -209,6 +215,10 @@ def _validate_aten_operation(
     names: Mapping[str, Any],
 ) -> None:
     target = str(semantic.get("target", ""))
+    if target in _UNINITIALIZED_ALLOCATION_TARGETS:
+        raise AtenIRError(
+            f"layer {layer_id} uses unsupported exact operation {target!r}",
+        )
     if target not in SUPPORTED_ATEN_TARGETS:
         import torch
 
@@ -235,7 +245,13 @@ def _validate_aten_operation(
             f"layer {layer_id} does not preserve every ordered tensor argument",
         )
     _validate_effects(layer_id, semantic, names, input_arity)
-    _validate_required_parameters(layer_id, target, arguments, kwargs)
+    _validate_required_parameters(
+        layer_id,
+        target,
+        arguments,
+        kwargs,
+        output_arity=len(names.get("outputs") or []),
+    )
 
 
 def _collect_tensor_references(value: Any, references: set[int]) -> None:
@@ -282,6 +298,8 @@ def _validate_required_parameters(
     target: str,
     arguments: list[Any],
     kwargs: Mapping[str, Any],
+    *,
+    output_arity: int,
 ) -> None:
     required = {
         "chunk": (("chunks", 2),),
@@ -298,6 +316,7 @@ def _validate_required_parameters(
         "select": (("dim", 3), ("index", 3)),
         "softmax": (("dim", 2),),
         "split": (("split_size_or_sections", 2),),
+        "topk": (("k", 2),),
         "unsqueeze": (("dim", 2),),
     }
     missing = [
@@ -305,11 +324,16 @@ def _validate_required_parameters(
         for key, arity in required.get(target, ())
         if key not in kwargs and len(arguments) < arity
     ]
-    if target == "slice" and not (
-        "dim" in kwargs
-        and any(key in kwargs for key in ("start", "end", "step"))
-    ):
+    explicit_slice_dim = len(arguments) >= 2 or "dim" in kwargs
+    explicit_slice_bounds = len(arguments) >= 3 or any(
+        key in kwargs for key in ("start", "end", "step")
+    )
+    if target == "slice" and not (explicit_slice_dim and explicit_slice_bounds):
         missing.append("explicit slice bounds")
+    if target == "topk" and output_arity != 2:
+        missing.append("two output slots")
+    if target in {"chunk", "split"} and output_arity < 1:
+        missing.append("output slots")
     if missing:
         raise AtenIRError(
             f"layer {layer_id} lacks exact {target} parameters: "

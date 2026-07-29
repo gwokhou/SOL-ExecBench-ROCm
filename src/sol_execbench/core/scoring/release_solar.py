@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.integrity import (
@@ -26,9 +27,13 @@ from sol_execbench.core.scoring.release_models import (
     SolarIndexStatement,
 )
 from sol_execbench.core.solar_bridge.models import (
-    FORMAL_ARTIFACT_PATHS,
     FORMAL_BOUND_KIND,
     SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+    IRPath,
+    formal_artifact_paths,
+)
+from sol_execbench.core.solar_bridge.workload_context import (
+    structured_input_indices,
 )
 
 _MAX_SOLAR_MANIFEST_BYTES = 1024 * 1024
@@ -57,6 +62,7 @@ def verify_solar_index(
             corpus=corpus,
             problem_path=item.problem_path,
             workload_uuid=item.workload_uuid,
+            ir_path=index.ir_path,
         )
     return bounds
 
@@ -92,6 +98,7 @@ def _verify_solar_manifest(
     corpus: AKACorpusManifest,
     problem_path: str,
     workload_uuid: str,
+    ir_path: IRPath,
 ) -> float:
     path = verify_artifact_file(
         bundle_root,
@@ -107,6 +114,19 @@ def _verify_solar_manifest(
             encoding="utf-8",
         ),
     )
+    workloads = [
+        Workload.model_validate_json(line)
+        for line in (corpus.authored_root / problem_path / "workload.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip()
+    ]
+    matches = [item for item in workloads if item.uuid == workload_uuid]
+    if len(matches) != 1:
+        raise ValueError("formal SOLAR workload identity is ambiguous")
+    preserved_input_indices = list(
+        structured_input_indices(definition, matches[0]),
+    )
     _verify_manifest_identity(
         payload,
         definition=definition,
@@ -114,8 +134,14 @@ def _verify_solar_manifest(
         architecture_sha256=str(
             corpus.formal_analysis["architecture_profile_sha256"],
         ),
+        ir_path=ir_path,
+        preserved_input_indices=preserved_input_indices,
     )
-    _verify_manifest_artifacts(path.parent, payload.get("artifacts"))
+    _verify_manifest_artifacts(
+        path.parent,
+        payload.get("artifacts"),
+        ir_path=ir_path,
+    )
     bound = payload.get("bound")
     if not isinstance(bound, dict):
         raise ValueError("formal SOLAR manifest bound is missing")
@@ -138,6 +164,8 @@ def _verify_manifest_identity(
     definition: Definition,
     workload_uuid: str,
     architecture_sha256: str,
+    ir_path: IRPath,
+    preserved_input_indices: list[int],
 ) -> None:
     reference = payload.get("reference")
     contract = payload.get("analysis_contract")
@@ -157,6 +185,10 @@ def _verify_manifest_identity(
         or payload.get("architecture_sha256") != architecture_sha256
         or reference.get("sha256")
         != sha256_bytes(definition.reference.encode())
+        or contract.get("ir_path") != ir_path.value
+        or contract.get("extraction_kind") != ir_path.extraction_kind.value
+        or contract.get("ir_kind") != ir_path.ir_kind.value
+        or contract.get("preserved_input_indices") != preserved_input_indices
         or contract.get("require_orojenesis") is not True
         or payload.get("publication_eligible") is not True
         or bound.get("kind") != FORMAL_BOUND_KIND
@@ -168,7 +200,12 @@ def _verify_manifest_identity(
         raise ValueError("formal SOLAR manifest identity or bound mismatch")
 
 
-def _verify_manifest_artifacts(root: Path, value: object) -> None:
+def _verify_manifest_artifacts(
+    root: Path,
+    value: object,
+    *,
+    ir_path: IRPath,
+) -> None:
     if not isinstance(value, list):
         raise ValueError("formal SOLAR manifest artifacts are missing")
     observed: set[str] = set()
@@ -192,7 +229,7 @@ def _verify_manifest_artifacts(root: Path, value: object) -> None:
             or sha256_file(path) != digest
         ):
             raise ValueError("formal SOLAR artifact identity mismatch")
-    if observed != FORMAL_ARTIFACT_PATHS:
+    if observed != formal_artifact_paths(ir_path):
         raise ValueError("formal SOLAR artifact denominator mismatch")
 
 

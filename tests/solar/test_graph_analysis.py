@@ -144,7 +144,7 @@ def test_transparent_view_preserves_internal_io_and_shared_input_deduplication(
 
 
 def test_ir_lifecycle_rejects_unsupported_schema() -> None:
-    with pytest.raises(ValueError, match="schema_version=4"):
+    with pytest.raises(ValueError, match="schema_version=5"):
         validate_extended_einsum_graph(
             {
                 "schema_version": 0,

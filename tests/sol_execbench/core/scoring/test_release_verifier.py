@@ -80,10 +80,12 @@ from sol_execbench.core.scoring.release_models import (
     SolarManifestEvidence,
     release_model_payload,
 )
+from sol_execbench.core.scoring.release_solar import verify_solar_index
 from sol_execbench.core.scoring.release_verifier import verify_and_score_release
 from sol_execbench.core.solar_bridge.models import (
     FORMAL_BOUND_KIND,
     SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+    IRPath,
 )
 
 _SOURCE_REVISION = "a" * 40
@@ -125,6 +127,32 @@ def test_content_addressed_release_bundle_verifies_and_scores(
     assert result.suite.score == pytest.approx(expected)
     assert result.suite.scored_workloads == 4
     assert result.candidate_id == "candidate-test"
+
+
+def test_make_fx_aten_release_index_round_trips_and_verifies(
+    tmp_path: Path,
+) -> None:
+    corpus, workspace = _release_fixture(tmp_path)
+    _write_solar_artifacts(corpus, workspace, IRPath.MAKE_FX_ATEN)
+    index = _solar_statement(
+        corpus,
+        workspace,
+        artifact_reference(
+            workspace,
+            workspace / "corpus" / "manifest.yaml",
+        ),
+        IRPath.MAKE_FX_ATEN,
+    )
+    round_tripped = SolarIndexStatement.model_validate(
+        release_model_payload(index),
+    )
+
+    assert round_tripped.ir_path is IRPath.MAKE_FX_ATEN
+    assert verify_solar_index(
+        round_tripped,
+        bundle_root=workspace,
+        corpus=corpus,
+    )
 
 
 def test_publisher_assembly_verifies_and_scores(
@@ -597,18 +625,22 @@ def _environment_evidence() -> dict[str, object]:
     }
 
 
-def _write_solar_artifacts(corpus: AKACorpusManifest, workspace: Path) -> None:
+def _write_solar_artifacts(
+    corpus: AKACorpusManifest,
+    workspace: Path,
+    ir_path: IRPath = IRPath.TORCHVIEW_EXTENDED_EINSUM,
+) -> None:
     problem = corpus.authored_root / _PROBLEM_PATH
     definition = Definition.model_validate_json(
         (problem / "definition.json").read_text(encoding="utf-8"),
     )
     for workload in load_jsonl_file(Workload, problem / "workload.jsonl"):
         root = workspace / "solar" / "manifests" / _PROBLEM_PATH / workload.uuid
-        root.mkdir(parents=True)
+        root.mkdir(parents=True, exist_ok=True)
         artifacts = []
         for name in (
             "operator_graph.yaml",
-            "einsum_graph.yaml",
+            ir_path.graph_filename,
             "conversion-attestation.yaml",
             "solar-analysis.yaml",
         ):
@@ -623,7 +655,13 @@ def _write_solar_artifacts(corpus: AKACorpusManifest, workspace: Path) -> None:
                 "name": "test",
                 "sha256": sha256_bytes(definition.reference.encode()),
             },
-            "analysis_contract": {"require_orojenesis": True},
+            "analysis_contract": {
+                "ir_path": ir_path.value,
+                "extraction_kind": ir_path.extraction_kind.value,
+                "ir_kind": ir_path.ir_kind.value,
+                "preserved_input_indices": [],
+                "require_orojenesis": True,
+            },
             "publication_eligible": True,
             "artifacts": artifacts,
             "bound": {
@@ -763,6 +801,7 @@ def _solar_statement(
     corpus: AKACorpusManifest,
     workspace: Path,
     corpus_ref: ArtifactReference,
+    ir_path: IRPath = IRPath.TORCHVIEW_EXTENDED_EINSUM,
 ) -> SolarIndexStatement:
     entries = []
     for workload_uuid in corpus.entries[0].workload_uuids:
@@ -784,6 +823,7 @@ def _solar_statement(
     return SolarIndexStatement(
         generated_at="2026-07-25T00:00:00Z",
         source_revision=_SOURCE_REVISION,
+        ir_path=ir_path,
         corpus_manifest=corpus_ref,
         entries=tuple(entries),
     )

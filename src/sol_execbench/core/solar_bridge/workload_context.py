@@ -11,7 +11,11 @@ from pathlib import Path
 
 from sol_execbench.core.bench.eval_runtime import load_reference_function
 from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload import (
+    CustomInput,
+    SafetensorsInput,
+    Workload,
+)
 from sol_execbench.core.solar_bridge.input_factory import build_input_factory
 
 
@@ -23,6 +27,7 @@ class SolarWorkloadContext:
     workload: Workload
     reference: Callable[..., object]
     input_factory: Callable[[int], tuple[object, ...]]
+    preserved_input_indices: tuple[int, ...] = ()
 
 
 def load_solar_workload_context(
@@ -50,7 +55,29 @@ def load_solar_workload_context(
         problem,
         device,
     )
-    return SolarWorkloadContext(definition, workload, reference, factory)
+    preserved = structured_input_indices(definition, workload)
+    return SolarWorkloadContext(
+        definition,
+        workload,
+        reference,
+        factory,
+        preserved,
+    )
+
+
+def structured_input_indices(
+    definition: Definition,
+    workload: Workload,
+) -> tuple[int, ...]:
+    """Return argument indices whose authored structure must remain unchanged."""
+    return tuple(
+        index
+        for index, name in enumerate(definition.inputs)
+        if isinstance(
+            workload.inputs.get(name),
+            (CustomInput, SafetensorsInput),
+        )
+    )
 
 
 def _select_workload(
@@ -69,4 +96,8 @@ def _select_workload(
     return matches[0]
 
 
-__all__ = ["SolarWorkloadContext", "load_solar_workload_context"]
+__all__ = [
+    "SolarWorkloadContext",
+    "load_solar_workload_context",
+    "structured_input_indices",
+]

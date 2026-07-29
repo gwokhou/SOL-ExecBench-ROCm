@@ -205,12 +205,12 @@ class TorchviewTopologyMixin(TorchviewProcessorContract):
                 output_types.append("output")
             node_info.output_types = output_types
 
+        self._record_output_slots(result, id_to_node_info)
         if self.debug:
             nodes_with_inputs = sum(1 for n in result if n.input_nodes)
             nodes_with_outputs = sum(1 for n in result if n.output_nodes)
             print(f"  Nodes with input connections: {nodes_with_inputs}")
             print(f"  Nodes with output connections: {nodes_with_outputs}")
-
         # Step 4: Apply parameters from original model if provided
         # This handles both FunctionNode and ModuleNode cases
         if original_model:
@@ -219,6 +219,46 @@ class TorchviewTopologyMixin(TorchviewProcessorContract):
             )
 
         return result
+
+    @staticmethod
+    def _record_output_slots(
+        nodes: list[NodeInfo],
+        by_id: dict[str, NodeInfo],
+    ) -> None:
+        """Preserve ordered multi-output tensor identities and metadata."""
+        for node in nodes:
+            outputs = [by_id.get(node_id) for node_id in node.output_nodes]
+            tensor_outputs = [
+                output
+                for output in outputs
+                if output is not None and output.node_class == "TensorNode"
+            ]
+            if len(tensor_outputs) != len(node.output_shapes):
+                continue
+            slots: list[dict[str, Any]] = []
+            for index, output in enumerate(tensor_outputs):
+                output.module_args["producer_output_slot"] = index
+                shape = (
+                    output.input_shapes[0]
+                    if output.input_shapes
+                    else node.output_shapes[index]
+                )
+                dtype = (
+                    output.input_dtypes[0]
+                    if output.input_dtypes
+                    else node.output_dtypes[index]
+                )
+                slots.append(
+                    {
+                        "slot": index,
+                        "tensor_node": output.node_id,
+                        "shape": shape,
+                        "dtype": dtype,
+                    },
+                )
+            node.output_slots = slots
+            node.output_shapes = [list(slot["shape"]) for slot in slots]
+            node.output_dtypes = [str(slot["dtype"]) for slot in slots]
 
     def _validate_node_type(self, node: Any) -> None:
         """Validate that a node is one of the expected computation node types.

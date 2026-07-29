@@ -364,6 +364,9 @@ class ConverterPipelineMixin(ConverterMixinContract):
 
             if len(producers) == 1 and producers[0] in op_ids:
                 self._tensor_to_producer_op[tensor_id] = producers[0]
+                self._tensor_to_producer_slot[tensor_id] = (
+                    self._producer_output_slot(tensor_data)
+                )
 
             for producer in producers:
                 for consumer in consumers:
@@ -384,6 +387,16 @@ class ConverterPipelineMixin(ConverterMixinContract):
                         graph.add_edge(op_id, out_id)
 
         return graph, start_nodes_info, param_nodes_info
+
+    @staticmethod
+    def _producer_output_slot(tensor_data: dict[str, Any]) -> int:
+        """Return the exact producer slot recorded on a tensor edge."""
+        return int(
+            (tensor_data.get("module_args") or {}).get(
+                "producer_output_slot",
+                0,
+            ),
+        )
 
     def _partition_nodes(
         self,
@@ -447,6 +460,9 @@ class ConverterPipelineMixin(ConverterMixinContract):
                     "output_shapes": output_shapes,
                     "output_dtypes": output_dtypes,
                     "consumers": valid_consumers,
+                    "source_input_index": aux_data.get(
+                        "source_input_index",
+                    ),
                     "recovered_from": (aux_data.get("module_args") or {}).get(
                         "recovered_from"
                     ),

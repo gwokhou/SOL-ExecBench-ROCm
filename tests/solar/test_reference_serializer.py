@@ -6,6 +6,7 @@ import pytest
 import torch
 
 from solar.graph.reference_serializer import ReferenceGraphSerializer
+from solar.schema_versions import OPERATOR_GRAPH_SCHEMA_VERSION
 
 
 def test_make_fx_reference_records_strict_conversion_provenance() -> None:
@@ -17,7 +18,7 @@ def test_make_fx_reference_records_strict_conversion_provenance() -> None:
         "reference",
     )
 
-    assert result["schema_version"] == 1
+    assert result["schema_version"] == OPERATOR_GRAPH_SCHEMA_VERSION
     assert result["extraction_kind"] == "make_fx_reference_v1"
     assert result["joint_graph"] is False
     assert any(
@@ -27,6 +28,24 @@ def test_make_fx_reference_records_strict_conversion_provenance() -> None:
         layer.get("phase") in {"input", "reference"}
         for layer in result["layers"].values()
     )
+
+
+def test_canonical_target_retains_exact_aten_target_and_overload() -> None:
+    from torch.fx.experimental.proxy_tensor import make_fx
+
+    graph = make_fx(lambda value: value.to(torch.float16))(torch.ones(2))
+    result = ReferenceGraphSerializer().serialize_fx_reference(
+        graph,
+        "conversion",
+    )
+    conversion = next(
+        layer
+        for layer in result["layers"].values()
+        if (layer.get("semantic_op") or {}).get("target") == "to"
+    )
+
+    assert conversion["semantic_op"]["exact_target"] == "_to_copy"
+    assert conversion["semantic_op"]["overload"] == "default"
 
 
 def test_argument_and_tensor_metadata_serialization() -> None:
@@ -100,6 +119,22 @@ def test_schema_effects_reports_mutation_alias_and_atomicity() -> None:
         output_arity=1,
     )
     assert atomic["atomic"] is True
+
+    split = graph.call_function(
+        torch.ops.aten.split_with_sizes.default,
+        (left, [1, 1], 0),
+    )
+    split_effects = ReferenceGraphSerializer._schema_effects(
+        split,
+        [left],
+        target_name="split_with_sizes",
+        exact_target="aten.split_with_sizes.default",
+        output_arity=2,
+    )
+    assert split_effects["aliases"] == [
+        {"output": 0, "input": 0},
+        {"output": 1, "input": 0},
+    ]
 
 
 def test_schema_effects_rejects_missing_or_inconsistent_schema() -> None:

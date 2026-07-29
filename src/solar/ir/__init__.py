@@ -5,9 +5,11 @@
 
 from solar.ir.contracts import (
     DEFAULT_IR_KIND,
+    DEFAULT_IR_PATH,
     IRGraphArtifact,
     IRKind,
     IRLifecycle,
+    IRPath,
     LayerContractionAnalysis,
     layer_contraction_analysis,
 )
@@ -20,9 +22,11 @@ from solar.ir.registry import (
 
 __all__ = [
     "DEFAULT_IR_KIND",
+    "DEFAULT_IR_PATH",
     "IRGraphArtifact",
     "IRKind",
     "IRLifecycle",
+    "IRPath",
     "LayerContractionAnalysis",
     "graph_kind",
     "ir_lifecycle",

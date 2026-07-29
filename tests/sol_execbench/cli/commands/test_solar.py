@@ -12,16 +12,22 @@ from sol_execbench.core.solar_bridge.corpus_readiness import (
     CorpusStageAuditResult,
 )
 from sol_execbench.core.solar_bridge.models import (
+    IRPath,
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
     SolarStage,
 )
 
 
-def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
+def _formal_outcome(
+    analysis_id: str,
+    output_dir: str,
+    ir_path: IRPath = IRPath.TORCHVIEW_EXTENDED_EINSUM,
+) -> SolarAnalysisOutcome:
     return SolarAnalysisOutcome(
         status=SolarAnalysisStatus.ANALYZED,
         analysis_id=analysis_id,
+        ir_path=ir_path,
         output_dir=output_dir,
         architecture_sha256="a" * 64,
         lower_bound_seconds=0.001,
@@ -30,7 +36,7 @@ def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
             {"path": path, "sha256": "b" * 64}
             for path in (
                 "operator_graph.yaml",
-                "einsum_graph.yaml",
+                ir_path.graph_filename,
                 "conversion-attestation.yaml",
                 "solar-analysis.yaml",
             )
@@ -84,6 +90,79 @@ def test_solar_analyze_cli_returns_bound_and_artifacts(
             "solar-analysis.yaml",
         )
     }
+
+
+def test_solar_analyze_cli_selects_one_fixed_make_fx_aten_path(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    problem = tmp_path / "problem"
+    problem.mkdir()
+    output = tmp_path / "analysis"
+    observed: list[IRPath] = []
+
+    def analyze(request, **kwargs):
+        del kwargs
+        observed.append(request.ir_path)
+        return _formal_outcome(
+            request.workload_uuid,
+            request.output_dir,
+            request.ir_path,
+        )
+
+    monkeypatch.setattr(solar_commands, "run_solar_worker", analyze)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "solar",
+            "analyze",
+            str(problem),
+            "--workload",
+            "workload-1",
+            "--output",
+            str(output),
+            "--backend",
+            "make_fx_aten",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert observed == [IRPath.MAKE_FX_ATEN]
+    assert {
+        item["path"] for item in json.loads(result.output)["artifacts"]
+    } == {
+        str(output / path)
+        for path in (
+            "operator_graph.yaml",
+            "aten_graph.yaml",
+            "conversion-attestation.yaml",
+            "solar-analysis.yaml",
+        )
+    }
+
+
+def test_solar_analyze_cli_rejects_cross_combination_options(tmp_path) -> None:
+    problem = tmp_path / "problem"
+    problem.mkdir()
+    result = CliRunner().invoke(
+        cli,
+        [
+            "solar",
+            "analyze",
+            str(problem),
+            "--workload",
+            "workload-1",
+            "--output",
+            str(tmp_path / "analysis"),
+            "--extractor",
+            "make-fx",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "No such option '--extractor'" in result.output
 
 
 def test_solar_analyze_cli_rejects_non_formal_success(

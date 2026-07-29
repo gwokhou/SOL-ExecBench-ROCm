@@ -32,12 +32,13 @@ def main() -> None:
             workload_uuid=request.workload_uuid,
             output_dir=request.output_dir,
             device=request.device,
-            extraction_kind=request.extraction_kind,
+            ir_path=request.ir_path,
         )
     except Exception as exc:  # noqa: BLE001 -- isolated worker boundary
         outcome = SolarStageAuditOutcome(
             status=SolarReadinessStatus.FAILED,
             analysis_id=request.workload_uuid,
+            ir_path=request.ir_path,
             failure_stage=SolarStage.OUTER_BRIDGE,
             reason_code="bridge_failed",
             message=str(exc)[:4096],
@@ -45,6 +46,7 @@ def main() -> None:
     fallback = SolarStageAuditOutcome(
         status=SolarReadinessStatus.FAILED,
         analysis_id=request.workload_uuid,
+        ir_path=request.ir_path,
         failure_stage=SolarStage.OUTER_BRIDGE,
         reason_code="worker_response_failed",
         message="worker response serialization failed",

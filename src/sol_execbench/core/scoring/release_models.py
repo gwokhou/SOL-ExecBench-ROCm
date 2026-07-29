@@ -23,6 +23,7 @@ from sol_execbench.core.integrity.schema_versions import (
     RELEASE_EXECUTION_PLAN_SCHEMA_VERSION,
     RELEASE_SOLAR_INDEX_SCHEMA_VERSION,
 )
+from sol_execbench.core.solar_bridge.models import DEFAULT_IR_PATH, IRPath
 from sol_execbench.core.timestamps import validate_utc_timestamp
 
 _REVISION = re.compile(r"[0-9a-f]{40}")
@@ -226,6 +227,7 @@ class SolarIndexStatement(ReleaseModel):
     schema_version: str = RELEASE_SOLAR_INDEX_SCHEMA_VERSION
     generated_at: str
     source_revision: str
+    ir_path: IRPath = DEFAULT_IR_PATH
     corpus_manifest: ArtifactReference
     entries: tuple[SolarManifestEvidence, ...] = Field(min_length=1)
 

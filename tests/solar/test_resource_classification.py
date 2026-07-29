@@ -152,6 +152,106 @@ def test_softmax_rule_uses_recorded_reduction_dimension() -> None:
     }
 
 
+@pytest.mark.parametrize("target", ["floor", "log2", "exp2"])
+def test_new_scalar_math_rules_count_every_output(target: str) -> None:
+    result = _classify(
+        _layer(
+            target,
+            input_shapes=[[2, 3]],
+            output_shapes=[[2, 3]],
+            input_dtypes=["fp32"],
+            output_dtypes=["fp32"],
+        ),
+    )
+
+    assert result["work"] == {"sfu": {"fp32": 6}}
+
+
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [
+        (
+            "nll_loss",
+            {
+                "reduction": {"fp32": 1},
+                "valu": {"fp32": 2, "integer": 2},
+            },
+        ),
+        (
+            "cross_entropy_loss",
+            {
+                "reduction": {"fp32": 13},
+                "sfu": {"fp32": 8},
+                "valu": {"fp32": 18, "integer": 2},
+            },
+        ),
+    ],
+)
+def test_classification_models_indexed_loss_mandatory_work(
+    target: str,
+    expected: dict[str, dict[str, int]],
+) -> None:
+    result = _classify(
+        _layer(
+            target,
+            input_shapes=[[2, 4], [2]],
+            output_shapes=[[]],
+            input_dtypes=["fp32", "int64"],
+            output_dtypes=["fp32"],
+        ),
+    )
+
+    assert result["work"] == expected
+
+
+@pytest.mark.parametrize(
+    ("target", "valu"),
+    [("kl_div", 12), ("xlogy", 4)],
+)
+def test_classification_models_logarithmic_loss_mandatory_work(
+    target: str,
+    valu: int,
+) -> None:
+    result = _classify(
+        _layer(
+            target,
+            input_shapes=[[4], [4]],
+            output_shapes=[[4]],
+            input_dtypes=["fp32", "fp32"],
+            output_dtypes=["fp32"],
+        ),
+    )
+
+    assert result["work"] == {
+        "sfu": {"fp32": 4},
+        "valu": {"fp32": valu},
+    }
+
+
+def test_topk_and_to_alias_keep_their_resource_classes() -> None:
+    topk = _classify(
+        _layer(
+            "topk",
+            input_shapes=[[2, 8]],
+            output_shapes=[[2, 3], [2, 3]],
+            input_dtypes=["fp16"],
+            output_dtypes=["fp16", "int64"],
+        ),
+    )
+    converted = _classify(
+        _layer(
+            "_to_copy",
+            input_shapes=[[4]],
+            output_shapes=[[4]],
+            input_dtypes=["fp32"],
+            output_dtypes=["fp16"],
+        ),
+    )
+
+    assert topk["work"] == {"scan_sort": {"fp16": 16}}
+    assert converted["work"] == {"conversion": {"fp32->fp16": 4}}
+
+
 def test_unknown_operation_falls_back_to_macs_when_available() -> None:
     result = _classify(_layer("custom_contraction"), macs=3)
 

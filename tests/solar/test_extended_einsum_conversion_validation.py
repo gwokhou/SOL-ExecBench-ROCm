@@ -19,12 +19,18 @@ def _operator(
     )
 
 
-def _start(shape: list[int] | None = None) -> dict:
-    return {
+def _start(
+    shape: list[int] | None = None,
+    source_input_index: int | None = None,
+) -> dict:
+    layer = {
         "type": "start",
         "tensor_shapes": {"outputs": [] if shape is None else [shape]},
         "tensor_dtypes": {"outputs": ["torch.float32"]},
     }
+    if source_input_index is not None:
+        layer["source_input_index"] = source_input_index
+    return layer
 
 
 def test_validate_rejects_a_different_ir_kind() -> None:
@@ -39,14 +45,16 @@ def test_input_binding_rejects_arity_and_incomplete_metadata() -> None:
     with pytest.raises(RuntimeError, match="observed=.*starts=0"):
         conversion._bind_inputs({"layers": {}}, operator)
 
-    with pytest.raises(RuntimeError, match="lacks exact shape/dtype"):
+    with pytest.raises(
+        RuntimeError, match="does not match graph input metadata"
+    ):
         conversion._bind_inputs(
-            {"layers": {"input": _start()}},
+            {"layers": {"input": _start(source_input_index=0)}},
             operator,
         )
 
 
-def test_input_binding_rejects_ambiguous_signatures() -> None:
+def test_input_binding_rejects_missing_exact_source_indices() -> None:
     signature = TensorSignature((2, 3), "torch.float32")
     operator = _operator(inputs=((0, signature), (1, signature)))
     graph = {
@@ -56,8 +64,21 @@ def test_input_binding_rejects_ambiguous_signatures() -> None:
         },
     }
 
-    with pytest.raises(RuntimeError, match="ambiguous exact"):
+    with pytest.raises(RuntimeError, match="lacks an exact source index"):
         conversion._bind_inputs(graph, operator)
+
+
+def test_input_binding_uses_source_indices_for_identical_signatures() -> None:
+    signature = TensorSignature((2, 3), "torch.float32")
+    operator = _operator(inputs=((0, signature), (1, signature)))
+    graph = {
+        "layers": {
+            "left": _start([2, 3], 0),
+            "right": _start([2, 3], 1),
+        },
+    }
+
+    assert conversion._bind_inputs(graph, operator) == [0, 1]
 
 
 def test_output_binding_rejects_arity_and_signature_mismatches() -> None:
@@ -97,7 +118,7 @@ def test_output_binding_rejects_arity_and_signature_mismatches() -> None:
                 "tensor_shapes": {"outputs": [[2, 3]]},
                 "tensor_dtypes": {"outputs": ["torch.float32"]},
             },
-            "not single-output",
+            "lacks an exact producer output slot",
         ),
     ],
 )
@@ -117,3 +138,36 @@ def test_output_candidates_require_one_complete_producer(
 
     with pytest.raises(RuntimeError, match=message):
         conversion._output_candidates(graph, traced)
+
+
+def test_output_candidates_preserve_independent_multi_output_slots() -> None:
+    graph = {
+        "layers": {
+            "topk": {
+                "tensor_names": {"outputs": ["values", "indices"]},
+                "tensor_shapes": {"outputs": [[2, 3], [2, 3]]},
+                "tensor_dtypes": {
+                    "outputs": ["torch.float32", "torch.int64"],
+                },
+            },
+        },
+    }
+    traced = {
+        "layers": {
+            "values": {
+                "type": "output-tensor",
+                "connections": {"inputs": ["topk"]},
+                "module_args": {"producer_output_slot": 0},
+            },
+            "indices": {
+                "type": "output-tensor",
+                "connections": {"inputs": ["topk"]},
+                "module_args": {"producer_output_slot": 1},
+            },
+        },
+    }
+
+    assert conversion._output_candidates(graph, traced) == [
+        ("values", [2, 3], "torch.float32"),
+        ("indices", [2, 3], "torch.int64"),
+    ]

@@ -60,6 +60,8 @@ class UnaryElementwiseHandler(EinsumOpHandler):
         "abs",
         "neg",
         "exp",
+        "exp2",
+        "floor",
         "log",
         "log2",
         "log10",
@@ -168,6 +170,7 @@ class BinaryElementwiseHandler(EinsumOpHandler):
         "bitwise_and",
         "__and__",
         "masked_fill",
+        "xlogy",
     )
 
     def generate_einsum(

@@ -89,11 +89,14 @@ Build the formal 163-workload denominator:
 
 ```bash
 uv run sol-execbench solar release-build out/release \
+  --backend torchview_extended_einsum \
   --orojenesis-home /path/to/reviewed/orojenesis
 ```
 
-Each workload record binds the operator graph, einsum graph, conversion
-attestation, formal analysis, and request manifest. Verification rejects
+Each workload record binds the selected fixed IR path, operator graph, dynamic
+IR graph name, conversion attestation, formal analysis, and request manifest.
+Use a separate release root with `--backend make_fx_aten`; a release index
+cannot mix or resume with a different path. Verification rejects
 missing or duplicate workloads, diagnostic bounds, wrong
 reference/architecture identity, untrusted Orojenesis policy, and artifact
 hash drift.

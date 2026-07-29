@@ -12,6 +12,7 @@ from torch.nn import functional
 from solar.analysis.graph_analyzer import IRGraphAnalyzer
 from solar.graph.contracts import ExtractionKind
 from solar.graph.extraction import extract_operator_graph
+from solar.ir.contracts import IRKind
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.registry import ir_lifecycle
 from solar.verification.verify import IRGraphExecutor
@@ -100,6 +101,18 @@ def _max_values(value: torch.Tensor) -> torch.Tensor:
 def _split_recombine(value: torch.Tensor) -> torch.Tensor:
     first, second, third = torch.split(value, 2, dim=1)
     return first + second + third
+
+
+def _split_outputs(
+    value: torch.Tensor,
+) -> tuple[torch.Tensor, ...]:
+    return torch.split(value, 2, dim=1)
+
+
+def _topk_outputs(
+    value: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    return torch.topk(value, 3, dim=1)
 
 
 def _cases() -> list[tuple[str, Callable[..., torch.Tensor], tuple[Any, ...]]]:
@@ -199,7 +212,11 @@ def test_cpu_pipeline_preserves_reference_semantics(
         name=name,
         extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
     )
-    converted = convert_operator_graph(operator, output_dir=output)
+    converted = convert_operator_graph(
+        operator,
+        output_dir=output,
+        ir_kind=IRKind.ATEN,
+    )
     graph = yaml.safe_load(converted.path.read_text())
 
     actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
@@ -260,6 +277,88 @@ def test_extraction_preserves_source_positions_when_use_order_differs(
     assert artifact.used_source_indices == (0, 1)
 
 
+def test_torchview_preserves_repeated_use_of_one_source_input(
+    tmp_path: Path,
+) -> None:
+    def reference(value: torch.Tensor) -> torch.Tensor:
+        return value + value
+
+    inputs = (torch.arange(6.0).reshape(2, 3),)
+    operator = extract_operator_graph(
+        reference,
+        inputs,
+        device="cpu",
+        output_dir=tmp_path,
+        name="repeated-source",
+        extraction_kind=ExtractionKind.TORCHVIEW,
+    )
+    converted = convert_operator_graph(operator, output_dir=tmp_path)
+    graph = yaml.safe_load(converted.path.read_text())
+    add = next(
+        layer
+        for layer in graph["layers"].values()
+        if (layer.get("semantic_op") or {}).get("target") == "add"
+    )
+
+    assert graph["source_input_indices"] == [0]
+    assert add["tensor_names"]["inputs"][0] == add["tensor_names"]["inputs"][1]
+    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    torch.testing.assert_close(actual, reference(*inputs))
+
+
+@pytest.mark.parametrize(
+    ("name", "reference", "inputs", "target", "output_dtypes"),
+    [
+        (
+            "split-outputs",
+            _split_outputs,
+            (torch.arange(12.0).reshape(2, 6),),
+            "split",
+            ["torch.float32"] * 3,
+        ),
+        (
+            "topk-outputs",
+            _topk_outputs,
+            (torch.arange(16.0).reshape(2, 8),),
+            "topk",
+            ["torch.float32", "torch.int64"],
+        ),
+    ],
+)
+def test_torchview_preserves_independent_multi_output_slots(
+    tmp_path: Path,
+    name: str,
+    reference: Callable[..., tuple[torch.Tensor, ...]],
+    inputs: tuple[torch.Tensor, ...],
+    target: str,
+    output_dtypes: list[str],
+) -> None:
+    operator = extract_operator_graph(
+        reference,
+        inputs,
+        device="cpu",
+        output_dir=tmp_path,
+        name=name,
+        extraction_kind=ExtractionKind.TORCHVIEW,
+    )
+    converted = convert_operator_graph(operator, output_dir=tmp_path)
+    graph = yaml.safe_load(converted.path.read_text())
+    operation = next(
+        layer
+        for layer in graph["layers"].values()
+        if (layer.get("semantic_op") or {}).get("target") == target
+    )
+
+    assert len(operation["tensor_names"]["outputs"]) == len(output_dtypes)
+    assert operation["tensor_dtypes"]["outputs"] == output_dtypes
+    assert len(graph["outputs"]) == len(output_dtypes)
+    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    expected = reference(*inputs)
+    assert len(actual) == len(expected)
+    for observed, wanted in zip(actual, expected, strict=True):
+        torch.testing.assert_close(observed, wanted)
+
+
 def test_extraction_rejects_non_tensor_reference_output(tmp_path: Path) -> None:
     with pytest.raises(
         RuntimeError,
@@ -291,7 +390,11 @@ def test_canonical_extraction_preserves_explicit_backward_reference(
         name="backward-reference",
         extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
     )
-    converted = convert_operator_graph(operator, output_dir=tmp_path)
+    converted = convert_operator_graph(
+        operator,
+        output_dir=tmp_path,
+        ir_kind=IRKind.ATEN,
+    )
     graph = yaml.safe_load(converted.path.read_text())
 
     assert graph["joint_graph"] is False
@@ -300,3 +403,45 @@ def test_canonical_extraction_preserves_explicit_backward_reference(
     )
     actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
     torch.testing.assert_close(actual, reference(*inputs))
+
+
+def test_make_fx_removes_only_unreachable_pure_allocations(
+    tmp_path: Path,
+) -> None:
+    def dead_allocation(value: torch.Tensor) -> torch.Tensor:
+        torch.empty_like(value)
+        return value + 1
+
+    operator = extract_operator_graph(
+        dead_allocation,
+        (torch.ones(4),),
+        device="cpu",
+        output_dir=tmp_path / "dead",
+        name="dead-allocation",
+        extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
+    )
+    graph = yaml.safe_load(operator.path.read_text())
+    assert all(
+        (layer.get("semantic_op") or {}).get("target") != "empty_like"
+        for layer in graph["layers"].values()
+    )
+    convert_operator_graph(
+        operator,
+        output_dir=tmp_path / "dead",
+        ir_kind=IRKind.ATEN,
+    )
+
+    reachable = extract_operator_graph(
+        torch.empty_like,
+        (torch.ones(4),),
+        device="cpu",
+        output_dir=tmp_path / "reachable",
+        name="reachable-allocation",
+        extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
+    )
+    with pytest.raises(ValueError, match="unsupported exact operation"):
+        convert_operator_graph(
+            reachable,
+            output_dir=tmp_path / "reachable",
+            ir_kind=IRKind.ATEN,
+        )

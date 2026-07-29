@@ -241,7 +241,7 @@ def test_memory_level_and_profile_load_normalize_all_fields(tmp_path: Path):
     assert from_file.source == str(path)
     packaged = ArchitectureProfile.load("RX_9060_XT")
     assert packaged.vendor == "AMD"
-    assert packaged.profile_revision == "rx9060xt-amd-resource-v4"
+    assert packaged.profile_revision == "rx9060xt-amd-resource-v5"
     assert packaged.resource_rate_for("valu", "fp16") == 25_600_000_000_000.0
     assert packaged.resource_rate_for("valu", "generic") == 51_281_920_000_000.0
     assert "valu/generic" not in packaged.required_calibration_resource_modes()

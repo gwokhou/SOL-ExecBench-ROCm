@@ -21,7 +21,6 @@ from solar.graph.contracts import (
     TensorSignature,
 )
 from solar.ir.contracts import IRGraphArtifact, IRKind
-from solar.ir.extended_einsum.make_fx_conversion import convert_make_fx_graph
 from solar.ir.extended_einsum.semantics import validate_semantic_graph
 from solar.ir.extended_einsum.torchview.converter import PyTorchToEinsum
 from solar.types import DynamicValue
@@ -49,15 +48,6 @@ def convert_operator_graph(
     einsum_path = output / "einsum_graph.yaml"
     einsum_path.write_text(yaml.safe_dump(converted, sort_keys=False))
     return IRGraphArtifact(einsum_path, IRKind.EXTENDED_EINSUM)
-
-
-def _convert_make_fx_graph(
-    operator: OperatorGraphArtifact,
-    output: Path,
-    traced: Mapping[str, DynamicValue],
-) -> dict[str, DynamicValue]:
-    del output, traced
-    return convert_make_fx_graph(operator)
 
 
 def _convert_torchview_graph(
@@ -91,7 +81,6 @@ _SOURCE_CONVERTERS: dict[
         dict[str, DynamicValue],
     ],
 ] = {
-    ExtractionKind.MAKE_FX_REFERENCE: _convert_make_fx_graph,
     ExtractionKind.TORCHVIEW: _convert_torchview_graph,
 }
 
@@ -119,78 +108,52 @@ def _bind_inputs(
     graph: Mapping[str, DynamicValue], operator: OperatorGraphArtifact
 ) -> list[int]:
     starts = _start_layers(graph)
-    ordered = list(operator.used_source_indices)
-    if len(starts) != len(ordered):
+    expected = list(operator.used_source_indices)
+    if len(starts) != len(expected):
         raise SourceInputBindingError(
             "cannot bind source arguments to graph inputs: "
-            f"observed={ordered}, starts={len(starts)}"
+            f"observed={expected}, starts={len(starts)}"
         )
     signatures = dict(operator.source_inputs)
-    candidates = [
-        _input_candidates(layer, ordered, signatures) for layer in starts
-    ]
-    bindings: list[list[int]] = []
-    _search_bindings(starts, candidates, 0, [], set(ordered), -1, bindings)
-    if len(bindings) != 1:
-        reason = "no" if not bindings else "ambiguous"
+    result: list[int] = []
+    for layer in starts:
+        raw_index = layer.get("source_input_index")
+        if raw_index is None:
+            raise SourceInputBindingError(
+                "Torchview graph input lacks an exact source index",
+            )
+        source_index = int(raw_index)
+        if source_index not in expected or source_index in result:
+            raise SourceInputBindingError(
+                "Torchview graph input has an invalid source index",
+            )
+        _validate_input_signature(layer, source_index, signatures)
+        result.append(source_index)
+    if result != expected:
         raise SourceInputBindingError(
-            f"{reason} exact source-to-graph input binding",
+            "Torchview graph source indices do not match reference order",
         )
-    return bindings[0]
+    return result
 
 
-def _input_candidates(
+def _validate_input_signature(
     layer: Mapping[str, DynamicValue],
-    indices: Sequence[int],
+    source_index: int,
     inputs: Mapping[int, TensorSignature],
-) -> list[int]:
+) -> None:
     shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
     dtypes = (layer.get("tensor_dtypes") or {}).get("outputs") or []
-    if len(shapes) != 1 or len(dtypes) != 1:
+    signature = inputs.get(source_index)
+    if (
+        len(shapes) != 1
+        or len(dtypes) != 1
+        or signature is None
+        or tuple(shapes[0]) != signature.shape
+        or str(dtypes[0]) != signature.dtype
+    ):
         raise SourceInputBindingError(
-            "graph input lacks exact shape/dtype metadata",
+            "Torchview source index does not match graph input metadata",
         )
-    return [
-        index
-        for index in indices
-        if tuple(shapes[0]) == inputs[index].shape
-        and str(dtypes[0]) == inputs[index].dtype
-    ]
-
-
-def _search_bindings(
-    starts: Sequence[Mapping[str, DynamicValue]],
-    candidates: Sequence[Sequence[int]],
-    position: int,
-    chosen: list[int],
-    remaining: set[int],
-    last_ordered: int,
-    results: list[list[int]],
-) -> None:
-    if len(results) > 1:
-        return
-    if position == len(candidates):
-        results.append(list(chosen))
-        return
-    ordered_start = (
-        starts[position].get("source_binding") == "torchview_input_order"
-    )
-    for source_index in candidates[position]:
-        if source_index not in remaining:
-            continue
-        if ordered_start and source_index <= last_ordered:
-            continue
-        chosen.append(source_index)
-        _search_bindings(
-            starts,
-            candidates,
-            position + 1,
-            chosen,
-            remaining - {source_index},
-            source_index if ordered_start else last_ordered,
-            results,
-        )
-        chosen.pop()
 
 
 def _bind_outputs(
@@ -238,11 +201,29 @@ def _output_candidates(
         names = (producer.get("tensor_names") or {}).get("outputs") or []
         shapes = (producer.get("tensor_shapes") or {}).get("outputs") or []
         dtypes = (producer.get("tensor_dtypes") or {}).get("outputs") or []
-        if len(names) != 1 or len(shapes) != 1 or len(dtypes) != 1:
+        raw_slot = (output.get("module_args") or {}).get(
+            "producer_output_slot",
+        )
+        if raw_slot is None:
+            if len(names) == len(shapes) == len(dtypes) == 1:
+                raw_slot = 0
+            else:
+                raise ReferenceOutputBindingError(
+                    "traced graph output lacks an exact producer output slot"
+                )
+        slot = int(raw_slot)
+        if (
+            slot < 0
+            or slot >= len(names)
+            or slot >= len(shapes)
+            or slot >= len(dtypes)
+        ):
             raise ReferenceOutputBindingError(
-                "traced graph output producer is not single-output"
+                "traced graph output selects an unavailable producer slot"
             )
-        result.append((str(names[0]), list(shapes[0]), str(dtypes[0])))
+        result.append(
+            (str(names[slot]), list(shapes[slot]), str(dtypes[slot])),
+        )
     return result
 
 

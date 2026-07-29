@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         _enable_agent: bool
         _strict: bool
         _tensor_to_producer_op: dict[str, str]
+        _tensor_to_producer_slot: dict[str, int]
 
         @staticmethod
         def _as_list(

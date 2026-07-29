@@ -10,8 +10,10 @@ from solar.graph.contracts import DEFAULT_EXTRACTION_KIND, ExtractionKind
 from solar.graph.extraction import extract_operator_graph
 from solar.ir.contracts import (
     DEFAULT_IR_KIND,
+    DEFAULT_IR_PATH,
     IRKind,
     IRLifecycle,
+    IRPath,
 )
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.registry import ir_lifecycle, ir_lifecycles
@@ -22,28 +24,31 @@ def _matmul(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
     return left @ right
 
 
-def test_extended_einsum_is_default_and_aten_remains_interchangeable(
+def test_fixed_ir_paths_preserve_the_same_matmul_semantics(
     tmp_path: Path,
 ) -> None:
     inputs = (
         torch.arange(6.0).reshape(2, 3),
         torch.arange(12.0).reshape(3, 4),
     )
-    operator = extract_operator_graph(
-        _matmul,
-        inputs,
-        device="cpu",
-        output_dir=tmp_path,
-        name="matmul",
-        extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
-    )
-
-    extended_einsum = convert_operator_graph(operator, output_dir=tmp_path)
-    aten = convert_operator_graph(
-        operator,
-        output_dir=tmp_path,
-        ir_kind=IRKind.ATEN,
-    )
+    artifacts = {}
+    for ir_path in IRPath:
+        output = tmp_path / ir_path.value
+        operator = extract_operator_graph(
+            _matmul,
+            inputs,
+            device="cpu",
+            output_dir=output,
+            name="matmul",
+            extraction_kind=ir_path.extraction_kind,
+        )
+        artifacts[ir_path] = convert_operator_graph(
+            operator,
+            output_dir=output,
+            ir_kind=ir_path.ir_kind,
+        )
+    extended_einsum = artifacts[IRPath.TORCHVIEW_EXTENDED_EINSUM]
+    aten = artifacts[IRPath.MAKE_FX_ATEN]
     extended_einsum_graph = yaml.safe_load(extended_einsum.path.read_text())
     aten_graph = yaml.safe_load(aten.path.read_text())
 
@@ -91,6 +96,7 @@ def test_analysis_request_defaults_to_extended_einsum(tmp_path: Path) -> None:
     )
 
     assert DEFAULT_IR_KIND is IRKind.EXTENDED_EINSUM
+    assert DEFAULT_IR_PATH is IRPath.TORCHVIEW_EXTENDED_EINSUM
     assert DEFAULT_EXTRACTION_KIND is ExtractionKind.TORCHVIEW
     assert request.extraction_kind is ExtractionKind.TORCHVIEW
     assert request.ir_kind is IRKind.EXTENDED_EINSUM
@@ -101,15 +107,16 @@ def test_analysis_request_defaults_to_extended_einsum(tmp_path: Path) -> None:
             input_factory=lambda seed: (torch.tensor(float(seed)),),
             reference_name="tests#identity",
             reference_sha256="b" * 64,
-            extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
+            ir_path=IRPath.MAKE_FX_ATEN,
         ),
         architecture={},
         output_dir=tmp_path / "make-fx",
     )
-    assert make_fx.ir_kind is IRKind.EXTENDED_EINSUM
+    assert make_fx.ir_path is IRPath.MAKE_FX_ATEN
+    assert make_fx.ir_kind is IRKind.ATEN
 
 
-def test_every_lifecycle_shares_one_interface_on_the_same_data(
+def test_every_fixed_path_shares_one_lifecycle_interface(
     tmp_path: Path,
 ) -> None:
     """Both IR dialects implement one lifecycle on trusted make_fx data."""
@@ -125,18 +132,19 @@ def test_every_lifecycle_shares_one_interface_on_the_same_data(
         torch.arange(6.0).reshape(2, 3),
         torch.arange(12.0).reshape(3, 4),
     )
-    operator = extract_operator_graph(
-        _matmul,
-        inputs,
-        device="cpu",
-        output_dir=tmp_path,
-        name="matmul",
-        extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
-    )
     expected = _matmul(*inputs)
-    for lifecycle in lifecycles:
-        output_dir = tmp_path / lifecycle.kind.value
+    for ir_path in IRPath:
+        lifecycle = ir_lifecycle(ir_path.ir_kind)
+        output_dir = tmp_path / ir_path.value
         output_dir.mkdir()
+        operator = extract_operator_graph(
+            _matmul,
+            inputs,
+            device="cpu",
+            output_dir=output_dir,
+            name="matmul",
+            extraction_kind=ir_path.extraction_kind,
+        )
         artifact = lifecycle.convert(operator, output_dir)
         graph = yaml.safe_load(artifact.path.read_text())
         assert artifact.kind is lifecycle.kind

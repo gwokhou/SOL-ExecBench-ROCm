@@ -20,6 +20,7 @@ from solar.contracts import (
     SolarStageStatus,
 )
 from solar.errors import SolarError
+from solar.ir.contracts import IRPath, normalize_ir_path
 from solar.pipeline.stages import (
     convert_request_graph,
     extract_request_graph,
@@ -87,6 +88,7 @@ class ConversionReadinessResult:
 
     status: SolarReadinessStatus
     analysis_id: str
+    ir_path: IRPath
     output_dir: str
     architecture_sha256: str | None
     stages: tuple[ReadinessStage, ...]
@@ -97,6 +99,7 @@ class ConversionReadinessResult:
     def __post_init__(self) -> None:
         """Normalize boundary input and reject unknown result states."""
         object.__setattr__(self, "status", SolarReadinessStatus(self.status))
+        object.__setattr__(self, "ir_path", normalize_ir_path(self.ir_path))
         if self.failure_stage is not None:
             object.__setattr__(
                 self,
@@ -199,6 +202,7 @@ def _result(
         return ConversionReadinessResult(
             status=SolarReadinessStatus.READY,
             analysis_id=request.analysis_id,
+            ir_path=request.ir_path,
             output_dir=str(output),
             architecture_sha256=architecture_sha256,
             stages=tuple(passed),
@@ -221,6 +225,7 @@ def _result(
     return ConversionReadinessResult(
         status=SolarReadinessStatus.FAILED,
         analysis_id=request.analysis_id,
+        ir_path=request.ir_path,
         output_dir=str(output),
         architecture_sha256=architecture_sha256,
         stages=stages,

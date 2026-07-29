@@ -50,6 +50,14 @@ auditing. That conversion request owns one `VerificationPolicy`, so the extracto
 IR, replay device, seeds, input patterns, and numerical tolerances cannot drift
 between the readiness and formal-analysis entry points.
 
+The `--backend` IR identity is one of two fixed paths:
+`torchview_extended_einsum` or `make_fx_aten`. The default remains
+`torchview_extended_einsum`. Extractor and
+IR dialect are not separately selectable, and analysis never retries a failed
+workload through the other path. Worker requests, attestations, manifests,
+corpus matrices, and release indexes bind the selected path and its canonical
+IR artifact name.
+
 The ROCm formal-publication profile uses a pinned Orojenesis mapper when the
 stricter capacity-constrained bound is requested
 (`AnalysisRequest.require_orojenesis=True`). The default bound policy follows

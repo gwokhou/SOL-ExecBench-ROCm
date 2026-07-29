@@ -82,6 +82,27 @@ def test_run_solar_worker_rejects_non_formal_analyzed_response(
     assert outcome.reason_code == "worker_response_invalid"
 
 
+def test_run_solar_worker_rejects_ir_path_drift(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    def fake_run(command, stdout_path, stderr_path, **kwargs):
+        del stdout_path, stderr_path, kwargs
+        payload = _formal_payload()
+        payload["ir_path"] = "make_fx_aten"
+        payload["artifacts"][1]["path"] = "aten_graph.yaml"
+        Path(command[-1]).write_text(json.dumps(payload))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner, "run_in_process_group_to_files", fake_run)
+
+    outcome = runner.run_solar_worker(_request(tmp_path))
+
+    assert outcome.status == "failed"
+    assert outcome.reason_code == "worker_response_invalid"
+    assert outcome.message == "SOLAR worker IR path mismatch"
+
+
 def test_run_solar_worker_reports_bounded_worker_error(
     tmp_path,
     monkeypatch,

@@ -17,28 +17,40 @@ from solar.contracts import (
     SolarStage,
     SolarStageStatus,
 )
-from solar.graph.contracts import (
-    DEFAULT_EXTRACTION_KIND,
-    ExtractionKind,
-    normalize_extraction_kind,
+from solar.ir.contracts import (
+    DEFAULT_IR_PATH,
+    IRPath,
+    normalize_ir_path,
 )
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
-FORMAL_ARTIFACT_PATHS = frozenset(
-    {
-        "operator_graph.yaml",
-        "einsum_graph.yaml",
-        "conversion-attestation.yaml",
-        "solar-analysis.yaml",
-    },
-)
-READINESS_STAGE_ARTIFACTS = {
-    SolarStage.GRAPH_EXTRACTION: "operator_graph.yaml",
-    SolarStage.IR_CONVERSION: "einsum_graph.yaml",
-    SolarStage.CONVERSION_VERIFICATION: "conversion-attestation.yaml",
-}
-READINESS_STAGES = tuple(READINESS_STAGE_ARTIFACTS)
+
+
+def formal_artifact_paths(ir_path: IRPath) -> frozenset[str]:
+    """Return the exact publication artifact set for one fixed IR path."""
+    return frozenset(
+        {
+            "operator_graph.yaml",
+            ir_path.graph_filename,
+            "conversion-attestation.yaml",
+            "solar-analysis.yaml",
+        },
+    )
+
+
+def readiness_stage_artifacts(
+    ir_path: IRPath,
+) -> dict[SolarStage, str]:
+    """Return the exact readiness artifact names for one fixed IR path."""
+    return {
+        SolarStage.GRAPH_EXTRACTION: "operator_graph.yaml",
+        SolarStage.IR_CONVERSION: ir_path.graph_filename,
+        SolarStage.CONVERSION_VERIFICATION: "conversion-attestation.yaml",
+    }
+
+
+READINESS_STAGES = tuple(readiness_stage_artifacts(DEFAULT_IR_PATH))
 
 
 @dataclass(frozen=True)
@@ -50,15 +62,12 @@ class SolarWorkerRequest:
     output_dir: str
     device: str
     orojenesis_home: str | None
-    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND
+    ir_path: IRPath = DEFAULT_IR_PATH
 
     def __post_init__(self) -> None:
-        """Normalize the extraction_kind at the process boundary."""
-        object.__setattr__(
-            self,
-            "extraction_kind",
-            normalize_extraction_kind(self.extraction_kind),
-        )
+        """Reject requests that bypassed process-boundary normalization."""
+        if not isinstance(self.ir_path, IRPath):
+            raise TypeError("ir_path must be an IRPath")
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarWorkerRequest:
@@ -73,9 +82,7 @@ class SolarWorkerRequest:
                 if value.get("orojenesis_home")
                 else None
             ),
-            extraction_kind=normalize_extraction_kind(
-                value.get("extraction_kind", DEFAULT_EXTRACTION_KIND)
-            ),
+            ir_path=normalize_ir_path(value.get("ir_path", DEFAULT_IR_PATH)),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -91,15 +98,12 @@ class SolarStageAuditRequest:
     workload_uuid: str
     output_dir: str
     device: str
-    extraction_kind: ExtractionKind | str = DEFAULT_EXTRACTION_KIND
+    ir_path: IRPath = DEFAULT_IR_PATH
 
     def __post_init__(self) -> None:
-        """Normalize the extraction_kind at the process boundary."""
-        object.__setattr__(
-            self,
-            "extraction_kind",
-            normalize_extraction_kind(self.extraction_kind),
-        )
+        """Reject requests that bypassed process-boundary normalization."""
+        if not isinstance(self.ir_path, IRPath):
+            raise TypeError("ir_path must be an IRPath")
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarStageAuditRequest:
@@ -109,9 +113,7 @@ class SolarStageAuditRequest:
             workload_uuid=str(value["workload_uuid"]),
             output_dir=str(value["output_dir"]),
             device=str(value["device"]),
-            extraction_kind=normalize_extraction_kind(
-                value.get("extraction_kind", DEFAULT_EXTRACTION_KIND)
-            ),
+            ir_path=normalize_ir_path(value.get("ir_path", DEFAULT_IR_PATH)),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -125,6 +127,7 @@ class SolarAnalysisOutcome:
 
     status: SolarAnalysisStatus
     analysis_id: str
+    ir_path: IRPath = DEFAULT_IR_PATH
     output_dir: str | None = None
     architecture_sha256: str | None = None
     lower_bound_seconds: float | None = None
@@ -139,6 +142,7 @@ class SolarAnalysisOutcome:
     def __post_init__(self) -> None:
         """Normalize worker payload values and reject unknown states."""
         object.__setattr__(self, "status", SolarAnalysisStatus(self.status))
+        object.__setattr__(self, "ir_path", normalize_ir_path(self.ir_path))
         if self.stage is not None:
             object.__setattr__(self, "stage", SolarStage(self.stage))
 
@@ -192,7 +196,7 @@ class SolarAnalysisOutcome:
             ):
                 return False
             paths.add(str(path))
-        return paths == FORMAL_ARTIFACT_PATHS
+        return paths == formal_artifact_paths(self.ir_path)
 
 
 @dataclass(frozen=True)
@@ -201,6 +205,7 @@ class SolarStageAuditOutcome:
 
     status: SolarReadinessStatus
     analysis_id: str
+    ir_path: IRPath = DEFAULT_IR_PATH
     output_dir: str | None = None
     architecture_sha256: str | None = None
     stages: tuple[dict[str, Any], ...] = field(default_factory=tuple)
@@ -212,6 +217,7 @@ class SolarStageAuditOutcome:
     def __post_init__(self) -> None:
         """Normalize worker payload values and reject unknown states."""
         object.__setattr__(self, "status", SolarReadinessStatus(self.status))
+        object.__setattr__(self, "ir_path", normalize_ir_path(self.ir_path))
         if self.failure_stage is not None:
             object.__setattr__(
                 self,
@@ -260,7 +266,7 @@ class SolarStageAuditOutcome:
             return False
         if set(stages) != set(READINESS_STAGES):
             return False
-        for stage, path in READINESS_STAGE_ARTIFACTS.items():
+        for stage, path in readiness_stage_artifacts(self.ir_path).items():
             artifact = stages[stage].get("artifact") or {}
             if (
                 stages[stage].get("status") != SolarStageStatus.PASSED
@@ -295,11 +301,11 @@ def formal_precision_for_definition(definition: Any) -> str:
 
 
 __all__ = [
-    "FORMAL_ARTIFACT_PATHS",
+    "DEFAULT_IR_PATH",
     "FORMAL_BOUND_KIND",
     "READINESS_STAGES",
-    "READINESS_STAGE_ARTIFACTS",
     "SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION",
+    "IRPath",
     "SolarAnalysisOutcome",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",
@@ -308,5 +314,8 @@ __all__ = [
     "SolarStageAuditRequest",
     "SolarStageStatus",
     "SolarWorkerRequest",
+    "formal_artifact_paths",
     "formal_precision_for_definition",
+    "normalize_ir_path",
+    "readiness_stage_artifacts",
 ]
