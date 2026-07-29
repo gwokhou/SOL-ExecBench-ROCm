@@ -1,0 +1,37 @@
+{
+  "name": "l1n95_cross_entropy",
+  "op_type": "loss",
+  "description": "Cross entropy with class-bounded integer labels.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch size."
+    },
+    "C": {
+      "type": "var",
+      "description": "Class count."
+    }
+  },
+  "inputs": {
+    "predictions": {
+      "shape": [
+        "B",
+        "C"
+      ],
+      "dtype": "float32"
+    },
+    "targets": {
+      "shape": [
+        "B"
+      ],
+      "dtype": "int64"
+    }
+  },
+  "outputs": {
+    "loss": {
+      "shape": [],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\n\ndef run(predictions, targets):\n    return F.cross_entropy(predictions, targets)\n"
+}

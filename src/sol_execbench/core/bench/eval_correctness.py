@@ -14,7 +14,6 @@ import torch
 
 from sol_execbench.core.bench.correctness import (
     check_output_shape_dtype,
-    compute_error_stats,
     set_seed,
 )
 from sol_execbench.core.bench.eval_runtime import run_reward_hack_check
@@ -22,6 +21,7 @@ from sol_execbench.core.bench.eval_trace_helpers import WorkloadTraceEmitter
 from sol_execbench.core.bench.evaluation_requests import (
     WorkloadEvaluationRequest,
 )
+from sol_execbench.core.bench.output_checks import compare_output_checks
 from sol_execbench.core.bench.reference_protocol import (
     ReferenceCase,
     ReferenceExecutionError,
@@ -30,6 +30,7 @@ from sol_execbench.core.bench.reference_protocol import (
 )
 from sol_execbench.core.bench.reward_hack import check_lazy_outputs
 from sol_execbench.core.bench.utils import call_and_collect_outputs
+from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import Correctness, EvaluationStatus
 from sol_execbench.core.data.workload import Workload
 
@@ -101,7 +102,6 @@ def run_correctness_rounds(
     inputs = None
     _prepare_framework_thread_baseline(dependencies.user_fn, request.device)
     correctness = Correctness()
-
     for round_index in range(10):
         case = _load_reference_case(
             request,
@@ -114,7 +114,6 @@ def run_correctness_rounds(
             return CorrectnessRoundsResult(True, inputs, correctness)
         inputs = case.inputs
         ref_outputs = case.outputs
-
         try:
             user_outputs = call_and_collect_outputs(
                 dependencies.user_fn,
@@ -133,7 +132,6 @@ def run_correctness_rounds(
                 extra_msg=_candidate_failure_message(exc),
             )
             return CorrectnessRoundsResult(True, inputs, correctness)
-
         if emit_reward_hack_if_detected(
             emitter=emitter,
             workload=workload,
@@ -153,10 +151,13 @@ def run_correctness_rounds(
         ):
             return CorrectnessRoundsResult(True, inputs, correctness)
         correctness, numerically_wrong = _compare_outputs(
+            definition,
+            inputs,
             ref_outputs,
             user_outputs,
             workload,
             correctness,
+            round_index,
         )
         if numerically_wrong:
             emitter.emit_status(
@@ -223,28 +224,31 @@ def _first_round_failed(
 
 
 def _compare_outputs(
+    definition: Definition,
+    inputs: list[Any],
     reference_outputs: list[torch.Tensor],
     user_outputs: list[torch.Tensor],
     workload: Workload,
     correctness: Correctness,
+    round_index: int,
 ) -> tuple[Correctness, bool]:
-    for reference, user_output in zip(
+    current, exceeds = compare_output_checks(
+        definition,
+        workload,
+        inputs,
         reference_outputs,
         user_outputs,
-        strict=True,
-    ):
-        current, exceeds = compute_error_stats(
-            user_output,
-            reference,
-            workload.tolerance,
-        )
-        if (
-            current.max_absolute_error > correctness.max_absolute_error
-            or current.has_nan
-            or current.has_inf
-            and not correctness.has_nan
-        ):
-            correctness = current
-        if exceeds:
-            return correctness, True
-    return correctness, False
+        round_index,
+    )
+    correctness.max_absolute_error = max(
+        correctness.max_absolute_error,
+        current.max_absolute_error,
+    )
+    correctness.max_relative_error = max(
+        correctness.max_relative_error,
+        current.max_relative_error,
+    )
+    correctness.has_nan |= current.has_nan
+    correctness.has_inf |= current.has_inf
+    correctness.check_results.extend(current.check_results)
+    return correctness, exceeds

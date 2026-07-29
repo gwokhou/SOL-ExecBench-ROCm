@@ -34,13 +34,24 @@ def test_aka_author_seed_helpers_and_coverage_inventory(load_script) -> None:
     coverage = author._coverage_axes(author.SPECS[:3])
     assert set(coverage) == {
         "operation",
-        "dtype",
+        "input_dtype",
+        "output_dtype",
+        "capability",
         "pass_kind",
         "fusion_depth",
         "source_family",
         "suite",
     }
-    assert all(sum(category.values()) == 3 for category in coverage.values())
+    for axis in (
+        "operation",
+        "pass_kind",
+        "fusion_depth",
+        "source_family",
+        "suite",
+    ):
+        assert sum(coverage[axis].values()) == 3
+    assert sum(coverage["input_dtype"].values()) >= 3
+    assert sum(coverage["output_dtype"].values()) >= 3
 
 
 def test_aka_calibration_variation_handles_values_and_empty_outputs(
@@ -50,14 +61,15 @@ def test_aka_calibration_variation_handles_values_and_empty_outputs(
     anchor = (torch.tensor([1.0, 2.0]), torch.tensor([]))
     observed = (torch.tensor([1.5, 1.0]), torch.tensor([]))
 
-    max_abs, max_rel = calibration._variation(
+    metrics = calibration._variation(
         anchor,
         observed,
         ["float32", "float32"],
     )
 
-    assert max_abs == pytest.approx(1.0)
-    assert max_rel == pytest.approx(0.5)
+    assert metrics[0][0] == pytest.approx(1.0)
+    assert metrics[0][1] == pytest.approx(0.5)
+    assert metrics[1] == (0.0, 0.0)
 
 
 def test_orojenesis_provenance_hash_and_compiler_identity(

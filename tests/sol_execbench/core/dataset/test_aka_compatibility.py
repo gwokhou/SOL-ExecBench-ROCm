@@ -109,7 +109,9 @@ def test_probe_infrastructure_status_fails_closed() -> None:
 def test_gfx942_static_filter_excludes_fp8_without_live_probe() -> None:
     manifest = AKACorpusManifest.load(MANIFEST)
     entry = next(
-        item for item in manifest.entries if item.dtype == "float8_e4m3fn"
+        item
+        for item in manifest.entries
+        if "float8_e4m3fn" in {*item.input_dtypes, *item.output_dtypes}
     )
 
     def unexpected_probe(*_args):

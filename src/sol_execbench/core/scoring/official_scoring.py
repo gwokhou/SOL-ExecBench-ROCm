@@ -20,7 +20,7 @@ from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.solar_bridge.analyzer import formal_producer_readiness
 
 OFFICIAL_CORPUS_MANIFEST_SHA256 = (
-    "2f20a038ea7c6fae0da0f880f222362673e35516319345408693f6ee31441e82"
+    "88df1b100ae0479ddf8c6cc771f82811180d66f6b0ec46c3349ce412f53dfcf6"
 )
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 _PUBLISHED_RELEASE_BUNDLE = _REPOSITORY_ROOT / "RELEASE" / "release-bundle.json"

@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload import NumericCheck, Workload
 from sol_execbench.core.solar_bridge import analyzer, workload_context
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
@@ -47,16 +47,19 @@ def _definition(dtype: str = "torch.float16") -> Definition:
 
 
 def _workload() -> Workload:
-    tolerance = SimpleNamespace(
-        max_atol=0.01,
-        max_rtol=0.02,
-        required_matched_ratio=1.0,
-        max_error_cap=None,
-        allow_negative_inf=False,
-    )
     return cast(
         Workload,
-        SimpleNamespace(uuid="workload-1", tolerance=tolerance),
+        SimpleNamespace(
+            uuid="workload-1",
+            checks=[
+                NumericCheck(
+                    output="y",
+                    max_atol=0.01,
+                    max_rtol=0.02,
+                    required_matched_ratio=1.0,
+                ),
+            ],
+        ),
     )
 
 

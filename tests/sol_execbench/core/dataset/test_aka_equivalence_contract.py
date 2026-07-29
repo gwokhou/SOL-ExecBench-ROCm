@@ -45,6 +45,10 @@ def _contract() -> tuple[Definition, Workload]:
         {
             "axes": {"N": 4},
             "inputs": {"x": {"type": "random"}},
+            "checks": [
+                {"type": "numeric", "output": "first"},
+                {"type": "numeric", "output": "second"},
+            ],
             "uuid": "all-output-check",
         },
     )

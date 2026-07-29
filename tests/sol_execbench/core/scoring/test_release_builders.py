@@ -38,14 +38,14 @@ def test_release_baseline_materializes_exact_scored_corpus(
         for entry in corpus.entries
         if entry.role == "scored"
     }
-    assert len(expected) == 35
+    assert len(expected) == 43
     assert (
         sum(
             len(entry.workload_uuids)
             for entry in corpus.entries
             if entry.role == "scored"
         )
-        == 122
+        == 163
     )
     assert {item.problem_path for item in baseline.problems} == expected
     assert baseline.role == ReleaseRunKind.BASELINE
@@ -119,4 +119,4 @@ def test_candidate_plan_requires_exact_full_corpus_solution_set(
 
     assert candidate.role == ReleaseRunKind.CANDIDATE
     assert candidate.run_id == "candidate-test"
-    assert len(candidate.problems) == 35
+    assert len(candidate.problems) == 43

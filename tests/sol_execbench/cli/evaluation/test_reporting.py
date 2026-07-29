@@ -19,7 +19,12 @@ from sol_execbench.core import (
 
 
 def _workload(uuid: str) -> Workload:
-    return Workload(axes={}, inputs={}, uuid=uuid)
+    return Workload(
+        axes={},
+        inputs={},
+        uuid=uuid,
+        checks=[{"type": "numeric", "output": "output"}],
+    )
 
 
 def _evaluation(

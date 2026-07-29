@@ -10,14 +10,17 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast
 
 import torch
 
-from sol_execbench.core.bench.correctness import compute_error_stats
+from sol_execbench.core.bench.input_generation import gen_inputs
+from sol_execbench.core.bench.output_checks import compare_output_checks
 from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
-from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload import NumericCheck, Workload
+from sol_execbench.core.data.workload_validation import (
+    validate_problem_contract,
+)
 from sol_execbench.core.dataset.aka_contract import (
     AKAArtifactRole,
     AKACorpusRole,
@@ -27,6 +30,10 @@ from sol_execbench.core.dataset.aka_corpus import AKACorpusEntry
 from sol_execbench.core.dataset.aka_task import function_arg_names
 
 Oracle = Callable[[Mapping[str, object]], object]
+
+
+class _MoEModel(Protocol):
+    correction_bias: torch.Tensor
 
 
 class CrosscheckStatus(StrEnum):
@@ -61,6 +68,7 @@ def load_problem(problem_dir: Path) -> tuple[Definition, tuple[Workload, ...]]:
         .splitlines()
         if line.strip()
     )
+    validate_problem_contract(definition, list(workloads))
     return definition, workloads
 
 
@@ -70,24 +78,17 @@ def materialize_inputs(
     *,
     seed: int,
     device: torch.device,
+    custom_inputs_fn: Callable[..., object] | None = None,
 ) -> tuple[list[object], dict[str, object]]:
     """Create deterministic inputs matching a Definition/Workload contract."""
-    shapes = definition.get_input_shapes(workload.axes)
-    torch.manual_seed(seed)
-    ordered: list[object] = []
-    named: dict[str, object] = {}
-    for name, spec in definition.inputs.items():
-        meta = workload.inputs[name]
-        shape = shapes[name]
-        if shape is None:
-            value = getattr(meta, "value", 0.0)
-        else:
-            dtype = dtype_str_to_torch_dtype(spec.dtype)
-            value = torch.randn(shape, dtype=torch.float32, device=device).to(
-                dtype,
-            )
-        ordered.append(value)
-        named[name] = value
+    ordered = gen_inputs(
+        definition,
+        workload,
+        str(device),
+        custom_inputs_fn=custom_inputs_fn,
+        seed=seed,
+    )
+    named = dict(zip(definition.inputs, ordered, strict=True))
     return ordered, named
 
 
@@ -102,6 +103,28 @@ def execute_reference(reference_source: str) -> Callable[..., object]:
     if not callable(run):
         raise ValueError("authored reference does not define callable run")
     return run
+
+
+def execute_reference_entrypoints(
+    definition: Definition,
+) -> tuple[Callable[..., object], Callable[..., object] | None]:
+    """Compile trusted authored reference and custom-input entrypoints."""
+    namespace: dict[str, object] = {"torch": torch}
+    exec(  # noqa: S102 -- committed first-party benchmark source
+        compile(definition.reference, "<aka-authored-reference>", "exec"),
+        namespace,
+    )
+    run = namespace.get("run")
+    if not callable(run):
+        raise ValueError("authored reference does not define callable run")
+    custom = (
+        namespace.get(definition.custom_inputs_entrypoint)
+        if definition.custom_inputs_entrypoint
+        else None
+    )
+    if definition.custom_inputs_entrypoint and not callable(custom):
+        raise ValueError("authored custom input entrypoint is not callable")
+    return run, cast(Callable[..., object] | None, custom)
 
 
 def normalize_outputs(
@@ -121,7 +144,12 @@ def normalize_outputs(
             output,
             expected_shape=shapes[name],
             expected_dtype=dtype,
-            allow_negative_inf=workload.tolerance.allow_negative_inf,
+            allow_negative_inf=any(
+                isinstance(check, NumericCheck)
+                and check.output == name
+                and check.allow_negative_inf
+                for check in workload.checks
+            ),
             label=f"{source}.{name}",
         )
     return outputs
@@ -193,6 +221,14 @@ def load_aka_oracle(entry: AKACorpusEntry, aka_root: Path) -> Oracle | None:
     )
     if entry.suite is AKASuite.TORCH2HIP:
         return _load_torch2hip_oracle(entry, source)
+    if entry.problem_name in {
+        "fused_add_rmsnorm_bf16",
+        "per_token_i8_quant",
+        "rope_thd_fwd_bf16",
+        "dynamic_mxfp8_quant",
+        "moe_topk_softmax",
+    }:
+        return _load_torch2flydsl_model_oracle(entry, source)
     if entry.problem_name == "rmsnorm_bwd":
         return _load_rmsnorm_backward_oracle(source)
     if entry.problem_name == "silu_and_mul_bf16":
@@ -220,7 +256,10 @@ def _load_torch2hip_oracle(entry: AKACorpusEntry, source: Path) -> Oracle:
     text = source.read_text(encoding="utf-8")
     namespace: dict[str, object] = {"torch": torch}
     exec(compile(text, str(source), "exec"), namespace)  # noqa: S102
-    module_fn = namespace.get("module_fn")
+    function_name = (
+        "kd_loss_fn" if entry.problem_name == "14007_kd_loss" else "module_fn"
+    )
+    module_fn = namespace.get(function_name)
     if not callable(module_fn):
         raise ValueError(f"AKA semantic reference has no module_fn: {source}")
     callable_module = cast(Callable[..., object], module_fn)
@@ -238,6 +277,72 @@ def _load_torch2hip_oracle(entry: AKACorpusEntry, source: Path) -> Oracle:
         return callable_module(*(named[name] for name in arg_names))
 
     return direct
+
+
+def _load_torch2flydsl_model_oracle(
+    entry: AKACorpusEntry,
+    source: Path,
+) -> Oracle:
+    namespace: dict[str, object] = {"torch": torch}
+    exec(  # noqa: S102 -- committed first-party benchmark source
+        compile(source.read_text(encoding="utf-8"), str(source), "exec"),
+        namespace,
+    )
+    model_type = namespace.get("Model")
+    if not callable(model_type):
+        raise ValueError(f"AKA semantic reference has no Model: {source}")
+    if entry.problem_name == "fused_add_rmsnorm_bf16":
+        constructor = cast(
+            Callable[..., Callable[..., object]],
+            model_type,
+        )
+        return lambda values: constructor(values["eps"])(
+            values["input"],
+            values["weight"],
+            values["residual"],
+        )
+    if entry.problem_name == "per_token_i8_quant":
+        model = cast(Callable[..., object], model_type)()
+        return lambda values: cast(Callable[..., object], model)(
+            values["input"]
+        )
+    if entry.problem_name == "rope_thd_fwd_bf16":
+        model = cast(Callable[..., object], model_type)()
+        return lambda values: cast(Callable[..., object], model)(
+            values["input"],
+            values["cu_seqlens"],
+            values["freqs"],
+        )
+    if entry.problem_name == "dynamic_mxfp8_quant":
+        model = cast(Callable[..., object], model_type)(32)
+        return lambda values: cast(Callable[..., object], model)(
+            values["input"]
+        )
+    return _moe_model_oracle(cast(Callable[..., object], model_type))
+
+
+def _moe_model_oracle(model_type: Callable[..., object]) -> Oracle:
+    def oracle(values: Mapping[str, object]) -> object:
+        gating = values["gating"]
+        bias = values["bias"]
+        if not isinstance(gating, torch.Tensor) or not isinstance(
+            bias, torch.Tensor
+        ):
+            raise TypeError("MoE gating and bias inputs must be tensors")
+        use_bias = bool(torch.count_nonzero(bias).item())
+        model = model_type(
+            gating.shape[-1],
+            values["topk"],
+            values["route_scale"],
+            use_bias,
+        )
+        model = cast(torch.nn.Module, model).to(gating.device)
+        if use_bias:
+            parameter = cast(_MoEModel, model).correction_bias
+            parameter.data.copy_(bias)
+        return model(gating)
+
+    return oracle
 
 
 def _layernorm_adapter(
@@ -287,6 +392,13 @@ def _depthwise_adapter(
     return fn(x, values["weight"], values["bias"], 1, 0, x.shape[1])
 
 
+def _kd_loss_adapter(
+    fn: Callable[..., object],
+    values: Mapping[str, object],
+) -> object:
+    return fn(values["input"], values["target"], values["temperature"])
+
+
 _TORCH2HIP_ADAPTERS: dict[
     str,
     Callable[[Callable[..., object], Mapping[str, object]], object],
@@ -296,6 +408,7 @@ _TORCH2HIP_ADAPTERS: dict[
     "l1n42_maxpool2d": _maxpool_adapter,
     "l1n63_conv2d": _conv_adapter,
     "l1n82_conv_depthwise": _depthwise_adapter,
+    "14007_kd_loss": _kd_loss_adapter,
 }
 
 
@@ -413,7 +526,7 @@ def _check_executable_problem(
     device: torch.device,
     seed: int,
 ) -> AKAEquivalenceReport:
-    authored = execute_reference(definition.reference)
+    authored, custom_inputs_fn = execute_reference_entrypoints(definition)
     oracle = load_aka_oracle(entry, aka_root)
     output_count = 0
     for index, workload in enumerate(workloads):
@@ -422,6 +535,7 @@ def _check_executable_problem(
             workload,
             seed=seed + index,
             device=device,
+            custom_inputs_fn=custom_inputs_fn,
         )
         authored_outputs = normalize_outputs(
             authored(*ordered),
@@ -437,7 +551,13 @@ def _check_executable_problem(
                 workload,
                 source="AKA",
             )
-            _compare_outputs(authored_outputs, oracle_outputs, workload)
+            _compare_outputs(
+                definition,
+                ordered,
+                authored_outputs,
+                oracle_outputs,
+                workload,
+            )
     crosscheck = (
         CrosscheckStatus.PASSED
         if oracle is not None
@@ -454,24 +574,26 @@ def _check_executable_problem(
 
 
 def _compare_outputs(
+    definition: Definition,
+    inputs: Sequence[object],
     authored: Sequence[torch.Tensor],
     oracle: Sequence[torch.Tensor],
     workload: Workload,
 ) -> None:
-    for index, (actual, expected) in enumerate(
-        zip(authored, oracle, strict=True),
-    ):
-        stats, exceeds = compute_error_stats(
-            actual,
-            expected,
-            workload.tolerance,
+    stats, exceeds = compare_output_checks(
+        definition,
+        workload,
+        inputs,
+        oracle,
+        authored,
+        0,
+    )
+    if exceeds:
+        raise ValueError(
+            "authored outputs diverge from AKA oracle: "
+            f"max_abs={stats.max_absolute_error:.3e}, "
+            f"max_rel={stats.max_relative_error:.3e}",
         )
-        if exceeds:
-            raise ValueError(
-                f"output {index} diverges from AKA oracle: "
-                f"max_abs={stats.max_absolute_error:.3e}, "
-                f"max_rel={stats.max_relative_error:.3e}",
-            )
 
 
 __all__ = [
@@ -479,6 +601,7 @@ __all__ = [
     "CrosscheckStatus",
     "check_problem_equivalence",
     "execute_reference",
+    "execute_reference_entrypoints",
     "load_aka_oracle",
     "load_problem",
     "materialize_inputs",

@@ -62,11 +62,13 @@ _WORKLOAD_DICTS = [
     {
         "axes": {},
         "inputs": {"x": {"type": "random"}, "y": {"type": "random"}},
+        "checks": [{"type": "numeric", "output": "z"}],
         "uuid": "wkl-0001",
     },
     {
         "axes": {},
         "inputs": {"x": {"type": "random"}, "y": {"type": "random"}},
+        "checks": [{"type": "numeric", "output": "z"}],
         "uuid": "wkl-0002",
     },
 ]

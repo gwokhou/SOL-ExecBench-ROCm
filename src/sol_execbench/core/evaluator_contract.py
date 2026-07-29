@@ -16,8 +16,8 @@ from sol_execbench.core.integrity.schema_versions import (
 )
 
 SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION = EVALUATOR_CONTRACT_SCHEMA_VERSION
-SOL_EXECBENCH_CONTRACT_VERSION = "3.0"
-SOL_EXECBENCH_RELEASE = "v3.0.0"
+SOL_EXECBENCH_CONTRACT_VERSION = "4.0"
+SOL_EXECBENCH_RELEASE = "unreleased-v4"
 
 
 class EvaluatorContract(BaseModelWithDocstrings):
@@ -25,11 +25,11 @@ class EvaluatorContract(BaseModelWithDocstrings):
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
 
-    schema_version: Literal["sol_execbench.evaluator_contract.v4"] = (
+    schema_version: Literal["sol_execbench.evaluator_contract.v5"] = (
         SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION
     )
-    contract_version: Literal["3.0"] = SOL_EXECBENCH_CONTRACT_VERSION
-    release: Literal["v3.0.0"] = SOL_EXECBENCH_RELEASE
+    contract_version: Literal["4.0"] = SOL_EXECBENCH_CONTRACT_VERSION
+    release: Literal["unreleased-v4"] = SOL_EXECBENCH_RELEASE
     capabilities: dict[str, str] = Field(default_factory=dict)
     evaluation_statuses: list[str]
     corpus: dict[str, Any]
@@ -61,6 +61,8 @@ def _capabilities() -> dict[str, str]:
         "evaluation.reference_preparation": "trusted_reference_worker",
         "evaluation.candidate_execution": "untrusted_candidate_worker",
         "evaluation.relative_metrics": "sol_execbench_outer_runtime",
+        "evaluation.input_generation": "typed_generated_or_trusted_partial_custom",
+        "evaluation.output_checks": "closed_typed_check_registry",
         "evaluation.static_review": "deterministic_ast_rules_not_paper_llm_judge",
         "evidence.canonical_execution": "trace_jsonl",
         "evidence.evaluation_sidecars": "diagnostic_non_authoritative",
@@ -85,8 +87,8 @@ def _corpus_contract() -> dict[str, Any]:
         "source": "AMD-AGI/AgentKernelArena",
         "execution_targets": ["gfx942", "gfx1150", "gfx1200"],
         "formal_target": "gfx1200",
-        "scored_problems": 35,
-        "scored_workloads": 122,
+        "scored_problems": 43,
+        "scored_workloads": 163,
         "selection": "static_dtype_filter_then_trusted_live_probe",
         "local_output": "problems/local/AMD_AKA/<gfx-target>/",
     }
@@ -98,10 +100,11 @@ def _scoring_contract() -> dict[str, Any]:
         "formula": "1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))",
         "official_publication": "manifest_gated_content_addressed_release_bundle",
         "official_verifier_available": True,
+        "official_publication_available": False,
         "official_policy_source": "pinned_corpus_manifest",
         "official_producer_gate": "reviewed_orojenesis_mapper_allowlist",
         "official_release_source": "repository_release_bundle",
-        "baseline_strategy": "trusted_reference_eager_v1",
+        "baseline_strategy": "trusted_reference_eager_v2_pending",
         "incorrect_candidate": 0,
         "aggregation": "workload_mean_within_problem_then_equal_problem_mean_v1",
         "requires": [

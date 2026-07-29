@@ -37,15 +37,14 @@ from sol_execbench.core.dataset.aka_compatibility import (
 from sol_execbench.core.dataset.aka_contract import (
     AKA_MANIFEST_SCHEMA_VERSION,
     AKA_OFFICIAL_BASELINE_ID,
-    AKA_REQUIRED_RELEASE_EVIDENCE,
     AKA_TOLERANCE_CALIBRATION_FILENAME,
     AKAArtifactRole,
+    AKACapability,
     AKACorpusRole,
     AKAFusionDepth,
     AKAOfficialScoringStatus,
     AKAOperation,
     AKAPassKind,
-    AKAReleasePolicy,
     AKASourceFamily,
     AKASuite,
 )
@@ -64,7 +63,7 @@ from sol_execbench.core.dataset.aka_task import (
     read_task,
 )
 from sol_execbench.core.dataset.aka_tolerance import (
-    calibration_tolerances,
+    calibration_checks,
     dtype_default_tolerance,
     load_tolerance_calibration,
     workload_contract_sha256,
@@ -99,6 +98,8 @@ class Spec:
     role: AKACorpusRole = AKACorpusRole.SCORED
     exclusion_reason_code: str = ""
     description: str = ""
+    custom_inputs_entrypoint: str | None = None
+    capabilities: tuple[AKACapability, ...] = ()
 
 
 def _ax_var(desc: str) -> dict[str, Any]:
@@ -2659,7 +2660,7 @@ SPECS: list[Spec] = [
             },
         },
         reference=(
-            "import math\nimport torch\nimport torch.nn.functional as F\n\n"
+            "import math\n\nimport torch\nimport torch.nn.functional as F\n\n"
             "def _new_gelu(z):\n"
             "    return 0.5 * z * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (z + 0.044715 * torch.pow(z, 3.0))))\n\n"
             "def run(x, ln1_w, ln1_b, attn_c_attn_w, attn_c_attn_b, attn_c_proj_w, attn_c_proj_b, attn_bias, n_head, ln2_w, ln2_b, mlp_cfc_w, mlp_cfc_b, mlp_cproj_w, mlp_cproj_b, n_embd):\n"
@@ -2773,6 +2774,547 @@ SPECS: list[Spec] = [
 ]
 
 
+def _generated(generator: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "generated", "generator": generator}
+
+
+def _normal(mean: float = 0.0, std: float = 1.0) -> dict[str, Any]:
+    return _generated({"type": "normal", "mean": mean, "std": std})
+
+
+def _constant(value: float | bool) -> dict[str, Any]:
+    return _generated({"type": "constant", "value": value})
+
+
+def _numeric_normalized(output: str, threshold: float) -> dict[str, Any]:
+    return {
+        "type": "numeric",
+        "output": output,
+        "mode": "normalized_max",
+        "max_atol": 0.0,
+        "max_rtol": threshold,
+        "required_matched_ratio": 1.0,
+        "max_error_cap": None,
+        "allow_negative_inf": False,
+    }
+
+
+_CROSS_ENTROPY_SHAPES = [
+    (8192, 1024),
+    (16384, 2048),
+    (32768, 4096),
+    (16384, 8192),
+    (8192, 16384),
+]
+_BATCH_NORM_SHAPES = [
+    (16, 64, 64),
+    (32, 64, 64),
+    (64, 64, 64),
+    (32, 128, 128),
+    (64, 128, 128),
+]
+_KD_LOSS_SHAPES = [
+    (8, 10, 32, 32),
+    (16, 10, 32, 32),
+    (8, 10, 64, 64),
+    (16, 10, 64, 64),
+]
+_RMS_SHAPES = [
+    (1, 4096),
+    (8, 4096),
+    (32, 8192),
+    (128, 4096),
+    (256, 8192),
+    (64, 16384),
+]
+_I8_SHAPES = [(1, 4096), (16, 8192), (128, 4096), (256, 8192), (1024, 8192)]
+_MXFP8_SHAPES = [
+    (1, 32),
+    (8, 64),
+    (16, 128),
+    (32, 256),
+    (64, 512),
+    (128, 1024),
+    (137, 64),
+    (256, 32),
+]
+
+
+SPECS.extend(
+    [
+        Spec(
+            name="l1n95_cross_entropy",
+            suite=AKASuite.TORCH2HIP,
+            task_path="tasks/torch2hip/kernelbench/level1/l1n95_CrossEntropyLoss",
+            op_type=AKAOperation.LOSS,
+            dtype=DType.FLOAT32,
+            pass_kind=AKAPassKind.FORWARD,
+            fusion_depth=AKAFusionDepth.SINGLE,
+            source_family=AKASourceFamily.KERNELBENCH,
+            axes={"B": _ax_var("Batch size."), "C": _ax_var("Class count.")},
+            inputs={
+                "predictions": {"shape": ["B", "C"], "dtype": "float32"},
+                "targets": {"shape": ["B"], "dtype": "int64"},
+            },
+            outputs={"loss": {"shape": [], "dtype": "float32"}},
+            reference=(
+                "import torch.nn.functional as F\n\n"
+                "def run(predictions, targets):\n"
+                "    return F.cross_entropy(predictions, targets)\n"
+            ),
+            workloads=[
+                _wl(
+                    {"B": batch, "C": classes},
+                    {
+                        "predictions": _generated(
+                            {"type": "uniform", "low": 0.0, "high": 1.0},
+                        ),
+                        "targets": _generated(
+                            {"type": "integer", "low": 0, "high": "C"},
+                        ),
+                    },
+                )
+                for batch, classes in _CROSS_ENTROPY_SHAPES
+            ],
+            capabilities=(
+                AKACapability.BOUNDED_INTEGER_INPUT,
+                AKACapability.SCALAR_TENSOR_OUTPUT,
+            ),
+            description="Cross entropy with class-bounded integer labels.",
+        ),
+        Spec(
+            name="l2n52_conv_activation_batchnorm",
+            suite=AKASuite.TORCH2HIP,
+            task_path=(
+                "tasks/torch2hip/kernelbench/level2/"
+                "l2n52_Conv2d_Activation_BatchNorm"
+            ),
+            op_type=AKAOperation.CONV,
+            dtype=DType.FLOAT32,
+            pass_kind=AKAPassKind.FORWARD,
+            fusion_depth=AKAFusionDepth.FUSED,
+            source_family=AKASourceFamily.KERNELBENCH,
+            axes={
+                "B": _ax_var("Batch size."),
+                "H": _ax_var("Input height."),
+                "W": _ax_var("Input width."),
+                "IC": _ax_const(64),
+                "OC": _ax_const(128),
+                "K": _ax_const(3),
+                "OH": _ax_expr("H - K + 1"),
+                "OW": _ax_expr("W - K + 1"),
+            },
+            inputs={
+                "x": {"shape": ["B", "IC", "H", "W"], "dtype": "float32"},
+                "conv_weight": {
+                    "shape": ["OC", "IC", "K", "K"],
+                    "dtype": "float32",
+                },
+                "conv_bias": {"shape": ["OC"], "dtype": "float32"},
+                "bn_weight": {"shape": ["OC"], "dtype": "float32"},
+                "bn_bias": {"shape": ["OC"], "dtype": "float32"},
+                "bn_mean": {"shape": ["OC"], "dtype": "float32"},
+                "bn_var": {"shape": ["OC"], "dtype": "float32"},
+                "bn_eps": {"shape": None, "dtype": "float32"},
+            },
+            outputs={
+                "output": {"shape": ["B", "OC", "OH", "OW"], "dtype": "float32"}
+            },
+            reference=(
+                "import torch\n"
+                "import torch.nn.functional as F\n\n"
+                "def run(x, conv_weight, conv_bias, bn_weight, bn_bias, "
+                "bn_mean, bn_var, bn_eps):\n"
+                "    value = F.conv2d(x, conv_weight, conv_bias)\n"
+                "    value = torch.multiply(torch.tanh(F.softplus(value)), value)\n"
+                "    return F.batch_norm(value, bn_mean, bn_var, bn_weight, "
+                "bn_bias, training=False, eps=bn_eps)\n"
+            ),
+            workloads=[
+                _wl(
+                    {"B": batch, "H": height, "W": width},
+                    {
+                        "x": _generated(
+                            {"type": "uniform", "low": 0.0, "high": 1.0},
+                        ),
+                        "conv_weight": "random",
+                        "conv_bias": "random",
+                        "bn_weight": _constant(1.0),
+                        "bn_bias": _constant(0.0),
+                        "bn_mean": _constant(0.0),
+                        "bn_var": _constant(1.0),
+                        "bn_eps": {"scalar": 1e-5},
+                    },
+                )
+                for batch, height, width in _BATCH_NORM_SHAPES
+            ],
+            capabilities=(AKACapability.POSITIVE_INPUT,),
+            description="Conv2d, Mish activation, and eval-mode BatchNorm.",
+        ),
+        Spec(
+            name="14007_kd_loss",
+            suite=AKASuite.TORCH2HIP,
+            task_path="tasks/torch2hip/gpumode/14007_KDLoss",
+            op_type=AKAOperation.LOSS,
+            dtype=DType.FLOAT32,
+            pass_kind=AKAPassKind.FORWARD,
+            fusion_depth=AKAFusionDepth.FUSED,
+            source_family=AKASourceFamily.GPUMODE,
+            axes={
+                "N": _ax_var("Batch size."),
+                "C": _ax_var("Channel count."),
+                "H": _ax_var("Height."),
+                "W": _ax_var("Width."),
+            },
+            inputs={
+                "input": {"shape": ["N", "C", "H", "W"], "dtype": "float32"},
+                "target": {"shape": ["N", "C", "H", "W"], "dtype": "float32"},
+                "temperature": {"shape": None, "dtype": "float32"},
+            },
+            outputs={"loss": {"shape": [], "dtype": "float32"}},
+            reference=(
+                "import torch.nn.functional as F\n\n"
+                "def run(input, target, temperature):\n"
+                "    log_p = F.log_softmax(input / temperature, dim=1)\n"
+                "    return F.kl_div(log_p, target, reduction='sum') * "
+                "(temperature * temperature) / input.size(0)\n"
+            ),
+            workloads=[
+                _wl(
+                    {"N": n, "C": c, "H": h, "W": w},
+                    {
+                        "input": _normal(),
+                        "target": _generated(
+                            {"type": "simplex", "axis": 1, "temperature": 1.0},
+                        ),
+                        "temperature": {"scalar": 4.0},
+                    },
+                )
+                for n, c, h, w in _KD_LOSS_SHAPES
+            ],
+            capabilities=(
+                AKACapability.SIMPLEX_INPUT,
+                AKACapability.SCALAR_TENSOR_OUTPUT,
+            ),
+            description="Knowledge-distillation KL loss with probability targets.",
+        ),
+        Spec(
+            name="fused_add_rmsnorm_bf16",
+            suite=AKASuite.TORCH2FLYDSL,
+            task_path="tasks/torch2flydsl/fused_add_rmsnorm_kernel",
+            op_type=AKAOperation.NORM,
+            dtype=DType.BFLOAT16,
+            pass_kind=AKAPassKind.FORWARD,
+            fusion_depth=AKAFusionDepth.FUSED,
+            source_family=AKASourceFamily.FLYDSL,
+            axes={"M": _ax_var("Rows."), "N": _ax_var("Hidden size.")},
+            inputs={
+                "input": {"shape": ["M", "N"], "dtype": "bfloat16"},
+                "weight": {"shape": ["N"], "dtype": "bfloat16"},
+                "residual": {"shape": ["M", "N"], "dtype": "bfloat16"},
+                "eps": {"shape": None, "dtype": "float32"},
+            },
+            outputs={
+                "output": {"shape": ["M", "N"], "dtype": "bfloat16"},
+                "residual_out": {"shape": ["M", "N"], "dtype": "bfloat16"},
+            },
+            reference=(
+                "import torch\n\n"
+                "def run(input, weight, residual, eps):\n"
+                "    residual_out = input + residual\n"
+                "    value = residual_out.float()\n"
+                "    rstd = torch.rsqrt(value.pow(2).mean(-1, keepdim=True) + eps)\n"
+                "    output = value * rstd * weight.float()\n"
+                "    return output.to(input.dtype), residual_out.to(input.dtype)\n"
+            ),
+            workloads=[
+                {
+                    **_wl(
+                        {"M": m, "N": n},
+                        {
+                            "input": _normal(),
+                            "weight": _normal(),
+                            "residual": _normal(),
+                            "eps": {"scalar": 1e-5},
+                        },
+                    ),
+                    "checks": [
+                        _numeric_normalized("output", 1e-2),
+                        _numeric_normalized("residual_out", 1e-2),
+                    ],
+                }
+                for m, n in _RMS_SHAPES
+            ],
+            capabilities=(AKACapability.MULTI_OUTPUT,),
+            description="BF16 fused residual add and RMSNorm with two outputs.",
+        ),
+        Spec(
+            name="per_token_i8_quant",
+            suite=AKASuite.TORCH2FLYDSL,
+            task_path="tasks/torch2flydsl/per_token_i8_quant_kernel",
+            op_type=AKAOperation.QUANTIZATION,
+            dtype=DType.BFLOAT16,
+            pass_kind=AKAPassKind.FORWARD,
+            fusion_depth=AKAFusionDepth.FUSED,
+            source_family=AKASourceFamily.FLYDSL,
+            axes={"M": _ax_var("Rows."), "N": _ax_var("Hidden size.")},
+            inputs={"input": {"shape": ["M", "N"], "dtype": "bfloat16"}},
+            outputs={
+                "codes": {"shape": ["M", "N"], "dtype": "int8"},
+                "scale": {"shape": ["M", "1"], "dtype": "float32"},
+            },
+            reference=(
+                "import torch\n\n"
+                "def run(input):\n"
+                "    value = input.float()\n"
+                "    scale = value.abs().amax(dim=-1, keepdim=True) / 127.0\n"
+                "    scale = torch.where(scale == 0, torch.ones_like(scale), scale)\n"
+                "    codes = torch.clamp(value / scale, -128.0, 127.0).to(torch.int8)\n"
+                "    return codes, scale.float()\n"
+            ),
+            workloads=[
+                {
+                    **_wl({"M": m, "N": n}, {"input": _normal()}),
+                    "checks": [
+                        {
+                            "type": "code_distance",
+                            "output": "codes",
+                            "mode": "value",
+                            "max_distance": 1,
+                            "required_matched_ratio": 1.0,
+                        },
+                        _numeric_normalized("scale", 1e-3),
+                    ],
+                }
+                for m, n in _I8_SHAPES
+            ],
+            capabilities=(
+                AKACapability.CODE_DISTANCE,
+                AKACapability.MIXED_OUTPUT_DTYPE,
+                AKACapability.MULTI_OUTPUT,
+            ),
+            description="Dynamic per-token INT8 quantization with FP32 scale.",
+        ),
+        Spec(
+            name="rope_thd_fwd_bf16",
+            suite=AKASuite.TORCH2FLYDSL,
+            task_path="tasks/torch2flydsl/rope_thd_fwd_kernel",
+            op_type=AKAOperation.POSITION_ENCODING,
+            dtype=DType.BFLOAT16,
+            pass_kind=AKAPassKind.FORWARD,
+            fusion_depth=AKAFusionDepth.SINGLE,
+            source_family=AKASourceFamily.FLYDSL,
+            axes={
+                "T": _ax_var("Packed token count."),
+                "H": _ax_var("Head count."),
+                "D": _ax_var("Head dimension."),
+                "S1": _ax_var("Number of sequence offsets."),
+                "HALF": _ax_expr("D // 2"),
+                "ONE": _ax_const(1),
+            },
+            inputs={
+                "input": {"shape": ["T", "H", "D"], "dtype": "bfloat16"},
+                "cu_seqlens": {"shape": ["S1"], "dtype": "int32"},
+                "freqs": {
+                    "shape": ["T", "ONE", "ONE", "HALF"],
+                    "dtype": "bfloat16",
+                },
+            },
+            outputs={"output": {"shape": ["T", "H", "D"], "dtype": "bfloat16"}},
+            reference=(
+                "import torch\n\n"
+                "def gen_structured_inputs(values, device):\n"
+                "    cases = {(1024, 6): [0, 100, 228, 484, 712, 1024], "
+                "(1024, 5): [0, 233, 456, 711, 1024], "
+                "(1024, 9): [0, 100, 102, 128, 233, 456, 460, 711, 1024], "
+                "(2048, 4): [0, 512, 1024, 2048]}\n"
+                "    cu = torch.tensor(cases[(values['T'], values['S1'])], "
+                "dtype=torch.int32, device=device)\n"
+                "    half = values['D'] // 2\n"
+                "    inv = 1.0 / (10000 ** "
+                "(torch.arange(half, device=device).float() / half))\n"
+                "    pos = torch.arange(values['T'], device=device).float()\n"
+                "    freqs = torch.einsum('i,j->ij', pos, inv).view("
+                "values['T'], 1, 1, half).to(torch.bfloat16)\n"
+                "    return {'cu_seqlens': cu, 'freqs': freqs}\n\n"
+                "def run(input, cu_seqlens, freqs):\n"
+                "    lengths = (cu_seqlens[1:] - cu_seqlens[:-1]).tolist()\n"
+                "    outputs = []\n"
+                "    for value in torch.split(input, lengths):\n"
+                "        x = value.float().unsqueeze(1)\n"
+                "        angles = freqs[:value.shape[0]].float().repeat(1, 1, 1, 2)\n"
+                "        first, second = x.chunk(2, dim=-1)\n"
+                "        rotated = torch.cat((-second, first), dim=-1)\n"
+                "        outputs.append((x * angles.cos() + rotated * angles.sin()).squeeze(1))\n"
+                "    return torch.cat(outputs).to(input.dtype)\n"
+            ),
+            workloads=[
+                _wl(
+                    {"T": t, "H": h, "D": d, "S1": s1},
+                    {
+                        "input": _normal(),
+                        "cu_seqlens": {"type": "custom"},
+                        "freqs": {"type": "custom"},
+                    },
+                )
+                for t, h, d, s1 in [
+                    (1024, 8, 128, 6),
+                    (1024, 16, 128, 5),
+                    (1024, 8, 64, 9),
+                    (2048, 32, 128, 4),
+                ]
+            ],
+            custom_inputs_entrypoint="gen_structured_inputs",
+            capabilities=(
+                AKACapability.PARTIAL_CUSTOM_INPUT,
+                AKACapability.STRUCTURED_OFFSETS,
+            ),
+            description="Variable-length packed BF16 RoPE with int32 prefix offsets.",
+        ),
+        Spec(
+            name="dynamic_mxfp8_quant",
+            suite=AKASuite.TORCH2FLYDSL,
+            task_path="tasks/torch2flydsl/dynamic_mxfp8_quant_kernel",
+            op_type=AKAOperation.QUANTIZATION,
+            dtype=DType.BFLOAT16,
+            pass_kind=AKAPassKind.FORWARD,
+            fusion_depth=AKAFusionDepth.FUSED,
+            source_family=AKASourceFamily.FLYDSL,
+            axes={
+                "M": _ax_var("Rows."),
+                "K": _ax_var("Columns."),
+                "G": _ax_expr("K // 32"),
+            },
+            inputs={"input": {"shape": ["M", "K"], "dtype": "bfloat16"}},
+            outputs={
+                "codes": {"shape": ["M", "K"], "dtype": "float8_e4m3fn"},
+                "scale": {"shape": ["M", "G"], "dtype": "uint8"},
+            },
+            reference=(
+                "import torch\n\n"
+                "def run(input):\n"
+                "    value = input.float()\n"
+                "    m, k = value.shape\n"
+                "    blocks = value.reshape(m, k // 32, 32)\n"
+                "    amax = blocks.abs().amax(dim=-1, keepdim=True)\n"
+                "    bits = (amax.contiguous().view(torch.int32) + 0x200000) & -8388608\n"
+                "    power = bits.view(torch.float32)\n"
+                "    exponent = torch.clamp(power.log2().floor() - 8, -127, 127)\n"
+                "    scale = (exponent.to(torch.int32) + 127).to(torch.uint8)\n"
+                "    codes = (blocks * torch.exp2(-exponent)).reshape(m, k)\n"
+                "    return codes.to(torch.float8_e4m3fn), scale.reshape(m, k // 32)\n"
+            ),
+            workloads=[
+                {
+                    **_wl({"M": m, "K": k}, {"input": _normal(std=4.0)}),
+                    "checks": [
+                        {
+                            "type": "code_distance",
+                            "output": "codes",
+                            "mode": "raw_bits",
+                            "max_distance": 1,
+                            "required_matched_ratio": 1.0,
+                        },
+                        {"type": "exact", "output": "scale"},
+                    ],
+                }
+                for m, k in _MXFP8_SHAPES
+            ],
+            capabilities=(
+                AKACapability.CODE_DISTANCE,
+                AKACapability.FP8_OUTPUT,
+                AKACapability.MIXED_OUTPUT_DTYPE,
+                AKACapability.MULTI_OUTPUT,
+                AKACapability.RAW_CODE_DISTANCE,
+                AKACapability.UINT8_OUTPUT,
+            ),
+            description="Per-1x32 MXFP8 quantization with E8M0 byte scales.",
+        ),
+        Spec(
+            name="moe_topk_softmax",
+            suite=AKASuite.TORCH2FLYDSL,
+            task_path="tasks/torch2flydsl/moe_topk_softmax_kernel",
+            op_type=AKAOperation.ROUTING,
+            dtype=DType.BFLOAT16,
+            pass_kind=AKAPassKind.FORWARD,
+            fusion_depth=AKAFusionDepth.FUSED,
+            source_family=AKASourceFamily.FLYDSL,
+            axes={
+                "T": _ax_var("Token count."),
+                "E": _ax_var("Expert count."),
+                "K": _ax_var("Selected experts."),
+            },
+            inputs={
+                "gating": {"shape": ["T", "E"], "dtype": "bfloat16"},
+                "bias": {"shape": ["E"], "dtype": "float32"},
+                "topk": {"shape": None, "dtype": "int32"},
+                "route_scale": {"shape": None, "dtype": "float32"},
+            },
+            outputs={
+                "weights": {"shape": ["T", "K"], "dtype": "float32"},
+                "ids": {"shape": ["T", "K"], "dtype": "int32"},
+            },
+            reference=(
+                "import torch\n\n"
+                "def gen_gating(values, device):\n"
+                "    experts, tokens = values['E'], values['T']\n"
+                "    base = torch.arange(-1, 1, 2.0 / experts, device=device)[:experts]\n"
+                "    gating = base.repeat(tokens, 1).to(torch.bfloat16)\n"
+                "    perm = torch.argsort(torch.rand(gating.shape, device=device), dim=-1)\n"
+                "    return {'gating': torch.gather(gating, -1, perm).contiguous()}\n\n"
+                "def run(gating, bias, topk, route_scale):\n"
+                "    scores = torch.softmax(gating.float(), dim=-1)\n"
+                "    ids = (scores + bias.float()).topk(topk, dim=-1, sorted=False).indices\n"
+                "    weights = scores.gather(1, ids) * route_scale\n"
+                "    return weights.float(), ids.to(torch.int32)\n"
+            ),
+            workloads=[
+                {
+                    **_wl(
+                        {"T": t, "E": e, "K": k},
+                        {
+                            "gating": {"type": "custom"},
+                            "bias": _normal(std=0.1)
+                            if use_bias
+                            else _constant(0.0),
+                            "topk": {"scalar": k},
+                            "route_scale": {"scalar": 1.0},
+                        },
+                    ),
+                    "checks": [
+                        {
+                            "type": "topk_routing",
+                            "ids_output": "ids",
+                            "weights_output": "weights",
+                            "gating_input": "gating",
+                            "bias_input": "bias",
+                            "topk": k,
+                            "tie_atol": 1e-4,
+                            "weight_atol": 1e-2,
+                            "max_mismatch_ratio": 0.05 if use_bias else 0.0,
+                        },
+                    ],
+                }
+                for t, e, k, use_bias in [
+                    (64, 256, 8, True),
+                    (1024, 256, 8, True),
+                    (256, 128, 4, True),
+                    (64, 64, 2, False),
+                ]
+            ],
+            custom_inputs_entrypoint="gen_gating",
+            capabilities=(
+                AKACapability.COUPLED_TOPK,
+                AKACapability.MIXED_OUTPUT_DTYPE,
+                AKACapability.MULTI_OUTPUT,
+                AKACapability.PARTIAL_CUSTOM_INPUT,
+            ),
+            description="Tie-aware softmax MoE top-k routing with IDs and weights.",
+        ),
+    ],
+)
+
+
 def _artifact_record(
     task_root: Path,
     role: AKAArtifactRole,
@@ -2815,45 +3357,65 @@ def _aka_artifacts(aka_root: Path, spec: Spec) -> list[dict[str, str]]:
     ]
 
 
-def _write_problem(
+def _workload_checks(
+    spec: Spec,
+    workload: dict[str, Any],
+    uuid: str,
+    calibrated: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if calibrated is None or spec.role is AKACorpusRole.TARGET_INCOMPATIBLE:
+        checks = [dict(check) for check in workload.get("checks", [])]
+    else:
+        try:
+            checks = [
+                check.model_dump(mode="json") for check in calibrated[uuid]
+            ]
+        except KeyError as exc:
+            raise ValueError(f"missing calibrated checks for {uuid}") from exc
+    if checks:
+        return checks
+    return [
+        {
+            "type": "numeric",
+            "output": output,
+            **dtype_default_tolerance(output_spec["dtype"]).model_dump(
+                mode="json",
+            ),
+        }
+        for output, output_spec in spec.outputs.items()
+    ]
+
+
+def _workload_records(
     spec: Spec,
     calibrated: dict[str, Any] | None,
-    *,
-    problems_root: Path = PROBLEMS_ROOT,
-) -> dict[str, str]:
-    problem_dir = problems_root / spec.suite / spec.name
-    problem_dir.mkdir(parents=True, exist_ok=True)
-    workload_records = []
-    for idx, wl in enumerate(spec.workloads):
-        uuid = f"aka-{spec.name}-w{idx}"
-        if calibrated is None or spec.role is AKACorpusRole.TARGET_INCOMPATIBLE:
-            tolerance = dtype_default_tolerance(spec.dtype)
-        else:
-            try:
-                tolerance = calibrated[uuid]
-            except KeyError as exc:
-                raise ValueError(
-                    f"missing calibrated tolerance for {uuid}",
-                ) from exc
-        inputs_payload: dict[str, Any] = {}
-        for name, meta in wl["inputs"].items():
-            if isinstance(meta, dict) and "scalar" in meta:
-                inputs_payload[name] = {
-                    "type": "scalar",
-                    "value": meta["scalar"],
-                }
-            else:
-                inputs_payload[name] = {"type": "random"}
+) -> list[dict[str, Any]]:
+    records = []
+    for index, workload in enumerate(spec.workloads):
+        uuid = f"aka-{spec.name}-w{index}"
+        inputs = {
+            name: (
+                {"type": "scalar", "value": meta["scalar"]}
+                if isinstance(meta, dict) and "scalar" in meta
+                else dict(meta)
+                if isinstance(meta, dict) and "type" in meta
+                else {"type": "random"}
+            )
+            for name, meta in workload["inputs"].items()
+        }
         record = {
-            "axes": wl["axes"],
-            "inputs": inputs_payload,
-            "tolerance": tolerance.model_dump(mode="json"),
+            "axes": workload["axes"],
+            "inputs": inputs,
+            "checks": _workload_checks(spec, workload, uuid, calibrated),
             "uuid": uuid,
         }
         Workload.model_validate(record)
-        workload_records.append(record)
+        records.append(record)
+    return records
 
-    definition_payload = {
+
+def _definition_payload(spec: Spec) -> dict[str, Any]:
+    payload = {
         "name": spec.name,
         "op_type": spec.op_type,
         "description": spec.description,
@@ -2862,8 +3424,22 @@ def _write_problem(
         "outputs": spec.outputs,
         "reference": spec.reference,
     }
-    Definition.model_validate(definition_payload)
+    if spec.custom_inputs_entrypoint is not None:
+        payload["custom_inputs_entrypoint"] = spec.custom_inputs_entrypoint
+    Definition.model_validate(payload)
+    return payload
 
+
+def _write_problem(
+    spec: Spec,
+    calibrated: dict[str, Any] | None,
+    *,
+    problems_root: Path = PROBLEMS_ROOT,
+) -> dict[str, str]:
+    problem_dir = problems_root / spec.suite / spec.name
+    problem_dir.mkdir(parents=True, exist_ok=True)
+    definition_payload = _definition_payload(spec)
+    workload_records = _workload_records(spec, calibrated)
     definition_path = problem_dir / "definition.json"
     workload_path = problem_dir / "workload.jsonl"
     reference_path = problem_dir / "reference.py"
@@ -2990,14 +3566,58 @@ def _coverage_axes(specs: list[Spec]) -> dict[str, dict[str, int]]:
             out[value] = out.get(value, 0) + 1
         return dict(sorted(out.items()))
 
-    return {
+    axes = {
         "operation": _count("op_type"),
-        "dtype": _count("dtype"),
         "pass_kind": _count("pass_kind"),
         "fusion_depth": _count("fusion_depth"),
         "source_family": _count("source_family"),
         "suite": _count("suite"),
     }
+    for name, values in (
+        (
+            "input_dtype",
+            (
+                sorted({str(item["dtype"]) for item in spec.inputs.values()})
+                for spec in specs
+            ),
+        ),
+        (
+            "output_dtype",
+            (
+                sorted({str(item["dtype"]) for item in spec.outputs.values()})
+                for spec in specs
+            ),
+        ),
+        (
+            "capability",
+            (
+                [str(item) for item in _spec_capabilities(spec)]
+                for spec in specs
+            ),
+        ),
+    ):
+        counts: dict[str, int] = {}
+        for items in values:
+            for item in items:
+                counts[item] = counts.get(item, 0) + 1
+        axes[name] = dict(sorted(counts.items()))
+    return axes
+
+
+def _spec_capabilities(spec: Spec) -> tuple[AKACapability, ...]:
+    capabilities = set(spec.capabilities)
+    output_dtypes = {str(item["dtype"]) for item in spec.outputs.values()}
+    if len(spec.outputs) > 1:
+        capabilities.add(AKACapability.MULTI_OUTPUT)
+    if len(output_dtypes) > 1:
+        capabilities.add(AKACapability.MIXED_OUTPUT_DTYPE)
+    if any(item.get("shape") == [] for item in spec.outputs.values()):
+        capabilities.add(AKACapability.SCALAR_TENSOR_OUTPUT)
+    if "uint8" in output_dtypes:
+        capabilities.add(AKACapability.UINT8_OUTPUT)
+    if any(item.startswith("float8") for item in output_dtypes):
+        capabilities.add(AKACapability.FP8_OUTPUT)
+    return tuple(sorted(capabilities))
 
 
 def _manifest_entries(
@@ -3011,7 +3631,15 @@ def _manifest_entries(
             "task_path": spec.task_path,
             "problem_name": spec.name,
             "operation": str(spec.op_type),
-            "dtype": str(spec.dtype),
+            "input_dtypes": sorted(
+                {str(item["dtype"]) for item in spec.inputs.values()},
+            ),
+            "output_dtypes": sorted(
+                {str(item["dtype"]) for item in spec.outputs.values()},
+            ),
+            "capabilities": [
+                str(capability) for capability in _spec_capabilities(spec)
+            ],
             "pass_kind": str(spec.pass_kind),
             "fusion_depth": str(spec.fusion_depth),
             "source_family": str(spec.source_family),
@@ -3029,41 +3657,41 @@ def _manifest_entries(
     return entries
 
 
-def _formal_coverage_combinations() -> list[dict[str, object]]:
-    return [
+def _base_coverage_combinations() -> list[dict[str, object]]:
+    combinations = [
         {
             "operation": str(AKAOperation.MATMUL),
-            "dtype": str(DType.FLOAT32),
+            "input_dtype": str(DType.FLOAT32),
             "pass": str(AKAPassKind.FORWARD),
             "min_count": 1,
         },
         {
             "operation": str(AKAOperation.MATMUL),
-            "dtype": str(DType.BFLOAT16),
+            "input_dtype": str(DType.BFLOAT16),
             "pass": str(AKAPassKind.FORWARD),
             "min_count": 1,
         },
         {
             "operation": str(AKAOperation.SOFTMAX),
-            "dtype": str(DType.FLOAT32),
+            "input_dtype": str(DType.FLOAT32),
             "pass": str(AKAPassKind.FORWARD),
             "min_count": 1,
         },
         {
             "operation": str(AKAOperation.NORM),
-            "dtype": str(DType.BFLOAT16),
+            "input_dtype": str(DType.BFLOAT16),
             "pass": str(AKAPassKind.FORWARD),
             "min_count": 1,
         },
         {
             "operation": str(AKAOperation.CONV),
-            "dtype": str(DType.FLOAT32),
+            "input_dtype": str(DType.FLOAT32),
             "pass": str(AKAPassKind.FORWARD),
             "min_count": 1,
         },
         {
             "operation": str(AKAOperation.ELEMENTWISE),
-            "dtype": str(DType.FLOAT16),
+            "input_dtype": str(DType.FLOAT16),
             "pass": str(AKAPassKind.FORWARD),
             "min_count": 1,
         },
@@ -3079,12 +3707,59 @@ def _formal_coverage_combinations() -> list[dict[str, object]]:
         },
         {"pass": str(AKAPassKind.BACKWARD), "min_count": 1},
         {
-            "dtype": str(DType.FLOAT8_E4M3FN),
+            "output_dtype": str(DType.FLOAT8_E4M3FN),
             "pass": str(AKAPassKind.FORWARD),
             "min_count": 1,
         },
         {"fusion_depth": str(AKAFusionDepth.FUSED), "min_count": 1},
     ]
+    return combinations
+
+
+def _formal_coverage_combinations() -> list[dict[str, object]]:
+    combinations = _base_coverage_combinations()
+    combinations.extend(
+        [
+            {
+                "capability": str(capability),
+                "role": str(AKACorpusRole.SCORED),
+                "min_problems": problems,
+                "min_workloads": workloads,
+            }
+            for capability, problems, workloads in (
+                (AKACapability.BOUNDED_INTEGER_INPUT, 1, 5),
+                (AKACapability.POSITIVE_INPUT, 1, 5),
+                (AKACapability.SIMPLEX_INPUT, 1, 4),
+                (AKACapability.SCALAR_TENSOR_OUTPUT, 2, 9),
+                (AKACapability.MULTI_OUTPUT, 4, 23),
+                (AKACapability.MIXED_OUTPUT_DTYPE, 3, 17),
+                (AKACapability.CODE_DISTANCE, 2, 13),
+                (AKACapability.PARTIAL_CUSTOM_INPUT, 2, 8),
+                (AKACapability.STRUCTURED_OFFSETS, 1, 4),
+                (AKACapability.FP8_OUTPUT, 1, 8),
+                (AKACapability.UINT8_OUTPUT, 1, 8),
+                (AKACapability.RAW_CODE_DISTANCE, 1, 8),
+                (AKACapability.COUPLED_TOPK, 1, 4),
+            )
+        ],
+    )
+    combinations.extend(
+        [
+            {
+                "operation": str(operation),
+                "role": str(AKACorpusRole.SCORED),
+                "min_problems": problems,
+                "min_workloads": workloads,
+            }
+            for operation, problems, workloads in (
+                (AKAOperation.LOSS, 2, 9),
+                (AKAOperation.QUANTIZATION, 2, 13),
+                (AKAOperation.ROUTING, 1, 4),
+                (AKAOperation.POSITION_ENCODING, 1, 4),
+            )
+        ],
+    )
+    return combinations
 
 
 def _manifest_payload(
@@ -3124,14 +3799,9 @@ def _manifest_payload(
             "sha256": sha256_file(calibration_path),
         },
         "official_scoring": {
-            "status": str(AKAOfficialScoringStatus.AVAILABLE),
-            "release_policy": str(
-                AKAReleasePolicy.CONTENT_ADDRESSED_PUBLISHER_V1,
-            ),
+            "status": str(AKAOfficialScoringStatus.UNAVAILABLE),
             "baseline_id": AKA_OFFICIAL_BASELINE_ID,
-            "required_evidence": [
-                str(evidence) for evidence in AKA_REQUIRED_RELEASE_EVIDENCE
-            ],
+            "reason_code": "baseline_v2_release_evidence_pending",
         },
         "formal_coverage_requirements": {
             "axes": _coverage_axes(specs),
@@ -3217,7 +3887,7 @@ def main() -> None:
             raise FileNotFoundError(
                 "run scripts/internal/aka_calibrate_tolerances.py first",
             )
-        calibrated = calibration_tolerances(calibration_path)
+        calibrated = calibration_checks(calibration_path)
 
     records = []
     aka_artifacts: dict[str, list[dict[str, str]]] = {}

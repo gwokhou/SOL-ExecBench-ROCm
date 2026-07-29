@@ -53,6 +53,7 @@ def _get_dtype_str_to_torch_dtype() -> dict[str, torch.dtype]:
         "int32": torch.int32,
         "int16": torch.int16,
         "int8": torch.int8,
+        "uint8": torch.uint8,
         "bool": torch.bool,
     }
 
@@ -79,6 +80,7 @@ def dtype_storage_bits(dtype_str: str) -> int:
             "int32": 32,
             "int16": 16,
             "int8": 8,
+            "uint8": 8,
             "bool": 8,
         },
     )

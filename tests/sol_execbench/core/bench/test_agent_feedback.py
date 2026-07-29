@@ -97,6 +97,7 @@ def _trace(status: EvaluationStatus = EvaluationStatus.PASSED) -> Trace:
             uuid="w0",
             axes={"n": 1},
             inputs={"n": ScalarInput(value=1)},
+            checks=[{"type": "numeric", "output": "output"}],
         ),
         evaluation=Evaluation(
             status=status,
@@ -322,7 +323,7 @@ def test_agent_feedback_freshness_validation_classifies_identity(
         trace_path=str(trace_path),
         target_id="problem-0",
         run_id="run-0",
-        sol_version="v3.0.0",
+        sol_version="unreleased-v4",
         candidate_id=None,
         source_sha256=None,
     )
@@ -360,7 +361,7 @@ def test_agent_feedback_freshness_uses_canonical_hip_identity(tmp_path: Path):
         run_id="run-0",
         candidate_id="candidate-sha",
         source_sha256="source-sha",
-        sol_version="v3.0.0",
+        sol_version="unreleased-v4",
     )
     stale = validate_agent_feedback_freshness(
         sidecar,

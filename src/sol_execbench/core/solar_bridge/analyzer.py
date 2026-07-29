@@ -9,6 +9,7 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from sol_execbench.core.data.workload import conservative_numeric_tolerance
 from sol_execbench.core.integrity import sha256_bytes
 from sol_execbench.core.solar_bridge.formal_device import (
     FORMAL_ARCHITECTURE,
@@ -158,7 +159,7 @@ def _conversion_request(
     from solar.api import ConversionRequest, VerificationPolicy
 
     definition, workload = context.definition, context.workload
-    tolerance = workload.tolerance
+    tolerance = conservative_numeric_tolerance(workload.checks)
     return ConversionRequest(
         analysis_id=f"{definition.name}:{workload.uuid}",
         reference=context.reference,

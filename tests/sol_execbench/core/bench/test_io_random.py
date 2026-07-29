@@ -50,6 +50,59 @@ def test_seeded_random_input_restores_global_rng_state() -> None:
     assert torch.equal(torch.random.get_rng_state(), state_before)
 
 
+def test_generated_integer_uses_axis_expression_bound() -> None:
+    definition = make_definition(
+        name="labels",
+        op_type="test",
+        axes={"B": {"type": "var"}, "C": {"type": "var"}},
+        inputs={"target": {"shape": ["B"], "dtype": "int64"}},
+        outputs={"output": {"shape": [], "dtype": "float32"}},
+        reference="def run(target): return target.float().sum()",
+    )
+    workload = make_workload(
+        uuid="labels",
+        axes={"B": 1024, "C": 17},
+        inputs={
+            "target": {
+                "type": "generated",
+                "generator": {"type": "integer", "low": 0, "high": "C"},
+            },
+        },
+    )
+
+    target = gen_inputs(definition, workload, "cpu", seed=42)[0]
+
+    assert target.dtype == torch.int64
+    assert int(target.min()) >= 0
+    assert int(target.max()) < 17
+
+
+def test_generated_simplex_is_normalized_on_declared_axis() -> None:
+    definition = make_definition(
+        name="probabilities",
+        op_type="test",
+        axes={"N": {"type": "var"}, "C": {"type": "var"}},
+        inputs={"target": {"shape": ["N", "C"], "dtype": "float32"}},
+        outputs={"output": {"shape": ["N"], "dtype": "float32"}},
+        reference="def run(target): return target.sum(1)",
+    )
+    workload = make_workload(
+        uuid="probabilities",
+        axes={"N": 8, "C": 11},
+        inputs={
+            "target": {
+                "type": "generated",
+                "generator": {"type": "simplex", "axis": 1},
+            },
+        },
+    )
+
+    target = gen_inputs(definition, workload, "cpu", seed=42)[0]
+
+    assert torch.allclose(target.sum(dim=1), torch.ones(8))
+    assert bool((target >= 0).all())
+
+
 class TestRandTensor:
     def test_float32(self) -> None:
         tensor = _rand_tensor([4, 8], torch.float32, torch.device("cpu"))
@@ -81,6 +134,11 @@ class TestRandTensor:
         tensor = _rand_tensor([100], torch.int8, torch.device("cpu"))
         assert tensor.min().item() >= -128
         assert tensor.max().item() < 128
+
+    def test_uint8(self) -> None:
+        tensor = _rand_tensor([100], torch.uint8, torch.device("cpu"))
+        assert tensor.dtype == torch.uint8
+        assert tensor.min().item() >= 0
 
     @pytest.mark.parametrize("dtype", [torch.int32, torch.int64])
     def test_integer_dtype(self, dtype: torch.dtype) -> None:

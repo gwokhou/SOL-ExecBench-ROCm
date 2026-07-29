@@ -37,6 +37,9 @@ from sol_execbench.core.bench.reference_protocol import (
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload_validation import (
+    validate_problem_contract,
+)
 from sol_execbench.core.dataset.aka_compatibility import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
     AKACorpusSelection,
@@ -52,6 +55,7 @@ from sol_execbench.core.dataset.aka_contract import (
     AKA_OFFICIAL_BASELINE_ID,
     AKA_REQUIRED_RELEASE_EVIDENCE,
     AKAArtifactRole,
+    AKACapability,
     AKACorpusRole,
     AKAFusionDepth,
     AKAOfficialScoringStatus,
@@ -107,7 +111,9 @@ class AKACorpusEntry:
     task_path: str
     problem_name: str
     operation: AKAOperation
-    dtype: DType
+    input_dtypes: tuple[DType, ...]
+    output_dtypes: tuple[DType, ...]
+    capabilities: tuple[AKACapability, ...]
     pass_kind: AKAPassKind
     fusion_depth: AKAFusionDepth
     source_family: AKASourceFamily
@@ -415,7 +421,16 @@ def _load_entry(data: Mapping[str, Any]) -> AKACorpusEntry:
         task_path=str(data["task_path"]),
         problem_name=str(data["problem_name"]),
         operation=AKAOperation(str(data["operation"])),
-        dtype=DType(str(data["dtype"])),
+        input_dtypes=tuple(
+            DType(str(item)) for item in (data.get("input_dtypes") or ())
+        ),
+        output_dtypes=tuple(
+            DType(str(item)) for item in (data.get("output_dtypes") or ())
+        ),
+        capabilities=tuple(
+            AKACapability(str(item))
+            for item in (data.get("capabilities") or ())
+        ),
         pass_kind=AKAPassKind(str(data["pass_kind"])),
         fusion_depth=AKAFusionDepth(str(data["fusion_depth"])),
         source_family=AKASourceFamily(str(data["source_family"])),
@@ -476,9 +491,24 @@ def _validate_entries(
     # The DType enum names OCP FP8 as "float8_e4m3fn" / "float8_e5m2", so accept
     # Accept either the "fp8" or "float8" prefix for the FP8 sentinel.
     if sentinels and not all(
-        entry.dtype.startswith(("fp8", "float8")) for entry in sentinels
+        any(
+            str(dtype).startswith(("fp8", "float8"))
+            for dtype in entry.output_dtypes
+        )
+        for entry in sentinels
     ):
         raise ValueError("compatibility sentinels must be FP8 AKA tasks")
+    for entry in entries:
+        if not entry.input_dtypes or not entry.output_dtypes:
+            raise ValueError(
+                "AKA entries require non-empty input/output dtype sets"
+            )
+        if tuple(sorted(set(entry.input_dtypes))) != entry.input_dtypes:
+            raise ValueError("AKA input dtype sets must be sorted and unique")
+        if tuple(sorted(set(entry.output_dtypes))) != entry.output_dtypes:
+            raise ValueError("AKA output dtype sets must be sorted and unique")
+        if tuple(sorted(set(entry.capabilities))) != entry.capabilities:
+            raise ValueError("AKA capability sets must be sorted and unique")
     if sum(entry.role == AKACorpusRole.SCORED for entry in entries) == 0:
         raise ValueError("AKA corpus must contain at least one scored entry")
     _validate_coverage_truth(entries, coverage)
@@ -508,7 +538,6 @@ def _validate_coverage_truth(
     axes = coverage.get("axes") or {}
     tag_keys = {
         "operation": "operation",
-        "dtype": "dtype",
         "pass_kind": "pass_kind",
         "fusion_depth": "fusion_depth",
         "source_family": "source_family",
@@ -527,16 +556,45 @@ def _validate_coverage_truth(
                 f"coverage axis {axis_name!r} does not match entries: "
                 f"declared={declared}, actual={actual}",
             )
-    for combo in coverage.get("combinations") or []:
-        min_count = int(combo.get("min_count", 0))
-        if min_count <= 0:
+    for axis_name, entry_attr in (
+        ("input_dtype", "input_dtypes"),
+        ("output_dtype", "output_dtypes"),
+        ("capability", "capabilities"),
+    ):
+        declared = axes.get(axis_name) or {}
+        if not declared:
             continue
-        matched = sum(
-            1 for entry in entries if _entry_matches_combo(entry, combo)
-        )
-        if matched < min_count:
+        actual: dict[str, int] = {}
+        for entry in entries:
+            for value in getattr(entry, entry_attr):
+                key = str(value)
+                actual[key] = actual.get(key, 0) + 1
+        if actual != {k: int(v) for k, v in declared.items()}:
             raise ValueError(
-                f"coverage combination unmet ({matched}<{min_count}): {combo}",
+                f"coverage axis {axis_name!r} does not match entries: "
+                f"declared={declared}, actual={actual}",
+            )
+    for combo in coverage.get("combinations") or []:
+        min_problems = int(
+            combo.get("min_problems", combo.get("min_count", 0)),
+        )
+        min_workloads = int(combo.get("min_workloads", 0))
+        if min_problems <= 0 and min_workloads <= 0:
+            continue
+        matched_entries = [
+            entry for entry in entries if _entry_matches_combo(entry, combo)
+        ]
+        matched_workloads = sum(
+            len(entry.workload_uuids) for entry in matched_entries
+        )
+        if (
+            len(matched_entries) < min_problems
+            or matched_workloads < min_workloads
+        ):
+            raise ValueError(
+                "coverage combination unmet "
+                f"(problems={len(matched_entries)}/{min_problems}, "
+                f"workloads={matched_workloads}/{min_workloads}): {combo}",
             )
 
 
@@ -546,18 +604,31 @@ def _entry_matches_combo(
 ) -> bool:
     mapping = {
         "operation": entry.operation,
-        "dtype": entry.dtype,
         "pass_kind": entry.pass_kind,
         "pass": entry.pass_kind,
         "fusion_depth": entry.fusion_depth,
         "source_family": entry.source_family,
         "suite": entry.suite,
+        "role": entry.role,
     }
-    return all(
-        str(mapping.get(k)) == str(v)
-        for k, v in combo.items()
-        if k != "min_count"
-    )
+    for key, value in combo.items():
+        if key in {"min_count", "min_problems", "min_workloads"}:
+            continue
+        if key == "input_dtype" and DType(str(value)) not in entry.input_dtypes:
+            return False
+        if (
+            key == "output_dtype"
+            and DType(str(value)) not in entry.output_dtypes
+        ):
+            return False
+        if (
+            key == "capability"
+            and AKACapability(str(value)) not in entry.capabilities
+        ):
+            return False
+        if key in mapping and str(mapping[key]) != str(value):
+            return False
+    return True
 
 
 def _manifest_value(value: object) -> str:
@@ -710,6 +781,7 @@ def _validate_authored_problems(
             for line in workload_path.read_text().splitlines()
             if line.strip()
         ]
+        validate_problem_contract(definition, workloads)
         payload_incompatibility = tuple(
             static_reference_storage(definition, workload).reference_case_bytes
             > MAX_REFERENCE_TENSOR_STORAGE_BYTES
@@ -766,7 +838,6 @@ def _coverage_report(
     axes: dict[str, dict[str, int]] = {}
     for axis in (
         "operation",
-        "dtype",
         "pass_kind",
         "fusion_depth",
         "source_family",
@@ -777,16 +848,43 @@ def _coverage_report(
             value = str(getattr(entry, axis))
             counts[value] = counts.get(value, 0) + 1
         axes[axis] = counts
+    for axis, attribute in (
+        ("input_dtype", "input_dtypes"),
+        ("output_dtype", "output_dtypes"),
+        ("capability", "capabilities"),
+    ):
+        counts: dict[str, int] = {}
+        for entry in selected_entries:
+            for value in getattr(entry, attribute):
+                counts[str(value)] = counts.get(str(value), 0) + 1
+        axes[axis] = counts
     gaps: list[dict[str, Any]] = []
     for combo in (
         manifest.formal_coverage_requirements.get("combinations") or []
     ):
-        minimum = int(combo.get("min_count", 0))
-        matched = sum(
-            _entry_matches_combo(entry, combo) for entry in selected_entries
+        min_problems = int(
+            combo.get("min_problems", combo.get("min_count", 0)),
         )
-        if matched < minimum:
-            gaps.append({"requirement": dict(combo), "matched": matched})
+        min_workloads = int(combo.get("min_workloads", 0))
+        matched_entries = [
+            entry
+            for entry in selected_entries
+            if _entry_matches_combo(entry, combo)
+        ]
+        matched_workloads = sum(
+            len(entry.workload_uuids) for entry in matched_entries
+        )
+        if (
+            len(matched_entries) < min_problems
+            or matched_workloads < min_workloads
+        ):
+            gaps.append(
+                {
+                    "requirement": dict(combo),
+                    "matched_problems": len(matched_entries),
+                    "matched_workloads": matched_workloads,
+                },
+            )
     return {
         "problem_count": len(selected_entries),
         "workload_count": workload_count,
@@ -933,10 +1031,13 @@ def _audit_materialized_problem(
     )
     if workload_path.read_text(encoding="utf-8") != expected_payload:
         raise ValueError(f"selected workload payload mismatch: {item['path']}")
-    Definition.model_validate_json(definition_path.read_text())
-    for line in workload_path.read_text().splitlines():
-        if line.strip():
-            Workload.model_validate_json(line)
+    definition = Definition.model_validate_json(definition_path.read_text())
+    workloads = [
+        Workload.model_validate_json(line)
+        for line in workload_path.read_text().splitlines()
+        if line.strip()
+    ]
+    validate_problem_contract(definition, workloads)
 
 
 def _audit_no_unrecorded_problem_files(

@@ -21,15 +21,21 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.data.workload import (
+    GeneratedInput,
+    NumericCheck,
     RandomInput,
     ScalarInput,
-    ToleranceSpec,
     Workload,
 )
 
 
 def _wkl(**inputs):
-    return Workload(uuid="test-uuid", axes={}, inputs=inputs)
+    return Workload(
+        uuid="test-uuid",
+        axes={},
+        inputs=inputs,
+        checks=[NumericCheck(output="output")],
+    )
 
 
 class TestGetScalarInputs:
@@ -75,20 +81,44 @@ class TestGetScalarInputs:
 
     def test_input_type_discriminator_rejects_unknown_types(self):
         with pytest.raises(ValidationError, match="union_tag_invalid"):
-            _wkl(value={"type": "generated", "value": 42})
+            _wkl(value={"type": "mystery", "value": 42})
 
-
-class TestToleranceSpec:
-    def test_rejects_unknown_tolerance_fields(self):
-        with pytest.raises(ValidationError, match="extra_forbidden"):
-            ToleranceSpec.model_validate({"unsupported_ratio": 0.98})
-
-    def test_accepts_internal_required_matched_ratio_spelling(self):
-        wkl = Workload(
-            uuid="test-uuid",
-            axes={},
-            inputs={"x": RandomInput()},
-            tolerance=ToleranceSpec(required_matched_ratio=0.97),
+    def test_generated_input_uses_a_typed_generator(self):
+        wkl = _wkl(
+            value={
+                "type": "generated",
+                "generator": {"type": "integer", "low": 0, "high": "C"},
+            },
         )
 
-        assert wkl.tolerance.required_matched_ratio == 0.97
+        assert isinstance(wkl.inputs["value"], GeneratedInput)
+
+
+class TestOutputChecks:
+    def test_rejects_empty_checks(self):
+        with pytest.raises(ValidationError, match="must not be empty"):
+            Workload(uuid="test-uuid", axes={}, inputs={}, checks=[])
+
+    def test_rejects_removed_tolerance_wire_field(self):
+        with pytest.raises(ValidationError, match="extra_forbidden"):
+            Workload.model_validate(
+                {
+                    "uuid": "test-uuid",
+                    "axes": {},
+                    "inputs": {"x": {"type": "random"}},
+                    "checks": [{"type": "numeric", "output": "output"}],
+                    "tolerance": {"max_atol": 0.1},
+                },
+            )
+
+    def test_allows_partial_custom_inputs(self):
+        workload = Workload(
+            uuid="test-uuid",
+            axes={},
+            inputs={"x": RandomInput(), "offsets": {"type": "custom"}},
+            checks=[NumericCheck(output="output", required_matched_ratio=0.97)],
+        )
+
+        check = workload.checks[0]
+        assert isinstance(check, NumericCheck)
+        assert check.required_matched_ratio == 0.97

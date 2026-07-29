@@ -22,7 +22,7 @@ The embedded workload object follows [Workload](workload.md). It includes:
 - `uuid`
 - concrete `axes`
 - `inputs`
-- optional `tolerance`
+- required typed `checks`
 
 ## Evaluation
 
@@ -56,6 +56,7 @@ Status values:
 | `has_nan` | bool | True when solution or reference output contains NaN. |
 | `has_inf` | bool | True when solution or reference output contains Inf but no NaN. |
 | `extra` | object or null | Optional extra metrics. |
+| `check_results` | array | Typed per-check metrics, including output identity and correctness round. |
 
 When outputs contain non-finite values, max error fields are set to `0.0` and
 `has_nan` or `has_inf` explains the reason.

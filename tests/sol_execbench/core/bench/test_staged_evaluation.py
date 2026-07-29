@@ -70,6 +70,7 @@ def _request(
 ) -> WorkloadEvaluationRequest:
     definition = SimpleNamespace(
         name="demo",
+        outputs={"output": object()},
         get_resolved_axes_values=lambda axes: {},
     )
     dependencies = SimpleNamespace(

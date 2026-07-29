@@ -1,0 +1,58 @@
+{
+  "name": "fused_add_rmsnorm_bf16",
+  "op_type": "norm",
+  "description": "BF16 fused residual add and RMSNorm with two outputs.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Rows."
+    },
+    "N": {
+      "type": "var",
+      "description": "Hidden size."
+    }
+  },
+  "inputs": {
+    "input": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "bfloat16"
+    },
+    "weight": {
+      "shape": [
+        "N"
+      ],
+      "dtype": "bfloat16"
+    },
+    "residual": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "bfloat16"
+    },
+    "eps": {
+      "shape": null,
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "bfloat16"
+    },
+    "residual_out": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "bfloat16"
+    }
+  },
+  "reference": "import torch\n\n\ndef run(input, weight, residual, eps):\n    residual_out = input + residual\n    value = residual_out.float()\n    rstd = torch.rsqrt(value.pow(2).mean(-1, keepdim=True) + eps)\n    output = value * rstd * weight.float()\n    return output.to(input.dtype), residual_out.to(input.dtype)\n"
+}

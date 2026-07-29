@@ -44,6 +44,9 @@ from sol_execbench.core.bench.utils import call_and_collect_outputs
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload_validation import (
+    validate_problem_contract,
+)
 
 
 class ReferenceRequestError(ValueError):
@@ -85,6 +88,7 @@ class ReferenceService:
             .splitlines()
             if line.strip()
         ]
+        validate_problem_contract(self.definition, self.workloads)
         config_path = staging_dir / "config.json"
         self.config = (
             BenchmarkConfig(**json.loads(config_path.read_text()))

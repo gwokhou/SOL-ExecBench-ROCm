@@ -49,6 +49,7 @@ def _trace(
             uuid="w0",
             axes={"n": 1},
             inputs={"n": ScalarInput(value=1)},
+            checks=[{"type": "numeric", "output": "output"}],
         ),
         evaluation=Evaluation(
             status=EvaluationStatus.PASSED,

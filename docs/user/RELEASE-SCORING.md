@@ -4,25 +4,22 @@ Canonical Trace JSONL is the execution artifact. A numeric formula result is
 official only when it is derived from the repository-pinned corpus and a
 publisher-authored, content-addressed release bundle.
 
-## Published scoring contract
+## Pending v2 scoring contract
 
-The schema v5 RX 9060 XT corpus contains 35 scored problems and 122 scored
+The schema v6 RX 9060 XT corpus contains 43 scored problems and 163 scored
 workloads. The FP8 compatibility sentinel and the provenance-retained
 `l2n55_matmul_maxpool_sum_scale` target-incompatible problem are excluded from
 the denominator. The latter keeps its original AKA shapes; it is excluded
 because its trusted-reference IPC payload exceeds the bounded protocol.
 
-`problems/AMD_AKA/manifest.yaml` publishes:
+The v2 baseline evidence has not been published yet, so the manifest
+deliberately keeps official scoring fail-closed:
 
 ```yaml
 official_scoring:
-  status: available
-  release_policy: content_addressed_publisher_v1
-  baseline_id: rx9060xt-gfx1200-reference-v1
-  required_evidence:
-    - content_addressed_release_baseline
-    - content_addressed_candidate_execution
-    - pinned_solar_manifests
+  status: unavailable
+  baseline_id: rx9060xt-gfx1200-reference-v2
+  reason_code: baseline_v2_release_evidence_pending
 ```
 
 The release policy follows the paper's release-defined baseline `T_b`,
@@ -56,7 +53,7 @@ Create the canonical eager-PyTorch baseline:
 
 ```bash
 uv run sol-execbench baseline release-build out/release \
-  --baseline-id rx9060xt-gfx1200-reference-v1 \
+  --baseline-id rx9060xt-gfx1200-reference-v2 \
   --source-revision SOURCE_GIT_SHA
 ```
 
@@ -88,7 +85,7 @@ Baseline and candidate must use the same source revision and validated runtime
 environment, including the immutable container image. A candidate failure is
 retained in its complete trace denominator and receives zero.
 
-Build the formal 122-workload denominator:
+Build the formal 163-workload denominator:
 
 ```bash
 uv run sol-execbench solar release-build out/release \
@@ -146,5 +143,5 @@ S(T_k) = 1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))
 `T_b` is the canonical baseline run in the release bundle. Incorrect candidates
 score zero. Correct candidates must have finite positive runtimes and satisfy
 `T_b > T_SOL` and `T_k >= T_SOL`; violations are audit failures rather than
-values to clip. Workloads are averaged within each problem, then the 35 problem
+values to clip. Workloads are averaged within each problem, then the 43 problem
 means receive equal weight.

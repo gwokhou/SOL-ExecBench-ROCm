@@ -17,7 +17,7 @@
 """Strong-typed data definitions for traces and evaluations."""
 
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -26,6 +26,63 @@ from sol_execbench.core.data.base_model import (
     NonEmptyString,
 )
 from sol_execbench.core.data.workload import Workload
+
+
+class NumericCheckResult(BaseModelWithDocstrings):
+    """Observed metrics for one numeric check and correctness round."""
+
+    type: Literal["numeric"] = "numeric"
+    output: NonEmptyString
+    round_index: int = Field(ge=0)
+    passed: bool
+    max_relative_error: float = Field(ge=0.0)
+    max_absolute_error: float = Field(ge=0.0)
+    matched_ratio: float = Field(ge=0.0, le=1.0)
+    has_nan: bool = False
+    has_inf: bool = False
+
+
+class ExactCheckResult(BaseModelWithDocstrings):
+    """Observed mismatch count for one exact check."""
+
+    type: Literal["exact"] = "exact"
+    output: NonEmptyString
+    round_index: int = Field(ge=0)
+    passed: bool
+    mismatched_elements: int = Field(ge=0)
+    total_elements: int = Field(ge=0)
+
+
+class CodeDistanceCheckResult(BaseModelWithDocstrings):
+    """Observed code-distance metrics for one quantized output."""
+
+    type: Literal["code_distance"] = "code_distance"
+    output: NonEmptyString
+    round_index: int = Field(ge=0)
+    passed: bool
+    max_distance: int = Field(ge=0)
+    matched_ratio: float = Field(ge=0.0, le=1.0)
+
+
+class TopKRoutingCheckResult(BaseModelWithDocstrings):
+    """Observed joint MoE routing metrics."""
+
+    type: Literal["topk_routing"] = "topk_routing"
+    ids_output: NonEmptyString
+    weights_output: NonEmptyString
+    round_index: int = Field(ge=0)
+    passed: bool
+    genuine_mismatch_ratio: float = Field(ge=0.0, le=1.0)
+    max_matched_weight_error: float = Field(ge=0.0)
+
+
+OutputCheckResult = Annotated[
+    NumericCheckResult
+    | ExactCheckResult
+    | CodeDistanceCheckResult
+    | TopKRoutingCheckResult,
+    Field(discriminator="type"),
+]
 
 
 class Correctness(BaseModelWithDocstrings):
@@ -50,6 +107,8 @@ class Correctness(BaseModelWithDocstrings):
     """True when the solution or reference output contains Inf values (but no NaN)."""
     extra: dict[str, Any] | None = Field(default=None)
     """Extra metrics for correctness evaluation."""
+    check_results: list[OutputCheckResult] = Field(default_factory=list)
+    """Typed per-check metrics for every executed correctness round."""
 
     @field_validator("max_relative_error", "max_absolute_error")
     @classmethod
