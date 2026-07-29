@@ -76,5 +76,5 @@
       "description": "Depthwise conv output."
     }
   },
-  "reference": "import torch.nn.functional as F\n\n\ndef run(x, weight, bias):\n    return F.conv2d(x, weight, bias, stride=1, padding=0, dilation=1, groups=x.shape[1])\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(x, weight, bias):\n    return F.conv2d(\n        x, weight, bias, stride=1, padding=0, dilation=1, groups=x.shape[1]\n    )\n"
 }

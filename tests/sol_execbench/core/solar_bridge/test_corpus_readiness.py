@@ -62,23 +62,23 @@ def test_corpus_audit_derives_and_addresses_the_full_scored_denominator(
     )
 
     assert result.ready
-    assert result.problems == 35
-    assert result.workloads == 122
-    assert result.extraction_passed == 122
-    assert result.conversion_passed == 122
-    assert result.verification_passed == 122
+    assert result.problems == 43
+    assert result.workloads == 163
+    assert result.extraction_passed == 163
+    assert result.conversion_passed == 163
+    assert result.verification_passed == 163
     records = [
         json.loads(line)
         for line in result.matrix_path.read_text(encoding="utf-8").splitlines()
     ]
-    assert len(records) == 122
+    assert len(records) == 163
     assert all(record["gfx_target"] == "gfx1200" for record in records)
     assert all(
         len(record["trace_identity_sha256"]) == 64
         and len(record["architecture_sha256"]) == 64
         for record in records
     )
-    assert len({record["trace_identity_sha256"] for record in records}) == 122
+    assert len({record["trace_identity_sha256"] for record in records}) == 163
     assert not any("l2n55" in record["problem_path"] for record in records)
     assert all(
         len(record["verification_seeds"]) == 3
@@ -127,8 +127,8 @@ def test_corpus_audit_keeps_failed_workload_in_the_matrix(
     )
 
     assert not result.ready
-    assert result.workloads == 122
-    assert result.verification_passed == 121
+    assert result.workloads == 163
+    assert result.verification_passed == 162
     records = [
         json.loads(line)
         for line in result.matrix_path.read_text(encoding="utf-8").splitlines()
@@ -203,6 +203,6 @@ def test_corpus_audit_requires_every_stage_even_if_verification_passed(
     )
 
     assert not result.ready
-    assert result.verification_passed == 122
+    assert result.verification_passed == 163
     summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
     assert summary["status"] == "incomplete"

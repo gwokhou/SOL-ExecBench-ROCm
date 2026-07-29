@@ -1,4 +1,4 @@
-schema_version: 5
+schema_version: 6
 source:
   repository: https://github.com/AMD-AGI/AgentKernelArena
   revision: 869228138e07e773b61dd7fc1d8cdc0435c7b405
@@ -12,6 +12,11 @@ execution_targets:
     - bfloat16
     - float16
     - float32
+    - int64
+    - int32
+    - int8
+    - uint8
+    - bool
   gfx1150:
     generation: rdna3_5
     supported_tensor_dtypes:
@@ -19,6 +24,11 @@ execution_targets:
     - float16
     - float32
     - float8_e4m3fn
+    - int64
+    - int32
+    - int8
+    - uint8
+    - bool
   gfx1200:
     generation: rdna4
     supported_tensor_dtypes:
@@ -26,73 +36,101 @@ execution_targets:
     - float16
     - float32
     - float8_e4m3fn
+    - int64
+    - int32
+    - int8
+    - uint8
+    - bool
 formal_analysis:
   architecture_profile: solar:RX_9060_XT
   formal_gfx_target: gfx1200
   architecture_profile_sha256: abe2510a07805017c74f214c49990db365ccf59f1622ac1ba58434bf1351e71b
 tolerance_calibration:
   path: tolerance-calibration.json
-  sha256: d0cb5cebb1c4af5e54a338cf9225826ac01a4bdfa3124a929fee1ea21ce7fb2d
+  sha256: 1600b9ebedf4b9a7d7fe8504f3184ea49ecc6faf254c48797fd54ba9d1f17608
 official_scoring:
-  status: available
-  release_policy: content_addressed_publisher_v1
-  baseline_id: rx9060xt-gfx1200-reference-v1
-  required_evidence:
-  - content_addressed_release_baseline
-  - content_addressed_candidate_execution
-  - pinned_solar_manifests
+  status: unavailable
+  baseline_id: rx9060xt-gfx1200-reference-v2
+  reason_code: baseline_v2_release_evidence_pending
 formal_coverage_requirements:
   axes:
     operation:
       attention: 2
-      conv: 2
+      conv: 3
       elementwise: 11
+      loss: 2
       matmul: 15
-      norm: 5
+      norm: 6
+      position_encoding: 1
+      quantization: 2
+      routing: 1
       softmax: 2
-    dtype:
-      bfloat16: 4
-      float16: 3
-      float32: 29
-      float8_e4m3fn: 1
     pass_kind:
       backward: 1
-      forward: 36
+      forward: 44
     fusion_depth:
-      fused: 15
-      single: 22
+      fused: 21
+      single: 24
     source_family:
-      flydsl: 1
-      gpumode: 12
-      kernelbench: 22
+      flydsl: 6
+      gpumode: 13
+      kernelbench: 24
       rocmbench: 2
     suite:
       instruction2triton: 2
-      torch2flydsl: 1
-      torch2hip: 34
+      torch2flydsl: 6
+      torch2hip: 37
+    input_dtype:
+      bfloat16: 9
+      float16: 3
+      float32: 36
+      int32: 2
+      int64: 1
+    output_dtype:
+      bfloat16: 6
+      float16: 3
+      float32: 34
+      float8_e4m3fn: 2
+      int32: 1
+      int8: 1
+      uint8: 1
+    capability:
+      bounded_integer_input: 1
+      code_distance: 2
+      coupled_topk: 1
+      fp8_output: 2
+      mixed_output_dtype: 3
+      multi_output: 5
+      partial_custom_input: 2
+      positive_input: 1
+      raw_code_distance: 1
+      scalar_tensor_output: 2
+      simplex_input: 1
+      structured_offsets: 1
+      uint8_output: 1
   combinations:
   - operation: matmul
-    dtype: float32
+    input_dtype: float32
     pass: forward
     min_count: 1
   - operation: matmul
-    dtype: bfloat16
+    input_dtype: bfloat16
     pass: forward
     min_count: 1
   - operation: softmax
-    dtype: float32
+    input_dtype: float32
     pass: forward
     min_count: 1
   - operation: norm
-    dtype: bfloat16
+    input_dtype: bfloat16
     pass: forward
     min_count: 1
   - operation: conv
-    dtype: float32
+    input_dtype: float32
     pass: forward
     min_count: 1
   - operation: elementwise
-    dtype: float16
+    input_dtype: float16
     pass: forward
     min_count: 1
   - operation: attention
@@ -103,166 +141,270 @@ formal_coverage_requirements:
     min_count: 2
   - pass: backward
     min_count: 1
-  - dtype: float8_e4m3fn
+  - output_dtype: float8_e4m3fn
     pass: forward
     min_count: 1
   - fusion_depth: fused
     min_count: 1
+  - capability: bounded_integer_input
+    role: scored
+    min_problems: 1
+    min_workloads: 5
+  - capability: positive_input
+    role: scored
+    min_problems: 1
+    min_workloads: 5
+  - capability: simplex_input
+    role: scored
+    min_problems: 1
+    min_workloads: 4
+  - capability: scalar_tensor_output
+    role: scored
+    min_problems: 2
+    min_workloads: 9
+  - capability: multi_output
+    role: scored
+    min_problems: 4
+    min_workloads: 23
+  - capability: mixed_output_dtype
+    role: scored
+    min_problems: 3
+    min_workloads: 17
+  - capability: code_distance
+    role: scored
+    min_problems: 2
+    min_workloads: 13
+  - capability: partial_custom_input
+    role: scored
+    min_problems: 2
+    min_workloads: 8
+  - capability: structured_offsets
+    role: scored
+    min_problems: 1
+    min_workloads: 4
+  - capability: fp8_output
+    role: scored
+    min_problems: 1
+    min_workloads: 8
+  - capability: uint8_output
+    role: scored
+    min_problems: 1
+    min_workloads: 8
+  - capability: raw_code_distance
+    role: scored
+    min_problems: 1
+    min_workloads: 8
+  - capability: coupled_topk
+    role: scored
+    min_problems: 1
+    min_workloads: 4
+  - operation: loss
+    role: scored
+    min_problems: 2
+    min_workloads: 9
+  - operation: quantization
+    role: scored
+    min_problems: 2
+    min_workloads: 13
+  - operation: routing
+    role: scored
+    min_problems: 1
+    min_workloads: 4
+  - operation: position_encoding
+    role: scored
+    min_problems: 1
+    min_workloads: 4
 materialized_problems:
 - path: torch2hip/3267_doubled_matmul
   task_path: tasks/torch2hip/gpumode/3267_SimpleMatmulModule
   definition_sha256: bbd7ac2c99af5066be8dae63a15cdbfbde5c403dd77779e09600a9942d4958b8
-  workload_sha256: c1c6d4675ad3565f69f573715b26ca2b77c891de42a7372c9c4841d7d4d9accb
+  workload_sha256: 5afafcbd7648ce90d744b152de9b074c40d31b921a0428cdfb7d6b0cc63464b2
 - path: torch2hip/l1n1_square_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_
   definition_sha256: 90cf2e517322ce5c038a2cc8807fc12f72175a85ebd3344c344a7a73d1c5df3f
-  workload_sha256: 610f6fb60bafbbafabc5860d3d058d42f1943ea2be5a6e90eb6441a52393e4fb
+  workload_sha256: c9a8eec6aa47c4b90bd7ffabdd8f28fcd2ea8faf57c80132397fe9d56cdff692
 - path: torch2hip/l1n2_standard_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_
   definition_sha256: 10cdcf07386c5ae6c639a60d78eef5e159af2c4d7594941f03b0f93ce26630ea
-  workload_sha256: 6726372fa3c978b30c153d2e1b6de6fb3b1300eae14c2006364c1f5c44b15d1f
+  workload_sha256: 2580c7a67790a64d650de47d548e3fd0bfb32b6e7871579897a31d2bbae05058
 - path: torch2hip/l1n3_batched_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication
   definition_sha256: 0a68338de3f133fd9042d9bdf12dd7cb82cdbb9b8f028a9046fa7208ef765c4f
-  workload_sha256: 2c1a8c8b6f5586015ecfc1634402a7f780cc1831e5946ddaf0e187819825e1d0
+  workload_sha256: 4691fa21d6563a456d4f9783d5313d71c32d07ac0003cb5c9e25f8cf1cc69bcc
 - path: torch2hip/l1n4_matrix_vector
   task_path: tasks/torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_
   definition_sha256: 81b19335e7a655abe58d8a9c33b6858dc75d7ffd9e78fdce2e8b5f442279cd9b
-  workload_sha256: 84db5e434340a2d31b2cba1f96941e96a21b8bbf511a72c1f3b6d0c9e595111c
+  workload_sha256: 6015499f0fb363cd6da0d5e0c8f81aa614c7032517b4b67c11ee5e4875ce0b5e
 - path: torch2hip/l1n8_matmul_irregular
   task_path: tasks/torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_
   definition_sha256: 9f974692863dc369df33c9204e8d6ff87ecd86a8c9129e4a65557833edf2af94
-  workload_sha256: 2c1715ff091d407b693a02c541751390acb41448c7a0d3e21218331aa6670f50
+  workload_sha256: ccf7e3a95b5eef6e6fb4e5ddc338ee8be018977afa60c2fe7b49d7138e720f45
 - path: torch2hip/l1n9_tall_skinny_matmul
   task_path: tasks/torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_
   definition_sha256: d019b053b4a4051151fe79f492c781fa773829c291902092337f59de5e63e547
-  workload_sha256: f651aa17e019e84e84fa1c0b65f5ec7e4ff62968c56f2a28f1570e3c93191e89
+  workload_sha256: c008055d42692be60518842531f028792cfadeb78e189b90911366e8ad0d62db
 - path: torch2hip/l1n23_softmax
   task_path: tasks/torch2hip/kernelbench/level1/l1n23_Softmax
   definition_sha256: 0798a2e90123fef4ffc4b79482b96eaaf423ae8a2a223e54eb9aaffad7beee25
-  workload_sha256: 4bdad85bb4301a0ca2923692f34af048c810d0952144628a64bfe1f2e016351b
+  workload_sha256: 5f2c084b422d93cf47132362877dc4d091dc573f3e2fb0a09039b06a440edb10
 - path: torch2hip/l1n26_gelu
   task_path: tasks/torch2hip/kernelbench/level1/l1n26_GELU_
   definition_sha256: fe09ede0f08d60ea9ee0fccc1a0240ac22f8a0a3a64f9b999c4ded65fa358260
-  workload_sha256: 6bfa8a8a6f3a78fd43f1eede4ae2ebf34afd9c02c34acad0b702b79c0a06f83a
+  workload_sha256: 551d88c0bc5ae668fa2ffed3032fa2aef0bf4cc72c64e68dc83c86c3745b24fc
 - path: torch2hip/l1n36_rmsnorm
   task_path: tasks/torch2hip/kernelbench/level1/l1n36_RMSNorm_
   definition_sha256: e60d1511a3ed878ec98ec8adeb66a76bb28b7060b602bbdd6f897e47d8096ab2
-  workload_sha256: fe86807ed46ad6943d6fabe0cf6ac838660149f9ef476f361c1c056f61f33fe1
+  workload_sha256: d266db6a2dfaba40ca6706f21194139daa941794716155bbc289e738c9c80003
 - path: torch2hip/l1n40_layernorm
   task_path: tasks/torch2hip/kernelbench/level1/l1n40_LayerNorm
   definition_sha256: 4696aa91d750dc60522805e5e35689dc755e5e81f81c8dbe3abd818066317ad8
-  workload_sha256: c3998d1bcb3984a254bd55a0fac3b2d267e1c884b48b0c7d9d614cbcbaa77924
+  workload_sha256: 5fb91a75216ea8d8684561eb0b9008742c4e124d92f506b4abbfd2b9d7b117bd
 - path: torch2hip/l1n47_sum_reduction
   task_path: tasks/torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension
   definition_sha256: a280d87ba9663e3f245e80a676e299b6a9440b5e1dab54c163c5b6131c767d39
-  workload_sha256: 3bf3c420f038d8d08a453600b0e168d24e727066ca00b37f01259076b637ff13
+  workload_sha256: b8ab8e9f9444d5b0905d7aa966e262efcfd47b925b385bec18d0c8c7f8f4e722
 - path: torch2hip/l1n42_maxpool2d
   task_path: tasks/torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D
   definition_sha256: 0a214b6b89bf4bf154d662e7e664974114a1f47d007036ba5b5fdc04e2f7f46a
-  workload_sha256: fe9134fcca0a98e870138342543e09a017c4137aa1505b5f3596341c3ab8beff
+  workload_sha256: 628b874e3ecb432421c65cb7efcefd9dafbbe5cb2a9b088d0981de28bb18baa1
 - path: torch2hip/l1n63_conv2d
   task_path: tasks/torch2hip/kernelbench/level1/l1n63_conv_standard_2D__square_input__square_kernel
   definition_sha256: 40cf7967846546fb4c05382c252aa11aba7fbb994448f127d43add7e5b9fb5c9
-  workload_sha256: 62de391320791803eab81a0fc795d452f64f9ee63ddcf75c92cdfb67e40e5ac5
+  workload_sha256: a2556cb57c5d6d4751c03810714c1d6634675b4d17e45bfc4a5a0444320181e0
 - path: torch2hip/l1n82_conv_depthwise
   task_path: tasks/torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D_square_input_square_kernel
-  definition_sha256: 22004c30e14da779698cadc755665526bcd588b916876cf50b1951ad7daf8f48
-  workload_sha256: e8efe513827fc856eb1e0a45bf6fb168bc738bf440e8ab9bfcf55767bd71d647
+  definition_sha256: 66fee127507fefc5fba41448231a97036f47b52fda1dbfd0809548aa730e2eb5
+  workload_sha256: 31def5131b07219fc93b13a14cb2a8ba9d4039f534e710dd3e4e5cf32c097015
 - path: torch2hip/gpumode_silu
   task_path: tasks/torch2hip/gpumode/16636_SiLU
   definition_sha256: df2cfb5589b8bc39c74aab1ddff96c260885d49881be7237df1a85f7b05fa779
-  workload_sha256: 38fb1ecf232515420bb055697f7636ae2ea11acc73cc928e388a1bab7c79fc5a
+  workload_sha256: b57f25bc60db57300978b2f07a90de6185c0a6ddf81b92a37d52b22d5da95a89
 - path: torch2hip/gpumode_sigmoid
   task_path: tasks/torch2hip/gpumode/11184_Sigmoid
   definition_sha256: 663b310c0a497c9a73f44f24d465cd8a4f9a227b4b4de2a1119ac5c03d6f5c1d
-  workload_sha256: 7b13e204216723e4a7bc68f493e22e55e705837dad40f1e5d45bfb60af2c4546
+  workload_sha256: d329b83aea6711152a4d2c92ee7b3dbf78290424e380b6cb464cfdf877cca934
 - path: torch2hip/gpumode_tanh
   task_path: tasks/torch2hip/gpumode/11178_TanH
   definition_sha256: 0668d86d74b5e5b8fdbac3b7eb114a1b657e6380baba0cdcfd4f08c68bacbb40
-  workload_sha256: f81f7ab51b9005303ce9fe9de627a89b19ca5d778bc1477b34af7a54429c20a9
+  workload_sha256: 229ff43af7f1ece276dd7f35610498460bd5fcb55de7252fb280ae308d57bf77
 - path: torch2hip/l2n99_matmul_gelu_softmax
   task_path: tasks/torch2hip/kernelbench/level2/l2n99_Matmul_GELU_Softmax
   definition_sha256: 45f718e6be459c7e67f960193b56ea45f1a96d2deb429190b8e7dbb1daf5c4c5
-  workload_sha256: 13ac1dad2582b2d25cd348c058e6ece0946705d26f903d73836e7c8fea5aa13e
+  workload_sha256: dca7cb807593a149d10c25b53fa54dac12ec4d6b4e3290bf0b8d38cf7d7f31a9
 - path: torch2hip/l2n86_matmul_divide_gelu
   task_path: tasks/torch2hip/kernelbench/level2/l2n86_Matmul_Divide_GELU
   definition_sha256: d19cf0ba4740fc72dbef849aacaad159557cb2f4354d21eb2ded703bda5a708f
-  workload_sha256: b3bac161e4e0ddcba5e3bcc17ea94cb4438282efdb86dc87bf07d70d9f1b00e1
+  workload_sha256: 68667b757093f4d63c82eb41fded1d43ddea15c87768e465546a87f7c01f170c
 - path: torch2hip/l2n40_matmul_scaling_residual
   task_path: tasks/torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd
   definition_sha256: 6a7fadca0cf45eb8d8edd78ac8709b92e0903435b14f157b1ede9d5ce91c6328
-  workload_sha256: 1701c7f10e1aa63ccb6e77c801702550af4d435e16a139c7f6bfc2c057693452
+  workload_sha256: 0c7dd2bf3cf347b276dd65718eea0722f5892c34793429ca652e6d821ef105d4
 - path: torch2hip/l2n37_groupnorm_fused
   task_path: tasks/torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm
   definition_sha256: 57a1fd57346fe898edfd1fe4f17f8d4515b4ea1127878cff1f700f6fb0d096f1
-  workload_sha256: 6321d757ca7d28b90d19014b1d4703645e5e16a0b5fddf4d13b2855ed16a7c28
+  workload_sha256: 0332de1a8a4fd3be43cd72b834fc43aa464cb8977a317903ff6382af4489c960
 - path: torch2hip/l2n17_instancenorm_fused
   task_path: tasks/torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide
   definition_sha256: 83808a7a0c4551aaf3656cbc7a5915cd4f5d0ed6765fa0594d72c323dbdb9da7
-  workload_sha256: 309216d237cef3549e7c5a52a2e9478fda49bbe8346114653ba0268c350084c6
+  workload_sha256: a4b0db175ce36bf04ce4566e222919484d35f4edc7339c65864dafa97123744d
 - path: torch2hip/dot_product_attention
   task_path: tasks/torch2hip/gpumode/1001_NormalAttention_dot
   definition_sha256: cd8d7bfc39348f98564f68fdd11423d536db10609bcd32867989c318b0bcbc56
-  workload_sha256: 07f0c029e126eea576f34407fe8cc7ba716906d47eb952b840f151ae55d6ba66
+  workload_sha256: 5e0137ce90d5103bea20b69773deb47d351586ff57ed601f1c67307bd944a56d
 - path: torch2hip/gpumode_gelu_4d
   task_path: tasks/torch2hip/gpumode/14539_GELU
   definition_sha256: 9308907e9c7c16820f7312eedcb6c4b96adf1229bacd1adee8c6af908918d639
-  workload_sha256: a2058d09d76d1cb368222986b81c90f5f218f191b0a68ccac9f8b72778723ca6
+  workload_sha256: b482d00365e87f22ffa22052a3998bf6323109afe077dda87fd23b6f630f6fa9
 - path: instruction2triton/fp8_cast_sentinel
   task_path: tasks/instruction2triton/rocmbench/test_chained_dot_fp8
   definition_sha256: 45168f8644744877d84d622991a56a8c7ba69cd385452cfcea544d8d94d61d30
-  workload_sha256: 05515f530bd79291c37b5a260e48721584886cf39336c2f2a9824fbad3261714
+  workload_sha256: 8f11bd805c72e5fd094839768bb62667bf7195245fd8d11e4b6352bd54472bd0
 - path: instruction2triton/rmsnorm_bwd
   task_path: tasks/instruction2triton/rocmbench/rmsnorm_bwd
   definition_sha256: 496c30fba45c80f92e8d87410edb322d89f11ab86c5b3d98bcb9e58ca4f56262
-  workload_sha256: 5c0969ddc0710eed0c7c88b927c9dc96620f714e0dc23f639307a4d6d10049d4
+  workload_sha256: eedf9419e46d4abd36f22dde484610d956b0cea3ef842606eb5e3777b9df6254
 - path: torch2flydsl/silu_and_mul_bf16
   task_path: tasks/torch2flydsl/silu_and_mul_kernel
   definition_sha256: ba65c68964c311837f20d19193120dc5a210ee7d4ce60d185fb85e8c35ea96fe
-  workload_sha256: cae695ba60a4e6862db8357d2e6fd413cf27a2805cfead163056d6244ecebb4c
+  workload_sha256: ea534d007dfe214bf06b4ec3e35e5480fa781732463116f6d4b63e74e72b9132
 - path: torch2hip/gpumode_fused_leaky_relu
   task_path: tasks/torch2hip/gpumode/10190_FusedLeakyReLU
   definition_sha256: 6c7eadaf02a2b05dbb52f67a0dbdac42a747616f3b44a01e11376b34853aff42
-  workload_sha256: f8dc725b2d9f036fe18ff8b3255523d706be32c97cfe5ba02b0b37bf1138a377
+  workload_sha256: b300144ceef97d8aac510ce7a5a14163814cb472aea71ed33802526b9d9991bd
 - path: torch2hip/gpumode_transpose
   task_path: tasks/torch2hip/gpumode/1067_Transpose
   definition_sha256: 9650cff97057fbb5fa6856137783087786b1958b628688b6e989b8520d9f11af
-  workload_sha256: c4bbccf8e23ea3b7a66d58c3d473b1abaa23f2a9c430544053dae41417abbe6c
+  workload_sha256: fdce5b3f7ada52743579843e093aa0af77e6d3ea398c10f9a9e31706a616333b
 - path: torch2hip/gpumode_softmax_3d
   task_path: tasks/torch2hip/gpumode/10082_SoftmaxModule
   definition_sha256: 5307645ecc67128f8d98ff9576dc1c252372711720cc723867fa40e18e078c42
-  workload_sha256: 09e18c58df400a7a577241e3e88f1fe9bfddd450665105faaebcb176c2bd2c45
+  workload_sha256: 480ba9ebcf3763bb78bad2519f5f27895f96eacc78156acc2ebaa3713774bfa0
 - path: torch2hip/gpumode_feedforward
   task_path: tasks/torch2hip/gpumode/10024_Feedforward
   definition_sha256: 20d95477478b23cd0f89b46647435d2280d7632b149e086db33b34273b9a1945
-  workload_sha256: 83249866758c93982c3ef1fcf2a53912b9bc2033d237e174346bdbcca5fd890b
+  workload_sha256: 286fa2912cb78db953f20d319e7f65ab8df919d0d36bde325c6ec23751364e06
 - path: torch2hip/gpumode_positionwise_ffn
   task_path: tasks/torch2hip/gpumode/14044_PositionWiseFeedForward
   definition_sha256: 16c9fbb5e117f7f4700763495f2dfbf0f03ec2ddfc63f71b9f83c419d5f9163a
-  workload_sha256: 581dd12b024e54409b38b18ebcbfac72f8ccb3f5b1d3fd20ec6d40f1c09aa95d
+  workload_sha256: b7ccdec2a454652231d27a99ff1257569f47b5314c4e23cdf4512e04d8211533
 - path: torch2hip/gpumode_mlp
   task_path: tasks/torch2hip/gpumode/1178_MLP_model
   definition_sha256: ebf785bea81eda4d8b1e607f3f498b6e37d59c30fe4be5c36d28c6dbf990d28c
-  workload_sha256: 29311140fa6ee4ed07dd5016569b283a4a8a5a93cbf5beadd597f722205be693
+  workload_sha256: 002d30ab1677fa3a25096f0c7ffab7475036ac3e31fd88ef8a4857852eba8faa
 - path: torch2hip/l2n55_matmul_maxpool_sum_scale
   task_path: tasks/torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale
   definition_sha256: 230eebd644d6755c508a43025781448a3376b83b027cbc12203c9817844bfcb2
-  workload_sha256: 50d45faa179b9d21455243f12b06a78d9213d75aa14852c2500cc3414655440d
+  workload_sha256: 9af2a401f209ead53aa94e4dfbdba9b8988b709e9454f529fe476ddbdade3b84
 - path: torch2hip/l2n98_matmul_avgpool_gelu_scale_max
   task_path: tasks/torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max
   definition_sha256: ec45ac357fa5305bf7b441b83f9e72993457f2903a6f2b5cf98954d35fcbc5ce
-  workload_sha256: 00867dbf37d38b781ae3e341a6a10a22b745649ce4be4d3bb816c2b747acd39e
+  workload_sha256: 8cae51f6a85cb863e1cec0cb5b4563f75c280389fb73670d70abddb32bf138b7
 - path: torch2hip/l3n44_mingpt_block
   task_path: tasks/torch2hip/kernelbench/level3/l3n44_MiniGPTBlock
-  definition_sha256: 71ef00f783c5ebb8e78b01e51820304101c3cc7cb59f291674eaa522787848e1
-  workload_sha256: f68df6c8c466c534215c346c86eb364a3c15e8cc7b711a03ff9f7b9e4c1ace1f
+  definition_sha256: ac02a18c833f65c05a84502881b4feca7942eb02fe5fbc44a5a77b1a5504a6d6
+  workload_sha256: f01980b4b51fb0e44674363c47d2e667df9e299db3391ce17892a78e272fdeb8
+- path: torch2hip/l1n95_cross_entropy
+  task_path: tasks/torch2hip/kernelbench/level1/l1n95_CrossEntropyLoss
+  definition_sha256: e8622baad452256e115078cef8ad7ac8988d565dd9d61e9b75ddb3fbb73cf774
+  workload_sha256: 8a69748a6a3d1a9f66cb61c80856909b3a50bfc89c310e672dedd851c2f6dce3
+- path: torch2hip/l2n52_conv_activation_batchnorm
+  task_path: tasks/torch2hip/kernelbench/level2/l2n52_Conv2d_Activation_BatchNorm
+  definition_sha256: b5eab5ae7a13c7946d5d983058e2e404593038fc02a2d7c321aa93ef5db5e2a4
+  workload_sha256: 7dcb46c591c3c9386cfe85a2cd93834f3028d16b3cbaf34127b370a2574b7323
+- path: torch2hip/14007_kd_loss
+  task_path: tasks/torch2hip/gpumode/14007_KDLoss
+  definition_sha256: 9fc5bc34e46a2c6e9e4c08074f758f909f6d2e21db7296589fcff2ae01b6c812
+  workload_sha256: 21e001f778dcbba54096ac556a5810d596604262e6fda16eab6ab0b660df6f22
+- path: torch2flydsl/fused_add_rmsnorm_bf16
+  task_path: tasks/torch2flydsl/fused_add_rmsnorm_kernel
+  definition_sha256: 5268a834e17d9dd10095ab8ef2b0936ae0480aa56310aba6b59d9663d93c6508
+  workload_sha256: 122799c0e54ef01265dc1afe577baf485b0f5c9b6f5585e6a0f3594729b7a327
+- path: torch2flydsl/per_token_i8_quant
+  task_path: tasks/torch2flydsl/per_token_i8_quant_kernel
+  definition_sha256: 0e12160793170e92a761cb597600b3dbfc8b51a23d5d7cb8d18b74d450c890ed
+  workload_sha256: 654f2d3dad28a7979401a5d86fd3aa2d336e27236aca84b1705df90a36d1b15e
+- path: torch2flydsl/rope_thd_fwd_bf16
+  task_path: tasks/torch2flydsl/rope_thd_fwd_kernel
+  definition_sha256: 34491624cd39daad644ed19c6542f9dc17f8af8f613848e02735a1b04972f512
+  workload_sha256: ad077b979ffa76eb15df10dcbf58c16a721b94abc6bca3fc74a0ebf3fb979e1b
+- path: torch2flydsl/dynamic_mxfp8_quant
+  task_path: tasks/torch2flydsl/dynamic_mxfp8_quant_kernel
+  definition_sha256: cc91cd12d8bdf916d3a25a81d642e7bb4e6d0713c5838af9cc8b5d86c75635f4
+  workload_sha256: 04553151971bf5c8e7f5e0fe8dab7a1ae402526c3a8e2505c19fb7ea474c223e
+- path: torch2flydsl/moe_topk_softmax
+  task_path: tasks/torch2flydsl/moe_topk_softmax_kernel
+  definition_sha256: 8e168f5ae5d027fc32d74ad864965903997f383ad35b48e4094d3a8655478625
+  workload_sha256: 205ed91c7f0f28f98a7ac07c6b45c9e94fc241dadba1443a0b66d02ad680cb8b
 entries:
 - slot: 3267_doubled_matmul
   task_path: tasks/torch2hip/gpumode/3267_SimpleMatmulModule
   problem_name: 3267_doubled_matmul
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: gpumode
@@ -288,7 +430,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_
   problem_name: l1n1_square_matmul
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -314,7 +460,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_
   problem_name: l1n2_standard_matmul
   operation: matmul
-  dtype: bfloat16
+  input_dtypes:
+  - bfloat16
+  output_dtypes:
+  - bfloat16
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -339,7 +489,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication
   problem_name: l1n3_batched_matmul
   operation: matmul
-  dtype: bfloat16
+  input_dtypes:
+  - bfloat16
+  output_dtypes:
+  - bfloat16
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -364,7 +518,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_
   problem_name: l1n4_matrix_vector
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -389,7 +547,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_
   problem_name: l1n8_matmul_irregular
   operation: matmul
-  dtype: float16
+  input_dtypes:
+  - float16
+  output_dtypes:
+  - float16
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -414,7 +576,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_
   problem_name: l1n9_tall_skinny_matmul
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -439,7 +605,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n23_Softmax
   problem_name: l1n23_softmax
   operation: softmax
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -465,7 +635,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n26_GELU_
   problem_name: l1n26_gelu
   operation: elementwise
-  dtype: float16
+  input_dtypes:
+  - float16
+  output_dtypes:
+  - float16
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -490,7 +664,12 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n36_RMSNorm_
   problem_name: l1n36_rmsnorm
   operation: norm
-  dtype: bfloat16
+  input_dtypes:
+  - bfloat16
+  - float32
+  output_dtypes:
+  - bfloat16
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -515,7 +694,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n40_LayerNorm
   problem_name: l1n40_layernorm
   operation: norm
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -540,7 +723,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension
   problem_name: l1n47_sum_reduction
   operation: elementwise
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -565,7 +752,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D
   problem_name: l1n42_maxpool2d
   operation: elementwise
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -590,7 +781,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n63_conv_standard_2D__square_input__square_kernel
   problem_name: l1n63_conv2d
   operation: conv
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -615,7 +810,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D_square_input_square_kernel
   problem_name: l1n82_conv_depthwise
   operation: conv
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: kernelbench
@@ -640,7 +839,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/16636_SiLU
   problem_name: gpumode_silu
   operation: elementwise
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: gpumode
@@ -666,7 +869,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/11184_Sigmoid
   problem_name: gpumode_sigmoid
   operation: elementwise
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: gpumode
@@ -692,7 +899,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/11178_TanH
   problem_name: gpumode_tanh
   operation: elementwise
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: gpumode
@@ -718,7 +929,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level2/l2n99_Matmul_GELU_Softmax
   problem_name: l2n99_matmul_gelu_softmax
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: kernelbench
@@ -743,7 +958,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level2/l2n86_Matmul_Divide_GELU
   problem_name: l2n86_matmul_divide_gelu
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: kernelbench
@@ -768,7 +987,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd
   problem_name: l2n40_matmul_scaling_residual
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: kernelbench
@@ -793,7 +1016,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm
   problem_name: l2n37_groupnorm_fused
   operation: norm
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: kernelbench
@@ -818,7 +1045,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide
   problem_name: l2n17_instancenorm_fused
   operation: norm
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: kernelbench
@@ -843,7 +1074,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/1001_NormalAttention_dot
   problem_name: dot_product_attention
   operation: attention
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: gpumode
@@ -869,7 +1104,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/14539_GELU
   problem_name: gpumode_gelu_4d
   operation: elementwise
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: gpumode
@@ -895,7 +1134,12 @@ entries:
   task_path: tasks/instruction2triton/rocmbench/test_chained_dot_fp8
   problem_name: fp8_cast_sentinel
   operation: elementwise
-  dtype: float8_e4m3fn
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float8_e4m3fn
+  capabilities:
+  - fp8_output
   pass_kind: forward
   fusion_depth: single
   source_family: rocmbench
@@ -920,7 +1164,12 @@ entries:
   task_path: tasks/instruction2triton/rocmbench/rmsnorm_bwd
   problem_name: rmsnorm_bwd
   operation: norm
-  dtype: float16
+  input_dtypes:
+  - float16
+  output_dtypes:
+  - float16
+  capabilities:
+  - multi_output
   pass_kind: backward
   fusion_depth: single
   source_family: rocmbench
@@ -946,7 +1195,11 @@ entries:
   task_path: tasks/torch2flydsl/silu_and_mul_kernel
   problem_name: silu_and_mul_bf16
   operation: elementwise
-  dtype: bfloat16
+  input_dtypes:
+  - bfloat16
+  output_dtypes:
+  - bfloat16
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: flydsl
@@ -972,7 +1225,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/10190_FusedLeakyReLU
   problem_name: gpumode_fused_leaky_relu
   operation: elementwise
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: gpumode
@@ -998,7 +1255,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/1067_Transpose
   problem_name: gpumode_transpose
   operation: elementwise
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: gpumode
@@ -1024,7 +1285,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/10082_SoftmaxModule
   problem_name: gpumode_softmax_3d
   operation: softmax
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: single
   source_family: gpumode
@@ -1050,7 +1315,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/10024_Feedforward
   problem_name: gpumode_feedforward
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: gpumode
@@ -1076,7 +1345,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/14044_PositionWiseFeedForward
   problem_name: gpumode_positionwise_ffn
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: gpumode
@@ -1102,7 +1375,11 @@ entries:
   task_path: tasks/torch2hip/gpumode/1178_MLP_model
   problem_name: gpumode_mlp
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: gpumode
@@ -1128,7 +1405,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale
   problem_name: l2n55_matmul_maxpool_sum_scale
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: kernelbench
@@ -1154,7 +1435,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max
   problem_name: l2n98_matmul_avgpool_gelu_scale_max
   operation: matmul
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: kernelbench
@@ -1179,7 +1464,11 @@ entries:
   task_path: tasks/torch2hip/kernelbench/level3/l3n44_MiniGPTBlock
   problem_name: l3n44_mingpt_block
   operation: attention
-  dtype: float32
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities: []
   pass_kind: forward
   fusion_depth: fused
   source_family: kernelbench
@@ -1200,4 +1489,282 @@ entries:
   - role: correctness_runner
     path: pytorch_code_functional/py_l3n44_MiniGPTBlock_func.py
     sha256: fc5d35e941966715e6f8296f7e1443933f8b78713e512923c0588cf1c8dae2a5
+  golden: {}
+- slot: l1n95_cross_entropy
+  task_path: tasks/torch2hip/kernelbench/level1/l1n95_CrossEntropyLoss
+  problem_name: l1n95_cross_entropy
+  operation: loss
+  input_dtypes:
+  - float32
+  - int64
+  output_dtypes:
+  - float32
+  capabilities:
+  - bounded_integer_input
+  - scalar_tensor_output
+  pass_kind: forward
+  fusion_depth: single
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l1n95_cross_entropy-w0
+  - aka-l1n95_cross_entropy-w1
+  - aka-l1n95_cross_entropy-w2
+  - aka-l1n95_cross_entropy-w3
+  - aka-l1n95_cross_entropy-w4
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 92d055d79e76da3371ceb1376d6a08e79a68d9873388fd2d7c092c89ae509d13
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l1n95_CrossEntropyLoss_func.py
+    sha256: 8eb7561919c03c438ad4cd0c57825a9f3386c945f11a5965294d6ad790ab41fa
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l1n95_CrossEntropyLoss_func.py
+    sha256: 8eb7561919c03c438ad4cd0c57825a9f3386c945f11a5965294d6ad790ab41fa
+  golden: {}
+- slot: l2n52_conv_activation_batchnorm
+  task_path: tasks/torch2hip/kernelbench/level2/l2n52_Conv2d_Activation_BatchNorm
+  problem_name: l2n52_conv_activation_batchnorm
+  operation: conv
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities:
+  - positive_input
+  pass_kind: forward
+  fusion_depth: fused
+  source_family: kernelbench
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-l2n52_conv_activation_batchnorm-w0
+  - aka-l2n52_conv_activation_batchnorm-w1
+  - aka-l2n52_conv_activation_batchnorm-w2
+  - aka-l2n52_conv_activation_batchnorm-w3
+  - aka-l2n52_conv_activation_batchnorm-w4
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: e66aa19065f15cf7198fdad374d95ef5b2b6af8b137db44eaebc74eed6823efc
+  - role: semantic_reference
+    path: pytorch_code_functional/py_l2n52_Conv2d_Activation_BatchNorm_func.py
+    sha256: b8a3e186c35d156bcf51ed7f66188db17c8d3afff452c09675e1b895be0ecfd5
+  - role: correctness_runner
+    path: pytorch_code_functional/py_l2n52_Conv2d_Activation_BatchNorm_func.py
+    sha256: b8a3e186c35d156bcf51ed7f66188db17c8d3afff452c09675e1b895be0ecfd5
+  golden: {}
+- slot: 14007_kd_loss
+  task_path: tasks/torch2hip/gpumode/14007_KDLoss
+  problem_name: 14007_kd_loss
+  operation: loss
+  input_dtypes:
+  - float32
+  output_dtypes:
+  - float32
+  capabilities:
+  - scalar_tensor_output
+  - simplex_input
+  pass_kind: forward
+  fusion_depth: fused
+  source_family: gpumode
+  suite: torch2hip
+  role: scored
+  workload_uuids:
+  - aka-14007_kd_loss-w0
+  - aka-14007_kd_loss-w1
+  - aka-14007_kd_loss-w2
+  - aka-14007_kd_loss-w3
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 925d35ff0672d21e84baadb70102b98b2fc3aee07c8b14b20535fca39911459f
+  - role: semantic_reference
+    path: pytorch_code_functional/py_14007_KDLoss_func.py
+    sha256: 6e6ce85615758f6c9cdbdca618fa14b46b66f43db4bc804c1caab36dcd4913e1
+  - role: correctness_runner
+    path: pytorch_code_functional/py_14007_KDLoss_func.py
+    sha256: 6e6ce85615758f6c9cdbdca618fa14b46b66f43db4bc804c1caab36dcd4913e1
+  golden: {}
+- slot: fused_add_rmsnorm_bf16
+  task_path: tasks/torch2flydsl/fused_add_rmsnorm_kernel
+  problem_name: fused_add_rmsnorm_bf16
+  operation: norm
+  input_dtypes:
+  - bfloat16
+  - float32
+  output_dtypes:
+  - bfloat16
+  capabilities:
+  - multi_output
+  pass_kind: forward
+  fusion_depth: fused
+  source_family: flydsl
+  suite: torch2flydsl
+  role: scored
+  workload_uuids:
+  - aka-fused_add_rmsnorm_bf16-w0
+  - aka-fused_add_rmsnorm_bf16-w1
+  - aka-fused_add_rmsnorm_bf16-w2
+  - aka-fused_add_rmsnorm_bf16-w3
+  - aka-fused_add_rmsnorm_bf16-w4
+  - aka-fused_add_rmsnorm_bf16-w5
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: d10b428134245aa5f4eed40c934d27050de0504044d707c338019424b89fbdf5
+  - role: semantic_reference
+    path: model.py
+    sha256: 264ea626dead2c516d8c9b4847a5c7a2ade668740434634330fee4c7e50a38ca
+  - role: correctness_runner
+    path: test_kernel_harness.py
+    sha256: 2d26c8fb73d1c4d11506d8b3bd3e996b0ee718e41dcbeedfdfdfd6154df4e58d
+  golden: {}
+- slot: per_token_i8_quant
+  task_path: tasks/torch2flydsl/per_token_i8_quant_kernel
+  problem_name: per_token_i8_quant
+  operation: quantization
+  input_dtypes:
+  - bfloat16
+  output_dtypes:
+  - float32
+  - int8
+  capabilities:
+  - code_distance
+  - mixed_output_dtype
+  - multi_output
+  pass_kind: forward
+  fusion_depth: fused
+  source_family: flydsl
+  suite: torch2flydsl
+  role: scored
+  workload_uuids:
+  - aka-per_token_i8_quant-w0
+  - aka-per_token_i8_quant-w1
+  - aka-per_token_i8_quant-w2
+  - aka-per_token_i8_quant-w3
+  - aka-per_token_i8_quant-w4
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 2cb06341e91f3cdea4b886c6823856ee04e48bcbbb27c6bffee9905c238442d8
+  - role: semantic_reference
+    path: model.py
+    sha256: ed02e9cd668486366652e23865d621fb2ccb90b52e13bf37ce9fb73b591dd889
+  - role: correctness_runner
+    path: test_kernel_harness.py
+    sha256: 9791b58b552955cfe99636d5a678ac7f546a04dc0b930fe2db337a2d062f3158
+  golden: {}
+- slot: rope_thd_fwd_bf16
+  task_path: tasks/torch2flydsl/rope_thd_fwd_kernel
+  problem_name: rope_thd_fwd_bf16
+  operation: position_encoding
+  input_dtypes:
+  - bfloat16
+  - int32
+  output_dtypes:
+  - bfloat16
+  capabilities:
+  - partial_custom_input
+  - structured_offsets
+  pass_kind: forward
+  fusion_depth: single
+  source_family: flydsl
+  suite: torch2flydsl
+  role: scored
+  workload_uuids:
+  - aka-rope_thd_fwd_bf16-w0
+  - aka-rope_thd_fwd_bf16-w1
+  - aka-rope_thd_fwd_bf16-w2
+  - aka-rope_thd_fwd_bf16-w3
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 5e7d97807cb3ca4060a3726e520b93319578fd8d8a031828e554ce203d6cccda
+  - role: semantic_reference
+    path: model.py
+    sha256: 9f177fc09413c3439b57f048e83eb4b587053422fedb966042d7402d599c4bf9
+  - role: correctness_runner
+    path: test_kernel_harness.py
+    sha256: 4925626dad75cdc6c4ce5996e5e01f71a8e6a6c7dcea18763984d47ca298f863
+  golden: {}
+- slot: dynamic_mxfp8_quant
+  task_path: tasks/torch2flydsl/dynamic_mxfp8_quant_kernel
+  problem_name: dynamic_mxfp8_quant
+  operation: quantization
+  input_dtypes:
+  - bfloat16
+  output_dtypes:
+  - float8_e4m3fn
+  - uint8
+  capabilities:
+  - code_distance
+  - fp8_output
+  - mixed_output_dtype
+  - multi_output
+  - raw_code_distance
+  - uint8_output
+  pass_kind: forward
+  fusion_depth: fused
+  source_family: flydsl
+  suite: torch2flydsl
+  role: scored
+  workload_uuids:
+  - aka-dynamic_mxfp8_quant-w0
+  - aka-dynamic_mxfp8_quant-w1
+  - aka-dynamic_mxfp8_quant-w2
+  - aka-dynamic_mxfp8_quant-w3
+  - aka-dynamic_mxfp8_quant-w4
+  - aka-dynamic_mxfp8_quant-w5
+  - aka-dynamic_mxfp8_quant-w6
+  - aka-dynamic_mxfp8_quant-w7
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: 09055d5a95b420c37dcb79832062c526e588303d7e7362d4f5ff542477eeb558
+  - role: semantic_reference
+    path: model.py
+    sha256: 9e5b1e289eee05aba727b71e28a98e6a7611d9fd6737d5e87b83fe9469eed39d
+  - role: correctness_runner
+    path: test_kernel_harness.py
+    sha256: fbe3aedc4389c4f0e14cc4d0aae8a52cf1ca8db3f387e42cbf5da2f371a4a2da
+  golden: {}
+- slot: moe_topk_softmax
+  task_path: tasks/torch2flydsl/moe_topk_softmax_kernel
+  problem_name: moe_topk_softmax
+  operation: routing
+  input_dtypes:
+  - bfloat16
+  - float32
+  - int32
+  output_dtypes:
+  - float32
+  - int32
+  capabilities:
+  - coupled_topk
+  - mixed_output_dtype
+  - multi_output
+  - partial_custom_input
+  pass_kind: forward
+  fusion_depth: fused
+  source_family: flydsl
+  suite: torch2flydsl
+  role: scored
+  workload_uuids:
+  - aka-moe_topk_softmax-w0
+  - aka-moe_topk_softmax-w1
+  - aka-moe_topk_softmax-w2
+  - aka-moe_topk_softmax-w3
+  aka_artifacts:
+  - role: config
+    path: config.yaml
+    sha256: a3dd5a8838cd12a114edacd1e5e7bf256df9688e09b0f999f9a94e482729f198
+  - role: semantic_reference
+    path: model.py
+    sha256: 4b44d0858365a99e907cf9ad902dce929a547a720fab3f7a7c426c3ce521f5b9
+  - role: correctness_runner
+    path: test_kernel_harness.py
+    sha256: 8167d3e5e36c30c8de757e0021313bcc6a5256fc98ecbafca895b63d05614fa0
   golden: {}

@@ -62,6 +62,28 @@ class AKAOperation(StrEnum):
     NORM = "norm"
     CONV = "conv"
     ATTENTION = "attention"
+    LOSS = "loss"
+    QUANTIZATION = "quantization"
+    ROUTING = "routing"
+    POSITION_ENCODING = "position_encoding"
+
+
+class AKACapability(StrEnum):
+    """Mechanically enforced corpus expansion capabilities."""
+
+    BOUNDED_INTEGER_INPUT = "bounded_integer_input"
+    POSITIVE_INPUT = "positive_input"
+    SIMPLEX_INPUT = "simplex_input"
+    SCALAR_TENSOR_OUTPUT = "scalar_tensor_output"
+    MULTI_OUTPUT = "multi_output"
+    MIXED_OUTPUT_DTYPE = "mixed_output_dtype"
+    CODE_DISTANCE = "code_distance"
+    PARTIAL_CUSTOM_INPUT = "partial_custom_input"
+    STRUCTURED_OFFSETS = "structured_offsets"
+    FP8_OUTPUT = "fp8_output"
+    UINT8_OUTPUT = "uint8_output"
+    RAW_CODE_DISTANCE = "raw_code_distance"
+    COUPLED_TOPK = "coupled_topk"
 
 
 class AKAOfficialScoringStatus(StrEnum):
@@ -108,9 +130,9 @@ class AKATargetGeneration(StrEnum):
     RDNA4 = "rdna4"
 
 
-AKA_MANIFEST_SCHEMA_VERSION = 5
+AKA_MANIFEST_SCHEMA_VERSION = 6
 AKA_TOLERANCE_CALIBRATION_FILENAME = "tolerance-calibration.json"
-AKA_OFFICIAL_BASELINE_ID = "rx9060xt-gfx1200-reference-v1"
+AKA_OFFICIAL_BASELINE_ID = "rx9060xt-gfx1200-reference-v2"
 AKA_REQUIRED_RELEASE_EVIDENCE = tuple(AKARequiredEvidenceKind)
 
 __all__ = [
@@ -119,6 +141,7 @@ __all__ = [
     "AKA_REQUIRED_RELEASE_EVIDENCE",
     "AKA_TOLERANCE_CALIBRATION_FILENAME",
     "AKAArtifactRole",
+    "AKACapability",
     "AKACompatibilityStage",
     "AKACorpusRole",
     "AKAFusionDepth",

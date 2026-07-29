@@ -16,14 +16,18 @@ import torch
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import atomic_write_json_value
-from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload import (
+    NumericCheck,
+    NumericCheckMode,
+    Workload,
+)
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import (
     AKA_REVISION,
     FORMAL_GFX_TARGET,
 )
 from sol_execbench.core.dataset.aka_equivalence import (
-    execute_reference,
+    execute_reference_entrypoints,
     load_problem,
     materialize_inputs,
     normalize_outputs,
@@ -84,9 +88,8 @@ def _variation(
     anchor: tuple[torch.Tensor, ...],
     observed: tuple[torch.Tensor, ...],
     output_dtypes: list[str],
-) -> tuple[float, float]:
-    max_abs = 0.0
-    max_rel = 0.0
+) -> list[tuple[float, float]]:
+    metrics: list[tuple[float, float]] = []
     for expected, actual, dtype in zip(
         anchor,
         observed,
@@ -95,12 +98,14 @@ def _variation(
     ):
         absolute = (actual.float() - expected.float()).abs()
         if not absolute.numel():
+            metrics.append((0.0, 0.0))
             continue
         floor = dtype_default_tolerance(dtype, margin=1.0).max_atol
         relative = absolute / expected.float().abs().clamp(min=floor)
-        max_abs = max(max_abs, float(absolute.max().item()))
-        max_rel = max(max_rel, float(relative.max().item()))
-    return max_abs, max_rel
+        metrics.append(
+            (float(absolute.max().item()), float(relative.max().item())),
+        )
+    return metrics
 
 
 def _calibrate_workload(
@@ -112,10 +117,10 @@ def _calibrate_workload(
     seed_count: int,
     repeats: int,
     margin: float,
+    custom_inputs_fn: Callable[..., object] | None,
 ) -> dict[str, Any]:
     output_dtypes = [spec.dtype for spec in definition.outputs.values()]
-    observed_abs = 0.0
-    observed_rel = 0.0
+    observed_metrics = {name: [0.0, 0.0] for name in definition.outputs}
     samples = 0
     for seed_index in range(seed_count):
         ordered, _ = materialize_inputs(
@@ -123,31 +128,60 @@ def _calibrate_workload(
             workload,
             seed=10_000 + seed_index,
             device=device,
+            custom_inputs_fn=custom_inputs_fn,
         )
         anchor = _output_snapshot(run, ordered, definition, workload)
         for _ in range(repeats - 1):
-            observed = _output_snapshot(run, ordered, definition, workload)
-            current_abs, current_rel = _variation(
+            observed_outputs = _output_snapshot(
+                run,
+                ordered,
+                definition,
+                workload,
+            )
+            current = _variation(
                 anchor,
-                observed,
+                observed_outputs,
                 output_dtypes,
             )
-            observed_abs = max(observed_abs, current_abs)
-            observed_rel = max(observed_rel, current_rel)
-            samples += len(observed)
-    tolerance = calibrate_tolerance(
-        output_dtypes,
-        observed_max_atol=observed_abs,
-        observed_max_rtol=observed_rel,
-        margin=margin,
-    )
+            for name, (current_abs, current_rel) in zip(
+                definition.outputs,
+                current,
+                strict=True,
+            ):
+                observed_metrics[name][0] = max(
+                    observed_metrics[name][0],
+                    current_abs,
+                )
+                observed_metrics[name][1] = max(
+                    observed_metrics[name][1],
+                    current_rel,
+                )
+            samples += len(observed_outputs)
+    checks = []
+    for check in workload.checks:
+        calibrated_check = check
+        if (
+            isinstance(check, NumericCheck)
+            and check.mode is NumericCheckMode.ELEMENTWISE
+        ):
+            dtype = definition.outputs[check.output].dtype
+            values = observed_metrics[check.output]
+            tolerance = calibrate_tolerance(
+                [dtype],
+                observed_max_atol=values[0],
+                observed_max_rtol=values[1],
+                margin=margin,
+            )
+            calibrated_check = check.model_copy(
+                update=tolerance.model_dump(mode="python"),
+            )
+        checks.append(calibrated_check.model_dump(mode="json"))
     return {
         "status": CalibrationStatus.CALIBRATED,
-        "observed_max_atol": observed_abs,
-        "observed_max_rtol": observed_rel,
+        "observed_outputs": observed_metrics,
         "output_dtypes": output_dtypes,
         "samples": samples,
-        "tolerance": tolerance.model_dump(mode="json"),
+        "checks": checks,
     }
 
 
@@ -161,7 +195,7 @@ def _records(args: argparse.Namespace) -> list[dict[str, Any]]:
     for spec in specs:
         problem_path = f"{spec.suite}/{spec.name}"
         definition, workloads = load_problem(args.problems_root / problem_path)
-        run = execute_reference(definition.reference)
+        run, custom_inputs_fn = execute_reference_entrypoints(definition)
         for workload in workloads:
             common = {
                 "problem_path": problem_path,
@@ -185,6 +219,7 @@ def _records(args: argparse.Namespace) -> list[dict[str, Any]]:
                     seed_count=args.seed_count,
                     repeats=args.repeats_per_seed,
                     margin=args.margin,
+                    custom_inputs_fn=custom_inputs_fn,
                 )
             records.append({**common, **result})
             print(f"calibrated {workload.uuid}: {result['status']}")

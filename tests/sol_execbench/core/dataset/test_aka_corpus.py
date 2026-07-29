@@ -27,7 +27,6 @@ from sol_execbench.core.dataset.aka_contract import (
     AKAOfficialScoringStatus,
     AKAOperation,
     AKAPassKind,
-    AKARequiredEvidenceKind,
     AKASuite,
 )
 from sol_execbench.core.dataset.aka_corpus import (
@@ -102,7 +101,7 @@ def test_aka_manifest_loads_and_pins_revision():
     )
     assert (
         manifest.official_scoring["status"]
-        == AKAOfficialScoringStatus.AVAILABLE
+        == AKAOfficialScoringStatus.UNAVAILABLE
     )
     assert set(manifest.execution_targets) == {"gfx942", "gfx1150", "gfx1200"}
     assert manifest.formal_analysis["formal_gfx_target"] == "gfx1200"
@@ -157,7 +156,13 @@ def test_entries_are_unique_with_fp8_sentinel_policy():
         for entry in manifest.entries
         if entry.role is AKACorpusRole.COMPATIBILITY_SENTINEL
     ]
-    assert all(entry.dtype.startswith(("fp8", "float8")) for entry in sentinels)
+    assert all(
+        any(
+            str(dtype).startswith(("fp8", "float8"))
+            for dtype in entry.output_dtypes
+        )
+        for entry in sentinels
+    )
     assert (
         sum(
             1
@@ -180,10 +185,18 @@ def test_expansion_coverage_breadth():
     fp8 = [
         entry
         for entry in manifest.entries
-        if entry.dtype.startswith(("fp8", "float8"))
+        if any(
+            str(dtype).startswith(("fp8", "float8"))
+            for dtype in entry.output_dtypes
+        )
     ]
-    assert len(fp8) == 1
-    assert fp8[0].role is AKACorpusRole.COMPATIBILITY_SENTINEL
+    assert {entry.role for entry in fp8} == {
+        AKACorpusRole.SCORED,
+        AKACorpusRole.COMPATIBILITY_SENTINEL,
+    }
+    assert operations[AKAOperation.LOSS] == 2
+    assert operations[AKAOperation.QUANTIZATION] == 2
+    assert operations[AKAOperation.ROUTING] == 1
 
     incompatible = [
         entry
@@ -207,7 +220,6 @@ def test_coverage_axes_truthfully_aggregate_entries():
 
     for field in (
         "operation",
-        "dtype",
         "pass_kind",
         "fusion_depth",
         "source_family",
@@ -218,6 +230,17 @@ def test_coverage_axes_truthfully_aggregate_entries():
             for entry in manifest.entries
         )
         assert dict(actual) == axes[field], f"coverage axis {field!r} mismatch"
+    for axis, attribute in (
+        ("input_dtype", "input_dtypes"),
+        ("output_dtype", "output_dtypes"),
+        ("capability", "capabilities"),
+    ):
+        actual = Counter(
+            str(value)
+            for entry in manifest.entries
+            for value in getattr(entry, attribute)
+        )
+        assert dict(actual) == axes[axis], f"coverage axis {axis!r} mismatch"
 
 
 def test_round_trip_every_authored_problem_through_the_schema():
@@ -286,13 +309,17 @@ def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
         )
 
 
-def test_official_score_reports_published_policy_without_accepting_raw_inputs():
+def test_official_score_reports_pending_v2_policy_without_raw_inputs():
     report = official_score_availability(MANIFEST)
 
-    assert report["policy"]["authorized"] is True
+    assert report["policy"]["authorized"] is False
     assert (
         report["policy"]["manifest_status"]
-        == AKAOfficialScoringStatus.AVAILABLE
+        == AKAOfficialScoringStatus.UNAVAILABLE
+    )
+    assert (
+        report["policy"]["reason_code"]
+        == "baseline_v2_release_evidence_pending"
     )
     assert report["verifier"]["available"] is True
     assert report["verifier"]["accepts_caller_authored_inputs"] is False
@@ -309,10 +336,7 @@ def test_official_score_reports_published_policy_without_accepting_raw_inputs():
         "reason_code": "repository_release_not_published",
         "path": None,
     }
-    assert (
-        AKARequiredEvidenceKind.RELEASE_BASELINE
-        in report["policy"]["required_evidence"]
-    )
+    assert report["policy"]["required_evidence"] == []
 
 
 def test_audit_rejects_incomplete_local_problem_inventory(tmp_path):

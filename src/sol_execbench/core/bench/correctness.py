@@ -186,4 +186,5 @@ def compute_error_stats(
     return Correctness(
         max_absolute_error=max_abs,
         max_relative_error=max_rel,
+        extra={"matched_ratio": matched_ratio},
     ), exceeds_tol

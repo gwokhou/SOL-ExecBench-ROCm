@@ -737,7 +737,7 @@ class TestGenInputs:
         inputs = gen_inputs(d, wkl, "cpu")
         assert inputs[1] == 0.5
 
-    def test_custom_factory_values_override_random_workload_inputs(self):
+    def test_custom_factory_only_materializes_marked_fields(self):
         d = _make_definition(
             inputs={
                 "a": {"shape": ["N"], "dtype": "float32"},
@@ -751,26 +751,24 @@ class TestGenInputs:
                 "    import torch\n"
                 "    return {\n"
                 "        'a': torch.full((axes['N'],), 3.0, device=device),\n"
-                "        'b': torch.full((axes['N'],), 4.0, device=device),\n"
                 "    }\n"
             ),
         )
         wkl = make_workload(
             uuid="u",
             axes={"N": 4},
-            inputs={"a": {"type": "random"}, "b": {"type": "random"}},
+            inputs={"a": {"type": "custom"}, "b": {"type": "random"}},
         )
 
         def gen(axes, device):
             return {
                 "a": torch.full((axes["N"],), 3.0, device=device),
-                "b": torch.full((axes["N"],), 4.0, device=device),
             }
 
         inputs = gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
 
         assert torch.equal(inputs[0], torch.full((4,), 3.0))
-        assert torch.equal(inputs[1], torch.full((4,), 4.0))
+        assert not torch.equal(inputs[1], torch.full((4,), 4.0))
 
     def test_custom_factory_is_deterministic_for_same_workload_seed(self):
         d = _make_definition(

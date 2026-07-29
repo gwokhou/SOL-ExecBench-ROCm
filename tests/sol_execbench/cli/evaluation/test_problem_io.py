@@ -31,6 +31,7 @@ def _workload_payload(uuid: str = "w0") -> dict:
         "uuid": uuid,
         "axes": {},
         "inputs": {"x": {"type": "random"}, "y": {"type": "random"}},
+        "checks": [{"type": "numeric", "output": "z"}],
     }
 
 

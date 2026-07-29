@@ -24,6 +24,10 @@ def make_definition(**kwargs: Any) -> Definition:
 
 
 def make_workload(**kwargs: Any) -> Workload:
+    kwargs.setdefault(
+        "checks",
+        [{"type": "numeric", "output": "output"}],
+    )
     return Workload.model_validate(kwargs)
 
 

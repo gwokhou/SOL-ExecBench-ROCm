@@ -12,15 +12,13 @@ from typing import Any
 
 import torch
 
-from sol_execbench.core.bench.correctness import (
-    check_output_shape_dtype,
-    compute_error_stats,
-)
+from sol_execbench.core.bench.correctness import check_output_shape_dtype
 from sol_execbench.core.bench.eval_runtime import TimingResult, measure_latency
 from sol_execbench.core.bench.evaluation_requests import (
     WorkloadEvaluationRequest,
 )
 from sol_execbench.core.bench.io import allocate_outputs, normalize_outputs
+from sol_execbench.core.bench.output_checks import compare_output_checks
 from sol_execbench.core.bench.reward_hack import RewardHackError
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.runtime import (
@@ -130,17 +128,19 @@ def _build_timed_output_validator(
             raise RewardHackError(
                 f"timed invocation returned invalid output shape or dtype: {issue}",
             )
-        for reference, candidate in zip(expected, actual, strict=True):
-            _, exceeds = compute_error_stats(
-                candidate,
-                reference,
-                workload.tolerance,
+        _, exceeds = compare_output_checks(
+            request.definition,
+            workload,
+            inputs,
+            expected,
+            actual,
+            0,
+        )
+        if exceeds:
+            raise RewardHackError(
+                "timed invocation output differs from the reference; "
+                "correctness and timing phases must execute identical behavior",
             )
-            if exceeds:
-                raise RewardHackError(
-                    "timed invocation output differs from the reference; "
-                    "correctness and timing phases must execute identical behavior",
-                )
 
     return validate
 

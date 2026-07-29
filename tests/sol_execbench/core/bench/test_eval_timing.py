@@ -25,7 +25,7 @@ def _request(*, destination_passing_style: bool = False):
     request = cast(
         WorkloadEvaluationRequest,
         SimpleNamespace(
-            definition=object(),
+            definition=SimpleNamespace(outputs={"output": object()}),
             device="cpu",
             output_names=["output"],
             output_dtypes_torch={"output": torch.float32},
@@ -51,11 +51,15 @@ def _workload() -> Workload:
         uuid="timing",
         axes={},
         inputs={},
-        tolerance={
-            "max_atol": 0.01,
-            "max_rtol": 0.01,
-            "required_matched_ratio": 1.0,
-        },
+        checks=[
+            {
+                "type": "numeric",
+                "output": "output",
+                "max_atol": 0.01,
+                "max_rtol": 0.01,
+                "required_matched_ratio": 1.0,
+            },
+        ],
     )
 
 

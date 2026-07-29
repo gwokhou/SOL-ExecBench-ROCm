@@ -208,8 +208,8 @@ def test_solar_corpus_audit_returns_incomplete_matrix(
         "audit_corpus_stage_readiness",
         lambda *args, **kwargs: CorpusStageAuditResult(
             status=CorpusReadinessStatus.INCOMPLETE,
-            problems=35,
-            workloads=122,
+            problems=43,
+            workloads=163,
             extraction_passed=118,
             conversion_passed=84,
             verification_passed=61,
@@ -232,7 +232,7 @@ def test_solar_corpus_audit_returns_incomplete_matrix(
 
     payload = json.loads(result.output)
     assert result.exit_code == 1
-    assert payload["data"]["workloads"] == 122
+    assert payload["data"]["workloads"] == 163
     assert payload["data"]["verification_passed"] == 61
     assert {item["path"] for item in payload["artifacts"]} == {
         str(matrix),

@@ -97,7 +97,7 @@ uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
   --timeout 14400
 ```
 
-The audit derives its 35-problem / 122-workload denominator from the pinned
+The audit derives its 43-problem / 163-workload denominator from the pinned
 manifest and writes a content-addressed `matrix.jsonl` plus `summary.json`.
 Failures remain in the matrix with stable stage and reason codes; `--resume`
 continues only when all recorded identities and artifact hashes still match.
@@ -113,11 +113,12 @@ closed.
 
 ## Official score
 
-The schema v5 corpus publishes the
-`content_addressed_publisher_v1` scoring policy and its canonical
-`rx9060xt-gfx1200-reference-v1` baseline identity. The fail-closed scorer
-accepts a publisher-authored release bundle whose SHA-256 references bind the
-corpus, baseline, candidate execution, and pinned SOLAR manifests:
+The schema v6 corpus pins the pending
+`rx9060xt-gfx1200-reference-v2` baseline identity. Official scoring remains
+unauthorized until its v2 release evidence is published. Once authorized, the
+fail-closed scorer accepts a publisher-authored release bundle whose SHA-256
+references bind the corpus, baseline, candidate execution, and pinned SOLAR
+manifests:
 
 ```bash
 uv run sol-execbench score official RELEASE/release-bundle.json
@@ -150,7 +151,7 @@ GPU tests declare their ROCm and architecture prerequisites. Build the optional
 container with `./scripts/run_docker.sh --build`.
 
 See [SOLAR boundary](docs/SOLAR-BOUNDARY.md) and
-[scoring contract](docs/SCORING-V3.md) for the normative v3 architecture. The
+[scoring contract](docs/SCORING-V3.md) for the normative architecture. The
 recorded GPU engineering evidence is limited to RX 9060 XT `gfx1200` on the
 locked ROCm 7.2 stack; see
 [RDNA4 validation scope](docs/user/RDNA4-VALIDATION.md) for the exact test,

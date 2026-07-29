@@ -102,11 +102,13 @@ _EVIL_WORKLOAD_DICTS = [
     {
         "axes": {},
         "inputs": {"x": {"type": "random"}, "y": {"type": "random"}},
+        "checks": [{"type": "numeric", "output": "z"}],
         "uuid": "evil-wkl-0001",
     },
     {
         "axes": {},
         "inputs": {"x": {"type": "random"}, "y": {"type": "random"}},
+        "checks": [{"type": "numeric", "output": "z"}],
         "uuid": "evil-wkl-0002",
     },
 ]

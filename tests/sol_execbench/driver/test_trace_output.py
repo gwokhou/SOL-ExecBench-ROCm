@@ -16,6 +16,7 @@ def _trace_json(uuid: str = "wkl-0001") -> str:
                     "x": {"type": "random"},
                     "y": {"type": "random"},
                 },
+                "checks": [{"type": "numeric", "output": "z"}],
                 "uuid": uuid,
             },
             "solution": "vecadd_python",

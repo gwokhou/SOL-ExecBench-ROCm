@@ -13,7 +13,7 @@ def _new_gelu(z):
         * (
             1.0
             + torch.tanh(
-                math.sqrt(2.0 / math.pi) * (z + 0.044715 * torch.pow(z, 3.0)),
+                math.sqrt(2.0 / math.pi) * (z + 0.044715 * torch.pow(z, 3.0))
             )
         )
     )

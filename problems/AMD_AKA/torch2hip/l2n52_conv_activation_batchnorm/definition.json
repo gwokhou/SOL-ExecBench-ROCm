@@ -1,0 +1,110 @@
+{
+  "name": "l2n52_conv_activation_batchnorm",
+  "op_type": "conv",
+  "description": "Conv2d, Mish activation, and eval-mode BatchNorm.",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "Batch size."
+    },
+    "H": {
+      "type": "var",
+      "description": "Input height."
+    },
+    "W": {
+      "type": "var",
+      "description": "Input width."
+    },
+    "IC": {
+      "type": "const",
+      "value": 64,
+      "description": ""
+    },
+    "OC": {
+      "type": "const",
+      "value": 128,
+      "description": ""
+    },
+    "K": {
+      "type": "const",
+      "value": 3,
+      "description": ""
+    },
+    "OH": {
+      "type": "expr",
+      "expression": "H - K + 1",
+      "description": ""
+    },
+    "OW": {
+      "type": "expr",
+      "expression": "W - K + 1",
+      "description": ""
+    }
+  },
+  "inputs": {
+    "x": {
+      "shape": [
+        "B",
+        "IC",
+        "H",
+        "W"
+      ],
+      "dtype": "float32"
+    },
+    "conv_weight": {
+      "shape": [
+        "OC",
+        "IC",
+        "K",
+        "K"
+      ],
+      "dtype": "float32"
+    },
+    "conv_bias": {
+      "shape": [
+        "OC"
+      ],
+      "dtype": "float32"
+    },
+    "bn_weight": {
+      "shape": [
+        "OC"
+      ],
+      "dtype": "float32"
+    },
+    "bn_bias": {
+      "shape": [
+        "OC"
+      ],
+      "dtype": "float32"
+    },
+    "bn_mean": {
+      "shape": [
+        "OC"
+      ],
+      "dtype": "float32"
+    },
+    "bn_var": {
+      "shape": [
+        "OC"
+      ],
+      "dtype": "float32"
+    },
+    "bn_eps": {
+      "shape": null,
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "OC",
+        "OH",
+        "OW"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch\nimport torch.nn.functional as F\n\n\ndef run(x, conv_weight, conv_bias, bn_weight, bn_bias, bn_mean, bn_var, bn_eps):\n    value = F.conv2d(x, conv_weight, conv_bias)\n    value = torch.multiply(torch.tanh(F.softplus(value)), value)\n    return F.batch_norm(\n        value, bn_mean, bn_var, bn_weight, bn_bias, training=False, eps=bn_eps\n    )\n"
+}

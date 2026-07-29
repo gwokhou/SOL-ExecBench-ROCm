@@ -1,0 +1,54 @@
+{
+  "name": "14007_kd_loss",
+  "op_type": "loss",
+  "description": "Knowledge-distillation KL loss with probability targets.",
+  "axes": {
+    "N": {
+      "type": "var",
+      "description": "Batch size."
+    },
+    "C": {
+      "type": "var",
+      "description": "Channel count."
+    },
+    "H": {
+      "type": "var",
+      "description": "Height."
+    },
+    "W": {
+      "type": "var",
+      "description": "Width."
+    }
+  },
+  "inputs": {
+    "input": {
+      "shape": [
+        "N",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32"
+    },
+    "target": {
+      "shape": [
+        "N",
+        "C",
+        "H",
+        "W"
+      ],
+      "dtype": "float32"
+    },
+    "temperature": {
+      "shape": null,
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "loss": {
+      "shape": [],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\n\ndef run(input, target, temperature):\n    log_p = F.log_softmax(input / temperature, dim=1)\n    return (\n        F.kl_div(log_p, target, reduction=\"sum\")\n        * (temperature * temperature)\n        / input.size(0)\n    )\n"
+}

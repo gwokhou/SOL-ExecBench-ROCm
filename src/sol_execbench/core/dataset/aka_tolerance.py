@@ -11,8 +11,14 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Protocol, cast
 
+from pydantic import TypeAdapter
+
 from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.workload import ToleranceSpec, Workload
+from sol_execbench.core.data.workload import (
+    OutputCheck,
+    ToleranceSpec,
+    Workload,
+)
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.integrity import (
     sha256_file,
@@ -21,7 +27,7 @@ from sol_execbench.core.integrity import (
     validate_sha256,
 )
 
-CALIBRATION_SCHEMA_VERSION = 1
+CALIBRATION_SCHEMA_VERSION = 2
 CALIBRATION_METHOD = "repeated_reference_runs"
 DEFAULT_MARGIN = 1.25
 DEFAULT_SEED_COUNT = 3
@@ -123,13 +129,13 @@ def workload_contract_sha256(
     definition: Definition,
     workload: Workload,
 ) -> str:
-    """Hash semantic Definition plus Workload fields excluding tolerance."""
+    """Hash semantic Definition plus Workload fields excluding calibrated checks."""
     return stable_json_checksum(
         {
             "definition": definition.model_dump(mode="json"),
             "workload": workload.model_dump(
                 mode="json",
-                exclude={"tolerance"},
+                exclude={"checks"},
             ),
         },
     )
@@ -166,10 +172,11 @@ def load_tolerance_calibration(path: Path) -> dict[str, object]:
     return data
 
 
-def calibration_tolerances(path: Path) -> dict[str, ToleranceSpec]:
-    """Return calibrated tolerances indexed by workload UUID."""
+def calibration_checks(path: Path) -> dict[str, list[OutputCheck]]:
+    """Return calibrated output checks indexed by workload UUID."""
     data = load_tolerance_calibration(path)
-    result: dict[str, ToleranceSpec] = {}
+    result: dict[str, list[OutputCheck]] = {}
+    adapter = TypeAdapter(list[OutputCheck])
     for record in _record_list(data):
         if not isinstance(record, Mapping):
             raise ValueError(
@@ -182,9 +189,7 @@ def calibration_tolerances(path: Path) -> dict[str, ToleranceSpec]:
             raise ValueError(
                 "calibration workload UUID is missing or duplicated",
             )
-        result[uuid] = ToleranceSpec.model_validate(
-            record.get("tolerance") or {},
-        )
+        result[uuid] = adapter.validate_python(record.get("checks") or [])
     return result
 
 
@@ -317,10 +322,12 @@ def _validate_workload_record(
                 f"calibration exclusion mismatch for {workload.uuid}",
             )
         return
-    calibrated = ToleranceSpec.model_validate(record.get("tolerance") or {})
-    if workload.tolerance != calibrated:
+    calibrated = TypeAdapter(list[OutputCheck]).validate_python(
+        record.get("checks") or [],
+    )
+    if workload.checks != calibrated:
         raise ValueError(
-            f"authored tolerance is not calibrated for {workload.uuid}",
+            f"authored checks are not calibrated for {workload.uuid}",
         )
     samples = record.get("samples")
     if not isinstance(samples, int) or samples <= 0:
@@ -344,7 +351,7 @@ __all__ = [
     "DEFAULT_SEED_COUNT",
     "CalibrationStatus",
     "calibrate_tolerance",
-    "calibration_tolerances",
+    "calibration_checks",
     "dtype_default_tolerance",
     "load_tolerance_calibration",
     "validate_calibration_binding",

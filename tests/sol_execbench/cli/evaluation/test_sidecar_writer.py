@@ -134,6 +134,7 @@ def _trace() -> Trace:
             uuid="w0",
             axes={"n": 1},
             inputs={"n": ScalarInput(value=1)},
+            checks=[{"type": "numeric", "output": "output"}],
         ),
         evaluation=Evaluation(
             status=EvaluationStatus.COMPILE_ERROR,

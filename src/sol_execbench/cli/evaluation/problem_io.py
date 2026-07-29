@@ -19,6 +19,9 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import load_json_file, load_jsonl_file
 from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload_validation import (
+    validate_problem_contract,
+)
 from sol_execbench.core.platform.runtime import detect_rocm_device
 
 
@@ -69,9 +72,12 @@ def _load_config(path: Path | None) -> BenchmarkConfig:
 
 def load_problem_inputs(inputs: ResolvedProblemInputs) -> LoadedProblemInputs:
     """Load and validate every model needed by an evaluation run."""
+    definition = _load_definition(inputs.definition_file)
+    workloads = _load_workloads(inputs.workload_file)
+    validate_problem_contract(definition, workloads)
     return LoadedProblemInputs(
-        definition=_load_definition(inputs.definition_file),
-        workloads=_load_workloads(inputs.workload_file),
+        definition=definition,
+        workloads=workloads,
         solution=_load_solution(inputs.solution_file),
         config=_load_config(inputs.config_file),
     )

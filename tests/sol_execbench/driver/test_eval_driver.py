@@ -86,6 +86,7 @@ _MINIMAL_WORKLOAD = {
         "x": {"type": "random"},
         "y": {"type": "random"},
     },
+    "checks": [{"type": "numeric", "output": "z"}],
     "uuid": "sub-test-0001",
 }
 
@@ -280,6 +281,7 @@ def _custom_inputs_workload() -> dict:
     return {
         "axes": {},
         "inputs": {"a": {"type": "custom"}, "b": {"type": "custom"}},
+        "checks": [{"type": "numeric", "output": "c"}],
         "uuid": "custom-driver-0001",
     }
 
@@ -503,6 +505,7 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     workload = {
         "axes": {},
         "inputs": {"x": {"type": "random"}},
+        "checks": [{"type": "numeric", "output": "z"}],
         "uuid": "alias-freeze-0001",
     }
     _stage_evaluation_templates(tmp_path)

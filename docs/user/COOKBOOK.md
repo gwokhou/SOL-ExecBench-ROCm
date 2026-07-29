@@ -128,7 +128,7 @@ uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
   --timeout 14400
 ```
 
-This command derives the scored denominator from the manifest (currently 122
+This command derives the scored denominator from the manifest (currently 163
 workloads), then audits extraction, strict conversion, and multi-seed replay
 without running Orojenesis. It keeps every workload in the content-addressed
 matrix, including failed stages and stable reason codes. Use `--resume` only to

@@ -1,4 +1,4 @@
-# Scoring contract v3
+# Scoring contract
 
 SOLAR emits a lower-bound runtime and no candidate-facing metric. The outer
 benchmark applies the paper score:
@@ -17,18 +17,18 @@ scores belonging to the same problem are averaged first. Those per-problem
 means are then averaged with equal problem weight. Problems flagged as
 compatibility sentinels never enter either denominator.
 
-The checked-in schema v5 corpus publishes a content-addressed official-scoring
-policy and canonical baseline identity. The official command accepts only a
-publisher release bundle that binds the canonical baseline run, candidate run,
-per-workload SOLAR manifests, public corpus, and architecture identities. It
-does not accept caller-supplied runtime JSON.
+The checked-in schema v6 corpus defines 43 scored problems and 163 scored
+workloads. The verifier accepts only a publisher release bundle that binds the
+canonical baseline run, candidate run, per-workload SOLAR manifests, public
+corpus, and architecture identities. It does not accept caller-supplied runtime
+JSON.
 
 `score status` reports four separate states instead of a single overloaded
 availability flag: verifier availability, corpus-policy authorization, formal
-producer readiness, and whether a repository release bundle is published. In
-the current tree the verifier, policy, and formal producer are ready because a
-reproducibly built mapper digest is allowlisted. No repository release bundle
-is published.
+producer readiness, and whether a repository release bundle is published. The
+verifier and formal producer are available, but the v2 baseline evidence has
+not been published. The schema v6 manifest therefore keeps policy authorization
+fail-closed with reason `baseline_v2_release_evidence_pending`.
 
 ## SOLAR bound policy
 

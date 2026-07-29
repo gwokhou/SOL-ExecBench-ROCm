@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.workload import ToleranceSpec, Workload
+from sol_execbench.core.data.workload import NumericCheck, Workload
 from sol_execbench.core.dataset.aka_tolerance import (
     calibrate_tolerance,
     dtype_default_tolerance,
@@ -44,13 +44,24 @@ def _definition() -> Definition:
     )
 
 
-def _workload(tolerance: ToleranceSpec) -> Workload:
+def _workload(max_atol: float, max_rtol: float) -> Workload:
     return Workload.model_validate(
         {
             "axes": {"N": 8},
             "inputs": {"x": {"type": "random"}},
             "uuid": "calibration-test",
-            "tolerance": tolerance.model_dump(mode="json"),
+            "checks": [
+                NumericCheck(
+                    output="fp32",
+                    max_atol=max_atol,
+                    max_rtol=max_rtol,
+                ).model_dump(mode="json"),
+                NumericCheck(
+                    output="bf16",
+                    max_atol=max_atol,
+                    max_rtol=max_rtol,
+                ).model_dump(mode="json"),
+            ],
         },
     )
 
@@ -67,10 +78,10 @@ def test_runtime_observation_can_only_widen_dtype_floors():
     assert calibrated.max_atol >= dtype_default_tolerance("bfloat16").max_atol
 
 
-def test_workload_contract_hash_excludes_only_tolerance():
+def test_workload_contract_hash_excludes_only_output_checks():
     definition = _definition()
-    first = _workload(ToleranceSpec(max_atol=1e-5, max_rtol=1e-5))
-    second = _workload(ToleranceSpec(max_atol=1e-1, max_rtol=1e-1))
+    first = _workload(1e-5, 1e-5)
+    second = _workload(1e-1, 1e-1)
 
     assert workload_contract_sha256(
         definition,

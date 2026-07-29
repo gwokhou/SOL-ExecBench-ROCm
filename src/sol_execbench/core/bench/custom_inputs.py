@@ -28,7 +28,7 @@ import torch
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
-from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.data.workload import CustomInput, Workload
 
 GEN_INPUTS_ERROR = "gen_inputs_error"
 GEN_INPUTS_OOM_BLOCKED = "gen_inputs_oom_blocked"
@@ -193,7 +193,11 @@ def _validate_custom_tensors(
             provenance=provenance,
         )
 
-    expected_names = set(definition.inputs.keys())
+    expected_names = {
+        name
+        for name, input_spec in workload.inputs.items()
+        if isinstance(input_spec, CustomInput)
+    }
     generated_names = set(generated.keys())
     missing = sorted(expected_names - generated_names)
     if missing:
@@ -211,53 +215,74 @@ def _validate_custom_tensors(
         )
 
     shapes = definition.get_input_shapes(workload.axes)
-    validated: dict[str, Any] = {}
-    for name, spec in definition.inputs.items():
-        value = generated[name]
-        expected_shape = shapes[name]
-        expected_dtype = dtype_str_to_torch_dtype(spec.dtype)
-        if expected_shape is None:
-            if isinstance(value, torch.Tensor):
-                _raise_custom_input_error(
-                    f"'{name}' expected scalar, got tensor",
-                    failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
-                    provenance=provenance,
-                )
-            if not isinstance(value, (int, float, bool)):
-                _raise_custom_input_error(
-                    f"'{name}' expected scalar, got {type(value).__name__}",
-                    failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
-                    provenance=provenance,
-                )
-            validated[name] = value
-            continue
+    return {
+        name: _validate_custom_value(
+            name,
+            generated[name],
+            shapes[name],
+            definition.inputs[name].dtype,
+            device,
+            provenance,
+        )
+        for name in sorted(expected_names)
+    }
 
-        if not isinstance(value, torch.Tensor):
+
+def _validate_custom_value(
+    name: str,
+    value: Any,
+    expected_shape: tuple[int, ...] | None,
+    dtype: str,
+    device: torch.device,
+    provenance: CustomInputProvenance,
+) -> Any:
+    if expected_shape is None:
+        if isinstance(value, torch.Tensor):
             _raise_custom_input_error(
-                f"'{name}' expected tensor, got {type(value).__name__}",
+                f"'{name}' expected scalar, got tensor",
                 failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
                 provenance=provenance,
             )
-        if tuple(value.shape) != expected_shape:
+        if not isinstance(value, (int, float, bool)):
             _raise_custom_input_error(
-                f"'{name}' expected shape {expected_shape}, got {tuple(value.shape)}",
+                f"'{name}' expected scalar, got {type(value).__name__}",
                 failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
                 provenance=provenance,
             )
-        if value.dtype != expected_dtype:
-            _raise_custom_input_error(
-                f"'{name}' expected dtype {expected_dtype}, got {value.dtype}",
-                failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
-                provenance=provenance,
-            )
-        if value.device != device:
-            _raise_custom_input_error(
-                f"'{name}' expected device {device}, got {value.device}",
-                failure_class=GEN_INPUTS_DEVICE_MISMATCH,
-                provenance=provenance,
-            )
-        validated[name] = value
-    return validated
+        return value
+    if not isinstance(value, torch.Tensor):
+        _raise_custom_input_error(
+            f"'{name}' expected tensor, got {type(value).__name__}",
+            failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+            provenance=provenance,
+        )
+    expected_dtype = dtype_str_to_torch_dtype(dtype)
+    if tuple(value.shape) != expected_shape:
+        _raise_custom_input_error(
+            f"'{name}' expected shape {expected_shape}, got {tuple(value.shape)}",
+            failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+            provenance=provenance,
+        )
+    if value.dtype != expected_dtype:
+        _raise_custom_input_error(
+            f"'{name}' expected dtype {expected_dtype}, got {value.dtype}",
+            failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+            provenance=provenance,
+        )
+    if not _device_matches(value.device, device):
+        _raise_custom_input_error(
+            f"'{name}' expected device {device}, got {value.device}",
+            failure_class=GEN_INPUTS_DEVICE_MISMATCH,
+            provenance=provenance,
+        )
+    return value
+
+
+def _device_matches(actual: torch.device, expected: torch.device) -> bool:
+    """Match an unindexed device request to the selected device of that type."""
+    if expected.index is None:
+        return actual.type == expected.type
+    return actual == expected
 
 
 def gen_custom_inputs(

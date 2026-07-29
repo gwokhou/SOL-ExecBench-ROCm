@@ -1,0 +1,60 @@
+{
+  "name": "moe_topk_softmax",
+  "op_type": "routing",
+  "description": "Tie-aware softmax MoE top-k routing with IDs and weights.",
+  "axes": {
+    "T": {
+      "type": "var",
+      "description": "Token count."
+    },
+    "E": {
+      "type": "var",
+      "description": "Expert count."
+    },
+    "K": {
+      "type": "var",
+      "description": "Selected experts."
+    }
+  },
+  "inputs": {
+    "gating": {
+      "shape": [
+        "T",
+        "E"
+      ],
+      "dtype": "bfloat16"
+    },
+    "bias": {
+      "shape": [
+        "E"
+      ],
+      "dtype": "float32"
+    },
+    "topk": {
+      "shape": null,
+      "dtype": "int32"
+    },
+    "route_scale": {
+      "shape": null,
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "weights": {
+      "shape": [
+        "T",
+        "K"
+      ],
+      "dtype": "float32"
+    },
+    "ids": {
+      "shape": [
+        "T",
+        "K"
+      ],
+      "dtype": "int32"
+    }
+  },
+  "reference": "import torch\n\n\ndef gen_gating(values, device):\n    experts, tokens = values[\"E\"], values[\"T\"]\n    base = torch.arange(-1, 1, 2.0 / experts, device=device)[:experts]\n    gating = base.repeat(tokens, 1).to(torch.bfloat16)\n    perm = torch.argsort(torch.rand(gating.shape, device=device), dim=-1)\n    return {\"gating\": torch.gather(gating, -1, perm).contiguous()}\n\n\ndef run(gating, bias, topk, route_scale):\n    scores = torch.softmax(gating.float(), dim=-1)\n    ids = (scores + bias.float()).topk(topk, dim=-1, sorted=False).indices\n    weights = scores.gather(1, ids) * route_scale\n    return weights.float(), ids.to(torch.int32)\n",
+  "custom_inputs_entrypoint": "gen_gating"
+}

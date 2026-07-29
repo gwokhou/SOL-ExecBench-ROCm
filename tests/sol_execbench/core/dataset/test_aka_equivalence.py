@@ -39,4 +39,4 @@ def test_aka_equivalence_check_passes_for_the_corpus():
     )
     assert "[FAIL]" not in result.stdout, result.stdout
     assert "cross-check=failed" not in result.stdout, result.stdout
-    assert "35 source-equivalent, 2 explicitly not applicable" in result.stdout
+    assert "43 source-equivalent, 2 explicitly not applicable" in result.stdout

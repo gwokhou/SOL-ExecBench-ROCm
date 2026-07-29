@@ -19,7 +19,7 @@ ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
 ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION: Final = (
     "sol_execbench.environment_snapshot.v2"
 )
-EVALUATOR_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.evaluator_contract.v4"
+EVALUATOR_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.evaluator_contract.v5"
 ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION: Final = (
     "sol_execbench.rocm_compatibility_matrix.v1"
 )

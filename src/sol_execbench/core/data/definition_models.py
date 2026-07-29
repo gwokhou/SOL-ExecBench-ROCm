@@ -76,6 +76,8 @@ class DType(StrEnum):
     """16-bit signed integer."""
     INT8 = "int8"
     """8-bit signed integer."""
+    UINT8 = "uint8"
+    """8-bit unsigned integer."""
     BOOL = "bool"
     """Boolean type."""
 

@@ -122,7 +122,7 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     assert payload["reason_code"] == "profile_summary_generated"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["run_id"] == "run-0"
-    assert payload["identity"]["sol_version"] == "v3.0.0"
+    assert payload["identity"]["sol_version"] == "unreleased-v4"
     assert "sol_contract_version" not in payload["identity"]
     assert payload["authority"] == "diagnostic"
     assert payload["summary"]["profiler_status"] == "success"
@@ -165,7 +165,7 @@ def test_profile_summary_freshness_uses_canonical_sol_version(tmp_path: Path):
         sidecar,
         trace_path=str(tmp_path / "trace.jsonl"),
         run_id="run-0",
-        sol_version="v3.0.0",
+        sol_version="unreleased-v4",
     )
     stale = validate_profile_summary_freshness(sidecar, sol_version="9.9")
 
@@ -181,7 +181,10 @@ def test_profile_summary_freshness_sol_version_only_is_current(tmp_path: Path):
         run_id="run-0",
     )
 
-    current = validate_profile_summary_freshness(sidecar, sol_version="v3.0.0")
+    current = validate_profile_summary_freshness(
+        sidecar,
+        sol_version="unreleased-v4",
+    )
 
     assert current.status == "current"
     assert current.reason_codes == []
