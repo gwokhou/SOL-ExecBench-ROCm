@@ -291,7 +291,10 @@ def _performance_feedback_items(
     items: list[AgentFeedbackItem] = []
     for workload in diagnostic.workloads:
         for attribution in workload.attributions:
-            if not _usable_performance_attribution(attribution):
+            if not _usable_performance_attribution(
+                attribution,
+                diagnostic_status=diagnostic.status,
+            ):
                 continue
             action_code = attribution.action_code
             if action_code is None:
@@ -317,6 +320,8 @@ def _performance_feedback_items(
 
 def _usable_performance_attribution(
     attribution: PerformanceAttribution,
+    *,
+    diagnostic_status: DiagnosticSidecarStatus,
 ) -> bool:
     action = attribution.action_code
     if action not in _PERFORMANCE_ACTION_CODES:
@@ -326,6 +331,8 @@ def _usable_performance_attribution(
         "model_gap_no_kernel_action",
     }:
         return True
+    if diagnostic_status is not DiagnosticSidecarStatus.AVAILABLE:
+        return False
     return attribution.confidence in {
         DiagnosticConfidence.MEDIUM,
         DiagnosticConfidence.HIGH,

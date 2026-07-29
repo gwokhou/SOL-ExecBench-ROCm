@@ -19,6 +19,11 @@ from sol_execbench.core.bench.performance_model.attribution import (
     calculate_ratios,
     derive_attributions,
 )
+from sol_execbench.core.bench.performance_model.evidence_manifest import (
+    PerformanceEvidenceArtifactKind,
+    PerformanceEvidenceManifest,
+    load_and_verify_performance_evidence_manifest,
+)
 from sol_execbench.core.bench.performance_model.models import (
     CompiledCharacterization,
     DiagnosticCalibrationProfile,
@@ -35,6 +40,10 @@ from sol_execbench.core.bench.performance_model.prediction import (
     predict_hw,
     predict_ir,
     validate_calibration_identity,
+)
+from sol_execbench.core.bench.performance_model.timing_evidence import (
+    PerformanceTimingEvidenceSidecar,
+    WorkloadTimingEvidence,
 )
 from sol_execbench.core.bench.profile_summary import (
     ProfileSummarySidecar,
@@ -63,7 +72,7 @@ from sol_execbench.core.integrity import (
     verify_artifact_file,
 )
 from sol_execbench.core.solar_bridge.performance import (
-    load_semantic_characterization,
+    load_manifest_semantic_characterization,
 )
 
 
@@ -71,92 +80,319 @@ from sol_execbench.core.solar_bridge.performance import (
 class PerformanceDiagnosticBuildRequest:
     """Immutable paths and identity inputs for one diagnostic build."""
 
-    trace_path: Path
-    solar_analysis_paths: dict[str, Path]
-    profile_summary_path: Path
-    static_evidence_path: Path
+    evidence_manifest_path: Path
+    solar_manifest_path: Path
     output_path: Path
-    frontier_trace_paths: dict[str, Path]
     calibration_profile_path: Path | None = None
-    gpu_id: str | None = None
-    compiler_version: str | None = None
-    power_profile: str | None = None
+    frontier_trace_path: Path | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _BuildEvidence:
+    manifest: PerformanceEvidenceManifest
+    trace: Trace
+    timing: WorkloadTimingEvidence
+    compiled: list[CompiledCharacterization]
+    calibration: DiagnosticCalibrationProfile | None
+    dispatches: list[DispatchEvidence]
+    semantic: SemanticCharacterization
+    identity_reasons: list[str]
+    dispatch_reasons: list[str]
 
 
 def build_performance_diagnostic(
     request: PerformanceDiagnosticBuildRequest,
 ) -> PerformanceDiagnosticSidecar:
     """Validate all input identities and build one diagnostic-only sidecar."""
-    traces = load_jsonl_file(Trace, request.trace_path)
-    if not traces:
-        raise ValueError("canonical trace contains no rows")
-    by_workload = _traces_by_workload(traces)
-    _require_exact_workload_mapping(by_workload, request.solar_analysis_paths)
-    profile = load_json_file(
-        ProfileSummarySidecar, request.profile_summary_path
+    evidence = _load_build_evidence(request)
+    manifest = evidence.manifest
+    workload = _workload_diagnostic(
+        trace=evidence.trace,
+        semantic=evidence.semantic,
+        timing=evidence.timing,
+        frontier_path=request.frontier_trace_path,
+        compiled=evidence.compiled,
+        dispatches=evidence.dispatches,
+        calibration=evidence.calibration,
+        identity_reasons=evidence.identity_reasons,
+        extra_reasons=[
+            *manifest.reason_codes,
+            *evidence.dispatch_reasons,
+        ],
     )
-    _require_current_profile(profile, request.trace_path)
-    _require_trace_citation(profile, request.trace_path)
-    static = load_json_file(
-        StaticKernelEvidenceSidecar,
-        request.static_evidence_path,
-    )
-    gpu_architecture = _gpu_architecture(traces)
-    compiled, candidate_sha256 = _compiled_characterizations(
-        static,
-        request.static_evidence_path,
-        gpu_architecture,
-    )
-    calibration = _load_calibration(request.calibration_profile_path)
-    identity_reasons = _calibration_reasons(
-        calibration,
-        request=request,
-        traces=traces,
-        gpu_architecture=gpu_architecture,
-    )
-    dispatches, dispatch_reasons = _dispatch_evidence(
-        profile,
-        request.profile_summary_path,
-        by_workload,
-        candidate_sha256,
-        compiled,
-    )
-    workloads = [
-        _workload_diagnostic(
-            trace=by_workload[workload_uuid],
-            solar_path=request.solar_analysis_paths[workload_uuid],
-            frontier_path=request.frontier_trace_paths.get(workload_uuid),
-            compiled=compiled,
-            dispatches=dispatches.get(workload_uuid, []),
-            calibration=calibration,
-            identity_reasons=identity_reasons,
-            extra_reasons=dispatch_reasons,
+    reasons = list(
+        dict.fromkeys(
+            [
+                *manifest.reason_codes,
+                *evidence.identity_reasons,
+                *evidence.dispatch_reasons,
+                *workload.reason_codes,
+            ]
         )
-        for workload_uuid in sorted(by_workload)
-    ]
-    reasons = [
-        *identity_reasons,
-        *dispatch_reasons,
-        *(reason for workload in workloads for reason in workload.reason_codes),
-    ]
-    reasons = list(dict.fromkeys(reasons))
-    status = _sidecar_status(workloads, reasons)
+    )
     return PerformanceDiagnosticSidecar(
-        status=status,
-        run_id=profile.identity.run_id or sha256_file(request.trace_path),
-        candidate_sha256=candidate_sha256,
-        gpu_architecture=gpu_architecture,
-        calibration_identity=calibration.identity if calibration else None,
-        workloads=workloads,
-        evidence=_input_references(request),
+        status=_sidecar_status([workload], reasons),
+        run_id=manifest.identity.run_id,
+        candidate_sha256=manifest.identity.candidate_sha256,
+        gpu_architecture=manifest.identity.gpu_architecture,
+        calibration_identity=(
+            evidence.calibration.identity if evidence.calibration else None
+        ),
+        workloads=[workload],
+        evidence=[
+            *_input_references(request),
+            *_manifest_references(
+                request.evidence_manifest_path,
+                manifest,
+            ),
+        ],
         reason_codes=reasons,
         limitations=[
             "Performance predictions are diagnostic-only and do not affect SOL Score.",
             "Canonical Trace JSONL remains timing and correctness authority.",
             "Profiler duration and achieved rates are excluded from T_pred(HW).",
-            "Repeated profiler dispatches are reduced by median counters to one invocation.",
+            "Counter evidence is a post-canonical, single-workload replay.",
+            "Overlapping or multi-queue dispatches are unsupported.",
         ],
     )
+
+
+def _load_build_evidence(
+    request: PerformanceDiagnosticBuildRequest,
+) -> _BuildEvidence:
+    manifest = load_and_verify_performance_evidence_manifest(
+        request.evidence_manifest_path
+    )
+    trace_path = _manifest_artifact_path(
+        request.evidence_manifest_path,
+        manifest,
+        PerformanceEvidenceArtifactKind.TRACE,
+    )
+    timing_path = _manifest_artifact_path(
+        request.evidence_manifest_path,
+        manifest,
+        PerformanceEvidenceArtifactKind.TIMING,
+    )
+    profile_path = _manifest_artifact_path(
+        request.evidence_manifest_path,
+        manifest,
+        PerformanceEvidenceArtifactKind.PROFILE_SUMMARY,
+    )
+    static_path = _manifest_artifact_path(
+        request.evidence_manifest_path,
+        manifest,
+        PerformanceEvidenceArtifactKind.STATIC_EVIDENCE,
+    )
+    traces = load_jsonl_file(Trace, trace_path)
+    if len(traces) != 1:
+        raise ValueError("performance evidence requires exactly one trace row")
+    trace = traces[0]
+    _require_manifest_trace_identity(manifest, trace, trace_path)
+    timing = _load_timing_evidence(timing_path, manifest, trace)
+    profile = load_json_file(ProfileSummarySidecar, profile_path)
+    _require_current_profile(profile, trace_path)
+    _require_trace_citation(profile, trace_path)
+    static = load_json_file(StaticKernelEvidenceSidecar, static_path)
+    compiled = _manifest_compiled_characterizations(
+        manifest,
+        static,
+        static_path,
+    )
+    calibration = _load_calibration(request.calibration_profile_path)
+    identity_reasons = _manifest_calibration_reasons(calibration, manifest)
+    dispatches, dispatch_reasons = _manifest_dispatch_evidence(
+        manifest,
+        request.evidence_manifest_path,
+        trace,
+        compiled,
+    )
+    semantic = load_manifest_semantic_characterization(
+        request.solar_manifest_path,
+        workload_uuid=trace.workload.uuid,
+        definition=trace.definition,
+    )
+    return _BuildEvidence(
+        manifest=manifest,
+        trace=trace,
+        semantic=semantic,
+        timing=timing,
+        compiled=compiled,
+        dispatches=dispatches,
+        calibration=calibration,
+        identity_reasons=identity_reasons,
+        dispatch_reasons=dispatch_reasons,
+    )
+
+
+def _manifest_artifact_path(
+    manifest_path: Path,
+    manifest: PerformanceEvidenceManifest,
+    kind: PerformanceEvidenceArtifactKind,
+) -> Path:
+    artifact = manifest.artifact(kind)
+    if artifact is None:
+        raise ValueError(f"performance evidence lacks {kind}")
+    return (manifest_path.parent / artifact.path).resolve()
+
+
+def _require_manifest_trace_identity(
+    manifest: PerformanceEvidenceManifest,
+    trace: Trace,
+    trace_path: Path,
+) -> None:
+    identity = manifest.identity
+    reasons: list[str] = []
+    if identity.run_id != sha256_file(trace_path):
+        reasons.append("manifest_run_id_mismatch")
+    if identity.definition != trace.definition:
+        reasons.append("manifest_definition_mismatch")
+    if identity.definition_sha256 != stable_json_checksum(trace.definition):
+        reasons.append("manifest_definition_sha256_mismatch")
+    if identity.workload_uuid != trace.workload.uuid:
+        reasons.append("manifest_workload_uuid_mismatch")
+    workload_hash = stable_json_checksum(trace.workload.model_dump(mode="json"))
+    if identity.workload_sha256 != workload_hash:
+        reasons.append("manifest_workload_sha256_mismatch")
+    evaluation = trace.evaluation
+    if evaluation is None or evaluation.performance is None:
+        reasons.append("canonical_performance_missing")
+    elif identity.gpu_architecture != evaluation.environment.hardware:
+        reasons.append("manifest_gpu_architecture_mismatch")
+    if reasons:
+        raise ValueError(",".join(reasons))
+
+
+def _load_timing_evidence(
+    path: Path,
+    manifest: PerformanceEvidenceManifest,
+    trace: Trace,
+) -> WorkloadTimingEvidence:
+    timing = load_json_file(PerformanceTimingEvidenceSidecar, path)
+    identity = manifest.identity
+    if (
+        timing.run_id != identity.run_id
+        or timing.trace_sha256 != identity.run_id
+        or timing.solution_sha256 != identity.solution_sha256
+    ):
+        raise ValueError("timing_evidence_identity_mismatch")
+    matches = [
+        item
+        for item in timing.workloads
+        if item.workload_uuid == trace.workload.uuid
+    ]
+    if len(matches) != 1:
+        raise ValueError("timing_evidence_workload_mismatch")
+    evaluation = trace.evaluation
+    if (
+        evaluation is None
+        or evaluation.performance is None
+        or matches[0].latency_ms != evaluation.performance.latency_ms
+    ):
+        raise ValueError("timing_evidence_latency_mismatch")
+    return matches[0]
+
+
+def _manifest_compiled_characterizations(
+    manifest: PerformanceEvidenceManifest,
+    static: StaticKernelEvidenceSidecar,
+    static_path: Path,
+) -> list[CompiledCharacterization]:
+    if not manifest.code_object_sha256:
+        return []
+    compiled, _ = _compiled_characterizations(
+        static,
+        static_path,
+        manifest.identity.gpu_architecture,
+    )
+    observed = {
+        item.code_object_sha256
+        for item in compiled
+        if item.code_object_sha256 is not None
+    }
+    if observed != set(manifest.code_object_sha256):
+        raise ValueError("manifest_code_object_sha256_mismatch")
+    return [
+        item.model_copy(
+            update={"candidate_sha256": manifest.identity.candidate_sha256}
+        )
+        for item in compiled
+    ]
+
+
+def _manifest_calibration_reasons(
+    calibration: DiagnosticCalibrationProfile | None,
+    manifest: PerformanceEvidenceManifest,
+) -> list[str]:
+    if calibration is None:
+        return ["calibration_profile_missing"]
+    identity = manifest.identity
+    return validate_calibration_identity(
+        calibration,
+        gpu_architecture=identity.gpu_architecture,
+        gpu_id=identity.gpu_id,
+        gpu_bdf=identity.gpu_bdf,
+        rocm_version=identity.rocm_version,
+        compiler_version=identity.compiler_version,
+        clock_mode=identity.clock_mode,
+        power_profile=identity.power_profile,
+    )
+
+
+def _manifest_dispatch_evidence(
+    manifest: PerformanceEvidenceManifest,
+    manifest_path: Path,
+    trace: Trace,
+    compiled: list[CompiledCharacterization],
+) -> tuple[list[DispatchEvidence], list[str]]:
+    _verify_counter_provenance(manifest, manifest_path)
+    csv_artifacts = manifest.artifacts_of_kind(
+        PerformanceEvidenceArtifactKind.COUNTER_CSV
+    )
+    if not csv_artifacts:
+        return [], ["counter_csv_missing"]
+    passes: list[CounterPassCSV] = []
+    for artifact in csv_artifacts:
+        path = (manifest_path.parent / artifact.path).resolve()
+        pass_index = counter_pass_index(path)
+        if pass_index is None:
+            raise ValueError(f"counter_csv_pass_identity_missing:{path.name}")
+        passes.append(CounterPassCSV(pass_index, path))
+    dispatches = parse_and_align_counter_passes(
+        passes,
+        workload_uuid=trace.workload.uuid,
+        candidate_sha256=manifest.identity.candidate_sha256,
+    )
+    collapsed = _collapse_replayed_dispatches(
+        _record_static_runtime_conflicts(dispatches, compiled)
+    )
+    reasons = (
+        []
+        if any(dispatch.valid for dispatch in collapsed)
+        else ["no_valid_dispatch_evidence"]
+    )
+    return collapsed, reasons
+
+
+def _verify_counter_provenance(
+    manifest: PerformanceEvidenceManifest,
+    manifest_path: Path,
+) -> None:
+    artifact = manifest.artifact(
+        PerformanceEvidenceArtifactKind.COUNTER_PROVENANCE
+    )
+    if artifact is None:
+        raise ValueError("counter_provenance_missing")
+    payload = load_json_value(manifest_path.parent / artifact.path)
+    if not isinstance(payload, dict):
+        raise ValueError("counter_provenance_invalid")
+    if (
+        payload.get("schema_version")
+        != "sol_execbench.rocprofv3_counter_provenance.v2"
+        or payload.get("replay_phase") != "evidence"
+        or payload.get("diagnostic_only") is not True
+        or payload.get("score_authority") is not False
+    ):
+        raise ValueError("counter_provenance_contract_mismatch")
 
 
 def _traces_by_workload(traces: list[Trace]) -> dict[str, Trace]:
@@ -412,69 +648,54 @@ def _verify_calibration_audit(
 ) -> None:
     probe = audit.get("probe_identity")
     protocol = audit.get("protocol")
-    held_out = audit.get("held_out_evidence")
+    tuning = audit.get("tuning_evidence")
+    estimation = audit.get("parameter_estimation_evidence")
     if not isinstance(probe, dict) or not isinstance(protocol, dict):
         raise ValueError("calibration_audit_invalid")
-    if not isinstance(held_out, list) or not held_out:
-        raise ValueError("calibration_held_out_evidence_missing")
-    expected_hashes = {
-        stable_json_checksum(held_out),
+    if not isinstance(tuning, list) or not tuning:
+        raise ValueError("calibration_tuning_evidence_missing")
+    if not isinstance(estimation, list) or not estimation:
+        raise ValueError("calibration_parameter_estimation_evidence_missing")
+    estimation_hashes = {
+        stable_json_checksum(estimation),
         sha256_file(audit_path),
     }
-    if not expected_hashes <= set(profile.held_out_evidence_sha256):
-        raise ValueError("calibration_held_out_evidence_sha256_mismatch")
+    if not estimation_hashes <= set(
+        profile.parameter_estimation_evidence_sha256
+    ):
+        raise ValueError("calibration_parameter_estimation_sha256_mismatch")
+    if stable_json_checksum(tuning) not in profile.tuning_evidence_sha256:
+        raise ValueError("calibration_tuning_evidence_sha256_mismatch")
     if stable_json_checksum(probe) not in profile.probe_evidence_sha256:
         raise ValueError("calibration_probe_evidence_sha256_mismatch")
     if (
         probe.get("architecture") != profile.identity.gpu_architecture
         or probe.get("rocm_version") != profile.identity.rocm_version
         or probe.get("gpu_id") != profile.identity.gpu_id
+        or probe.get("gpu_bdf") != profile.identity.gpu_bdf
         or probe.get("compiler_version") != profile.identity.compiler_version
     ):
         raise ValueError("calibration_audit_identity_mismatch")
     if protocol.get(
-        "configuration_frozen_before_held_out_measurement"
+        "configuration_frozen_before_parameter_estimation"
     ) is not True or any(
         not isinstance(batch, dict)
-        or batch.get("phase") != "held_out_after_configuration_freeze"
+        or batch.get("phase")
+        != "parameter_estimation_after_configuration_freeze"
         or batch.get("clocks_locked") is not True
-        for batch in held_out
+        for batch in estimation
     ):
-        raise ValueError("calibration_held_out_protocol_invalid")
-
-
-def _calibration_reasons(
-    calibration: DiagnosticCalibrationProfile | None,
-    *,
-    request: PerformanceDiagnosticBuildRequest,
-    traces: list[Trace],
-    gpu_architecture: str,
-) -> list[str]:
-    if calibration is None:
-        return ["calibration_profile_missing"]
-    rocm_versions = {
-        _rocm_version(trace)
-        for trace in traces
-        if _rocm_version(trace) is not None
-    }
-    if len(rocm_versions) > 1:
-        return ["trace_rocm_version_mismatch"]
-    rocm_version = next(iter(rocm_versions), None)
-    clocks_locked = {
-        trace.evaluation.environment.clocks_locked
-        for trace in traces
-        if trace.evaluation is not None
-    }
-    clock_mode = "locked" if clocks_locked == {True} else "unlocked"
-    return validate_calibration_identity(
-        calibration,
-        gpu_architecture=gpu_architecture,
-        gpu_id=request.gpu_id,
-        rocm_version=rocm_version,
-        compiler_version=request.compiler_version,
-        clock_mode=clock_mode,
-        power_profile=request.power_profile,
-    )
+        raise ValueError("calibration_parameter_estimation_protocol_invalid")
+    if (
+        protocol.get("bootstrap_seed") != profile.bootstrap_seed
+        or protocol.get("bootstrap_replicates") != profile.bootstrap_replicates
+    ):
+        raise ValueError("calibration_bootstrap_protocol_mismatch")
+    process_batches = protocol.get("parameter_estimation_process_batches")
+    if not isinstance(process_batches, int) or process_batches < 5:
+        raise ValueError(
+            "calibration_parameter_estimation_processes_insufficient"
+        )
 
 
 def _rocm_version(trace: Trace) -> str | None:
@@ -684,7 +905,8 @@ def _counter_artifact_paths(
 def _workload_diagnostic(
     *,
     trace: Trace,
-    solar_path: Path,
+    semantic: SemanticCharacterization,
+    timing: WorkloadTimingEvidence,
     frontier_path: Path | None,
     compiled: list[CompiledCharacterization],
     dispatches: list[DispatchEvidence],
@@ -692,10 +914,6 @@ def _workload_diagnostic(
     identity_reasons: list[str],
     extra_reasons: list[str],
 ) -> WorkloadPerformanceDiagnostic:
-    semantic = load_semantic_characterization(
-        solar_path,
-        workload_uuid=trace.workload.uuid,
-    )
     ir, hw = _workload_predictions(
         semantic=semantic,
         compiled=compiled,
@@ -720,7 +938,8 @@ def _workload_diagnostic(
         t_pred_ir=ir,
         t_pred_hw=hw,
         t_measured_ms=measured,
-        timing_noise_ms=max(measured * 0.02, 0.0001),
+        t_measured_lower_ms=timing.lower_ms,
+        t_measured_upper_ms=timing.upper_ms,
         t_sol_ms=semantic.t_sol_ms,
         t_frontier_ms=frontier,
         frontier_reason_codes=frontier_reasons,
@@ -733,6 +952,8 @@ def _workload_diagnostic(
         t_pred_ir=ir,
         t_pred_hw=hw,
         t_measured_ms=measured,
+        t_measured_lower_ms=timing.lower_ms,
+        t_measured_upper_ms=timing.upper_ms,
         t_frontier_ms=frontier,
         ratios=ratios,
         attributions=derive_attributions(
@@ -774,6 +995,7 @@ def _workload_predictions(
             identity_reason_codes=identity_reasons,
         ),
         predict_hw(
+            semantic,
             compiled,
             dispatches,
             calibration,
@@ -901,23 +1123,30 @@ def _input_references(
     request: PerformanceDiagnosticBuildRequest,
 ) -> list[EvidenceReference]:
     paths = [
-        ("trace", request.trace_path),
-        ("profile_summary", request.profile_summary_path),
-        ("static_evidence", request.static_evidence_path),
-        *(
-            ("solar_analysis", path)
-            for path in request.solar_analysis_paths.values()
-        ),
-        *(
-            ("frontier_trace", path)
-            for path in request.frontier_trace_paths.values()
-        ),
+        ("performance_evidence_manifest", request.evidence_manifest_path),
+        ("solar_manifest", request.solar_manifest_path),
     ]
     if request.calibration_profile_path is not None:
         paths.append(("calibration_profile", request.calibration_profile_path))
+    if request.frontier_trace_path is not None:
+        paths.append(("frontier_trace", request.frontier_trace_path))
     return [
         EvidenceReference(kind=kind, path=str(path), sha256=sha256_file(path))
         for kind, path in paths
+    ]
+
+
+def _manifest_references(
+    manifest_path: Path,
+    manifest: PerformanceEvidenceManifest,
+) -> list[EvidenceReference]:
+    return [
+        EvidenceReference(
+            kind=artifact.kind,
+            path=str((manifest_path.parent / artifact.path).resolve()),
+            sha256=artifact.sha256,
+        )
+        for artifact in manifest.artifacts
     ]
 
 

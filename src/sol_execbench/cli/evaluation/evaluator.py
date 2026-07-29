@@ -20,7 +20,11 @@ import sol_execbench.cli.evaluation.phases as cli_phases
 import sol_execbench.cli.evaluation.problem_io as cli_problem_io
 import sol_execbench.cli.evaluation.runtime as cli_evaluation_runtime
 import sol_execbench.cli.evaluation.sidecar_writer as cli_sidecar_writer
-from sol_execbench.cli.evaluation.requests import EvaluationRequest
+from sol_execbench.cli.evaluation.requests import (
+    EvaluationRequest,
+    require_counter_evidence_outputs,
+    select_evaluation_workloads,
+)
 from sol_execbench.cli.protocol import CliFailure, CliResult, artifact
 from sol_execbench.driver.problem_packager import ProblemPackager
 
@@ -36,6 +40,7 @@ PROFILE_ROCPROFV3_COUNTERS = cli_phases.PROFILE_ROCPROFV3_COUNTERS
 def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
     """Evaluate a SOL-ExecBench solution on GPU."""
     cli_phases.require_execution_isolation(request)
+    require_counter_evidence_outputs(request)
     cli_problem_io.require_materialized_target_match(
         request.problem_dir,
         request.device,
@@ -55,7 +60,10 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
         raise CliFailure(str(exc), code="invalid_input_schema") from exc
 
     definition = loaded.definition
-    workloads = loaded.workloads
+    workloads = select_evaluation_workloads(
+        loaded.workloads,
+        request,
+    )
     solution = loaded.solution
     config = loaded.config
 
@@ -91,7 +99,7 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
         )
         return _run_packaged_evaluation(
             request=request,
-            loaded=loaded,
+            loaded=dataclasses.replace(loaded, workloads=workloads),
             staging_dir=staging_dir,
             packager=packager,
         )
@@ -132,6 +140,7 @@ def _run_packaged_evaluation(
             solution=solution,
             profile_result=runtime_result.profile_result,
             static_evidence_result=phase_result.static_evidence,
+            compile_result=phase_result.compile_result,
             decision=request.decision,
             identity=cli_sidecar_writer.SidecarIdentity(
                 trace_run_id=trace_run_id,
@@ -180,11 +189,13 @@ def _run_evaluation_phases(
         output_file=request.output_file,
         console=console,
     )
-    static_evidence_result = cli_phases.run_optional_compile_phase(
-        context,
-        compile_timeout=request.compile_timeout,
-        static_evidence=request.static_evidence,
-        verbose=request.verbose,
+    static_evidence_result, compile_result = (
+        cli_phases.run_optional_compile_phase(
+            context,
+            compile_timeout=request.compile_timeout,
+            static_evidence=request.static_evidence,
+            verbose=request.verbose,
+        )
     )
 
     eval_cmd = packager.execute()
@@ -211,6 +222,7 @@ def _run_evaluation_phases(
     return cli_phases.EvaluationPhasesResult(
         static_evidence=static_evidence_result,
         runtime=runtime_result,
+        compile_result=compile_result,
     )
 
 

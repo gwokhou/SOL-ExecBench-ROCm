@@ -33,6 +33,7 @@ class SolutionTimingResult:
 
     latency_ms: float
     timed_iterations_per_trial: tuple[int, ...]
+    trial_samples_ms: tuple[tuple[float, ...], ...]
     cache_clear_policy: CacheClearPolicy | None = None
 
     @property
@@ -77,6 +78,7 @@ def measure_solution_latency(
         timed_iterations_per_trial=tuple(
             trial.timed_iterations for trial in trials
         ),
+        trial_samples_ms=tuple(trial.samples_ms for trial in trials),
         cache_clear_policy=cache_policy,
     )
 

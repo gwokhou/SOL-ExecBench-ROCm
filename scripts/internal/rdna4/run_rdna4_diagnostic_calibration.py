@@ -187,9 +187,9 @@ def run_calibration(
     output: Path,
     gpu_id: str,
     tuning_batches: int,
-    held_out_batches: int,
+    estimation_batches: int,
 ) -> Path:
-    """Compile, tune, freeze, and collect independent held-out evidence."""
+    """Compile, tune, freeze, and collect parameter-estimation evidence."""
     hipcc = resolve_rocm_tool("hipcc")
     if hipcc is None:
         raise RuntimeError("hipcc is unavailable")
@@ -207,6 +207,30 @@ def run_calibration(
             f"--gpu-id does not match device {device.index} UUID",
         )
     compiler_version = _compiler_version(hipcc)
+    return _run_calibration_workspace(
+        output=output,
+        hipcc=hipcc,
+        device=device,
+        observed_gpu_id=observed_gpu_id,
+        gpu_bdf=gpu_bdf,
+        compiler_version=compiler_version,
+        tuning_batches=tuning_batches,
+        estimation_batches=estimation_batches,
+    )
+
+
+def _run_calibration_workspace(
+    *,
+    output: Path,
+    hipcc: Path,
+    device: RocmDeviceInfo,
+    observed_gpu_id: str,
+    gpu_bdf: str,
+    compiler_version: str,
+    tuning_batches: int,
+    estimation_batches: int,
+) -> Path:
+    """Collect evidence and publish calibration within a temporary workspace."""
     with tempfile.TemporaryDirectory(
         prefix="sol_diag_calibration_"
     ) as raw_workspace:
@@ -222,10 +246,10 @@ def run_calibration(
                 process_batches=tuning_batches,
             )
             frozen = freeze_probe_configuration(tuning)
-            held_out = _collect_phase(
+            estimation = _collect_phase(
                 binary,
-                phase="held_out_after_configuration_freeze",
-                process_batches=held_out_batches,
+                phase="parameter_estimation_after_configuration_freeze",
+                process_batches=estimation_batches,
             )
         isa = _isa_evidence(binary, device.gfx_target, workspace)
         audit = _audit_payload(
@@ -234,7 +258,7 @@ def run_calibration(
             device=device,
             tuning=tuning,
             frozen=frozen,
-            held_out=held_out,
+            estimation=estimation,
             isa=isa,
             gpu_id=observed_gpu_id,
             gpu_bdf=gpu_bdf,
@@ -246,19 +270,26 @@ def run_calibration(
             identity=CalibrationIdentity(
                 gpu_architecture="gfx1200",
                 gpu_id=observed_gpu_id,
+                gpu_bdf=gpu_bdf,
                 rocm_version=device.hip_version,
                 compiler_version=compiler_version,
                 clock_mode="locked",
                 power_profile="stable_peak",
             ),
-            parameters=build_calibration_parameters(held_out, frozen),
+            parameters=build_calibration_parameters(estimation, frozen),
+            tuning_evidence_sha256=[
+                stable_json_checksum(audit["tuning_evidence"])
+            ],
+            parameter_estimation_evidence_sha256=[
+                stable_json_checksum(audit["parameter_estimation_evidence"]),
+                sha256_file(audit_path),
+            ],
             probe_evidence_sha256=[
                 stable_json_checksum(audit["probe_identity"])
             ],
-            held_out_evidence_sha256=[
-                stable_json_checksum(audit["held_out_evidence"]),
-                sha256_file(audit_path),
-            ],
+            configuration_frozen_before_estimation=True,
+            bootstrap_seed=BOOTSTRAP_SEED,
+            bootstrap_replicates=BOOTSTRAP_REPLICATES,
         )
         atomic_write_json_value(output, profile.model_dump(mode="json"))
     return output
@@ -271,14 +302,14 @@ def _audit_payload(
     device: RocmDeviceInfo,
     tuning: Sequence[ProbeBatch],
     frozen: dict[str, str],
-    held_out: Sequence[ProbeBatch],
+    estimation: Sequence[ProbeBatch],
     isa: dict[str, object],
     gpu_id: str,
     gpu_bdf: str,
     compiler_version: str,
 ) -> dict[str, object]:
     return {
-        "schema_version": "sol_execbench.diagnostic_calibration_audit.v1",
+        "schema_version": "sol_execbench.diagnostic_calibration_audit.v2",
         "probe_identity": {
             "source_sha256": sha256_file(PROBE_SOURCE),
             "binary_sha256": sha256_file(binary),
@@ -293,17 +324,21 @@ def _audit_payload(
             "isa": isa,
         },
         "protocol": {
-            "design": "two_phase_tuning_then_held_out_measurement",
-            "configuration_frozen_before_held_out_measurement": True,
+            "design": "two_phase_tuning_then_parameter_estimation",
+            "configuration_frozen_before_parameter_estimation": True,
             "tuning_process_batches": len(tuning) // len(MODES),
-            "held_out_process_batches": len(held_out) // len(MODES),
+            "parameter_estimation_process_batches": (
+                len(estimation) // len(MODES)
+            ),
             "bootstrap_replicates": BOOTSTRAP_REPLICATES,
             "bootstrap_seed": BOOTSTRAP_SEED,
             "clock_mode": "STABLE_PEAK",
         },
         "frozen_configuration": frozen,
         "tuning_evidence": [batch.to_dict() for batch in tuning],
-        "held_out_evidence": [batch.to_dict() for batch in held_out],
+        "parameter_estimation_evidence": [
+            batch.to_dict() for batch in estimation
+        ],
     }
 
 
@@ -325,12 +360,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--gpu-id", required=True)
     parser.add_argument("--tuning-batches", type=int, default=3)
-    parser.add_argument("--held-out-batches", type=int, default=5)
+    parser.add_argument("--estimation-batches", type=int, default=5)
     arguments = parser.parse_args()
     if arguments.tuning_batches < 1:
         parser.error("--tuning-batches must be positive")
-    if arguments.held_out_batches < 5:
-        parser.error("--held-out-batches must be at least 5")
+    if arguments.estimation_batches < 5:
+        parser.error("--estimation-batches must be at least 5")
     return arguments
 
 
@@ -341,7 +376,7 @@ def main() -> int:
         output=arguments.output,
         gpu_id=arguments.gpu_id,
         tuning_batches=arguments.tuning_batches,
-        held_out_batches=arguments.held_out_batches,
+        estimation_batches=arguments.estimation_batches,
     )
     response = response_success(
         COMMAND_NAME,

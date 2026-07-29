@@ -33,6 +33,7 @@ from sol_execbench.core.bench.reward_hack import (
 from sol_execbench.core.bench.utils import call_and_collect_outputs, make_eval
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
+from sol_execbench.core.data.json_utils import atomic_write_jsonl_values
 from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
@@ -47,6 +48,7 @@ __all__ = [
     "Workload",
     "WorkloadEvaluationRequest",
     "allocate_outputs",
+    "atomic_write_jsonl_values",
     "call_and_collect_outputs",
     "check_eval_integrity",
     "check_lazy_outputs",

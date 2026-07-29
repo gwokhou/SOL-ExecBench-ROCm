@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 
 from sol_execbench.core.bench.performance_model.acceptance import (
-    DiagnosticAcceptanceCase,
+    DiagnosticAcceptanceManifest,
     evaluate_diagnostic_acceptance,
 )
-from sol_execbench.core.data.json_utils import load_json_value
+from sol_execbench.core.data.json_utils import load_json_file
 
 pytestmark = [pytest.mark.requires_rocm, pytest.mark.requires_rdna4]
 
@@ -24,11 +24,7 @@ def test_frozen_gfx1200_performance_model_acceptance() -> None:
     path = Path(raw_path)
     if not path.is_file():
         pytest.fail(f"acceptance artifact does not exist: {path}")
-    payload = load_json_value(path)
-    if not isinstance(payload, list):
-        pytest.fail("acceptance artifact must be a JSON list")
-    cases = [DiagnosticAcceptanceCase.model_validate(item) for item in payload]
-
-    result = evaluate_diagnostic_acceptance(cases)
+    manifest = load_json_file(DiagnosticAcceptanceManifest, path)
+    result = evaluate_diagnostic_acceptance(manifest)
 
     assert result.accepted, result.model_dump(mode="json")

@@ -32,7 +32,8 @@ def calculate_ratios(
     t_pred_ir: PerformancePrediction,
     t_pred_hw: PerformancePrediction,
     t_measured_ms: float,
-    timing_noise_ms: float,
+    t_measured_lower_ms: float,
+    t_measured_upper_ms: float,
     t_sol_ms: float,
     t_frontier_ms: float | None,
     frontier_reason_codes: Sequence[str] = (),
@@ -45,7 +46,12 @@ def calculate_ratios(
             reason_codes=frontier_reason_codes,
         ),
         _prediction_ratio(RatioKind.C, t_pred_hw, t_pred_ir),
-        _measured_ratio(t_measured_ms, timing_noise_ms, t_pred_hw),
+        _measured_ratio(
+            t_measured_ms,
+            t_measured_lower_ms,
+            t_measured_upper_ms,
+            t_pred_hw,
+        ),
     ]
 
 
@@ -153,7 +159,8 @@ def _prediction_ratio(
 
 def _measured_ratio(
     measured_ms: float,
-    noise_ms: float,
+    measured_lower_ms: float,
+    measured_upper_ms: float,
     predicted: PerformancePrediction,
 ) -> DiagnosticRatio:
     if (
@@ -165,14 +172,14 @@ def _measured_ratio(
         return _ratio_unavailable(
             RatioKind.R, "hardware_prediction_unavailable"
         )
-    measured_lower = max(0.0, measured_ms - max(noise_ms, 0.0))
-    measured_upper = measured_ms + max(noise_ms, 0.0)
+    if not measured_lower_ms <= measured_ms <= measured_upper_ms:
+        return _ratio_unavailable(RatioKind.R, "measured_interval_invalid")
     return DiagnosticRatio(
         kind=RatioKind.R,
         status=predicted.status,
         value=measured_ms / predicted.predicted_time_ms,
-        lower=measured_lower / predicted.upper_ms,
-        upper=measured_upper / predicted.lower_ms,
+        lower=measured_lower_ms / predicted.upper_ms,
+        upper=measured_upper_ms / predicted.lower_ms,
         reason_codes=list(predicted.reason_codes),
     )
 
@@ -353,7 +360,10 @@ def _runtime_actions(
 def _unverified_runtime_action(
     prediction: PerformancePrediction,
 ) -> PerformanceAttribution:
-    missing = "missing_dynamic_resource_counters" in prediction.reason_codes
+    missing = any(
+        reason.startswith("missing_dynamic_")
+        for reason in prediction.reason_codes
+    )
     return PerformanceAttribution(
         code="runtime_residual_unverified",
         category="evidence" if missing else "model",

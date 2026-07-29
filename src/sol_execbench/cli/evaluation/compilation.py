@@ -13,6 +13,8 @@ from typing import Protocol, cast
 
 from sol_execbench.core.bench.io import flashinfer_safetensors_env
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
+from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.process.environment import sanitized_subprocess_env
 from sol_execbench.core.process.subprocesses import (
     TextSubprocessRunner,
@@ -54,6 +56,10 @@ class CompilePhaseResult:
     stdout: str
     filtered_stderr: str
     returncode: int
+    command: tuple[str, ...] = ()
+    compiler_path: str | None = None
+    compiler_sha256: str | None = None
+    compiler_version: str | None = None
 
 
 def _compile_command(
@@ -89,6 +95,7 @@ def run_compile_phase(
             stdout="",
             filtered_stderr="",
             returncode=0,
+            command=(),
         )
 
     artifact_path = staging_dir / "benchmark_kernel.so"
@@ -113,6 +120,11 @@ def run_compile_phase(
             env=env,
         )
 
+    compiler = (
+        _compiler_provenance()
+        if runner is None and proc.returncode == 0
+        else (None, None, None)
+    )
     return CompilePhaseResult(
         attempted=True,
         succeeded=proc.returncode == 0,
@@ -120,4 +132,29 @@ def run_compile_phase(
         stdout=proc.stdout,
         filtered_stderr=filter_benign_rocm_stderr(proc.stderr),
         returncode=proc.returncode,
+        command=tuple(cmd),
+        compiler_path=compiler[0],
+        compiler_sha256=compiler[1],
+        compiler_version=compiler[2],
     )
+
+
+def _compiler_provenance() -> tuple[str | None, str | None, str | None]:
+    compiler = resolve_rocm_tool("hipcc")
+    if compiler is None:
+        return None, None, None
+    completed = run_in_process_group_bounded(
+        [str(compiler), "--version"],
+        timeout=30.0,
+    )
+    if completed.returncode != 0:
+        return str(compiler), sha256_file(compiler), None
+    version = next(
+        (
+            line.strip()
+            for line in completed.stdout.splitlines()
+            if line.strip()
+        ),
+        None,
+    )
+    return str(compiler), sha256_file(compiler), version

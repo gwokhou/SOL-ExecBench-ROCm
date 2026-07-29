@@ -80,6 +80,8 @@ class _MutableDispatch:
     candidate_sha256: str
     dispatch_id: str
     correlation_id: str | None
+    queue_id: str | None
+    stream_id: str | None
     kernel_symbol: str
     grid: tuple[int, int, int]
     workgroup: tuple[int, int, int]
@@ -248,7 +250,10 @@ def counter_names_in_csv(path: str | Path) -> frozenset[str]:
 def counter_pass_index(path: str | Path) -> int | None:
     """Return the pass/PMC index encoded in an artifact path."""
     for part in Path(path).parts:
-        match = re.fullmatch(r"(?:pass|pmc)[_-](\d+)", part.lower())
+        match = re.fullmatch(
+            r"(?:pass|pmc)[_-](\d+)",
+            Path(part).stem.lower(),
+        )
         if match:
             return int(match.group(1))
     return None
@@ -311,6 +316,7 @@ def _dispatch_from_rows(
     source: EvidenceReference,
 ) -> _MutableDispatch:
     first = rows[0]
+    _require_consistent_row_identity(rows)
     kernel = _required_field(first, "kernelname", "name")
     grid = _dimensions(first, "gridsize", "grid")
     workgroup = _dimensions(first, "workgroupsize", "workgroup")
@@ -330,6 +336,8 @@ def _dispatch_from_rows(
         candidate_sha256=candidate_sha256,
         dispatch_id=_required_field(first, "dispatchid", "dispatch"),
         correlation_id=_field(first, "correlationid", "correlation"),
+        queue_id=_field(first, "queueid", "queue"),
+        stream_id=_field(first, "streamid", "stream"),
         kernel_symbol=kernel,
         grid=grid,
         workgroup=workgroup,
@@ -365,6 +373,7 @@ def _align_passes(
         mismatch = len(concrete) != len(maps)
         counter_conflict = _has_counter_conflict(concrete)
         footprint_conflict = _has_footprint_conflict(concrete)
+        execution_identity_conflict = _has_execution_identity_conflict(concrete)
         first = concrete[0]
         counters = _merged_counters(concrete)
         missing = sorted(
@@ -378,6 +387,8 @@ def _align_passes(
             reasons.append("cross_pass_counter_conflict")
         if footprint_conflict:
             reasons.append("cross_pass_footprint_conflict")
+        if execution_identity_conflict:
+            reasons.append("cross_pass_execution_identity_conflict")
         if missing:
             reasons.append("missing_required_counters")
         aligned.append(
@@ -386,6 +397,8 @@ def _align_passes(
                 candidate_sha256=first.candidate_sha256,
                 dispatch_id=first.dispatch_id,
                 correlation_id=first.correlation_id,
+                queue_id=first.queue_id,
+                stream_id=first.stream_id,
                 kernel_symbol=first.kernel_symbol,
                 grid=first.grid,
                 workgroup=first.workgroup,
@@ -428,6 +441,41 @@ def _has_footprint_conflict(
     dispatches: Sequence[_MutableDispatch],
 ) -> bool:
     return len({dispatch.runtime_footprint for dispatch in dispatches}) > 1
+
+
+def _has_execution_identity_conflict(
+    dispatches: Sequence[_MutableDispatch],
+) -> bool:
+    return (
+        len(
+            {
+                (
+                    dispatch.queue_id,
+                    dispatch.stream_id,
+                )
+                for dispatch in dispatches
+            }
+        )
+        > 1
+    )
+
+
+def _require_consistent_row_identity(
+    rows: Sequence[Mapping[str, str]],
+) -> None:
+    identities = {
+        (
+            _field(row, "kernelname", "name"),
+            _field(row, "correlationid", "correlation"),
+            _field(row, "queueid", "queue"),
+            _field(row, "streamid", "stream"),
+            _dimensions(row, "gridsize", "grid"),
+            _dimensions(row, "workgroupsize", "workgroup"),
+        )
+        for row in rows
+    }
+    if len(identities) != 1:
+        raise ValueError("counter_dispatch_identity_conflict_within_pass")
 
 
 def _merged_counters(

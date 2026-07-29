@@ -14,7 +14,19 @@ AGENT_FEEDBACK_SCHEMA_VERSION: Final = "sol_execbench.agent_feedback.v3"
 DECISION_SCHEMA_VERSION: Final = "sol_execbench.decision.v2"
 PROFILE_SUMMARY_SCHEMA_VERSION: Final = "sol_execbench.profile_summary.v3"
 PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION: Final = (
-    "sol_execbench.performance_diagnostic.v1"
+    "sol_execbench.performance_diagnostic.v2"
+)
+PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION: Final = (
+    "sol_execbench.performance_evidence_manifest.v1"
+)
+PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION: Final = (
+    "sol_execbench.performance_timing_evidence.v1"
+)
+DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION: Final = (
+    "sol_execbench.diagnostic_acceptance.v1"
+)
+DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION: Final = (
+    "sol_execbench.diagnostic_calibration.v2"
 )
 ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
     "sol_execbench.environment_diagnostics.v1"
@@ -51,6 +63,9 @@ RELEASE_SOLAR_INDEX_SCHEMA_VERSION: Final = (
 ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION: Final = (
     "sol_execbench.rocprofv3_overhead_calibration.v2"
 )
+ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION: Final = (
+    "sol_execbench.rocprofv3_counter_provenance.v2"
+)
 STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION: Final = (
     "sol_execbench.static_artifact_manifest.v1"
 )
@@ -64,6 +79,12 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "decision": DECISION_SCHEMA_VERSION,
     "profile_summary": PROFILE_SUMMARY_SCHEMA_VERSION,
     "performance_diagnostic": PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION,
+    "performance_evidence_manifest": (
+        PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION
+    ),
+    "performance_timing_evidence": PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION,
+    "diagnostic_acceptance": DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION,
+    "diagnostic_calibration": DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION,
     "amd_isa_release_lock": "sol_execbench.amd_isa_release_lock.v1",
     "arch_capability_budget": "sol_execbench.arch_capability_budget.v1",
     "cli_contract": "sol_execbench.cli_contract.v1",
@@ -91,6 +112,9 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "release_solar_index": RELEASE_SOLAR_INDEX_SCHEMA_VERSION,
     "rocm_docker_targets": "sol_execbench.rocm_docker_targets.v1",
     "rocprofv3_diagnostics": "sol_execbench.rocprofv3_diagnostics.v1",
+    "rocprofv3_counter_provenance": (
+        ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION
+    ),
     "rocprofv3_overhead_calibration": ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
     "rocprofv3_profile": "sol_execbench.rocprofv3_profile.v1",
     "rocprofv3_timing": "sol_execbench.rocprofv3_timing.v1",
@@ -116,10 +140,14 @@ __all__ = [
     "CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION",
     "CURRENT_SCHEMA_VERSIONS",
     "DECISION_SCHEMA_VERSION",
+    "DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION",
+    "DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION",
     "ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION",
     "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION",
     "EVALUATOR_CONTRACT_SCHEMA_VERSION",
     "PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION",
+    "PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION",
+    "PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION",
     "PROFILE_SUMMARY_SCHEMA_VERSION",
     "RDNA4_VALIDATION_SCHEMA_VERSION",
     "RELEASE_BASELINE_SCHEMA_VERSION",
@@ -129,6 +157,7 @@ __all__ = [
     "RELEASE_EXECUTION_PLAN_SCHEMA_VERSION",
     "RELEASE_SOLAR_INDEX_SCHEMA_VERSION",
     "ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION",
+    "ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION",
     "ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION",
     "SCHEMA_VERSIONS",
     "STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION",

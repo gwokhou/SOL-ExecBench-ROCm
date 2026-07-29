@@ -18,12 +18,22 @@
 
 新增 `core/bench/performance_model/`，定义以下严格、冻结、`extra="forbid"` 的类型：
 
-- `SemanticCharacterization`：从经验证的 `solar-analysis.yaml` 提取 workload UUID、shape、resource work、融合区域、语义 FLOP/Byte 和 `T_SOL`。
+- `SemanticCharacterization`：从经验证的 SOLAR request manifest 及其
+  `solar-analysis.yaml` 提取 workload UUID、typed workload descriptor、
+  resource work、融合区域、语义 FLOP/Byte 和 `T_SOL`。
 - `CompiledCharacterization`：code-object hash、kernel symbol、ISA functional-group counts、WMMA/VALU 类型、VGPR/LDS/scratch footprint。
 - `DispatchEvidence`：dispatch/correlation ID、kernel、grid/workgroup、iteration、counter pass、动态指令/流量/cache/LDS/wave 计数。
-- `DiagnosticCalibrationProfile`：GPU/ROCm/compiler/clock 身份、参数值、置信区间、适用区间、探针和 held-out 证据 hash。
+- `DiagnosticCalibrationProfile`：GPU/ROCm/compiler/clock 身份、参数值、置信区间、适用区间，以及 probe、tuning 和独立 parameter-estimation 证据 hash。
 - `PerformancePrediction`：状态、预测时间、置信区间、各资源/dispatch component、模型版本和限制。
-- `PerformanceDiagnosticSidecar`，schema `sol_execbench.performance_diagnostic.v1`：保存 `T_SOL`、`T_pred(IR)`、`T_pred(HW)`、`T_measured`、可选 `T_frontier`、`L/C/R`、归因、行动建议及全部证据引用。
+- `PerformanceTimingEvidenceSidecar`：保存 canonical timing 的 trial/iteration
+  原始样本和固定 seed、10,000 replicate 的 hierarchical-bootstrap 区间。
+- `PerformanceEvidenceManifest`：以 SHA256 绑定 definition、workload、
+  solution、编译命令/compiler、code object、GPU/ROCm/clock、Trace、timing、
+  static ISA、counter CSV、ROCPD 和 counter provenance。
+- `PerformanceDiagnosticSidecar`，schema
+  `sol_execbench.performance_diagnostic.v2`：保存 `T_SOL`、`T_pred(IR)`、
+  `T_pred(HW)`、`T_measured` 区间、可选 `T_frontier`、`L/C/R`、归因、
+  行动建议及全部证据引用。
 
 通过 `solar_bridge` 读取并验证 SOLAR artifact；其他外层模块不得直接 import `solar`。
 
@@ -39,27 +49,34 @@
 
 该模式：
 
+- 要求 `--workload-uuid` 精确选择一个 workload、`--output` 和
+  `--static-evidence auto`；
+- 先完成唯一 canonical run，再进行 diagnostic-only counter replay；
 - 使用 `rocprofv3-avail` 检查当前 gfx1200/ROCm 实际支持的 counter。
 - 从版本化 gfx1200 manifest 选择最小 counter groups：compute/WMMA、memory/cache、LDS、wave/occupancy。
 - 生成受控 YAML job，使用 CSV 作为规范化输入，同时保留 rocpd 作为审计引用。
 - 记录 profiler、counter definition、配置文件和可执行文件 SHA256。
 - 将多 pass 结果按 workload、candidate hash、kernel、grid/workgroup 和 iteration ordinal 对齐；任何不一致使相关 dispatch 失效。
 - canonical Trace 时间仍是 `T_measured`；profiler duration 和由 duration 推导的 achieved rate禁止进入 `T_pred(HW)`。
+- dispatch 缺 queue/stream identity、多 queue/stream 或 timestamp overlap
+  均返回 `partial/unavailable`，首版不建 overlap 模型。
 
 扩展现有 bounded parser，支持官方 `Counter_Name`、`Counter_Value`、`Dispatch_Id`、grid/workgroup、timestamp 等字段及 ROCm 版本差异。
 
 ### 3. 扩展 gfx1200 校准参数包
 
-复用现有 `hardware_calibration_probes`、锁频、ISA 验证、tuning/held-out、bootstrap 和 content-addressed audit 流程，增加：
+复用现有 `hardware_calibration_probes`、锁频、ISA 验证、tuning/parameter-estimation、bootstrap 和 content-addressed audit 流程，增加：
 
 - 空 kernel/device dispatch floor；
 - L2/L3/VRAM working-set 带宽转折；
-- contiguous、transpose 和 stride 访问效率；
+- contiguous 和真实 2D transpose 访问效率；
 - LDS 正常访问与 bank conflict；
 - reduction/barrier 宽度 sweep；
 - irregular WMMA tile、边缘 tile 和 active-wave sweep。
 
-冻结配置后重新采集独立 held-out batches。校准 artifact 必须绑定 GPU、ROCm、hipcc、code object、时钟和功耗状态；不匹配时预测不可用。
+冻结配置后重新采集独立 parameter-estimation batches。验收 held-out 样本
+与 tuning/parameter-estimation 严格分离。校准 artifact 必须绑定 GPU UUID、
+BDF、ROCm、hipcc、code object、时钟和功耗状态；不匹配时预测不可用。
 
 首版不实现 gather/scatter/atomic、完整 cache latency、跨 kernel overlap 和任意图模型。
 
@@ -75,8 +92,9 @@
 `T_pred(HW)`：
 
 - 以实际 dispatch 分解、ISA、footprint 和动态 counter 为输入。
-- 单 dispatch 采用校准后的固定成本与资源瓶颈组合；多 dispatch 默认按时间顺序求和。
-- 只有在 dispatch timestamp 明确证明 overlap 时才按 interval union 处理。
+- 单 dispatch 采用校准后的固定成本与资源瓶颈组合；多 dispatch 仅在
+  同一已验证 queue/stream 且无 overlap 时按时间顺序求和。
+- 首版不支持 interval union；任何 overlap 证据均 fail closed。
 - 禁止读取 profiler duration、canonical runtime 或同一 candidate 的 achieved throughput。
 
 归因规则：
@@ -99,17 +117,29 @@ L = T_frontier / T_SOL  # 仅可信 frontier 可用时
 
 ```text
 sol-execbench diagnostics performance \
-  --trace TRACE.jsonl \
-  --solar-analysis WORKLOAD_UUID=solar-analysis.yaml \
-  --profile-summary TRACE.profile-summary.json \
-  --static-evidence TRACE.static-evidence.json \
-  [--frontier-trace WORKLOAD_UUID=TRACE.jsonl] \
+  --evidence-manifest TRACE.jsonl.performance-evidence.json \
+  --solar-manifest SOLAR_REQUEST/manifest.yaml \
+  [--frontier-trace TRACE.jsonl] \
+  [--calibration-profile CALIBRATION.json] \
   --output TRACE.performance-diagnostic.json
 ```
 
-命令支持重复的 workload 映射，并要求每个 artifact 通过 hash、run、candidate、GPU 和 workload identity 检查。
+命令只支持 evidence manifest 中的单 workload，并要求每个 artifact 通过
+hash、run、candidate、GPU 和 workload identity 检查。GPU/compiler/power
+身份不得由 CLI 手工覆盖。
 
-扩展 Agent Feedback，使其读取通过 governance 的 performance diagnostic，并输出稳定行动码：
+新增独立命令：
+
+```text
+sol-execbench diagnostics agent-feedback \
+  --performance-diagnostic DIAGNOSTIC.json \
+  --evidence-manifest EVIDENCE.json \
+  --acceptance ACCEPTANCE.json \
+  --output FEEDBACK.json
+```
+
+使 Agent Feedback 只读取通过 freshness、governance 和 held-out acceptance
+的 performance diagnostic，并输出稳定行动码：
 
 - `stop_launch_bound_search`
 - `reduce_dispatch_count`
@@ -134,7 +164,8 @@ sol-execbench diagnostics performance \
 - `L` 在无 frontier 时 unavailable；scoring baseline 不得被自动采用。
 - static/runtime 冲突时 runtime evidence 优先，但保留冲突和限制。
 - Agent Feedback 只消费 current、usable、足够置信的诊断。
-- 现有 `T_SOL`、Trace JSONL、scoring 和 sidecar fixture 保持兼容。
+- 现有 `T_SOL`、Trace JSONL 和 scoring 保持兼容；performance diagnostic
+  与 calibration 直接升级 v2，不提供 v1 compatibility loader。
 
 ### gfx1200硬件验收
 
@@ -147,7 +178,8 @@ sol-execbench diagnostics performance \
 | 两种 RMSNorm | reduction 宽度、LDS/barrier 差异 |
 | Irregular Matmul | WMMA 路径、padding 和边缘 tile 差异 |
 
-在冻结的 held-out 样本上要求：
+在冻结、与 calibration 完全独立的 held-out 样本上，每个 workload family
+至少 10 个 case（总计至少 40 个），并要求：
 
 - `T_pred(HW)` median absolute percentage error ≤ 15%；
 - P90 absolute percentage error ≤ 30%；
@@ -164,4 +196,3 @@ sol-execbench diagnostics performance \
 - `T_frontier` 首版由调用者显式提供可信 trace，不建设全局 frontier registry。
 - CrossEntropy、MiniGPT、gather/scatter/atomic、复杂 overlap、训练 reward 更新和跨架构参数包进入后续里程碑。
 - `T_SOL` 与经验校准严格隔离，任何持续吞吐、launch floor、counter 或 candidate 信息均不得进入 `solar`。
-

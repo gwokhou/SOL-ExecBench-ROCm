@@ -62,6 +62,7 @@ class EvaluationPhasesResult:
 
     static_evidence: StaticKernelEvidenceSidecar | None
     runtime: cli_evaluation_runtime.EvaluationRuntimeSuccess
+    compile_result: cli_compilation.CompilePhaseResult | None = None
 
 
 def require_execution_isolation(request: EvaluationRequest) -> None:
@@ -132,10 +133,14 @@ def run_optional_compile_phase(
     compile_timeout: int,
     static_evidence: str,
     verbose: bool,
-) -> StaticKernelEvidenceSidecar | None:
+) -> tuple[
+    StaticKernelEvidenceSidecar | None,
+    cli_compilation.CompilePhaseResult | None,
+]:
     """Compile native solutions and optionally collect static evidence."""
     packager = context.packager
     static_evidence_result: StaticKernelEvidenceSidecar | None = None
+    compile_result: cli_compilation.CompilePhaseResult | None = None
     if packager._is_cpp:
         with Progress(
             SpinnerColumn(),
@@ -189,7 +194,7 @@ def run_optional_compile_phase(
                 output_file=context.output_file,
             )
         )
-    return static_evidence_result
+    return static_evidence_result, compile_result
 
 
 def run_evaluation_phase(

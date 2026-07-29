@@ -13,7 +13,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from sol_execbench.core.bench.performance_model.models import (
+    ApplicabilityDimension,
     CalibrationParameter,
+    CalibrationParameterName,
+    CalibrationUnit,
 )
 
 METRIC_PREFIX = "METRIC "
@@ -100,12 +103,13 @@ def build_calibration_parameters(
 ) -> list[CalibrationParameter]:
     """Build rates, working-set transitions, and efficiency parameters."""
     if not held_out or any(
-        batch.phase != "held_out_after_configuration_freeze"
+        batch.phase != "parameter_estimation_after_configuration_freeze"
         or not batch.clocks_locked
         for batch in held_out
     ):
         raise ValueError(
-            "held-out evidence must be locked and collected after freeze",
+            "parameter-estimation evidence must be locked and collected "
+            "after freeze",
         )
     grouped = _group_process_medians(held_out)
     parameters = [
@@ -113,46 +117,42 @@ def build_calibration_parameters(
             grouped,
             source_name="dispatch_floor_ms",
             variant="device",
-            target_name="dispatch_floor_ms",
-        ),
-        _parameter(
-            grouped,
-            source_name="valu_flop_per_ms",
-            variant="fp32",
-            target_name="valu_flop_per_ms",
+            target_name=CalibrationParameterName.DISPATCH_FLOOR_MS,
+            expected_unit=CalibrationUnit.MS,
         ),
         _parameter(
             grouped,
             source_name="wmma_flop_per_ms",
             variant=frozen["wmma_variant"],
-            target_name="wmma_flop_per_ms",
+            target_name=CalibrationParameterName.WMMA_F16_F32_FLOP_PER_MS,
+            expected_unit=CalibrationUnit.FLOP_PER_MS,
         ),
         _parameter(
             grouped,
             source_name="memory_byte_per_ms",
             variant=frozen["vram_variant"],
-            target_name="vram_byte_per_ms",
+            target_name=CalibrationParameterName.VRAM_BYTE_PER_MS,
+            expected_unit=CalibrationUnit.BYTE_PER_MS,
             applicability=(64.0 * 2**20, 256.0 * 2**20),
+            applicability_dimension=(ApplicabilityDimension.WORKING_SET_BYTES),
         ),
         _parameter(
             grouped,
             source_name="lds_byte_per_ms",
             variant="normal",
-            target_name="lds_byte_per_ms",
+            target_name=CalibrationParameterName.LDS_BYTE_PER_MS,
+            expected_unit=CalibrationUnit.BYTE_PER_MS,
         ),
         _parameter(
             grouped,
-            source_name="reduction_op_per_ms",
-            variant=frozen["reduction_variant"],
-            target_name="reduction_op_per_ms",
-        ),
-        _parameter(
-            grouped,
-            source_name="barrier_penalty_ms",
-            variant=frozen["reduction_variant"],
-            target_name="barrier_penalty_ms",
+            source_name="lds_bank_conflict_penalty_ms",
+            variant="bank_conflict",
+            target_name=(CalibrationParameterName.LDS_BANK_CONFLICT_PENALTY_MS),
+            expected_unit=CalibrationUnit.MS_PER_EVENT,
         ),
     ]
+    parameters.extend(_valu_parameters(grouped))
+    parameters.extend(_reduction_parameters(grouped))
     parameters.extend(_hierarchy_and_efficiency_parameters(grouped, frozen))
     return parameters
 
@@ -226,8 +226,10 @@ def _parameter(
     *,
     source_name: str,
     variant: str,
-    target_name: str,
+    target_name: CalibrationParameterName,
+    expected_unit: CalibrationUnit,
     applicability: tuple[float, float] | None = None,
+    applicability_dimension: ApplicabilityDimension | None = None,
 ) -> CalibrationParameter:
     matches = [
         (unit, values)
@@ -237,13 +239,18 @@ def _parameter(
     if len(matches) != 1:
         raise RuntimeError(f"held-out evidence lacks {source_name}:{variant}")
     unit, values = matches[0]
+    if unit != expected_unit:
+        raise RuntimeError(
+            f"{source_name}:{variant} has unit {unit}, expected {expected_unit}"
+        )
     value = statistics.median(values)
     return CalibrationParameter(
         name=target_name,
         value=value,
-        unit=unit,
+        unit=expected_unit,
         confidence_interval=_bootstrap_interval(values),
         applicability=applicability,
+        applicability_dimension=applicability_dimension,
     )
 
 
@@ -253,7 +260,9 @@ def _ratio_parameter(
     source_name: str,
     numerator_variant: str,
     denominator_variant: str,
-    target_name: str,
+    target_name: CalibrationParameterName,
+    applicability: tuple[float, float] | None = None,
+    applicability_dimension: ApplicabilityDimension | None = None,
 ) -> CalibrationParameter:
     numerator = _metric_values(grouped, source_name, numerator_variant)
     denominator = _metric_values(grouped, source_name, denominator_variant)
@@ -267,9 +276,10 @@ def _ratio_parameter(
     return CalibrationParameter(
         name=target_name,
         value=value,
-        unit="ratio",
+        unit=CalibrationUnit.RATIO,
         confidence_interval=_bootstrap_interval(ratios),
-        applicability=(0.0, 1.0),
+        applicability=applicability,
+        applicability_dimension=applicability_dimension,
     )
 
 
@@ -297,52 +307,109 @@ def _hierarchy_and_efficiency_parameters(
             grouped,
             source_name="memory_byte_per_ms",
             variant=frozen["l2_variant"],
-            target_name="l2_byte_per_ms",
-            applicability=(0.0, 256.0 * 2**10),
+            target_name=CalibrationParameterName.L2_BYTE_PER_MS,
+            expected_unit=CalibrationUnit.BYTE_PER_MS,
+            applicability=(0.0, 2.0 * 2**20),
+            applicability_dimension=(ApplicabilityDimension.WORKING_SET_BYTES),
         ),
         _parameter(
             grouped,
             source_name="memory_byte_per_ms",
             variant=frozen["l3_variant"],
-            target_name="l3_byte_per_ms",
-            applicability=(2.0 * 2**20, 16.0 * 2**20),
+            target_name=CalibrationParameterName.L3_BYTE_PER_MS,
+            expected_unit=CalibrationUnit.BYTE_PER_MS,
+            applicability=(2.0 * 2**20, 64.0 * 2**20),
+            applicability_dimension=(ApplicabilityDimension.WORKING_SET_BYTES),
         ),
         _ratio_parameter(
             grouped,
             source_name="memory_byte_per_ms",
             numerator_variant="transpose",
             denominator_variant="contiguous",
-            target_name="transpose_access_efficiency",
-        ),
-        _ratio_parameter(
-            grouped,
-            source_name="memory_byte_per_ms",
-            numerator_variant="stride127",
-            denominator_variant="contiguous",
-            target_name="stride_access_efficiency",
-        ),
-        _ratio_parameter(
-            grouped,
-            source_name="lds_byte_per_ms",
-            numerator_variant="bank_conflict",
-            denominator_variant="normal",
-            target_name="lds_bank_conflict_efficiency",
+            target_name=CalibrationParameterName.TRANSPOSE_EFFICIENCY,
         ),
         _ratio_parameter(
             grouped,
             source_name="wmma_flop_per_ms",
-            numerator_variant="active_waves3",
+            numerator_variant=(f"irregular_tile17_{frozen['wmma_variant']}"),
             denominator_variant=frozen["wmma_variant"],
-            target_name="irregular_wmma_efficiency",
+            target_name=CalibrationParameterName.IRREGULAR_WMMA_EFFICIENCY,
+            applicability=(1.0, 15.0),
+            applicability_dimension=ApplicabilityDimension.TILE_REMAINDER,
         ),
         _ratio_parameter(
             grouped,
             source_name="wmma_flop_per_ms",
-            numerator_variant="active_waves1",
+            numerator_variant=f"edge_tile15_{frozen['wmma_variant']}",
             denominator_variant=frozen["wmma_variant"],
-            target_name="edge_wmma_efficiency",
+            target_name=CalibrationParameterName.EDGE_WMMA_EFFICIENCY,
+            applicability=(1.0, 15.0),
+            applicability_dimension=ApplicabilityDimension.TILE_REMAINDER,
         ),
     ]
+
+
+def _valu_parameters(
+    grouped: dict[tuple[str, str, str], list[float]],
+) -> list[CalibrationParameter]:
+    variants = {
+        CalibrationParameterName.VALU_SIMPLE_FP32_PER_MS: "simple_fp32",
+        CalibrationParameterName.VALU_SIMPLE_BF16_PER_MS: "simple_bf16",
+        CalibrationParameterName.VALU_TRANSCENDENTAL_FP32_PER_MS: (
+            "transcendental_fp32"
+        ),
+        CalibrationParameterName.VALU_TRANSCENDENTAL_BF16_PER_MS: (
+            "transcendental_bf16"
+        ),
+        CalibrationParameterName.VALU_COMPOSITE_FP32_PER_MS: "composite_fp32",
+        CalibrationParameterName.VALU_COMPOSITE_BF16_PER_MS: "composite_bf16",
+    }
+    return [
+        _parameter(
+            grouped,
+            source_name="valu_item_per_ms",
+            variant=variant,
+            target_name=name,
+            expected_unit=CalibrationUnit.ITEM_PER_MS,
+        )
+        for name, variant in variants.items()
+    ]
+
+
+def _reduction_parameters(
+    grouped: dict[tuple[str, str, str], list[float]],
+) -> list[CalibrationParameter]:
+    parameters: list[CalibrationParameter] = []
+    for width in (32, 64, 128, 256, 512, 1024):
+        applicability = (float(width), float(width))
+        variant = f"width{width}"
+        parameters.extend(
+            (
+                _parameter(
+                    grouped,
+                    source_name="reduction_op_per_ms",
+                    variant=variant,
+                    target_name=CalibrationParameterName.REDUCTION_OP_PER_MS,
+                    expected_unit=CalibrationUnit.ITEM_PER_MS,
+                    applicability=applicability,
+                    applicability_dimension=(
+                        ApplicabilityDimension.REDUCTION_WIDTH
+                    ),
+                ),
+                _parameter(
+                    grouped,
+                    source_name="barrier_penalty_ms",
+                    variant=variant,
+                    target_name=CalibrationParameterName.BARRIER_PENALTY_MS,
+                    expected_unit=CalibrationUnit.MS_PER_EVENT,
+                    applicability=applicability,
+                    applicability_dimension=(
+                        ApplicabilityDimension.REDUCTION_WIDTH
+                    ),
+                ),
+            )
+        )
+    return parameters
 
 
 __all__ = [

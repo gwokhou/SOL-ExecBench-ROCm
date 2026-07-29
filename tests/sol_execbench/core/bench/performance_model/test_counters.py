@@ -14,7 +14,7 @@ from sol_execbench.core.bench.rocm_profiler.counters import (
 )
 
 _HEADER = (
-    "Correlation_Id,Dispatch_Id,Grid_Size,Kernel_Name,Workgroup_Size,"
+    "Correlation_Id,Dispatch_Id,Queue_Id,Grid_Size,Kernel_Name,Workgroup_Size,"
     "Counter_Name,Counter_Value,Start_Timestamp,End_Timestamp,Duration\n"
 )
 
@@ -22,7 +22,7 @@ _HEADER = (
 def _write_pass(path: Path, dispatch: int, counter: str, value: str) -> None:
     path.write_text(
         _HEADER
-        + f"{dispatch},{dispatch},1024,kernel,64,{counter},{value},100,200,100\n",
+        + f"{dispatch},{dispatch},0,1024,kernel,64,{counter},{value},100,200,100\n",
         encoding="utf-8",
     )
 
@@ -57,7 +57,7 @@ def test_counter_parser_invalidates_cross_pass_misalignment(
     second = tmp_path / "pass_2.csv"
     _write_pass(first, 1, "SQ_WAVES", "32")
     second.write_text(
-        _HEADER + "2,2,2048,other_kernel,64,FETCH_SIZE,1024,100,200,100\n",
+        _HEADER + "2,2,0,2048,other_kernel,64,FETCH_SIZE,1024,100,200,100\n",
         encoding="utf-8",
     )
 

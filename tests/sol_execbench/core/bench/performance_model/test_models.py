@@ -6,6 +6,8 @@ from pydantic import ValidationError
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
 from sol_execbench.core.bench.performance_model.models import (
     CalibrationParameter,
+    CalibrationParameterName,
+    CalibrationUnit,
     DiagnosticRatio,
     EvidenceReference,
     PerformancePrediction,
@@ -17,24 +19,24 @@ from sol_execbench.core.bench.performance_model.models import (
 def test_contracts_reject_unknown_nonfinite_and_invalid_intervals() -> None:
     with pytest.raises(ValidationError, match="Extra inputs"):
         CalibrationParameter(
-            name="rate",
+            name=CalibrationParameterName.VALU_SIMPLE_FP32_PER_MS,
             value=1.0,
-            unit="item/ms",
+            unit=CalibrationUnit.ITEM_PER_MS,
             confidence_interval=(0.9, 1.1),
             unknown=True,
         )
     with pytest.raises(ValidationError):
         CalibrationParameter(
-            name="rate",
+            name=CalibrationParameterName.VALU_SIMPLE_FP32_PER_MS,
             value=float("nan"),
-            unit="item/ms",
+            unit=CalibrationUnit.ITEM_PER_MS,
             confidence_interval=(0.9, 1.1),
         )
     with pytest.raises(ValidationError, match="must contain value"):
         CalibrationParameter(
-            name="rate",
+            name=CalibrationParameterName.VALU_SIMPLE_FP32_PER_MS,
             value=2.0,
-            unit="item/ms",
+            unit=CalibrationUnit.ITEM_PER_MS,
             confidence_interval=(0.9, 1.1),
         )
     with pytest.raises(ValidationError, match="lowercase SHA-256"):

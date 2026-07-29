@@ -19,27 +19,20 @@ from sol_execbench.cli.protocol import (
     response_success,
 )
 from sol_execbench.core.bench.performance_model.acceptance import (
-    DiagnosticAcceptanceCase,
+    DiagnosticAcceptanceManifest,
     evaluate_diagnostic_acceptance,
 )
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
-    load_json_value,
+    load_json_file,
 )
 
 COMMAND_NAME = "rdna4 diagnostic acceptance"
 
 
-def _load_cases(path: Path) -> list[DiagnosticAcceptanceCase]:
-    payload = load_json_value(path)
-    if not isinstance(payload, list):
-        raise ValueError("acceptance artifact must be a JSON list")
-    return [DiagnosticAcceptanceCase.model_validate(item) for item in payload]
-
-
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cases", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -47,7 +40,11 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     """Write a strict aggregate verdict and return nonzero on rejection."""
     arguments = _parse_args()
-    result = evaluate_diagnostic_acceptance(_load_cases(arguments.cases))
+    manifest = load_json_file(
+        DiagnosticAcceptanceManifest,
+        arguments.manifest,
+    )
+    result = evaluate_diagnostic_acceptance(manifest)
     atomic_write_json_value(arguments.output, result.model_dump(mode="json"))
     exit_code = 0 if result.accepted else EXIT_RESULT_FAILED
     response = response_success(

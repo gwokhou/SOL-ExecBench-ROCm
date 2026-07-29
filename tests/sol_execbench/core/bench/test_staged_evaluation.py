@@ -366,6 +366,7 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
         lambda **kwargs: SolutionTimingResult(
             1.25,
             (4,),
+            ((1.25, 1.25, 1.25, 1.25),),
             CacheClearPolicy(
                 detected_l2_bytes=4 * 1024**2,
                 clear_buffer_bytes=8 * 1024**2,
