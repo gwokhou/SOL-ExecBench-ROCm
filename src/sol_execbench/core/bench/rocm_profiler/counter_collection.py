@@ -52,6 +52,9 @@ from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
 )
+from sol_execbench.core.integrity.schema_versions import (
+    ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION,
+)
 from sol_execbench.core.platform.runtime import (
     resolve_rocm_tool,
     resolve_tool_path,
@@ -219,9 +222,10 @@ def _write_provenance(
     atomic_write_json_value(
         path,
         {
-            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v1",
+            "schema_version": ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION,
             "diagnostic_only": True,
             "score_authority": False,
+            "replay_phase": "evidence",
             **provenance,
         },
     )

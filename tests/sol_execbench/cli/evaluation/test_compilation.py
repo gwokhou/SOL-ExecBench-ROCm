@@ -45,6 +45,7 @@ def test_run_compile_phase_skips_non_cpp_solution(tmp_path: Path) -> None:
         stdout="",
         filtered_stderr="",
         returncode=0,
+        command=(),
     )
     assert called is False
     assert packager.compile_output_path is None
@@ -90,6 +91,7 @@ def test_run_compile_phase_executes_compile_command_for_cpp_solution(
         stdout="compiled\n",
         filtered_stderr="",
         returncode=0,
+        command=("python", "build_ext.py"),
     )
 
 

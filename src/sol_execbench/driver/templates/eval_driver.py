@@ -59,6 +59,7 @@ from sol_execbench.driver.eval_runtime_api import (  # noqa: F401
     Workload,
     WorkloadEvaluationRequest,
     allocate_outputs,
+    atomic_write_jsonl_values,
     call_and_collect_outputs,
     check_eval_integrity,
     check_lazy_outputs,
@@ -150,6 +151,7 @@ try:
     # Resolve candidate code only after the trusted reference channel exists.
     # The reference implementation itself is never imported in this process.
     user_fn = load_user_function(_solution, STAGING_DIR)
+    _timing_records = []
     evaluate_workloads(
         WorkloadEvaluationRequest(
             definition=definition,
@@ -167,9 +169,15 @@ try:
                 check_integrity=_check_integrity,
                 driver_globals=globals(),
                 real_stdout=_real_stdout,
+                timing_recorder=_timing_records.append,
             ),
         ),
     )
+    if _timing_records:
+        atomic_write_jsonl_values(
+            STAGING_DIR / "performance-timing-raw.jsonl",
+            _timing_records,
+        )
 finally:
     _reference_client.close()
 

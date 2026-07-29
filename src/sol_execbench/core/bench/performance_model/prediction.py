@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping, Sequence
 
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
@@ -13,26 +14,26 @@ from sol_execbench.core.bench.performance_model.counter_metrics import (
 )
 from sol_execbench.core.bench.performance_model.models import (
     CalibrationParameter,
+    CalibrationParameterName,
     CompiledCharacterization,
     DiagnosticCalibrationProfile,
     DispatchEvidence,
+    ElementwiseDescriptor,
+    ElementwiseOperationClass,
+    MatmulDescriptor,
     PerformancePrediction,
     PredictionComponent,
     PredictionKind,
+    ReductionDescriptor,
     SemanticCharacterization,
-    WorkloadKind,
+    TensorDType,
+    TransposeDescriptor,
+    UnsupportedDescriptor,
 )
 
-_IR_PARAMETERS = frozenset(
-    {
-        "dispatch_floor_ms",
-        "valu_flop_per_ms",
-        "wmma_flop_per_ms",
-        "vram_byte_per_ms",
-        "lds_byte_per_ms",
-        "reduction_op_per_ms",
-    },
-)
+_F16_WMMA_FLOPS = 2.0 * 16.0 * 16.0 * 16.0
+_GFX1200_WAVE_SIZE = 32.0
+_FP32_BYTES = 4.0
 
 
 def validate_calibration_identity(
@@ -40,16 +41,17 @@ def validate_calibration_identity(
     *,
     gpu_architecture: str,
     gpu_id: str | None = None,
+    gpu_bdf: str | None = None,
     rocm_version: str | None = None,
     compiler_version: str | None = None,
     clock_mode: str | None = None,
     power_profile: str | None = None,
 ) -> list[str]:
     """Return explicit reason codes for every calibration identity mismatch."""
-    actual = profile.identity
     expected = {
         "gpu_architecture": gpu_architecture,
         "gpu_id": gpu_id,
+        "gpu_bdf": gpu_bdf,
         "rocm_version": rocm_version,
         "compiler_version": compiler_version,
         "clock_mode": clock_mode,
@@ -59,7 +61,7 @@ def validate_calibration_identity(
     for field, value in expected.items():
         if value is None:
             reasons.append(f"calibration_{field}_unverified")
-        elif getattr(actual, field) != value:
+        elif getattr(profile.identity, field) != value:
             reasons.append(f"calibration_{field}_mismatch")
     return reasons
 
@@ -73,350 +75,553 @@ def predict_ir(
     """Predict logical SOLAR-region runtime without candidate evidence."""
     if identity_reason_codes:
         return _unavailable(PredictionKind.IR, identity_reason_codes)
-    parameters, missing = _parameters(calibration, _IR_PARAMETERS)
-    if missing:
+    if isinstance(semantic.descriptor, UnsupportedDescriptor):
         return _unavailable(
             PredictionKind.IR,
-            [f"missing_calibration_parameter:{name}" for name in missing],
+            semantic.descriptor.reason_codes,
         )
-    dispatches = max(len(semantic.fusion_regions), 1)
-    components = _semantic_components(semantic, parameters, dispatches)
+    if semantic.reason_codes:
+        return _unavailable(PredictionKind.IR, semantic.reason_codes)
+    try:
+        components = _semantic_components(semantic, calibration)
+    except _PredictionUnavailableError as error:
+        return _unavailable(PredictionKind.IR, error.reasons)
     predicted, lower, upper = _combine_components(components)
-    reasons = list(semantic.reason_codes)
-    status = (
-        DiagnosticSidecarStatus.PARTIAL
-        if semantic.workload_kind is WorkloadKind.UNSUPPORTED or reasons
-        else DiagnosticSidecarStatus.AVAILABLE
-    )
     return PerformancePrediction(
         kind=PredictionKind.IR,
-        status=status,
+        status=DiagnosticSidecarStatus.AVAILABLE,
         predicted_time_ms=predicted,
         lower_ms=lower,
         upper_ms=upper,
         components=components,
-        reason_codes=reasons,
         limitations=[
-            "Logical dispatches are SOLAR fusion regions.",
-            "Prediction is diagnostic-only and is excluded from SOL Score.",
+            "Logical dispatches are verified SOLAR fusion regions.",
+            "Prediction is diagnostic-only and excluded from SOL Score.",
         ],
     )
 
 
 def predict_hw(
+    semantic: SemanticCharacterization,
     compiled: Sequence[CompiledCharacterization],
     dispatches: Sequence[DispatchEvidence],
     calibration: DiagnosticCalibrationProfile,
     *,
     identity_reason_codes: Sequence[str] = (),
 ) -> PerformancePrediction:
-    """Predict candidate dispatch runtime without measured/profiler duration."""
+    """Predict candidate dispatch runtime without measured duration."""
     if identity_reason_codes:
         return _unavailable(PredictionKind.HW, identity_reason_codes)
-    parameters, missing = _parameters(calibration, _IR_PARAMETERS)
-    if missing:
+    if isinstance(semantic.descriptor, UnsupportedDescriptor):
         return _unavailable(
             PredictionKind.HW,
-            [f"missing_calibration_parameter:{name}" for name in missing],
+            semantic.descriptor.reason_codes,
         )
     valid = [dispatch for dispatch in dispatches if dispatch.valid]
     if not valid:
         return _unavailable(PredictionKind.HW, ["no_valid_dispatch_evidence"])
+    if concurrency_reason := _concurrency_reason(valid):
+        return _unavailable(PredictionKind.HW, [concurrency_reason])
     static_by_symbol = {item.kernel_symbol: item for item in compiled}
-    modeled = [
-        _dispatch_components(
-            dispatch,
-            static_by_symbol.get(dispatch.kernel_symbol),
-            parameters,
-        )
-        for dispatch in valid
-    ]
-    components = [component for group in modeled for component in group]
-    estimates = [_combine_components(group) for group in modeled]
-    predicted, lower, upper = _combine_dispatches(valid, estimates)
-    reasons = _hardware_reason_codes(compiled, dispatches, components)
-    status = (
-        DiagnosticSidecarStatus.PARTIAL
-        if reasons
-        else DiagnosticSidecarStatus.AVAILABLE
+    try:
+        groups = [
+            _dispatch_components(
+                semantic,
+                dispatch,
+                static_by_symbol.get(dispatch.kernel_symbol),
+                calibration,
+            )
+            for dispatch in valid
+        ]
+    except _PredictionUnavailableError as error:
+        return _unavailable(PredictionKind.HW, error.reasons)
+    components = [component for group in groups for component in group]
+    estimates = [_combine_components(group) for group in groups]
+    predicted = tuple(sum(values) for values in zip(*estimates, strict=True))
+    reasons = _hardware_reason_codes(
+        semantic,
+        compiled,
+        dispatches,
+        components,
     )
     return PerformancePrediction(
         kind=PredictionKind.HW,
-        status=status,
-        predicted_time_ms=predicted,
-        lower_ms=lower,
-        upper_ms=upper,
+        status=(
+            DiagnosticSidecarStatus.PARTIAL
+            if reasons
+            else DiagnosticSidecarStatus.AVAILABLE
+        ),
+        predicted_time_ms=predicted[0],
+        lower_ms=predicted[1],
+        upper_ms=predicted[2],
         components=components,
         reason_codes=reasons,
         limitations=[
-            "Profiler duration and achieved throughput are not prediction inputs.",
-            "Dispatch predictions sum unless timestamps prove overlap.",
+            "Profiler duration and achieved throughput are not inputs.",
+            "The v2 model supports serial dispatches only.",
         ],
     )
 
 
-def _parameters(
-    calibration: DiagnosticCalibrationProfile,
-    required: Iterable[str],
-) -> tuple[dict[str, CalibrationParameter], list[str]]:
-    parameters = {
-        parameter.name: parameter for parameter in calibration.parameters
-    }
-    missing = sorted(set(required) - parameters.keys())
-    return parameters, missing
+class _PredictionUnavailableError(Exception):
+    """Internal fail-closed signal carrying stable reasons."""
+
+    def __init__(self, *reasons: str) -> None:
+        super().__init__(", ".join(reasons))
+        self.reasons = list(reasons)
 
 
 def _semantic_components(
     semantic: SemanticCharacterization,
-    parameters: Mapping[str, CalibrationParameter],
-    dispatches: int,
+    calibration: DiagnosticCalibrationProfile,
 ) -> list[PredictionComponent]:
-    kind = semantic.workload_kind
-    compute_name = (
-        "wmma_flop_per_ms"
-        if kind is WorkloadKind.MATMUL
-        else "valu_flop_per_ms"
-    )
-    compute = _scaled_component(
-        "compute",
-        semantic.semantic_flops,
-        parameters[compute_name],
-    )
-    if kind is WorkloadKind.MATMUL:
-        efficiency = _wmma_efficiency(semantic, parameters)
-        if efficiency is not None:
-            compute = _apply_efficiency(compute, efficiency)
-    memory = _scaled_component(
-        "memory",
-        semantic.semantic_bytes,
-        _memory_parameter(semantic.semantic_bytes, parameters),
-    )
-    if kind is WorkloadKind.TRANSPOSE:
-        efficiency = parameters.get("transpose_access_efficiency")
-        if efficiency is not None:
-            memory = _apply_efficiency(memory, efficiency)
-    components = [
+    dispatches = len(semantic.fusion_regions)
+    if dispatches <= 0:
+        raise _PredictionUnavailableError("fusion_regions_missing")
+    result = [
         _scaled_component(
             "dispatch",
             float(dispatches),
-            parameters["dispatch_floor_ms"],
+            _required(calibration, CalibrationParameterName.DISPATCH_FLOOR_MS),
             multiply=True,
         ),
-        compute,
-        memory,
     ]
-    lds_work = _resource_total(semantic.resource_work, "lds")
-    reduction_work = _resource_total(semantic.resource_work, "reduction")
-    if lds_work:
-        components.append(
-            _scaled_component(
-                "lds",
-                lds_work,
-                parameters["lds_byte_per_ms"],
+    descriptor = semantic.descriptor
+    if isinstance(descriptor, ElementwiseDescriptor):
+        result.extend(
+            _elementwise_components(
+                descriptor,
+                semantic.semantic_bytes,
+                calibration,
+            )
+        )
+    elif isinstance(descriptor, TransposeDescriptor):
+        result.append(
+            _memory_component(
+                semantic.semantic_bytes,
+                calibration,
+                efficiency_name=CalibrationParameterName.TRANSPOSE_EFFICIENCY,
             ),
         )
-    if reduction_work or kind is WorkloadKind.REDUCTION:
-        work = reduction_work or max(semantic.semantic_flops, 1.0)
-        components.append(
-            _scaled_component(
-                "reduction",
-                work,
-                parameters["reduction_op_per_ms"],
+    elif isinstance(descriptor, ReductionDescriptor):
+        result.extend(
+            _reduction_components(
+                semantic,
+                descriptor,
+                calibration,
             ),
         )
-    return components
+    elif isinstance(descriptor, MatmulDescriptor):
+        result.extend(_matmul_components(semantic, descriptor, calibration))
+    return result
+
+
+def _elementwise_components(
+    descriptor: ElementwiseDescriptor,
+    semantic_bytes: float,
+    calibration: DiagnosticCalibrationProfile,
+) -> list[PredictionComponent]:
+    compute = [
+        _scaled_component(
+            "compute",
+            amount,
+            _required(
+                calibration,
+                _elementwise_parameter(descriptor.dtype, operation),
+            ),
+        )
+        for operation, amount in descriptor.operations.items()
+    ]
+    combined_compute = PredictionComponent(
+        name="compute",
+        time_ms=sum(item.time_ms for item in compute),
+        lower_ms=sum(item.lower_ms for item in compute),
+        upper_ms=sum(item.upper_ms for item in compute),
+    )
+    return [
+        combined_compute,
+        _memory_component(semantic_bytes, calibration),
+    ]
+
+
+def _reduction_components(
+    semantic: SemanticCharacterization,
+    descriptor: ReductionDescriptor,
+    calibration: DiagnosticCalibrationProfile,
+) -> list[PredictionComponent]:
+    operations = descriptor.outer_rows * max(descriptor.reduction_width - 1, 1)
+    barrier_events = (
+        descriptor.outer_rows
+        * math.ceil(descriptor.reduction_width / _GFX1200_WAVE_SIZE)
+        * math.ceil(math.log2(descriptor.reduction_width))
+    )
+    return [
+        _scaled_component(
+            "reduction",
+            float(operations),
+            _required(
+                calibration,
+                CalibrationParameterName.REDUCTION_OP_PER_MS,
+                coordinate=float(descriptor.reduction_width),
+            ),
+        ),
+        _memory_component(semantic.semantic_bytes, calibration),
+        _scaled_component(
+            "barrier_penalty",
+            float(barrier_events),
+            _required(
+                calibration,
+                CalibrationParameterName.BARRIER_PENALTY_MS,
+                coordinate=float(descriptor.reduction_width),
+            ),
+            multiply=True,
+        ),
+    ]
+
+
+def _matmul_components(
+    semantic: SemanticCharacterization,
+    descriptor: MatmulDescriptor,
+    calibration: DiagnosticCalibrationProfile,
+) -> list[PredictionComponent]:
+    compute = _scaled_component(
+        "wmma",
+        semantic.semantic_flops,
+        _required(
+            calibration,
+            CalibrationParameterName.WMMA_F16_F32_FLOP_PER_MS,
+        ),
+    )
+    remainders = (descriptor.m % 16, descriptor.n % 16, descriptor.k % 16)
+    if any(remainders):
+        efficiency_name = (
+            CalibrationParameterName.IRREGULAR_WMMA_EFFICIENCY
+            if sum(bool(value) for value in remainders) > 1
+            else CalibrationParameterName.EDGE_WMMA_EFFICIENCY
+        )
+        compute = _apply_efficiency(
+            compute,
+            _required(
+                calibration,
+                efficiency_name,
+                coordinate=float(max(remainders)),
+            ),
+        )
+    return [compute, _memory_component(semantic.semantic_bytes, calibration)]
 
 
 def _dispatch_components(
+    semantic: SemanticCharacterization,
     dispatch: DispatchEvidence,
     compiled: CompiledCharacterization | None,
-    parameters: Mapping[str, CalibrationParameter],
+    calibration: DiagnosticCalibrationProfile,
 ) -> list[PredictionComponent]:
-    counter = dispatch.counters
-    waves = _counter(counter, "SQ_WAVES") or 0.0
-    valu_instructions = _counter(
-        counter,
+    counters = dispatch.counters
+    waves = _counter(counters, "SQ_WAVES") or 0.0
+    valu = _counter(
+        counters,
+        "VALUINSTS",
         "SQ_INSTS_VALU",
         "SQ_INSTS_VALU_ADD",
     )
-    derived_valu_per_wave = _counter(counter, "VALUINSTS")
-    if not valu_instructions and derived_valu_per_wave and waves:
-        valu_instructions = derived_valu_per_wave * waves
-    wmma_instructions = _counter(
-        counter,
+    wmma = _counter(
+        counters,
         "SQ_INSTS_WMMA",
         "SQ_INSTS_MFMA",
         "MFMAINSTS",
     )
-    barrier_instructions = 0.0
-    lds_instructions = _counter(counter, "SQ_INSTS_LDS")
+    lds = _counter(counters, "LDSINSTS", "SQ_INSTS_LDS")
     if compiled is not None and waves:
-        valu_instructions = valu_instructions or (
-            _static_group(compiled, "valu") * waves
-        )
-        wmma_instructions = wmma_instructions or (
-            _static_matrix_count(compiled) * waves
-        )
-        barrier_instructions = _static_group(compiled, "barrier") * waves
-        lds_instructions = lds_instructions or (
-            _static_group(compiled, "lds") * waves
-        )
-    dispatch_id = dispatch.dispatch_id
+        valu = valu or _static_group(compiled, "valu") * waves
+        wmma = wmma or _static_matrix_count(compiled) * waves
+        lds = lds or _static_group(compiled, "lds") * waves
     result = [
         _scaled_component(
             "dispatch",
             1.0,
-            parameters["dispatch_floor_ms"],
+            _required(calibration, CalibrationParameterName.DISPATCH_FLOOR_MS),
             multiply=True,
-            dispatch_id=dispatch_id,
+            dispatch_id=dispatch.dispatch_id,
         ),
     ]
-    _append_dynamic_components(
+    _append_compute_component(
+        result, semantic, dispatch.dispatch_id, valu, wmma, calibration
+    )
+    memory_bytes = counter_memory_bytes(counters)
+    if memory_bytes:
+        result.append(
+            _memory_component(
+                memory_bytes,
+                calibration,
+                dispatch_id=dispatch.dispatch_id,
+            ),
+        )
+    if lds:
+        result.append(
+            _scaled_component(
+                "lds",
+                lds * _GFX1200_WAVE_SIZE * _FP32_BYTES,
+                _required(
+                    calibration,
+                    CalibrationParameterName.LDS_BYTE_PER_MS,
+                ),
+                dispatch_id=dispatch.dispatch_id,
+            ),
+        )
+    _append_serial_penalties(
         result,
-        dispatch_id=dispatch_id,
-        counters=counter,
-        valu_instructions=valu_instructions,
-        wmma_instructions=wmma_instructions,
-        barrier_instructions=barrier_instructions,
-        lds_instructions=lds_instructions,
-        parameters=parameters,
+        semantic,
+        dispatch,
+        compiled,
+        calibration,
     )
     return result
 
 
-def _append_dynamic_components(
+def _append_compute_component(
     result: list[PredictionComponent],
-    *,
+    semantic: SemanticCharacterization,
     dispatch_id: str,
-    counters: Mapping[str, float],
-    valu_instructions: float | None,
-    wmma_instructions: float | None,
-    barrier_instructions: float,
-    lds_instructions: float | None,
-    parameters: Mapping[str, CalibrationParameter],
+    valu: float | None,
+    wmma: float | None,
+    calibration: DiagnosticCalibrationProfile,
 ) -> None:
-    if valu_instructions:
-        result.append(
-            _scaled_component(
-                "compute",
-                valu_instructions * 64.0,
-                parameters["valu_flop_per_ms"],
-                dispatch_id=dispatch_id,
-            ),
-        )
-    if wmma_instructions:
+    descriptor = semantic.descriptor
+    if wmma and isinstance(descriptor, MatmulDescriptor):
         result.append(
             _scaled_component(
                 "wmma",
-                wmma_instructions * 8192.0,
-                parameters["wmma_flop_per_ms"],
+                wmma * _F16_WMMA_FLOPS,
+                _required(
+                    calibration,
+                    CalibrationParameterName.WMMA_F16_F32_FLOP_PER_MS,
+                ),
                 dispatch_id=dispatch_id,
             ),
         )
-    memory_bytes = counter_memory_bytes(counters)
-    if memory_bytes:
+    if not valu:
+        return
+    amount = valu * _GFX1200_WAVE_SIZE
+    if isinstance(descriptor, ElementwiseDescriptor):
         result.append(
-            _scaled_component(
-                "memory",
-                memory_bytes,
-                parameters["vram_byte_per_ms"],
-                dispatch_id=dispatch_id,
-            ),
-        )
-    if lds_instructions:
-        lds_component = _scaled_component(
-            "lds",
-            lds_instructions * 128.0,
-            parameters["lds_byte_per_ms"],
-            dispatch_id=dispatch_id,
-        )
-        conflict = _counter(
-            counters,
-            "LDSBANKCONFLICT",
-            "SQC_LDS_BANK_CONFLICT",
-            "SQ_LDS_BANK_CONFLICT",
-        )
-        efficiency = parameters.get("lds_bank_conflict_efficiency")
-        if conflict and efficiency is not None:
-            lds_component = _apply_efficiency(lds_component, efficiency)
-        result.append(lds_component)
-    _append_counter_penalties(
-        result,
-        dispatch_id=dispatch_id,
-        counters=counters,
-        barrier_instructions=barrier_instructions,
-        parameters=parameters,
-    )
-
-
-def _append_counter_penalties(
-    result: list[PredictionComponent],
-    *,
-    dispatch_id: str,
-    counters: Mapping[str, float],
-    barrier_instructions: float,
-    parameters: Mapping[str, CalibrationParameter],
-) -> None:
-    penalties = (
-        (
-            "cache",
-            _counter(
-                counters,
-                "GL2C_MISS_SUM",
-                "TCC_MISS",
-                "L2CACHEMISS",
-            ),
-            parameters.get("cache_miss_penalty_ms"),
-        ),
-        (
-            "lds_conflict",
-            _counter(
-                counters,
-                "LDSBANKCONFLICT",
-                "SQC_LDS_BANK_CONFLICT",
-                "SQ_LDS_BANK_CONFLICT",
-            ),
-            parameters.get("lds_bank_conflict_penalty_ms"),
-        ),
-    )
-    for name, amount, parameter in penalties:
-        _append_penalty_component(
-            result,
-            name=name,
-            amount=amount,
-            parameter=parameter,
-            dispatch_id=dispatch_id,
-        )
-    _append_penalty_component(
-        result,
-        name="barrier",
-        amount=_counter(counters, "SQ_INSTS_BARRIER", "BARRIERINSTS"),
-        fallback_amount=barrier_instructions,
-        parameter=parameters.get("barrier_penalty_ms"),
-        dispatch_id=dispatch_id,
-    )
-
-
-def _append_penalty_component(
-    result: list[PredictionComponent],
-    *,
-    name: str,
-    amount: float | None,
-    fallback_amount: float = 0.0,
-    parameter: CalibrationParameter | None,
-    dispatch_id: str,
-) -> None:
-    amount = amount or fallback_amount
-    if amount and parameter is not None:
-        result.append(
-            _scaled_component(
-                name,
+            _hardware_elementwise_component(
+                descriptor,
                 amount,
-                parameter,
-                multiply=True,
+                calibration,
+                dispatch_id,
+            )
+        )
+    elif isinstance(descriptor, ReductionDescriptor):
+        result.append(
+            _scaled_component(
+                "reduction",
+                amount,
+                _required(
+                    calibration,
+                    CalibrationParameterName.REDUCTION_OP_PER_MS,
+                    coordinate=float(descriptor.reduction_width),
+                ),
                 dispatch_id=dispatch_id,
+            )
+        )
+    elif isinstance(descriptor, MatmulDescriptor):
+        result.append(
+            _scaled_component(
+                "compute",
+                amount,
+                _required(
+                    calibration,
+                    CalibrationParameterName.VALU_SIMPLE_FP32_PER_MS,
+                ),
+                dispatch_id=dispatch_id,
+            )
+        )
+
+
+def _hardware_elementwise_component(
+    descriptor: ElementwiseDescriptor,
+    amount: float,
+    calibration: DiagnosticCalibrationProfile,
+    dispatch_id: str,
+) -> PredictionComponent:
+    total = sum(descriptor.operations.values())
+    if total <= 0:
+        raise _PredictionUnavailableError("elementwise_operation_count_missing")
+    components = [
+        _scaled_component(
+            "compute",
+            amount * operation_amount / total,
+            _required(
+                calibration,
+                _elementwise_parameter(descriptor.dtype, operation),
+            ),
+            dispatch_id=dispatch_id,
+        )
+        for operation, operation_amount in descriptor.operations.items()
+    ]
+    return PredictionComponent(
+        name="compute",
+        time_ms=sum(item.time_ms for item in components),
+        lower_ms=sum(item.lower_ms for item in components),
+        upper_ms=sum(item.upper_ms for item in components),
+        dispatch_id=dispatch_id,
+    )
+
+
+def _append_serial_penalties(
+    result: list[PredictionComponent],
+    semantic: SemanticCharacterization,
+    dispatch: DispatchEvidence,
+    compiled: CompiledCharacterization | None,
+    calibration: DiagnosticCalibrationProfile,
+) -> None:
+    counters = dispatch.counters
+    conflict = _counter(
+        counters,
+        "LDSBANKCONFLICT",
+        "SQC_LDS_BANK_CONFLICT",
+        "SQ_LDS_BANK_CONFLICT",
+    )
+    if conflict:
+        result.append(
+            _scaled_component(
+                "lds_conflict_penalty",
+                conflict,
+                _required(
+                    calibration,
+                    CalibrationParameterName.LDS_BANK_CONFLICT_PENALTY_MS,
+                ),
+                multiply=True,
+                dispatch_id=dispatch.dispatch_id,
             ),
         )
+    barriers = _counter(counters, "SQ_INSTS_BARRIER", "BARRIERINSTS")
+    if not barriers and compiled is not None:
+        waves = _counter(counters, "SQ_WAVES") or 0.0
+        barriers = _static_group(compiled, "barrier") * waves
+    if barriers:
+        coordinate = (
+            float(semantic.descriptor.reduction_width)
+            if isinstance(semantic.descriptor, ReductionDescriptor)
+            else None
+        )
+        if coordinate is None:
+            raise _PredictionUnavailableError("barrier_semantics_unsupported")
+        result.append(
+            _scaled_component(
+                "barrier_penalty",
+                barriers,
+                _required(
+                    calibration,
+                    CalibrationParameterName.BARRIER_PENALTY_MS,
+                    coordinate=coordinate,
+                ),
+                multiply=True,
+                dispatch_id=dispatch.dispatch_id,
+            ),
+        )
+
+
+def _memory_component(
+    working_set_bytes: float,
+    calibration: DiagnosticCalibrationProfile,
+    *,
+    efficiency_name: CalibrationParameterName | None = None,
+    dispatch_id: str | None = None,
+) -> PredictionComponent:
+    parameter = _memory_parameter(working_set_bytes, calibration)
+    component = _scaled_component(
+        "memory",
+        working_set_bytes,
+        parameter,
+        dispatch_id=dispatch_id,
+    )
+    if efficiency_name is not None:
+        component = _apply_efficiency(
+            component,
+            _required(calibration, efficiency_name),
+        )
+    return component
+
+
+def _memory_parameter(
+    working_set_bytes: float,
+    calibration: DiagnosticCalibrationProfile,
+) -> CalibrationParameter:
+    for name in (
+        CalibrationParameterName.L2_BYTE_PER_MS,
+        CalibrationParameterName.L3_BYTE_PER_MS,
+        CalibrationParameterName.VRAM_BYTE_PER_MS,
+    ):
+        parameter = calibration.parameter(name)
+        if parameter is not None and _applies(parameter, working_set_bytes):
+            return parameter
+    raise _PredictionUnavailableError(
+        "calibration_out_of_range:working_set_bytes"
+    )
+
+
+def _required(
+    calibration: DiagnosticCalibrationProfile,
+    name: CalibrationParameterName,
+    *,
+    coordinate: float | None = None,
+) -> CalibrationParameter:
+    parameter = calibration.parameter(name, coordinate)
+    if parameter is None:
+        raise _PredictionUnavailableError(
+            f"missing_calibration_parameter:{name}"
+        )
+    if coordinate is not None and not _applies(parameter, coordinate):
+        raise _PredictionUnavailableError(f"calibration_out_of_range:{name}")
+    return parameter
+
+
+def _applies(parameter: CalibrationParameter, coordinate: float) -> bool:
+    if parameter.applicability is None:
+        return True
+    lower, upper = parameter.applicability
+    return lower <= coordinate <= upper
+
+
+def _elementwise_parameter(
+    dtype: TensorDType,
+    operation: ElementwiseOperationClass,
+) -> CalibrationParameterName:
+    names = {
+        (TensorDType.FLOAT32, ElementwiseOperationClass.SIMPLE): (
+            CalibrationParameterName.VALU_SIMPLE_FP32_PER_MS
+        ),
+        (TensorDType.BFLOAT16, ElementwiseOperationClass.SIMPLE): (
+            CalibrationParameterName.VALU_SIMPLE_BF16_PER_MS
+        ),
+        (TensorDType.FLOAT32, ElementwiseOperationClass.TRANSCENDENTAL): (
+            CalibrationParameterName.VALU_TRANSCENDENTAL_FP32_PER_MS
+        ),
+        (TensorDType.BFLOAT16, ElementwiseOperationClass.TRANSCENDENTAL): (
+            CalibrationParameterName.VALU_TRANSCENDENTAL_BF16_PER_MS
+        ),
+        (TensorDType.FLOAT32, ElementwiseOperationClass.COMPOSITE): (
+            CalibrationParameterName.VALU_COMPOSITE_FP32_PER_MS
+        ),
+        (TensorDType.BFLOAT16, ElementwiseOperationClass.COMPOSITE): (
+            CalibrationParameterName.VALU_COMPOSITE_BF16_PER_MS
+        ),
+    }
+    try:
+        return names[(dtype, operation)]
+    except KeyError as error:
+        raise _PredictionUnavailableError(
+            f"unsupported_compute_dtype:{dtype}"
+        ) from error
+
+
+def _semantic_compute_dtype(descriptor: object) -> TensorDType:
+    if isinstance(descriptor, ElementwiseDescriptor):
+        return descriptor.dtype
+    if isinstance(descriptor, ReductionDescriptor):
+        return descriptor.input_dtype
+    return TensorDType.FLOAT32
 
 
 def _scaled_component(
@@ -435,7 +640,7 @@ def _scaled_component(
     else:
         estimate = amount / parameter.value
         lower = amount / upper_parameter
-        upper = amount / lower_parameter if lower_parameter else estimate
+        upper = amount / lower_parameter
     return PredictionComponent(
         name=name,
         time_ms=estimate,
@@ -452,11 +657,7 @@ def _apply_efficiency(
     lower_efficiency, upper_efficiency = efficiency.confidence_interval
     estimate = component.time_ms / efficiency.value
     lower = component.lower_ms / upper_efficiency
-    upper = (
-        component.upper_ms / lower_efficiency
-        if lower_efficiency
-        else component.upper_ms
-    )
+    upper = component.upper_ms / lower_efficiency
     return component.model_copy(
         update={
             "time_ms": estimate,
@@ -466,89 +667,60 @@ def _apply_efficiency(
     )
 
 
-def _memory_parameter(
-    working_set_bytes: float,
-    parameters: Mapping[str, CalibrationParameter],
-) -> CalibrationParameter:
-    hierarchy = [
-        parameter
-        for name in ("l2_byte_per_ms", "l3_byte_per_ms")
-        if (parameter := parameters.get(name)) is not None
-        and parameter.applicability is not None
-        and parameter.applicability[0]
-        <= working_set_bytes
-        <= parameter.applicability[1]
-    ]
-    return hierarchy[0] if hierarchy else parameters["vram_byte_per_ms"]
-
-
-def _wmma_efficiency(
-    semantic: SemanticCharacterization,
-    parameters: Mapping[str, CalibrationParameter],
-) -> CalibrationParameter | None:
-    if any("irregular" in reason for reason in semantic.reason_codes):
-        return parameters.get("irregular_wmma_efficiency")
-    matrix_shape = semantic.shape[-3:]
-    if matrix_shape and any(dimension % 16 for dimension in matrix_shape):
-        return parameters.get("edge_wmma_efficiency")
-    return None
-
-
 def _combine_components(
     components: Sequence[PredictionComponent],
 ) -> tuple[float, float, float]:
     dispatch = [item for item in components if item.name == "dispatch"]
-    resources = [item for item in components if item.name != "dispatch"]
-    dispatch_values = (
-        sum(item.time_ms for item in dispatch),
-        sum(item.lower_ms for item in dispatch),
-        sum(item.upper_ms for item in dispatch),
-    )
-    if not resources:
-        return dispatch_values
-    return (
-        dispatch_values[0] + max(item.time_ms for item in resources),
-        dispatch_values[1] + max(item.lower_ms for item in resources),
-        dispatch_values[2] + max(item.upper_ms for item in resources),
+    penalties = [item for item in components if item.name.endswith("_penalty")]
+    resources = [
+        item
+        for item in components
+        if item.name != "dispatch" and not item.name.endswith("_penalty")
+    ]
+    return tuple(
+        sum(getattr(item, attribute) for item in dispatch)
+        + max(
+            (getattr(item, attribute) for item in resources),
+            default=0.0,
+        )
+        + sum(getattr(item, attribute) for item in penalties)
+        for attribute in ("time_ms", "lower_ms", "upper_ms")
     )
 
 
-def _combine_dispatches(
+def _has_overlap(dispatches: Sequence[DispatchEvidence]) -> bool:
+    return any(
+        _overlaps(left, right)
+        for index, left in enumerate(dispatches)
+        for right in dispatches[index + 1 :]
+    )
+
+
+def _concurrency_reason(
     dispatches: Sequence[DispatchEvidence],
-    estimates: Sequence[tuple[float, float, float]],
-) -> tuple[float, float, float]:
-    clusters: list[list[int]] = []
-    for index, dispatch in enumerate(dispatches):
-        overlapping = [
-            cluster
-            for cluster in clusters
-            if any(_overlaps(dispatch, dispatches[other]) for other in cluster)
-        ]
-        if not overlapping:
-            clusters.append([index])
-            continue
-        merged = [index, *(item for cluster in overlapping for item in cluster)]
-        clusters = [
-            cluster for cluster in clusters if cluster not in overlapping
-        ]
-        clusters.append(merged)
-    return (
-        sum(
-            max(estimates[index][0] for index in cluster)
-            for cluster in clusters
-        ),
-        sum(
-            max(estimates[index][1] for index in cluster)
-            for cluster in clusters
-        ),
-        sum(
-            max(estimates[index][2] for index in cluster)
-            for cluster in clusters
-        ),
-    )
+) -> str | None:
+    if any(
+        dispatch.queue_id is None and dispatch.stream_id is None
+        for dispatch in dispatches
+    ):
+        return "dispatch_queue_identity_unverified"
+    identities = {
+        (dispatch.queue_id, dispatch.stream_id) for dispatch in dispatches
+    }
+    if len(identities) != 1 or _has_overlap(dispatches):
+        return "overlap_model_unsupported"
+    return None
 
 
 def _overlaps(left: DispatchEvidence, right: DispatchEvidence) -> bool:
+    values = (
+        left.start_timestamp_ns,
+        left.end_timestamp_ns,
+        right.start_timestamp_ns,
+        right.end_timestamp_ns,
+    )
+    if any(value is None for value in values):
+        return False
     left_start = left.start_timestamp_ns
     left_end = left.end_timestamp_ns
     right_start = right.start_timestamp_ns
@@ -560,10 +732,11 @@ def _overlaps(left: DispatchEvidence, right: DispatchEvidence) -> bool:
         or right_end is None
     ):
         return False
-    return bool(left_start < right_end and right_start < left_end)
+    return left_start < right_end and right_start < left_end
 
 
 def _hardware_reason_codes(
+    semantic: SemanticCharacterization,
     compiled: Sequence[CompiledCharacterization],
     dispatches: Sequence[DispatchEvidence],
     components: Sequence[PredictionComponent],
@@ -581,14 +754,22 @@ def _hardware_reason_codes(
     valid_ids = {item.dispatch_id for item in dispatches if item.valid}
     if component_dispatches != valid_ids:
         reasons.append("missing_dynamic_resource_counters")
+    if semantic.semantic_bytes > 0 and any(
+        dispatch.valid and counter_memory_bytes(dispatch.counters) <= 0
+        for dispatch in dispatches
+    ):
+        reasons.append("missing_dynamic_memory_counters")
+    expected_compute = {
+        ElementwiseDescriptor: {"compute"},
+        ReductionDescriptor: {"reduction"},
+        MatmulDescriptor: {"compute", "wmma"},
+    }
+    names = expected_compute.get(type(semantic.descriptor))
+    if names is not None and not any(
+        component.name in names for component in components
+    ):
+        reasons.append("missing_dynamic_compute_counters")
     return list(dict.fromkeys(reasons))
-
-
-def _resource_total(
-    resources: Mapping[str, Mapping[str, float]],
-    name: str,
-) -> float:
-    return sum(resources.get(name, {}).values())
 
 
 def _counter(counters: Mapping[str, float], *names: str) -> float | None:
@@ -613,6 +794,17 @@ def _static_matrix_count(compiled: CompiledCharacterization) -> float:
             if "wmma" in name.lower() or "mfma" in name.lower()
         ),
     )
+
+
+def _shape_elements(shape: Sequence[int]) -> int:
+    result = 1
+    for dimension in shape:
+        result *= dimension
+    return result
+
+
+def _dtype_bytes(dtype: TensorDType) -> int:
+    return 4 if dtype is TensorDType.FLOAT32 else 2
 
 
 def _unavailable(

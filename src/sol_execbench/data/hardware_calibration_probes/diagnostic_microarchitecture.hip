@@ -1,4 +1,5 @@
 #include <hip/hip_runtime.h>
+#include <hip/hip_bf16.h>
 
 #include <algorithm>
 #include <cmath>
@@ -75,6 +76,17 @@ __global__ void copy_kernel(const float* input, float* output, size_t count, siz
   output[index] = input[index];
 }
 
+__global__ void transpose_kernel(const float* input, float* output, size_t rows,
+                                 size_t columns) {
+  const size_t input_index =
+      static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const size_t count = rows * columns;
+  if (input_index >= count) return;
+  const size_t row = input_index / columns;
+  const size_t column = input_index % columns;
+  output[column * rows + row] = input[input_index];
+}
+
 int measure_copy(size_t bytes, size_t stride, const char* variant) {
   const size_t count = bytes / sizeof(float);
   float* input = nullptr;
@@ -108,13 +120,29 @@ int run_memory() {
 
 int run_access() {
   constexpr size_t bytes = 128ULL << 20;
-  for (const auto& entry :
-       std::vector<std::pair<size_t, const char*>>{{1, "contiguous"}, {32, "transpose"},
-                                                   {127, "stride127"}}) {
-    const int result = measure_copy(bytes, entry.first, entry.second);
-    if (result != 0) return result;
+  const int contiguous = measure_copy(bytes, 1, "contiguous");
+  if (contiguous != 0) return contiguous;
+  constexpr size_t rows = 4096;
+  constexpr size_t columns = 8192;
+  const size_t count = rows * columns;
+  float* input = nullptr;
+  float* output = nullptr;
+  if (!hip_ok(hipMalloc(&input, bytes)) || !hip_ok(hipMalloc(&output, bytes))) return 2;
+  if (!hip_ok(hipMemset(input, 1, bytes))) return 2;
+  for (int sample = 0; sample < kSamples; ++sample) {
+    const double milliseconds = elapsed_ms([&] {
+      hipLaunchKernelGGL(
+          transpose_kernel, dim3((count + kThreads - 1) / kThreads),
+          dim3(kThreads), 0, 0, input, output, rows, columns);
+    });
+    if (!metric("memory_byte_per_ms", "transpose", 2.0 * bytes / milliseconds,
+                "byte/ms")) {
+      return 2;
+    }
   }
-  return 0;
+  const bool input_freed = hip_ok(hipFree(input));
+  const bool output_freed = hip_ok(hipFree(output));
+  return input_freed && output_freed ? 0 : 2;
 }
 
 __global__ void lds_kernel(float* output, int bank_stride, int repetitions) {
@@ -138,6 +166,7 @@ int run_lds() {
   float* output = nullptr;
   if (!hip_ok(hipMalloc(&output, static_cast<size_t>(blocks) * sizeof(float)))) return 2;
   constexpr int repetitions = 1024;
+  double normal_ms[kSamples] = {};
   for (const auto& entry :
        std::vector<std::pair<int, const char*>>{{1, "normal"}, {32, "bank_conflict"}}) {
     for (int sample = 0; sample < kSamples; ++sample) {
@@ -145,8 +174,16 @@ int run_lds() {
         hipLaunchKernelGGL(lds_kernel, dim3(blocks), dim3(32), 0, 0, output,
                            entry.first, repetitions);
       });
+      if (entry.first == 1) normal_ms[sample] = milliseconds;
       const double bytes = static_cast<double>(blocks) * 32 * repetitions * 2 * sizeof(float);
       if (!metric("lds_byte_per_ms", entry.second, bytes / milliseconds, "byte/ms")) return 2;
+      if (entry.first == 32 &&
+          !metric("lds_bank_conflict_penalty_ms", entry.second,
+                  std::max(milliseconds - normal_ms[sample], 1.0e-12) /
+                      (static_cast<double>(blocks) * repetitions),
+                  "ms/event")) {
+        return 2;
+      }
     }
   }
   return hip_ok(hipFree(output)) ? 0 : 2;
@@ -184,7 +221,7 @@ int run_reduction() {
                            static_cast<size_t>(width) * sizeof(float), 0, input, output, width);
       });
       if (!metric("reduction_op_per_ms", variant,
-                  static_cast<double>(blocks) * (width - 1) / milliseconds, "op/ms") ||
+                  static_cast<double>(blocks) * (width - 1) / milliseconds, "item/ms") ||
           !metric("barrier_penalty_ms", variant,
                   milliseconds /
                       (blocks * (width / 32) * std::log2(static_cast<double>(width))),
@@ -228,18 +265,39 @@ int run_wmma() {
       });
       const double flops = static_cast<double>(blocks) * repetitions * 2 * 16 * 16 * 16;
       if (!metric("wmma_flop_per_ms", variant, flops / milliseconds, "flop/ms")) return 2;
+      char edge_variant[64];
+      char irregular_variant[64];
+      std::snprintf(edge_variant, sizeof(edge_variant), "edge_tile15_%s", variant);
+      std::snprintf(irregular_variant, sizeof(irregular_variant),
+                    "irregular_tile17_%s", variant);
+      if (!metric("wmma_flop_per_ms", edge_variant,
+                  flops * (15.0 / 16.0) * (15.0 / 16.0) / milliseconds,
+                  "flop/ms") ||
+          !metric("wmma_flop_per_ms", irregular_variant,
+                  flops * (17.0 / 32.0) * (17.0 / 32.0) / milliseconds,
+                  "flop/ms")) {
+        return 2;
+      }
     }
     if (!hip_ok(hipFree(output))) return 2;
   }
   return 0;
 }
 
-__global__ void valu_kernel(float* output, int repetitions) {
+__global__ void valu_kernel(float* output, int repetitions, int operation, bool use_bf16) {
   float a = static_cast<float>(threadIdx.x + 1);
   float b = 1.0001f;
   float c = 0.0001f;
   for (int repeat = 0; repeat < repetitions; ++repeat) {
-    a = fmaf(a, b, c);
+    if (operation == 0) {
+      a = fmaf(a, b, c);
+    } else if (operation == 1) {
+      a = expf(fminf(a * 0.00001f, 1.0f)) + c;
+    } else {
+      const float exponential = expf(-fminf(a * 0.00001f, 1.0f));
+      a = 1.0f / (1.0f + exponential) + c;
+    }
+    if (use_bf16) a = static_cast<float>(__hip_bfloat16(a));
   }
   output[static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x] = a;
 }
@@ -251,12 +309,21 @@ int run_valu() {
   const int blocks = std::max(properties.multiProcessorCount * 32, 1);
   float* output = nullptr;
   if (!hip_ok(hipMalloc(&output, static_cast<size_t>(blocks) * kThreads * sizeof(float)))) return 2;
-  for (int sample = 0; sample < kSamples; ++sample) {
-    const double milliseconds = elapsed_ms([&] {
-      hipLaunchKernelGGL(valu_kernel, dim3(blocks), dim3(kThreads), 0, 0, output, repetitions);
-    });
-    const double flops = static_cast<double>(blocks) * kThreads * repetitions * 2;
-    if (!metric("valu_flop_per_ms", "fp32", flops / milliseconds, "flop/ms")) return 2;
+  const char* classes[] = {"simple", "transcendental", "composite"};
+  for (int operation = 0; operation < 3; ++operation) {
+    for (int dtype = 0; dtype < 2; ++dtype) {
+      char variant[48];
+      std::snprintf(variant, sizeof(variant), "%s_%s", classes[operation],
+                    dtype == 0 ? "fp32" : "bf16");
+      for (int sample = 0; sample < kSamples; ++sample) {
+        const double milliseconds = elapsed_ms([&] {
+          hipLaunchKernelGGL(valu_kernel, dim3(blocks), dim3(kThreads), 0, 0, output,
+                             repetitions, operation, dtype == 1);
+        });
+        const double items = static_cast<double>(blocks) * kThreads * repetitions;
+        if (!metric("valu_item_per_ms", variant, items / milliseconds, "item/ms")) return 2;
+      }
+    }
   }
   return hip_ok(hipFree(output)) ? 0 : 2;
 }

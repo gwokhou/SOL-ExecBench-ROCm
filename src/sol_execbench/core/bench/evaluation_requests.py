@@ -26,6 +26,7 @@ class EvaluationDependencies:
     check_integrity: Callable[[dict[str, int], dict[str, Any]], None]
     driver_globals: dict[str, Any]
     real_stdout: TextIO
+    timing_recorder: Callable[[dict[str, object]], None] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

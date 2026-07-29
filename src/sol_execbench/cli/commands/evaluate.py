@@ -87,6 +87,13 @@ from sol_execbench.cli.protocol import CliFailure, CliResult, output_format
     show_default=True,
 )
 @click.option(
+    "--workload-uuid",
+    help=(
+        "Select one exact workload UUID. Required for rocprofv3-counters "
+        "when the workload file contains multiple rows."
+    ),
+)
+@click.option(
     "--static-evidence",
     type=click.Choice(
         [
@@ -123,6 +130,7 @@ def evaluate_cli(
     unsafe_local_execution: bool,
     keep_staging: bool,
     profile: str,
+    workload_uuid: str | None,
     static_evidence: str,
     decision: str,
     feedback_target_id: str | None,
@@ -169,6 +177,7 @@ def evaluate_cli(
         feedback_candidate_id=feedback_candidate_id,
         feedback_source_sha256=feedback_source_sha256,
         feedback_sol_version=feedback_sol_version,
+        workload_uuid=workload_uuid,
         verbose=verbose,
         device=device,
         unsafe_local_execution=unsafe_local_execution,

@@ -40,6 +40,7 @@ class TimingResult:
     latency_ms: float
     failure: str | None = None
     timed_iterations: int = 0
+    samples_ms: tuple[float, ...] = ()
 
 
 def _cpu_time_runnable(
@@ -73,6 +74,7 @@ def _cpu_time_runnable(
     return TimingResult(
         latency_ms=statistics.mean(samples) * 1000.0,
         timed_iterations=len(samples),
+        samples_ms=tuple(sample * 1000.0 for sample in samples),
     )
 
 
@@ -176,6 +178,7 @@ def _timing_result(
         return TimingResult(
             latency_ms=statistics.mean(float(item) for item in value),
             timed_iterations=len(value),
+            samples_ms=tuple(float(item) for item in value),
         )
     if not isinstance(value, (int, float)):
         return TimingResult(

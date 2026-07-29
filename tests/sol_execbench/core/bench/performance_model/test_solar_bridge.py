@@ -5,7 +5,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from sol_execbench.core.bench.performance_model.models import WorkloadKind
+from sol_execbench.core.bench.performance_model.models import (
+    ElementwiseDescriptor,
+    WorkloadKind,
+)
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.solar_bridge.performance import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
@@ -22,6 +25,10 @@ def _analysis() -> dict[str, object]:
                 "tensor_shapes": {
                     "inputs": [[4, 8]],
                     "outputs": [[4, 8]],
+                },
+                "tensor_dtypes": {
+                    "inputs": ["float32"],
+                    "outputs": ["float32"],
                 },
             },
         },
@@ -52,7 +59,8 @@ def test_bridge_validates_and_extracts_semantic_characterization(
     )
 
     assert result.workload_kind is WorkloadKind.ELEMENTWISE
-    assert result.shape == [4, 8]
+    assert isinstance(result.descriptor, ElementwiseDescriptor)
+    assert result.descriptor.shape == [4, 8]
     assert result.semantic_flops == 128
     assert result.semantic_bytes == 256
     assert result.t_sol_ms == pytest.approx(0.002)

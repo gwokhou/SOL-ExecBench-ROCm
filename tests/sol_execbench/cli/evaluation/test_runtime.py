@@ -292,7 +292,7 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
     assert result.profile_fallback_reason == "rocprofv3 unavailable"
 
 
-def test_counter_profile_routes_to_explicit_counter_mode(
+def test_counter_profile_is_deferred_until_after_canonical_runtime(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -337,9 +337,9 @@ def test_counter_profile_routes_to_explicit_counter_mode(
         profile="rocprofv3-counters",
     )
 
-    assert calls == [True]
+    assert calls == []
     assert profiled_proc is None
-    assert observed_result is profile_result
+    assert observed_result is None
 
 
 def test_counter_profile_replay_stdout_is_not_canonical(

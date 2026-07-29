@@ -17,6 +17,9 @@ from sol_execbench.cli.evaluation.profile_mode import (
     PROFILE_ROCPROFV3,
     PROFILE_ROCPROFV3_COUNTERS,
 )
+from sol_execbench.core.bench.performance_model.timing_evidence import (
+    RAW_TIMING_FILENAME,
+)
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
 from sol_execbench.core.data.trace import Trace
@@ -123,16 +126,7 @@ def _run_profiled_or_none(
     if profile not in {PROFILE_ROCPROFV3, PROFILE_ROCPROFV3_COUNTERS}:
         return None, None
     if profile == PROFILE_ROCPROFV3_COUNTERS:
-        _, profile_result = cli_evaluation._run_profiled_evaluation(
-            eval_cmd,
-            staging_dir=staging_dir,
-            output_file=output_file,
-            timeout=timeout,
-            counter_mode=True,
-        )
-        # Counter jobs replay the application once per pass. Their stdout is
-        # profiler evidence, never the canonical evaluation result.
-        return None, profile_result
+        return None, None
     return cli_evaluation._run_profiled_evaluation(
         eval_cmd,
         staging_dir=staging_dir,
@@ -158,8 +152,6 @@ def run_evaluation_runtime(
         timeout=timeout,
         profile=profile,
     )
-    fallback_reason = _profile_fallback_reason(profile_result)
-
     try:
         proc = profiled_proc or cli_evaluation._run_evaluation_command(
             eval_cmd,
@@ -176,7 +168,7 @@ def run_evaluation_runtime(
             stderr=stderr,
             filtered_stderr=filter_benign_rocm_stderr(stderr),
             profile_result=profile_result,
-            profile_fallback_reason=fallback_reason,
+            profile_fallback_reason=_profile_fallback_reason(profile_result),
         )
 
     filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
@@ -188,7 +180,7 @@ def run_evaluation_runtime(
             stderr=proc.stderr,
             filtered_stderr=filtered_stderr,
             profile_result=profile_result,
-            profile_fallback_reason=fallback_reason,
+            profile_fallback_reason=_profile_fallback_reason(profile_result),
         )
 
     traces = packager.convert_stdout_to_traces(proc.stdout)
@@ -200,10 +192,17 @@ def run_evaluation_runtime(
             stderr=proc.stderr,
             filtered_stderr=filtered_stderr,
             profile_result=profile_result,
-            profile_fallback_reason=fallback_reason,
+            profile_fallback_reason=_profile_fallback_reason(profile_result),
         )
 
     apply_reference_speedups(traces)
+    if profile == PROFILE_ROCPROFV3_COUNTERS:
+        profile_result = _collect_counter_replay(
+            eval_cmd,
+            staging_dir=staging_dir,
+            output_file=output_file,
+            timeout=timeout,
+        )
 
     return EvaluationRuntimeSuccess(
         traces=traces,
@@ -212,5 +211,33 @@ def run_evaluation_runtime(
         filtered_stderr=filtered_stderr,
         returncode=proc.returncode,
         profile_result=profile_result,
-        profile_fallback_reason=fallback_reason,
+        profile_fallback_reason=_profile_fallback_reason(profile_result),
     )
+
+
+def _collect_counter_replay(
+    eval_cmd: list[str],
+    *,
+    staging_dir: Path,
+    output_file: Path | None,
+    timeout: int,
+) -> Rocprofv3ProfileResult:
+    """Collect counter passes after canonical timing and preserve its samples."""
+    timing_path = staging_dir / RAW_TIMING_FILENAME
+    canonical_timing = (
+        timing_path.read_bytes() if timing_path.is_file() else None
+    )
+    try:
+        _, result = cli_evaluation._run_profiled_evaluation(
+            eval_cmd,
+            staging_dir=staging_dir,
+            output_file=output_file,
+            timeout=timeout,
+            counter_mode=True,
+        )
+    finally:
+        if canonical_timing is not None:
+            timing_path.write_bytes(canonical_timing)
+        elif timing_path.is_file():
+            timing_path.unlink()
+    return result

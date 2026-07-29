@@ -16,12 +16,22 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSidecarStatus,
     SizedDiagnosticArtifactCitation,
 )
+from sol_execbench.core.bench.performance_model.evidence_manifest import (
+    PerformanceEvidenceArtifact,
+    PerformanceEvidenceArtifactKind,
+    PerformanceEvidenceManifest,
+    PerformanceRunIdentity,
+)
 from sol_execbench.core.bench.performance_model.governance import (
     evaluate_performance_diagnostic_governance,
     validate_performance_diagnostic_freshness,
 )
 from sol_execbench.core.bench.performance_model.models import (
     PerformanceDiagnosticSidecar,
+)
+from sol_execbench.core.bench.performance_model.timing_evidence import (
+    PerformanceTimingEvidenceSidecar,
+    WorkloadTimingEvidence,
 )
 from sol_execbench.core.bench.profile_summary import (
     ProfileSummaryContent,
@@ -50,9 +60,10 @@ from sol_execbench.core.data.trace import (
     Trace,
 )
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.solar_bridge.performance import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
+    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
 )
 
 
@@ -97,6 +108,10 @@ def _solar(path: Path) -> None:
                     "inputs": [[64], [64]],
                     "outputs": [[64]],
                 },
+                "tensor_dtypes": {
+                    "inputs": ["float32", "float32"],
+                    "outputs": ["float32"],
+                },
             },
         },
         "total": {
@@ -108,6 +123,21 @@ def _solar(path: Path) -> None:
         "metadata": {
             "fusion": {"regions": [{"id": "region-0", "layers": ["add"]}]},
         },
+    }
+    path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+
+def _solar_manifest(path: Path, analysis: Path, trace: Trace) -> None:
+    payload = {
+        "schema_version": SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+        "analysis_id": f"{trace.definition}:{trace.workload.uuid}",
+        "sol_score_eligible": True,
+        "artifacts": [
+            {
+                "path": "solar-analysis.yaml",
+                "sha256": sha256_file(analysis),
+            }
+        ],
     }
     path.write_text(yaml.safe_dump(payload), encoding="utf-8")
 
@@ -166,17 +196,122 @@ def _static(path: Path) -> None:
     atomic_write_json_value(path, sidecar.to_dict())
 
 
+def _timing(path: Path, trace_path: Path, trace: Trace) -> str:
+    solution_hash = "e" * 64
+    sidecar = PerformanceTimingEvidenceSidecar(
+        run_id=sha256_file(trace_path),
+        trace_sha256=sha256_file(trace_path),
+        solution_sha256=solution_hash,
+        workloads=[
+            WorkloadTimingEvidence(
+                workload_uuid=trace.workload.uuid,
+                latency_ms=0.25,
+                lower_ms=0.24,
+                upper_ms=0.26,
+                trial_samples_ms=[[0.24, 0.25, 0.26]],
+                warmup_runs=3,
+                timing_protocol="device_event_v1",
+            )
+        ],
+    )
+    atomic_write_json_value(path, sidecar.to_dict())
+    return solution_hash
+
+
+def _evidence_manifest(
+    path: Path,
+    *,
+    trace_path: Path,
+    trace: Trace,
+    timing_path: Path,
+    profile_path: Path,
+    static_path: Path,
+    solution_hash: str,
+) -> None:
+    provenance = path.parent / "counter-metadata.json"
+    counter = path.parent / "pass_1.csv"
+    rocpd = path.parent / "profile.rocpd"
+    atomic_write_json_value(
+        provenance,
+        {
+            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v2",
+            "diagnostic_only": True,
+            "score_authority": False,
+            "replay_phase": "evidence",
+        },
+    )
+    counter.write_text(
+        "Dispatch_Id,Queue_Id,Grid_Size,Kernel_Name,Workgroup_Size,"
+        "Counter_Name,Counter_Value\n"
+        "1,0,64,vector_add,64,SQ_WAVES,1\n",
+        encoding="utf-8",
+    )
+    rocpd.write_bytes(b"rocpd")
+    artifact_paths = [
+        (PerformanceEvidenceArtifactKind.TRACE, trace_path),
+        (PerformanceEvidenceArtifactKind.TIMING, timing_path),
+        (PerformanceEvidenceArtifactKind.PROFILE_SUMMARY, profile_path),
+        (PerformanceEvidenceArtifactKind.STATIC_EVIDENCE, static_path),
+        (PerformanceEvidenceArtifactKind.COUNTER_PROVENANCE, provenance),
+        (PerformanceEvidenceArtifactKind.COUNTER_CSV, counter),
+        (PerformanceEvidenceArtifactKind.ROCPD, rocpd),
+    ]
+    manifest = PerformanceEvidenceManifest(
+        status=DiagnosticSidecarStatus.PARTIAL,
+        identity=PerformanceRunIdentity(
+            run_id=sha256_file(trace_path),
+            definition=trace.definition,
+            definition_sha256=stable_json_checksum(trace.definition),
+            workload_uuid=trace.workload.uuid,
+            workload_sha256=stable_json_checksum(
+                trace.workload.model_dump(mode="json")
+            ),
+            solution_sha256=solution_hash,
+            candidate_sha256="f" * 64,
+            gpu_architecture="gfx1200",
+            clock_mode="locked",
+            timing_protocol="device_event_v1",
+        ),
+        artifacts=[
+            PerformanceEvidenceArtifact(
+                kind=kind,
+                path=artifact_path.name,
+                sha256=sha256_file(artifact_path),
+                size_bytes=artifact_path.stat().st_size,
+            )
+            for kind, artifact_path in artifact_paths
+        ],
+        code_object_sha256=["c" * 64],
+        reason_codes=["gpu_identity_missing"],
+    )
+    atomic_write_json_value(path, manifest.to_dict())
+
+
 def test_performance_diagnostics_cli_and_agent_feedback_governance(
     tmp_path: Path,
 ) -> None:
     trace_path, trace = _trace(tmp_path)
     solar_path = tmp_path / "solar-analysis.yaml"
+    solar_manifest_path = tmp_path / "solar-manifest.yaml"
     profile_path = tmp_path / "trace.profile-summary.json"
     static_path = tmp_path / "trace.static-evidence.json"
+    timing_path = tmp_path / "trace.performance-timing.json"
+    evidence_path = tmp_path / "trace.performance-evidence.json"
     output = tmp_path / "trace.performance-diagnostic.json"
     _solar(solar_path)
+    _solar_manifest(solar_manifest_path, solar_path, trace)
     _profile(profile_path, trace_path)
     _static(static_path)
+    solution_hash = _timing(timing_path, trace_path, trace)
+    _evidence_manifest(
+        evidence_path,
+        trace_path=trace_path,
+        trace=trace,
+        timing_path=timing_path,
+        profile_path=profile_path,
+        static_path=static_path,
+        solution_hash=solution_hash,
+    )
 
     result = CliRunner().invoke(
         cli,
@@ -185,14 +320,10 @@ def test_performance_diagnostics_cli_and_agent_feedback_governance(
             "json",
             "diagnostics",
             "performance",
-            "--trace",
-            str(trace_path),
-            "--solar-analysis",
-            f"{trace.workload.uuid}={solar_path}",
-            "--profile-summary",
-            str(profile_path),
-            "--static-evidence",
-            str(static_path),
+            "--evidence-manifest",
+            str(evidence_path),
+            "--solar-manifest",
+            str(solar_manifest_path),
             "--output",
             str(output),
         ],

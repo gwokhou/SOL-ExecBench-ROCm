@@ -163,6 +163,7 @@ def _measure_and_emit(
         args=(thread_monitor,),
     ):
         return
+    _record_timing_evidence(request, workload, solution_timing)
     emitter.emit_status(
         workload,
         EvaluationStatus.PASSED,
@@ -173,6 +174,27 @@ def _measure_and_emit(
             solution_timing,
         ),
         extra_msg=timing_case.timing_failure,
+    )
+
+
+def _record_timing_evidence(
+    request: WorkloadEvaluationRequest,
+    workload: Workload,
+    timing: SolutionTimingResult,
+) -> None:
+    recorder = getattr(request.dependencies, "timing_recorder", None)
+    if recorder is None:
+        return
+    recorder(
+        {
+            "workload_uuid": workload.uuid,
+            "latency_ms": timing.latency_ms,
+            "trial_samples_ms": [
+                list(samples) for samples in timing.trial_samples_ms
+            ],
+            "warmup_runs": request.bench_config.warmup_runs,
+            "timing_protocol": request.bench_config.timing_protocol,
+        },
     )
 
 

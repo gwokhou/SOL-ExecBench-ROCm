@@ -9,9 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sol_execbench.cli.commands import environment as cli_environment
+from sol_execbench.cli.evaluation.compilation import CompilePhaseResult
 from sol_execbench.cli.sidecars import (
     agent_feedback as cli_agent_feedback_sidecar,
     decision as cli_decision_sidecar,
+    performance as cli_performance_sidecars,
     profile as cli_profile_sidecars,
     static_evidence as cli_static_evidence,
 )
@@ -52,6 +54,7 @@ class SidecarWriteRequest:
     static_evidence_result: StaticKernelEvidenceSidecar | None
     decision: str
     identity: SidecarIdentity
+    compile_result: CompilePhaseResult | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -64,6 +67,8 @@ class WrittenSidecars:
     static_evidence: Path | None
     decision: Path | None
     agent_feedback: Path | None
+    performance_timing: Path | None
+    performance_evidence: Path | None
 
 
 def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
@@ -93,7 +98,55 @@ def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
             request.static_evidence_result,
         )
     )
-    decision_sidecar_path = cli_decision_sidecar._write_decision_sidecar(
+    performance_timing_sidecar_path = (
+        cli_performance_sidecars.write_performance_timing_sidecar(
+            output_file=request.output_file,
+            staging_dir=request.staging_dir,
+            traces=request.traces,
+            solution=request.solution,
+        )
+    )
+    performance_evidence_manifest_path = (
+        cli_performance_sidecars.write_performance_evidence_manifest(
+            output_file=request.output_file,
+            traces=request.traces,
+            solution=request.solution,
+            timing_path=performance_timing_sidecar_path,
+            profile_summary_path=profile_summary_sidecar_path,
+            static_evidence_path=static_evidence_sidecar_path,
+            profile_result=request.profile_result,
+            static_evidence=request.static_evidence_result,
+            compile_result=request.compile_result,
+        )
+    )
+    decision_sidecar_path, agent_feedback_sidecar_path = (
+        _write_decision_and_feedback(
+            request,
+            environment_sidecar_path=environment_sidecar_path,
+            profile_sidecar_path=profile_sidecar_path,
+            static_evidence_sidecar_path=static_evidence_sidecar_path,
+        )
+    )
+    return WrittenSidecars(
+        environment=environment_sidecar_path,
+        profile=profile_sidecar_path,
+        profile_summary=profile_summary_sidecar_path,
+        static_evidence=static_evidence_sidecar_path,
+        decision=decision_sidecar_path,
+        agent_feedback=agent_feedback_sidecar_path,
+        performance_timing=performance_timing_sidecar_path,
+        performance_evidence=performance_evidence_manifest_path,
+    )
+
+
+def _write_decision_and_feedback(
+    request: SidecarWriteRequest,
+    *,
+    environment_sidecar_path: Path | None,
+    profile_sidecar_path: Path | None,
+    static_evidence_sidecar_path: Path | None,
+) -> tuple[Path | None, Path | None]:
+    decision = cli_decision_sidecar._write_decision_sidecar(
         request.output_file,
         request.decision,
         request.static_evidence_result,
@@ -105,10 +158,7 @@ def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
         source_sha256=request.identity.source_sha256,
         sol_version=request.identity.sol_version,
     )
-    write_agent_feedback = (
-        cli_agent_feedback_sidecar._write_agent_feedback_sidecar
-    )
-    agent_feedback_sidecar_path = write_agent_feedback(
+    feedback = cli_agent_feedback_sidecar._write_agent_feedback_sidecar(
         cli_agent_feedback_sidecar.AgentFeedbackWriteRequest(
             output_file=request.output_file,
             traces=request.traces,
@@ -129,14 +179,7 @@ def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
             ),
         ),
     )
-    return WrittenSidecars(
-        environment=environment_sidecar_path,
-        profile=profile_sidecar_path,
-        profile_summary=profile_summary_sidecar_path,
-        static_evidence=static_evidence_sidecar_path,
-        decision=decision_sidecar_path,
-        agent_feedback=agent_feedback_sidecar_path,
-    )
+    return decision, feedback
 
 
 __all__ = [
