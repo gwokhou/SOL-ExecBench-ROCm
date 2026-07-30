@@ -15,6 +15,12 @@ from solar.ir.extended_einsum.native_registry import native_op_spec
 from solar.types import DynamicValue
 from solar.verification.errors import IRExecutionError
 from solar.verification.numerics import torch_equation
+from solar.verification.semantic_values import (
+    EXTENDED_VALUE_POLICY,
+    SemanticValueDecodeError,
+    SemanticValueErrorKind,
+    decode_semantic_value,
+)
 
 
 def execute_extended_einsum_layer(
@@ -71,46 +77,33 @@ def _decode_value(
     tensors: Sequence[DynamicValue],
     layer_id: str,
 ) -> DynamicValue:
-    import torch
+    try:
+        return decode_semantic_value(
+            value,
+            tensors,
+            policy=EXTENDED_VALUE_POLICY,
+        )
+    except SemanticValueDecodeError as exc:
+        raise _extended_decode_error(layer_id, exc) from exc
 
-    if isinstance(value, list):
-        return [_decode_value(item, tensors, layer_id) for item in value]
-    if isinstance(value, tuple):
-        return tuple(_decode_value(item, tensors, layer_id) for item in value)
-    if not isinstance(value, Mapping):
-        return value
-    if "tensor" in value:
-        index = int(value["tensor"])
-        if index not in range(len(tensors)):
-            raise IRExecutionError(
-                f"layer {layer_id} references missing tensor operand {index}"
-            )
-        return tensors[index]
-    if "literal" in value or "value" in value:
-        literal = value.get("literal", value.get("value"))
-        return Ellipsis if literal == "__ellipsis__" else literal
-    if "dtype" in value:
-        result = getattr(torch, str(value["dtype"]), None)
-        if not isinstance(result, torch.dtype):
-            raise IRExecutionError(
-                f"native_attribute_unsupported: invalid dtype {value['dtype']!r}"
-            )
-        return result
-    if "device" in value:
-        return torch.device(str(value["device"]))
-    if "layout" in value:
-        result = getattr(torch, str(value["layout"]), None)
-        if not isinstance(result, torch.layout):
-            raise IRExecutionError(
-                f"native_attribute_unsupported: invalid layout {value['layout']!r}"
-            )
-        return result
-    if "slice" in value:
-        parts = [
-            _decode_value(item, tensors, layer_id) for item in value["slice"]
-        ]
-        return slice(*parts)
-    raise IRExecutionError(
+
+def _extended_decode_error(
+    layer_id: str,
+    error: SemanticValueDecodeError,
+) -> IRExecutionError:
+    if error.kind is SemanticValueErrorKind.MISSING_TENSOR:
+        return IRExecutionError(
+            f"layer {layer_id} references missing tensor operand {error.detail}"
+        )
+    if error.kind is SemanticValueErrorKind.INVALID_DTYPE:
+        return IRExecutionError(
+            f"native_attribute_unsupported: invalid dtype {error.detail!r}"
+        )
+    if error.kind is SemanticValueErrorKind.INVALID_LAYOUT:
+        return IRExecutionError(
+            f"native_attribute_unsupported: invalid layout {error.detail!r}"
+        )
+    return IRExecutionError(
         f"native_attribute_unsupported: layer {layer_id} has invalid value"
     )
 

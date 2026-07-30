@@ -49,23 +49,36 @@ class TorchviewTopologyMixin(TorchviewProcessorContract):
     def _extract_from_edge_list(
         self, computation_graph: Any, original_model: nn.Module | None = None
     ) -> list[NodeInfo]:
-        """Extract nodes from the edge_list of the computation graph.
+        """Extract nodes and ordered relationships from a Torchview edge list."""
+        computation_nodes, node_order = self._collect_computation_nodes(
+            computation_graph.edge_list
+        )
+        self._prescan_module_hierarchy(computation_nodes, node_order)
+        result = self._build_node_infos(
+            computation_nodes,
+            node_order,
+            original_model,
+        )
+        by_id = {node.node_id: node for node in result}
+        self._connect_node_infos(computation_graph.edge_list, by_id)
+        self._order_node_inputs(computation_nodes, node_order, by_id)
+        self._classify_connection_types(result, by_id)
+        self._record_output_slots(result, by_id)
+        self._report_connection_counts(result)
+        if original_model:
+            self._apply_model_parameters(
+                result, original_model, computation_nodes
+            )
+        return result
 
-        This method properly tracks node relationships (input_nodes, output_nodes)
-        by processing the edge list to build connection information.
-
-        Args:
-            computation_graph: ComputationGraph with edge_list.
-            original_model: Original PyTorch model for parameter extraction.
-
-        Returns:
-            List of NodeInfo objects with proper connection information.
-        """
-        computation_nodes = {}  # original_id -> node object
-        node_order = []  # Preserve order of discovery
-
-        # Step 1: Collect all unique nodes from edges
-        for i, edge in enumerate(computation_graph.edge_list):
+    def _collect_computation_nodes(
+        self,
+        edges: list[Any],
+    ) -> tuple[dict[str, Any], list[str]]:
+        """Validate edges and collect nodes in stable discovery order."""
+        computation_nodes: dict[str, Any] = {}
+        node_order: list[str] = []
+        for i, edge in enumerate(edges):
             if len(edge) < 2:
                 raise ValueError(
                     f"Edge at index {i} has fewer than 2 nodes: {edge}. "
@@ -86,16 +99,18 @@ class TorchviewTopologyMixin(TorchviewProcessorContract):
                 if original_id not in computation_nodes:
                     computation_nodes[original_id] = node
                     node_order.append(original_id)
-
         if self.debug:
             print(f"  Found {len(computation_nodes)} unique computation nodes")
+        return computation_nodes, node_order
 
-        # Step 2: Pre-scan all nodes to discover which module names have duplicates
-        # This allows us to add indices consistently (Linear_0, Linear_1, Linear_2)
-        self._prescan_module_hierarchy(computation_nodes, node_order)
-
-        # Step 3: Generate clean IDs and hierarchical names for all nodes
-        result = []
+    def _build_node_infos(
+        self,
+        computation_nodes: dict[str, Any],
+        node_order: list[str],
+        original_model: nn.Module | None,
+    ) -> list[NodeInfo]:
+        """Generate stable public IDs and metadata for collected nodes."""
+        result: list[NodeInfo] = []
         for original_id in node_order:
             node = computation_nodes[original_id]
             clean_id = self._generate_clean_id(node)
@@ -105,120 +120,97 @@ class TorchviewTopologyMixin(TorchviewProcessorContract):
             self._original_to_hierarchical[original_id] = hierarchical_name
 
             node_info = self._extract_node_info(node, clean_id, original_model)
-            # Add hierarchical_name to module_args
             node_info.module_args["hierarchical_name"] = hierarchical_name
             result.append(node_info)
+        return result
 
-        # Step 3: Build relationships from edge list using the ID mapping
-        id_to_node_info = {node.node_id: node for node in result}
+    def _connect_node_infos(
+        self,
+        edges: list[Any],
+        by_id: dict[str, NodeInfo],
+    ) -> None:
+        """Populate bidirectional clean-ID connections from validated edges."""
+        for source_node, target_node in edges:
+            source_id = self._clean_id_for(source_node)
+            target_id = self._clean_id_for(target_node)
+            if source_id is None or target_id is None:
+                continue
+            source_info = by_id.get(source_id)
+            target_info = by_id.get(target_id)
+            if source_info is None or target_info is None:
+                continue
+            if target_id not in source_info.output_nodes:
+                source_info.output_nodes.append(target_id)
+            if source_id not in target_info.input_nodes:
+                target_info.input_nodes.append(source_id)
 
-        for edge in computation_graph.edge_list:
-            if len(edge) >= 2:
-                source_node, target_node = edge[0], edge[1]
+    def _clean_id_for(self, node: Any) -> str | None:
+        original_id = str(getattr(node, "node_id", id(node)))
+        return self._original_to_clean_id.get(original_id)
 
-                source_original_id = str(
-                    getattr(source_node, "node_id", id(source_node))
-                )
-                target_original_id = str(
-                    getattr(target_node, "node_id", id(target_node))
-                )
-
-                source_clean_id = self._original_to_clean_id.get(
-                    source_original_id
-                )
-                target_clean_id = self._original_to_clean_id.get(
-                    target_original_id
-                )
-
-                if source_clean_id and target_clean_id:
-                    source_info = id_to_node_info.get(source_clean_id)
-                    target_info = id_to_node_info.get(target_clean_id)
-
-                    if source_info and target_info:
-                        # Add connection if not already present
-                        if target_clean_id not in source_info.output_nodes:
-                            source_info.output_nodes.append(target_clean_id)
-                        if source_clean_id not in target_info.input_nodes:
-                            target_info.input_nodes.append(source_clean_id)
-
-        # Reorder input_nodes to match positional arg order using ordered_input_nodes
-        # from the patched torchview FunctionNode
+    def _order_node_inputs(
+        self,
+        computation_nodes: dict[str, Any],
+        node_order: list[str],
+        by_id: dict[str, NodeInfo],
+    ) -> None:
+        """Restore positional input order recorded by patched Torchview."""
         for original_id in node_order:
             node = computation_nodes[original_id]
             ordered_inputs = getattr(node, "ordered_input_nodes", None)
-            if ordered_inputs:
-                ordered_node_id = self._original_to_clean_id.get(original_id)
-                if ordered_node_id:
-                    node_info = id_to_node_info.get(ordered_node_id)
-                    if node_info and node_info.input_nodes:
-                        # Build ordered input_nodes from ordered_input_nodes
-                        ordered_clean_ids = []
-                        for input_node in ordered_inputs:
-                            inp_orig_id = str(
-                                getattr(input_node, "node_id", id(input_node))
-                            )
-                            inp_clean_id = self._original_to_clean_id.get(
-                                inp_orig_id
-                            )
-                            if (
-                                inp_clean_id
-                                and inp_clean_id in node_info.input_nodes
-                            ):
-                                ordered_clean_ids.append(inp_clean_id)
-                        # Append any remaining input_nodes not in ordered list
-                        for inp_id in node_info.input_nodes:
-                            if inp_id not in ordered_clean_ids:
-                                ordered_clean_ids.append(inp_id)
-                        node_info.input_nodes = ordered_clean_ids
+            node_info = by_id.get(
+                self._original_to_clean_id.get(original_id, "")
+            )
+            if (
+                not ordered_inputs
+                or node_info is None
+                or not node_info.input_nodes
+            ):
+                continue
+            ordered_ids: list[str] = []
+            for input_node in ordered_inputs:
+                clean_id = self._clean_id_for(input_node)
+                if clean_id is not None and clean_id in node_info.input_nodes:
+                    ordered_ids.append(clean_id)
+            ordered_ids.extend(
+                input_id
+                for input_id in node_info.input_nodes
+                if input_id not in ordered_ids
+            )
+            node_info.input_nodes = ordered_ids
 
-        # Populate input_types and output_types based on connected node types.
-        # Input classification:
-        #   'input-tensor', 'auxiliary-tensor', 'hidden-tensor' -> 'input'
-        #   'parameter-tensor' -> 'weight'
-        #   FunctionNode/ModuleNode predecessor -> 'input'
-        # Output classification:
-        #   'output-tensor', 'auxiliary-tensor', 'hidden-tensor' -> 'output'
-        #   FunctionNode/ModuleNode successor -> 'output'
-        #   'parameter-tensor' -> ASSERT FAIL (invalid)
-        weight_tensor_types = {"parameter-tensor"}
-
-        for node_info in result:
-            # input_types
-            input_types = []
-            for inp_id in node_info.input_nodes:
-                inp_node = id_to_node_info.get(inp_id)
-                if inp_node and inp_node.type.lower() in weight_tensor_types:
-                    input_types.append("weight")
-                else:
-                    input_types.append("input")
-            node_info.input_types = input_types
-
-            # output_types
-            output_types = []
-            for out_id in node_info.output_nodes:
-                out_node = id_to_node_info.get(out_id)
-                if out_node and out_node.type.lower() == "parameter-tensor":
+    @staticmethod
+    def _classify_connection_types(
+        nodes: list[NodeInfo],
+        by_id: dict[str, NodeInfo],
+    ) -> None:
+        """Classify incoming parameters as weights and reject weight outputs."""
+        for node in nodes:
+            node.input_types = [
+                (
+                    "weight"
+                    if (source := by_id.get(input_id))
+                    and source.type.lower() == "parameter-tensor"
+                    else "input"
+                )
+                for input_id in node.input_nodes
+            ]
+            for output_id in node.output_nodes:
+                output = by_id.get(output_id)
+                if output and output.type.lower() == "parameter-tensor":
                     raise ValueError(
-                        f"Output node {out_id} of {node_info.node_id} is "
+                        f"Output node {output_id} of {node.node_id} is "
                         "parameter-tensor, which should only appear as input."
                     )
-                output_types.append("output")
-            node_info.output_types = output_types
+            node.output_types = ["output"] * len(node.output_nodes)
 
-        self._record_output_slots(result, id_to_node_info)
+    def _report_connection_counts(self, nodes: list[NodeInfo]) -> None:
+        """Print compact connection diagnostics when debug mode is enabled."""
         if self.debug:
-            nodes_with_inputs = sum(1 for n in result if n.input_nodes)
-            nodes_with_outputs = sum(1 for n in result if n.output_nodes)
+            nodes_with_inputs = sum(1 for node in nodes if node.input_nodes)
+            nodes_with_outputs = sum(1 for node in nodes if node.output_nodes)
             print(f"  Nodes with input connections: {nodes_with_inputs}")
             print(f"  Nodes with output connections: {nodes_with_outputs}")
-        # Step 4: Apply parameters from original model if provided
-        # This handles both FunctionNode and ModuleNode cases
-        if original_model:
-            self._apply_model_parameters(
-                result, original_model, computation_nodes
-            )
-
-        return result
 
     @staticmethod
     def _record_output_slots(

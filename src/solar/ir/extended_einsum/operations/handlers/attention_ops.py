@@ -31,9 +31,6 @@ from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.ir.extended_einsum.operations.handlers.registry import (
-    get_global_registry,
-)
 from solar.types import TensorShape, TensorShapes
 
 
@@ -220,13 +217,6 @@ class MultiHeadAttentionHandler(EinsumOpHandler):
             elementwise_op="mul",
             reduction_op="add",
         )
-
-
-# Register handlers with global registry (without loading other handlers)
-_registry = get_global_registry(load_handlers=False)
-_registry.register_handler(ScaledDotProductAttentionHandler)
-_registry.register_handler(FlexAttentionHandler)
-_registry.register_handler(MultiHeadAttentionHandler)
 
 
 __all__ = [

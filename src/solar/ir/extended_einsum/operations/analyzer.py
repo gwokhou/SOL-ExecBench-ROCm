@@ -28,6 +28,7 @@ from solar.ir.extended_einsum.operations.handlers.base import (
     compute_cost_from_equation,
 )
 from solar.ir.extended_einsum.operations.handlers.registry import (
+    EinsumOpRegistry,
     get_global_registry,
 )
 from solar.types import TensorShape, TensorShapes
@@ -223,15 +224,23 @@ class EinsumAnalyzer:
     in the global EinsumOpRegistry.
     """
 
-    def __init__(self, debug: bool = False) -> None:
+    def __init__(
+        self,
+        debug: bool = False,
+        *,
+        registry: EinsumOpRegistry | None = None,
+    ) -> None:
         """Initialize the EinsumAnalyzer.
 
         Args:
             debug: Enable debug output.
+            registry: Optional independent operation-handler registry.
 
         """
         self.debug = debug
-        self._registry = get_global_registry()
+        self._registry = (
+            registry if registry is not None else get_global_registry()
+        )
 
     def get_compute_cost(
         self,

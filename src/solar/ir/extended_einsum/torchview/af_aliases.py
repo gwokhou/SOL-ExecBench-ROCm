@@ -75,6 +75,11 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from solar.ir.extended_einsum.torchview.axis_mapping import (
+    AxisMappingRequest,
+    derive_axis_mapping,
+)
+
 # Op-type classification
 
 # Solar layer-types treated as explicit copy operations in the AF graph.
@@ -144,250 +149,17 @@ def _derive_pos_mapping(
     out_dims: list[str],
     out_shape: list[int],
 ) -> tuple[list[int | None], list[list[int]]] | None:
-    """Return (out_to_in, in_to_out) for an elide-able shape op.
-
-    Returns None when the rewrite is not safe (e.g. genuine reshape, or
-    shape ambiguity we can't resolve from operands alone).
-    """
-    n_in = len(in_dims)
-    n_out = len(out_dims)
-    op_type = layer.get("type")
-
-    # contiguous / identity-view (shapes match positionally).
-    if n_in == n_out and in_shape == out_shape:
-        return list(range(n_in)), [[i] for i in range(n_in)]
-
-    # Pure label permutation (same multiset of labels, same multiset of sizes).
-    # transpose / permute usually fall here. solar's transpose has identical
-    # labels with reordered sizes ("AB->AB" but shape transposed) — so we
-    # PREFER shape-based matching over label-based.
-    if n_in == n_out and sorted(in_shape) == sorted(out_shape):
-        # Try label-based permutation first when the labels are a true
-        # multiset permutation distinct from identity.
-        if sorted(in_dims) == sorted(out_dims) and in_dims != out_dims:
-            used: set[int] = set()
-            o2i: list[int | None] | None = []
-            for j, lbl in enumerate(out_dims):
-                hit = None
-                for i, ilbl in enumerate(in_dims):
-                    if i in used:
-                        continue
-                    if ilbl == lbl and in_shape[i] == out_shape[j]:
-                        hit = i
-                        break
-                if hit is None:
-                    o2i = None
-                    break
-                used.add(hit)
-                o2i.append(hit)
-            if o2i is not None:
-                i2o: list[list[int]] = [[] for _ in range(n_in)]
-                for j, i in enumerate(o2i):
-                    if i is not None:
-                        i2o[i].append(j)
-                return o2i, i2o
-        # Shape-based positional permutation. Greedy unique match by size;
-        # bail out if sizes aren't unique enough to derive an unambiguous
-        # permutation (caller will emit the op normally).
-        used2: set[int] = set()
-        o2i2: list[int | None] = []
-        ok = True
-        for j in range(n_out):
-            hit = None
-            for i in range(n_in):
-                if i in used2:
-                    continue
-                if in_shape[i] == out_shape[j]:
-                    hit = i
-                    break
-            if hit is None:
-                ok = False
-                break
-            used2.add(hit)
-            o2i2.append(hit)
-        if ok:
-            i2o = [[] for _ in range(n_in)]
-            for j, i in enumerate(o2i2):
-                if i is not None:
-                    i2o[i].append(j)
-            return o2i2, i2o
-        return None
-
-    # squeeze: input has size-1 dims that are dropped in output.
-    if op_type == "squeeze" and n_out <= n_in:
-        ok = True
-        used3: set[int] = set()
-        o2i3: list[int | None] = []
-        for j in range(n_out):
-            hit = None
-            for i in range(n_in):
-                if i in used3:
-                    continue
-                if in_shape[i] == out_shape[j]:
-                    hit = i
-                    break
-            if hit is None:
-                ok = False
-                break
-            used3.add(hit)
-            o2i3.append(hit)
-        if ok and all(in_shape[i] == 1 for i in range(n_in) if i not in used3):
-            # Every unmatched input position must be size 1 (the dropped axes).
-            i2o = [[] for _ in range(n_in)]
-            for j, i in enumerate(o2i3):
-                if i is not None:
-                    i2o[i].append(j)
-            return o2i3, i2o
-        return None
-
-    # unsqueeze: output has size-1 dims that aren't in input.
-    if op_type == "unsqueeze" and n_in <= n_out:
-        ok = True
-        used4: set[int] = set()
-        o2i4: list[int | None] = []
-        for j in range(n_out):
-            if out_shape[j] == 1:
-                # Either it's a true unsqueeze-introduced axis, or a
-                # preserved size-1 from input — prefer to match an unused
-                # size-1 input first so order is stable.
-                hit = None
-                for i in range(n_in):
-                    if i in used4:
-                        continue
-                    if in_shape[i] == 1:
-                        hit = i
-                        break
-                if hit is not None:
-                    used4.add(hit)
-                    o2i4.append(hit)
-                else:
-                    o2i4.append(None)
-                continue
-            hit2 = None
-            for i in range(n_in):
-                if i in used4:
-                    continue
-                if in_shape[i] == out_shape[j]:
-                    hit2 = i
-                    break
-            if hit2 is None:
-                ok = False
-                break
-            used4.add(hit2)
-            o2i4.append(hit2)
-        if ok and len(used4) == n_in:
-            i2o = [[] for _ in range(n_in)]
-            for j, i in enumerate(o2i4):
-                if i is not None:
-                    i2o[i].append(j)
-            return o2i4, i2o
-        return None
-
-    # expand: a size-1 input dim is broadcast to a larger output dim.
-    if op_type == "expand" and n_in == n_out:
-        o2i5: list[int | None] = list(range(n_in))
-        i2o: list[list[int]] = [[j] for j in range(n_in)]
-        return o2i5, i2o
-
-    # torchview emits Tensor.T as ``__get__``.  Tensor.T reverses dimensions;
-    # do this before the exact-shape branch because a square transpose has the
-    # same shape but is not an identity mapping.
-    if op_type == "__get__" and n_in == n_out and in_shape[::-1] == out_shape:
-        o2i_get: list[int | None] = list(reversed(range(n_in)))
-        i2o_get: list[list[int]] = [[] for _ in range(n_in)]
-        for output_axis, input_axis in enumerate(o2i_get):
-            if input_axis is None:
-                raise ValueError("getitem axis mapping is incomplete")
-            i2o_get[input_axis].append(output_axis)
-        return o2i_get, i2o_get
-
-    # __getitem__: only safe when the access selects every element along every
-    # axis (no-op). Detect by exact shape equality.
-    if op_type == "__getitem__":
-        if n_in == n_out and in_shape == out_shape:
-            return list(range(n_in)), [[i] for i in range(n_in)]
-        # Same total size but different shape. Try the permutation derivation
-        # above for conservative legacy traces.
-        try:
-            prod_in = 1
-            for s in in_shape:
-                prod_in *= s
-            prod_out = 1
-            for s in out_shape:
-                prod_out *= s
-        except Exception:  # noqa: BLE001 - malformed optional metadata
-            return None
-        if (
-            prod_in == prod_out
-            and n_in == n_out
-            and sorted(in_shape) == sorted(out_shape)
-        ):
-            used5: set[int] = set()
-            o2i6: list[int | None] = []
-            ok = True
-            for j in range(n_out):
-                hit = None
-                for i in range(n_in):
-                    if i in used5:
-                        continue
-                    if in_shape[i] == out_shape[j]:
-                        hit = i
-                        break
-                if hit is None:
-                    ok = False
-                    break
-                used5.add(hit)
-                o2i6.append(hit)
-            if ok:
-                i2o = [[] for _ in range(n_in)]
-                for j, i in enumerate(o2i6):
-                    if i is not None:
-                        i2o[i].append(j)
-                return o2i6, i2o
-        return None
-
-    # view / reshape: only elide when it's a pure no-op (same shape) OR a
-    # squeeze-or-unsqueeze of size-1 dims. Axis collapse / split is left
-    # to AF as a real op.
-    if op_type in ("view", "reshape"):
-        # Identity reshape (shape unchanged).
-        if n_in == n_out and in_shape == out_shape:
-            return list(range(n_in)), [[i] for i in range(n_in)]
-        # Reshape that only adds/drops size-1 dims (product preserved).
-        # Build the mapping by walking the non-unit dim sequences in both
-        # sides — they must match in order.
-        in_nonunit = [(i, s) for i, s in enumerate(in_shape) if s != 1]
-        out_nonunit = [(j, s) for j, s in enumerate(out_shape) if s != 1]
-        if len(in_nonunit) == len(out_nonunit) and all(
-            a[1] == b[1] for a, b in zip(in_nonunit, out_nonunit, strict=False)
-        ):
-            o2i7: list[int | None] = [None] * n_out
-            for (i, _), (j, _) in zip(in_nonunit, out_nonunit, strict=False):
-                o2i7[j] = i
-            # Pair leftover size-1 input dims to leftover size-1 output
-            # dims in order; remaining are introduced (None on out side)
-            # or dropped (no entry on out side).
-            unmatched_in = [
-                i
-                for i in range(n_in)
-                if i not in {x for x in o2i7 if x is not None}
-            ]
-            unmatched_out = [j for j in range(n_out) if o2i7[j] is None]
-            for k in range(min(len(unmatched_in), len(unmatched_out))):
-                o2i7[unmatched_out[k]] = unmatched_in[k]
-            # Validate every input dim is either matched (one or more
-            # output slot points to it) or is a dropped size-1.
-            i2o = [[] for _ in range(n_in)]
-            for j, i in enumerate(o2i7):
-                if i is not None:
-                    i2o[i].append(j)
-            for i in range(n_in):
-                if not i2o[i] and in_shape[i] != 1:
-                    return None
-            return o2i7, i2o
-        return None
-
-    return None
+    """Return the first safe axis mapping for an elide-able shape op."""
+    del layer_name
+    return derive_axis_mapping(
+        AxisMappingRequest(
+            operation=str(layer.get("type", "")),
+            input_dims=in_dims,
+            input_shape=in_shape,
+            output_dims=out_dims,
+            output_shape=out_shape,
+        )
+    )
 
 
 def _build_shape_op_aliases(

@@ -37,9 +37,6 @@ from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.ir.extended_einsum.operations.handlers.registry import (
-    get_global_registry,
-)
 from solar.types import TensorShape, TensorShapes
 
 
@@ -164,11 +161,6 @@ class CumulativeHandler(EinsumOpHandler):
             # Can be represented but not efficiently parallelizable
             is_einsum_supportable=True,
         )
-
-
-# Register handler with global registry (without loading other handlers)
-_registry = get_global_registry(load_handlers=False)
-_registry.register_handler(CumulativeHandler)
 
 
 __all__ = ["CumulativeHandler"]

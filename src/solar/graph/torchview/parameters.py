@@ -51,100 +51,100 @@ class TorchviewParametersMixin(TorchviewProcessorContract):
         model: nn.Module,
         computation_nodes: dict[str, Any] | None = None,
     ) -> None:
-        """Apply parameters from the original model to extracted nodes.
-
-        This uses shape-based matching to correctly associate PyTorch modules
-        with their corresponding function nodes. Also handles ModuleNode cases
-        where the node directly references a PyTorch module.
-
-        Args:
-            layer_nodes: List of NodeInfo objects to update.
-            model: Original PyTorch model.
-            computation_nodes: Optional dict mapping original IDs to node objects.
-        """
-        # First, try to extract from ModuleNode objects directly
+        """Apply direct and shape-matched model parameters to graph nodes."""
         if computation_nodes:
-            for original_id, node in computation_nodes.items():
-                if type(node).__name__ == "ModuleNode":
-                    clean_id = self._original_to_clean_id.get(original_id)
-                    if clean_id:
-                        node_info = next(
-                            (n for n in layer_nodes if n.node_id == clean_id),
-                            None,
-                        )
-                        if (
-                            node_info
-                            and node_info.node_id not in self._processed_nodes
-                        ):
-                            pytorch_module = self._get_pytorch_module(node)
-                            if pytorch_module:
-                                module_type = type(pytorch_module).__name__
-                                self._apply_module_to_node(
-                                    node_info, pytorch_module, module_type
-                                )
-                                self._processed_nodes.add(node_info.node_id)
-                                if self.debug:
-                                    print(
-                                        f"  Applied module from ModuleNode: {node_info.node_id}"
-                                    )
+            self._apply_direct_module_nodes(layer_nodes, computation_nodes)
+        modules_by_type = self._collect_modules_by_type(model)
+        if self.debug:
+            count = sum(len(modules) for modules in modules_by_type.values())
+            print(f"  Found {count} PyTorch modules")
+        for module_type, modules in modules_by_type.items():
+            self._match_module_group(layer_nodes, module_type, modules)
 
-        # Collect all modules from the model
+    def _apply_direct_module_nodes(
+        self,
+        layer_nodes: list[NodeInfo],
+        computation_nodes: dict[str, Any],
+    ) -> None:
+        """Apply modules referenced directly by Torchview ModuleNodes."""
+        by_id = {node.node_id: node for node in layer_nodes}
+        for original_id, node in computation_nodes.items():
+            if type(node).__name__ != "ModuleNode":
+                continue
+            clean_id = self._original_to_clean_id.get(original_id)
+            node_info = by_id.get(clean_id) if clean_id else None
+            if node_info is None or node_info.node_id in self._processed_nodes:
+                continue
+            pytorch_module = self._get_pytorch_module(node)
+            if pytorch_module is None:
+                continue
+            self._apply_module_to_node(
+                node_info,
+                pytorch_module,
+                type(pytorch_module).__name__,
+            )
+            self._processed_nodes.add(node_info.node_id)
+            if self.debug:
+                print(f"  Applied module from ModuleNode: {node_info.node_id}")
+
+    @staticmethod
+    def _collect_modules_by_type(
+        model: nn.Module,
+    ) -> dict[str, list[tuple[str, nn.Module]]]:
+        """Group non-root model modules by concrete class name."""
         modules_by_type: dict[str, list[tuple[str, nn.Module]]] = {}
         for name, module in model.named_modules():
-            if name == "":  # Skip root
+            if not name:
                 continue
             module_type = type(module).__name__
-            if module_type not in modules_by_type:
-                modules_by_type[module_type] = []
-            modules_by_type[module_type].append((name, module))
+            modules_by_type.setdefault(module_type, []).append((name, module))
+        return modules_by_type
 
-        if self.debug:
+    def _match_module_group(
+        self,
+        layer_nodes: list[NodeInfo],
+        module_type: str,
+        modules: list[tuple[str, nn.Module]],
+    ) -> None:
+        """Match one concrete module family to compatible graph nodes."""
+        candidates = [
+            node
+            for node in layer_nodes
+            if node.node_class in ("FunctionNode", "ModuleNode")
+            and module_type.lower() in node.type.lower()
+            and node.node_id not in self._processed_nodes
+        ]
+        if self.debug and modules:
             print(
-                f"  Found {sum(len(v) for v in modules_by_type.values())} PyTorch modules"
+                f"  Matching {len(modules)} {module_type} modules to "
+                f"{len(candidates)} nodes"
             )
+        if module_type == "Linear" and len(modules) > len(candidates) > 0:
+            self._match_linear_modules_by_shape(modules, candidates)
+            return
+        self._match_modules_sequentially(module_type, modules, candidates)
 
-        # Match modules to nodes by type and shape
-        for module_type, modules_list in modules_by_type.items():
-            # Find candidate nodes for this module type (both FunctionNode and ModuleNode)
-            candidate_nodes = [
-                node
-                for node in layer_nodes
-                if node.node_class in ("FunctionNode", "ModuleNode")
-                and module_type.lower() in node.type.lower()
-                and node.node_id not in self._processed_nodes
-            ]
-
-            if self.debug and modules_list:
-                print(
-                    f"  Matching {len(modules_list)} {module_type} modules to {len(candidate_nodes)} nodes"
-                )
-
-            # Special handling for Linear layers with shape matching
-            if (
-                module_type == "Linear"
-                and len(modules_list) > len(candidate_nodes) > 0
-            ):
-                self._match_linear_modules_by_shape(
-                    modules_list, candidate_nodes
-                )
-            else:
-                # Standard sequential matching
-                for _i, (module_name, module) in enumerate(modules_list):
-                    if module_name in self._matched_modules:
-                        continue
-
-                    target_node = None
-                    for node in candidate_nodes:
-                        if node.node_id not in self._processed_nodes:
-                            target_node = node
-                            break
-
-                    if target_node:
-                        self._apply_module_to_node(
-                            target_node, module, module_type
-                        )
-                        self._processed_nodes.add(target_node.node_id)
-                        self._matched_modules.add(module_name)
+    def _match_modules_sequentially(
+        self,
+        module_type: str,
+        modules: list[tuple[str, nn.Module]],
+        candidates: list[NodeInfo],
+    ) -> None:
+        """Apply unmatched modules and candidate nodes in stable order."""
+        available = iter(
+            node
+            for node in candidates
+            if node.node_id not in self._processed_nodes
+        )
+        for module_name, module in modules:
+            if module_name in self._matched_modules:
+                continue
+            target = next(available, None)
+            if target is None:
+                return
+            self._apply_module_to_node(target, module, module_type)
+            self._processed_nodes.add(target.node_id)
+            self._matched_modules.add(module_name)
 
     def _match_linear_modules_by_shape(
         self,
