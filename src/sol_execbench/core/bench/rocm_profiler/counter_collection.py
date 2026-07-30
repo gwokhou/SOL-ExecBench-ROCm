@@ -69,6 +69,7 @@ from sol_execbench.core.process.environment import (
 from sol_execbench.core.text_utils import subprocess_text
 
 COUNTER_REASON_AVAIL_FAILED = "rocprof_counter_availability_failed"
+COUNTER_REASON_PMC_CHECK_FAILED = "rocprof_counter_pmc_check_failed"
 COUNTER_REASON_UNSUPPORTED = "rocprof_required_counters_unsupported"
 COUNTER_REASON_COLLECTED = "rocprof_counters_collected"
 COUNTER_REASON_ARTIFACT_INCOMPLETE = "rocprof_counter_artifact_incomplete"
@@ -108,11 +109,20 @@ def collect_rocprofv3_counters(
         )
         if missing:
             return _unsupported(request, missing, availability)
+        pmc_checks = _run_pmc_checks(
+            request,
+            run,
+            str(avail_path),
+            groups,
+        )
+        if isinstance(pmc_checks, Rocprofv3ProfileResult):
+            return pmc_checks
         return _collect_selected(
             request,
             groups=groups,
             manifest_path=manifest_path,
             availability=availability,
+            pmc_checks=pmc_checks,
             runner=run,
         )
 
@@ -149,12 +159,49 @@ def _run_availability(
     return completed
 
 
+def _run_pmc_checks(
+    request: Rocprofv3ProfileRequest,
+    runner: ProfileRunner,
+    executable: str,
+    groups: Sequence[Sequence[str]],
+) -> list[subprocess.CompletedProcess[str]] | Rocprofv3ProfileResult:
+    completed_checks: list[subprocess.CompletedProcess[str]] = []
+    for group in groups:
+        command = [executable, "-d", "0", "pmc-check", *group]
+        try:
+            completed = runner(
+                command,
+                request.working_directory,
+                request.timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as error:
+            return _failed(
+                request,
+                tuple(command),
+                COUNTER_REASON_PMC_CHECK_FAILED,
+                "rocprofv3-avail pmc-check timed out",
+                stdout=subprocess_text(error.stdout),
+                stderr=subprocess_text(error.stderr),
+            )
+        if completed.returncode != 0:
+            return _failed(
+                request,
+                tuple(command),
+                COUNTER_REASON_PMC_CHECK_FAILED,
+                "rocprofv3-avail rejected a selected counter group",
+                completed=completed,
+            )
+        completed_checks.append(completed)
+    return completed_checks
+
+
 def _collect_selected(
     request: Rocprofv3ProfileRequest,
     *,
     groups: list[list[str]],
     manifest_path: Path,
     availability: subprocess.CompletedProcess[str],
+    pmc_checks: Sequence[subprocess.CompletedProcess[str]],
     runner: ProfileRunner,
 ) -> Rocprofv3ProfileResult:
     prepare_profile_output_directory(
@@ -203,6 +250,7 @@ def _collect_selected(
         config_paths=config_paths,
         manifest_path=manifest_path,
         availability=availability,
+        pmc_checks=pmc_checks,
     )
     completed = _aggregate_completed(commands, completed_passes)
     return _counter_completed(
@@ -220,6 +268,7 @@ def _write_provenance(
     config_paths: Sequence[Path],
     manifest_path: Path,
     availability: subprocess.CompletedProcess[str],
+    pmc_checks: Sequence[subprocess.CompletedProcess[str]],
 ) -> dict[str, str]:
     executable = resolve_rocm_tool(request.executable)
     application_executable = resolve_tool_path(request.application_command[0])
@@ -232,6 +281,17 @@ def _write_provenance(
             [sha256_file(path) for path in config_paths],
         ),
         "availability_sha256": sha256_bytes(availability.stdout.encode()),
+        "pmc_check_sha256": stable_json_checksum(
+            [
+                {
+                    "command": list(item.args),
+                    "returncode": item.returncode,
+                    "stderr": item.stderr or "",
+                    "stdout": item.stdout or "",
+                }
+                for item in pmc_checks
+            ]
+        ),
         "application_executable_sha256": (
             sha256_file(application_executable)
             if application_executable is not None
@@ -508,6 +568,7 @@ __all__ = [
     "COUNTER_REASON_ARTIFACT_INCOMPLETE",
     "COUNTER_REASON_AVAIL_FAILED",
     "COUNTER_REASON_COLLECTED",
+    "COUNTER_REASON_PMC_CHECK_FAILED",
     "COUNTER_REASON_UNSUPPORTED",
     "collect_rocprofv3_counters",
 ]

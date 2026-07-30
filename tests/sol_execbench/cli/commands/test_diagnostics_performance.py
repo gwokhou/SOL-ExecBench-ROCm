@@ -258,7 +258,7 @@ def _evidence_manifest(
     atomic_write_json_value(
         provenance,
         {
-            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v3",
+            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v4",
             "diagnostic_only": True,
             "score_authority": False,
             "replay_phase": "evidence",
@@ -391,3 +391,26 @@ def test_performance_diagnostics_cli_and_agent_feedback_governance(
     assert "model_gap_no_kernel_action" in {
         item.code for item in feedback.items
     }
+
+    feedback_output = tmp_path / "trace.performance-agent-feedback.json"
+    feedback_result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "diagnostics",
+            "agent-feedback",
+            "--performance-diagnostic",
+            str(output),
+            "--evidence-manifest",
+            str(evidence_path),
+            "--output",
+            str(feedback_output),
+        ],
+    )
+
+    assert feedback_result.exit_code == 0, feedback_result.output
+    feedback_response = json.loads(feedback_result.output)
+    assert feedback_response["ok"] is True
+    assert feedback_response["data"]["diagnostic_only"] is True
+    assert feedback_output.is_file()

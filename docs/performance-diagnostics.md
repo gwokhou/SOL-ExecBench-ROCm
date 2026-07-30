@@ -22,6 +22,12 @@ rocprofv3 replay that workload in fail-safe counter passes. Replay stdout and
 timing never become canonical timing. Overlapping/multi-queue dispatches are
 unsupported and fail closed.
 
+Every selected counter group must first pass an exact
+`rocprofv3-avail -d 0 pmc-check ...` invocation. A rejected or timed-out group
+fails closed before replay. The combined command/output digest is stored in
+the counter provenance alongside availability, profiler, configuration, and
+application hashes.
+
 Alongside the normal Trace/profile/static artifacts, the command writes:
 
 - `TRACE.jsonl.performance-timing.json`: the exact canonical trial/iteration
@@ -47,6 +53,12 @@ Development and held-out corpora contain only labels and content-addressed
 evidence/SOLAR references. They cannot contain supplied predictions. Each
 corpus contains at least 20 cases from each supported family (80 total), and
 their workload/candidate pair IDs must be disjoint.
+
+The current corpus contract derives each pair ID from the evidence-bound
+workload SHA-256 and candidate SHA-256. Authoring re-derives that identity,
+checks the declared family against the built diagnostic, and rejects reused
+evidence manifests across development and held-out data. A caller-provided
+`independent=true` assertion is not accepted.
 
 ```bash
 sol-execbench --format json diagnostics fit-performance-inference \
@@ -134,3 +146,49 @@ observations. Acceptance requires at least 20 held-out cases per family (80
 total), at least 90% empirical interval coverage in every family, median
 absolute percentage error at most 15%, P90 at most 30%, and at least 90%
 precision plus 70% recall for every enabled code-changing action.
+
+## Four-family hardware smoke
+
+Before collecting the full validation corpora, verify one complete,
+content-addressed case from each supported family. Set
+`SOL_EXECBENCH_DIAGNOSTIC_SMOKE_JSON` to a root-confined configuration:
+
+```json
+{
+  "schema_version": "diagnostic_smoke_test.v1",
+  "calibration_profile": "calibration/gfx1200-diagnostic-v3.json",
+  "cases": [
+    {
+      "workload_kind": "elementwise",
+      "evidence_manifest": "elementwise/performance-evidence.json",
+      "solar_manifest": "elementwise/solar/manifest.yaml"
+    },
+    {
+      "workload_kind": "transpose",
+      "evidence_manifest": "transpose/performance-evidence.json",
+      "solar_manifest": "transpose/solar/manifest.yaml"
+    },
+    {
+      "workload_kind": "reduction_norm",
+      "evidence_manifest": "reduction/performance-evidence.json",
+      "solar_manifest": "reduction/solar/manifest.yaml"
+    },
+    {
+      "workload_kind": "matmul",
+      "evidence_manifest": "matmul/performance-evidence.json",
+      "solar_manifest": "matmul/solar/manifest.yaml"
+    }
+  ]
+}
+```
+
+Then run:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/core/bench/test_rdna4_performance_diagnostics_smoke.py
+```
+
+The smoke requires available IR and HW predictions plus available `C` and `R`
+for all four cases. A missing configuration skips the optional hardware test
+and is not evidence that the smoke passed.

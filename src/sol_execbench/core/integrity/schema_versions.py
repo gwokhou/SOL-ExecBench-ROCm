@@ -52,7 +52,7 @@ DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION: Final = (
     "sol_execbench.diagnostic_inference_profile.v1"
 )
 DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION: Final = (
-    "sol_execbench.diagnostic_validation_corpus.v1"
+    "sol_execbench.diagnostic_validation_corpus.v2"
 )
 DOCKER_PREFLIGHT_SCHEMA_VERSION: Final = "sol_execbench.docker_preflight.v1"
 ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
@@ -91,7 +91,7 @@ ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION: Final = (
     "sol_execbench.rocprofv3_overhead_calibration.v2"
 )
 ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION: Final = (
-    "sol_execbench.rocprofv3_counter_provenance.v3"
+    "sol_execbench.rocprofv3_counter_provenance.v4"
 )
 ROCPROFV3_COUNTER_MANIFEST_SCHEMA_VERSION: Final = (
     "sol_execbench.rocprofv3_counter_manifest.v2"

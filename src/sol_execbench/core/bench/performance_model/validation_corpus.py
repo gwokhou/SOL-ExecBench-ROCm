@@ -14,7 +14,7 @@ from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     StrictArtifactModel,
 )
-from sol_execbench.core.integrity import SHA256Digest
+from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import (
     DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION,
 )
@@ -47,12 +47,11 @@ class DiagnosticValidationCase(StrictArtifactModel):
     model_config = _CONFIG
 
     case_id: str = Field(min_length=1)
-    pair_id: str = Field(min_length=1)
+    pair_id: SHA256Digest
     workload_kind: WorkloadKind
     evidence_manifest: ValidationArtifactReference
     solar_manifest: ValidationArtifactReference
     gold_action_codes: list[str] = Field(default_factory=list)
-    independent: Literal[True] = True
 
 
 class DiagnosticValidationCorpus(CurrentSchemaModel):
@@ -61,7 +60,7 @@ class DiagnosticValidationCorpus(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_validation_corpus.v1"] = (
+    schema_version: Literal["sol_execbench.diagnostic_validation_corpus.v2"] = (
         DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION
     )
     role: Literal["development", "held_out"]
@@ -80,6 +79,9 @@ class DiagnosticValidationCorpus(CurrentSchemaModel):
             raise ValueError(
                 "validation corpus repeats workload/candidate pair"
             )
+        evidence_hashes = [case.evidence_manifest.sha256 for case in self.cases]
+        if len(evidence_hashes) != len(set(evidence_hashes)):
+            raise ValueError("validation corpus repeats evidence manifest")
         kinds = {case.workload_kind for case in self.cases}
         if not kinds <= _SUPPORTED_FAMILIES:
             raise ValueError("validation corpus contains unsupported family")
@@ -97,11 +99,30 @@ def require_disjoint_corpora(
     """Reject role mistakes or repeated workload/candidate pairs."""
     if development.role != "development" or held_out.role != "held_out":
         raise ValueError("validation corpus roles are invalid")
-    overlap = {case.pair_id for case in development.cases} & {
+    pair_overlap = {case.pair_id for case in development.cases} & {
         case.pair_id for case in held_out.cases
     }
-    if overlap:
+    if pair_overlap:
         raise ValueError("development and held-out corpora overlap")
+    evidence_overlap = {
+        case.evidence_manifest.sha256 for case in development.cases
+    } & {case.evidence_manifest.sha256 for case in held_out.cases}
+    if evidence_overlap:
+        raise ValueError("development and held-out evidence manifests overlap")
+
+
+def validation_pair_id(
+    *,
+    workload_sha256: str,
+    candidate_sha256: str,
+) -> SHA256Digest:
+    """Derive the only admitted workload/candidate pair identity."""
+    return stable_json_checksum(
+        {
+            "candidate_sha256": candidate_sha256,
+            "workload_sha256": workload_sha256,
+        }
+    )
 
 
 __all__ = [
@@ -111,4 +132,5 @@ __all__ = [
     "DiagnosticValidationCorpus",
     "ValidationArtifactReference",
     "require_disjoint_corpora",
+    "validation_pair_id",
 ]
