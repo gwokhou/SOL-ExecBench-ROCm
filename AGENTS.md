@@ -43,9 +43,9 @@ real collision, a clear module role, or conventional third-party spelling such
 as `numpy as np`. Do not create private/self aliases or incidental compatibility
 re-exports; update callers when symbols move.
 
-Keep canonical acronyms fully capitalized in `PascalCase`: `IRBackend`,
+Keep canonical acronyms fully capitalized in `PascalCase`: `SOLBound`, `IRBackend`,
 `AKACorpusManifest`, `GPUEvidence`, `ISAInstructionRequirement`,
-`AMDSmiProcess`, and `JSONDict`. Acronyms stay lowercase in `snake_case`;
+`AMDSMIProcess`, and `JSONDict`. Acronyms stay lowercase in `snake_case`;
 use their all-caps form in prose, and preserve official casing such as `ROCm`
 and third-party namespace spelling.
 

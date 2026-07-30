@@ -20,6 +20,7 @@ from safetensors.torch import (
     save as save_safetensors_bytes,
 )
 
+from sol_execbench.core.integrity import sha256_bytes, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
 PROTOCOL_VERSION = SCHEMA_VERSIONS["reference_ipc"]
@@ -68,6 +69,7 @@ class ReferenceTimingCase(ReferenceCase):
     """A fresh timing case with independently measured reference latency."""
 
     reference_latency_ms: float
+    input_sha256: str
     timing_failure: str | None = None
 
 
@@ -218,6 +220,27 @@ def _decode_values(
     return values
 
 
+def _encoded_inputs_sha256(
+    metadata: list[dict[str, Any]],
+    tensors: dict[str, torch.Tensor],
+) -> str:
+    """Hash exactly the scalar metadata and tensor storage received over IPC."""
+    input_tensors = {
+        item["key"]: tensors[item["key"]]
+        for item in metadata
+        if item.get("kind") == "tensor"
+        and isinstance(item.get("key"), str)
+        and item["key"] in tensors
+    }
+    payload = save_safetensors_bytes(dict(sorted(input_tensors.items())))
+    return stable_json_checksum(
+        {
+            "metadata": metadata,
+            "tensor_payload_sha256": sha256_bytes(payload),
+        },
+    )
+
+
 def send_case(
     connection: Connection,
     case: ReferenceCase,
@@ -307,6 +330,7 @@ def receive_case(connection: Connection, *, device: str) -> ReferenceTimingCase:
         inputs=inputs,
         outputs=outputs,
         reference_latency_ms=float(latency),
+        input_sha256=_encoded_inputs_sha256(inputs_meta, tensors),
         timing_failure=(
             str(header["timing_failure"])
             if header.get("timing_failure")

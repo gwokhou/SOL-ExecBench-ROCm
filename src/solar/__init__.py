@@ -36,7 +36,7 @@ _LAZY_IMPORTS = {
     "FormalProducerReadiness": ("solar.api", "FormalProducerReadiness"),
     "IRKind": ("solar.api", "IRKind"),
     "IRPath": ("solar.api", "IRPath"),
-    "SolBound": ("solar.api", "SolBound"),
+    "SOLBound": ("solar.api", "SOLBound"),
     "VerificationPolicy": ("solar.api", "VerificationPolicy"),
     "analyze": ("solar.api", "analyze"),
     "architecture_profile_sha256": (
@@ -71,7 +71,7 @@ __all__ = [
     "FormalProducerReadiness",
     "IRKind",
     "IRPath",
-    "SolBound",
+    "SOLBound",
     "VerificationPolicy",
     "analyze",
     "architecture_profile_sha256",

@@ -175,8 +175,13 @@ try:
         ),
     )
     if _timing_records:
+        _timing_name = (
+            f"performance-replay-raw-{os.getpid()}.jsonl"
+            if os.environ.get("SOL_EXECBENCH_COUNTER_REPLAY") == "1"
+            else "performance-timing-raw.jsonl"
+        )
         atomic_write_jsonl_values(
-            STAGING_DIR / "performance-timing-raw.jsonl",
+            STAGING_DIR / _timing_name,
             _timing_records,
         )
 finally:

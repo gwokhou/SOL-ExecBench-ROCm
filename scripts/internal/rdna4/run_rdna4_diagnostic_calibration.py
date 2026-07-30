@@ -10,6 +10,7 @@ import argparse
 import json
 import tempfile
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 from sol_execbench.cli.protocol import (
@@ -39,6 +40,12 @@ from sol_execbench.core.bench.timing_isolation import (
     verify_clock_state_with_warning,
 )
 from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.evidence.runtime_evidence.collectors import (
+    collect_runtime_gpu_telemetry,
+)
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeGPUTelemetry,
+)
 from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
@@ -67,6 +74,18 @@ PROBE_SOURCE = (
 MODES = ("dispatch", "memory", "access", "lds", "reduction", "wmma", "valu")
 COMMAND_TIMEOUT_SECONDS = 180.0
 COMMAND_NAME = "rdna4 diagnostic calibration"
+
+
+@dataclass(frozen=True, slots=True)
+class _CalibrationContext:
+    output: Path
+    hipcc: Path
+    device: RocmDeviceInfo
+    gpu_id: str
+    gpu_bdf: str
+    compiler_version: str
+    tuning_batches: int
+    estimation_batches: int
 
 
 def _compile_probe(hipcc: Path, architecture: str, output: Path) -> None:
@@ -214,133 +233,143 @@ def run_calibration(
         )
     compiler_version = _compiler_version(hipcc)
     return _run_calibration_workspace(
-        output=output,
-        hipcc=hipcc,
-        device=device,
-        observed_gpu_id=observed_gpu_id,
-        gpu_bdf=gpu_bdf,
-        compiler_version=compiler_version,
-        tuning_batches=tuning_batches,
-        estimation_batches=estimation_batches,
+        _CalibrationContext(
+            output=output,
+            hipcc=hipcc,
+            device=device,
+            gpu_id=observed_gpu_id,
+            gpu_bdf=gpu_bdf,
+            compiler_version=compiler_version,
+            tuning_batches=tuning_batches,
+            estimation_batches=estimation_batches,
+        ),
     )
 
 
-def _run_calibration_workspace(
-    *,
-    output: Path,
-    hipcc: Path,
-    device: RocmDeviceInfo,
-    observed_gpu_id: str,
-    gpu_bdf: str,
-    compiler_version: str,
-    tuning_batches: int,
-    estimation_batches: int,
-) -> Path:
+def _run_calibration_workspace(context: _CalibrationContext) -> Path:
     """Collect evidence and publish calibration within a temporary workspace."""
     with tempfile.TemporaryDirectory(
         prefix="sol_diag_calibration_"
     ) as raw_workspace:
         workspace = Path(raw_workspace)
         binary = workspace / "diagnostic_microarchitecture"
-        _compile_probe(hipcc, device.gfx_target, binary)
+        _compile_probe(context.hipcc, context.device.gfx_target, binary)
         with acquire_clock_lock() as lease:
             if not lease.locked:
                 raise RuntimeError("STABLE_PEAK clock lock is required")
+            environment = [collect_runtime_gpu_telemetry(phase="pre")]
             tuning = _collect_phase(
                 binary,
                 phase="tuning",
-                process_batches=tuning_batches,
+                process_batches=context.tuning_batches,
             )
             frozen = freeze_probe_configuration(tuning)
             estimation = _collect_phase(
                 binary,
                 phase="parameter_estimation_after_configuration_freeze",
-                process_batches=estimation_batches,
+                process_batches=context.estimation_batches,
             )
-        isa = _isa_evidence(binary, device.gfx_target, workspace)
+            environment.append(collect_runtime_gpu_telemetry(phase="post"))
+        isa = _isa_evidence(binary, context.device.gfx_target, workspace)
         audit = DiagnosticCalibrationAudit.model_validate(
             _audit_payload(
+                context,
                 binary=binary,
-                hipcc=hipcc,
-                device=device,
                 tuning=tuning,
                 frozen=frozen,
                 estimation=estimation,
                 isa=isa,
-                gpu_id=observed_gpu_id,
-                gpu_bdf=gpu_bdf,
-                compiler_version=compiler_version,
+                environment=environment,
             ),
         )
-        audit_path = output.with_name(f"{output.stem}.audit.json")
+        audit_path = context.output.with_name(
+            f"{context.output.stem}.audit.json"
+        )
         atomic_write_json_value(audit_path, audit.model_dump(mode="json"))
-        profile = DiagnosticCalibrationProfile(
-            identity=CalibrationIdentity(
-                gpu_architecture="gfx1200",
-                gpu_id=observed_gpu_id,
-                gpu_bdf=gpu_bdf,
-                rocm_version=device.hip_version,
-                compiler_version=compiler_version,
-                clock_mode="locked",
-                power_profile="stable_peak",
-            ),
-            parameters=build_calibration_parameters(estimation, frozen),
-            tuning_evidence_sha256=[
-                stable_json_checksum(
-                    [
-                        item.model_dump(mode="json")
-                        for item in audit.tuning_evidence
-                    ],
-                )
-            ],
-            parameter_estimation_evidence_sha256=[
-                stable_json_checksum(
-                    [
-                        item.model_dump(mode="json")
-                        for item in audit.parameter_estimation_evidence
-                    ],
-                ),
-                sha256_file(audit_path),
-            ],
-            probe_evidence_sha256=[
-                stable_json_checksum(
-                    audit.probe_identity.model_dump(mode="json"),
-                )
-            ],
-            configuration_frozen_before_estimation=True,
-            bootstrap_seed=BOOTSTRAP_SEED,
-            bootstrap_replicates=BOOTSTRAP_REPLICATES,
+        profile = _calibration_profile(
+            context,
+            audit=audit,
+            audit_path=audit_path,
+            estimation=estimation,
+            frozen=frozen,
         )
-        atomic_write_json_value(output, profile.model_dump(mode="json"))
-    return output
+        atomic_write_json_value(
+            context.output,
+            profile.model_dump(mode="json"),
+        )
+    return context.output
+
+
+def _calibration_profile(
+    context: _CalibrationContext,
+    *,
+    audit: DiagnosticCalibrationAudit,
+    audit_path: Path,
+    estimation: Sequence[ProbeBatch],
+    frozen: dict[str, str],
+) -> DiagnosticCalibrationProfile:
+    return DiagnosticCalibrationProfile(
+        identity=CalibrationIdentity(
+            gpu_architecture="gfx1200",
+            gpu_id=context.gpu_id,
+            gpu_bdf=context.gpu_bdf,
+            rocm_version=context.device.hip_version,
+            compiler_version=context.compiler_version,
+            clock_mode="locked",
+            power_profile="stable_peak",
+        ),
+        parameters=build_calibration_parameters(estimation, frozen),
+        tuning_evidence_sha256=[
+            stable_json_checksum(
+                [
+                    item.model_dump(mode="json")
+                    for item in audit.tuning_evidence
+                ],
+            )
+        ],
+        parameter_estimation_evidence_sha256=[
+            stable_json_checksum(
+                [
+                    item.model_dump(mode="json")
+                    for item in audit.parameter_estimation_evidence
+                ],
+            ),
+            sha256_file(audit_path),
+        ],
+        probe_evidence_sha256=[
+            stable_json_checksum(
+                audit.probe_identity.model_dump(mode="json"),
+            )
+        ],
+        configuration_frozen_before_estimation=True,
+        bootstrap_seed=BOOTSTRAP_SEED,
+        bootstrap_replicates=BOOTSTRAP_REPLICATES,
+    )
 
 
 def _audit_payload(
+    context: _CalibrationContext,
     *,
     binary: Path,
-    hipcc: Path,
-    device: RocmDeviceInfo,
     tuning: Sequence[ProbeBatch],
     frozen: dict[str, str],
     estimation: Sequence[ProbeBatch],
     isa: dict[str, object],
-    gpu_id: str,
-    gpu_bdf: str,
-    compiler_version: str,
+    environment: Sequence[RuntimeGPUTelemetry],
 ) -> dict[str, object]:
     return {
         "schema_version": DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION,
         "probe_identity": {
             "source_sha256": sha256_file(PROBE_SOURCE),
             "binary_sha256": sha256_file(binary),
-            "compiler_sha256": sha256_file(hipcc),
-            "architecture": device.gfx_target,
-            "rocm_version": device.hip_version,
-            "device_name": device.name,
-            "gpu_id": gpu_id,
-            "gpu_bdf": gpu_bdf,
-            "total_memory_bytes": device.total_memory_bytes,
-            "compiler_version": compiler_version,
+            "compiler_sha256": sha256_file(context.hipcc),
+            "architecture": context.device.gfx_target,
+            "rocm_version": context.device.hip_version,
+            "device_name": context.device.name,
+            "gpu_id": context.gpu_id,
+            "gpu_bdf": context.gpu_bdf,
+            "total_memory_bytes": context.device.total_memory_bytes,
+            "compiler_version": context.compiler_version,
             "isa": isa,
         },
         "protocol": {
@@ -359,6 +388,7 @@ def _audit_payload(
         "parameter_estimation_evidence": [
             batch.to_dict() for batch in estimation
         ],
+        "environment": [item.model_dump(mode="json") for item in environment],
     }
 
 

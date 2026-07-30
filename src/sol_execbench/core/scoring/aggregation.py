@@ -79,7 +79,7 @@ def diagnostic_workload_score(
     workload score for diagnostic display. It is never a publication-grade score.
 
     Raises:
-        SolScoreAuditError: if the runtimes violate a paper precondition
+        SOLScoreAuditError: if the runtimes violate a paper precondition
             (e.g. candidate faster than SOL, or baseline not slower than SOL).
 
     """

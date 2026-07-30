@@ -158,7 +158,7 @@ def predict_hw(
         reason_codes=reasons,
         limitations=[
             "Profiler duration and achieved throughput are not inputs.",
-            "The v2 model supports serial dispatches only.",
+            "The v3 model supports serial dispatches only.",
         ],
     )
 
@@ -317,7 +317,7 @@ def _dispatch_components(
     calibration: DiagnosticCalibrationProfile,
 ) -> list[PredictionComponent]:
     counters = dispatch.counters
-    waves = _counter(counters, "SQ_WAVES") or 0.0
+    waves = _counter(counters, "SQ_WAVES_SUM", "SQ_WAVES") or 0.0
     valu = _counter(
         counters,
         "VALUINSTS",
@@ -478,7 +478,6 @@ def _append_serial_penalties(
     counters = dispatch.counters
     conflict = _counter(
         counters,
-        "LDSBANKCONFLICT",
         "SQC_LDS_BANK_CONFLICT",
         "SQ_LDS_BANK_CONFLICT",
     )
@@ -497,7 +496,7 @@ def _append_serial_penalties(
         )
     barriers = _counter(counters, "SQ_INSTS_BARRIER", "BARRIERINSTS")
     if not barriers and compiled is not None:
-        waves = _counter(counters, "SQ_WAVES") or 0.0
+        waves = _counter(counters, "SQ_WAVES_SUM", "SQ_WAVES") or 0.0
         barriers = _static_group(compiled, "barrier") * waves
     if barriers:
         coordinate = (

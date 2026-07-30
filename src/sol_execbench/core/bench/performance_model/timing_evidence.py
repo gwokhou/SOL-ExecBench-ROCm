@@ -14,9 +14,11 @@ import numpy as np
 from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
-    DiagnosticSidecarAuthority,
+    CurrentDiagnosticSidecarAuthority,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.base_model import (
+    StrictArtifactModel,
+)
 from sol_execbench.core.data.json_utils import load_jsonl_file
 from sol_execbench.core.data.trace import CacheClearEvidence, Trace
 from sol_execbench.core.integrity import SHA256Digest, sha256_file
@@ -35,12 +37,13 @@ _MODEL_CONFIG = ConfigDict(
 )
 
 
-class RawPerformanceTimingRecord(BaseModelWithDocstrings):
+class RawPerformanceTimingRecord(StrictArtifactModel):
     """Trusted-driver timing samples before trace identity is available."""
 
     model_config = _MODEL_CONFIG
 
     workload_uuid: str = Field(min_length=1)
+    input_sha256: SHA256Digest
     latency_ms: float = Field(gt=0.0)
     trial_samples_ms: list[list[float]] = Field(min_length=1)
     warmup_runs: int = Field(ge=0)
@@ -57,12 +60,13 @@ class RawPerformanceTimingRecord(BaseModelWithDocstrings):
         return self
 
 
-class WorkloadTimingEvidence(BaseModelWithDocstrings):
+class WorkloadTimingEvidence(StrictArtifactModel):
     """Canonical samples and hierarchical-bootstrap interval for one workload."""
 
     model_config = _MODEL_CONFIG
 
     workload_uuid: str
+    input_sha256: SHA256Digest
     latency_ms: float = Field(gt=0.0)
     lower_ms: float = Field(gt=0.0)
     upper_ms: float = Field(gt=0.0)
@@ -79,12 +83,13 @@ class WorkloadTimingEvidence(BaseModelWithDocstrings):
         return self
 
 
-class PerformanceTimingEvidenceSidecar(DiagnosticSidecarAuthority):
+class PerformanceTimingEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     """Diagnostic sample evidence from the same events as canonical Trace."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.performance_timing_evidence.v1"] = (
+    schema_version: Literal["sol_execbench.performance_timing_evidence.v2"] = (
         PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION
     )
     run_id: SHA256Digest
@@ -154,6 +159,7 @@ def _workload_timing(
     lower, upper = hierarchical_bootstrap_interval(raw.trial_samples_ms)
     return WorkloadTimingEvidence(
         workload_uuid=raw.workload_uuid,
+        input_sha256=raw.input_sha256,
         latency_ms=measured,
         lower_ms=min(lower, measured),
         upper_ms=max(upper, measured),

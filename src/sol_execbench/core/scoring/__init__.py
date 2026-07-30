@@ -9,7 +9,7 @@ from sol_execbench.core.scoring.aggregation import (
     aggregate_suite_scores,
     diagnostic_workload_score,
 )
-from sol_execbench.core.scoring.formula import SolScoreAuditError, sol_score
+from sol_execbench.core.scoring.formula import SOLScoreAuditError, sol_score
 from sol_execbench.core.scoring.official_scoring import (
     official_score_availability,
 )
@@ -20,7 +20,7 @@ from sol_execbench.core.scoring.release_verifier import (
 
 __all__ = [
     "OfficialScoreResult",
-    "SolScoreAuditError",
+    "SOLScoreAuditError",
     "SuiteScore",
     "WorkloadScore",
     "aggregate_suite_scores",

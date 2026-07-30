@@ -39,12 +39,12 @@ canonical Trace timing, `T_SOL`, SOL Score, leaderboard values, or rewards.
 The model and artifact contracts are:
 
 ```text
-model: gfx1200_diagnostic.v2
-diagnostic: sol_execbench.performance_diagnostic.v2
-calibration: sol_execbench.diagnostic_calibration.v2
-evidence manifest: sol_execbench.performance_evidence_manifest.v1
-timing evidence: sol_execbench.performance_timing_evidence.v1
-acceptance: sol_execbench.diagnostic_acceptance.v1
+model: gfx1200_diagnostic.v3
+diagnostic: sol_execbench.performance_diagnostic.v3
+calibration: sol_execbench.diagnostic_calibration.v3
+evidence manifest: sol_execbench.performance_evidence_manifest.v2
+timing evidence: sol_execbench.performance_timing_evidence.v2
+acceptance: sol_execbench.diagnostic_acceptance.v2
 ```
 
 ### Governed evidence collection
@@ -136,14 +136,17 @@ at least five fresh parameter-estimation processes. Its audit binds GPU UUID,
 BDF, gfx target, ROCm, compiler, code object, clock/power state, frozen
 configuration, and all input evidence hashes.
 
-The independent acceptance contract requires at least ten non-tuning held-out
-cases in each of the four supported families, at least 40 cases total. It
+The independent acceptance contract requires at least twenty non-tuning
+held-out cases in each of the four supported families, at least 80 cases total.
+Development uses the same minimum and is pair-disjoint from held-out data. It
 accepts the model only when:
 
 ```text
 median absolute percentage error <= 15%
 P90 absolute percentage error    <= 30%
-expected primary attribution     matches every family
+per-family interval coverage     >= 90%
+enabled action precision         >= 90%
+enabled action recall            >= 70%
 ```
 
 Agent feedback requires the exact accepted calibration identity and profile
@@ -181,10 +184,30 @@ uv run pytest tests/sol_execbench/cli/sidecars/test_profile.py
 uv run pytest tests/sol_execbench/core/bench/test_staged_evaluation.py
 ```
 
-No gfx1200 calibration, counter-collection matrix, or independent held-out
-acceptance run was performed as part of this update. There is no reviewed
-calibration/acceptance artifact in the repository. The model must therefore be
-treated as implemented but not hardware-accepted.
+A governed gfx1200 calibration was collected on the RX 9060 XT and strict
+current-schema reload succeeded:
+
+```text
+data/outputs/gfx1200-diagnostic-v3.json
+data/outputs/gfx1200-diagnostic-v3.audit.json
+```
+
+The audit binds GPU UUID/BDF, ROCm/compiler/code-object identity, STABLE_PEAK
+pre/post state, temperature, and foreign-process observations. The repository
+counter orchestrator was also run against the real device. Its four independent
+passes selected `SQ_WAVES_sum`, memory traffic, cache hit/miss, and LDS conflict
+percentage; all passes produced CSV and ROCPD artifacts, and the orchestrator
+reported complete coverage.
+
+ROCm 7.2 has an upstream rocprofv3 ring-buffer defect when its temporary path is
+derived from an unsuitable container working directory. The runtime now sets
+`ROCPROF_TMPDIR` to a writable controlled directory. With that setting, the
+repository parser aligned all 168 probe dispatches across the four real passes.
+
+No independent 20-per-family development and held-out corpora are present under
+`data/`, so no accepted held-out artifact was produced. Until those 160
+content-addressed cases are collected and pass the frozen gates, the model is
+hardware-calibrated and counter-validated but not hardware-accepted.
 
 The following static and quality gates were also rerun and passed:
 
@@ -199,88 +222,33 @@ uv run --with ruff ruff format --check .
 git diff --check
 ```
 
-The schema-version gate currently fails:
-
-```text
-scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py:
-  unsupported schema identifier
-  sol_execbench.diagnostic_calibration_audit.v2
-
-src/sol_execbench/core/bench/rocm_profiler/counters.py:
-src/sol_execbench/data/rocprofv3_counters/gfx1200_v1.yaml:
-  unsupported schema identifier
-  sol_execbench.rocprofv3_counter_manifest.v1
-```
-
-This is a pre-existing gap in the three diagnostic commits, not a failure
-introduced by the handoff edit. No full-suite result was recorded in the prior
-handoff, and the full repository Pytest suite was not rerun during this update.
-Do not infer full-tree validation from the focused results.
+The schema-version gate and the full `tests/` suite now pass. Package coverage
+also passes the repository's line and branch policy.
 
 ## Next work
 
-### P0: Repair the schema registry gate
-
-Register the calibration-audit and counter-manifest artifact families in the
-single canonical schema-version policy, update the focused schema tests, and
-rerun:
-
-```bash
-uv run --no-sync python scripts/check_schema_versions.py
-```
-
-Do not silence the scanner, add local allowlists, or preserve obsolete schema
-identifiers as compatibility aliases. Confirm that producers, parsers, package
-data, tests, and documentation use the same canonical identifiers.
-
-### P0: Run the governed gfx1200 calibration
-
-Run on the intended RX 9060 XT/gfx1200 host, outside a sandbox that hides
-`/dev/kfd` or `/dev/dri`:
-
-```bash
-uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
-  --output CALIBRATION.json \
-  --gpu-id GPU_UUID \
-  --estimation-batches 5
-```
-
-Before trusting the result:
-
-1. Confirm the audit has one tuning phase and at least five independent
-   parameter-estimation process records.
-2. Confirm GPU UUID/BDF, gfx1200, ROCm, hipcc, code-object, clock, and power
-   identities are complete and stable.
-3. Confirm every referenced artifact hash verifies.
-4. Review parameter intervals and applicability ranges; do not fill gaps with
-   representative shapes, nominal peaks, measured candidate throughput, or
-   locally asserted provenance.
-5. Freeze the configuration and calibration profile before collecting
-   acceptance cases.
-
-Any sandbox-only GPU failure must be retried as the same bounded host command
-before concluding that a counter, compiler, driver, or device feature is
-unsupported.
-
 ### P0: Collect and pass independent held-out acceptance
 
-Prepare at least ten independent cases for each of elementwise, transpose,
+Prepare at least twenty independent cases for each of elementwise, transpose,
 reduction/norm, and matmul. For every case:
 
 1. Produce a canonical single-workload Trace and governed counter evidence.
 2. Produce the exact eligible SOLAR manifest.
-3. Build the v2 diagnostic against the frozen calibration.
-4. Record content hashes, predicted time, canonical measured time, and primary
-   attribution in the acceptance manifest.
+3. Build the v3 diagnostic against the frozen calibration and inference policy.
+4. Record only labels and content-addressed evidence references in the public
+   corpus; the authoring command derives predictions and measured timing.
 5. Prove that the workload/candidate was not used for tuning or parameter
    estimation.
 
 Then run:
 
 ```bash
-uv run python \
-  scripts/internal/rdna4/verify_rdna4_diagnostic_acceptance.py \
-  --manifest HELD_OUT_MANIFEST.json \
+uv run sol-execbench --format json diagnostics accept-performance-model \
+  --development-corpus DEVELOPMENT.json \
+  --held-out-corpus HELD_OUT.json \
+  --calibration-profile CALIBRATION.json \
+  --inference-profile INFERENCE.json \
+  --manifest-output ACCEPTANCE-MANIFEST.json \
   --output ACCEPTANCE.json
 ```
 

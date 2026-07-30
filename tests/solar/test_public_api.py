@@ -19,7 +19,7 @@ def test_solar_public_api_exposes_only_atomic_pipeline() -> None:
         "FormalProducerReadiness",
         "IRKind",
         "IRPath",
-        "SolBound",
+        "SOLBound",
         "VerificationPolicy",
         "analyze",
         "architecture_profile_sha256",

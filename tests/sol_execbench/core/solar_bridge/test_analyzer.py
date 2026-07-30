@@ -19,7 +19,7 @@ from sol_execbench.core.solar_bridge.models import (
 from sol_execbench.core.solar_bridge.workload_context import (
     SolarWorkloadContext,
 )
-from solar.api import AnalysisFailure, AnalysisResult, ArtifactRef, SolBound
+from solar.api import AnalysisFailure, AnalysisResult, ArtifactRef, SOLBound
 from solar.ir.contracts import IRPath
 
 _FORMAL_ARTIFACTS = tuple(
@@ -178,7 +178,7 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
             output_dir=result_dir,
             architecture_sha256="a" * 64,
             artifacts=_FORMAL_ARTIFACTS,
-            bound=SolBound(
+            bound=SOLBound(
                 0.001,
                 "capacity_constrained_tile_aware_v1",
                 "memory",
@@ -219,7 +219,7 @@ def test_invoke_solar_rejects_non_formal_result(tmp_path, monkeypatch) -> None:
             output_dir=result_dir,
             architecture_sha256="a" * 64,
             artifacts=_FORMAL_ARTIFACTS,
-            bound=SolBound(0.001, "diagnostic", "memory"),
+            bound=SOLBound(0.001, "diagnostic", "memory"),
         ),
     )
 

@@ -27,11 +27,14 @@
 - `PerformancePrediction`：状态、预测时间、置信区间、各资源/dispatch component、模型版本和限制。
 - `PerformanceTimingEvidenceSidecar`：保存 canonical timing 的 trial/iteration
   原始样本和固定 seed、10,000 replicate 的 hierarchical-bootstrap 区间。
+- `PerformanceReplayEvidenceSidecar`：绑定 canonical input hash、独立 replay
+  进程、ROCTx marker、cache policy、跨 pass dispatch 序列及 pre/post AMD SMI
+  环境快照。
 - `PerformanceEvidenceManifest`：以 SHA256 绑定 definition、workload、
   solution、编译命令/compiler、code object、GPU/ROCm/clock、Trace、timing、
   static ISA、counter CSV、ROCPD 和 counter provenance。
 - `PerformanceDiagnosticSidecar`，schema
-  `sol_execbench.performance_diagnostic.v2`：保存 `T_SOL`、`T_pred(IR)`、
+  `sol_execbench.performance_diagnostic.v3`：保存 `T_SOL`、`T_pred(IR)`、
   `T_pred(HW)`、`T_measured` 区间、可选 `T_frontier`、`L/C/R`、归因、
   行动建议及全部证据引用。
 
@@ -53,7 +56,9 @@
   `--static-evidence auto`；
 - 先完成唯一 canonical run，再进行 diagnostic-only counter replay；
 - 使用 `rocprofv3-avail` 检查当前 gfx1200/ROCm 实际支持的 counter。
-- 从版本化 gfx1200 manifest 选择最小 counter groups：compute/WMMA、memory/cache、LDS、wave/occupancy。
+- 从版本化 gfx1200 manifest 选择四个经真实 `pmc-check` 验证的 counter
+  groups：`SQ_WAVES_sum`、完整 memory traffic、cache hit/miss、LDS conflict
+  percentage；首版不建立 occupancy/residency 模型。
 - 生成受控 YAML job，使用 CSV 作为规范化输入，同时保留 rocpd 作为审计引用。
 - 记录 profiler、counter definition、配置文件和可执行文件 SHA256。
 - 将多 pass 结果按 workload、candidate hash、kernel、grid/workgroup 和 iteration ordinal 对齐；任何不一致使相关 dispatch 失效。
@@ -106,7 +111,7 @@ L = T_frontier / T_SOL  # 仅可信 frontier 可用时
 ```
 
 - `C` 高：输出 fusion、padding、额外流量、spill、barrier、未生成 WMMA 等 implementation/codegen 原因。
-- `R` 高：输出 cache、访问效率、occupancy、LDS、调度或模型缺项原因。
+- `R` 高：输出 cache、访问效率、LDS、调度或模型缺项原因。
 - `L` 无 frontier：状态为 unavailable，不得用 scoring baseline 替代。
 - 任一比值显著小于 1：优先输出 identity/model contradiction，不产生“超越模型”的优化建议。
 - 阈值必须结合 prediction interval 和 canonical timing noise；差异未超过联合不确定度时输出 inconclusive。
@@ -121,6 +126,7 @@ sol-execbench diagnostics performance \
   --solar-manifest SOLAR_REQUEST/manifest.yaml \
   [--frontier-trace TRACE.jsonl] \
   [--calibration-profile CALIBRATION.json] \
+  [--inference-profile INFERENCE.json] \
   --output TRACE.performance-diagnostic.json
 ```
 
@@ -138,8 +144,10 @@ sol-execbench diagnostics agent-feedback \
   --output FEEDBACK.json
 ```
 
-使 Agent Feedback 只读取通过 freshness、governance 和 held-out acceptance
-的 performance diagnostic，并输出稳定行动码：
+开发集和 held-out 集各至少包含四类 workload 每类 20 个 case（各至少 80
+个），两者按 workload/candidate pair 严格不相交。开发集冻结按 family 的
+95% split-conformal 区间和动作阈值；held-out 验收后 Agent Feedback 才可
+输出以下代码修改行动码：
 
 - `stop_launch_bound_search`
 - `reduce_dispatch_count`
@@ -164,8 +172,9 @@ sol-execbench diagnostics agent-feedback \
 - `L` 在无 frontier 时 unavailable；scoring baseline 不得被自动采用。
 - static/runtime 冲突时 runtime evidence 优先，但保留冲突和限制。
 - Agent Feedback 只消费 current、usable、足够置信的诊断。
-- 现有 `T_SOL`、Trace JSONL 和 scoring 保持兼容；performance diagnostic
-  与 calibration 直接升级 v2，不提供 v1 compatibility loader。
+- 现有 `T_SOL`、Trace JSONL 和 scoring 保持兼容；performance diagnostic、
+  calibration 及其证据契约只接受各自的 current schema，不提供旧版本
+  compatibility loader。
 
 ### gfx1200硬件验收
 
@@ -178,12 +187,13 @@ sol-execbench diagnostics agent-feedback \
 | 两种 RMSNorm | reduction 宽度、LDS/barrier 差异 |
 | Irregular Matmul | WMMA 路径、padding 和边缘 tile 差异 |
 
-在冻结、与 calibration 完全独立的 held-out 样本上，每个 workload family
-至少 10 个 case（总计至少 40 个），并要求：
+在冻结、与 calibration 和开发集完全独立的 held-out 样本上，每个 workload
+family 至少 20 个 case（总计至少 80 个），并要求：
 
 - `T_pred(HW)` median absolute percentage error ≤ 15%；
 - P90 absolute percentage error ≤ 30%；
-- 四类 workload 的首要归因与预期一致；
+- 每个 family 的区间 empirical coverage ≥ 90%；
+- 每个启用的代码行动 precision ≥ 90%、recall ≥ 70%，允许 abstain；
 - tuning 样本不得计入验收统计；
 - profiler 或 GPU 资源在 sandbox 中不可见时，按仓库规则申请精确 host 命令重试，不得误判为硬件不支持。
 

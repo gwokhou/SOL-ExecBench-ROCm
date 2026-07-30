@@ -18,6 +18,9 @@ from sol_execbench.core.bench.timing_policy import (
     TimingPolicy,
 )
 from sol_execbench.core.evidence import CANONICAL_BENCHMARK_OUTPUT
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeGPUTelemetry,
+)
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.text_utils import text_tail
 
@@ -162,6 +165,7 @@ class Rocprofv3ProfileResult:
     profiler_data_artifacts: bool = False
     output_directory_listing: tuple[str, ...] = ()
     provenance: dict[str, str] = field(default_factory=dict)
+    environment_snapshots: tuple[RuntimeGPUTelemetry, ...] = ()
     schema_version: str = field(
         init=False,
         default=ROCPROFV3_PROFILE_SCHEMA_VERSION,

@@ -11,17 +11,20 @@ from typing import Annotated, Literal
 from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
-    DiagnosticSidecarAuthority,
+    CurrentDiagnosticSidecarAuthority,
     DiagnosticSidecarStatus,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    CurrentSchemaModel,
+)
 from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
     DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION,
     PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION,
 )
 
-PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v2"
+PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v3"
 
 _MODEL_CONFIG = ConfigDict(
     extra="forbid",
@@ -42,7 +45,7 @@ class WorkloadKind(StrEnum):
 
 
 class TensorDType(StrEnum):
-    """Tensor dtypes admitted by the gfx1200 v2 model."""
+    """Tensor dtypes admitted by the gfx1200 v3 model."""
 
     FLOAT16 = "float16"
     BFLOAT16 = "bfloat16"
@@ -58,7 +61,7 @@ class ElementwiseOperationClass(StrEnum):
 
 
 class ReductionOperation(StrEnum):
-    """Reduction forms admitted by the v2 model."""
+    """Reduction forms admitted by the v3 model."""
 
     SUM = "sum"
     MEAN = "mean"
@@ -66,7 +69,7 @@ class ReductionOperation(StrEnum):
 
 
 class CalibrationParameterName(StrEnum):
-    """Closed parameter vocabulary for the gfx1200 v2 model."""
+    """Closed parameter vocabulary for the gfx1200 v3 model."""
 
     DISPATCH_FLOOR_MS = "dispatch_floor_ms"
     VALU_SIMPLE_FP32_PER_MS = "valu_simple_fp32_per_ms"
@@ -139,6 +142,17 @@ class EvidenceReference(BaseModelWithDocstrings):
     kind: str
     path: str | None = None
     sha256: SHA256Digest
+
+
+class DiagnosticModelIdentity(BaseModelWithDocstrings):
+    """Hashes only code and resources that can change model output."""
+
+    model_config = _MODEL_CONFIG
+
+    model_version: str = Field(min_length=1)
+    policy_files: dict[str, SHA256Digest] = Field(min_length=1)
+    counter_semantics_sha256: SHA256Digest
+    policy_bundle_sha256: SHA256Digest
 
 
 class FusionRegion(BaseModelWithDocstrings):
@@ -374,15 +388,16 @@ class CalibrationParameter(BaseModelWithDocstrings):
         return self
 
 
-class DiagnosticCalibrationProfile(BaseModelWithDocstrings):
+class DiagnosticCalibrationProfile(CurrentSchemaModel):
     """Content-addressed gfx1200 diagnostic calibration."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_calibration.v2"] = (
+    schema_version: Literal["sol_execbench.diagnostic_calibration.v3"] = (
         DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v2"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
     identity: CalibrationIdentity
     parameters: list[CalibrationParameter] = Field(min_length=1)
     tuning_evidence_sha256: list[SHA256Digest] = Field(min_length=1)
@@ -561,7 +576,7 @@ class PerformancePrediction(BaseModelWithDocstrings):
     lower_ms: float | None = Field(default=None, ge=0.0)
     upper_ms: float | None = Field(default=None, ge=0.0)
     components: list[PredictionComponent] = Field(default_factory=list)
-    model_version: Literal["gfx1200_diagnostic.v2"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
     reason_codes: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
 
@@ -666,16 +681,19 @@ class WorkloadPerformanceDiagnostic(BaseModelWithDocstrings):
         return self
 
 
-class PerformanceDiagnosticSidecar(DiagnosticSidecarAuthority):
+class PerformanceDiagnosticSidecar(CurrentDiagnosticSidecarAuthority):
     """Diagnostic-only microarchitecture sidecar."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.performance_diagnostic.v2"] = (
+    schema_version: Literal["sol_execbench.performance_diagnostic.v3"] = (
         PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION
     )
     status: DiagnosticSidecarStatus
-    model_version: Literal["gfx1200_diagnostic.v2"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
+    model_identity: DiagnosticModelIdentity
+    inference_profile_sha256: SHA256Digest | None = None
     run_id: str
     candidate_sha256: SHA256Digest
     gpu_architecture: str
@@ -695,12 +713,12 @@ class PerformanceDiagnosticSidecar(DiagnosticSidecarAuthority):
         workload_ids = [workload.workload_uuid for workload in self.workloads]
         if len(workload_ids) != len(set(workload_ids)):
             raise ValueError("performance diagnostic repeats workload UUID")
-        if (
+        if self.model_identity.model_version != self.model_version or (
             self.calibration_identity is not None
             and self.calibration_identity.gpu_architecture
             != self.gpu_architecture
         ):
-            raise ValueError("performance diagnostic calibration GPU mismatch")
+            raise ValueError("performance diagnostic authority mismatch")
         for workload in self.workloads:
             if any(
                 compiled.candidate_sha256 != self.candidate_sha256
@@ -727,6 +745,7 @@ __all__ = [
     "CompiledCharacterization",
     "DiagnosticCalibrationProfile",
     "DiagnosticConfidence",
+    "DiagnosticModelIdentity",
     "DiagnosticRatio",
     "DispatchEvidence",
     "ElementwiseDescriptor",

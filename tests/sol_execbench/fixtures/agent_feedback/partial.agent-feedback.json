@@ -47,7 +47,7 @@
     "rocprofv3 profile status is unavailable."
   ],
   "reason_code": "partial_diagnostics",
-  "schema_version": "sol_execbench.agent_feedback.v3",
+  "schema_version": "sol_execbench.agent_feedback.v4",
   "source_refs": [
     {
       "kind": "trace",

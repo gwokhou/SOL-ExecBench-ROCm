@@ -10,15 +10,16 @@ from sol_execbench.core.bench.performance_model.acceptance import (
 )
 from sol_execbench.core.bench.performance_model.models import (
     CalibrationIdentity,
+    DiagnosticModelIdentity,
     WorkloadKind,
 )
 from sol_execbench.core.integrity import stable_json_checksum
 
-_ATTRIBUTIONS = {
-    WorkloadKind.ELEMENTWISE: "launch_bound",
-    WorkloadKind.TRANSPOSE: "memory_access_efficiency",
-    WorkloadKind.REDUCTION: "lds_barrier_pressure",
-    WorkloadKind.MATMUL: "matrix_path_missing",
+_ACTIONS = {
+    WorkloadKind.ELEMENTWISE: "stop_launch_bound_search",
+    WorkloadKind.TRANSPOSE: "improve_coalescing",
+    WorkloadKind.REDUCTION: "reduce_lds_barriers",
+    WorkloadKind.MATMUL: "restore_wmma_path",
 }
 
 
@@ -34,67 +35,83 @@ def _identity() -> CalibrationIdentity:
     )
 
 
+def _model_identity() -> DiagnosticModelIdentity:
+    return DiagnosticModelIdentity(
+        model_version="gfx1200_diagnostic.v3",
+        policy_files={"policy.py": "d" * 64},
+        counter_semantics_sha256="e" * 64,
+        policy_bundle_sha256="f" * 64,
+    )
+
+
 def _case(kind: WorkloadKind, index: int) -> DiagnosticAcceptanceCase:
     identity = f"{kind}:{index}"
+    action = _ACTIONS[kind]
     return DiagnosticAcceptanceCase(
-        workload_uuid=identity,
+        case_id=identity,
+        pair_id=stable_json_checksum([identity, "pair"]),
         workload_kind=kind,
-        candidate_sha256=stable_json_checksum([identity, "candidate"]),
         evidence_manifest_sha256=stable_json_checksum([identity, "evidence"]),
         performance_diagnostic_sha256=stable_json_checksum(
             [identity, "diagnostic"]
         ),
         predicted_ms=1.05,
+        lower_ms=0.9,
+        upper_ms=1.1,
         measured_ms=1.0,
-        primary_attribution_code=_ATTRIBUTIONS[kind],
+        predicted_action_codes=[action],
+        gold_action_codes=[action],
     )
 
 
 def _manifest() -> DiagnosticAcceptanceManifest:
     return DiagnosticAcceptanceManifest(
+        model_identity=_model_identity(),
         calibration_profile_sha256="a" * 64,
         calibration_identity=_identity(),
-        frozen_configuration_sha256="b" * 64,
-        tuning_evidence_sha256=["c" * 64],
-        cases=[
-            _case(kind, index) for kind in _ATTRIBUTIONS for index in range(10)
-        ],
+        inference_profile_sha256="b" * 64,
+        development_corpus_sha256="c" * 64,
+        held_out_corpus_sha256="d" * 64,
+        enabled_action_codes=sorted(_ACTIONS.values()),
+        cases=[_case(kind, index) for kind in _ACTIONS for index in range(20)],
     )
 
 
-def test_frozen_acceptance_requires_ten_cases_per_family() -> None:
+def test_frozen_acceptance_requires_twenty_cases_per_family() -> None:
     result = evaluate_diagnostic_acceptance(_manifest())
 
     assert result.accepted is True
-    assert result.case_count == 40
-    assert set(result.family_case_counts.values()) == {10}
+    assert result.case_count == 80
+    assert set(result.family_case_counts.values()) == {20}
+    assert set(result.family_empirical_coverage.values()) == {1.0}
     assert result.median_absolute_percentage_error <= 15.0
     assert result.p90_absolute_percentage_error <= 30.0
 
 
-def test_tuning_samples_are_rejected_by_contract() -> None:
+def test_supplied_prediction_field_is_rejected_by_corpus_contract() -> None:
     with pytest.raises(ValidationError):
-        _case(WorkloadKind.ELEMENTWISE, 0).model_copy(
-            update={"tuning_sample": True}
-        ).model_validate(
+        DiagnosticAcceptanceCase.model_validate(
             {
                 **_case(
                     WorkloadKind.ELEMENTWISE,
                     0,
                 ).model_dump(mode="json"),
-                "tuning_sample": True,
+                "primary_attribution_code": "supplied",
             }
         )
 
 
-def test_wrong_attribution_fails_acceptance() -> None:
+def test_wrong_action_fails_acceptance() -> None:
     manifest = _manifest()
     cases = list(manifest.cases)
-    cases[0] = cases[0].model_copy(update={"primary_attribution_code": "wrong"})
+    for index in range(7):
+        cases[index] = cases[index].model_copy(
+            update={"gold_action_codes": ["wrong"]}
+        )
 
     result = evaluate_diagnostic_acceptance(
         manifest.model_copy(update={"cases": cases})
     )
 
     assert result.accepted is False
-    assert "primary_attribution_mismatch" in result.reason_codes
+    assert "held_out_action_quality_gate_failed" in result.reason_codes

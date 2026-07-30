@@ -69,6 +69,7 @@ class WrittenSidecars:
     agent_feedback: Path | None
     performance_timing: Path | None
     performance_evidence: Path | None
+    performance_replay: Path | None
 
 
 def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
@@ -106,6 +107,18 @@ def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
             solution=request.solution,
         )
     )
+    performance_replay_sidecar_path = (
+        cli_performance_sidecars.write_performance_replay_sidecar(
+            output_file=request.output_file,
+            staging_dir=request.staging_dir,
+            traces=request.traces,
+            solution=request.solution,
+            timing_path=performance_timing_sidecar_path,
+            profile_result=request.profile_result,
+            static_evidence=request.static_evidence_result,
+            compile_result=request.compile_result,
+        )
+    )
     performance_evidence_manifest_path = (
         cli_performance_sidecars.write_performance_evidence_manifest(
             output_file=request.output_file,
@@ -117,6 +130,7 @@ def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
             profile_result=request.profile_result,
             static_evidence=request.static_evidence_result,
             compile_result=request.compile_result,
+            replay_path=performance_replay_sidecar_path,
         )
     )
     decision_sidecar_path, agent_feedback_sidecar_path = (
@@ -136,6 +150,7 @@ def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
         agent_feedback=agent_feedback_sidecar_path,
         performance_timing=performance_timing_sidecar_path,
         performance_evidence=performance_evidence_manifest_path,
+        performance_replay=performance_replay_sidecar_path,
     )
 
 

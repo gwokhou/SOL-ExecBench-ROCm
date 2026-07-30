@@ -12,10 +12,12 @@ from typing import Literal
 from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
-    DiagnosticSidecarAuthority,
+    CurrentDiagnosticSidecarAuthority,
     DiagnosticSidecarStatus,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.base_model import (
+    StrictArtifactModel,
+)
 from sol_execbench.core.data.json_utils import load_json_file
 from sol_execbench.core.integrity import (
     SHA256Digest,
@@ -41,9 +43,10 @@ class PerformanceEvidenceArtifactKind(StrEnum):
     COUNTER_CSV = "counter_csv"
     ROCPD = "rocpd"
     ENVIRONMENT = "environment"
+    REPLAY_EVIDENCE = "replay_evidence"
 
 
-class PerformanceEvidenceArtifact(BaseModelWithDocstrings):
+class PerformanceEvidenceArtifact(StrictArtifactModel):
     """One manifest-relative content-addressed artifact."""
 
     model_config = _MODEL_CONFIG
@@ -54,7 +57,7 @@ class PerformanceEvidenceArtifact(BaseModelWithDocstrings):
     size_bytes: int = Field(ge=0)
 
 
-class PerformanceRunIdentity(BaseModelWithDocstrings):
+class PerformanceRunIdentity(StrictArtifactModel):
     """Identity shared by every artifact in one diagnostic replay."""
 
     model_config = _MODEL_CONFIG
@@ -76,13 +79,14 @@ class PerformanceRunIdentity(BaseModelWithDocstrings):
     timing_protocol: str
 
 
-class PerformanceEvidenceManifest(DiagnosticSidecarAuthority):
+class PerformanceEvidenceManifest(CurrentDiagnosticSidecarAuthority):
     """Root manifest binding one workload to all diagnostic evidence."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION
 
     schema_version: Literal[
-        "sol_execbench.performance_evidence_manifest.v1"
+        "sol_execbench.performance_evidence_manifest.v2"
     ] = PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION
     status: DiagnosticSidecarStatus
     identity: PerformanceRunIdentity
@@ -187,6 +191,12 @@ def load_and_verify_performance_evidence_manifest(
         PerformanceEvidenceArtifactKind.PROFILE_SUMMARY,
         PerformanceEvidenceArtifactKind.STATIC_EVIDENCE,
     }
+    if require_complete:
+        required |= {
+            PerformanceEvidenceArtifactKind.COUNTER_PROVENANCE,
+            PerformanceEvidenceArtifactKind.COUNTER_CSV,
+            PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE,
+        }
     observed = {artifact.kind for artifact in manifest.artifacts}
     missing = sorted(kind for kind in required - observed)
     if missing:

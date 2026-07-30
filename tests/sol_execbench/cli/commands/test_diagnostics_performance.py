@@ -228,6 +228,7 @@ def _timing(path: Path, trace_path: Path, trace: Trace) -> str:
         workloads=[
             WorkloadTimingEvidence(
                 workload_uuid=trace.workload.uuid,
+                input_sha256="a" * 64,
                 latency_ms=0.25,
                 lower_ms=0.24,
                 upper_ms=0.26,
@@ -257,7 +258,7 @@ def _evidence_manifest(
     atomic_write_json_value(
         provenance,
         {
-            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v2",
+            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v3",
             "diagnostic_only": True,
             "score_authority": False,
             "replay_phase": "evidence",

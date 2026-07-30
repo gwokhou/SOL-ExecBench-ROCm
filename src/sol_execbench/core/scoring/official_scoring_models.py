@@ -1,0 +1,111 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+
+"""Strict wire models for official-score availability reporting."""
+
+from __future__ import annotations
+
+from typing import Literal, TypedDict
+
+from pydantic import ConfigDict, Field
+
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaModel,
+    StrictArtifactModel,
+)
+from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+
+
+class _AvailabilityModel(StrictArtifactModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class OfficialVerifierAvailability(_AvailabilityModel):
+    available: Literal[True]
+    accepts_content_addressed_release_bundle: Literal[True]
+    accepts_caller_authored_inputs: Literal[False]
+    requires_signatures: bool
+    publisher_authentication: Literal["distribution_channel"]
+
+
+class OfficialPolicyAvailability(_AvailabilityModel):
+    authorized: bool
+    reason_code: str
+    manifest_status: str
+    release_policy: str | None
+    baseline_id: str | None
+    required_evidence: list[str]
+
+
+class OfficialProducerAvailability(_AvailabilityModel):
+    ready: bool
+    reason_code: str
+
+
+class PublishedReleaseAvailability(_AvailabilityModel):
+    available: bool
+    reason_code: str
+    path: str | None
+
+
+class OfficialScoreAvailability(CurrentSchemaModel):
+    """Current machine-readable official-score availability report."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    current_schema_version = SCHEMA_VERSIONS["official_score_availability"]
+
+    schema_version: Literal["sol_execbench.official_score_availability.v3"] = (
+        "sol_execbench.official_score_availability.v3"
+    )
+    corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    trusted_corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    verifier: OfficialVerifierAvailability
+    policy: OfficialPolicyAvailability
+    producer: OfficialProducerAvailability
+    published_release: PublishedReleaseAvailability
+
+
+class _VerifierReport(TypedDict):
+    available: bool
+    accepts_content_addressed_release_bundle: bool
+    accepts_caller_authored_inputs: bool
+    requires_signatures: bool
+    publisher_authentication: str
+
+
+class _PolicyReport(TypedDict):
+    authorized: bool
+    reason_code: str
+    manifest_status: str
+    release_policy: str | None
+    baseline_id: str | None
+    required_evidence: list[str]
+
+
+class _ProducerReport(TypedDict):
+    ready: bool
+    reason_code: str
+
+
+class _PublishedReleaseReport(TypedDict):
+    available: bool
+    reason_code: str
+    path: str | None
+
+
+class OfficialScoreAvailabilityReport(TypedDict):
+    """JSON-compatible projection returned by the availability API."""
+
+    schema_version: str
+    corpus_manifest_sha256: str
+    trusted_corpus_manifest_sha256: str
+    verifier: _VerifierReport
+    policy: _PolicyReport
+    producer: _ProducerReport
+    published_release: _PublishedReleaseReport
+
+
+__all__ = [
+    "OfficialScoreAvailability",
+    "OfficialScoreAvailabilityReport",
+]

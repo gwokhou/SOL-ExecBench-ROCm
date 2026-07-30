@@ -29,7 +29,7 @@ boundary test also scans `tests/sol_execbench/` so test code reaches `solar`
 only through the bridge, with one documented exception: the bridge's own
 contract tests under `tests/sol_execbench/core/solar_bridge/` may reference
 public `solar.api` types (`AnalysisResult`, `AnalysisFailure`, `ArtifactRef`,
-`SolBound`) to verify the outcome-mapping logic.
+`SOLBound`) to verify the outcome-mapping logic.
 
 Formal conversion is offline and fail-closed. Graph extraction is a declared
 `ExtractionKind`: `torchview_v1` uses the reviewed Torchview extractor and

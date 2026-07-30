@@ -349,7 +349,7 @@ def test_measure_and_emit_classifies_timing_errors(
         emitter,
         request.workloads[0],
         {},
-        ReferenceTimingCase([tensor], [tensor], 2.0),
+        ReferenceTimingCase([tensor], [tensor], 2.0, "a" * 64),
         Correctness(),
     )
 
@@ -390,7 +390,13 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
         emitter,
         request.workloads[0],
         {},
-        ReferenceTimingCase([tensor], [tensor], 2.0, "reference diagnostic"),
+        ReferenceTimingCase(
+            [tensor],
+            [tensor],
+            2.0,
+            "a" * 64,
+            "reference diagnostic",
+        ),
         Correctness(),
     )
 

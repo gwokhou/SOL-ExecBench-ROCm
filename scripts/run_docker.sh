@@ -566,10 +566,12 @@ DOCKER_COMMON_ARGS=(
     --ipc=host
     --ulimit memlock=-1
     --ulimit stack=67108864
+    --workdir "${CONTAINER_PROJECT}"
     -v "${REPO_ROOT}:${CONTAINER_PROJECT}:ro"
     -v "${OUTPUT_DIR}:/outputs:rw"
     -v "${GPU_LOCK_DIR}:/run/lock/sol-execbench"
     -e "SOL_EXECBENCH_GPU_LOCK_DIR=/run/lock/sol-execbench"
+    -e "ROCPROF_TMPDIR=/tmp"
     -e "SOLAR_OROJENESIS_HOME=${SOLAR_OROJENESIS_HOME:-}"
     -e "SOL_EXECBENCH_GPU_CLK_MHZ=${SOL_EXECBENCH_GPU_CLK_MHZ:-}"
     -e "SOL_EXECBENCH_DRAM_CLK_MHZ=${SOL_EXECBENCH_DRAM_CLK_MHZ:-}"

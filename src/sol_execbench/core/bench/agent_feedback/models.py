@@ -6,12 +6,13 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
+    CurrentDiagnosticSidecarEnvelope,
     DiagnosticArtifactCitation,
-    DiagnosticSidecarEnvelope,
     DiagnosticSidecarStatus,
     DiagnosticSourceRef,
     ExtendedDiagnosticIdentity,
@@ -95,12 +96,21 @@ class AgentFeedbackSummary(BaseModelWithDocstrings):
     """Optional static evidence sidecar status."""
     performance_diagnostic_status: DiagnosticSidecarStatus | None = None
     """Optional governed performance diagnostic status."""
+    performance_acceptance_status: Literal[
+        "omitted",
+        "failed",
+        "accepted",
+    ] = "omitted"
+    """Whether held-out acceptance admitted code-changing actions."""
+    enabled_performance_actions: list[str] = Field(default_factory=list)
+    """Accepted action codes that may reach an Agent."""
 
 
-class AgentFeedbackSidecar(DiagnosticSidecarEnvelope):
+class AgentFeedbackSidecar(CurrentDiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for agent next-experiment guidance."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = AGENT_FEEDBACK_SCHEMA_VERSION
 
     schema_version: AgentFeedbackSchemaVersion = AGENT_FEEDBACK_SCHEMA_VERSION
     status: DiagnosticSidecarStatus
