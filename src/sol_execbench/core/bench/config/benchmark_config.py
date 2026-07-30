@@ -1,26 +1,20 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
-"""Configuration for benchmark execution."""
+"""Versioned configuration for benchmark execution."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from typing import Literal
 
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from pydantic import Field, model_validator
+
+from sol_execbench.core.data.base_model import CurrentSchemaModel
+from sol_execbench.core.integrity.schema_versions import (
+    BENCHMARK_CONFIG_SCHEMA_VERSION,
+    SCHEMA_VERSIONS,
+)
 
 OFFICIAL_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS[
     "rocm_event_timing_paper_counts"
@@ -28,23 +22,25 @@ OFFICIAL_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS[
 CUSTOM_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS["rocm_event_timing_custom"]
 
 
-@dataclass
-class BenchmarkConfig:
-    """Configuration for benchmark runs.
+class BenchmarkConfig(CurrentSchemaModel):
+    """Configuration for benchmark runs."""
 
-    All fields have default values to make configuration optional.
-    """
+    current_schema_version = BENCHMARK_CONFIG_SCHEMA_VERSION
 
-    warmup_runs: int = field(default=10)
-    iterations: int = field(default=50)
-    trials: int = field(default=3)
-    min_measurement_time_seconds: float | None = field(default=None)
-    lock_clocks: bool = field(default=True)
-    benchmark_reference: bool = field(default=True)
-    seed: int = field(default=200)
+    schema_version: Literal["sol_execbench.benchmark_config.v1"] = (
+        BENCHMARK_CONFIG_SCHEMA_VERSION
+    )
+    warmup_runs: int = Field(default=10, ge=0)
+    iterations: int = Field(default=50, gt=0)
+    trials: int = Field(default=3, gt=0)
+    min_measurement_time_seconds: float | None = Field(default=None, gt=0)
+    lock_clocks: bool = True
+    benchmark_reference: bool = True
+    seed: int = 200
 
-    def __post_init__(self) -> None:
-        """Validate benchmark iteration and timing settings."""
+    @model_validator(mode="after")
+    def _timing_settings_are_valid(self) -> BenchmarkConfig:
+        """Keep explicit validation messages stable for CLI callers."""
         if self.warmup_runs < 0:
             raise ValueError("warmup_runs must be >= 0")
         if self.iterations <= 0:
@@ -56,6 +52,7 @@ class BenchmarkConfig:
             and self.min_measurement_time_seconds <= 0
         ):
             raise ValueError("min_measurement_time_seconds must be > 0 or None")
+        return self
 
     @property
     def timing_protocol(self) -> str:

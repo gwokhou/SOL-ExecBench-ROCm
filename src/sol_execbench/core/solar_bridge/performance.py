@@ -10,8 +10,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
 
-import yaml
-
 from sol_execbench.core.bench.performance_model.models import (
     ElementwiseDescriptor,
     ElementwiseOperationClass,
@@ -29,6 +27,9 @@ from sol_execbench.core.bench.performance_model.models import (
 from sol_execbench.core.integrity import (
     sha256_file,
     validate_relative_artifact_path,
+)
+from sol_execbench.core.solar_bridge.models import (
+    SolarRequestManifest,
 )
 from solar.artifacts import load_yaml_artifact
 from solar.schema_versions import (
@@ -60,13 +61,12 @@ def load_manifest_semantic_characterization(
 ) -> SemanticCharacterization:
     """Verify a SOLAR manifest and load its cited analysis."""
     path = Path(manifest_path)
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    manifest = _mapping(raw, "manifest")
-    if manifest.get("schema_version") != SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION:
-        raise ValueError("unsupported_solar_manifest_schema")
-    if manifest.get("analysis_id") != f"{definition}:{workload_uuid}":
+    manifest = SolarRequestManifest.from_yaml(
+        path.read_text(encoding="utf-8"),
+    )
+    if manifest.analysis_id != f"{definition}:{workload_uuid}":
         raise ValueError("solar_manifest_workload_identity_mismatch")
-    if manifest.get("sol_score_eligible") is not True:
+    if manifest.sol_score_eligible is not True:
         raise ValueError("solar_manifest_bound_not_eligible")
     analysis_path, digest = _manifest_analysis(path.parent, manifest)
     return load_semantic_characterization(
@@ -78,22 +78,18 @@ def load_manifest_semantic_characterization(
 
 def _manifest_analysis(
     root: Path,
-    manifest: Mapping[str, object],
+    manifest: SolarRequestManifest,
 ) -> tuple[Path, str]:
-    artifacts = manifest.get("artifacts")
-    if not isinstance(artifacts, list):
-        raise ValueError("solar_manifest_artifacts_invalid")
     matches = [
         item
-        for item in artifacts
-        if isinstance(item, Mapping)
-        and item.get("path") == "solar-analysis.yaml"
+        for item in manifest.artifacts
+        if item.path == "solar-analysis.yaml"
     ]
     if len(matches) != 1:
         raise ValueError("solar_manifest_analysis_reference_missing")
     record = matches[0]
-    relative = validate_relative_artifact_path(record.get("path"))
-    digest = str(record.get("sha256"))
+    relative = validate_relative_artifact_path(record.path)
+    digest = record.sha256
     analysis_path = root.resolve() / relative
     if (
         analysis_path.is_symlink()

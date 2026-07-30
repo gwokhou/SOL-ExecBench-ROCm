@@ -11,9 +11,14 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.integrity.schema_versions import (
+    SOLAR_WORKER_IPC_SCHEMA_VERSION,
+)
 from solar.contracts import (
     SolarAnalysisStatus,
     SolarReadinessStatus,
+    SolarRequestArtifact,
+    SolarRequestManifest,
     SolarStage,
     SolarStageStatus,
 )
@@ -25,6 +30,11 @@ from solar.ir.contracts import (
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
+
+
+def _require_worker_schema(value: Mapping[str, Any]) -> None:
+    if value.get("schema_version") != SOLAR_WORKER_IPC_SCHEMA_VERSION:
+        raise ValueError("SOLAR worker IPC schema mismatch")
 
 
 def formal_artifact_paths(ir_path: IRPath) -> frozenset[str]:
@@ -63,15 +73,19 @@ class SolarWorkerRequest:
     device: str
     orojenesis_home: str | None
     ir_path: IRPath = DEFAULT_IR_PATH
+    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         """Reject requests that bypassed process-boundary normalization."""
+        if self.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
+            raise ValueError("SOLAR worker IPC schema mismatch")
         if not isinstance(self.ir_path, IRPath):
             raise TypeError("ir_path must be an IRPath")
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarWorkerRequest:
         """Build a request from its process-boundary mapping."""
+        _require_worker_schema(value)
         return cls(
             problem_dir=str(value["problem_dir"]),
             workload_uuid=str(value["workload_uuid"]),
@@ -83,6 +97,7 @@ class SolarWorkerRequest:
                 else None
             ),
             ir_path=normalize_ir_path(value.get("ir_path", DEFAULT_IR_PATH)),
+            schema_version=str(value["schema_version"]),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -99,21 +114,26 @@ class SolarStageAuditRequest:
     output_dir: str
     device: str
     ir_path: IRPath = DEFAULT_IR_PATH
+    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         """Reject requests that bypassed process-boundary normalization."""
+        if self.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
+            raise ValueError("SOLAR worker IPC schema mismatch")
         if not isinstance(self.ir_path, IRPath):
             raise TypeError("ir_path must be an IRPath")
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarStageAuditRequest:
         """Build a stage-audit request from a mapping."""
+        _require_worker_schema(value)
         return cls(
             problem_dir=str(value["problem_dir"]),
             workload_uuid=str(value["workload_uuid"]),
             output_dir=str(value["output_dir"]),
             device=str(value["device"]),
             ir_path=normalize_ir_path(value.get("ir_path", DEFAULT_IR_PATH)),
+            schema_version=str(value["schema_version"]),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -138,9 +158,12 @@ class SolarAnalysisOutcome:
     reason_code: str | None = None
     message: str | None = None
     publication_eligible: bool = False
+    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         """Normalize worker payload values and reject unknown states."""
+        if self.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
+            raise ValueError("SOLAR worker IPC schema mismatch")
         object.__setattr__(self, "status", SolarAnalysisStatus(self.status))
         object.__setattr__(self, "ir_path", normalize_ir_path(self.ir_path))
         if self.stage is not None:
@@ -149,6 +172,7 @@ class SolarAnalysisOutcome:
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarAnalysisOutcome:
         """Build an analysis outcome from a worker response mapping."""
+        _require_worker_schema(value)
         data = dict(value)
         data["artifacts"] = tuple(
             dict(item) for item in data.get("artifacts") or []
@@ -213,9 +237,12 @@ class SolarStageAuditOutcome:
     failure_stage: SolarStage | None = None
     reason_code: str | None = None
     message: str | None = None
+    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         """Normalize worker payload values and reject unknown states."""
+        if self.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
+            raise ValueError("SOLAR worker IPC schema mismatch")
         object.__setattr__(self, "status", SolarReadinessStatus(self.status))
         object.__setattr__(self, "ir_path", normalize_ir_path(self.ir_path))
         if self.failure_stage is not None:
@@ -228,6 +255,7 @@ class SolarStageAuditOutcome:
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarStageAuditOutcome:
         """Build a stage-audit outcome from a worker response mapping."""
+        _require_worker_schema(value)
         data = dict(value)
         data["stages"] = tuple(dict(item) for item in data.get("stages") or [])
         data["artifacts"] = tuple(
@@ -309,6 +337,8 @@ __all__ = [
     "SolarAnalysisOutcome",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",
+    "SolarRequestArtifact",
+    "SolarRequestManifest",
     "SolarStage",
     "SolarStageAuditOutcome",
     "SolarStageAuditRequest",

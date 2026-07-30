@@ -26,9 +26,11 @@ from pydantic import Field, field_validator, model_validator
 
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
+    CurrentSchemaModel,
     NonEmptyString,
     NonNegativeInt,
 )
+from sol_execbench.core.integrity.schema_versions import WORKLOAD_SCHEMA_VERSION
 
 
 class RandomInput(BaseModelWithDocstrings):
@@ -286,7 +288,7 @@ def conservative_numeric_tolerance(
     )
 
 
-class Workload(BaseModelWithDocstrings):
+class Workload(CurrentSchemaModel):
     """Concrete workload configuration for benchmarking.
 
     Defines a specific instance of a computational workload with concrete
@@ -294,6 +296,11 @@ class Workload(BaseModelWithDocstrings):
     This represents an executable configuration that can be benchmarked.
     """
 
+    current_schema_version = WORKLOAD_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.workload.v1"] = (
+        WORKLOAD_SCHEMA_VERSION
+    )
     axes: dict[str, NonNegativeInt]
     """Dictionary mapping axis names to their concrete integer values. All values must be
     positive."""

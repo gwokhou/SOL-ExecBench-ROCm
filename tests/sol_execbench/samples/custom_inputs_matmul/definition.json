@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "custom_matmul",
   "op_type": "matmul",
   "axes": {

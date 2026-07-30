@@ -28,6 +28,9 @@ from sol_execbench.core.bench.performance_model.calibration import (
     freeze_probe_configuration,
     parse_probe_metrics,
 )
+from sol_execbench.core.bench.performance_model.calibration_audit import (
+    DiagnosticCalibrationAudit,
+)
 from sol_execbench.core.bench.performance_model.models import (
     CalibrationIdentity,
     DiagnosticCalibrationProfile,
@@ -255,20 +258,22 @@ def _run_calibration_workspace(
                 process_batches=estimation_batches,
             )
         isa = _isa_evidence(binary, device.gfx_target, workspace)
-        audit = _audit_payload(
-            binary=binary,
-            hipcc=hipcc,
-            device=device,
-            tuning=tuning,
-            frozen=frozen,
-            estimation=estimation,
-            isa=isa,
-            gpu_id=observed_gpu_id,
-            gpu_bdf=gpu_bdf,
-            compiler_version=compiler_version,
+        audit = DiagnosticCalibrationAudit.model_validate(
+            _audit_payload(
+                binary=binary,
+                hipcc=hipcc,
+                device=device,
+                tuning=tuning,
+                frozen=frozen,
+                estimation=estimation,
+                isa=isa,
+                gpu_id=observed_gpu_id,
+                gpu_bdf=gpu_bdf,
+                compiler_version=compiler_version,
+            ),
         )
         audit_path = output.with_name(f"{output.stem}.audit.json")
-        atomic_write_json_value(audit_path, audit)
+        atomic_write_json_value(audit_path, audit.model_dump(mode="json"))
         profile = DiagnosticCalibrationProfile(
             identity=CalibrationIdentity(
                 gpu_architecture="gfx1200",
@@ -281,14 +286,26 @@ def _run_calibration_workspace(
             ),
             parameters=build_calibration_parameters(estimation, frozen),
             tuning_evidence_sha256=[
-                stable_json_checksum(audit["tuning_evidence"])
+                stable_json_checksum(
+                    [
+                        item.model_dump(mode="json")
+                        for item in audit.tuning_evidence
+                    ],
+                )
             ],
             parameter_estimation_evidence_sha256=[
-                stable_json_checksum(audit["parameter_estimation_evidence"]),
+                stable_json_checksum(
+                    [
+                        item.model_dump(mode="json")
+                        for item in audit.parameter_estimation_evidence
+                    ],
+                ),
                 sha256_file(audit_path),
             ],
             probe_evidence_sha256=[
-                stable_json_checksum(audit["probe_identity"])
+                stable_json_checksum(
+                    audit.probe_identity.model_dump(mode="json"),
+                )
             ],
             configuration_frozen_before_estimation=True,
             bootstrap_seed=BOOTSTRAP_SEED,

@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n42_maxpool2d",
   "op_type": "elementwise",
   "description": "2x2 stride-2 max pooling. Derived from AKA torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D module_fn.",

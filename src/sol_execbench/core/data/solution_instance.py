@@ -18,7 +18,7 @@
 
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import (
     ConfigDict,
@@ -28,13 +28,14 @@ from pydantic import (
 )
 
 from sol_execbench.core.data.base_model import (
-    BaseModelWithDocstrings,
+    CurrentSchemaModel,
     NonEmptyString,
 )
 from sol_execbench.core.data.solution_models import BuildSpec, SourceFile
+from sol_execbench.core.integrity.schema_versions import SOLUTION_SCHEMA_VERSION
 
 
-class Solution(BaseModelWithDocstrings):
+class Solution(CurrentSchemaModel):
     """A concrete implementation for a given Definition.
 
     Represents a complete solution that provides a high-performance implementation
@@ -49,6 +50,11 @@ class Solution(BaseModelWithDocstrings):
     _hash_cache: str = PrivateAttr()
     """Memoized hash of the solution content."""
 
+    current_schema_version = SOLUTION_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.solution.v1"] = (
+        SOLUTION_SCHEMA_VERSION
+    )
     name: NonEmptyString
     """A unique, human-readable name for this specific solution (e.g., 'rmsnorm_triton_v1_h100')."""
     definition: NonEmptyString

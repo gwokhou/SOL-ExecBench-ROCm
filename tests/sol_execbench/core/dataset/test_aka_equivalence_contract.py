@@ -11,11 +11,16 @@ import torch
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_equivalence import normalize_outputs
+from sol_execbench.core.integrity.schema_versions import (
+    DEFINITION_SCHEMA_VERSION,
+    WORKLOAD_SCHEMA_VERSION,
+)
 
 
 def _contract() -> tuple[Definition, Workload]:
     definition = Definition.model_validate(
         {
+            "schema_version": DEFINITION_SCHEMA_VERSION,
             "name": "multi_output",
             "op_type": "test",
             "axes": {"N": {"type": "var", "description": "elements"}},
@@ -43,6 +48,7 @@ def _contract() -> tuple[Definition, Workload]:
     )
     workload = Workload.model_validate(
         {
+            "schema_version": WORKLOAD_SCHEMA_VERSION,
             "axes": {"N": 4},
             "inputs": {"x": {"type": "random"}},
             "checks": [

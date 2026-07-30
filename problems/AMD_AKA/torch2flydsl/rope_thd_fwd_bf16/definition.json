@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "rope_thd_fwd_bf16",
   "op_type": "position_encoding",
   "description": "Variable-length packed BF16 RoPE with int32 prefix offsets.",

@@ -16,7 +16,6 @@
 
 """Build a staged native solution as a Torch extension."""
 
-import json
 from pathlib import Path
 
 import torch.utils.cpp_extension as ext
@@ -28,7 +27,9 @@ HERE = Path.cwd().resolve()
 ENVIRON = __import__("os").environ
 
 # Parse solution — validates sources (e.g. forbidden keywords) at compile time.
-solution = Solution(**json.loads((HERE / "solution.json").read_text()))
+solution = Solution.model_validate_json(
+    (HERE / "solution.json").read_text(),
+)
 compile_options = solution.spec.compile_options
 
 

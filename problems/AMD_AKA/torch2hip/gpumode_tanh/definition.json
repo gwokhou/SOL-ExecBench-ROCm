@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_tanh",
   "op_type": "elementwise",
   "description": "Scaled tanh: tanh(a * x) * max. Derived from AKA torch2hip/gpumode/11178_TanH module_fn.",

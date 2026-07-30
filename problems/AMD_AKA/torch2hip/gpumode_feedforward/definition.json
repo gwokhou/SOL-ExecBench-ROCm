@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_feedforward",
   "op_type": "matmul",
   "description": "Fused two-input feedforward: vstack(x,y) -> linear -> ReLU -> linear -> sigmoid. Derived from AKA torch2hip/gpumode/10024_Feedforward module_fn.",

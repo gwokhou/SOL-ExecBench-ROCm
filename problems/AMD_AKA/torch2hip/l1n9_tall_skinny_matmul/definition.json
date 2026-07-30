@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n9_tall_skinny_matmul",
   "op_type": "matmul",
   "description": "Tall-skinny matrix multiply (M >> K). Derived from AKA torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_.",

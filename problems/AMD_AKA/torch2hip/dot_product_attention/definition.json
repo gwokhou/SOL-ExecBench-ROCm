@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "dot_product_attention",
   "op_type": "attention",
   "description": "Dot-product non-local attention with ELU-normalized query/key energy, query/key/value 1x1 projections, and an output projection. Lifted exactly from AKA torch2hip/gpumode/1001_NormalAttention_dot module_fn.",

@@ -23,9 +23,11 @@ from pydantic import Field, field_validator, model_validator
 
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
+    CurrentSchemaModel,
     NonEmptyString,
 )
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.integrity.schema_versions import TRACE_SCHEMA_VERSION
 
 
 class NumericCheckResult(BaseModelWithDocstrings):
@@ -271,7 +273,7 @@ class Evaluation(BaseModelWithDocstrings):
         return self
 
 
-class Trace(BaseModelWithDocstrings):
+class Trace(CurrentSchemaModel):
     """Complete trace linking a solution to a definition with evaluation results.
 
     A Trace represents the complete record of benchmarking a specific solution
@@ -283,6 +285,9 @@ class Trace(BaseModelWithDocstrings):
     without an actual benchmark execution.
     """
 
+    current_schema_version = TRACE_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.trace.v1"] = TRACE_SCHEMA_VERSION
     definition: NonEmptyString
     """Name of the Definition that specifies the computational workload."""
     workload: Workload

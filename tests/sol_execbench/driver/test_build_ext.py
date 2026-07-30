@@ -34,6 +34,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from sol_execbench.core.integrity.schema_versions import (
+    SOLUTION_SCHEMA_VERSION,
+)
+
 _TEMPLATE_PATH = (
     Path(__file__).resolve().parents[3]
     / "src"
@@ -51,6 +55,7 @@ def _make_solution_json(
 ) -> str:
     """Create a minimal valid solution JSON string with given compile_options."""
     solution = {
+        "schema_version": SOLUTION_SCHEMA_VERSION,
         "name": "test_solution",
         "definition": "test_def",
         "author": "test",

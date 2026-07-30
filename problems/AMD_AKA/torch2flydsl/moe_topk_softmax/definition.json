@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "moe_topk_softmax",
   "op_type": "routing",
   "description": "Tie-aware softmax MoE top-k routing with IDs and weights.",

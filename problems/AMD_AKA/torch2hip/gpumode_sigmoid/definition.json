@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_sigmoid",
   "op_type": "elementwise",
   "description": "Scaled sigmoid: sigmoid(a * x) * max. Derived from AKA torch2hip/gpumode/11184_Sigmoid module_fn.",

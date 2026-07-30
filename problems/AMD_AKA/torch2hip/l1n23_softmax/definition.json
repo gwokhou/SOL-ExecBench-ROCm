@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n23_softmax",
   "op_type": "softmax",
   "description": "Row-wise softmax over the last dimension. Derived from AKA torch2hip/kernelbench/level1/l1n23_Softmax module_fn (dim=1).",

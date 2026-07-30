@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n63_conv2d",
   "op_type": "conv",
   "description": "Standard 2D convolution (stride 1, no padding, 3x3 kernel). Derived from AKA torch2hip/kernelbench/level1/l1n63_conv_standard_2D.",

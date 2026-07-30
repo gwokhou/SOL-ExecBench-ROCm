@@ -169,6 +169,7 @@ different calibrated bounds without weakening unrelated outputs.
 
 ```json
 {
+  "schema_version": "sol_execbench.workload.v1",
   "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "axes": {"M": 1024},
   "inputs": {
@@ -185,6 +186,7 @@ different calibrated bounds without weakening unrelated outputs.
 
 ```json
 {
+  "schema_version": "sol_execbench.workload.v1",
   "uuid": "6120f144-b973-4bd9-b884-77ecb132914e",
   "axes": {
     "B": 4,
@@ -207,6 +209,7 @@ different calibrated bounds without weakening unrelated outputs.
 
 ```json
 {
+  "schema_version": "sol_execbench.workload.v1",
   "uuid": "deadbeef-0000-1111-2222-333344445555",
   "axes": {"T": 256},
   "inputs": {

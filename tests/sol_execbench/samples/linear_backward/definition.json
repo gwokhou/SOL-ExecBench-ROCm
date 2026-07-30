@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "linear_backward",
   "op_type": "backward",
   "axes": {

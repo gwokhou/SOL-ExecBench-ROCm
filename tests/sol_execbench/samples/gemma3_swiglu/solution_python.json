@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "gemma3_swiglu_python",
   "definition": "google_gemma-3-12b-it_gemma3_fused_gate_up_projection_with_swiglu",
   "author": "test",

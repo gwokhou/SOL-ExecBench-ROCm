@@ -27,6 +27,7 @@ from sol_execbench.core.data.workload import (
     ScalarInput,
     Workload,
 )
+from sol_execbench.core.integrity.schema_versions import WORKLOAD_SCHEMA_VERSION
 
 
 def _wkl(**inputs):
@@ -103,6 +104,7 @@ class TestOutputChecks:
         with pytest.raises(ValidationError, match="extra_forbidden"):
             Workload.model_validate(
                 {
+                    "schema_version": WORKLOAD_SCHEMA_VERSION,
                     "uuid": "test-uuid",
                     "axes": {},
                     "inputs": {"x": {"type": "random"}},

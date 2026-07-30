@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "description": "Fused attention output projection (o_proj) with residual addition. After computing attention outputs, this operation performs the final linear projection and adds the residual connection. The projection is a matmul (hidden_size x hidden_size) fused with elementwise residual add to eliminate intermediate memory traffic.",
   "axes": {
     "batch_size": {

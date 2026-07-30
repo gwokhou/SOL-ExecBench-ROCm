@@ -19,6 +19,9 @@ from sol_execbench.core.bench.performance_model.attribution import (
     calculate_ratios,
     derive_attributions,
 )
+from sol_execbench.core.bench.performance_model.calibration_audit import (
+    DiagnosticCalibrationAudit,
+)
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceArtifactKind,
     PerformanceEvidenceManifest,
@@ -634,28 +637,23 @@ def _load_calibration(
     audit_path = path.with_name(f"{path.stem}.audit.json")
     if not audit_path.is_file():
         raise ValueError("calibration_audit_missing")
-    audit = load_json_value(audit_path)
-    if not isinstance(audit, dict):
-        raise ValueError("calibration_audit_invalid")
+    audit = load_json_file(DiagnosticCalibrationAudit, audit_path)
     _verify_calibration_audit(profile, audit, audit_path)
     return profile
 
 
 def _verify_calibration_audit(
     profile: DiagnosticCalibrationProfile,
-    audit: dict[str, object],
+    audit: DiagnosticCalibrationAudit,
     audit_path: Path,
 ) -> None:
-    probe = audit.get("probe_identity")
-    protocol = audit.get("protocol")
-    tuning = audit.get("tuning_evidence")
-    estimation = audit.get("parameter_estimation_evidence")
-    if not isinstance(probe, dict) or not isinstance(protocol, dict):
-        raise ValueError("calibration_audit_invalid")
-    if not isinstance(tuning, list) or not tuning:
-        raise ValueError("calibration_tuning_evidence_missing")
-    if not isinstance(estimation, list) or not estimation:
-        raise ValueError("calibration_parameter_estimation_evidence_missing")
+    probe = audit.probe_identity
+    protocol = audit.protocol
+    tuning = [item.model_dump(mode="json") for item in audit.tuning_evidence]
+    estimation = [
+        item.model_dump(mode="json")
+        for item in audit.parameter_estimation_evidence
+    ]
     estimation_hashes = {
         stable_json_checksum(estimation),
         sha256_file(audit_path),
@@ -666,33 +664,31 @@ def _verify_calibration_audit(
         raise ValueError("calibration_parameter_estimation_sha256_mismatch")
     if stable_json_checksum(tuning) not in profile.tuning_evidence_sha256:
         raise ValueError("calibration_tuning_evidence_sha256_mismatch")
-    if stable_json_checksum(probe) not in profile.probe_evidence_sha256:
+    if (
+        stable_json_checksum(probe.model_dump(mode="json"))
+        not in profile.probe_evidence_sha256
+    ):
         raise ValueError("calibration_probe_evidence_sha256_mismatch")
     if (
-        probe.get("architecture") != profile.identity.gpu_architecture
-        or probe.get("rocm_version") != profile.identity.rocm_version
-        or probe.get("gpu_id") != profile.identity.gpu_id
-        or probe.get("gpu_bdf") != profile.identity.gpu_bdf
-        or probe.get("compiler_version") != profile.identity.compiler_version
+        probe.architecture != profile.identity.gpu_architecture
+        or probe.rocm_version != profile.identity.rocm_version
+        or probe.gpu_id != profile.identity.gpu_id
+        or probe.gpu_bdf != profile.identity.gpu_bdf
+        or probe.compiler_version != profile.identity.compiler_version
     ):
         raise ValueError("calibration_audit_identity_mismatch")
-    if protocol.get(
-        "configuration_frozen_before_parameter_estimation"
-    ) is not True or any(
-        not isinstance(batch, dict)
-        or batch.get("phase")
-        != "parameter_estimation_after_configuration_freeze"
+    if not protocol.configuration_frozen_before_parameter_estimation or any(
+        batch.get("phase") != "parameter_estimation_after_configuration_freeze"
         or batch.get("clocks_locked") is not True
         for batch in estimation
     ):
         raise ValueError("calibration_parameter_estimation_protocol_invalid")
     if (
-        protocol.get("bootstrap_seed") != profile.bootstrap_seed
-        or protocol.get("bootstrap_replicates") != profile.bootstrap_replicates
+        protocol.bootstrap_seed != profile.bootstrap_seed
+        or protocol.bootstrap_replicates != profile.bootstrap_replicates
     ):
         raise ValueError("calibration_bootstrap_protocol_mismatch")
-    process_batches = protocol.get("parameter_estimation_process_batches")
-    if not isinstance(process_batches, int) or process_batches < 5:
+    if protocol.parameter_estimation_process_batches < 5:
         raise ValueError(
             "calibration_parameter_estimation_processes_insufficient"
         )

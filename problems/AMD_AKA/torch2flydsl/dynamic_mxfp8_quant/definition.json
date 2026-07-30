@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "dynamic_mxfp8_quant",
   "op_type": "quantization",
   "description": "Per-1x32 MXFP8 quantization with E8M0 byte scales.",

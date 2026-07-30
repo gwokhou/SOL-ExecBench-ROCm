@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n36_rmsnorm",
   "op_type": "norm",
   "description": "Root-mean-square normalization over the last dimension. Derived from AKA torch2hip/kernelbench/level1/l1n36_RMSNorm_ module_fn.",

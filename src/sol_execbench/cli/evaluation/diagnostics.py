@@ -8,10 +8,13 @@ from __future__ import annotations
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
+from pydantic import ConfigDict, Field
 from rich.console import Console
 
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
+from sol_execbench.core.data.base_model import CurrentSchemaModel
 from sol_execbench.core.evidence.runtime_evidence import write_json_payload
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
@@ -29,6 +32,27 @@ class NoTraceDiagnostics:
     returncode: int
     stdout: str
     stderr: str
+
+
+class NoTraceDiagnosticsSidecar(CurrentSchemaModel):
+    """Current bounded no-trace diagnostic artifact."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    current_schema_version = NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.no_trace_diagnostics.v1"] = (
+        "sol_execbench.no_trace_diagnostics.v1"
+    )
+    diagnostic_only: Literal[True]
+    canonical_trace_jsonl: Literal[False]
+    reason: str
+    returncode: int
+    stdout_tail: str = Field(max_length=_DIAGNOSTIC_TAIL_LIMIT)
+    stderr_tail: str = Field(max_length=_DIAGNOSTIC_TAIL_LIMIT)
+    stdout_line_count: int = Field(ge=0)
+    stderr_line_count: int = Field(ge=0)
+    stdout_truncated: bool
+    stderr_truncated: bool
 
 
 def _diagnostic_tail(text: str, *, limit: int = _DIAGNOSTIC_TAIL_LIMIT) -> str:
@@ -71,21 +95,24 @@ def _write_no_trace_diagnostics_sidecar(
         keep_staging=keep_staging,
     )
     filtered_stderr = filter_benign_rocm_stderr(diagnostics.stderr)
-    payload = {
-        "schema_version": NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
-        "diagnostic_only": True,
-        "canonical_trace_jsonl": False,
-        "reason": diagnostics.reason,
-        "returncode": diagnostics.returncode,
-        "stdout_tail": _diagnostic_tail(diagnostics.stdout),
-        "stderr_tail": _diagnostic_tail(filtered_stderr),
-        "stdout_line_count": len(diagnostics.stdout.splitlines()),
-        "stderr_line_count": len(filtered_stderr.splitlines()),
-        "stdout_truncated": len(diagnostics.stdout) > _DIAGNOSTIC_TAIL_LIMIT,
-        "stderr_truncated": len(filtered_stderr) > _DIAGNOSTIC_TAIL_LIMIT,
-    }
+    payload = NoTraceDiagnosticsSidecar.model_validate(
+        {
+            "schema_version": NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
+            "diagnostic_only": True,
+            "canonical_trace_jsonl": False,
+            "reason": diagnostics.reason,
+            "returncode": diagnostics.returncode,
+            "stdout_tail": _diagnostic_tail(diagnostics.stdout),
+            "stderr_tail": _diagnostic_tail(filtered_stderr),
+            "stdout_line_count": len(diagnostics.stdout.splitlines()),
+            "stderr_line_count": len(filtered_stderr.splitlines()),
+            "stdout_truncated": len(diagnostics.stdout)
+            > _DIAGNOSTIC_TAIL_LIMIT,
+            "stderr_truncated": len(filtered_stderr) > _DIAGNOSTIC_TAIL_LIMIT,
+        },
+    )
     try:
-        write_json_payload(sidecar_path, payload)
+        write_json_payload(sidecar_path, payload.model_dump(mode="json"))
         return sidecar_path
     except OSError as exc:
         console.print(

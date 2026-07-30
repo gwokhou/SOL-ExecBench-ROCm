@@ -131,13 +131,36 @@ def _solar_manifest(path: Path, analysis: Path, trace: Trace) -> None:
     payload = {
         "schema_version": SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
         "analysis_id": f"{trace.definition}:{trace.workload.uuid}",
+        "architecture_sha256": "a" * 64,
+        "reference": {"name": "test", "sha256": "b" * 64},
+        "analysis_contract": {
+            "ir_path": "torchview_extended_einsum",
+            "extraction_kind": "torchview",
+            "precision": "fp32",
+            "ir_kind": "extended_einsum",
+            "trace_seed": 200,
+            "verification_seeds": [11, 29, 47],
+            "atol": 1e-2,
+            "rtol": 1e-2,
+            "required_matched_ratio": 0.99,
+            "max_error_cap": None,
+            "allow_negative_inf": False,
+            "preserved_input_indices": [],
+            "require_orojenesis": True,
+        },
         "sol_score_eligible": True,
+        "publication_eligible": True,
         "artifacts": [
             {
                 "path": "solar-analysis.yaml",
                 "sha256": sha256_file(analysis),
             }
         ],
+        "bound": {
+            "seconds": 1e-6,
+            "kind": "capacity_constrained_tile_aware_v1",
+            "limiting_resource": "valu",
+        },
     }
     path.write_text(yaml.safe_dump(payload), encoding="utf-8")
 

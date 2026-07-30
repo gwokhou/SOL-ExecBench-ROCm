@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "triton_ref_vecadd_torch",
   "definition": "vecadd",
   "author": "test",

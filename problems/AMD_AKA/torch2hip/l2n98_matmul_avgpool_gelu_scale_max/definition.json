@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l2n98_matmul_avgpool_gelu_scale_max",
   "op_type": "matmul",
   "description": "Fused linear -> avg_pool1d -> GELU -> scale -> max-reduce to a 1D per-batch output. Derived from AKA torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max.",

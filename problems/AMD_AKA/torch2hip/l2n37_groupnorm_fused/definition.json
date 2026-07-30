@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l2n37_groupnorm_fused",
   "op_type": "norm",
   "description": "Fused linear -> swish -> add -> group_norm. Derived from AKA torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm module_fn.",

@@ -10,9 +10,15 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 from xml.etree import ElementTree
 
+from pydantic import ConfigDict, Field
+
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaModel,
+    StrictArtifactModel,
+)
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import (
     RDNA4_VALIDATION_SCHEMA_VERSION,
@@ -37,6 +43,74 @@ _LOCAL_ATTESTATION_KINDS = frozenset(
     {"github_actions_self_hosted", "local_unsigned"},
 )
 _ROCM_PATH_VERSION = re.compile(r"(?:^|/)rocm-(\d+\.\d+\.\d+)(?:/|$)")
+
+_VALIDATION_CONFIG = ConfigDict(extra="forbid", frozen=True)
+
+
+class _ValidationModel(StrictArtifactModel):
+    model_config = _VALIDATION_CONFIG
+
+
+class Rdna4TargetSchema(_ValidationModel):
+    """Validated hardware and user-space target identity."""
+
+    gfx_target: str
+    device_name: str
+    device_index: int | None
+    rocm_version: str
+    torch_version: str
+    hip_version: str
+    pci_vendor_id: str
+    pci_device_id: str
+
+
+class Rdna4PytestSummary(_ValidationModel):
+    """Aggregate pytest result bound by the validation manifest."""
+
+    returncode: int
+    tests: int = Field(ge=0)
+    failures: int = Field(ge=0)
+    errors: int = Field(ge=0)
+    skipped: int = Field(ge=0)
+
+
+class Rdna4Artifact(_ValidationModel):
+    """Content-addressed validation artifact."""
+
+    path: str
+    size_bytes: int = Field(ge=0)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class Rdna4Attestation(_ValidationModel):
+    """Explicitly local, non-release validation authority."""
+
+    kind: Literal["github_actions_self_hosted", "local_unsigned"]
+    trusted_execution: bool
+
+
+class Rdna4ValidationManifest(CurrentSchemaModel):
+    """Current local RDNA4 validation manifest."""
+
+    model_config = _VALIDATION_CONFIG
+    current_schema_version = RDNA4_VALIDATION_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.rdna4_validation.v2"] = (
+        RDNA4_VALIDATION_SCHEMA_VERSION
+    )
+    generated_at: str
+    status: Literal["passed", "failed"]
+    release_eligible: bool
+    source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    source_dirty: bool
+    target: Rdna4TargetSchema
+    pytest: Rdna4PytestSummary
+    artifacts: list[Rdna4Artifact] = Field(min_length=1)
+    attestation: Rdna4Attestation
+    payload_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,23 +282,28 @@ def build_validation_manifest(
         }
         for path in sorted(artifact_paths)
     ]
-    manifest: dict[str, Any] = {
-        "schema_version": RDNA4_VALIDATION_SCHEMA_VERSION,
-        "generated_at": generated_at,
-        "status": "passed" if passed else "failed",
-        # Local evidence is useful for engineering validation but cannot
-        # self-upgrade into trusted release authority.
-        "release_eligible": False,
-        "source_revision": source_revision,
-        "source_dirty": source_dirty,
-        "target": environment.to_dict(),
-        "pytest": {"returncode": pytest_returncode, **counts},
-        "artifacts": artifacts,
-        "attestation": attestation
-        or {"kind": "local_unsigned", "trusted_execution": False},
-    }
+    model = Rdna4ValidationManifest.model_validate(
+        {
+            "schema_version": RDNA4_VALIDATION_SCHEMA_VERSION,
+            "generated_at": generated_at,
+            "status": "passed" if passed else "failed",
+            # Local evidence is useful for engineering validation but cannot
+            # self-upgrade into trusted release authority.
+            "release_eligible": False,
+            "source_revision": source_revision,
+            "source_dirty": source_dirty,
+            "target": environment.to_dict(),
+            "pytest": {"returncode": pytest_returncode, **counts},
+            "artifacts": artifacts,
+            "attestation": attestation
+            or {"kind": "local_unsigned", "trusted_execution": False},
+        },
+    )
+    manifest = model.model_dump(mode="json", exclude_none=True)
     manifest["payload_sha256"] = stable_json_checksum(manifest)
-    return manifest
+    return Rdna4ValidationManifest.model_validate(manifest).model_dump(
+        mode="json",
+    )
 
 
 def verify_validation_directory(
@@ -239,12 +318,12 @@ def verify_validation_directory(
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         raise ValueError("RDNA4 validation manifest is invalid") from exc
-    if not isinstance(manifest, dict):
-        raise ValueError("RDNA4 validation manifest must be a JSON object")
-    payload_sha256 = manifest.pop("payload_sha256", None)
-    if payload_sha256 != stable_json_checksum(manifest):
+    model = Rdna4ValidationManifest.model_validate(manifest)
+    payload_sha256 = model.payload_sha256
+    unsigned = model.model_dump(mode="json", exclude={"payload_sha256"})
+    if payload_sha256 != stable_json_checksum(unsigned):
         raise ValueError("RDNA4 validation manifest checksum mismatch")
-    manifest["payload_sha256"] = payload_sha256
+    manifest = model.model_dump(mode="json")
     _verify_manifest_contract(
         manifest,
         expected_source_revision=expected_source_revision,

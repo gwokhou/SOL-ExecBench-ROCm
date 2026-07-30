@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "fused_add_rmsnorm_bf16",
   "op_type": "norm",
   "description": "BF16 fused residual add and RMSNorm with two outputs.",

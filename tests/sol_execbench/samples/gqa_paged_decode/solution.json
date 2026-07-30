@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "gqa_paged_decode_h32_kv8_d128_ps1_ref_test",
   "definition": "gqa_paged_decode_h32_kv8_d128_ps1",
   "author": "test",

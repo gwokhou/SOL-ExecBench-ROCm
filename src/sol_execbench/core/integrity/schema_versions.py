@@ -16,7 +16,16 @@ AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION: Final = 2
 COVERAGE_POLICY_SCHEMA_VERSION: Final = 1
 
 AGENT_FEEDBACK_SCHEMA_VERSION: Final = "sol_execbench.agent_feedback.v3"
+BENCHMARK_CONFIG_SCHEMA_VERSION: Final = "sol_execbench.benchmark_config.v1"
+DEFINITION_SCHEMA_VERSION: Final = "sol_execbench.definition.v1"
+DEPENDENCY_PREFLIGHT_SCHEMA_VERSION: Final = (
+    "sol_execbench.dependency_preflight.v1"
+)
 DECISION_SCHEMA_VERSION: Final = "sol_execbench.decision.v2"
+SOLUTION_SCHEMA_VERSION: Final = "sol_execbench.solution.v1"
+SOLAR_WORKER_IPC_SCHEMA_VERSION: Final = "sol_execbench.solar_worker_ipc.v1"
+TRACE_SCHEMA_VERSION: Final = "sol_execbench.trace.v1"
+WORKLOAD_SCHEMA_VERSION: Final = "sol_execbench.workload.v1"
 PROFILE_SUMMARY_SCHEMA_VERSION: Final = "sol_execbench.profile_summary.v3"
 PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION: Final = (
     "sol_execbench.performance_diagnostic.v2"
@@ -36,6 +45,7 @@ DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION: Final = (
 DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION: Final = (
     "sol_execbench.diagnostic_calibration_audit.v2"
 )
+DOCKER_PREFLIGHT_SCHEMA_VERSION: Final = "sol_execbench.docker_preflight.v1"
 ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
     "sol_execbench.environment_diagnostics.v1"
 )
@@ -87,7 +97,14 @@ TOOLCHAIN_ROUTING_SCHEMA_VERSION: Final = "sol_execbench.toolchain_routing.v1"
 
 SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "agent_feedback": AGENT_FEEDBACK_SCHEMA_VERSION,
+    "benchmark_config": BENCHMARK_CONFIG_SCHEMA_VERSION,
+    "definition": DEFINITION_SCHEMA_VERSION,
+    "dependency_preflight": DEPENDENCY_PREFLIGHT_SCHEMA_VERSION,
     "decision": DECISION_SCHEMA_VERSION,
+    "solution": SOLUTION_SCHEMA_VERSION,
+    "solar_worker_ipc": SOLAR_WORKER_IPC_SCHEMA_VERSION,
+    "trace": TRACE_SCHEMA_VERSION,
+    "workload": WORKLOAD_SCHEMA_VERSION,
     "profile_summary": PROFILE_SUMMARY_SCHEMA_VERSION,
     "performance_diagnostic": PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION,
     "performance_evidence_manifest": (
@@ -99,6 +116,7 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "diagnostic_calibration_audit": (
         DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION
     ),
+    "docker_preflight": DOCKER_PREFLIGHT_SCHEMA_VERSION,
     "amd_isa_release_lock": "sol_execbench.amd_isa_release_lock.v1",
     "arch_capability_budget": "sol_execbench.arch_capability_budget.v1",
     "cli_contract": "sol_execbench.cli_contract.v1",
@@ -162,6 +180,7 @@ __all__ = [
     "AKA_CORPUS_MANIFEST_SCHEMA_VERSION",
     "AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION",
     "AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION",
+    "BENCHMARK_CONFIG_SCHEMA_VERSION",
     "CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION",
     "CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION",
     "CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION",
@@ -169,9 +188,12 @@ __all__ = [
     "CURRENT_NUMERIC_SCHEMA_VERSIONS",
     "CURRENT_SCHEMA_VERSIONS",
     "DECISION_SCHEMA_VERSION",
+    "DEFINITION_SCHEMA_VERSION",
+    "DEPENDENCY_PREFLIGHT_SCHEMA_VERSION",
     "DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION",
     "DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION",
     "DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION",
+    "DOCKER_PREFLIGHT_SCHEMA_VERSION",
     "ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION",
     "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION",
     "EVALUATOR_CONTRACT_SCHEMA_VERSION",
@@ -191,9 +213,13 @@ __all__ = [
     "ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION",
     "ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION",
     "SCHEMA_VERSIONS",
+    "SOLAR_WORKER_IPC_SCHEMA_VERSION",
+    "SOLUTION_SCHEMA_VERSION",
     "STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION",
     "STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION",
     "TOOLCHAIN_ROUTING_SCHEMA_VERSION",
+    "TRACE_SCHEMA_VERSION",
+    "WORKLOAD_SCHEMA_VERSION",
     "AgentFeedbackSchemaVersion",
     "DecisionSchemaVersion",
     "ProfileSummarySchemaVersion",

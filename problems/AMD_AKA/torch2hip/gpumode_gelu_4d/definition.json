@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_gelu_4d",
   "op_type": "elementwise",
   "description": "GELU pinned to 4D [B, C, H, W]. Rank-split from the variable-rank (1D-4D) AKA torch2hip/gpumode/14539_GELU module_fn; the 2D case is l1n26_gelu. The schema pins rank per Definition, so each rank becomes its own problem.",

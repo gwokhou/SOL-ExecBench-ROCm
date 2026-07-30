@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "rmsnorm_bwd",
   "op_type": "norm",
   "description": "RMSNorm backward (gradient w.r.t. input and weight) via autograd. Derived from and cross-checked against the PyTorch oracle in AKA instruction2triton/rocmbench/rmsnorm_bwd.",

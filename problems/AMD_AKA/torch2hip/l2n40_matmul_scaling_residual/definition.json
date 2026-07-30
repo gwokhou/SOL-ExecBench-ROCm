@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l2n40_matmul_scaling_residual",
   "op_type": "matmul",
   "description": "Fused linear -> scale -> residual add. Derived from AKA torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd module_fn.",

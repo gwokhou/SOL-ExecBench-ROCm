@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n3_batched_matmul",
   "op_type": "matmul",
   "description": "Batched BF16 matrix multiply via torch.bmm. Derived from AKA torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication.",

@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "post_norm_residual_triton",
   "definition": "allenai_Olmo-3-1025-7B_post_norm_residual",
   "author": "test",

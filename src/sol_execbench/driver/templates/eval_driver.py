@@ -25,7 +25,6 @@ All non-JSON output (library messages, Triton JIT logs) goes to stderr.
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 from pathlib import Path
@@ -86,17 +85,19 @@ definition_dict, _workload_dicts = load_staged_problem(STAGING_DIR)
 # ── Load config ───────────────────────────────────────────────────────────────
 _config_path = STAGING_DIR / "config.json"
 bench_config = (
-    BenchmarkConfig(**json.loads(_config_path.read_text()))
+    BenchmarkConfig.model_validate_json(_config_path.read_text())
     if _config_path.exists()
     else BenchmarkConfig()
 )
 
 # ── Parse definition ──────────────────────────────────────────────────────────
-definition = Definition(**definition_dict)
-workloads = [Workload(**w) for w in _workload_dicts]
+definition = Definition.model_validate(definition_dict)
+workloads = [Workload.model_validate(w) for w in _workload_dicts]
 
 # ── Parse solution ────────────────────────────────────────────────────────────
-_solution = Solution(**json.loads((STAGING_DIR / "solution.json").read_text()))
+_solution = Solution.model_validate_json(
+    (STAGING_DIR / "solution.json").read_text(),
+)
 _solution_name = _solution.name
 _entry_point = _solution.spec.entry_point
 _dps = _solution.spec.destination_passing_style

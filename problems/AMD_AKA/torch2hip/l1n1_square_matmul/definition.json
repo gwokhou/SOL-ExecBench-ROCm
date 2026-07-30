@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n1_square_matmul",
   "op_type": "matmul",
   "description": "Square matrix multiply C = A @ B. Derived from AKA torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_ module_fn.",

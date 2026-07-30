@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_transpose",
   "op_type": "elementwise",
   "description": "Transpose two dimensions and return a contiguous tensor. Derived from AKA torch2hip/gpumode/1067_Transpose module_fn (dims 1, 2).",

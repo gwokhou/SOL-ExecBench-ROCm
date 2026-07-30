@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_softmax_3d",
   "op_type": "softmax",
   "description": "Softmax over the last axis of a 3D cube. Derived from AKA torch2hip/gpumode/10082_SoftmaxModule module_fn (axis=2).",

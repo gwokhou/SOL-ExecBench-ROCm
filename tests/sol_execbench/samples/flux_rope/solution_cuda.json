@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "flux_rope_hip",
   "definition": "black-forest-labs_FLUX.1-schnell_flux_rope_apply_rotation",
   "author": "test",

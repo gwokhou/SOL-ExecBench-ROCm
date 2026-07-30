@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "description": "Gemma3's fused gate and up projection followed by GELU-tanh activation and element-wise multiplication. Computes gelu_tanh(x @ gate_proj.T) * (x @ up_proj.T) where gate_proj and up_proj are weight matrices. This fuses two parallel linear projections from hidden_size=3072 to intermediate_size=24576, followed by GELU activation on gate output and element-wise multiplication with up output.",
   "axes": {
     "batch_size": {

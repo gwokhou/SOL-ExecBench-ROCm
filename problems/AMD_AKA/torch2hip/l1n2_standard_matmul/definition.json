@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n2_standard_matmul",
   "op_type": "matmul",
   "description": "General (non-square) BF16 matrix multiply C = A @ B. Derived from AKA torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_.",

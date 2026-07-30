@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_mlp",
   "op_type": "matmul",
   "description": "7-layer MLP (4 -> 4096 -> 2048 -> 512 -> 128 -> 64 -> 32 -> 4) with ReLU. Derived from AKA torch2hip/gpumode/1178_MLP_model module_fn.",

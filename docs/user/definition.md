@@ -166,6 +166,7 @@ def fn(
 
 ```json
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "moe_dispatch_h4096_e64_k4",
   "custom_inputs_entrypoint": "generate_inputs",
   "axes": {
@@ -193,6 +194,7 @@ def fn(
 
 ```json
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gemm_n4096_k4096",
   "op_type": "gemm",
   "description": "General matrix multiply C = A @ B.T",
@@ -216,6 +218,7 @@ def fn(
 
 ```json
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "rmsnorm_h4096",
   "op_type": "rmsnorm",
   "axes": {
@@ -238,6 +241,7 @@ def fn(
 
 ```json
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gqa_ragged_hr4_dqk128_dvo128",
   "op_type": "gqa_ragged",
   "axes": {
