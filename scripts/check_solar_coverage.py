@@ -7,6 +7,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.integrity.schema_versions import (
+    COVERAGE_POLICY_SCHEMA_VERSION,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_POLICY = ROOT / "scripts" / "solar_coverage_policy.json"
 
@@ -56,6 +60,13 @@ def _combined_percentages(
 
 def check_report(report: dict[str, Any], policy: dict[str, Any]) -> list[str]:
     """Return human-readable policy violations for one coverage JSON report."""
+    if policy.get("schema_version") != COVERAGE_POLICY_SCHEMA_VERSION:
+        return [
+            (
+                "coverage policy must use current "
+                f"schema_version={COVERAGE_POLICY_SCHEMA_VERSION}"
+            ),
+        ]
     files = report.get("files")
     if not isinstance(files, dict):
         return ["coverage report has no files mapping"]

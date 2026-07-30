@@ -8,7 +8,7 @@ artifacts derived from AMD AgentKernelArena (AKA) tasks under the methodology in
 ``docs/internal/aka-sol-task-source-research.md`` §8 and the SOL-ExecBench paper
 (arXiv 2603.19173) §3. Each problem is committed under
 ``problems/AMD_AKA/<suite>/<name>/`` as ``definition.json`` + ``workload.jsonl``
-(+ optional ``reference.py``), in the backward-compatible schema consumed by
+(+ optional ``reference.py``), in the current schema consumed by
 ``sol_execbench.cli.evaluation.problem_io`` and the rest of the harness.
 
 The manifest pins the AKA source revision and records per-problem checksums and
@@ -51,7 +51,6 @@ from sol_execbench.core.dataset.aka_compatibility import (
     static_reference_storage,
 )
 from sol_execbench.core.dataset.aka_contract import (
-    AKA_MANIFEST_SCHEMA_VERSION,
     AKA_OFFICIAL_BASELINE_ID,
     AKA_REQUIRED_RELEASE_EVIDENCE,
     AKAArtifactRole,
@@ -72,6 +71,10 @@ from sol_execbench.core.integrity import (
     sha256_file,
     validate_relative_artifact_path,
     validate_sha256,
+)
+from sol_execbench.core.integrity.schema_versions import (
+    AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
+    AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION,
 )
 from sol_execbench.core.platform.runtime import derive_cache_clear_policy
 
@@ -249,9 +252,13 @@ class AKACorpusManifest:
         output = Path(output_root).resolve()
         record_path = output / "materialization-manifest.yaml"
         record = yaml.safe_load(record_path.read_text(encoding="utf-8")) or {}
-        if int(record.get("schema_version", 0)) != 2:
+        if (
+            int(record.get("schema_version", 0))
+            != AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION
+        ):
             raise ValueError(
-                "AKA materialization record must use schema_version 2",
+                "AKA materialization record must use schema_version "
+                f"{AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION}",
             )
         if record.get("aka_manifest_sha256") != sha256_file(self.path):
             raise ValueError("corpus manifest identity changed")
@@ -354,9 +361,10 @@ class AKACorpusManifest:
 
 
 def _validate_manifest_header(data: Mapping[str, Any]) -> None:
-    if int(data.get("schema_version", 0)) != AKA_MANIFEST_SCHEMA_VERSION:
+    if int(data.get("schema_version", 0)) != AKA_CORPUS_MANIFEST_SCHEMA_VERSION:
         raise ValueError(
-            f"AKA corpus manifest must use schema_version {AKA_MANIFEST_SCHEMA_VERSION}",
+            "AKA corpus manifest must use schema_version "
+            f"{AKA_CORPUS_MANIFEST_SCHEMA_VERSION}",
         )
     source = data.get("source") or {}
     if source.get("repository") != AKA_REPOSITORY:
@@ -695,7 +703,7 @@ def _write_materialization_manifest(
     probe_timeout_seconds: float,
 ) -> None:
     payload = {
-        "schema_version": 2,
+        "schema_version": AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION,
         "source": {
             "repository": manifest.source.get("repository"),
             "revision": manifest.source.get("revision"),

@@ -26,8 +26,10 @@ from sol_execbench.core.integrity import (
     validate_relative_artifact_path,
     validate_sha256,
 )
+from sol_execbench.core.integrity.schema_versions import (
+    AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION,
+)
 
-CALIBRATION_SCHEMA_VERSION = 2
 CALIBRATION_METHOD = "repeated_reference_runs"
 DEFAULT_MARGIN = 1.25
 DEFAULT_SEED_COUNT = 3
@@ -146,10 +148,13 @@ def load_tolerance_calibration(path: Path) -> dict[str, object]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("AKA tolerance calibration must be a JSON object")
-    if int(data.get("schema_version", 0)) != CALIBRATION_SCHEMA_VERSION:
+    if (
+        int(data.get("schema_version", 0))
+        != AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION
+    ):
         raise ValueError(
             f"AKA tolerance calibration must use schema_version "
-            f"{CALIBRATION_SCHEMA_VERSION}",
+            f"{AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION}",
         )
     if data.get("method") != CALIBRATION_METHOD:
         raise ValueError(
@@ -345,7 +350,6 @@ def _record_list(data: Mapping[str, object]) -> list[object]:
 
 __all__ = [
     "CALIBRATION_METHOD",
-    "CALIBRATION_SCHEMA_VERSION",
     "DEFAULT_MARGIN",
     "DEFAULT_REPEATS_PER_SEED",
     "DEFAULT_SEED_COUNT",

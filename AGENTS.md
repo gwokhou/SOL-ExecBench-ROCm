@@ -95,6 +95,19 @@ tests with existing markers such as `requires_rocm`, `cpp`, `requires_rdna4`, or
 small unit tests for schemas and driver logic, adding integration coverage for
 subprocess or GPU execution changes.
 
+## Schema Lifecycle
+
+- Each schema family has exactly one current version in the canonical version
+  registry; string and numeric versions follow the same rule.
+- Every reader requires and exactly matches that version before parsing business
+  fields. Relaxed, diagnostic, and test paths must not bypass version checks.
+- A schema change updates producers, checked-in artifacts, tests, and docs
+  atomically, then deletes superseded models, readers, migrations, aliases,
+  fixtures, and version-specific prose. Git history is the only archive.
+- Schema audits cover string IDs, numeric versions, versioned prose/resources,
+  and multi-version acceptance logic. Raw numeric schema literals are forbidden
+  outside canonical registries and registered artifacts.
+
 ## Quality Regression Guardrails
 
 - For Python changes, run the relevant subset of Ruff, `ty check`, readability,

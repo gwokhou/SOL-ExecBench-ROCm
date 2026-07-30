@@ -178,7 +178,7 @@ class ConverterPipelineMixin(ConverterMixinContract):
             if not self._strict:
                 raise
             # AccelForge's legacy cost IR cannot encode every executable
-            # schema-v3 operation (notably gather/scatter and multi-output
+            # Extended operation (notably gather/scatter and multi-output
             # primitives).  The exact semantic graph has already passed the
             # strict validator above, so retain it and record that the
             # secondary AF projection is unavailable instead of inventing a

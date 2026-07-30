@@ -35,7 +35,6 @@ from sol_execbench.core.dataset.aka_compatibility import (
     AKA_EXECUTION_TARGET_SPECS,
 )
 from sol_execbench.core.dataset.aka_contract import (
-    AKA_MANIFEST_SCHEMA_VERSION,
     AKA_OFFICIAL_BASELINE_ID,
     AKA_TOLERANCE_CALIBRATION_FILENAME,
     AKAArtifactRole,
@@ -69,6 +68,9 @@ from sol_execbench.core.dataset.aka_tolerance import (
     workload_contract_sha256,
 )
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.integrity.schema_versions import (
+    AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
+)
 from sol_execbench.core.platform.runtime import resolve_tool_path
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
@@ -3771,7 +3773,7 @@ def _manifest_payload(
     calibration_path: Path,
 ) -> dict[str, object]:
     return {
-        "schema_version": AKA_MANIFEST_SCHEMA_VERSION,
+        "schema_version": AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
         "source": {
             "repository": AKA_REPOSITORY,
             "revision": AKA_REVISION,

@@ -10,6 +10,11 @@ working tree; Git history is the only archive for superseded contracts.
 
 from typing import Final, Literal
 
+AKA_CORPUS_MANIFEST_SCHEMA_VERSION: Final = 6
+AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION: Final = 2
+AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION: Final = 2
+COVERAGE_POLICY_SCHEMA_VERSION: Final = 1
+
 AGENT_FEEDBACK_SCHEMA_VERSION: Final = "sol_execbench.agent_feedback.v3"
 DECISION_SCHEMA_VERSION: Final = "sol_execbench.decision.v2"
 PROFILE_SUMMARY_SCHEMA_VERSION: Final = "sol_execbench.profile_summary.v3"
@@ -139,15 +144,29 @@ type AgentFeedbackSchemaVersion = Literal["sol_execbench.agent_feedback.v3"]
 type DecisionSchemaVersion = Literal["sol_execbench.decision.v2"]
 type ProfileSummarySchemaVersion = Literal["sol_execbench.profile_summary.v3"]
 
+CURRENT_NUMERIC_SCHEMA_VERSIONS: Final[dict[str, int]] = {
+    "aka_corpus_manifest": AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
+    "aka_materialization_manifest": (
+        AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION
+    ),
+    "aka_tolerance_calibration": AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION,
+    "coverage_policy": COVERAGE_POLICY_SCHEMA_VERSION,
+}
+
 CURRENT_SCHEMA_VERSIONS: Final[frozenset[str]] = frozenset(
     SCHEMA_VERSIONS.values(),
 )
 
 __all__ = [
     "AGENT_FEEDBACK_SCHEMA_VERSION",
+    "AKA_CORPUS_MANIFEST_SCHEMA_VERSION",
+    "AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION",
+    "AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION",
     "CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION",
     "CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION",
     "CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION",
+    "COVERAGE_POLICY_SCHEMA_VERSION",
+    "CURRENT_NUMERIC_SCHEMA_VERSIONS",
     "CURRENT_SCHEMA_VERSIONS",
     "DECISION_SCHEMA_VERSION",
     "DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION",

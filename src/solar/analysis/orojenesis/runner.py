@@ -169,16 +169,11 @@ class OrojenesisRunner:
             IDENTITY_POLICY,
             trusted_mapper_sha256=OROJENESIS_TRUSTED_MAPPER_SHA256,
         )
-        identity = validate_toolchain_identity(
+        return validate_toolchain_identity(
             self.home,
             self.mapper,
             policy,
         )
-        if int(identity.get("schema_version", 0)) != policy.schema_version:
-            raise OrojenesisError(
-                "unsupported Orojenesis provenance schema",
-            )
-        return identity
 
     @staticmethod
     def problem_for_layer(layer: Mapping[str, Any]) -> dict[str, Any]:

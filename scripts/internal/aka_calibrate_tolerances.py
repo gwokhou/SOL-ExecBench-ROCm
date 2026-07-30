@@ -34,7 +34,6 @@ from sol_execbench.core.dataset.aka_equivalence import (
 )
 from sol_execbench.core.dataset.aka_tolerance import (
     CALIBRATION_METHOD,
-    CALIBRATION_SCHEMA_VERSION,
     DEFAULT_MARGIN,
     DEFAULT_REPEATS_PER_SEED,
     DEFAULT_SEED_COUNT,
@@ -42,6 +41,9 @@ from sol_execbench.core.dataset.aka_tolerance import (
     calibrate_tolerance,
     dtype_default_tolerance,
     workload_contract_sha256,
+)
+from sol_execbench.core.integrity.schema_versions import (
+    AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION,
 )
 from sol_execbench.core.platform.runtime import detect_rocm_device
 
@@ -240,7 +242,7 @@ def main() -> None:
             f"calibration requires {FORMAL_GFX_TARGET}, got {device.gfx_target}",
         )
     payload = {
-        "schema_version": CALIBRATION_SCHEMA_VERSION,
+        "schema_version": AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION,
         "method": CALIBRATION_METHOD,
         "aka_revision": AKA_REVISION,
         "margin": args.margin,
