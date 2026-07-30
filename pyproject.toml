@@ -127,20 +127,32 @@ extend-select = [
     "BLE",
     "C4",
     "D",
+    "E731",
+    "E741",
     "G",
     "I",
     "N",
     "PIE",
     "PLW2901",
+    "RET504",
+    "RET505",
+    "RET508",
     "RUF012",
     "RUF059",
     "S101",
     "SIM",
     "TID",
+    "A",
+    "ERA001",
+    "FURB171",
+    "LOG",
+    "PT011",
+    "PT012",
+    "PT017",
+    "RSE",
 ]
 ignore = [
     "ANN401", # Dynamic external payload boundaries are inventoried separately.
-    "E741",   # Mathematical kernels use conventional short dimension names.
     "TRY004", # External payload validators intentionally use a ValueError contract.
 ]
 

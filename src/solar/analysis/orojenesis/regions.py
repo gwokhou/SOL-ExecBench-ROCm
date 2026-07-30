@@ -29,7 +29,12 @@ from solar.analysis.orojenesis.multi_einsum import (
     _shape_product,
     find_multi_einsum_chains,
 )
-from solar.ir.contracts import CONTRACTION_KIND, INPUT_KIND, layer_operation
+from solar.ir.contracts import (
+    CONTRACTION_KIND,
+    INPUT_KIND,
+    layer_operation,
+    operation_operands,
+)
 from solar.schema_versions import OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION
 
 
@@ -121,7 +126,7 @@ def _view_axis_map(metadata: _ViewMetadata) -> list[int] | None:
         return None
     literal_arguments = [
         item.get("value")
-        for item in metadata.semantic.get("arguments") or []
+        for item in operation_operands(metadata.semantic)
         if isinstance(item, Mapping) and "value" in item
     ]
     if target == "transpose":

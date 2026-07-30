@@ -200,12 +200,10 @@ def test_msgpack_handles_full_numeric_range():
     # negative fixint (0xE0-0xFF)
     assert _unpack_msgpack(bytes([0xFF]))[0] == -1
     assert _unpack_msgpack(bytes([0xE0]))[0] == -32
-    # int64 (0xD3)
     assert (
         _unpack_msgpack(bytes([0xD3]) + struct.pack(">q", -123456789012))[0]
         == -123456789012
     )
-    # float32 (0xCA) / float64 (0xCB)
     assert _unpack_msgpack(bytes([0xCA]) + struct.pack(">f", 1.5))[0] == 1.5
     assert (
         _unpack_msgpack(bytes([0xCB]) + struct.pack(">d", 2.718281828))[0]
@@ -220,10 +218,8 @@ def test_msgpack_handles_large_containers_and_blobs():
     # array32 (0xDD) with two entries
     payload = bytes([0xDD]) + struct.pack(">I", 2) + _pack(1) + _pack(2)
     assert _unpack_msgpack(payload)[0] == [1, 2]
-    # bin16 (0xC5)
     payload = bytes([0xC5]) + struct.pack(">H", 3) + b"abc"
     assert _unpack_msgpack(payload)[0] == b"abc"
-    # str32 (0xDB)
     payload = bytes([0xDB]) + struct.pack(">I", 3) + b"xyz"
     assert _unpack_msgpack(payload)[0] == "xyz"
 

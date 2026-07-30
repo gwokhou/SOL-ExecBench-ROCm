@@ -415,7 +415,7 @@ class GraphAccountingMixin(AnalysisMixinContract):
         accumulator: AnalysisAccumulator,
     ) -> None:
         data = self._parse_layer(layer_id, layer)
-        compute = self._compute_layer(data)
+        compute = self._compute_layer(data, strict=prepared.strict)
         memory = self._memory_elements(data, compute, topology)
         if memory.orphaned:
             accumulator.orphaned_layers.add(layer_id)

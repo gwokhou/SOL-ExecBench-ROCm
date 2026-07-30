@@ -28,6 +28,9 @@ DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION: Final = (
 DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION: Final = (
     "sol_execbench.diagnostic_calibration.v2"
 )
+DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION: Final = (
+    "sol_execbench.diagnostic_calibration_audit.v2"
+)
 ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
     "sol_execbench.environment_diagnostics.v1"
 )
@@ -66,6 +69,9 @@ ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION: Final = (
 ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION: Final = (
     "sol_execbench.rocprofv3_counter_provenance.v2"
 )
+ROCPROFV3_COUNTER_MANIFEST_SCHEMA_VERSION: Final = (
+    "sol_execbench.rocprofv3_counter_manifest.v1"
+)
 STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION: Final = (
     "sol_execbench.static_artifact_manifest.v1"
 )
@@ -85,6 +91,9 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "performance_timing_evidence": PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION,
     "diagnostic_acceptance": DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION,
     "diagnostic_calibration": DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION,
+    "diagnostic_calibration_audit": (
+        DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION
+    ),
     "amd_isa_release_lock": "sol_execbench.amd_isa_release_lock.v1",
     "arch_capability_budget": "sol_execbench.arch_capability_budget.v1",
     "cli_contract": "sol_execbench.cli_contract.v1",
@@ -115,6 +124,7 @@ SCHEMA_VERSIONS: Final[dict[str, str]] = {
     "rocprofv3_counter_provenance": (
         ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION
     ),
+    "rocprofv3_counter_manifest": ROCPROFV3_COUNTER_MANIFEST_SCHEMA_VERSION,
     "rocprofv3_overhead_calibration": ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
     "rocprofv3_profile": "sol_execbench.rocprofv3_profile.v1",
     "rocprofv3_timing": "sol_execbench.rocprofv3_timing.v1",
@@ -141,6 +151,7 @@ __all__ = [
     "CURRENT_SCHEMA_VERSIONS",
     "DECISION_SCHEMA_VERSION",
     "DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION",
+    "DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION",
     "DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION",
     "ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION",
     "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION",
@@ -157,6 +168,7 @@ __all__ = [
     "RELEASE_EXECUTION_PLAN_SCHEMA_VERSION",
     "RELEASE_SOLAR_INDEX_SCHEMA_VERSION",
     "ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION",
+    "ROCPROFV3_COUNTER_MANIFEST_SCHEMA_VERSION",
     "ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION",
     "ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION",
     "SCHEMA_VERSIONS",

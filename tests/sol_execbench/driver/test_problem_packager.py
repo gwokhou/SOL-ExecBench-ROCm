@@ -192,7 +192,7 @@ class TestInit:
         )
         path = pkg.output_dir / "workload.jsonl"
         assert path.exists()
-        lines = [l for l in path.read_text().splitlines() if l.strip()]
+        lines = [line for line in path.read_text().splitlines() if line.strip()]
         assert len(lines) == 2
 
     def test_solution_json_written(

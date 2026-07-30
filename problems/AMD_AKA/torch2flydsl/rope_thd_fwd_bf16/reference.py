@@ -24,7 +24,7 @@ def gen_structured_inputs(values, device):
     return {"cu_seqlens": cu, "freqs": freqs}
 
 
-def run(input, cu_seqlens, freqs):
+def run(input, cu_seqlens, freqs):  # noqa: A002 - benchmark ABI
     lengths = (cu_seqlens[1:] - cu_seqlens[:-1]).tolist()
     outputs = []
     for value in torch.split(input, lengths):

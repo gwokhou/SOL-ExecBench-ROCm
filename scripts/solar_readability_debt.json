@@ -80,9 +80,7 @@
     "src/solar/ir/extended_einsum/torchview/converter_parsing.py:ConverterParsingMixin._repair_torchview_quirks": 405,
     "src/solar/ir/extended_einsum/torchview/converter_pipeline.py:ConverterPipelineMixin._build_einsum_graph": 157,
     "src/solar/ir/extended_einsum/torchview/converter_recurrent.py:ConverterRecurrentMixin._expand_gru": 204,
-    "src/solar/ir/extended_einsum/torchview/converter_recurrent.py:ConverterRecurrentMixin._expand_lstm": 207,
-    "src/solar/ir/extended_einsum/torchview/semantics.py:build_semantic_operation": 118,
-    "src/solar/ir/extended_einsum/torchview/semantics.py:validate_semantic_graph": 148
+    "src/solar/ir/extended_einsum/torchview/converter_recurrent.py:ConverterRecurrentMixin._expand_lstm": 207
   },
   "oversized_modules": {},
   "wide_functions": {},

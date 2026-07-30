@@ -72,16 +72,6 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
         # the flattened edge_list which contains FunctionNodes (e.g., F.linear).
         # The hierarchy is useful for understanding module structure but edge_list
         # provides the actual computation graph with tensor flow.
-        #
-        #  Extract from node hierarchy if available (hierarchical module info)
-        # if hasattr(computation_graph, 'node_hierarchy') and computation_graph.node_hierarchy:
-        #     if self._is_hierarchy_useful(computation_graph.node_hierarchy):
-        #         if self.debug:
-        #             print("Extracting from node_hierarchy...")
-        #         return self._extract_from_hierarchy(
-        #             computation_graph.node_hierarchy, 'Model'
-        #         )
-
         # Extract from edge_list (flattened computation graph)
         if (
             hasattr(computation_graph, "edge_list")
@@ -91,10 +81,9 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
                 print(
                     f"Extracting from edge_list ({len(computation_graph.edge_list)} edges)..."
                 )
-            layer_nodes = self._extract_from_edge_list(
+            return self._extract_from_edge_list(
                 computation_graph, original_model
             )
-            return layer_nodes
 
         # Parse visual graph as fallback
         if hasattr(computation_graph, "visual_graph"):
@@ -320,7 +309,7 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
                 dtype = obj.dtype
                 if isinstance(dtype, torch.dtype):
                     return str(dtype)
-                elif isinstance(dtype, str):
+                if isinstance(dtype, str):
                     return dtype
 
             # Check for tensor attribute that might have dtype
@@ -473,8 +462,7 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
         if module is not None:
             module_info["module_args"] = self._extract_module_arguments(module)
         else:
-            # Fallback: parse the 'attributes' string from torchview
-            # Format: "Linear(training=False, in_features=64, out_features=64)"
+            # Fall back to torchview's serialized module attributes.
             if hasattr(node, "attributes") and node.attributes:
                 parsed = self._parse_module_attributes_string(node.attributes)
                 if parsed:
@@ -551,8 +539,7 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
         if not attributes:
             return result
 
-        # Extract module type from the beginning
-        # Format: "ModuleType(key=value, ...)"
+        # The leading token is the serialized module type.
 
         match = re.match(r"(\w+)\((.*)\)", attributes)
         if not match:
@@ -747,7 +734,7 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
                         ]
 
             elif node_name == "permute":
-                # permute(input, dims) or permute(input, *dims)
+                # Torchview may flatten dimensions or retain one sequence.
                 int_args = [arg for arg in scalar_args if isinstance(arg, int)]
                 if int_args:
                     result["permute_dims"] = int_args
@@ -769,7 +756,7 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
                 result["transpose_dims"] = [1, 0]
 
             elif node_name in ("view", "reshape"):
-                # view(input, *sizes) or reshape(input, shape)
+                # Torchview may flatten sizes or retain one shape sequence.
                 int_args = [arg for arg in scalar_args if isinstance(arg, int)]
                 if int_args:
                     result["target_shape"] = int_args
@@ -812,7 +799,7 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
                         if isinstance(arg, int):
                             result["dim"] = [arg]
                             break
-                        elif isinstance(arg, (list, tuple)) and all(
+                        if isinstance(arg, (list, tuple)) and all(
                             isinstance(d, int) for d in arg
                         ):
                             result["dim"] = list(arg)

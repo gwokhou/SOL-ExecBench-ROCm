@@ -1,63 +1,300 @@
-# SOLAR Dual-Path Handoff
+# gfx1200 Performance Diagnostics Handoff
 
 ## Repository state
 
-Handoff date: 2026-07-29
+Handoff date: 2026-07-30
 
-The dual-path implementation baseline is recorded by these DCO commits:
-
-```text
-35e0f836 Add fail-closed SOLAR path comparison
-24dfe9d6 Enable fixed dual-path SOLAR analysis
-c5510916 Expand AKA workload and correctness contracts
-```
-
-The commits contain `Signed-off-by: Guohao Zhang
-<akidezhang@outlook.com>`.
-
-## What is implemented
-
-SOLAR exposes exactly two reviewed extraction-to-IR paths:
+Branch `main` is three DCO-signed commits ahead of `origin/main`:
 
 ```text
-torchview_extended_einsum  (default)
-make_fx_aten
+079fdcb5 Implement gfx1200 diagnostic feedback loop
+54ef60d6 Harden performance diagnostic evidence validation
+16e11690 Implement microarchitecture diagnostics
 ```
 
-The `IRPath` enum binds the extractor, IR kind, and canonical graph filename.
-CLI and JSON/worker IPC boundaries normalize strings once. Internal requests
-hold a typed `IRPath`; properties and downstream workers do not repeatedly
-normalize it.
+The upstream base is:
 
-The following behavior is enforced:
+```text
+1bd7e798 Document microarchitecture diagnostics plan
+```
 
-- `analyze`, `corpus-audit`, and `release-build` select one path with
-  `--backend`.
-- Extractor and IR cannot be selected independently.
-- A command never falls back to the other path.
-- One release root cannot mix paths or resume with a different path.
-- Extended-einsum writes `einsum_graph.yaml`; ATen writes `aten_graph.yaml`.
-- Requests, results, attestations, corpus records, manifests, and release
-  indexes bind `ir_path`.
-- Resume and release verification reject path or artifact-name drift.
-- Exact ATen target/overload, output slots, aliases, and mutation effects are
-  preserved and replayed.
-- Structured inputs such as `cu_seqlens` are protected during zeros/boundary
-  verification through `preserved_input_indices`.
-- Resource analysis uses `amd_resource_v2`.
-- Unknown exact operations, unclassified resources, ambiguous Torchview input
-  binding, incomplete topology, and incomplete Orojenesis evidence remain
-  fail-closed.
+The worktree was clean before this handoff update. `HANDSOFF.md` is the only
+intended uncommitted change after the update. The three implementation commits
+have not been pushed.
 
-The default path has deliberately not changed from
-`torchview_extended_einsum`. New workloads may opt into `make_fx_aten`
-explicitly.
+The earlier SOLAR dual-path commits were rebased. Their current hashes are:
 
-## Verification already completed
+```text
+b5c92aee Add fail-closed SOLAR path comparison
+83c42d75 Enable fixed dual-path SOLAR analysis
+501676fe Expand AKA workload and correctness contracts
+```
 
-### Repository gates
+Do not use the obsolete pre-rebase hashes previously recorded in this file.
 
-The final tree passed:
+## Current implementation
+
+The new path is a diagnostic-only gfx1200 performance model. It does not change
+canonical Trace timing, `T_SOL`, SOL Score, leaderboard values, or rewards.
+The model and artifact contracts are:
+
+```text
+model: gfx1200_diagnostic.v2
+diagnostic: sol_execbench.performance_diagnostic.v2
+calibration: sol_execbench.diagnostic_calibration.v2
+evidence manifest: sol_execbench.performance_evidence_manifest.v1
+timing evidence: sol_execbench.performance_timing_evidence.v1
+acceptance: sol_execbench.diagnostic_acceptance.v1
+```
+
+### Governed evidence collection
+
+Evaluation now has an explicit single-workload counter mode:
+
+```bash
+uv run sol-execbench --format json evaluate PROBLEM_DIR \
+  --solution SOLUTION.json \
+  --workload-uuid WORKLOAD_UUID \
+  --profile rocprofv3-counters \
+  --static-evidence auto \
+  --output TRACE.jsonl
+```
+
+The unprofiled canonical run happens first. Counter collection is a later
+diagnostic replay and cannot replace canonical timing. The workflow writes:
+
+```text
+TRACE.jsonl.performance-timing.json
+TRACE.jsonl.performance-evidence.json
+```
+
+The timing sidecar binds the exact trial/iteration samples and a deterministic
+10,000-replicate hierarchical-bootstrap interval. The evidence manifest binds
+the definition, workload, solution, compile command/compiler, code objects,
+GPU/ROCm/clock identity, Trace, timing sidecar, static ISA, counter CSV, ROCPD,
+and counter provenance by SHA-256.
+
+The rocprofv3 counter path:
+
+- selects counters from the versioned gfx1200 manifest;
+- checks availability through `rocprofv3-avail`;
+- preserves raw CSV and ROCPD evidence;
+- aligns passes by workload, candidate, kernel, launch geometry, queue, and
+  iteration;
+- rejects missing queue identity, multi-queue execution, overlap, incomplete
+  passes, counter mismatch, and candidate/code-object drift;
+- never uses profiler duration or achieved throughput as a prediction input.
+
+HIP/C++ candidates with inspectable code objects can produce complete hardware
+evidence. Candidate forms without a content-bound code object remain partial.
+
+### Prediction and attribution
+
+The admitted semantic families are intentionally narrow:
+
+- contiguous FP32/BF16 elementwise graphs;
+- out-of-place 2D FP16/BF16/FP32 transpose;
+- last-axis sum, mean, and RMSNorm with BF16/FP32 input and FP32 accumulation;
+- contiguous FP16 GEMM/BMM with FP32 accumulation and output.
+
+`T_pred(IR)` consumes verified SOLAR work and fusion regions.
+`T_pred(HW)` consumes actual dispatch decomposition, ISA/resource footprint,
+dynamic counters, and the compatible calibration profile. Unsupported
+semantics, missing evidence, identity drift, calibration range misses, and
+overlap return explicit `partial`/`unavailable` reason codes.
+
+The diagnostic reports:
+
+```text
+L = T_frontier / T_SOL
+C = T_pred(HW) / T_pred(IR)
+R = T_measured / T_pred(HW)
+```
+
+`L` is unavailable unless the caller supplies a trusted frontier Trace.
+The scoring baseline is never substituted for a frontier. Ratio and action
+selection account for prediction intervals and canonical timing noise.
+Ratios materially below one are treated as identity/model contradictions, not
+as evidence that a candidate exceeded the model.
+
+Build a diagnostic with:
+
+```bash
+uv run sol-execbench --format json diagnostics performance \
+  --evidence-manifest TRACE.jsonl.performance-evidence.json \
+  --solar-manifest SOLAR_REQUEST/manifest.yaml \
+  --calibration-profile CALIBRATION.json \
+  --output TRACE.performance-diagnostic.json
+```
+
+`--frontier-trace FRONTIER.jsonl` is optional.
+
+### Calibration, acceptance, and Agent feedback
+
+The calibration workflow uses a frozen two-phase protocol: tuning followed by
+at least five fresh parameter-estimation processes. Its audit binds GPU UUID,
+BDF, gfx target, ROCm, compiler, code object, clock/power state, frozen
+configuration, and all input evidence hashes.
+
+The independent acceptance contract requires at least ten non-tuning held-out
+cases in each of the four supported families, at least 40 cases total. It
+accepts the model only when:
+
+```text
+median absolute percentage error <= 15%
+P90 absolute percentage error    <= 30%
+expected primary attribution     matches every family
+```
+
+Agent feedback requires the exact accepted calibration identity and profile
+hash, a current diagnostic, and its exact evidence manifest:
+
+```bash
+uv run sol-execbench --format json diagnostics agent-feedback \
+  --performance-diagnostic TRACE.performance-diagnostic.json \
+  --evidence-manifest TRACE.jsonl.performance-evidence.json \
+  --acceptance ACCEPTANCE.json \
+  --output TRACE.performance-agent-feedback.json
+```
+
+Partial or ungoverned diagnostics can request new evidence or report a model
+gap, but cannot recommend a kernel code change. Stable actions cover launch
+bound search, dispatch reduction, WMMA restoration, excess traffic,
+coalescing, LDS/barrier pressure, missing counters, and model gaps.
+
+## Verification completed
+
+The following focused CPU/contract tests were rerun on the current `HEAD`
+during this handoff update and passed:
+
+```bash
+uv run pytest tests/sol_execbench/core/bench/performance_model
+uv run pytest \
+  tests/sol_execbench/cli/commands/test_diagnostics_performance.py
+uv run pytest \
+  tests/sol_execbench/cli/evaluation/test_runtime.py \
+  tests/sol_execbench/cli/evaluation/test_compilation.py
+uv run pytest tests/sol_execbench/core/bench/test_agent_feedback.py
+uv run pytest \
+  tests/sol_execbench/core/bench/test_rdna4_performance_model_acceptance.py
+uv run pytest tests/sol_execbench/cli/sidecars/test_profile.py
+uv run pytest tests/sol_execbench/core/bench/test_staged_evaluation.py
+```
+
+No gfx1200 calibration, counter-collection matrix, or independent held-out
+acceptance run was performed as part of this update. There is no reviewed
+calibration/acceptance artifact in the repository. The model must therefore be
+treated as implemented but not hardware-accepted.
+
+The following static and quality gates were also rerun and passed:
+
+```bash
+uv run --no-sync ty check
+uv run --no-sync python scripts/check_coupling.py
+uv run --no-sync python scripts/check_readability.py
+uv run --no-sync python scripts/check_production_reachability.py
+uv run --no-sync python scripts/check_current_docs.py
+uv run --with ruff ruff check .
+uv run --with ruff ruff format --check .
+git diff --check
+```
+
+The schema-version gate currently fails:
+
+```text
+scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py:
+  unsupported schema identifier
+  sol_execbench.diagnostic_calibration_audit.v2
+
+src/sol_execbench/core/bench/rocm_profiler/counters.py:
+src/sol_execbench/data/rocprofv3_counters/gfx1200_v1.yaml:
+  unsupported schema identifier
+  sol_execbench.rocprofv3_counter_manifest.v1
+```
+
+This is a pre-existing gap in the three diagnostic commits, not a failure
+introduced by the handoff edit. No full-suite result was recorded in the prior
+handoff, and the full repository Pytest suite was not rerun during this update.
+Do not infer full-tree validation from the focused results.
+
+## Next work
+
+### P0: Repair the schema registry gate
+
+Register the calibration-audit and counter-manifest artifact families in the
+single canonical schema-version policy, update the focused schema tests, and
+rerun:
+
+```bash
+uv run --no-sync python scripts/check_schema_versions.py
+```
+
+Do not silence the scanner, add local allowlists, or preserve obsolete schema
+identifiers as compatibility aliases. Confirm that producers, parsers, package
+data, tests, and documentation use the same canonical identifiers.
+
+### P0: Run the governed gfx1200 calibration
+
+Run on the intended RX 9060 XT/gfx1200 host, outside a sandbox that hides
+`/dev/kfd` or `/dev/dri`:
+
+```bash
+uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
+  --output CALIBRATION.json \
+  --gpu-id GPU_UUID \
+  --estimation-batches 5
+```
+
+Before trusting the result:
+
+1. Confirm the audit has one tuning phase and at least five independent
+   parameter-estimation process records.
+2. Confirm GPU UUID/BDF, gfx1200, ROCm, hipcc, code-object, clock, and power
+   identities are complete and stable.
+3. Confirm every referenced artifact hash verifies.
+4. Review parameter intervals and applicability ranges; do not fill gaps with
+   representative shapes, nominal peaks, measured candidate throughput, or
+   locally asserted provenance.
+5. Freeze the configuration and calibration profile before collecting
+   acceptance cases.
+
+Any sandbox-only GPU failure must be retried as the same bounded host command
+before concluding that a counter, compiler, driver, or device feature is
+unsupported.
+
+### P0: Collect and pass independent held-out acceptance
+
+Prepare at least ten independent cases for each of elementwise, transpose,
+reduction/norm, and matmul. For every case:
+
+1. Produce a canonical single-workload Trace and governed counter evidence.
+2. Produce the exact eligible SOLAR manifest.
+3. Build the v2 diagnostic against the frozen calibration.
+4. Record content hashes, predicted time, canonical measured time, and primary
+   attribution in the acceptance manifest.
+5. Prove that the workload/candidate was not used for tuning or parameter
+   estimation.
+
+Then run:
+
+```bash
+uv run python \
+  scripts/internal/rdna4/verify_rdna4_diagnostic_acceptance.py \
+  --manifest HELD_OUT_MANIFEST.json \
+  --output ACCEPTANCE.json
+```
+
+Do not weaken the 15% median, 30% P90, coverage, independence, or attribution
+requirements to make the first run pass. Investigate model or evidence defects,
+repeat calibration when justified, refreeze, and collect a new independent
+acceptance set.
+
+Only an accepted result for the exact calibration profile authorizes
+code-changing Agent feedback.
+
+### P1: Run full repository gates
+
+After hardware-facing fixes, run:
 
 ```bash
 uv run pytest tests/
@@ -72,95 +309,11 @@ uv run --with ruff ruff format --check .
 git diff --check
 ```
 
-Do not raise readability, coupling, or quality baselines to accommodate later
-changes.
+Do not raise readability, coupling, or quality baselines.
 
-### GPU audits
+### P1: Complete the SOLAR release evidence
 
-The host used for validation was:
-
-```text
-AMD Radeon RX 9060 XT
-gfx1200
-ROCm device cuda:0
-```
-
-Current focused conversion/replay results for the eight new problems and 41
-workloads:
-
-| Path | Conversion/replay |
-| --- | ---: |
-| `make_fx_aten` | 41/41 ready |
-| `torchview_extended_einsum` | 41/41 ready |
-
-The previous nine Torchview failures were fixed generically:
-
-- 0-D RecorderTensor edges now retain their exact producer identity;
-- positional and keyword tensor arguments share one ordered trace contract;
-- root TensorNodes carry their exact reference source indices.
-
-No problem-name special cases or shape/dtype source-binding guesses were added.
-Strict resource analysis and cross-path accounting have not been rerun for the
-nine newly ready workloads, so 41-workload accounting equivalence is not
-established.
-
-The current full scored-corpus conversion audit produces:
-
-| Path | Ready | Failure summary |
-| --- | ---: | --- |
-| `make_fx_aten` | 163/163 | none |
-| `torchview_extended_einsum` | 159/163 | 4 graph extraction |
-
-The four remaining failures are every workload in
-`instruction2triton/rmsnorm_bwd`. Vendored Torchview executes its trace under
-`torch.no_grad()` and cannot represent the reference's explicit autograd
-backward graph. Enabling gradients only records the forward graph and omits
-`grad_output` plus both gradient outputs, so that is not a valid coverage fix.
-These workloads remain fail-closed at `graph_extraction`.
-
-The current 159/163 result is development evidence. Rerun the complete matrix
-on the exact reviewed source before publishing evidence.
-
-Temporary evidence currently exists at:
-
-```text
-/tmp/solar-audit-makefx-new41-final/focused-summary.json
-/tmp/solar-analysis-makefx-new41-final/analysis-summary.json
-/tmp/solar-audit-torchview-new41-final/focused-summary.json
-/tmp/solar-analysis-torchview-new41-final/analysis-summary.json
-/tmp/solar-dual-path-comparison-final.json
-/tmp/solar-corpus-audit-makefx-full-v1/summary.json
-/tmp/solar-corpus-audit-torchview-coverage-v6/summary.json
-```
-
-These files are not committed and may disappear. They are development evidence,
-not publication artifacts.
-
-### Cross-path comparison
-
-Thirty-two new workloads are ready on both paths. Their exact replay succeeds
-against the same reference contract, but the current analysis artifacts do not
-establish cross-path equivalence:
-
-```text
-dual ready workloads:          32
-model I/O accounting mismatch: 32
-resource-work mismatch:        12
-formal-bound mismatch:         32
-```
-
-The comparison script used for this check is `/tmp/compare_solar_paths.py`.
-It is an ad hoc diagnostic, not a repository-owned verifier.
-
-Never select the lower or otherwise more favorable result automatically. A
-successful replay on both paths proves each path against the reference; it does
-not prove that their graph accounting or formal lower bounds are equivalent.
-
-## Next work
-
-### P0: Produce and review release evidence
-
-Official scoring is intentionally still unavailable:
+The diagnostic work does not unblock official scoring. Current policy remains:
 
 ```yaml
 official_scoring:
@@ -169,181 +322,108 @@ official_scoring:
   reason_code: baseline_v2_release_evidence_pending
 ```
 
-Do not change this policy merely because conversion readiness is complete.
-Availability requires a reviewed, content-addressed release bundle.
+The previous development audit reported MakeFX readiness at 163/163 and
+Torchview readiness at 159/163. The four Torchview failures are the explicit
+backward references in `instruction2triton/rmsnorm_bwd`; a forward-only trace
+is not a valid fix. These results were not rerun on the diagnostic `HEAD` and
+must not be presented as release evidence.
 
-1. Start from a clean checkout of `24dfe9d6` plus any reviewed follow-up
-   commits.
-2. Reproduce the pinned Orojenesis mapper:
+The repository-owned comparison covers 32 dual-ready workloads and reports
+agreement in external identity, model I/O, mandatory work, limiting resource,
+and formal bound. Internal fusion/intermediate accounting differs because of
+the two dialect decompositions. The nine later Torchview coverage fixes have
+not been added to a reviewed 41-workload comparison.
 
-   ```bash
-   scripts/internal/orojenesis/verify_reproducible_build.sh \
-     out/orojenesis-reproducible
-   ```
+Rerun the complete audits and comparison on the exact release source:
 
-3. Verify that the two clean builds, provenance, and mapper digest are
-   byte-identical. The reviewed digest currently allowlisted in
-   `src/solar/analysis/orojenesis/configuration.py` is:
+```bash
+uv run sol-execbench solar corpus-audit \
+  /tmp/solar-corpus-audit-makefx-release \
+  --backend make_fx_aten \
+  --device cuda:0
 
-   ```text
-   18591892b1ecec3264ec729b0e457ec9f22422993f656ece40dba809c032d77a
-   ```
+uv run sol-execbench solar corpus-audit \
+  /tmp/solar-corpus-audit-torchview-release \
+  --backend torchview_extended_einsum \
+  --device cuda:0
 
-   Do not trust a locally self-declared provenance file or silently update the
-   allowlist.
-
-4. Rerun the complete scored-corpus audit on the exact release source:
-
-   ```bash
-   uv run sol-execbench solar corpus-audit \
-     /tmp/solar-corpus-audit-makefx-release \
-     --backend make_fx_aten \
-     --device cuda:0
-
-   uv run sol-execbench solar corpus-audit \
-     /tmp/solar-corpus-audit-torchview-release \
-     --backend torchview_extended_einsum \
-     --device cuda:0
-   ```
-
-5. Build the canonical baseline and execute it in the pinned container:
-
-   ```bash
-   uv run sol-execbench baseline release-build out/release-makefx \
-     --baseline-id rx9060xt-gfx1200-reference-v2 \
-     --source-revision SOURCE_GIT_SHA
-
-   ./scripts/run_docker.sh -- sol-execbench baseline release-run \
-     /outputs/release-makefx/baseline/plan.json
-   ```
-
-6. Build the formal SOLAR denominator with one explicit path. MakeFX is the
-   current practical candidate because all 163 workloads pass its strict
-   conversion audit:
-
-   ```bash
-   uv run sol-execbench solar release-build out/release-makefx \
-     --backend make_fx_aten \
-     --orojenesis-home /path/to/reviewed/orojenesis
-   ```
-
-   If a Torchview release is also required, use a separate release root. Never
-   mix the two paths within one index.
-
-7. Build statements, assemble the bundle, and run the official verifier as
-   documented in `docs/user/RELEASE-SCORING.md`.
-8. Review every missing/unsupported contraction proof and every release
-   verifier failure. Do not downgrade a formal requirement to diagnostic
-   output.
-9. Only after the repository-owned release evidence is complete and reviewed
-   should a separate change update the official-scoring policy.
-
-No hardware peak recalibration is required solely for `amd_resource_v2`: the
-resource kinds and peak values did not change. The architecture profile hash
-is pinned to:
-
-```text
-55cd3f60ead976732130ab23c9e76b526f9435e2fa7e100707b1c75ae1a459cb
+uv run sol-execbench solar compare-paths \
+  /tmp/solar-corpus-audit-makefx-release \
+  /tmp/solar-corpus-audit-torchview-release \
+  --output /tmp/solar-path-comparison-release.json
 ```
 
-If peak values or resource kinds change later, treat that as a new calibration
-task rather than reusing this conclusion.
-
-### P1: Explain cross-path accounting differences
-
-Before claiming equivalence, add a repository-owned comparison contract that
-separates:
-
-- external reference input/output identity;
-- graph-level model I/O accounting;
-- per-resource mandatory work;
-- fusion and intermediate accounting;
-- limiting resource and final lower bound.
-
-For each mismatch, identify whether it is:
-
-- an extraction/topology loss;
-- a normalization difference;
-- a legitimate dialect decomposition difference;
-- a resource-model bug;
-- or a formal-bound policy difference.
-
-The comparison must report differences and fail closed. It must not choose a
-preferred path, average bounds, or treat numerically matching replay outputs as
-proof of equal resource work.
-
-### P2: Improve Torchview coverage generically
-
-The generic source-binding, tensor-kwargs, functional-linear, multi-output
-reduction, and non-finite scalar gaps are closed. The complete matrix is
-159/163. The remaining work is explicit backward-reference support:
-
-1. Define a reviewed Torchview-path contract that represents backward
-   operations, upstream gradients, and ordered gradient outputs explicitly.
-2. Do not reuse the MakeFX extractor or restore a prohibited cross-path
-   extractor/IR combination.
-3. Add focused CPU exact-replay tests for explicit backward references.
-4. Rerun all four `rmsnorm_bwd` GPU rows, then the complete 163-workload matrix.
-5. Keep the current graph-extraction failures until the full dependency graph
-   is represented and exact replay succeeds.
-
-Do not count a forward-only trace as improvement: it omits the defining
-backward work and is not equivalent to the reference.
+Follow `docs/user/RELEASE-SCORING.md` for reproducible Orojenesis, canonical
+baseline, SOLAR release, statement construction, bundle assembly, and official
+verification. Do not change the policy until reviewed content-addressed release
+evidence exists.
 
 ## Important invariants
 
-- Keep `torchview_extended_einsum` as the default unless a separate reviewed
-  contract change explicitly switches it.
-- Do not restore `--extractor`.
-- Do not restore
-  `src/solar/ir/extended_einsum/make_fx_conversion.py`; that module represented
-  a prohibited cross-path combination.
-- Do not add automatic fallback, per-workload backend selection, or resume
-  across paths.
-- Keep exact target/overload and explicit alias/mutation effects.
-- Do not replace exact replay with an operation-name whitelist.
-- Keep structured input preservation in the request, attestation, manifest,
-  and resume identity.
-- Reachable or effectful uninitialized allocations must remain rejected.
-- Unknown operations and unclassified resource work must remain errors.
-- Do not commit `/tmp`, downloaded data, benchmark output, kernels, tokens, or
-  proprietary evidence.
-- GPU conclusions require host execution when the sandbox hides `/dev/kfd` or
-  `/dev/dri`.
-- Run commits with DCO signing:
+- Performance diagnostics remain diagnostic-only.
+- Canonical execution happens before profiler replay.
+- Canonical timing comes only from the unprofiled Trace.
+- Profiler duration, achieved rate, and the candidate's measured runtime never
+  enter `T_pred(IR)` or `T_pred(HW)`.
+- Evidence identity and hashes fail closed; do not add guessed fallbacks.
+- Multi-queue execution and overlapping dispatches remain unsupported until a
+  reviewed overlap model exists.
+- An unavailable frontier keeps `L` unavailable.
+- Partial diagnostics cannot request kernel code changes.
+- Tuning or parameter-estimation samples cannot enter held-out acceptance.
+- Keep `torchview_extended_einsum` as the default SOLAR path.
+- Do not restore `--extractor`, automatic path fallback, mixed release roots, or
+  the retired extended-einsum MakeFX conversion.
+- Unknown SOLAR operations and unclassified resource work remain errors.
+- Do not commit GPU evidence, benchmark outputs, downloaded data, kernels,
+  tokens, or proprietary inputs.
+- GPU conclusions require a bounded host retry when the sandbox hides required
+  devices or runtime resources.
+- Use DCO signing for later commits:
 
   ```bash
   git commit -s -m "Imperative summary"
   ```
 
-## Key implementation locations
+## Key locations
 
 ```text
-src/solar/ir/contracts.py
-    IRPath and fixed extractor/IR/artifact bindings
+docs/performance-diagnostics.md
+    user workflow and current diagnostic contract
 
-src/solar/contracts.py
-    typed conversion request and manifest contract
+microarchitecture_diagnostics_plan.md
+    scope, design decisions, and deferred work
 
-src/sol_execbench/core/solar_bridge/
-    CLI/process boundary, corpus audit, release path identity
+src/sol_execbench/core/bench/performance_model/
+    contracts, prediction, attribution, calibration, acceptance, governance,
+    timing evidence, and evidence manifest
 
-src/solar/graph/reference_serializer.py
-src/solar/ir/aten/conversion.py
-src/solar/verification/
-    exact ATen schema/effects/replay and protected inputs
+src/sol_execbench/core/bench/rocm_profiler/
+    counter discovery, collection, parsing, and pass alignment
 
-src/solar/graph/torchview/
-src/solar/ir/extended_einsum/torchview/
-    exact source binding and multi-output Torchview topology
+src/sol_execbench/cli/sidecars/performance.py
+    evaluation-time timing/evidence sidecar construction
 
-src/solar/analysis/resources.py
-src/solar/rocm/profiles/RX_9060_XT.yaml
-    amd_resource_v2 formulas and pinned architecture identity
+src/sol_execbench/core/solar_bridge/performance.py
+    validated SOLAR-to-diagnostic boundary
+
+src/sol_execbench/cli/commands/diagnostics.py
+    performance diagnostic and governed Agent-feedback commands
+
+scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py
+scripts/internal/rdna4/verify_rdna4_diagnostic_acceptance.py
+    host calibration and held-out acceptance entry points
+
+src/sol_execbench/data/rocprofv3_counters/gfx1200_v1.yaml
+    versioned gfx1200 counter groups
+
+src/sol_execbench/data/hardware_calibration_probes/diagnostic_microarchitecture.hip
+    packaged calibration probe source
 
 docs/user/RELEASE-SCORING.md
-    authoritative release workflow
+docs/user/CROSS-PATH-COMPARISON.md
+    outstanding SOLAR publication workflow and comparison contract
 ```
 
-Before changing code, re-read `AGENTS.md` and `/home/guohao/.codex/RTK.md`.
-Repository shell commands must be prefixed with `rtk`.
+Before changing code, re-read `AGENTS.md` and
+`/home/guohao/.codex/RTK.md`. Prefix repository shell commands with `rtk`.

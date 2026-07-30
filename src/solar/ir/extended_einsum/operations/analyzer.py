@@ -323,15 +323,15 @@ class EinsumAnalyzer:
         """Infer output shape for conv ops when not provided."""
         try:
             if op_norm == "conv1d":
-                b, _c, l = input_shape
+                batch, _channels, input_length = input_shape
                 o, _c2, k = weight_shape
                 stride_1d = int((kwargs.get("stride") or (1,))[0])
                 padding_1d = int((kwargs.get("padding") or (0,))[0])
                 dilation_1d = int((kwargs.get("dilation") or (1,))[0])
                 l_out = (
-                    l + 2 * padding_1d - dilation_1d * (k - 1) - 1
+                    input_length + 2 * padding_1d - dilation_1d * (k - 1) - 1
                 ) // stride_1d + 1
-                return [b, o, l_out]
+                return [batch, o, l_out]
 
             if op_norm == "conv3d":
                 b, _c, d, h, w = input_shape

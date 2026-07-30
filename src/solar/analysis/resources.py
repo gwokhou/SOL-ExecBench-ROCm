@@ -15,171 +15,70 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from solar.ir.contracts import layer_operation
+from solar.analysis.resource_targets import (
+    _ATOMIC_OPS,
+    _COMPOSITE_SFU_OPS,
+    _CONVERSION_OPS,
+    _INDEX_OPS,
+    _LOSS_OPS,
+    _MEMORY_ONLY_OPS,
+    _MFMA_OPS,
+    _NORMALIZATION_OPS,
+    _REDUCTION_OPS,
+    _SCAN_SORT_OPS,
+    _SFU_OPS,
+    _VALU_OPS,
+    _VARIANCE_OPS,
+    _VIEW_OPS,
+)
+from solar.ir.contracts import (
+    layer_operation,
+    operation_attributes,
+    operation_operands,
+)
 from solar.precision import normalize_dtype
 from solar.schema_versions import AMD_RESOURCE_MODEL_VERSION
 
 RESOURCE_MODEL_VERSION = AMD_RESOURCE_MODEL_VERSION
 
-_VIEW_OPS = frozenset(
-    {
-        "detach",
-        "expand",
-        "flatten",
-        "getitem",
-        "identity",
-        "narrow",
-        "permute",
-        "reshape",
-        "select",
-        "slice",
-        "squeeze",
-        "transpose",
-        "unsqueeze",
-        "view",
-    },
-)
-_MEMORY_ONLY_OPS = frozenset(
-    {
-        "cat",
-        "chunk",
-        "clone",
-        "contiguous",
-        "copy",
-        "copy_",
-        "pad",
-        "repeat",
-        "repeat_interleave",
-        "split",
-        "stack",
-        "tensor_split",
-        "vstack",
-    },
-)
-_MFMA_OPS = frozenset(
-    {
-        "addmm",
-        "bmm",
-        "conv1d",
-        "conv2d",
-        "conv3d",
-        "conv_transpose1d",
-        "conv_transpose2d",
-        "conv_transpose3d",
-        "linear",
-        "matmul",
-        "mm",
-    },
-)
-_SFU_OPS = frozenset(
-    {
-        "cos",
-        "exp",
-        "exp2",
-        "floor",
-        "log",
-        "log2",
-        "pow",
-        "rsqrt",
-        "sin",
-        "sqrt",
-        "tanh",
-    },
-)
-_LOSS_OPS = frozenset(
-    {
-        "cross_entropy",
-        "cross_entropy_loss",
-        "kl_div",
-        "nll_loss",
-        "nll_loss_forward",
-        "xlogy",
-    },
-)
-_COMPOSITE_SFU_OPS = frozenset(
-    {
-        "elu",
-        "gelu",
-        "hardsigmoid",
-        "hardswish",
-        "mish",
-        "sigmoid",
-        "silu",
-        "softplus",
-    },
-)
-_REDUCTION_OPS = frozenset(
-    {"amax", "amin", "argmax", "argmin", "logsumexp", "mean", "prod", "sum"},
-)
-_VARIANCE_OPS = frozenset({"std", "std_mean", "var", "var_mean"})
-_NORMALIZATION_OPS = frozenset(
-    {"batch_norm", "group_norm", "layer_norm", "log_softmax", "softmax"},
-)
-_ATOMIC_OPS = frozenset(
-    {
-        "__setitem__",
-        "index_add",
-        "index_copy",
-        "index_put",
-        "scatter",
-        "scatter_add",
-    },
-)
-_SCAN_SORT_OPS = frozenset(
-    {"argsort", "cummax", "cummin", "cumprod", "cumsum", "sort", "topk"},
-)
-_CONVERSION_OPS = frozenset(
-    {
-        "bfloat16",
-        "dequantize",
-        "fake_quantize_per_channel_affine",
-        "fake_quantize_per_tensor_affine",
-        "float",
-        "half",
-        "int",
-        "long",
-        "quantize_per_channel",
-        "quantize_per_tensor",
-        "to",
-        "type",
-        "type_as",
-    },
-)
-_INDEX_OPS = frozenset(
-    {"embedding", "embedding_bag", "gather", "index_select", "tril", "triu"},
-)
-_VALU_OPS = frozenset(
-    {
-        "abs",
-        "add",
-        "bitwise_and",
-        "bitwise_not",
-        "clamp",
-        "div",
-        "eq",
-        "ge",
-        "gt",
-        "le",
-        "lt",
-        "maximum",
-        "masked_fill",
-        "minimum",
-        "mul",
-        "ne",
-        "neg",
-        "ones_like",
-        "relu",
-        "square",
-        "sub",
-        "where",
-        "zeros_like",
-    },
-)
-
 
 def is_mfma_operation(target: str) -> bool:
     """Return whether a canonical operation is modeled as an MFMA contraction."""
     return target in _MFMA_OPS
+
+
+def mandatory_mfma_macs(
+    target: str,
+    input_shapes: list[Any],
+    output_shapes: list[Any],
+    semantic: Mapping[str, Any],
+) -> int:
+    """Return exact dense MAC count for canonical public contractions."""
+    if not input_shapes or not output_shapes:
+        return 0
+    output_n = max(_elements(output_shapes), default=0)
+    if target in {"mm", "bmm", "matmul"} and len(input_shapes) >= 2:
+        left = input_shapes[0]
+        return output_n * int(left[-1]) if left else 0
+    if target == "addmm" and len(input_shapes) >= 3:
+        left = input_shapes[1]
+        return output_n * int(left[-1]) if left else 0
+    if target == "linear" and len(input_shapes) >= 2:
+        activation = input_shapes[0]
+        return output_n * int(activation[-1]) if activation else 0
+    if target.startswith("conv_transpose") and len(input_shapes) >= 2:
+        activation, weight = input_shapes[:2]
+        if len(activation) < 2 or len(weight) < 3:
+            return 0
+        groups = int(_unwrap(operation_attributes(semantic).get("groups", 1)))
+        kernel = math.prod(int(item) for item in weight[2:])
+        return output_n * int(activation[1]) * kernel // max(1, groups)
+    if target.startswith("conv") and len(input_shapes) >= 2:
+        weight = input_shapes[1]
+        if len(weight) < 3:
+            return 0
+        return output_n * math.prod(int(item) for item in weight[1:])
+    return 0
 
 
 class ResourceClassificationError(ValueError):
@@ -198,7 +97,16 @@ def _elements(shapes: list[Any]) -> list[int]:
     result: list[int] = []
     for shape in shapes:
         if isinstance(shape, list):
-            result.append(int(math.prod(int(dim) for dim in shape)))
+            result.append(
+                int(
+                    math.prod(
+                        int(dim["lower"])
+                        if isinstance(dim, Mapping)
+                        else int(dim)
+                        for dim in shape
+                    )
+                )
+            )
         else:
             result.append(0)
     return result
@@ -226,12 +134,12 @@ def _reduction_groups(
 ) -> int:
     if not shape:
         return 1
-    kwargs = semantic.get("kwargs") or {}
+    kwargs = operation_attributes(semantic)
     dim = _unwrap(kwargs.get("dim"))
     if dim is None:
         positional = [
             _unwrap(argument)
-            for argument in (semantic.get("arguments") or [])
+            for argument in operation_operands(semantic)
             if not (isinstance(argument, Mapping) and "tensor" in argument)
         ]
         if positional:
@@ -288,10 +196,21 @@ class _ResourceContext:
         if target.endswith("_") and not target.endswith("__"):
             target = target[:-1]
         target = {
+            "_adaptive_avg_pool2d": "adaptive_avg_pool2d",
+            "_embedding_bag_forward_only": "embedding_bag",
+            "_fft_c2c": "fft",
+            "_fft_r2c": "fft",
+            "_fused_rms_norm": "rms_norm",
             "_to_copy": "to",
+            "grid_sampler_2d": "grid_sample",
+            "linalg_vector_norm": "vector_norm",
+            "max_pool2d_with_indices": "max_pool2d",
             "miopen_batch_norm": "batch_norm",
             "native_batch_norm": "batch_norm",
             "split_with_sizes": "split",
+            "upsample_bicubic2d": "interpolate",
+            "upsample_bilinear2d": "interpolate",
+            "upsample_nearest2d": "interpolate",
         }.get(target, target)
         shapes = layer.get("tensor_shapes") or {}
         input_shapes = list(shapes.get("inputs") or [])
@@ -489,6 +408,155 @@ def _scan_sort_rule(
         context.mode,
         max(context.input_n, context.output_n),
         "one mandatory item visit",
+    )
+    return _MATCHED
+
+
+def _nonzero_rule(
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
+) -> _RuleResult:
+    if context.target != "nonzero":
+        return _NO_MATCH
+    accumulator.add(
+        "scan_sort",
+        "integer",
+        context.input_n,
+        "one predicate/scan visit per input element",
+    )
+    accumulator.add(
+        "valu",
+        "integer",
+        sum(context.output_elements),
+        "one emitted coordinate per nonzero output element",
+    )
+    return _MATCHED
+
+
+def _pooling_rule(
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
+) -> _RuleResult:
+    if context.target not in {
+        "adaptive_avg_pool2d",
+        "avg_pool2d",
+        "max_pool2d",
+    }:
+        return _NO_MATCH
+    accumulator.add(
+        "reduction",
+        context.mode,
+        max(0, context.input_n - context.output_n),
+        "conservative input visits minus pooled outputs",
+    )
+    if context.target != "max_pool2d":
+        accumulator.add(
+            "valu",
+            context.mode,
+            context.output_n,
+            "one normalization per average-pool output",
+        )
+    return _MATCHED
+
+
+def _resampling_rule(
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
+) -> _RuleResult:
+    if context.target not in {"grid_sample", "interpolate"}:
+        return _NO_MATCH
+    accumulator.add(
+        "valu",
+        context.mode,
+        context.output_n,
+        "at least one interpolation/sample selection per output",
+    )
+    accumulator.add(
+        "valu",
+        "integer",
+        context.output_n,
+        "at least one source-coordinate calculation per output",
+    )
+    return _MATCHED
+
+
+def _vector_norm_rule(
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
+) -> _RuleResult:
+    if context.target != "vector_norm":
+        return _NO_MATCH
+    groups = max(1, context.output_n)
+    accumulator.add(
+        "valu",
+        context.mode,
+        context.input_n,
+        "one magnitude/power contribution per input",
+    )
+    accumulator.add(
+        "reduction",
+        context.mode,
+        max(0, context.input_n - groups),
+        "norm contribution combines",
+    )
+    accumulator.add(
+        "sfu",
+        context.mode,
+        groups,
+        "one root/power normalization per norm output",
+    )
+    return _MATCHED
+
+
+def _embedding_bag_rule(
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
+) -> _RuleResult:
+    if context.target != "embedding_bag":
+        return _NO_MATCH
+    indices = context.input_elements[0] if context.input_elements else 0
+    output_shape = context.output_shapes[0] if context.output_shapes else []
+    embedding_width = int(output_shape[-1]) if output_shape else 1
+    contributions = indices * embedding_width
+    accumulator.add(
+        "valu",
+        "integer",
+        indices,
+        "one embedding address calculation per index",
+    )
+    accumulator.add(
+        "reduction",
+        context.mode,
+        max(0, contributions - context.output_n),
+        "embedding contributions minus bag outputs",
+    )
+    return _MATCHED
+
+
+def _fft_rule(
+    context: _ResourceContext,
+    accumulator: _ResourceAccumulator,
+) -> _RuleResult:
+    if context.target != "fft":
+        return _NO_MATCH
+    source_mode = normalize_dtype(context.dtype, context.fallback_precision)
+    mode = {
+        "complex32": "fp16",
+        "complex64": "fp32",
+        "complex128": "fp64",
+    }.get(source_mode, source_mode)
+    stages = max(1, math.ceil(math.log2(max(2, context.input_n))))
+    accumulator.add(
+        "valu",
+        mode,
+        4 * context.output_n * stages,
+        "complex butterfly real additions",
+    )
+    accumulator.add(
+        "valu",
+        mode,
+        4 * context.output_n * stages,
+        "complex butterfly real multiplications",
     )
     return _MATCHED
 
@@ -715,7 +783,7 @@ def _reduction_rule(
     combines = max(0, context.input_n - groups)
     accumulator.add(
         "reduction",
-        context.mode,
+        "integer" if context.target in {"all", "any"} else context.mode,
         combines,
         "input elements minus reduction groups",
     )
@@ -831,6 +899,12 @@ _RESOURCE_RULES: tuple[_ResourceRule, ...] = (
     _memory_rule,
     _atomic_rule,
     _scan_sort_rule,
+    _nonzero_rule,
+    _pooling_rule,
+    _resampling_rule,
+    _vector_norm_rule,
+    _embedding_bag_rule,
+    _fft_rule,
     _conversion_rule,
     _normalization_rule,
     _loss_rule,
@@ -910,6 +984,7 @@ __all__ = [
     "ResourceClassificationError",
     "classify_layer_resources",
     "is_mfma_operation",
+    "mandatory_mfma_macs",
     "merge_resource_work",
     "validate_resource_work",
 ]

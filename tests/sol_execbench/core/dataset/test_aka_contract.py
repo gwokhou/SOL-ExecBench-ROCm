@@ -65,5 +65,5 @@ def test_closed_contract_enums_round_trip(enum_type, value):
     ],
 )
 def test_closed_contract_enums_reject_unknown_values(enum_type):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="unknown_contract_value"):
         enum_type("unknown_contract_value")

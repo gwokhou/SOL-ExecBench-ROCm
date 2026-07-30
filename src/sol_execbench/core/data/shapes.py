@@ -37,7 +37,7 @@ _UNARY_OPS = {
 }
 
 
-def resolve_shape_expression(expr: str, vars: dict[str, int]) -> int:
+def resolve_shape_expression(expr: str, variables: dict[str, int]) -> int:
     """Safely evaluate a simple arithmetic expression with variables.
 
     Allowed: numbers, variable names, + - * / // % **, parentheses, unary +/-
@@ -53,8 +53,8 @@ def resolve_shape_expression(expr: str, vars: dict[str, int]) -> int:
             )
 
         if isinstance(node, ast.Name):  # variable like x
-            if node.id in vars:
-                v = vars[node.id]
+            if node.id in variables:
+                v = variables[node.id]
                 if not isinstance(v, int):
                     raise TypeError(
                         f"Variable '{node.id}' must be int, got {type(v).__name__}",

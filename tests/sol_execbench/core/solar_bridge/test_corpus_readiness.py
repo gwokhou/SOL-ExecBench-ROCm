@@ -4,6 +4,8 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.solar_bridge import corpus_readiness
 from sol_execbench.core.solar_bridge.models import (
@@ -57,15 +59,11 @@ def test_corpus_audit_rejects_worker_ir_path_drift(
 
     monkeypatch.setattr(corpus_readiness, "run_solar_stage_worker", wrong_path)
 
-    try:
+    with pytest.raises(ValueError, match="readiness worker IR path mismatch"):
         corpus_readiness.audit_corpus_stage_readiness(
             MANIFEST,
             tmp_path / "audit",
         )
-    except ValueError as exc:
-        assert str(exc) == "readiness worker IR path mismatch"
-    else:
-        raise AssertionError("IR path drift was accepted")
 
 
 def test_corpus_audit_derives_and_addresses_the_full_scored_denominator(
@@ -178,15 +176,14 @@ def test_corpus_audit_rejects_worker_architecture_identity_drift(
         wrong_architecture,
     )
 
-    try:
+    with pytest.raises(
+        ValueError,
+        match="readiness worker architecture identity mismatch",
+    ):
         corpus_readiness.audit_corpus_stage_readiness(
             MANIFEST,
             tmp_path / "audit",
         )
-    except ValueError as exc:
-        assert str(exc) == "readiness worker architecture identity mismatch"
-    else:
-        raise AssertionError("architecture identity drift was accepted")
 
 
 def test_corpus_audit_requires_every_stage_even_if_verification_passed(

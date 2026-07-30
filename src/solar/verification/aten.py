@@ -39,6 +39,7 @@ def execute_aten_layer(
     }
     target = str(semantic.get("target", ""))
     handlers = (
+        _execute_autograd_public,
         _execute_exact_aten,
         _execute_mutation,
         _execute_arithmetic,
@@ -62,6 +63,42 @@ def execute_aten_layer(
     raise IRExecutionError(
         f"operation {target!r} at {layer_id} is not executable exactly",
     )
+
+
+def _execute_autograd_public(
+    target: str,
+    arguments: list[DynamicValue],
+    kwargs: dict[str, DynamicValue],
+    semantic: Mapping[str, DynamicValue],
+    layer_id: str,
+    output_shapes: Sequence[tuple[int, ...]],
+) -> DynamicValue:
+    del kwargs, semantic, layer_id
+    if target != "_embedding_bag_forward_only":
+        return _UNHANDLED
+    import torch
+    from torch.nn import functional
+
+    weight, indices, offsets = arguments[:3]
+    mode = {0: "sum", 1: "mean", 2: "max"}[int(arguments[4])]
+    output = functional.embedding_bag(
+        indices,
+        weight,
+        offsets,
+        scale_grad_by_freq=bool(arguments[3]),
+        mode=mode,
+        sparse=bool(arguments[5]),
+        per_sample_weights=arguments[6],
+    )
+    auxiliaries = tuple(
+        torch.empty(
+            shape,
+            dtype=indices.dtype,
+            device=indices.device,
+        )
+        for shape in output_shapes[1:]
+    )
+    return (output, *auxiliaries)
 
 
 def _decode_semantic_argument(

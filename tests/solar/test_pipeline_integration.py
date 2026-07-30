@@ -268,7 +268,7 @@ def test_cpu_pipeline_preserves_reference_semantics(
         strict=True,
     )
     assert analysis is not None
-    assert analysis["schema_version"] == 3
+    assert analysis["schema_version"] == 4
 
 
 def test_extraction_tracks_only_tensor_inputs_used_by_reference(

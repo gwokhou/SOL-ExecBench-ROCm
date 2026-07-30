@@ -12,7 +12,7 @@ corpus; public models accept only the current field names.
 
 SOLAR owns graph extraction, conversion verification, and formal lower-bound
 analysis. Its fixed `torchview_extended_einsum` and `make_fx_aten` paths use
-separately versioned graph schemas and the `amd_resource_v2` mandatory-work
+separately versioned graph schemas and the `amd_resource_v3` mandatory-work
 model. Formal ROCm bounds fail closed unless the selected path, configured
 architecture, exact operations, resource rules, and pinned Orojenesis evidence
 satisfy the current contract.

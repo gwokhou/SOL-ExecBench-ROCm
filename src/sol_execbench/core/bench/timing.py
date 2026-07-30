@@ -38,9 +38,9 @@ def _summarize_statistics(
     """Summarize timing statistics based on return mode."""
     if return_mode == "all":
         return times
-    elif return_mode == "mean":
+    if return_mode == "mean":
         return statistics.mean(times)
-    elif return_mode == "median":
+    if return_mode == "median":
         return statistics.median(times)
     raise ValueError(f"Unknown return_mode: {return_mode}")
 

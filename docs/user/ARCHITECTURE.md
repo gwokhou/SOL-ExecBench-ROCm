@@ -154,8 +154,13 @@ src/
 ```
 
 `solar.ir.extended_einsum` is first-party maintained code with one strict
-reviewed handler stack. The `_vendor` namespace is reserved for dependencies
-retained as vendored snapshots.
+reviewed native-operation registry. Its v6 artifact semantics are independent
+of ATen: layers are `input`, standard executable `einsum`, or canonical
+`operation` records with ordered operands, named attributes, effects, and
+bounded dynamic dimensions. Public PyTorch APIs provide the default execution
+backend, while `make_fx_aten` retains its separate ATen lifecycle. The
+`_vendor` namespace is reserved for dependencies retained as vendored
+snapshots.
 
 Shared evidence identifiers live below both producers and reports. Platform
 modules do not import scoring, and benchmark runtime modules do not import

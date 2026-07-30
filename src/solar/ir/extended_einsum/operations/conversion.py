@@ -30,20 +30,6 @@ REDUCTION_OPS_WITH_DIM = frozenset(
         "nanmean",
     },
 )
-FORCE_ATEN_SEMANTICS_OPS = frozenset(
-    {
-        "conv1d",
-        "conv2d",
-        "conv3d",
-        "convtranspose1d",
-        "convtranspose2d",
-        "convtranspose3d",
-        "conv_transpose1d",
-        "conv_transpose2d",
-        "conv_transpose3d",
-        "scaled_dot_product_attention",
-    },
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +62,6 @@ def default_operation_representation() -> OperationRepresentation:
 
 
 __all__ = [
-    "FORCE_ATEN_SEMANTICS_OPS",
     "REDUCTION_OPS_WITH_DIM",
     "OperationRepresentation",
     "default_operation_representation",

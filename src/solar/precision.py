@@ -34,6 +34,9 @@ BYTES_PER_ELEMENT = {
     "int16": 2,
     "uint8": 1,
     "bool": 1,
+    "complex32": 4,
+    "complex64": 8,
+    "complex128": 16,
 }
 
 _DTYPE_ALIASES = {
@@ -45,6 +48,9 @@ _DTYPE_ALIASES = {
     "float16": "fp16",
     "half": "fp16",
     "bfloat16": "bf16",
+    "chalf": "complex32",
+    "cfloat": "complex64",
+    "cdouble": "complex128",
     "float8": "fp8",
     "float8_e4m3fn": "fp8",
     "float8_e4m3fnuz": "fp8",

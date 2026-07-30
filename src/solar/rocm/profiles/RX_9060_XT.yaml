@@ -46,7 +46,7 @@ peak_ops_per_second:
   fp8: 205000000000000
   int8: 205000000000000
   int4: 410000000000000
-resource_model_version: amd_resource_v2
+resource_model_version: amd_resource_v3
 # MFMA rates use the published FP16/FP8/INT8 matrix throughput; BF16 uses the
 # matching gfx12 FP16/BF16 WMMA issue shape because AMD publishes no RX 9060 XT
 # BF16 figure.  VALU fp32/fp16 use the published Vector peaks (25.6 TFLOPs
@@ -140,8 +140,8 @@ precision_support:
 audit_evidence:
   status: verified
   path: rocm/audits/rx9060xt_resource_peaks_v3.json
-  sha256: 112a77785063d1242c27bbae9e9fe7c4fd9a4af5c1aa7a5d866fd4d889e359d7
-  required_schema_version: solar.resource_peak_calibration.v3
+  sha256: f41e60f0cb39dd7b8336c464d457d00db3e8df48db52dc0994c0deb21f4be384
+  required_schema_version: solar.resource_peak_calibration.v4
   required_timing_profile: official
   required_clocks_locked: true
   # ROCm 7.2 reports THROTTLED on this Navi48 board even while idle in AUTO.

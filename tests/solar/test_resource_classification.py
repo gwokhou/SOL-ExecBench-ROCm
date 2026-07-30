@@ -252,6 +252,39 @@ def test_topk_and_to_alias_keep_their_resource_classes() -> None:
     assert converted["work"] == {"conversion": {"fp32->fp16": 4}}
 
 
+def test_rocm_fused_rms_norm_uses_canonical_normalization_rule() -> None:
+    result = _classify(
+        _layer(
+            "_fused_rms_norm",
+            input_shapes=[[3, 4], [4]],
+            output_shapes=[[3, 4], [3, 1]],
+            input_dtypes=["fp32", "fp32"],
+            output_dtypes=["fp32", "fp32"],
+        ),
+    )
+
+    assert result["classification"] == "modeled"
+    assert result["work"] == {
+        "reduction": {"fp32": 22},
+        "sfu": {"fp32": 1},
+        "valu": {"fp32": 60},
+    }
+
+
+def test_fp16_fft_uses_fp16_real_work_for_complex32_output() -> None:
+    result = _classify(
+        _layer(
+            "fft",
+            input_shapes=[[8]],
+            output_shapes=[[8]],
+            input_dtypes=["torch.float16"],
+            output_dtypes=["torch.complex32"],
+        ),
+    )
+
+    assert result["work"] == {"valu": {"fp16": 192}}
+
+
 def test_unknown_operation_falls_back_to_macs_when_available() -> None:
     result = _classify(_layer("custom_contraction"), macs=3)
 

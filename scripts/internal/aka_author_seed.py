@@ -3658,7 +3658,7 @@ def _manifest_entries(
 
 
 def _base_coverage_combinations() -> list[dict[str, object]]:
-    combinations = [
+    return [
         {
             "operation": str(AKAOperation.MATMUL),
             "input_dtype": str(DType.FLOAT32),
@@ -3713,7 +3713,6 @@ def _base_coverage_combinations() -> list[dict[str, object]]:
         },
         {"fusion_depth": str(AKAFusionDepth.FUSED), "min_count": 1},
     ]
-    return combinations
 
 
 def _formal_coverage_combinations() -> list[dict[str, object]]:

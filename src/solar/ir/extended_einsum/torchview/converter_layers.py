@@ -51,15 +51,14 @@ import networkx as nx
 from solar.ir.extended_einsum.equations import (
     validate_tensor_names_match_shapes,
 )
+from solar.ir.extended_einsum.native_registry import (
+    NATIVE_OP_REGISTRY,
+    canonical_native_target,
+)
 from solar.ir.extended_einsum.operations.conversion import (
-    FORCE_ATEN_SEMANTICS_OPS,
     REDUCTION_OPS_WITH_DIM,
     OperationRepresentation,
     default_operation_representation,
-)
-from solar.ir.extended_einsum.operations.policy import (
-    SUPPORTABLE_OPERATIONS,
-    UNSUPPORTABLE_CONTROL_FLOW,
 )
 from solar.ir.extended_einsum.torchview.converter_contract import (
     ConverterMixinContract,
@@ -67,9 +66,6 @@ from solar.ir.extended_einsum.torchview.converter_contract import (
 from solar.ir.extended_einsum.torchview.converter_models import (
     ConversionError,
     ConvertedTensorMetadata,
-)
-from solar.ir.extended_einsum.torchview.semantics import (
-    SUPPORTED_ATEN_TARGETS,
 )
 from solar.types import TensorShapes
 
@@ -252,7 +248,10 @@ class ConverterLayersMixin(ConverterMixinContract):
     def _failed_operation_representation(
         self, node_id: str, node_type: str, error: Exception
     ) -> OperationRepresentation:
-        if self._strict and node_type in SUPPORTED_ATEN_TARGETS:
+        if (
+            self._strict
+            and canonical_native_target(node_type) in NATIVE_OP_REGISTRY
+        ):
             return OperationRepresentation(
                 equation="",
                 operands={},
@@ -541,8 +540,6 @@ class ConverterLayersMixin(ConverterMixinContract):
         source_target = re.sub(r"_\d+$", "", source_target)
         if source_target.endswith("_") and not source_target.endswith("__"):
             result["mutates_inputs"] = True
-        if self._strict and node_type in FORCE_ATEN_SEMANTICS_OPS:
-            result["force_aten_semantics"] = True
         semantic_args = {
             str(key): value
             for key, value in module_args.items()
@@ -721,21 +718,5 @@ class ConverterLayersMixin(ConverterMixinContract):
         """Check if extended-einsum can express an operation."""
         op = op_type.lower()
 
-        # Check against known supportable operations
-        if op in SUPPORTABLE_OPERATIONS:
-            return True
-
-        # Check for suffixed matches
-        for supported_op in SUPPORTABLE_OPERATIONS:
-            if op.endswith(f".{supported_op}"):
-                return True
-
-        # Check prefixed patterns
-        if any(
-            op.startswith(prefix) for prefix in ["torch.", "nn.", "functional."]
-        ):
-            stripped = op.split(".")[-1]
-            return stripped in SUPPORTABLE_OPERATIONS
-
-        # Default: supportable unless explicitly unsupportable
-        return op not in UNSUPPORTABLE_CONTROL_FLOW
+        canonical = canonical_native_target(op)
+        return canonical in NATIVE_OP_REGISTRY

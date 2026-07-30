@@ -11,7 +11,15 @@ from solar.verification.errors import IRExecutionError
 
 def _shapes(layer: Mapping[str, DynamicValue]) -> list[tuple[int, ...]]:
     outputs = (layer.get("tensor_shapes") or {}).get("outputs") or []
-    return [tuple(int(dimension) for dimension in shape) for shape in outputs]
+    return [
+        tuple(
+            int(dimension["trace_value"])
+            if isinstance(dimension, Mapping)
+            else int(dimension)
+            for dimension in shape
+        )
+        for shape in outputs
+    ]
 
 
 class IRGraphExecutor:
@@ -56,6 +64,7 @@ class IRGraphExecutor:
             else None
         )
         self.check_shapes = check_shapes
+        self._dynamic_symbols: dict[str, int] = {}
         self._validate_layers()
 
     def _validate_layers(self) -> None:
@@ -75,6 +84,7 @@ class IRGraphExecutor:
 
     def __call__(self, *inputs: DynamicValue) -> DynamicValue:
         """Execute the graph for positional inputs and return declared outputs."""
+        self._dynamic_symbols = {}
         values, start_ids, produced, input_index = self._bind_start_inputs(
             inputs,
         )
@@ -118,12 +128,26 @@ class IRGraphExecutor:
             names = (self.layers[layer_id].get("tensor_names") or {}).get(
                 "outputs",
             ) or []
-            for name in names:
+            contracts = (self.layers[layer_id].get("tensor_shapes") or {}).get(
+                "outputs"
+            ) or []
+            for slot, name in enumerate(names):
                 if input_index >= len(inputs):
                     raise IRExecutionError(
                         "not enough inputs for graph start tensors",
                     )
-                values[str(name)] = inputs[input_index]
+                value = inputs[input_index]
+                shape = getattr(value, "shape", None)
+                if (
+                    self.check_shapes
+                    and shape is not None
+                    and not self._shape_matches(tuple(shape), contracts[slot])
+                ):
+                    raise IRExecutionError(
+                        f"graph input {name} produced {tuple(shape)}, "
+                        f"expected {contracts[slot]}"
+                    )
+                values[str(name)] = value
                 input_index += 1
         return values, start_ids, produced, input_index
 
@@ -211,7 +235,6 @@ class IRGraphExecutor:
                 f"layer {layer_id} returned {len(results)} outputs, "
                 f"expected {len(output_names)}",
             )
-        expected_shapes = _shapes(layer)
         for index, (output_name, output) in enumerate(
             zip(output_names, results, strict=True),
         ):
@@ -219,15 +242,39 @@ class IRGraphExecutor:
                 raise IRExecutionError(
                     f"layer {layer_id} output {index} is not a tensor",
                 )
-            if (
-                self.check_shapes
-                and tuple(output.shape) != expected_shapes[index]
+            contract = (
+                (layer.get("tensor_shapes") or {}).get("outputs") or []
+            )[index]
+            if self.check_shapes and not self._shape_matches(
+                tuple(output.shape), contract
             ):
                 raise IRExecutionError(
                     f"layer {layer_id} output {index} produced "
-                    f"{tuple(output.shape)}, expected {expected_shapes[index]}",
+                    f"{tuple(output.shape)}, expected {contract}",
                 )
             values[output_name] = output
+
+    def _shape_matches(
+        self,
+        actual: tuple[int, ...],
+        contract: Sequence[DynamicValue],
+    ) -> bool:
+        if len(actual) != len(contract):
+            return False
+        for observed, expected in zip(actual, contract, strict=True):
+            if not isinstance(expected, Mapping):
+                if observed != int(expected):
+                    return False
+                continue
+            symbol = str(expected["symbol"])
+            lower = int(expected["lower"])
+            upper = int(expected["upper"])
+            if observed < lower or observed > upper:
+                return False
+            bound = self._dynamic_symbols.setdefault(symbol, observed)
+            if bound != observed:
+                return False
+        return True
 
     def _terminal_outputs(
         self,

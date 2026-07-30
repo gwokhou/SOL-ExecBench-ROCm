@@ -142,7 +142,7 @@ class LinearHandler(EinsumOpHandler):
             EinsumOp for the linear operation.
 
         """
-        # Linear: input @ weight.T
+        # Linear applies the transposed weight to the input.
         batch_dims = len(input_shape) - 1
         batch_letters = [f"B{i}" for i in range(batch_dims)]
 

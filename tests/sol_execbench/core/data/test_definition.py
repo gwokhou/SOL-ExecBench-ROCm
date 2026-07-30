@@ -91,7 +91,7 @@ class TestGetResolvedAxesValues:
 
 class TestDefinitionValidators:
     def test_empty_hf_id_is_rejected(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="hf_id"):
             _make(hf_id="")
 
     def test_missing_run_function_raises(self):
@@ -99,7 +99,7 @@ class TestDefinitionValidators:
             _make(reference="def helper(): pass")
 
     def test_invalid_python_reference_raises(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="valid Python"):
             _make(reference="def run(: bad syntax")
 
     def test_undefined_axis_in_input_shape_raises(self):

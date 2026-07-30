@@ -3,7 +3,7 @@
 import torch
 
 
-def run(input, weight, residual, eps):
+def run(input, weight, residual, eps):  # noqa: A002 - benchmark ABI
     residual_out = input + residual
     value = residual_out.float()
     rstd = torch.rsqrt(value.pow(2).mean(-1, keepdim=True) + eps)

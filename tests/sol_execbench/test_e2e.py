@@ -473,7 +473,9 @@ def test_cli_gqa_paged_decode(tmp_path: Path):
     )
 
     assert output_file.exists(), "Output file not created"
-    lines = [l for l in output_file.read_text().splitlines() if l.strip()]
+    lines = [
+        line for line in output_file.read_text().splitlines() if line.strip()
+    ]
     assert len(lines) == 2, f"Expected 2 traces, got {len(lines)}"
 
     for line in lines:

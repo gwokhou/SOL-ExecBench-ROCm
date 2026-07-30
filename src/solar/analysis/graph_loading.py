@@ -52,9 +52,15 @@ from solar.analysis.graph_validation import (
 )
 from solar.analysis.mixin_contract import AnalysisMixinContract
 from solar.analysis.resources import (
+    ResourceClassificationError,
     is_mfma_operation,
+    mandatory_mfma_macs,
 )
-from solar.ir.contracts import layer_contraction_analysis, layer_operation
+from solar.ir.contracts import (
+    OPERATION_KIND,
+    layer_contraction_analysis,
+    layer_operation,
+)
 from solar.precision import (
     BYTES_PER_ELEMENT,
     dtype_bytes,
@@ -288,7 +294,7 @@ class GraphLoadingMixin(AnalysisMixinContract):
             ],
         )
 
-    def _compute_layer(self, data: LayerData) -> LayerCompute:
+    def _compute_layer(self, data: LayerData, *, strict: bool) -> LayerCompute:
         shapes = TensorShapes(
             inputs=data.input_shapes,
             outputs=data.output_shapes,
@@ -300,8 +306,18 @@ class GraphLoadingMixin(AnalysisMixinContract):
                 inputs=data.input_shapes[1:3],
                 outputs=data.output_shapes,
             )
+        semantic_kind = str(layer_operation(data.layer).get("kind", ""))
+        semantic = layer_operation(data.layer)
+        semantic_target = str(semantic.get("target", data.op_type))
         try:
-            if data.is_real_einsum and data.equation:
+            if semantic_kind == OPERATION_KIND:
+                cost = mandatory_mfma_macs(
+                    semantic_target,
+                    data.input_shapes,
+                    data.output_shapes,
+                    semantic,
+                )
+            elif data.is_real_einsum and data.equation:
                 cost = int(
                     self.einsum_analyzer.get_compute_cost(
                         operation,
@@ -313,13 +329,17 @@ class GraphLoadingMixin(AnalysisMixinContract):
                 cost = int(
                     self.einsum_analyzer.get_compute_cost(operation, shapes),
                 )
-        except Exception:  # noqa: BLE001 -- operation-handler fallback
+        except Exception as exc:
+            if strict:
+                raise ResourceClassificationError(
+                    f"operation handler failed for {data.op_type!r}: {exc}"
+                ) from exc
             cost = 0
         is_real_einsum = data.is_real_einsum
         if data.op_type in ZERO_COMPUTE_OPS:
             cost = 0
             is_real_einsum = False
-        contraction = is_real_einsum or is_mfma_operation(data.op_type)
+        contraction = is_real_einsum or is_mfma_operation(semantic_target)
         macs = cost if contraction else 0
         return LayerCompute(
             is_real_einsum=is_real_einsum,
