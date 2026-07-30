@@ -18,6 +18,9 @@ from sol_execbench.core.bench.performance_model.builder import (
     PerformanceDiagnosticBuildRequest,
     build_performance_diagnostic,
 )
+from sol_execbench.core.bench.performance_model.evidence_manifest import (
+    load_and_verify_performance_evidence_manifest,
+)
 from sol_execbench.core.bench.performance_model.inference import (
     DiagnosticInferenceProfile,
     InferenceObservation,
@@ -36,6 +39,7 @@ from sol_execbench.core.bench.performance_model.validation_corpus import (
     DiagnosticValidationCase,
     DiagnosticValidationCorpus,
     require_disjoint_corpora,
+    validation_pair_id,
 )
 from sol_execbench.core.data.json_utils import load_json_file
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
@@ -213,6 +217,13 @@ def _build_case_diagnostic(
         case.solar_manifest.path,
         case.solar_manifest.sha256,
     )
+    manifest = load_and_verify_performance_evidence_manifest(evidence)
+    expected_pair_id = validation_pair_id(
+        workload_sha256=manifest.identity.workload_sha256,
+        candidate_sha256=manifest.identity.candidate_sha256,
+    )
+    if case.pair_id != expected_pair_id:
+        raise ValueError("validation case pair identity mismatch")
     diagnostic = build_performance_diagnostic(
         PerformanceDiagnosticBuildRequest(
             evidence_manifest_path=evidence,
@@ -225,6 +236,8 @@ def _build_case_diagnostic(
     )
     if len(diagnostic.workloads) != 1:
         raise ValueError("validation case must produce one workload")
+    if diagnostic.workloads[0].semantic.workload_kind is not case.workload_kind:
+        raise ValueError("validation case workload family mismatch")
     return diagnostic
 
 

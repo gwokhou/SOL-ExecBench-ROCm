@@ -1,0 +1,212 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Literal
+
+from click.testing import CliRunner
+
+from sol_execbench.cli.main import cli
+from sol_execbench.core.bench.performance_model import authoring
+from sol_execbench.core.bench.performance_model.acceptance import (
+    DiagnosticAcceptanceCase,
+)
+from sol_execbench.core.bench.performance_model.inference import (
+    InferenceObservation,
+)
+from sol_execbench.core.bench.performance_model.models import (
+    CalibrationIdentity,
+    CalibrationParameter,
+    CalibrationParameterName,
+    CalibrationUnit,
+    DiagnosticCalibrationProfile,
+    WorkloadKind,
+)
+from sol_execbench.core.bench.performance_model.validation_corpus import (
+    DiagnosticValidationCase,
+    DiagnosticValidationCorpus,
+    ValidationArtifactReference,
+    validation_pair_id,
+)
+from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.integrity import stable_json_checksum
+
+_FAMILIES = (
+    WorkloadKind.ELEMENTWISE,
+    WorkloadKind.TRANSPOSE,
+    WorkloadKind.REDUCTION,
+    WorkloadKind.MATMUL,
+)
+
+
+def _corpus(
+    role: Literal["development", "held_out"],
+    prefix: str,
+) -> DiagnosticValidationCorpus:
+    return DiagnosticValidationCorpus(
+        role=role,
+        cases=[
+            DiagnosticValidationCase(
+                case_id=f"{prefix}:{kind}:{index}",
+                pair_id=validation_pair_id(
+                    workload_sha256=stable_json_checksum(
+                        [prefix, kind, index, "workload"]
+                    ),
+                    candidate_sha256=stable_json_checksum(
+                        [prefix, kind, index, "candidate"]
+                    ),
+                ),
+                workload_kind=kind,
+                evidence_manifest=ValidationArtifactReference(
+                    path=f"{prefix}/{kind}-{index}.evidence.json",
+                    sha256=stable_json_checksum(
+                        [prefix, kind, index, "evidence"]
+                    ),
+                ),
+                solar_manifest=ValidationArtifactReference(
+                    path=f"{prefix}/{kind}-{index}.solar.yaml",
+                    sha256=stable_json_checksum([prefix, kind, index, "solar"]),
+                ),
+            )
+            for kind in _FAMILIES
+            for index in range(20)
+        ],
+    )
+
+
+def _calibration() -> DiagnosticCalibrationProfile:
+    return DiagnosticCalibrationProfile(
+        identity=CalibrationIdentity(
+            gpu_architecture="gfx1200",
+            gpu_id="gpu-0",
+            gpu_bdf="0000:03:00.0",
+            rocm_version="7.2",
+            compiler_version="hipcc-7.2",
+            clock_mode="locked",
+            power_profile="stable_peak",
+        ),
+        parameters=[
+            CalibrationParameter(
+                name=CalibrationParameterName.DISPATCH_FLOOR_MS,
+                value=0.01,
+                unit=CalibrationUnit.MS,
+                confidence_interval=(0.009, 0.011),
+            )
+        ],
+        tuning_evidence_sha256=["a" * 64],
+        parameter_estimation_evidence_sha256=["b" * 64],
+        probe_evidence_sha256=["c" * 64],
+        bootstrap_seed=1,
+        bootstrap_replicates=10_000,
+    )
+
+
+def _development_observation(
+    case: DiagnosticValidationCase,
+    **_kwargs,
+) -> InferenceObservation:
+    return InferenceObservation(
+        case_id=case.case_id,
+        workload_kind=case.workload_kind,
+        measured_ms=1.0,
+        base_lower_ms=0.9,
+        base_upper_ms=1.1,
+    )
+
+
+def _acceptance_case(
+    case: DiagnosticValidationCase,
+    **_kwargs,
+) -> DiagnosticAcceptanceCase:
+    return DiagnosticAcceptanceCase(
+        case_id=case.case_id,
+        pair_id=case.pair_id,
+        workload_kind=case.workload_kind,
+        evidence_manifest_sha256=case.evidence_manifest.sha256,
+        performance_diagnostic_sha256=stable_json_checksum(
+            [case.case_id, "diagnostic"]
+        ),
+        predicted_ms=1.0,
+        lower_ms=0.9,
+        upper_ms=1.1,
+        measured_ms=1.0,
+    )
+
+
+def test_inference_and_acceptance_authoring_cli_workflow(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    development_path = tmp_path / "development.json"
+    held_out_path = tmp_path / "held-out.json"
+    calibration_path = tmp_path / "calibration.json"
+    audit_path = tmp_path / "calibration.audit.json"
+    inference_path = tmp_path / "inference.json"
+    acceptance_manifest_path = tmp_path / "acceptance-manifest.json"
+    acceptance_path = tmp_path / "acceptance.json"
+    atomic_write_json_value(
+        development_path,
+        _corpus("development", "dev").model_dump(mode="json"),
+    )
+    atomic_write_json_value(
+        held_out_path,
+        _corpus("held_out", "held").model_dump(mode="json"),
+    )
+    atomic_write_json_value(
+        calibration_path,
+        _calibration().model_dump(mode="json"),
+    )
+    atomic_write_json_value(audit_path, {"content": "content-addressed"})
+    monkeypatch.setattr(
+        authoring,
+        "_development_observation",
+        _development_observation,
+    )
+    monkeypatch.setattr(authoring, "_acceptance_case", _acceptance_case)
+
+    fit_result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "diagnostics",
+            "fit-performance-inference",
+            "--development-corpus",
+            str(development_path),
+            "--calibration-profile",
+            str(calibration_path),
+            "--output",
+            str(inference_path),
+        ],
+    )
+
+    assert fit_result.exit_code == 0, fit_result.output
+    assert json.loads(fit_result.output)["ok"] is True
+    acceptance_result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "diagnostics",
+            "accept-performance-model",
+            "--development-corpus",
+            str(development_path),
+            "--held-out-corpus",
+            str(held_out_path),
+            "--calibration-profile",
+            str(calibration_path),
+            "--inference-profile",
+            str(inference_path),
+            "--manifest-output",
+            str(acceptance_manifest_path),
+            "--output",
+            str(acceptance_path),
+        ],
+    )
+
+    assert acceptance_result.exit_code == 0, acceptance_result.output
+    response = json.loads(acceptance_result.output)
+    assert response["ok"] is True
+    assert response["data"] == {"accepted": True, "case_count": 80}
+    assert acceptance_manifest_path.is_file()
+    assert acceptance_path.is_file()

@@ -22,7 +22,7 @@ class Rocprofv3CounterProvenance(CurrentSchemaModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     current_schema_version = ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.rocprofv3_counter_provenance.v3"] = (
+    schema_version: Literal["sol_execbench.rocprofv3_counter_provenance.v4"] = (
         ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION
     )
     diagnostic_only: Literal[True] = True
@@ -32,6 +32,7 @@ class Rocprofv3CounterProvenance(CurrentSchemaModel):
     counter_definition_sha256: SHA256Digest
     configuration_sha256: SHA256Digest
     availability_sha256: SHA256Digest
+    pmc_check_sha256: SHA256Digest
     application_executable_sha256: SHA256Digest | Literal["unresolved"]
     application_command_sha256: SHA256Digest
 

@@ -209,6 +209,21 @@ No independent 20-per-family development and held-out corpora are present under
 content-addressed cases are collected and pass the frozen gates, the model is
 hardware-calibrated and counter-validated but not hardware-accepted.
 
+The validation corpus now uses a derived workload/candidate pair hash rather
+than a caller assertion. Authoring re-derives the pair from governed evidence,
+checks the workload family, and rejects evidence reuse across development and
+held-out corpora. Counter collection also runs an exact `pmc-check` for every
+selected group before replay and binds the combined result into v4 provenance.
+All four groups pass `pmc-check` on the local RX 9060 XT. The current
+production collector also completed all four replay passes against the
+packaged diagnostic probe and emitted strict v4 provenance plus CSV/ROCPD
+artifacts under `data/outputs/diagnostic-counter-v4-audit-20260730/`.
+
+A strict four-family hardware smoke entry point is available through
+`SOL_EXECBENCH_DIAGNOSTIC_SMOKE_JSON`. No four-case smoke configuration is
+currently present under `data/`; a skipped smoke test is not acceptance
+evidence.
+
 The following static and quality gates were also rerun and passed:
 
 ```bash
