@@ -215,6 +215,8 @@ def layer_operation(layer: Mapping[str, Any]) -> Mapping[str, Any]:
     """Expose the representation-neutral semantic operation for one layer."""
     semantic = layer.get("semantic_op")
     if isinstance(semantic, Mapping):
+        if semantic.get("kind") == "aten":
+            return {**semantic, "kind": OPERATION_KIND}
         return semantic
     analysis = layer_contraction_analysis(layer)
     return {
@@ -225,6 +227,26 @@ def layer_operation(layer: Mapping[str, Any]) -> Mapping[str, Any]:
         "equation": analysis.equation,
         "effects": layer.get("effects") or {},
     }
+
+
+def operation_operands(
+    semantic: Mapping[str, Any],
+) -> Sequence[Any]:
+    """Expose ordered call operands from either supported IR dialect."""
+    value = semantic.get("operands")
+    if value is None:
+        value = semantic.get("arguments")
+    return value if isinstance(value, Sequence) else ()
+
+
+def operation_attributes(
+    semantic: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Expose named call attributes from either supported IR dialect."""
+    value = semantic.get("attributes")
+    if value is None:
+        value = semantic.get("kwargs")
+    return value if isinstance(value, Mapping) else {}
 
 
 @dataclass(frozen=True)
@@ -270,4 +292,6 @@ __all__ = [
     "layer_operation",
     "normalize_ir_kind",
     "normalize_ir_path",
+    "operation_attributes",
+    "operation_operands",
 ]

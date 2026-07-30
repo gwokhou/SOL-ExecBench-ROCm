@@ -138,7 +138,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         Path(kwargs["output_path"]).write_text("predicate: passed\n")
 
     analysis = {
-        "schema_version": 3,
+        "schema_version": 4,
         "total": {"lower_bound_seconds": 0.001, "compute_resource": "mfma"},
         "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
     }
@@ -186,7 +186,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         "manifest.yaml",
     }
     manifest = yaml.safe_load((output / "manifest.yaml").read_text())
-    assert manifest["schema_version"] == 5
+    assert manifest["schema_version"] == 6
     assert "candidate_runtime" not in manifest
     assert "score" not in manifest
     assert manifest["analysis_contract"]["precision"] == "fp16"
@@ -310,7 +310,10 @@ def test_analysis_request_rejects_invalid_contract_fields(tmp_path, changes):
         policy_values.update(changes)
     else:
         conversion_values.update(changes)
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="non-empty|SHA-256|tolerances|cannot exceed",
+    ):
         AnalysisRequest(
             conversion=ConversionRequest(
                 **conversion_values,
@@ -333,7 +336,7 @@ def test_analyze_refuses_to_overwrite_existing_output(tmp_path):
 def test_bound_and_reason_code_helpers_fail_closed():
     valid = api._extract_bound(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "total": {"lower_bound_seconds": 0, "compute_resource": None},
             "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
         },
@@ -344,7 +347,7 @@ def test_bound_and_reason_code_helpers_fail_closed():
         with pytest.raises(ValueError, match="finite lower bound"):
             api._extract_bound(
                 {
-                    "schema_version": 3,
+                    "schema_version": 4,
                     "total": {"lower_bound_seconds": seconds},
                     "metadata": {
                         "bound_kind": "capacity_constrained_tile_aware_v1",
@@ -354,7 +357,7 @@ def test_bound_and_reason_code_helpers_fail_closed():
     with pytest.raises(ValueError, match="non-tile-aware"):
         api._extract_bound(
             {
-                "schema_version": 3,
+                "schema_version": 4,
                 "total": {"lower_bound_seconds": 1},
                 "metadata": {"bound_kind": "roofline"},
             },
@@ -560,7 +563,7 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
 
         def analyze_graph(self, *args, **kwargs):
             observed.update(kwargs)
-            return {"schema_version": 3}
+            return {"schema_version": 4}
 
     monkeypatch.setattr(
         "solar.analysis.graph_analyzer.OrojenesisRunner",
@@ -580,7 +583,7 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
         IRGraphArtifact(tmp_path / "ir_graph.yaml", IRKind.ATEN),
     )
 
-    assert result == {"schema_version": 3}
+    assert result == {"schema_version": 4}
     assert observed["orojenesis_runner"] is None
     assert observed["require_orojenesis"] is False
 
@@ -588,7 +591,7 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
 def test_extract_bound_accepts_paper_roofline_when_orojenesis_not_required():
     bound = api._extract_bound(
         {
-            "schema_version": 3,
+            "schema_version": 4,
             "total": {"lower_bound_seconds": 1.5, "compute_resource": "mfma"},
             "metadata": {"bound_kind": "roofline_eq1_v1"},
         },
@@ -603,7 +606,7 @@ def test_extract_bound_rejects_roofline_when_tile_evidence_is_required():
     with pytest.raises(ValueError, match="non-tile-aware"):
         api._extract_bound(
             {
-                "schema_version": 3,
+                "schema_version": 4,
                 "total": {"lower_bound_seconds": 1.5},
                 "metadata": {"bound_kind": "roofline_eq1_v1"},
             },
@@ -615,7 +618,7 @@ def test_extract_bound_rejects_unknown_kind_even_when_orojenesis_not_required():
     with pytest.raises(ValueError, match="unsupported bound kind"):
         api._extract_bound(
             {
-                "schema_version": 3,
+                "schema_version": 4,
                 "total": {"lower_bound_seconds": 1.5},
                 "metadata": {"bound_kind": "roofline"},
             },

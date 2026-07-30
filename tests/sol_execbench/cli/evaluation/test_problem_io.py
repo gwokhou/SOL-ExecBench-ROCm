@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import click
+import pytest
 
 from sol_execbench.cli.evaluation import problem_io
 from sol_execbench.core import BenchmarkConfig
@@ -172,7 +173,10 @@ def test_resolve_problem_inputs_allows_explicit_workload_when_problem_dir_defaul
 
 
 def test_resolve_problem_inputs_rejects_missing_solution() -> None:
-    try:
+    with pytest.raises(
+        click.ClickException,
+        match="Provide PROBLEM_DIR with solution.json or --solution",
+    ):
         problem_io.resolve_problem_inputs(
             problem_dir=None,
             definition_file=Path("definition.json"),
@@ -180,9 +184,3 @@ def test_resolve_problem_inputs_rejects_missing_solution() -> None:
             solution_file=None,
             config_file=None,
         )
-    except click.ClickException as exc:
-        assert "Provide PROBLEM_DIR with solution.json or --solution" in str(
-            exc,
-        )
-    else:
-        raise AssertionError("expected ClickException")

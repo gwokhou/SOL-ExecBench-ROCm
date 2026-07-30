@@ -40,6 +40,9 @@ from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
 )
+from sol_execbench.core.integrity.schema_versions import (
+    DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION,
+)
 from sol_execbench.core.platform.amd_smi import parse_gpu_identity
 from sol_execbench.core.platform.amdgpu_code_object import extract_code_object
 from sol_execbench.core.platform.isa_validation import analyze_isa_disassembly
@@ -309,7 +312,7 @@ def _audit_payload(
     compiler_version: str,
 ) -> dict[str, object]:
     return {
-        "schema_version": "sol_execbench.diagnostic_calibration_audit.v2",
+        "schema_version": DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION,
         "probe_identity": {
             "source_sha256": sha256_file(PROBE_SOURCE),
             "binary_sha256": sha256_file(binary),

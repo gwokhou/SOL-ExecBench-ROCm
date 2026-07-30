@@ -21,7 +21,7 @@ from solar.ir.extended_einsum.conversion import (
 )
 from solar.rocm.architecture import ArchitectureProfile
 from solar.types import DynamicValue
-from solar.verification.aten import execute_aten_layer
+from solar.verification.extended import execute_extended_einsum_layer
 
 
 def _verify(
@@ -77,7 +77,7 @@ lifecycle = IRLifecycle(
     extractions=frozenset({ExtractionKind.TORCHVIEW}),
     validate=validate_extended_einsum_graph,
     convert=convert_operator_graph,
-    execute=execute_aten_layer,
+    execute=execute_extended_einsum_layer,
     verify=_verify,
     analyze=_analyze,
 )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -17,11 +18,13 @@ from solar.types import DynamicValue
 PathLike = str | Path
 
 
-def product(shape: list[int]) -> int:
-    """Return the product of concrete tensor dimensions."""
+def product(shape: list[DynamicValue]) -> int:
+    """Return the conservative lower-bound tensor element count."""
     result = 1
     for dimension in shape:
-        result *= int(dimension)
+        result *= int(
+            dimension["lower"] if isinstance(dimension, Mapping) else dimension
+        )
     return int(result)
 
 
@@ -235,8 +238,8 @@ def _live_layers(
         for output in declared_outputs
         if (producer := producers.get(output)) is not None
     }
-    if len(roots) != len(declared_outputs):
-        missing = sorted(declared_outputs - producers.keys())
+    missing = sorted(declared_outputs - producers.keys())
+    if missing:
         raise ValueError(
             "declared graph outputs have no exact producer: "
             + ", ".join(missing),

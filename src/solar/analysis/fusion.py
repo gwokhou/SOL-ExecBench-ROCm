@@ -22,14 +22,16 @@ from solar.precision import dtype_bytes
 from solar.rocm.architecture import MemoryLevel
 
 
-def _product(shape: Sequence[int]) -> int:
+def _product(shape: Sequence[Any]) -> int:
     result = 1
     for dimension in shape:
-        result *= int(dimension)
+        result *= int(
+            dimension["upper"] if isinstance(dimension, Mapping) else dimension
+        )
     return result
 
 
-def _tensor_bytes(shape: Sequence[int], dtype: str) -> int:
+def _tensor_bytes(shape: Sequence[Any], dtype: str) -> int:
     return int(_product(shape) * dtype_bytes(dtype))
 
 

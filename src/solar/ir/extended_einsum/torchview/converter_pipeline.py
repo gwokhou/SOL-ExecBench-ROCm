@@ -60,9 +60,6 @@ from solar.ir.extended_einsum.torchview.converter_models import (
     ConversionError,
     PathLike,
 )
-from solar.ir.extended_einsum.torchview.reviewed_handlers import (
-    expand_reviewed_handlers,
-)
 from solar.ir.extended_einsum.torchview.semantics import (
     annotate_semantics,
     validate_semantic_graph,
@@ -137,20 +134,17 @@ class ConverterPipelineMixin(ConverterMixinContract):
         )
         if expand_complex_ops:
             op_graph = (
-                self._expand_reviewed_ops(op_graph)
-                if self._strict
-                else self._expand_complex_ops(op_graph)
+                op_graph if self._strict else self._expand_complex_ops(op_graph)
             )
         einsum_graph = self._build_einsum_graph(
             pytorch_graph, op_graph, start_nodes_info, param_nodes_info
         )
+        self._validate_tensor_shape_consistency(einsum_graph)
         einsum_graph = annotate_semantics(einsum_graph, strict=self._strict)
         if self._strict:
             self._validate_exact_graph(einsum_graph)
             validate_semantic_graph(einsum_graph)
-        einsum_graph = add_taco_expressions(einsum_graph)
-        self._validate_tensor_shape_consistency(einsum_graph)
-        return einsum_graph
+        return add_taco_expressions(einsum_graph)
 
     def _publish_einsum_graph(
         self,
@@ -502,19 +496,6 @@ class ConverterPipelineMixin(ConverterMixinContract):
                     f"complex-operation expansion failed: {exc}"
                 ) from exc
             return graph
-
-    def _expand_reviewed_ops(self, graph: nx.DiGraph) -> nx.DiGraph:
-        """Delegate formal handler trust and expansion to its dedicated stage."""
-        try:
-            return expand_reviewed_handlers(
-                graph,
-                handler_directory=self._cache_dir,
-                debug=self._debug,
-            )
-        except Exception as exc:
-            raise ConversionError(
-                f"reviewed handler expansion failed: {exc}"
-            ) from exc
 
     @staticmethod
     def _validate_exact_graph(einsum_graph: dict[str, Any]) -> None:

@@ -104,7 +104,7 @@ def _analysis(
         "metadata": {
             "bound_kind": "roofline_eq1_v1",
             "resource_model": {
-                "version": "amd_resource_v2",
+                "version": "amd_resource_v3",
                 "coverage": {"modeled": 1},
                 "fail_closed": True,
             },
@@ -126,7 +126,7 @@ def _attestation(graph_name: str, graph_sha256: str) -> dict:
         ],
         "predicate": {
             "status": "passed",
-            "verifier": "solar.verification.ir.v4",
+            "verifier": "solar.verification.ir.v5",
             "execution": {"device_type": "cuda", "gfx_target": "gfx1200"},
             "cases": [{"seed": 11, "pattern": "random", "parameters": {}}],
         },

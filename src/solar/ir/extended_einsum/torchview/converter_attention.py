@@ -91,7 +91,7 @@ class ConverterAttentionMixin(ConverterMixinContract):
         else:
             node_type = str(node_type).lower()
 
-        return node_type in {"lstm"}
+        return node_type == "lstm"
 
     def _should_expand_gru(self, node_data: dict[str, Any]) -> bool:
         """Check if this is a GRU that should be expanded."""
@@ -101,7 +101,7 @@ class ConverterAttentionMixin(ConverterMixinContract):
         else:
             node_type = str(node_type).lower()
 
-        return node_type in {"gru"}
+        return node_type == "gru"
 
     def _expand_sdpa(
         self,

@@ -110,6 +110,11 @@ denominator. Both paths preserve exact source-input, output, tensor-metadata,
 and effect provenance; unsupported tracing, conversion, replay, or resource
 accounting fails closed.
 
+Extended schema v6 is a native semantic IR, not serialized ATen. Its operations
+carry ordered operands, public attributes, effects, and bounded dynamic shapes;
+the default executor calls public PyTorch APIs independently of the ATen path.
+Legacy Extended and ATen v5 artifacts are intentionally rejected.
+
 ## Official score
 
 The schema v6 corpus pins the pending

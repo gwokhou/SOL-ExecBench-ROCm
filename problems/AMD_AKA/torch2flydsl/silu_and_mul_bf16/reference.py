@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 
 
-def run(input):
+def run(input):  # noqa: A002 - benchmark ABI names this argument
     d = input.shape[-1] // 2
     x, y = input.split([d, d], dim=-1)
     return (F.silu(x.float()) * y.float()).to(torch.bfloat16)

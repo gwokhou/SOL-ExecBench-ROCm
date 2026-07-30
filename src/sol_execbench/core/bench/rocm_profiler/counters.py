@@ -24,10 +24,13 @@ from sol_execbench.core.bench.performance_model.models import (
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.integrity.schema_versions import (
+    ROCPROFV3_COUNTER_MANIFEST_SCHEMA_VERSION,
+)
 
 MAX_COUNTER_CSV_BYTES = 128 * 1024 * 1024
 ROCPROFV3_AVAIL_EXECUTABLE = "rocprofv3-avail"
-COUNTER_MANIFEST_SCHEMA_VERSION = "sol_execbench.rocprofv3_counter_manifest.v1"
+COUNTER_MANIFEST_SCHEMA_VERSION = ROCPROFV3_COUNTER_MANIFEST_SCHEMA_VERSION
 _FIELD_TOKEN = re.compile(r"[^a-z0-9]+")
 _COUNTER_TOKEN = re.compile(r"[^A-Za-z0-9]+")
 _NUMBER = re.compile(

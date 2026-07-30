@@ -506,7 +506,7 @@ class ReferenceGraphSerializer:
             )
             node_output_names[node] = output_tensor_names
             layers[node.name] = layer
-        result = {
+        return {
             "schema_version": OPERATOR_GRAPH_SCHEMA_VERSION,
             "ir_kind": "aten",
             "model_name": model_name,
@@ -516,4 +516,3 @@ class ReferenceGraphSerializer:
             "layers": layers,
             "graph_signature": self._graph_signature(nodes, output_names),
         }
-        return result

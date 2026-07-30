@@ -40,7 +40,13 @@ extraction provenance and rejects unsupported extractor/IR pairings before
 replay or analysis.
 
 The maintained extended-einsum implementation lives under
-`solar.ir.extended_einsum`. It owns one canonical reviewed handler registry;
+`solar.ir.extended_einsum`. Schema v6 uses only `input`, executable `einsum`,
+and canonical native `operation` semantics. Ordered operands, named public-API
+attributes, bounded dynamic dimensions, aliases, and mutations are explicit in
+the artifact. Its independent executor uses public PyTorch APIs as the default
+runtime backend; Extended artifacts do not contain ATen targets or overloads
+and never dispatch through the ATen executor. It owns one canonical reviewed
+native-operation registry;
 the retired `solar.nvlabs` and `solar.einsum` duplicate namespaces no longer
 exist. `solar._vendor` remains reserved for dependencies retained as vendored
 snapshots.

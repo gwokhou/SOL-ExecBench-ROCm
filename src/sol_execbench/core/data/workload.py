@@ -314,7 +314,7 @@ class Workload(BaseModelWithDocstrings):
     def get_scalar_inputs(self) -> dict[str, int | float | bool]:
         """Return scalar input values keyed by input name."""
         return {
-            name: input.value
-            for name, input in self.inputs.items()
-            if isinstance(input, ScalarInput)
+            name: input_spec.value
+            for name, input_spec in self.inputs.items()
+            if isinstance(input_spec, ScalarInput)
         }

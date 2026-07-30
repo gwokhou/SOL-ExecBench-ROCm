@@ -25,8 +25,6 @@ from solar.ir.extended_einsum.semantics import validate_semantic_graph
 from solar.ir.extended_einsum.torchview.converter import PyTorchToEinsum
 from solar.types import DynamicValue
 
-_REVIEWED_HANDLERS = Path(__file__).parent / "reviewed_handlers"
-
 
 def convert_operator_graph(
     operator: OperatorGraphArtifact,
@@ -55,9 +53,9 @@ def _convert_torchview_graph(
     output: Path,
     traced: Mapping[str, DynamicValue],
 ) -> dict[str, DynamicValue]:
-    converted = PyTorchToEinsum(
-        strict=True, cache_dir=str(_REVIEWED_HANDLERS)
-    ).convert(operator.path, output, copy_graph=False, enable_rename=False)
+    converted = PyTorchToEinsum(strict=True).convert(
+        operator.path, output, copy_graph=False, enable_rename=False
+    )
     if converted is None:
         raise StrictConversionError(
             "strict graph conversion produced no einsum graph",
@@ -65,6 +63,12 @@ def _convert_torchview_graph(
     source_node_remap = converted.pop("_source_node_remap", {})
     converted["ir_kind"] = IRKind.EXTENDED_EINSUM.value
     converted["source_input_indices"] = _bind_inputs(converted, operator)
+    _repair_reference_output_dtypes(
+        converted,
+        traced,
+        operator.reference_outputs,
+        source_node_remap,
+    )
     converted["outputs"] = _bind_outputs(
         converted,
         traced,
@@ -72,6 +76,50 @@ def _convert_torchview_graph(
         source_node_remap,
     )
     return converted
+
+
+def _repair_reference_output_dtypes(
+    graph: dict[str, DynamicValue],
+    traced: Mapping[str, DynamicValue],
+    expected: Sequence[TensorSignature],
+    source_node_remap: Mapping[str, DynamicValue],
+) -> None:
+    """Repair known Torchview output-dtype loss from exact reference slots."""
+    output_nodes = [
+        layer
+        for layer in (traced.get("layers") or {}).values()
+        if str(layer.get("type", "")).lower() == "output-tensor"
+    ]
+    if len(output_nodes) != len(expected):
+        return
+    layers = graph.get("layers") or {}
+    for output, signature in zip(output_nodes, expected, strict=True):
+        producers = (output.get("connections") or {}).get("inputs") or []
+        if len(producers) != 1:
+            continue
+        producer_id = source_node_remap.get(producers[0], producers[0])
+        producer = layers.get(producer_id)
+        if not isinstance(producer, dict):
+            continue
+        shapes = (producer.get("tensor_shapes") or {}).get("outputs") or []
+        dtypes = (producer.get("tensor_dtypes") or {}).get("outputs") or []
+        raw_slot = (output.get("module_args") or {}).get("producer_output_slot")
+        slot = int(raw_slot) if raw_slot is not None else 0
+        if (
+            slot in range(len(shapes))
+            and slot in range(len(dtypes))
+            and _trace_shape(shapes[slot]) == signature.shape
+        ):
+            dtypes[slot] = signature.dtype
+
+
+def _trace_shape(shape: Sequence[DynamicValue]) -> tuple[int, ...]:
+    return tuple(
+        int(dimension["trace_value"])
+        if isinstance(dimension, Mapping)
+        else int(dimension)
+        for dimension in shape
+    )
 
 
 _SOURCE_CONVERTERS: dict[
@@ -176,7 +224,7 @@ def _bind_outputs(
         matches = [
             index
             for index, (_, shape, dtype) in enumerate(candidates)
-            if tuple(shape) == value.shape and dtype == value.dtype
+            if _trace_shape(shape) == value.shape and dtype == value.dtype
         ]
         if not matches:
             raise ReferenceOutputBindingError(

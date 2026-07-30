@@ -41,6 +41,10 @@ class VerificationPolicy(TolerancePolicy):
     patterns: Sequence[str] = ("random", "zeros", "boundary")
     device: str = "cpu"
     preserved_input_indices: Sequence[int] = ()
+    verify_gradients: bool = True
+    gradient_input_indices: Sequence[int] | None = None
+    gradient_atol: float | None = None
+    gradient_rtol: float | None = None
 
     def __post_init__(self) -> None:
         """Validate tolerances and structured-input protection indices."""
@@ -53,6 +57,22 @@ class VerificationPolicy(TolerancePolicy):
                 "preserved_input_indices must be unique and non-negative",
             )
         object.__setattr__(self, "preserved_input_indices", indices)
+        gradient_indices = self.gradient_input_indices
+        if gradient_indices is not None:
+            normalized = tuple(int(index) for index in gradient_indices)
+            if any(index < 0 for index in normalized) or len(normalized) != len(
+                set(normalized)
+            ):
+                raise ValueError(
+                    "gradient_input_indices must be unique and non-negative"
+                )
+            object.__setattr__(self, "gradient_input_indices", normalized)
+        for name, value in (
+            ("gradient_atol", self.gradient_atol),
+            ("gradient_rtol", self.gradient_rtol),
+        ):
+            if value is not None and (not math.isfinite(value) or value < 0):
+                raise ValueError(f"{name} must be finite and non-negative")
 
 
 __all__ = ["TolerancePolicy", "VerificationPolicy"]

@@ -34,9 +34,7 @@ def _is_weight_matrix(name: str, shape: tuple[int, ...]) -> bool:
         return True
     stripped = name.rstrip("0123456789")
     return bool(
-        stripped
-        and stripped in ("weight",)
-        or stripped.endswith(weight_suffixes)
+        stripped and stripped == "weight" or stripped.endswith(weight_suffixes)
     )
 
 

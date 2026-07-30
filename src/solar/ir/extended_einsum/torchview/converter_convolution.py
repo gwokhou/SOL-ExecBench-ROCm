@@ -126,15 +126,15 @@ class ConverterConvolutionMixin(ConverterMixinContract):
         O_total = (  # noqa: N806 - matches the einsum rank label
             weight_shape[0] if weight_shape else output_shape[1]
         )
-        I = C_in // groups  # noqa: N806 - matches the einsum rank label
+        channels_per_group = C_in // groups
         O_pg = O_total // groups  # noqa: N806 - matches the einsum rank label
 
         if is_2d:
             H, W = input_shape[2], input_shape[3]  # noqa: N806
             KH, KW = weight_shape[2], weight_shape[3]  # noqa: N806
             H_out, W_out = output_shape[2], output_shape[3]  # noqa: N806
-            reshaped_input = [B, groups, I, H, W]
-            reshaped_weight = [groups, O_pg, I, KH, KW]
+            reshaped_input = [B, groups, channels_per_group, H, W]
+            reshaped_weight = [groups, O_pg, channels_per_group, KH, KW]
             reshaped_output = [B, groups, O_pg, H_out, W_out]
             reshape_in_eq = "ABCD->AE0E1CD"
             reshape_in_operands = {
@@ -151,8 +151,8 @@ class ConverterConvolutionMixin(ConverterMixinContract):
             L = input_shape[2]  # noqa: N806 - matches the einsum rank label
             KL = weight_shape[2]  # noqa: N806 - matches the einsum rank label
             L_out = output_shape[2]  # noqa: N806 - einsum rank label
-            reshaped_input = [B, groups, I, L]
-            reshaped_weight = [groups, O_pg, I, KL]
+            reshaped_input = [B, groups, channels_per_group, L]
+            reshaped_weight = [groups, O_pg, channels_per_group, KL]
             reshaped_output = [B, groups, O_pg, L_out]
             reshape_in_eq = "ABC->ADE0C"
             reshape_in_operands = {

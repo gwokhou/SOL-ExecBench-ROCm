@@ -211,7 +211,7 @@ def test_declared_outputs_exclude_unreachable_trace_dead_ends(
 
 
 def test_ir_lifecycle_rejects_unsupported_schema() -> None:
-    with pytest.raises(ValueError, match="schema_version=5"):
+    with pytest.raises(ValueError, match="schema_version=6"):
         validate_extended_einsum_graph(
             {
                 "schema_version": 0,

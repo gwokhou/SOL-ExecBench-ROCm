@@ -587,6 +587,8 @@ def test_library_quantization_and_aten_fallback_dispatch() -> None:
 
 
 def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
+    transpose_value = torch.ones(2, 2, 2)
+    missing_value = torch.ones(1)
     with pytest.raises(IRExecutionError, match="schema_version"):
         _graph_executor(
             {"schema_version": 0, "ir_kind": "aten", "layers": {}},
@@ -600,14 +602,20 @@ def test_executor_rejects_invalid_graph_and_runtime_contracts() -> None:
         IRExecutionError,
         match="explicit transpose dimensions",
     ):
-        value = torch.ones(2, 2, 2)
-        _execute("transpose", (value,), expected=value)
+        _execute(
+            "transpose",
+            (transpose_value,),
+            expected=transpose_value,
+        )
     with pytest.raises(
         IRExecutionError,
         match="unsupported exact operation",
     ):
-        value = torch.ones(1)
-        _execute("definitely_missing", (value,), expected=value)
+        _execute(
+            "definitely_missing",
+            (missing_value,),
+            expected=missing_value,
+        )
 
 
 def test_argument_decoder_rejects_bad_tensor_dtype_and_mapping() -> None:

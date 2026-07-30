@@ -30,6 +30,11 @@ from solar.verification.errors import IRExecutionError, VerificationError
 from solar.verification.executor import (
     IRGraphExecutor,
 )
+from solar.verification.gradients import (
+    capture_rng_state,
+    restore_rng_state,
+    verify_gradients,
+)
 from solar.verification.numerics import (
     alias_relation,
     assert_close,
@@ -173,8 +178,10 @@ def _verify_case(
     error_cap = policy.max_error_cap
     allow_negative_inf = policy.allow_negative_inf
     with torch.enable_grad():
+        rng_state = capture_rng_state()
         expected = reference(*reference_inputs)
     with torch.inference_mode():
+        restore_rng_state(rng_state)
         actual = executor(*executor_inputs)
         try:
             stats = assert_close(
@@ -217,6 +224,15 @@ def _verify_case(
             raise VerificationError(
                 "output/input alias relationships differ from the reference",
             )
+    if isinstance(policy, VerificationPolicy) and policy.verify_gradients:
+        gradient_stats = verify_gradients(
+            reference,
+            executor,
+            graph,
+            reference_inputs,
+            policy,
+        )
+        stats.update(gradient_stats)
     return stats
 
 
@@ -390,6 +406,14 @@ def _verification_policy_record(
     return {
         **_tolerance_record(policy),
         "preserved_input_indices": list(policy.preserved_input_indices),
+        "verify_gradients": policy.verify_gradients,
+        "gradient_input_indices": (
+            list(policy.gradient_input_indices)
+            if policy.gradient_input_indices is not None
+            else None
+        ),
+        "gradient_atol": policy.gradient_atol,
+        "gradient_rtol": policy.gradient_rtol,
     }
 
 
@@ -679,6 +703,22 @@ def _validated_recorded_tolerance(
             int(index)
             for index in tolerance.get("preserved_input_indices") or ()
         ),
+        verify_gradients=bool(tolerance.get("verify_gradients", True)),
+        gradient_input_indices=(
+            tuple(int(index) for index in tolerance["gradient_input_indices"])
+            if tolerance.get("gradient_input_indices") is not None
+            else None
+        ),
+        gradient_atol=(
+            float(tolerance["gradient_atol"])
+            if tolerance.get("gradient_atol") is not None
+            else None
+        ),
+        gradient_rtol=(
+            float(tolerance["gradient_rtol"])
+            if tolerance.get("gradient_rtol") is not None
+            else None
+        ),
     )
     cap_is_weaker = required.max_error_cap is not None and (
         recorded.max_error_cap is None
@@ -697,6 +737,10 @@ def _validated_recorded_tolerance(
         or isinstance(required, VerificationPolicy)
         and recorded.preserved_input_indices
         != tuple(required.preserved_input_indices)
+        or isinstance(required, VerificationPolicy)
+        and recorded.verify_gradients != required.verify_gradients
+        or isinstance(required, VerificationPolicy)
+        and recorded.gradient_input_indices != required.gradient_input_indices
     ):
         raise VerificationError(
             "verification tolerance is weaker than benchmark tolerance",

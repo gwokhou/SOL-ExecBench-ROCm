@@ -92,7 +92,7 @@ class ConverterRecurrentMixin(ConverterMixinContract):
         act_shape = input_shapes[0] if input_shapes else []
         if len(act_shape) < 3:
             raise ValueError(f"LSTM requires [S,B,I] input. Got: {act_shape}")
-        S, B, I = act_shape[0], act_shape[1], act_shape[2]  # noqa: N806
+        S, B, input_width = act_shape[:3]  # noqa: N806
 
         # Find weight shapes
         w_ih_shape = None  # [4H, I]
@@ -101,7 +101,7 @@ class ConverterRecurrentMixin(ConverterMixinContract):
             if t == "weight" and i < len(input_shapes):
                 ws = input_shapes[i]
                 if isinstance(ws, list) and len(ws) == 2:
-                    if ws[1] == I and w_ih_shape is None:
+                    if ws[1] == input_width and w_ih_shape is None:
                         w_ih_shape = ws
                     elif w_hh_shape is None:
                         w_hh_shape = ws
@@ -109,7 +109,7 @@ class ConverterRecurrentMixin(ConverterMixinContract):
         H = (  # noqa: N806 - matches the einsum rank label
             w_hh_shape[1]
             if w_hh_shape
-            else (w_ih_shape[0] // 4 if w_ih_shape else I)
+            else (w_ih_shape[0] // 4 if w_ih_shape else input_width)
         )
 
         input_connections = sorted(op_graph.predecessors(node_id))
@@ -166,7 +166,7 @@ class ConverterRecurrentMixin(ConverterMixinContract):
                 "outputs": ["output"],
             },
             "tensor_shapes": {
-                "inputs": [list(act_shape), w_ih_shape or [G, I]],
+                "inputs": [list(act_shape), w_ih_shape or [G, input_width]],
                 "outputs": [ih_output_shape],
             },
             "tensor_dtypes": {
@@ -300,7 +300,7 @@ class ConverterRecurrentMixin(ConverterMixinContract):
         act_shape = input_shapes[0] if input_shapes else []
         if len(act_shape) < 3:
             raise ValueError(f"GRU requires [S,B,I] input. Got: {act_shape}")
-        S, B, I = act_shape[0], act_shape[1], act_shape[2]  # noqa: N806
+        S, B, input_width = act_shape[:3]  # noqa: N806
 
         w_ih_shape = None  # [3H, I]
         w_hh_shape = None  # [3H, H]
@@ -308,7 +308,7 @@ class ConverterRecurrentMixin(ConverterMixinContract):
             if t == "weight" and i < len(input_shapes):
                 ws = input_shapes[i]
                 if isinstance(ws, list) and len(ws) == 2:
-                    if ws[1] == I and w_ih_shape is None:
+                    if ws[1] == input_width and w_ih_shape is None:
                         w_ih_shape = ws
                     elif w_hh_shape is None:
                         w_hh_shape = ws
@@ -316,7 +316,7 @@ class ConverterRecurrentMixin(ConverterMixinContract):
         H = (  # noqa: N806 - matches the einsum rank label
             w_hh_shape[1]
             if w_hh_shape
-            else (w_ih_shape[0] // 3 if w_ih_shape else I)
+            else (w_ih_shape[0] // 3 if w_ih_shape else input_width)
         )
 
         input_connections = sorted(op_graph.predecessors(node_id))
@@ -371,7 +371,7 @@ class ConverterRecurrentMixin(ConverterMixinContract):
                 "outputs": ["output"],
             },
             "tensor_shapes": {
-                "inputs": [list(act_shape), w_ih_shape or [G, I]],
+                "inputs": [list(act_shape), w_ih_shape or [G, input_width]],
                 "outputs": [ih_output_shape],
             },
             "tensor_dtypes": {

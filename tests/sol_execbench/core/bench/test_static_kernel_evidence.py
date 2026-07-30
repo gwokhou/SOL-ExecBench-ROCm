@@ -532,7 +532,7 @@ def test_static_artifact_manifest_rejects_unsupported_schema(tmp_path):
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="schema_version"):
         collect_static_kernel_artifacts(
             build_directory=build_dir,
             evidence_directory=evidence_dir,

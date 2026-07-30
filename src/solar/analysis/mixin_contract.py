@@ -32,7 +32,12 @@ if TYPE_CHECKING:
             layer: dict[str, DynamicValue],
         ) -> LayerData: ...
 
-        def _compute_layer(self, data: LayerData) -> LayerCompute: ...
+        def _compute_layer(
+            self,
+            data: LayerData,
+            *,
+            strict: bool,
+        ) -> LayerCompute: ...
 
         @staticmethod
         def _memory_elements(

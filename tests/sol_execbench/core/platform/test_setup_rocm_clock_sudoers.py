@@ -51,7 +51,7 @@ def test_render_sudoers_covers_only_exact_amd_smi_clock_commands():
     ],
 )
 def test_render_sudoers_rejects_injection(user, amd_smi, label):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="unsafe|absolute path"):
         sudoers.render_sudoers(user=user, amd_smi=amd_smi, label=label)
 
 

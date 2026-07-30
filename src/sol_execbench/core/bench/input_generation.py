@@ -128,7 +128,7 @@ def _rand_tensor(
             2.0,
         )
         return t.to(dtype)
-    elif dtype == torch.float4_e2m1fn_x2:
+    if dtype == torch.float4_e2m1fn_x2:
         return _cast_to_fp4x2(
             torch.randn(shape, dtype=torch.float32, device=device),
         )

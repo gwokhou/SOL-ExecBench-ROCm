@@ -40,13 +40,13 @@ def test_rejects_unregistered_schema_identifier():
 def test_accepts_current_solar_schema_identifier():
     findings, families = audit_text(
         Path("audit.json"),
-        '{"schema_version": "solar.resource_peak_calibration.v3"}',
+        '{"schema_version": "solar.resource_peak_calibration.v4"}',
     )
 
     assert findings == []
     assert families == {
         "solar.resource_peak_calibration": {
-            "solar.resource_peak_calibration.v3",
+            "solar.resource_peak_calibration.v4",
         },
     }
 

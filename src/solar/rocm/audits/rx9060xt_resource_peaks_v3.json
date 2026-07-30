@@ -6454,10 +6454,10 @@
       }
     }
   ],
-  "payload_sha256": "d465dbd2230de56ff0887d53d2b546a81108159fdccda41005b9e0d32f06ce78",
+  "payload_sha256": "5e5c5987f566f05d70e4643ee53ddf3c77069b6ad337fe067f287a54b4a13bcc",
   "policy": "SOL bounds use the AMD nominal theoretical peak; the sustained held-out median here is audit evidence only and must not replace the nominal bound. Best-observed throughput is retained as supplemental evidence, never as the primary statistic.",
   "profile": "RX_9060_XT",
-  "schema_version": "solar.resource_peak_calibration.v3",
+  "schema_version": "solar.resource_peak_calibration.v4",
   "source_revision": "86659747a199c4fa467835e5e66ac80cb5d59048",
   "timing_profile": "official",
   "toolchain": {

@@ -81,12 +81,12 @@ def atomic_write_jsonl_values(
         temporary.unlink(missing_ok=True)
 
 
-def save_json_file(object: BaseModel, path: str | Path) -> None:
+def save_json_file(model: BaseModel, path: str | Path) -> None:
     """Save a Pydantic BaseModel object to a JSON file.
 
     Parameters
     ----------
-    object : BaseModel
+    model : BaseModel
         The Pydantic BaseModel instance to be serialized and saved.
     path : Union[str, Path]
         The file path where the JSON will be saved. Parent directories
@@ -96,7 +96,7 @@ def save_json_file(object: BaseModel, path: str | Path) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        f.write(object.model_dump_json(indent=2, exclude_unset=True))
+        f.write(model.model_dump_json(indent=2, exclude_unset=True))
 
 
 def load_json_value(path: str | Path) -> Any:
