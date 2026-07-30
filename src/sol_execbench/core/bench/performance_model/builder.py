@@ -27,7 +27,15 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceManifest,
     load_and_verify_performance_evidence_manifest,
 )
+from sol_execbench.core.bench.performance_model.inference import (
+    DiagnosticInferenceProfile,
+    apply_conformal_interval,
+)
+from sol_execbench.core.bench.performance_model.model_identity import (
+    build_diagnostic_model_identity,
+)
 from sol_execbench.core.bench.performance_model.models import (
+    PERFORMANCE_MODEL_VERSION,
     CompiledCharacterization,
     DiagnosticCalibrationProfile,
     DispatchEvidence,
@@ -44,6 +52,9 @@ from sol_execbench.core.bench.performance_model.prediction import (
     predict_ir,
     validate_calibration_identity,
 )
+from sol_execbench.core.bench.performance_model.replay_evidence import (
+    PerformanceReplayEvidenceSidecar,
+)
 from sol_execbench.core.bench.performance_model.timing_evidence import (
     PerformanceTimingEvidenceSidecar,
     WorkloadTimingEvidence,
@@ -52,6 +63,9 @@ from sol_execbench.core.bench.profile_summary import (
     ProfileSummarySidecar,
     evaluate_profile_summary_governance,
     validate_profile_summary_freshness,
+)
+from sol_execbench.core.bench.rocm_profiler.counter_provenance import (
+    Rocprofv3CounterProvenance,
 )
 from sol_execbench.core.bench.rocm_profiler.counters import (
     CounterPassCSV,
@@ -65,7 +79,6 @@ from sol_execbench.core.bench.static_kernel.evidence import (
 )
 from sol_execbench.core.data.json_utils import (
     load_json_file,
-    load_json_value,
     load_jsonl_file,
 )
 from sol_execbench.core.data.trace import Trace
@@ -87,6 +100,7 @@ class PerformanceDiagnosticBuildRequest:
     solar_manifest_path: Path
     output_path: Path
     calibration_profile_path: Path | None = None
+    inference_profile_path: Path | None = None
     frontier_trace_path: Path | None = None
 
 
@@ -97,6 +111,7 @@ class _BuildEvidence:
     timing: WorkloadTimingEvidence
     compiled: list[CompiledCharacterization]
     calibration: DiagnosticCalibrationProfile | None
+    inference: DiagnosticInferenceProfile | None
     dispatches: list[DispatchEvidence]
     semantic: SemanticCharacterization
     identity_reasons: list[str]
@@ -117,6 +132,7 @@ def build_performance_diagnostic(
         compiled=evidence.compiled,
         dispatches=evidence.dispatches,
         calibration=evidence.calibration,
+        inference=evidence.inference,
         identity_reasons=evidence.identity_reasons,
         extra_reasons=[
             *manifest.reason_codes,
@@ -135,6 +151,14 @@ def build_performance_diagnostic(
     )
     return PerformanceDiagnosticSidecar(
         status=_sidecar_status([workload], reasons),
+        model_identity=build_diagnostic_model_identity(
+            PERFORMANCE_MODEL_VERSION,
+        ),
+        inference_profile_sha256=(
+            sha256_file(request.inference_profile_path)
+            if request.inference_profile_path is not None
+            else None
+        ),
         run_id=manifest.identity.run_id,
         candidate_sha256=manifest.identity.candidate_sha256,
         gpu_architecture=manifest.identity.gpu_architecture,
@@ -202,11 +226,16 @@ def _load_build_evidence(
         static_path,
     )
     calibration = _load_calibration(request.calibration_profile_path)
+    inference = _load_inference_profile(
+        request.inference_profile_path,
+        request.calibration_profile_path,
+    )
     identity_reasons = _manifest_calibration_reasons(calibration, manifest)
     dispatches, dispatch_reasons = _manifest_dispatch_evidence(
         manifest,
         request.evidence_manifest_path,
         trace,
+        timing,
         compiled,
     )
     semantic = load_manifest_semantic_characterization(
@@ -222,6 +251,7 @@ def _load_build_evidence(
         compiled=compiled,
         dispatches=dispatches,
         calibration=calibration,
+        inference=inference,
         identity_reasons=identity_reasons,
         dispatch_reasons=dispatch_reasons,
     )
@@ -345,9 +375,27 @@ def _manifest_dispatch_evidence(
     manifest: PerformanceEvidenceManifest,
     manifest_path: Path,
     trace: Trace,
+    timing: WorkloadTimingEvidence,
     compiled: list[CompiledCharacterization],
 ) -> tuple[list[DispatchEvidence], list[str]]:
-    _verify_counter_provenance(manifest, manifest_path)
+    replay, replay_reasons = _verify_replay_evidence(
+        manifest,
+        manifest_path,
+        timing,
+    )
+    if replay_reasons:
+        return [], replay_reasons
+    provenance = _verify_counter_provenance(manifest, manifest_path)
+    if (
+        replay is not None
+        and provenance.application_executable_sha256 != "unresolved"
+        and any(
+            process.process_executable_sha256
+            != provenance.application_executable_sha256
+            for process in replay.processes
+        )
+    ):
+        raise ValueError("replay_process_executable_sha256_mismatch")
     csv_artifacts = manifest.artifacts_of_kind(
         PerformanceEvidenceArtifactKind.COUNTER_CSV
     )
@@ -376,26 +424,47 @@ def _manifest_dispatch_evidence(
     return collapsed, reasons
 
 
+def _verify_replay_evidence(
+    manifest: PerformanceEvidenceManifest,
+    manifest_path: Path,
+    timing: WorkloadTimingEvidence,
+) -> tuple[PerformanceReplayEvidenceSidecar | None, list[str]]:
+    artifact = manifest.artifact(
+        PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE
+    )
+    if artifact is None:
+        return None, ["replay_evidence_missing"]
+    replay = load_json_file(
+        PerformanceReplayEvidenceSidecar,
+        manifest_path.parent / artifact.path,
+    )
+    identity = manifest.identity
+    if (
+        replay.run_id != identity.run_id
+        or replay.candidate_sha256 != identity.candidate_sha256
+        or replay.canonical_input_sha256 != timing.input_sha256
+    ):
+        raise ValueError("replay_evidence_identity_mismatch")
+    if replay.status is not DiagnosticSidecarStatus.AVAILABLE:
+        return replay, (
+            list(replay.reason_codes) or ["replay_evidence_unavailable"]
+        )
+    return replay, []
+
+
 def _verify_counter_provenance(
     manifest: PerformanceEvidenceManifest,
     manifest_path: Path,
-) -> None:
+) -> Rocprofv3CounterProvenance:
     artifact = manifest.artifact(
         PerformanceEvidenceArtifactKind.COUNTER_PROVENANCE
     )
     if artifact is None:
         raise ValueError("counter_provenance_missing")
-    payload = load_json_value(manifest_path.parent / artifact.path)
-    if not isinstance(payload, dict):
-        raise ValueError("counter_provenance_invalid")
-    if (
-        payload.get("schema_version")
-        != "sol_execbench.rocprofv3_counter_provenance.v2"
-        or payload.get("replay_phase") != "evidence"
-        or payload.get("diagnostic_only") is not True
-        or payload.get("score_authority") is not False
-    ):
-        raise ValueError("counter_provenance_contract_mismatch")
+    return load_json_file(
+        Rocprofv3CounterProvenance,
+        manifest_path.parent / artifact.path,
+    )
 
 
 def _traces_by_workload(traces: list[Trace]) -> dict[str, Trace]:
@@ -639,6 +708,30 @@ def _load_calibration(
         raise ValueError("calibration_audit_missing")
     audit = load_json_file(DiagnosticCalibrationAudit, audit_path)
     _verify_calibration_audit(profile, audit, audit_path)
+    return profile
+
+
+def _load_inference_profile(
+    path: Path | None,
+    calibration_path: Path | None,
+) -> DiagnosticInferenceProfile | None:
+    if path is None:
+        return None
+    if calibration_path is None:
+        raise ValueError("inference_profile_requires_calibration")
+    profile = load_json_file(DiagnosticInferenceProfile, path)
+    expected_identity = build_diagnostic_model_identity(
+        PERFORMANCE_MODEL_VERSION,
+    )
+    if profile.model_identity != expected_identity:
+        raise ValueError("inference_profile_model_identity_mismatch")
+    audit_path = calibration_path.with_name(
+        f"{calibration_path.stem}.audit.json"
+    )
+    if profile.calibration_profile_sha256 != sha256_file(calibration_path):
+        raise ValueError("inference_profile_calibration_sha256_mismatch")
+    if profile.calibration_audit_sha256 != sha256_file(audit_path):
+        raise ValueError("inference_profile_calibration_audit_sha256_mismatch")
     return profile
 
 
@@ -907,6 +1000,7 @@ def _workload_diagnostic(
     compiled: list[CompiledCharacterization],
     dispatches: list[DispatchEvidence],
     calibration: DiagnosticCalibrationProfile | None,
+    inference: DiagnosticInferenceProfile | None,
     identity_reasons: list[str],
     extra_reasons: list[str],
 ) -> WorkloadPerformanceDiagnostic:
@@ -918,6 +1012,8 @@ def _workload_diagnostic(
         identity_reasons=identity_reasons,
         extra_reasons=extra_reasons,
     )
+    ir = apply_conformal_interval(ir, semantic.workload_kind, inference)
+    hw = apply_conformal_interval(hw, semantic.workload_kind, inference)
     evaluation = trace.evaluation
     if evaluation is None or evaluation.performance is None:
         raise ValueError(
@@ -959,6 +1055,7 @@ def _workload_diagnostic(
             t_pred_ir=ir,
             t_pred_hw=hw,
             ratios=ratios,
+            inference_profile=inference,
         ),
         reason_codes=[
             *identity_reasons,
@@ -1124,6 +1221,8 @@ def _input_references(
     ]
     if request.calibration_profile_path is not None:
         paths.append(("calibration_profile", request.calibration_profile_path))
+    if request.inference_profile_path is not None:
+        paths.append(("inference_profile", request.inference_profile_path))
     if request.frontier_trace_path is not None:
         paths.append(("frontier_trace", request.frontier_trace_path))
     return [

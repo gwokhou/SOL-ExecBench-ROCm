@@ -4,10 +4,17 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
+
 from pydantic import BaseModel, ConfigDict, RootModel
 
+type MetricJSON = (
+    str | int | float | bool | None | list[MetricJSON] | dict[str, MetricJSON]
+)
 
-class AMDSmiPerformanceLevel(BaseModel):
+
+class AMDSMIPerformanceLevel(BaseModel):
     """Performance-level record for one GPU."""
 
     model_config = ConfigDict(extra="ignore")
@@ -16,15 +23,15 @@ class AMDSmiPerformanceLevel(BaseModel):
     perf_level: str
 
 
-class AMDSmiPerformancePayload(BaseModel):
+class AMDSMIPerformancePayload(BaseModel):
     """Top-level AMD SMI performance-level response."""
 
     model_config = ConfigDict(extra="ignore")
 
-    gpu_data: list[AMDSmiPerformanceLevel]
+    gpu_data: list[AMDSMIPerformanceLevel]
 
 
-class AMDSmiProcess(BaseModel):
+class AMDSMIProcess(BaseModel):
     """Process record reported by AMD SMI."""
 
     model_config = ConfigDict(extra="ignore")
@@ -34,20 +41,20 @@ class AMDSmiProcess(BaseModel):
     process_name: str | None = None
 
 
-class AMDSmiGPUProcesses(BaseModel):
+class AMDSMIGPUProcesses(BaseModel):
     """Processes associated with one GPU."""
 
     model_config = ConfigDict(extra="ignore")
 
     gpu: int | str
-    process_list: list[AMDSmiProcess]
+    process_list: list[AMDSMIProcess]
 
 
-class AMDSmiProcessPayload(RootModel[list[AMDSmiGPUProcesses]]):
+class AMDSMIProcessPayload(RootModel[list[AMDSMIGPUProcesses]]):
     """Root list of per-GPU process records."""
 
 
-class AMDSmiGPUIdentity(BaseModel):
+class AMDSMIGPUIdentity(BaseModel):
     """Minimal identity record for one GPU."""
 
     model_config = ConfigDict(extra="ignore")
@@ -57,13 +64,29 @@ class AMDSmiGPUIdentity(BaseModel):
     uuid: str | None = None
 
 
-class AMDSmiListPayload(RootModel[list[AMDSmiGPUIdentity]]):
+class AMDSMIListPayload(RootModel[list[AMDSMIGPUIdentity]]):
     """Root list returned by the AMD SMI list command."""
+
+
+class AMDSMIMetricPayload(RootModel[dict[str, MetricJSON] | list[MetricJSON]]):
+    """Version-tolerant root validated before metric field extraction."""
+
+
+@dataclass(frozen=True, slots=True)
+class AMDSMIMetricObservation:
+    """Normalized numeric telemetry for one GPU."""
+
+    sclk_mhz: float | None
+    mclk_mhz: float | None
+    temperature_c: float | None
+    power_cap_w: float | None
+    power_draw_w: float | None
+    power_profile: str | None
 
 
 def parse_performance_levels(raw: str) -> tuple[str, ...]:
     """Return normalized, non-empty levels for every reported GPU."""
-    payload = AMDSmiPerformancePayload.model_validate_json(raw)
+    payload = AMDSMIPerformancePayload.model_validate_json(raw)
     if not payload.gpu_data:
         raise ValueError("amd-smi returned no GPU performance-level data")
     levels = tuple(
@@ -76,7 +99,7 @@ def parse_performance_levels(raw: str) -> tuple[str, ...]:
 
 def parse_processes(raw: str) -> list[dict[str, int | str]]:
     """Return the stable process fields used by isolation snapshots."""
-    payload = AMDSmiProcessPayload.model_validate_json(raw)
+    payload = AMDSMIProcessPayload.model_validate_json(raw)
     processes: list[dict[str, int | str]] = []
     for gpu_entry in payload.root:
         for process in gpu_entry.process_list:
@@ -94,13 +117,13 @@ def parse_processes(raw: str) -> list[dict[str, int | str]]:
 
 def parse_gpu_count(raw: str) -> int:
     """Return the number of unique GPU identifiers in ``amd-smi list`` JSON."""
-    payload = AMDSmiListPayload.model_validate_json(raw)
+    payload = AMDSMIListPayload.model_validate_json(raw)
     return len({str(entry.gpu) for entry in payload.root})
 
 
-def parse_gpu_identity(raw: str, gpu_index: int) -> AMDSmiGPUIdentity:
+def parse_gpu_identity(raw: str, gpu_index: int) -> AMDSMIGPUIdentity:
     """Return one exact GPU list identity with required UUID and BDF."""
-    payload = AMDSmiListPayload.model_validate_json(raw)
+    payload = AMDSMIListPayload.model_validate_json(raw)
     matches = [
         identity
         for identity in payload.root
@@ -114,3 +137,117 @@ def parse_gpu_identity(raw: str, gpu_index: int) -> AMDSmiGPUIdentity:
     if not identity.uuid or not identity.bdf:
         raise ValueError("amd-smi GPU identity lacks UUID or BDF")
     return identity
+
+
+def parse_gpu_metrics(raw: str, gpu_index: int) -> AMDSMIMetricObservation:
+    """Extract stable telemetry across AMD SMI JSON naming variations."""
+    payload = AMDSMIMetricPayload.model_validate_json(raw).root
+    selected = _select_gpu_metric_payload(payload, gpu_index)
+    flattened = _flatten_metric_payload(selected)
+    return AMDSMIMetricObservation(
+        sclk_mhz=_first_number(
+            flattened,
+            "clock_gfx_0_clk_value",
+            "gfx_clock",
+            "sclk",
+            "clk_gfx",
+        ),
+        mclk_mhz=_first_number(
+            flattened,
+            "clock_mem_0_clk_value",
+            "mem_clock",
+            "mclk",
+            "clk_mem",
+        ),
+        temperature_c=_first_number(
+            flattened,
+            "temperature_hotspot_value",
+            "temperature_edge_value",
+            "temperature_hotspot",
+            "hotspot_temperature",
+            "temperature_edge",
+            "temperature",
+        ),
+        power_cap_w=_first_number(
+            flattened,
+            "power_cap",
+            "socket_power_cap",
+        ),
+        power_draw_w=_first_number(
+            flattened,
+            "power_socket_power_value",
+            "current_socket_power",
+            "average_socket_power",
+            "power_draw",
+        ),
+        power_profile=_first_text(
+            flattened,
+            "power_profile",
+            "power_management",
+        ),
+    )
+
+
+def _select_gpu_metric_payload(
+    value: MetricJSON,
+    gpu_index: int,
+) -> MetricJSON:
+    if isinstance(value, dict):
+        gpu_data = value.get("gpu_data")
+        if isinstance(gpu_data, list):
+            return _select_gpu_metric_payload(gpu_data, gpu_index)
+        return value
+    if isinstance(value, list):
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            observed = item.get("gpu", item.get("gpu_id", item.get("device")))
+            if str(observed) == str(gpu_index):
+                return item
+        if len(value) == 1:
+            return value[0]
+    raise ValueError(f"amd-smi metrics lack GPU {gpu_index}")
+
+
+def _flatten_metric_payload(
+    value: MetricJSON,
+    *,
+    prefix: str = "",
+) -> dict[str, MetricJSON]:
+    result: dict[str, MetricJSON] = {}
+    if not isinstance(value, dict):
+        return result
+    for key, item in value.items():
+        normalized = re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
+        path = f"{prefix}_{normalized}".strip("_")
+        if isinstance(item, dict):
+            result.update(_flatten_metric_payload(item, prefix=path))
+        else:
+            result[path] = item
+            result.setdefault(normalized, item)
+    return result
+
+
+def _first_number(
+    values: dict[str, MetricJSON],
+    *suffixes: str,
+) -> float | None:
+    for suffix in suffixes:
+        for key, value in values.items():
+            if key == suffix or key.endswith(f"_{suffix}"):
+                match = re.search(r"[-+]?\d+(?:\.\d+)?", str(value))
+                if match is not None:
+                    return float(match.group())
+    return None
+
+
+def _first_text(
+    values: dict[str, MetricJSON],
+    *suffixes: str,
+) -> str | None:
+    for suffix in suffixes:
+        for key, value in values.items():
+            if key == suffix or key.endswith(f"_{suffix}"):
+                text = str(value).strip()
+                return text or None
+    return None

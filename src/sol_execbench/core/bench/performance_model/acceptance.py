@@ -5,158 +5,275 @@
 
 from __future__ import annotations
 
+import math
 import statistics
 from typing import Literal
 
-import numpy as np
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.inference import (
+    ACTION_PRECISION_GATE,
+    ACTION_RECALL_GATE,
+)
 from sol_execbench.core.bench.performance_model.models import (
     PERFORMANCE_MODEL_VERSION,
     CalibrationIdentity,
+    DiagnosticModelIdentity,
     WorkloadKind,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.bench.performance_model.validation_corpus import (
+    MINIMUM_CASES_PER_FAMILY,
+)
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaModel,
+    StrictArtifactModel,
+)
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import (
     DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION,
 )
 
-_MODEL_CONFIG = ConfigDict(
-    extra="forbid",
-    frozen=True,
-    allow_inf_nan=False,
+MINIMUM_EMPIRICAL_COVERAGE = 0.90
+MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR = 15.0
+MAXIMUM_P90_ABSOLUTE_PERCENTAGE_ERROR = 30.0
+_SUPPORTED_FAMILIES = (
+    WorkloadKind.ELEMENTWISE,
+    WorkloadKind.TRANSPOSE,
+    WorkloadKind.REDUCTION,
+    WorkloadKind.MATMUL,
 )
-_EXPECTED_PRIMARY_CODES = {
-    WorkloadKind.ELEMENTWISE: {"launch_bound"},
-    WorkloadKind.TRANSPOSE: {"memory_access_efficiency"},
-    WorkloadKind.REDUCTION: {"lds_barrier_pressure"},
-    WorkloadKind.MATMUL: {"matrix_path_missing"},
-}
-MINIMUM_CASES_PER_FAMILY = 10
+_CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
-class DiagnosticAcceptanceCase(BaseModelWithDocstrings):
-    """One independent workload result excluded from calibration."""
+class DiagnosticAcceptanceCase(StrictArtifactModel):
+    """One held-out result derived from cited diagnostic evidence."""
 
-    model_config = _MODEL_CONFIG
+    model_config = _CONFIG
 
-    workload_uuid: str = Field(min_length=1)
+    case_id: str = Field(min_length=1)
+    pair_id: str = Field(min_length=1)
     workload_kind: WorkloadKind
-    candidate_sha256: SHA256Digest
     evidence_manifest_sha256: SHA256Digest
     performance_diagnostic_sha256: SHA256Digest
-    independent_held_out: Literal[True] = True
-    tuning_sample: Literal[False] = False
-    predicted_ms: float = Field(gt=0.0)
-    measured_ms: float = Field(gt=0.0)
-    primary_attribution_code: str = Field(min_length=1)
-
-
-class DiagnosticAcceptanceManifest(BaseModelWithDocstrings):
-    """Frozen identity and held-out cases supplied to acceptance."""
-
-    model_config = _MODEL_CONFIG
-
-    schema_version: Literal["sol_execbench.diagnostic_acceptance.v1"] = (
-        DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
-    )
-    model_version: Literal["gfx1200_diagnostic.v2"] = PERFORMANCE_MODEL_VERSION
-    calibration_profile_sha256: SHA256Digest
-    calibration_identity: CalibrationIdentity
-    frozen_configuration_sha256: SHA256Digest
-    tuning_evidence_sha256: list[SHA256Digest] = Field(min_length=1)
-    configuration_frozen_before_acceptance: Literal[True] = True
-    cases: list[DiagnosticAcceptanceCase] = Field(min_length=40)
+    predicted_ms: float = Field(gt=0)
+    lower_ms: float = Field(gt=0)
+    upper_ms: float = Field(gt=0)
+    measured_ms: float = Field(gt=0)
+    predicted_action_codes: list[str] = Field(default_factory=list)
+    gold_action_codes: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def cases_are_independent(self) -> DiagnosticAcceptanceManifest:
-        """Reject duplicate workload/candidate pairs."""
-        identities = [
-            (case.workload_uuid, case.candidate_sha256) for case in self.cases
-        ]
-        if len(identities) != len(set(identities)):
-            raise ValueError("acceptance cases repeat workload/candidate")
+    def interval_is_ordered(self) -> DiagnosticAcceptanceCase:
+        """Reject a point estimate outside its interval."""
+        if not self.lower_ms <= self.predicted_ms <= self.upper_ms:
+            raise ValueError("acceptance prediction interval is invalid")
         return self
 
 
-class DiagnosticAcceptanceResult(BaseModelWithDocstrings):
-    """Content-bound aggregate acceptance verdict."""
+class ActionAcceptanceMetric(StrictArtifactModel):
+    """Held-out precision and recall for one enabled code action."""
 
-    model_config = _MODEL_CONFIG
+    model_config = _CONFIG
 
-    schema_version: Literal["sol_execbench.diagnostic_acceptance.v1"] = (
+    action_code: str
+    predicted_support: int = Field(ge=0)
+    positive_support: int = Field(ge=0)
+    precision: float = Field(ge=0, le=1)
+    recall: float = Field(ge=0, le=1)
+    passed: bool
+
+
+class DiagnosticAcceptanceManifest(CurrentSchemaModel):
+    """Frozen identities and evidence-derived held-out observations."""
+
+    model_config = _CONFIG
+    current_schema_version = DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.diagnostic_acceptance.v2"] = (
         DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v2"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
+    model_identity: DiagnosticModelIdentity
+    calibration_profile_sha256: SHA256Digest
+    calibration_identity: CalibrationIdentity
+    inference_profile_sha256: SHA256Digest
+    development_corpus_sha256: SHA256Digest
+    held_out_corpus_sha256: SHA256Digest
+    configuration_frozen_before_acceptance: Literal[True] = True
+    enabled_action_codes: list[str]
+    cases: list[DiagnosticAcceptanceCase] = Field(min_length=80)
+
+    @model_validator(mode="after")
+    def cases_are_independent(self) -> DiagnosticAcceptanceManifest:
+        """Require unique pairs and the locked family support."""
+        pair_ids = [case.pair_id for case in self.cases]
+        if len(pair_ids) != len(set(pair_ids)):
+            raise ValueError("acceptance cases repeat workload/candidate pair")
+        for kind in _SUPPORTED_FAMILIES:
+            if (
+                sum(case.workload_kind is kind for case in self.cases)
+                < MINIMUM_CASES_PER_FAMILY
+            ):
+                raise ValueError(f"acceptance lacks {kind} coverage")
+        if self.model_identity.model_version != self.model_version:
+            raise ValueError("acceptance model identity mismatch")
+        return self
+
+
+class DiagnosticAcceptanceResult(CurrentSchemaModel):
+    """Content-bound aggregate acceptance verdict and Agent admission set."""
+
+    model_config = _CONFIG
+    current_schema_version = DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.diagnostic_acceptance.v2"] = (
+        DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
+    )
+    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
+    model_identity: DiagnosticModelIdentity
     manifest_sha256: SHA256Digest
     calibration_profile_sha256: SHA256Digest
     calibration_identity: CalibrationIdentity
+    inference_profile_sha256: SHA256Digest
+    development_corpus_sha256: SHA256Digest
+    held_out_corpus_sha256: SHA256Digest
     accepted: bool
     case_count: int = Field(ge=0)
     family_case_counts: dict[WorkloadKind, int]
-    median_absolute_percentage_error: float = Field(ge=0.0)
-    p90_absolute_percentage_error: float = Field(ge=0.0)
-    attribution_matches: dict[WorkloadKind, bool]
+    family_empirical_coverage: dict[WorkloadKind, float]
+    median_absolute_percentage_error: float = Field(ge=0)
+    p90_absolute_percentage_error: float = Field(ge=0)
+    action_metrics: list[ActionAcceptanceMetric]
+    enabled_action_codes: list[str]
     reason_codes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def verdict_is_internally_consistent(self) -> DiagnosticAcceptanceResult:
+        """Reject a promoted verdict that contradicts its reported metrics."""
+        if self.model_identity.model_version != self.model_version:
+            raise ValueError("acceptance result model identity mismatch")
+        if self.accepted:
+            if (
+                self.reason_codes
+                or any(
+                    value < MINIMUM_EMPIRICAL_COVERAGE
+                    for value in self.family_empirical_coverage.values()
+                )
+                or self.median_absolute_percentage_error
+                > MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR
+                or self.p90_absolute_percentage_error
+                > MAXIMUM_P90_ABSOLUTE_PERCENTAGE_ERROR
+                or any(not metric.passed for metric in self.action_metrics)
+            ):
+                raise ValueError("accepted result contradicts quality metrics")
+        elif self.enabled_action_codes:
+            raise ValueError("failed acceptance cannot enable actions")
+        return self
 
 
 def evaluate_diagnostic_acceptance(
     manifest: DiagnosticAcceptanceManifest,
 ) -> DiagnosticAcceptanceResult:
-    """Apply frozen accuracy, coverage, and attribution thresholds."""
+    """Apply frozen accuracy, coverage, and action-quality gates."""
     cases = manifest.cases
     counts = {
         kind: sum(case.workload_kind is kind for case in cases)
-        for kind in _EXPECTED_PRIMARY_CODES
+        for kind in _SUPPORTED_FAMILIES
     }
-    reasons = [
-        "acceptance_workload_coverage_incomplete"
-        for kind in counts
-        if counts[kind] < MINIMUM_CASES_PER_FAMILY
-    ]
+    coverage = {
+        kind: _family_coverage(cases, kind) for kind in _SUPPORTED_FAMILIES
+    }
     errors = [
-        abs(case.predicted_ms - case.measured_ms) / case.measured_ms * 100.0
+        abs(case.predicted_ms - case.measured_ms) / case.measured_ms * 100
         for case in cases
     ]
-    median_error = statistics.median(errors) if errors else 0.0
-    p90_error = float(np.percentile(errors, 90.0)) if errors else 0.0
-    if median_error > 15.0:
+    median_error = statistics.median(errors)
+    p90_error = _nearest_rank_percentile(errors, 0.90)
+    action_metrics = [
+        _action_metric(cases, action)
+        for action in sorted(set(manifest.enabled_action_codes))
+    ]
+    reasons: list[str] = []
+    if any(value < MINIMUM_EMPIRICAL_COVERAGE for value in coverage.values()):
+        reasons.append("family_empirical_coverage_below_90_percent")
+    if median_error > MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR:
         reasons.append("median_absolute_percentage_error_exceeded")
-    if p90_error > 30.0:
+    if p90_error > MAXIMUM_P90_ABSOLUTE_PERCENTAGE_ERROR:
         reasons.append("p90_absolute_percentage_error_exceeded")
-    attribution_matches = _attribution_matches(cases)
-    if not all(attribution_matches.values()):
-        reasons.append("primary_attribution_mismatch")
+    if any(not metric.passed for metric in action_metrics):
+        reasons.append("held_out_action_quality_gate_failed")
+    accepted = not reasons
     return DiagnosticAcceptanceResult(
+        model_identity=manifest.model_identity,
         manifest_sha256=stable_json_checksum(manifest.model_dump(mode="json")),
         calibration_profile_sha256=manifest.calibration_profile_sha256,
         calibration_identity=manifest.calibration_identity,
-        accepted=not reasons,
+        inference_profile_sha256=manifest.inference_profile_sha256,
+        development_corpus_sha256=manifest.development_corpus_sha256,
+        held_out_corpus_sha256=manifest.held_out_corpus_sha256,
+        accepted=accepted,
         case_count=len(cases),
         family_case_counts=counts,
+        family_empirical_coverage=coverage,
         median_absolute_percentage_error=median_error,
         p90_absolute_percentage_error=p90_error,
-        attribution_matches=attribution_matches,
-        reason_codes=list(dict.fromkeys(reasons)),
+        action_metrics=action_metrics,
+        enabled_action_codes=(
+            sorted(set(manifest.enabled_action_codes)) if accepted else []
+        ),
+        reason_codes=reasons,
     )
 
 
-def _attribution_matches(
+def _family_coverage(
     cases: list[DiagnosticAcceptanceCase],
-) -> dict[WorkloadKind, bool]:
-    result: dict[WorkloadKind, bool] = {}
-    for kind, expected_codes in _EXPECTED_PRIMARY_CODES.items():
-        kind_cases = [case for case in cases if case.workload_kind is kind]
-        result[kind] = len(kind_cases) >= MINIMUM_CASES_PER_FAMILY and all(
-            case.primary_attribution_code in expected_codes
-            for case in kind_cases
-        )
-    return result
+    kind: WorkloadKind,
+) -> float:
+    selected = [case for case in cases if case.workload_kind is kind]
+    return sum(
+        case.lower_ms <= case.measured_ms <= case.upper_ms for case in selected
+    ) / len(selected)
+
+
+def _action_metric(
+    cases: list[DiagnosticAcceptanceCase],
+    action_code: str,
+) -> ActionAcceptanceMetric:
+    predicted = [
+        case for case in cases if action_code in case.predicted_action_codes
+    ]
+    positives = [
+        case for case in cases if action_code in case.gold_action_codes
+    ]
+    true_positive = sum(
+        action_code in case.gold_action_codes for case in predicted
+    )
+    precision = true_positive / len(predicted) if predicted else 0.0
+    recall = true_positive / len(positives) if positives else 0.0
+    return ActionAcceptanceMetric(
+        action_code=action_code,
+        predicted_support=len(predicted),
+        positive_support=len(positives),
+        precision=precision,
+        recall=recall,
+        passed=(
+            precision >= ACTION_PRECISION_GATE and recall >= ACTION_RECALL_GATE
+        ),
+    )
+
+
+def _nearest_rank_percentile(values: list[float], quantile: float) -> float:
+    ordered = sorted(values)
+    rank = max(1, math.ceil(len(ordered) * quantile))
+    return ordered[rank - 1]
 
 
 __all__ = [
+    "MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR",
+    "MAXIMUM_P90_ABSOLUTE_PERCENTAGE_ERROR",
     "MINIMUM_CASES_PER_FAMILY",
+    "MINIMUM_EMPIRICAL_COVERAGE",
+    "ActionAcceptanceMetric",
     "DiagnosticAcceptanceCase",
     "DiagnosticAcceptanceManifest",
     "DiagnosticAcceptanceResult",

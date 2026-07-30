@@ -9,7 +9,7 @@ from sol_execbench.core.scoring.aggregation import (
     aggregate_suite_scores,
     diagnostic_workload_score,
 )
-from sol_execbench.core.scoring.formula import SolScoreAuditError, sol_score
+from sol_execbench.core.scoring.formula import SOLScoreAuditError, sol_score
 
 
 def test_sol_score_preserves_paper_anchors():
@@ -28,7 +28,7 @@ def test_sol_score_treats_precondition_violations_as_audit_errors(
     baseline,
     bound,
 ):
-    with pytest.raises(SolScoreAuditError):
+    with pytest.raises(SOLScoreAuditError):
         sol_score(candidate, baseline, bound)
 
 
@@ -79,7 +79,7 @@ def test_diagnostic_workload_score_wraps_formula_and_aggregates():
 
 def test_diagnostic_workload_score_propagates_audit_errors():
     # Candidate faster than SOL is a reward-hack/bound-review precondition.
-    with pytest.raises(SolScoreAuditError):
+    with pytest.raises(SOLScoreAuditError):
         diagnostic_workload_score(
             problem="p",
             workload_uuid="w",

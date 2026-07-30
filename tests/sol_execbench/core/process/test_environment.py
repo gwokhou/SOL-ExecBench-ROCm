@@ -24,4 +24,5 @@ def test_preserves_explicit_rocm_and_thread_runtime_configuration(
     assert result["MIOPEN_USER_DB_PATH"] == "/var/cache/miopen"
     assert result["DEVICE_LIB_PATH"] == "/opt/rocm/amdgcn/bitcode"
     assert result["SOL_EXECBENCH_DEVICE"] == "cuda:1"
+    assert result["ROCPROF_TMPDIR"] == str(tmp_path / ".tmp")
     assert "OPENAI_API_KEY" not in result

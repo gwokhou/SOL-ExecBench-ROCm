@@ -17,7 +17,7 @@
     "No evaluated trace rows were available for feedback."
   ],
   "reason_code": "no_evaluation_traces",
-  "schema_version": "sol_execbench.agent_feedback.v3",
+  "schema_version": "sol_execbench.agent_feedback.v4",
   "source_refs": [
     {
       "kind": "trace",

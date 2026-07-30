@@ -31,7 +31,7 @@ from solar.contracts import (
     IRPath,
     SolarAnalysisStatus,
     SolarStage,
-    SolBound,
+    SOLBound,
     VerificationPolicy,
     write_request_manifest,
 )
@@ -122,7 +122,7 @@ def architecture_profile_sha256(
 def _extract_bound(
     analysis: Mapping[str, Any],
     require_orojenesis: bool = True,
-) -> SolBound:
+) -> SOLBound:
     if analysis.get("schema_version") != SOLAR_ANALYSIS_SCHEMA_VERSION:
         raise ValueError("formal analysis uses an unsupported schema")
     total = analysis.get("total") or {}
@@ -143,7 +143,7 @@ def _extract_bound(
     elif kind not in SOL_BOUND_KINDS:
         raise ValueError(f"analysis returned unsupported bound kind {kind!r}")
     resource = total.get("compute_resource")
-    return SolBound(float(seconds), kind, str(resource) if resource else None)
+    return SOLBound(float(seconds), kind, str(resource) if resource else None)
 
 
 def _finish_artifacts(
@@ -264,7 +264,7 @@ __all__ = [
     "IRPath",
     "ReadinessArtifact",
     "ReadinessStage",
-    "SolBound",
+    "SOLBound",
     "SolarAnalysisStatus",
     "SolarStage",
     "VerificationPolicy",

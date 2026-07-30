@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 import statistics
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,11 +20,19 @@ from sol_execbench.core.bench.evaluation_requests import (
 )
 from sol_execbench.core.bench.io import allocate_outputs, normalize_outputs
 from sol_execbench.core.bench.output_checks import compare_output_checks
+from sol_execbench.core.bench.performance_model.replay_evidence import (
+    REPLAY_EVIDENCE_ITERATIONS,
+    REPLAY_WARMUP_RUNS,
+)
 from sol_execbench.core.bench.reward_hack import RewardHackError
+from sol_execbench.core.bench.roctx_control import ROCTxReplayController
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.runtime import (
     CacheClearPolicy,
     cache_clear_policy_for_device,
+)
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_COUNTER_REPLAY,
 )
 
 
@@ -63,6 +72,9 @@ def measure_solution_latency(
         if request.device.split(":", maxsplit=1)[0] == "cuda"
         else None
     )
+    replay = _counter_replay_enabled()
+    trial_count = 1 if replay else request.bench_config.trials
+    trial_kwargs = {"workload": workload} if replay else {}
     trials = [
         _measure_solution_trial(
             request,
@@ -70,8 +82,9 @@ def measure_solution_latency(
             inputs,
             validator,
             cache_policy,
+            **trial_kwargs,
         )
-        for _ in range(request.bench_config.trials)
+        for _ in range(trial_count)
     ]
     return SolutionTimingResult(
         latency_ms=statistics.mean(trial.latency_ms for trial in trials),
@@ -89,6 +102,8 @@ def _measure_solution_trial(
     inputs: list[Any],
     validator: Callable[[list[Any], Any], None],
     cache_clear_policy: CacheClearPolicy | None = None,
+    *,
+    workload: Workload | None = None,
 ) -> TimingResult:
     outputs = (
         allocate_outputs(request.definition, resolved_axes, request.device)
@@ -96,20 +111,71 @@ def _measure_solution_trial(
         else []
     )
     config = request.bench_config
+    replay = _counter_replay_enabled()
+    if replay and workload is None:
+        raise ValueError("counter replay requires workload identity")
+    timed_fn = (
+        _marked_replay_callable(
+            request.dependencies.user_fn,
+            workload.uuid if workload is not None else "",
+            warmup=REPLAY_WARMUP_RUNS,
+        )
+        if replay
+        else request.dependencies.user_fn
+    )
     timing = measure_latency(
-        request.dependencies.user_fn,
+        timed_fn,
         inputs,
         outputs,
         request.device,
-        warmup=config.warmup_runs,
-        rep=config.iterations,
-        min_measurement_time_seconds=config.min_measurement_time_seconds,
+        warmup=REPLAY_WARMUP_RUNS if replay else config.warmup_runs,
+        rep=REPLAY_EVIDENCE_ITERATIONS if replay else config.iterations,
+        min_measurement_time_seconds=(
+            None if replay else config.min_measurement_time_seconds
+        ),
         validator=validator,
         cache_clear_policy=cache_clear_policy,
     )
     if timing.failure is not None:
         raise RuntimeError(timing.failure)
     return timing
+
+
+def replay_marker_ranges(workload_uuid: str) -> list[str]:
+    """Return the exact marker sequence required in every replay pass."""
+    return [
+        f"sol_execbench/{workload_uuid}/iteration/{index}"
+        for index in range(REPLAY_EVIDENCE_ITERATIONS)
+    ]
+
+
+def _counter_replay_enabled() -> bool:
+    return os.environ.get(ENV_SOL_EXECBENCH_COUNTER_REPLAY) == "1"
+
+
+def _marked_replay_callable(
+    fn: Callable[..., Any],
+    workload_uuid: str,
+    *,
+    warmup: int,
+) -> Callable[..., Any]:
+    controller = ROCTxReplayController()
+    controller.pause()
+    marker_ranges = replay_marker_ranges(workload_uuid)
+    invocation = 0
+
+    def run(*args: Any) -> Any:
+        nonlocal invocation
+        index = invocation
+        invocation += 1
+        if index < warmup:
+            return fn(*args)
+        marker_index = index - warmup
+        if marker_index >= len(marker_ranges):
+            raise RuntimeError("replay iteration exceeds frozen protocol")
+        return controller.run_range(marker_ranges[marker_index], fn, *args)
+
+    return run
 
 
 def _build_timed_output_validator(
@@ -166,4 +232,5 @@ def _timed_outputs(
 
 __all__ = [
     "measure_solution_latency",
+    "replay_marker_ranges",
 ]

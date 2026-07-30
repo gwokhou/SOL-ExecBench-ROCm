@@ -7,11 +7,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     StrictArtifactModel,
+)
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
@@ -82,7 +85,7 @@ class DiagnosticCalibrationAudit(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_calibration_audit.v2"] = (
+    schema_version: Literal["sol_execbench.diagnostic_calibration_audit.v3"] = (
         DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION
     )
     probe_identity: CalibrationProbeIdentity
@@ -92,6 +95,27 @@ class DiagnosticCalibrationAudit(CurrentSchemaModel):
     parameter_estimation_evidence: list[CalibrationProbeBatch] = Field(
         min_length=1,
     )
+    environment: list[RuntimeGPUTelemetry] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def environment_is_stable(self) -> DiagnosticCalibrationAudit:
+        """Require stable pre/post identity without foreign GPU work."""
+        if {item.phase for item in self.environment} != {"pre", "post"}:
+            raise ValueError("calibration requires pre/post environment")
+        identity = self.probe_identity
+        for item in self.environment:
+            if (
+                item.gpu_id != identity.gpu_id
+                or item.gpu_bdf != identity.gpu_bdf
+            ):
+                raise ValueError("calibration environment identity mismatch")
+            if item.performance_level != "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK":
+                raise ValueError("calibration clock mode is not stable peak")
+            if item.temperature_c is None:
+                raise ValueError("calibration temperature is unavailable")
+            if item.foreign_process_count not in {0, None}:
+                raise ValueError("calibration foreign GPU process detected")
+        return self
 
 
 __all__ = ["DiagnosticCalibrationAudit"]

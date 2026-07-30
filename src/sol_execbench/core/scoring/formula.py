@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 
 
-class SolScoreAuditError(ValueError):
+class SOLScoreAuditError(ValueError):
     """A paper precondition failed and requires bound or integrity review."""
 
 
@@ -24,17 +24,17 @@ def sol_score(
         return 0.0
     values = (candidate_runtime, baseline_runtime, sol_runtime)
     if not all(math.isfinite(value) and value > 0 for value in values):
-        raise SolScoreAuditError("all runtimes must be finite and positive")
+        raise SOLScoreAuditError("all runtimes must be finite and positive")
     if baseline_runtime <= sol_runtime:
-        raise SolScoreAuditError(
+        raise SOLScoreAuditError(
             "scoring baseline must be strictly slower than the SOL bound",
         )
     if candidate_runtime < sol_runtime:
-        raise SolScoreAuditError(
+        raise SOLScoreAuditError(
             "candidate faster than SOL requires bound and reward-hacking review",
         )
     headroom = baseline_runtime - sol_runtime
     return 1.0 / (1.0 + (candidate_runtime - sol_runtime) / headroom)
 
 
-__all__ = ["SolScoreAuditError", "sol_score"]
+__all__ = ["SOLScoreAuditError", "sol_score"]

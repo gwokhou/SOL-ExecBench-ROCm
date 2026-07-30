@@ -10,8 +10,9 @@ import logging
 import os
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from rich.console import Console
 
@@ -36,6 +37,12 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
     collect_rocprofv3_counters,
     collect_rocprofv3_profile,
+)
+from sol_execbench.core.evidence.runtime_evidence.collectors import (
+    collect_runtime_gpu_telemetry,
+)
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeGPUTelemetry,
 )
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.process.environment import (
@@ -191,15 +198,11 @@ def _run_profiled_evaluation(
 
     The rocprofv3 collection is wrapped in a best-effort STABLE_PEAK clock lock.
 
-    On gfx1200, ``SQ_WAVE_CYCLES`` reads zero under ``AUTO`` dVFS and corrupts
-    derived occupancy metrics. ``STABLE_PEAK`` removes those transitions while
-    retaining a representative high SCLK/MCLK mix. See ROCm issue #8523.
-
     The lock comes from :func:`acquire_clock_lock`: idempotent (an outer
     STABLE_PEAK is preserved, never released by this inner acquire) and
     best-effort -- if the lock is unsupported or unavailable, profiling still
-    runs unlocked and a warning is logged that gfx1200 counters may be
-    unreliable.
+    runs unlocked and a warning records that the environment is not suitable
+    for formal counter evidence.
     """
     output_directory = _profile_output_directory(output_file, staging_dir)
     request = Rocprofv3ProfileRequest(
@@ -214,20 +217,18 @@ def _run_profiled_evaluation(
             resolve_rocm_tool(ROCPROFV3_EXECUTABLE) is not None
         )
 
-    # gfx1200: SQ_WAVE_CYCLES reads zero under AUTO/dVFS (ROCm issue #8523,
-    # https://github.com/ROCm/rocm-systems/issues/8523). Hold STABLE_PEAK for
-    # the rocprofv3 collection so the counter and its derived occupancy/stall
-    # metrics are valid. Idempotent vs an outer lock; best-effort skip below.
+    # Hold STABLE_PEAK across collection so replay passes share one audited
+    # clock policy. Idempotent vs an outer lock; best-effort skip below.
     with clock_locker() as clock_lease:
         if not clock_lease.locked:
             logger.warning(
                 "rocprofv3 profiling is running without a STABLE_PEAK clock "
-                "lock; on gfx1200 SQ_WAVE_CYCLES and derived occupancy/stall "
-                "metrics may read zero (ROCm issue #8523).",
+                "lock; this run cannot be formal gfx1200 counter evidence.",
             )
         collector = (
             collect_rocprofv3_counters if counter_mode else profile_collector
         )
+        pre_snapshot = _replay_snapshot("pre") if counter_mode else None
         profile_result = collector(
             request,
             rocprofv3_available=rocprofv3_available,
@@ -237,6 +238,16 @@ def _run_profiled_evaluation(
                 subprocess_run,
             ),
         )
+        post_snapshot = _replay_snapshot("post") if counter_mode else None
+        if counter_mode:
+            profile_result = replace(
+                profile_result,
+                environment_snapshots=tuple(
+                    snapshot
+                    for snapshot in (pre_snapshot, post_snapshot)
+                    if snapshot is not None
+                ),
+            )
     if profile_result.succeeded:
         profiled_proc = subprocess.CompletedProcess(
             args=list(profile_result.command),
@@ -246,3 +257,13 @@ def _run_profiled_evaluation(
         )
         return profiled_proc, profile_result
     return None, profile_result
+
+
+def _replay_snapshot(
+    phase: Literal["pre", "post"],
+) -> RuntimeGPUTelemetry | None:
+    try:
+        return collect_runtime_gpu_telemetry(phase=phase)
+    except (OSError, TypeError, ValueError):
+        logger.warning("Unable to collect %s replay GPU telemetry", phase)
+        return None

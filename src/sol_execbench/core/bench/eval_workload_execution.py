@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import gc
+import os
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -16,6 +18,7 @@ from sol_execbench.core.bench.eval_correctness import (
 from sol_execbench.core.bench.eval_timing import (
     SolutionTimingResult,
     measure_solution_latency,
+    replay_marker_ranges,
 )
 from sol_execbench.core.bench.eval_trace_helpers import WorkloadTraceEmitter
 from sol_execbench.core.bench.evaluation_requests import (
@@ -39,6 +42,11 @@ from sol_execbench.core.data.trace import (
     Performance,
 )
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_COUNTER_REPLAY,
+    ENV_SOL_EXECBENCH_REPLAY_PASS_INDEX,
+)
 
 
 def evaluate_one_workload(
@@ -163,7 +171,12 @@ def _measure_and_emit(
         args=(thread_monitor,),
     ):
         return
-    _record_timing_evidence(request, workload, solution_timing)
+    _record_timing_evidence(
+        request,
+        workload,
+        solution_timing,
+        input_sha256=timing_case.input_sha256,
+    )
     emitter.emit_status(
         workload,
         EvaluationStatus.PASSED,
@@ -181,13 +194,19 @@ def _record_timing_evidence(
     request: WorkloadEvaluationRequest,
     workload: Workload,
     timing: SolutionTimingResult,
+    *,
+    input_sha256: str,
 ) -> None:
     recorder = getattr(request.dependencies, "timing_recorder", None)
     if recorder is None:
         return
+    if os.environ.get(ENV_SOL_EXECBENCH_COUNTER_REPLAY) == "1":
+        recorder(_replay_record(workload, timing, input_sha256))
+        return
     recorder(
         {
             "workload_uuid": workload.uuid,
+            "input_sha256": input_sha256,
             "latency_ms": timing.latency_ms,
             "trial_samples_ms": [
                 list(samples) for samples in timing.trial_samples_ms
@@ -196,6 +215,36 @@ def _record_timing_evidence(
             "timing_protocol": request.bench_config.timing_protocol,
         },
     )
+
+
+def _replay_record(
+    workload: Workload,
+    timing: SolutionTimingResult,
+    input_sha256: str,
+) -> dict[str, object]:
+    cache = timing.cache_clear_policy
+    cache_identity = stable_json_checksum(
+        {
+            "detected_l2_bytes": cache.detected_l2_bytes if cache else None,
+            "clear_buffer_bytes": cache.clear_buffer_bytes if cache else None,
+            "source": cache.source if cache else None,
+            "fallback_reason": cache.fallback_reason if cache else None,
+        },
+    )
+    return {
+        "pid": os.getpid(),
+        "parent_pid": os.getppid(),
+        "process_executable_sha256": sha256_file(
+            Path("/proc/self/exe").resolve()
+        ),
+        "pass_index": int(
+            os.environ.get(ENV_SOL_EXECBENCH_REPLAY_PASS_INDEX, "0")
+        ),
+        "workload_uuid": workload.uuid,
+        "input_sha256": input_sha256,
+        "cache_identity_sha256": cache_identity,
+        "marker_ranges": replay_marker_ranges(workload.uuid),
+    }
 
 
 def _performance_evidence(

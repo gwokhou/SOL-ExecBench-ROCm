@@ -17,7 +17,10 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    CurrentSchemaMixin,
+)
 
 
 class DiagnosticSidecarStatus(StrEnum):
@@ -70,6 +73,20 @@ class DiagnosticSidecarEnvelope(BaseModelWithDocstrings):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     authority: Literal["diagnostic"] = "diagnostic"
+
+
+class CurrentDiagnosticSidecarAuthority(
+    CurrentSchemaMixin,
+    DiagnosticSidecarAuthority,
+):
+    """Version-aware authority base for top-level diagnostic artifacts."""
+
+
+class CurrentDiagnosticSidecarEnvelope(
+    CurrentSchemaMixin,
+    DiagnosticSidecarEnvelope,
+):
+    """Version-aware envelope base for top-level diagnostic artifacts."""
 
 
 class DiagnosticSourceRef(BaseModelWithDocstrings):

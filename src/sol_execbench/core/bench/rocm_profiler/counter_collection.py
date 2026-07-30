@@ -19,6 +19,9 @@ from sol_execbench.core.bench.rocm_profiler.commands import (
     ProfileRunner,
     default_profile_runner,
 )
+from sol_execbench.core.bench.rocm_profiler.counter_provenance import (
+    Rocprofv3CounterProvenance,
+)
 from sol_execbench.core.bench.rocm_profiler.counters import (
     ROCPROFV3_AVAIL_EXECUTABLE,
     build_rocprofv3_counter_command,
@@ -58,6 +61,10 @@ from sol_execbench.core.integrity.schema_versions import (
 from sol_execbench.core.platform.runtime import (
     resolve_rocm_tool,
     resolve_tool_path,
+)
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_COUNTER_REPLAY,
+    ENV_SOL_EXECBENCH_REPLAY_PASS_INDEX,
 )
 from sol_execbench.core.text_utils import subprocess_text
 
@@ -154,36 +161,53 @@ def _collect_selected(
         request.output_directory,
         request.output_file,
     )
-    config_path = (
-        request.output_directory / f"{request.output_file}.counters.yaml"
-    )
-    write_counter_job(
-        config_path,
-        groups,
-        output_directory=str(request.output_directory),
-    )
-    command = build_rocprofv3_counter_command(
-        request.application_command,
-        input_path=config_path,
-        executable=request.executable,
-    )
-    try:
-        completed = runner(
-            command,
-            request.working_directory,
-            request.timeout_seconds,
+    config_paths: list[Path] = []
+    completed_passes: list[subprocess.CompletedProcess[str]] = []
+    commands: list[list[str]] = []
+    for pass_index, group in enumerate(groups, start=1):
+        pass_directory = request.output_directory / f"pass_{pass_index}"
+        config_path = request.output_directory / (
+            f"{request.output_file}.pass_{pass_index}.counters.yaml"
         )
-    except subprocess.TimeoutExpired as error:
-        return _counter_timeout(request, command, error)
+        write_counter_job(
+            config_path,
+            [group],
+            output_directory=str(pass_directory),
+        )
+        application = (
+            "env",
+            f"{ENV_SOL_EXECBENCH_COUNTER_REPLAY}=1",
+            f"{ENV_SOL_EXECBENCH_REPLAY_PASS_INDEX}={pass_index}",
+            *request.application_command,
+        )
+        command = build_rocprofv3_counter_command(
+            application,
+            input_path=config_path,
+            executable=request.executable,
+        )
+        config_paths.append(config_path)
+        commands.append(command)
+        try:
+            completed = runner(
+                command,
+                request.working_directory,
+                request.timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as error:
+            return _counter_timeout(request, command, error)
+        completed_passes.append(completed)
+        if completed.returncode != 0:
+            break
     provenance = _write_provenance(
         request,
-        config_path=config_path,
+        config_paths=config_paths,
         manifest_path=manifest_path,
         availability=availability,
     )
+    completed = _aggregate_completed(commands, completed_passes)
     return _counter_completed(
         request,
-        command,
+        [item for command in commands for item in command],
         completed,
         provenance,
         groups=groups,
@@ -193,7 +217,7 @@ def _collect_selected(
 def _write_provenance(
     request: Rocprofv3ProfileRequest,
     *,
-    config_path: Path,
+    config_paths: Sequence[Path],
     manifest_path: Path,
     availability: subprocess.CompletedProcess[str],
 ) -> dict[str, str]:
@@ -204,7 +228,9 @@ def _write_provenance(
             sha256_file(executable) if executable is not None else "unresolved"
         ),
         "counter_definition_sha256": sha256_file(manifest_path),
-        "configuration_sha256": sha256_file(config_path),
+        "configuration_sha256": stable_json_checksum(
+            [sha256_file(path) for path in config_paths],
+        ),
         "availability_sha256": sha256_bytes(availability.stdout.encode()),
         "application_executable_sha256": (
             sha256_file(application_executable)
@@ -219,8 +245,7 @@ def _write_provenance(
         request.output_directory
         / f"{request.output_file}.counter-metadata.json"
     )
-    atomic_write_json_value(
-        path,
+    payload = Rocprofv3CounterProvenance.model_validate(
         {
             "schema_version": ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION,
             "diagnostic_only": True,
@@ -229,7 +254,23 @@ def _write_provenance(
             **provenance,
         },
     )
+    atomic_write_json_value(path, payload.model_dump(mode="json"))
     return provenance
+
+
+def _aggregate_completed(
+    commands: Sequence[Sequence[str]],
+    completed: Sequence[subprocess.CompletedProcess[str]],
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(
+        args=[item for command in commands for item in command],
+        returncode=next(
+            (result.returncode for result in completed if result.returncode),
+            0,
+        ),
+        stdout="\n".join(result.stdout or "" for result in completed),
+        stderr="\n".join(result.stderr or "" for result in completed),
+    )
 
 
 def _counter_completed(

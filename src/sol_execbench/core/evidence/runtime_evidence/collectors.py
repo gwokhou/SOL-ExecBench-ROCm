@@ -4,7 +4,18 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from pathlib import Path
+from typing import Literal
 
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeGPUTelemetry,
+)
+from sol_execbench.core.platform.amd_smi import (
+    parse_gpu_identity,
+    parse_gpu_metrics,
+    parse_performance_levels,
+    parse_processes,
+)
 from sol_execbench.core.platform.compatibility import (
     MatrixGPUEvidence,
     MatrixHostEvidence,
@@ -13,6 +24,8 @@ from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
     collect_pytorch_dependency_observation,
 )
+from sol_execbench.core.platform.runtime import resolve_rocm_tool
+from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 VISIBLE_DEVICE_ENV_VARS = (
     "HIP_VISIBLE_DEVICES",
@@ -150,3 +163,47 @@ def build_dependency_observation(
         }
         return observation.model_copy(update=updates)
     return overrides
+
+
+def collect_runtime_gpu_telemetry(
+    *,
+    phase: Literal["pre", "post"],
+    device_index: int = 0,
+) -> RuntimeGPUTelemetry:
+    """Collect a bounded pre/post AMD SMI snapshot for replay admission."""
+    amd_smi = resolve_rocm_tool("amd-smi")
+    if amd_smi is None:
+        return RuntimeGPUTelemetry(phase=phase)
+    identity_raw = _amd_smi_json(amd_smi, "list")
+    metric_raw = _amd_smi_json(amd_smi, "metric")
+    process_raw = _amd_smi_json(amd_smi, "process")
+    if identity_raw is None or metric_raw is None:
+        return RuntimeGPUTelemetry(phase=phase)
+    identity = parse_gpu_identity(identity_raw, device_index)
+    metrics = parse_gpu_metrics(metric_raw, device_index)
+    levels = parse_performance_levels(metric_raw)
+    processes = parse_processes(process_raw) if process_raw is not None else []
+    foreign = sum(process["pid"] != os.getpid() for process in processes)
+    return RuntimeGPUTelemetry(
+        phase=phase,
+        gpu_id=identity.uuid,
+        gpu_bdf=identity.bdf,
+        performance_level=(
+            levels[device_index] if device_index < len(levels) else None
+        ),
+        sclk_mhz=metrics.sclk_mhz,
+        mclk_mhz=metrics.mclk_mhz,
+        temperature_c=metrics.temperature_c,
+        power_profile=metrics.power_profile,
+        power_cap_w=metrics.power_cap_w,
+        power_draw_w=metrics.power_draw_w,
+        foreign_process_count=foreign,
+    )
+
+
+def _amd_smi_json(executable: Path, command: str) -> str | None:
+    completed = run_in_process_group_bounded(
+        [str(executable), command, "--json"],
+        timeout=10.0,
+    )
+    return completed.stdout if completed.returncode == 0 else None

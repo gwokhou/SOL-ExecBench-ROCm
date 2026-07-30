@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Literal
 
 from sol_execbench.core.bench.agent_feedback.items import trace_feedback_items
 from sol_execbench.core.bench.agent_feedback.models import (
@@ -40,7 +41,7 @@ from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,
     StaticKernelEvidenceStatus,
 )
-from sol_execbench.core.data.trace import Trace
+from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.evaluator_contract import SOL_EXECBENCH_RELEASE
 from sol_execbench.core.timestamps import utc_timestamp
 
@@ -69,6 +70,12 @@ class AgentFeedbackBuildRequest:
     artifact_citations: Sequence[DiagnosticArtifactCitation] = ()
     performance_diagnostic: PerformanceDiagnosticSidecar | None = None
     performance_governance: DiagnosticGovernanceGuardrail | None = None
+    performance_acceptance_status: Literal[
+        "omitted",
+        "failed",
+        "accepted",
+    ] = "omitted"
+    enabled_performance_actions: frozenset[str] = frozenset()
 
 
 def build_agent_feedback_sidecar(
@@ -114,24 +121,7 @@ def build_agent_feedback_sidecar(
             candidate_id=identity.candidate_id,
             source_sha256=identity.source_sha256,
         ),
-        summary=AgentFeedbackSummary(
-            trace_count=len(traces),
-            evaluated_trace_count=len(evaluated),
-            status_counts=dict(
-                sorted(
-                    (status, count) for status, count in status_counter.items()
-                ),
-            ),
-            profile_status=profile_result.status if profile_result else None,
-            static_evidence_status=(
-                static_evidence.status if static_evidence else None
-            ),
-            performance_diagnostic_status=(
-                performance_diagnostic.status
-                if performance_diagnostic
-                else None
-            ),
-        ),
+        summary=_feedback_summary(request, status_counter, len(evaluated)),
         items=[
             *trace_feedback_items(status_counter),
             *_performance_feedback_items(request),
@@ -149,6 +139,28 @@ def build_agent_feedback_sidecar(
             performance_diagnostic,
         ),
         artifact_citations=list(request.artifact_citations),
+    )
+
+
+def _feedback_summary(
+    request: AgentFeedbackBuildRequest,
+    status_counter: Counter[EvaluationStatus],
+    evaluated_trace_count: int,
+) -> AgentFeedbackSummary:
+    profile = request.profile_result
+    static = request.static_evidence
+    performance = request.performance_diagnostic
+    return AgentFeedbackSummary(
+        trace_count=len(request.traces),
+        evaluated_trace_count=evaluated_trace_count,
+        status_counts=dict(sorted(status_counter.items())),
+        profile_status=profile.status if profile else None,
+        static_evidence_status=static.status if static else None,
+        performance_diagnostic_status=(
+            performance.status if performance else None
+        ),
+        performance_acceptance_status=request.performance_acceptance_status,
+        enabled_performance_actions=sorted(request.enabled_performance_actions),
     )
 
 
@@ -294,6 +306,8 @@ def _performance_feedback_items(
             if not _usable_performance_attribution(
                 attribution,
                 diagnostic_status=diagnostic.status,
+                acceptance_status=request.performance_acceptance_status,
+                enabled_actions=request.enabled_performance_actions,
             ):
                 continue
             action_code = attribution.action_code
@@ -322,6 +336,8 @@ def _usable_performance_attribution(
     attribution: PerformanceAttribution,
     *,
     diagnostic_status: DiagnosticSidecarStatus,
+    acceptance_status: Literal["omitted", "failed", "accepted"],
+    enabled_actions: frozenset[str],
 ) -> bool:
     action = attribution.action_code
     if action not in _PERFORMANCE_ACTION_CODES:
@@ -331,6 +347,8 @@ def _usable_performance_attribution(
         "model_gap_no_kernel_action",
     }:
         return True
+    if acceptance_status != "accepted" or action not in enabled_actions:
+        return False
     if diagnostic_status is not DiagnosticSidecarStatus.AVAILABLE:
         return False
     return attribution.confidence in {

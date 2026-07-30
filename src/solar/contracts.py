@@ -191,7 +191,7 @@ class ArtifactRef:
 
 
 @dataclass(frozen=True)
-class SolBound:
+class SOLBound:
     """The formal lower bound emitted by SOLAR, never a benchmark score."""
 
     seconds: float
@@ -208,7 +208,7 @@ class AnalysisResult:
     output_dir: Path
     architecture_sha256: str
     artifacts: tuple[ArtifactRef, ...]
-    bound: SolBound
+    bound: SOLBound
     ir_path: IRPath = DEFAULT_IR_PATH
 
     def __post_init__(self) -> None:
@@ -338,7 +338,7 @@ def write_request_manifest(
     staging: Path,
     architecture_sha256: str,
     artifacts: Sequence[ArtifactRef],
-    bound: SolBound,
+    bound: SOLBound,
     *,
     formal_bound_kind: str,
 ) -> None:
@@ -403,7 +403,7 @@ __all__ = [
     "FormalProducerReadiness",
     "IRKind",
     "IRPath",
-    "SolBound",
+    "SOLBound",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",
     "SolarRequestManifest",

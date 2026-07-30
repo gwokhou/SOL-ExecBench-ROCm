@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from sol_execbench.core.bench.rocm_profiler.counters import (
@@ -32,21 +33,24 @@ def test_counter_parser_aligns_passes_without_exposing_duration(
 ) -> None:
     first = tmp_path / "pass_1.csv"
     second = tmp_path / "pass_2.csv"
-    _write_pass(first, 7, "SQ_WAVES", "32")
+    _write_pass(first, 7, "SQ_WAVES_sum", "32")
     _write_pass(second, 99, "FETCH_SIZE", "2")
 
     dispatches = parse_and_align_counter_passes(
         [CounterPassCSV(1, first), CounterPassCSV(2, second)],
         workload_uuid="workload-1",
         candidate_sha256="c" * 64,
-        required_counters={"SQ_WAVES", "FETCH_SIZE"},
+        required_counters={"SQ_WAVES_sum", "FETCH_SIZE"},
     )
 
     assert len(dispatches) == 1
     dispatch = dispatches[0]
     assert dispatch.valid is True
     assert dispatch.counter_passes == [1, 2]
-    assert dispatch.counters == {"FETCH_SIZE": 2048.0, "SQ_WAVES": 32.0}
+    assert dispatch.counters == {
+        "FETCH_SIZE": 2048.0,
+        "SQ_WAVES_SUM": 32.0,
+    }
     assert "duration" not in dispatch.model_dump()
 
 
@@ -55,7 +59,7 @@ def test_counter_parser_invalidates_cross_pass_misalignment(
 ) -> None:
     first = tmp_path / "pass_1.csv"
     second = tmp_path / "pass_2.csv"
-    _write_pass(first, 1, "SQ_WAVES", "32")
+    _write_pass(first, 1, "SQ_WAVES_sum", "32")
     second.write_text(
         _HEADER + "2,2,0,2048,other_kernel,64,FETCH_SIZE,1024,100,200,100\n",
         encoding="utf-8",
@@ -79,16 +83,16 @@ def test_availability_and_controlled_job_formats(tmp_path: Path) -> None:
     output = """
     GPU:0
     Name:gfx1200
-    Counter_Name : SQ_WAVES
+    Counter_Name : SQ_WAVES_sum
     Counter_Name : FETCH_SIZE
     """
-    assert parse_available_counters(output) == {"SQ_WAVES", "FETCH_SIZE"}
+    assert parse_available_counters(output) == {"SQ_WAVES_sum", "FETCH_SIZE"}
     assert parse_available_architectures(output) == {"gfx1200"}
 
     job = tmp_path / "counters.yaml"
     write_counter_job(
         job,
-        [["SQ_WAVES"], ["FETCH_SIZE"]],
+        [["SQ_WAVES_sum"], ["FETCH_SIZE"]],
         output_directory=str(tmp_path / "out"),
     )
     payload = yaml.safe_load(job.read_text(encoding="utf-8"))
@@ -104,3 +108,17 @@ def test_availability_and_controlled_job_formats(tmp_path: Path) -> None:
         "python",
         "evaluate.py",
     ]
+
+
+def test_counter_parser_rejects_negative_hardware_values(
+    tmp_path: Path,
+) -> None:
+    counter_path = tmp_path / "pass_1.csv"
+    _write_pass(counter_path, 1, "SQ_WAVES", "-1")
+
+    with pytest.raises(ValueError, match="negative_counter_value"):
+        parse_and_align_counter_passes(
+            [CounterPassCSV(1, counter_path)],
+            workload_uuid="workload-1",
+            candidate_sha256="c" * 64,
+        )

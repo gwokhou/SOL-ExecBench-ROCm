@@ -61,6 +61,7 @@ def test_timing_evidence_binds_raw_samples_to_trace(tmp_path: Path) -> None:
         [
             RawPerformanceTimingRecord(
                 workload_uuid="w0",
+                input_sha256="a" * 64,
                 latency_ms=1.0,
                 trial_samples_ms=[[0.9, 1.0, 1.1]],
                 warmup_runs=3,
@@ -84,6 +85,7 @@ def test_timing_evidence_binds_raw_samples_to_trace(tmp_path: Path) -> None:
         [
             RawPerformanceTimingRecord(
                 workload_uuid="w0",
+                input_sha256="a" * 64,
                 latency_ms=2.0,
                 trial_samples_ms=[[2.0]],
                 warmup_runs=3,

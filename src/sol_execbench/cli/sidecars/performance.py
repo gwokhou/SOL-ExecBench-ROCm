@@ -20,6 +20,9 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
     artifact_reference,
     candidate_sha256,
 )
+from sol_execbench.core.bench.performance_model.replay_evidence import (
+    build_performance_replay_evidence,
+)
 from sol_execbench.core.bench.performance_model.timing_evidence import (
     RAW_TIMING_FILENAME,
     PerformanceTimingEvidenceSidecar,
@@ -101,6 +104,67 @@ def performance_evidence_manifest_path(
     )
 
 
+def performance_replay_sidecar_path(
+    output_file: Path | None,
+) -> Path | None:
+    """Return the replay evidence path for one persisted canonical trace."""
+    if output_file is None:
+        return None
+    return output_file.with_name(f"{output_file.name}.performance-replay.json")
+
+
+def write_performance_replay_sidecar(
+    *,
+    output_file: Path | None,
+    staging_dir: Path,
+    traces: list[Trace],
+    solution: Solution,
+    timing_path: Path | None,
+    profile_result: Rocprofv3ProfileResult | None,
+    static_evidence: StaticKernelEvidenceSidecar | None,
+    compile_result: CompilePhaseResult | None,
+) -> Path | None:
+    """Publish trusted-input and cross-pass replay alignment evidence."""
+    destination = performance_replay_sidecar_path(output_file)
+    if (
+        destination is None
+        or output_file is None
+        or timing_path is None
+        or profile_result is None
+        or len(traces) != 1
+    ):
+        return None
+    identity, _code_hashes, _reasons = _manifest_identity(
+        trace_path=output_file,
+        trace=traces[0],
+        solution=solution,
+        timing_path=timing_path,
+        profile_result=profile_result,
+        static_evidence=static_evidence,
+        compile_result=compile_result,
+    )
+    try:
+        sidecar = build_performance_replay_evidence(
+            staging_dir=staging_dir,
+            run_id=identity.run_id,
+            candidate_sha256=identity.candidate_sha256,
+            canonical_timing_path=timing_path,
+            artifact_paths=[
+                artifact.path for artifact in profile_result.artifacts
+            ],
+            expected_gpu_id=identity.gpu_id,
+            expected_gpu_bdf=identity.gpu_bdf,
+            environment=list(profile_result.environment_snapshots),
+        )
+        atomic_write_json_value(destination, sidecar.to_dict())
+    except (OSError, ValueError) as error:
+        console.print(
+            f"[yellow]Performance replay evidence skipped: {error}[/yellow]"
+        )
+        return None
+    return destination
+
+
 def write_performance_evidence_manifest(
     *,
     output_file: Path | None,
@@ -112,6 +176,7 @@ def write_performance_evidence_manifest(
     profile_result: Rocprofv3ProfileResult | None,
     static_evidence: StaticKernelEvidenceSidecar | None,
     compile_result: CompilePhaseResult | None,
+    replay_path: Path | None = None,
 ) -> Path | None:
     """Publish a single-workload counter-evidence root manifest."""
     destination = performance_evidence_manifest_path(output_file)
@@ -133,6 +198,7 @@ def write_performance_evidence_manifest(
             profile_result=profile_result,
             static_evidence=static_evidence,
             compile_result=compile_result,
+            replay_path=replay_path,
         )
         atomic_write_json_value(destination, manifest.to_dict())
     except (OSError, ValueError) as error:
@@ -157,6 +223,7 @@ def _build_performance_evidence_manifest(
     profile_result: Rocprofv3ProfileResult,
     static_evidence: StaticKernelEvidenceSidecar | None,
     compile_result: CompilePhaseResult | None,
+    replay_path: Path | None = None,
 ) -> PerformanceEvidenceManifest:
     if len(traces) != 1:
         raise ValueError("counter evidence requires exactly one workload")
@@ -168,6 +235,7 @@ def _build_performance_evidence_manifest(
         profile_summary_path=profile_summary_path,
         static_evidence_path=static_evidence_path,
         profile_result=profile_result,
+        replay_path=replay_path,
     )
     identity, code_hashes, identity_reasons = _manifest_identity(
         trace_path=trace_path,
@@ -304,6 +372,7 @@ def _manifest_artifacts(
     profile_summary_path: Path | None,
     static_evidence_path: Path | None,
     profile_result: Rocprofv3ProfileResult,
+    replay_path: Path | None = None,
 ) -> tuple[list[PerformanceEvidenceArtifact], list[str]]:
     paths = (
         (PerformanceEvidenceArtifactKind.TRACE, trace_path),
@@ -316,6 +385,7 @@ def _manifest_artifacts(
             PerformanceEvidenceArtifactKind.STATIC_EVIDENCE,
             static_evidence_path,
         ),
+        (PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE, replay_path),
     )
     artifacts = [
         artifact_reference(kind=kind, path=path, root=root)
@@ -423,7 +493,9 @@ def _timing_identity(
 
 __all__ = [
     "performance_evidence_manifest_path",
+    "performance_replay_sidecar_path",
     "performance_timing_sidecar_path",
     "write_performance_evidence_manifest",
+    "write_performance_replay_sidecar",
     "write_performance_timing_sidecar",
 ]

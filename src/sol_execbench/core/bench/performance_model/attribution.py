@@ -11,6 +11,12 @@ from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
 from sol_execbench.core.bench.performance_model.counter_metrics import (
     counter_memory_bytes,
 )
+from sol_execbench.core.bench.performance_model.inference import (
+    CONTRADICTION_RATIO_THRESHOLD,
+    HIGH_RATIO_THRESHOLD,
+    DiagnosticInferenceProfile,
+    action_is_admitted,
+)
 from sol_execbench.core.bench.performance_model.models import (
     CompiledCharacterization,
     DiagnosticConfidence,
@@ -22,9 +28,6 @@ from sol_execbench.core.bench.performance_model.models import (
     SemanticCharacterization,
     WorkloadKind,
 )
-
-_HIGH_RATIO = 1.20
-_CONTRADICTION_RATIO = 0.85
 
 
 def calculate_ratios(
@@ -63,17 +66,36 @@ def derive_attributions(
     t_pred_ir: PerformancePrediction,
     t_pred_hw: PerformancePrediction,
     ratios: Sequence[DiagnosticRatio],
+    inference_profile: DiagnosticInferenceProfile | None = None,
 ) -> list[PerformanceAttribution]:
     """Derive bounded actions, prioritizing evidence contradictions."""
     ratio_by_kind = {ratio.kind: ratio for ratio in ratios}
-    contradiction = _contradiction(ratio_by_kind)
+    contradiction = _contradiction(
+        ratio_by_kind,
+        (
+            inference_profile.contradiction_ratio_threshold
+            if inference_profile is not None
+            else CONTRADICTION_RATIO_THRESHOLD
+        ),
+    )
     if contradiction is not None:
         return [contradiction]
     actions: list[PerformanceAttribution] = []
+    scores = action_scores(
+        semantic=semantic,
+        compiled=compiled,
+        dispatches=dispatches,
+        t_pred_ir=t_pred_ir,
+    )
     if _launch_dominates(t_pred_ir):
         actions.append(_launch_bound_action())
     c_ratio = ratio_by_kind[RatioKind.C]
-    if _significantly_high(c_ratio):
+    high_ratio = (
+        inference_profile.high_ratio_threshold
+        if inference_profile is not None
+        else HIGH_RATIO_THRESHOLD
+    )
+    if _significantly_high(c_ratio, high_ratio):
         actions.extend(
             _codegen_actions(
                 semantic=semantic,
@@ -84,7 +106,7 @@ def derive_attributions(
     r_ratio = ratio_by_kind[RatioKind.R]
     if t_pred_hw.status is not DiagnosticSidecarStatus.AVAILABLE:
         actions.append(_unverified_runtime_action(t_pred_hw))
-    elif _significantly_high(r_ratio):
+    elif _significantly_high(r_ratio, high_ratio):
         actions.extend(_runtime_actions(dispatches))
     if not actions:
         actions.append(
@@ -98,7 +120,23 @@ def derive_attributions(
                 ),
             ),
         )
-    return _deduplicate_actions(actions)
+    return [
+        action
+        for action in _deduplicate_actions(actions)
+        if action.action_code is None
+        or action_is_admitted(
+            action.action_code,
+            scores,
+            inference_profile,
+        )
+    ] or [
+        PerformanceAttribution(
+            code="action_policy_abstained",
+            category="inconclusive",
+            confidence=DiagnosticConfidence.LOW,
+            message="Frozen action policy did not admit a code-changing action.",
+        )
+    ]
 
 
 def _frontier_ratio(
@@ -206,10 +244,11 @@ def _ratio_unavailable(kind: RatioKind, *reasons: str) -> DiagnosticRatio:
 
 def _contradiction(
     ratios: Mapping[RatioKind, DiagnosticRatio],
+    threshold: float,
 ) -> PerformanceAttribution | None:
     for kind in (RatioKind.C, RatioKind.R):
         ratio = ratios[kind]
-        if ratio.upper is not None and ratio.upper < _CONTRADICTION_RATIO:
+        if ratio.upper is not None and ratio.upper < threshold:
             return PerformanceAttribution(
                 code="identity_or_model_contradiction",
                 category="contradiction",
@@ -442,8 +481,57 @@ def _counter(counters: Mapping[str, float], *names: str) -> float:
     return next((counters[name] for name in names if name in counters), 0.0)
 
 
-def _significantly_high(ratio: DiagnosticRatio) -> bool:
-    return ratio.lower is not None and ratio.lower > _HIGH_RATIO
+def _significantly_high(
+    ratio: DiagnosticRatio,
+    threshold: float,
+) -> bool:
+    return ratio.lower is not None and ratio.lower > threshold
+
+
+def action_scores(
+    *,
+    semantic: SemanticCharacterization,
+    compiled: Sequence[CompiledCharacterization],
+    dispatches: Sequence[DispatchEvidence],
+    t_pred_ir: PerformancePrediction,
+) -> dict[str, float]:
+    """Return the frozen-policy metrics used to admit code actions."""
+    counters = _aggregate_counters(dispatches)
+    misses = _counter(counters, "GL2C_MISS_SUM", "TCC_MISS", "L2CACHEMISS")
+    hits = _counter(counters, "GL2C_HIT_SUM", "TCC_HIT", "L2CACHEHIT")
+    conflicts = _counter(
+        counters,
+        "SQC_LDS_BANK_CONFLICT",
+        "SQ_LDS_BANK_CONFLICT",
+    )
+    conflict_percent = _max_counter(dispatches, "LDSBANKCONFLICT")
+    lds_ops = _counter(counters, "LDS_INSTS", "SQ_LDS_INSTS")
+    dispatch_time = sum(
+        component.time_ms
+        for component in t_pred_ir.components
+        if component.name == "dispatch"
+    )
+    prediction_ms = t_pred_ir.predicted_time_ms or 0.0
+    logical_dispatches = max(len(semantic.fusion_regions), 1)
+    semantic_bytes = max(semantic.semantic_bytes, 1.0)
+    return {
+        "launch_share": dispatch_time / prediction_ms if prediction_ms else 0.0,
+        "dispatch_ratio": len(dispatches) / logical_dispatches,
+        "wmma_missing": float(
+            semantic.workload_kind is WorkloadKind.MATMUL
+            and not _has_matrix_isa(compiled)
+            and not _static_isa_mapping_ambiguous(compiled)
+        ),
+        "traffic_ratio": _dynamic_bytes(dispatches) / semantic_bytes,
+        "memory_inefficiency": (
+            misses / (hits + misses) if hits + misses else 0.0
+        ),
+        "lds_conflict_ratio": (
+            conflict_percent / 100.0
+            if conflict_percent
+            else conflicts / max(lds_ops, 1.0)
+        ),
+    }
 
 
 def _deduplicate_actions(
@@ -459,4 +547,18 @@ def _deduplicate_actions(
     return result
 
 
-__all__ = ["calculate_ratios", "derive_attributions"]
+def _max_counter(
+    dispatches: Sequence[DispatchEvidence],
+    name: str,
+) -> float:
+    return max(
+        (
+            dispatch.counters.get(name, 0.0)
+            for dispatch in dispatches
+            if dispatch.valid
+        ),
+        default=0.0,
+    )
+
+
+__all__ = ["action_scores", "calculate_ratios", "derive_attributions"]

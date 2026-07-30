@@ -15,15 +15,21 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.counter_metrics import (
+    counter_native_multiplier,
+)
 from sol_execbench.core.bench.performance_model.models import (
     DispatchEvidence,
     EvidenceReference,
     ResourceFootprint,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    CurrentSchemaModel,
+)
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import (
     ROCPROFV3_COUNTER_MANIFEST_SCHEMA_VERSION,
 )
@@ -39,14 +45,28 @@ _NUMBER = re.compile(
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
 
+class CounterAlternative(BaseModelWithDocstrings):
+    """One exact counter spelling and conversion into the metric unit."""
+
+    model_config = _MODEL_CONFIG
+
+    name: str
+    native_unit: str
+    multiplier: float = Field(gt=0)
+
+
 class CounterChoice(BaseModelWithDocstrings):
     """Ordered counter alternatives for one normalized model metric."""
 
     model_config = _MODEL_CONFIG
 
     metric: str
-    alternatives: list[str] = Field(min_length=1)
+    alternatives: list[CounterAlternative] = Field(min_length=1)
     required: bool = True
+    normalized_unit: str
+    scope: str
+    aggregation: str
+    sanity: str
 
 
 class CounterGroup(BaseModelWithDocstrings):
@@ -58,15 +78,32 @@ class CounterGroup(BaseModelWithDocstrings):
     counters: list[CounterChoice] = Field(min_length=1)
 
 
-class CounterManifest(BaseModelWithDocstrings):
+class CounterManifest(CurrentSchemaModel):
     """Versioned per-architecture counter selection policy."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = COUNTER_MANIFEST_SCHEMA_VERSION
 
-    schema_version: str
+    schema_version: str = COUNTER_MANIFEST_SCHEMA_VERSION
     architecture: str
     rocm_compatibility: str
     groups: list[CounterGroup] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def semantics_match_model(self) -> CounterManifest:
+        """Reject drift between manifest units and inference conversion."""
+        for group in self.groups:
+            for choice in group.counters:
+                for alternative in choice.alternatives:
+                    expected = counter_native_multiplier(alternative.name)
+                    if (
+                        expected is not None
+                        and alternative.multiplier != expected
+                    ):
+                        raise ValueError(
+                            f"counter multiplier mismatch: {alternative.name}"
+                        )
+        return self
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,23 +178,29 @@ def select_counter_groups(
     manifest: CounterManifest,
     available: Iterable[str],
 ) -> tuple[list[list[str]], list[str]]:
-    """Select supported alternatives in fail-safe single-counter passes."""
+    """Select one supported alternative per metric in at most four passes."""
     supported = set(available)
     groups: list[list[str]] = []
     missing: list[str] = []
     for group in manifest.groups:
+        selected: list[str] = []
         for choice in group.counters:
             counter = next(
-                (name for name in choice.alternatives if name in supported),
+                (
+                    alternative.name
+                    for alternative in choice.alternatives
+                    if alternative.name in supported
+                ),
                 None,
             )
             if counter is not None:
-                # gfx12 counter-block compatibility varies by driver and
-                # firmware. A singleton pass is always auditable and avoids
-                # rocprofiler aborting an otherwise valid collection.
-                groups.append([counter])
+                selected.append(counter)
             elif choice.required:
                 missing.append(f"{group.name}:{choice.metric}")
+        if selected:
+            groups.append(selected)
+    if len(groups) > 4:
+        raise ValueError("counter_manifest_pass_limit_exceeded")
     return groups, missing
 
 
@@ -178,6 +221,7 @@ def write_counter_job(
                 "pmc": list(group),
                 "output_directory": output_directory,
                 "output_format": ["csv", "rocpd"],
+                "marker_trace": True,
                 "truncate_kernels": False,
             }
             for group in groups
@@ -260,6 +304,29 @@ def counter_pass_index(path: str | Path) -> int | None:
         if match:
             return int(match.group(1))
     return None
+
+
+def counter_dispatch_sequence_digest(path: str | Path) -> str:
+    """Hash ordered dispatch identity without profiler-assigned dispatch IDs."""
+    parsed = _parse_counter_pass(
+        CounterPassCSV(1, Path(path)),
+        workload_uuid="digest",
+        candidate_sha256="0" * 64,
+    )
+    sequence = [
+        {
+            "kernel_symbol": item.kernel_symbol,
+            "grid": item.grid,
+            "workgroup": item.workgroup,
+            "iteration_ordinal": item.iteration_ordinal,
+            "queue_id": item.queue_id,
+            "stream_id": item.stream_id,
+        }
+        for item in parsed
+    ]
+    if len(sequence) > 5 * 256:
+        raise ValueError("counter_dispatch_limit_exceeded")
+    return stable_json_checksum(sequence)
 
 
 def normalize_counter_name(value: str) -> str:
@@ -552,6 +619,8 @@ def _counter_value(value: str, *, counter_name: str) -> float:
     if scale is None:
         raise ValueError("unsupported_counter_unit")
     normalized = number * scale
+    if normalized < 0:
+        raise ValueError("negative_counter_value")
     if not suffix and counter_name in {"FETCH_SIZE", "WRITE_SIZE"}:
         return normalized * 1024.0
     return normalized
@@ -567,10 +636,12 @@ __all__ = [
     "COUNTER_MANIFEST_SCHEMA_VERSION",
     "MAX_COUNTER_CSV_BYTES",
     "ROCPROFV3_AVAIL_EXECUTABLE",
+    "CounterAlternative",
     "CounterGroup",
     "CounterManifest",
     "CounterPassCSV",
     "build_rocprofv3_counter_command",
+    "counter_dispatch_sequence_digest",
     "counter_names_in_csv",
     "counter_pass_index",
     "load_counter_manifest",

@@ -87,7 +87,8 @@ USER ${HOST_UID}:${HOST_GID}
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never \
-    UV_PROJECT_ENVIRONMENT=/venv
+    UV_PROJECT_ENVIRONMENT=/venv \
+    ROCPROF_TMPDIR=/tmp
 
 # Copy dependency files (changes less frequently than source code)
 COPY --chown=${HOST_UID}:${HOST_GID} pyproject.toml uv.lock README.md ./

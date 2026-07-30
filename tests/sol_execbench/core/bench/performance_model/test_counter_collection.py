@@ -20,12 +20,12 @@ from sol_execbench.core.bench.rocm_profiler.models import (
 
 _REQUIRED_COUNTERS = """
 Name:gfx1200
-Counter_Name : SQ_WAVES
-Counter_Name : SQ_INSTS_VALU
+Counter_Name : SQ_WAVES_sum
 Counter_Name : FETCH_SIZE
 Counter_Name : GL2C_EA_WRREQ_64B_sum
-Counter_Name : SQ_INSTS_LDS
-Counter_Name : SQ_WAVE_CYCLES
+Counter_Name : GL2C_MISS_sum
+Counter_Name : GL2C_HIT_sum
+Counter_Name : LDSBankConflict
 """
 
 
@@ -59,18 +59,20 @@ def test_counter_collection_discovers_availability_and_hashes_inputs(
                 command, 0, _REQUIRED_COUNTERS, ""
             )
         job = yaml.safe_load(Path(command[2]).read_text(encoding="utf-8"))
-        assert all(len(entry["pmc"]) == 1 for entry in job["jobs"])
-        for index, entry in enumerate(job["jobs"], start=1):
-            pass_dir = request.output_directory / f"pass_{index}"
-            pass_dir.mkdir(parents=True)
-            counter = entry["pmc"][0]
-            (pass_dir / f"{index}_counter_collection.csv").write_text(
-                "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,"
-                "Counter_Name,Counter_Value\n"
-                f"1,kernel,1,1,{counter},1\n",
-                encoding="utf-8",
-            )
-            (pass_dir / f"{index}_results.rocpd").write_bytes(b"audit")
+        assert len(job["jobs"]) == 1
+        entry = job["jobs"][0]
+        pass_dir = Path(entry["output_directory"])
+        pass_dir.mkdir(parents=True)
+        rows = "".join(
+            f"1,kernel,1,1,{counter},1\n" for counter in entry["pmc"]
+        )
+        pass_index = int(pass_dir.name.removeprefix("pass_"))
+        (pass_dir / f"{pass_index}_counter_collection.csv").write_text(
+            "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,"
+            "Counter_Name,Counter_Value\n" + rows,
+            encoding="utf-8",
+        )
+        (pass_dir / f"{pass_index}_results.rocpd").write_bytes(b"audit")
         return subprocess.CompletedProcess(command, 0, "", "")
 
     result = collect_rocprofv3_counters(request, runner=runner)
@@ -107,7 +109,7 @@ def test_counter_collection_fails_closed_for_unsupported_counter(
         return subprocess.CompletedProcess(
             command,
             0,
-            "Name:gfx1200\nCounter_Name : SQ_WAVES\n",
+            "Name:gfx1200\nCounter_Name : SQ_WAVES_sum\n",
             "",
         )
 

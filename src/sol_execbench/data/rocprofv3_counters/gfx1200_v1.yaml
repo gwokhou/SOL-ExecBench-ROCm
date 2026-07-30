@@ -1,36 +1,59 @@
-schema_version: sol_execbench.rocprofv3_counter_manifest.v1
+schema_version: sol_execbench.rocprofv3_counter_manifest.v2
 architecture: gfx1200
 rocm_compatibility: "7.2"
 groups:
   - name: compute_wmma
     counters:
       - metric: waves
-        alternatives: [SQ_WAVES]
-      - metric: valu_instructions
-        alternatives: [VALUInsts, SQ_INSTS_VALU, SQ_INSTS_VALU_ADD]
-      - metric: wmma_instructions
-        alternatives: [SQ_INSTS_MFMA, SQ_INSTS_WMMA, MFMAInsts]
-        required: false
-  - name: memory_cache
+        alternatives:
+          - {name: SQ_WAVES_sum, native_unit: waves, multiplier: 1}
+        normalized_unit: waves
+        scope: dispatch
+        aggregation: sum
+        sanity: positive
+  - name: memory_traffic
     counters:
       - metric: bytes_read
-        alternatives: [FETCH_SIZE, GL2C_EA_RDREQ_32B_sum, TCC_EA_RDREQ_32B_sum]
+        alternatives:
+          - {name: FETCH_SIZE, native_unit: kibibytes, multiplier: 1024}
+        normalized_unit: bytes
+        scope: dispatch
+        aggregation: sum
+        sanity: positive
       - metric: bytes_written
-        alternatives: [WRITE_SIZE, GL2C_EA_WRREQ_64B_sum, TCC_EA_WRREQ_64B_sum]
+        alternatives:
+          - {name: GL2C_EA_WRREQ_64B_sum, native_unit: transactions_64b, multiplier: 64}
+        normalized_unit: bytes
+        scope: dispatch
+        aggregation: sum
+        sanity: non_negative
+  - name: cache
+    counters:
       - metric: cache_misses
-        alternatives: [GL2C_MISS_sum, TCC_MISS, L2CacheMiss]
+        alternatives:
+          - {name: GL2C_MISS_sum, native_unit: requests, multiplier: 1}
+          - {name: TCC_MISS, native_unit: requests, multiplier: 1}
+          - {name: L2CacheMiss, native_unit: requests, multiplier: 1}
         required: false
+        normalized_unit: requests
+        scope: dispatch
+        aggregation: sum
+        sanity: non_negative
+      - metric: cache_hits
+        alternatives:
+          - {name: GL2C_HIT_sum, native_unit: requests, multiplier: 1}
+        required: false
+        normalized_unit: requests
+        scope: dispatch
+        aggregation: sum
+        sanity: non_negative
   - name: lds
     counters:
-      - metric: lds_instructions
-        alternatives: [SQ_INSTS_LDS, LDSInsts]
-      - metric: lds_bank_conflicts
-        alternatives: [LDSBankConflict, SQC_LDS_BANK_CONFLICT, SQ_LDS_BANK_CONFLICT]
+      - metric: lds_bank_conflict_percent
+        alternatives:
+          - {name: LDSBankConflict, native_unit: percent, multiplier: 1}
         required: false
-  - name: wave_occupancy
-    counters:
-      - metric: wave_cycles
-        alternatives: [SQ_WAVE_CYCLES, WavefrontOccupancy]
-      - metric: occupancy
-        alternatives: [MeanOccupancyPerCU, OccupancyPercent]
-        required: false
+        normalized_unit: percent
+        scope: dispatch
+        aggregation: maximum
+        sanity: non_negative

@@ -225,7 +225,7 @@ int run_reduction() {
           !metric("barrier_penalty_ms", variant,
                   milliseconds /
                       (blocks * (width / 32) * std::log2(static_cast<double>(width))),
-                  "ms/barrier")) {
+                  "ms/event")) {
         return 2;
       }
     }
