@@ -40,6 +40,9 @@ from typing import Any
 import torch
 from torch import nn
 
+from solar.graph.torchview.attribute_parsing import (
+    parse_operation_attributes,
+)
 from solar.graph.torchview.constants import (
     BOOLEAN_ATTRS,
     GEOMETRIC_ATTRS,
@@ -172,85 +175,65 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
     def _extract_shapes(
         self, node: Any, node_type: str
     ) -> tuple[list[TensorShape], list[TensorShape]]:
-        """Extract input and output shapes from a node.
+        """Extract input and output shapes from a node."""
+        tensor_shapes = self._tensor_node_shapes(node, node_type)
+        if tensor_shapes is not None:
+            return tensor_shapes
+        return (
+            self._shapes_from_side(node, "inputs", "input_shape"),
+            self._shapes_from_side(node, "outputs", "output_shape"),
+        )
 
-        Args:
-            node: Node object.
-            node_type: Type of the node for special handling.
-            original_model: Optional model used to recover module dtypes.
-            input_shapes: Optional normalized input shapes.
-            output_shapes: Optional normalized output shapes.
-            original_model: Optional model used to recover module dtypes.
-            input_shapes: Optional normalized input shapes.
-            output_shapes: Optional normalized output shapes.
+    @staticmethod
+    def _tensor_node_shapes(
+        node: Any,
+        node_type: str,
+    ) -> tuple[list[TensorShape], list[TensorShape]] | None:
+        """Return the shape placement for a concrete TensorNode."""
+        if type(node).__name__ != "TensorNode":
+            return None
+        raw_shape = getattr(node, "tensor_shape", None)
+        if raw_shape is None:
+            return None
+        tensor_shape = (
+            list(raw_shape) if hasattr(raw_shape, "__iter__") else [raw_shape]
+        )
+        if not tensor_shape:
+            return None
+        node_name = node_type.lower() if node_type else ""
+        if node_name in {
+            "input-tensor",
+            "auxiliary-tensor",
+            "parameter-tensor",
+        }:
+            return [], [tensor_shape]
+        if node_name == "output-tensor":
+            return [tensor_shape], []
+        return [tensor_shape], [tensor_shape]
 
-        Returns:
-            Tuple of (input_shapes, output_shapes).
-        """
-        input_shapes = []
-        output_shapes = []
-        node_class = type(node).__name__
-
-        # Special handling for TensorNode - check tensor_shape first
-        if node_class == "TensorNode":
-            tensor_shape = None
-            if hasattr(node, "tensor_shape") and node.tensor_shape is not None:
-                if hasattr(node.tensor_shape, "__iter__"):
-                    tensor_shape = list(node.tensor_shape)
-                else:
-                    tensor_shape = [node.tensor_shape]
-
-            if tensor_shape:
-                node_name = node_type.lower() if node_type else ""
-                if node_name in {
-                    "input-tensor",
-                    "auxiliary-tensor",
-                    "parameter-tensor",
-                }:
-                    output_shapes = [tensor_shape]
-                elif node_name == "output-tensor":
-                    input_shapes = [tensor_shape]
-                elif node_name == "hidden-tensor":
-                    input_shapes = [tensor_shape]
-                    output_shapes = [tensor_shape]
-                else:
-                    input_shapes = [tensor_shape]
-                    output_shapes = [tensor_shape]
-                return input_shapes, output_shapes
-
-        # Extract input shapes from inputs attribute
-        if hasattr(node, "inputs") and node.inputs:
-            for inp in node.inputs:
-                if (
-                    hasattr(inp, "tensor_shape")
-                    and inp.tensor_shape is not None
-                ):
-                    input_shapes.append(list(inp.tensor_shape))
-                elif hasattr(inp, "shape"):
-                    input_shapes.append(list(inp.shape))
-        elif hasattr(node, "input_shape") and node.input_shape:
-            if isinstance(node.input_shape, (list, tuple)):
-                input_shapes = [list(s) for s in node.input_shape]
-            else:
-                input_shapes = [list(node.input_shape)]
-
-        # Extract output shapes from outputs attribute
-        if hasattr(node, "outputs") and node.outputs:
-            for out in node.outputs:
-                if (
-                    hasattr(out, "tensor_shape")
-                    and out.tensor_shape is not None
-                ):
-                    output_shapes.append(list(out.tensor_shape))
-                elif hasattr(out, "shape"):
-                    output_shapes.append(list(out.shape))
-        elif hasattr(node, "output_shape") and node.output_shape:
-            if isinstance(node.output_shape, (list, tuple)):
-                output_shapes = [list(s) for s in node.output_shape]
-            else:
-                output_shapes = [list(node.output_shape)]
-
-        return input_shapes, output_shapes
+    @staticmethod
+    def _shapes_from_side(
+        node: Any,
+        collection_name: str,
+        fallback_name: str,
+    ) -> list[TensorShape]:
+        """Extract shapes from one connected side or its legacy attribute."""
+        connected = getattr(node, collection_name, None)
+        if connected:
+            result: list[TensorShape] = []
+            for item in connected:
+                shape = getattr(item, "tensor_shape", None)
+                if shape is None:
+                    shape = getattr(item, "shape", None)
+                if shape is not None:
+                    result.append(list(shape))
+            return result
+        fallback = getattr(node, fallback_name, None)
+        if not fallback:
+            return []
+        if isinstance(fallback, (list, tuple)):
+            return [list(shape) for shape in fallback]
+        return [list(fallback)]
 
     @staticmethod
     def _classify_tensor_node_dtype(
@@ -276,157 +259,94 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
         input_shapes: list[TensorShape] | None = None,
         output_shapes: list[TensorShape] | None = None,
     ) -> tuple[list[str], list[str]]:
-        """Extract input and output dtypes from a node.
+        """Extract input and output dtypes from a node."""
+        tensor_dtype = self._tensor_node_dtype(node)
+        if type(node).__name__ == "TensorNode" and tensor_dtype:
+            return self._classify_tensor_node_dtype(node_type, tensor_dtype)
 
-        Args:
-            node: Node object.
-            node_type: Type of the node for special handling.
-            original_model: Optional model used to recover module dtypes.
-            input_shapes: Optional normalized input shapes.
-            output_shapes: Optional normalized output shapes.
-
-        Returns:
-            Tuple of (input_dtypes, output_dtypes).
-        """
-        input_dtypes = []
-        output_dtypes = []
-        node_class = type(node).__name__
-
-        # Helper function to extract dtype from a tensor-like object
-        def get_dtype(obj: Any) -> str | None:
-            """Extract dtype string from a tensor-like object."""
-            if obj is None:
-                return None
-
-            # Check for tensor_dtype attribute (torchview convention)
-            if hasattr(obj, "tensor_dtype") and obj.tensor_dtype is not None:
-                dtype = obj.tensor_dtype
-                if isinstance(dtype, torch.dtype) or dtype is not None:
-                    return str(dtype)
-
-            # Check for dtype attribute directly
-            if hasattr(obj, "dtype"):
-                dtype = obj.dtype
-                if isinstance(dtype, torch.dtype):
-                    return str(dtype)
-                if isinstance(dtype, str):
-                    return dtype
-
-            # Check for tensor attribute that might have dtype
-            if hasattr(obj, "tensor") and obj.tensor is not None:
-                tensor_obj = obj.tensor
-                if hasattr(tensor_obj, "dtype"):
-                    return str(tensor_obj.dtype)
-
-            # Check if it's a torch.Tensor directly
-            if isinstance(obj, torch.Tensor):
-                return str(obj.dtype)
-
-            return None
-
-        # Special handling for TensorNode - mirror shape extraction logic
-        if node_class == "TensorNode":
-            tensor_dtype = None
-
-            # Try tensor_dtype attribute first (torchview convention)
-            if hasattr(node, "tensor_dtype") and node.tensor_dtype is not None:
-                tensor_dtype = str(node.tensor_dtype)
-            # Try dtype attribute
-            elif hasattr(node, "dtype") and node.dtype is not None:
-                tensor_dtype = str(node.dtype)
-            # Try tensor attribute
-            elif hasattr(node, "tensor") and node.tensor is not None:
-                if hasattr(node.tensor, "dtype"):
-                    tensor_dtype = str(node.tensor.dtype)
-            # Try getting from inputs/outputs if available
-            elif hasattr(node, "outputs") and node.outputs:
-                for out in node.outputs:
-                    dtype = get_dtype(out)
-                    if dtype:
-                        tensor_dtype = dtype
-                        break
-
-            # Assign dtype to the same tensor sides used by shape extraction.
-            if tensor_dtype:
-                return self._classify_tensor_node_dtype(node_type, tensor_dtype)
-
-        # Extract input dtypes from inputs attribute (mirroring shape extraction)
-        if hasattr(node, "inputs") and node.inputs:
-            for inp in node.inputs:
-                dtype = get_dtype(inp)
-                if dtype:
-                    input_dtypes.append(dtype)
-                else:
-                    # If we can't get dtype from the input object, try to infer from shape
-                    # by checking if it has tensor_shape and we can get dtype from that
-                    if hasattr(inp, "tensor_shape") and hasattr(
-                        inp, "tensor_dtype"
-                    ):
-                        dtype = get_dtype(inp)
-                        if dtype:
-                            input_dtypes.append(dtype)
-
-        # Extract output dtypes from outputs attribute (mirroring shape extraction)
-        if hasattr(node, "outputs") and node.outputs:
-            for out in node.outputs:
-                dtype = get_dtype(out)
-                if dtype:
-                    output_dtypes.append(dtype)
-                else:
-                    # Try to get dtype from tensor_shape's source
-                    if hasattr(out, "tensor_shape") and hasattr(
-                        out, "tensor_dtype"
-                    ):
-                        dtype = get_dtype(out)
-                        if dtype:
-                            output_dtypes.append(dtype)
-
-        # Fallback: try input_shape/output_shape attributes (some nodes might have these)
-        if (
-            not input_dtypes
-            and hasattr(node, "input_dtype")
-            and node.input_dtype
-        ):
-            if isinstance(node.input_dtype, (list, tuple)):
-                input_dtypes = [str(d) for d in node.input_dtype]
-            else:
-                input_dtypes = [str(node.input_dtype)]
-
-        if (
-            not output_dtypes
-            and hasattr(node, "output_dtype")
-            and node.output_dtype
-        ):
-            if isinstance(node.output_dtype, (list, tuple)):
-                output_dtypes = [str(d) for d in node.output_dtype]
-            else:
-                output_dtypes = [str(node.output_dtype)]
-
-        # Fallback: If we have shapes but no dtypes, try to infer from original model
-        # This ensures dtype counts match shape counts
-        if input_shapes is None:
-            input_shapes = []
-        if output_shapes is None:
-            output_shapes = []
-
+        input_dtypes = self._dtypes_from_side(node, "inputs")
+        output_dtypes = self._dtypes_from_side(node, "outputs")
+        if not input_dtypes:
+            input_dtypes = self._legacy_dtypes(node, "input_dtype")
+        if not output_dtypes:
+            output_dtypes = self._legacy_dtypes(node, "output_dtype")
         if original_model is not None:
-            if self._cached_default_dtype is None:
-                for param in original_model.parameters():
-                    if param.dtype is not None:
-                        self._cached_default_dtype = str(param.dtype)
-                        break
-                if self._cached_default_dtype is None:
-                    self._cached_default_dtype = "torch.float32"
-
-            default_dtype = self._cached_default_dtype
-
-            while len(input_dtypes) < len(input_shapes):
-                input_dtypes.append(default_dtype)
-
-            while len(output_dtypes) < len(output_shapes):
-                output_dtypes.append(default_dtype)
-
+            default_dtype = self._model_default_dtype(original_model)
+            self._pad_dtypes(input_dtypes, input_shapes, default_dtype)
+            self._pad_dtypes(output_dtypes, output_shapes, default_dtype)
         return input_dtypes, output_dtypes
+
+    @staticmethod
+    def _tensor_like_dtype(obj: Any) -> str | None:
+        """Extract a dtype string from a Torchview tensor-like object."""
+        if obj is None:
+            return None
+        tensor_dtype = getattr(obj, "tensor_dtype", None)
+        if tensor_dtype is not None:
+            return str(tensor_dtype)
+        dtype = getattr(obj, "dtype", None)
+        if isinstance(dtype, (torch.dtype, str)):
+            return str(dtype)
+        tensor = getattr(obj, "tensor", None)
+        if tensor is not None and hasattr(tensor, "dtype"):
+            return str(tensor.dtype)
+        if isinstance(obj, torch.Tensor):
+            return str(obj.dtype)
+        return None
+
+    def _tensor_node_dtype(self, node: Any) -> str | None:
+        """Recover a TensorNode dtype, including its output fallback."""
+        if type(node).__name__ != "TensorNode":
+            return None
+        direct = self._tensor_like_dtype(node)
+        if direct:
+            return direct
+        for output in getattr(node, "outputs", None) or ():
+            dtype = self._tensor_like_dtype(output)
+            if dtype:
+                return dtype
+        return None
+
+    def _dtypes_from_side(self, node: Any, name: str) -> list[str]:
+        """Extract every available dtype from one connected tensor side."""
+        return [
+            dtype
+            for item in (getattr(node, name, None) or ())
+            if (dtype := self._tensor_like_dtype(item)) is not None
+        ]
+
+    @staticmethod
+    def _legacy_dtypes(node: Any, name: str) -> list[str]:
+        """Normalize a legacy singular-or-sequence dtype attribute."""
+        value = getattr(node, name, None)
+        if not value:
+            return []
+        if isinstance(value, (list, tuple)):
+            return [str(dtype) for dtype in value]
+        return [str(value)]
+
+    def _model_default_dtype(self, model: nn.Module) -> str:
+        """Cache the first model parameter dtype for missing graph metadata."""
+        if self._cached_default_dtype is None:
+            self._cached_default_dtype = next(
+                (
+                    str(parameter.dtype)
+                    for parameter in model.parameters()
+                    if parameter.dtype is not None
+                ),
+                "torch.float32",
+            )
+        return self._cached_default_dtype
+
+    @staticmethod
+    def _pad_dtypes(
+        dtypes: list[str],
+        shapes: list[TensorShape] | None,
+        default_dtype: str,
+    ) -> None:
+        """Pad dtype metadata to the corresponding tensor-shape count."""
+        while len(dtypes) < len(shapes or ()):
+            dtypes.append(default_dtype)
 
     def _extract_module_info(self, node: Any) -> dict[str, Any]:
         """Extract module argument information from a node.
@@ -624,193 +544,27 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
         attributes: str,
         node_name: str,
     ) -> dict[str, Any]:
-        """Parse torchview stringified attributes to extract function arguments.
-
-        torchview's stringify_attributes() produces strings like:
-        - For functions: "[[Tensor(shape=(2, 32, 64), dtype=torch.float32), 1, 2], {}]"
-        - This represents [args_list, kwargs_dict]
-
-        We parse this by replacing Tensor(...) with a placeholder and using eval.
-
-        Args:
-            attributes: Stringified attributes from torchview.
-            node_name: Name of the function (e.g., 'transpose', 'permute').
-
-        Returns:
-            Dictionary of parsed arguments.
-        """
-        result: dict[str, Any] = {}
-
+        """Parse exact and diagnostic arguments from Torchview text."""
         if not attributes:
-            return result
-
-        # Store raw attributes for debugging
-        result["raw_attributes"] = attributes
-
+            return {}
+        result: dict[str, Any] = {"raw_attributes": attributes}
         try:
-            # Parse the attributes string by replacing Tensor(...) with a placeholder
-            args_list, kwargs_dict = self._eval_attributes_string(attributes)
-
-            if args_list is None:
+            arguments, kwargs = self._eval_attributes_string(attributes)
+            if arguments is None:
                 return result
-            kwargs_dict = kwargs_dict or {}
-
-            tensor_index = 0
-
-            def semantic_value(value: Any) -> Any:
-                nonlocal tensor_index
-                if isinstance(value, dict) and value.get("tensor_placeholder"):
-                    reference = {"tensor": tensor_index}
-                    tensor_index += 1
-                    return reference
-                if isinstance(value, dict):
-                    return {
-                        str(key): semantic_value(item)
-                        for key, item in value.items()
-                    }
-                if isinstance(value, (list, tuple)):
-                    return [semantic_value(item) for item in value]
-                if isinstance(value, str) and value.startswith("__torch_"):
-                    name = value.removeprefix("__torch_").removesuffix("__")
-                    if name in {
-                        "bool",
-                        "bfloat16",
-                        "float16",
-                        "float32",
-                        "float64",
-                        "int8",
-                        "int16",
-                        "int32",
-                        "int64",
-                        "uint8",
-                        "float8_e4m3fn",
-                        "float8_e5m2",
-                    }:
-                        return {"dtype": name}
-                    return {"value": name}
-                return {"value": value}
-
-            # Preserve the exact ordered call signature.  This is the source
-            # of truth for executable semantic IR; operation-specific fields
-            # below remain useful cost-model diagnostics only.
-            result["call_arguments"] = [
-                semantic_value(item) for item in args_list
-            ]
-            result["call_kwargs"] = {
-                str(key): semantic_value(value)
-                for key, value in kwargs_dict.items()
-            }
-
-            # Extract non-tensor arguments (skip index 0 which is usually the input tensor)
-            non_tensor_args = [
-                arg
-                for arg in args_list
-                if not isinstance(arg, dict) or "tensor_placeholder" not in arg
-            ]
-            # Filter out tensor placeholders
-            scalar_args = [
-                arg
-                for arg in non_tensor_args
-                if not (isinstance(arg, dict) and "tensor_placeholder" in arg)
-            ]
-
-            if node_name == "transpose":
-                # transpose(input, dim0, dim1) - extract dim0 and dim1
-                int_args = [arg for arg in scalar_args if isinstance(arg, int)]
-                if len(int_args) >= 2:
-                    result["dim0"] = int_args[0]
-                    result["dim1"] = int_args[1]
-                    result["transpose_dims"] = [int_args[0], int_args[1]]
-                # Also check kwargs
-                if kwargs_dict:
-                    if "dim0" in kwargs_dict:
-                        result["dim0"] = kwargs_dict["dim0"]
-                    if "dim1" in kwargs_dict:
-                        result["dim1"] = kwargs_dict["dim1"]
-                    if "dim0" in result and "dim1" in result:
-                        result["transpose_dims"] = [
-                            result["dim0"],
-                            result["dim1"],
-                        ]
-
-            elif node_name == "permute":
-                # Torchview may flatten dimensions or retain one sequence.
-                int_args = [arg for arg in scalar_args if isinstance(arg, int)]
-                if int_args:
-                    result["permute_dims"] = int_args
-                # Check for tuple/list arg
-                for arg in scalar_args:
-                    if isinstance(arg, (list, tuple)) and all(
-                        isinstance(d, int) for d in arg
-                    ):
-                        result["permute_dims"] = list(arg)
-                        break
-                # Check kwargs
-                if kwargs_dict and "dims" in kwargs_dict:
-                    result["permute_dims"] = list(kwargs_dict["dims"])
-
-            elif node_name == "t":
-                # t() is always transpose(0, 1) for 2D tensors
-                result["dim0"] = 0
-                result["dim1"] = 1
-                result["transpose_dims"] = [1, 0]
-
-            elif node_name in ("view", "reshape"):
-                # Torchview may flatten sizes or retain one shape sequence.
-                int_args = [arg for arg in scalar_args if isinstance(arg, int)]
-                if int_args:
-                    result["target_shape"] = int_args
-                # Check for tuple/list arg
-                for arg in scalar_args:
-                    if isinstance(arg, (list, tuple)) and all(
-                        isinstance(d, int) for d in arg
-                    ):
-                        result["target_shape"] = list(arg)
-                        break
-
-            elif node_name in (
-                "mean",
-                "sum",
-                "logsumexp",
-                "prod",
-                "amax",
-                "amin",
-                "any",
-                "all",
-                "norm",
-                "std",
-                "var",
-            ):
-                # Reduction ops: func(input, dim, keepdim=False)
-                # scalar_args may contain dim as int or list of ints
-                if kwargs_dict:
-                    if "dim" in kwargs_dict:
-                        dim_val = kwargs_dict["dim"]
-                        result["dim"] = (
-                            [dim_val]
-                            if isinstance(dim_val, int)
-                            else list(dim_val)
-                        )
-                    if "keepdim" in kwargs_dict:
-                        result["keepdim"] = kwargs_dict["keepdim"]
-                # dim can also be a positional arg
-                if "dim" not in result:
-                    for arg in scalar_args:
-                        if isinstance(arg, int):
-                            result["dim"] = [arg]
-                            break
-                        if isinstance(arg, (list, tuple)) and all(
-                            isinstance(d, int) for d in arg
-                        ):
-                            result["dim"] = list(arg)
-                            break
-
-        except Exception as e:  # noqa: BLE001 - optional backend fallback
+            result.update(
+                parse_operation_attributes(
+                    node_name,
+                    arguments,
+                    kwargs or {},
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - optional backend fallback
             if self.debug:
                 print(
-                    f"Warning: Failed to parse attributes for {node_name}: {e}"
+                    "Warning: Failed to parse attributes for "
+                    f"{node_name}: {exc}"
                 )
-
         return result
 
     @staticmethod

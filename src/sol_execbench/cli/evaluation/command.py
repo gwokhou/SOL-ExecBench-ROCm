@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -147,6 +147,33 @@ def _run_evaluation_command(
     )
 
 
+def _profile_command_runner(
+    staging_dir: Path,
+    env_builder: EnvironmentBuilder,
+    subprocess_run: TextSubprocessRunner | None,
+) -> ProfileRunner:
+    """Build the profiler callback around the evaluation process policy."""
+
+    def run(
+        command: Sequence[str],
+        cwd: Path | None,
+        timeout_seconds: int | None,
+    ) -> subprocess.CompletedProcess[str]:
+        return _run_command(
+            list(command),
+            cwd=cwd,
+            timeout=timeout_seconds,
+            env=_evaluation_env(
+                staging_dir,
+                env_builder,
+                graceful_exit=True,
+            ),
+            runner=subprocess_run,
+        )
+
+    return run
+
+
 def _run_profiled_evaluation(
     eval_cmd: list[str],
     *,
@@ -186,6 +213,7 @@ def _run_profiled_evaluation(
         rocprofv3_available = (
             resolve_rocm_tool(ROCPROFV3_EXECUTABLE) is not None
         )
+
     # gfx1200: SQ_WAVE_CYCLES reads zero under AUTO/dVFS (ROCm issue #8523,
     # https://github.com/ROCm/rocm-systems/issues/8523). Hold STABLE_PEAK for
     # the rocprofv3 collection so the counter and its derived occupancy/stall
@@ -203,14 +231,10 @@ def _run_profiled_evaluation(
         profile_result = collector(
             request,
             rocprofv3_available=rocprofv3_available,
-            runner=lambda command, cwd, timeout_seconds: _run_command(
-                list(command),
-                cwd=cwd,
-                timeout=timeout_seconds,
-                env=_evaluation_env(
-                    staging_dir, env_builder, graceful_exit=True
-                ),
-                runner=subprocess_run,
+            runner=_profile_command_runner(
+                staging_dir,
+                env_builder,
+                subprocess_run,
             ),
         )
     if profile_result.succeeded:

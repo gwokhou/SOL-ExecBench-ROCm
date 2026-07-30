@@ -13,13 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Registry for einsum operation handlers.
+"""Registry for einsum operation handlers."""
 
-This module provides a centralized registry for managing einsum operation
-handlers. Handlers can be registered using a decorator or explicit registration.
-"""
+from __future__ import annotations
 
-from importlib import import_module
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -28,20 +26,6 @@ if TYPE_CHECKING:
         EinsumOpHandler,
     )
     from solar.types import TensorShapes
-
-_BUILTIN_HANDLER_MODULES = (
-    "attention_ops",
-    "conv_ops",
-    "cumulative_ops",
-    "elementwise_ops",
-    "loss_ops",
-    "matmul_ops",
-    "misc_ops",
-    "norm_ops",
-    "pooling_ops",
-    "reduction_ops",
-    "shape_ops",
-)
 
 
 class EinsumOpRegistry:
@@ -78,7 +62,7 @@ class EinsumOpRegistry:
         self._handler_classes: list[type[EinsumOpHandler]] = []
         self._op_to_handler: dict[str, EinsumOpHandler] = {}
 
-    def register_handler(self, handler_class: type["EinsumOpHandler"]) -> None:
+    def register_handler(self, handler_class: type[EinsumOpHandler]) -> None:
         """Register a handler class.
 
         Args:
@@ -100,8 +84,8 @@ class EinsumOpRegistry:
 
     def register(
         self,
-        handler_class: type["EinsumOpHandler"],
-    ) -> type["EinsumOpHandler"]:
+        handler_class: type[EinsumOpHandler],
+    ) -> type[EinsumOpHandler]:
         """Decorator to register a handler class.
 
         Usage:
@@ -112,7 +96,7 @@ class EinsumOpRegistry:
         self.register_handler(handler_class)
         return handler_class
 
-    def get_handler(self, op_name: str) -> "EinsumOpHandler | None":
+    def get_handler(self, op_name: str) -> EinsumOpHandler | None:
         """Get the handler for an operation.
 
         Args:
@@ -139,9 +123,9 @@ class EinsumOpRegistry:
     def get_einsum_op(
         self,
         op_name: str,
-        shapes: "TensorShapes",
+        shapes: TensorShapes,
         **kwargs: Any,
-    ) -> "EinsumOp":
+    ) -> EinsumOp:
         """Get an einsum operation for the given operation name.
 
         Args:
@@ -163,61 +147,48 @@ class EinsumOpRegistry:
         return handler.generate_einsum(op_name, shapes, **kwargs)
 
 
+@dataclass(slots=True)
 class _RegistryState:
-    """Hold the import-time registry state behind the public accessor."""
+    """Hold the optional process-wide registry behind the public accessor."""
 
-    def __init__(self) -> None:
-        self.registry: EinsumOpRegistry | None = None
-        self.handlers_loaded = False
-        self.loading_handlers = False
+    registry: EinsumOpRegistry | None = None
+    handlers_loaded: bool = False
 
 
-# Handler decorators run while their modules are imported, so one process-wide
-# state object is required to break recursive initialization. Keeping it private
-# and exposing it only through get_global_registry constrains mutation.
 _REGISTRY_STATE = _RegistryState()
 
 
+def _register_builtin_handlers(registry: EinsumOpRegistry) -> None:
+    """Register the explicit built-in inventory in precedence order."""
+    from solar.ir.extended_einsum.operations.handlers.builtin_handlers import (
+        BUILTIN_HANDLER_CLASSES,
+    )
+
+    for handler_class in BUILTIN_HANDLER_CLASSES:
+        registry.register_handler(handler_class)
+
+
+def build_builtin_registry(*, debug: bool = False) -> EinsumOpRegistry:
+    """Build an independent registry containing every built-in handler."""
+    registry = EinsumOpRegistry(debug=debug)
+    _register_builtin_handlers(registry)
+    return registry
+
+
 def get_global_registry(load_handlers: bool = True) -> EinsumOpRegistry:
-    """Get the global einsum operation registry.
-
-    Args:
-        load_handlers: If True, load all handlers on first access.
-
-    Returns:
-        The global registry instance.
-
-    """
+    """Return the compatibility process-wide registry."""
     if _REGISTRY_STATE.registry is None:
         _REGISTRY_STATE.registry = EinsumOpRegistry()
 
-    # Load handlers if requested and not already loaded/loading
-    if (
-        load_handlers
-        and not _REGISTRY_STATE.handlers_loaded
-        and not _REGISTRY_STATE.loading_handlers
-    ):
-        _REGISTRY_STATE.loading_handlers = True
-        try:
-            _load_all_handlers()
-            _REGISTRY_STATE.handlers_loaded = True
-        finally:
-            _REGISTRY_STATE.loading_handlers = False
-
+    if load_handlers and not _REGISTRY_STATE.handlers_loaded:
+        _register_builtin_handlers(_REGISTRY_STATE.registry)
+        _REGISTRY_STATE.handlers_loaded = True
     return _REGISTRY_STATE.registry
 
 
-def _load_all_handlers() -> None:
-    """Load all built-in handlers."""
-    for module_name in _BUILTIN_HANDLER_MODULES:
-        import_module(
-            f"solar.ir.extended_einsum.operations.handlers.{module_name}"
-        )
-
-
 def register_einsum_op(
-    handler_class: type["EinsumOpHandler"],
-) -> type["EinsumOpHandler"]:
+    handler_class: type[EinsumOpHandler],
+) -> type[EinsumOpHandler]:
     """Decorator to register a handler with the global registry.
 
     Usage:
@@ -226,9 +197,13 @@ def register_einsum_op(
             supported_ops = ["my_op"]
             ...
     """
-    # Get registry without loading handlers to avoid circular import
     get_global_registry(load_handlers=False).register_handler(handler_class)
     return handler_class
 
 
-__all__ = ["EinsumOpRegistry", "get_global_registry", "register_einsum_op"]
+__all__ = [
+    "EinsumOpRegistry",
+    "build_builtin_registry",
+    "get_global_registry",
+    "register_einsum_op",
+]

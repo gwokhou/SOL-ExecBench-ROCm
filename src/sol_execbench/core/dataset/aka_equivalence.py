@@ -9,6 +9,7 @@ import ast
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import partial
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -42,6 +43,18 @@ class CrosscheckStatus(StrEnum):
     PASSED = "passed"
     NOT_APPLICABLE = "not_applicable"
     FAILED = "failed"
+
+
+def _positional_oracle(
+    function: Callable[..., object],
+    *argument_names: str,
+) -> Oracle:
+    """Adapt a positional callable to the named AKA input contract."""
+
+    def oracle(values: Mapping[str, object]) -> object:
+        return function(*(values[name] for name in argument_names))
+
+    return oracle
 
 
 @dataclass(frozen=True)
@@ -265,7 +278,7 @@ def _load_torch2hip_oracle(entry: AKACorpusEntry, source: Path) -> Oracle:
     callable_module = cast(Callable[..., object], module_fn)
     adapter = _TORCH2HIP_ADAPTERS.get(entry.problem_name)
     if adapter is not None:
-        return lambda named: adapter(callable_module, named)
+        return partial(adapter, callable_module)
     arg_names = function_arg_names(text, "module_fn")
 
     def direct(named: Mapping[str, object]) -> object:
@@ -296,27 +309,34 @@ def _load_torch2flydsl_model_oracle(
             Callable[..., Callable[..., object]],
             model_type,
         )
-        return lambda values: constructor(values["eps"])(
-            values["input"],
-            values["weight"],
-            values["residual"],
-        )
+
+        def fused_add_rmsnorm(values: Mapping[str, object]) -> object:
+            return constructor(values["eps"])(
+                values["input"],
+                values["weight"],
+                values["residual"],
+            )
+
+        return fused_add_rmsnorm
     if entry.problem_name == "per_token_i8_quant":
         model = cast(Callable[..., object], model_type)()
-        return lambda values: cast(Callable[..., object], model)(
-            values["input"]
+        return _positional_oracle(
+            cast(Callable[..., object], model),
+            "input",
         )
     if entry.problem_name == "rope_thd_fwd_bf16":
         model = cast(Callable[..., object], model_type)()
-        return lambda values: cast(Callable[..., object], model)(
-            values["input"],
-            values["cu_seqlens"],
-            values["freqs"],
+        return _positional_oracle(
+            cast(Callable[..., object], model),
+            "input",
+            "cu_seqlens",
+            "freqs",
         )
     if entry.problem_name == "dynamic_mxfp8_quant":
         model = cast(Callable[..., object], model_type)(32)
-        return lambda values: cast(Callable[..., object], model)(
-            values["input"]
+        return _positional_oracle(
+            cast(Callable[..., object], model),
+            "input",
         )
     return _moe_model_oracle(cast(Callable[..., object], model_type))
 
@@ -458,7 +478,7 @@ def _load_silu_and_mul_oracle(source: Path) -> Oracle:
     if not callable(model):
         raise TypeError(f"AKA Model instance is not callable: {source}")
     callable_model = cast(Callable[..., object], model)
-    return lambda values: callable_model(values["input"])
+    return _positional_oracle(callable_model, "input")
 
 
 def _top_level_function_source(text: str, name: str) -> str:

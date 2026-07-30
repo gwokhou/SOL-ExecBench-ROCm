@@ -10,6 +10,12 @@ from collections.abc import Callable, Mapping, Sequence
 from solar.types import DynamicValue
 from solar.verification.errors import IRExecutionError
 from solar.verification.numerics import torch_equation
+from solar.verification.semantic_values import (
+    ATEN_VALUE_POLICY,
+    SemanticValueDecodeError,
+    SemanticValueErrorKind,
+    decode_semantic_value,
+)
 
 _UNHANDLED = object()
 
@@ -106,65 +112,34 @@ def _decode_semantic_argument(
     operands: Sequence[DynamicValue],
     layer_id: str,
 ) -> DynamicValue:
-    import torch
-
-    if argument == "preserve_format":
-        return torch.preserve_format
-    if argument == "contiguous_format":
-        return torch.contiguous_format
-    if isinstance(argument, list):
-        return [
-            _decode_semantic_argument(item, operands, layer_id)
-            for item in argument
-        ]
-    if isinstance(argument, tuple):
-        return tuple(
-            _decode_semantic_argument(item, operands, layer_id)
-            for item in argument
+    try:
+        return decode_semantic_value(
+            argument,
+            operands,
+            policy=ATEN_VALUE_POLICY,
         )
-    if not isinstance(argument, Mapping):
-        return argument
-    if "tensor" in argument:
-        index = int(argument["tensor"])
-        if index < 0 or index >= len(operands):
-            raise IRExecutionError(
-                f"layer {layer_id} references missing tensor argument {index}",
-            )
-        return operands[index]
-    if "dtype" in argument:
-        dtype = getattr(torch, str(argument["dtype"]), None)
-        if not isinstance(dtype, torch.dtype):
-            raise IRExecutionError(
-                f"layer {layer_id} references invalid dtype "
-                f"{argument['dtype']!r}",
-            )
-        return dtype
-    if "device" in argument:
-        return torch.device(str(argument["device"]))
-    if "layout" in argument:
-        layout = getattr(torch, str(argument["layout"]), None)
-        if not isinstance(layout, torch.layout):
-            raise IRExecutionError(
-                f"layer {layer_id} references invalid layout "
-                f"{argument['layout']!r}",
-            )
-        return layout
-    if "value" in argument:
-        value = argument["value"]
-        if value == "__ellipsis__":
-            return Ellipsis
-        if value == "preserve_format":
-            return torch.preserve_format
-        if value == "contiguous_format":
-            return torch.contiguous_format
-        return value
-    if "slice" in argument:
-        values = [
-            _decode_semantic_argument(item, operands, layer_id)
-            for item in argument["slice"]
-        ]
-        return slice(*values)
-    raise IRExecutionError(
+    except SemanticValueDecodeError as exc:
+        raise _aten_decode_error(layer_id, exc) from exc
+
+
+def _aten_decode_error(
+    layer_id: str,
+    error: SemanticValueDecodeError,
+) -> IRExecutionError:
+    if error.kind is SemanticValueErrorKind.MISSING_TENSOR:
+        return IRExecutionError(
+            f"layer {layer_id} references missing tensor argument "
+            f"{error.detail}",
+        )
+    if error.kind is SemanticValueErrorKind.INVALID_DTYPE:
+        return IRExecutionError(
+            f"layer {layer_id} references invalid dtype {error.detail!r}",
+        )
+    if error.kind is SemanticValueErrorKind.INVALID_LAYOUT:
+        return IRExecutionError(
+            f"layer {layer_id} references invalid layout {error.detail!r}",
+        )
+    return IRExecutionError(
         f"layer {layer_id} has an invalid semantic argument",
     )
 

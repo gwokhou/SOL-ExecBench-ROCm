@@ -28,9 +28,6 @@ from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.ir.extended_einsum.operations.handlers.registry import (
-    get_global_registry,
-)
 from solar.types import TensorShape, TensorShapes
 
 
@@ -317,12 +314,6 @@ class BinaryElementwiseHandler(EinsumOpHandler):
             elementwise_op=op_type,
             reduction_op="none",
         )
-
-
-# Register handlers with global registry (without loading other handlers)
-_registry = get_global_registry(load_handlers=False)
-_registry.register_handler(UnaryElementwiseHandler)
-_registry.register_handler(BinaryElementwiseHandler)
 
 
 __all__ = ["BinaryElementwiseHandler", "UnaryElementwiseHandler"]

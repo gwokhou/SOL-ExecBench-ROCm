@@ -31,9 +31,6 @@ from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.ir.extended_einsum.operations.handlers.registry import (
-    get_global_registry,
-)
 from solar.types import TensorShape, TensorShapes
 
 
@@ -517,12 +514,6 @@ class MatrixStructureHandler(EinsumOpHandler):
             elementwise_op="copy",
             reduction_op="none",
         )
-
-
-# Register handlers with global registry (without loading other handlers)
-_registry = get_global_registry(load_handlers=False)
-_registry.register_handler(TensorManipulationHandler)
-_registry.register_handler(MatrixStructureHandler)
 
 
 __all__ = ["MatrixStructureHandler", "TensorManipulationHandler"]

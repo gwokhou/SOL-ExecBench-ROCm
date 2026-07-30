@@ -6,8 +6,14 @@ from typing import Any
 import pytest
 
 from solar.ir.extended_einsum.operations.analyzer import EinsumAnalyzer
+from solar.ir.extended_einsum.operations.handlers.base import (
+    EinsumOp,
+    EinsumOperand,
+    EinsumOpHandler,
+)
 from solar.ir.extended_einsum.operations.handlers.registry import (
     EinsumOpRegistry,
+    build_builtin_registry,
     get_global_registry,
 )
 from solar.types import TensorShapes
@@ -112,6 +118,26 @@ CASES = (
 )
 
 
+class _InjectedHandler(EinsumOpHandler):
+    supported_ops = ("injected",)
+
+    def generate_einsum(
+        self,
+        op_name: str,
+        tensor_shapes: TensorShapes,
+        **kwargs: Any,
+    ) -> EinsumOp:
+        del tensor_shapes, kwargs
+        return EinsumOp(
+            operands=[
+                EinsumOperand("Input", ["A"]),
+                EinsumOperand("Output", ["A"], is_output=True),
+            ],
+            equation="A->A",
+            name=op_name,
+        )
+
+
 def test_global_registry_loads_every_builtin_handler_family() -> None:
     registry = get_global_registry()
 
@@ -131,6 +157,31 @@ def test_global_registry_loads_every_builtin_handler_family() -> None:
             "sum",
         )
     )
+
+
+def test_builtin_registry_builds_independent_instances() -> None:
+    first = build_builtin_registry()
+    second = build_builtin_registry()
+
+    first.register_handler(_InjectedHandler)
+
+    assert first.has_handler("injected")
+    assert not second.has_handler("injected")
+
+
+def test_analyzer_uses_injected_registry_without_global_fallback() -> None:
+    registry = EinsumOpRegistry()
+    registry.register_handler(_InjectedHandler)
+    analyzer = EinsumAnalyzer(registry=registry)
+
+    operation = analyzer.get_einsum_op(
+        "injected",
+        TensorShapes(inputs=[[2]], outputs=[[2]]),
+    )
+
+    assert operation.equation == "A->A"
+    with pytest.raises(ValueError, match="Unsupported operation"):
+        analyzer.get_einsum_op("matmul", TensorShapes(inputs=[[2], [2]]))
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.operation)

@@ -31,9 +31,6 @@ from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.ir.extended_einsum.operations.handlers.registry import (
-    get_global_registry,
-)
 from solar.types import TensorShape, TensorShapes
 
 
@@ -104,11 +101,6 @@ class NormalizationHandler(EinsumOpHandler):
             elementwise_op=normalized_norm,
             reduction_op="none",
         )
-
-
-# Register handler with global registry (without loading other handlers)
-_registry = get_global_registry(load_handlers=False)
-_registry.register_handler(NormalizationHandler)
 
 
 __all__ = ["NormalizationHandler"]

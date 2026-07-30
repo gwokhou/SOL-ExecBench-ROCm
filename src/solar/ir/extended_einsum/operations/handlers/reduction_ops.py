@@ -30,9 +30,6 @@ from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.ir.extended_einsum.operations.handlers.registry import (
-    get_global_registry,
-)
 from solar.types import TensorShape, TensorShapes
 
 
@@ -225,11 +222,6 @@ def _reduction_output_labels(
     return [
         label for index, label in enumerate(input_labels) if index not in dims
     ]
-
-
-# Register handler with global registry (without loading other handlers)
-_registry = get_global_registry(load_handlers=False)
-_registry.register_handler(ReductionHandler)
 
 
 __all__ = ["ReductionHandler"]

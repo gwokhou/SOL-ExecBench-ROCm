@@ -31,9 +31,6 @@ from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.ir.extended_einsum.operations.handlers.registry import (
-    get_global_registry,
-)
 from solar.types import TensorShape, TensorShapes
 
 
@@ -511,18 +508,6 @@ class TrivialOpsHandler(EinsumOpHandler):
             elementwise_op="copy",
             reduction_op="none",
         )
-
-
-# Register handlers with global registry (without loading other handlers)
-_registry = get_global_registry(load_handlers=False)
-_registry.register_handler(EmbeddingHandler)
-_registry.register_handler(GRUHandler)
-_registry.register_handler(LSTMHandler)
-_registry.register_handler(RNNHandler)
-_registry.register_handler(CrossEntropyHandler)
-_registry.register_handler(PairwiseLossHandler)
-_registry.register_handler(TopKHandler)
-_registry.register_handler(TrivialOpsHandler)
 
 
 __all__ = [

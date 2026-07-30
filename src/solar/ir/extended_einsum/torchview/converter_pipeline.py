@@ -56,6 +56,10 @@ from solar.ir.extended_einsum.torchview.af_graph_builder import (
 from solar.ir.extended_einsum.torchview.converter_contract import (
     ConverterMixinContract,
 )
+from solar.ir.extended_einsum.torchview.converter_expansion import (
+    OperationExpansionRequest,
+    expand_operation,
+)
 from solar.ir.extended_einsum.torchview.converter_models import (
     ConversionError,
     PathLike,
@@ -573,105 +577,18 @@ class ConverterPipelineMixin(ConverterMixinContract):
         for node_id in op_graph.nodes():
             node_data = dict(op_graph.nodes[node_id] or {})
             self._validate_input_types_alignment(node_id, node_data)
-
-            # Check if this is a linear layer with bias that should be split
-            if self._should_split_linear_with_bias(node_data):
-                matmul_layer, add_layer = self._split_linear_with_bias(
-                    node_id,
-                    node_data,
-                    op_graph,
-                    all_source_nodes_info,
-                    start_node_id_map,
-                )
-                result["layers"][node_id] = matmul_layer
-                add_node_id = f"{node_id}.bias_add"
-                result["layers"][add_node_id] = add_layer
-                # Remap: original node_id outputs now come from add_node_id
-                node_id_remap[node_id] = add_node_id
-
-            # Check if this is a group-wise conv that needs reshape expansion
-            elif self._should_expand_groupwise_conv(node_data):
-                subgraph_layers, final_node_id, input_mapping = (
-                    self._expand_groupwise_conv(
-                        node_id,
-                        node_data,
-                        op_graph,
-                        start_nodes_info,
-                        start_node_id_map,
-                    )
-                )
-                for sub_id, sub_layer in subgraph_layers.items():
-                    result["layers"][sub_id] = sub_layer
-                node_id_remap[node_id] = final_node_id
-                expanded_input_map[node_id] = input_mapping
-
-            # Check if this is MHA that should be expanded
-            elif self._should_expand_mha(node_data):
-                subgraph_layers, final_node_id, input_mapping = (
-                    self._expand_mha(
-                        node_id,
-                        node_data,
-                        op_graph,
-                        start_nodes_info,
-                        start_node_id_map,
-                    )
-                )
-                for sub_id, sub_layer in subgraph_layers.items():
-                    result["layers"][sub_id] = sub_layer
-                node_id_remap[node_id] = final_node_id
-                expanded_input_map[node_id] = input_mapping
-
-            # Check if this is LSTM that should be expanded
-            elif self._should_expand_lstm(node_data):
-                subgraph_layers, final_node_id, input_mapping = (
-                    self._expand_lstm(
-                        node_id,
-                        node_data,
-                        op_graph,
-                        start_nodes_info,
-                        start_node_id_map,
-                    )
-                )
-                for sub_id, sub_layer in subgraph_layers.items():
-                    result["layers"][sub_id] = sub_layer
-                node_id_remap[node_id] = final_node_id
-                expanded_input_map[node_id] = input_mapping
-
-            # Check if this is GRU that should be expanded
-            elif self._should_expand_gru(node_data):
-                subgraph_layers, final_node_id, input_mapping = (
-                    self._expand_gru(
-                        node_id,
-                        node_data,
-                        op_graph,
-                        start_nodes_info,
-                        start_node_id_map,
-                    )
-                )
-                for sub_id, sub_layer in subgraph_layers.items():
-                    result["layers"][sub_id] = sub_layer
-                node_id_remap[node_id] = final_node_id
-                expanded_input_map[node_id] = input_mapping
-
-            # Check if this is SDPA that should be expanded
-            elif self._should_expand_sdpa(node_data):
-                subgraph_layers, final_node_id, input_mapping = (
-                    self._expand_sdpa(
-                        node_id,
-                        node_data,
-                        op_graph,
-                        start_nodes_info,
-                        start_node_id_map,
-                    )
-                )
-                for sub_id, sub_layer in subgraph_layers.items():
-                    result["layers"][sub_id] = sub_layer
-                # Remap: original node_id outputs now come from final subgraph node
-                node_id_remap[node_id] = final_node_id
-                # Store input mapping for predecessor updates
-                expanded_input_map[node_id] = input_mapping
-
-            else:
+            expansion = expand_operation(
+                self,
+                OperationExpansionRequest(
+                    node_id=node_id,
+                    node=node_data,
+                    graph=op_graph,
+                    source_nodes=start_nodes_info,
+                    all_source_nodes=all_source_nodes_info,
+                    source_node_ids=start_node_id_map,
+                ),
+            )
+            if expansion is None:
                 layer_dict = self._convert_operation(
                     node_id,
                     node_data,
@@ -680,6 +597,12 @@ class ConverterPipelineMixin(ConverterMixinContract):
                     start_node_id_map,
                 )
                 result["layers"][node_id] = layer_dict
+                continue
+
+            result["layers"].update(expansion.layers)
+            node_id_remap[node_id] = expansion.final_node_id
+            if expansion.input_mapping is not None:
+                expanded_input_map[node_id] = expansion.input_mapping
 
         self._fix_split_connections(result, node_id_remap, expanded_input_map)
         result["_source_node_remap"] = node_id_remap

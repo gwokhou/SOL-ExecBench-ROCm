@@ -29,9 +29,6 @@ from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.ir.extended_einsum.operations.handlers.registry import (
-    get_global_registry,
-)
 from solar.types import TensorShape, TensorShapes
 
 
@@ -216,13 +213,6 @@ class BmmHandler(EinsumOpHandler):
             elementwise_op="mul",
             reduction_op="add",
         )
-
-
-# Register handlers with global registry (without loading other handlers)
-_registry = get_global_registry(load_handlers=False)
-_registry.register_handler(MatmulHandler)
-_registry.register_handler(LinearHandler)
-_registry.register_handler(BmmHandler)
 
 
 __all__ = ["BmmHandler", "LinearHandler", "MatmulHandler"]

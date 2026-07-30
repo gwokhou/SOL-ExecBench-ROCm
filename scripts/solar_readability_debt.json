@@ -62,14 +62,8 @@
     "src/solar/verification/verify.py"
   ],
   "long_functions": {
-    "src/solar/graph/torchview/metadata.py:TorchviewMetadataMixin._extract_dtypes": 159,
-    "src/solar/graph/torchview/metadata.py:TorchviewMetadataMixin._extract_shapes": 82,
-    "src/solar/graph/torchview/metadata.py:TorchviewMetadataMixin._parse_torchview_attributes": 193,
-    "src/solar/graph/torchview/parameters.py:TorchviewParametersMixin._apply_model_parameters": 100,
-    "src/solar/graph/torchview/topology.py:TorchviewTopologyMixin._extract_from_edge_list": 173,
     "src/solar/ir/extended_einsum/torchview/af_aliases.py:_apply_shape_op_elision": 106,
     "src/solar/ir/extended_einsum/torchview/af_aliases.py:_build_shape_op_aliases": 165,
-    "src/solar/ir/extended_einsum/torchview/af_aliases.py:_derive_pos_mapping": 252,
     "src/solar/ir/extended_einsum/torchview/af_aliases.py:_normalize_operands": 148,
     "src/solar/ir/extended_einsum/torchview/af_emission.py:_emit_af_workload": 257,
     "src/solar/ir/extended_einsum/torchview/converter_attention.py:ConverterAttentionMixin._expand_mha": 335,
@@ -77,8 +71,6 @@
     "src/solar/ir/extended_einsum/torchview/converter_convolution.py:ConverterConvolutionMixin._expand_groupwise_conv": 324,
     "src/solar/ir/extended_einsum/torchview/converter_normalization.py:ConverterNormalizationMixin._fix_split_connections": 88,
     "src/solar/ir/extended_einsum/torchview/converter_normalization.py:ConverterNormalizationMixin._split_linear_with_bias": 300,
-    "src/solar/ir/extended_einsum/torchview/converter_parsing.py:ConverterParsingMixin._repair_torchview_quirks": 405,
-    "src/solar/ir/extended_einsum/torchview/converter_pipeline.py:ConverterPipelineMixin._build_einsum_graph": 157,
     "src/solar/ir/extended_einsum/torchview/converter_recurrent.py:ConverterRecurrentMixin._expand_gru": 204,
     "src/solar/ir/extended_einsum/torchview/converter_recurrent.py:ConverterRecurrentMixin._expand_lstm": 207
   },
