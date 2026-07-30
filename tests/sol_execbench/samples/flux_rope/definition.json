@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "description": "FLUX's rotary position embedding application that rotates query/key tensors using precomputed cos/sin frequencies. Performs complex rotation: (x1*cos - x2*sin, x1*sin + x2*cos) on paired features. Appears 114+ times per forward pass and is memory-bandwidth bound.",
   "axes": {
     "batch_size": {

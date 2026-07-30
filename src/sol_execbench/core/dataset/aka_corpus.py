@@ -64,6 +64,10 @@ from sol_execbench.core.dataset.aka_contract import (
     AKASourceFamily,
     AKASuite,
 )
+from sol_execbench.core.dataset.aka_schemas import (
+    AKACorpusManifestSchema,
+    AKAMaterializationManifestSchema,
+)
 from sol_execbench.core.dataset.aka_tolerance import (
     validate_calibration_binding,
 )
@@ -156,7 +160,10 @@ class AKACorpusManifest:
     def load(cls, path: str | Path) -> AKACorpusManifest:
         """Load and validate a corpus manifest."""
         manifest_path = Path(path).resolve()
-        data = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        data = AKACorpusManifestSchema.model_validate(raw).model_dump(
+            mode="json",
+        )
         _validate_manifest_header(data)
         entries = tuple(_load_entry(item) for item in data.get("entries") or [])
         coverage = dict(data.get("formal_coverage_requirements") or {})
@@ -251,15 +258,12 @@ class AKACorpusManifest:
         """Validate local files against manifest checksums and the schema."""
         output = Path(output_root).resolve()
         record_path = output / "materialization-manifest.yaml"
-        record = yaml.safe_load(record_path.read_text(encoding="utf-8")) or {}
-        if (
-            int(record.get("schema_version", 0))
-            != AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION
-        ):
-            raise ValueError(
-                "AKA materialization record must use schema_version "
-                f"{AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION}",
-            )
+        raw_record = (
+            yaml.safe_load(record_path.read_text(encoding="utf-8")) or {}
+        )
+        record = AKAMaterializationManifestSchema.model_validate(
+            raw_record,
+        ).model_dump(mode="json")
         if record.get("aka_manifest_sha256") != sha256_file(self.path):
             raise ValueError("corpus manifest identity changed")
         if record.get("source", {}).get("revision") != self.source.get(
@@ -702,30 +706,32 @@ def _write_materialization_manifest(
     target: AKAMaterializationTarget,
     probe_timeout_seconds: float,
 ) -> None:
-    payload = {
-        "schema_version": AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION,
-        "source": {
-            "repository": manifest.source.get("repository"),
-            "revision": manifest.source.get("revision"),
-            "license": manifest.source.get("license"),
-            "provenance_class": manifest.source.get("provenance_class"),
+    payload = AKAMaterializationManifestSchema.model_validate(
+        {
+            "schema_version": AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION,
+            "source": {
+                "repository": manifest.source.get("repository"),
+                "revision": manifest.source.get("revision"),
+                "license": manifest.source.get("license"),
+                "provenance_class": manifest.source.get("provenance_class"),
+            },
+            "aka_manifest_sha256": sha256_file(manifest.path),
+            "target": target.to_dict(),
+            "selection_policy": {
+                "static_filter": "manifest_supported_tensor_dtypes",
+                "live_probe": "trusted_reference_and_harness_minimum",
+                "probe_timeout_seconds": probe_timeout_seconds,
+                "unknown_targets": "fail_closed",
+            },
+            "problems": records,
+            "workload_decisions": [
+                decision.to_dict() for decision in selection.decisions
+            ],
+            "coverage": _selection_coverage(manifest, selection),
         },
-        "aka_manifest_sha256": sha256_file(manifest.path),
-        "target": target.to_dict(),
-        "selection_policy": {
-            "static_filter": "manifest_supported_tensor_dtypes",
-            "live_probe": "trusted_reference_and_harness_minimum",
-            "probe_timeout_seconds": probe_timeout_seconds,
-            "unknown_targets": "fail_closed",
-        },
-        "problems": records,
-        "workload_decisions": [
-            decision.to_dict() for decision in selection.decisions
-        ],
-        "coverage": _selection_coverage(manifest, selection),
-    }
+    )
     (staging / "materialization-manifest.yaml").write_text(
-        yaml.safe_dump(payload, sort_keys=False),
+        yaml.safe_dump(payload.model_dump(mode="json"), sort_keys=False),
     )
 
 

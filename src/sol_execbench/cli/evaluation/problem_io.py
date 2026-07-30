@@ -61,13 +61,13 @@ def _load_solution(path: Path) -> Solution:
             src_path = sol_dir / src["path"]
             if src_path.exists():
                 src["content"] = src_path.read_text()
-    return Solution(**sol_dict)
+    return Solution.model_validate(sol_dict)
 
 
 def _load_config(path: Path | None) -> BenchmarkConfig:
     if path is None:
         return BenchmarkConfig()
-    return BenchmarkConfig(**json.loads(path.read_text()))
+    return BenchmarkConfig.model_validate_json(path.read_text())
 
 
 def load_problem_inputs(inputs: ResolvedProblemInputs) -> LoadedProblemInputs:

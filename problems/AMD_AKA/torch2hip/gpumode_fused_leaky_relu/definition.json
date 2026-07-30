@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_fused_leaky_relu",
   "op_type": "elementwise",
   "description": "Fused bias-add -> leaky_relu -> scale. Derived from AKA torch2hip/gpumode/10190_FusedLeakyReLU module_fn (fused_leaky_relu_fn).",

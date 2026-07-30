@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "attn_proj_residual_rocm_pytorch_compatibility",
   "definition": "ai21labs_AI21-Jamba-Reasoning-3B_attention_output_projection_with_residual",
   "author": "test",

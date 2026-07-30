@@ -10,8 +10,14 @@ from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
+from pydantic import ConfigDict, Field
+
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaModel,
+    StrictArtifactModel,
+)
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
@@ -64,6 +70,114 @@ class CorpusReadinessStatus(StrEnum):
 
     READY = "ready"
     INCOMPLETE = "incomplete"
+
+
+_SCHEMA_CONFIG = ConfigDict(
+    extra="forbid",
+    frozen=True,
+    allow_inf_nan=False,
+)
+
+
+class _ReadinessModel(StrictArtifactModel):
+    model_config = _SCHEMA_CONFIG
+
+
+class ReadinessArtifact(_ReadinessModel):
+    path: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ReadinessStageRecord(_ReadinessModel):
+    stage: SolarStage
+    status: SolarStageStatus
+    reason_code: str | None = None
+    message: str | None = None
+    artifact: ReadinessArtifact | None = None
+
+
+class CorpusTraceIdentity(CurrentSchemaModel):
+    """Current content identity used to address a readiness trace."""
+
+    model_config = _SCHEMA_CONFIG
+    current_schema_version = CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.corpus_stage_trace_identity.v3"] = (
+        CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION
+    )
+    corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    definition_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    workload_file_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    workload_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reference_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    gfx_target: str
+    architecture_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    trace_seed: int
+    preserved_input_indices: list[int]
+    ir_path: str
+    extraction_kind: str
+    ir_kind: str
+
+
+class CorpusReadinessRecord(CurrentSchemaModel):
+    """Current per-workload readiness matrix record."""
+
+    model_config = _SCHEMA_CONFIG
+    current_schema_version = CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION
+
+    schema_version: Literal[
+        "sol_execbench.corpus_stage_readiness_record.v4"
+    ] = CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION
+    problem_path: str
+    workload_uuid: str
+    corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    definition_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    workload_file_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    workload_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reference_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    gfx_target: str
+    architecture_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    trace_seed: int
+    verification_seeds: list[int]
+    verification_patterns: list[str]
+    preserved_input_indices: list[int]
+    ir_path: str
+    extraction_kind: str
+    ir_kind: str
+    trace_identity_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    status: SolarReadinessStatus
+    failure_stage: SolarStage | None
+    reason_code: str | None
+    message: str | None
+    stages: list[ReadinessStageRecord]
+
+
+class ReadinessMatrixReference(_ReadinessModel):
+    path: str
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes: int = Field(gt=0)
+
+
+class CorpusReadinessSummary(CurrentSchemaModel):
+    """Current aggregate readiness summary."""
+
+    model_config = _SCHEMA_CONFIG
+    current_schema_version = CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION
+
+    schema_version: Literal[
+        "sol_execbench.corpus_stage_readiness_summary.v2"
+    ] = CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION
+    generated_at: str
+    status: CorpusReadinessStatus
+    corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    gfx_target: str
+    ir_path: str
+    problem_count: int = Field(gt=0)
+    workload_count: int = Field(gt=0)
+    fully_ready_problem_count: int = Field(ge=0)
+    stage_counts: dict[SolarStage, int]
+    failure_counts: dict[str, int]
+    matrix: ReadinessMatrixReference
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +384,9 @@ def _identity(
             )
         },
     }
+    trace_contract = CorpusTraceIdentity.model_validate(
+        trace_contract,
+    ).model_dump(mode="json")
     return {
         **identity,
         "trace_identity_sha256": stable_json_checksum(trace_contract),
@@ -304,6 +421,9 @@ def _record(
         "message": outcome.message,
         "stages": stages,
     }
+    record = CorpusReadinessRecord.model_validate(record).model_dump(
+        mode="json",
+    )
     _verify_record_artifacts(record, output)
     return record
 
@@ -329,13 +449,9 @@ def _load_resumed_record(
     identity: dict[str, Any],
 ) -> dict[str, Any]:
     record = load_json_value(result_path)
-    if not isinstance(record, dict):
-        raise ValueError(f"invalid resumed readiness record: {result_path}")
-    if (
-        record.get("schema_version")
-        != CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION
-    ):
-        raise ValueError("resumed readiness record schema mismatch")
+    record = CorpusReadinessRecord.model_validate(record).model_dump(
+        mode="json",
+    )
     if any(record.get(key) != value for key, value in identity.items()):
         raise ValueError("resumed readiness record identity mismatch")
     _verify_record_artifacts(record, output)
@@ -438,7 +554,7 @@ def _summary(
             record["status"] == SolarReadinessStatus.READY,
         )
     ready = all(_record_ready(record) for record in records)
-    return {
+    summary = {
         "schema_version": CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION,
         "generated_at": utc_timestamp(),
         "status": (
@@ -470,6 +586,9 @@ def _summary(
             "size_bytes": matrix_path.stat().st_size,
         },
     }
+    return CorpusReadinessSummary.model_validate(summary).model_dump(
+        mode="json",
+    )
 
 
 def _workloads(path: Path) -> dict[str, Workload]:

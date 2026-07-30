@@ -12,7 +12,9 @@ import subprocess
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.rocm_profiler.artifacts import (
     discover_rocprofv3_artifacts,
@@ -40,8 +42,36 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ProfileStatus,
     has_profiler_data_artifact,
 )
+from sol_execbench.core.data.base_model import CurrentSchemaModel
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.text_utils import subprocess_text, text_tail
+
+_ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION = SCHEMA_VERSIONS["rocprofv3_diagnostics"]
+
+
+class Rocprofv3Diagnostics(CurrentSchemaModel):
+    """Current bounded no-data profiler diagnostic artifact."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    current_schema_version = _ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.rocprofv3_diagnostics.v1"] = (
+        "sol_execbench.rocprofv3_diagnostics.v1"
+    )
+    generated_at: str
+    diagnostic_only: Literal[True]
+    score_authority: Literal[False]
+    status: Literal["no_profiler_data_artifacts"]
+    returncode: int
+    command: list[str] = Field(min_length=1)
+    working_directory: str | None
+    output_directory: str
+    output_file: str
+    output_format: str
+    output_directory_listing: list[str] | tuple[str, ...]
+    stdout_tail: str = Field(max_length=4096)
+    stderr_tail: str = Field(max_length=4096)
+    reason_codes: list[str] = Field(min_length=1)
 
 
 def collect_rocprofv3_profile(
@@ -326,35 +356,39 @@ def write_rocprofv3_diagnostic_artifact(
 ) -> Path | None:
     """Persist bounded profiler execution diagnostics when rocprof writes no data."""
     path = request.output_directory / f"{request.output_file}.diagnostics.json"
-    payload = {
-        "schema_version": SCHEMA_VERSIONS["rocprofv3_diagnostics"],
-        "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        "diagnostic_only": True,
-        "score_authority": False,
-        "status": "no_profiler_data_artifacts",
-        "returncode": completed.returncode,
-        "command": list(command),
-        "working_directory": (
-            str(request.working_directory)
-            if request.working_directory is not None
-            else None
-        ),
-        "output_directory": str(request.output_directory),
-        "output_file": request.output_file,
-        "output_format": request.output_format,
-        "output_directory_listing": profile_output_directory_listing(
-            request.output_directory,
-        ),
-        "stdout_tail": text_tail(completed.stdout or "", limit=4096),
-        "stderr_tail": text_tail(completed.stderr or "", limit=4096),
-        "reason_codes": [
-            ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
-            ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
-        ],
-    }
+    payload = Rocprofv3Diagnostics.model_validate(
+        {
+            "schema_version": SCHEMA_VERSIONS["rocprofv3_diagnostics"],
+            "generated_at": datetime.now(UTC)
+            .isoformat()
+            .replace("+00:00", "Z"),
+            "diagnostic_only": True,
+            "score_authority": False,
+            "status": "no_profiler_data_artifacts",
+            "returncode": completed.returncode,
+            "command": list(command),
+            "working_directory": (
+                str(request.working_directory)
+                if request.working_directory is not None
+                else None
+            ),
+            "output_directory": str(request.output_directory),
+            "output_file": request.output_file,
+            "output_format": request.output_format,
+            "output_directory_listing": profile_output_directory_listing(
+                request.output_directory,
+            ),
+            "stdout_tail": text_tail(completed.stdout or "", limit=4096),
+            "stderr_tail": text_tail(completed.stderr or "", limit=4096),
+            "reason_codes": [
+                ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
+                ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
+            ],
+        },
+    )
     try:
         path.write_text(
-            json.dumps(payload, sort_keys=True) + "\n",
+            json.dumps(payload.model_dump(mode="json"), sort_keys=True) + "\n",
             encoding="utf-8",
         )
     except OSError:

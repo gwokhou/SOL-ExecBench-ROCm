@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "rdna4_vecadd_f32",
   "op_type": "vecadd",
   "axes": {

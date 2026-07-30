@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "14007_kd_loss",
   "op_type": "loss",
   "description": "Knowledge-distillation KL loss with probability targets.",

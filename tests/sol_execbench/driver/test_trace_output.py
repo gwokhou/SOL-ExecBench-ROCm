@@ -2,15 +2,23 @@
 
 import json
 
+import pytest
+
 from sol_execbench.core import Trace
+from sol_execbench.core.integrity.schema_versions import (
+    TRACE_SCHEMA_VERSION,
+    WORKLOAD_SCHEMA_VERSION,
+)
 from sol_execbench.driver.trace_output import parse_trace_jsonl
 
 
 def _trace_json(uuid: str = "wkl-0001") -> str:
     return json.dumps(
         {
+            "schema_version": TRACE_SCHEMA_VERSION,
             "definition": "test_vecadd",
             "workload": {
+                "schema_version": WORKLOAD_SCHEMA_VERSION,
                 "axes": {},
                 "inputs": {
                     "x": {"type": "random"},
@@ -60,3 +68,17 @@ def test_skips_non_json_lines() -> None:
 
 def test_returns_empty_for_no_traces() -> None:
     assert parse_trace_jsonl("no json here\njust noise\n") == []
+
+
+@pytest.mark.parametrize("replacement", [None, "future.v999"])
+def test_rejects_missing_or_wrong_trace_schema(
+    replacement: str | None,
+) -> None:
+    payload = json.loads(_trace_json())
+    if replacement is None:
+        payload.pop("schema_version")
+    else:
+        payload["schema_version"] = replacement
+
+    with pytest.raises(ValueError, match="requires schema_version"):
+        parse_trace_jsonl(json.dumps(payload))

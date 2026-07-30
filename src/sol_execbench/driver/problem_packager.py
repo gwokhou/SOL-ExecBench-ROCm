@@ -18,7 +18,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import os
 import subprocess
@@ -100,7 +99,7 @@ class ProblemPackager:
             solution.model_dump_json(),
         )
         (self.output_dir / "config.json").write_text(
-            json.dumps(dataclasses.asdict(config)),
+            config.model_dump_json(),
         )
         self._write_sources()
         self._stage_safetensors_inputs()

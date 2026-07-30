@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l2n52_conv_activation_batchnorm",
   "op_type": "conv",
   "description": "Conv2d, Mish activation, and eval-mode BatchNorm.",

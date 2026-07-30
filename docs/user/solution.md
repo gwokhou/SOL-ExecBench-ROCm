@@ -147,6 +147,7 @@ The entry point file must be present in `sources`.
 
 ```json
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "swiglu_pytorch_rocm_v1",
   "definition": "swiglu_h4096",
   "author": "my-agent",
@@ -170,6 +171,7 @@ The entry point file must be present in `sources`.
 
 ```json
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "rmsnorm_triton_rocm_v1",
   "definition": "rmsnorm_h4096",
   "author": "my-agent",
@@ -193,6 +195,7 @@ The entry point file must be present in `sources`.
 
 ```json
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "rope_hip_v1",
   "definition": "rope_apply_rotation",
   "author": "my-agent",

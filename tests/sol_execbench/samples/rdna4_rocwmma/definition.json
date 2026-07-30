@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "rdna4_rocwmma_matmul_f16",
   "op_type": "matmul",
   "axes": {

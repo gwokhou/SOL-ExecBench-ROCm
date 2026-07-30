@@ -7,9 +7,6 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Any
-
-import yaml
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
@@ -28,8 +25,9 @@ from sol_execbench.core.scoring.release_models import (
 )
 from sol_execbench.core.solar_bridge.models import (
     FORMAL_BOUND_KIND,
-    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
     IRPath,
+    SolarRequestArtifact,
+    SolarRequestManifest,
     formal_artifact_paths,
 )
 from sol_execbench.core.solar_bridge.workload_context import (
@@ -139,27 +137,23 @@ def _verify_solar_manifest(
     )
     _verify_manifest_artifacts(
         path.parent,
-        payload.get("artifacts"),
+        payload.artifacts,
         ir_path=ir_path,
     )
-    bound = payload.get("bound")
-    if not isinstance(bound, dict):
-        raise ValueError("formal SOLAR manifest bound is missing")
-    return float(bound["seconds"]) * 1000.0
+    return payload.bound.seconds * 1000.0
 
 
-def _load_manifest(path: Path) -> dict[str, Any]:
+def _load_manifest(path: Path) -> SolarRequestManifest:
     try:
-        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        return SolarRequestManifest.from_yaml(
+            path.read_text(encoding="utf-8"),
+        )
+    except (OSError, UnicodeError, ValueError) as exc:
         raise ValueError("formal SOLAR manifest is invalid") from exc
-    if not isinstance(payload, dict):
-        raise ValueError("formal SOLAR manifest must be an object")
-    return payload
 
 
 def _verify_manifest_identity(
-    payload: dict[str, Any],
+    payload: SolarRequestManifest,
     *,
     definition: Definition,
     workload_uuid: str,
@@ -167,56 +161,38 @@ def _verify_manifest_identity(
     ir_path: IRPath,
     preserved_input_indices: list[int],
 ) -> None:
-    reference = payload.get("reference")
-    contract = payload.get("analysis_contract")
-    bound = payload.get("bound")
-    if not all(isinstance(item, dict) for item in (reference, contract, bound)):
-        raise ValueError("formal SOLAR manifest contract is incomplete")
     if (
-        not isinstance(reference, dict)
-        or not isinstance(contract, dict)
-        or not isinstance(bound, dict)
-    ):
-        raise ValueError("formal SOLAR manifest contract is incomplete")
-    seconds = bound.get("seconds")
-    if (
-        payload.get("schema_version") != SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
-        or payload.get("analysis_id") != f"{definition.name}:{workload_uuid}"
-        or payload.get("architecture_sha256") != architecture_sha256
-        or reference.get("sha256")
+        payload.analysis_id != f"{definition.name}:{workload_uuid}"
+        or payload.architecture_sha256 != architecture_sha256
+        or payload.reference.sha256
         != sha256_bytes(definition.reference.encode())
-        or contract.get("ir_path") != ir_path.value
-        or contract.get("extraction_kind") != ir_path.extraction_kind.value
-        or contract.get("ir_kind") != ir_path.ir_kind.value
-        or contract.get("preserved_input_indices") != preserved_input_indices
-        or contract.get("require_orojenesis") is not True
-        or payload.get("publication_eligible") is not True
-        or bound.get("kind") != FORMAL_BOUND_KIND
-        or isinstance(seconds, bool)
-        or not isinstance(seconds, (int, float))
-        or not math.isfinite(float(seconds))
-        or float(seconds) <= 0
+        or payload.analysis_contract.ir_path != ir_path.value
+        or payload.analysis_contract.extraction_kind
+        != ir_path.extraction_kind.value
+        or payload.analysis_contract.ir_kind != ir_path.ir_kind.value
+        or payload.analysis_contract.preserved_input_indices
+        != preserved_input_indices
+        or payload.analysis_contract.require_orojenesis is not True
+        or payload.publication_eligible is not True
+        or payload.bound.kind != FORMAL_BOUND_KIND
+        or not math.isfinite(payload.bound.seconds)
     ):
         raise ValueError("formal SOLAR manifest identity or bound mismatch")
 
 
 def _verify_manifest_artifacts(
     root: Path,
-    value: object,
+    value: list[SolarRequestArtifact],
     *,
     ir_path: IRPath,
 ) -> None:
-    if not isinstance(value, list):
-        raise ValueError("formal SOLAR manifest artifacts are missing")
     observed: set[str] = set()
     for raw in value:
-        if not isinstance(raw, dict):
-            raise ValueError("formal SOLAR artifact entry is invalid")
         relative = validate_relative_artifact_path(
-            raw.get("path"),
+            raw.path,
             "SOLAR artifact",
         )
-        digest = validate_sha256(raw.get("sha256"), "SOLAR artifact SHA-256")
+        digest = validate_sha256(raw.sha256, "SOLAR artifact SHA-256")
         if relative in observed:
             raise ValueError(
                 "formal SOLAR manifest contains duplicate artifacts",

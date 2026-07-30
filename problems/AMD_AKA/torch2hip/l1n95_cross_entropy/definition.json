@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n95_cross_entropy",
   "op_type": "loss",
   "description": "Cross entropy with class-bounded integer labels.",

@@ -9,10 +9,14 @@ import json
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Literal, Protocol, cast
 
-from pydantic import TypeAdapter
+from pydantic import ConfigDict, Field, TypeAdapter
 
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaModel,
+    StrictArtifactModel,
+)
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import (
     OutputCheck,
@@ -61,6 +65,56 @@ class CalibrationStatus(StrEnum):
 
     CALIBRATED = "calibrated"
     EXCLUDED = "excluded"
+
+
+_ARTIFACT_CONFIG = ConfigDict(
+    extra="forbid",
+    frozen=True,
+    allow_inf_nan=False,
+)
+
+
+class AKACalibrationDevice(StrictArtifactModel):
+    """Device and framework identity used for tolerance calibration."""
+
+    model_config = _ARTIFACT_CONFIG
+
+    gfx_target: str = Field(min_length=1)
+    hip_version: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    torch_version: str = Field(min_length=1)
+
+
+class AKACalibrationRecord(StrictArtifactModel):
+    """One calibrated or explicitly excluded workload."""
+
+    model_config = _ARTIFACT_CONFIG
+
+    workload_uuid: str = Field(min_length=1)
+    problem_path: str = Field(min_length=1)
+    contract_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    status: CalibrationStatus
+    reason_code: str | None = None
+    checks: list[OutputCheck] | None = None
+    observed_outputs: dict[str, tuple[float, float]] | None = None
+    output_dtypes: list[str] | None = None
+    samples: int | None = Field(default=None, gt=0)
+
+
+class AKAToleranceCalibration(CurrentSchemaModel):
+    """Current AKA tolerance-calibration artifact."""
+
+    model_config = _ARTIFACT_CONFIG
+    current_schema_version = AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION
+
+    schema_version: int = AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION
+    aka_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    device: AKACalibrationDevice
+    margin: float = Field(ge=1)
+    method: Literal["repeated_reference_runs"]
+    records: list[AKACalibrationRecord] = Field(min_length=1)
+    repeats_per_seed: int = Field(ge=2)
+    seed_count: int = Field(ge=2)
 
 
 class CalibrationEntry(Protocol):
@@ -144,37 +198,10 @@ def workload_contract_sha256(
 
 
 def load_tolerance_calibration(path: Path) -> dict[str, object]:
-    """Load and validate the top-level shape of a calibration artifact."""
+    """Load and fully validate a calibration artifact."""
     data = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
-        raise ValueError("AKA tolerance calibration must be a JSON object")
-    if (
-        int(data.get("schema_version", 0))
-        != AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION
-    ):
-        raise ValueError(
-            f"AKA tolerance calibration must use schema_version "
-            f"{AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION}",
-        )
-    if data.get("method") != CALIBRATION_METHOD:
-        raise ValueError(
-            f"AKA tolerance calibration method must be {CALIBRATION_METHOD}",
-        )
-    if float(data.get("margin", 0.0)) < 1.0:
-        raise ValueError(
-            "AKA tolerance calibration margin must be at least 1.0",
-        )
-    if int(data.get("seed_count", 0)) < 2:
-        raise ValueError(
-            "AKA tolerance calibration requires at least two seeds",
-        )
-    if int(data.get("repeats_per_seed", 0)) < 2:
-        raise ValueError(
-            "AKA tolerance calibration requires repeated executions",
-        )
-    if not isinstance(data.get("records"), list):
-        raise ValueError("AKA tolerance calibration records must be a list")
-    return data
+    calibration = AKAToleranceCalibration.model_validate(data)
+    return cast(dict[str, object], calibration.model_dump(mode="json"))
 
 
 def calibration_checks(path: Path) -> dict[str, list[OutputCheck]]:
@@ -353,6 +380,7 @@ __all__ = [
     "DEFAULT_MARGIN",
     "DEFAULT_REPEATS_PER_SEED",
     "DEFAULT_SEED_COUNT",
+    "AKAToleranceCalibration",
     "CalibrationStatus",
     "calibrate_tolerance",
     "calibration_checks",

@@ -14,6 +14,7 @@ from enum import StrEnum
 from pathlib import Path
 
 import yaml
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from solar.graph.contracts import (
     ExtractionKind,
@@ -252,6 +253,86 @@ class FormalProducerReadiness:
     reason_code: str
 
 
+class _ManifestModel(BaseModel):
+    """Strict immutable component of a SOLAR request manifest."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        allow_inf_nan=False,
+    )
+
+
+class SolarRequestReference(_ManifestModel):
+    """Reference identity bound by a request manifest."""
+
+    name: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class SolarRequestAnalysisContract(_ManifestModel):
+    """Frozen conversion and verification choices."""
+
+    ir_path: str = Field(min_length=1)
+    extraction_kind: str = Field(min_length=1)
+    precision: str = Field(min_length=1)
+    ir_kind: str = Field(min_length=1)
+    trace_seed: int
+    verification_seeds: list[int] = Field(min_length=1)
+    atol: float = Field(ge=0)
+    rtol: float = Field(ge=0)
+    required_matched_ratio: float = Field(ge=0, le=1)
+    max_error_cap: float | None = Field(default=None, ge=0)
+    allow_negative_inf: bool
+    preserved_input_indices: list[int]
+    require_orojenesis: bool
+
+
+class SolarRequestArtifact(_ManifestModel):
+    """Content-addressed output in a request manifest."""
+
+    path: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class SolarRequestBound(_ManifestModel):
+    """Formal lower bound published by a request manifest."""
+
+    seconds: float = Field(gt=0)
+    kind: str = Field(min_length=1)
+    limiting_resource: str | None
+
+
+class SolarRequestManifest(_ManifestModel):
+    """Current fully typed SOLAR analysis request manifest."""
+
+    schema_version: int = SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
+    analysis_id: str = Field(min_length=1)
+    architecture_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reference: SolarRequestReference
+    analysis_contract: SolarRequestAnalysisContract
+    sol_score_eligible: bool
+    publication_eligible: bool
+    artifacts: list[SolarRequestArtifact] = Field(min_length=1)
+    bound: SolarRequestBound
+
+    @model_validator(mode="after")
+    def _require_current_version(self) -> SolarRequestManifest:
+        if self.schema_version != SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION:
+            raise ValueError("SOLAR request manifest schema_version mismatch")
+        return self
+
+    @classmethod
+    def from_yaml(cls, text: str) -> SolarRequestManifest:
+        """Parse YAML after requiring the exact current schema version."""
+        value = yaml.safe_load(text)
+        if not isinstance(value, Mapping):
+            raise ValueError("SOLAR request manifest must be an object")
+        if value.get("schema_version") != SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION:
+            raise ValueError("SOLAR request manifest schema_version mismatch")
+        return cls.model_validate(value)
+
+
 def write_request_manifest(
     request: AnalysisRequest,
     staging: Path,
@@ -262,47 +343,49 @@ def write_request_manifest(
     formal_bound_kind: str,
 ) -> None:
     """Write the content-addressed analysis contract and authority status."""
-    manifest = {
-        "schema_version": SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
-        "analysis_id": request.analysis_id,
-        "architecture_sha256": architecture_sha256,
-        "reference": {
-            "name": request.reference_name,
-            "sha256": request.reference_sha256,
+    manifest = SolarRequestManifest.model_validate(
+        {
+            "schema_version": SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+            "analysis_id": request.analysis_id,
+            "architecture_sha256": architecture_sha256,
+            "reference": {
+                "name": request.reference_name,
+                "sha256": request.reference_sha256,
+            },
+            "analysis_contract": {
+                "ir_path": request.ir_path.value,
+                "extraction_kind": normalize_extraction_kind(
+                    request.extraction_kind,
+                ).value,
+                "precision": request.precision,
+                "ir_kind": request.ir_kind.value,
+                "trace_seed": request.trace_seed,
+                "verification_seeds": list(request.verification_seeds),
+                "atol": request.atol,
+                "rtol": request.rtol,
+                "required_matched_ratio": request.required_matched_ratio,
+                "max_error_cap": request.max_error_cap,
+                "allow_negative_inf": request.allow_negative_inf,
+                "preserved_input_indices": list(
+                    request.verification.preserved_input_indices,
+                ),
+                "require_orojenesis": request.require_orojenesis,
+            },
+            "sol_score_eligible": bound.kind in SOL_BOUND_KINDS,
+            "publication_eligible": bound.kind == formal_bound_kind,
+            "artifacts": [
+                {"path": artifact.path, "sha256": artifact.sha256}
+                for artifact in artifacts
+            ],
+            "bound": {
+                "seconds": bound.seconds,
+                "kind": bound.kind,
+                "limiting_resource": bound.limiting_resource,
+            },
         },
-        "analysis_contract": {
-            "ir_path": request.ir_path.value,
-            "extraction_kind": normalize_extraction_kind(
-                request.extraction_kind,
-            ).value,
-            "precision": request.precision,
-            "ir_kind": request.ir_kind.value,
-            "trace_seed": request.trace_seed,
-            "verification_seeds": list(request.verification_seeds),
-            "atol": request.atol,
-            "rtol": request.rtol,
-            "required_matched_ratio": request.required_matched_ratio,
-            "max_error_cap": request.max_error_cap,
-            "allow_negative_inf": request.allow_negative_inf,
-            "preserved_input_indices": list(
-                request.verification.preserved_input_indices,
-            ),
-            "require_orojenesis": request.require_orojenesis,
-        },
-        "sol_score_eligible": bound.kind in SOL_BOUND_KINDS,
-        "publication_eligible": bound.kind == formal_bound_kind,
-        "artifacts": [
-            {"path": artifact.path, "sha256": artifact.sha256}
-            for artifact in artifacts
-        ],
-        "bound": {
-            "seconds": bound.seconds,
-            "kind": bound.kind,
-            "limiting_resource": bound.limiting_resource,
-        },
-    }
+    )
     (staging / "manifest.yaml").write_text(
-        yaml.safe_dump(manifest, sort_keys=False),
+        yaml.safe_dump(manifest.model_dump(mode="json"), sort_keys=False),
     )
 
 
@@ -323,6 +406,7 @@ __all__ = [
     "SolBound",
     "SolarAnalysisStatus",
     "SolarReadinessStatus",
+    "SolarRequestManifest",
     "SolarStage",
     "SolarStageStatus",
     "VerificationPolicy",

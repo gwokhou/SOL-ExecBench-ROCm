@@ -6,8 +6,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Literal, TypedDict, cast
 
+from pydantic import ConfigDict, Field
+
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaModel,
+    StrictArtifactModel,
+)
 from sol_execbench.core.dataset.aka_contract import (
     AKAOfficialScoringStatus,
     AKAReleasePolicy,
@@ -20,13 +26,102 @@ from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 from sol_execbench.core.solar_bridge.analyzer import formal_producer_readiness
 
 OFFICIAL_CORPUS_MANIFEST_SHA256 = (
-    "c5a23992728b4f3bbe04108fa5268f9682269832a54135bcaff645fe27bb8c8b"
+    "e932fa4509c18292f3d97b9704a8fc2b77189f46ff11ca95e574e958966d9b0c"
 )
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 _PUBLISHED_RELEASE_BUNDLE = _REPOSITORY_ROOT / "RELEASE" / "release-bundle.json"
 
 
-def official_score_availability(corpus_manifest: str | Path) -> dict[str, Any]:
+class _AvailabilityModel(StrictArtifactModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class OfficialVerifierAvailability(_AvailabilityModel):
+    available: Literal[True]
+    accepts_content_addressed_release_bundle: Literal[True]
+    accepts_caller_authored_inputs: Literal[False]
+    requires_signatures: bool
+    publisher_authentication: Literal["distribution_channel"]
+
+
+class OfficialPolicyAvailability(_AvailabilityModel):
+    authorized: bool
+    reason_code: str
+    manifest_status: str
+    release_policy: str | None
+    baseline_id: str | None
+    required_evidence: list[str]
+
+
+class OfficialProducerAvailability(_AvailabilityModel):
+    ready: bool
+    reason_code: str
+
+
+class PublishedReleaseAvailability(_AvailabilityModel):
+    available: bool
+    reason_code: str
+    path: str | None
+
+
+class OfficialScoreAvailability(CurrentSchemaModel):
+    """Current machine-readable official-score availability report."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    current_schema_version = SCHEMA_VERSIONS["official_score_availability"]
+
+    schema_version: Literal["sol_execbench.official_score_availability.v3"] = (
+        "sol_execbench.official_score_availability.v3"
+    )
+    corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    trusted_corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    verifier: OfficialVerifierAvailability
+    policy: OfficialPolicyAvailability
+    producer: OfficialProducerAvailability
+    published_release: PublishedReleaseAvailability
+
+
+class _VerifierReport(TypedDict):
+    available: bool
+    accepts_content_addressed_release_bundle: bool
+    accepts_caller_authored_inputs: bool
+    requires_signatures: bool
+    publisher_authentication: str
+
+
+class _PolicyReport(TypedDict):
+    authorized: bool
+    reason_code: str
+    manifest_status: str
+    release_policy: str | None
+    baseline_id: str | None
+    required_evidence: list[str]
+
+
+class _ProducerReport(TypedDict):
+    ready: bool
+    reason_code: str
+
+
+class _PublishedReleaseReport(TypedDict):
+    available: bool
+    reason_code: str
+    path: str | None
+
+
+class OfficialScoreAvailabilityReport(TypedDict):
+    schema_version: str
+    corpus_manifest_sha256: str
+    trusted_corpus_manifest_sha256: str
+    verifier: _VerifierReport
+    policy: _PolicyReport
+    producer: _ProducerReport
+    published_release: _PublishedReleaseReport
+
+
+def official_score_availability(
+    corpus_manifest: str | Path,
+) -> OfficialScoreAvailabilityReport:
     """Report verifier, policy, producer, and published-release state separately."""
     corpus = AKACorpusManifest.load(corpus_manifest)
     scoring = corpus.official_scoring
@@ -55,7 +150,7 @@ def official_score_availability(corpus_manifest: str | Path) -> dict[str, Any]:
         policy_reason = "authorized"
     producer_ready, producer_reason = formal_producer_readiness()
     release_published = _PUBLISHED_RELEASE_BUNDLE.is_file()
-    return {
+    report = {
         "schema_version": SCHEMA_VERSIONS["official_score_availability"],
         "corpus_manifest_sha256": observed_manifest_sha256,
         "trusted_corpus_manifest_sha256": OFFICIAL_CORPUS_MANIFEST_SHA256,
@@ -92,6 +187,12 @@ def official_score_availability(corpus_manifest: str | Path) -> dict[str, Any]:
             ),
         },
     }
+    return cast(
+        OfficialScoreAvailabilityReport,
+        OfficialScoreAvailability.model_validate(report).model_dump(
+            mode="json",
+        ),
+    )
 
 
 __all__ = [

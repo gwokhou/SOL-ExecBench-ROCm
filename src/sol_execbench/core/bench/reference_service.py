@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import statistics
 from multiprocessing.connection import Connection
@@ -91,7 +90,7 @@ class ReferenceService:
         validate_problem_contract(self.definition, self.workloads)
         config_path = staging_dir / "config.json"
         self.config = (
-            BenchmarkConfig(**json.loads(config_path.read_text()))
+            BenchmarkConfig.model_validate_json(config_path.read_text())
             if config_path.exists()
             else BenchmarkConfig()
         )

@@ -20,12 +20,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, model_validator
 
 from sol_execbench.core.data.base_model import (
-    BaseModelWithDocstrings,
+    CurrentSchemaModel,
     NonEmptyString,
 )
 from sol_execbench.core.data.definition_axes import (
@@ -53,6 +53,9 @@ from sol_execbench.core.data.definition_reference import (
     validate_reference_inputs_match,
     verify_custom_inputs_entrypoint,
 )
+from sol_execbench.core.integrity.schema_versions import (
+    DEFINITION_SCHEMA_VERSION,
+)
 
 if TYPE_CHECKING:
     import torch
@@ -67,9 +70,14 @@ __all__ = [
 ]
 
 
-class Definition(BaseModelWithDocstrings):
+class Definition(CurrentSchemaModel):
     """Complete definition of a computational workload."""
 
+    current_schema_version = DEFINITION_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.definition.v1"] = (
+        DEFINITION_SCHEMA_VERSION
+    )
     name: NonEmptyString
     """A unique, human-readable name for the kernel definition."""
     op_type: NonEmptyString

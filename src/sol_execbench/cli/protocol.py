@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import click
+from pydantic import ConfigDict, Field
 
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaModel,
+    StrictArtifactModel,
+)
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
 CLI_RESPONSE_SCHEMA_VERSION = SCHEMA_VERSIONS["cli_response"]
@@ -50,15 +55,67 @@ class CliFailure(click.ClickException):
         self.hint = hint
 
 
+class CliArtifact(StrictArtifactModel):
+    """One path returned by a machine-readable CLI response."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    type: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+
+
+class CliError(StrictArtifactModel):
+    """Stable failure details in a CLI response."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: str = Field(min_length=1)
+    message: str
+    details: Any
+    hint: str | None
+
+
+class CliSuccessResponse(CurrentSchemaModel):
+    """Current successful CLI response envelope."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    current_schema_version = CLI_RESPONSE_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.cli_response.v1"] = (
+        "sol_execbench.cli_response.v1"
+    )
+    ok: Literal[True]
+    command: str = Field(min_length=1)
+    data: Any
+    artifacts: list[CliArtifact]
+    warnings: list[str]
+
+
+class CliFailureResponse(CurrentSchemaModel):
+    """Current failed CLI response envelope."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    current_schema_version = CLI_RESPONSE_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.cli_response.v1"] = (
+        "sol_execbench.cli_response.v1"
+    )
+    ok: Literal[False]
+    command: str = Field(min_length=1)
+    error: CliError
+
+
 def artifact(path: Path, artifact_type: str) -> dict[str, Any]:
     """Return a serialized CLI artifact reference."""
-    return {"type": artifact_type, "path": str(path)}
+    return CliArtifact(type=artifact_type, path=str(path)).model_dump(
+        mode="json",
+    )
 
 
 def response_success(command: str, result: CliResult | None) -> dict[str, Any]:
     """Build a successful machine-readable CLI response."""
     result = result or CliResult()
-    return {
+    response = {
         "schema_version": CLI_RESPONSE_SCHEMA_VERSION,
         "ok": True,
         "command": command,
@@ -66,6 +123,7 @@ def response_success(command: str, result: CliResult | None) -> dict[str, Any]:
         "artifacts": list(result.artifacts),
         "warnings": list(result.warnings),
     }
+    return CliSuccessResponse.model_validate(response).model_dump(mode="json")
 
 
 def response_failure(command: str, error: BaseException) -> dict[str, Any]:
@@ -86,7 +144,7 @@ def response_failure(command: str, error: BaseException) -> dict[str, Any]:
         code = "execution_error"
         details = {"exception_type": type(error).__name__}
         hint = None
-    return {
+    response = {
         "schema_version": CLI_RESPONSE_SCHEMA_VERSION,
         "ok": False,
         "command": command,
@@ -97,6 +155,7 @@ def response_failure(command: str, error: BaseException) -> dict[str, Any]:
             "hint": hint,
         },
     }
+    return CliFailureResponse.model_validate(response).model_dump(mode="json")
 
 
 def output_format(ctx: click.Context | None = None) -> str:

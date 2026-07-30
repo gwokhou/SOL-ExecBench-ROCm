@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l3n44_mingpt_block",
   "op_type": "attention",
   "description": "Full MiniGPT transformer block: layernorm -> causal self-attention -> residual -> layernorm -> MLP(new-GELU) -> residual. Derived from AKA torch2hip/kernelbench/level3/l3n44_MiniGPTBlock module_fn.",

@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "rms_norm_triton",
   "definition": "nvidia_Llama-3.3-Nemotron-70B-Select_rms_norm",
   "author": "test",

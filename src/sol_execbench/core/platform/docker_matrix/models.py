@@ -8,7 +8,10 @@ from typing import Any, Literal
 from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.integrity.schema_versions import (
+    DOCKER_PREFLIGHT_SCHEMA_VERSION,
+    SCHEMA_VERSIONS,
+)
 from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityStatus,
     MatrixEntry,
@@ -167,6 +170,7 @@ class DockerPreflightResult(BaseModelWithDocstrings):
         target_payload = entry_payload["target"]
         container_payload = entry_payload["observed"]["container"]
         return {
+            "schema_version": DOCKER_PREFLIGHT_SCHEMA_VERSION,
             "target_id": target_payload["target_id"],
             "validation_scope": target_payload["validation_scope"],
             "image_repository": container_payload["image_repository"],

@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import shutil
 import tempfile
 from contextlib import ExitStack
@@ -75,7 +74,7 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
     console.print(f"[bold]Workloads:[/bold] {len(workloads)}")
     if resolved_inputs.config_file:
         console.print(
-            f"[bold]Config:[/bold]   {json.dumps(dataclasses.asdict(config))}",
+            f"[bold]Config:[/bold]   {config.model_dump_json()}",
         )
 
     staging_dir = Path(tempfile.mkdtemp(prefix="sol_execbench_"))

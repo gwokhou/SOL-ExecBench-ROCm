@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n4_matrix_vector",
   "op_type": "matmul",
   "description": "Matrix-vector product y = A @ B with B a column vector. Derived from AKA torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_.",

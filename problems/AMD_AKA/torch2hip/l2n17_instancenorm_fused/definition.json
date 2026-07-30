@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l2n17_instancenorm_fused",
   "op_type": "norm",
   "description": "Fused conv2d -> instance_norm -> divide. Derived from AKA torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide module_fn.",

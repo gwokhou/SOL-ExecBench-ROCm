@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_positionwise_ffn",
   "op_type": "matmul",
   "description": "Position-wise feedforward block: linear -> ReLU -> linear -> dropout(eval) -> residual -> layer_norm. Derived from AKA torch2hip/gpumode/14044_PositionWiseFeedForward module_fn (eval mode, deterministic).",

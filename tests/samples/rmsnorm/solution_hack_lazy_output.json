@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "rmsnorm_hack_lazy_output",
   "definition": "rmsnorm_h4096",
   "author": "test",

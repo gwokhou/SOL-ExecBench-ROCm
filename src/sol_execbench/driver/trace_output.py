@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import json
-
 from sol_execbench.core.data.trace import Trace
 
 
@@ -16,5 +14,5 @@ def parse_trace_jsonl(stdout: str) -> list[Trace]:
     for raw_line in stdout.splitlines():
         line = raw_line.strip()
         if line.startswith("{"):
-            traces.append(Trace(**json.loads(line)))
+            traces.append(Trace.model_validate_json(line))
     return traces

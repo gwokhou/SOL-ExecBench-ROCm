@@ -7,12 +7,16 @@ from typing import cast
 
 import pytest
 
+from sol_execbench.core.integrity.schema_versions import (
+    SOLAR_WORKER_IPC_SCHEMA_VERSION,
+)
 from sol_execbench.core.solar_bridge import stage_worker, worker
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
     SolarReadinessStatus,
     SolarStageAuditOutcome,
+    SolarWorkerRequest,
 )
 
 
@@ -43,6 +47,7 @@ def _write_request(tmp_path: Path) -> tuple[Path, Path]:
     request.write_text(
         json.dumps(
             {
+                "schema_version": SOLAR_WORKER_IPC_SCHEMA_VERSION,
                 "problem_dir": str(tmp_path / "problem"),
                 "workload_uuid": "workload-1",
                 "output_dir": str(tmp_path / "output"),
@@ -60,6 +65,7 @@ def _write_stage_request(tmp_path: Path) -> tuple[Path, Path]:
     request.write_text(
         json.dumps(
             {
+                "schema_version": SOLAR_WORKER_IPC_SCHEMA_VERSION,
                 "problem_dir": str(tmp_path / "problem"),
                 "workload_uuid": "workload-1",
                 "output_dir": str(tmp_path / "output"),
@@ -68,6 +74,27 @@ def _write_stage_request(tmp_path: Path) -> tuple[Path, Path]:
         ),
     )
     return request, response
+
+
+@pytest.mark.parametrize(
+    "version",
+    [None, "sol_execbench.solar_worker_ipc." + "v999"],
+)
+def test_worker_request_rejects_missing_or_wrong_schema(
+    version: str | None,
+) -> None:
+    payload = {
+        "problem_dir": "problem",
+        "workload_uuid": "workload-1",
+        "output_dir": "output",
+        "device": "hip:0",
+        "orojenesis_home": None,
+    }
+    if version is not None:
+        payload["schema_version"] = version
+
+    with pytest.raises(ValueError, match="schema mismatch"):
+        SolarWorkerRequest.from_dict(payload)
 
 
 def test_analysis_worker_serializes_success(tmp_path, monkeypatch) -> None:
@@ -116,6 +143,7 @@ def test_analysis_worker_converts_exception_to_stable_failure(
         "output_dir": None,
         "publication_eligible": False,
         "reason_code": "bridge_failed",
+        "schema_version": SOLAR_WORKER_IPC_SCHEMA_VERSION,
         "stage": "outer_bridge",
         "status": "failed",
     }

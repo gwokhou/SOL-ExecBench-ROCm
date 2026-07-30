@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "per_token_i8_quant",
   "op_type": "quantization",
   "description": "Dynamic per-token INT8 quantization with FP32 scale.",

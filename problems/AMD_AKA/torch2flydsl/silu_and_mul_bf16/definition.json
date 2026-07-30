@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "silu_and_mul_bf16",
   "op_type": "elementwise",
   "description": "Fused SiLU-and-multiply (SwIGLU): silu(x) * y over the two halves of the last dimension, computed in FP32 then cast to BF16. Derived from AKA torch2flydsl/silu_and_mul_kernel Model.forward (the suite's FlyDSL target is irrelevant here; we lift the PyTorch oracle).",

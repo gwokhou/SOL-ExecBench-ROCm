@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "linear_backward_pytorch",
   "definition": "linear_backward",
   "author": "example",

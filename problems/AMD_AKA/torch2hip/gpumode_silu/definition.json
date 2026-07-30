@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "gpumode_silu",
   "op_type": "elementwise",
   "description": "SiLU activation x * sigmoid(x). Derived from AKA torch2hip/gpumode/16636_SiLU module_fn (silu_fn).",

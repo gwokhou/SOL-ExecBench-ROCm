@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n82_conv_depthwise",
   "op_type": "conv",
   "description": "Depthwise 2D convolution (groups = channels, 3x3 kernel, stride 1, no padding). Derived from AKA torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D.",

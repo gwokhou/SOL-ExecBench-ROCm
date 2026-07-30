@@ -12,11 +12,16 @@ from sol_execbench.core.dataset.aka_tolerance import (
     dtype_default_tolerance,
     workload_contract_sha256,
 )
+from sol_execbench.core.integrity.schema_versions import (
+    DEFINITION_SCHEMA_VERSION,
+    WORKLOAD_SCHEMA_VERSION,
+)
 
 
 def _definition() -> Definition:
     return Definition.model_validate(
         {
+            "schema_version": DEFINITION_SCHEMA_VERSION,
             "name": "two_outputs",
             "op_type": "test",
             "axes": {"N": {"type": "var", "description": "elements"}},
@@ -47,6 +52,7 @@ def _definition() -> Definition:
 def _workload(max_atol: float, max_rtol: float) -> Workload:
     return Workload.model_validate(
         {
+            "schema_version": WORKLOAD_SCHEMA_VERSION,
             "axes": {"N": 8},
             "inputs": {"x": {"type": "random"}},
             "uuid": "calibration-test",

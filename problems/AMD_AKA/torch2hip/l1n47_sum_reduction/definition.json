@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "l1n47_sum_reduction",
   "op_type": "elementwise",
   "description": "Sum reduction over the last dimension with keepdim. Derived from AKA torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension.",

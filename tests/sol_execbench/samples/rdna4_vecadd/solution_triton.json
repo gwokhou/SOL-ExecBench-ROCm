@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.solution.v1",
   "name": "rdna4_vecadd_triton",
   "definition": "rdna4_vecadd_f32",
   "author": "test",

@@ -1,4 +1,5 @@
 {
+  "schema_version": "sol_execbench.definition.v1",
   "name": "rmsnorm_h4096",
   "op_type": "rmsnorm",
   "axes": {
