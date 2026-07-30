@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
-import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -33,35 +32,33 @@ int main() {
 """
 
 
-def test_hipcc_compile_and_run():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        src = os.path.join(tmpdir, "test.hip")
-        exe = os.path.join(tmpdir, "test")
-        with open(src, "w", encoding="utf-8") as f:
-            f.write(HIP_SRC)
+def test_hipcc_compile_and_run(tmp_path: Path) -> None:
+    src = tmp_path / "test.hip"
+    exe = tmp_path / "test"
+    src.write_text(HIP_SRC, encoding="utf-8")
 
-        result = subprocess.run(
-            ["hipcc", src, "-o", exe],
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=120,
-        )
-        assert result.returncode == 0, (
-            f"hipcc compile failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-        )
-        assert os.path.isfile(exe), "Binary was not produced"
+    result = subprocess.run(
+        ["hipcc", src, "-o", exe],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, (
+        f"hipcc compile failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert exe.is_file(), "Binary was not produced"
 
-        result = subprocess.run(
-            [exe],
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=30,
-        )
-        assert result.returncode == 0, (
-            f"Binary exited nonzero:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-        )
-        assert "PASS" in result.stdout, (
-            f"Binary did not produce PASS:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-        )
+    result = subprocess.run(
+        [exe],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, (
+        f"Binary exited nonzero:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert "PASS" in result.stdout, (
+        f"Binary did not produce PASS:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )

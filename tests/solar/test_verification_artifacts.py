@@ -277,7 +277,7 @@ def test_pattern_inputs_cover_float_bool_integer_and_unknown() -> None:
         numerics.pattern_inputs(source, "missing")
 
 
-def test_assert_close_reports_success_and_all_failure_modes() -> None:
+def test_assert_close_reports_success_for_supported_output_shapes() -> None:
     assert numerics.assert_close(torch.ones(2), torch.ones(2), 0, 0) == {
         "max_abs_error": 0.0,
         "matched_ratio": 1.0,
@@ -317,33 +317,105 @@ def test_assert_close_reports_success_and_all_failure_modes() -> None:
     )
     assert numerics.assert_close("x", "x", 0, 0)["max_abs_error"] == 0.0
 
-    cases = [
-        (torch.ones(2), torch.ones(3), "shape mismatch"),
-        (torch.ones(2), torch.ones(2, dtype=torch.float16), "dtype mismatch"),
-        (
-            torch.tensor([1]),
-            torch.tensor([2]),
-            "integer/bool tensor values differ",
+
+@pytest.mark.parametrize(
+    ("actual", "expected", "atol", "max_error_cap", "message"),
+    (
+        pytest.param(
+            torch.ones(2),
+            torch.full((2,), 2.0),
+            0,
+            None,
+            "numerical mismatch",
+            id="outside-tolerance",
         ),
-        (torch.tensor([torch.nan]), torch.tensor([torch.nan]), "non-finite"),
-        (torch.zeros(2), torch.ones(2), "all-zero output"),
-        ((torch.ones(1),), (torch.ones(1), torch.ones(1)), "arity mismatch"),
-        ({"x": 1}, {"y": 1}, "mapping keys differ"),
-        ("x", "y", "non-tensor output mismatch"),
-    ]
-    for actual, expected, message in cases:
-        with pytest.raises(VerificationError, match=message):
-            numerics.assert_close(actual, expected, 0, 0)
-    with pytest.raises(VerificationError, match="numerical mismatch"):
-        numerics.assert_close(torch.ones(2), torch.full((2,), 2.0), 0, 0)
-    with pytest.raises(VerificationError, match="exceeds cap"):
-        numerics.assert_close(
+        pytest.param(
             torch.tensor([1.1]),
             torch.tensor([1.0]),
             1,
+            0.01,
+            "exceeds cap",
+            id="above-error-cap",
+        ),
+    ),
+)
+def test_assert_close_rejects_float_values_outside_policy(
+    actual: torch.Tensor,
+    expected: torch.Tensor,
+    atol: float,
+    max_error_cap: float | None,
+    message: str,
+) -> None:
+    with pytest.raises(VerificationError, match=message):
+        numerics.assert_close(
+            actual,
+            expected,
+            atol,
             0,
-            max_error_cap=0.01,
+            max_error_cap=max_error_cap,
         )
+
+
+@pytest.mark.parametrize(
+    ("actual", "expected", "message"),
+    (
+        pytest.param(
+            torch.ones(2),
+            torch.ones(3),
+            "shape mismatch",
+            id="tensor-shape",
+        ),
+        pytest.param(
+            torch.ones(2),
+            torch.ones(2, dtype=torch.float16),
+            "dtype mismatch",
+            id="tensor-dtype",
+        ),
+        pytest.param(
+            torch.tensor([1]),
+            torch.tensor([2]),
+            "integer/bool tensor values differ",
+            id="integer-values",
+        ),
+        pytest.param(
+            torch.tensor([torch.nan]),
+            torch.tensor([torch.nan]),
+            "non-finite",
+            id="non-finite-values",
+        ),
+        pytest.param(
+            torch.zeros(2),
+            torch.ones(2),
+            "all-zero output",
+            id="all-zero-output",
+        ),
+        pytest.param(
+            (torch.ones(1),),
+            (torch.ones(1), torch.ones(1)),
+            "arity mismatch",
+            id="sequence-arity",
+        ),
+        pytest.param(
+            {"x": 1},
+            {"y": 1},
+            "mapping keys differ",
+            id="mapping-keys",
+        ),
+        pytest.param(
+            "x",
+            "y",
+            "non-tensor output mismatch",
+            id="scalar-value",
+        ),
+    ),
+)
+def test_assert_close_rejects_invalid_values(
+    actual: Any,
+    expected: Any,
+    message: str,
+) -> None:
+    with pytest.raises(VerificationError, match=message):
+        numerics.assert_close(actual, expected, 0, 0)
 
 
 def test_pure_contraction_roundoff_requires_both_results_within_gamma_bound() -> (
@@ -443,6 +515,18 @@ def source_artifact(tmp_path: Path, verification_files):
             "no execution backend identity",
         ),
     ],
+    ids=(
+        "statement-type",
+        "predicate-type",
+        "predicate-status",
+        "workload-name",
+        "workload-parameters",
+        "tolerance",
+        "empty-results",
+        "missing-required-case",
+        "unsupported-device",
+        "unsupported-backend",
+    ),
 )
 def test_replay_rejects_untrusted_artifact_mutations(
     source_artifact,

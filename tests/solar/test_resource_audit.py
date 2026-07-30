@@ -573,6 +573,24 @@ def test_rejects_unreproducible_measurement_evidence(
             "measurement exceeds nominal",
         ),
     ],
+    ids=(
+        "schema-version",
+        "timing-profile",
+        "gfx-target",
+        "clock-lock-state",
+        "instruction-validation-status",
+        "calibration-covered-precisions",
+        "calibration-covered-resource-modes",
+        "measurement-covered-precisions",
+        "measurement-covered-resource-modes",
+        "required-instruction-checks",
+        "native-instruction-evidence",
+        "isa-declaration",
+        "compiler-instruction-count",
+        "compiler-isa-provenance",
+        "runtime-probe-status",
+        "nominal-throughput-bound",
+    ),
 )
 def test_rejects_invalid_audit_contract(tmp_path: Path, mutation, message):
     path = tmp_path / "audit.json"

@@ -639,34 +639,43 @@ class TestCheckOutputShapeDtype:
         assert c.max_absolute_error > 0  # ref_norm
         assert c.max_relative_error > 0
 
-    def test_correctness_error_values_are_json_safe(self):
+    @pytest.mark.parametrize(
+        ("out", "ref"),
+        (
+            pytest.param(
+                torch.tensor([float("nan")]),
+                torch.tensor([1.0]),
+                id="nan-output",
+            ),
+            pytest.param(
+                torch.tensor([float("inf")]),
+                torch.tensor([1.0]),
+                id="positive-inf-output",
+            ),
+            pytest.param(
+                torch.tensor([float("-inf")]),
+                torch.tensor([1.0]),
+                id="negative-inf-output",
+            ),
+            pytest.param(
+                torch.zeros(3),
+                torch.ones(3),
+                id="all-zero-output",
+            ),
+        ),
+    )
+    def test_correctness_error_values_are_json_safe(self, out, ref):
         """All Correctness instances from compute_error_stats have JSON-safe floats."""
         import json
         import math
 
-        cases = [
-            (torch.tensor([float("nan")]), torch.tensor([1.0])),
-            (torch.tensor([float("inf")]), torch.tensor([1.0])),
-            (torch.tensor([float("-inf")]), torch.tensor([1.0])),
-            (torch.zeros(3), torch.ones(3)),
-        ]
-        for out, ref in cases:
-            c, _ = compute_error_stats(out, ref, _spec())
-            assert not math.isnan(c.max_absolute_error), (
-                f"NaN in max_absolute_error for {out}"
-            )
-            assert not math.isnan(c.max_relative_error), (
-                f"NaN in max_relative_error for {out}"
-            )
-            assert not math.isinf(c.max_absolute_error), (
-                f"Inf in max_absolute_error for {out}"
-            )
-            assert not math.isinf(c.max_relative_error), (
-                f"Inf in max_relative_error for {out}"
-            )
-            # Must serialize without allow_nan
-            data = c.model_dump(mode="json")
-            json.dumps(data, allow_nan=False)  # must not raise
+        c, _ = compute_error_stats(out, ref, _spec())
+        assert not math.isnan(c.max_absolute_error)
+        assert not math.isnan(c.max_relative_error)
+        assert not math.isinf(c.max_absolute_error)
+        assert not math.isinf(c.max_relative_error)
+        data = c.model_dump(mode="json")
+        json.dumps(data, allow_nan=False)
 
     def test_compute_error_stats_nan_returns_finite(self):
         """compute_error_stats with NaN output returns finite abs/rel error values."""

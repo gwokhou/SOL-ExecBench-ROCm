@@ -126,7 +126,7 @@ MISC_CASES = (
 @pytest.mark.parametrize(
     "case",
     MATMUL_CASES + CONV_CASES + MISC_CASES,
-    ids=lambda case: f"{case.name}-{case.equation}",
+    ids=lambda case: f"{case.name}-{len(case.inputs)}-inputs-{case.equation}",
 )
 def test_handler_shape_branches_generate_expected_equation(
     case: OperationCase,

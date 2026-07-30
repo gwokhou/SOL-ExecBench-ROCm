@@ -343,17 +343,6 @@ def test_bound_and_reason_code_helpers_fail_closed():
     )
     assert valid.seconds == 0
     assert valid.limiting_resource is None
-    for seconds in (None, -1, float("nan")):
-        with pytest.raises(ValueError, match="finite lower bound"):
-            api._extract_bound(
-                {
-                    "schema_version": 4,
-                    "total": {"lower_bound_seconds": seconds},
-                    "metadata": {
-                        "bound_kind": "capacity_constrained_tile_aware_v1",
-                    },
-                },
-            )
     with pytest.raises(ValueError, match="non-tile-aware"):
         api._extract_bound(
             {
@@ -378,6 +367,27 @@ def test_bound_and_reason_code_helpers_fail_closed():
     assert pipeline.pipeline_reason_code(
         SolarStage.GRAPH_EXTRACTION, RuntimeError()
     ) == ("graph_extraction_failed")
+
+
+@pytest.mark.parametrize(
+    "seconds",
+    (
+        pytest.param(None, id="missing"),
+        pytest.param(-1, id="negative"),
+        pytest.param(float("nan"), id="not-a-number"),
+    ),
+)
+def test_extract_bound_rejects_non_finite_or_negative_seconds(seconds) -> None:
+    with pytest.raises(ValueError, match="finite lower bound"):
+        api._extract_bound(
+            {
+                "schema_version": 4,
+                "total": {"lower_bound_seconds": seconds},
+                "metadata": {
+                    "bound_kind": "capacity_constrained_tile_aware_v1",
+                },
+            },
+        )
 
 
 def test_analysis_request_defaults_to_eq1_roofline_bound():
