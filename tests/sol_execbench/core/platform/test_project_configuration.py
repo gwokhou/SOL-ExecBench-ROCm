@@ -51,6 +51,21 @@ def test_python_support_is_pinned_to_3_12() -> None:
     assert "3.13" not in QUALITY_WORKFLOW.read_text()
 
 
+def test_pytest_configuration_is_strict_and_scoped() -> None:
+    data = tomllib.loads(PYPROJECT.read_text())
+    pytest_config = data["tool"]["pytest"]["ini_options"]
+
+    assert "pytest>=9.1.1" in data["dependency-groups"]["dev"]
+    assert pytest_config["minversion"] == "9.1.1"
+    assert pytest_config["testpaths"] == ["tests"]
+    assert pytest_config["norecursedirs"] == ["data", "out"]
+    assert pytest_config["required_plugins"] == ["pytest-xdist>=3.5"]
+    assert pytest_config["strict_config"] is True
+    assert pytest_config["strict_markers"] is True
+    assert pytest_config["strict_parametrization_ids"] is True
+    assert pytest_config["strict_xfail"] is True
+
+
 def test_quality_workflow_splits_parallel_responsibilities() -> None:
     workflow = _quality_workflow()
     jobs = workflow["jobs"]

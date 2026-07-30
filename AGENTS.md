@@ -1,156 +1,120 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## Layout and Ownership
 
-The package source is under `src/sol_execbench/`: `cli/` contains Click commands,
-`core/` contains models and benchmark logic, and `driver/` contains execution
-backends. Put package tests in `tests/sol_execbench/`, CLI tests beside their
-commands, and example workflow tests in `tests/examples/`. Runnable kernel examples
-live in `examples/`; Docker support is in `docker/`; helper scripts are in
-`scripts/`. Keep downloaded benchmark data and generated outputs in `data/`, not in
-commits.
+Production code lives in `src/sol_execbench/` and `src/solar/`.
+`sol_execbench` owns the Click CLI, benchmark models and logic, platform
+evidence, and execution drivers; `solar` owns graph extraction, IR,
+verification, and formal analysis. Mirror package coverage under
+`tests/sol_execbench/` and `tests/solar/`; keep workflow tests in
+`tests/examples/`. Runnable kernels live in `examples/`, Docker support in
+`docker/`, and maintenance scripts in `scripts/`. Keep downloaded data and
+generated outputs under `data/` and out of commits.
 
-## Reuse and Shared-Primitives Policy
+## Commands and Verification
 
-- Before adding a generic helper, search with `rg` and reuse the existing
-  implementation; do not hand-write duplicates in domains, CLIs, or scripts.
-- Shared helpers belong in `core/` by concern: `integrity`, `process`,
-  `data.json_utils`, `text_utils`, `platform.runtime`, `arguments`, or
-  `timestamps`. Do not create `core.utils` or restore the retired evidence
-  checksum/log modules.
-- `tools/` is only for external-tool integrations. Domain packages must not
-  re-export generic helpers; wrappers require a documented test seam and a
-  focused test. Migrate in-scope duplicates and confirm old imports are gone.
+- Install all dependencies with `uv sync --all-groups`.
+- Run the suite with `uv run pytest tests/`. Never use `-n auto`; the configured
+  maximum of eight workers avoids ROCm memory exhaustion. A focused example is
+  `uv run pytest tests/sol_execbench/test_e2e.py`.
+- Run Python checks with `uv run --with ruff ruff check .`,
+  `uv run --with ruff ruff format .`, and `uv run ty check`.
+- Evaluate one solution with
+  `uv run sol-execbench evaluate <problem_dir> --solution <path>`.
+- Build the ROCm environment with `./scripts/run_docker.sh --build`.
 
-## Build, Test, and Development Commands
+## Architecture and Reuse
 
-- `uv sync --all-groups` installs runtime and development dependencies.
-- `uv run pytest tests/` runs the test suite. Do not add `-n auto`: ROCm workers
-  consume substantial memory; the repository config limits the default to eight.
-- `uv run pytest tests/sol_execbench/test_e2e.py` runs a focused test module.
-- `uv run sol-execbench evaluate <problem_dir> --solution <path>` evaluates one solution.
-- `uv run --with ruff ruff check .` lints, and `uv run --with ruff ruff format .`
-  formats Python files. Run `uv run ty check` for static type checking when relevant.
-- `./scripts/run_docker.sh --build` builds the ROCm evaluation environment.
+- Search with `rg` before adding a generic helper. Shared helpers belong in
+  `core/` by concern: `integrity`, `process`, `data.json_utils`, `text_utils`,
+  `platform.runtime`, `arguments`, or `timestamps`. Do not create `core.utils`
+  or restore retired evidence checksum/log modules.
+- Reserve `tools/` for external integrations. Domain packages must not re-export
+  generic helpers; wrappers need a documented test seam and focused coverage.
+  Migrate in-scope callers and remove obsolete imports.
+- Orchestrators use typed stage inputs and results; parsers own raw JSON
+  validation. Reuse core primitives and write canonical artifacts atomically.
 
-## Coding Style & Naming Conventions
+## Naming and Resources
 
-Target Python 3.12 and follow Ruff's formatting. Use four-space indentation,
-`snake_case` for modules, functions, and variables, and `PascalCase` for classes
-and Pydantic models. Keep focused changes local to the affected subsystem; avoid
-unrelated refactors. Name tests descriptively, for example
-`test_rejects_invalid_solution_schema`.
+Target Python 3.12 and Ruff formatting. Keep changes local to the affected
+subsystem. Import canonical names from their defining modules; alias only for a
+real collision, a clear module role, or conventional third-party spelling such
+as `numpy as np`. Do not create private/self aliases or incidental compatibility
+re-exports; update callers when symbols move.
 
-### Import Aliases
+Keep canonical acronyms fully capitalized in `PascalCase`: `IRBackend`,
+`AKACorpusManifest`, `GPUEvidence`, `ISAInstructionRequirement`,
+`AMDSmiProcess`, and `JSONDict`. Acronyms stay lowercase in `snake_case`;
+use their all-caps form in prose, and preserve official casing such as `ROCm`
+and third-party namespace spelling.
 
-- Import canonical symbol names directly. Do not add aliases solely to make an
-  imported name private or silence lint, such as `GraphIoTotals as
-  _GraphIoTotals`, and never write a self-alias such as `Schema as Schema`.
-- Use an alias only when it resolves a real local name collision, gives a module
-  a clear role-specific name, or follows a conventional third-party spelling
-  such as `numpy as np`. Prefer a qualified module import when many symbols
-  would otherwise need aliases.
-- Import shared types and helpers from their defining module. Public facades may
-  re-export intentionally through `__all__`; do not create incidental
-  compatibility re-exports through aliasing. When moving a symbol, update
-  callers and tests to its canonical owner.
+Store large production HIP or C++ sources as package resources loaded through
+`importlib.resources`, not as Python string literals. Focused test snippets may
+remain inline.
 
-### Acronyms in Identifiers
+## Tests and Hardware
 
-Acronyms are written in ALL-CAPS inside `PascalCase` identifiers, never
-title-cased. Prefer `IRBackend` / `IRKind`, `AKACorpusManifest` /
-`AKACorpusRole`, `GPUEvidence`, `ISAInstructionRequirement`, `AMDSmiProcess`,
-and `JSONDict` — not `IrBackend`, `AkaCorpusManifest`, `GpuEvidence`,
-`IsaInstructionRequirement`, `AmdSmiProcess`, or `JsonDict`. Canonical acronyms
-already in use:
+- Put coverage near the implementation. Use focused unit tests for schema and
+  driver logic, and integration tests for subprocess or GPU behavior.
+- Register markers only in `[tool.pytest.ini_options]` in `pyproject.toml`.
+  Use existing markers such as `requires_rocm`, `cpp`, `requires_rdna4`, and
+  `requires_cdna3`.
+- Parameterize independent scenarios and give non-trivial cases stable semantic
+  IDs; avoid generated or duplicate IDs. Prefer pytest-managed fixtures for
+  temporary files, state, logging, and output capture.
+- Hardware tests must declare every prerequisite and skip only for the precise
+  missing capability. Do not hide source regressions behind broad `xfail` or
+  skip rules.
+- A pytest upgrade must atomically update the development dependency,
+  `minversion`, `uv.lock`, configuration contract tests, and newly enabled
+  strictness fixes.
 
-| Acronym | Identifier examples                         | Module / file name      |
-|---------|---------------------------------------------|-------------------------|
-| IR      | `IRBackend`, `IRKind`, `IRGraphArtifact`    | `ir/`                   |
-| AKA     | `AKACorpusManifest`, `AKACorpusRole`        | `aka_contract.py`       |
-| GPU     | `GPUEvidence`, `GPULockVerificationError`   | `gpu_lock.py`           |
-| ISA     | `ISABudget`, `ISAInstructionRequirement`    | `isa_validation.py`, `amd_isa/` |
-| AMD     | `AMDSmiProcess`, `AMDSmiGpuIdentity`        | `amd_smi.py`, `amd_isa/`|
-| JSON    | `JSONDict`, `JSONSchema`                    | `json_utils`            |
+## Schemas and Public Contracts
 
-In `snake_case` names (modules, functions, variables, constants) the acronym
-stays lowercase, matching the module name: `DEFAULT_IR_KIND`, `json_dict()`,
-`ir_backend()`. Docstrings, comments, and prose use the full all-caps form
-("SOLAR IR", "AMD AgentKernelArena (AKA)"). Brand names keep their official
-casing (`ROCm`, not `ROCM` or `Rocm`), and third-party namespace symbols keep
-their original casing (for example `amdisa::IsaDecoder`). When introducing a
-new acronym-typed identifier, apply this table rather than coining a fresh
-title-case spelling.
+- Each schema family has exactly one current version in its canonical registry.
+  Every reader must require and exactly match it before parsing business fields;
+  diagnostic and test paths may not bypass the check.
+- Change producers, artifacts, tests, and docs atomically, then delete
+  superseded models, readers, migrations, aliases, fixtures, and prose. Git
+  history is the archive.
+- Audit string IDs, numeric versions, versioned resources/prose, and
+  multi-version acceptance. Raw numeric schema versions are allowed only in
+  canonical registries and registered artifacts.
+- Breaking public changes are allowed only when the CLI contract, docs,
+  examples, and tests change together and superseded paths are removed.
+  User-facing errors need a stable code, actionable hint, and no credential
+  leakage.
 
-In production code, do not embed large HIP or C++ source files directly in
-Python string literals. Store them as package resources and load them through
-`importlib.resources`. Tests may embed source snippets or fixtures directly when
-that keeps the test focused and readable.
+## Quality and Process Safety
 
-## Testing Guidelines
-
-Use Pytest and place coverage near the implementation. Mark environment-specific
-tests with existing markers such as `requires_rocm`, `cpp`, `requires_rdna4`, or
-`requires_cdna3`; these document required hardware and allow safe skipping. Prefer
-small unit tests for schemas and driver logic, adding integration coverage for
-subprocess or GPU execution changes.
-
-## Schema Lifecycle
-
-- Each schema family has exactly one current version in the canonical version
-  registry; string and numeric versions follow the same rule.
-- Every reader requires and exactly matches that version before parsing business
-  fields. Relaxed, diagnostic, and test paths must not bypass version checks.
-- A schema change updates producers, checked-in artifacts, tests, and docs
-  atomically, then deletes superseded models, readers, migrations, aliases,
-  fixtures, and version-specific prose. Git history is the only archive.
-- Schema audits cover string IDs, numeric versions, versioned prose/resources,
-  and multi-version acceptance logic. Raw numeric schema literals are forbidden
-  outside canonical registries and registered artifacts.
-
-## Quality Regression Guardrails
-
-- For Python changes, run the relevant subset of Ruff, `ty check`, readability,
-  coupling, and Pytest; CI runs all four static gates. Keep their limits in one
-  policy source, and never raise a quality baseline to accept new debt.
-- Lint exclusions are root-scoped: exclude downloaded `data/` and root
-  `examples/` only, never `core/data` or `tests/examples` by name.
+- For Python changes, run the relevant Ruff, `ty`, coupling, readability, and
+  Pytest checks. Keep limits in their canonical policy source and never raise a
+  baseline to admit new debt.
+- Lint exclusions are root-scoped: exclude root `data/` and `examples/`, never
+  `core/data` or `tests/examples` by name.
 - Do not add production functions over 80 lines or 10 parameters, or test files
-  over 1000 lines. Split touched violations unless fixing correctness urgently.
-- Orchestrators use typed stage inputs/results; parsers own raw JSON validation.
-  Reuse core primitives; write canonical artifacts atomically.
-- Subprocesses need bounded, redacted output, timeouts, and process-group cleanup.
-  Hardware tests declare all prerequisites and precisely skip when unavailable;
-  never hide source regressions behind broad `xfail` or skips.
-- Breaking public changes are allowed, but update the CLI contract, user docs,
-  examples, and tests together; remove superseded paths. User-facing errors need
-  a stable code, actionable hint, and no leaked credentials.
+  over 1000 lines. Split touched violations unless correctness is urgent.
+- Subprocesses require bounded and redacted output, timeouts, and process-group
+  cleanup.
 
-## Commit & Pull Request Guidelines
-
-Use concise imperative commit summaries and sign commits with DCO, for example:
-`git commit -s -m "Fix trace parsing"`. Keep PRs focused; describe behavior
-changes and list tests and any ROCm hardware checks performed.
-
-## Security & Configuration
+## Security and GPU Execution
 
 Never commit tokens, proprietary kernels, datasets, caches, or benchmark output.
-GPU evaluation requires ROCm-capable AMD hardware and may need `/dev/kfd` and
-`/dev/dri` access; document architecture-specific assumptions in tests or PR notes.
+Document architecture assumptions in tests or PR notes.
 
-## Container Permission Handling
+If a required container operation fails only because of sandbox, cache, or
+filesystem permissions, request scoped escalation and retry the same operation;
+do not classify the permission failure as a benchmark or calibration failure.
+Sandboxes may incompletely expose `/dev/kfd` or hide `/dev/dri/renderD*`. For
+GPU enumeration, compilation, execution, profiling, tracing, or calibration,
+retry the exact bounded command with scoped host access before declaring a
+device, architecture, counter, driver, compiler, or runtime unsupported. Write
+evidence only to approved temporary/output locations. Do not use service-manager
+or sandbox-escape wrappers instead of approval.
 
-When a required container operation fails solely because of sandbox, cache, or
-filesystem permissions, request the necessary escalation from the user and retry
-the same scoped operation. Do not treat that permission failure as a benchmark,
-calibration, or implementation failure.
+## Commits and Pull Requests
 
-For any GPU-related operation (enumeration, compilation, execution, profiling,
-tracing, or calibration), a sandbox may expose `/dev/kfd` incompletely or hide
-`/dev/dri/renderD*` and other required runtime resources. Before concluding that
-a GPU, architecture, counter, driver, compiler, or runtime feature is
-unsupported or broken, request narrowly scoped host execution for the exact
-failing command and retry it there. Keep the command bounded (single workload or
-explicit limit), write generated evidence only to an approved temporary/output
-directory, and do not use service-manager or other sandbox-escape wrappers as a
-substitute for that approval.
+Use concise imperative summaries and DCO-sign commits, for example
+`git commit -s -m "Fix trace parsing"`. Keep PRs focused and report tests plus
+any ROCm hardware checks.

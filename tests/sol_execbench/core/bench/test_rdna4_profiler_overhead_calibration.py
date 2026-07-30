@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any, cast
 
@@ -142,15 +141,14 @@ class TestReadOverheadCalibration:
         payload.update(overrides)
         return payload
 
-    def test_reads_valid_calibration(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            cal_path = Path(tmpdir) / "cal.json"
-            cal_path.write_text(
-                json.dumps(self._payload()) + "\n",
-                encoding="utf-8",
-            )
-            result = read_overhead_calibration(cal_path)
-            assert result == 0.023
+    def test_reads_valid_calibration(self, tmp_path: Path):
+        cal_path = tmp_path / "cal.json"
+        cal_path.write_text(
+            json.dumps(self._payload()) + "\n",
+            encoding="utf-8",
+        )
+        result = read_overhead_calibration(cal_path)
+        assert result == 0.023
 
     def test_returns_none_for_missing_file(self):
         result = read_overhead_calibration(Path("/nonexistent/file.json"))
@@ -160,22 +158,20 @@ class TestReadOverheadCalibration:
         result = read_overhead_calibration(None)
         assert result is None
 
-    def test_returns_none_for_invalid_json(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            cal_path = Path(tmpdir) / "cal.json"
-            cal_path.write_text("not json", encoding="utf-8")
-            result = read_overhead_calibration(cal_path)
-            assert result is None
+    def test_returns_none_for_invalid_json(self, tmp_path: Path):
+        cal_path = tmp_path / "cal.json"
+        cal_path.write_text("not json", encoding="utf-8")
+        result = read_overhead_calibration(cal_path)
+        assert result is None
 
-    def test_returns_none_for_unsupported_schema(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            cal_path = Path(tmpdir) / "cal.json"
-            cal_path.write_text(
-                json.dumps({"schema_version": "unsupported"}) + "\n",
-                encoding="utf-8",
-            )
-            result = read_overhead_calibration(cal_path)
-            assert result is None
+    def test_returns_none_for_unsupported_schema(self, tmp_path: Path):
+        cal_path = tmp_path / "cal.json"
+        cal_path.write_text(
+            json.dumps({"schema_version": "unsupported"}) + "\n",
+            encoding="utf-8",
+        )
+        result = read_overhead_calibration(cal_path)
+        assert result is None
 
     def test_rejects_architecture_mismatch(self, tmp_path):
         cal_path = tmp_path / "cal.json"

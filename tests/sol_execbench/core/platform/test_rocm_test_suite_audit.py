@@ -70,6 +70,14 @@ def test_pytest_markers_describe_rocm_hardware_semantics():
     ]
     for phrase in expected:
         assert phrase in pyproject
+    assert not any(
+        isinstance(node, ast.Call)
+        and _attr_path(node.func).endswith(".addinivalue_line")
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == "markers"
+        for node in ast.walk(ast.parse(conftest))
+    ), "custom markers must have one registry in pyproject.toml"
 
     marker_logic = [
         "ROCm device nodes unavailable in current execution environment",

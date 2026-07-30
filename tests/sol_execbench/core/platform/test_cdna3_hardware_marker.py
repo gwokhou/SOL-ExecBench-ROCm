@@ -24,12 +24,6 @@ def _skip_reasons(item: Any) -> list[str]:
 
 
 class _FakeConfig:
-    def __init__(self) -> None:
-        self.registered_markers: list[str] = []
-
-    def addinivalue_line(self, _name: str, line: str) -> None:
-        self.registered_markers.append(line)
-
     def getoption(self, _name: str, default: str = "") -> str:
         return default
 
@@ -69,16 +63,12 @@ def test_real_gpu_markers_share_one_xdist_group(marker_name: str) -> None:
     assert item.added_markers[-1].mark.args == ("real_rocm_gpu",)
 
 
-def test_cdna3_marker_is_registered_with_concrete_hardware_semantics() -> None:
-    conftest = _test_conftest()
-    config = _FakeConfig()
-
-    conftest.pytest_configure(config)
-
-    assert any(
-        marker
-        == "requires_cdna3: test requires an AMD CDNA 3 GPU, such as gfx942"
-        for marker in config.registered_markers
+def test_cdna3_marker_is_registered_with_concrete_hardware_semantics(
+    pytestconfig: pytest.Config,
+) -> None:
+    assert (
+        "requires_cdna3: test requires an AMD CDNA 3 GPU, such as gfx942"
+        in pytestconfig.getini("markers")
     )
 
 

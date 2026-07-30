@@ -54,13 +54,21 @@ packages = ["src/sol_execbench", "src/solar"]
 dev = [
     "coverage[toml]>=7.10",
     "pre-commit>=4.6.0",
-    "pytest>=9.0.2",
+    "pytest>=9.1.1",
     "pytest-xdist>=3.5",
     "ruff>=0.16.0,<0.17.0",
     "ty>=0.0.64,<0.0.65",
 ]
 
 [tool.pytest.ini_options]
+minversion = "9.1.1"
+testpaths = ["tests"]
+norecursedirs = ["data", "out"]
+required_plugins = ["pytest-xdist>=3.5"]
+strict_config = true
+strict_markers = true
+strict_parametrization_ids = true
+strict_xfail = true
 # DO NOT use `-n auto`: each worker loads PyTorch+ROCm (~1.5 GB), so on a 32-core
 # machine `auto` spawns ~32 workers that exhaust 30 GB RAM and trigger OOM killer.
 # Keep worker count ≤8 to stay within memory budget.
@@ -74,11 +82,14 @@ markers = [
     "requires_rocm_dev: test requires ROCm native extension development headers",
     "requires_triton_rocm: test requires the triton-rocm Python package",
     "requires_safetensors_torch: test requires safetensors.torch support",
+    "requires_ck: test requires Composable Kernel headers",
+    "requires_rocwmma: test requires rocWMMA headers",
     "requires_miopen: test requires MIOpen headers",
     "docker_dependency: test verifies dependencies expected inside the Docker ROCm environment",
     "subprocess_uv: test launches uv-managed subprocesses and may need build-system dependencies cached",
     "native_extension: test loads native extension modules such as torch or safetensors",
     "native_extension_serial: native extension test skipped by default; run with: pytest tests -m native_extension_serial -n 0",
+    "timing_serial: GPU timing tests skipped by default; run with: pytest tests -m timing_serial -n 0",
     "requires_rdna4: test requires the validated AMD gfx1200 RDNA 4 target",
     "requires_cdna3: test requires an AMD CDNA 3 GPU, such as gfx942",
     "requires_network: test fetches a pinned external resource and is opt-in",
