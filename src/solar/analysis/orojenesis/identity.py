@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from solar.analysis.orojenesis.errors import OrojenesisError
+from solar.schema_versions import OROJENESIS_PROVENANCE_SCHEMA_VERSION
 from solar.types import DynamicValue
 
 
@@ -16,7 +17,6 @@ from solar.types import DynamicValue
 class OrojenesisIdentityPolicy:
     """Expected source, artifact, and reproducible-build identities."""
 
-    schema_version: int
     repository: str
     commit: str
     tree_oid: str
@@ -72,6 +72,8 @@ def _load_provenance(path: Path) -> dict[str, DynamicValue]:
         raise OrojenesisError("cannot parse Orojenesis provenance") from exc
     if not isinstance(provenance, dict):
         raise OrojenesisError("Orojenesis provenance must be an object")
+    if provenance.get("schema_version") != OROJENESIS_PROVENANCE_SCHEMA_VERSION:
+        raise OrojenesisError("unsupported Orojenesis provenance schema")
     return provenance
 
 

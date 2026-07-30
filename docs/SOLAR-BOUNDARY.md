@@ -33,7 +33,7 @@ public `solar.api` types (`AnalysisResult`, `AnalysisFailure`, `ArtifactRef`,
 
 Formal conversion is offline and fail-closed. Graph extraction is a declared
 `ExtractionKind`: `torchview_v1` uses the reviewed Torchview extractor and
-`make_fx_reference_v1` uses `make_fx`. Both emit operator-graph schema v1 with
+`make_fx_reference_v1` uses `make_fx`. Both emit operator-graph schema v2 with
 exact source argument indices, tensor metadata, effects, and outputs. The
 requested `IRKind` remains a separate choice. Conversion validates recorded
 extraction provenance and rejects unsupported extractor/IR pairings before

@@ -42,7 +42,7 @@ def _sidecar(**overrides) -> DecisionSidecar:
     return sidecar
 
 
-def test_schema_version_is_v1():
+def test_schema_version_is_current():
     assert DECISION_SCHEMA_VERSION == "sol_execbench.decision.v2"
 
 

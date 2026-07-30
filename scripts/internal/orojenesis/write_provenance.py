@@ -14,6 +14,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from solar.schema_versions import OROJENESIS_PROVENANCE_SCHEMA_VERSION
+
 
 def _sha256(path: Path) -> str:
     with path.open("rb") as handle:
@@ -86,7 +88,7 @@ def main() -> int:
     if observed != expected:
         raise ValueError(f"Orojenesis source identity mismatch: {observed}")
     payload = {
-        "schema_version": 1,
+        "schema_version": OROJENESIS_PROVENANCE_SCHEMA_VERSION,
         "source": {
             "repository": "https://github.com/NVlabs/timeloop.git",
             "commit": observed["commit"],

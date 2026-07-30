@@ -1,7 +1,6 @@
 """Pinned Orojenesis toolchain and composition configuration."""
 
 from solar.analysis.orojenesis.identity import OrojenesisIdentityPolicy
-from solar.schema_versions import OROJENESIS_IDENTITY_SCHEMA_VERSION
 
 OROJENESIS_COMMIT = "97d52178bf9a9c209bf79be96b87c164bcd35625"
 OROJENESIS_REPOSITORY = "https://github.com/NVlabs/timeloop.git"
@@ -37,7 +36,6 @@ MULTI_EINSUM_BATCH_COMPOSITION = "broadcast_batch_linear_tile_shape_v1"
 MULTI_EINSUM_FANOUT_COMPOSITION = "matmul_fanout_tree_tile_shape_v1"
 
 IDENTITY_POLICY = OrojenesisIdentityPolicy(
-    schema_version=OROJENESIS_IDENTITY_SCHEMA_VERSION,
     repository=OROJENESIS_REPOSITORY,
     commit=OROJENESIS_COMMIT,
     tree_oid=OROJENESIS_TREE_OID,

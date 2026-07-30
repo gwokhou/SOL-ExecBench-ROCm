@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from solar.analysis.operand_provenance import (
 from solar.ir.extended_einsum.conversion import (
     validate_extended_einsum_graph,
 )
+from solar.schema_versions import EXTENDED_EINSUM_IR_SCHEMA_VERSION
 
 
 def _start(output_name: str = "start.Output", dtype: str = "torch.float32"):
@@ -55,23 +57,32 @@ def _operation(
     }
 
 
+def _reject_partial_graph(graph: Mapping[str, Any]) -> None:
+    del graph
+    raise ValueError("partial accounting fixture")
+
+
 def _analyze(
     tmp_path: Path,
     layers: dict[str, Any],
     *,
     strict: bool = False,
-    schema_version: int = 3,
+    schema_version: int = EXTENDED_EINSUM_IR_SCHEMA_VERSION,
     outputs: list[str] | None = None,
 ):
     graph_path = tmp_path / "einsum_graph.yaml"
-    graph = {"schema_version": schema_version, "layers": layers}
+    graph = {
+        "schema_version": schema_version,
+        "ir_kind": "extended_einsum",
+        "layers": layers,
+    }
     if outputs is not None:
         graph["outputs"] = outputs
     graph_path.write_text(
         yaml.safe_dump(graph),
     )
     output_dir = tmp_path / "analysis"
-    result = IRGraphAnalyzer().analyze_graph(
+    result = IRGraphAnalyzer(validator=_reject_partial_graph).analyze_graph(
         graph_path,
         output_dir,
         copy_graph=False,
@@ -218,6 +229,18 @@ def test_ir_lifecycle_rejects_unsupported_schema() -> None:
                 "ir_kind": "extended_einsum",
                 "layers": {"start": _start()},
             },
+        )
+
+
+def test_analysis_rejects_non_current_ir_schema_in_relaxed_mode(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="current schema_version=6"):
+        _analyze(
+            tmp_path,
+            {"start": _start()},
+            schema_version=0,
+            strict=False,
         )
 
 

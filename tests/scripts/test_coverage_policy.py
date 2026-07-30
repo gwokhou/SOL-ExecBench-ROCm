@@ -31,12 +31,22 @@ def _entry(
 
 def _policy() -> dict[str, object]:
     return {
+        "schema_version": coverage_policy.COVERAGE_POLICY_SCHEMA_VERSION,
         "package": "example",
         "global": {"line": 70.0, "branch": 55.0},
         "files": {
             "src/example/critical.py": {"line": 80.0, "branch": 65.0},
         },
     }
+
+
+def test_rejects_non_current_policy_schema() -> None:
+    policy = _policy()
+    policy["schema_version"] = 0
+
+    assert coverage_policy.check_report({"files": {}}, policy) == [
+        "coverage policy must use current schema_version=1",
+    ]
 
 
 def test_accepts_package_and_critical_file_above_floors() -> None:

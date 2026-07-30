@@ -51,6 +51,82 @@ def test_accepts_current_solar_schema_identifier():
     }
 
 
+def test_accepts_current_numeric_schema_prose():
+    findings, _ = audit_text(
+        Path("guide.md"),
+        "Both emit operator-graph schema v2.",
+    )
+
+    assert findings == []
+
+
+def test_rejects_retired_numeric_schema_prose():
+    retired = "operator-graph schema " + "v1"
+
+    findings, _ = audit_text(Path("guide.md"), retired)
+
+    assert findings == [
+        "guide.md: unsupported operator_graph schema version 1; current is 2",
+    ]
+
+
+def test_rejects_non_current_tracked_numeric_artifact():
+    findings, _ = audit_text(
+        Path("problems/AMD_AKA/manifest.yaml"),
+        "schema_version: 5\n",
+    )
+
+    assert findings == [
+        (
+            "problems/AMD_AKA/manifest.yaml: aka_corpus_manifest must contain "
+            "only schema version 6"
+        ),
+    ]
+
+
+def test_rejects_unregistered_numeric_schema_artifact():
+    findings, _ = audit_text(
+        Path("config/new-policy.yaml"),
+        "schema_version: 1\n",
+    )
+
+    assert findings == [
+        "config/new-policy.yaml: unregistered numeric schema artifact",
+    ]
+
+
+def test_rejects_raw_numeric_schema_in_production_python():
+    findings, _ = audit_text(
+        Path("src/example.py"),
+        'payload = {"schema_version": 2}\n',
+    )
+
+    assert findings == [
+        (
+            "src/example.py:1: raw numeric schema version must use the "
+            "current family constant"
+        ),
+    ]
+
+
+def test_rejects_raw_numeric_schema_in_all_python_contract_positions():
+    samples = (
+        "def load(schema_version: int = 2):\n    return schema_version\n",
+        "load(schema_version=2)\n",
+        'if payload.get("schema_version") != 2:\n    raise ValueError\n',
+        'payload["schema_version"] = 2\n',
+    )
+
+    for content in samples:
+        findings, _ = audit_text(Path("src/example.py"), content)
+        assert findings == [
+            (
+                "src/example.py:1: raw numeric schema version must use the "
+                "current family constant"
+            ),
+        ]
+
+
 def test_rejects_retired_solar_schema_identifier():
     retired = "solar.verification.ir." + "v1"
 
@@ -78,3 +154,15 @@ def test_upstream_tolerance_name_is_rejected_everywhere():
     assert findings == [
         "public.json: upstream tolerance name escaped the import boundary",
     ]
+
+
+def test_retired_workload_schema_migrator_stays_removed():
+    assert (
+        Path(
+            "scripts/internal/migrate_workload_checks.py",
+        )
+        in MODULE.RETIRED_SCHEMA_PATHS
+    )
+    assert not (
+        MODULE.ROOT / "scripts/internal/migrate_workload_checks.py"
+    ).exists()
