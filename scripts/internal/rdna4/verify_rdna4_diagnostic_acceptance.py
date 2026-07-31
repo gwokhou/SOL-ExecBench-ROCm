@@ -11,8 +11,7 @@ import json
 from pathlib import Path
 
 from sol_execbench.cli.protocol import (
-    EXIT_EXECUTION,
-    EXIT_RESULT_FAILED,
+    CliExitCode,
     CliResult,
     artifact,
     response_failure,
@@ -46,7 +45,9 @@ def main() -> int:
     )
     result = evaluate_diagnostic_acceptance(manifest)
     atomic_write_json_value(arguments.output, result.model_dump(mode="json"))
-    exit_code = 0 if result.accepted else EXIT_RESULT_FAILED
+    exit_code = (
+        CliExitCode.SUCCESS if result.accepted else CliExitCode.RESULT_FAILED
+    )
     response = response_success(
         COMMAND_NAME,
         CliResult(
@@ -66,7 +67,7 @@ def _entrypoint() -> int:
         return main()
     except Exception as error:  # noqa: BLE001 -- standalone JSON boundary
         print(json.dumps(response_failure(COMMAND_NAME, error), sort_keys=True))
-        return EXIT_EXECUTION
+        return CliExitCode.EXECUTION
 
 
 if __name__ == "__main__":

@@ -9,7 +9,10 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    CurrentSchemaModel,
+)
 from sol_execbench.core.platform.compatibility_enums import (
     MATRIX_MODEL_CONFIG,
     ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
@@ -46,10 +49,11 @@ class MatrixClaimBoundary(BaseModelWithDocstrings):
     """Whether real hardware evidence for the intended architecture is present."""
 
 
-class MatrixEntry(BaseModelWithDocstrings):
+class MatrixEntry(CurrentSchemaModel):
     """Strict diagnostic compatibility Matrix Entry."""
 
     model_config = MATRIX_MODEL_CONFIG
+    current_schema_version = ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.rocm_compatibility_matrix.v1"] = (
         ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
@@ -216,10 +220,11 @@ class MatrixExecutionDecision(BaseModelWithDocstrings):
     """Whether the decision permits a clean native-host claim."""
 
 
-class RocmCompatibilityMatrixReport(BaseModelWithDocstrings):
+class RocmCompatibilityMatrixReport(CurrentSchemaModel):
     """Aggregate ROCm compatibility matrix report."""
 
     model_config = MATRIX_MODEL_CONFIG
+    current_schema_version = ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.rocm_compatibility_matrix.v1"] = (
         ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION

@@ -17,8 +17,8 @@ from enum import StrEnum
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
+    CurrentDiagnosticSidecarEnvelope,
     DiagnosticArtifactCitation,
-    DiagnosticSidecarEnvelope,
     DiagnosticSidecarStatus,
     DiagnosticSourceRef,
     ExtendedDiagnosticIdentity,
@@ -132,10 +132,11 @@ class DecisionSummary(BaseModelWithDocstrings):
     """Counts per bottleneck class label."""
 
 
-class DecisionSidecar(DiagnosticSidecarEnvelope):
+class DecisionSidecar(CurrentDiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for Layer R optimization hints."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = DECISION_SCHEMA_VERSION
 
     schema_version: DecisionSchemaVersion = DECISION_SCHEMA_VERSION
     status: DiagnosticSidecarStatus

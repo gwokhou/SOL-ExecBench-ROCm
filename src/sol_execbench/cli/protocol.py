@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import IntEnum
 from pathlib import Path
 from typing import Any, Literal
 
@@ -13,16 +14,19 @@ from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     StrictArtifactModel,
 )
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.integrity.schema_versions import (
+    CLI_RESPONSE_SCHEMA_VERSION,
+)
 
-CLI_RESPONSE_SCHEMA_VERSION = SCHEMA_VERSIONS["cli_response"]
-CLI_CONTRACT_SCHEMA_VERSION = SCHEMA_VERSIONS["cli_contract"]
 
-EXIT_SUCCESS = 0
-EXIT_RESULT_FAILED = 1
-EXIT_INPUT = 2
-EXIT_UNAVAILABLE = 3
-EXIT_EXECUTION = 4
+class CliExitCode(IntEnum):
+    """Stable process exit codes for the command-line protocol."""
+
+    SUCCESS = 0
+    RESULT_FAILED = 1
+    INPUT = 2
+    UNAVAILABLE = 3
+    EXECUTION = 4
 
 
 @dataclass(frozen=True)
@@ -32,7 +36,7 @@ class CliResult:
     data: Any = field(default_factory=dict)
     artifacts: tuple[dict[str, Any], ...] = ()
     warnings: tuple[str, ...] = ()
-    exit_code: int = EXIT_SUCCESS
+    exit_code: CliExitCode = CliExitCode.SUCCESS
 
 
 class CliFailure(click.ClickException):
@@ -43,14 +47,14 @@ class CliFailure(click.ClickException):
         message: str,
         *,
         code: str = "input_error",
-        exit_code: int = EXIT_INPUT,
+        exit_code: CliExitCode = CliExitCode.INPUT,
         details: Any = None,
         hint: str | None = None,
     ) -> None:
         """Initialize a classified user-facing CLI failure."""
         super().__init__(message)
         self.code = code
-        self.cli_exit_code = exit_code
+        self.cli_exit_code = CliExitCode(exit_code)
         self.details = {} if details is None else details
         self.hint = hint
 

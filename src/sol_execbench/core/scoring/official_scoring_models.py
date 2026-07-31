@@ -13,7 +13,9 @@ from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     StrictArtifactModel,
 )
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.integrity.schema_versions import (
+    OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION,
+)
 
 
 class _AvailabilityModel(StrictArtifactModel):
@@ -52,7 +54,7 @@ class OfficialScoreAvailability(CurrentSchemaModel):
     """Current machine-readable official-score availability report."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
-    current_schema_version = SCHEMA_VERSIONS["official_score_availability"]
+    current_schema_version = OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.official_score_availability.v3"] = (
         "sol_execbench.official_score_availability.v3"

@@ -8,6 +8,7 @@ from __future__ import annotations
 import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
@@ -80,12 +81,10 @@ class _ExtractorContext:
 
 def _memoize_which(which: Which) -> Which:
     """Cache ``which(binary)`` lookups; tool paths are invariant across a run."""
-    cache: dict[str, str | None] = {}
 
+    @cache
     def resolved(binary: str) -> str | None:
-        if binary not in cache:
-            cache[binary] = which(binary)
-        return cache[binary]
+        return which(binary)
 
     return resolved
 
@@ -97,16 +96,20 @@ def _memoize_probe_runner(runner: ProbeRunner | None) -> ProbeRunner:
     artifacts in one run, so memoizing it avoids N redundant subprocess spawns
     when the extractor loop routes the same tool per artifact.
     """
-    cache: dict[tuple[str, ...], ProbeCompletedProcess] = {}
+    effective_runner = runner or run_bounded_probe
+
+    @cache
+    def cached(
+        command: tuple[str, ...],
+        timeout_seconds: float,
+    ) -> ProbeCompletedProcess:
+        return effective_runner(list(command), timeout_seconds)
 
     def resolved(
         command: list[str],
         timeout_seconds: float,
     ) -> ProbeCompletedProcess:
-        key = tuple(command)
-        if key not in cache:
-            cache[key] = (runner or run_bounded_probe)(command, timeout_seconds)
-        return cache[key]
+        return cached(tuple(command), timeout_seconds)
 
     return resolved
 

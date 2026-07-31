@@ -4,6 +4,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticConfidence,
     SizedDiagnosticArtifactCitation,
 )
 from sol_execbench.core.bench.profile_summary import (
@@ -17,7 +18,6 @@ from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryBottleneckHint,
     ProfileSummaryContent,
     ProfileSummaryHintCategory,
-    ProfileSummaryHintConfidence,
     ProfileSummaryHintSeverity,
     ProfileSummaryKernelMetric,
     ProfileSummaryMetric,
@@ -129,7 +129,7 @@ def test_profile_summary_hint_uses_closed_enums() -> None:
     hint = ProfileSummaryBottleneckHint(
         category=ProfileSummaryHintCategory.COMPUTE_BOUND,
         severity=ProfileSummaryHintSeverity.MEDIUM,
-        confidence=ProfileSummaryHintConfidence.HIGH,
+        confidence=DiagnosticConfidence.HIGH,
         message="runtime evidence",
     )
 

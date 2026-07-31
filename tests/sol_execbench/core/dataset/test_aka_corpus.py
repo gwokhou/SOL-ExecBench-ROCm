@@ -37,6 +37,9 @@ from sol_execbench.core.dataset.aka_corpus import (
     SEED_SET_MIN_PROBLEMS,
     AKACorpusManifest,
 )
+from sol_execbench.core.integrity.schema_versions import (
+    AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
+)
 from sol_execbench.core.platform.runtime import RocmDeviceInfo
 from sol_execbench.core.scoring.official_scoring import (
     official_score_availability,
@@ -56,6 +59,13 @@ TEST_TARGET = materialization_target(
         hip_version="test",
     ),
 )
+
+
+def test_manifest_header_rejects_coerced_schema_version() -> None:
+    with pytest.raises(ValueError, match="must use schema_version"):
+        aka_corpus._validate_manifest_header(
+            {"schema_version": str(AKA_CORPUS_MANIFEST_SCHEMA_VERSION)},
+        )
 
 
 def _passing_probe(problem_dir, _row_index, workload, _target, _timeout):

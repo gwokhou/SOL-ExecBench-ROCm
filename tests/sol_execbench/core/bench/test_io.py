@@ -23,8 +23,7 @@ from sol_execbench_type_helpers import make_definition, make_workload
 
 from sol_execbench.core.bench.io import (
     FLASHINFER_TRACE_ENV,
-    GEN_INPUTS_DEVICE_MISMATCH,
-    GEN_INPUTS_SCHEMA_MISMATCH,
+    CustomInputFailureClass,
     CustomInputGenerationError,
     ShiftingMemoryPoolAllocator,
     _cast_to_fp4x2,
@@ -838,9 +837,13 @@ class TestGenInputs:
         with pytest.raises(CustomInputGenerationError) as excinfo:
             gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
 
-        assert excinfo.value.failure_class == GEN_INPUTS_SCHEMA_MISMATCH
         assert (
-            excinfo.value.provenance.failure_class == GEN_INPUTS_SCHEMA_MISMATCH
+            excinfo.value.failure_class
+            is CustomInputFailureClass.SCHEMA_MISMATCH
+        )
+        assert (
+            excinfo.value.provenance.failure_class
+            is CustomInputFailureClass.SCHEMA_MISMATCH
         )
         assert excinfo.value.provenance.generated_keys == ("a",)
 
@@ -869,7 +872,10 @@ class TestGenInputs:
         with pytest.raises(CustomInputGenerationError) as excinfo:
             gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
 
-        assert excinfo.value.failure_class == GEN_INPUTS_SCHEMA_MISMATCH
+        assert (
+            excinfo.value.failure_class
+            is CustomInputFailureClass.SCHEMA_MISMATCH
+        )
 
     def test_custom_factory_device_mismatch_raises_device_class(self):
         if torch.cuda.is_available():
@@ -900,7 +906,10 @@ class TestGenInputs:
         with pytest.raises(CustomInputGenerationError) as excinfo:
             gen_inputs(d, wkl, "cpu", custom_inputs_fn=gen)
 
-        assert excinfo.value.failure_class == GEN_INPUTS_DEVICE_MISMATCH
+        assert (
+            excinfo.value.failure_class
+            is CustomInputFailureClass.DEVICE_MISMATCH
+        )
 
     def test_missing_safetensors_raises(self):
         d = _make_definition(

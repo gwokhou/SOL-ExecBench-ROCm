@@ -24,20 +24,20 @@ from typing import Any, Literal
 from pydantic import ConfigDict, Field, ValidationError
 
 from sol_execbench.core.data.base_model import CurrentSchemaModel
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.integrity.schema_versions import (
+    GPU_DEVICE_ISOLATION_SCHEMA_VERSION,
+)
 from sol_execbench.core.platform.amd_smi import parse_gpu_count, parse_processes
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 
 logger = logging.getLogger(__name__)
-
-GPU_ISOLATION_SCHEMA_VERSION = SCHEMA_VERSIONS["gpu_device_isolation"]
 
 
 class GPUDeviceIsolation(CurrentSchemaModel):
     """Current GPU isolation observation."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
-    current_schema_version = GPU_ISOLATION_SCHEMA_VERSION
+    current_schema_version = GPU_DEVICE_ISOLATION_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.gpu_device_isolation.v1"] = (
         "sol_execbench.gpu_device_isolation.v1"
@@ -199,7 +199,7 @@ def validate_gpu_device_isolation(
     isolated = gpu_count <= 1 or rocr_visible is not None
 
     result = {
-        "schema_version": GPU_ISOLATION_SCHEMA_VERSION,
+        "schema_version": GPU_DEVICE_ISOLATION_SCHEMA_VERSION,
         "isolated": isolated,
         "gpu_count": gpu_count,
         "rocr_visible_devices": rocr_visible,

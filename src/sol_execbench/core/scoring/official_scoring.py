@@ -16,7 +16,9 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKACorpusManifest,
 )
 from sol_execbench.core.integrity import sha256_file
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.integrity.schema_versions import (
+    OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION,
+)
 from sol_execbench.core.scoring.official_scoring_models import (
     OfficialScoreAvailability,
     OfficialScoreAvailabilityReport,
@@ -62,7 +64,7 @@ def official_score_availability(
     producer_ready, producer_reason = formal_producer_readiness()
     release_published = _PUBLISHED_RELEASE_BUNDLE.is_file()
     report = {
-        "schema_version": SCHEMA_VERSIONS["official_score_availability"],
+        "schema_version": OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION,
         "corpus_manifest_sha256": observed_manifest_sha256,
         "trusted_corpus_manifest_sha256": OFFICIAL_CORPUS_MANIFEST_SHA256,
         "verifier": {

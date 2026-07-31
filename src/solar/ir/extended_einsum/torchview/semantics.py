@@ -295,7 +295,7 @@ def _annotate_dynamic_shapes(
 
 def validate_semantic_graph(graph: Mapping[str, Any]) -> None:
     """Validate v6 without accepting legacy Extended artifacts."""
-    if int(graph.get("schema_version", 0)) != EXTENDED_EINSUM_IR_SCHEMA_VERSION:
+    if graph.get("schema_version") != EXTENDED_EINSUM_IR_SCHEMA_VERSION:
         raise SemanticGraphError(
             "extended-einsum graph must use current "
             f"schema_version={EXTENDED_EINSUM_IR_SCHEMA_VERSION}"

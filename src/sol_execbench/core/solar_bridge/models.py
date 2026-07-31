@@ -15,6 +15,7 @@ from sol_execbench.core.integrity.schema_versions import (
     SOLAR_WORKER_IPC_SCHEMA_VERSION,
 )
 from solar.contracts import (
+    FORMAL_BOUND_KIND,
     SolarAnalysisStatus,
     SolarReadinessStatus,
     SolarRequestArtifact,
@@ -28,8 +29,6 @@ from solar.ir.contracts import (
     normalize_ir_path,
 )
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
-
-FORMAL_BOUND_KIND = "capacity_constrained_tile_aware_v1"
 
 
 def _require_worker_schema(value: Mapping[str, Any]) -> None:
@@ -112,7 +111,7 @@ class SolarWorkerRequest:
                 else None
             ),
             ir_path=normalize_ir_path(value.get("ir_path", DEFAULT_IR_PATH)),
-            schema_version=str(value["schema_version"]),
+            schema_version=value["schema_version"],
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -148,7 +147,7 @@ class SolarStageAuditRequest:
             output_dir=str(value["output_dir"]),
             device=str(value["device"]),
             ir_path=normalize_ir_path(value.get("ir_path", DEFAULT_IR_PATH)),
-            schema_version=str(value["schema_version"]),
+            schema_version=value["schema_version"],
         )
 
     def to_dict(self) -> dict[str, Any]:

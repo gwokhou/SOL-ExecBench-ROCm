@@ -22,6 +22,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
+    Rocprofv3ReasonCode,
 )
 
 
@@ -63,9 +64,9 @@ def _profile_result(
             else Rocprofv3ArtifactCoverageStatus.NONE
         ),
         reason_codes=(
-            ("rocprof_artifacts_registered",)
+            (Rocprofv3ReasonCode.ARTIFACTS_REGISTERED,)
             if status is Rocprofv3ProfileStatus.SUCCESS
-            else ("rocprof_command_failed",)
+            else (Rocprofv3ReasonCode.COMMAND_FAILED,)
         ),
         timeout_seconds=60,
     )
@@ -218,7 +219,7 @@ def test_profile_summary_sidecar_includes_structured_artifact_evidence(
         returncode=0,
         profiler_available=True,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.COMPLETE,
-        reason_codes=("rocprof_artifacts_registered",),
+        reason_codes=(Rocprofv3ReasonCode.ARTIFACTS_REGISTERED,),
     )
 
     payload = build_profile_summary_sidecar(profile_result=profile).model_dump(
@@ -302,8 +303,8 @@ def test_profile_summary_diagnostic_log_only_profile_is_partial(tmp_path: Path):
             Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY
         ),
         reason_codes=(
-            "rocprof_no_registered_artifacts",
-            "rocprof_diagnostic_log_registered",
+            Rocprofv3ReasonCode.NO_REGISTERED_ARTIFACTS,
+            Rocprofv3ReasonCode.DIAGNOSTIC_LOG_REGISTERED,
         ),
         warnings=(
             "rocprofv3 returned success but produced no profiler data artifacts",
@@ -367,8 +368,8 @@ def test_profile_summary_success_with_only_diagnostic_json_is_partial(
             Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY
         ),
         reason_codes=(
-            "rocprof_no_registered_artifacts",
-            "rocprof_diagnostic_log_registered",
+            Rocprofv3ReasonCode.NO_REGISTERED_ARTIFACTS,
+            Rocprofv3ReasonCode.DIAGNOSTIC_LOG_REGISTERED,
         ),
     )
 

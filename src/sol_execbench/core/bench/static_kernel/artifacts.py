@@ -23,7 +23,10 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceSourceReference,
     StaticKernelEvidenceStatus,
 )
-from sol_execbench.core.data.base_model import StrictArtifactModel
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaModel,
+    StrictArtifactModel,
+)
 from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.integrity.schema_versions import (
     STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION,
@@ -44,8 +47,10 @@ class StaticArtifactManifestEntry(StrictArtifactModel):
     path: str = Field(min_length=1)
 
 
-class StaticArtifactManifest(StrictArtifactModel):
+class StaticArtifactManifest(CurrentSchemaModel):
     """Current explicit static-artifact selection manifest."""
+
+    current_schema_version = STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.static_artifact_manifest.v1"] = (
         STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION

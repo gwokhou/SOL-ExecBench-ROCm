@@ -19,12 +19,13 @@ This module provides a registry system for node type handlers,
 supporting both built-in and dynamically generated handlers.
 """
 
-import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from solar.artifacts import sha256_bytes, sha256_file
 
 
 @dataclass
@@ -178,7 +179,7 @@ class NodeTypeRegistry:
             code_file = self.cache_dir / f"{node_type}.py"
             code_file.write_text(handler.metadata["source_code"])
             cache_data["code_file"] = code_file.name
-            source_digest = hashlib.sha256(code_file.read_bytes()).hexdigest()
+            source_digest = sha256_file(code_file)
             if handler.metadata.get("source_sha256") != source_digest:
                 raise ValueError(
                     f"generated handler provenance hash mismatch: {node_type}"
@@ -232,7 +233,7 @@ class NodeTypeRegistry:
         if not code_file.is_file() or not digest:
             raise ValueError("handler source or source_sha256 is missing")
         source = code_file.read_text()
-        if hashlib.sha256(source.encode()).hexdigest() != digest:
+        if sha256_bytes(source.encode()) != digest:
             raise ValueError("handler source hash mismatch")
         if str(metadata.get("source_sha256", "")) != digest:
             raise ValueError("handler provenance hash mismatch")

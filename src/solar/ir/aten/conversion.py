@@ -158,7 +158,7 @@ def validate_aten_graph(graph: Mapping[str, Any]) -> None:
     """Validate one exact ATen IR graph without accepting legacy schemas."""
     if graph.get("ir_kind") != IRKind.ATEN.value:
         raise AtenIRError("graph is not ATen IR")
-    if int(graph.get("schema_version", 0)) != ATEN_IR_SCHEMA_VERSION:
+    if graph.get("schema_version") != ATEN_IR_SCHEMA_VERSION:
         raise AtenIRError(
             "ATen graph must use current "
             f"schema_version={ATEN_IR_SCHEMA_VERSION}",

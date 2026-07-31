@@ -12,15 +12,12 @@ from pathlib import Path
 from sol_execbench.core.bench.rocm_profiler.models import (
     _PROFILE_ARTIFACT_SUFFIXES,
     PROFILE_OUTPUT_DIR_NAMES,
-    ROCPROF_REASON_ARTIFACTS_REGISTERED,
-    ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
-    ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
-    ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE,
     ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE,
     ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS,
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
+    Rocprofv3ReasonCode,
     is_profiler_data_artifact,
 )
 
@@ -151,7 +148,11 @@ def profile_artifact_coverage_metadata(
     artifacts: Sequence[Rocprofv3ProfileArtifact],
     *,
     command_succeeded: bool,
-) -> tuple[Rocprofv3ArtifactCoverageStatus, tuple[str, ...], tuple[str, ...]]:
+) -> tuple[
+    Rocprofv3ArtifactCoverageStatus,
+    tuple[Rocprofv3ReasonCode, ...],
+    tuple[str, ...],
+]:
     """Classify profiler artifact coverage and return reasons and warnings."""
     if not artifacts:
         return Rocprofv3ArtifactCoverageStatus.NONE, (), ()
@@ -162,7 +163,7 @@ def profile_artifact_coverage_metadata(
     if command_succeeded and has_profiler_data_artifact:
         return (
             Rocprofv3ArtifactCoverageStatus.COMPLETE,
-            (ROCPROF_REASON_ARTIFACTS_REGISTERED,),
+            (Rocprofv3ReasonCode.ARTIFACTS_REGISTERED,),
             (),
         )
 
@@ -173,15 +174,15 @@ def profile_artifact_coverage_metadata(
         return (
             Rocprofv3ArtifactCoverageStatus.DIAGNOSTIC_LOGS_ONLY,
             (
-                ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
-                ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
+                Rocprofv3ReasonCode.NO_REGISTERED_ARTIFACTS,
+                Rocprofv3ReasonCode.DIAGNOSTIC_LOG_REGISTERED,
             ),
             (ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS,),
         )
 
     return (
         Rocprofv3ArtifactCoverageStatus.PARTIAL,
-        (ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE,),
+        (Rocprofv3ReasonCode.PARTIAL_ARTIFACT_COVERAGE,),
         (ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE,),
     )
 

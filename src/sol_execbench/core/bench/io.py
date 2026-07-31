@@ -19,11 +19,7 @@
 from __future__ import annotations
 
 from sol_execbench.core.bench.custom_inputs import (
-    GEN_INPUTS_DEVICE_MISMATCH,
-    GEN_INPUTS_ERROR,
-    GEN_INPUTS_OOM_BLOCKED,
-    GEN_INPUTS_SCHEMA_MISMATCH,
-    GEN_INPUTS_TIMEOUT,
+    CustomInputFailureClass,
     CustomInputGenerationError,
     CustomInputProvenance,
     _classify_custom_generation_exception,
@@ -64,11 +60,7 @@ from sol_execbench.core.bench.safetensors_io import (
 
 __all__ = [
     "FLASHINFER_TRACE_ENV",
-    "GEN_INPUTS_DEVICE_MISMATCH",
-    "GEN_INPUTS_ERROR",
-    "GEN_INPUTS_OOM_BLOCKED",
-    "GEN_INPUTS_SCHEMA_MISMATCH",
-    "GEN_INPUTS_TIMEOUT",
+    "CustomInputFailureClass",
     "CustomInputGenerationError",
     "CustomInputProvenance",
     "ShiftingMemoryPoolAllocator",

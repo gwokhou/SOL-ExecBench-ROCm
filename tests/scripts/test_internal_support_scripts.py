@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import subprocess
 from collections.abc import Sequence
@@ -72,14 +71,12 @@ def test_aka_calibration_variation_handles_values_and_empty_outputs(
     assert metrics[1] == (0.0, 0.0)
 
 
-def test_orojenesis_provenance_hash_and_compiler_identity(
+def test_orojenesis_provenance_compiler_identity(
     load_script,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     provenance = load_script("scripts/internal/orojenesis/write_provenance.py")
-    artifact = tmp_path / "artifact"
-    artifact.write_bytes(b"mapper")
     monkeypatch.setattr(
         provenance.subprocess,
         "run",
@@ -88,7 +85,6 @@ def test_orojenesis_provenance_hash_and_compiler_identity(
         ),
     )
 
-    assert provenance._sha256(artifact) == hashlib.sha256(b"mapper").hexdigest()
     assert provenance._compiler_identity(tmp_path / "compiler") == (
         "clang version 19.0"
     )

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceReasonCode,
@@ -78,7 +79,7 @@ def test_static_evidence_sidecar_writes_summary(tmp_path: Path):
 
 def test_static_evidence_none_does_not_collect(tmp_path: Path):
     sidecar = cli_static_evidence._collect_static_evidence_for_cli(
-        enabled=cli_static_evidence.STATIC_EVIDENCE_NONE,
+        enabled=SidecarMode.NONE,
         is_cpp=True,
         staging_dir=tmp_path / "staging",
         output_file=tmp_path / "trace.jsonl",
@@ -91,7 +92,7 @@ def test_static_evidence_auto_for_non_cpp_is_unsupported_sidecar(
     tmp_path: Path,
 ):
     sidecar = cli_static_evidence._collect_static_evidence_for_cli(
-        enabled=cli_static_evidence.STATIC_EVIDENCE_AUTO,
+        enabled=SidecarMode.AUTO,
         is_cpp=False,
         staging_dir=tmp_path / "staging",
         output_file=tmp_path / "trace.jsonl",
@@ -112,7 +113,7 @@ def test_static_evidence_collection_failure_is_failed_sidecar(
         raise RuntimeError("collector failed")
 
     sidecar = cli_static_evidence._collect_static_evidence_for_cli(
-        enabled=cli_static_evidence.STATIC_EVIDENCE_AUTO,
+        enabled=SidecarMode.AUTO,
         is_cpp=True,
         staging_dir=tmp_path / "staging",
         output_file=tmp_path / "trace.jsonl",

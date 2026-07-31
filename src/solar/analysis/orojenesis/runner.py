@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 import os
 import subprocess
@@ -56,6 +55,7 @@ from solar.analysis.orojenesis.regions import (
     multi_einsum_region_mapper_role,
     multi_einsum_region_problem,
 )
+from solar.artifacts import sha256_file
 
 __all__ = [
     "find_multi_einsum_chains",
@@ -66,10 +66,6 @@ __all__ = [
     "multi_einsum_region_mapper_role",
     "multi_einsum_region_problem",
 ]
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _multi_word_bytes(word_bits: int) -> int:
@@ -120,7 +116,7 @@ def _multi_evidence(
     return {
         name: {
             "path": str(path.relative_to(output)),
-            "sha256": _sha256(path),
+            "sha256": sha256_file(path),
         }
         for name, path in paths.items()
     }
@@ -302,12 +298,12 @@ class OrojenesisRunner:
             "curve": curve,
             "evidence_files": {
                 **{
-                    name: {"path": name, "sha256": _sha256(path)}
+                    name: {"path": name, "sha256": sha256_file(path)}
                     for name, path in paths.items()
                 },
                 "curve": {
                     "path": raw.name,
-                    "sha256": _sha256(raw),
+                    "sha256": sha256_file(raw),
                 },
             },
         }

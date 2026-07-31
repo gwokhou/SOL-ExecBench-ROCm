@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 from typing import Protocol
 
@@ -18,6 +17,7 @@ from solar.analysis.graph_models import (
     LowerBound,
 )
 from solar.analysis.resources import RESOURCE_MODEL_VERSION
+from solar.artifacts import sha256_file
 from solar.artifacts.yaml import NoAliasDumper
 from solar.contracts import FORMAL_BOUND_KIND, ROOFLINE_BOUND_KIND
 from solar.rocm.architecture import ArchitectureProfile
@@ -148,9 +148,7 @@ def _analysis_metadata(
             else "per_tensor"
         ),
         "source_graph": str(prepared.source),
-        "source_graph_sha256": hashlib.sha256(
-            prepared.source.read_bytes(),
-        ).hexdigest(),
+        "source_graph_sha256": sha256_file(prepared.source),
         "fusion": formal.fusion,
         "orojenesis": formal.orojenesis,
         "bound_kind": (

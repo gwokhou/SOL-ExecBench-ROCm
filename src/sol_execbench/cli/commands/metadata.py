@@ -12,13 +12,15 @@ from typing import Any
 import click
 
 from sol_execbench.cli.protocol import (
-    CLI_CONTRACT_SCHEMA_VERSION,
-    CLI_RESPONSE_SCHEMA_VERSION,
-    EXIT_UNAVAILABLE,
+    CliExitCode,
     CliResult,
     output_format,
 )
 from sol_execbench.core.evaluator_contract import build_evaluator_contract
+from sol_execbench.core.integrity.schema_versions import (
+    CLI_CONTRACT_SCHEMA_VERSION,
+    CLI_RESPONSE_SCHEMA_VERSION,
+)
 from sol_execbench.core.platform.environment import (
     build_environment_diagnostics,
 )
@@ -55,7 +57,9 @@ def doctor_cli() -> CliResult:
     unavailable = payload.get("status") == EnvironmentEvidenceStatus.UNAVAILABLE
     return CliResult(
         data=payload,
-        exit_code=EXIT_UNAVAILABLE if unavailable else 0,
+        exit_code=(
+            CliExitCode.UNAVAILABLE if unavailable else CliExitCode.SUCCESS
+        ),
     )
 
 

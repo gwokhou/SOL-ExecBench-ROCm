@@ -10,9 +10,7 @@
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
-import json
 import math
 import re
 import sys
@@ -23,6 +21,7 @@ from typing import Any
 
 import yaml
 
+from solar.artifacts import sha256_file, stable_json_checksum
 from solar.ir.contracts import IRLifecycle, layer_operation
 from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
 from solar.verification.contracts import TolerancePolicy, VerificationPolicy
@@ -45,24 +44,14 @@ from solar.verification.numerics import (
 
 
 def _canonical_hash(value: Mapping[str, Any]) -> str:
-    encoded = json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    ).encode()
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return stable_json_checksum(value)
 
 
 _TOKEN = re.compile(r"[A-Za-z][0-9]*")
 
 
 def _load_module(path: Path) -> Any:
-    name = f"_solar_verify_{_sha256(path)[:16]}"
+    name = f"_solar_verify_{sha256_file(path)[:16]}"
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise VerificationError(f"cannot import reference module: {path}")
@@ -482,11 +471,11 @@ def _file_attestation(
         "subject": [
             {
                 "name": reference_path.name,
-                "digest": {"sha256": _sha256(reference_path)},
+                "digest": {"sha256": sha256_file(reference_path)},
             },
             {
                 "name": graph_path.name,
-                "digest": {"sha256": _sha256(graph_path)},
+                "digest": {"sha256": sha256_file(graph_path)},
             },
         ],
         "predicateType": (
@@ -573,7 +562,7 @@ def _callable_attestation(
             {"name": reference_name, "digest": {"sha256": reference_sha256}},
             {
                 "name": graph_path.name,
-                "digest": {"sha256": _sha256(graph_path)},
+                "digest": {"sha256": sha256_file(graph_path)},
             },
         ],
         "predicateType": "https://solar-rocm.dev/attestations/callable-to-einsum/v1",
@@ -667,9 +656,9 @@ def _validated_replay_predicate(
         str(subject.get("name")): (subject.get("digest") or {}).get("sha256")
         for subject in artifact.get("subject") or []
     }
-    if digests.get(reference_path.name) != _sha256(reference_path):
+    if digests.get(reference_path.name) != sha256_file(reference_path):
         raise VerificationError("verification reference SHA-256 mismatch")
-    if digests.get(graph_path.name) != _sha256(graph_path):
+    if digests.get(graph_path.name) != sha256_file(graph_path):
         raise VerificationError("verification graph SHA-256 mismatch")
     workload_data = predicate.get("workload") or {}
     if workload_data.get("name") != workload_name:

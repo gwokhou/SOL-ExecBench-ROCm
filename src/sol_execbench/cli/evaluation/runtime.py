@@ -13,10 +13,7 @@ from pathlib import Path
 from typing import ClassVar, Protocol
 
 from sol_execbench.cli.evaluation import command as cli_evaluation
-from sol_execbench.cli.evaluation.profile_mode import (
-    PROFILE_ROCPROFV3,
-    PROFILE_ROCPROFV3_COUNTERS,
-)
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.core.bench.performance_model.timing_evidence import (
     RAW_TIMING_FILENAME,
 )
@@ -122,14 +119,14 @@ def _run_profiled_or_none(
     staging_dir: Path,
     output_file: Path | None,
     timeout: int,
-    profile: str,
+    profile: ProfileMode,
 ) -> tuple[
     subprocess.CompletedProcess[str] | None,
     Rocprofv3ProfileResult | None,
 ]:
-    if profile not in {PROFILE_ROCPROFV3, PROFILE_ROCPROFV3_COUNTERS}:
+    if profile not in {ProfileMode.ROCPROFV3, ProfileMode.ROCPROFV3_COUNTERS}:
         return None, None
-    if profile == PROFILE_ROCPROFV3_COUNTERS:
+    if profile == ProfileMode.ROCPROFV3_COUNTERS:
         return None, None
     return cli_evaluation._run_profiled_evaluation(
         eval_cmd,
@@ -146,7 +143,7 @@ def run_evaluation_runtime(
     staging_dir: Path,
     output_file: Path | None,
     timeout: int,
-    profile: str,
+    profile: ProfileMode,
 ) -> EvaluationRuntimeResult:
     """Run evaluation and classify subprocess outcomes without CLI side effects."""
     profiled_proc, profile_result = _run_profiled_or_none(
@@ -200,7 +197,7 @@ def run_evaluation_runtime(
         )
 
     apply_reference_speedups(traces)
-    if profile == PROFILE_ROCPROFV3_COUNTERS:
+    if profile == ProfileMode.ROCPROFV3_COUNTERS:
         profile_result = _collect_counter_replay(
             packager,
             eval_cmd,

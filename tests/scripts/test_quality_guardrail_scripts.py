@@ -9,6 +9,137 @@ from typing import Any, cast
 import pytest
 
 
+def test_python_reuse_rejects_duplicate_canonical_literals(
+    load_script,
+) -> None:
+    reuse = load_script("scripts/check_python_reuse.py")
+
+    findings = reuse.audit_source(
+        Path("src/sol_execbench/duplicate.py"),
+        'MODE = "rocprofv3-counters"\n',
+    )
+
+    assert findings == [
+        (
+            "src/sol_execbench/duplicate.py:1: import canonical literal "
+            "'rocprofv3-counters' from "
+            "src/sol_execbench/cli/evaluation/profile_mode.py"
+        ),
+    ]
+
+
+def test_python_reuse_rejects_hand_written_memoization(load_script) -> None:
+    reuse = load_script("scripts/check_python_reuse.py")
+
+    findings = reuse.audit_source(
+        Path("src/solar/example.py"),
+        (
+            "def resolve(key):\n"
+            "    if key not in cache:\n"
+            "        cache[key] = load(key)\n"
+            "    return cache[key]\n"
+        ),
+    )
+
+    assert findings == [
+        (
+            "src/solar/example.py:2: replace hand-written cache memoization "
+            "with functools.cache"
+        ),
+    ]
+
+
+def test_python_reuse_accepts_functools_cache(load_script) -> None:
+    reuse = load_script("scripts/check_python_reuse.py")
+
+    findings = reuse.audit_source(
+        Path("src/solar/example.py"),
+        (
+            "from functools import cache\n\n"
+            "@cache\n"
+            "def resolve(key):\n"
+            "    return load(key)\n"
+        ),
+    )
+
+    assert findings == []
+
+
+def test_python_reuse_rejects_local_file_checksum_implementations(
+    load_script,
+) -> None:
+    reuse = load_script("scripts/check_python_reuse.py")
+
+    findings = reuse.audit_source(
+        Path("src/solar/example.py"),
+        "digest = hashlib.sha256(path.read_bytes()).hexdigest()\n",
+    )
+
+    assert findings == [
+        ("src/solar/example.py:1: use the package-owned sha256_file helper"),
+    ]
+
+
+def test_python_reuse_rejects_duplicate_canonical_enums(load_script) -> None:
+    reuse = load_script("scripts/check_python_reuse.py")
+
+    findings = reuse.audit_source(
+        Path("src/sol_execbench/duplicate.py"),
+        (
+            "from enum import StrEnum\n\n"
+            "class LocalConfidence(StrEnum):\n"
+            '    LOW = "low"\n'
+            '    MEDIUM = "medium"\n'
+            '    HIGH = "high"\n'
+        ),
+    )
+
+    assert findings == [
+        (
+            "src/sol_execbench/duplicate.py:3: reuse canonical enum "
+            "DiagnosticConfidence from "
+            "src/sol_execbench/core/bench/diagnostic_sidecar.py"
+        ),
+    ]
+
+
+def test_python_reuse_rejects_constants_replaced_by_enums(load_script) -> None:
+    reuse = load_script("scripts/check_python_reuse.py")
+
+    findings = reuse.audit_source(
+        Path("src/sol_execbench/example.py"),
+        'GEN_INPUTS_TIMEOUT = "gen_inputs_timeout"\n',
+    )
+
+    assert findings == [
+        (
+            "src/sol_execbench/example.py:1: model GEN_INPUTS_TIMEOUT "
+            "as a member of its canonical enum"
+        ),
+    ]
+
+
+def test_python_reuse_rejects_enum_member_constant_aliases(load_script) -> None:
+    reuse = load_script("scripts/check_python_reuse.py")
+
+    findings = reuse.audit_source(
+        Path("src/sol_execbench/example.py"),
+        (
+            "from enum import StrEnum\n\n"
+            "class ProfileMode(StrEnum):\n"
+            '    NONE = "none"\n\n'
+            "PROFILE_DEFAULT = str(ProfileMode.NONE)\n"
+        ),
+    )
+
+    assert findings == [
+        (
+            "src/sol_execbench/example.py:6: do not duplicate an enum member "
+            "as a module constant; derive boundary collections from the enum"
+        ),
+    ]
+
+
 def test_coupling_resolves_imports_cycles_and_boundaries(
     load_script,
     tmp_path: Path,

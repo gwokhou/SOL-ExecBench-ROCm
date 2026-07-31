@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -16,6 +15,7 @@ from typing import Any, cast
 import yaml
 
 from solar import schema_versions
+from solar.artifacts import sha256_file, stable_json_checksum
 from solar.precision import normalize_dtype
 from solar.rocm.audit_validation import (
     audit_mapping,
@@ -63,13 +63,7 @@ def resource_peak_payload_sha256(payload: Mapping[str, Any]) -> str:
     """Return the resource-audit digest with ``payload_sha256`` omitted."""
     unsigned = dict(payload)
     unsigned.pop("payload_sha256", None)
-    encoded = json.dumps(
-        unsigned,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    return stable_json_checksum(unsigned)
 
 
 def verify_resource_peak_audit(
@@ -90,8 +84,7 @@ def verify_resource_peak_audit(
         raise ValueError(f"architecture audit evidence file is missing: {path}")
     if path.stat().st_size > _MAX_AUDIT_BYTES:
         raise ValueError("architecture audit evidence exceeds the size limit")
-    with path.open("rb") as audit:
-        observed_sha256 = hashlib.file_digest(audit, "sha256").hexdigest()
+    observed_sha256 = sha256_file(path)
     if observed_sha256 != expected_sha256:
         raise ValueError("architecture audit evidence identity mismatch")
     try:

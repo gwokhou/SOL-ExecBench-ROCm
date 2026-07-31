@@ -12,7 +12,7 @@ import click
 from rich.console import Console
 
 from sol_execbench.cli.protocol import (
-    EXIT_RESULT_FAILED,
+    CliExitCode,
     CliFailure,
     CliResult,
     artifact,
@@ -188,7 +188,11 @@ def accept_performance_model_cli(
             artifact(manifest_output, "diagnostic_acceptance_manifest_json"),
             artifact(output, "diagnostic_acceptance_result_json"),
         ),
-        exit_code=0 if result.accepted else EXIT_RESULT_FAILED,
+        exit_code=(
+            CliExitCode.SUCCESS
+            if result.accepted
+            else CliExitCode.RESULT_FAILED
+        ),
     )
 
 

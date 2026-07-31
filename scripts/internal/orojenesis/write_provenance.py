@@ -7,19 +7,14 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import subprocess
 import tempfile
 from pathlib import Path
 
+from solar.artifacts import sha256_bytes, sha256_file
 from solar.schema_versions import OROJENESIS_PROVENANCE_SCHEMA_VERSION
-
-
-def _sha256(path: Path) -> str:
-    with path.open("rb") as handle:
-        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def _git(home: Path, *args: str) -> str:
@@ -40,7 +35,7 @@ def _archive_sha256(home: Path) -> str:
         capture_output=True,
         timeout=60,
     )
-    return hashlib.sha256(completed.stdout).hexdigest()
+    return sha256_bytes(completed.stdout)
 
 
 def _compiler_identity(wrapper: Path) -> str:
@@ -97,7 +92,7 @@ def main() -> int:
         },
         "artifact": {
             "path": "bin/timeloop-mapper",
-            "sha256": _sha256(mapper),
+            "sha256": sha256_file(mapper),
         },
         "build": {
             "bootstrap_packages": {
@@ -109,7 +104,7 @@ def main() -> int:
             "ubuntu_snapshot": args.ubuntu_snapshot,
             "source_date_epoch": args.source_date_epoch,
             "compiler": _compiler_identity(args.compiler_wrapper),
-            "compiler_wrapper_sha256": _sha256(args.compiler_wrapper),
+            "compiler_wrapper_sha256": sha256_file(args.compiler_wrapper),
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)

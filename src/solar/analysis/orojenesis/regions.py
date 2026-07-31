@@ -540,7 +540,7 @@ def multi_einsum_region_problem(region: Mapping[str, Any]) -> dict[str, Any]:
         raise OrojenesisError(
             "multi-einsum region is not serializable",
         ) from exc
-    if int(descriptor.get("schema_version", 0)) != schema_version:
+    if descriptor.get("schema_version") != schema_version:
         raise OrojenesisError("unsupported multi-einsum region schema")
     compositions = {
         "linear_matmul_with_axis_maps": MULTI_EINSUM_LAYOUT_COMPOSITION,

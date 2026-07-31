@@ -5,13 +5,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from sol_execbench.core.integrity.checksums import sha256_file
+from sol_execbench.core.integrity.checksums import sha256_bytes, sha256_file
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.process.subprocesses import run_in_process_group
 
@@ -110,7 +109,7 @@ def extract_code_object(
         path=code_object,
         sha256=sha256_file(code_object),
         disassembly=disassembly,
-        disassembly_sha256=_sha256(disassembly.encode("utf-8")),
+        disassembly_sha256=sha256_bytes(disassembly.encode("utf-8")),
     )
 
 
@@ -149,10 +148,6 @@ def _run(
         detail = (result.stderr or result.stdout)[-4000:]
         raise RuntimeError(f"ISA artifact command failed: {detail}")
     return result
-
-
-def _sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
 
 
 def _is_amdgpu_elf(path: Path) -> bool:

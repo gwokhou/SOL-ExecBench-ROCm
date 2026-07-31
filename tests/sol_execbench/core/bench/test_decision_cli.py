@@ -14,10 +14,9 @@ import json
 from pathlib import Path
 
 from sol_execbench.cli.sidecars.decision import (
-    DECISION_AUTO,
-    DECISION_NONE,
     _write_decision_sidecar,
 )
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
@@ -84,7 +83,7 @@ def test_decision_auto_writes_sidecar_with_matched_budget(
 
     path = _write_decision_sidecar(
         output,
-        DECISION_AUTO,
+        SidecarMode.AUTO,
         _static_evidence(["gfx942"]),
         env_path,
         run_id="r1",
@@ -108,7 +107,7 @@ def test_decision_none_writes_nothing(tmp_path: Path) -> None:
     assert (
         _write_decision_sidecar(
             output,
-            DECISION_NONE,
+            SidecarMode.NONE,
             _static_evidence(["gfx942"]),
             None,
         )
@@ -127,7 +126,9 @@ def test_decision_auto_without_footprints_writes_nothing(
         status=StaticKernelEvidenceStatus.COLLECTED,
         reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
     )
-    assert _write_decision_sidecar(output, DECISION_AUTO, empty, None) is None
+    assert (
+        _write_decision_sidecar(output, SidecarMode.AUTO, empty, None) is None
+    )
     assert not (tmp_path / "trace.jsonl.decision.json").exists()
 
 
@@ -139,7 +140,7 @@ def test_decision_auto_without_environment_budget_falls_back_to_partial(
     # No environment sidecar -> budget None -> PARTIAL with spill-only hints.
     path = _write_decision_sidecar(
         output,
-        DECISION_AUTO,
+        SidecarMode.AUTO,
         _static_evidence(["gfx942"]),
         None,
     )
@@ -184,7 +185,7 @@ def test_runtime_profile_uses_explicit_class_mapping(tmp_path: Path) -> None:
 
     path = _write_decision_sidecar(
         output,
-        DECISION_AUTO,
+        SidecarMode.AUTO,
         _static_evidence(["gfx942"]),
         env_path,
         profile_result=_profile_result_with_counter(
@@ -235,7 +236,7 @@ def test_unavailable_profile_does_not_apply_runtime_precedence(
 
     path = _write_decision_sidecar(
         output,
-        DECISION_AUTO,
+        SidecarMode.AUTO,
         _static_evidence(["gfx942"]),
         env_path,
         profile_result=profile,

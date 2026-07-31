@@ -20,12 +20,13 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from sol_execbench.cli.evaluation import (
     command as cli_evaluation,
     compilation as cli_compilation,
-    profile_mode,
     runtime as cli_evaluation_runtime,
 )
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
-from sol_execbench.cli.protocol import EXIT_EXECUTION, CliFailure
+from sol_execbench.cli.protocol import CliExitCode, CliFailure
 from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.gpu_lock import (
     GPULockVerificationError,
     acquire_evaluation_gpu_lock,
@@ -40,9 +41,6 @@ from sol_execbench.core.process.environment import (
 )
 from sol_execbench.driver import ProblemPackager
 
-PROFILE_NONE = profile_mode.PROFILE_NONE
-PROFILE_ROCPROFV3 = profile_mode.PROFILE_ROCPROFV3
-PROFILE_ROCPROFV3_COUNTERS = profile_mode.PROFILE_ROCPROFV3_COUNTERS
 _EXECUTION_ENV_LOCK = threading.RLock()
 
 
@@ -131,7 +129,7 @@ def run_optional_compile_phase(
     context: EvaluationPhaseContext,
     *,
     compile_timeout: int,
-    static_evidence: str,
+    static_evidence: SidecarMode,
     verbose: bool,
 ) -> tuple[
     StaticKernelEvidenceSidecar | None,
@@ -167,7 +165,7 @@ def run_optional_compile_phase(
             raise CliFailure(
                 "solution compilation failed",
                 code="compilation_failed",
-                exit_code=EXIT_EXECUTION,
+                exit_code=CliExitCode.EXECUTION,
             )
 
         context.console.print("[green]Compilation succeeded[/green]")
@@ -176,7 +174,7 @@ def run_optional_compile_phase(
                 f"[dim]{compile_result.filtered_stderr}[/dim]",
             )
 
-        if static_evidence == cli_static_evidence.STATIC_EVIDENCE_AUTO:
+        if static_evidence is SidecarMode.AUTO:
             static_evidence_result = (
                 cli_static_evidence._collect_static_evidence_for_cli(
                     enabled=static_evidence,
@@ -185,7 +183,7 @@ def run_optional_compile_phase(
                     output_file=context.output_file,
                 )
             )
-    elif static_evidence == cli_static_evidence.STATIC_EVIDENCE_AUTO:
+    elif static_evidence is SidecarMode.AUTO:
         static_evidence_result = (
             cli_static_evidence._collect_static_evidence_for_cli(
                 enabled=static_evidence,
@@ -202,14 +200,14 @@ def run_evaluation_phase(
     *,
     eval_cmd: list[str],
     timeout: int,
-    profile: str,
+    profile: ProfileMode,
     workload_count: int,
 ) -> cli_evaluation_runtime.EvaluationRuntimeResult:
     """Execute the staged solution and parse its runtime result."""
-    if profile in {PROFILE_ROCPROFV3, PROFILE_ROCPROFV3_COUNTERS}:
+    if profile in {ProfileMode.ROCPROFV3, ProfileMode.ROCPROFV3_COUNTERS}:
         description = (
             "rocprofv3 counter"
-            if profile == PROFILE_ROCPROFV3_COUNTERS
+            if profile is ProfileMode.ROCPROFV3_COUNTERS
             else "rocprofv3"
         )
         context.console.print(
@@ -276,7 +274,7 @@ def handle_no_trace_failure(
     raise CliFailure(
         runtime_result.message,
         code=runtime_result.reason,
-        exit_code=EXIT_EXECUTION,
+        exit_code=CliExitCode.EXECUTION,
         details={
             "returncode": runtime_result.returncode,
             "diagnostics_path": str(diagnostic_path)

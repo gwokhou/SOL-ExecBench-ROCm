@@ -18,7 +18,7 @@ import click
 from rich.console import Console
 
 from sol_execbench.cli.protocol import (
-    EXIT_UNAVAILABLE,
+    CliExitCode,
     CliFailure,
     CliResult,
     artifact,
@@ -113,7 +113,7 @@ def materialize_cli(
         raise CliFailure(
             str(exc),
             code="aka_target_unavailable",
-            exit_code=EXIT_UNAVAILABLE,
+            exit_code=CliExitCode.UNAVAILABLE,
             hint="Use a ROCm device whose exact target is gfx942, gfx1150, or gfx1200.",
         ) from exc
     if target_arch is not None and device_info.gfx_target != target_arch:
@@ -135,7 +135,7 @@ def materialize_cli(
         raise CliFailure(
             str(exc),
             code="aka_probe_infrastructure_error",
-            exit_code=EXIT_UNAVAILABLE,
+            exit_code=CliExitCode.UNAVAILABLE,
             hint="Check ROCm visibility and retry the reported workload probe.",
         ) from exc
     except FileExistsError as exc:

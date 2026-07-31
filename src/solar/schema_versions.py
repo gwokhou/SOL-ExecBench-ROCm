@@ -3,6 +3,8 @@
 
 """Current schema versions for SOLAR artifact families."""
 
+from collections.abc import Mapping
+from types import MappingProxyType
 from typing import Final
 
 OPERATOR_GRAPH_SCHEMA_VERSION: Final = 2
@@ -21,22 +23,24 @@ RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION: Final = (
     "solar.resource_peak_calibration.v4"
 )
 
-CURRENT_NUMERIC_SCHEMA_VERSIONS: Final[dict[str, int]] = {
-    "operator_graph": OPERATOR_GRAPH_SCHEMA_VERSION,
-    "aten_ir": ATEN_IR_SCHEMA_VERSION,
-    "extended_einsum_ir": EXTENDED_EINSUM_IR_SCHEMA_VERSION,
-    "solar_analysis": SOLAR_ANALYSIS_SCHEMA_VERSION,
-    "orojenesis_provenance": OROJENESIS_PROVENANCE_SCHEMA_VERSION,
-    "orojenesis_analysis": OROJENESIS_ANALYSIS_SCHEMA_VERSION,
-    "orojenesis_multi_einsum_problem": (
-        OROJENESIS_MULTI_EINSUM_PROBLEM_SCHEMA_VERSION
-    ),
-    "orojenesis_multi_einsum_region": (
-        OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION
-    ),
-    "solar_request_manifest": SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
-    "solar_path_comparison": SOLAR_PATH_COMPARISON_SCHEMA_VERSION,
-}
+CURRENT_NUMERIC_SCHEMA_VERSIONS: Final[Mapping[str, int]] = MappingProxyType(
+    {
+        "operator_graph": OPERATOR_GRAPH_SCHEMA_VERSION,
+        "aten_ir": ATEN_IR_SCHEMA_VERSION,
+        "extended_einsum_ir": EXTENDED_EINSUM_IR_SCHEMA_VERSION,
+        "solar_analysis": SOLAR_ANALYSIS_SCHEMA_VERSION,
+        "orojenesis_provenance": OROJENESIS_PROVENANCE_SCHEMA_VERSION,
+        "orojenesis_analysis": OROJENESIS_ANALYSIS_SCHEMA_VERSION,
+        "orojenesis_multi_einsum_problem": (
+            OROJENESIS_MULTI_EINSUM_PROBLEM_SCHEMA_VERSION
+        ),
+        "orojenesis_multi_einsum_region": (
+            OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION
+        ),
+        "solar_request_manifest": SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+        "solar_path_comparison": SOLAR_PATH_COMPARISON_SCHEMA_VERSION,
+    }
+)
 
 CURRENT_STRING_SCHEMA_VERSIONS: Final[frozenset[str]] = frozenset(
     {

@@ -22,6 +22,7 @@ import hashlib
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from typing import Any
 
 import torch
@@ -30,11 +31,15 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.workload import CustomInput, Workload
 
-GEN_INPUTS_ERROR = "gen_inputs_error"
-GEN_INPUTS_OOM_BLOCKED = "gen_inputs_oom_blocked"
-GEN_INPUTS_TIMEOUT = "gen_inputs_timeout"
-GEN_INPUTS_SCHEMA_MISMATCH = "gen_inputs_schema_mismatch"
-GEN_INPUTS_DEVICE_MISMATCH = "gen_inputs_device_mismatch"
+
+class CustomInputFailureClass(StrEnum):
+    """Stable failure classes for custom input generation."""
+
+    ERROR = "gen_inputs_error"
+    OOM_BLOCKED = "gen_inputs_oom_blocked"
+    TIMEOUT = "gen_inputs_timeout"
+    SCHEMA_MISMATCH = "gen_inputs_schema_mismatch"
+    DEVICE_MISMATCH = "gen_inputs_device_mismatch"
 
 
 @dataclass(frozen=True)
@@ -46,7 +51,7 @@ class CustomInputProvenance:
     workload_uuid: str | None
     row_index: int | None
     generated_keys: tuple[str, ...] = ()
-    failure_class: str | None = None
+    failure_class: CustomInputFailureClass | None = None
 
     def log_text(self) -> str:
         """Return a stable single-line provenance summary."""
@@ -69,12 +74,12 @@ class CustomInputGenerationError(RuntimeError):
         self,
         message: str,
         *,
-        failure_class: str,
+        failure_class: CustomInputFailureClass,
         provenance: CustomInputProvenance,
     ) -> None:
         """Initialize a classified custom-input generation failure."""
         super().__init__(message)
-        self.failure_class = failure_class
+        self.failure_class = CustomInputFailureClass(failure_class)
         self.provenance = provenance
 
 
@@ -133,7 +138,7 @@ def _custom_input_provenance(
     row_index: int | None,
     seed: int,
     generated_keys: Sequence[str] = (),
-    failure_class: str | None = None,
+    failure_class: CustomInputFailureClass | None = None,
 ) -> CustomInputProvenance:
     return CustomInputProvenance(
         entrypoint=definition.custom_inputs_entrypoint,
@@ -148,7 +153,7 @@ def _custom_input_provenance(
 def _raise_custom_input_error(
     message: str,
     *,
-    failure_class: str,
+    failure_class: CustomInputFailureClass,
     provenance: CustomInputProvenance,
 ) -> None:
     raise CustomInputGenerationError(
@@ -158,7 +163,9 @@ def _raise_custom_input_error(
     )
 
 
-def _classify_custom_generation_exception(exc: BaseException) -> str:
+def _classify_custom_generation_exception(
+    exc: BaseException,
+) -> CustomInputFailureClass:
     text = str(exc).lower()
     name = type(exc).__name__.lower()
     if (
@@ -166,7 +173,7 @@ def _classify_custom_generation_exception(exc: BaseException) -> str:
         or "timeout" in text
         or "timed out" in text
     ):
-        return GEN_INPUTS_TIMEOUT
+        return CustomInputFailureClass.TIMEOUT
     if (
         isinstance(exc, torch.cuda.OutOfMemoryError)
         or "outofmemory" in name
@@ -174,8 +181,8 @@ def _classify_custom_generation_exception(exc: BaseException) -> str:
         or "hip out of memory" in text
         or "cuda out of memory" in text
     ):
-        return GEN_INPUTS_OOM_BLOCKED
-    return GEN_INPUTS_ERROR
+        return CustomInputFailureClass.OOM_BLOCKED
+    return CustomInputFailureClass.ERROR
 
 
 def _validate_custom_tensors(
@@ -189,7 +196,7 @@ def _validate_custom_tensors(
     if not isinstance(generated, Mapping):
         _raise_custom_input_error(
             "custom_inputs_entrypoint must return a mapping of input names to values",
-            failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+            failure_class=CustomInputFailureClass.SCHEMA_MISMATCH,
             provenance=provenance,
         )
 
@@ -203,14 +210,14 @@ def _validate_custom_tensors(
     if missing:
         _raise_custom_input_error(
             f"custom_inputs_entrypoint missing required input keys: {missing}",
-            failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+            failure_class=CustomInputFailureClass.SCHEMA_MISMATCH,
             provenance=provenance,
         )
     unexpected = sorted(generated_names - expected_names)
     if unexpected:
         _raise_custom_input_error(
             f"custom_inputs_entrypoint returned unexpected input keys: {unexpected}",
-            failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+            failure_class=CustomInputFailureClass.SCHEMA_MISMATCH,
             provenance=provenance,
         )
 
@@ -240,39 +247,39 @@ def _validate_custom_value(
         if isinstance(value, torch.Tensor):
             _raise_custom_input_error(
                 f"'{name}' expected scalar, got tensor",
-                failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+                failure_class=CustomInputFailureClass.SCHEMA_MISMATCH,
                 provenance=provenance,
             )
         if not isinstance(value, (int, float, bool)):
             _raise_custom_input_error(
                 f"'{name}' expected scalar, got {type(value).__name__}",
-                failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+                failure_class=CustomInputFailureClass.SCHEMA_MISMATCH,
                 provenance=provenance,
             )
         return value
     if not isinstance(value, torch.Tensor):
         _raise_custom_input_error(
             f"'{name}' expected tensor, got {type(value).__name__}",
-            failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+            failure_class=CustomInputFailureClass.SCHEMA_MISMATCH,
             provenance=provenance,
         )
     expected_dtype = dtype_str_to_torch_dtype(dtype)
     if tuple(value.shape) != expected_shape:
         _raise_custom_input_error(
             f"'{name}' expected shape {expected_shape}, got {tuple(value.shape)}",
-            failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+            failure_class=CustomInputFailureClass.SCHEMA_MISMATCH,
             provenance=provenance,
         )
     if value.dtype != expected_dtype:
         _raise_custom_input_error(
             f"'{name}' expected dtype {expected_dtype}, got {value.dtype}",
-            failure_class=GEN_INPUTS_SCHEMA_MISMATCH,
+            failure_class=CustomInputFailureClass.SCHEMA_MISMATCH,
             provenance=provenance,
         )
     if not _device_matches(value.device, device):
         _raise_custom_input_error(
             f"'{name}' expected device {device}, got {value.device}",
-            failure_class=GEN_INPUTS_DEVICE_MISMATCH,
+            failure_class=CustomInputFailureClass.DEVICE_MISMATCH,
             provenance=provenance,
         )
     return value

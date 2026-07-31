@@ -7,10 +7,13 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    CurrentSchemaModel,
+)
 from sol_execbench.core.integrity.schema_versions import (
     DOCKER_PREFLIGHT_SCHEMA_VERSION,
-    SCHEMA_VERSIONS,
+    ROCM_DOCKER_TARGETS_SCHEMA_VERSION,
 )
 from sol_execbench.core.platform.compatibility import (
     MatrixCompatibilityStatus,
@@ -19,9 +22,6 @@ from sol_execbench.core.platform.compatibility import (
     MatrixValidationScope,
     MatrixValidationScopeField,
 )
-
-ROCM_DOCKER_TARGETS_SCHEMA_VERSION = SCHEMA_VERSIONS["rocm_docker_targets"]
-
 
 DEFAULT_DOCKER_TARGET_MANIFEST = (
     Path(__file__).resolve().parents[3] / "docker" / "rocm-targets.json"
@@ -70,10 +70,11 @@ class DockerTargetManifestEntry(BaseModelWithDocstrings):
         return self
 
 
-class DockerTargetManifest(BaseModelWithDocstrings):
+class DockerTargetManifest(CurrentSchemaModel):
     """Repository-owned declared Docker Target manifest."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = ROCM_DOCKER_TARGETS_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.rocm_docker_targets.v1"]
     """Docker Target manifest schema version."""

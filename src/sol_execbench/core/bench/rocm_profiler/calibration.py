@@ -7,7 +7,10 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from sol_execbench.core.data.base_model import StrictArtifactModel
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaModel,
+    StrictArtifactModel,
+)
 from sol_execbench.core.integrity.schema_versions import (
     ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
 )
@@ -21,8 +24,10 @@ class CalibrationClockSetup(StrictArtifactModel):
     reset_on_exit: bool
 
 
-class Rocprofv3OverheadCalibration(StrictArtifactModel):
+class Rocprofv3OverheadCalibration(CurrentSchemaModel):
     """One current profiler-overhead calibration artifact."""
+
+    current_schema_version = ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION
 
     schema_version: Literal[
         "sol_execbench.rocprofv3_overhead_calibration.v2"

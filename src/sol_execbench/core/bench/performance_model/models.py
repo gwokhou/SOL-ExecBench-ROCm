@@ -12,6 +12,7 @@ from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
     CurrentDiagnosticSidecarAuthority,
+    DiagnosticConfidence,
     DiagnosticSidecarStatus,
 )
 from sol_execbench.core.data.base_model import (
@@ -185,14 +186,6 @@ class RatioKind(StrEnum):
     L = "L"
     C = "C"
     R = "R"
-
-
-class DiagnosticConfidence(StrEnum):
-    """Bounded qualitative confidence for advice."""
-
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
 
 
 class EvidenceReference(BaseModelWithDocstrings):
@@ -569,10 +562,11 @@ class DispatchScheduleEdge(BaseModelWithDocstrings):
     reason: Literal["same_lane", "happens_before"]
 
 
-class PerformanceScheduleEvidence(BaseModelWithDocstrings):
+class PerformanceScheduleEvidence(CurrentSchemaModel):
     """Controlled-replay dispatch topology used by the overlap model."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = PERFORMANCE_SCHEDULE_EVIDENCE_SCHEMA_VERSION
 
     schema_version: Literal[
         "sol_execbench.performance_schedule_evidence.v1"
@@ -1135,7 +1129,6 @@ __all__ = [
     "CrossEntropyDescriptor",
     "CrossEntropyReduction",
     "DiagnosticCalibrationProfile",
-    "DiagnosticConfidence",
     "DiagnosticModelIdentity",
     "DiagnosticRatio",
     "DispatchEvidence",

@@ -226,11 +226,17 @@ def test_declared_outputs_exclude_unreachable_trace_dead_ends(
     assert result["total"]["resource_work"] == {"valu": {"fp32": 2}}
 
 
-def test_ir_lifecycle_rejects_unsupported_schema() -> None:
+@pytest.mark.parametrize(
+    "schema_version",
+    [0, str(EXTENDED_EINSUM_IR_SCHEMA_VERSION)],
+)
+def test_ir_lifecycle_rejects_unsupported_schema(
+    schema_version: int | str,
+) -> None:
     with pytest.raises(ValueError, match="schema_version=6"):
         validate_extended_einsum_graph(
             {
-                "schema_version": 0,
+                "schema_version": schema_version,
                 "ir_kind": "extended_einsum",
                 "layers": {"start": _start()},
             },

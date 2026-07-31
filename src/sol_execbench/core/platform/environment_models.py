@@ -11,7 +11,10 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    CurrentSchemaModel,
+)
 from sol_execbench.core.integrity.schema_versions import (
     ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION,
     ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
@@ -134,10 +137,11 @@ class EnvironmentCapabilityBudget(BaseModelWithDocstrings):
     """Source of the derivation, such as the packaged budget catalog."""
 
 
-class EnvironmentSnapshot(BaseModelWithDocstrings):
+class EnvironmentSnapshot(CurrentSchemaModel):
     """Optional ROCm environment evidence snapshot."""
 
     model_config = ConfigDict(use_attribute_docstrings=True)
+    current_schema_version = ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.environment_snapshot.v2"] = (
         ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
@@ -180,10 +184,11 @@ class EnvironmentCheckResult(BaseModelWithDocstrings):
     """Optional remediation hint."""
 
 
-class EnvironmentDiagnostics(BaseModelWithDocstrings):
+class EnvironmentDiagnostics(CurrentSchemaModel):
     """Standalone environment diagnostic payload."""
 
     model_config = ConfigDict(use_attribute_docstrings=True)
+    current_schema_version = ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.environment_diagnostics.v1"] = (
         ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION

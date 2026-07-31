@@ -13,6 +13,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
+    Rocprofv3ReasonCode,
     classify_profile_artifact,
 )
 
@@ -62,7 +63,7 @@ def _profile_result(
         returncode=0,
         profiler_available=True,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.COMPLETE,
-        reason_codes=("rocprof_artifacts_registered",),
+        reason_codes=(Rocprofv3ReasonCode.ARTIFACTS_REGISTERED,),
     )
 
 

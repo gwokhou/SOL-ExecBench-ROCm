@@ -17,6 +17,7 @@ from sol_execbench.cli.sidecars import (
     profile as cli_profile_sidecars,
     static_evidence as cli_static_evidence,
 )
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.rocm_profiler import Rocprofv3ProfileResult
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,
@@ -52,7 +53,7 @@ class SidecarWriteRequest:
     solution: Solution
     profile_result: Rocprofv3ProfileResult | None
     static_evidence_result: StaticKernelEvidenceSidecar | None
-    decision: str
+    decision: SidecarMode
     identity: SidecarIdentity
     compile_result: CompilePhaseResult | None = None
 

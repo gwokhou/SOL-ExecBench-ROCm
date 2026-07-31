@@ -40,15 +40,13 @@ from sol_execbench.core.bench.rocm_profiler.counters import (
     write_counter_job,
 )
 from sol_execbench.core.bench.rocm_profiler.models import (
-    ROCPROF_REASON_COMMAND_FAILED,
-    ROCPROF_REASON_COMMAND_TIMEOUT,
-    ROCPROF_REASON_UNAVAILABLE,
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
+    Rocprofv3ReasonCode,
     has_profiler_data_artifact,
 )
 from sol_execbench.core.bench.rocm_profiler.profile import (
@@ -72,12 +70,6 @@ from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_REPLAY_PASS_INDEX,
 )
 from sol_execbench.core.text_utils import subprocess_text
-
-COUNTER_REASON_AVAIL_FAILED = "rocprof_counter_availability_failed"
-COUNTER_REASON_PMC_CHECK_FAILED = "rocprof_counter_pmc_check_failed"
-COUNTER_REASON_UNSUPPORTED = "rocprof_required_counters_unsupported"
-COUNTER_REASON_COLLECTED = "rocprof_counters_collected"
-COUNTER_REASON_ARTIFACT_INCOMPLETE = "rocprof_counter_artifact_incomplete"
 
 
 def collect_rocprofv3_counters(
@@ -148,7 +140,7 @@ def _run_availability(
         return _failed(
             request,
             tuple(command),
-            COUNTER_REASON_AVAIL_FAILED,
+            Rocprofv3ReasonCode.COUNTER_AVAILABILITY_FAILED,
             f"rocprofv3-avail timed out after {request.timeout_seconds} seconds",
             stdout=subprocess_text(error.stdout),
             stderr=subprocess_text(error.stderr),
@@ -157,7 +149,7 @@ def _run_availability(
         return _failed(
             request,
             tuple(command),
-            COUNTER_REASON_AVAIL_FAILED,
+            Rocprofv3ReasonCode.COUNTER_AVAILABILITY_FAILED,
             f"rocprofv3-avail failed with exit code {completed.returncode}",
             completed=completed,
         )
@@ -183,7 +175,7 @@ def _run_pmc_checks(
             return _failed(
                 request,
                 tuple(command),
-                COUNTER_REASON_PMC_CHECK_FAILED,
+                Rocprofv3ReasonCode.COUNTER_PMC_CHECK_FAILED,
                 "rocprofv3-avail pmc-check timed out",
                 stdout=subprocess_text(error.stdout),
                 stderr=subprocess_text(error.stderr),
@@ -192,7 +184,7 @@ def _run_pmc_checks(
             return _failed(
                 request,
                 tuple(command),
-                COUNTER_REASON_PMC_CHECK_FAILED,
+                Rocprofv3ReasonCode.COUNTER_PMC_CHECK_FAILED,
                 "rocprofv3-avail rejected a selected counter group",
                 completed=completed,
             )
@@ -388,12 +380,12 @@ def _counter_completed(
         profiler_available=True,
         artifact_coverage_status=coverage,
         reason_codes=(
-            (COUNTER_REASON_COLLECTED, *coverage_reasons)
+            (Rocprofv3ReasonCode.COUNTERS_COLLECTED, *coverage_reasons)
             if success
             else (
-                ROCPROF_REASON_COMMAND_FAILED,
+                Rocprofv3ReasonCode.COMMAND_FAILED,
                 *(
-                    (COUNTER_REASON_ARTIFACT_INCOMPLETE,)
+                    (Rocprofv3ReasonCode.COUNTER_ARTIFACT_INCOMPLETE,)
                     if artifact_reasons
                     else ()
                 ),
@@ -754,7 +746,7 @@ def _counter_timeout(
         timeout_seconds=request.timeout_seconds,
         profiler_available=True,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.PARTIAL,
-        reason_codes=(ROCPROF_REASON_COMMAND_TIMEOUT,),
+        reason_codes=(Rocprofv3ReasonCode.COMMAND_TIMEOUT,),
         output_format="csv,rocpd",
         profiler_data_artifacts=bool(artifacts),
         output_directory_listing=profile_output_directory_listing(
@@ -777,7 +769,7 @@ def _unavailable(
         timeout_seconds=request.timeout_seconds,
         profiler_available=False,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.UNAVAILABLE,
-        reason_codes=(ROCPROF_REASON_UNAVAILABLE,),
+        reason_codes=(Rocprofv3ReasonCode.UNAVAILABLE,),
         output_format="csv,rocpd",
     )
 
@@ -799,7 +791,7 @@ def _unsupported(
         timeout_seconds=request.timeout_seconds,
         profiler_available=True,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.UNAVAILABLE,
-        reason_codes=(COUNTER_REASON_UNSUPPORTED,),
+        reason_codes=(Rocprofv3ReasonCode.REQUIRED_COUNTERS_UNSUPPORTED,),
         output_format="csv,rocpd",
     )
 
@@ -807,7 +799,7 @@ def _unsupported(
 def _failed(
     request: Rocprofv3ProfileRequest,
     command: tuple[str, ...],
-    reason_code: str,
+    reason_code: Rocprofv3ReasonCode,
     message: str,
     *,
     completed: subprocess.CompletedProcess[str] | None = None,
@@ -833,10 +825,5 @@ def _failed(
 
 
 __all__ = [
-    "COUNTER_REASON_ARTIFACT_INCOMPLETE",
-    "COUNTER_REASON_AVAIL_FAILED",
-    "COUNTER_REASON_COLLECTED",
-    "COUNTER_REASON_PMC_CHECK_FAILED",
-    "COUNTER_REASON_UNSUPPORTED",
     "collect_rocprofv3_counters",
 ]
