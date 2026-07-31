@@ -4,18 +4,28 @@
 
 Handoff date: 2026-07-31.
 
-`main` is two commits ahead of `origin/main`:
+`main` is in sync with `origin/main` at `321978f1`. The v6 semantic-range
+expansion has been merged into `main` and pushed:
 
 ```text
+321978f1 Enforce acyclic architecture domains
+f124b1d2 Tighten schema and reuse governance
+3cc00558 Expand gfx1200 performance diagnostics
 13085b42 Harden performance diagnostic governance
 fe95530e Implement governed gfx1200 performance diagnostics
 ```
 
-The worktree contains the active v6 semantic-range expansion. Do not discard
-or reset it.
+The v6 expansion no longer needs a separate worktree. The leftover
+`.worktrees/task4-live-test` (`codex/task4-live-test`, `806c9878`) is marked
+prunable and may be removed once confirmed unneeded. Do not reset `main`.
 
 The software implementation, full test suite, static checks, real gfx1200
-calibration, and immutable 660-case corpus design are complete.
+calibration, and immutable 660-case corpus design are complete. Eleven-family
+smoke artifacts are already present on disk under
+`data/outputs/microarchitecture-diagnostics-v6/smoke/` plus
+`diagnostic-smoke.json`, but they have not yet been re-verified green on
+hardware under the current `main` HEAD, and their hash is not yet recorded
+here.
 
 The remaining blocking outcome is the v6 hardware statistical acceptance:
 
@@ -51,8 +61,13 @@ Do not describe v6 as hardware-accepted until this sequence completes.
   committed.
 
 Current schema names and versions are canonical only in
-`src/sol_execbench/core/integrity/schema_versions.py`. The model is
-`gfx1200_diagnostic.v6`; do not add old-schema compatibility readers.
+`src/sol_execbench/core/integrity/schema_versions.py`. The performance
+diagnostic model is `sol_execbench.performance_diagnostic.v6`, surrounded by
+`sol_execbench.diagnostic_calibration.v6`,
+`sol_execbench.diagnostic_calibration_audit.v6`,
+`sol_execbench.diagnostic_inference_profile.v8`, and
+`sol_execbench.agent_feedback.v6`. Do not add old-schema compatibility
+readers.
 
 Reuse `core.data.definition_models.DType` for integer indices. Deterministic
 field-order JSON uses `atomic_write_json_value(..., sort_keys=False)`.
@@ -164,15 +179,19 @@ The HIP probe compiled for gfx1200 and all new modes ran on the real device.
 
 ## Remaining work
 
-### 1. Prepare eleven smoke cases
+### 1. Verify the eleven smoke cases on hardware
 
-Create one runnable problem/solution pair per family. The likely missing
-templates are Softmax, CrossEntropy, indexed read/update, composite, MiniGPT,
-and concurrent DAG.
+One problem/solution pair per family is already authored and staged under
+`data/outputs/microarchitecture-diagnostics-v6/smoke/` (composite, concurrent,
+cross_entropy, elementwise, indexed_read, indexed_update, matmul, reduction,
+softmax, transformer, transpose), with `diagnostic-smoke.json` indexing all
+eleven. The remaining task is to re-run them on real gfx1200 hardware under
+the current `main` HEAD, confirm every case is green, and record the smoke
+content hash here.
 
-Special requirements:
+Special requirements still apply to the existing artifacts:
 
-- MiniGPT must expose FP32/C=768/8-head/S<=1024 semantics.
+- MiniGPT (transformer) must expose FP32/C=768/8-head/S<=1024 semantics.
 - Concurrent cases must emit controlled lane identity and marker scope.
 - Indexed cases must exercise trusted summaries without retaining raw indices.
 
