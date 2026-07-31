@@ -12,12 +12,14 @@ from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     extract_amdgpu_footprints,
+    extract_amdgpu_kernels,
 )
 from sol_execbench.core.bench.static_kernel.evidence_builders import (
     build_static_kernel_evidence_sidecar,
 )
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceArtifact,
+    StaticKernelEvidenceKernel,
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceSidecar,
     StaticKernelEvidenceSourceReference,
@@ -142,7 +144,7 @@ def run_static_kernel_extractors(
         context,
     )
 
-    footprints, amdgpu_runs = _collect_resource_footprints(
+    footprints, kernels, amdgpu_runs = _collect_resource_footprints(
         artifacts=artifacts,
         context=context,
         output_artifacts=output_artifacts,
@@ -164,6 +166,7 @@ def run_static_kernel_extractors(
         reason_code=aggregate_extractor_reason(tool_runs),
         artifacts=all_artifacts,
         tool_runs=tool_runs,
+        kernels=kernels,
         footprints=footprints,
         isa_analyses=isa_analyses,
         warnings=warnings,
@@ -330,7 +333,11 @@ def _collect_resource_footprints(
     artifacts: Sequence[StaticKernelEvidenceArtifact],
     context: _ExtractorContext,
     output_artifacts: list[StaticKernelEvidenceArtifact],
-) -> tuple[list[StaticResourceFootprint], list[StaticKernelEvidenceToolRun]]:
+) -> tuple[
+    list[StaticResourceFootprint],
+    list[StaticKernelEvidenceKernel],
+    list[StaticKernelEvidenceToolRun],
+]:
     """Run footprint extractors (``roc-objdump`` then native AMDGPU metadata).
 
     ``roc-objdump`` is the routed extractor where available; on ROCm 7.x
@@ -340,6 +347,7 @@ def _collect_resource_footprints(
     real footprint source.
     """
     footprints: list[StaticResourceFootprint] = []
+    kernels: dict[str, StaticKernelEvidenceKernel] = {}
     amdgpu_runs: list[StaticKernelEvidenceToolRun] = []
     for artifact in artifacts:
         artifact_type = toolchain_artifact_type_for_static_artifact(artifact)
@@ -356,17 +364,20 @@ def _collect_resource_footprints(
         )
         footprints.extend(routed_footprints)
         output_artifacts.extend(raw_artifacts)
-        if routed_footprints:
-            continue
-        native_footprints, native_run = _collect_native_amdgpu_footprints(
-            artifact,
-            artifact_path,
-            context,
+        native_footprints, native_kernels, native_run = (
+            _collect_native_amdgpu_footprints(
+                artifact,
+                artifact_path,
+                context,
+            )
         )
-        footprints.extend(native_footprints)
-        if native_run is not None:
+        if not routed_footprints:
+            footprints.extend(native_footprints)
+        for kernel in native_kernels:
+            kernels.setdefault(kernel.name, kernel)
+        if native_run is not None and not routed_footprints:
             amdgpu_runs.append(native_run)
-    return footprints, amdgpu_runs
+    return footprints, list(kernels.values()), amdgpu_runs
 
 
 def _collect_routed_footprints(
@@ -439,19 +450,30 @@ def _collect_native_amdgpu_footprints(
     artifact: StaticKernelEvidenceArtifact,
     artifact_path: Path,
     context: _ExtractorContext,
-) -> tuple[list[StaticResourceFootprint], StaticKernelEvidenceToolRun | None]:
+) -> tuple[
+    list[StaticResourceFootprint],
+    list[StaticKernelEvidenceKernel],
+    StaticKernelEvidenceToolRun | None,
+]:
     """Read AMDGPU code-object metadata when no routed footprint is available."""
     try:
+        data = artifact_path.read_bytes()
         footprints = extract_amdgpu_footprints(
-            artifact_path.read_bytes(),
+            data,
+            artifact_id=artifact.artifact_id,
+            source_sha256=artifact.sha256,
+            target_architecture=artifact.target_architecture,
+        )
+        kernels = extract_amdgpu_kernels(
+            data,
             artifact_id=artifact.artifact_id,
             source_sha256=artifact.sha256,
             target_architecture=artifact.target_architecture,
         )
     except OSError:
-        return [], None
+        return [], [], None
     if not footprints:
-        return [], None
+        return [], kernels, None
     tool_run = StaticKernelEvidenceToolRun(
         tool_id="amdgpu-metadata",
         command=["amdgpu-metadata", str(artifact_path)],
@@ -460,4 +482,4 @@ def _collect_native_amdgpu_footprints(
         stdout_tail=f"native AMDGPU metadata: {len(footprints)} footprint(s)",
         timeout_seconds=context.timeout_seconds,
     )
-    return footprints, tool_run
+    return footprints, kernels, tool_run

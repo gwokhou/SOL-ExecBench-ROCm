@@ -168,7 +168,7 @@ def test_static_kernel_evidence_round_trips_strict_json_payload():
 
     assert payload["schema_version"] == STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
     assert (
-        payload["schema_version"] == "sol_execbench.static_kernel_evidence.v3"
+        payload["schema_version"] == "sol_execbench.static_kernel_evidence.v4"
     )
     assert StaticKernelEvidenceSidecar.model_validate(payload) == sidecar
 

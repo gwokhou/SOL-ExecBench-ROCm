@@ -1,6 +1,6 @@
 # Agent Feedback Sidecar
 
-`sol_execbench.agent_feedback.v4` is an optional diagnostic sidecar written next
+`sol_execbench.agent_feedback.v6` is an optional diagnostic sidecar written next
 to canonical Trace JSONL by `_agent_feedback_sidecar_path` in
 `src/sol_execbench/cli/sidecars/agent_feedback.py`. It gives downstream agents
 bounded next-experiment guidance while preserving Trace JSONL as the only

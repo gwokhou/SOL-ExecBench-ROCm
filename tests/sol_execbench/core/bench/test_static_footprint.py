@@ -90,7 +90,7 @@ def test_valid_footprint_fixture_loads_as_v3_sidecar():
     )
     sidecar = StaticKernelEvidenceSidecar.model_validate(payload)
 
-    assert sidecar.schema_version == "sol_execbench.static_kernel_evidence.v3"
+    assert sidecar.schema_version == "sol_execbench.static_kernel_evidence.v4"
     assert len(sidecar.footprints) == 1
     footprint = sidecar.footprints[0]
     assert footprint.vgpr_used == 32

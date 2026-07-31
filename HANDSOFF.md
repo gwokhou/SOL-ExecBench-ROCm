@@ -1,261 +1,219 @@
 # gfx1200 Performance Diagnostics Handoff
 
-## Repository state
+## Current state
 
-Handoff date: 2026-07-30
+Handoff date: 2026-07-31.
 
-Branch `main` is three DCO-signed commits ahead of `origin/main`:
-
-```text
-079fdcb5 Implement gfx1200 diagnostic feedback loop
-54ef60d6 Harden performance diagnostic evidence validation
-16e11690 Implement microarchitecture diagnostics
-```
-
-The upstream base is:
+`main` is two commits ahead of `origin/main`:
 
 ```text
-1bd7e798 Document microarchitecture diagnostics plan
+13085b42 Harden performance diagnostic governance
+fe95530e Implement governed gfx1200 performance diagnostics
 ```
 
-The worktree was clean before this handoff update. `HANDSOFF.md` is the only
-intended uncommitted change after the update. The three implementation commits
-have not been pushed.
+The worktree contains the active v6 semantic-range expansion. Do not discard
+or reset it.
 
-The earlier SOLAR dual-path commits were rebased. Their current hashes are:
+The software implementation, full test suite, static checks, real gfx1200
+calibration, and immutable 660-case corpus design are complete.
+
+The remaining blocking outcome is the v6 hardware statistical acceptance:
 
 ```text
-b5c92aee Add fail-closed SOLAR path comparison
-83c42d75 Enable fixed dual-path SOLAR analysis
-501676fe Expand AKA workload and correctness contracts
+11-family smoke
+-> 440 development cases
+-> frozen inference
+-> 220 held-out cases
+-> acceptance
+-> accepted Agent feedback smoke
 ```
 
-Do not use the obsolete pre-rebase hashes previously recorded in this file.
+Do not describe v6 as hardware-accepted until this sequence completes.
 
-## Current implementation
+## Boundaries that must not change
 
-The new path is a diagnostic-only gfx1200 performance model. It does not change
-canonical Trace timing, `T_SOL`, SOL Score, leaderboard values, or rewards.
-The model and artifact contracts are:
+- Performance diagnostics remain diagnostic-only.
+- `T_SOL`, canonical Trace timing, SOL Score, leaderboard values, and rewards
+  remain unchanged.
+- Canonical execution precedes profiler replay.
+- Profiler duration, timestamp delta, achieved throughput, and the same
+  candidate's measured runtime never become prediction components.
+- Timestamps may establish verified dispatch topology only.
+- Evidence identity, schema version, calibration range, and artifact hashes
+  fail closed.
+- `L` stays unavailable without an explicitly supplied trusted frontier.
+- Partial or ungoverned diagnostics cannot request kernel code changes.
+- Tuning and parameter-estimation samples cannot enter development or
+  held-out acceptance.
+- The current hardware target is RX 9060 XT/gfx1200 with the ROCm 7.2
+  compatible toolchain.
+- Generated evidence under `data/outputs/` is ignored and must not be
+  committed.
+
+Current schema names and versions are canonical only in
+`src/sol_execbench/core/integrity/schema_versions.py`. The model is
+`gfx1200_diagnostic.v6`; do not add old-schema compatibility readers.
+
+Reuse `core.data.definition_models.DType` for integer indices. Deterministic
+field-order JSON uses `atomic_write_json_value(..., sort_keys=False)`.
+
+## Implemented scope
+
+The model supports eleven validation families:
+
+1. elementwise;
+2. transpose;
+3. reduction, RMSNorm, and LayerNorm;
+4. FP16/FP32 GEMM and BMM;
+5. Softmax and LogSoftmax;
+6. class-index CrossEntropy;
+7. gather, index-select, and embedding;
+8. indexed overwrite and FP32 atomic add;
+9. exact acyclic primitive graphs of at most 32 nodes;
+10. preregistered MiniGPT FP32/C=768/8-head/S<=1024 blocks;
+11. controlled concurrent DAGs.
+
+Indexed workloads use a canonical-input-bound access sidecar containing only
+de-identified INT32/INT64 locality and collision summaries. Raw indices are
+prohibited.
+
+Sequential dispatches are summed. Controlled overlap requires verified
+process/GPU/lane/marker scope and uses a duration-free precedence DAG.
+Timestamp distances are not prediction inputs.
+
+The overlap calibration stores eleven measured `resource_mix` points:
 
 ```text
-model: gfx1200_diagnostic.v3
-diagnostic: sol_execbench.performance_diagnostic.v3
-calibration: sol_execbench.diagnostic_calibration.v3
-evidence manifest: sol_execbench.performance_evidence_manifest.v2
-timing evidence: sol_execbench.performance_timing_evidence.v2
-acceptance: sol_execbench.diagnostic_acceptance.v2
+0.000, 0.108, 0.195, 0.327, 0.492, 0.660,
+0.795, 0.886, 0.939, 0.969, 1.000
 ```
 
-### Governed evidence collection
+Prediction interpolates only between adjacent measured points for the exact
+calibrated concurrency count. It does not claim wide ranges such as
+`resource_mix=0.67:1`.
 
-Evaluation now has an explicit single-workload counter mode:
+Semantic and hardware descriptor dispatch use `functools.singledispatch`.
+Closed string operation vocabularies use mapping tables.
+
+## Completed evidence
+
+### Calibration
+
+A locked 3-batch tuning plus 5-batch independent parameter-estimation run
+completed on the real gfx1200 device.
+
+```text
+data/outputs/microarchitecture-diagnostics-v6/calibration/
+  gfx1200-diagnostic-v6.json
+  gfx1200-diagnostic-v6.audit.json
+```
+
+```text
+profile 063f3759ec542442d82e50ff9b29635aaf27955527022e9f20a1be6c1bf6a092
+audit   42e889052772ce90c771d385e7441a5f00eb53436436c6f8e76d5852741f0ffb
+```
+
+The profile strictly reloads as v6 and contains 37 scalar parameters, four
+multidimensional surfaces, and eleven overlap points. The probe covers the
+new indexed-read, atomic, FP32 matrix, residency, and overlap behavior.
+Residency is measured rather than represented by placeholder constants.
+
+### Corpus design
+
+The design was frozen before any v6 corpus case was collected:
+
+```text
+data/outputs/microarchitecture-diagnostics-v6/
+  preregistered-corpus/design.json
+```
+
+```text
+SHA256 45cae9e06a4c247e452f9ec5401701b4979a1bec47e20bb0818443ba8d06cd5c
+```
+
+It defines 60 cases per family:
+
+```text
+point-fit development       220
+conformal development       220
+development total           440
+held-out                    220
+total                       660
+```
+
+The separate `preregister` stage is immutable. Later stages require the exact
+design and never overwrite a mismatch.
+
+### Verification
+
+The current worktree passed:
 
 ```bash
-uv run sol-execbench --format json evaluate PROBLEM_DIR \
-  --solution SOLUTION.json \
-  --workload-uuid WORKLOAD_UUID \
-  --profile rocprofv3-counters \
-  --static-evidence auto \
-  --output TRACE.jsonl
-```
-
-The unprofiled canonical run happens first. Counter collection is a later
-diagnostic replay and cannot replace canonical timing. The workflow writes:
-
-```text
-TRACE.jsonl.performance-timing.json
-TRACE.jsonl.performance-evidence.json
-```
-
-The timing sidecar binds the exact trial/iteration samples and a deterministic
-10,000-replicate hierarchical-bootstrap interval. The evidence manifest binds
-the definition, workload, solution, compile command/compiler, code objects,
-GPU/ROCm/clock identity, Trace, timing sidecar, static ISA, counter CSV, ROCPD,
-and counter provenance by SHA-256.
-
-The rocprofv3 counter path:
-
-- selects counters from the versioned gfx1200 manifest;
-- checks availability through `rocprofv3-avail`;
-- preserves raw CSV and ROCPD evidence;
-- aligns passes by workload, candidate, kernel, launch geometry, queue, and
-  iteration;
-- rejects missing queue identity, multi-queue execution, overlap, incomplete
-  passes, counter mismatch, and candidate/code-object drift;
-- never uses profiler duration or achieved throughput as a prediction input.
-
-HIP/C++ candidates with inspectable code objects can produce complete hardware
-evidence. Candidate forms without a content-bound code object remain partial.
-
-### Prediction and attribution
-
-The admitted semantic families are intentionally narrow:
-
-- contiguous FP32/BF16 elementwise graphs;
-- out-of-place 2D FP16/BF16/FP32 transpose;
-- last-axis sum, mean, and RMSNorm with BF16/FP32 input and FP32 accumulation;
-- contiguous FP16 GEMM/BMM with FP32 accumulation and output.
-
-`T_pred(IR)` consumes verified SOLAR work and fusion regions.
-`T_pred(HW)` consumes actual dispatch decomposition, ISA/resource footprint,
-dynamic counters, and the compatible calibration profile. Unsupported
-semantics, missing evidence, identity drift, calibration range misses, and
-overlap return explicit `partial`/`unavailable` reason codes.
-
-The diagnostic reports:
-
-```text
-L = T_frontier / T_SOL
-C = T_pred(HW) / T_pred(IR)
-R = T_measured / T_pred(HW)
-```
-
-`L` is unavailable unless the caller supplies a trusted frontier Trace.
-The scoring baseline is never substituted for a frontier. Ratio and action
-selection account for prediction intervals and canonical timing noise.
-Ratios materially below one are treated as identity/model contradictions, not
-as evidence that a candidate exceeded the model.
-
-Build a diagnostic with:
-
-```bash
-uv run sol-execbench --format json diagnostics performance \
-  --evidence-manifest TRACE.jsonl.performance-evidence.json \
-  --solar-manifest SOLAR_REQUEST/manifest.yaml \
-  --calibration-profile CALIBRATION.json \
-  --output TRACE.performance-diagnostic.json
-```
-
-`--frontier-trace FRONTIER.jsonl` is optional.
-
-### Calibration, acceptance, and Agent feedback
-
-The calibration workflow uses a frozen two-phase protocol: tuning followed by
-at least five fresh parameter-estimation processes. Its audit binds GPU UUID,
-BDF, gfx target, ROCm, compiler, code object, clock/power state, frozen
-configuration, and all input evidence hashes.
-
-The independent acceptance contract requires at least twenty non-tuning
-held-out cases in each of the four supported families, at least 80 cases total.
-Development uses the same minimum and is pair-disjoint from held-out data. It
-accepts the model only when:
-
-```text
-median absolute percentage error <= 15%
-P90 absolute percentage error    <= 30%
-per-family interval coverage     >= 90%
-enabled action precision         >= 90%
-enabled action recall            >= 70%
-```
-
-Agent feedback requires the exact accepted calibration identity and profile
-hash, a current diagnostic, and its exact evidence manifest:
-
-```bash
-uv run sol-execbench --format json diagnostics agent-feedback \
-  --performance-diagnostic TRACE.performance-diagnostic.json \
-  --evidence-manifest TRACE.jsonl.performance-evidence.json \
-  --acceptance ACCEPTANCE.json \
-  --output TRACE.performance-agent-feedback.json
-```
-
-Partial or ungoverned diagnostics can request new evidence or report a model
-gap, but cannot recommend a kernel code change. Stable actions cover launch
-bound search, dispatch reduction, WMMA restoration, excess traffic,
-coalescing, LDS/barrier pressure, missing counters, and model gaps.
-
-## Verification completed
-
-The following focused CPU/contract tests were rerun on the current `HEAD`
-during this handoff update and passed:
-
-```bash
-uv run pytest tests/sol_execbench/core/bench/performance_model
-uv run pytest \
-  tests/sol_execbench/cli/commands/test_diagnostics_performance.py
-uv run pytest \
-  tests/sol_execbench/cli/evaluation/test_runtime.py \
-  tests/sol_execbench/cli/evaluation/test_compilation.py
-uv run pytest tests/sol_execbench/core/bench/test_agent_feedback.py
-uv run pytest \
-  tests/sol_execbench/core/bench/test_rdna4_performance_model_acceptance.py
-uv run pytest tests/sol_execbench/cli/sidecars/test_profile.py
-uv run pytest tests/sol_execbench/core/bench/test_staged_evaluation.py
-```
-
-A governed gfx1200 calibration was collected on the RX 9060 XT and strict
-current-schema reload succeeded:
-
-```text
-data/outputs/gfx1200-diagnostic-v3.json
-data/outputs/gfx1200-diagnostic-v3.audit.json
-```
-
-The audit binds GPU UUID/BDF, ROCm/compiler/code-object identity, STABLE_PEAK
-pre/post state, temperature, and foreign-process observations. The repository
-counter orchestrator was also run against the real device. Its four independent
-passes selected `SQ_WAVES_sum`, memory traffic, cache hit/miss, and LDS conflict
-percentage; all passes produced CSV and ROCPD artifacts, and the orchestrator
-reported complete coverage.
-
-ROCm 7.2 has an upstream rocprofv3 ring-buffer defect when its temporary path is
-derived from an unsuitable container working directory. The runtime now sets
-`ROCPROF_TMPDIR` to a writable controlled directory. With that setting, the
-repository parser aligned all 168 probe dispatches across the four real passes.
-
-No independent 20-per-family development and held-out corpora are present under
-`data/`, so no accepted held-out artifact was produced. Until those 160
-content-addressed cases are collected and pass the frozen gates, the model is
-hardware-calibrated and counter-validated but not hardware-accepted.
-
-The validation corpus now uses a derived workload/candidate pair hash rather
-than a caller assertion. Authoring re-derives the pair from governed evidence,
-checks the workload family, and rejects evidence reuse across development and
-held-out corpora. Counter collection also runs an exact `pmc-check` for every
-selected group before replay and binds the combined result into v4 provenance.
-All four groups pass `pmc-check` on the local RX 9060 XT. The current
-production collector also completed all four replay passes against the
-packaged diagnostic probe and emitted strict v4 provenance plus CSV/ROCPD
-artifacts under `data/outputs/diagnostic-counter-v4-audit-20260730/`.
-
-A strict four-family hardware smoke entry point is available through
-`SOL_EXECBENCH_DIAGNOSTIC_SMOKE_JSON`. No four-case smoke configuration is
-currently present under `data/`; a skipped smoke test is not acceptance
-evidence.
-
-The following static and quality gates were also rerun and passed:
-
-```bash
-uv run --no-sync ty check
-uv run --no-sync python scripts/check_coupling.py
-uv run --no-sync python scripts/check_readability.py
-uv run --no-sync python scripts/check_production_reachability.py
-uv run --no-sync python scripts/check_current_docs.py
+uv run pytest tests/
+uv run ty check
+uv run python scripts/check_coupling.py
+uv run python scripts/check_readability.py
 uv run --with ruff ruff check .
 uv run --with ruff ruff format --check .
+uv run python scripts/check_current_docs.py
+uv run python scripts/check_schema_versions.py
 git diff --check
 ```
 
-The schema-version gate and the full `tests/` suite now pass. Package coverage
-also passes the repository's line and branch policy.
+The HIP probe compiled for gfx1200 and all new modes ran on the real device.
 
-## Next work
+## Remaining work
 
-### P0: Collect and pass independent held-out acceptance
+### 1. Prepare eleven smoke cases
 
-Prepare at least twenty independent cases for each of elementwise, transpose,
-reduction/norm, and matmul. For every case:
+Create one runnable problem/solution pair per family. The likely missing
+templates are Softmax, CrossEntropy, indexed read/update, composite, MiniGPT,
+and concurrent DAG.
 
-1. Produce a canonical single-workload Trace and governed counter evidence.
-2. Produce the exact eligible SOLAR manifest.
-3. Build the v3 diagnostic against the frozen calibration and inference policy.
-4. Record only labels and content-addressed evidence references in the public
-   corpus; the authoring command derives predictions and measured timing.
-5. Prove that the workload/candidate was not used for tuning or parameter
-   estimation.
+Special requirements:
 
-Then run:
+- MiniGPT must expose FP32/C=768/8-head/S<=1024 semantics.
+- Concurrent cases must emit controlled lane identity and marker scope.
+- Indexed cases must exercise trusted summaries without retaining raw indices.
+
+### 2. Pass the eleven-family hardware smoke
+
+For every case require:
+
+- correct SOLAR descriptor and family classification;
+- current timing/access/replay/static/counter evidence;
+- available IR and HW predictions;
+- available `C` and `R`;
+- scope-verified concurrent scheduling;
+- no profiler-duration or achieved-rate dependency.
+
+Do not begin the long collection until all eleven pass.
+
+### 3. Collect development
+
+Collect 20 point-fit and 20 conformal cases per family, 440 total. Work in
+recoverable `family x phase x 20` batches and validate each batch immediately.
+
+GPU collection must remain serial. SOLAR may use bounded parallelism only
+after memory behavior is verified.
+
+Freeze development and fit inference:
+
+```bash
+uv run sol-execbench --format json diagnostics fit-performance-inference \
+  --development-corpus DEVELOPMENT.json \
+  --calibration-profile CALIBRATION.json \
+  --output INFERENCE.json
+```
+
+Record the inference SHA256. Held-out results must not change calibration,
+features, conformal policy, or action thresholds. A required change invalidates
+the held-out run.
+
+### 4. Collect held-out and accept
+
+Collect 20 pair-disjoint cases per family, 220 total. Reject any pair reused
+from development and any tuning, parameter-estimation, or conformal sample.
 
 ```bash
 uv run sol-execbench --format json diagnostics accept-performance-model \
@@ -267,146 +225,116 @@ uv run sol-execbench --format json diagnostics accept-performance-model \
   --output ACCEPTANCE.json
 ```
 
-Do not weaken the 15% median, 30% P90, coverage, independence, or attribution
-requirements to make the first run pass. Investigate model or evidence defects,
-repeat calibration when justified, refreeze, and collect a new independent
-acceptance set.
+Required gates:
 
-Only an accepted result for the exact calibration profile authorizes
-code-changing Agent feedback.
+```text
+median absolute percentage error <= 15%
+P90 absolute percentage error    <= 30%
+per-family interval coverage     >= 90%
+enabled action precision         >= 90%
+enabled action recall            >= 70%
+```
 
-### P1: Run full repository gates
+Every enabled code-changing action also needs at least ten held-out positives.
+If `reduce_atomic_contention` or `restore_fused_attention_path` should be
+enabled, add explicit positive/negative candidate variants and gold labels.
 
-After hardware-facing fixes, run:
+Do not weaken a gate to make a run pass. Fix the model or evidence, refreeze,
+and collect a new independent held-out set.
+
+### 5. Close the Agent loop
+
+Only an acceptance result for the exact calibration and inference hashes may
+authorize code-changing feedback.
 
 ```bash
-uv run pytest tests/
-uv run --no-sync ty check
-uv run --no-sync python scripts/check_coupling.py
-uv run --no-sync python scripts/check_readability.py
-uv run --no-sync python scripts/check_production_reachability.py
-uv run --no-sync python scripts/check_current_docs.py
-uv run --no-sync python scripts/check_schema_versions.py
-uv run --with ruff ruff check .
-uv run --with ruff ruff format --check .
-git diff --check
+uv run sol-execbench --format json diagnostics agent-feedback \
+  --performance-diagnostic DIAGNOSTIC.json \
+  --evidence-manifest EVIDENCE.json \
+  --acceptance ACCEPTANCE.json \
+  --output FEEDBACK.json
 ```
 
-Do not raise readability, coupling, or quality baselines.
+Record the smoke, development, held-out, inference, acceptance, and feedback
+hashes plus every family/action statistic in this file.
 
-### P1: Complete the SOLAR release evidence
+## Runtime and batching
 
-The diagnostic work does not unblock official scoring. Current policy remains:
+GPU evidence collection is the dominant cost:
 
-```yaml
-official_scoring:
-  status: unavailable
-  baseline_id: rx9060xt-gfx1200-reference-v2
-  reason_code: baseline_v2_release_evidence_pending
+```text
+estimated wall time ~= per-case P50 x 660
 ```
 
-The previous development audit reported MakeFX readiness at 163/163 and
-Torchview readiness at 159/163. The four Torchview failures are the explicit
-backward references in `instruction2triton/rmsnorm_bwd`; a forward-only trace
-is not a valid fix. These results were not rerun on the diagnostic `HEAD` and
-must not be presented as release evidence.
+Illustrative totals:
 
-The repository-owned comparison covers 32 dual-ready workloads and reports
-agreement in external identity, model I/O, mandatory work, limiting resource,
-and formal bound. Internal fusion/intermediate accounting differs because of
-the two dialect decompositions. The nine later Torchview coverage fixes have
-not been added to a reviewed 41-workload comparison.
-
-Rerun the complete audits and comparison on the exact release source:
-
-```bash
-uv run sol-execbench solar corpus-audit \
-  /tmp/solar-corpus-audit-makefx-release \
-  --backend make_fx_aten \
-  --device cuda:0
-
-uv run sol-execbench solar corpus-audit \
-  /tmp/solar-corpus-audit-torchview-release \
-  --backend torchview_extended_einsum \
-  --device cuda:0
-
-uv run sol-execbench solar compare-paths \
-  /tmp/solar-corpus-audit-makefx-release \
-  /tmp/solar-corpus-audit-torchview-release \
-  --output /tmp/solar-path-comparison-release.json
+```text
+2 minutes/case   about 22 hours
+5 minutes/case   about 55 hours
+10 minutes/case  about 110 hours
 ```
 
-Follow `docs/user/RELEASE-SCORING.md` for reproducible Orojenesis, canonical
-baseline, SOLAR release, statement construction, bundle assembly, and official
-verification. Do not change the policy until reviewed content-addressed release
-evidence exists.
+Development is approximately 15-73 hours and held-out 7-37 hours under those
+assumptions. The other potentially expensive stage is 660-case SOLAR analysis,
+especially MiniGPT and composite graphs.
 
-## Important invariants
+Before the full run:
 
-- Performance diagnostics remain diagnostic-only.
-- Canonical execution happens before profiler replay.
-- Canonical timing comes only from the unprofiled Trace.
-- Profiler duration, achieved rate, and the candidate's measured runtime never
-  enter `T_pred(IR)` or `T_pred(HW)`.
-- Evidence identity and hashes fail closed; do not add guessed fallbacks.
-- Multi-queue execution and overlapping dispatches remain unsupported until a
-  reviewed overlap model exists.
-- An unavailable frontier keeps `L` unavailable.
-- Partial diagnostics cannot request kernel code changes.
-- Tuning or parameter-estimation samples cannot enter held-out acceptance.
-- Keep `torchview_extended_einsum` as the default SOLAR path.
-- Do not restore `--extractor`, automatic path fallback, mixed release roots, or
-  the retired extended-einsum MakeFX conversion.
-- Unknown SOLAR operations and unclassified resource work remain errors.
-- Do not commit GPU evidence, benchmark outputs, downloaded data, kernels,
-  tokens, or proprietary inputs.
-- GPU conclusions require a bounded host retry when the sandbox hides required
-  devices or runtime resources.
-- Use DCO signing for later commits:
+1. complete the eleven-case smoke;
+2. run a 33-case pilot, three cases per family;
+3. record per-family P50 and P90 wall time;
+4. estimate:
 
-  ```bash
-  git commit -s -m "Imperative summary"
-  ```
+   ```text
+   expected = sum(family P50 x 60)
+   conservative = sum(family P90 x 60)
+   ```
+
+Use 33 recoverable batches: eleven families x three phases x twenty cases.
+Retry only the failed bounded batch. Do not run concurrent GPU collectors.
+
+Recommended order:
+
+```text
+prepare templates
+-> 11-case smoke
+-> development SOLAR
+-> development GPU collection
+-> freeze development
+-> fit and freeze inference
+-> held-out SOLAR
+-> held-out GPU collection
+-> freeze held-out
+-> acceptance
+-> Agent feedback smoke
+-> record final hashes and statistics
+```
 
 ## Key locations
 
 ```text
 docs/performance-diagnostics.md
-    user workflow and current diagnostic contract
-
-microarchitecture_diagnostics_plan.md
-    scope, design decisions, and deferred work
+    user workflow and current contract
 
 src/sol_execbench/core/bench/performance_model/
-    contracts, prediction, attribution, calibration, acceptance, governance,
-    timing evidence, and evidence manifest
-
-src/sol_execbench/core/bench/rocm_profiler/
-    counter discovery, collection, parsing, and pass alignment
-
-src/sol_execbench/cli/sidecars/performance.py
-    evaluation-time timing/evidence sidecar construction
+    contracts, prediction, calibration, access, scheduling, and acceptance
 
 src/sol_execbench/core/solar_bridge/performance.py
-    validated SOLAR-to-diagnostic boundary
-
-src/sol_execbench/cli/commands/diagnostics.py
-    performance diagnostic and governed Agent-feedback commands
+    validated semantic boundary
 
 scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py
-scripts/internal/rdna4/verify_rdna4_diagnostic_acceptance.py
-    host calibration and held-out acceptance entry points
+    locked two-phase calibration
 
-src/sol_execbench/data/rocprofv3_counters/gfx1200_v1.yaml
-    versioned gfx1200 counter groups
+scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py
+    preregistration and resumable corpus authoring
 
-src/sol_execbench/data/hardware_calibration_probes/diagnostic_microarchitecture.hip
-    packaged calibration probe source
-
-docs/user/RELEASE-SCORING.md
-docs/user/CROSS-PATH-COMPARISON.md
-    outstanding SOLAR publication workflow and comparison contract
+tests/sol_execbench/core/bench/test_rdna4_performance_diagnostics_smoke.py
+    eleven-family hardware smoke
 ```
+
+Deferred scope is limited to arbitrary Transformer/control-flow graphs,
+non-FP32 atomics, uncontrolled overlap, cross-architecture calibration, and
+training-reward changes.
 
 Before changing code, re-read `AGENTS.md` and
 `/home/guohao/.codex/RTK.md`. Prefix repository shell commands with `rtk`.

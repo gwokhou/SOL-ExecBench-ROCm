@@ -195,6 +195,40 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
     assert manifest["publication_eligible"] is True
 
 
+def test_attach_analysis_metadata_preserves_formal_metadata() -> None:
+    analysis = {
+        "metadata": {
+            "bound_kind": "capacity_constrained_tile_aware_v1",
+        }
+    }
+
+    api._attach_analysis_metadata(
+        analysis,
+        {
+            "performance_semantics": {
+                "graph_class": "concurrent_graph",
+            }
+        },
+    )
+
+    assert analysis["metadata"] == {
+        "bound_kind": "capacity_constrained_tile_aware_v1",
+        "performance_semantics": {
+            "graph_class": "concurrent_graph",
+        },
+    }
+
+
+def test_attach_analysis_metadata_rejects_reserved_collision() -> None:
+    analysis = {"metadata": {"bound_kind": "formal"}}
+
+    with pytest.raises(ValueError, match="reserved"):
+        api._attach_analysis_metadata(
+            analysis,
+            {"bound_kind": "diagnostic"},
+        )
+
+
 def test_analyze_failure_leaves_no_partial_output(tmp_path, monkeypatch):
     output = tmp_path / "result"
     monkeypatch.setattr(

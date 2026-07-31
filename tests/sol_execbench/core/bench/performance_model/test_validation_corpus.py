@@ -20,6 +20,13 @@ _FAMILIES = (
     WorkloadKind.TRANSPOSE,
     WorkloadKind.REDUCTION,
     WorkloadKind.MATMUL,
+    WorkloadKind.SOFTMAX,
+    WorkloadKind.CROSS_ENTROPY,
+    WorkloadKind.INDEXED_READ,
+    WorkloadKind.INDEXED_UPDATE,
+    WorkloadKind.COMPOSITE,
+    WorkloadKind.TRANSFORMER,
+    WorkloadKind.CONCURRENT,
 )
 
 

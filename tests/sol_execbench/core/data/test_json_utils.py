@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from sol_execbench.core.data.json_utils import (
+    atomic_write_json_value,
     load_jsonl_file,
 )
 
@@ -16,6 +17,22 @@ from sol_execbench.core.data.json_utils import (
 class ExampleModel(BaseModel):
     name: str
     count: int
+
+
+def test_atomic_write_json_value_can_preserve_contractual_key_order(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "definition.json"
+
+    atomic_write_json_value(
+        path,
+        {"inputs": {"v": {}, "a": {}, "max": {}}},
+        sort_keys=False,
+    )
+
+    assert path.read_text(encoding="utf-8").find('"v"') < path.read_text(
+        encoding="utf-8"
+    ).find('"a"')
 
 
 def test_load_jsonl_file_uses_pydantic_validation_and_skips_blank_lines(

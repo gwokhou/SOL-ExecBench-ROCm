@@ -95,6 +95,8 @@ def _dispatch(
         iteration_ordinal=iteration,
         counters={"SQ_WAVES": value},
         runtime_footprint=ResourceFootprint(scratch_bytes=scratch_bytes),
+        start_timestamp_ns=iteration * 10,
+        end_timestamp_ns=iteration * 10 + 1,
     )
 
 
@@ -129,6 +131,25 @@ def test_dispatch_without_static_kernel_identity_is_invalid() -> None:
     assert result.reason_codes == ["dispatch_static_kernel_identity_mismatch"]
 
 
+def test_runtime_demangled_symbol_matches_static_itanium_symbol() -> None:
+    compiled = CompiledCharacterization(
+        candidate_sha256="c" * 64,
+        code_object_sha256="d" * 64,
+        gpu_architecture="gfx1200",
+        kernel_symbol="_Z10toy_kernelPf",
+        footprint=ResourceFootprint(scratch_bytes=0),
+        source=_source(),
+    )
+
+    [result] = builder._record_static_runtime_conflicts(
+        [_dispatch("toy_kernel(float*)")],
+        [compiled],
+    )
+
+    assert result.valid is True
+    assert result.reason_codes == []
+
+
 def test_replayed_dispatches_collapse_to_one_representative_invocation() -> (
     None
 ):
@@ -153,7 +174,24 @@ def test_replayed_dispatches_collapse_to_one_representative_invocation() -> (
         ("b", 1),
     ]
     assert [item.counters["SQ_WAVES"] for item in result] == [1.5, 2.0, 3.0]
-    assert all(item.start_timestamp_ns is None for item in result)
+    assert [item.start_timestamp_ns for item in result] == [0, 0, 10]
+
+
+def test_replayed_dispatches_preserve_concurrent_lanes() -> None:
+    dispatches = [
+        _dispatch("stage", iteration=index).model_copy(
+            update={"queue_id": lane},
+        )
+        for index in range(2)
+        for lane in ("left", "right")
+    ]
+
+    result = builder._collapse_replayed_dispatches(dispatches)
+
+    assert [(item.queue_id, item.start_timestamp_ns) for item in result] == [
+        ("left", 0),
+        ("right", 0),
+    ]
 
 
 def test_counter_artifacts_require_cited_relative_path_and_hash(
@@ -241,6 +279,7 @@ def test_multiple_kernels_do_not_reuse_aggregate_isa_analysis(
         item.reason_codes == ["static_isa_kernel_mapping_ambiguous"]
         for item in compiled
     )
+    assert builder._compiled_reason_codes(compiled) == []
 
 
 def test_frontier_requires_matching_runtime_identity() -> None:

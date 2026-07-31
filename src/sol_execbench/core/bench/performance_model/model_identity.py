@@ -23,7 +23,7 @@ _POLICY_MODULES = (
     "sol_execbench.core.bench.performance_model.counter_metrics",
     "sol_execbench.core.bench.performance_model.inference",
 )
-_COUNTER_RESOURCE = "gfx1200_v1.yaml"
+_COUNTER_RESOURCE = "gfx1200_v3.yaml"
 
 
 def build_diagnostic_model_identity(

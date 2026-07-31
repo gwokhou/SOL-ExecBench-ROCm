@@ -160,3 +160,54 @@ def test_replay_evidence_fails_closed_on_input_drift(tmp_path: Path) -> None:
 
     assert replay.status is DiagnosticSidecarStatus.PARTIAL
     assert "replay_input_sha256_mismatch" in replay.reason_codes
+
+
+def test_replay_evidence_parses_only_registered_counter_csvs(
+    tmp_path: Path,
+) -> None:
+    timing_path = tmp_path / "timing.json"
+    _write_timing(timing_path)
+    record = RawPerformanceReplayRecord(
+        pid=101,
+        parent_pid=10,
+        process_executable_sha256="d" * 64,
+        pass_index=1,
+        workload_uuid="w0",
+        input_sha256="c" * 64,
+        cache_identity_sha256=_EMPTY_CACHE_SHA256,
+        marker_ranges=[
+            f"sol_execbench/w0/iteration/{index}"
+            for index in range(REPLAY_EVIDENCE_ITERATIONS)
+        ],
+    )
+    atomic_write_jsonl_values(
+        tmp_path / "performance-replay-raw-1.jsonl",
+        [record.model_dump(mode="json")],
+    )
+    pass_dir = tmp_path / "pass_1"
+    pass_dir.mkdir()
+    counter_path = pass_dir / "counter.csv"
+    counter_path.write_text(
+        _HEADER + "1,kernel,1,1,SQ_WAVES,1\n",
+        encoding="utf-8",
+    )
+    marker_path = pass_dir / "marker_api_trace.csv"
+    marker_path.write_text(
+        "Domain,Function\nMARKER_CORE_RANGE_API,iteration/0\n",
+        encoding="utf-8",
+    )
+
+    replay = build_performance_replay_evidence(
+        staging_dir=tmp_path,
+        run_id="a" * 64,
+        candidate_sha256="f" * 64,
+        canonical_timing_path=timing_path,
+        artifact_paths=[counter_path, marker_path],
+        counter_paths=[counter_path],
+        expected_gpu_id="gpu-0",
+        expected_gpu_bdf="0000:03:00.0",
+        environment=_environment(),
+    )
+
+    assert replay.status is DiagnosticSidecarStatus.AVAILABLE
+    assert marker_path.name in replay.artifact_sha256

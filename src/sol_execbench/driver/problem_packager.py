@@ -46,6 +46,7 @@ from sol_execbench.driver.staging import (
     stage_definition_files,
     stage_safetensors_inputs,
     stage_solution_sources,
+    stage_trusted_definition_file,
 )
 from sol_execbench.driver.trace_output import Trace, parse_trace_jsonl
 
@@ -213,6 +214,10 @@ class ProblemPackager:
             )
 
         return [sys.executable, "evaluation_orchestrator.py"]
+
+    def restage_trusted_reference(self) -> None:
+        """Restore worker-only reference input for one independent replay."""
+        stage_trusted_definition_file(self.definition, self.output_dir)
 
     def convert_stdout_to_traces(self, stdout: str) -> list[Trace]:
         """Parse JSONL stdout from eval_driver.py into Trace objects.

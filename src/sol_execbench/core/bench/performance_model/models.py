@@ -18,13 +18,15 @@ from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentSchemaModel,
 )
+from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
     DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION,
     PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION,
+    PERFORMANCE_SCHEDULE_EVIDENCE_SCHEMA_VERSION,
 )
 
-PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v3"
+PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v6"
 
 _MODEL_CONFIG = ConfigDict(
     extra="forbid",
@@ -35,17 +37,24 @@ _MODEL_CONFIG = ConfigDict(
 
 
 class WorkloadKind(StrEnum):
-    """Workload families supported by the first diagnostic model."""
+    """Workload families supported by the current diagnostic model."""
 
     ELEMENTWISE = "elementwise"
     TRANSPOSE = "transpose"
     REDUCTION = "reduction_norm"
     MATMUL = "matmul"
+    SOFTMAX = "softmax"
+    CROSS_ENTROPY = "cross_entropy"
+    INDEXED_READ = "indexed_read"
+    INDEXED_UPDATE = "indexed_update"
+    COMPOSITE = "composite_graph"
+    TRANSFORMER = "transformer_block"
+    CONCURRENT = "concurrent_graph"
     UNSUPPORTED = "unsupported"
 
 
 class TensorDType(StrEnum):
-    """Tensor dtypes admitted by the gfx1200 v3 model."""
+    """Floating tensor dtypes admitted by the gfx1200 model."""
 
     FLOAT16 = "float16"
     BFLOAT16 = "bfloat16"
@@ -61,15 +70,48 @@ class ElementwiseOperationClass(StrEnum):
 
 
 class ReductionOperation(StrEnum):
-    """Reduction forms admitted by the v3 model."""
+    """Reduction and normalization forms admitted by the model."""
 
     SUM = "sum"
     MEAN = "mean"
     RMS_NORM = "rms_norm"
+    LAYER_NORM = "layer_norm"
+
+
+class SoftmaxOperation(StrEnum):
+    """Supported normalization operations."""
+
+    SOFTMAX = "softmax"
+    LOG_SOFTMAX = "log_softmax"
+
+
+class CrossEntropyReduction(StrEnum):
+    """Supported CrossEntropy output reductions."""
+
+    MEAN = "mean"
+    SUM = "sum"
+
+
+class IndexedReadOperation(StrEnum):
+    """Supported indexed-read forms."""
+
+    GATHER = "gather"
+    INDEX_SELECT = "index_select"
+    EMBEDDING = "embedding"
+
+
+class IndexedUpdateOperation(StrEnum):
+    """Supported indexed-write and atomic-update forms."""
+
+    SCATTER = "scatter"
+    INDEX_COPY = "index_copy"
+    INDEX_PUT = "index_put"
+    SCATTER_ADD = "scatter_add"
+    INDEX_ADD = "index_add"
 
 
 class CalibrationParameterName(StrEnum):
-    """Closed parameter vocabulary for the gfx1200 v3 model."""
+    """Closed scalar parameter vocabulary for the gfx1200 model."""
 
     DISPATCH_FLOOR_MS = "dispatch_floor_ms"
     VALU_SIMPLE_FP32_PER_MS = "valu_simple_fp32_per_ms"
@@ -89,6 +131,10 @@ class CalibrationParameterName(StrEnum):
     BARRIER_PENALTY_MS = "barrier_penalty_ms"
     EDGE_WMMA_EFFICIENCY = "edge_wmma_efficiency"
     IRREGULAR_WMMA_EFFICIENCY = "irregular_wmma_efficiency"
+    FP32_MATRIX_FLOP_PER_MS = "fp32_matrix_flop_per_ms"
+    SOFTMAX_REDUCTION_OP_PER_MS = "softmax_reduction_op_per_ms"
+    INDEXED_ADDRESS_OP_PER_MS = "indexed_address_op_per_ms"
+    STRIDED_MATMUL_EFFICIENCY = "strided_matmul_efficiency"
 
 
 class CalibrationUnit(StrEnum):
@@ -109,6 +155,21 @@ class ApplicabilityDimension(StrEnum):
     REDUCTION_WIDTH = "reduction_width"
     TILE_REMAINDER = "tile_remainder"
     ACTIVE_WAVES = "active_waves"
+    INDEX_LOCALITY = "index_locality"
+    COLLISION_FRACTION = "collision_fraction"
+    MAX_MULTIPLICITY = "max_multiplicity"
+    ELEMENT_BYTES = "element_bytes"
+    RESOURCE_MIX = "resource_mix"
+    CONCURRENT_DISPATCHES = "concurrent_dispatches"
+
+
+class CalibrationSurfaceName(StrEnum):
+    """Closed multidimensional calibration surfaces."""
+
+    INDEXED_READ = "indexed_read"
+    ATOMIC_UPDATE = "atomic_update"
+    RESIDENCY = "residency"
+    OVERLAP = "overlap"
 
 
 class PredictionKind(StrEnum):
@@ -213,7 +274,7 @@ class ReductionDescriptor(BaseModelWithDocstrings):
 
 
 class MatmulDescriptor(BaseModelWithDocstrings):
-    """Strict descriptor for a pure contiguous FP16 GEMM or BMM."""
+    """Strict descriptor for a calibrated GEMM or BMM."""
 
     model_config = _MODEL_CONFIG
 
@@ -227,10 +288,167 @@ class MatmulDescriptor(BaseModelWithDocstrings):
     leading_dimension_a: int = Field(gt=0)
     leading_dimension_b: int = Field(gt=0)
     leading_dimension_c: int = Field(gt=0)
-    input_dtype: Literal[TensorDType.FLOAT16] = TensorDType.FLOAT16
+    input_dtype: TensorDType = TensorDType.FLOAT16
     accumulation_dtype: Literal[TensorDType.FLOAT32] = TensorDType.FLOAT32
-    output_dtype: Literal[TensorDType.FLOAT32] = TensorDType.FLOAT32
+    output_dtype: TensorDType = TensorDType.FLOAT32
+    contiguous: bool = True
+    batch_stride_a: int | None = Field(default=None, ge=0)
+    batch_stride_b: int | None = Field(default=None, ge=0)
+    batch_stride_c: int | None = Field(default=None, ge=0)
+
+
+class SoftmaxDescriptor(BaseModelWithDocstrings):
+    """Strict descriptor for a contiguous last-axis Softmax."""
+
+    model_config = _MODEL_CONFIG
+
+    kind: Literal["softmax"] = "softmax"
+    operation: SoftmaxOperation
+    outer_rows: int = Field(gt=0)
+    reduction_width: int = Field(gt=0)
+    input_dtype: Literal[TensorDType.BFLOAT16, TensorDType.FLOAT32]
+    output_dtype: Literal[TensorDType.BFLOAT16, TensorDType.FLOAT32]
     contiguous: Literal[True] = True
+    reduction_axis: Literal[-1] = -1
+
+
+class CrossEntropyDescriptor(BaseModelWithDocstrings):
+    """Strict descriptor for class-index CrossEntropy."""
+
+    model_config = _MODEL_CONFIG
+
+    kind: Literal["cross_entropy"] = "cross_entropy"
+    rows: int = Field(gt=0)
+    classes: int = Field(gt=1)
+    logits_dtype: Literal[TensorDType.BFLOAT16, TensorDType.FLOAT32]
+    target_dtype: Literal[DType.INT32, DType.INT64]
+    reduction: CrossEntropyReduction
+    contiguous_logits: Literal[True] = True
+
+
+class IndexedReadDescriptor(BaseModelWithDocstrings):
+    """Strict descriptor for one contiguous-source indexed read."""
+
+    model_config = _MODEL_CONFIG
+
+    kind: Literal["indexed_read"] = "indexed_read"
+    operation: IndexedReadOperation
+    source_shape: list[int] = Field(min_length=1)
+    index_shape: list[int] = Field(min_length=1)
+    axis: int
+    payload_dtype: TensorDType
+    index_dtype: Literal[DType.INT32, DType.INT64]
+    element_bytes: int = Field(gt=0)
+    contiguous_source: Literal[True] = True
+
+    @model_validator(mode="after")
+    def axis_is_in_range(self) -> IndexedReadDescriptor:
+        """Require a normalized source axis."""
+        if not 0 <= self.axis < len(self.source_shape):
+            raise ValueError("indexed-read axis is out of range")
+        return self
+
+
+class IndexedUpdateDescriptor(BaseModelWithDocstrings):
+    """Strict descriptor for one indexed write or atomic update."""
+
+    model_config = _MODEL_CONFIG
+
+    kind: Literal["indexed_update"] = "indexed_update"
+    operation: IndexedUpdateOperation
+    output_shape: list[int] = Field(min_length=1)
+    index_shape: list[int] = Field(min_length=1)
+    axis: int
+    payload_dtype: Literal[TensorDType.FLOAT32]
+    index_dtype: Literal[DType.INT32, DType.INT64]
+    element_bytes: Literal[4] = 4
+    contiguous_output: Literal[True] = True
+    atomic: bool
+
+    @model_validator(mode="after")
+    def operation_matches_effect(self) -> IndexedUpdateDescriptor:
+        """Keep overwrite and atomic operations distinct."""
+        expected_atomic = self.operation in {
+            IndexedUpdateOperation.SCATTER_ADD,
+            IndexedUpdateOperation.INDEX_ADD,
+        }
+        if self.atomic is not expected_atomic:
+            raise ValueError("indexed-update atomic effect mismatch")
+        if not 0 <= self.axis < len(self.output_shape):
+            raise ValueError("indexed-update axis is out of range")
+        return self
+
+
+PrimitiveSemanticDescriptor = Annotated[
+    ElementwiseDescriptor
+    | TransposeDescriptor
+    | ReductionDescriptor
+    | MatmulDescriptor
+    | SoftmaxDescriptor
+    | CrossEntropyDescriptor
+    | IndexedReadDescriptor
+    | IndexedUpdateDescriptor,
+    Field(discriminator="kind"),
+]
+
+
+class CompositeGraphNode(BaseModelWithDocstrings):
+    """One admitted primitive node in a bounded semantic DAG."""
+
+    model_config = _MODEL_CONFIG
+
+    node_id: str = Field(min_length=1)
+    layer_names: list[str] = Field(min_length=1)
+    descriptor: PrimitiveSemanticDescriptor
+    input_tensors: list[str] = Field(default_factory=list)
+    output_tensors: list[str] = Field(min_length=1)
+
+
+class CompositeGraphEdge(BaseModelWithDocstrings):
+    """One exact producer-consumer tensor dependency."""
+
+    model_config = _MODEL_CONFIG
+
+    producer: str = Field(min_length=1)
+    consumer: str = Field(min_length=1)
+    tensor: str = Field(min_length=1)
+    materialized: bool
+
+
+class CompositeGraphDescriptor(BaseModelWithDocstrings):
+    """Acyclic graph composed only from admitted primitive nodes."""
+
+    model_config = _MODEL_CONFIG
+
+    kind: Literal["composite_graph"] = "composite_graph"
+    graph_class: Literal[
+        "composite_graph",
+        "transformer_block",
+        "concurrent_graph",
+    ]
+    nodes: list[CompositeGraphNode] = Field(min_length=1)
+    edges: list[CompositeGraphEdge] = Field(default_factory=list)
+    schedule: list[str] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def graph_is_complete_and_acyclic(self) -> CompositeGraphDescriptor:
+        """Require exact node identity and a topological schedule."""
+        node_ids = [node.node_id for node in self.nodes]
+        if len(node_ids) != len(set(node_ids)):
+            raise ValueError("composite graph repeats node_id")
+        if self.schedule != list(dict.fromkeys(self.schedule)) or set(
+            self.schedule
+        ) != set(node_ids):
+            raise ValueError("composite graph schedule is incomplete")
+        positions = {
+            node_id: index for index, node_id in enumerate(self.schedule)
+        }
+        for edge in self.edges:
+            if edge.producer not in positions or edge.consumer not in positions:
+                raise ValueError("composite graph edge references unknown node")
+            if positions[edge.producer] >= positions[edge.consumer]:
+                raise ValueError("composite graph schedule is not topological")
+        return self
 
 
 class UnsupportedDescriptor(BaseModelWithDocstrings):
@@ -243,10 +461,8 @@ class UnsupportedDescriptor(BaseModelWithDocstrings):
 
 
 SemanticDescriptor = Annotated[
-    ElementwiseDescriptor
-    | TransposeDescriptor
-    | ReductionDescriptor
-    | MatmulDescriptor
+    PrimitiveSemanticDescriptor
+    | CompositeGraphDescriptor
     | UnsupportedDescriptor,
     Field(discriminator="kind"),
 ]
@@ -343,6 +559,58 @@ class DispatchEvidence(BaseModelWithDocstrings):
         return self
 
 
+class DispatchScheduleEdge(BaseModelWithDocstrings):
+    """One timestamp-established precedence edge without measured duration."""
+
+    model_config = _MODEL_CONFIG
+
+    predecessor_dispatch_id: str = Field(min_length=1)
+    successor_dispatch_id: str = Field(min_length=1)
+    reason: Literal["same_lane", "happens_before"]
+
+
+class PerformanceScheduleEvidence(BaseModelWithDocstrings):
+    """Controlled-replay dispatch topology used by the overlap model."""
+
+    model_config = _MODEL_CONFIG
+
+    schema_version: Literal[
+        "sol_execbench.performance_schedule_evidence.v1"
+    ] = PERFORMANCE_SCHEDULE_EVIDENCE_SCHEMA_VERSION
+    status: DiagnosticSidecarStatus
+    workload_uuid: str = Field(min_length=1)
+    candidate_sha256: SHA256Digest
+    same_process: bool
+    same_gpu: bool
+    marker_contained: bool
+    dispatch_ids: list[str] = Field(min_length=1)
+    edges: list[DispatchScheduleEdge] = Field(default_factory=list)
+    reason_codes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def topology_is_consistent(self) -> PerformanceScheduleEvidence:
+        """Require unique dispatches and explicit unavailable reasons."""
+        if len(self.dispatch_ids) != len(set(self.dispatch_ids)):
+            raise ValueError("schedule evidence repeats dispatch ID")
+        known = set(self.dispatch_ids)
+        if any(
+            edge.predecessor_dispatch_id not in known
+            or edge.successor_dispatch_id not in known
+            for edge in self.edges
+        ):
+            raise ValueError("schedule edge references unknown dispatch")
+        scope = self.same_process and self.same_gpu and self.marker_contained
+        if self.status is DiagnosticSidecarStatus.AVAILABLE and (
+            not scope or self.reason_codes
+        ):
+            raise ValueError("available schedule requires verified scope")
+        if self.status is not DiagnosticSidecarStatus.AVAILABLE and not (
+            self.reason_codes
+        ):
+            raise ValueError("unavailable schedule requires reasons")
+        return self
+
+
 class CalibrationIdentity(BaseModelWithDocstrings):
     """Hardware and toolchain identity bound to a calibration profile."""
 
@@ -388,18 +656,109 @@ class CalibrationParameter(BaseModelWithDocstrings):
         return self
 
 
+class CalibrationSurfaceCell(BaseModelWithDocstrings):
+    """One bounded cell in a multidimensional calibration surface."""
+
+    model_config = _MODEL_CONFIG
+
+    coordinates: dict[
+        ApplicabilityDimension,
+        tuple[float, float],
+    ] = Field(min_length=1)
+    value: float = Field(gt=0.0)
+    confidence_interval: tuple[float, float]
+
+    @model_validator(mode="after")
+    def intervals_are_ordered(self) -> CalibrationSurfaceCell:
+        """Reject invalid coordinate or confidence intervals."""
+        lower, upper = self.confidence_interval
+        if lower <= 0 or upper < lower or not lower <= self.value <= upper:
+            raise ValueError("surface confidence interval must contain value")
+        if any(
+            start < 0 or end < start for start, end in self.coordinates.values()
+        ):
+            raise ValueError("surface coordinate interval is invalid")
+        return self
+
+    def matches(
+        self,
+        coordinates: dict[ApplicabilityDimension, float],
+    ) -> bool:
+        """Return whether every governed coordinate lies in this cell."""
+        return set(coordinates) == set(self.coordinates) and all(
+            self.coordinates[dimension][0]
+            <= value
+            <= self.coordinates[dimension][1]
+            for dimension, value in coordinates.items()
+        )
+
+
+class CalibrationSurface(BaseModelWithDocstrings):
+    """Non-overlapping multidimensional empirical parameter cells."""
+
+    model_config = _MODEL_CONFIG
+
+    name: CalibrationSurfaceName
+    unit: CalibrationUnit
+    cells: list[CalibrationSurfaceCell] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def cells_do_not_overlap(self) -> CalibrationSurface:
+        """Reject ambiguity across cells with the same coordinate axes."""
+        if self.name is CalibrationSurfaceName.OVERLAP:
+            for cell in self.cells:
+                interval = cell.coordinates.get(
+                    ApplicabilityDimension.RESOURCE_MIX
+                )
+                if interval is None or interval[0] != interval[1]:
+                    raise ValueError(
+                        "overlap resource_mix cells must be measured points"
+                    )
+        for index, left in enumerate(self.cells):
+            for right in self.cells[index + 1 :]:
+                if _surface_cells_overlap(left, right):
+                    raise ValueError(
+                        f"calibration surface overlaps: {self.name}"
+                    )
+        return self
+
+    def cell(
+        self,
+        coordinates: dict[ApplicabilityDimension, float],
+    ) -> CalibrationSurfaceCell | None:
+        """Return the unique matching cell without interpolation."""
+        matches = [cell for cell in self.cells if cell.matches(coordinates)]
+        if len(matches) > 1:
+            raise ValueError(f"ambiguous calibration surface {self.name}")
+        return matches[0] if matches else None
+
+
+def _surface_cells_overlap(
+    left: CalibrationSurfaceCell,
+    right: CalibrationSurfaceCell,
+) -> bool:
+    if set(left.coordinates) != set(right.coordinates):
+        return False
+    return all(
+        max(left.coordinates[dimension][0], right.coordinates[dimension][0])
+        <= min(left.coordinates[dimension][1], right.coordinates[dimension][1])
+        for dimension in left.coordinates
+    )
+
+
 class DiagnosticCalibrationProfile(CurrentSchemaModel):
     """Content-addressed gfx1200 diagnostic calibration."""
 
     model_config = _MODEL_CONFIG
     current_schema_version = DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_calibration.v3"] = (
+    schema_version: Literal["sol_execbench.diagnostic_calibration.v6"] = (
         DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
     identity: CalibrationIdentity
     parameters: list[CalibrationParameter] = Field(min_length=1)
+    surfaces: list[CalibrationSurface] = Field(default_factory=list)
     tuning_evidence_sha256: list[SHA256Digest] = Field(min_length=1)
     parameter_estimation_evidence_sha256: list[SHA256Digest] = Field(
         min_length=1
@@ -433,6 +792,16 @@ class DiagnosticCalibrationProfile(CurrentSchemaModel):
             raise ValueError(
                 f"ambiguous calibration parameter {name} at {coordinate}"
             )
+        return matches[0] if matches else None
+
+    def surface(
+        self,
+        name: CalibrationSurfaceName,
+    ) -> CalibrationSurface | None:
+        """Return one uniquely named calibration surface."""
+        matches = [surface for surface in self.surfaces if surface.name is name]
+        if len(matches) > 1:
+            raise ValueError(f"duplicate calibration surface {name}")
         return matches[0] if matches else None
 
     @model_validator(mode="after")
@@ -519,6 +888,16 @@ _CALIBRATION_PARAMETER_UNITS = {
     CalibrationParameterName.BARRIER_PENALTY_MS: (CalibrationUnit.MS_PER_EVENT),
     CalibrationParameterName.EDGE_WMMA_EFFICIENCY: CalibrationUnit.RATIO,
     CalibrationParameterName.IRREGULAR_WMMA_EFFICIENCY: (CalibrationUnit.RATIO),
+    CalibrationParameterName.FP32_MATRIX_FLOP_PER_MS: (
+        CalibrationUnit.FLOP_PER_MS
+    ),
+    CalibrationParameterName.SOFTMAX_REDUCTION_OP_PER_MS: (
+        CalibrationUnit.ITEM_PER_MS
+    ),
+    CalibrationParameterName.INDEXED_ADDRESS_OP_PER_MS: (
+        CalibrationUnit.ITEM_PER_MS
+    ),
+    CalibrationParameterName.STRIDED_MATMUL_EFFICIENCY: (CalibrationUnit.RATIO),
 }
 
 _CALIBRATION_PARAMETER_DIMENSIONS = {
@@ -542,6 +921,9 @@ _CALIBRATION_PARAMETER_DIMENSIONS = {
     ),
     CalibrationParameterName.IRREGULAR_WMMA_EFFICIENCY: (
         ApplicabilityDimension.TILE_REMAINDER
+    ),
+    CalibrationParameterName.SOFTMAX_REDUCTION_OP_PER_MS: (
+        ApplicabilityDimension.REDUCTION_WIDTH
     ),
 }
 
@@ -576,7 +958,7 @@ class PerformancePrediction(BaseModelWithDocstrings):
     lower_ms: float | None = Field(default=None, ge=0.0)
     upper_ms: float | None = Field(default=None, ge=0.0)
     components: list[PredictionComponent] = Field(default_factory=list)
-    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
     reason_codes: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
 
@@ -654,6 +1036,7 @@ class WorkloadPerformanceDiagnostic(BaseModelWithDocstrings):
     semantic: SemanticCharacterization
     compiled: list[CompiledCharacterization] = Field(default_factory=list)
     dispatches: list[DispatchEvidence] = Field(default_factory=list)
+    schedule: PerformanceScheduleEvidence | None = None
     t_pred_ir: PerformancePrediction
     t_pred_hw: PerformancePrediction
     t_measured_ms: float = Field(ge=0.0)
@@ -687,11 +1070,11 @@ class PerformanceDiagnosticSidecar(CurrentDiagnosticSidecarAuthority):
     model_config = _MODEL_CONFIG
     current_schema_version = PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.performance_diagnostic.v3"] = (
+    schema_version: Literal["sol_execbench.performance_diagnostic.v6"] = (
         PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION
     )
     status: DiagnosticSidecarStatus
-    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     inference_profile_sha256: SHA256Digest | None = None
     run_id: str
@@ -741,21 +1124,35 @@ __all__ = [
     "CalibrationIdentity",
     "CalibrationParameter",
     "CalibrationParameterName",
+    "CalibrationSurface",
+    "CalibrationSurfaceCell",
+    "CalibrationSurfaceName",
     "CalibrationUnit",
     "CompiledCharacterization",
+    "CompositeGraphDescriptor",
+    "CompositeGraphEdge",
+    "CompositeGraphNode",
+    "CrossEntropyDescriptor",
+    "CrossEntropyReduction",
     "DiagnosticCalibrationProfile",
     "DiagnosticConfidence",
     "DiagnosticModelIdentity",
     "DiagnosticRatio",
     "DispatchEvidence",
+    "DispatchScheduleEdge",
     "ElementwiseDescriptor",
     "ElementwiseOperationClass",
     "EvidenceReference",
     "FusionRegion",
+    "IndexedReadDescriptor",
+    "IndexedReadOperation",
+    "IndexedUpdateDescriptor",
+    "IndexedUpdateOperation",
     "MatmulDescriptor",
     "PerformanceAttribution",
     "PerformanceDiagnosticSidecar",
     "PerformancePrediction",
+    "PerformanceScheduleEvidence",
     "PredictionComponent",
     "PredictionKind",
     "RatioKind",
@@ -764,6 +1161,8 @@ __all__ = [
     "ResourceFootprint",
     "SemanticCharacterization",
     "SemanticDescriptor",
+    "SoftmaxDescriptor",
+    "SoftmaxOperation",
     "TensorDType",
     "TransposeDescriptor",
     "UnsupportedDescriptor",

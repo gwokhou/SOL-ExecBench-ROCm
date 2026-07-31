@@ -101,7 +101,7 @@ class PerformanceReplayEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     model_config = _CONFIG
     current_schema_version = PERFORMANCE_REPLAY_EVIDENCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.performance_replay_evidence.v1"] = (
+    schema_version: Literal["sol_execbench.performance_replay_evidence.v3"] = (
         PERFORMANCE_REPLAY_EVIDENCE_SCHEMA_VERSION
     )
     status: DiagnosticSidecarStatus
@@ -139,6 +139,7 @@ def build_performance_replay_evidence(
     candidate_sha256: str,
     canonical_timing_path: Path,
     artifact_paths: list[Path],
+    counter_paths: list[Path] | None = None,
     expected_gpu_id: str | None = None,
     expected_gpu_bdf: str | None = None,
     environment: list[RuntimeGPUTelemetry] | None = None,
@@ -161,7 +162,9 @@ def build_performance_replay_evidence(
             expected_gpu_bdf=expected_gpu_bdf,
         ),
     )
-    dispatch_digests = _dispatch_digests(artifact_paths)
+    dispatch_digests = _dispatch_digests(
+        counter_paths if counter_paths is not None else artifact_paths,
+    )
     processes = [
         _process_evidence(record, dispatch_digests.get(record.pass_index))
         for record in records

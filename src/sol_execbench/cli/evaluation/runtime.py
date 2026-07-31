@@ -29,6 +29,10 @@ from sol_execbench.core.reports.relative_metrics import apply_reference_speedups
 class EvaluationPackager(Protocol):
     """Minimal staged-package behavior needed by runtime evaluation."""
 
+    def restage_trusted_reference(self) -> None:
+        """Restore the worker-only reference for one replay process."""
+        ...
+
     def convert_stdout_to_traces(self, stdout: str) -> list[Trace]:
         """Parse staged-driver standard output into traces."""
         ...
@@ -198,6 +202,7 @@ def run_evaluation_runtime(
     apply_reference_speedups(traces)
     if profile == PROFILE_ROCPROFV3_COUNTERS:
         profile_result = _collect_counter_replay(
+            packager,
             eval_cmd,
             staging_dir=staging_dir,
             output_file=output_file,
@@ -216,6 +221,7 @@ def run_evaluation_runtime(
 
 
 def _collect_counter_replay(
+    packager: EvaluationPackager,
     eval_cmd: list[str],
     *,
     staging_dir: Path,
@@ -234,6 +240,11 @@ def _collect_counter_replay(
             output_file=output_file,
             timeout=timeout,
             counter_mode=True,
+            lifecycle=cli_evaluation.ProfileLifecycle(
+                prepare_profiled_application=(
+                    packager.restage_trusted_reference
+                ),
+            ),
         )
     finally:
         if canonical_timing is not None:

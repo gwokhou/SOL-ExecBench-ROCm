@@ -36,11 +36,19 @@ from sol_execbench.core.integrity.schema_versions import (
 MINIMUM_EMPIRICAL_COVERAGE = 0.90
 MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR = 15.0
 MAXIMUM_P90_ABSOLUTE_PERCENTAGE_ERROR = 30.0
+MINIMUM_ACTION_HELD_OUT_POSITIVES = 10
 _SUPPORTED_FAMILIES = (
     WorkloadKind.ELEMENTWISE,
     WorkloadKind.TRANSPOSE,
     WorkloadKind.REDUCTION,
     WorkloadKind.MATMUL,
+    WorkloadKind.SOFTMAX,
+    WorkloadKind.CROSS_ENTROPY,
+    WorkloadKind.INDEXED_READ,
+    WorkloadKind.INDEXED_UPDATE,
+    WorkloadKind.COMPOSITE,
+    WorkloadKind.TRANSFORMER,
+    WorkloadKind.CONCURRENT,
 )
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
@@ -89,10 +97,10 @@ class DiagnosticAcceptanceManifest(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_acceptance.v2"] = (
+    schema_version: Literal["sol_execbench.diagnostic_acceptance.v5"] = (
         DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     calibration_profile_sha256: SHA256Digest
     calibration_identity: CalibrationIdentity
@@ -101,7 +109,7 @@ class DiagnosticAcceptanceManifest(CurrentSchemaModel):
     held_out_corpus_sha256: SHA256Digest
     configuration_frozen_before_acceptance: Literal[True] = True
     enabled_action_codes: list[str]
-    cases: list[DiagnosticAcceptanceCase] = Field(min_length=80)
+    cases: list[DiagnosticAcceptanceCase] = Field(min_length=220)
 
     @model_validator(mode="after")
     def cases_are_independent(self) -> DiagnosticAcceptanceManifest:
@@ -126,10 +134,10 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_acceptance.v2"] = (
+    schema_version: Literal["sol_execbench.diagnostic_acceptance.v5"] = (
         DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     manifest_sha256: SHA256Digest
     calibration_profile_sha256: SHA256Digest
@@ -257,7 +265,9 @@ def _action_metric(
         precision=precision,
         recall=recall,
         passed=(
-            precision >= ACTION_PRECISION_GATE and recall >= ACTION_RECALL_GATE
+            len(positives) >= MINIMUM_ACTION_HELD_OUT_POSITIVES
+            and precision >= ACTION_PRECISION_GATE
+            and recall >= ACTION_RECALL_GATE
         ),
     )
 
@@ -271,6 +281,7 @@ def _nearest_rank_percentile(values: list[float], quantile: float) -> float:
 __all__ = [
     "MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR",
     "MAXIMUM_P90_ABSOLUTE_PERCENTAGE_ERROR",
+    "MINIMUM_ACTION_HELD_OUT_POSITIVES",
     "MINIMUM_CASES_PER_FAMILY",
     "MINIMUM_EMPIRICAL_COVERAGE",
     "ActionAcceptanceMetric",

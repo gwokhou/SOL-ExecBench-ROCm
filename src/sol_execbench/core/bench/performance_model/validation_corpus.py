@@ -20,13 +20,20 @@ from sol_execbench.core.integrity.schema_versions import (
 )
 
 MINIMUM_CASES_PER_FAMILY = 20
-MINIMUM_CORPUS_CASES = 80
+MINIMUM_CORPUS_CASES = 220
 _SUPPORTED_FAMILIES = frozenset(
     {
         WorkloadKind.ELEMENTWISE,
         WorkloadKind.TRANSPOSE,
         WorkloadKind.REDUCTION,
         WorkloadKind.MATMUL,
+        WorkloadKind.SOFTMAX,
+        WorkloadKind.CROSS_ENTROPY,
+        WorkloadKind.INDEXED_READ,
+        WorkloadKind.INDEXED_UPDATE,
+        WorkloadKind.COMPOSITE,
+        WorkloadKind.TRANSFORMER,
+        WorkloadKind.CONCURRENT,
     }
 )
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
@@ -55,12 +62,12 @@ class DiagnosticValidationCase(StrictArtifactModel):
 
 
 class DiagnosticValidationCorpus(CurrentSchemaModel):
-    """Frozen development or held-out cases for the four admitted families."""
+    """Frozen development or held-out cases for every admitted family."""
 
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_validation_corpus.v2"] = (
+    schema_version: Literal["sol_execbench.diagnostic_validation_corpus.v5"] = (
         DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION
     )
     role: Literal["development", "held_out"]

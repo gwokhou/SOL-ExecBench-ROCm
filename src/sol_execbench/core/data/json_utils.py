@@ -27,8 +27,13 @@ from pydantic import BaseModel
 T = TypeVar("T", bound=BaseModel)
 
 
-def atomic_write_json_value(path: str | Path, value: Any) -> None:
-    """Atomically write a deterministic JSON value in the destination directory."""
+def atomic_write_json_value(
+    path: str | Path,
+    value: Any,
+    *,
+    sort_keys: bool = True,
+) -> None:
+    """Atomically write JSON, sorting keys unless field order is contractual."""
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
@@ -40,7 +45,12 @@ def atomic_write_json_value(path: str | Path, value: Any) -> None:
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             handle.write(
-                json.dumps(value, indent=2, sort_keys=True, allow_nan=False)
+                json.dumps(
+                    value,
+                    indent=2,
+                    sort_keys=sort_keys,
+                    allow_nan=False,
+                )
                 + "\n",
             )
             handle.flush()

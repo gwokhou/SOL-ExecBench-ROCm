@@ -67,6 +67,51 @@ def test_run_solar_worker_returns_structured_response(
     }
 
 
+def test_run_solar_worker_accepts_nested_orojenesis_evidence(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    def fake_run(command, stdout_path, stderr_path, **kwargs):
+        del stdout_path, stderr_path, kwargs
+        payload = _formal_payload()
+        payload["artifacts"].append(
+            {
+                "path": "orojenesis/mm/problem.yaml",
+                "sha256": "c" * 64,
+            },
+        )
+        Path(command[-1]).write_text(json.dumps(payload))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner, "run_in_process_group_to_files", fake_run)
+
+    outcome = runner.run_solar_worker(_request(tmp_path))
+
+    assert outcome.status == "analyzed"
+    assert outcome.is_formal_publication
+
+
+def test_run_solar_worker_rejects_unexpected_formal_artifact(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    def fake_run(command, stdout_path, stderr_path, **kwargs):
+        del stdout_path, stderr_path, kwargs
+        payload = _formal_payload()
+        payload["artifacts"].append(
+            {"path": "stdout.log", "sha256": "c" * 64},
+        )
+        Path(command[-1]).write_text(json.dumps(payload))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner, "run_in_process_group_to_files", fake_run)
+
+    outcome = runner.run_solar_worker(_request(tmp_path))
+
+    assert outcome.status == "failed"
+    assert outcome.reason_code == "worker_response_invalid"
+
+
 def test_run_solar_worker_rejects_non_formal_analyzed_response(
     tmp_path,
     monkeypatch,

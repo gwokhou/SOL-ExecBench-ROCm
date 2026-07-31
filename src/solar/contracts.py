@@ -180,6 +180,9 @@ class AnalysisRequest(ConversionRequestEnvelope):
     precision: str = "fp16"
     require_orojenesis: bool = False
     orojenesis_home: str | Path | None = None
+    analysis_metadata: Mapping[str, DynamicValue] = field(
+        default_factory=dict,
+    )
 
 
 @dataclass(frozen=True)

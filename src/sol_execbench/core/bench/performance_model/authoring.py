@@ -25,6 +25,7 @@ from sol_execbench.core.bench.performance_model.inference import (
     DiagnosticInferenceProfile,
     InferenceObservation,
     build_inference_profile,
+    point_features,
 )
 from sol_execbench.core.bench.performance_model.model_identity import (
     build_diagnostic_model_identity,
@@ -147,13 +148,15 @@ def _development_observation(
         inference_path=None,
     )
     workload = diagnostic.workloads[0]
-    _, lower_ms, upper_ms = _prediction_values(workload.t_pred_hw)
+    predicted_ms, lower_ms, upper_ms = _prediction_values(workload.t_pred_hw)
     return InferenceObservation(
         case_id=case.case_id,
         workload_kind=case.workload_kind,
         measured_ms=workload.t_measured_ms,
+        base_predicted_ms=predicted_ms,
         base_lower_ms=lower_ms,
         base_upper_ms=upper_ms,
+        point_features=point_features(workload.semantic),
         action_scores=action_scores(
             semantic=workload.semantic,
             compiled=workload.compiled,

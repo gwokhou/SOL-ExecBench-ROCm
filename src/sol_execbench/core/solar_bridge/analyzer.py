@@ -22,6 +22,9 @@ from sol_execbench.core.solar_bridge.models import (
     SolarStageAuditOutcome,
     formal_precision_for_definition,
 )
+from sol_execbench.core.solar_bridge.semantic_metadata import (
+    performance_analysis_metadata,
+)
 from sol_execbench.core.solar_bridge.workload_context import (
     SolarWorkloadContext,
     load_solar_workload_context,
@@ -112,6 +115,7 @@ def _invoke_solar(
         precision=formal_precision_for_definition(definition),
         require_orojenesis=True,
         orojenesis_home=orojenesis_home,
+        analysis_metadata=performance_analysis_metadata(context),
     )
     result = analyze(request)
     if isinstance(result, AnalysisFailure):

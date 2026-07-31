@@ -12,7 +12,7 @@ import shutil
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -73,6 +73,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         architecture_sha256 = _profile_hash(profile)
         pipeline = run_pipeline(request, profile, staging)
         ir_graph, analysis = pipeline.ir_graph, pipeline.analysis
+        _attach_analysis_metadata(analysis, request.analysis_metadata)
         bound = _extract_bound(analysis, request.require_orojenesis)
         artifacts = _finish_artifacts(staging, analysis, ir_graph.path.name)
         write_request_manifest(
@@ -101,6 +102,25 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         return _failure(
             request, stage, pipeline_reason_code(stage, exc), str(exc)
         )
+
+
+def _attach_analysis_metadata(
+    analysis: dict[str, Any],
+    requested: Mapping[str, Any],
+) -> None:
+    """Attach caller-authored semantic metadata before artifact hashing."""
+    if not requested:
+        return
+    metadata = analysis.get("metadata")
+    if not isinstance(metadata, dict):
+        raise ValueError("analysis metadata is not a mapping")
+    metadata = cast("dict[str, Any]", metadata)
+    collisions = sorted(set(metadata) & set(requested))
+    if collisions:
+        raise ValueError(
+            f"analysis metadata keys are reserved: {collisions}",
+        )
+    metadata.update(requested)
 
 
 def formal_producer_readiness() -> FormalProducerReadiness:

@@ -22,6 +22,7 @@ from sol_execbench.core.bench.performance_model.models import (
     DiagnosticConfidence,
     DiagnosticRatio,
     DispatchEvidence,
+    IndexedUpdateDescriptor,
     PerformanceAttribution,
     PerformancePrediction,
     RatioKind,
@@ -87,20 +88,64 @@ def derive_attributions(
         dispatches=dispatches,
         t_pred_ir=t_pred_ir,
     )
-    if _launch_dominates(t_pred_ir):
-        actions.append(_launch_bound_action())
-    c_ratio = ratio_by_kind[RatioKind.C]
     high_ratio = (
         inference_profile.high_ratio_threshold
         if inference_profile is not None
         else HIGH_RATIO_THRESHOLD
     )
+    actions = _candidate_attributions(
+        semantic=semantic,
+        compiled=compiled,
+        dispatches=dispatches,
+        t_pred_ir=t_pred_ir,
+        t_pred_hw=t_pred_hw,
+        ratio_by_kind=ratio_by_kind,
+        high_ratio=high_ratio,
+    )
+    return [
+        action
+        for action in _deduplicate_actions(actions)
+        if action.action_code is None
+        or action_is_admitted(
+            action.action_code,
+            scores,
+            inference_profile,
+        )
+    ] or [
+        PerformanceAttribution(
+            code="action_policy_abstained",
+            category="inconclusive",
+            confidence=DiagnosticConfidence.LOW,
+            message="Frozen action policy did not admit a code-changing action.",
+        )
+    ]
+
+
+def _candidate_attributions(
+    *,
+    semantic: SemanticCharacterization,
+    compiled: Sequence[CompiledCharacterization],
+    dispatches: Sequence[DispatchEvidence],
+    t_pred_ir: PerformancePrediction,
+    t_pred_hw: PerformancePrediction,
+    ratio_by_kind: Mapping[RatioKind, DiagnosticRatio],
+    high_ratio: float,
+) -> list[PerformanceAttribution]:
+    """Derive candidate actions before frozen policy admission."""
+    actions: list[PerformanceAttribution] = []
+    matrix_path_action = _matrix_path_action(semantic, compiled)
+    if matrix_path_action is not None:
+        actions.append(matrix_path_action)
+    if _launch_dominates(t_pred_ir):
+        actions.append(_launch_bound_action())
+    c_ratio = ratio_by_kind[RatioKind.C]
     if _significantly_high(c_ratio, high_ratio):
         actions.extend(
             _codegen_actions(
                 semantic=semantic,
                 compiled=compiled,
                 dispatches=dispatches,
+                t_pred_ir=t_pred_ir,
             ),
         )
     r_ratio = ratio_by_kind[RatioKind.R]
@@ -120,23 +165,7 @@ def derive_attributions(
                 ),
             ),
         )
-    return [
-        action
-        for action in _deduplicate_actions(actions)
-        if action.action_code is None
-        or action_is_admitted(
-            action.action_code,
-            scores,
-            inference_profile,
-        )
-    ] or [
-        PerformanceAttribution(
-            code="action_policy_abstained",
-            category="inconclusive",
-            confidence=DiagnosticConfidence.LOW,
-            message="Frozen action policy did not admit a code-changing action.",
-        )
-    ]
+    return actions
 
 
 def _frontier_ratio(
@@ -274,6 +303,22 @@ def _launch_dominates(prediction: PerformancePrediction) -> bool:
     return dispatch_time / prediction.predicted_time_ms >= 0.60
 
 
+def _component_share(
+    prediction: PerformancePrediction,
+    name: str,
+) -> float:
+    if not prediction.predicted_time_ms:
+        return 0.0
+    return (
+        sum(
+            component.time_ms
+            for component in prediction.components
+            if component.name == name
+        )
+        / prediction.predicted_time_ms
+    )
+
+
 def _launch_bound_action() -> PerformanceAttribution:
     return PerformanceAttribution(
         code="launch_bound",
@@ -293,6 +338,7 @@ def _codegen_actions(
     semantic: SemanticCharacterization,
     compiled: Sequence[CompiledCharacterization],
     dispatches: Sequence[DispatchEvidence],
+    t_pred_ir: PerformancePrediction,
 ) -> list[PerformanceAttribution]:
     actions: list[PerformanceAttribution] = []
     logical_dispatches = max(len(semantic.fusion_regions), 1)
@@ -305,21 +351,6 @@ def _codegen_actions(
                 message="Runtime dispatch count exceeds SOLAR logical regions.",
                 action_code="reduce_dispatch_count",
                 evidence=["dispatch_count", "solar_fusion_regions"],
-            ),
-        )
-    if (
-        semantic.workload_kind is WorkloadKind.MATMUL
-        and not _has_matrix_isa(compiled)
-        and not _static_isa_mapping_ambiguous(compiled)
-    ):
-        actions.append(
-            PerformanceAttribution(
-                code="matrix_path_missing",
-                category="codegen",
-                confidence=DiagnosticConfidence.HIGH,
-                message="The compiled candidate has no observed WMMA/MFMA path.",
-                action_code="restore_wmma_path",
-                evidence=["static_evidence:observed_matrix_units"],
             ),
         )
     if _dynamic_bytes(dispatches) > semantic.semantic_bytes * 1.20:
@@ -344,7 +375,56 @@ def _codegen_actions(
                 evidence=["static_evidence:scratch_bytes"],
             ),
         )
+    if (
+        isinstance(semantic.descriptor, IndexedUpdateDescriptor)
+        and semantic.descriptor.atomic
+        and _component_share(t_pred_ir, "atomic_update") >= 0.20
+    ):
+        actions.append(
+            PerformanceAttribution(
+                code="atomic_contention",
+                category="atomic",
+                confidence=DiagnosticConfidence.HIGH,
+                message="Calibrated collision evidence makes atomic updates dominant.",
+                action_code="reduce_atomic_contention",
+                evidence=["access_pattern:duplicate_fraction"],
+            ),
+        )
+    if semantic.workload_kind is WorkloadKind.TRANSFORMER and len(
+        dispatches
+    ) > max(len(semantic.fusion_regions), 1):
+        actions.append(
+            PerformanceAttribution(
+                code="fused_attention_path_missing",
+                category="fusion",
+                confidence=DiagnosticConfidence.HIGH,
+                message="Runtime dispatch topology exceeds verified attention regions.",
+                action_code="restore_fused_attention_path",
+                evidence=["dispatch_count", "solar_fusion_regions"],
+            ),
+        )
     return actions
+
+
+def _matrix_path_action(
+    semantic: SemanticCharacterization,
+    compiled: Sequence[CompiledCharacterization],
+) -> PerformanceAttribution | None:
+    """Return the direct action proved by unambiguous static matrix evidence."""
+    if (
+        semantic.workload_kind is not WorkloadKind.MATMUL
+        or _has_matrix_isa(compiled)
+        or _static_isa_mapping_ambiguous(compiled)
+    ):
+        return None
+    return PerformanceAttribution(
+        code="matrix_path_missing",
+        category="codegen",
+        confidence=DiagnosticConfidence.HIGH,
+        message="The compiled candidate has no observed WMMA/MFMA path.",
+        action_code="restore_wmma_path",
+        evidence=["static_evidence:observed_matrix_units"],
+    )
 
 
 def _runtime_actions(
@@ -530,6 +610,12 @@ def action_scores(
             conflict_percent / 100.0
             if conflict_percent
             else conflicts / max(lds_ops, 1.0)
+        ),
+        "atomic_share": _component_share(t_pred_ir, "atomic_update"),
+        "attention_dispatch_ratio": (
+            len(dispatches) / logical_dispatches
+            if semantic.workload_kind is WorkloadKind.TRANSFORMER
+            else 0.0
         ),
     }
 

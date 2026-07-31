@@ -41,6 +41,7 @@ RUN apt-get update \
 
 COPY --chmod=0755 docker/orojenesis/g++-cstdint /tmp/orojenesis-compiler/g++
 COPY scripts/internal/orojenesis/write_provenance.py /tmp/write_provenance.py
+COPY src/solar/__init__.py src/solar/schema_versions.py /tmp/solar/
 
 RUN git clone https://github.com/NVlabs/timeloop.git /opt/orojenesis \
     && git -C /opt/orojenesis checkout --detach "${OROJENESIS_COMMIT}" \

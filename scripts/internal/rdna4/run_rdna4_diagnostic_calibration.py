@@ -26,6 +26,7 @@ from sol_execbench.core.bench.performance_model.calibration import (
     BOOTSTRAP_SEED,
     ProbeBatch,
     build_calibration_parameters,
+    build_calibration_surfaces,
     freeze_probe_configuration,
     parse_probe_metrics,
 )
@@ -59,6 +60,7 @@ from sol_execbench.core.platform.isa_validation import analyze_isa_disassembly
 from sol_execbench.core.platform.runtime import (
     RocmDeviceInfo,
     detect_rocm_device,
+    detect_rocm_version,
     resolve_rocm_tool,
 )
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
@@ -71,7 +73,20 @@ PROBE_SOURCE = (
     / "hardware_calibration_probes"
     / "diagnostic_microarchitecture.hip"
 )
-MODES = ("dispatch", "memory", "access", "lds", "reduction", "wmma", "valu")
+MODES = (
+    "dispatch",
+    "memory",
+    "access",
+    "lds",
+    "reduction",
+    "wmma",
+    "valu",
+    "indexed_read",
+    "atomic_update",
+    "fp32_matrix",
+    "residency",
+    "overlap",
+)
 COMMAND_TIMEOUT_SECONDS = 180.0
 COMMAND_NAME = "rdna4 diagnostic calibration"
 
@@ -83,6 +98,7 @@ class _CalibrationContext:
     device: RocmDeviceInfo
     gpu_id: str
     gpu_bdf: str
+    rocm_version: str
     compiler_version: str
     tuning_batches: int
     estimation_batches: int
@@ -232,6 +248,9 @@ def run_calibration(
             f"--gpu-id does not match device {device.index} UUID",
         )
     compiler_version = _compiler_version(hipcc)
+    rocm_version = detect_rocm_version()
+    if rocm_version is None:
+        raise RuntimeError("ROCm user-space version is unavailable")
     return _run_calibration_workspace(
         _CalibrationContext(
             output=output,
@@ -239,6 +258,7 @@ def run_calibration(
             device=device,
             gpu_id=observed_gpu_id,
             gpu_bdf=gpu_bdf,
+            rocm_version=rocm_version,
             compiler_version=compiler_version,
             tuning_batches=tuning_batches,
             estimation_batches=estimation_batches,
@@ -313,12 +333,13 @@ def _calibration_profile(
             gpu_architecture="gfx1200",
             gpu_id=context.gpu_id,
             gpu_bdf=context.gpu_bdf,
-            rocm_version=context.device.hip_version,
+            rocm_version=context.rocm_version,
             compiler_version=context.compiler_version,
             clock_mode="locked",
             power_profile="stable_peak",
         ),
         parameters=build_calibration_parameters(estimation, frozen),
+        surfaces=build_calibration_surfaces(estimation),
         tuning_evidence_sha256=[
             stable_json_checksum(
                 [
@@ -364,7 +385,7 @@ def _audit_payload(
             "binary_sha256": sha256_file(binary),
             "compiler_sha256": sha256_file(context.hipcc),
             "architecture": context.device.gfx_target,
-            "rocm_version": context.device.hip_version,
+            "rocm_version": context.rocm_version,
             "device_name": context.device.name,
             "gpu_id": context.gpu_id,
             "gpu_bdf": context.gpu_bdf,

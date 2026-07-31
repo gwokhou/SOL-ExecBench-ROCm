@@ -5,13 +5,17 @@
 
 from __future__ import annotations
 
-import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from rich.console import Console
 
 from sol_execbench.cli.evaluation.compilation import CompilePhaseResult
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
+from sol_execbench.core.bench.performance_model.access_evidence import (
+    WorkloadAccessEvidence,
+    build_performance_access_evidence,
+)
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceArtifact,
     PerformanceEvidenceArtifactKind,
@@ -26,6 +30,7 @@ from sol_execbench.core.bench.performance_model.replay_evidence import (
 from sol_execbench.core.bench.performance_model.timing_evidence import (
     RAW_TIMING_FILENAME,
     PerformanceTimingEvidenceSidecar,
+    RawPerformanceTimingRecord,
     build_performance_timing_evidence,
 )
 from sol_execbench.core.bench.rocm_profiler import (
@@ -38,16 +43,33 @@ from sol_execbench.core.bench.static_kernel.evidence import (
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     load_json_file,
+    load_jsonl_file,
 )
 from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import Environment, Trace
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeGPUTelemetry,
+)
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.platform.amd_smi import parse_gpu_identity
-from sol_execbench.core.platform.runtime import resolve_rocm_tool
-from sol_execbench.core.process.environment import ENV_SOL_EXECBENCH_DEVICE
-from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 console = Console(stderr=True)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PerformanceEvidenceManifestWriteRequest:
+    """Inputs required to publish one performance evidence root."""
+
+    output_file: Path | None
+    traces: list[Trace]
+    solution: Solution
+    timing_path: Path | None
+    access_path: Path | None
+    profile_summary_path: Path | None
+    static_evidence_path: Path | None
+    profile_result: Rocprofv3ProfileResult | None
+    static_evidence: StaticKernelEvidenceSidecar | None
+    compile_result: CompilePhaseResult | None
+    replay_path: Path | None = None
 
 
 def performance_timing_sidecar_path(
@@ -89,6 +111,59 @@ def write_performance_timing_sidecar(
         return None
     console.print(
         f"[green]Saved performance timing evidence to {destination}[/green]",
+    )
+    return destination
+
+
+def performance_access_sidecar_path(
+    output_file: Path | None,
+) -> Path | None:
+    """Return the access-evidence path for a persisted canonical trace."""
+    if output_file is None:
+        return None
+    return output_file.with_name(f"{output_file.name}.performance-access.json")
+
+
+def write_performance_access_sidecar(
+    *,
+    output_file: Path | None,
+    staging_dir: Path,
+    traces: list[Trace],
+) -> Path | None:
+    """Publish de-identified trusted-input access summaries."""
+    destination = performance_access_sidecar_path(output_file)
+    raw_path = staging_dir / RAW_TIMING_FILENAME
+    if destination is None or output_file is None or not raw_path.is_file():
+        return None
+    try:
+        raw_records = load_jsonl_file(RawPerformanceTimingRecord, raw_path)
+        expected = {
+            trace.workload.uuid
+            for trace in traces
+            if trace.evaluation is not None
+            and trace.evaluation.performance is not None
+        }
+        if {record.workload_uuid for record in raw_records} != expected:
+            raise ValueError("raw access workload identity mismatch")
+        sidecar = build_performance_access_evidence(
+            trace_path=output_file,
+            workloads=[
+                WorkloadAccessEvidence(
+                    workload_uuid=record.workload_uuid,
+                    canonical_input_sha256=record.input_sha256,
+                    patterns=record.access_patterns,
+                )
+                for record in raw_records
+            ],
+        )
+        atomic_write_json_value(destination, sidecar.to_dict())
+    except (OSError, ValueError) as error:
+        console.print(
+            f"[yellow]Performance access evidence skipped: {error}[/yellow]",
+        )
+        return None
+    console.print(
+        f"[green]Saved performance access evidence to {destination}[/green]",
     )
     return destination
 
@@ -152,6 +227,11 @@ def write_performance_replay_sidecar(
             artifact_paths=[
                 artifact.path for artifact in profile_result.artifacts
             ],
+            counter_paths=[
+                artifact.path
+                for artifact in profile_result.artifacts
+                if artifact.kind is Rocprofv3ArtifactKind.COUNTER_CSV
+            ],
             expected_gpu_id=identity.gpu_id,
             expected_gpu_bdf=identity.gpu_bdf,
             environment=list(profile_result.environment_snapshots),
@@ -166,40 +246,19 @@ def write_performance_replay_sidecar(
 
 
 def write_performance_evidence_manifest(
-    *,
-    output_file: Path | None,
-    traces: list[Trace],
-    solution: Solution,
-    timing_path: Path | None,
-    profile_summary_path: Path | None,
-    static_evidence_path: Path | None,
-    profile_result: Rocprofv3ProfileResult | None,
-    static_evidence: StaticKernelEvidenceSidecar | None,
-    compile_result: CompilePhaseResult | None,
-    replay_path: Path | None = None,
+    request: PerformanceEvidenceManifestWriteRequest,
 ) -> Path | None:
     """Publish a single-workload counter-evidence root manifest."""
-    destination = performance_evidence_manifest_path(output_file)
+    destination = performance_evidence_manifest_path(request.output_file)
     if (
         destination is None
-        or output_file is None
-        or profile_result is None
-        or "counter_definition_sha256" not in profile_result.provenance
+        or request.output_file is None
+        or request.profile_result is None
+        or "counter_definition_sha256" not in request.profile_result.provenance
     ):
         return None
     try:
-        manifest = _build_performance_evidence_manifest(
-            trace_path=output_file,
-            traces=traces,
-            solution=solution,
-            timing_path=timing_path,
-            profile_summary_path=profile_summary_path,
-            static_evidence_path=static_evidence_path,
-            profile_result=profile_result,
-            static_evidence=static_evidence,
-            compile_result=compile_result,
-            replay_path=replay_path,
-        )
+        manifest = _build_performance_evidence_manifest(request)
         atomic_write_json_value(destination, manifest.to_dict())
     except (OSError, ValueError) as error:
         console.print(
@@ -213,38 +272,31 @@ def write_performance_evidence_manifest(
 
 
 def _build_performance_evidence_manifest(
-    *,
-    trace_path: Path,
-    traces: list[Trace],
-    solution: Solution,
-    timing_path: Path | None,
-    profile_summary_path: Path | None,
-    static_evidence_path: Path | None,
-    profile_result: Rocprofv3ProfileResult,
-    static_evidence: StaticKernelEvidenceSidecar | None,
-    compile_result: CompilePhaseResult | None,
-    replay_path: Path | None = None,
+    request: PerformanceEvidenceManifestWriteRequest,
 ) -> PerformanceEvidenceManifest:
-    if len(traces) != 1:
+    if request.output_file is None or request.profile_result is None:
+        raise ValueError("performance manifest request is incomplete")
+    if len(request.traces) != 1:
         raise ValueError("counter evidence requires exactly one workload")
-    trace = traces[0]
+    trace = request.traces[0]
     artifacts, reasons = _manifest_artifacts(
-        root=trace_path.parent,
-        trace_path=trace_path,
-        timing_path=timing_path,
-        profile_summary_path=profile_summary_path,
-        static_evidence_path=static_evidence_path,
-        profile_result=profile_result,
-        replay_path=replay_path,
+        root=request.output_file.parent,
+        trace_path=request.output_file,
+        timing_path=request.timing_path,
+        access_path=request.access_path,
+        profile_summary_path=request.profile_summary_path,
+        static_evidence_path=request.static_evidence_path,
+        profile_result=request.profile_result,
+        replay_path=request.replay_path,
     )
     identity, code_hashes, identity_reasons = _manifest_identity(
-        trace_path=trace_path,
+        trace_path=request.output_file,
         trace=trace,
-        solution=solution,
-        timing_path=timing_path,
-        profile_result=profile_result,
-        static_evidence=static_evidence,
-        compile_result=compile_result,
+        solution=request.solution,
+        timing_path=request.timing_path,
+        profile_result=request.profile_result,
+        static_evidence=request.static_evidence,
+        compile_result=request.compile_result,
     )
     reasons.extend(identity_reasons)
     reasons = list(dict.fromkeys(reasons))
@@ -287,7 +339,9 @@ def _manifest_identity(
         compiler_sha256=compiler_hash,
         code_object_sha256=code_hashes,
     )
-    gpu_id, gpu_bdf, gpu_reasons = _gpu_identity()
+    gpu_id, gpu_bdf, gpu_reasons = _gpu_identity(
+        profile_result.environment_snapshots,
+    )
     reasons.extend(gpu_reasons)
     timing = _timing_identity(timing_path, trace_path)
     reasons.extend(timing[1])
@@ -369,6 +423,7 @@ def _manifest_artifacts(
     root: Path,
     trace_path: Path,
     timing_path: Path | None,
+    access_path: Path | None,
     profile_summary_path: Path | None,
     static_evidence_path: Path | None,
     profile_result: Rocprofv3ProfileResult,
@@ -377,6 +432,7 @@ def _manifest_artifacts(
     paths = (
         (PerformanceEvidenceArtifactKind.TRACE, trace_path),
         (PerformanceEvidenceArtifactKind.TIMING, timing_path),
+        (PerformanceEvidenceArtifactKind.ACCESS_PATTERN, access_path),
         (
             PerformanceEvidenceArtifactKind.PROFILE_SUMMARY,
             profile_summary_path,
@@ -461,22 +517,18 @@ def _compiler_identity(
     )
 
 
-def _gpu_identity() -> tuple[str | None, str | None, list[str]]:
-    amd_smi = resolve_rocm_tool("amd-smi")
-    if amd_smi is None:
-        return None, None, ["gpu_identity_tool_missing"]
-    completed = run_in_process_group_bounded(
-        [str(amd_smi), "list", "--json"],
-        timeout=30.0,
-    )
-    if completed.returncode != 0:
-        return None, None, ["gpu_identity_collection_failed"]
-    try:
-        device = int(os.environ.get(ENV_SOL_EXECBENCH_DEVICE, "0"))
-        identity = parse_gpu_identity(completed.stdout, device)
-    except (TypeError, ValueError):
-        return None, None, ["gpu_identity_invalid"]
-    return identity.uuid, identity.bdf, []
+def _gpu_identity(
+    snapshots: tuple[RuntimeGPUTelemetry, ...],
+) -> tuple[str | None, str | None, list[str]]:
+    if {snapshot.phase for snapshot in snapshots} != {"pre", "post"}:
+        return None, None, ["gpu_identity_snapshot_incomplete"]
+    gpu_ids = {snapshot.gpu_id for snapshot in snapshots}
+    gpu_bdfs = {snapshot.gpu_bdf for snapshot in snapshots}
+    if None in gpu_ids or len(gpu_ids) != 1:
+        return None, None, ["gpu_id_snapshot_invalid"]
+    if None in gpu_bdfs or len(gpu_bdfs) != 1:
+        return None, None, ["gpu_bdf_snapshot_invalid"]
+    return next(iter(gpu_ids)), next(iter(gpu_bdfs)), []
 
 
 def _timing_identity(
@@ -492,9 +544,11 @@ def _timing_identity(
 
 
 __all__ = [
+    "performance_access_sidecar_path",
     "performance_evidence_manifest_path",
     "performance_replay_sidecar_path",
     "performance_timing_sidecar_path",
+    "write_performance_access_sidecar",
     "write_performance_evidence_manifest",
     "write_performance_replay_sidecar",
     "write_performance_timing_sidecar",

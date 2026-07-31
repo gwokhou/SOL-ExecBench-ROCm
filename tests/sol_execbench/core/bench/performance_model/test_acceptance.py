@@ -20,6 +20,13 @@ _ACTIONS = {
     WorkloadKind.TRANSPOSE: "improve_coalescing",
     WorkloadKind.REDUCTION: "reduce_lds_barriers",
     WorkloadKind.MATMUL: "restore_wmma_path",
+    WorkloadKind.SOFTMAX: "stop_launch_bound_search",
+    WorkloadKind.CROSS_ENTROPY: "improve_coalescing",
+    WorkloadKind.INDEXED_READ: "improve_coalescing",
+    WorkloadKind.INDEXED_UPDATE: "reduce_atomic_contention",
+    WorkloadKind.COMPOSITE: "reduce_dispatch_count",
+    WorkloadKind.TRANSFORMER: "restore_fused_attention_path",
+    WorkloadKind.CONCURRENT: "remove_extra_traffic",
 }
 
 
@@ -37,7 +44,7 @@ def _identity() -> CalibrationIdentity:
 
 def _model_identity() -> DiagnosticModelIdentity:
     return DiagnosticModelIdentity(
-        model_version="gfx1200_diagnostic.v3",
+        model_version="gfx1200_diagnostic.v6",
         policy_files={"policy.py": "d" * 64},
         counter_semantics_sha256="e" * 64,
         policy_bundle_sha256="f" * 64,
@@ -81,7 +88,7 @@ def test_frozen_acceptance_requires_twenty_cases_per_family() -> None:
     result = evaluate_diagnostic_acceptance(_manifest())
 
     assert result.accepted is True
-    assert result.case_count == 80
+    assert result.case_count == 220
     assert set(result.family_case_counts.values()) == {20}
     assert set(result.family_empirical_coverage.values()) == {1.0}
     assert result.median_absolute_percentage_error <= 15.0

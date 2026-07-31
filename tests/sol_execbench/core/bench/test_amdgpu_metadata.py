@@ -11,6 +11,7 @@ from pathlib import Path
 from sol_execbench.core.bench.static_kernel.amdgpu_metadata import (
     _unpack_msgpack,
     extract_amdgpu_footprints,
+    extract_amdgpu_kernels,
 )
 
 
@@ -84,6 +85,30 @@ def test_extract_footprint_from_minimal_metadata():
     assert fp.source_tool == "amdgpu-metadata"
     assert fp.identity is not None
     assert fp.identity.extractor_tool_id == "amdgpu-metadata"
+
+
+def test_extract_kernel_symbol_with_exact_footprint() -> None:
+    metadata = {
+        "amdhsa.kernels": [
+            {
+                ".name": "_Z10toy_kernelPf",
+                ".vgpr_count": 12,
+                ".sgpr_count": 8,
+            },
+        ],
+        "amdhsa.target": "amdgcn-amd-amdhsa--gfx1200",
+    }
+
+    kernels = extract_amdgpu_kernels(
+        _note(_pack(metadata)),
+        artifact_id="artifact-so",
+        target_architecture="gfx1200",
+    )
+
+    assert [kernel.name for kernel in kernels] == ["_Z10toy_kernelPf"]
+    assert kernels[0].detected_architectures == ["gfx1200"]
+    assert kernels[0].footprint is not None
+    assert kernels[0].footprint.vgpr_used == 12
 
 
 def test_no_spill_when_scratch_zero():

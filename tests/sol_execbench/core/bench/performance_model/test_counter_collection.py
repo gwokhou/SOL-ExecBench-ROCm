@@ -79,15 +79,20 @@ def test_counter_collection_discovers_availability_and_hashes_inputs(
         pass_dir = Path(entry["output_directory"])
         pass_dir.mkdir(parents=True)
         rows = "".join(
-            f"1,kernel,1,1,{counter},1\n" for counter in entry["pmc"]
+            f"1,kernel,1,1,{counter},1,100,200\n" for counter in entry["pmc"]
         )
         pass_index = int(pass_dir.name.removeprefix("pass_"))
         (pass_dir / f"{pass_index}_counter_collection.csv").write_text(
             "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,"
-            "Counter_Name,Counter_Value\n" + rows,
+            "Counter_Name,Counter_Value,Start_Timestamp,End_Timestamp\n" + rows,
             encoding="utf-8",
         )
         (pass_dir / f"{pass_index}_results.rocpd").write_bytes(b"audit")
+        (pass_dir / f"{pass_index}_marker_api_trace.csv").write_text(
+            "Domain,Function,Start_Timestamp,End_Timestamp\n"
+            "MARKER_CORE_RANGE_API,sol_execbench/w0/iteration/0,50,250\n",
+            encoding="utf-8",
+        )
         return subprocess.CompletedProcess(command, 0, "", "")
 
     result = collect_rocprofv3_counters(request, runner=runner)
@@ -106,12 +111,78 @@ def test_counter_collection_discovers_availability_and_hashes_inputs(
     assert {artifact.kind for artifact in result.artifacts} >= {
         Rocprofv3ArtifactKind.COUNTER_CSV,
         Rocprofv3ArtifactKind.ROCPD,
+        Rocprofv3ArtifactKind.TRACE_CSV,
     }
     provenance = load_json_file(
         Rocprofv3CounterProvenance,
         request.output_directory / "profile.counter-metadata.json",
     )
     assert provenance.pmc_check_sha256 == result.provenance["pmc_check_sha256"]
+
+
+def test_counter_collection_selects_only_roctx_marked_candidate_process(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    tool = tmp_path / "rocprofv3"
+    tool.write_text("fake executable", encoding="utf-8")
+    monkeypatch.setattr(
+        counter_collection,
+        "resolve_rocm_tool",
+        lambda _name: tool,
+    )
+
+    def runner(command, _cwd, _timeout):
+        if "info" in command:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                _REQUIRED_COUNTERS,
+                "",
+            )
+        if "pmc-check" in command:
+            return subprocess.CompletedProcess(command, 0, "supported", "")
+        job = yaml.safe_load(Path(command[2]).read_text(encoding="utf-8"))
+        entry = job["jobs"][0]
+        pass_dir = Path(entry["output_directory"])
+        pass_dir.mkdir(parents=True)
+        rows = "".join(
+            f"1,kernel,1,1,{counter},1,100,200\n" for counter in entry["pmc"]
+        )
+        header = (
+            "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,"
+            "Counter_Name,Counter_Value,Start_Timestamp,End_Timestamp\n"
+        )
+        (pass_dir / "101_counter_collection.csv").write_text(
+            header + "0,helper,1,1,SQ_WAVES_sum,1,10,20\n" + rows,
+            encoding="utf-8",
+        )
+        (pass_dir / "101_results.db").write_bytes(b"candidate")
+        (pass_dir / "101_marker_api_trace.csv").write_text(
+            "Domain,Function,Start_Timestamp,End_Timestamp\n"
+            "MARKER_CORE_RANGE_API,sol_execbench/w0/iteration/0,50,250\n",
+            encoding="utf-8",
+        )
+        (pass_dir / "202_counter_collection.csv").write_text(
+            header + rows,
+            encoding="utf-8",
+        )
+        (pass_dir / "202_results.db").write_bytes(b"reference")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    result = collect_rocprofv3_counters(_request(tmp_path), runner=runner)
+
+    assert result.status is Rocprofv3ProfileStatus.SUCCESS
+    registered_paths = {artifact.path.name for artifact in result.artifacts}
+    assert "101_counter_collection.csv" in registered_paths
+    assert "101_results.db.gz" in registered_paths
+    assert "202_counter_collection.csv" not in registered_paths
+    assert "202_results.db" not in registered_paths
+    assert not (tmp_path / "profile" / "pass_1" / "202_results.db").exists()
+    candidate_csv = (
+        tmp_path / "profile" / "pass_1" / "101_counter_collection.csv"
+    ).read_text(encoding="utf-8")
+    assert "helper" not in candidate_csv
 
 
 def test_unsupported_counter_provenance_schema_is_rejected() -> None:

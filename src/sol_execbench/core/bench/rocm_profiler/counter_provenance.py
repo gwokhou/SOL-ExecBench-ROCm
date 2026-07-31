@@ -22,7 +22,7 @@ class Rocprofv3CounterProvenance(CurrentSchemaModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     current_schema_version = ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.rocprofv3_counter_provenance.v4"] = (
+    schema_version: Literal["sol_execbench.rocprofv3_counter_provenance.v5"] = (
         ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION
     )
     diagnostic_only: Literal[True] = True

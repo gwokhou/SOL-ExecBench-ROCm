@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Self
 
 from sol_execbench.cli import evaluation as cli_evaluation
+from sol_execbench.cli.evaluation.command import ProfileLifecycle
 from sol_execbench.core.bench.clock_lock import ClockLockLease
 
 
@@ -109,7 +110,12 @@ def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
         env_builder=fake_env,
         subprocess_run=fake_run,
         rocprofv3_available=True,
-        clock_locker=lambda: _FakeClockLease(locked=True, acquired=False),
+        lifecycle=ProfileLifecycle(
+            clock_locker=lambda: _FakeClockLease(
+                locked=True,
+                acquired=False,
+            ),
+        ),
     )
 
     assert profiled_proc is not None
@@ -146,7 +152,9 @@ def test_run_profiled_evaluation_acquires_and_releases_clock_lock(
         timeout=30,
         subprocess_run=_fake_profile_run_succeed,
         rocprofv3_available=True,
-        clock_locker=lambda: lease,
+        lifecycle=ProfileLifecycle(
+            clock_locker=lambda: lease,
+        ),
     )
 
     assert profile_result.succeeded is True
@@ -171,7 +179,9 @@ def test_run_profiled_evaluation_runs_unlocked_when_lock_unavailable(
             timeout=30,
             subprocess_run=_fake_profile_run_succeed,
             rocprofv3_available=True,
-            clock_locker=lambda: lease,
+            lifecycle=ProfileLifecycle(
+                clock_locker=lambda: lease,
+            ),
         )
 
     # Profiling still runs even when the clock lock cannot be acquired.

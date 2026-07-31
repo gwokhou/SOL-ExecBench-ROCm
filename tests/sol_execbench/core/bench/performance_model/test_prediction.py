@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
+from sol_execbench.core.bench.performance_model import prediction
 from sol_execbench.core.bench.performance_model.attribution import (
     calculate_ratios,
     derive_attributions,
@@ -13,6 +14,7 @@ from sol_execbench.core.bench.performance_model.models import (
     CalibrationParameter,
     CalibrationParameterName,
     CalibrationUnit,
+    CompiledCharacterization,
     DiagnosticCalibrationProfile,
     DispatchEvidence,
     ElementwiseDescriptor,
@@ -107,6 +109,39 @@ def _calibration() -> DiagnosticCalibrationProfile:
     )
 
 
+def test_required_parameter_interpolates_adjacent_calibrated_points() -> None:
+    calibration = _calibration().model_copy(
+        update={
+            "parameters": [
+                *_calibration().parameters,
+                _parameter(
+                    CalibrationParameterName.REDUCTION_OP_PER_MS,
+                    320.0,
+                    CalibrationUnit.ITEM_PER_MS,
+                    applicability=(32.0, 32.0),
+                    dimension=ApplicabilityDimension.REDUCTION_WIDTH,
+                ),
+                _parameter(
+                    CalibrationParameterName.REDUCTION_OP_PER_MS,
+                    640.0,
+                    CalibrationUnit.ITEM_PER_MS,
+                    applicability=(64.0, 64.0),
+                    dimension=ApplicabilityDimension.REDUCTION_WIDTH,
+                ),
+            ],
+        },
+    )
+
+    result = prediction._required(
+        calibration,
+        CalibrationParameterName.REDUCTION_OP_PER_MS,
+        coordinate=48.0,
+    )
+
+    assert result.value == pytest.approx(480.0)
+    assert result.applicability == (48.0, 48.0)
+
+
 def _semantic(
     kind: WorkloadKind = WorkloadKind.ELEMENTWISE,
 ) -> SemanticCharacterization:
@@ -166,6 +201,61 @@ def test_predictions_are_deterministic_and_exclude_measured_duration() -> None:
     assert hw.status is DiagnosticSidecarStatus.AVAILABLE
     assert ir.predicted_time_ms == pytest.approx(0.074)
     assert hw.predicted_time_ms == pytest.approx(1.034)
+
+
+def test_hw_prediction_matches_static_mangled_symbol_and_warm_gl2_traffic() -> (
+    None
+):
+    semantic = _semantic()
+    calibration = _calibration()
+    source = EvidenceReference(kind="static_evidence", sha256="e" * 64)
+    compiled = CompiledCharacterization(
+        candidate_sha256="c" * 64,
+        gpu_architecture="gfx1200",
+        kernel_symbol="_Z6kernelv",
+        functional_group_counts={"Vector ALU": 2},
+        source=source,
+    )
+    dispatch = DispatchEvidence(
+        workload_uuid="workload-1",
+        candidate_sha256="c" * 64,
+        dispatch_id="1",
+        queue_id="0",
+        kernel_symbol="kernel()",
+        grid=(32, 1, 1),
+        workgroup=(32, 1, 1),
+        iteration_ordinal=0,
+        counter_passes=[1],
+        counters={
+            "FETCH_SIZE": 0,
+            "GL2C_HIT_SUM": 1,
+            "GL2C_MISS_SUM": 1,
+            "SQ_WAVES_SUM": 1,
+        },
+    )
+    runtime_helper = dispatch.model_copy(
+        update={
+            "dispatch_id": "2",
+            "kernel_symbol": "__amd_rocclr_copyBuffer",
+            "valid": False,
+            "reason_codes": ["dispatch_static_kernel_identity_mismatch"],
+        },
+    )
+
+    prediction = predict_hw(
+        semantic,
+        [compiled],
+        [dispatch, runtime_helper],
+        calibration,
+    )
+
+    assert prediction.status is DiagnosticSidecarStatus.AVAILABLE
+    assert {component.name for component in prediction.components} == {
+        "compute",
+        "dispatch",
+        "memory",
+    }
+    assert prediction.reason_codes == []
 
 
 def test_ir_applies_transpose_efficiency() -> None:
@@ -264,14 +354,13 @@ def test_frontier_is_unavailable_and_unverified_r_only_reprofiles() -> None:
     ("updates", "reason"),
     [
         ({"queue_id": None}, "dispatch_queue_identity_unverified"),
-        ({"queue_id": "1"}, "overlap_model_unsupported"),
         (
             {
                 "queue_id": "0",
                 "start_timestamp_ns": 5,
                 "end_timestamp_ns": 20,
             },
-            "overlap_model_unsupported",
+            "same_lane_dispatch_overlap",
         ),
     ],
 )
@@ -311,3 +400,37 @@ def test_hardware_prediction_rejects_unverified_concurrency(
 
     assert prediction.status is DiagnosticSidecarStatus.UNAVAILABLE
     assert prediction.reason_codes == [reason]
+
+
+def test_hardware_prediction_accepts_ordered_cross_queue_schedule() -> None:
+    first = DispatchEvidence(
+        workload_uuid="workload-1",
+        candidate_sha256="c" * 64,
+        dispatch_id="1",
+        queue_id="0",
+        kernel_symbol="kernel",
+        grid=(32, 1, 1),
+        workgroup=(32, 1, 1),
+        iteration_ordinal=0,
+        counters={"SQ_INSTS_VALU": 1, "SQ_WAVES": 1},
+        start_timestamp_ns=0,
+        end_timestamp_ns=10,
+    )
+    second = first.model_copy(
+        update={
+            "dispatch_id": "2",
+            "queue_id": "1",
+            "iteration_ordinal": 1,
+            "start_timestamp_ns": 10,
+            "end_timestamp_ns": 20,
+        }
+    )
+
+    prediction = predict_hw(
+        _semantic(),
+        [],
+        [first, second],
+        _calibration(),
+    )
+
+    assert prediction.status is not DiagnosticSidecarStatus.UNAVAILABLE
