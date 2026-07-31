@@ -8,12 +8,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from sol_execbench.cli.evaluation.evaluator import (
-    PROFILE_NONE,
-    run_evaluation_cli,
-)
+from sol_execbench.cli.evaluation.evaluator import run_evaluation_cli
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import CliFailure
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.utils import make_eval
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import (
@@ -244,9 +243,9 @@ def _evaluation_request(
         json_output=False,
         lock_clocks=True,
         keep_staging=False,
-        profile=PROFILE_NONE,
-        static_evidence="none",
-        decision="none",
+        profile=ProfileMode.NONE,
+        static_evidence=SidecarMode.NONE,
+        decision=SidecarMode.NONE,
         feedback_run_id=None,
         feedback_target_id=None,
         feedback_candidate_id=None,

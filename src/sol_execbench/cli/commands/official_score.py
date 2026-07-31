@@ -11,7 +11,7 @@ import click
 from rich.console import Console
 
 from sol_execbench.cli.protocol import (
-    EXIT_RESULT_FAILED,
+    CliExitCode,
     CliFailure,
     CliResult,
     artifact,
@@ -91,7 +91,7 @@ def official_score_cli(bundle: Path, manifest_path: Path) -> CliResult:
         raise CliFailure(
             str(exc),
             code="official_release_verification_failed",
-            exit_code=EXIT_RESULT_FAILED,
+            exit_code=CliExitCode.RESULT_FAILED,
             hint="Verify every content-addressed artifact and the pinned corpus.",
         ) from exc
     report = result.to_dict()

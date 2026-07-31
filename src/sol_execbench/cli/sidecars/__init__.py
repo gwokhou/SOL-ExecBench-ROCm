@@ -1,8 +1,6 @@
 """Sidecar helpers for the SOL ExecBench CLI."""
 
 from sol_execbench.cli.sidecars.common import (
-    STATIC_EVIDENCE_AUTO,
-    STATIC_EVIDENCE_NONE,
     _agent_feedback_artifact_citations,
     _agent_feedback_identity_fields,
     _agent_feedback_run_id,
@@ -23,8 +21,6 @@ from sol_execbench.cli.sidecars.common import (
 )
 
 __all__ = [
-    "STATIC_EVIDENCE_AUTO",
-    "STATIC_EVIDENCE_NONE",
     "_agent_feedback_artifact_citations",
     "_agent_feedback_identity_fields",
     "_agent_feedback_run_id",

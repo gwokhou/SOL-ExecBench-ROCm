@@ -5,13 +5,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import shutil
 import tempfile
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from solar.artifacts import sha256_file, stable_json_checksum
 from solar.contracts import (
     ConversionRequest,
     ConversionRequestEnvelope,
@@ -185,7 +185,7 @@ def _passed_stage(stage: SolarStage, path: Path) -> ReadinessStage:
     return ReadinessStage(
         stage=stage,
         status=SolarStageStatus.PASSED,
-        artifact=ReadinessArtifact(path.name, _sha256(path)),
+        artifact=ReadinessArtifact(path.name, sha256_file(path)),
     )
 
 
@@ -253,24 +253,12 @@ def readiness_reason_code(stage: SolarStage, exc: Exception) -> str:
 def _profile_hash(
     profile: ArchitectureProfile | Mapping[str, DynamicValue],
 ) -> str:
-    import json
-
     value = (
         profile.to_dict()
         if isinstance(profile, ArchitectureProfile)
         else profile
     )
-    encoded = json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    ).encode()
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return stable_json_checksum(value)
 
 
 __all__ = [

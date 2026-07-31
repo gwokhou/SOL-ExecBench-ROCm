@@ -13,7 +13,7 @@ from pathlib import Path
 import click
 import yaml
 
-from sol_execbench.cli.protocol import EXIT_UNAVAILABLE, CliFailure
+from sol_execbench.cli.protocol import CliExitCode, CliFailure
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import load_json_file, load_jsonl_file
@@ -124,7 +124,7 @@ def require_materialized_target_match(
         raise CliFailure(
             str(exc),
             code="evaluation_target_unavailable",
-            exit_code=EXIT_UNAVAILABLE,
+            exit_code=CliExitCode.UNAVAILABLE,
         ) from exc
     if observed != expected:
         raise CliFailure(

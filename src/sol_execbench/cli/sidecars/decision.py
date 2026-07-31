@@ -10,6 +10,7 @@ from pathlib import Path
 
 from rich.console import Console
 
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.decision.builder import build_decision_sidecar
 from sol_execbench.core.bench.decision.precedence import (
     apply_runtime_precedence,
@@ -29,9 +30,6 @@ from sol_execbench.core.platform.arch_capabilities import (
 )
 
 console = Console(stderr=True)
-
-DECISION_NONE = "none"
-DECISION_AUTO = "auto"
 
 
 def _load_budget_from_environment(
@@ -79,7 +77,7 @@ def _load_budget_from_environment(
 
 def _write_decision_sidecar(
     output_file: Path | None,
-    enabled: str,
+    enabled: SidecarMode,
     static_evidence_result: StaticKernelEvidenceSidecar | None,
     environment_sidecar_path: Path | None,
     *,
@@ -91,7 +89,7 @@ def _write_decision_sidecar(
     sol_version: str | None = None,
 ) -> Path | None:
     """Write an optional Layer R decision sidecar derived from static footprints."""
-    if enabled == DECISION_NONE or output_file is None:
+    if enabled is SidecarMode.NONE or output_file is None:
         return None
     footprints = (
         list(static_evidence_result.footprints)

@@ -50,6 +50,7 @@ from sol_execbench.core.dataset.aka_corpus import (
 )
 from sol_execbench.core.integrity import sha256_bytes, sha256_file
 from sol_execbench.core.integrity.schema_versions import (
+    RELEASE_BUNDLE_SCHEMA_VERSION,
     RELEASE_ENVIRONMENT_SCHEMA_VERSION,
 )
 from sol_execbench.core.platform.rdna4_validation import (
@@ -430,6 +431,7 @@ def test_release_bundle_schema_rejects_legacy_signature_fields(
     with pytest.raises(ValidationError):
         ReleaseBundle.model_validate(
             {
+                "schema_version": RELEASE_BUNDLE_SCHEMA_VERSION,
                 "corpus_manifest": artifact_reference(
                     workspace,
                     workspace / "corpus" / "manifest.yaml",

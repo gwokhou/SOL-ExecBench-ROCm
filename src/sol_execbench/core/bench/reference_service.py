@@ -22,7 +22,7 @@ from sol_execbench.core.bench.eval_runtime import (
     measure_reference_latency,
 )
 from sol_execbench.core.bench.io import (
-    GEN_INPUTS_ERROR,
+    CustomInputFailureClass,
     CustomInputGenerationError,
     derive_custom_input_seed,
     gen_inputs,
@@ -58,7 +58,12 @@ class ReferenceRequestError(ValueError):
 class InputGenerationError(RuntimeError):
     """Trusted input generation failed before the reference function ran."""
 
-    def __init__(self, message: str, *, failure_class: str) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        failure_class: CustomInputFailureClass,
+    ) -> None:
         """Initialize a classified input-generation failure."""
         super().__init__(f"{failure_class}: {message}")
         self.failure_class = failure_class
@@ -147,7 +152,7 @@ class ReferenceService:
         except Exception as exc:
             raise InputGenerationError(
                 str(exc),
-                failure_class=GEN_INPUTS_ERROR,
+                failure_class=CustomInputFailureClass.ERROR,
             ) from exc
         resolved_axes = self.definition.get_resolved_axes_values(workload.axes)
         outputs = call_and_collect_outputs(

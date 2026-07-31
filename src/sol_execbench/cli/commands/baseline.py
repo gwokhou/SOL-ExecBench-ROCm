@@ -10,7 +10,12 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from sol_execbench.cli.protocol import CliFailure, CliResult, artifact
+from sol_execbench.cli.protocol import (
+    CliExitCode,
+    CliFailure,
+    CliResult,
+    artifact,
+)
 from sol_execbench.core.scoring.release_builders import (
     materialize_release_baseline,
     materialize_release_candidate,
@@ -157,7 +162,7 @@ def release_run_cli(
         raise CliFailure(
             str(exc),
             code="release_plan_execution_failed",
-            exit_code=4,
+            exit_code=CliExitCode.EXECUTION,
             hint="Run the plan inside the hardened container on the pinned GPU.",
         ) from exc
     report = {

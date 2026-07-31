@@ -30,30 +30,26 @@ from sol_execbench.core.bench.rocm_profiler.commands import (
 )
 from sol_execbench.core.bench.rocm_profiler.models import (
     PROFILE_OUTPUT_DIR_NAMES,
-    ROCPROF_REASON_COMMAND_FAILED,
-    ROCPROF_REASON_COMMAND_TIMEOUT,
-    ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
-    ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
-    ROCPROF_REASON_UNAVAILABLE,
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
+    Rocprofv3ReasonCode,
     has_profiler_data_artifact,
 )
 from sol_execbench.core.data.base_model import CurrentSchemaModel
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.integrity.schema_versions import (
+    ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION,
+)
 from sol_execbench.core.text_utils import subprocess_text, text_tail
-
-_ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION = SCHEMA_VERSIONS["rocprofv3_diagnostics"]
 
 
 class Rocprofv3Diagnostics(CurrentSchemaModel):
     """Current bounded no-data profiler diagnostic artifact."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
-    current_schema_version = _ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION
+    current_schema_version = ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.rocprofv3_diagnostics.v1"] = (
         "sol_execbench.rocprofv3_diagnostics.v1"
@@ -122,7 +118,7 @@ def _unavailable_result(
         timeout_seconds=request.timeout_seconds,
         profiler_available=False,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.UNAVAILABLE,
-        reason_codes=(ROCPROF_REASON_UNAVAILABLE,),
+        reason_codes=(Rocprofv3ReasonCode.UNAVAILABLE,),
         **profile_result_metadata(request),
     )
 
@@ -154,7 +150,7 @@ def _timeout_result(
         timeout_seconds=request.timeout_seconds,
         profiler_available=True,
         artifact_coverage_status=coverage,
-        reason_codes=(ROCPROF_REASON_COMMAND_TIMEOUT, *reasons),
+        reason_codes=(Rocprofv3ReasonCode.COMMAND_TIMEOUT, *reasons),
         warnings=warnings,
         **profile_result_metadata(request, artifacts),
     )
@@ -207,7 +203,7 @@ def _failed_command_result(
         timeout_seconds=request.timeout_seconds,
         profiler_available=True,
         artifact_coverage_status=coverage,
-        reason_codes=(ROCPROF_REASON_COMMAND_FAILED, *reasons),
+        reason_codes=(Rocprofv3ReasonCode.COMMAND_FAILED, *reasons),
         warnings=warnings,
         **profile_result_metadata(request, artifacts),
     )
@@ -246,7 +242,7 @@ def _no_artifacts_result(
         timeout_seconds=request.timeout_seconds,
         profiler_available=True,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.NONE,
-        reason_codes=(ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,),
+        reason_codes=(Rocprofv3ReasonCode.NO_REGISTERED_ARTIFACTS,),
         **profile_result_metadata(request),
     )
 
@@ -358,7 +354,7 @@ def write_rocprofv3_diagnostic_artifact(
     path = request.output_directory / f"{request.output_file}.diagnostics.json"
     payload = Rocprofv3Diagnostics.model_validate(
         {
-            "schema_version": SCHEMA_VERSIONS["rocprofv3_diagnostics"],
+            "schema_version": ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION,
             "generated_at": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),
@@ -381,8 +377,8 @@ def write_rocprofv3_diagnostic_artifact(
             "stdout_tail": text_tail(completed.stdout or "", limit=4096),
             "stderr_tail": text_tail(completed.stderr or "", limit=4096),
             "reason_codes": [
-                ROCPROF_REASON_NO_REGISTERED_ARTIFACTS,
-                ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED,
+                Rocprofv3ReasonCode.NO_REGISTERED_ARTIFACTS,
+                Rocprofv3ReasonCode.DIAGNOSTIC_LOG_REGISTERED,
             ],
         },
     )

@@ -8,12 +8,14 @@ from sol_execbench.cli.evaluation.sidecar_writer import (
     SidecarWriteRequest,
     write_optional_sidecars,
 )
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
     Rocprofv3ProfileArtifact,
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
+    Rocprofv3ReasonCode,
 )
 from sol_execbench.core.data.solution import (
     BuildSpec,
@@ -45,7 +47,7 @@ def test_optional_sidecars_use_consumer_identity_for_profile_summary(
             solution=_solution(),
             profile_result=_profile_result(tmp_path),
             static_evidence_result=None,
-            decision="none",
+            decision=SidecarMode.NONE,
             identity=SidecarIdentity(
                 trace_run_id="trace-sha-run-id",
                 feedback_run_id="consumer-run-id",
@@ -102,7 +104,7 @@ def _profile_result(tmp_path: Path) -> Rocprofv3ProfileResult:
         returncode=0,
         profiler_available=True,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.COMPLETE,
-        reason_codes=("rocprof_artifacts_registered",),
+        reason_codes=(Rocprofv3ReasonCode.ARTIFACTS_REGISTERED,),
         timeout_seconds=60,
     )
 

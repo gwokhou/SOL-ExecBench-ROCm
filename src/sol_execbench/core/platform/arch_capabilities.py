@@ -12,13 +12,12 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.data.base_model import CurrentSchemaModel
+from sol_execbench.core.integrity.schema_versions import (
+    ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION,
+)
 from sol_execbench.core.platform.confidence import EstimateConfidence
 
-ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION = SCHEMA_VERSIONS[
-    "arch_capability_budget"
-]
 _BUILTIN_ARCH_BUDGETS = ("gfx942", "gfx1150", "gfx1200")
 
 
@@ -38,10 +37,11 @@ _MODEL_CONFIG = ConfigDict(
 )
 
 
-class ArchISABudget(BaseModelWithDocstrings):
+class ArchISABudget(CurrentSchemaModel):
     """Arch-level ISA resource budget; diagnostic only, never an authority."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.arch_capability_budget.v1"]
     """Capability budget schema version."""

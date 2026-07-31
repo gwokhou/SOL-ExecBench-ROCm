@@ -21,6 +21,7 @@ from sol_execbench.core.bench.agent_feedback.models import (
 )
 from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticArtifactCitation,
+    DiagnosticConfidence,
     DiagnosticGovernanceGuardrail,
     DiagnosticGovernanceStatus,
     DiagnosticSidecarStatus,
@@ -29,7 +30,6 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     compact_path,
 )
 from sol_execbench.core.bench.performance_model.models import (
-    DiagnosticConfidence,
     PerformanceAttribution,
     PerformanceDiagnosticSidecar,
 )

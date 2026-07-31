@@ -365,7 +365,7 @@ class AKACorpusManifest:
 
 
 def _validate_manifest_header(data: Mapping[str, Any]) -> None:
-    if int(data.get("schema_version", 0)) != AKA_CORPUS_MANIFEST_SCHEMA_VERSION:
+    if data.get("schema_version") != AKA_CORPUS_MANIFEST_SCHEMA_VERSION:
         raise ValueError(
             "AKA corpus manifest must use schema_version "
             f"{AKA_CORPUS_MANIFEST_SCHEMA_VERSION}",

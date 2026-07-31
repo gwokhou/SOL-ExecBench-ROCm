@@ -3,6 +3,11 @@
 
 """Typed artifact documents and publication helpers."""
 
+from solar.artifacts.checksums import (
+    sha256_bytes,
+    sha256_file,
+    stable_json_checksum,
+)
 from solar.artifacts.document import (
     MAX_ARTIFACT_BYTES,
     ArtifactDocument,
@@ -19,4 +24,7 @@ __all__ = [
     "ArtifactScalar",
     "ArtifactValue",
     "load_yaml_artifact",
+    "sha256_bytes",
+    "sha256_file",
+    "stable_json_checksum",
 ]

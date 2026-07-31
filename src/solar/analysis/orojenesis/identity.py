@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
 from solar.analysis.orojenesis.errors import OrojenesisError
+from solar.artifacts import sha256_file
 from solar.schema_versions import OROJENESIS_PROVENANCE_SCHEMA_VERSION
 from solar.types import DynamicValue
 
@@ -39,7 +39,7 @@ def validate_toolchain_identity(
     """Validate a mapper and return its authenticated provenance record."""
     if not mapper.is_file() or not os.access(mapper, os.X_OK):
         raise OrojenesisError(f"missing executable: {mapper}")
-    binary_sha256 = _sha256(mapper)
+    binary_sha256 = sha256_file(mapper)
     if binary_sha256 not in policy.trusted_mapper_sha256:
         raise OrojenesisError(
             "Orojenesis mapper artifact is not trusted by this SOLAR release",
@@ -57,7 +57,7 @@ def validate_toolchain_identity(
     return {
         **provenance,
         "verification_mode": "provenance_manifest",
-        "provenance_sha256": _sha256(provenance_path),
+        "provenance_sha256": sha256_file(provenance_path),
     }
 
 
@@ -153,7 +153,3 @@ def _validate_build(
         raise OrojenesisError("Orojenesis provenance source epoch mismatch")
     if not str(build.get("compiler", "")):
         raise OrojenesisError("Orojenesis provenance lacks build identity")
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()

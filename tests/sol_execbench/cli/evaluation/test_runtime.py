@@ -9,6 +9,7 @@ from sol_execbench.cli.evaluation import (
     command as cli_evaluation,
     runtime as evaluation_runtime,
 )
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
@@ -90,7 +91,7 @@ def test_run_evaluation_runtime_returns_success_for_parseable_traces(
         staging_dir=tmp_path,
         output_file=None,
         timeout=7,
-        profile="none",
+        profile=ProfileMode.NONE,
     )
 
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
@@ -125,7 +126,7 @@ def test_runtime_derives_reference_speedup_after_worker_exit(
         staging_dir=tmp_path,
         output_file=None,
         timeout=7,
-        profile="none",
+        profile=ProfileMode.NONE,
     )
 
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
@@ -162,7 +163,7 @@ def test_run_evaluation_runtime_classifies_timeout(
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
-        profile="none",
+        profile=ProfileMode.NONE,
     )
 
     assert isinstance(
@@ -199,7 +200,7 @@ def test_run_evaluation_runtime_classifies_failure_without_stdout(
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
-        profile="none",
+        profile=ProfileMode.NONE,
     )
 
     assert isinstance(
@@ -236,7 +237,7 @@ def test_run_evaluation_runtime_classifies_no_parseable_traces(
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
-        profile="none",
+        profile=ProfileMode.NONE,
     )
 
     assert isinstance(
@@ -288,7 +289,7 @@ def test_run_evaluation_runtime_falls_back_when_profile_unavailable(
         staging_dir=tmp_path,
         output_file=tmp_path / "trace.jsonl",
         timeout=5,
-        profile="rocprofv3",
+        profile=ProfileMode.ROCPROFV3,
     )
 
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
@@ -338,7 +339,7 @@ def test_counter_profile_is_deferred_until_after_canonical_runtime(
         staging_dir=tmp_path,
         output_file=None,
         timeout=5,
-        profile="rocprofv3-counters",
+        profile=ProfileMode.ROCPROFV3_COUNTERS,
     )
 
     assert calls == []
@@ -387,7 +388,7 @@ def test_counter_profile_replay_stdout_is_not_canonical(
         staging_dir=tmp_path,
         output_file=tmp_path / "trace.jsonl",
         timeout=5,
-        profile="rocprofv3-counters",
+        profile=ProfileMode.ROCPROFV3_COUNTERS,
     )
 
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
@@ -436,7 +437,7 @@ def test_counter_profile_restages_reference_before_each_application(
         staging_dir=tmp_path,
         output_file=tmp_path / "trace.jsonl",
         timeout=5,
-        profile="rocprofv3-counters",
+        profile=ProfileMode.ROCPROFV3_COUNTERS,
     )
 
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)

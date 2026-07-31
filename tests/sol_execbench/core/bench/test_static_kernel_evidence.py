@@ -30,6 +30,10 @@ from sol_execbench.core.bench.static_kernel.extractor_routing import (
     extractor_command,
     static_extractor_tool_ids,
 )
+from sol_execbench.core.bench.static_kernel.extractors import (
+    _memoize_probe_runner,
+    _memoize_which,
+)
 from sol_execbench.core.bench.static_kernel.status import (
     ExtractorReasonVocabulary,
     ExtractorStatusVocabulary,
@@ -62,6 +66,38 @@ EXPECTED_REASON_CODES = {
     "extractor_timeout",
     "parser_failed",
 }
+
+
+def test_static_extractor_lookup_cache_preserves_none_results() -> None:
+    calls: list[str] = []
+
+    def which(binary: str) -> str | None:
+        calls.append(binary)
+        return None
+
+    memoized = _memoize_which(which)
+
+    assert memoized("missing") is None
+    assert memoized("missing") is None
+    assert calls == ["missing"]
+
+
+def test_static_extractor_probe_cache_keys_timeout() -> None:
+    calls: list[tuple[tuple[str, ...], float]] = []
+
+    def runner(command: list[str], timeout_seconds: float):
+        calls.append((tuple(command), timeout_seconds))
+        return ProbeCompletedProcess(returncode=0, stdout="version")
+
+    memoized = _memoize_probe_runner(runner)
+
+    assert memoized(["tool", "--version"], 1.0).stdout == "version"
+    assert memoized(["tool", "--version"], 1.0).stdout == "version"
+    assert memoized(["tool", "--version"], 2.0).stdout == "version"
+    assert calls == [
+        (("tool", "--version"), 1.0),
+        (("tool", "--version"), 2.0),
+    ]
 
 
 def test_extractor_commands_are_built_by_the_registered_strategies(tmp_path):

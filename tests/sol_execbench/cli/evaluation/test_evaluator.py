@@ -8,8 +8,10 @@ import pytest
 import yaml
 
 from sol_execbench.cli.evaluation import evaluator, problem_io
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import CliFailure
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.config import BenchmarkConfig
 
 
@@ -66,9 +68,9 @@ def test_staging_scope_handles_failure_before_packager_construction(
         json_output=False,
         lock_clocks=False,
         keep_staging=keep_staging,
-        profile="none",
-        static_evidence="none",
-        decision="none",
+        profile=ProfileMode.NONE,
+        static_evidence=SidecarMode.NONE,
+        decision=SidecarMode.NONE,
         feedback_target_id=None,
         feedback_run_id=None,
         feedback_candidate_id=None,

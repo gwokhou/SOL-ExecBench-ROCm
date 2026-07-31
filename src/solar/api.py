@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 import shutil
 import tempfile
@@ -16,6 +14,7 @@ from typing import Any, cast
 
 import yaml
 
+from solar.artifacts import sha256_file, stable_json_checksum
 from solar.contracts import (
     FORMAL_BOUND_KIND,
     ROOFLINE_BOUND_KIND,
@@ -36,16 +35,14 @@ from solar.contracts import (
     write_request_manifest,
 )
 from solar.pipeline import (
-    PipelineStageError,
-    pipeline_reason_code,
-    run_pipeline,
-)
-from solar.pipeline.readiness import (
     ConversionReadinessRequest,
     ConversionReadinessResult,
+    PipelineStageError,
     ReadinessArtifact,
     ReadinessStage,
     audit_conversion,
+    pipeline_reason_code,
+    run_pipeline,
 )
 from solar.rocm.architecture import ArchitectureProfile
 from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
@@ -191,7 +188,7 @@ def _finish_artifacts(
     if missing:
         raise ValueError(f"analysis is missing required artifacts: {missing}")
     return tuple(
-        ArtifactRef(path.relative_to(staging).as_posix(), _sha256(path))
+        ArtifactRef(path.relative_to(staging).as_posix(), sha256_file(path))
         for path in paths
     )
 
@@ -238,17 +235,7 @@ def _verify_publication_tree(
 
 
 def _profile_hash(profile: ArchitectureProfile) -> str:
-    encoded = json.dumps(
-        profile.to_dict(),
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    ).encode()
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return stable_json_checksum(profile.to_dict())
 
 
 def _failure(

@@ -17,7 +17,7 @@ from typing import Any
 import click
 
 from sol_execbench.cli.protocol import (
-    EXIT_EXECUTION,
+    CliExitCode,
     CliFailure,
     CliResult,
     response_failure,
@@ -170,7 +170,7 @@ class RootGroup(LazyGroup):
                 if type(exc) is click.ClickException:
                     exit_code = 2
             else:
-                exit_code = EXIT_EXECUTION
+                exit_code = CliExitCode.EXECUTION
             if json_mode:
                 click.echo(
                     json.dumps(

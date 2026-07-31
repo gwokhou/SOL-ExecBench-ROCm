@@ -12,7 +12,7 @@ from sol_execbench_type_helpers import (
     make_workload,
 )
 
-from sol_execbench.cli.protocol import CliFailure, CliResult
+from sol_execbench.cli.protocol import CliExitCode, CliFailure, CliResult
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
@@ -389,7 +389,7 @@ def test_execute_problem_covers_resume_and_missing_trace(
     monkeypatch.setattr(
         release_runner,
         "run_evaluation_cli",
-        lambda **_kwargs: CliResult(exit_code=0),
+        lambda **_kwargs: CliResult(),
     )
     with pytest.raises(ValueError, match="produced no trace"):
         release_runner._execute_problem(
@@ -414,7 +414,11 @@ def test_execute_problem_converts_candidate_cli_failure(
         release_runner,
         "run_evaluation_cli",
         lambda **_kwargs: (_ for _ in ()).throw(
-            CliFailure("timed out", code="evaluation_timeout", exit_code=4),
+            CliFailure(
+                "timed out",
+                code="evaluation_timeout",
+                exit_code=CliExitCode.EXECUTION,
+            ),
         ),
     )
     writes: list[Path] = []
@@ -502,7 +506,7 @@ def test_candidate_failure_writes_one_bounded_trace_per_workload(
         failure=CliFailure(
             "timeout " + "x" * 9000,
             code="evaluation_timeout",
-            exit_code=4,
+            exit_code=CliExitCode.EXECUTION,
         ),
         device="cpu",
     )

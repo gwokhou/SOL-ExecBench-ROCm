@@ -11,6 +11,7 @@ from pathlib import Path
 
 from rich.console import Console
 
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceReasonCode,
     StaticKernelEvidenceSidecar,
@@ -25,9 +26,6 @@ from sol_execbench.core.bench.static_kernel.evidence import (
 from sol_execbench.core.evidence.runtime_evidence import write_json_payload
 
 console = Console(stderr=True)
-
-STATIC_EVIDENCE_NONE = "none"
-STATIC_EVIDENCE_AUTO = "auto"
 
 
 def _static_evidence_directory(
@@ -121,7 +119,7 @@ def _write_static_evidence_sidecar(
 
 def _collect_static_evidence_for_cli(
     *,
-    enabled: str,
+    enabled: SidecarMode,
     is_cpp: bool,
     staging_dir: Path,
     output_file: Path | None,
@@ -134,7 +132,7 @@ def _collect_static_evidence_for_cli(
     ] = run_static_kernel_extractors,
 ) -> StaticKernelEvidenceSidecar | None:
     """Collect optional static evidence for the CLI."""
-    if enabled == STATIC_EVIDENCE_NONE:
+    if enabled is SidecarMode.NONE:
         return None
     evidence_dir = _static_evidence_directory(output_file, staging_dir)
     if not is_cpp:

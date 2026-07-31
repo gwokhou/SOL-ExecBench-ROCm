@@ -87,9 +87,17 @@ def test_validate_accepts_input_einsum_and_dynamic_aten_targets() -> None:
             lambda graph: graph.update(ir_kind="extended_einsum"),
             "not ATen IR",
         ),
-        (
+        pytest.param(
             lambda graph: graph.update(schema_version=0),
             "current schema_version",
+            id="numeric-schema-version",
+        ),
+        pytest.param(
+            lambda graph: graph.update(
+                schema_version=str(ATEN_IR_SCHEMA_VERSION),
+            ),
+            "current schema_version",
+            id="string-schema-version",
         ),
         (lambda graph: graph.update(layers={}), "has no layers"),
         (

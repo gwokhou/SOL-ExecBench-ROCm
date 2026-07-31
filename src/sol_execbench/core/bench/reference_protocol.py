@@ -24,9 +24,11 @@ from sol_execbench.core.bench.performance_model.access_evidence import (
     AccessPatternSummary,
 )
 from sol_execbench.core.integrity import sha256_bytes, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.integrity.schema_versions import (
+    REFERENCE_IPC_SCHEMA_VERSION,
+)
 
-PROTOCOL_VERSION = SCHEMA_VERSIONS["reference_ipc"]
+PROTOCOL_VERSION = REFERENCE_IPC_SCHEMA_VERSION
 REFERENCE_REQUEST_FD_ENV = "SOL_EXECBENCH_REFERENCE_REQUEST_FD"
 REFERENCE_RESPONSE_FD_ENV = "SOL_EXECBENCH_REFERENCE_RESPONSE_FD"
 REFERENCE_TOKEN_ENV = "SOL_EXECBENCH_REFERENCE_TOKEN"

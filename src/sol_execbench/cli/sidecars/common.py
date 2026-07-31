@@ -22,8 +22,6 @@ from sol_execbench.cli.sidecars.profile import (
     _write_profile_summary_sidecar,
 )
 from sol_execbench.cli.sidecars.static_evidence import (
-    STATIC_EVIDENCE_AUTO,
-    STATIC_EVIDENCE_NONE,
     _collect_static_evidence_for_cli,
     _static_evidence_directory,
     _static_evidence_payload,
@@ -33,8 +31,6 @@ from sol_execbench.cli.sidecars.static_evidence import (
 )
 
 __all__ = [
-    "STATIC_EVIDENCE_AUTO",
-    "STATIC_EVIDENCE_NONE",
     "_agent_feedback_artifact_citations",
     "_agent_feedback_identity_fields",
     "_agent_feedback_run_id",

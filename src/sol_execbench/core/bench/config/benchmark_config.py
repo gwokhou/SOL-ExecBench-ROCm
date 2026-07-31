@@ -13,13 +13,12 @@ from pydantic import Field, model_validator
 from sol_execbench.core.data.base_model import CurrentSchemaModel
 from sol_execbench.core.integrity.schema_versions import (
     BENCHMARK_CONFIG_SCHEMA_VERSION,
-    SCHEMA_VERSIONS,
+    ROCM_EVENT_TIMING_CUSTOM_SCHEMA_VERSION,
+    ROCM_EVENT_TIMING_PAPER_COUNTS_SCHEMA_VERSION,
 )
 
-OFFICIAL_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS[
-    "rocm_event_timing_paper_counts"
-]
-CUSTOM_ROCM_TIMING_PROTOCOL = SCHEMA_VERSIONS["rocm_event_timing_custom"]
+OFFICIAL_ROCM_TIMING_PROTOCOL = ROCM_EVENT_TIMING_PAPER_COUNTS_SCHEMA_VERSION
+CUSTOM_ROCM_TIMING_PROTOCOL = ROCM_EVENT_TIMING_CUSTOM_SCHEMA_VERSION
 
 
 class BenchmarkConfig(CurrentSchemaModel):

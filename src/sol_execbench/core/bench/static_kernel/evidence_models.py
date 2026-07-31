@@ -11,6 +11,7 @@ from typing import Annotated, Literal
 from pydantic import BeforeValidator, ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
+    CurrentDiagnosticSidecarAuthority,
     DiagnosticSidecarAuthority,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
@@ -306,10 +307,11 @@ class StaticKernelEvidenceSummary(BaseModelWithDocstrings):
     claim_boundaries: StaticEvidenceClaimBoundaries
 
 
-class StaticKernelEvidenceSidecar(DiagnosticSidecarAuthority):
+class StaticKernelEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     """Strict diagnostic-only static kernel evidence sidecar."""
 
     model_config = _STATIC_MODEL_CONFIG
+    current_schema_version = STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.static_kernel_evidence.v4"] = (
         STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION

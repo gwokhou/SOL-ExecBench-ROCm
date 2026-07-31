@@ -11,7 +11,7 @@ import click
 from rich.console import Console
 
 from sol_execbench.cli.protocol import (
-    EXIT_RESULT_FAILED,
+    CliExitCode,
     CliFailure,
     CliResult,
     artifact,
@@ -80,7 +80,7 @@ def compare_paths_cli(
         raise CliFailure(
             str(exc),
             code="solar_path_comparison_failed",
-            exit_code=EXIT_RESULT_FAILED,
+            exit_code=CliExitCode.RESULT_FAILED,
             hint="Use intact content-addressed outputs from both fixed paths.",
         ) from exc
     data = {
@@ -101,7 +101,9 @@ def compare_paths_cli(
     return CliResult(
         data=data,
         artifacts=(artifact(output, "json_file"),),
-        exit_code=EXIT_RESULT_FAILED if failed else 0,
+        exit_code=(
+            CliExitCode.RESULT_FAILED if failed else CliExitCode.SUCCESS
+        ),
     )
 
 
@@ -180,7 +182,7 @@ def analyze_cli(
         console.print(
             f"[red]SOLAR failed at {outcome.stage}: {outcome.message}[/red]",
         )
-        return CliResult(data=data, exit_code=EXIT_RESULT_FAILED)
+        return CliResult(data=data, exit_code=CliExitCode.RESULT_FAILED)
     console.print(
         f"[green]Formal SOL bound: {outcome.lower_bound_seconds:.9g} s[/green]",
     )
@@ -250,7 +252,7 @@ def release_build_cli(
         raise CliFailure(
             str(exc),
             code="solar_release_build_failed",
-            exit_code=EXIT_RESULT_FAILED,
+            exit_code=CliExitCode.RESULT_FAILED,
             hint=(
                 "Use the clean declared source revision and reviewed "
                 "Orojenesis artifact."
@@ -321,7 +323,7 @@ def corpus_audit_cli(
         raise CliFailure(
             str(exc),
             code="solar_corpus_audit_failed",
-            exit_code=EXIT_RESULT_FAILED,
+            exit_code=CliExitCode.RESULT_FAILED,
             hint="Inspect the failed workload matrix and rerun on gfx1200.",
         ) from exc
     color = "green" if result.ready else "yellow"
@@ -336,7 +338,9 @@ def corpus_audit_cli(
             artifact(result.matrix_path, "jsonl_file"),
             artifact(result.summary_path, "json_file"),
         ),
-        exit_code=0 if result.ready else EXIT_RESULT_FAILED,
+        exit_code=(
+            CliExitCode.SUCCESS if result.ready else CliExitCode.RESULT_FAILED
+        ),
     )
 
 

@@ -127,6 +127,39 @@ def test_rejects_raw_numeric_schema_in_all_python_contract_positions():
         ]
 
 
+def test_rejects_string_keyed_schema_registry_access():
+    findings, _ = audit_text(
+        Path("src/example.py"),
+        'VERSION = SCHEMA_VERSIONS["example"]\n',
+    )
+
+    assert findings == [
+        (
+            "src/example.py:1: import the named schema-version constant "
+            "instead of indexing SCHEMA_VERSIONS"
+        ),
+    ]
+
+
+def test_rejects_schema_version_coercion_at_reader_boundaries():
+    for conversion in ("int", "str"):
+        findings, _ = audit_text(
+            Path("src/example.py"),
+            f'value = {conversion}(payload["schema_version"])\n',
+        )
+
+        assert findings == [
+            (
+                f"src/example.py:1: schema_version readers must not coerce "
+                f"with {conversion}()"
+            ),
+        ]
+
+
+def test_current_schema_registries_are_read_only():
+    assert MODULE.registry_findings() == []
+
+
 def test_rejects_retired_solar_schema_identifier():
     retired = "solar.verification.ir." + "v1"
 

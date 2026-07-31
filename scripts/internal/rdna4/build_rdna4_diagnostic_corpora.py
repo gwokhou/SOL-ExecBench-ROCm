@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     load_and_verify_performance_evidence_manifest,
@@ -460,7 +461,7 @@ def _collect_case(root: Path, case: CaseSpec, *, force: bool) -> None:
         case.workload_uuid,
         "--lock-clocks",
         "--profile",
-        "rocprofv3-counters",
+        str(ProfileMode.ROCPROFV3_COUNTERS),
         "--static-evidence",
         "auto",
     ]

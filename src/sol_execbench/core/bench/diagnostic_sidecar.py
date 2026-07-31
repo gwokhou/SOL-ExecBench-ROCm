@@ -31,6 +31,14 @@ class DiagnosticSidecarStatus(StrEnum):
     UNAVAILABLE = "unavailable"
 
 
+class DiagnosticConfidence(StrEnum):
+    """Shared qualitative confidence scale for diagnostic guidance."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 class DiagnosticFreshnessStatus(StrEnum):
     """Freshness vocabulary shared by diagnostic-only sidecars."""
 

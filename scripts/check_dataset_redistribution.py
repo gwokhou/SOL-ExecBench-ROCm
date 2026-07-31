@@ -14,7 +14,9 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.integrity.schema_versions import (
+    DATASET_REDISTRIBUTION_CHECK_SCHEMA_VERSION,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE_PATH = REPO_ROOT / "provenance.toml"
@@ -55,7 +57,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         import json
 
         payload = {
-            "schema_version": SCHEMA_VERSIONS["dataset_redistribution_check"],
+            "schema_version": DATASET_REDISTRIBUTION_CHECK_SCHEMA_VERSION,
             "overall_status": "blocking" if findings else "passed",
             "findings": [finding.__dict__ for finding in findings],
         }

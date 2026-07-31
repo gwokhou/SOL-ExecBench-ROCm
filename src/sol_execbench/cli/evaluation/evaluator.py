@@ -24,16 +24,15 @@ from sol_execbench.cli.evaluation.requests import (
     require_counter_evidence_outputs,
     select_evaluation_workloads,
 )
-from sol_execbench.cli.protocol import CliFailure, CliResult, artifact
+from sol_execbench.cli.protocol import (
+    CliExitCode,
+    CliFailure,
+    CliResult,
+    artifact,
+)
 from sol_execbench.driver.problem_packager import ProblemPackager
 
 console = Console(stderr=True)
-
-# Compatibility exports for callers of the root evaluator module.  The
-# canonical definitions live in ``profile_mode`` and are re-exported by phases.
-PROFILE_NONE = cli_phases.PROFILE_NONE
-PROFILE_ROCPROFV3 = cli_phases.PROFILE_ROCPROFV3
-PROFILE_ROCPROFV3_COUNTERS = cli_phases.PROFILE_ROCPROFV3_COUNTERS
 
 
 def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
@@ -171,7 +170,9 @@ def _run_packaged_evaluation(
             "all_passed": all_passed,
         },
         artifacts=artifacts,
-        exit_code=0 if all_passed else 1,
+        exit_code=(
+            CliExitCode.SUCCESS if all_passed else CliExitCode.RESULT_FAILED
+        ),
     )
 
 
@@ -226,9 +227,6 @@ def _run_evaluation_phases(
 
 
 __all__ = [
-    "PROFILE_NONE",
-    "PROFILE_ROCPROFV3",
-    "PROFILE_ROCPROFV3_COUNTERS",
     "EvaluationRequest",
     "run_evaluation_cli",
 ]

@@ -211,6 +211,16 @@ def _batched_region() -> dict:
     }
 
 
+def test_multi_einsum_region_rejects_coerced_schema_version() -> None:
+    region = _batched_region()
+    region["schema_version"] = str(
+        OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
+    )
+
+    with pytest.raises(orojenesis.OrojenesisError, match="unsupported.*schema"):
+        orojenesis.multi_einsum_region_problem(region)
+
+
 def test_run_multi_region_composes_sweeps(tmp_path, monkeypatch):
     runner = _runner(tmp_path)
     monkeypatch.setattr(

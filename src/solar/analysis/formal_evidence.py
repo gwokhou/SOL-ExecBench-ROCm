@@ -5,10 +5,10 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
 from pathlib import Path
 
+from solar.artifacts import sha256_file
 from solar.types import NodeDict
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -79,7 +79,7 @@ def _evidence_files_are_verified(result: NodeDict, evidence_root: Path) -> bool:
             not resolved.is_relative_to(root)
             or not resolved.is_file()
             or _SHA256.fullmatch(digest) is None
-            or hashlib.sha256(resolved.read_bytes()).hexdigest() != digest
+            or sha256_file(resolved) != digest
         ):
             return False
     return True

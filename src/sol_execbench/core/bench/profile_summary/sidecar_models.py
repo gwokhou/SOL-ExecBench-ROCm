@@ -10,8 +10,8 @@ from enum import StrEnum
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
+    CurrentDiagnosticSidecarEnvelope,
     DiagnosticIdentity,
-    DiagnosticSidecarEnvelope,
     DiagnosticSidecarStatus,
     SizedDiagnosticArtifactCitation,
 )
@@ -43,10 +43,11 @@ class ProfileSummaryReasonCode(StrEnum):
     NO_PROFILE_RESULT = "no_profile_result"
 
 
-class ProfileSummarySidecar(DiagnosticSidecarEnvelope):
+class ProfileSummarySidecar(CurrentDiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for normalized profiler metadata."""
 
     model_config = _MODEL_CONFIG
+    current_schema_version = PROFILE_SUMMARY_SCHEMA_VERSION
 
     schema_version: ProfileSummarySchemaVersion = PROFILE_SUMMARY_SCHEMA_VERSION
     status: DiagnosticSidecarStatus

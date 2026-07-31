@@ -21,19 +21,14 @@ from sol_execbench.core.evidence import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
-from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
+from sol_execbench.core.integrity.schema_versions import (
+    ROCPROFV3_PROFILE_SCHEMA_VERSION,
+    ROCPROFV3_TIMING_SCHEMA_VERSION,
+)
 from sol_execbench.core.text_utils import text_tail
 
 ROCPROFV3_EXECUTABLE = "rocprofv3"
-ROCPROFV3_EVIDENCE_SCHEMA_VERSION = SCHEMA_VERSIONS["rocprofv3_timing"]
-ROCPROFV3_PROFILE_SCHEMA_VERSION = SCHEMA_VERSIONS["rocprofv3_profile"]
-ROCPROF_REASON_ARTIFACTS_REGISTERED = "rocprof_artifacts_registered"
-ROCPROF_REASON_NO_REGISTERED_ARTIFACTS = "rocprof_no_registered_artifacts"
-ROCPROF_REASON_DIAGNOSTIC_LOG_REGISTERED = "rocprof_diagnostic_log_registered"
-ROCPROF_REASON_PARTIAL_ARTIFACT_COVERAGE = "rocprof_partial_artifact_coverage"
-ROCPROF_REASON_COMMAND_FAILED = "rocprof_command_failed"
-ROCPROF_REASON_COMMAND_TIMEOUT = "rocprof_command_timeout"
-ROCPROF_REASON_UNAVAILABLE = "rocprof_unavailable"
+ROCPROFV3_EVIDENCE_SCHEMA_VERSION = ROCPROFV3_TIMING_SCHEMA_VERSION
 ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS = (
     "rocprofv3 returned success but produced no profiler data artifacts"
 )
@@ -41,6 +36,23 @@ ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE = (
     "rocprofv3 registered artifacts, but coverage is incomplete or only opaque "
     "artifacts were discovered"
 )
+
+
+class Rocprofv3ReasonCode(StrEnum):
+    """Stable reason vocabulary for profiler collection outcomes."""
+
+    ARTIFACTS_REGISTERED = "rocprof_artifacts_registered"
+    NO_REGISTERED_ARTIFACTS = "rocprof_no_registered_artifacts"
+    DIAGNOSTIC_LOG_REGISTERED = "rocprof_diagnostic_log_registered"
+    PARTIAL_ARTIFACT_COVERAGE = "rocprof_partial_artifact_coverage"
+    COMMAND_FAILED = "rocprof_command_failed"
+    COMMAND_TIMEOUT = "rocprof_command_timeout"
+    UNAVAILABLE = "rocprof_unavailable"
+    COUNTER_AVAILABILITY_FAILED = "rocprof_counter_availability_failed"
+    COUNTER_PMC_CHECK_FAILED = "rocprof_counter_pmc_check_failed"
+    REQUIRED_COUNTERS_UNSUPPORTED = "rocprof_required_counters_unsupported"
+    COUNTERS_COLLECTED = "rocprof_counters_collected"
+    COUNTER_ARTIFACT_INCOMPLETE = "rocprof_counter_artifact_incomplete"
 
 
 class Rocprofv3ProfileStatus(StrEnum):
@@ -159,7 +171,7 @@ class Rocprofv3ProfileResult:
     timeout_seconds: int | None = None
     profiler_available: bool | None = None
     artifact_coverage_status: Rocprofv3ArtifactCoverageStatus | None = None
-    reason_codes: tuple[str, ...] = ()
+    reason_codes: tuple[Rocprofv3ReasonCode, ...] = ()
     warnings: tuple[str, ...] = ()
     output_format: str | None = None
     profiler_data_artifacts: bool = False
@@ -174,6 +186,11 @@ class Rocprofv3ProfileResult:
     def __post_init__(self) -> None:
         """Reject contradictory status and reason combinations."""
         object.__setattr__(self, "status", Rocprofv3ProfileStatus(self.status))
+        object.__setattr__(
+            self,
+            "reason_codes",
+            tuple(Rocprofv3ReasonCode(code) for code in self.reason_codes),
+        )
         if self.artifact_coverage_status is not None:
             object.__setattr__(
                 self,

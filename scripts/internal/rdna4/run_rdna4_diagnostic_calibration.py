@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sol_execbench.cli.protocol import (
-    EXIT_EXECUTION,
+    CliExitCode,
     CliResult,
     artifact,
     response_failure,
@@ -471,7 +471,7 @@ def _entrypoint() -> int:
         return main()
     except Exception as error:  # noqa: BLE001 -- standalone JSON boundary
         print(json.dumps(response_failure(COMMAND_NAME, error), sort_keys=True))
-        return EXIT_EXECUTION
+        return CliExitCode.EXECUTION
 
 
 if __name__ == "__main__":

@@ -7,10 +7,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.protocol import CliFailure
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.data.workload import Workload
-
-PROFILE_ROCPROFV3_COUNTERS = "rocprofv3-counters"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -28,9 +28,9 @@ class EvaluationRequest:
     json_output: bool
     lock_clocks: bool
     keep_staging: bool
-    profile: str
-    static_evidence: str
-    decision: str
+    profile: ProfileMode
+    static_evidence: SidecarMode
+    decision: SidecarMode
     feedback_target_id: str | None
     feedback_run_id: str | None
     feedback_candidate_id: str | None
@@ -40,6 +40,16 @@ class EvaluationRequest:
     workload_uuid: str | None = None
     device: str = "cuda:0"
     unsafe_local_execution: bool = False
+
+    def __post_init__(self) -> None:
+        """Normalize CLI strings into the closed evaluation vocabularies."""
+        object.__setattr__(self, "profile", ProfileMode(self.profile))
+        object.__setattr__(
+            self,
+            "static_evidence",
+            SidecarMode(self.static_evidence),
+        )
+        object.__setattr__(self, "decision", SidecarMode(self.decision))
 
 
 def select_evaluation_workloads(
@@ -60,7 +70,7 @@ def select_evaluation_workloads(
                 f"{request.workload_uuid}",
                 code="workload_uuid_not_unique",
             )
-    if request.profile == PROFILE_ROCPROFV3_COUNTERS and len(selected) != 1:
+    if request.profile is ProfileMode.ROCPROFV3_COUNTERS and len(selected) != 1:
         raise CliFailure(
             "rocprofv3-counters requires exactly one workload",
             code="performance_counter_single_workload_required",
@@ -71,7 +81,7 @@ def select_evaluation_workloads(
 
 def require_counter_evidence_outputs(request: EvaluationRequest) -> None:
     """Fail closed unless counter mode can publish its complete evidence root."""
-    if request.profile != PROFILE_ROCPROFV3_COUNTERS:
+    if request.profile is not ProfileMode.ROCPROFV3_COUNTERS:
         return
     if request.output_file is None:
         raise CliFailure(
@@ -79,7 +89,7 @@ def require_counter_evidence_outputs(request: EvaluationRequest) -> None:
             code="performance_counter_output_required",
             hint="Pass --output TRACE.jsonl.",
         )
-    if request.static_evidence != "auto":
+    if request.static_evidence is not SidecarMode.AUTO:
         raise CliFailure(
             "rocprofv3-counters requires static evidence collection",
             code="performance_counter_static_evidence_required",

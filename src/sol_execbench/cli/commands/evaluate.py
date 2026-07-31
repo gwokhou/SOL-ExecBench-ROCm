@@ -6,16 +6,17 @@ from pathlib import Path
 
 import click
 
-import sol_execbench.cli.sidecars.decision as cli_decision
-import sol_execbench.cli.sidecars.static_evidence as cli_static_evidence
-from sol_execbench.cli.evaluation.evaluator import (
-    PROFILE_NONE,
-    PROFILE_ROCPROFV3,
-    PROFILE_ROCPROFV3_COUNTERS,
-    run_evaluation_cli,
+from sol_execbench.cli.evaluation.evaluator import run_evaluation_cli
+from sol_execbench.cli.evaluation.profile_mode import (
+    PROFILE_MODE_CHOICES,
+    ProfileMode,
 )
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import CliFailure, CliResult, output_format
+from sol_execbench.cli.sidecars.mode import (
+    SIDECAR_MODE_CHOICES,
+    SidecarMode,
+)
 
 
 @click.command(
@@ -80,10 +81,8 @@ from sol_execbench.cli.protocol import CliFailure, CliResult, output_format
 @click.option("--keep-staging", is_flag=True)
 @click.option(
     "--profile",
-    type=click.Choice(
-        [PROFILE_NONE, PROFILE_ROCPROFV3, PROFILE_ROCPROFV3_COUNTERS],
-    ),
-    default=PROFILE_NONE,
+    type=click.Choice(PROFILE_MODE_CHOICES),
+    default=str(ProfileMode.NONE),
     show_default=True,
 )
 @click.option(
@@ -95,19 +94,14 @@ from sol_execbench.cli.protocol import CliFailure, CliResult, output_format
 )
 @click.option(
     "--static-evidence",
-    type=click.Choice(
-        [
-            cli_static_evidence.STATIC_EVIDENCE_NONE,
-            cli_static_evidence.STATIC_EVIDENCE_AUTO,
-        ],
-    ),
-    default=cli_static_evidence.STATIC_EVIDENCE_NONE,
+    type=click.Choice(SIDECAR_MODE_CHOICES),
+    default=str(SidecarMode.NONE),
     show_default=True,
 )
 @click.option(
     "--decision",
-    type=click.Choice([cli_decision.DECISION_NONE, cli_decision.DECISION_AUTO]),
-    default=cli_decision.DECISION_NONE,
+    type=click.Choice(SIDECAR_MODE_CHOICES),
+    default=str(SidecarMode.NONE),
     show_default=True,
 )
 @click.option("--feedback-target-id")
@@ -169,9 +163,9 @@ def evaluate_cli(
         json_output=False,
         lock_clocks=lock_clocks,
         keep_staging=keep_staging,
-        profile=profile,
-        static_evidence=static_evidence,
-        decision=decision,
+        profile=ProfileMode(profile),
+        static_evidence=SidecarMode(static_evidence),
+        decision=SidecarMode(decision),
         feedback_run_id=feedback_run_id,
         feedback_target_id=feedback_target_id,
         feedback_candidate_id=feedback_candidate_id,

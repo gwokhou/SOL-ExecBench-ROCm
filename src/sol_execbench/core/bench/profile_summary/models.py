@@ -10,6 +10,7 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
+from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticConfidence
 from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ProfileStatus,
@@ -37,14 +38,6 @@ class ProfileSummaryHintSeverity(StrEnum):
     MEDIUM = "medium"
     HIGH = "high"
     UNKNOWN = "unknown"
-
-
-class ProfileSummaryHintConfidence(StrEnum):
-    """Closed confidence scale for a runtime bottleneck hint."""
-
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
 
 
 class ProfileSummaryMetric(BaseModelWithDocstrings):
@@ -113,7 +106,7 @@ class ProfileSummaryBottleneckHint(BaseModelWithDocstrings):
     """Closed diagnostic hint category."""
     severity: ProfileSummaryHintSeverity = ProfileSummaryHintSeverity.LOW
     """Conservative severity label."""
-    confidence: ProfileSummaryHintConfidence = ProfileSummaryHintConfidence.LOW
+    confidence: DiagnosticConfidence = DiagnosticConfidence.LOW
     """Confidence in this diagnostic hint."""
     message: str
     """Bounded human-readable diagnostic message."""

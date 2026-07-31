@@ -11,7 +11,10 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.base_model import (
+    BaseModelWithDocstrings,
+    CurrentSchemaModel,
+)
 from sol_execbench.core.integrity.schema_versions import (
     TOOLCHAIN_ROUTING_SCHEMA_VERSION,
 )
@@ -166,10 +169,11 @@ class ToolchainRoutingDecision(BaseModelWithDocstrings):
     """Dynamic probe evidence when attempted."""
 
 
-class ToolchainRoutingReport(BaseModelWithDocstrings):
+class ToolchainRoutingReport(CurrentSchemaModel):
     """Toolchain routing report for one request."""
 
     model_config = ConfigDict(use_attribute_docstrings=True)
+    current_schema_version = TOOLCHAIN_ROUTING_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.toolchain_routing.v1"] = (
         TOOLCHAIN_ROUTING_SCHEMA_VERSION

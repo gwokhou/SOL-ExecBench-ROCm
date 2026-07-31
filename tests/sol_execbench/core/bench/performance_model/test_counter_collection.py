@@ -9,10 +9,6 @@ from pydantic import ValidationError
 
 from sol_execbench.core.bench.rocm_profiler import counter_collection
 from sol_execbench.core.bench.rocm_profiler.counter_collection import (
-    COUNTER_REASON_ARTIFACT_INCOMPLETE,
-    COUNTER_REASON_COLLECTED,
-    COUNTER_REASON_PMC_CHECK_FAILED,
-    COUNTER_REASON_UNSUPPORTED,
     collect_rocprofv3_counters,
 )
 from sol_execbench.core.bench.rocm_profiler.counter_provenance import (
@@ -22,6 +18,7 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ArtifactKind,
     Rocprofv3ProfileRequest,
     Rocprofv3ProfileStatus,
+    Rocprofv3ReasonCode,
 )
 from sol_execbench.core.data.json_utils import load_json_file
 
@@ -98,7 +95,7 @@ def test_counter_collection_discovers_availability_and_hashes_inputs(
     result = collect_rocprofv3_counters(request, runner=runner)
 
     assert result.status is Rocprofv3ProfileStatus.SUCCESS
-    assert COUNTER_REASON_COLLECTED in result.reason_codes
+    assert Rocprofv3ReasonCode.COUNTERS_COLLECTED in result.reason_codes
     assert set(result.provenance) == {
         "application_command_sha256",
         "application_executable_sha256",
@@ -215,7 +212,9 @@ def test_counter_collection_fails_closed_for_unsupported_counter(
     result = collect_rocprofv3_counters(_request(tmp_path), runner=runner)
 
     assert result.status is Rocprofv3ProfileStatus.UNAVAILABLE
-    assert result.reason_codes == (COUNTER_REASON_UNSUPPORTED,)
+    assert result.reason_codes == (
+        Rocprofv3ReasonCode.REQUIRED_COUNTERS_UNSUPPORTED,
+    )
 
 
 def test_counter_collection_rejects_non_gfx1200_device(
@@ -272,7 +271,9 @@ def test_counter_collection_rejects_incomplete_successful_run(
     result = collect_rocprofv3_counters(_request(tmp_path), runner=runner)
 
     assert result.status is Rocprofv3ProfileStatus.FAILED
-    assert COUNTER_REASON_ARTIFACT_INCOMPLETE in result.reason_codes
+    assert (
+        Rocprofv3ReasonCode.COUNTER_ARTIFACT_INCOMPLETE in result.reason_codes
+    )
     assert not any(
         artifact.kind is Rocprofv3ArtifactKind.COUNTER_CSV
         for artifact in result.artifacts
@@ -304,4 +305,6 @@ def test_counter_collection_fails_closed_when_pmc_check_rejects_group(
     result = collect_rocprofv3_counters(_request(tmp_path), runner=runner)
 
     assert result.status is Rocprofv3ProfileStatus.FAILED
-    assert result.reason_codes == (COUNTER_REASON_PMC_CHECK_FAILED,)
+    assert result.reason_codes == (
+        Rocprofv3ReasonCode.COUNTER_PMC_CHECK_FAILED,
+    )

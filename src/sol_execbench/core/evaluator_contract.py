@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.data.base_model import CurrentSchemaModel
 from sol_execbench.core.data.trace import EvaluationStatus
 from sol_execbench.core.integrity.schema_versions import (
     EVALUATOR_CONTRACT_SCHEMA_VERSION,
@@ -20,10 +20,11 @@ SOL_EXECBENCH_CONTRACT_VERSION = "4.0"
 SOL_EXECBENCH_RELEASE = "unreleased-v4"
 
 
-class EvaluatorContract(BaseModelWithDocstrings):
+class EvaluatorContract(CurrentSchemaModel):
     """Current evaluator, corpus, SOLAR, and scoring ownership contract."""
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
+    current_schema_version = EVALUATOR_CONTRACT_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.evaluator_contract.v5"] = (
         SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION

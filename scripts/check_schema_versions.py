@@ -9,10 +9,12 @@ import subprocess
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
+from types import MappingProxyType
 
 from sol_execbench.core.integrity.schema_versions import (
     CURRENT_NUMERIC_SCHEMA_VERSIONS as EXECBENCH_NUMERIC_SCHEMA_VERSIONS,
     CURRENT_SCHEMA_VERSIONS,
+    SCHEMA_VERSIONS,
 )
 from solar.schema_versions import (
     CURRENT_NUMERIC_SCHEMA_VERSIONS as SOLAR_NUMERIC_SCHEMA_VERSIONS,
@@ -30,6 +32,7 @@ CURRENT_SCHEMA_IDENTIFIERS = (
 CURRENT_NUMERIC_SCHEMA_VERSIONS = (
     EXECBENCH_NUMERIC_SCHEMA_VERSIONS | SOLAR_NUMERIC_SCHEMA_VERSIONS
 )
+READ_ONLY_MAPPING_TYPE = type(MappingProxyType({}))
 NUMERIC_SCHEMA_FIELD_RE = re.compile(
     r'(?m)^[ \t]*(?:"schema_version"|schema_version)[ \t]*:[ \t]*(\d+)\b',
 )
@@ -185,6 +188,37 @@ class _NumericSchemaLiteralVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+class _SchemaAccessPolicyVisitor(ast.NodeVisitor):
+    """Reject schema lookup and coercion patterns that weaken exact contracts."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.findings: list[str] = []
+
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        if (
+            isinstance(node.value, ast.Name)
+            and node.value.id == "SCHEMA_VERSIONS"
+        ):
+            self.findings.append(
+                f"{self.path}:{node.lineno}: import the named schema-version "
+                "constant instead of indexing SCHEMA_VERSIONS",
+            )
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id in {"int", "str"}
+            and any(_mentions_schema_version(item) for item in node.args)
+        ):
+            self.findings.append(
+                f"{self.path}:{node.lineno}: schema_version readers must not "
+                f"coerce with {node.func.id}()",
+            )
+        self.generic_visit(node)
+
+
 def _python_numeric_schema_findings(path: Path, content: str) -> list[str]:
     """Reject raw positive numeric schema versions outside their registries."""
     if path.suffix != ".py" or path.parts[0] not in {"src", "scripts"}:
@@ -200,7 +234,25 @@ def _python_numeric_schema_findings(path: Path, content: str) -> list[str]:
         return []
     visitor = _NumericSchemaLiteralVisitor(path)
     visitor.visit(tree)
-    return visitor.findings
+    access_visitor = _SchemaAccessPolicyVisitor(path)
+    access_visitor.visit(tree)
+    return [*visitor.findings, *access_visitor.findings]
+
+
+def registry_findings() -> list[str]:
+    """Require every current-version registry to be immutable at runtime."""
+    registries = {
+        "sol_execbench SCHEMA_VERSIONS": SCHEMA_VERSIONS,
+        "sol_execbench CURRENT_NUMERIC_SCHEMA_VERSIONS": (
+            EXECBENCH_NUMERIC_SCHEMA_VERSIONS
+        ),
+        "solar CURRENT_NUMERIC_SCHEMA_VERSIONS": SOLAR_NUMERIC_SCHEMA_VERSIONS,
+    }
+    return [
+        f"{name} must be a read-only mapping"
+        for name, registry in registries.items()
+        if not isinstance(registry, READ_ONLY_MAPPING_TYPE)
+    ]
 
 
 def _numeric_schema_findings(path: Path, content: str) -> list[str]:
@@ -316,6 +368,7 @@ def main() -> int:
         for path in sorted(RETIRED_SCHEMA_PATHS)
         if (ROOT / path).exists()
     )
+    findings.extend(registry_findings())
     findings.extend(audit_paths(first_party_paths()))
     if findings:
         print("\n".join(findings))

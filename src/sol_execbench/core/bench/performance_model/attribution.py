@@ -7,7 +7,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
+from sol_execbench.core.bench.diagnostic_sidecar import (
+    DiagnosticConfidence,
+    DiagnosticSidecarStatus,
+)
 from sol_execbench.core.bench.performance_model.counter_metrics import (
     counter_memory_bytes,
 )
@@ -19,7 +22,6 @@ from sol_execbench.core.bench.performance_model.inference import (
 )
 from sol_execbench.core.bench.performance_model.models import (
     CompiledCharacterization,
-    DiagnosticConfidence,
     DiagnosticRatio,
     DispatchEvidence,
     IndexedUpdateDescriptor,

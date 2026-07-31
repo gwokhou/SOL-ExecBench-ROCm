@@ -7,11 +7,14 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Any
+from typing import Any, ClassVar, Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
-from sol_execbench.core.data.base_model import StrictArtifactModel
+from sol_execbench.core.data.base_model import (
+    CurrentSchemaMixin,
+    StrictArtifactModel,
+)
 from sol_execbench.core.integrity import (
     validate_relative_artifact_path,
     validate_sha256,
@@ -109,10 +112,16 @@ class ExecutionPlanProblem(ReleaseModel):
         return validate_sha256(value, "execution-plan input SHA-256")
 
 
-class ReleaseExecutionPlan(ReleaseModel):
+class ReleaseExecutionPlan(CurrentSchemaMixin, ReleaseModel):
     """Exact full-corpus plan consumed by the trusted release runner."""
 
-    schema_version: str = RELEASE_EXECUTION_PLAN_SCHEMA_VERSION
+    current_schema_version: ClassVar[str] = (
+        RELEASE_EXECUTION_PLAN_SCHEMA_VERSION
+    )
+
+    schema_version: Literal["sol_execbench.release_execution_plan.v2"] = (
+        RELEASE_EXECUTION_PLAN_SCHEMA_VERSION
+    )
     generated_at: str
     source_revision: str
     run_id: str = Field(min_length=1)
@@ -143,8 +152,6 @@ class ReleaseExecutionPlan(ReleaseModel):
     @model_validator(mode="after")
     def _contract(self) -> ReleaseExecutionPlan:
         identities = [item.problem_path for item in self.problems]
-        if self.schema_version != RELEASE_EXECUTION_PLAN_SCHEMA_VERSION:
-            raise ValueError("release execution-plan schema mismatch")
         if len(identities) != len(set(identities)):
             raise ValueError(
                 "release execution plan contains duplicate problems",
@@ -182,30 +189,26 @@ class ReleaseRunStatement(ReleaseModel):
         return self
 
 
-class BaselineStatement(ReleaseRunStatement):
+class BaselineStatement(CurrentSchemaMixin, ReleaseRunStatement):
     """Release-defined scoring baseline execution."""
 
-    schema_version: str = RELEASE_BASELINE_SCHEMA_VERSION
+    current_schema_version: ClassVar[str] = RELEASE_BASELINE_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.release_baseline.v1"] = (
+        RELEASE_BASELINE_SCHEMA_VERSION
+    )
     baseline_id: str = Field(min_length=1)
 
-    @model_validator(mode="after")
-    def _schema(self) -> BaselineStatement:
-        if self.schema_version != RELEASE_BASELINE_SCHEMA_VERSION:
-            raise ValueError("release baseline schema mismatch")
-        return self
 
-
-class CandidateStatement(ReleaseRunStatement):
+class CandidateStatement(CurrentSchemaMixin, ReleaseRunStatement):
     """Trusted execution evidence for one full-corpus candidate."""
 
-    schema_version: str = RELEASE_CANDIDATE_SCHEMA_VERSION
-    candidate_id: str = Field(min_length=1)
+    current_schema_version: ClassVar[str] = RELEASE_CANDIDATE_SCHEMA_VERSION
 
-    @model_validator(mode="after")
-    def _schema(self) -> CandidateStatement:
-        if self.schema_version != RELEASE_CANDIDATE_SCHEMA_VERSION:
-            raise ValueError("release candidate schema mismatch")
-        return self
+    schema_version: Literal["sol_execbench.release_candidate.v1"] = (
+        RELEASE_CANDIDATE_SCHEMA_VERSION
+    )
+    candidate_id: str = Field(min_length=1)
 
 
 class SolarManifestEvidence(ReleaseModel):
@@ -221,10 +224,14 @@ class SolarManifestEvidence(ReleaseModel):
         return validate_relative_artifact_path(value, "problem path")
 
 
-class SolarIndexStatement(ReleaseModel):
+class SolarIndexStatement(CurrentSchemaMixin, ReleaseModel):
     """Exact formal-bound manifest inventory for the scoring denominator."""
 
-    schema_version: str = RELEASE_SOLAR_INDEX_SCHEMA_VERSION
+    current_schema_version: ClassVar[str] = RELEASE_SOLAR_INDEX_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.release_solar_index.v2"] = (
+        RELEASE_SOLAR_INDEX_SCHEMA_VERSION
+    )
     generated_at: str
     source_revision: str
     ir_path: IRPath = DEFAULT_IR_PATH
@@ -248,17 +255,19 @@ class SolarIndexStatement(ReleaseModel):
         identities = [
             (item.problem_path, item.workload_uuid) for item in self.entries
         ]
-        if self.schema_version != RELEASE_SOLAR_INDEX_SCHEMA_VERSION:
-            raise ValueError("release SOLAR index schema mismatch")
         if len(identities) != len(set(identities)):
             raise ValueError("release SOLAR index contains duplicate workloads")
         return self
 
 
-class ReleaseBundle(ReleaseModel):
+class ReleaseBundle(CurrentSchemaMixin, ReleaseModel):
     """Publisher-authored content-addressed evidence for one official score."""
 
-    schema_version: str = RELEASE_BUNDLE_SCHEMA_VERSION
+    current_schema_version: ClassVar[str] = RELEASE_BUNDLE_SCHEMA_VERSION
+
+    schema_version: Literal["sol_execbench.release_bundle.v2"] = (
+        RELEASE_BUNDLE_SCHEMA_VERSION
+    )
     corpus_manifest: ArtifactReference
     baseline: ArtifactReference
     candidate: ArtifactReference
@@ -266,8 +275,6 @@ class ReleaseBundle(ReleaseModel):
 
     @model_validator(mode="after")
     def _contract(self) -> ReleaseBundle:
-        if self.schema_version != RELEASE_BUNDLE_SCHEMA_VERSION:
-            raise ValueError("release bundle schema mismatch")
         statements = (self.baseline, self.candidate, self.solar)
         if any(
             item.size_bytes > MAX_RELEASE_STATEMENT_BYTES for item in statements
