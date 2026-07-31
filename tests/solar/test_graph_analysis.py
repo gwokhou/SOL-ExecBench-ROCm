@@ -230,7 +230,7 @@ def test_declared_outputs_exclude_unreachable_trace_dead_ends(
     "schema_version",
     [0, str(EXTENDED_EINSUM_IR_SCHEMA_VERSION)],
 )
-def test_ir_lifecycle_rejects_unsupported_schema(
+def test_ir_backend_rejects_unsupported_schema(
     schema_version: int | str,
 ) -> None:
     with pytest.raises(ValueError, match="schema_version=6"):

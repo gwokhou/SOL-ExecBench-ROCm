@@ -14,11 +14,16 @@ uv run ty check
 The coupling gate scans both `sol_execbench` and `solar`. It rejects:
 
 - internal strongly connected import components;
+- strongly connected components that emerge after modules are grouped into
+  their owning architecture domains;
 - implementation imports from broad package facades;
 - SOLAR importing benchmark code;
 - benchmark code importing SOLAR outside `core.solar_bridge`;
 - `core.platform` importing `core.scoring`;
 - `core.bench` importing `core.reports`;
+- `core.scoring` importing CLI adapters, `core.bench` importing the SOLAR
+  bridge, or foundational `core.integrity` importing platform evidence;
+- SOLAR IR representation code importing pipeline, verification or analysis;
 - generated candidate driver imports outside `driver.eval_runtime_api`;
 - line-count or fan-out growth at named orchestration boundaries.
 
@@ -29,11 +34,15 @@ tests and current documentation in the same change.
 ## Responsibility rules
 
 - CLI modules coordinate user interaction; they do not own benchmark math.
+- Release execution receives an evaluation adapter from the CLI composition
+  boundary; scoring never imports CLI request, result or failure contracts.
 - `ProblemPackager` stages assets; templates own process bootstrap only.
 - The trusted reference service owns reference code, reference outputs and
   reference timing. Candidate modules cannot import reference runtime helpers.
 - SOLAR owns formal analysis artifacts but never benchmark/candidate/scoring
   concepts. The bridge is the only cross-package adapter.
+- SOLAR pipeline composition joins IR backends, verification runtimes and
+  formal analyzers; the IR package owns representation and conversion only.
 - Platform evidence is lower-level than scoring. Benchmark evidence producers
   are lower-level than report presentation.
 - Formula, aggregation and official authority remain separate scoring modules.

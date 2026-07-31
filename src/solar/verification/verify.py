@@ -22,9 +22,13 @@ from typing import Any
 import yaml
 
 from solar.artifacts import sha256_file, stable_json_checksum
-from solar.ir.contracts import IRLifecycle, layer_operation
+from solar.ir.contracts import layer_operation
 from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
-from solar.verification.contracts import TolerancePolicy, VerificationPolicy
+from solar.verification.contracts import (
+    IRVerificationBackend,
+    TolerancePolicy,
+    VerificationPolicy,
+)
 from solar.verification.errors import IRExecutionError, VerificationError
 from solar.verification.executor import (
     IRGraphExecutor,
@@ -229,7 +233,7 @@ def _run_cases(
     reference: Callable[..., Any],
     input_factory: Callable[..., Any],
     graph: Mapping[str, Any],
-    lifecycle: IRLifecycle,
+    backend: IRVerificationBackend,
     cases: Sequence[Mapping[str, Any]],
     *,
     tolerance: TolerancePolicy,
@@ -240,7 +244,7 @@ def _run_cases(
 
     executor = IRGraphExecutor(
         graph,
-        lifecycle,
+        backend,
         check_shapes=check_shapes,
     )
     results: list[dict[str, Any]] = []
@@ -416,7 +420,7 @@ def create_verification_artifact(
     workload_parameters: Mapping[str, Any],
     output_path: str | Path,
     policy: VerificationPolicy,
-    lifecycle: IRLifecycle,
+    backend: IRVerificationBackend,
 ) -> dict[str, Any]:
     """Verify and write a deterministic, hash-bound ``verification.yaml``."""
     reference_path = Path(reference_path).resolve()
@@ -431,7 +435,7 @@ def create_verification_artifact(
         reference,
         input_factory,
         graph,
-        lifecycle,
+        backend,
         cases,
         tolerance=policy,
         device=policy.device,
@@ -509,7 +513,7 @@ def verify_callable_conversion(
     graph_path: str | Path,
     output_path: str | Path,
     policy: VerificationPolicy,
-    lifecycle: IRLifecycle,
+    backend: IRVerificationBackend,
     graph: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Verify a callable reference and write a hash-bound attestation.
@@ -527,7 +531,7 @@ def verify_callable_conversion(
         reference,
         _CallableInputFactory(input_factory),
         graph,
-        lifecycle,
+        backend,
         cases,
         tolerance=policy,
         device=policy.device,
@@ -585,7 +589,7 @@ def replay_verification_artifact(
     workload_name: str,
     workload_parameters: Mapping[str, Any],
     required_tolerance: TolerancePolicy,
-    lifecycle: IRLifecycle,
+    backend: IRVerificationBackend,
     device: str | None = None,
 ) -> None:
     """Validate every binding and numerically replay a verification artifact."""
@@ -617,7 +621,7 @@ def replay_verification_artifact(
         getattr(module, str(reference_data["entry_point"])),
         getattr(module, str(reference_data["input_factory"])),
         graph,
-        lifecycle,
+        backend,
         cases,
         tolerance=recorded_tolerance,
         device=replay_device,

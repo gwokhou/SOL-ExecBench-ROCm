@@ -6,9 +6,9 @@ import pytest
 import torch
 from torch.nn import functional
 
-from solar.ir.registry import ir_lifecycle
 from solar.schema_versions import ATEN_IR_SCHEMA_VERSION
 from solar.verification import numerics
+from solar.verification.registry import verification_backend
 from solar.verification.verify import IRExecutionError, IRGraphExecutor
 
 
@@ -19,7 +19,7 @@ def _graph_executor(
 ) -> IRGraphExecutor:
     return IRGraphExecutor(
         graph,
-        ir_lifecycle(str(graph["ir_kind"])),
+        verification_backend(str(graph["ir_kind"])),
         check_shapes=check_shapes,
     )
 

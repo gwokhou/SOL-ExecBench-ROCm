@@ -10,17 +10,26 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from sol_execbench.cli.evaluation.evaluator import run_evaluation_cli
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
+from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import (
     CliExitCode,
     CliFailure,
     CliResult,
     artifact,
 )
+from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.scoring.release_builders import (
     materialize_release_baseline,
     materialize_release_candidate,
 )
-from sol_execbench.core.scoring.release_runner import execute_release_plan
+from sol_execbench.core.scoring.release_runner import (
+    ReleaseEvaluationError,
+    ReleaseEvaluationRequest,
+    ReleaseEvaluationResult,
+    execute_release_plan,
+)
 
 console = Console(stderr=True)
 
@@ -154,6 +163,7 @@ def release_run_cli(
         result = execute_release_plan(
             plan,
             corpus_manifest_path=manifest_path,
+            evaluator=_evaluate_release_problem,
             timeout_seconds=timeout_seconds,
             resume=resume,
             device=device,
@@ -177,6 +187,46 @@ def release_run_cli(
         f"{result.passed}/{result.workloads} workloads passed.[/green]",
     )
     return CliResult(data=report)
+
+
+def _evaluate_release_problem(
+    request: ReleaseEvaluationRequest,
+) -> ReleaseEvaluationResult:
+    """Adapt release execution to the normal hardened evaluator."""
+    try:
+        result = run_evaluation_cli(
+            request=EvaluationRequest(
+                problem_dir=request.problem_dir,
+                definition_file=None,
+                workload_file=None,
+                solution_file=request.solution_path,
+                config_file=None,
+                compile_timeout=min(request.timeout_seconds, 300),
+                timeout=request.timeout_seconds,
+                output_file=request.trace_path,
+                json_output=False,
+                lock_clocks=True,
+                keep_staging=False,
+                profile=ProfileMode.NONE,
+                static_evidence=SidecarMode.NONE,
+                decision=SidecarMode.NONE,
+                feedback_run_id=None,
+                feedback_target_id=None,
+                feedback_candidate_id=None,
+                feedback_source_sha256=None,
+                feedback_sol_version=None,
+                verbose=False,
+                device=request.device,
+                unsafe_local_execution=False,
+            ),
+        )
+    except CliFailure as exc:
+        raise ReleaseEvaluationError(
+            str(exc),
+            code=exc.code,
+            exit_code=int(exc.cli_exit_code),
+        ) from exc
+    return ReleaseEvaluationResult(exit_code=int(result.exit_code))
 
 
 __all__ = ["baseline_cli"]

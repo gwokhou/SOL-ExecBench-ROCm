@@ -142,8 +142,8 @@ src/
   solar/
     graph/               operator graph extraction
     ir/
-      aten/              exact ATen IR lifecycle
-      extended_einsum/   canonical reviewed extended-einsum lifecycle
+      aten/              exact ATen representation/conversion backend
+      extended_einsum/   reviewed extended-einsum representation backend
     verification/        callable-versus-graph proof
     analysis/
       orojenesis/        pinned mapper integration and region analysis
@@ -157,15 +157,18 @@ src/
 reviewed native-operation registry. Its v6 artifact semantics are independent
 of ATen: layers are `input`, standard executable `einsum`, or canonical
 `operation` records with ordered operands, named attributes, effects, and
-bounded dynamic dimensions. Public PyTorch APIs provide the default execution
-backend, while `make_fx_aten` retains its separate ATen lifecycle. The
+bounded dynamic dimensions. Public PyTorch APIs provide the verification
+execution backend, while `make_fx_aten` retains its separate ATen
+representation. The
 `_vendor` namespace is reserved for dependencies retained as vendored
 snapshots.
 
 Shared evidence identifiers live below both producers and reports. Platform
 modules do not import scoring, and benchmark runtime modules do not import
 reports. `scripts/check_coupling.py` enforces these dependency directions and
-the sole SOLAR bridge.
+the sole SOLAR bridge. It also rejects cycles after modules are grouped by
+architecture domain, so a file-level DAG cannot hide mutually dependent
+packages.
 
 ## Canonical artifacts
 

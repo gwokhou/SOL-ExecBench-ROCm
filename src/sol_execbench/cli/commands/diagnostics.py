@@ -52,6 +52,9 @@ from sol_execbench.core.data.json_utils import (
 )
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.solar_bridge.performance import (
+    load_manifest_semantic_characterization,
+)
 
 console = Console(stderr=True)
 _FILE = click.Path(exists=True, dir_okay=False, path_type=Path)
@@ -92,6 +95,7 @@ def performance_diagnostics_cli(
                 calibration_profile_path=calibration_profile,
                 inference_profile_path=inference_profile,
             ),
+            semantic_loader=load_manifest_semantic_characterization,
         )
         atomic_write_json_value(output, sidecar.to_dict())
     except (OSError, ValueError) as error:
@@ -128,6 +132,7 @@ def fit_performance_inference_cli(
         profile = fit_diagnostic_inference_profile(
             development_corpus_path=development_corpus,
             calibration_profile_path=calibration_profile,
+            semantic_loader=load_manifest_semantic_characterization,
         )
         atomic_write_json_value(output, profile.model_dump(mode="json"))
     except (OSError, ValueError) as error:
@@ -167,6 +172,7 @@ def accept_performance_model_cli(
             held_out_corpus_path=held_out_corpus,
             calibration_profile_path=calibration_profile,
             inference_profile_path=inference_profile,
+            semantic_loader=load_manifest_semantic_characterization,
         )
         atomic_write_json_value(
             manifest_output,

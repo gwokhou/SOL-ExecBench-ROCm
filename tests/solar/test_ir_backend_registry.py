@@ -1,30 +1,30 @@
-"""Registry-driven dispatch is what makes a third IR lifecycle plug in cleanly.
-
-These tests monkeypatch the lifecycle registry to prove that every stage routes
-through :func:`ir_lifecycle` rather than a parallel hardcoded registry.
-"""
+"""Registry dispatch keeps IR representation below verification and pipeline."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 import torch
 import yaml
 
+from solar.analysis import graph_analyzer
 from solar.graph.contracts import ExtractionKind
 from solar.ir import registry as ir_registry
-from solar.ir.contracts import IRGraphArtifact, IRKind, IRLifecycle
+from solar.ir.contracts import IRBackend, IRGraphArtifact, IRKind
 from solar.ir.registry import (
     graph_kind,
-    ir_lifecycle,
-    ir_lifecycles,
+    ir_backend,
+    ir_backends,
     validate_ir_graph,
 )
-from solar.pipeline.stages import analyze_request_graph, verify_request_graph
+from solar.pipeline import stages as pipeline_stages
+from solar.verification import registry as verification_registry
 from solar.verification.executor import IRGraphExecutor
+from solar.verification.registry import verification_backend
 
 
 def _stub_graph() -> dict[str, Any]:
@@ -52,88 +52,112 @@ def _stub_graph() -> dict[str, Any]:
     }
 
 
-def test_registry_drives_complete_lifecycle_lookup(
-    monkeypatch,
-    tmp_path: Path,
+def test_registries_compose_representation_and_execution(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    seen: dict[str, bool] = {}
+    seen: set[str] = set()
 
-    def stub_validate(graph: Mapping[str, Any]) -> None:
-        seen["validate"] = True
+    def stub_validate(_graph: Mapping[str, Any]) -> None:
+        seen.add("validate")
 
     def stub_execute(
-        layer_id: str,
-        layer: Mapping[str, Any],
+        _layer_id: str,
+        _layer: Mapping[str, Any],
         operands: Sequence[Any],
-        output_shapes: Sequence[tuple[int, ...]],
+        _output_shapes: Sequence[tuple[int, ...]],
     ) -> Any:
-        seen["execute"] = True
+        seen.add("execute")
         return operands[0]
 
-    def stub_verify(request, graph_path, output_path) -> None:
-        del request, graph_path, output_path
-        seen["verify"] = True
-
-    def stub_analyze(request, profile, staging, graph_path) -> dict:
-        del request, profile, staging, graph_path
-        seen["analyze"] = True
-        return {"status": "passed"}
-
-    stub = IRLifecycle(
+    stub = IRBackend(
         kind=IRKind.EXTENDED_EINSUM,
         extractions=frozenset(ExtractionKind),
         validate=stub_validate,
-        convert=lambda operator, output_dir: IRGraphArtifact(
+        convert=lambda _operator, output_dir: IRGraphArtifact(
             Path(output_dir),
             IRKind.EXTENDED_EINSUM,
         ),
-        execute=stub_execute,
-        verify=stub_verify,
-        analyze=stub_analyze,
     )
     monkeypatch.setitem(
-        ir_registry._LIFECYCLE_LOADERS,
+        ir_registry._BACKEND_LOADERS,
         IRKind.EXTENDED_EINSUM,
         lambda: stub,
     )
+    monkeypatch.setitem(
+        verification_registry._EXECUTORS,
+        IRKind.EXTENDED_EINSUM,
+        stub_execute,
+    )
 
-    assert ir_lifecycle(IRKind.EXTENDED_EINSUM) is stub
-    assert stub in ir_lifecycles()
+    assert ir_backend(IRKind.EXTENDED_EINSUM) is stub
+    assert stub in ir_backends()
+    runtime = verification_backend(IRKind.EXTENDED_EINSUM)
+    assert runtime.ir is stub
+    validate_ir_graph(_stub_graph())
+    result = IRGraphExecutor(_stub_graph(), runtime)(torch.ones(2, 2))
 
-    graph = _stub_graph()
-    validate_ir_graph(graph)
-    assert seen["validate"]
-
-    result = IRGraphExecutor(graph, stub)(torch.ones(2, 2))
-    assert seen["execute"]
+    assert seen == {"validate", "execute"}
     torch.testing.assert_close(result, torch.ones(2, 2))
 
+
+def test_pipeline_owns_verification_and_analysis_composition(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: dict[str, Any] = {}
+    graph = _stub_graph()
     graph_path = tmp_path / "graph.yaml"
     graph_path.write_text(yaml.safe_dump(graph), encoding="utf-8")
     artifact = IRGraphArtifact(graph_path, IRKind.EXTENDED_EINSUM)
-    verify_request_graph(
-        cast(Any, object()),
-        artifact,
-        Path("verification.json"),
+
+    def record_verification(**kwargs: Any) -> None:
+        seen["verification"] = kwargs["backend"]
+
+    class Analyzer:
+        def __init__(self, *, validator) -> None:
+            seen["validator"] = validator
+
+        def analyze_graph(self, *_args: Any, **_kwargs: Any) -> dict[str, str]:
+            return {"status": "passed"}
+
+    monkeypatch.setattr(
+        pipeline_stages,
+        "verify_callable_conversion",
+        record_verification,
     )
-    analysis = analyze_request_graph(
+    monkeypatch.setattr(graph_analyzer, "IRGraphAnalyzer", Analyzer)
+    request = SimpleNamespace(
+        reference=lambda value: value,
+        input_factory=lambda _seed: (torch.ones(2, 2),),
+        reference_name="tests#identity",
+        reference_sha256="a" * 64,
+        verification=object(),
+        precision="fp32",
+        require_orojenesis=False,
+        orojenesis_home=None,
+    )
+
+    pipeline_stages.verify_request_graph(
+        cast(Any, request),
+        artifact,
+        tmp_path / "verification.yaml",
+    )
+    analysis = pipeline_stages.analyze_request_graph(
+        cast(Any, request),
         cast(Any, object()),
-        cast(Any, object()),
-        Path("staging"),
+        tmp_path,
         artifact,
     )
-    assert seen["verify"]
-    assert seen["analyze"]
+
+    assert seen["verification"].ir.kind is IRKind.EXTENDED_EINSUM
+    assert callable(seen["validator"])
     assert analysis == {"status": "passed"}
 
 
 def test_registry_lists_every_registered_dialect() -> None:
-    kinds = {lifecycle.kind for lifecycle in ir_lifecycles()}
-    assert IRKind.ATEN in kinds
-    assert IRKind.EXTENDED_EINSUM in kinds
-    assert all(
-        isinstance(lifecycle, IRLifecycle) for lifecycle in ir_lifecycles()
-    )
+    kinds = {backend.kind for backend in ir_backends()}
+    assert kinds == {IRKind.ATEN, IRKind.EXTENDED_EINSUM}
+    assert all(isinstance(backend, IRBackend) for backend in ir_backends())
 
 
 def test_graph_dispatch_requires_an_explicit_ir_kind() -> None:

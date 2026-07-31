@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from sol_execbench.core.integrity.source_state import verify_git_source_state
+from sol_execbench.core.platform.source_state import verify_git_source_state
 
 
 def test_verifies_exact_clean_release_source(tmp_path: Path) -> None:

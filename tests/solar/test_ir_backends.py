@@ -11,12 +11,13 @@ from solar.graph.extraction import extract_operator_graph
 from solar.ir.contracts import (
     DEFAULT_IR_KIND,
     DEFAULT_IR_PATH,
+    IRBackend,
     IRKind,
-    IRLifecycle,
     IRPath,
 )
 from solar.ir.conversion import convert_operator_graph
-from solar.ir.registry import ir_lifecycle, ir_lifecycles
+from solar.ir.registry import ir_backend, ir_backends
+from solar.verification.registry import verification_backend
 from solar.verification.verify import IRGraphExecutor
 
 
@@ -77,7 +78,9 @@ def test_fixed_ir_paths_preserve_the_same_matmul_semantics(
     expected = _matmul(*inputs)
     for graph in (extended_einsum_graph, aten_graph):
         torch.testing.assert_close(
-            IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs),
+            IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
+                *inputs
+            ),
             expected,
         )
 
@@ -116,17 +119,17 @@ def test_analysis_request_defaults_to_extended_einsum(tmp_path: Path) -> None:
     assert make_fx.ir_kind is IRKind.ATEN
 
 
-def test_every_fixed_path_shares_one_lifecycle_interface(
+def test_every_fixed_path_shares_one_backend_interface(
     tmp_path: Path,
 ) -> None:
-    """Both IR dialects implement one lifecycle on trusted make_fx data."""
-    lifecycles = ir_lifecycles()
-    assert {lifecycle.kind for lifecycle in lifecycles} == {
+    """Both IR dialects implement one backend on trusted make_fx data."""
+    backends = ir_backends()
+    assert {backend.kind for backend in backends} == {
         IRKind.ATEN,
         IRKind.EXTENDED_EINSUM,
     }
-    assert all(isinstance(lifecycle, IRLifecycle) for lifecycle in lifecycles)
-    assert ir_lifecycle(DEFAULT_IR_KIND).kind is IRKind.EXTENDED_EINSUM
+    assert all(isinstance(backend, IRBackend) for backend in backends)
+    assert ir_backend(DEFAULT_IR_KIND).kind is IRKind.EXTENDED_EINSUM
 
     inputs = (
         torch.arange(6.0).reshape(2, 3),
@@ -134,7 +137,7 @@ def test_every_fixed_path_shares_one_lifecycle_interface(
     )
     expected = _matmul(*inputs)
     for ir_path in IRPath:
-        lifecycle = ir_lifecycle(ir_path.ir_kind)
+        backend = ir_backend(ir_path.ir_kind)
         output_dir = tmp_path / ir_path.value
         output_dir.mkdir()
         operator = extract_operator_graph(
@@ -145,12 +148,15 @@ def test_every_fixed_path_shares_one_lifecycle_interface(
             name="matmul",
             extraction_kind=ir_path.extraction_kind,
         )
-        artifact = lifecycle.convert(operator, output_dir)
+        artifact = backend.convert(operator, output_dir)
         graph = yaml.safe_load(artifact.path.read_text())
-        assert artifact.kind is lifecycle.kind
-        lifecycle.validate(graph)
-        assert graph["ir_kind"] == lifecycle.kind
+        assert artifact.kind is backend.kind
+        backend.validate(graph)
+        assert graph["ir_kind"] == backend.kind
         torch.testing.assert_close(
-            IRGraphExecutor(graph, lifecycle)(*inputs),
+            IRGraphExecutor(
+                graph,
+                verification_backend(ir_path.ir_kind),
+            )(*inputs),
             expected,
         )

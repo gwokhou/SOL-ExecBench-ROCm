@@ -16,6 +16,9 @@ from sol_execbench.cli.protocol import (
     CliResult,
     artifact,
 )
+from sol_execbench.core.scoring.release_solar_runner import (
+    build_release_solar_manifests,
+)
 from sol_execbench.core.solar_bridge.corpus_readiness import (
     audit_corpus_stage_readiness,
 )
@@ -32,9 +35,6 @@ from sol_execbench.core.solar_bridge.path_comparison import (
 )
 from sol_execbench.core.solar_bridge.path_comparison_models import (
     PathComparisonStatus,
-)
-from sol_execbench.core.solar_bridge.release import (
-    build_release_solar_manifests,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
 

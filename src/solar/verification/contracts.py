@@ -6,8 +6,29 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+
+from solar.ir.contracts import IRBackend
+from solar.types import DynamicValue
+
+LayerExecutor = Callable[
+    [
+        str,
+        Mapping[str, DynamicValue],
+        Sequence[DynamicValue],
+        Sequence[tuple[int, ...]],
+    ],
+    DynamicValue,
+]
+
+
+@dataclass(frozen=True)
+class IRVerificationBackend:
+    """Verification runtime paired with its representation backend."""
+
+    ir: IRBackend
+    execute: LayerExecutor
 
 
 @dataclass(frozen=True)
@@ -75,4 +96,9 @@ class VerificationPolicy(TolerancePolicy):
                 raise ValueError(f"{name} must be finite and non-negative")
 
 
-__all__ = ["TolerancePolicy", "VerificationPolicy"]
+__all__ = [
+    "IRVerificationBackend",
+    "LayerExecutor",
+    "TolerancePolicy",
+    "VerificationPolicy",
+]

@@ -20,6 +20,9 @@ from sol_execbench.core.bench.performance_model.models import (
     WorkloadKind,
 )
 from sol_execbench.core.data.base_model import StrictArtifactModel
+from sol_execbench.core.solar_bridge.performance import (
+    load_manifest_semantic_characterization,
+)
 
 pytestmark = [pytest.mark.requires_rocm, pytest.mark.requires_rdna4]
 
@@ -90,7 +93,8 @@ def test_real_gfx1200_diagnostics_cover_all_supported_families(
                 ),
                 calibration_profile_path=calibration,
                 output_path=tmp_path / f"{case.workload_kind}.json",
-            )
+            ),
+            semantic_loader=load_manifest_semantic_characterization,
         )
         assert diagnostic.status is DiagnosticSidecarStatus.AVAILABLE
         assert len(diagnostic.workloads) == 1

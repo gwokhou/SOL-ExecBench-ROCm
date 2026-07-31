@@ -7,12 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
-from sol_execbench.cli.evaluation.evaluator import run_evaluation_cli
-from sol_execbench.cli.evaluation.profile_mode import ProfileMode
-from sol_execbench.cli.evaluation.requests import EvaluationRequest
-from sol_execbench.cli.protocol import CliFailure
-from sol_execbench.cli.sidecars.mode import SidecarMode
 from sol_execbench.core.bench.utils import make_eval
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import (
@@ -57,10 +53,50 @@ class ReleaseRunResult:
     passed: int
 
 
+@dataclass(frozen=True, slots=True)
+class ReleaseEvaluationRequest:
+    """Inputs required from an evaluation application adapter."""
+
+    problem_dir: Path
+    solution_path: Path
+    trace_path: Path
+    timeout_seconds: int
+    device: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReleaseEvaluationResult:
+    """Minimal evaluator outcome consumed by release execution."""
+
+    exit_code: int
+
+
+class ReleaseEvaluationError(RuntimeError):
+    """Classified evaluator failure without a CLI dependency."""
+
+    def __init__(self, message: str, *, code: str, exit_code: int) -> None:
+        """Initialize a classified application-level evaluation error."""
+        super().__init__(message)
+        self.code = code
+        self.exit_code = exit_code
+
+
+class ReleaseEvaluator(Protocol):
+    """Application adapter capable of producing one canonical trace."""
+
+    def __call__(
+        self,
+        request: ReleaseEvaluationRequest,
+    ) -> ReleaseEvaluationResult:
+        """Evaluate one release problem and publish its trace."""
+        ...
+
+
 def execute_release_plan(
     plan_path: Path,
     *,
     corpus_manifest_path: Path,
+    evaluator: ReleaseEvaluator,
     timeout_seconds: int = 900,
     resume: bool = False,
     device: str = "cuda:0",
@@ -83,6 +119,7 @@ def execute_release_plan(
             timeout_seconds=timeout_seconds,
             resume=resume,
             device=device,
+            evaluator=evaluator,
         )
         workloads += len(result)
         passed += sum(trace.is_successful() for trace in result)
@@ -169,6 +206,7 @@ def _execute_problem(
     timeout_seconds: int,
     resume: bool,
     device: str,
+    evaluator: ReleaseEvaluator,
 ) -> list[Trace]:
     trace_path = workspace / problem.trace_path
     solution_path = verify_artifact_file(
@@ -191,16 +229,16 @@ def _execute_problem(
             plan.role,
         )
     try:
-        result = run_evaluation_cli(
-            request=_evaluation_request(
-                problem_dir,
-                solution_path,
-                trace_path,
+        result = evaluator(
+            ReleaseEvaluationRequest(
+                problem_dir=problem_dir,
+                solution_path=solution_path,
+                trace_path=trace_path,
                 timeout_seconds=timeout_seconds,
                 device=device,
             ),
         )
-    except CliFailure as exc:
+    except ReleaseEvaluationError as exc:
         if plan.role is not ReleaseRunKind.CANDIDATE:
             raise
         _write_candidate_failure(
@@ -223,53 +261,19 @@ def _execute_problem(
     )
 
 
-def _evaluation_request(
-    problem_dir: Path,
-    solution_path: Path,
-    trace_path: Path,
-    *,
-    timeout_seconds: int,
-    device: str,
-) -> EvaluationRequest:
-    return EvaluationRequest(
-        problem_dir=problem_dir,
-        definition_file=None,
-        workload_file=None,
-        solution_file=solution_path,
-        config_file=None,
-        compile_timeout=min(timeout_seconds, 300),
-        timeout=timeout_seconds,
-        output_file=trace_path,
-        json_output=False,
-        lock_clocks=True,
-        keep_staging=False,
-        profile=ProfileMode.NONE,
-        static_evidence=SidecarMode.NONE,
-        decision=SidecarMode.NONE,
-        feedback_run_id=None,
-        feedback_target_id=None,
-        feedback_candidate_id=None,
-        feedback_source_sha256=None,
-        feedback_sol_version=None,
-        verbose=False,
-        device=device,
-        unsafe_local_execution=False,
-    )
-
-
 def _write_candidate_failure(
     trace_path: Path,
     *,
     problem_dir: Path,
     solution: Solution,
-    failure: CliFailure,
+    failure: ReleaseEvaluationError,
     device: str,
 ) -> None:
     status = {
         "compilation_failed": EvaluationStatus.COMPILE_ERROR,
         "evaluation_timeout": EvaluationStatus.TIMEOUT,
     }.get(failure.code, EvaluationStatus.RUNTIME_ERROR)
-    if failure.cli_exit_code < 4:
+    if failure.exit_code < 4:
         raise failure
     definition = Definition.model_validate_json(
         (problem_dir / "definition.json").read_text(encoding="utf-8"),
@@ -318,4 +322,11 @@ def _validate_existing_trace(
     return traces
 
 
-__all__ = ["ReleaseRunResult", "execute_release_plan"]
+__all__ = [
+    "ReleaseEvaluationError",
+    "ReleaseEvaluationRequest",
+    "ReleaseEvaluationResult",
+    "ReleaseEvaluator",
+    "ReleaseRunResult",
+    "execute_release_plan",
+]
