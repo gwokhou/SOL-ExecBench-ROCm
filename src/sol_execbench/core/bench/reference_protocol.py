@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from multiprocessing.connection import Connection
 from typing import Any
@@ -20,6 +20,9 @@ from safetensors.torch import (
     save as save_safetensors_bytes,
 )
 
+from sol_execbench.core.bench.performance_model.access_evidence import (
+    AccessPatternSummary,
+)
 from sol_execbench.core.integrity import sha256_bytes, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import SCHEMA_VERSIONS
 
@@ -71,6 +74,7 @@ class ReferenceTimingCase(ReferenceCase):
     reference_latency_ms: float
     input_sha256: str
     timing_failure: str | None = None
+    access_patterns: list[AccessPatternSummary] = field(default_factory=list)
 
 
 def send_json(connection: Connection, value: dict[str, Any]) -> None:
@@ -247,6 +251,7 @@ def send_case(
     *,
     reference_latency_ms: float | None = None,
     timing_failure: str | None = None,
+    access_patterns: Sequence[AccessPatternSummary] = (),
 ) -> None:
     """Send a reference case using JSON metadata and safetensors payload bytes."""
     input_metadata, input_tensors = _encode_values(case.inputs, "input")
@@ -266,6 +271,9 @@ def send_case(
             "payload_bytes": len(payload),
             "reference_latency_ms": reference_latency_ms,
             "timing_failure": timing_failure,
+            "access_patterns": [
+                pattern.model_dump(mode="json") for pattern in access_patterns
+            ],
         },
     )
     _send_bytes(connection, payload, channel="tensor")
@@ -320,6 +328,10 @@ def receive_case(connection: Connection, *, device: str) -> ReferenceTimingCase:
     try:
         inputs = _decode_values(inputs_meta, tensors, device=device)
         outputs = _decode_values(outputs_meta, tensors, device=device)
+        access_patterns = [
+            AccessPatternSummary.model_validate(item)
+            for item in header.get("access_patterns", [])
+        ]
     except ReferenceProtocolError:
         raise
     except Exception as exc:
@@ -331,6 +343,7 @@ def receive_case(connection: Connection, *, device: str) -> ReferenceTimingCase:
         outputs=outputs,
         reference_latency_ms=float(latency),
         input_sha256=_encoded_inputs_sha256(inputs_meta, tensors),
+        access_patterns=access_patterns,
         timing_failure=(
             str(header["timing_failure"])
             if header.get("timing_failure")

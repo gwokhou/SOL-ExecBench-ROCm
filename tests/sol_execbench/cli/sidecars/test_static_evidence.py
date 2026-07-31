@@ -7,6 +7,7 @@ from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceReasonCode,
+    StaticKernelEvidenceSidecar,
     StaticKernelEvidenceStatus,
     build_static_kernel_evidence_sidecar,
 )
@@ -64,12 +65,15 @@ def test_static_evidence_sidecar_writes_summary(tmp_path: Path):
     assert written is not None
     payload = json.loads(written.read_text())
     assert (
-        payload["schema_version"] == "sol_execbench.static_kernel_evidence.v3"
+        payload["schema_version"] == "sol_execbench.static_kernel_evidence.v4"
     )
     assert payload["summary"]["status"] == "collected"
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["claim_boundaries"]["diagnostic_only"] is True
     assert payload["summary"]["claim_boundaries"]["score_authority"] is False
+    loaded = StaticKernelEvidenceSidecar.model_validate(payload)
+    assert loaded.summary is not None
+    assert loaded.summary.artifact_count == 1
 
 
 def test_static_evidence_none_does_not_collect(tmp_path: Path):

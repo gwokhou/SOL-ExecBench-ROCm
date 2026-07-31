@@ -28,6 +28,13 @@ _FAMILIES = (
     WorkloadKind.TRANSPOSE,
     WorkloadKind.REDUCTION,
     WorkloadKind.MATMUL,
+    WorkloadKind.SOFTMAX,
+    WorkloadKind.CROSS_ENTROPY,
+    WorkloadKind.INDEXED_READ,
+    WorkloadKind.INDEXED_UPDATE,
+    WorkloadKind.COMPOSITE,
+    WorkloadKind.TRANSFORMER,
+    WorkloadKind.CONCURRENT,
 )
 
 
@@ -44,7 +51,7 @@ class _SmokeConfiguration(StrictArtifactModel):
 
     schema_version: Literal["diagnostic_smoke_test.v1"]
     calibration_profile: str = Field(min_length=1)
-    cases: list[_SmokeCase] = Field(min_length=4, max_length=4)
+    cases: list[_SmokeCase] = Field(min_length=11, max_length=11)
 
     @model_validator(mode="after")
     def contains_each_supported_family_once(self) -> _SmokeConfiguration:
@@ -60,7 +67,7 @@ def test_real_gfx1200_diagnostics_cover_all_supported_families(
     raw_path = os.environ.get("SOL_EXECBENCH_DIAGNOSTIC_SMOKE_JSON")
     if raw_path is None:
         pytest.skip(
-            "set SOL_EXECBENCH_DIAGNOSTIC_SMOKE_JSON to the four-family "
+            "set SOL_EXECBENCH_DIAGNOSTIC_SMOKE_JSON to the eleven-family "
             "content-addressed smoke configuration"
         )
     configuration_path = Path(raw_path).resolve()

@@ -170,6 +170,68 @@ def test_clock_lock_workload_amd_smi_and_log_are_bounded(
     assert "[clock/state]" in capsys.readouterr().out
 
 
+def test_rdna4_diagnostic_corpus_design_is_preregistered_and_stratified(
+    load_script,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    development = corpus._cases("development")
+    held_out = corpus._cases("held_out")
+    all_cases = [*development, *held_out]
+
+    assert len(development) == 440
+    assert len(held_out) == 220
+    for family in corpus.FAMILIES:
+        for phase in ("point_fit", "conformal", "held_out"):
+            selected = [
+                case
+                for case in all_cases
+                if case.family is family and case.phase == phase
+            ]
+            assert len(selected) == 20
+
+    for start in range(corpus.UNIVERSE_START, corpus.UNIVERSE_START + 60, 3):
+        assert {corpus._phase(index) for index in range(start, start + 3)} == {
+            "point_fit",
+            "conformal",
+            "held_out",
+        }
+
+    reduction = [
+        case
+        for case in all_cases
+        if case.family is corpus.WorkloadKind.REDUCTION
+    ]
+    expected_widths = {32, 64, 128, 256, 512, 1024}
+    for phase in ("point_fit", "conformal", "held_out"):
+        widths = [case.axes["N"] for case in reduction if case.phase == phase]
+        assert set(widths) == expected_widths
+        assert max(widths.count(width) for width in expected_widths) == 4
+        assert min(widths.count(width) for width in expected_widths) == 3
+
+    design = corpus._design_payload()
+    assert design["configuration_frozen_before_collection"] is True
+    assert len(design["cases"]) == 660
+
+
+def test_rdna4_diagnostic_preregistration_is_immutable(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    corpus._preregister(tmp_path)
+    design_path = tmp_path / "design.json"
+
+    corpus._preregister(tmp_path)
+    design_path.write_text('{"changed": true}\n', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="differs"):
+        corpus._preregister(tmp_path)
+
+
 def _result_output(values: Sequence[object]) -> str:
     return "\n".join(f"RESULT {value}" for value in values)
 

@@ -722,6 +722,33 @@ class TestExecute:
             assert template.exists()
             ast.parse(template.read_text())
 
+    def test_restages_worker_only_reference_after_canonical_execution(
+        self,
+        tmp_path,
+        definition,
+        workloads,
+        python_solution,
+        config,
+    ):
+        pkg = _make_packager(
+            tmp_path,
+            definition,
+            workloads,
+            python_solution,
+            config,
+        )
+        trusted_path = pkg.output_dir / TRUSTED_DEFINITION_FILE
+        trusted_path.unlink()
+
+        pkg.restage_trusted_reference()
+
+        trusted_definition = json.loads(trusted_path.read_text())
+        candidate_definition = json.loads(
+            (pkg.output_dir / "definition.json").read_text()
+        )
+        assert trusted_definition["reference"] == definition.reference
+        assert candidate_definition["reference"] != definition.reference
+
     def test_lock_clocks_is_managed_for_evaluator_lifecycle(
         self,
         tmp_path,

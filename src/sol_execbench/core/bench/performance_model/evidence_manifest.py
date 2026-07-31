@@ -37,6 +37,7 @@ class PerformanceEvidenceArtifactKind(StrEnum):
 
     TRACE = "trace"
     TIMING = "timing_evidence"
+    ACCESS_PATTERN = "access_pattern_evidence"
     PROFILE_SUMMARY = "profile_summary"
     STATIC_EVIDENCE = "static_evidence"
     COUNTER_PROVENANCE = "counter_provenance"
@@ -86,7 +87,7 @@ class PerformanceEvidenceManifest(CurrentDiagnosticSidecarAuthority):
     current_schema_version = PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION
 
     schema_version: Literal[
-        "sol_execbench.performance_evidence_manifest.v2"
+        "sol_execbench.performance_evidence_manifest.v4"
     ] = PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION
     status: DiagnosticSidecarStatus
     identity: PerformanceRunIdentity
@@ -188,6 +189,7 @@ def load_and_verify_performance_evidence_manifest(
     required = {
         PerformanceEvidenceArtifactKind.TRACE,
         PerformanceEvidenceArtifactKind.TIMING,
+        PerformanceEvidenceArtifactKind.ACCESS_PATTERN,
         PerformanceEvidenceArtifactKind.PROFILE_SUMMARY,
         PerformanceEvidenceArtifactKind.STATIC_EVIDENCE,
     }

@@ -172,7 +172,7 @@ def test_agent_feedback_sidecar_is_diagnostic_only_for_passing_trace():
     sidecar = build_agent_feedback_sidecar(traces=[_trace()])
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == "sol_execbench.agent_feedback.v4"
+    assert payload["schema_version"] == "sol_execbench.agent_feedback.v6"
     assert payload["status"] == "available"
     assert payload["reason_code"] == "feedback_generated"
     assert payload["summary"]["status_counts"] == {"PASSED": 1}

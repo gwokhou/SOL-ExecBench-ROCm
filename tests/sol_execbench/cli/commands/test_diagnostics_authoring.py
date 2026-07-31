@@ -36,6 +36,13 @@ _FAMILIES = (
     WorkloadKind.TRANSPOSE,
     WorkloadKind.REDUCTION,
     WorkloadKind.MATMUL,
+    WorkloadKind.SOFTMAX,
+    WorkloadKind.CROSS_ENTROPY,
+    WorkloadKind.INDEXED_READ,
+    WorkloadKind.INDEXED_UPDATE,
+    WorkloadKind.COMPOSITE,
+    WorkloadKind.TRANSFORMER,
+    WorkloadKind.CONCURRENT,
 )
 
 
@@ -69,7 +76,7 @@ def _corpus(
                 ),
             )
             for kind in _FAMILIES
-            for index in range(20)
+            for index in range(40 if role == "development" else 20)
         ],
     )
 
@@ -109,8 +116,23 @@ def _development_observation(
         case_id=case.case_id,
         workload_kind=case.workload_kind,
         measured_ms=1.0,
+        base_predicted_ms=1.0,
         base_lower_ms=0.9,
         base_upper_ms=1.1,
+        point_features={
+            "solar_lower_bound_ms": 1.0,
+            "width_64": 0.0,
+            "width_128": 0.0,
+            "width_256": 0.0,
+            "width_512": 0.0,
+            "width_1024": 0.0,
+            "outer_rows_width_32": 1.0,
+            "outer_rows_width_64": 0.0,
+            "outer_rows_width_128": 0.0,
+            "outer_rows_width_256": 0.0,
+            "outer_rows_width_512": 0.0,
+            "outer_rows_width_1024": 0.0,
+        },
     )
 
 
@@ -207,6 +229,6 @@ def test_inference_and_acceptance_authoring_cli_workflow(
     assert acceptance_result.exit_code == 0, acceptance_result.output
     response = json.loads(acceptance_result.output)
     assert response["ok"] is True
-    assert response["data"] == {"accepted": True, "case_count": 80}
+    assert response["data"] == {"accepted": True, "case_count": 220}
     assert acceptance_manifest_path.is_file()
     assert acceptance_path.is_file()

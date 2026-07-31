@@ -1,5 +1,6 @@
 #include <hip/hip_runtime.h>
 #include <hip/hip_bf16.h>
+#include <hip/hip_fp16.h>
 
 #include <algorithm>
 #include <cmath>
@@ -328,6 +329,323 @@ int run_valu() {
   return hip_ok(hipFree(output)) ? 0 : 2;
 }
 
+template <typename T>
+__global__ void indexed_read_kernel(const T* source, const int* indices,
+                                    T* output, size_t count) {
+  const size_t index = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index < count) output[index] = source[indices[index]];
+}
+
+template <typename T>
+double measure_indexed_read(const T* source, const int* indices, T* output,
+                            size_t count) {
+  return elapsed_ms([&] {
+    hipLaunchKernelGGL((indexed_read_kernel<T>),
+                       dim3((count + kThreads - 1) / kThreads), dim3(kThreads),
+                       0, 0, source, indices, output, count);
+  });
+}
+
+template <typename T>
+int emit_indexed_read_metrics(const T* source, int* device_indices, T* output,
+                              size_t source_count, size_t count, int pattern,
+                              const char* variant, bool emit_address_rate) {
+  std::vector<int> indices(count);
+  unsigned int state = 17;
+  for (size_t index = 0; index < count; ++index) {
+    state = state * 1664525U + 1013904223U;
+    if (pattern == 0) indices[index] = static_cast<int>(state % source_count);
+    if (pattern == 1) {
+      indices[index] =
+          static_cast<int>(((index / 2) * 17 + index % 2) % source_count);
+    }
+    if (pattern == 2) indices[index] = static_cast<int>(index % source_count);
+  }
+  if (!hip_ok(hipMemcpy(device_indices, indices.data(), count * sizeof(int),
+                        hipMemcpyHostToDevice))) {
+    return 2;
+  }
+  for (int sample = 0; sample < kSamples; ++sample) {
+    const double milliseconds =
+        measure_indexed_read(source, device_indices, output, count);
+    if (!metric("indexed_read_item_per_ms", variant, count / milliseconds,
+                "item/ms")) {
+      return 2;
+    }
+    if (emit_address_rate && pattern == 2 &&
+        !metric("indexed_address_op_per_ms", "device", count / milliseconds,
+                "item/ms")) {
+      return 2;
+    }
+  }
+  return 0;
+}
+
+template <typename T>
+int run_indexed_read_type(int* indices, size_t source_bytes,
+                          const size_t* working_set_bytes,
+                          const char* element_interval,
+                          bool emit_address_rate) {
+  constexpr size_t count = 1ULL << 20;
+  T* source = nullptr;
+  T* output = nullptr;
+  if (!hip_ok(hipMalloc(&source, source_bytes)) ||
+      !hip_ok(hipMalloc(&output, count * sizeof(T))) ||
+      !hip_ok(hipMemset(source, 1, source_bytes))) {
+    return 2;
+  }
+  const char* locality[] = {"0:0.33", "0.34:0.66", "0.67:1"};
+  const char* working_sets[] = {
+      "0:2097152", "2097152.000001:67108864",
+      "67108864.000001:134217728"};
+  for (int tier = 0; tier < 3; ++tier) {
+    const size_t source_count = working_set_bytes[tier] / sizeof(T);
+    for (int pattern = 0; pattern < 3; ++pattern) {
+      char variant[192];
+      std::snprintf(
+          variant, sizeof(variant),
+          "index_locality=%s,working_set_bytes=%s,element_bytes=%s",
+          locality[pattern], working_sets[tier], element_interval);
+      if (emit_indexed_read_metrics(
+              source, indices, output, source_count, count, pattern, variant,
+              emit_address_rate && tier == 0) != 0) {
+        return 2;
+      }
+    }
+  }
+  const bool freed = hip_ok(hipFree(source)) && hip_ok(hipFree(output));
+  return freed ? 0 : 2;
+}
+
+int run_indexed_read() {
+  constexpr size_t source_bytes = 128ULL << 20;
+  constexpr size_t working_set_bytes[] = {
+      256ULL << 10, 16ULL << 20, 128ULL << 20};
+  int* indices = nullptr;
+  if (!hip_ok(hipMalloc(&indices, (1ULL << 20) * sizeof(int)))) return 2;
+  const int fp32_status = run_indexed_read_type<float>(
+      indices, source_bytes, working_set_bytes, "4:4", true);
+  const int fp16_status = run_indexed_read_type<__half>(
+      indices, source_bytes, working_set_bytes, "2:2", false);
+  const bool freed = hip_ok(hipFree(indices));
+  return fp32_status == 0 && fp16_status == 0 && freed ? 0 : 2;
+}
+
+__global__ void atomic_update_kernel(float* output, const int* indices, size_t count) {
+  const size_t index = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index < count) atomicAdd(&output[indices[index]], 1.0f);
+}
+
+int emit_atomic_metrics(float* output, int* device_indices, size_t count,
+                        size_t output_count, const char* variant) {
+  std::vector<int> indices(count);
+  const size_t multiplicity = count / output_count;
+  for (size_t index = 0; index < count; ++index) {
+    indices[index] = static_cast<int>(index / multiplicity);
+  }
+  if (!hip_ok(hipMemcpy(device_indices, indices.data(), count * sizeof(int),
+                        hipMemcpyHostToDevice))) {
+    return 2;
+  }
+  for (int sample = 0; sample < kSamples; ++sample) {
+    if (!hip_ok(hipMemset(output, 0, count * sizeof(float)))) return 2;
+    const double milliseconds = elapsed_ms([&] {
+      hipLaunchKernelGGL(atomic_update_kernel, dim3((count + kThreads - 1) / kThreads),
+                         dim3(kThreads), 0, 0, output, device_indices, count);
+    });
+    if (!metric("atomic_update_item_per_ms", variant, count / milliseconds,
+                "item/ms")) {
+      return 2;
+    }
+  }
+  return 0;
+}
+
+int run_atomic_update() {
+  constexpr size_t count = 1ULL << 20;
+  float* output = nullptr;
+  int* indices = nullptr;
+  if (!hip_ok(hipMalloc(&output, count * sizeof(float))) ||
+      !hip_ok(hipMalloc(&indices, count * sizeof(int)))) {
+    return 2;
+  }
+  const size_t output_counts[] = {count, count / 4, count / 32};
+  const char* variants[] = {
+      "collision_fraction=0:0.25,max_multiplicity=1:2,element_bytes=4:4",
+      "collision_fraction=0.250001:0.85,max_multiplicity=3:8,element_bytes=4:4",
+      "collision_fraction=0.850001:1,max_multiplicity=9:1.0995e12,element_bytes=4:4"};
+  for (int pattern = 0; pattern < 3; ++pattern) {
+    if (emit_atomic_metrics(output, indices, count, output_counts[pattern],
+                            variants[pattern]) != 0) {
+      return 2;
+    }
+  }
+  return hip_ok(hipFree(output)) && hip_ok(hipFree(indices)) ? 0 : 2;
+}
+
+__global__ void fp32_matrix_kernel(float* output, int repetitions, int stride) {
+  const size_t logical =
+      static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  float value = static_cast<float>(logical + 1);
+  for (int repeat = 0; repeat < repetitions; ++repeat) {
+    value = fmaf(value, 1.000001f, 0.000001f);
+  }
+  output[(logical * static_cast<size_t>(stride)) %
+         (static_cast<size_t>(gridDim.x) * blockDim.x)] = value;
+}
+
+int run_fp32_matrix() {
+  hipDeviceProp_t properties{};
+  if (!hip_ok(hipGetDeviceProperties(&properties, 0))) return 2;
+  const int blocks = std::max(properties.multiProcessorCount * 32, 1);
+  constexpr int repetitions = 8192;
+  const size_t threads = static_cast<size_t>(blocks) * kThreads;
+  float* output = nullptr;
+  if (!hip_ok(hipMalloc(&output, threads * sizeof(float)))) return 2;
+  for (int stride : {1, 17}) {
+    const char* variant = stride == 1 ? "dense" : "strided";
+    for (int sample = 0; sample < kSamples; ++sample) {
+      const double milliseconds = elapsed_ms([&] {
+        hipLaunchKernelGGL(fp32_matrix_kernel, dim3(blocks), dim3(kThreads), 0, 0,
+                           output, repetitions, stride);
+      });
+      const double flops = 2.0 * threads * repetitions;
+      if (!metric("fp32_matrix_flop_per_ms", variant, flops / milliseconds,
+                  "flop/ms")) {
+        return 2;
+      }
+    }
+  }
+  return hip_ok(hipFree(output)) ? 0 : 2;
+}
+
+int run_residency() {
+  hipDeviceProp_t properties{};
+  if (!hip_ok(hipGetDeviceProperties(&properties, 0))) return 2;
+  const int low_blocks = std::max(properties.multiProcessorCount, 1);
+  const int high_blocks = std::max(properties.multiProcessorCount * 16, 1);
+  constexpr int repetitions = 4096;
+  const size_t high_threads = static_cast<size_t>(high_blocks) * kThreads;
+  float* output = nullptr;
+  if (!hip_ok(hipMalloc(&output, high_threads * sizeof(float)))) return 2;
+  const char* low =
+      "active_waves=0:8,element_bytes=2:4";
+  const char* high =
+      "active_waves=8.000001:64,element_bytes=2:4";
+  for (int sample = 0; sample < kSamples; ++sample) {
+    const double low_ms = elapsed_ms([&] {
+      hipLaunchKernelGGL(fp32_matrix_kernel, dim3(low_blocks), dim3(kThreads), 0,
+                         0, output, repetitions, 1);
+    });
+    const double high_ms = elapsed_ms([&] {
+      hipLaunchKernelGGL(fp32_matrix_kernel, dim3(high_blocks), dim3(kThreads),
+                         0, 0, output, repetitions, 1);
+    });
+    const double low_rate =
+        2.0 * low_blocks * kThreads * repetitions / low_ms;
+    const double high_rate =
+        2.0 * high_blocks * kThreads * repetitions / high_ms;
+    const double reference_rate = std::max(low_rate, high_rate);
+    if (!metric("residency_ratio", low, low_rate / reference_rate, "ratio") ||
+        !metric("residency_ratio", high, high_rate / reference_rate, "ratio")) {
+      return 2;
+    }
+  }
+  return hip_ok(hipFree(output)) ? 0 : 2;
+}
+
+__global__ void mixed_resource_kernel(const float* input, float* output,
+                                      size_t count, int repetitions) {
+  const size_t index =
+      static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+  if (index >= count) return;
+  float value = input[index];
+  for (int repeat = 0; repeat < repetitions; ++repeat) {
+    value = fmaf(value, 1.000001f, 0.000001f);
+  }
+  output[index] = value;
+}
+
+void launch_overlap_kernel(int repetitions, hipStream_t stream,
+                           const float* input,
+                           float* output, size_t count) {
+  const dim3 grid((count + kThreads - 1) / kThreads);
+  if (repetitions < 0) {
+    hipLaunchKernelGGL(fp32_matrix_kernel, grid, dim3(kThreads), 0, stream,
+                       output, 4096, 1);
+    return;
+  }
+  hipLaunchKernelGGL(mixed_resource_kernel, grid, dim3(kThreads), 0, stream,
+                     input, output, count, repetitions);
+}
+
+double measure_overlap_single(int repetitions, hipStream_t stream,
+                              const float* input, float* output, size_t count) {
+  return elapsed_ms([&] {
+    launch_overlap_kernel(repetitions, stream, input, output, count);
+    (void)hipStreamSynchronize(stream);
+  });
+}
+
+double measure_overlap_pair(int repetitions, hipStream_t first,
+                            hipStream_t second, const float* left,
+                            const float* right, float* left_out,
+                            float* right_out, size_t count) {
+  return elapsed_ms([&] {
+    launch_overlap_kernel(repetitions, first, left, left_out, count);
+    launch_overlap_kernel(repetitions, second, right, right_out, count);
+    (void)hipStreamSynchronize(first);
+    (void)hipStreamSynchronize(second);
+  });
+}
+
+int run_overlap() {
+  constexpr size_t bytes = 32ULL << 20;
+  constexpr size_t count = bytes / sizeof(float);
+  float *left = nullptr, *right = nullptr, *left_out = nullptr,
+        *right_out = nullptr;
+  hipStream_t first = nullptr, second = nullptr;
+  if (!hip_ok(hipMalloc(&left, bytes)) || !hip_ok(hipMalloc(&right, bytes)) ||
+      !hip_ok(hipMalloc(&left_out, bytes)) ||
+      !hip_ok(hipMalloc(&right_out, bytes)) ||
+      !hip_ok(hipStreamCreate(&first)) ||
+      !hip_ok(hipStreamCreate(&second))) {
+    return 2;
+  }
+  const int repetitions[] = {0, 1, 2, 4, 8, 16, 32, 64, 128, 256, -1};
+  const char* variants[] = {
+      "arithmetic_repetitions=0,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=1,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=2,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=4,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=8,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=16,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=32,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=64,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=128,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=256,concurrent_dispatches=2:2",
+      "arithmetic_repetitions=pure_compute,concurrent_dispatches=2:2"};
+  for (int mode = 0; mode < 11; ++mode) {
+    for (int sample = 0; sample < kSamples; ++sample) {
+      const double single = measure_overlap_single(
+          repetitions[mode], first, left, left_out, count);
+      const double concurrent = measure_overlap_pair(
+          repetitions[mode], first, second, left, right, left_out, right_out,
+          count);
+      const double efficiency =
+          std::min(std::max(single / concurrent, 0.05), 1.0);
+      if (!metric("overlap_ratio", variants[mode], efficiency, "ratio")) {
+        return 2;
+      }
+    }
+  }
+  const bool freed =
+      hip_ok(hipStreamDestroy(first)) && hip_ok(hipStreamDestroy(second)) &&
+      hip_ok(hipFree(left)) && hip_ok(hipFree(right)) &&
+      hip_ok(hipFree(left_out)) && hip_ok(hipFree(right_out));
+  return freed ? 0 : 2;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -342,6 +660,11 @@ int main(int argc, char** argv) {
   if (std::strcmp(argv[1], "reduction") == 0) return run_reduction();
   if (std::strcmp(argv[1], "wmma") == 0) return run_wmma();
   if (std::strcmp(argv[1], "valu") == 0) return run_valu();
+  if (std::strcmp(argv[1], "indexed_read") == 0) return run_indexed_read();
+  if (std::strcmp(argv[1], "atomic_update") == 0) return run_atomic_update();
+  if (std::strcmp(argv[1], "fp32_matrix") == 0) return run_fp32_matrix();
+  if (std::strcmp(argv[1], "residency") == 0) return run_residency();
+  if (std::strcmp(argv[1], "overlap") == 0) return run_overlap();
   std::fprintf(stderr, "unknown mode: %s\n", argv[1]);
   return 1;
 }

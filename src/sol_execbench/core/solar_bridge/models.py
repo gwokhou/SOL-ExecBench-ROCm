@@ -38,7 +38,7 @@ def _require_worker_schema(value: Mapping[str, Any]) -> None:
 
 
 def formal_artifact_paths(ir_path: IRPath) -> frozenset[str]:
-    """Return the exact publication artifact set for one fixed IR path."""
+    """Return the required top-level artifacts for one fixed IR path."""
     return frozenset(
         {
             "operator_graph.yaml",
@@ -47,6 +47,21 @@ def formal_artifact_paths(ir_path: IRPath) -> frozenset[str]:
             "solar-analysis.yaml",
         },
     )
+
+
+def valid_formal_artifact_paths(
+    paths: set[str],
+    ir_path: IRPath,
+) -> bool:
+    """Accept the required artifacts plus only nested Orojenesis evidence."""
+    required = formal_artifact_paths(ir_path)
+    if not required.issubset(paths):
+        return False
+    for value in paths - required:
+        parts = Path(value).parts
+        if len(parts) < 2 or parts[0] != "orojenesis":
+            return False
+    return True
 
 
 def readiness_stage_artifacts(
@@ -220,7 +235,7 @@ class SolarAnalysisOutcome:
             ):
                 return False
             paths.add(str(path))
-        return paths == formal_artifact_paths(self.ir_path)
+        return valid_formal_artifact_paths(paths, self.ir_path)
 
 
 @dataclass(frozen=True)
@@ -348,4 +363,5 @@ __all__ = [
     "formal_precision_for_definition",
     "normalize_ir_path",
     "readiness_stage_artifacts",
+    "valid_formal_artifact_paths",
 ]

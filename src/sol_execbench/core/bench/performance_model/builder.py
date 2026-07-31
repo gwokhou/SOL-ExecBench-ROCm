@@ -15,6 +15,10 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticGovernanceStatus,
     DiagnosticSidecarStatus,
 )
+from sol_execbench.core.bench.performance_model.access_evidence import (
+    AccessPatternSummary,
+    PerformanceAccessEvidenceSidecar,
+)
 from sol_execbench.core.bench.performance_model.attribution import (
     calculate_ratios,
     derive_attributions,
@@ -30,6 +34,10 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
 from sol_execbench.core.bench.performance_model.inference import (
     DiagnosticInferenceProfile,
     apply_conformal_interval,
+    point_features,
+)
+from sol_execbench.core.bench.performance_model.kernel_identity import (
+    kernel_symbol_key,
 )
 from sol_execbench.core.bench.performance_model.model_identity import (
     build_diagnostic_model_identity,
@@ -54,6 +62,9 @@ from sol_execbench.core.bench.performance_model.prediction import (
 )
 from sol_execbench.core.bench.performance_model.replay_evidence import (
     PerformanceReplayEvidenceSidecar,
+)
+from sol_execbench.core.bench.performance_model.schedule_evidence import (
+    build_schedule_evidence,
 )
 from sol_execbench.core.bench.performance_model.timing_evidence import (
     PerformanceTimingEvidenceSidecar,
@@ -109,6 +120,7 @@ class _BuildEvidence:
     manifest: PerformanceEvidenceManifest
     trace: Trace
     timing: WorkloadTimingEvidence
+    access_patterns: list[AccessPatternSummary]
     compiled: list[CompiledCharacterization]
     calibration: DiagnosticCalibrationProfile | None
     inference: DiagnosticInferenceProfile | None
@@ -118,6 +130,30 @@ class _BuildEvidence:
     dispatch_reasons: list[str]
 
 
+@dataclass(frozen=True, slots=True)
+class _BuildArtifactPaths:
+    trace: Path
+    timing: Path
+    access: Path
+    profile: Path
+    static: Path
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _WorkloadDiagnosticInputs:
+    trace: Trace
+    semantic: SemanticCharacterization
+    timing: WorkloadTimingEvidence
+    access_patterns: list[AccessPatternSummary]
+    frontier_path: Path | None
+    compiled: list[CompiledCharacterization]
+    dispatches: list[DispatchEvidence]
+    calibration: DiagnosticCalibrationProfile | None
+    inference: DiagnosticInferenceProfile | None
+    identity_reasons: list[str]
+    extra_reasons: list[str]
+
+
 def build_performance_diagnostic(
     request: PerformanceDiagnosticBuildRequest,
 ) -> PerformanceDiagnosticSidecar:
@@ -125,19 +161,22 @@ def build_performance_diagnostic(
     evidence = _load_build_evidence(request)
     manifest = evidence.manifest
     workload = _workload_diagnostic(
-        trace=evidence.trace,
-        semantic=evidence.semantic,
-        timing=evidence.timing,
-        frontier_path=request.frontier_trace_path,
-        compiled=evidence.compiled,
-        dispatches=evidence.dispatches,
-        calibration=evidence.calibration,
-        inference=evidence.inference,
-        identity_reasons=evidence.identity_reasons,
-        extra_reasons=[
-            *manifest.reason_codes,
-            *evidence.dispatch_reasons,
-        ],
+        _WorkloadDiagnosticInputs(
+            trace=evidence.trace,
+            semantic=evidence.semantic,
+            timing=evidence.timing,
+            access_patterns=evidence.access_patterns,
+            frontier_path=request.frontier_trace_path,
+            compiled=evidence.compiled,
+            dispatches=evidence.dispatches,
+            calibration=evidence.calibration,
+            inference=evidence.inference,
+            identity_reasons=evidence.identity_reasons,
+            extra_reasons=[
+                *manifest.reason_codes,
+                *evidence.dispatch_reasons,
+            ],
+        )
     )
     reasons = list(
         dict.fromkeys(
@@ -179,7 +218,7 @@ def build_performance_diagnostic(
             "Canonical Trace JSONL remains timing and correctness authority.",
             "Profiler duration and achieved rates are excluded from T_pred(HW).",
             "Counter evidence is a post-canonical, single-workload replay.",
-            "Overlapping or multi-queue dispatches are unsupported.",
+            "Only scope-verified multi-queue overlap topology is admitted.",
         ],
     )
 
@@ -190,40 +229,26 @@ def _load_build_evidence(
     manifest = load_and_verify_performance_evidence_manifest(
         request.evidence_manifest_path
     )
-    trace_path = _manifest_artifact_path(
-        request.evidence_manifest_path,
-        manifest,
-        PerformanceEvidenceArtifactKind.TRACE,
-    )
-    timing_path = _manifest_artifact_path(
-        request.evidence_manifest_path,
-        manifest,
-        PerformanceEvidenceArtifactKind.TIMING,
-    )
-    profile_path = _manifest_artifact_path(
-        request.evidence_manifest_path,
-        manifest,
-        PerformanceEvidenceArtifactKind.PROFILE_SUMMARY,
-    )
-    static_path = _manifest_artifact_path(
-        request.evidence_manifest_path,
-        manifest,
-        PerformanceEvidenceArtifactKind.STATIC_EVIDENCE,
-    )
-    traces = load_jsonl_file(Trace, trace_path)
+    paths = _build_artifact_paths(request.evidence_manifest_path, manifest)
+    traces = load_jsonl_file(Trace, paths.trace)
     if len(traces) != 1:
         raise ValueError("performance evidence requires exactly one trace row")
     trace = traces[0]
-    _require_manifest_trace_identity(manifest, trace, trace_path)
-    timing = _load_timing_evidence(timing_path, manifest, trace)
-    profile = load_json_file(ProfileSummarySidecar, profile_path)
-    _require_current_profile(profile, trace_path)
-    _require_trace_citation(profile, trace_path)
-    static = load_json_file(StaticKernelEvidenceSidecar, static_path)
+    _require_manifest_trace_identity(manifest, trace, paths.trace)
+    timing = _load_timing_evidence(paths.timing, manifest, trace)
+    access_patterns = _load_access_evidence(
+        paths.access,
+        manifest,
+        timing,
+    )
+    profile = load_json_file(ProfileSummarySidecar, paths.profile)
+    _require_current_profile(profile, paths.trace)
+    _require_trace_citation(profile, paths.trace)
+    static = load_json_file(StaticKernelEvidenceSidecar, paths.static)
     compiled = _manifest_compiled_characterizations(
         manifest,
         static,
-        static_path,
+        paths.static,
     )
     calibration = _load_calibration(request.calibration_profile_path)
     inference = _load_inference_profile(
@@ -248,12 +273,29 @@ def _load_build_evidence(
         trace=trace,
         semantic=semantic,
         timing=timing,
+        access_patterns=access_patterns,
         compiled=compiled,
         dispatches=dispatches,
         calibration=calibration,
         inference=inference,
         identity_reasons=identity_reasons,
         dispatch_reasons=dispatch_reasons,
+    )
+
+
+def _build_artifact_paths(
+    manifest_path: Path,
+    manifest: PerformanceEvidenceManifest,
+) -> _BuildArtifactPaths:
+    def artifact(kind: PerformanceEvidenceArtifactKind) -> Path:
+        return _manifest_artifact_path(manifest_path, manifest, kind)
+
+    return _BuildArtifactPaths(
+        trace=artifact(PerformanceEvidenceArtifactKind.TRACE),
+        timing=artifact(PerformanceEvidenceArtifactKind.TIMING),
+        access=artifact(PerformanceEvidenceArtifactKind.ACCESS_PATTERN),
+        profile=artifact(PerformanceEvidenceArtifactKind.PROFILE_SUMMARY),
+        static=artifact(PerformanceEvidenceArtifactKind.STATIC_EVIDENCE),
     )
 
 
@@ -323,6 +365,31 @@ def _load_timing_evidence(
     ):
         raise ValueError("timing_evidence_latency_mismatch")
     return matches[0]
+
+
+def _load_access_evidence(
+    path: Path,
+    manifest: PerformanceEvidenceManifest,
+    timing: WorkloadTimingEvidence,
+) -> list[AccessPatternSummary]:
+    access = load_json_file(PerformanceAccessEvidenceSidecar, path)
+    identity = manifest.identity
+    if (
+        access.run_id != identity.run_id
+        or access.trace_sha256 != identity.run_id
+    ):
+        raise ValueError("access_evidence_identity_mismatch")
+    matches = [
+        item
+        for item in access.workloads
+        if item.workload_uuid == identity.workload_uuid
+    ]
+    if (
+        len(matches) != 1
+        or matches[0].canonical_input_sha256 != timing.input_sha256
+    ):
+        raise ValueError("access_evidence_workload_mismatch")
+    return matches[0].patterns
 
 
 def _manifest_compiled_characterizations(
@@ -832,11 +899,15 @@ def _record_static_runtime_conflicts(
     dispatches: list[DispatchEvidence],
     compiled: list[CompiledCharacterization],
 ) -> list[DispatchEvidence]:
-    static_by_symbol = {item.kernel_symbol: item.footprint for item in compiled}
+    static_by_symbol = {
+        key: item.footprint
+        for item in compiled
+        if (key := kernel_symbol_key(item.kernel_symbol)) is not None
+    }
     result: list[DispatchEvidence] = []
     for dispatch in dispatches:
         runtime = dispatch.runtime_footprint
-        static = static_by_symbol.get(dispatch.kernel_symbol)
+        static = static_by_symbol.get(kernel_symbol_key(dispatch.kernel_symbol))
         if static is None:
             result.append(
                 dispatch.model_copy(
@@ -887,11 +958,23 @@ def _collapse_replayed_dispatches(
     if not valid:
         return invalid
     grouped: dict[
-        tuple[str, tuple[int, int, int], tuple[int, int, int]],
+        tuple[
+            str,
+            tuple[int, int, int],
+            tuple[int, int, int],
+            str | None,
+            str | None,
+        ],
         list[DispatchEvidence],
     ] = {}
     for dispatch in valid:
-        key = (dispatch.kernel_symbol, dispatch.grid, dispatch.workgroup)
+        key = (
+            dispatch.kernel_symbol,
+            dispatch.grid,
+            dispatch.workgroup,
+            dispatch.queue_id,
+            dispatch.stream_id,
+        )
         grouped.setdefault(key, []).append(dispatch)
     repetitions = reduce(gcd, (len(group) for group in grouped.values()))
     if repetitions <= 1:
@@ -909,6 +992,12 @@ def _representative_dispatch(
     samples: list[DispatchEvidence],
     slot: int,
 ) -> DispatchEvidence:
+    """Collapse replay counters while retaining duration-free topology.
+
+    The first aligned invocation supplies only ordering and overlap relations.
+    Prediction code never consumes its timestamp distances as durations; the
+    median counters below remain the quantitative replay aggregate.
+    """
     first = samples[0]
     footprints = {sample.runtime_footprint for sample in samples}
     if len(footprints) > 1:
@@ -948,8 +1037,6 @@ def _representative_dispatch(
                 },
             ),
             "counters": counters,
-            "start_timestamp_ns": None,
-            "end_timestamp_ns": None,
             "sources": list(sources.values()),
         },
     )
@@ -992,83 +1079,95 @@ def _counter_artifact_paths(
 
 
 def _workload_diagnostic(
-    *,
-    trace: Trace,
-    semantic: SemanticCharacterization,
-    timing: WorkloadTimingEvidence,
-    frontier_path: Path | None,
-    compiled: list[CompiledCharacterization],
-    dispatches: list[DispatchEvidence],
-    calibration: DiagnosticCalibrationProfile | None,
-    inference: DiagnosticInferenceProfile | None,
-    identity_reasons: list[str],
-    extra_reasons: list[str],
+    inputs: _WorkloadDiagnosticInputs,
 ) -> WorkloadPerformanceDiagnostic:
     ir, hw = _workload_predictions(
-        semantic=semantic,
-        compiled=compiled,
-        dispatches=dispatches,
-        calibration=calibration,
-        identity_reasons=identity_reasons,
-        extra_reasons=extra_reasons,
+        semantic=inputs.semantic,
+        access_patterns=inputs.access_patterns,
+        compiled=inputs.compiled,
+        dispatches=inputs.dispatches,
+        calibration=inputs.calibration,
+        identity_reasons=inputs.identity_reasons,
+        extra_reasons=inputs.extra_reasons,
     )
-    ir = apply_conformal_interval(ir, semantic.workload_kind, inference)
-    hw = apply_conformal_interval(hw, semantic.workload_kind, inference)
-    evaluation = trace.evaluation
+    hw = apply_conformal_interval(
+        hw,
+        inputs.semantic.workload_kind,
+        point_features(inputs.semantic),
+        inputs.inference,
+    )
+    evaluation = inputs.trace.evaluation
     if evaluation is None or evaluation.performance is None:
         raise ValueError(
-            f"workload {trace.workload.uuid} lacks canonical performance timing",
+            f"workload {inputs.trace.workload.uuid} lacks canonical performance timing",
         )
     measured = evaluation.performance.latency_ms
     frontier, frontier_reasons = _frontier_time(
-        frontier_path,
-        trace.workload.uuid,
-        trace,
+        inputs.frontier_path,
+        inputs.trace.workload.uuid,
+        inputs.trace,
     )
-    compiled_reasons = _compiled_reason_codes(compiled)
+    compiled_reasons = _compiled_reason_codes(inputs.compiled)
     ratios = calculate_ratios(
         t_pred_ir=ir,
         t_pred_hw=hw,
         t_measured_ms=measured,
-        t_measured_lower_ms=timing.lower_ms,
-        t_measured_upper_ms=timing.upper_ms,
-        t_sol_ms=semantic.t_sol_ms,
+        t_measured_lower_ms=inputs.timing.lower_ms,
+        t_measured_upper_ms=inputs.timing.upper_ms,
+        t_sol_ms=inputs.semantic.t_sol_ms,
         t_frontier_ms=frontier,
         frontier_reason_codes=frontier_reasons,
     )
     return WorkloadPerformanceDiagnostic(
-        workload_uuid=trace.workload.uuid,
-        semantic=semantic,
-        compiled=compiled,
-        dispatches=dispatches,
+        workload_uuid=inputs.trace.workload.uuid,
+        semantic=inputs.semantic,
+        compiled=inputs.compiled,
+        dispatches=inputs.dispatches,
+        schedule=build_schedule_evidence(
+            inputs.dispatches,
+            scope_verified=_schedule_scope_verified(inputs.extra_reasons),
+        ),
         t_pred_ir=ir,
         t_pred_hw=hw,
         t_measured_ms=measured,
-        t_measured_lower_ms=timing.lower_ms,
-        t_measured_upper_ms=timing.upper_ms,
+        t_measured_lower_ms=inputs.timing.lower_ms,
+        t_measured_upper_ms=inputs.timing.upper_ms,
         t_frontier_ms=frontier,
         ratios=ratios,
         attributions=derive_attributions(
-            semantic=semantic,
-            compiled=compiled,
-            dispatches=dispatches,
+            semantic=inputs.semantic,
+            compiled=inputs.compiled,
+            dispatches=inputs.dispatches,
             t_pred_ir=ir,
             t_pred_hw=hw,
             ratios=ratios,
-            inference_profile=inference,
+            inference_profile=inputs.inference,
         ),
         reason_codes=[
-            *identity_reasons,
-            *extra_reasons,
+            *inputs.identity_reasons,
+            *inputs.extra_reasons,
             *compiled_reasons,
             *frontier_reasons,
         ],
     )
 
 
+def _schedule_scope_verified(reason_codes: list[str]) -> bool:
+    identity_reasons = {
+        "gpu_identity_snapshot_incomplete",
+        "gpu_id_snapshot_invalid",
+        "gpu_bdf_snapshot_invalid",
+    }
+    return not any(
+        reason.startswith("replay_") or reason in identity_reasons
+        for reason in reason_codes
+    )
+
+
 def _workload_predictions(
     *,
     semantic: SemanticCharacterization,
+    access_patterns: list[AccessPatternSummary],
     compiled: list[CompiledCharacterization],
     dispatches: list[DispatchEvidence],
     calibration: DiagnosticCalibrationProfile | None,
@@ -1086,13 +1185,16 @@ def _workload_predictions(
             semantic,
             calibration,
             identity_reason_codes=identity_reasons,
+            access_patterns=access_patterns,
         ),
         predict_hw(
             semantic,
             compiled,
             dispatches,
             calibration,
-            identity_reason_codes=[*identity_reasons, *extra_reasons],
+            identity_reason_codes=identity_reasons,
+            evidence_reason_codes=extra_reasons,
+            access_patterns=access_patterns,
         ),
     )
 
@@ -1100,11 +1202,13 @@ def _workload_predictions(
 def _compiled_reason_codes(
     compiled: list[CompiledCharacterization],
 ) -> list[str]:
+    non_blocking = {"static_isa_kernel_mapping_ambiguous"}
     return list(
         dict.fromkeys(
             reason
             for characterization in compiled
             for reason in characterization.reason_codes
+            if reason not in non_blocking
         ),
     )
 

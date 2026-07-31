@@ -21,6 +21,7 @@ from types import MappingProxyType
 from typing import cast
 
 from sol_execbench.core.bench.static_kernel.evidence_models import (
+    StaticKernelEvidenceKernel,
     StaticResourceFootprint,
     StaticResourceFootprintIdentity,
 )
@@ -341,6 +342,66 @@ def extract_amdgpu_footprints(
             if footprint is not None:
                 footprints.append(footprint)
     return footprints
+
+
+def extract_amdgpu_kernels(
+    data: bytes,
+    *,
+    artifact_id: str,
+    source_sha256: str | None = None,
+    target_architecture: str | None = None,
+) -> list[StaticKernelEvidenceKernel]:
+    """Extract exact metadata kernel symbols with their resource footprints."""
+    wanted = (
+        target_architecture.split(":")[0].strip().lower()
+        if target_architecture
+        else None
+    )
+    result: list[StaticKernelEvidenceKernel] = []
+    for metadata in _iter_amdgpu_metadata(data):
+        target = metadata.get("amdhsa.target")
+        if wanted is not None and (
+            not isinstance(target, str) or wanted not in target.lower()
+        ):
+            continue
+        architectures = (
+            [wanted]
+            if wanted is not None
+            else list(_metadata_architectures(metadata))
+        )
+        kernels = metadata.get("amdhsa.kernels")
+        if not isinstance(kernels, list):
+            continue
+        for kernel in kernels:
+            if not isinstance(kernel, dict):
+                continue
+            kernel_metadata = cast(dict[object, object], kernel)
+            name = kernel_metadata.get(".name")
+            if not isinstance(name, str) or not name:
+                continue
+            result.append(
+                StaticKernelEvidenceKernel(
+                    name=name,
+                    detected_architectures=architectures,
+                    footprint=_footprint_from_kernel(
+                        kernel_metadata,
+                        artifact_id=artifact_id,
+                        source_sha256=source_sha256,
+                    ),
+                ),
+            )
+    return result
+
+
+def _metadata_architectures(
+    metadata: Mapping[object, object],
+) -> tuple[str, ...]:
+    target = metadata.get("amdhsa.target")
+    if not isinstance(target, str):
+        return ()
+    return tuple(
+        part for part in target.lower().split("-") if part.startswith("gfx")
+    )
 
 
 def extract_amdgpu_targets(data: bytes) -> tuple[str, ...]:

@@ -34,13 +34,21 @@ def _candidate_reference_stub(definition: Definition) -> str:
 
 def stage_definition_files(definition: Definition, output_dir: Path) -> None:
     """Write a worker-only definition and a candidate-visible redacted copy."""
-    (output_dir / TRUSTED_DEFINITION_FILE).write_text(
-        definition.model_dump_json(),
-    )
+    stage_trusted_definition_file(definition, output_dir)
     candidate_definition: dict[str, Any] = definition.model_dump(mode="json")
     candidate_definition["reference"] = _candidate_reference_stub(definition)
     (output_dir / "definition.json").write_text(
         json.dumps(candidate_definition),
+    )
+
+
+def stage_trusted_definition_file(
+    definition: Definition,
+    output_dir: Path,
+) -> None:
+    """Restore the worker-only definition immediately before one execution."""
+    (output_dir / TRUSTED_DEFINITION_FILE).write_text(
+        definition.model_dump_json(),
     )
 
 

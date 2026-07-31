@@ -5,8 +5,13 @@
 
 from __future__ import annotations
 
+import csv
+import gzip
+import shutil
 import subprocess
+import tempfile
 from collections.abc import Sequence
+from dataclasses import replace
 from importlib.resources import as_file, files
 from pathlib import Path
 
@@ -92,7 +97,7 @@ def collect_rocprofv3_counters(
     if isinstance(availability, Rocprofv3ProfileResult):
         return availability
     resource = files("sol_execbench.data.rocprofv3_counters").joinpath(
-        "gfx1200_v1.yaml",
+        "gfx1200_v3.yaml",
     )
     with as_file(resource) as manifest_path:
         manifest = load_counter_manifest(manifest_path)
@@ -341,10 +346,12 @@ def _counter_completed(
     *,
     groups: Sequence[Sequence[str]],
 ) -> Rocprofv3ProfileResult:
-    artifacts = discover_rocprofv3_artifacts(
+    discovered = discover_rocprofv3_artifacts(
         request.output_directory,
         request.output_file,
     )
+    artifacts = _candidate_replay_artifacts(discovered)
+    artifacts = _compact_candidate_replay_artifacts(discovered, artifacts)
     coverage, coverage_reasons, warnings = profile_artifact_coverage_metadata(
         artifacts,
         command_succeeded=completed.returncode == 0,
@@ -425,11 +432,272 @@ def _counter_artifact_reasons(
             reasons.extend(
                 _counter_csv_reasons(csv_artifacts[0].path, group, pass_index),
             )
-    if not any(
-        artifact.kind is Rocprofv3ArtifactKind.ROCPD for artifact in artifacts
-    ):
-        reasons.append("counter_rocpd_missing")
+        if (
+            len(
+                _artifacts_by_pass(artifacts, Rocprofv3ArtifactKind.ROCPD).get(
+                    pass_index,
+                    [],
+                )
+            )
+            != 1
+        ):
+            reasons.append(f"counter_pass_rocpd_count:{pass_index}")
+        marker_artifacts = [
+            artifact
+            for artifact in _artifacts_by_pass(
+                artifacts,
+                Rocprofv3ArtifactKind.TRACE_CSV,
+            ).get(pass_index, [])
+            if "marker" in artifact.path.name.lower()
+        ]
+        if len(marker_artifacts) != 1:
+            reasons.append(f"counter_pass_marker_count:{pass_index}")
+        elif len(csv_artifacts) == 1:
+            try:
+                _select_counter_rows_in_marker_ranges(
+                    csv_artifacts[0].path,
+                    marker_artifacts[0].path,
+                )
+            except (OSError, ValueError):
+                reasons.append(
+                    f"counter_pass_marker_window_invalid:{pass_index}"
+                )
     return reasons
+
+
+def _candidate_replay_artifacts(
+    artifacts: Sequence[Rocprofv3ProfileArtifact],
+) -> tuple[Rocprofv3ProfileArtifact, ...]:
+    """Select the ROCTx-marked candidate process while retaining metadata."""
+    marker_processes = {
+        (artifact.path.parent, _artifact_process_prefix(artifact.path))
+        for artifact in artifacts
+        if artifact.kind is Rocprofv3ArtifactKind.TRACE_CSV
+        and "marker" in artifact.path.name.lower()
+    }
+    selected: list[Rocprofv3ProfileArtifact] = []
+    process_kinds = {
+        Rocprofv3ArtifactKind.AGENT_INFO_CSV,
+        Rocprofv3ArtifactKind.COUNTER_CSV,
+        Rocprofv3ArtifactKind.ROCPD,
+        Rocprofv3ArtifactKind.TRACE_CSV,
+    }
+    for artifact in artifacts:
+        if artifact.kind not in process_kinds:
+            selected.append(artifact)
+            continue
+        identity = (
+            artifact.path.parent,
+            _artifact_process_prefix(artifact.path),
+        )
+        if identity in marker_processes:
+            selected.append(artifact)
+    return tuple(selected)
+
+
+def _compact_candidate_replay_artifacts(
+    discovered: Sequence[Rocprofv3ProfileArtifact],
+    selected: Sequence[Rocprofv3ProfileArtifact],
+) -> tuple[Rocprofv3ProfileArtifact, ...]:
+    """Keep candidate evidence only and deterministically compress its ROCPD."""
+    selected_paths = {artifact.path for artifact in selected}
+    markers = {
+        (
+            artifact.path.parent,
+            _artifact_process_prefix(artifact.path),
+        ): artifact
+        for artifact in selected
+        if artifact.kind is Rocprofv3ArtifactKind.TRACE_CSV
+        and "marker" in artifact.path.name.lower()
+    }
+    process_kinds = {
+        Rocprofv3ArtifactKind.AGENT_INFO_CSV,
+        Rocprofv3ArtifactKind.COUNTER_CSV,
+        Rocprofv3ArtifactKind.ROCPD,
+        Rocprofv3ArtifactKind.TRACE_CSV,
+    }
+    compacted: list[Rocprofv3ProfileArtifact] = []
+    for artifact in selected:
+        identity = (
+            artifact.path.parent,
+            _artifact_process_prefix(artifact.path),
+        )
+        if artifact.kind is Rocprofv3ArtifactKind.COUNTER_CSV:
+            marker = markers.get(identity)
+            try:
+                compacted.append(
+                    _filter_counter_csv_to_marker_ranges(artifact, marker)
+                )
+            except (OSError, ValueError):
+                compacted.append(artifact)
+        elif artifact.kind is Rocprofv3ArtifactKind.ROCPD:
+            compacted.append(_compress_rocpd(artifact))
+        else:
+            compacted.append(artifact)
+    for artifact in discovered:
+        if (
+            artifact.kind in process_kinds
+            and artifact.path not in selected_paths
+        ):
+            artifact.path.unlink(missing_ok=True)
+    return tuple(compacted)
+
+
+def _filter_counter_csv_to_marker_ranges(
+    artifact: Rocprofv3ProfileArtifact,
+    marker: Rocprofv3ProfileArtifact | None,
+) -> Rocprofv3ProfileArtifact:
+    if marker is None:
+        raise ValueError("candidate_marker_artifact_missing")
+    fieldnames, rows = _select_counter_rows_in_marker_ranges(
+        artifact.path,
+        marker.path,
+    )
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=artifact.path.parent,
+            prefix=f".{artifact.path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=fieldnames,
+                lineterminator="\n",
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+        temporary_path.replace(artifact.path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+    return replace(artifact, size_bytes=artifact.path.stat().st_size)
+
+
+def _select_counter_rows_in_marker_ranges(
+    counter_path: Path,
+    marker_path: Path,
+) -> tuple[list[str], list[dict[str, str]]]:
+    intervals = _candidate_marker_intervals(marker_path)
+    with counter_path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise ValueError("counter_csv_header_missing")
+        fieldnames = list(reader.fieldnames)
+        normalized = {_normalize_csv_header(name): name for name in fieldnames}
+        start_key = normalized.get("starttimestamp")
+        end_key = normalized.get("endtimestamp")
+        if start_key is None or end_key is None:
+            raise ValueError("counter_csv_timestamp_columns_missing")
+        selected: list[dict[str, str]] = []
+        matched_intervals: set[int] = set()
+        for row in reader:
+            start = _parse_timestamp(row.get(start_key))
+            end = _parse_timestamp(row.get(end_key))
+            if end < start:
+                raise ValueError("counter_csv_timestamp_order_invalid")
+            for index, (marker_start, marker_end) in enumerate(intervals):
+                if marker_start <= start and end <= marker_end:
+                    selected.append(row)
+                    matched_intervals.add(index)
+                    break
+    if len(matched_intervals) != len(intervals):
+        raise ValueError("candidate_marker_interval_without_dispatch")
+    return fieldnames, selected
+
+
+def _candidate_marker_intervals(path: Path) -> list[tuple[int, int]]:
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise ValueError("marker_csv_header_missing")
+        normalized = {
+            _normalize_csv_header(name): name for name in reader.fieldnames
+        }
+        domain_key = normalized.get("domain")
+        function_key = normalized.get("function") or normalized.get("name")
+        start_key = normalized.get("starttimestamp")
+        end_key = normalized.get("endtimestamp")
+        if None in (domain_key, function_key, start_key, end_key):
+            raise ValueError("marker_csv_required_columns_missing")
+        intervals = []
+        for row in reader:
+            domain = (row.get(domain_key) or "").strip().upper()
+            function = (row.get(function_key) or "").strip()
+            if domain != "MARKER_CORE_RANGE_API":
+                continue
+            if not function.startswith("sol_execbench/"):
+                continue
+            marker_prefix, separator, iteration = function.rpartition(
+                "/iteration/"
+            )
+            if not separator or not marker_prefix or not iteration.isdecimal():
+                continue
+            start = _parse_timestamp(row.get(start_key))
+            end = _parse_timestamp(row.get(end_key))
+            if end < start:
+                raise ValueError("marker_csv_timestamp_order_invalid")
+            intervals.append((start, end))
+    if not intervals:
+        raise ValueError("candidate_marker_intervals_missing")
+    return intervals
+
+
+def _normalize_csv_header(value: str) -> str:
+    return "".join(
+        character for character in value.lower() if character.isalnum()
+    )
+
+
+def _parse_timestamp(value: str | None) -> int:
+    if value is None:
+        raise ValueError("timestamp_missing")
+    try:
+        return int(value.strip())
+    except ValueError as error:
+        raise ValueError("timestamp_invalid") from error
+
+
+def _compress_rocpd(
+    artifact: Rocprofv3ProfileArtifact,
+) -> Rocprofv3ProfileArtifact:
+    source = artifact.path
+    destination = source.with_name(f"{source.name}.gz")
+    temporary = destination.with_name(f".{destination.name}.tmp")
+    if destination.exists() or temporary.exists():
+        raise ValueError("compressed_rocpd_output_exists")
+    try:
+        with (
+            source.open("rb") as input_handle,
+            temporary.open("xb") as raw_output,
+            gzip.GzipFile(
+                filename="",
+                mode="wb",
+                compresslevel=1,
+                fileobj=raw_output,
+                mtime=0,
+            ) as output_handle,
+        ):
+            shutil.copyfileobj(input_handle, output_handle)
+        temporary.replace(destination)
+        source.unlink()
+    finally:
+        temporary.unlink(missing_ok=True)
+    return replace(
+        artifact,
+        path=destination,
+        size_bytes=destination.stat().st_size,
+    )
+
+
+def _artifact_process_prefix(path: Path) -> str:
+    """Return rocprofv3's process-scoped filename prefix."""
+    return path.name.split("_", maxsplit=1)[0]
 
 
 def _artifacts_by_pass(

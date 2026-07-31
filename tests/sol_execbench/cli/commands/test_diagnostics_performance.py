@@ -16,6 +16,10 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSidecarStatus,
     SizedDiagnosticArtifactCitation,
 )
+from sol_execbench.core.bench.performance_model.access_evidence import (
+    PerformanceAccessEvidenceSidecar,
+    WorkloadAccessEvidence,
+)
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceArtifact,
     PerformanceEvidenceArtifactKind,
@@ -242,12 +246,29 @@ def _timing(path: Path, trace_path: Path, trace: Trace) -> str:
     return solution_hash
 
 
+def _access(path: Path, trace_path: Path, trace: Trace) -> None:
+    sidecar = PerformanceAccessEvidenceSidecar(
+        status=DiagnosticSidecarStatus.AVAILABLE,
+        run_id=sha256_file(trace_path),
+        trace_sha256=sha256_file(trace_path),
+        workloads=[
+            WorkloadAccessEvidence(
+                workload_uuid=trace.workload.uuid,
+                canonical_input_sha256="a" * 64,
+                patterns=[],
+            )
+        ],
+    )
+    atomic_write_json_value(path, sidecar.to_dict())
+
+
 def _evidence_manifest(
     path: Path,
     *,
     trace_path: Path,
     trace: Trace,
     timing_path: Path,
+    access_path: Path,
     profile_path: Path,
     static_path: Path,
     solution_hash: str,
@@ -258,7 +279,7 @@ def _evidence_manifest(
     atomic_write_json_value(
         provenance,
         {
-            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v4",
+            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v5",
             "diagnostic_only": True,
             "score_authority": False,
             "replay_phase": "evidence",
@@ -274,6 +295,7 @@ def _evidence_manifest(
     artifact_paths = [
         (PerformanceEvidenceArtifactKind.TRACE, trace_path),
         (PerformanceEvidenceArtifactKind.TIMING, timing_path),
+        (PerformanceEvidenceArtifactKind.ACCESS_PATTERN, access_path),
         (PerformanceEvidenceArtifactKind.PROFILE_SUMMARY, profile_path),
         (PerformanceEvidenceArtifactKind.STATIC_EVIDENCE, static_path),
         (PerformanceEvidenceArtifactKind.COUNTER_PROVENANCE, provenance),
@@ -320,6 +342,7 @@ def test_performance_diagnostics_cli_and_agent_feedback_governance(
     profile_path = tmp_path / "trace.profile-summary.json"
     static_path = tmp_path / "trace.static-evidence.json"
     timing_path = tmp_path / "trace.performance-timing.json"
+    access_path = tmp_path / "trace.performance-access.json"
     evidence_path = tmp_path / "trace.performance-evidence.json"
     output = tmp_path / "trace.performance-diagnostic.json"
     _solar(solar_path)
@@ -327,11 +350,13 @@ def test_performance_diagnostics_cli_and_agent_feedback_governance(
     _profile(profile_path, trace_path)
     _static(static_path)
     solution_hash = _timing(timing_path, trace_path, trace)
+    _access(access_path, trace_path, trace)
     _evidence_manifest(
         evidence_path,
         trace_path=trace_path,
         trace=trace,
         timing_path=timing_path,
+        access_path=access_path,
         profile_path=profile_path,
         static_path=static_path,
         solution_hash=solution_hash,

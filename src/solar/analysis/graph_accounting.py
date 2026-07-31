@@ -56,6 +56,48 @@ from solar.precision import (
 )
 
 
+def _serialized_tensor_metadata(
+    data: LayerData,
+    memory: MemoryElements,
+    byte_counts: MemoryBytes,
+) -> dict[str, object]:
+    """Return the shape, size, identity, dtype, and memory tensor payload."""
+    return {
+        "tensor_shapes": {
+            "inputs": [
+                shape for shape in data.input_shapes if isinstance(shape, list)
+            ],
+            "outputs": [
+                shape for shape in data.output_shapes if isinstance(shape, list)
+            ],
+        },
+        "tensor_sizes": {
+            "inputs": data.input_sizes,
+            "outputs": data.output_sizes,
+        },
+        "memory_elements": {
+            "inputs": memory.reads,
+            "outputs": memory.writes,
+        },
+        "memory_bytes": {
+            "inputs": byte_counts.input_bytes,
+            "outputs": byte_counts.output_bytes,
+        },
+        "tensor_dtypes": {
+            "inputs": data.input_dtypes,
+            "outputs": data.output_dtypes,
+        },
+        "tensor_names": {
+            "inputs": data.input_names,
+            "outputs": data.output_names,
+        },
+        "tensor_types": {
+            "inputs": data.input_types,
+            "outputs": data.output_types,
+        },
+    }
+
+
 class GraphAccountingMixin(AnalysisMixinContract):
     """Account graph compute, memory, and external I/O."""
 
@@ -335,6 +377,7 @@ class GraphAccountingMixin(AnalysisMixinContract):
     ) -> AnalyzedLayer:
         payload: dict[str, Any] = {
             "type": data.op_type,
+            "semantic_op": dict(layer_operation(data.layer)),
             "einsum_equation": data.equation,
             "is_real_einsum": compute.is_real_einsum,
             "macs": compute.macs,
@@ -349,38 +392,7 @@ class GraphAccountingMixin(AnalysisMixinContract):
             "orojenesis_elements": None,
             "fused_elements": int(io.model_elems),
             "fused_bytes": float(io.model_bytes),
-            "tensor_shapes": {
-                "inputs": [
-                    shape
-                    for shape in data.input_shapes
-                    if isinstance(shape, list)
-                ],
-                "outputs": [
-                    shape
-                    for shape in data.output_shapes
-                    if isinstance(shape, list)
-                ],
-            },
-            "tensor_sizes": {
-                "inputs": data.input_sizes,
-                "outputs": data.output_sizes,
-            },
-            "memory_elements": {
-                "inputs": memory.reads,
-                "outputs": memory.writes,
-            },
-            "memory_bytes": {
-                "inputs": byte_counts.input_bytes,
-                "outputs": byte_counts.output_bytes,
-            },
-            "tensor_dtypes": {
-                "inputs": data.input_dtypes,
-                "outputs": data.output_dtypes,
-            },
-            "tensor_types": {
-                "inputs": data.input_types,
-                "outputs": data.output_types,
-            },
+            **_serialized_tensor_metadata(data, memory, byte_counts),
             "input_elements": byte_counts.input_elems,
             "output_elements": byte_counts.output_elems,
             "intermediate_elements": io.intermediate_elems,

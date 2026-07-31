@@ -28,9 +28,13 @@ class _FakePackager:
     def __init__(self, traces: list[Trace] | None = None) -> None:
         self.traces = traces or []
         self.converted_stdout: str | None = None
+        self.restage_calls = 0
 
     def execute(self) -> list[str]:
         raise AssertionError("runtime must not call execute")
+
+    def restage_trusted_reference(self) -> None:
+        self.restage_calls += 1
 
     def convert_stdout_to_traces(self, stdout: str) -> list[Trace]:
         self.converted_stdout = stdout
@@ -389,3 +393,51 @@ def test_counter_profile_replay_stdout_is_not_canonical(
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
     assert packager.converted_stdout == "canonical\n"
     assert result.profile_result is profile_result
+
+
+def test_counter_profile_restages_reference_before_each_application(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packager = _FakePackager(traces=[_trace()])
+    profile_result = Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.SUCCESS,
+        command=("rocprofv3",),
+        output_directory=tmp_path,
+        output_file="profile",
+    )
+
+    def _run_profiled(*args, **kwargs):
+        prepare = kwargs["lifecycle"].prepare_profiled_application
+        assert prepare is not None
+        prepare()
+        prepare()
+        return None, profile_result
+
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_profiled_evaluation",
+        _run_profiled,
+    )
+    monkeypatch.setattr(
+        cli_evaluation,
+        "_run_evaluation_command",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=["python"],
+            returncode=0,
+            stdout="canonical\n",
+            stderr="",
+        ),
+    )
+
+    result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=["python", "candidate.py"],
+        staging_dir=tmp_path,
+        output_file=tmp_path / "trace.jsonl",
+        timeout=5,
+        profile="rocprofv3-counters",
+    )
+
+    assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
+    assert packager.restage_calls == 2

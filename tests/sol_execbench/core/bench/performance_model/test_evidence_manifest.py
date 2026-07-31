@@ -22,6 +22,7 @@ def test_manifest_verifies_all_content_addressed_artifacts(
     for kind in (
         PerformanceEvidenceArtifactKind.TRACE,
         PerformanceEvidenceArtifactKind.TIMING,
+        PerformanceEvidenceArtifactKind.ACCESS_PATTERN,
         PerformanceEvidenceArtifactKind.PROFILE_SUMMARY,
         PerformanceEvidenceArtifactKind.STATIC_EVIDENCE,
     ):

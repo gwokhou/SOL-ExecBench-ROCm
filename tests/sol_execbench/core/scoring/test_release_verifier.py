@@ -155,6 +155,43 @@ def test_make_fx_aten_release_index_round_trips_and_verifies(
     )
 
 
+def test_release_index_accepts_content_addressed_orojenesis_evidence(
+    tmp_path: Path,
+) -> None:
+    corpus, workspace = _release_fixture(tmp_path)
+    _write_solar_artifacts(corpus, workspace)
+    for workload_uuid in corpus.entries[0].workload_uuids:
+        root = workspace / "solar" / "manifests" / _PROBLEM_PATH / workload_uuid
+        evidence = root / "orojenesis" / "mm" / "problem.yaml"
+        evidence.parent.mkdir(parents=True)
+        evidence.write_text("problem: mm\n", encoding="utf-8")
+        manifest = yaml.safe_load((root / "manifest.yaml").read_text())
+        manifest["artifacts"].append(
+            {
+                "path": "orojenesis/mm/problem.yaml",
+                "sha256": sha256_file(evidence),
+            },
+        )
+        (root / "manifest.yaml").write_text(
+            yaml.safe_dump(manifest, sort_keys=False),
+            encoding="utf-8",
+        )
+    index = _solar_statement(
+        corpus,
+        workspace,
+        artifact_reference(
+            workspace,
+            workspace / "corpus" / "manifest.yaml",
+        ),
+    )
+
+    assert verify_solar_index(
+        index,
+        bundle_root=workspace,
+        corpus=corpus,
+    )
+
+
 def test_publisher_assembly_verifies_and_scores(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

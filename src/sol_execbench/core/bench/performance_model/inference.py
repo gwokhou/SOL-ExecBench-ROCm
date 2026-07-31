@@ -9,12 +9,14 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Literal
 
+import numpy as np
 from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.bench.performance_model.models import (
     PERFORMANCE_MODEL_VERSION,
     DiagnosticModelIdentity,
     PerformancePrediction,
+    SemanticCharacterization,
     WorkloadKind,
 )
 from sol_execbench.core.data.base_model import (
@@ -26,7 +28,8 @@ from sol_execbench.core.integrity.schema_versions import (
     DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION,
 )
 
-MINIMUM_CASES_PER_FAMILY = 20
+MINIMUM_POINT_FIT_CASES = 20
+CONFORMAL_CALIBRATION_CASES = 20
 MINIMUM_ACTION_POSITIVES = 10
 MINIMUM_ACTION_NEGATIVES = 10
 TARGET_NOMINAL_COVERAGE = 0.95
@@ -49,6 +52,8 @@ CODE_CHANGING_ACTION_CODES = frozenset(
         "remove_extra_traffic",
         "improve_coalescing",
         "reduce_lds_barriers",
+        "reduce_atomic_contention",
+        "restore_fused_attention_path",
     }
 )
 _ACTION_POLICIES: dict[
@@ -73,8 +78,43 @@ _ACTION_POLICIES: dict[
         "ge",
         RATIO_THRESHOLD_GRID,
     ),
+    "reduce_atomic_contention": (
+        "atomic_share",
+        "ge",
+        FRACTION_THRESHOLD_GRID,
+    ),
+    "restore_fused_attention_path": (
+        "attention_dispatch_ratio",
+        "ge",
+        RATIO_THRESHOLD_GRID,
+    ),
 }
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+_POINT_FEATURES = {
+    WorkloadKind.ELEMENTWISE: ("solar_lower_bound_ms",),
+    WorkloadKind.TRANSPOSE: ("solar_lower_bound_ms",),
+    WorkloadKind.REDUCTION: (
+        "width_64",
+        "width_128",
+        "width_256",
+        "width_512",
+        "width_1024",
+        "outer_rows_width_32",
+        "outer_rows_width_64",
+        "outer_rows_width_128",
+        "outer_rows_width_256",
+        "outer_rows_width_512",
+        "outer_rows_width_1024",
+    ),
+    WorkloadKind.MATMUL: ("solar_lower_bound_ms",),
+    WorkloadKind.SOFTMAX: ("solar_lower_bound_ms",),
+    WorkloadKind.CROSS_ENTROPY: ("solar_lower_bound_ms",),
+    WorkloadKind.INDEXED_READ: ("solar_lower_bound_ms",),
+    WorkloadKind.INDEXED_UPDATE: ("solar_lower_bound_ms",),
+    WorkloadKind.COMPOSITE: ("solar_lower_bound_ms",),
+    WorkloadKind.TRANSFORMER: ("solar_lower_bound_ms",),
+    WorkloadKind.CONCURRENT: ("solar_lower_bound_ms",),
+}
 
 
 class InferenceObservation(StrictArtifactModel):
@@ -85,15 +125,19 @@ class InferenceObservation(StrictArtifactModel):
     case_id: str = Field(min_length=1)
     workload_kind: WorkloadKind
     measured_ms: float = Field(gt=0)
+    base_predicted_ms: float = Field(gt=0)
     base_lower_ms: float = Field(gt=0)
     base_upper_ms: float = Field(gt=0)
+    point_features: dict[str, float]
     action_scores: dict[str, float] = Field(default_factory=dict)
     gold_action_codes: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def interval_is_ordered(self) -> InferenceObservation:
         """Reject reversed base intervals."""
-        if self.base_upper_ms < self.base_lower_ms:
+        if not (
+            self.base_lower_ms <= self.base_predicted_ms <= self.base_upper_ms
+        ):
             raise ValueError("base prediction interval is reversed")
         return self
 
@@ -104,9 +148,37 @@ class FamilyConformalCalibration(StrictArtifactModel):
     model_config = _CONFIG
 
     workload_kind: WorkloadKind
-    case_count: int = Field(ge=MINIMUM_CASES_PER_FAMILY)
+    case_count: int = Field(
+        ge=MINIMUM_POINT_FIT_CASES + CONFORMAL_CALIBRATION_CASES
+    )
+    point_fit_case_count: int = Field(ge=MINIMUM_POINT_FIT_CASES)
+    conformal_case_count: Literal[20] = CONFORMAL_CALIBRATION_CASES
+    point_feature_names: list[str] = Field(min_length=1)
+    point_feature_means: list[float] = Field(min_length=1)
+    point_feature_scales: list[float] = Field(min_length=1)
+    point_intercept_ms: float
+    point_coefficients: list[float] = Field(min_length=1)
+    point_floor_ms: float = Field(gt=0)
     quantile_rank: int = Field(ge=1)
     q95: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def point_model_is_complete(self) -> FamilyConformalCalibration:
+        """Require an exact, finite family feature model."""
+        expected = list(_POINT_FEATURES[self.workload_kind])
+        width = len(expected)
+        if self.point_feature_names != expected:
+            raise ValueError("point model feature policy mismatch")
+        if not (
+            len(self.point_feature_means)
+            == len(self.point_feature_scales)
+            == len(self.point_coefficients)
+            == width
+        ):
+            raise ValueError("point model coefficient dimensions mismatch")
+        if any(value <= 0 for value in self.point_feature_scales):
+            raise ValueError("point model feature scale must be positive")
+        return self
 
 
 class ActionThreshold(StrictArtifactModel):
@@ -133,16 +205,16 @@ class DiagnosticInferenceProfile(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_inference_profile.v1"] = (
+    schema_version: Literal["sol_execbench.diagnostic_inference_profile.v8"] = (
         DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v3"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     calibration_profile_sha256: SHA256Digest
     calibration_audit_sha256: SHA256Digest
     development_corpus_sha256: SHA256Digest
-    conformal: list[FamilyConformalCalibration] = Field(min_length=4)
-    action_thresholds: list[ActionThreshold] = Field(min_length=6)
+    conformal: list[FamilyConformalCalibration] = Field(min_length=11)
+    action_thresholds: list[ActionThreshold] = Field(min_length=8)
     high_ratio_threshold: float = HIGH_RATIO_THRESHOLD
     contradiction_ratio_threshold: float = CONTRADICTION_RATIO_THRESHOLD
 
@@ -213,11 +285,13 @@ def build_inference_profile(
 def apply_conformal_interval(
     prediction: PerformancePrediction,
     workload_kind: WorkloadKind,
+    point_features: Mapping[str, float],
     profile: DiagnosticInferenceProfile | None,
 ) -> PerformancePrediction:
-    """Expand a base prediction with its frozen family quantile."""
+    """Apply the frozen family point correction and conformal interval."""
     if (
         profile is None
+        or prediction.predicted_time_ms is None
         or prediction.lower_ms is None
         or prediction.upper_ms is None
     ):
@@ -228,16 +302,55 @@ def apply_conformal_interval(
         if item.workload_kind is workload_kind
     )
     factor = math.exp(calibration.q95)
+    point = _calibrated_point(calibration, point_features)
+    lower_ratio = prediction.lower_ms / prediction.predicted_time_ms
+    upper_ratio = prediction.upper_ms / prediction.predicted_time_ms
     return prediction.model_copy(
         update={
-            "lower_ms": prediction.lower_ms / factor,
-            "upper_ms": prediction.upper_ms * factor,
+            "predicted_time_ms": point,
+            "lower_ms": point * lower_ratio / factor,
+            "upper_ms": point * upper_ratio * factor,
             "limitations": [
                 *prediction.limitations,
-                "Interval expanded by a frozen family split-conformal q95.",
+                (
+                    "Point and interval calibrated by a frozen family "
+                    "development profile."
+                ),
             ],
         },
     )
+
+
+def point_features(
+    semantic: SemanticCharacterization,
+) -> dict[str, float]:
+    """Return the closed semantic feature set used by point calibration."""
+    values = {"solar_lower_bound_ms": semantic.t_sol_ms}
+    if semantic.workload_kind is WorkloadKind.REDUCTION:
+        descriptor = semantic.descriptor
+        if descriptor.kind != "reduction_norm":
+            raise ValueError("reduction point feature descriptor mismatch")
+        width = descriptor.reduction_width
+        supported_widths = (32, 64, 128, 256, 512, 1024)
+        if width not in supported_widths:
+            raise ValueError("reduction point feature width unsupported")
+        values.update(
+            {
+                **{
+                    f"width_{selected}": float(width == selected)
+                    for selected in supported_widths[1:]
+                },
+                **{
+                    f"outer_rows_width_{selected}": (
+                        float(descriptor.outer_rows)
+                        if width == selected
+                        else 0.0
+                    )
+                    for selected in supported_widths
+                },
+            }
+        )
+    return values
 
 
 def action_is_admitted(
@@ -261,23 +374,110 @@ def _family_conformal(
     kind: WorkloadKind,
 ) -> FamilyConformalCalibration:
     selected = [item for item in observations if item.workload_kind is kind]
-    if len(selected) < MINIMUM_CASES_PER_FAMILY:
+    required = MINIMUM_POINT_FIT_CASES + CONFORMAL_CALIBRATION_CASES
+    if len(selected) < required:
         raise ValueError(f"development corpus lacks {kind} coverage")
-    scores = sorted(_conformal_score(item) for item in selected)
+    point_fit = selected[:-CONFORMAL_CALIBRATION_CASES]
+    conformal = selected[-CONFORMAL_CALIBRATION_CASES:]
+    feature_names = list(_POINT_FEATURES[kind])
+    feature_matrix = np.asarray(
+        [
+            [_required_feature(item, name) for name in feature_names]
+            for item in point_fit
+        ],
+        dtype=np.float64,
+    )
+    targets = np.asarray(
+        [item.measured_ms for item in point_fit],
+        dtype=np.float64,
+    )
+    means = feature_matrix.mean(axis=0)
+    scales = feature_matrix.std(axis=0)
+    scales = np.where(scales > 0, scales, 1.0)
+    design = np.column_stack(
+        (np.ones(len(point_fit)), (feature_matrix - means) / scales)
+    )
+    fitted = np.linalg.lstsq(design, targets, rcond=None)[0]
+    floor_ms = min(item.measured_ms for item in point_fit) * 0.5
+    calibration = FamilyConformalCalibration(
+        workload_kind=kind,
+        case_count=len(selected),
+        point_fit_case_count=len(point_fit),
+        conformal_case_count=20,
+        point_feature_names=feature_names,
+        point_feature_means=means.tolist(),
+        point_feature_scales=scales.tolist(),
+        point_intercept_ms=float(fitted[0]),
+        point_coefficients=fitted[1:].tolist(),
+        point_floor_ms=floor_ms,
+        quantile_rank=1,
+        q95=0.0,
+    )
+    scores = sorted(
+        _conformal_score(item, calibration=calibration) for item in conformal
+    )
     rank = math.ceil((len(scores) + 1) * TARGET_NOMINAL_COVERAGE)
     rank = min(rank, len(scores))
-    return FamilyConformalCalibration(
-        workload_kind=kind,
-        case_count=len(scores),
-        quantile_rank=rank,
-        q95=scores[rank - 1],
+    return calibration.model_copy(
+        update={
+            "quantile_rank": rank,
+            "q95": scores[rank - 1],
+        }
     )
 
 
-def _conformal_score(observation: InferenceObservation) -> float:
+def _calibrated_point(
+    calibration: FamilyConformalCalibration,
+    features: Mapping[str, float],
+) -> float:
+    normalized = (
+        (_mapping_feature(features, name) - mean) / scale
+        for name, mean, scale in zip(
+            calibration.point_feature_names,
+            calibration.point_feature_means,
+            calibration.point_feature_scales,
+            strict=True,
+        )
+    )
+    fitted = calibration.point_intercept_ms + sum(
+        coefficient * value
+        for coefficient, value in zip(
+            calibration.point_coefficients,
+            normalized,
+            strict=True,
+        )
+    )
+    return max(fitted, calibration.point_floor_ms)
+
+
+def _required_feature(
+    observation: InferenceObservation,
+    name: str,
+) -> float:
+    return _mapping_feature(observation.point_features, name)
+
+
+def _mapping_feature(features: Mapping[str, float], name: str) -> float:
+    try:
+        value = features[name]
+    except KeyError as error:
+        raise ValueError(f"point model feature missing:{name}") from error
+    if not math.isfinite(value):
+        raise ValueError(f"point model feature is not finite:{name}")
+    return value
+
+
+def _conformal_score(
+    observation: InferenceObservation,
+    *,
+    calibration: FamilyConformalCalibration,
+) -> float:
+    point = _calibrated_point(calibration, observation.point_features)
+    lower_ratio = observation.base_lower_ms / observation.base_predicted_ms
+    upper_ratio = observation.base_upper_ms / observation.base_predicted_ms
     return max(
-        math.log(observation.base_lower_ms / observation.measured_ms),
-        math.log(observation.measured_ms / observation.base_upper_ms),
+        math.log(point * lower_ratio / observation.measured_ms),
+        math.log(observation.measured_ms / (point * upper_ratio)),
         0.0,
     )
 
@@ -362,6 +562,13 @@ def _supported_families() -> tuple[WorkloadKind, ...]:
         WorkloadKind.TRANSPOSE,
         WorkloadKind.REDUCTION,
         WorkloadKind.MATMUL,
+        WorkloadKind.SOFTMAX,
+        WorkloadKind.CROSS_ENTROPY,
+        WorkloadKind.INDEXED_READ,
+        WorkloadKind.INDEXED_UPDATE,
+        WorkloadKind.COMPOSITE,
+        WorkloadKind.TRANSFORMER,
+        WorkloadKind.CONCURRENT,
     )
 
 
@@ -378,4 +585,5 @@ __all__ = [
     "action_is_admitted",
     "apply_conformal_interval",
     "build_inference_profile",
+    "point_features",
 ]

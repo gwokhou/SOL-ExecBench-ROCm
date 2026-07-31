@@ -10,7 +10,7 @@ import logging
 import os
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -70,6 +70,18 @@ console = Console(stderr=True)
 logger = logging.getLogger(__name__)
 EnvironmentBuilder = Callable[[Mapping[str, str]], dict[str, str]]
 ClockLocker = Callable[[], ClockLockLease]
+ProfileApplicationPreparer = Callable[[], None]
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileLifecycle:
+    """Injected clock and replay-restaging lifecycle hooks."""
+
+    clock_locker: ClockLocker = acquire_clock_lock
+    prepare_profiled_application: ProfileApplicationPreparer | None = None
+
+
+_DEFAULT_PROFILE_LIFECYCLE = ProfileLifecycle()
 
 
 class ProfileCollector(Protocol):
@@ -158,6 +170,7 @@ def _profile_command_runner(
     staging_dir: Path,
     env_builder: EnvironmentBuilder,
     subprocess_run: TextSubprocessRunner | None,
+    prepare_profiled_application: ProfileApplicationPreparer | None,
 ) -> ProfileRunner:
     """Build the profiler callback around the evaluation process policy."""
 
@@ -166,6 +179,8 @@ def _profile_command_runner(
         cwd: Path | None,
         timeout_seconds: int | None,
     ) -> subprocess.CompletedProcess[str]:
+        if prepare_profiled_application is not None and "--" in command:
+            prepare_profiled_application()
         return _run_command(
             list(command),
             cwd=cwd,
@@ -192,7 +207,7 @@ def _run_profiled_evaluation(
     rocprofv3_available: bool | None = None,
     profile_collector: ProfileCollector = collect_rocprofv3_profile,
     counter_mode: bool = False,
-    clock_locker: ClockLocker = acquire_clock_lock,
+    lifecycle: ProfileLifecycle = _DEFAULT_PROFILE_LIFECYCLE,
 ) -> tuple[subprocess.CompletedProcess[str] | None, Rocprofv3ProfileResult]:
     """Run evaluation under `rocprofv3`, returning normal execution on failure.
 
@@ -219,7 +234,7 @@ def _run_profiled_evaluation(
 
     # Hold STABLE_PEAK across collection so replay passes share one audited
     # clock policy. Idempotent vs an outer lock; best-effort skip below.
-    with clock_locker() as clock_lease:
+    with lifecycle.clock_locker() as clock_lease:
         if not clock_lease.locked:
             logger.warning(
                 "rocprofv3 profiling is running without a STABLE_PEAK clock "
@@ -236,6 +251,7 @@ def _run_profiled_evaluation(
                 staging_dir,
                 env_builder,
                 subprocess_run,
+                lifecycle.prepare_profiled_application,
             ),
         )
         post_snapshot = _replay_snapshot("post") if counter_mode else None

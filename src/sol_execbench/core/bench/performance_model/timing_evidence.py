@@ -16,6 +16,9 @@ from pydantic import ConfigDict, Field, model_validator
 from sol_execbench.core.bench.diagnostic_sidecar import (
     CurrentDiagnosticSidecarAuthority,
 )
+from sol_execbench.core.bench.performance_model.access_evidence import (
+    AccessPatternSummary,
+)
 from sol_execbench.core.data.base_model import (
     StrictArtifactModel,
 )
@@ -48,6 +51,7 @@ class RawPerformanceTimingRecord(StrictArtifactModel):
     trial_samples_ms: list[list[float]] = Field(min_length=1)
     warmup_runs: int = Field(ge=0)
     timing_protocol: str
+    access_patterns: list[AccessPatternSummary] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def samples_are_valid(self) -> RawPerformanceTimingRecord:

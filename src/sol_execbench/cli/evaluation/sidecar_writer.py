@@ -68,8 +68,17 @@ class WrittenSidecars:
     decision: Path | None
     agent_feedback: Path | None
     performance_timing: Path | None
+    performance_access: Path | None
     performance_evidence: Path | None
     performance_replay: Path | None
+
+
+@dataclass(frozen=True, slots=True)
+class _PerformanceSidecars:
+    timing: Path | None
+    access: Path | None
+    replay: Path | None
+    evidence: Path | None
 
 
 def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
@@ -99,39 +108,10 @@ def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
             request.static_evidence_result,
         )
     )
-    performance_timing_sidecar_path = (
-        cli_performance_sidecars.write_performance_timing_sidecar(
-            output_file=request.output_file,
-            staging_dir=request.staging_dir,
-            traces=request.traces,
-            solution=request.solution,
-        )
-    )
-    performance_replay_sidecar_path = (
-        cli_performance_sidecars.write_performance_replay_sidecar(
-            output_file=request.output_file,
-            staging_dir=request.staging_dir,
-            traces=request.traces,
-            solution=request.solution,
-            timing_path=performance_timing_sidecar_path,
-            profile_result=request.profile_result,
-            static_evidence=request.static_evidence_result,
-            compile_result=request.compile_result,
-        )
-    )
-    performance_evidence_manifest_path = (
-        cli_performance_sidecars.write_performance_evidence_manifest(
-            output_file=request.output_file,
-            traces=request.traces,
-            solution=request.solution,
-            timing_path=performance_timing_sidecar_path,
-            profile_summary_path=profile_summary_sidecar_path,
-            static_evidence_path=static_evidence_sidecar_path,
-            profile_result=request.profile_result,
-            static_evidence=request.static_evidence_result,
-            compile_result=request.compile_result,
-            replay_path=performance_replay_sidecar_path,
-        )
+    performance = _write_performance_sidecars(
+        request,
+        profile_summary_path=profile_summary_sidecar_path,
+        static_evidence_path=static_evidence_sidecar_path,
     )
     decision_sidecar_path, agent_feedback_sidecar_path = (
         _write_decision_and_feedback(
@@ -148,9 +128,60 @@ def write_optional_sidecars(request: SidecarWriteRequest) -> WrittenSidecars:
         static_evidence=static_evidence_sidecar_path,
         decision=decision_sidecar_path,
         agent_feedback=agent_feedback_sidecar_path,
-        performance_timing=performance_timing_sidecar_path,
-        performance_evidence=performance_evidence_manifest_path,
-        performance_replay=performance_replay_sidecar_path,
+        performance_timing=performance.timing,
+        performance_access=performance.access,
+        performance_evidence=performance.evidence,
+        performance_replay=performance.replay,
+    )
+
+
+def _write_performance_sidecars(
+    request: SidecarWriteRequest,
+    *,
+    profile_summary_path: Path | None,
+    static_evidence_path: Path | None,
+) -> _PerformanceSidecars:
+    timing = cli_performance_sidecars.write_performance_timing_sidecar(
+        output_file=request.output_file,
+        staging_dir=request.staging_dir,
+        traces=request.traces,
+        solution=request.solution,
+    )
+    access = cli_performance_sidecars.write_performance_access_sidecar(
+        output_file=request.output_file,
+        staging_dir=request.staging_dir,
+        traces=request.traces,
+    )
+    replay = cli_performance_sidecars.write_performance_replay_sidecar(
+        output_file=request.output_file,
+        staging_dir=request.staging_dir,
+        traces=request.traces,
+        solution=request.solution,
+        timing_path=timing,
+        profile_result=request.profile_result,
+        static_evidence=request.static_evidence_result,
+        compile_result=request.compile_result,
+    )
+    evidence = cli_performance_sidecars.write_performance_evidence_manifest(
+        cli_performance_sidecars.PerformanceEvidenceManifestWriteRequest(
+            output_file=request.output_file,
+            traces=request.traces,
+            solution=request.solution,
+            timing_path=timing,
+            access_path=access,
+            profile_summary_path=profile_summary_path,
+            static_evidence_path=static_evidence_path,
+            profile_result=request.profile_result,
+            static_evidence=request.static_evidence_result,
+            compile_result=request.compile_result,
+            replay_path=replay,
+        )
+    )
+    return _PerformanceSidecars(
+        timing=timing,
+        access=access,
+        replay=replay,
+        evidence=evidence,
     )
 
 

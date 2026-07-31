@@ -79,6 +79,7 @@ def test_build_rocprofv3_profile_command_prefers_rocpd_artifacts():
 
 def test_profile_artifact_discovery_classifies_rocpd_and_csv_outputs(tmp_path):
     (tmp_path / "profile.rocpd").write_text("db")
+    (tmp_path / "profile-results.db.gz").write_bytes(b"compressed db")
     (tmp_path / "profile_kernel.csv").write_text("kernel")
     (tmp_path / "profile_agent_info.csv").write_text("agent")
     (tmp_path / "unrelated.csv").write_text("skip")
@@ -87,6 +88,7 @@ def test_profile_artifact_discovery_classifies_rocpd_and_csv_outputs(tmp_path):
 
     assert sorted(artifact.kind for artifact in artifacts) == [
         "agent_info_csv",
+        "rocpd",
         "rocpd",
         "trace_csv",
     ]

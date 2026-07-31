@@ -94,6 +94,8 @@ def is_profile_artifact_candidate(
 
 def is_known_profile_artifact_name(path: Path) -> bool:
     """Return whether a filename uses a recognized profiler artifact form."""
+    if _is_compressed_rocpd(path):
+        return True
     if path.suffix.lower() in _PROFILE_ARTIFACT_SUFFIXES:
         return True
     normalized_name = normalize_profile_artifact_token(path.name)
@@ -107,6 +109,8 @@ def is_known_profile_artifact_name(path: Path) -> bool:
 
 def is_unprefixed_profile_artifact_name(path: Path) -> bool:
     """Return whether an unprefixed filename is a profiler artifact."""
+    if _is_compressed_rocpd(path):
+        return True
     suffix = path.suffix.lower()
     normalized_name = normalize_profile_artifact_token(path.stem or path.name)
     if suffix in {".db", ".sqlite", ".sqlite3", ".rocpd", ".pftrace", ".otf2"}:
@@ -186,7 +190,12 @@ def classify_profile_artifact(path: Path) -> Rocprofv3ArtifactKind:
     """Classify a profiler artifact from its filename and suffix."""
     name = path.name.lower()
     suffix = path.suffix.lower()
-    if suffix in {".db", ".sqlite", ".sqlite3", ".rocpd"}:
+    if _is_compressed_rocpd(path) or suffix in {
+        ".db",
+        ".sqlite",
+        ".sqlite3",
+        ".rocpd",
+    }:
         return Rocprofv3ArtifactKind.ROCPD
     if suffix == ".csv":
         if "agent" in name:
@@ -203,6 +212,11 @@ def classify_profile_artifact(path: Path) -> Rocprofv3ArtifactKind:
     if suffix == ".otf2":
         return Rocprofv3ArtifactKind.OTF2_TRACE
     return Rocprofv3ArtifactKind.OTHER
+
+
+def _is_compressed_rocpd(path: Path) -> bool:
+    name = path.name.lower()
+    return name.endswith((".db.gz", ".sqlite.gz", ".sqlite3.gz", ".rocpd.gz"))
 
 
 def profile_output_directory_listing(output_directory: Path) -> tuple[str, ...]:

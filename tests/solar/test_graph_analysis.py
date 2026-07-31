@@ -116,6 +116,11 @@ def test_analysis_stages_account_simple_external_io(tmp_path: Path) -> None:
     assert result["total"]["intermediate_elements"] == 0
     assert result["total"]["resource_work"] == {"valu": {"fp32": 2}}
     assert result["metadata"]["orojenesis"]["status"] == "not_requested"
+    assert result["layers"]["add"]["semantic_op"]["target"] == "add"
+    assert result["layers"]["add"]["tensor_names"] == {
+        "inputs": ["start.Output", "bias"],
+        "outputs": ["add.Output"],
+    }
     assert yaml.safe_load((output_dir / "analysis.yaml").read_text()) == result
 
 

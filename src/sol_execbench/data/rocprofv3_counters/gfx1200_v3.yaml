@@ -1,4 +1,4 @@
-schema_version: sol_execbench.rocprofv3_counter_manifest.v2
+schema_version: sol_execbench.rocprofv3_counter_manifest.v3
 architecture: gfx1200
 rocm_compatibility: "7.2"
 groups:

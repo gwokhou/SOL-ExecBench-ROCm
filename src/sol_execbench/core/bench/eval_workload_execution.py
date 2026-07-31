@@ -176,6 +176,10 @@ def _measure_and_emit(
         workload,
         solution_timing,
         input_sha256=timing_case.input_sha256,
+        access_patterns=[
+            pattern.model_dump(mode="json")
+            for pattern in timing_case.access_patterns
+        ],
     )
     emitter.emit_status(
         workload,
@@ -196,6 +200,7 @@ def _record_timing_evidence(
     timing: SolutionTimingResult,
     *,
     input_sha256: str,
+    access_patterns: list[dict[str, object]],
 ) -> None:
     recorder = getattr(request.dependencies, "timing_recorder", None)
     if recorder is None:
@@ -213,6 +218,7 @@ def _record_timing_evidence(
             ],
             "warmup_runs": request.bench_config.warmup_runs,
             "timing_protocol": request.bench_config.timing_protocol,
+            "access_patterns": access_patterns,
         },
     )
 

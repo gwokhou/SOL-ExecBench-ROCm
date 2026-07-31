@@ -28,6 +28,9 @@ from sol_execbench.core.bench.io import (
     gen_inputs,
     load_safetensors,
 )
+from sol_execbench.core.bench.performance_model.access_evidence import (
+    summarize_integer_inputs,
+)
 from sol_execbench.core.bench.reference_protocol import (
     PROTOCOL_VERSION,
     TRUSTED_DEFINITION_FILE,
@@ -258,12 +261,26 @@ def _serve_connection(
             if request.get("operation") == "shutdown":
                 send_json(writer, {"ok": True, "protocol": PROTOCOL_VERSION})
                 return
-            _, case, latency, failure = service.handle(request)
+            operation, case, latency, failure = service.handle(request)
+            access_patterns = (
+                summarize_integer_inputs(
+                    dict(
+                        zip(
+                            service.definition.inputs,
+                            case.inputs,
+                            strict=True,
+                        )
+                    )
+                )
+                if operation == "timing"
+                else []
+            )
             send_case(
                 writer,
                 case,
                 reference_latency_ms=latency,
                 timing_failure=failure,
+                access_patterns=access_patterns,
             )
             del case
             if torch.cuda.is_available():

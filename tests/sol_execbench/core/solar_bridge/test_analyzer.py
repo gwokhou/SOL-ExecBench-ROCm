@@ -16,6 +16,9 @@ from sol_execbench.core.solar_bridge.models import (
     SolarWorkerRequest,
     formal_precision_for_definition,
 )
+from sol_execbench.core.solar_bridge.semantic_metadata import (
+    performance_analysis_metadata,
+)
 from sol_execbench.core.solar_bridge.workload_context import (
     SolarWorkloadContext,
 )
@@ -39,6 +42,7 @@ def _definition(dtype: str = "torch.float16") -> Definition:
         Definition,
         SimpleNamespace(
             name="problem",
+            op_type="elementwise",
             reference="def reference(x): return x",
             custom_inputs_entrypoint=None,
             inputs={"x": tensor},
@@ -200,6 +204,62 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
     assert outcome.publication_eligible is True
     assert {artifact["path"] for artifact in outcome.artifacts} == {
         artifact.path for artifact in _FORMAL_ARTIFACTS
+    }
+
+
+def test_performance_metadata_marks_controlled_concurrent_graph() -> None:
+    definition = cast(
+        Definition,
+        SimpleNamespace(op_type="concurrent_graph"),
+    )
+    context = SolarWorkloadContext(
+        definition,
+        _workload(),
+        lambda value: value,
+        lambda seed: (seed,),
+    )
+
+    assert performance_analysis_metadata(context) == {
+        "performance_semantics": {
+            "graph_class": "concurrent_graph",
+        }
+    }
+
+
+def test_performance_metadata_requires_exact_minigpt_contract() -> None:
+    definition = cast(
+        Definition,
+        SimpleNamespace(
+            op_type="transformer_block",
+            inputs={
+                "input": SimpleNamespace(dtype=SimpleNamespace(value="float32"))
+            },
+            get_resolved_axes_values=lambda axes: {
+                **axes,
+                "N": 768,
+                "M": axes["S"],
+            },
+        ),
+    )
+    workload = cast(
+        Workload,
+        SimpleNamespace(axes={"S": 128}),
+    )
+    context = SolarWorkloadContext(
+        definition,
+        workload,
+        lambda value: value,
+        lambda seed: (seed,),
+    )
+
+    assert performance_analysis_metadata(context) == {
+        "performance_semantics": {
+            "graph_class": "transformer_block",
+            "hidden_size": 768,
+            "num_heads": 8,
+            "sequence_length": 128,
+            "dtype": "float32",
+        }
     }
 
 

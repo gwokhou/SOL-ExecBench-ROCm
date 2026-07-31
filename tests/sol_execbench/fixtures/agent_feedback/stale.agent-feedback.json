@@ -24,7 +24,7 @@
     "Canonical Trace JSONL remains the authority for correctness, timing, scoring, and status."
   ],
   "reason_code": "feedback_generated",
-  "schema_version": "sol_execbench.agent_feedback.v4",
+  "schema_version": "sol_execbench.agent_feedback.v6",
   "source_refs": [
     {
       "kind": "trace",

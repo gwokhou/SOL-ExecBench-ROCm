@@ -274,12 +274,44 @@ class StaticKernelEvidenceToolRun(BaseModelWithDocstrings):
     """Sidecar-relative bounded raw output artifact path when preserved."""
 
 
+class StaticEvidenceClaimBoundaries(BaseModelWithDocstrings):
+    """Explicit authority exclusions repeated in the compact summary."""
+
+    model_config = _STATIC_MODEL_CONFIG
+
+    diagnostic_only: Literal[True] = True
+    correctness_authority: Literal[False] = False
+    performance_authority: Literal[False] = False
+    timing_authority: Literal[False] = False
+    score_authority: Literal[False] = False
+    paper_parity_authority: Literal[False] = False
+    leaderboard_authority: Literal[False] = False
+
+
+class StaticKernelEvidenceSummary(BaseModelWithDocstrings):
+    """Compact, strictly typed summary persisted by the CLI."""
+
+    model_config = _STATIC_MODEL_CONFIG
+
+    status: StaticKernelEvidenceStatusField
+    reason_code: StaticKernelEvidenceReasonCodeField
+    artifact_count: int = Field(ge=0)
+    tool_run_count: int = Field(ge=0)
+    isa_analysis_count: int = Field(ge=0)
+    metadata_present: bool
+    disassembly_present: bool
+    detected_architectures: list[str] = Field(default_factory=list)
+    unsupported_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    claim_boundaries: StaticEvidenceClaimBoundaries
+
+
 class StaticKernelEvidenceSidecar(DiagnosticSidecarAuthority):
     """Strict diagnostic-only static kernel evidence sidecar."""
 
     model_config = _STATIC_MODEL_CONFIG
 
-    schema_version: Literal["sol_execbench.static_kernel_evidence.v3"] = (
+    schema_version: Literal["sol_execbench.static_kernel_evidence.v4"] = (
         STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
     )
     """Static kernel evidence schema version."""
@@ -307,6 +339,8 @@ class StaticKernelEvidenceSidecar(DiagnosticSidecarAuthority):
         default_factory=list,
     )
     """References supporting this sidecar."""
+    summary: StaticKernelEvidenceSummary | None = None
+    """Compact persisted CLI summary, absent in in-memory collection stages."""
 
     def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible sidecar payload."""

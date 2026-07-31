@@ -16,6 +16,9 @@ from sol_execbench.core.bench.performance_model.models import (
     ApplicabilityDimension,
     CalibrationParameter,
     CalibrationParameterName,
+    CalibrationSurface,
+    CalibrationSurfaceCell,
+    CalibrationSurfaceName,
     CalibrationUnit,
 )
 
@@ -150,11 +153,186 @@ def build_calibration_parameters(
             target_name=(CalibrationParameterName.LDS_BANK_CONFLICT_PENALTY_MS),
             expected_unit=CalibrationUnit.MS_PER_EVENT,
         ),
+        _parameter(
+            grouped,
+            source_name="fp32_matrix_flop_per_ms",
+            variant="dense",
+            target_name=CalibrationParameterName.FP32_MATRIX_FLOP_PER_MS,
+            expected_unit=CalibrationUnit.FLOP_PER_MS,
+        ),
+        _parameter(
+            grouped,
+            source_name="indexed_address_op_per_ms",
+            variant="device",
+            target_name=CalibrationParameterName.INDEXED_ADDRESS_OP_PER_MS,
+            expected_unit=CalibrationUnit.ITEM_PER_MS,
+        ),
     ]
     parameters.extend(_valu_parameters(grouped))
     parameters.extend(_reduction_parameters(grouped))
     parameters.extend(_hierarchy_and_efficiency_parameters(grouped, frozen))
     return parameters
+
+
+def build_calibration_surfaces(
+    held_out: Sequence[ProbeBatch],
+) -> list[CalibrationSurface]:
+    """Build the four required multidimensional calibration surfaces."""
+    if not held_out or any(
+        batch.phase != "parameter_estimation_after_configuration_freeze"
+        or not batch.clocks_locked
+        for batch in held_out
+    ):
+        raise ValueError("surface evidence must be locked and held out")
+    grouped = _group_process_medians(held_out)
+    return [
+        _calibration_surface(
+            grouped,
+            metric_name="indexed_read_item_per_ms",
+            name=CalibrationSurfaceName.INDEXED_READ,
+            unit=CalibrationUnit.ITEM_PER_MS,
+            dimensions=(
+                ApplicabilityDimension.INDEX_LOCALITY,
+                ApplicabilityDimension.WORKING_SET_BYTES,
+                ApplicabilityDimension.ELEMENT_BYTES,
+            ),
+        ),
+        _calibration_surface(
+            grouped,
+            metric_name="atomic_update_item_per_ms",
+            name=CalibrationSurfaceName.ATOMIC_UPDATE,
+            unit=CalibrationUnit.ITEM_PER_MS,
+            dimensions=(
+                ApplicabilityDimension.COLLISION_FRACTION,
+                ApplicabilityDimension.MAX_MULTIPLICITY,
+                ApplicabilityDimension.ELEMENT_BYTES,
+            ),
+        ),
+        _calibration_surface(
+            grouped,
+            metric_name="residency_ratio",
+            name=CalibrationSurfaceName.RESIDENCY,
+            unit=CalibrationUnit.RATIO,
+            dimensions=(
+                ApplicabilityDimension.ACTIVE_WAVES,
+                ApplicabilityDimension.ELEMENT_BYTES,
+            ),
+        ),
+        _overlap_calibration_surface(grouped),
+    ]
+
+
+def _overlap_calibration_surface(
+    grouped: dict[tuple[str, str, str], list[float]],
+) -> CalibrationSurface:
+    valu_rate = statistics.median(
+        grouped[("valu_item_per_ms", "simple_fp32", "item/ms")]
+    )
+    memory_rate = statistics.median(
+        grouped[("memory_byte_per_ms", "256MiB", "byte/ms")]
+    )
+    count = float(32 * 2**20 // 4)
+    memory_time = 2.0 * count * 4.0 / memory_rate
+    cells = []
+    for (name, variant, unit), values in grouped.items():
+        if name != "overlap_ratio" or unit != CalibrationUnit.RATIO.value:
+            continue
+        raw = dict(item.split("=", 1) for item in variant.split(","))
+        repetitions = raw.get("arithmetic_repetitions")
+        concurrent = raw.get("concurrent_dispatches")
+        if repetitions is None or concurrent is None:
+            raise ValueError(f"invalid overlap surface variant: {variant}")
+        mix = (
+            1.0
+            if repetitions == "pure_compute"
+            else _overlap_compute_mix(
+                count,
+                int(repetitions),
+                valu_rate,
+                memory_time,
+            )
+        )
+        concurrent_interval = _surface_interval(concurrent, variant)
+        cells.append(
+            CalibrationSurfaceCell(
+                coordinates={
+                    ApplicabilityDimension.RESOURCE_MIX: (mix, mix),
+                    ApplicabilityDimension.CONCURRENT_DISPATCHES: (
+                        concurrent_interval
+                    ),
+                },
+                value=statistics.median(values),
+                confidence_interval=_bootstrap_interval(values),
+            )
+        )
+    if not cells:
+        raise ValueError("surface evidence lacks overlap_ratio")
+    return CalibrationSurface(
+        name=CalibrationSurfaceName.OVERLAP,
+        unit=CalibrationUnit.RATIO,
+        cells=sorted(
+            cells,
+            key=lambda cell: cell.coordinates[
+                ApplicabilityDimension.RESOURCE_MIX
+            ],
+        ),
+    )
+
+
+def _overlap_compute_mix(
+    count: float,
+    repetitions: int,
+    valu_rate: float,
+    memory_time: float,
+) -> float:
+    compute_time = count * repetitions / valu_rate
+    return compute_time / (compute_time + memory_time)
+
+
+def _surface_interval(value: str, variant: str) -> tuple[float, float]:
+    lower, separator, upper = value.partition(":")
+    if not separator:
+        raise ValueError(f"invalid surface variant: {variant}")
+    return float(lower), float(upper)
+
+
+def _calibration_surface(
+    grouped: dict[tuple[str, str, str], list[float]],
+    *,
+    metric_name: str,
+    name: CalibrationSurfaceName,
+    unit: CalibrationUnit,
+    dimensions: tuple[ApplicabilityDimension, ...],
+) -> CalibrationSurface:
+    cells = [
+        CalibrationSurfaceCell(
+            coordinates=_surface_coordinates(variant, dimensions),
+            value=statistics.median(values),
+            confidence_interval=_bootstrap_interval(values),
+        )
+        for (observed_name, variant, observed_unit), values in grouped.items()
+        if observed_name == metric_name and observed_unit == unit.value
+    ]
+    if not cells:
+        raise ValueError(f"surface evidence lacks {metric_name}")
+    return CalibrationSurface(name=name, unit=unit, cells=cells)
+
+
+def _surface_coordinates(
+    variant: str,
+    dimensions: tuple[ApplicabilityDimension, ...],
+) -> dict[ApplicabilityDimension, tuple[float, float]]:
+    raw = {}
+    for item in variant.split(","):
+        key, separator, interval = item.partition("=")
+        lower, range_separator, upper = interval.partition(":")
+        if not separator or not range_separator:
+            raise ValueError(f"invalid surface variant: {variant}")
+        raw[key] = (float(lower), float(upper))
+    expected = {dimension.value for dimension in dimensions}
+    if set(raw) != expected:
+        raise ValueError(f"surface variant dimensions mismatch: {variant}")
+    return {dimension: raw[dimension.value] for dimension in dimensions}
 
 
 def _group_values(
@@ -346,6 +524,13 @@ def _hierarchy_and_efficiency_parameters(
             applicability=(1.0, 15.0),
             applicability_dimension=ApplicabilityDimension.TILE_REMAINDER,
         ),
+        _ratio_parameter(
+            grouped,
+            source_name="fp32_matrix_flop_per_ms",
+            numerator_variant="strided",
+            denominator_variant="dense",
+            target_name=CalibrationParameterName.STRIDED_MATMUL_EFFICIENCY,
+        ),
     ]
 
 
@@ -407,6 +592,19 @@ def _reduction_parameters(
                         ApplicabilityDimension.REDUCTION_WIDTH
                     ),
                 ),
+                _parameter(
+                    grouped,
+                    source_name="reduction_op_per_ms",
+                    variant=variant,
+                    target_name=(
+                        CalibrationParameterName.SOFTMAX_REDUCTION_OP_PER_MS
+                    ),
+                    expected_unit=CalibrationUnit.ITEM_PER_MS,
+                    applicability=applicability,
+                    applicability_dimension=(
+                        ApplicabilityDimension.REDUCTION_WIDTH
+                    ),
+                ),
             )
         )
     return parameters
@@ -418,6 +616,7 @@ __all__ = [
     "MetricSample",
     "ProbeBatch",
     "build_calibration_parameters",
+    "build_calibration_surfaces",
     "freeze_probe_configuration",
     "parse_probe_metrics",
 ]

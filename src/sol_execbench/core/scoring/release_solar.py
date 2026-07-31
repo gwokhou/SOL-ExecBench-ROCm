@@ -28,7 +28,7 @@ from sol_execbench.core.solar_bridge.models import (
     IRPath,
     SolarRequestArtifact,
     SolarRequestManifest,
-    formal_artifact_paths,
+    valid_formal_artifact_paths,
 )
 from sol_execbench.core.solar_bridge.workload_context import (
     structured_input_indices,
@@ -205,7 +205,7 @@ def _verify_manifest_artifacts(
             or sha256_file(path) != digest
         ):
             raise ValueError("formal SOLAR artifact identity mismatch")
-    if observed != formal_artifact_paths(ir_path):
+    if not valid_formal_artifact_paths(observed, ir_path):
         raise ValueError("formal SOLAR artifact denominator mismatch")
 
 
