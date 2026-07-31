@@ -36,8 +36,19 @@ EXACT_IMPORTS = {
     ],
 }
 FORBIDDEN_DEPENDENCIES = {
-    "sol_execbench.core.bench": ("sol_execbench.core.reports",),
+    "sol_execbench.core.bench": (
+        "sol_execbench.core.reports",
+        "sol_execbench.core.solar_bridge",
+    ),
+    "sol_execbench.core.integrity": ("sol_execbench.core.platform",),
     "sol_execbench.core.platform": ("sol_execbench.core.scoring",),
+    "sol_execbench.core.scoring": ("sol_execbench.cli",),
+    "sol_execbench.core.solar_bridge": ("sol_execbench.core.scoring",),
+    "solar.ir": (
+        "solar.analysis",
+        "solar.pipeline",
+        "solar.verification",
+    ),
 }
 
 
@@ -183,6 +194,35 @@ def strongly_connected_components(
     return sorted(components)
 
 
+def architecture_domain(module: str) -> str:
+    """Return the package domain used for architectural layering."""
+    parts = module.split(".")
+    if len(parts) == 1:
+        return f"{parts[0]}.root"
+    if parts[:2] == ["sol_execbench", "core"]:
+        return (
+            ".".join(parts[:3])
+            if len(parts) >= 3
+            else "sol_execbench.core.root"
+        )
+    return ".".join(parts[:2])
+
+
+def architecture_domain_cycles(
+    modules: dict[str, Path],
+    edges: set[tuple[str, str]],
+) -> list[tuple[str, ...]]:
+    """Return cycles that emerge after imports are grouped by domain."""
+    domains = {architecture_domain(module) for module in modules}
+    domain_edges = {
+        (architecture_domain(source), architecture_domain(target))
+        for source, target in edges
+        if architecture_domain(source) != architecture_domain(target)
+    }
+    domain_modules = {domain: Path() for domain in domains}
+    return strongly_connected_components(domain_modules, domain_edges)
+
+
 def module_stats(
     modules: dict[str, Path],
     edges: set[tuple[str, str]],
@@ -307,6 +347,10 @@ def payload() -> dict[str, Any]:
     stats = module_stats(modules, edges, selected_modules)
     return {
         "cycles": strongly_connected_components(modules, edges),
+        "architecture_domain_cycles": architecture_domain_cycles(
+            modules,
+            edges,
+        ),
         "cross_package_violations": cross_package_violations(edges),
         "facade_import_violations": facade_import_violations(modules),
         "layer_violations": layer_violations(edges),
@@ -334,6 +378,10 @@ def main() -> int:
     else:
         print("Coupling Guardrails")
         print(f"cycles: {result['cycles']}")
+        print(
+            "architecture domain cycles: "
+            f"{result['architecture_domain_cycles']}"
+        )
         print(f"cross-package violations: {result['cross_package_violations']}")
         print(f"facade import violations: {result['facade_import_violations']}")
         print(f"layer violations: {result['layer_violations']}")
@@ -344,6 +392,7 @@ def main() -> int:
             )
     if (
         result["cycles"]
+        or result["architecture_domain_cycles"]
         or result["cross_package_violations"]
         or result["facade_import_violations"]
         or result["layer_violations"]

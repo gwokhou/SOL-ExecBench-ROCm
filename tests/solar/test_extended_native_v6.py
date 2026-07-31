@@ -20,11 +20,14 @@ from solar.graph.contracts import ExtractionKind
 from solar.graph.extraction import extract_operator_graph
 from solar.ir.contracts import IRKind
 from solar.ir.conversion import convert_operator_graph
-from solar.ir.extended_einsum.lifecycle import lifecycle
+from solar.ir.extended_einsum.backend import backend as extended_backend
 from solar.ir.extended_einsum.native_registry import NATIVE_OP_REGISTRY
-from solar.ir.registry import ir_lifecycle
+from solar.ir.registry import ir_backend
 from solar.schema_versions import EXTENDED_EINSUM_IR_SCHEMA_VERSION
 from solar.verification.executor import IRGraphExecutor
+from solar.verification.registry import verification_backend
+
+_EXTENDED_VERIFIER = verification_backend(IRKind.EXTENDED_EINSUM)
 
 
 def _cases() -> list[tuple[str, Callable[..., Any], tuple[torch.Tensor, ...]]]:
@@ -288,7 +291,7 @@ def test_native_v6_cpu_capability_matrix(
     )
     converted = convert_operator_graph(operator, output_dir=output)
     graph = yaml.safe_load(converted.path.read_text())
-    actual = IRGraphExecutor(graph, lifecycle)(*inputs)
+    actual = IRGraphExecutor(graph, _EXTENDED_VERIFIER)(*inputs)
     expected = reference(*inputs)
 
     assert graph["schema_version"] == EXTENDED_EINSUM_IR_SCHEMA_VERSION
@@ -297,7 +300,9 @@ def test_native_v6_cpu_capability_matrix(
     assert "kind: aten" not in serialized
     assert "exact_target:" not in serialized
     assert "overload:" not in serialized
-    analysis = IRGraphAnalyzer(validator=lifecycle.validate).analyze_graph(
+    analysis = IRGraphAnalyzer(
+        validator=extended_backend.validate
+    ).analyze_graph(
         converted.path,
         output / "analysis",
         copy_graph=False,
@@ -305,7 +310,7 @@ def test_native_v6_cpu_capability_matrix(
     )
     assert analysis is not None
     _assert_gradient_parity(
-        reference, IRGraphExecutor(graph, lifecycle), inputs
+        reference, IRGraphExecutor(graph, _EXTENDED_VERIFIER), inputs
     )
 
 
@@ -314,7 +319,7 @@ def test_native_registry_and_executor_are_independent_from_aten() -> None:
 
     required = {name for name, _, _ in _cases()} - {"einsum"}
     assert required <= set(NATIVE_OP_REGISTRY)
-    assert lifecycle.execute is extended.execute_extended_einsum_layer
+    assert _EXTENDED_VERIFIER.execute is extended.execute_extended_einsum_layer
     source = inspect.getsource(extended)
     assert "execute_aten_layer" not in source
     assert "torch.ops.aten" not in source
@@ -342,11 +347,11 @@ def test_aten_v6_cpu_capability_matrix(
         ir_kind=IRKind.ATEN,
     )
     graph = yaml.safe_load(converted.path.read_text())
-    aten_lifecycle = ir_lifecycle(IRKind.ATEN)
-    executor = IRGraphExecutor(graph, aten_lifecycle)
+    aten_backend = ir_backend(IRKind.ATEN)
+    executor = IRGraphExecutor(graph, verification_backend(IRKind.ATEN))
 
     torch.testing.assert_close(executor(*inputs), reference(*inputs))
-    analysis = IRGraphAnalyzer(validator=aten_lifecycle.validate).analyze_graph(
+    analysis = IRGraphAnalyzer(validator=aten_backend.validate).analyze_graph(
         converted.path,
         output / "analysis",
         copy_graph=False,
@@ -380,7 +385,7 @@ def test_nonzero_uses_one_bounded_runtime_symbol(tmp_path: Path) -> None:
     assert {item["symbol"] for item in descriptors} == {"nnz0"}
     assert {item["upper"] for item in descriptors} == {4}
 
-    executor = IRGraphExecutor(graph, lifecycle)
+    executor = IRGraphExecutor(graph, _EXTENDED_VERIFIER)
     for value in (torch.zeros(2, 2), torch.ones(2, 2)):
         actual = executor(value)
         expected = reference(value)
@@ -434,7 +439,7 @@ def test_native_effects_preserve_out_and_inplace_aliases(
     reference_inputs = tuple(item.clone() for item in inputs)
     executor_inputs = tuple(item.clone() for item in inputs)
     expected = reference(*reference_inputs)
-    actual = IRGraphExecutor(graph, lifecycle)(*executor_inputs)
+    actual = IRGraphExecutor(graph, _EXTENDED_VERIFIER)(*executor_inputs)
     torch.testing.assert_close(actual, expected)
     torch.testing.assert_close(
         executor_inputs[mutation_index], reference_inputs[mutation_index]

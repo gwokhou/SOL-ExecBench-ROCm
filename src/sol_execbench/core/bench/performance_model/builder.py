@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from functools import reduce
 from math import gcd
 from pathlib import Path
+from typing import Protocol
 
 from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticGovernanceStatus,
@@ -98,9 +99,6 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
     verify_artifact_file,
 )
-from sol_execbench.core.solar_bridge.performance import (
-    load_manifest_semantic_characterization,
-)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -113,6 +111,20 @@ class PerformanceDiagnosticBuildRequest:
     calibration_profile_path: Path | None = None
     inference_profile_path: Path | None = None
     frontier_trace_path: Path | None = None
+
+
+class SemanticCharacterizationLoader(Protocol):
+    """Boundary adapter for loading validated SOLAR semantics."""
+
+    def __call__(
+        self,
+        manifest_path: Path,
+        *,
+        workload_uuid: str,
+        definition: str,
+    ) -> SemanticCharacterization:
+        """Load one identity-bound semantic characterization."""
+        ...
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -156,9 +168,11 @@ class _WorkloadDiagnosticInputs:
 
 def build_performance_diagnostic(
     request: PerformanceDiagnosticBuildRequest,
+    *,
+    semantic_loader: SemanticCharacterizationLoader,
 ) -> PerformanceDiagnosticSidecar:
     """Validate all input identities and build one diagnostic-only sidecar."""
-    evidence = _load_build_evidence(request)
+    evidence = _load_build_evidence(request, semantic_loader=semantic_loader)
     manifest = evidence.manifest
     workload = _workload_diagnostic(
         _WorkloadDiagnosticInputs(
@@ -225,6 +239,8 @@ def build_performance_diagnostic(
 
 def _load_build_evidence(
     request: PerformanceDiagnosticBuildRequest,
+    *,
+    semantic_loader: SemanticCharacterizationLoader,
 ) -> _BuildEvidence:
     manifest = load_and_verify_performance_evidence_manifest(
         request.evidence_manifest_path
@@ -263,7 +279,7 @@ def _load_build_evidence(
         timing,
         compiled,
     )
-    semantic = load_manifest_semantic_characterization(
+    semantic = semantic_loader(
         request.solar_manifest_path,
         workload_uuid=trace.workload.uuid,
         definition=trace.definition,
@@ -1351,5 +1367,6 @@ def _manifest_references(
 
 __all__ = [
     "PerformanceDiagnosticBuildRequest",
+    "SemanticCharacterizationLoader",
     "build_performance_diagnostic",
 ]

@@ -195,6 +195,40 @@ def test_coupling_resolves_imports_cycles_and_boundaries(
     assert not coupling.is_under("solar.graphical", "solar.graph")
 
 
+def test_coupling_rejects_domain_cycles_without_module_cycles(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    coupling = load_script("scripts/check_coupling.py")
+    modules = {
+        "sol_execbench.cli.entry": tmp_path / "entry.py",
+        "sol_execbench.cli.output": tmp_path / "output.py",
+        "sol_execbench.core.scoring.runner": tmp_path / "runner.py",
+        "sol_execbench.core.scoring.models": tmp_path / "models.py",
+    }
+    edges = {
+        (
+            "sol_execbench.cli.entry",
+            "sol_execbench.core.scoring.runner",
+        ),
+        (
+            "sol_execbench.core.scoring.models",
+            "sol_execbench.cli.output",
+        ),
+    }
+
+    assert coupling.strongly_connected_components(modules, edges) == []
+    assert coupling.architecture_domain_cycles(modules, edges) == [
+        ("sol_execbench.cli", "sol_execbench.core.scoring"),
+    ]
+    assert coupling.layer_violations(edges) == [
+        (
+            "sol_execbench.core.scoring.models",
+            "sol_execbench.cli.output",
+        ),
+    ]
+
+
 def test_coupling_limit_failures_include_lines_fanout_and_exact_imports(
     load_script,
 ) -> None:

@@ -12,9 +12,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.integrity import GitSourceState, verify_git_source_state
 from sol_execbench.core.integrity.schema_versions import (
     RELEASE_ENVIRONMENT_SCHEMA_VERSION,
+)
+from sol_execbench.core.platform.source_state import (
+    GitSourceState,
+    verify_git_source_state,
 )
 
 CONTAINER_IMAGE_ID_ENV = "SOL_EXECBENCH_CONTAINER_IMAGE_ID"

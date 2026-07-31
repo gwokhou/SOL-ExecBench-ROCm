@@ -15,14 +15,9 @@ from sol_execbench.core.integrity.checksums import (
     stable_json_checksum,
 )
 from sol_execbench.core.integrity.schema_versions import CURRENT_SCHEMA_VERSIONS
-from sol_execbench.core.integrity.source_state import (
-    GitSourceState,
-    verify_git_source_state,
-)
 
 __all__ = [
     "CURRENT_SCHEMA_VERSIONS",
-    "GitSourceState",
     "SHA256Digest",
     "sha256_bytes",
     "sha256_file",
@@ -30,5 +25,4 @@ __all__ = [
     "validate_relative_artifact_path",
     "validate_sha256",
     "verify_artifact_file",
-    "verify_git_source_state",
 ]

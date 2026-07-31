@@ -9,6 +9,7 @@ import torch
 import yaml
 
 from solar import api, pipeline
+from solar.analysis import graph_analyzer
 from solar.analysis.orojenesis import OrojenesisError
 from solar.api import (
     AnalysisFailure,
@@ -21,8 +22,10 @@ from solar.contracts import SolarStage
 from solar.graph.extraction import OperatorGraphArtifact
 from solar.ir.contracts import IRKind, IRPath
 from solar.ir.conversion import IRGraphArtifact
-from solar.ir.registry import ir_lifecycle
-from solar.pipeline import analysis as analysis_pipeline
+from solar.pipeline import (
+    analysis as analysis_pipeline,
+    stages as pipeline_stages,
+)
 from solar.verification import VerificationError
 
 
@@ -610,21 +613,25 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
             return {"schema_version": 4}
 
     monkeypatch.setattr(
-        "solar.analysis.graph_analyzer.OrojenesisRunner",
+        graph_analyzer,
+        "OrojenesisRunner",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("runner must not be constructed"),
         ),
     )
     monkeypatch.setattr(
-        "solar.analysis.graph_analyzer.IRGraphAnalyzer",
+        graph_analyzer,
+        "IRGraphAnalyzer",
         FakeAnalyzer,
     )
 
-    result = ir_lifecycle(IRKind.ATEN).analyze(
+    graph_path = tmp_path / "ir_graph.yaml"
+    graph_path.write_text("ir_kind: aten\n", encoding="utf-8")
+    result = pipeline_stages.analyze_request_graph(
         _request(tmp_path / "result"),
         cast(Any, _Profile()),
         tmp_path,
-        IRGraphArtifact(tmp_path / "ir_graph.yaml", IRKind.ATEN),
+        IRGraphArtifact(graph_path, IRKind.ATEN),
     )
 
     assert result == {"schema_version": 4}

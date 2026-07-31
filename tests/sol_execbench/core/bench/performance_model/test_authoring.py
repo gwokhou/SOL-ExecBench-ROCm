@@ -15,6 +15,10 @@ from sol_execbench.core.bench.performance_model.validation_corpus import (
 from sol_execbench.core.integrity import sha256_file
 
 
+def _unused_semantic_loader(*_args, **_kwargs):
+    raise AssertionError("semantic loader should be passed through only")
+
+
 def _case(
     tmp_path: Path,
     *,
@@ -71,7 +75,7 @@ def test_case_identity_is_derived_from_bound_evidence(
     monkeypatch.setattr(
         authoring,
         "build_performance_diagnostic",
-        lambda _request: diagnostic,
+        lambda _request, **_kwargs: diagnostic,
     )
 
     result = authoring._build_case_diagnostic(
@@ -79,6 +83,7 @@ def test_case_identity_is_derived_from_bound_evidence(
         corpus_path=tmp_path / "corpus.json",
         calibration_path=tmp_path / "calibration.json",
         inference_path=None,
+        semantic_loader=_unused_semantic_loader,
     )
 
     assert result is diagnostic
@@ -107,7 +112,7 @@ def test_case_rejects_forged_pair_or_family(
     monkeypatch.setattr(
         authoring,
         "build_performance_diagnostic",
-        lambda _request: SimpleNamespace(
+        lambda _request, **_kwargs: SimpleNamespace(
             workloads=[
                 SimpleNamespace(
                     semantic=SimpleNamespace(
@@ -124,6 +129,7 @@ def test_case_rejects_forged_pair_or_family(
             corpus_path=tmp_path / "corpus.json",
             calibration_path=tmp_path / "calibration.json",
             inference_path=None,
+            semantic_loader=_unused_semantic_loader,
         )
     with pytest.raises(ValueError, match="workload family mismatch"):
         authoring._build_case_diagnostic(
@@ -135,4 +141,5 @@ def test_case_rejects_forged_pair_or_family(
             corpus_path=tmp_path / "corpus.json",
             calibration_path=tmp_path / "calibration.json",
             inference_path=None,
+            semantic_loader=_unused_semantic_loader,
         )

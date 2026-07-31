@@ -12,7 +12,7 @@ from sol_execbench_type_helpers import (
     make_workload,
 )
 
-from sol_execbench.cli.protocol import CliExitCode, CliFailure, CliResult
+from sol_execbench.cli.commands import baseline as baseline_command
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
@@ -23,6 +23,11 @@ from sol_execbench.core.scoring.release_models import (
     ReleaseExecutionPlan,
     ReleaseRunKind,
 )
+from sol_execbench.core.scoring.release_runner import (
+    ReleaseEvaluationError,
+    ReleaseEvaluationRequest,
+    ReleaseEvaluationResult,
+)
 
 
 class _TraceResult:
@@ -31,6 +36,13 @@ class _TraceResult:
 
     def is_successful(self) -> bool:
         return self.successful
+
+
+def _unused_evaluator(
+    request: ReleaseEvaluationRequest,
+) -> ReleaseEvaluationResult:
+    del request
+    return ReleaseEvaluationResult(exit_code=0)
 
 
 def _plan(
@@ -92,6 +104,7 @@ def test_execute_release_plan_summarizes_candidate_results(
     result = release_runner.execute_release_plan(
         tmp_path / "workspace/plans/plan.json",
         corpus_manifest_path=tmp_path / "manifest.yaml",
+        evaluator=_unused_evaluator,
         timeout_seconds=17,
         resume=True,
         device="cuda:1",
@@ -140,6 +153,7 @@ def test_execute_release_plan_rejects_incomplete_baseline(
         release_runner.execute_release_plan(
             tmp_path / "workspace/plans/plan.json",
             corpus_manifest_path=tmp_path / "manifest.yaml",
+            evaluator=_unused_evaluator,
         )
 
 
@@ -371,6 +385,7 @@ def test_execute_problem_covers_resume_and_missing_trace(
             timeout_seconds=5,
             resume=True,
             device="cuda:0",
+            evaluator=_unused_evaluator,
         )
         is expected
     )
@@ -383,14 +398,10 @@ def test_execute_problem_covers_resume_and_missing_trace(
             timeout_seconds=5,
             resume=False,
             device="cuda:0",
+            evaluator=_unused_evaluator,
         )
 
     trace_path.unlink()
-    monkeypatch.setattr(
-        release_runner,
-        "run_evaluation_cli",
-        lambda **_kwargs: CliResult(),
-    )
     with pytest.raises(ValueError, match="produced no trace"):
         release_runner._execute_problem(
             _plan(),
@@ -400,6 +411,7 @@ def test_execute_problem_covers_resume_and_missing_trace(
             timeout_seconds=5,
             resume=False,
             device="cuda:0",
+            evaluator=_unused_evaluator,
         )
 
 
@@ -410,17 +422,17 @@ def test_execute_problem_converts_candidate_cli_failure(
     problem, corpus, solution_path = _problem(tmp_path)
     _stub_solution(monkeypatch, solution_path)
     expected = [cast(Trace, object())]
-    monkeypatch.setattr(
-        release_runner,
-        "run_evaluation_cli",
-        lambda **_kwargs: (_ for _ in ()).throw(
-            CliFailure(
-                "timed out",
-                code="evaluation_timeout",
-                exit_code=CliExitCode.EXECUTION,
-            ),
-        ),
-    )
+
+    def fail_evaluation(
+        request: ReleaseEvaluationRequest,
+    ) -> ReleaseEvaluationResult:
+        del request
+        raise ReleaseEvaluationError(
+            "timed out",
+            code="evaluation_timeout",
+            exit_code=4,
+        )
+
     writes: list[Path] = []
 
     def write_failure(path, **_kwargs):
@@ -447,6 +459,7 @@ def test_execute_problem_converts_candidate_cli_failure(
         timeout_seconds=5,
         resume=False,
         device="cuda:0",
+        evaluator=fail_evaluation,
     )
 
     assert result is expected
@@ -503,10 +516,10 @@ def test_candidate_failure_writes_one_bounded_trace_per_workload(
         trace_path,
         problem_dir=problem_dir,
         solution=solution,
-        failure=CliFailure(
+        failure=ReleaseEvaluationError(
             "timeout " + "x" * 9000,
             code="evaluation_timeout",
-            exit_code=CliExitCode.EXECUTION,
+            exit_code=4,
         ),
         device="cpu",
     )
@@ -532,15 +545,29 @@ def test_candidate_failure_writes_one_bounded_trace_per_workload(
 
 def test_evaluation_request_is_hardened_and_caps_compile_timeout(
     tmp_path,
+    monkeypatch,
 ) -> None:
-    request = release_runner._evaluation_request(
-        tmp_path / "problem",
-        tmp_path / "solution.json",
-        tmp_path / "trace.jsonl",
-        timeout_seconds=900,
-        device="cuda:1",
+    observed = []
+    monkeypatch.setattr(
+        baseline_command,
+        "run_evaluation_cli",
+        lambda *, request: (
+            observed.append(request) or SimpleNamespace(exit_code=0)
+        ),
     )
 
+    result = baseline_command._evaluate_release_problem(
+        ReleaseEvaluationRequest(
+            problem_dir=tmp_path / "problem",
+            solution_path=tmp_path / "solution.json",
+            trace_path=tmp_path / "trace.jsonl",
+            timeout_seconds=900,
+            device="cuda:1",
+        ),
+    )
+    request = observed[0]
+
+    assert result == ReleaseEvaluationResult(exit_code=0)
     assert request.compile_timeout == 300
     assert request.timeout == 900
     assert request.device == "cuda:1"

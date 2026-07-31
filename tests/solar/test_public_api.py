@@ -34,8 +34,8 @@ def test_solar_public_api_exposes_only_atomic_pipeline() -> None:
 def test_stage_packages_do_not_advertise_legacy_bypass_apis() -> None:
     assert solar.analysis.__all__ == []
     assert solar.ir.extended_einsum.__all__ == [
+        "backend",
         "convert_operator_graph",
-        "lifecycle",
         "validate_extended_einsum_graph",
     ]
     assert solar.graph.__all__ == [

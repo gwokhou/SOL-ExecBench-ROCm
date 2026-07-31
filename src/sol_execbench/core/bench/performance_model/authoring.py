@@ -16,6 +16,7 @@ from sol_execbench.core.bench.performance_model.acceptance import (
 from sol_execbench.core.bench.performance_model.attribution import action_scores
 from sol_execbench.core.bench.performance_model.builder import (
     PerformanceDiagnosticBuildRequest,
+    SemanticCharacterizationLoader,
     build_performance_diagnostic,
 )
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
@@ -50,6 +51,7 @@ def fit_diagnostic_inference_profile(
     *,
     development_corpus_path: Path,
     calibration_profile_path: Path,
+    semantic_loader: SemanticCharacterizationLoader,
 ) -> DiagnosticInferenceProfile:
     """Fit only from a declared development corpus and frozen calibration."""
     corpus = load_json_file(
@@ -70,6 +72,7 @@ def fit_diagnostic_inference_profile(
             case,
             corpus_path=development_corpus_path,
             calibration_path=calibration_profile_path,
+            semantic_loader=semantic_loader,
         )
         for case in corpus.cases
     ]
@@ -90,6 +93,7 @@ def build_diagnostic_acceptance(
     held_out_corpus_path: Path,
     calibration_profile_path: Path,
     inference_profile_path: Path,
+    semantic_loader: SemanticCharacterizationLoader,
 ) -> tuple[DiagnosticAcceptanceManifest, DiagnosticAcceptanceResult]:
     """Evaluate the frozen profile once against disjoint held-out evidence."""
     development = load_json_file(
@@ -119,6 +123,7 @@ def build_diagnostic_acceptance(
             corpus_path=held_out_corpus_path,
             calibration_path=calibration_profile_path,
             inference_path=inference_profile_path,
+            semantic_loader=semantic_loader,
         )
         for case in held_out.cases
     ]
@@ -140,12 +145,14 @@ def _development_observation(
     *,
     corpus_path: Path,
     calibration_path: Path,
+    semantic_loader: SemanticCharacterizationLoader,
 ) -> InferenceObservation:
     diagnostic = _build_case_diagnostic(
         case,
         corpus_path=corpus_path,
         calibration_path=calibration_path,
         inference_path=None,
+        semantic_loader=semantic_loader,
     )
     workload = diagnostic.workloads[0]
     predicted_ms, lower_ms, upper_ms = _prediction_values(workload.t_pred_hw)
@@ -173,12 +180,14 @@ def _acceptance_case(
     corpus_path: Path,
     calibration_path: Path,
     inference_path: Path,
+    semantic_loader: SemanticCharacterizationLoader,
 ) -> DiagnosticAcceptanceCase:
     diagnostic = _build_case_diagnostic(
         case,
         corpus_path=corpus_path,
         calibration_path=calibration_path,
         inference_path=inference_path,
+        semantic_loader=semantic_loader,
     )
     workload = diagnostic.workloads[0]
     predicted_ms, lower_ms, upper_ms = _prediction_values(workload.t_pred_hw)
@@ -209,6 +218,7 @@ def _build_case_diagnostic(
     corpus_path: Path,
     calibration_path: Path,
     inference_path: Path | None,
+    semantic_loader: SemanticCharacterizationLoader,
 ) -> PerformanceDiagnosticSidecar:
     evidence = _verified_case_path(
         corpus_path,
@@ -235,7 +245,8 @@ def _build_case_diagnostic(
             / ".diagnostic-authoring-unused.json",
             calibration_profile_path=calibration_path,
             inference_profile_path=inference_path,
-        )
+        ),
+        semantic_loader=semantic_loader,
     )
     if len(diagnostic.workloads) != 1:
         raise ValueError("validation case must produce one workload")

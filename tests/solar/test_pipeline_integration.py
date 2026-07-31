@@ -14,7 +14,8 @@ from solar.graph.contracts import ExtractionKind
 from solar.graph.extraction import extract_operator_graph
 from solar.ir.contracts import IRKind
 from solar.ir.conversion import convert_operator_graph
-from solar.ir.registry import ir_lifecycle
+from solar.ir.registry import ir_backend
+from solar.verification.registry import verification_backend
 from solar.verification.verify import IRGraphExecutor
 
 
@@ -252,7 +253,9 @@ def test_cpu_pipeline_preserves_reference_semantics(
     )
     graph = yaml.safe_load(converted.path.read_text())
 
-    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    actual = IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
+        *inputs
+    )
 
     torch.testing.assert_close(actual, reference(*inputs), equal_nan=True)
     assert sorted(graph["source_input_indices"]) == sorted(
@@ -260,7 +263,7 @@ def test_cpu_pipeline_preserves_reference_semantics(
     )
     assert graph["outputs"]
     analysis = IRGraphAnalyzer(
-        validator=ir_lifecycle(graph["ir_kind"]).validate,
+        validator=ir_backend(graph["ir_kind"]).validate,
     ).analyze_graph(
         converted.path,
         output / "analysis",
@@ -310,7 +313,7 @@ def test_extraction_preserves_source_positions_when_use_order_differs(
     assert artifact.used_source_indices == (0, 1)
     converted = convert_operator_graph(artifact, output_dir=tmp_path)
     graph = yaml.safe_load(converted.path.read_text())
-    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(
+    actual = IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
         torch.ones(2),
         torch.full((2,), 3.0),
     )
@@ -342,7 +345,9 @@ def test_torchview_preserves_repeated_use_of_one_source_input(
 
     assert graph["source_input_indices"] == [0]
     assert add["tensor_names"]["inputs"][0] == add["tensor_names"]["inputs"][1]
-    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    actual = IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
+        *inputs
+    )
     torch.testing.assert_close(actual, reference(*inputs))
 
 
@@ -376,7 +381,7 @@ def test_torchview_preserves_internal_scalar_tensor_edges(
         )
         == 2
     )
-    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(
+    actual = IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
         *inputs[:2],
     )
     torch.testing.assert_close(actual, _scalar_tensor_chain(*inputs))
@@ -404,7 +409,9 @@ def test_torchview_binds_tensor_keyword_arguments_to_source_positions(
     graph = yaml.safe_load(converted.path.read_text())
 
     assert graph["source_input_indices"] == [0, 1, 2, 3, 4]
-    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    actual = IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
+        *inputs
+    )
     torch.testing.assert_close(
         actual,
         _batch_norm_with_tensor_kwargs(*inputs),
@@ -437,7 +444,9 @@ def test_torchview_linear_preserves_external_weight_and_bias(
     assert "source_node_remap" not in graph
     assert "_source_node_remap" not in graph
     assert "_source_node_remap" not in renamed_graph
-    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    actual = IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
+        *inputs
+    )
     torch.testing.assert_close(actual, _linear(*inputs))
 
 
@@ -478,7 +487,9 @@ def test_torchview_preserves_exact_reduction_and_nonfinite_semantics(
     converted = convert_operator_graph(operator, output_dir=tmp_path)
     graph = yaml.safe_load(converted.path.read_text())
 
-    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    actual = IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
+        *inputs
+    )
     torch.testing.assert_close(
         actual,
         reference(*inputs),
@@ -532,7 +543,9 @@ def test_torchview_preserves_independent_multi_output_slots(
     assert len(operation["tensor_names"]["outputs"]) == len(output_dtypes)
     assert operation["tensor_dtypes"]["outputs"] == output_dtypes
     assert len(graph["outputs"]) == len(output_dtypes)
-    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    actual = IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
+        *inputs
+    )
     expected = reference(*inputs)
     assert len(actual) == len(expected)
     for observed, wanted in zip(actual, expected, strict=True):
@@ -581,7 +594,9 @@ def test_canonical_extraction_preserves_explicit_backward_reference(
     assert any(
         layer.get("phase") == "reference" for layer in graph["layers"].values()
     )
-    actual = IRGraphExecutor(graph, ir_lifecycle(graph["ir_kind"]))(*inputs)
+    actual = IRGraphExecutor(graph, verification_backend(graph["ir_kind"]))(
+        *inputs
+    )
     torch.testing.assert_close(actual, reference(*inputs))
 
 

@@ -17,9 +17,13 @@ from sol_execbench.core.scoring.release_environment import (
 )
 from sol_execbench.core.scoring.release_models import SolarIndexStatement
 from sol_execbench.core.scoring.release_solar import verify_solar_index
-from sol_execbench.core.solar_bridge.models import SolarWorkerRequest
+from sol_execbench.core.solar_bridge.models import (
+    DEFAULT_IR_PATH,
+    IRPath,
+    SolarWorkerRequest,
+    normalize_ir_path,
+)
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
-from solar.ir.contracts import DEFAULT_IR_PATH, IRPath, normalize_ir_path
 
 
 @dataclass(frozen=True, slots=True)

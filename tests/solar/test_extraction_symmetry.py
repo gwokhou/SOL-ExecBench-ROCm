@@ -25,8 +25,9 @@ from solar.graph.extraction import extract_operator_graph
 from solar.graph.registry import extraction_backends
 from solar.ir.contracts import DEFAULT_IR_KIND, DEFAULT_IR_PATH, IRKind, IRPath
 from solar.ir.conversion import convert_operator_graph
-from solar.ir.registry import ir_lifecycle, ir_lifecycles
+from solar.ir.registry import ir_backends
 from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
+from solar.verification.registry import verification_backend
 
 
 def _matmul(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
@@ -146,7 +147,7 @@ def test_extended_einsum_is_default_and_backends_are_first_class(
     assert request.ir_path is IRPath.TORCHVIEW_EXTENDED_EINSUM
     assert request.extraction_kind is ExtractionKind.TORCHVIEW
     assert request.ir_kind is IRKind.EXTENDED_EINSUM
-    assert {lifecycle.kind for lifecycle in ir_lifecycles()} == {
+    assert {backend.kind for backend in ir_backends()} == {
         IRKind.ATEN,
         IRKind.EXTENDED_EINSUM,
     }
@@ -154,8 +155,8 @@ def test_extended_einsum_is_default_and_backends_are_first_class(
         ExtractionKind.MAKE_FX_REFERENCE,
         ExtractionKind.TORCHVIEW,
     }
-    assert ir_lifecycle(DEFAULT_IR_KIND).verify.__module__ == (
-        "solar.ir.extended_einsum.lifecycle"
+    assert verification_backend(DEFAULT_IR_KIND).execute.__module__ == (
+        "solar.verification.extended"
     )
 
 
@@ -171,7 +172,7 @@ def test_extraction_kinds_are_distinct() -> None:
         (ExtractionKind.MAKE_FX_REFERENCE, IRKind.EXTENDED_EINSUM),
     ],
 )
-def test_ir_lifecycle_rejects_cross_path_combinations(
+def test_ir_backend_rejects_cross_path_combinations(
     tmp_path: Path,
     extraction_kind: ExtractionKind,
     ir_kind: IRKind,

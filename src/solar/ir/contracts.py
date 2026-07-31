@@ -12,16 +12,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 from solar.artifacts import ArtifactDocument, load_yaml_artifact
 from solar.errors import StrictConversionError, UnsupportedOperationError
 from solar.graph.contracts import ExtractionKind, OperatorGraphArtifact
 from solar.types import DynamicValue
-from solar.verification.contracts import VerificationPolicy
-
-if TYPE_CHECKING:
-    from solar.rocm.architecture import ArchitectureProfile
 
 
 class IRKind(StrEnum):
@@ -93,7 +89,7 @@ class IRGraphArtifact:
 
 
 class IRConversionRequest(Protocol):
-    """Read-only request boundary used by IR conversion and verification."""
+    """Read-only request boundary used by extraction and IR conversion."""
 
     @property
     def analysis_id(self) -> str: ...
@@ -125,68 +121,15 @@ class IRConversionRequest(Protocol):
     @property
     def trace_seed(self) -> int: ...
 
-    @property
-    def verification_seeds(self) -> tuple[int, ...]: ...
-
-    @property
-    def atol(self) -> float: ...
-
-    @property
-    def rtol(self) -> float: ...
-
-    @property
-    def required_matched_ratio(self) -> float: ...
-
-    @property
-    def max_error_cap(self) -> float | None: ...
-
-    @property
-    def allow_negative_inf(self) -> bool: ...
-
-    @property
-    def verification(self) -> VerificationPolicy: ...
-
-
-class IRAnalysisRequest(IRConversionRequest, Protocol):
-    """Read-only request boundary used by an IR's analysis stage."""
-
-    @property
-    def precision(self) -> str: ...
-
-    @property
-    def require_orojenesis(self) -> bool: ...
-
-    @property
-    def orojenesis_home(self) -> str | Path | None: ...
-
 
 @dataclass(frozen=True)
-class IRLifecycle:
-    """Complete interface implemented by every SOLAR IR dialect.
-
-    The lifecycle owns validation, conversion, execution, verification, and
-    formal analysis. Registering a dialect therefore has exactly one dispatch
-    boundary and does not require parallel workflow registries.
-    """
+class IRBackend:
+    """Representation and conversion interface for one SOLAR IR dialect."""
 
     kind: IRKind
     extractions: frozenset[ExtractionKind]
     validate: Callable[[Mapping[str, Any]], None]
     convert: Callable[[OperatorGraphArtifact, str | Path], IRGraphArtifact]
-    execute: Callable[
-        [str, Mapping[str, Any], Sequence[Any], Sequence[tuple[int, ...]]],
-        Any,
-    ]
-    verify: Callable[[IRConversionRequest, IRGraphArtifact, Path], None]
-    analyze: Callable[
-        [
-            IRAnalysisRequest,
-            ArchitectureProfile,
-            Path,
-            IRGraphArtifact,
-        ],
-        dict[str, DynamicValue],
-    ]
 
 
 def normalize_ir_kind(value: IRKind | str) -> IRKind:
@@ -279,11 +222,10 @@ __all__ = [
     "DEFAULT_IR_PATH",
     "INPUT_KIND",
     "OPERATION_KIND",
-    "IRAnalysisRequest",
+    "IRBackend",
     "IRConversionRequest",
     "IRGraphArtifact",
     "IRKind",
-    "IRLifecycle",
     "IRPath",
     "LayerContractionAnalysis",
     "StrictConversionError",

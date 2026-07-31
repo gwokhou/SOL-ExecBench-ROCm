@@ -59,23 +59,22 @@ def test_only_solar_bridge_imports_solar_from_outer_package():
 
 def test_ir_backends_are_independent_implementations():
     backend_modules = {
-        "aten/lifecycle.py": (
-            "solar.ir.aten.conversion",
-            "solar.verification.aten",
-        ),
-        "extended_einsum/lifecycle.py": (
-            "solar.ir.extended_einsum.lifecycle",
-            "solar.verification.aten",
-        ),
+        "aten/backend.py": "solar.ir.aten.conversion",
+        "extended_einsum/backend.py": ("solar.ir.extended_einsum.conversion"),
     }
     ir_root = REPO_ROOT / "src" / "solar" / "ir"
-    backend_names = {item[0] for item in backend_modules.values()}
-    executor_names = {item[1] for item in backend_modules.values()}
-    for relative_path, (own_module, own_executor) in backend_modules.items():
+    backend_names = set(backend_modules.values())
+    for relative_path, own_module in backend_modules.items():
         imports = _imports(ir_root / relative_path)
         assert not (imports & (backend_names - {own_module}))
-        assert not (imports & (executor_names - {own_executor}))
         assert "solar.ir.registry" not in imports
+        assert not {
+            imported
+            for imported in imports
+            if imported.startswith(
+                ("solar.analysis", "solar.pipeline", "solar.verification")
+            )
+        }
 
     analysis_imports = {
         imported
@@ -83,11 +82,6 @@ def test_ir_backends_are_independent_implementations():
         for imported in _imports(path)
     }
     assert not (analysis_imports & backend_names)
-
-    orchestration_imports = _imports(
-        REPO_ROOT / "src" / "solar" / "verification" / "verify.py",
-    )
-    assert not (orchestration_imports & executor_names)
 
 
 def test_public_workflows_do_not_import_concrete_route_implementations():

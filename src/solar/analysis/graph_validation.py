@@ -34,7 +34,7 @@ def validate_current_ir_schema(graph: Mapping[str, ArtifactValue]) -> None:
 
 
 def accept_prevalidated_graph(graph: Mapping[str, ArtifactValue]) -> None:
-    """Require the discriminator proven by an enclosing IR lifecycle."""
+    """Require the discriminator proven by an enclosing IR backend."""
     if not isinstance(graph.get("ir_kind"), str):
         raise ValueError("IR graph has no explicit ir_kind discriminator")
 

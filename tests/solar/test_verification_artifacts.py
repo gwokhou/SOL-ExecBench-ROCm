@@ -9,9 +9,9 @@ import torch
 import yaml
 
 from solar.ir.contracts import IRKind
-from solar.ir.registry import ir_lifecycle
 from solar.schema_versions import ATEN_IR_SCHEMA_VERSION
 from solar.verification import numerics, verify as verification
+from solar.verification.registry import verification_backend
 from solar.verification.verify import VerificationError
 
 REFERENCE_SOURCE = """
@@ -96,7 +96,7 @@ def test_create_and_replay_source_verification_artifact(
         workload_parameters={},
         output_path=output,
         policy=verification.VerificationPolicy(atol=0.0, rtol=0.0),
-        lifecycle=ir_lifecycle(IRKind.ATEN),
+        backend=verification_backend(IRKind.ATEN),
     )
 
     assert yaml.safe_load(output.read_text()) == artifact
@@ -111,7 +111,7 @@ def test_create_and_replay_source_verification_artifact(
             atol=0.0,
             rtol=0.0,
         ),
-        lifecycle=ir_lifecycle(IRKind.ATEN),
+        backend=verification_backend(IRKind.ATEN),
     )
 
 
@@ -130,7 +130,7 @@ def test_callable_verification_writes_hash_bound_attestation(
         graph_path=graph,
         output_path=output,
         policy=verification.VerificationPolicy(atol=0.0, rtol=0.0),
-        lifecycle=ir_lifecycle(IRKind.ATEN),
+        backend=verification_backend(IRKind.ATEN),
     )
 
     assert artifact["subject"][0]["digest"]["sha256"] == "a" * 64
@@ -204,7 +204,7 @@ def test_artifact_creation_rejects_weak_case_sets(
         "graph_path": graph,
         "output_path": tmp_path / "out.yaml",
         "policy": verification.VerificationPolicy(atol=0.0, rtol=0.0),
-        "lifecycle": ir_lifecycle(IRKind.ATEN),
+        "backend": verification_backend(IRKind.ATEN),
     }
     if function is verification.create_verification_artifact:
         common.update(
@@ -233,7 +233,7 @@ def test_run_cases_validates_source_input_indices(verification_files) -> None:
     common: dict[str, Any] = {
         "reference": lambda *values: values[0],
         "input_factory": lambda parameters, device: [torch.ones(2, 2), 4],
-        "lifecycle": ir_lifecycle(IRKind.ATEN),
+        "backend": verification_backend(IRKind.ATEN),
         "cases": cases,
         "tolerance": verification.TolerancePolicy(atol=0.0, rtol=0.0),
         "device": "cpu",
@@ -463,7 +463,7 @@ def source_artifact(tmp_path: Path, verification_files):
             workload_parameters={},
             output_path=tmp_path / "verification.yaml",
             policy=verification.VerificationPolicy(atol=0.0, rtol=0.0),
-            lifecycle=ir_lifecycle(IRKind.ATEN),
+            backend=verification_backend(IRKind.ATEN),
         ),
         reference,
         graph,
@@ -547,7 +547,7 @@ def test_replay_rejects_untrusted_artifact_mutations(
                 atol=0.0,
                 rtol=0.0,
             ),
-            lifecycle=ir_lifecycle(IRKind.ATEN),
+            backend=verification_backend(IRKind.ATEN),
         )
 
 
@@ -563,7 +563,7 @@ def test_replay_rejects_subject_digest_mismatches(source_artifact) -> None:
             workload_name="identity",
             workload_parameters={},
             required_tolerance=verification.TolerancePolicy(atol=0, rtol=0),
-            lifecycle=ir_lifecycle(IRKind.ATEN),
+            backend=verification_backend(IRKind.ATEN),
         )
     changed = deepcopy(artifact)
     changed["subject"][1]["digest"]["sha256"] = "0" * 64
@@ -575,7 +575,7 @@ def test_replay_rejects_subject_digest_mismatches(source_artifact) -> None:
             workload_name="identity",
             workload_parameters={},
             required_tolerance=verification.TolerancePolicy(atol=0, rtol=0),
-            lifecycle=ir_lifecycle(IRKind.ATEN),
+            backend=verification_backend(IRKind.ATEN),
         )
 
 
