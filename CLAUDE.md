@@ -14,8 +14,8 @@ library categories while rejecting legacy CUDA/NVIDIA runtime metadata.
 # Install dependencies (uses uv package manager)
 uv sync --all-groups
 
-# Run the CLI
-uv run sol-execbench <problem_dir> --solution <solution-path>
+# Run the CLI (evaluate is a required top-level subcommand)
+uv run sol-execbench evaluate <problem_dir> --solution <solution-path>
 
 # Run all tests
 uv run pytest tests/
@@ -64,8 +64,8 @@ Kernel solutions use either **destination-passing style** (DPS, modifies pre-all
 
 ## Style
 
-Ruff for linting and formatting. Rule E741 is ignored. `data/` and `examples/`
-are excluded from lint.
+Ruff for linting and formatting. Rule E741 is ignored. `data/` is excluded from
+lint.
 
 ## Commits
 

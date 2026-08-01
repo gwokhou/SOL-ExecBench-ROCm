@@ -38,3 +38,21 @@ missing, retired, or future versions before validating business fields.
 Repository manifests, readiness matrices, diagnostic audits, CLI envelopes,
 and SOLAR request manifests follow the same rule through their own strict
 nested models.
+
+## Non-canonical local evidence
+
+`data/calibration/` and `data/local-evidence/` hold gfx1200 diagnostic evidence
+left over from local ROCm port work. They are git-ignored (`/data/*`),
+unreferenced by `src/`, `scripts/`, or `tests/`, and carry schema identifiers
+(under the `sol_execbench.` namespace) absent from `schema_versions.py`:
+
+- `hardware_calibration` v1 and v2
+- `amd_hardware_model` v3
+- `fusion_validation` v1
+- `hardware_profile_requirements` v1
+- `representative_suite` v1
+
+Governance decision (2026-08-01): these are non-canonical local evidence, not
+corpus. Their identifiers must **not** be registered, and the files must **not**
+be wired into evaluation or SOLAR consumption. A `NON_CANONICAL.md` marker in
+each directory records the same decision on disk.

@@ -10,7 +10,8 @@ sol_execbench.core.solar_bridge  (the only outer package allowed to import solar
                  |
                  v
 solar.api
-  Graph Extractor -> strict extended-einsum converter -> SOL Analyzer
+  architecture -> graph extraction -> strict extended-einsum conversion
+  -> conversion verification -> formal analysis
                  |
                  v
 hash-bound graphs, conversion proof, formal lower bound

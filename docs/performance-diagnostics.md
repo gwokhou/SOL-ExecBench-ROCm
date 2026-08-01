@@ -14,7 +14,7 @@ sol-execbench --format json evaluate PROBLEM_DIR \
   --workload-uuid WORKLOAD_UUID \
   --profile rocprofv3-counters \
   --static-evidence auto \
-  --output TRACE.jsonl
+  --trace-output TRACE.jsonl
 ```
 
 The unprofiled canonical run executes first. Only after it succeeds does

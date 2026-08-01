@@ -4,8 +4,9 @@
 
 Production code is in `src/sol_execbench/` (Click CLI, benchmarks, platform
 evidence, drivers) and `src/solar/` (graphs, IR, verification, formal analysis).
-Mirror these under `tests/`; keep workflows in `tests/examples/`, kernels in
-`examples/`, Docker support in `docker/`, and maintenance in `scripts/`.
+Mirror these under `tests/`; keep sample kernels under
+`tests/sol_execbench/samples/`, Docker support in `docker/`, and maintenance in
+`scripts/`.
 Downloaded/generated data belongs under uncommitted `data/`.
 
 ## Commands and Verification
