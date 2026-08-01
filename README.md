@@ -76,7 +76,7 @@ local provenance manifest is rejected:
 uv run sol-execbench solar analyze \
   problems/local/AMD_AKA/gfx1200/torch2hip/l1n36_rmsnorm \
   --workload aka-l1n36_rmsnorm-w0 \
-  --orojenesis-home /path/to/pinned/timeloop \
+  --orojenesis-home /path/to/pinned/orojenesis \
   --output out/solar/norm_forward_bf16
 ```
 

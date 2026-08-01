@@ -75,7 +75,7 @@ an appropriate device and filesystem policy.
 
 | Stage code | Owner | Input | Canonical output |
 | --- | --- | --- | --- |
-| `architecture` | `solar.rocm` | pinned architecture profile | verified architecture identity |
+| `architecture` | `solar.rocm.architecture` | pinned architecture profile | verified architecture identity |
 | `graph_extraction` | `solar.graph.extraction` | reference callable and trace inputs | `operator_graph.yaml` |
 | `ir_conversion` | `solar.ir.conversion` | typed operator artifact | selected IR graph artifact |
 | `conversion_verification` | `solar.verification` | reference and executable graph | `conversion-attestation.yaml` |
@@ -127,13 +127,17 @@ the required release authority, so official scoring fails closed.
 ```text
 src/
   sol_execbench/
-    cli/                 Click commands and outer orchestration
+    cli/
+      evaluation/        evaluation orchestration, phases, and diagnostics
+      sidecars/          diagnostics sidecar writers (decision, performance, ...)
     core/
       bench/             candidate execution and timing primitives
       data/              benchmark/trace schemas only
       dataset/           pinned corpus inventory and materialization
       evidence/          canonical and derived evidence contracts
+      integrity/         canonical schema/version registries
       platform/          hardware/runtime capability evidence
+      process/           bounded subprocess and process-group helpers
       reports/           derived presentation and summaries
       scoring/           formula, aggregation and authority
       solar_bridge/      sole benchmark-to-SOLAR adapter
@@ -192,6 +196,7 @@ uv run python scripts/check_coupling.py
 uv run python scripts/check_readability.py
 uv run python scripts/check_production_reachability.py
 uv run python scripts/check_current_docs.py
+uv run python scripts/check_non_canonical_artifacts.py
 uv run pytest tests/solar tests/sol_execbench/driver tests/sol_execbench/core -q
 ```
 

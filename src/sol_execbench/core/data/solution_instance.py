@@ -56,7 +56,7 @@ class Solution(CurrentSchemaModel):
         SOLUTION_SCHEMA_VERSION
     )
     name: NonEmptyString
-    """A unique, human-readable name for this specific solution (e.g., 'rmsnorm_triton_v1_h100')."""
+    """A unique, human-readable name for this specific solution (e.g., 'rmsnorm_hip_v1_gfx1200')."""
     definition: NonEmptyString
     """The name of the Definition this implementation solves."""
     author: NonEmptyString
