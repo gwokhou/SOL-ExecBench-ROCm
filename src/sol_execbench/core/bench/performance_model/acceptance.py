@@ -75,6 +75,12 @@ class DiagnosticAcceptanceCase(StrictArtifactModel):
         """Reject a point estimate outside its interval."""
         if not self.lower_ms <= self.predicted_ms <= self.upper_ms:
             raise ValueError("acceptance prediction interval is invalid")
+        if len(self.predicted_action_codes) != len(
+            set(self.predicted_action_codes)
+        ):
+            raise ValueError("acceptance prediction repeats action codes")
+        if len(self.gold_action_codes) != len(set(self.gold_action_codes)):
+            raise ValueError("acceptance gold labels repeat action codes")
         return self
 
 
@@ -109,7 +115,10 @@ class DiagnosticAcceptanceManifest(CurrentSchemaModel):
     held_out_corpus_sha256: SHA256Digest
     configuration_frozen_before_acceptance: Literal[True] = True
     enabled_action_codes: list[str]
-    cases: list[DiagnosticAcceptanceCase] = Field(min_length=220)
+    cases: list[DiagnosticAcceptanceCase] = Field(
+        min_length=220,
+        max_length=220,
+    )
 
     @model_validator(mode="after")
     def cases_are_independent(self) -> DiagnosticAcceptanceManifest:
@@ -117,6 +126,9 @@ class DiagnosticAcceptanceManifest(CurrentSchemaModel):
         pair_ids = [case.pair_id for case in self.cases]
         if len(pair_ids) != len(set(pair_ids)):
             raise ValueError("acceptance cases repeat workload/candidate pair")
+        case_ids = [case.case_id for case in self.cases]
+        if len(case_ids) != len(set(case_ids)):
+            raise ValueError("acceptance cases repeat case identity")
         for kind in _SUPPORTED_FAMILIES:
             if (
                 sum(case.workload_kind is kind for case in self.cases)
@@ -160,9 +172,32 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
         """Reject a promoted verdict that contradicts its reported metrics."""
         if self.model_identity.model_version != self.model_version:
             raise ValueError("acceptance result model identity mismatch")
+        expected_families = set(_SUPPORTED_FAMILIES)
+        if (
+            self.case_count
+            != len(_SUPPORTED_FAMILIES) * MINIMUM_CASES_PER_FAMILY
+        ):
+            raise ValueError(
+                "acceptance result has an invalid case denominator"
+            )
+        if set(self.family_case_counts) != expected_families or any(
+            count != MINIMUM_CASES_PER_FAMILY
+            for count in self.family_case_counts.values()
+        ):
+            raise ValueError("acceptance result has invalid family counts")
+        if set(self.family_empirical_coverage) != expected_families:
+            raise ValueError("acceptance result has incomplete family coverage")
+        metric_actions = [metric.action_code for metric in self.action_metrics]
+        if len(metric_actions) != len(set(metric_actions)):
+            raise ValueError("acceptance result repeats action metrics")
+        if len(self.enabled_action_codes) != len(
+            set(self.enabled_action_codes)
+        ):
+            raise ValueError("acceptance result repeats enabled action codes")
         if self.accepted:
             if (
-                self.reason_codes
+                set(metric_actions) != set(self.enabled_action_codes)
+                or self.reason_codes
                 or any(
                     value < MINIMUM_EMPIRICAL_COVERAGE
                     for value in self.family_empirical_coverage.values()

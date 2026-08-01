@@ -271,6 +271,7 @@ def _definition_template(
     )
     definition = load_json_value(definition_path)
     solution = load_json_value(solution_path)
+    solution["definition"] = definition["name"]
     for name in definition["axes"]:
         definition["axes"][name] = {
             "type": "var",
