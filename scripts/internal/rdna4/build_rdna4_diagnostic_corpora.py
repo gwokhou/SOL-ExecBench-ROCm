@@ -169,8 +169,11 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
         WorkloadKind.TRANSFORMER,
         WorkloadKind.CONCURRENT,
     }:
+        # Each universe case needs a distinct M so no two cases within a phase
+        # share a shape-bearing workload_uuid. The prior ``global_index % 16``
+        # universe yielded only 16 distinct M values for 20 cases per phase.
         return {
-            "M": 32 + 8 * (global_index % 16),
+            "M": 32 + 8 * (global_index - UNIVERSE_START),
             "N": 768,
         }
     return {
@@ -276,7 +279,7 @@ def _definition_template(
     return definition, solution
 
 
-def _workload(case: CaseSpec) -> dict[str, object]:
+def _workload(case: CaseSpec, output_name: str) -> dict[str, object]:
     if case.family is WorkloadKind.ELEMENTWISE:
         inputs = {
             "a": {"type": "scalar", "value": 1.0},
@@ -289,8 +292,8 @@ def _workload(case: CaseSpec) -> dict[str, object]:
         tolerance = 0.02
     elif case.family is WorkloadKind.CROSS_ENTROPY:
         inputs = {
-            "logits": {"type": "random"},
-            "target": {
+            "predictions": {"type": "random"},
+            "targets": {
                 "type": "generated",
                 "generator": {"type": "integer", "low": 0, "high": "N"},
             },
@@ -332,7 +335,7 @@ def _workload(case: CaseSpec) -> dict[str, object]:
         "checks": [
             {
                 "type": "numeric",
-                "output": "output",
+                "output": output_name,
                 "max_atol": tolerance,
                 "max_rtol": tolerance,
                 "required_matched_ratio": 1.0,
@@ -366,10 +369,11 @@ def _prepare(
             sort_keys=False,
         )
         atomic_write_json_value(problem / "solution.json", solution)
+        output_name = next(iter(definition["outputs"]))
         atomic_write_jsonl_values(
             problem / "workload.jsonl",
             [
-                _workload(case)
+                _workload(case, output_name)
                 for case in all_cases
                 if case.family is selected_family
             ],
