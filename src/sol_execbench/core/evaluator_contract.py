@@ -68,6 +68,8 @@ def _capabilities() -> dict[str, str]:
         "evidence.canonical_execution": "trace_jsonl",
         "evidence.evaluation_sidecars": "diagnostic_non_authoritative",
         "evidence.runtime_environment": "platform_observation_non_authoritative",
+        "agent_feedback.sidecar": "optional_diagnostic_non_authoritative",
+        "profile_summary.sidecar": "optional_diagnostic_non_authoritative",
         "solar.graph_extraction": "solar.graph",
         "solar.ir_conversion": "solar.ir",
         "solar.conversion_verification": "solar.verification",

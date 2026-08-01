@@ -77,6 +77,28 @@ class AgentFeedbackBuildRequest:
     ] = "omitted"
     enabled_performance_actions: frozenset[str] = frozenset()
 
+    def __post_init__(self) -> None:
+        """Reject inconsistent or unknown performance-action admission."""
+        actions = self.enabled_performance_actions
+        if actions and self.performance_acceptance_status != "accepted":
+            raise ValueError(
+                "performance actions require an accepted model report",
+            )
+        unknown = actions - _PERFORMANCE_ACTION_CODES
+        if unknown:
+            raise ValueError(
+                f"unknown accepted performance actions: {sorted(unknown)}",
+            )
+        if self.performance_acceptance_status == "accepted" and (
+            self.performance_diagnostic is None
+            or self.performance_governance is None
+            or self.performance_governance.status
+            is not DiagnosticGovernanceStatus.USABLE_DIAGNOSTIC
+        ):
+            raise ValueError(
+                "accepted performance feedback requires a usable diagnostic",
+            )
+
 
 def build_agent_feedback_sidecar(
     request: AgentFeedbackBuildRequest,

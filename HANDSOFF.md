@@ -442,6 +442,13 @@ full measurements; re-measure during the early batches of the full run.
 
 Before the full run:
 
+0. run the CPU-only corpus and resume preflight before occupying the GPU;
+
+   ```bash
+   uv run python scripts/internal/rdna4/preflight_rdna4_diagnostic_corpus.py \
+     --corpus-root data/outputs/microarchitecture-diagnostics-v6/preregistered-corpus
+   ```
+
 1. complete the eleven-case smoke (done, hashes recorded and re-verified
    after the authoring fixes);
 2. run a 33-case pilot, three cases per family (done, all eleven families

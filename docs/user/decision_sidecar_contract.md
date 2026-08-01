@@ -29,8 +29,12 @@ The Decision sidecar consumes facts from the diagnostic data sidecars:
   `sol_execbench.arch_capability_budget.v1` budgets).
 - `StaticKernelEvidenceSidecar.footprints[]` and `kernels[].footprint` —
   per-kernel resource usage (`sol_execbench.static_kernel_evidence.v4`).
-- Optional `profile_summary.v3` runtime bottleneck hints and `agent_feedback.v3`
-  aggregate items, after each passes its own freshness and authority checks.
+
+The current Layer R builder does not consume profile-summary or Agent-feedback
+sidecars. Runtime bottleneck hints remain owned by `profile_summary.v3`, while
+accepted performance actions remain owned by `agent_feedback.v6`. Consumers may
+present those independent diagnostic surfaces together only after validating
+each artifact's freshness and authority.
 
 **Applicability.** The Decision sidecar requires
 `StaticKernelEvidenceSidecar.footprints[]`, which the static-evidence path
@@ -39,10 +43,9 @@ solutions produce no footprints, so no decision sidecar is written for them.
 
 ## Outputs
 
-- A closed bottleneck taxonomy spanning compile-time, runtime, and resource
-  dimensions, merged across data sources with documented precedence (runtime
-  measured > static inferred; static informs the pre-run and no-profile
-  fallback cases).
+- A closed static Layer R bottleneck taxonomy derived from resource footprints
+  and the matching architecture budget. It does not emit measured runtime
+  bottlenecks or merge runtime evidence.
 - Prompt-safe `recommendation` strings, `confidence`, `limitations[]`, and
   `evidence_refs[]` per hint.
 

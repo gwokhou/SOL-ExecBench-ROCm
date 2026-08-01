@@ -6,6 +6,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from sol_execbench.core.evaluator_contract import build_evaluator_contract
+
 ROOT = Path(__file__).resolve().parents[1]
 CURRENT_DOCS = (
     ROOT / "README.md",
@@ -39,6 +41,10 @@ RETIRED_REFERENCES = (
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\((?P<target>[^)\s]+)")
 EXTERNAL_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+CAPABILITY_KEY_REFERENCE = re.compile(
+    r"`(?P<key>[a-z][a-z0-9_.]+)`[^.\n]{0,80}\bcapability key\b",
+    re.IGNORECASE,
+)
 
 
 def _broken_local_links(path: Path, text: str) -> list[str]:
@@ -55,6 +61,23 @@ def _broken_local_links(path: Path, text: str) -> list[str]:
     return failures
 
 
+def _unknown_capability_claims(path: Path, text: str) -> list[str]:
+    """Reject documented evaluator capability keys absent from the contract."""
+    published = build_evaluator_contract().capabilities
+    try:
+        display_path = path.relative_to(ROOT)
+    except ValueError:
+        display_path = path
+    return [
+        (
+            f"{display_path} claims unpublished evaluator "
+            f"capability {match.group('key')!r}"
+        )
+        for match in CAPABILITY_KEY_REFERENCE.finditer(text)
+        if match.group("key") not in published
+    ]
+
+
 def main() -> int:
     """Check current documentation content and local links."""
     failures: list[str] = []
@@ -66,6 +89,7 @@ def main() -> int:
                     f"{path.relative_to(ROOT)} references retired path {reference!r}",
                 )
         failures.extend(_broken_local_links(path, text))
+        failures.extend(_unknown_capability_claims(path, text))
     if failures:
         print("\n".join(failures))
         return 1
