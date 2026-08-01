@@ -10,21 +10,21 @@ import shutil
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from sol_execbench.core.platform.runtime import Which
 from sol_execbench.core.platform.toolchain.models import (
     DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
-    ProbeRunner,
     ToolchainCapability,
     ToolchainRoutingDecision,
     ToolchainRoutingReport,
     ToolchainRoutingRequest,
     ToolchainStatus,
     ToolLifecycle,
-    Which,
 )
 from sol_execbench.core.platform.toolchain.probes import probe_toolchain_tool
 from sol_execbench.core.platform.toolchain.registry import (
     default_toolchain_registry,
 )
+from sol_execbench.core.process.subprocesses import ProbeRunner
 
 
 def build_toolchain_routing_report(

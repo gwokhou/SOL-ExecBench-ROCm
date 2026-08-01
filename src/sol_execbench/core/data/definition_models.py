@@ -9,8 +9,6 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
-
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     NonEmptyString,
@@ -29,23 +27,23 @@ class AxisConst(BaseModelWithDocstrings):
     """An optional human-readable description explaining the purpose of this axis."""
 
 
-class AxisVar(BaseModel):
+class AxisVar(BaseModelWithDocstrings):
     """Variable axis that can be specified at runtime."""
 
     type: Literal["var"] = "var"
     """The type identifier for variable axes."""
-    description: str | None = Field(default=None)
+    description: str | None = None
     """An optional human-readable description explaining the purpose of this axis."""
 
 
-class AxisExpr(BaseModel):
+class AxisExpr(BaseModelWithDocstrings):
     """Expression axis that can be specified at runtime."""
 
     type: Literal["expr"] = "expr"
     """The type identifier for expression axes."""
     expression: NonEmptyString
     """The mathematical expression that defines the value of this axis."""
-    description: str | None = Field(default=None)
+    description: str | None = None
     """An optional human-readable description explaining the purpose of this axis."""
 
 

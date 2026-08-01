@@ -36,6 +36,13 @@ def _require_worker_schema(value: Mapping[str, Any]) -> None:
         raise ValueError("SOLAR worker IPC schema mismatch")
 
 
+def _normalize_worker_outcome(value: Any) -> None:
+    """Normalize fields shared by distinct worker outcome state machines."""
+    if value.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
+        raise ValueError("SOLAR worker IPC schema mismatch")
+    object.__setattr__(value, "ir_path", normalize_ir_path(value.ir_path))
+
+
 def formal_artifact_paths(ir_path: IRPath) -> frozenset[str]:
     """Return the required top-level artifacts for one fixed IR path."""
     return frozenset(
@@ -78,41 +85,38 @@ READINESS_STAGES = tuple(readiness_stage_artifacts(DEFAULT_IR_PATH))
 
 
 @dataclass(frozen=True)
-class SolarWorkerRequest:
-    """Serializable request for one isolated SOLAR analysis."""
+class _SolarWorkerRequestBase:
+    """Common process-boundary contract for isolated SOLAR requests."""
 
     problem_dir: str
     workload_uuid: str
     output_dir: str
     device: str
-    orojenesis_home: str | None
-    ir_path: IRPath = DEFAULT_IR_PATH
-    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         """Reject requests that bypassed process-boundary normalization."""
-        if self.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
+        if (
+            getattr(self, "schema_version", None)
+            != SOLAR_WORKER_IPC_SCHEMA_VERSION
+        ):
             raise ValueError("SOLAR worker IPC schema mismatch")
-        if not isinstance(self.ir_path, IRPath):
+        if not isinstance(getattr(self, "ir_path", None), IRPath):
             raise TypeError("ir_path must be an IRPath")
 
-    @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> SolarWorkerRequest:
-        """Build a request from its process-boundary mapping."""
+    @staticmethod
+    def _common_arguments(value: Mapping[str, Any]) -> dict[str, Any]:
+        """Normalize fields shared by every request at the IPC boundary."""
         _require_worker_schema(value)
-        return cls(
-            problem_dir=str(value["problem_dir"]),
-            workload_uuid=str(value["workload_uuid"]),
-            output_dir=str(value["output_dir"]),
-            device=str(value["device"]),
-            orojenesis_home=(
-                str(value["orojenesis_home"])
-                if value.get("orojenesis_home")
-                else None
+        return {
+            "problem_dir": str(value["problem_dir"]),
+            "workload_uuid": str(value["workload_uuid"]),
+            "output_dir": str(value["output_dir"]),
+            "device": str(value["device"]),
+            "ir_path": normalize_ir_path(
+                value.get("ir_path", DEFAULT_IR_PATH),
             ),
-            ir_path=normalize_ir_path(value.get("ir_path", DEFAULT_IR_PATH)),
-            schema_version=value["schema_version"],
-        )
+            "schema_version": value["schema_version"],
+        }
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible process-boundary mapping."""
@@ -120,39 +124,37 @@ class SolarWorkerRequest:
 
 
 @dataclass(frozen=True)
-class SolarStageAuditRequest:
-    """One corpus workload request for the isolated three-stage audit."""
+class SolarWorkerRequest(_SolarWorkerRequestBase):
+    """Serializable request for one isolated SOLAR analysis."""
 
-    problem_dir: str
-    workload_uuid: str
-    output_dir: str
-    device: str
+    orojenesis_home: str | None
     ir_path: IRPath = DEFAULT_IR_PATH
     schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
 
-    def __post_init__(self) -> None:
-        """Reject requests that bypassed process-boundary normalization."""
-        if self.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
-            raise ValueError("SOLAR worker IPC schema mismatch")
-        if not isinstance(self.ir_path, IRPath):
-            raise TypeError("ir_path must be an IRPath")
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> SolarWorkerRequest:
+        """Build a request from its process-boundary mapping."""
+        return cls(
+            **cls._common_arguments(value),
+            orojenesis_home=(
+                str(value["orojenesis_home"])
+                if value.get("orojenesis_home")
+                else None
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class SolarStageAuditRequest(_SolarWorkerRequestBase):
+    """One corpus workload request for the isolated three-stage audit."""
+
+    ir_path: IRPath = DEFAULT_IR_PATH
+    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarStageAuditRequest:
         """Build a stage-audit request from a mapping."""
-        _require_worker_schema(value)
-        return cls(
-            problem_dir=str(value["problem_dir"]),
-            workload_uuid=str(value["workload_uuid"]),
-            output_dir=str(value["output_dir"]),
-            device=str(value["device"]),
-            ir_path=normalize_ir_path(value.get("ir_path", DEFAULT_IR_PATH)),
-            schema_version=value["schema_version"],
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-compatible process-boundary mapping."""
-        return asdict(self)
+        return cls(**cls._common_arguments(value))
 
 
 @dataclass(frozen=True)
@@ -176,10 +178,8 @@ class SolarAnalysisOutcome:
 
     def __post_init__(self) -> None:
         """Normalize worker payload values and reject unknown states."""
-        if self.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
-            raise ValueError("SOLAR worker IPC schema mismatch")
+        _normalize_worker_outcome(self)
         object.__setattr__(self, "status", SolarAnalysisStatus(self.status))
-        object.__setattr__(self, "ir_path", normalize_ir_path(self.ir_path))
         if self.stage is not None:
             object.__setattr__(self, "stage", SolarStage(self.stage))
 
@@ -255,10 +255,8 @@ class SolarStageAuditOutcome:
 
     def __post_init__(self) -> None:
         """Normalize worker payload values and reject unknown states."""
-        if self.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
-            raise ValueError("SOLAR worker IPC schema mismatch")
+        _normalize_worker_outcome(self)
         object.__setattr__(self, "status", SolarReadinessStatus(self.status))
-        object.__setattr__(self, "ir_path", normalize_ir_path(self.ir_path))
         if self.failure_stage is not None:
             object.__setattr__(
                 self,

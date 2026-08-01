@@ -7,13 +7,14 @@ from sol_execbench.cli.evaluation import compilation
 
 
 class _Packager:
-    def __init__(self, *, is_cpp: bool) -> None:
+    def __init__(self, *, is_cpp: bool, artifact_path: Path) -> None:
         self._is_cpp = is_cpp
+        self._artifact_path = artifact_path
         self.compile_output_path: Path | None = None
 
-    def _make_compile_cmd(self, output_path: Path) -> list[str]:
-        self.compile_output_path = output_path
-        return ["python", "build_ext.py"]
+    def compile(self) -> tuple[list[str], str]:
+        self.compile_output_path = self._artifact_path
+        return ["python", "build_ext.py"], str(self._artifact_path)
 
 
 def _env_builder(env):
@@ -28,7 +29,10 @@ def test_run_compile_phase_skips_non_cpp_solution(tmp_path: Path) -> None:
         called = True
         raise AssertionError("runner should not be called")
 
-    packager = _Packager(is_cpp=False)
+    packager = _Packager(
+        is_cpp=False,
+        artifact_path=tmp_path / "benchmark_kernel.so",
+    )
 
     result = compilation.run_compile_phase(
         packager,
@@ -65,7 +69,10 @@ def test_run_compile_phase_executes_compile_command_for_cpp_solution(
             stderr="",
         )
 
-    packager = _Packager(is_cpp=True)
+    packager = _Packager(
+        is_cpp=True,
+        artifact_path=tmp_path / "benchmark_kernel.so",
+    )
 
     result = compilation.run_compile_phase(
         packager,
@@ -108,7 +115,10 @@ def test_run_compile_phase_filters_benign_rocm_stderr(tmp_path: Path) -> None:
         )
 
     result = compilation.run_compile_phase(
-        _Packager(is_cpp=True),
+        _Packager(
+            is_cpp=True,
+            artifact_path=tmp_path / "benchmark_kernel.so",
+        ),
         staging_dir=tmp_path,
         compile_timeout=11,
         env_builder=_env_builder,

@@ -15,11 +15,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from sol_execbench.core.data.base_model import (
-    BaseModelWithDocstrings,
     CurrentSchemaMixin,
+    FrozenArtifactModel,
 )
 
 
@@ -56,15 +56,13 @@ class DiagnosticGovernanceStatus(StrEnum):
     INVALID_DIAGNOSTIC = "invalid_diagnostic"
 
 
-class DiagnosticSidecarAuthority(BaseModelWithDocstrings):
+class DiagnosticSidecarAuthority(FrozenArtifactModel):
     """Shared diagnostic-only authority boundary for sidecar guardrails.
 
     Carries the frozen + extra-forbid config and the closed set of authority
     booleans that keep every diagnostic sidecar guardrail non-authoritative for
     benchmark truth (correctness / timing / scoring / release / ...).
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     diagnostic_only: Literal[True] = True
     correctness_authority: Literal[False] = False
@@ -75,10 +73,8 @@ class DiagnosticSidecarAuthority(BaseModelWithDocstrings):
     leaderboard_authority: Literal[False] = False
 
 
-class DiagnosticSidecarEnvelope(BaseModelWithDocstrings):
+class DiagnosticSidecarEnvelope(FrozenArtifactModel):
     """Shared wire envelope for every derived diagnostic sidecar."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     authority: Literal["diagnostic"] = "diagnostic"
 
@@ -97,20 +93,16 @@ class CurrentDiagnosticSidecarEnvelope(
     """Version-aware envelope base for top-level diagnostic artifacts."""
 
 
-class DiagnosticSourceRef(BaseModelWithDocstrings):
+class DiagnosticSourceRef(FrozenArtifactModel):
     """Compact reference to source evidence used by a diagnostic sidecar."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: str
     label: str
     status: str | None = None
 
 
-class DiagnosticArtifactCitation(BaseModelWithDocstrings):
+class DiagnosticArtifactCitation(FrozenArtifactModel):
     """Compact citation for an artifact consumed by a diagnostic sidecar."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: str
     label: str
@@ -125,10 +117,8 @@ class SizedDiagnosticArtifactCitation(DiagnosticArtifactCitation):
     size_bytes: int | None = Field(default=None, ge=0)
 
 
-class DiagnosticIdentity(BaseModelWithDocstrings):
+class DiagnosticIdentity(FrozenArtifactModel):
     """Shared producer and trace identity for a derived diagnostic sidecar."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     generated_at: str
     sol_version: str
@@ -144,10 +134,8 @@ class ExtendedDiagnosticIdentity(DiagnosticIdentity):
     source_sha256: str | None = None
 
 
-class DiagnosticFreshnessValidation(BaseModelWithDocstrings):
+class DiagnosticFreshnessValidation(FrozenArtifactModel):
     """Result of matching a diagnostic identity to expected run identity."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     status: DiagnosticFreshnessStatus
     reason_codes: list[str] = Field(default_factory=list)

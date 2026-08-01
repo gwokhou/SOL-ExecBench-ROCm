@@ -30,7 +30,6 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticResourceFootprint,
 )
 from sol_execbench.core.bench.static_kernel.extractor_execution import (
-    ExtractorRunner,
     run_static_extractor,
 )
 from sol_execbench.core.bench.static_kernel.extractor_routing import (
@@ -51,15 +50,15 @@ from sol_execbench.core.bench.static_kernel.footprint_parsers import (
 from sol_execbench.core.bench.static_kernel.isa_analysis import (
     collect_static_isa_analyses,
 )
+from sol_execbench.core.platform.runtime import Which
 from sol_execbench.core.platform.toolchain import (
-    ProbeRunner,
     ToolchainArtifactType,
     ToolchainCapability,
     ToolchainStatus,
-    Which,
 )
 from sol_execbench.core.process.subprocesses import (
     ProbeCompletedProcess,
+    ProbeRunner,
     run_bounded_probe,
 )
 
@@ -73,7 +72,7 @@ class _ExtractorContext:
     evidence_root: Path
     sidecar_base: Path
     timeout_seconds: float
-    runner: ExtractorRunner | None
+    runner: ProbeRunner | None
     probe_runner: ProbeRunner
     which: Which
     registry: Sequence[ToolchainCapability] | None
@@ -120,7 +119,7 @@ def run_static_kernel_extractors(
     evidence_directory: Path,
     sidecar_base_directory: Path | None = None,
     timeout_seconds: float = 10.0,
-    runner: ExtractorRunner | None = None,
+    runner: ProbeRunner | None = None,
     probe_runner: ProbeRunner | None = None,
     which: Which = shutil.which,
     registry: Sequence[ToolchainCapability] | None = None,

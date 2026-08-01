@@ -138,7 +138,7 @@ def test_compute_cost_supports_compound_ranks_and_malformed_equations() -> None:
 
 
 def test_handler_validation_fixes_unary_and_binary_rank_mismatches() -> None:
-    handler = MatmulHandler(debug=True)
+    handler = MatmulHandler()
     unary = EinsumOp(
         [EinsumOperand("Input", ["A"]), EinsumOperand("Output", ["A"], True)],
         "A->A",

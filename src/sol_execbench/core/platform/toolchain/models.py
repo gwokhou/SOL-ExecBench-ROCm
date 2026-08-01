@@ -5,11 +5,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
@@ -18,7 +17,6 @@ from sol_execbench.core.data.base_model import (
 from sol_execbench.core.integrity.schema_versions import (
     TOOLCHAIN_ROUTING_SCHEMA_VERSION,
 )
-from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
 DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS = 3.0
 
@@ -72,8 +70,6 @@ class ToolchainStatus(StrEnum):
 class ToolchainProbeResult(BaseModelWithDocstrings):
     """Bounded dynamic probe result for one tool."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
-
     tool_id: str
     """Stable tool identifier."""
     command: list[str] = Field(default_factory=list)
@@ -94,8 +90,6 @@ class ToolchainProbeResult(BaseModelWithDocstrings):
 
 class ToolchainCapability(BaseModelWithDocstrings):
     """One registry entry describing a ROCm-related tool capability."""
-
-    model_config = ConfigDict(use_attribute_docstrings=True)
 
     tool_id: str
     """Stable tool identifier."""
@@ -130,8 +124,6 @@ class ToolchainCapability(BaseModelWithDocstrings):
 class ToolchainRoutingRequest(BaseModelWithDocstrings):
     """Request to route a tool for a target evidence level and artifact."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
-
     evidence_level: ToolchainEvidenceLevel
     """Evidence level requested."""
     artifact_type: ToolchainArtifactType = ToolchainArtifactType.NONE
@@ -146,8 +138,6 @@ class ToolchainRoutingRequest(BaseModelWithDocstrings):
 
 class ToolchainRoutingDecision(BaseModelWithDocstrings):
     """One routing decision for a registry entry."""
-
-    model_config = ConfigDict(use_attribute_docstrings=True)
 
     tool_id: str
     """Tool that was considered."""
@@ -172,7 +162,6 @@ class ToolchainRoutingDecision(BaseModelWithDocstrings):
 class ToolchainRoutingReport(CurrentSchemaModel):
     """Toolchain routing report for one request."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
     current_schema_version = TOOLCHAIN_ROUTING_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.toolchain_routing.v1"] = (
@@ -195,7 +184,3 @@ class ToolchainRoutingReport(CurrentSchemaModel):
     """Selected tool when one is available."""
     decisions: list[ToolchainRoutingDecision] = Field(default_factory=list)
     """All considered routing decisions."""
-
-
-ProbeRunner = Callable[[list[str], float], ProbeCompletedProcess]
-Which = Callable[[str], str | None]

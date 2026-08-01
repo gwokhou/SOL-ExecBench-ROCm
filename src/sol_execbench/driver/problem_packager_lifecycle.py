@@ -7,14 +7,15 @@ from __future__ import annotations
 
 import logging
 import shutil
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from sol_execbench.core.bench.clock_lock import ClockLockLease
+from sol_execbench.core.bench.clock_lock import (
+    ClockLockAcquirer,
+    ClockLockLease,
+)
 
 logger = logging.getLogger(__name__)
-ClockAcquirer = Callable[[], ClockLockLease]
 
 
 @dataclass
@@ -26,7 +27,7 @@ class ProblemPackagerLifecycle:
     clock_lock: ClockLockLease | None = None
     closed: bool = False
 
-    def acquire_clock_lock(self, acquire: ClockAcquirer) -> bool:
+    def acquire_clock_lock(self, acquire: ClockLockAcquirer) -> bool:
         """Acquire at most once and publish the verified clock state."""
         if self.clock_lock is None:
             self.clock_lock = acquire()

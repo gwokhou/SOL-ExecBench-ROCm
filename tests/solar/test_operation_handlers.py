@@ -169,6 +169,19 @@ def test_builtin_registry_builds_independent_instances() -> None:
     assert not second.has_handler("injected")
 
 
+def test_registry_requires_explicit_handler_replacement() -> None:
+    registry = EinsumOpRegistry()
+    registry.register_handler(_InjectedHandler)
+
+    with pytest.raises(ValueError, match="would replace registered handlers"):
+        registry.register_handler(_InjectedHandler)
+
+    registry.register_handler(
+        _InjectedHandler,
+        replace_ops=frozenset({"injected"}),
+    )
+
+
 def test_analyzer_uses_injected_registry_without_global_fallback() -> None:
     registry = EinsumOpRegistry()
     registry.register_handler(_InjectedHandler)

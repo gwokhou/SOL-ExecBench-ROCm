@@ -27,7 +27,7 @@ import os
 import subprocess
 import time
 from dataclasses import dataclass, field
-from typing import Self
+from typing import Protocol, Self
 
 from pydantic import ValidationError
 
@@ -165,6 +165,14 @@ class ClockLockLease:
             exc_value.add_note(message)
             return
         raise RuntimeError(message)
+
+
+class ClockLockAcquirer(Protocol):
+    """Injectable boundary for acquiring one owned GPU clock lease."""
+
+    def __call__(self) -> ClockLockLease:
+        """Acquire and return a clock-lock lease."""
+        ...
 
 
 def _amd_smi_executable() -> str:

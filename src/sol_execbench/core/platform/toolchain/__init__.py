@@ -9,10 +9,10 @@ import shutil
 from collections.abc import Callable
 from datetime import datetime
 
+from sol_execbench.core.platform.runtime import Which
 from sol_execbench.core.platform.toolchain.models import (
     DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
     TOOLCHAIN_ROUTING_SCHEMA_VERSION,
-    ProbeRunner,
     ToolchainArtifactType,
     ToolchainCapability,
     ToolchainEvidenceLevel,
@@ -22,7 +22,6 @@ from sol_execbench.core.platform.toolchain.models import (
     ToolchainRoutingRequest,
     ToolchainStatus,
     ToolLifecycle,
-    Which,
 )
 from sol_execbench.core.platform.toolchain.probes import probe_toolchain_tool
 from sol_execbench.core.platform.toolchain.registry import (
@@ -32,6 +31,7 @@ from sol_execbench.core.platform.toolchain.routing import (
     build_toolchain_routing_report as _build_toolchain_routing_report,
 )
 from sol_execbench.core.process.subprocesses import (
+    ProbeRunner,
     run_bounded_probe as _run_probe,
 )
 
@@ -59,7 +59,6 @@ def build_toolchain_routing_report(
 __all__ = [
     "DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS",
     "TOOLCHAIN_ROUTING_SCHEMA_VERSION",
-    "ProbeRunner",
     "ToolLifecycle",
     "ToolchainArtifactType",
     "ToolchainCapability",
@@ -69,7 +68,6 @@ __all__ = [
     "ToolchainRoutingReport",
     "ToolchainRoutingRequest",
     "ToolchainStatus",
-    "Which",
     "build_toolchain_routing_report",
     "default_toolchain_registry",
     "probe_toolchain_tool",

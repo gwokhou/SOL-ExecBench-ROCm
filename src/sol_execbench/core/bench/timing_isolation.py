@@ -21,9 +21,9 @@ import os
 import subprocess
 from typing import Any, Literal
 
-from pydantic import ConfigDict, Field, ValidationError
+from pydantic import Field, ValidationError
 
-from sol_execbench.core.data.base_model import CurrentSchemaModel
+from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.integrity.schema_versions import (
     GPU_DEVICE_ISOLATION_SCHEMA_VERSION,
 )
@@ -33,10 +33,9 @@ from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 logger = logging.getLogger(__name__)
 
 
-class GPUDeviceIsolation(CurrentSchemaModel):
+class GPUDeviceIsolation(CurrentFrozenSchemaModel):
     """Current GPU isolation observation."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
     current_schema_version = GPU_DEVICE_ISOLATION_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.gpu_device_isolation.v1"] = (

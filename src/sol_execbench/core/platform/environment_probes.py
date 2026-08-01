@@ -13,15 +13,15 @@ from typing import Any
 from sol_execbench.core.platform.environment_models import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
     EnvironmentEvidenceStatus,
-    ProbeRunner,
     PytorchRocmSummary,
     ToolProbeResult,
-    Which,
 )
 from sol_execbench.core.platform.runtime import (
+    Which,
     resolve_rocm_tool,
     resolve_tool_path,
 )
+from sol_execbench.core.process.subprocesses import ProbeRunner
 from sol_execbench.core.text_utils import text_tail
 
 

@@ -186,15 +186,6 @@ class EinsumOpHandler(ABC):
 
     supported_ops: ClassVar[tuple[str, ...]] = ()
 
-    def __init__(self, debug: bool = False) -> None:
-        """Initialize the handler.
-
-        Args:
-            debug: Enable debug output.
-
-        """
-        self.debug = debug
-
     @abstractmethod
     def generate_einsum(
         self,
