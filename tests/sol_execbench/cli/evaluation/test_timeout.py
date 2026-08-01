@@ -57,6 +57,12 @@ def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
         "_run_evaluation_command",
         _raise_timeout,
     )
+    # The CLI execution boundary acquires the host GPU lock before running; point
+    # it at an isolated lock dir so this test never contends with live GPU runs.
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_GPU_LOCK_DIR",
+        str(tmp_path / "gpu-locks"),
+    )
 
     result = CliRunner().invoke(
         cli,
