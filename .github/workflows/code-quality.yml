@@ -51,6 +51,7 @@ jobs:
           uv run --no-sync python scripts/check_production_reachability.py
           uv run --no-sync python scripts/check_current_docs.py
           uv run --no-sync python scripts/check_schema_versions.py
+          uv run --no-sync python scripts/check_non_canonical_artifacts.py
           uv run --no-sync python scripts/check_python_reuse.py
 
   package-tests:
