@@ -78,6 +78,17 @@ if TYPE_CHECKING:
         ) -> tuple[float, bool]: ...
 
 else:
+    from solar.mixin_contracts import runtime_mixin_contract
 
-    class AnalysisMixinContract:
-        """Runtime-empty base for graph-analysis mixins."""
+    AnalysisMixinContract = runtime_mixin_contract(
+        "AnalysisMixinContract",
+        (
+            "_parse_layer",
+            "_compute_layer",
+            "_memory_elements",
+            "_memory_bytes",
+            "_plan_fusion",
+            "_run_orojenesis_evidence",
+            "_audit_orojenesis_evidence",
+        ),
+    )

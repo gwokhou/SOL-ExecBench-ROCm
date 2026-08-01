@@ -87,4 +87,28 @@ BUILTIN_HANDLER_CLASSES: tuple[type[EinsumOpHandler], ...] = (
     MatrixStructureHandler,
 )
 
-__all__ = ["BUILTIN_HANDLER_CLASSES"]
+# These specialized handlers intentionally replace the generic loss mapping.
+BUILTIN_HANDLER_OVERRIDE_OPS: dict[
+    type[EinsumOpHandler],
+    frozenset[str],
+] = {
+    CrossEntropyHandler: frozenset(
+        {
+            "cross_entropy",
+            "nll_loss",
+        },
+    ),
+    PairwiseLossHandler: frozenset(
+        {
+            "binary_cross_entropy",
+            "cosine_embedding_loss",
+            "huber_loss",
+            "kl_div",
+            "l1_loss",
+            "mse_loss",
+            "smooth_l1_loss",
+        },
+    ),
+}
+
+__all__ = ["BUILTIN_HANDLER_CLASSES", "BUILTIN_HANDLER_OVERRIDE_OPS"]

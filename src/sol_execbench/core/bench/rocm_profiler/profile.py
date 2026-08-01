@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from sol_execbench.core.bench.rocm_profiler.artifacts import (
     discover_rocprofv3_artifacts,
@@ -38,17 +38,16 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ReasonCode,
     has_profiler_data_artifact,
 )
-from sol_execbench.core.data.base_model import CurrentSchemaModel
+from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.integrity.schema_versions import (
     ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION,
 )
 from sol_execbench.core.text_utils import subprocess_text, text_tail
 
 
-class Rocprofv3Diagnostics(CurrentSchemaModel):
+class Rocprofv3Diagnostics(CurrentFrozenSchemaModel):
     """Current bounded no-data profiler diagnostic artifact."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
     current_schema_version = ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.rocprofv3_diagnostics.v1"] = (

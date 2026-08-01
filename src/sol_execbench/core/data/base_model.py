@@ -40,19 +40,23 @@ class BaseModelWithDocstrings(BaseModel):
     )
 
 
-class StrictArtifactModel(BaseModel):
+class StrictArtifactModel(BaseModelWithDocstrings):
     """Base class for stable, strictly validated JSON artifacts.
+
+    ``strict`` here means that unknown fields are rejected. Pydantic's scalar
+    coercion remains enabled unless a schema family explicitly opts into
+    ``ConfigDict(strict=True)``.
 
     Artifact models are deliberately mutable unless an individual schema opts in
     to freezing.  This keeps the base suitable for incremental report builders
     while ensuring that parser boundaries reject misspelled or future fields.
     """
 
-    model_config = ConfigDict(
-        extra="forbid",
-        use_attribute_docstrings=True,
-        validate_assignment=True,
-    )
+
+class FrozenArtifactModel(StrictArtifactModel):
+    """Immutable stable artifact model with strict field ownership."""
+
+    model_config = ConfigDict(frozen=True)
 
 
 class CurrentSchemaMixin:
@@ -89,10 +93,12 @@ class CurrentSchemaMixin:
         cls._require_current_schema(obj)
         validator = cast(
             Callable[..., Self],
-            BaseModel.model_validate.__func__,
+            getattr(  # noqa: B009 -- cooperative call hidden from mixin typing
+                super(),
+                "model_validate",
+            ),
         )
         return validator(
-            cls,
             obj,
             strict=strict,
             extra=extra,
@@ -125,7 +131,7 @@ class CurrentSchemaMixin:
         )
 
 
-class CurrentSchemaModel(CurrentSchemaMixin, BaseModelWithDocstrings):
+class CurrentSchemaModel(CurrentSchemaMixin, StrictArtifactModel):
     """Base for one current, versioned first-party wire contract.
 
     Direct construction is reserved for trusted producers and may use a field
@@ -133,3 +139,7 @@ class CurrentSchemaModel(CurrentSchemaMixin, BaseModelWithDocstrings):
     to be explicitly present and exactly current before Pydantic reads any
     business fields.
     """
+
+
+class CurrentFrozenSchemaModel(CurrentSchemaMixin, FrozenArtifactModel):
+    """Immutable current-version wire contract."""

@@ -18,6 +18,7 @@
 """Tests for sol_execbench.core.data.definition.Definition."""
 
 import pytest
+from pydantic import ValidationError
 from sol_execbench_type_helpers import make_definition
 
 _REFERENCE = "def run(a): return a"
@@ -90,6 +91,19 @@ class TestGetResolvedAxesValues:
 
 
 class TestDefinitionValidators:
+    @pytest.mark.parametrize(
+        "axis",
+        [
+            {"type": "const", "value": 1, "unexpected": True},
+            {"type": "var", "unexpected": True},
+            {"type": "expr", "expression": "N * 2", "unexpected": True},
+        ],
+        ids=["const", "var", "expr"],
+    )
+    def test_axis_models_reject_unknown_fields(self, axis):
+        with pytest.raises(ValidationError, match="extra_forbidden"):
+            _make(axes={"N": axis})
+
     def test_empty_hf_id_is_rejected(self):
         with pytest.raises(ValueError, match="hf_id"):
             _make(hf_id="")

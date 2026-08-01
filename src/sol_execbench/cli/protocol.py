@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 import click
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from sol_execbench.core.data.base_model import (
-    CurrentSchemaModel,
-    StrictArtifactModel,
+    CurrentFrozenSchemaModel,
+    FrozenArtifactModel,
 )
 from sol_execbench.core.integrity.schema_versions import (
     CLI_RESPONSE_SCHEMA_VERSION,
@@ -59,19 +59,15 @@ class CliFailure(click.ClickException):
         self.hint = hint
 
 
-class CliArtifact(StrictArtifactModel):
+class CliArtifact(FrozenArtifactModel):
     """One path returned by a machine-readable CLI response."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     type: str = Field(min_length=1)
     path: str = Field(min_length=1)
 
 
-class CliError(StrictArtifactModel):
+class CliError(FrozenArtifactModel):
     """Stable failure details in a CLI response."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     code: str = Field(min_length=1)
     message: str
@@ -79,10 +75,9 @@ class CliError(StrictArtifactModel):
     hint: str | None
 
 
-class CliSuccessResponse(CurrentSchemaModel):
+class CliSuccessResponse(CurrentFrozenSchemaModel):
     """Current successful CLI response envelope."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
     current_schema_version = CLI_RESPONSE_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.cli_response.v1"] = (
@@ -95,10 +90,9 @@ class CliSuccessResponse(CurrentSchemaModel):
     warnings: list[str]
 
 
-class CliFailureResponse(CurrentSchemaModel):
+class CliFailureResponse(CurrentFrozenSchemaModel):
     """Current failed CLI response envelope."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
     current_schema_version = CLI_RESPONSE_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.cli_response.v1"] = (

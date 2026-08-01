@@ -9,11 +9,11 @@ import re
 from enum import StrEnum
 from typing import Any, ClassVar, Literal
 
-from pydantic import ConfigDict, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from sol_execbench.core.data.base_model import (
     CurrentSchemaMixin,
-    StrictArtifactModel,
+    FrozenArtifactModel,
 )
 from sol_execbench.core.integrity import (
     validate_relative_artifact_path,
@@ -33,10 +33,8 @@ _REVISION = re.compile(r"[0-9a-f]{40}")
 MAX_RELEASE_STATEMENT_BYTES = 8 * 1024 * 1024
 
 
-class ReleaseModel(StrictArtifactModel):
+class ReleaseModel(FrozenArtifactModel):
     """Immutable base for content-addressed release artifacts."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class ReleaseRunKind(StrEnum):

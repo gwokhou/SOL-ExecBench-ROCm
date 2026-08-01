@@ -17,11 +17,9 @@ from sol_execbench.core.platform.environment_models import (
     EnvironmentEvidenceStatus,
     EnvironmentSnapshot,
     GPUEnvironmentSummary,
-    ProbeRunner,
     PytorchRocmSummary,
     RocmEnvironmentSummary,
     ToolProbeResult,
-    Which,
 )
 from sol_execbench.core.platform.environment_probes import (
     collect_pytorch_rocm_summary,
@@ -39,11 +37,9 @@ __all__ = [
     "EnvironmentEvidenceStatus",
     "EnvironmentSnapshot",
     "GPUEnvironmentSummary",
-    "ProbeRunner",
     "PytorchRocmSummary",
     "RocmEnvironmentSummary",
     "ToolProbeResult",
-    "Which",
     "build_environment_diagnostics",
     "collect_environment_snapshot",
     "collect_pytorch_rocm_summary",

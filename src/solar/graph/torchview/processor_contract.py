@@ -58,6 +58,16 @@ if TYPE_CHECKING:
         ) -> None: ...
 
 else:
+    from solar.mixin_contracts import runtime_mixin_contract
 
-    class TorchviewProcessorContract:
-        """Runtime-empty base for Torchview processor mixins."""
+    TorchviewProcessorContract = runtime_mixin_contract(
+        "TorchviewProcessorContract",
+        (
+            "_extract_from_edge_list",
+            "_extract_from_visual_graph",
+            "_extract_node_info",
+            "_get_pytorch_module",
+            "_extract_module_arguments",
+            "_apply_model_parameters",
+        ),
+    )

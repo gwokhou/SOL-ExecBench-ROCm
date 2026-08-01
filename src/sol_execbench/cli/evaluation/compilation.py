@@ -9,7 +9,7 @@ import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 
 from sol_execbench.core.bench.io import flashinfer_safetensors_env
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
@@ -22,28 +22,15 @@ from sol_execbench.core.process.subprocesses import (
 )
 
 
-class CompilePackagerBase(Protocol):
-    """Common staged-package behavior needed by the compile phase."""
+class CompilePackager(Protocol):
+    """Staged-package behavior needed by the compile phase."""
 
     @property
     def _is_cpp(self) -> bool: ...
 
-
-class NativeCompilePackager(CompilePackagerBase, Protocol):
-    """Packager that exposes a native compilation command."""
-
     def compile(self) -> tuple[list[str], str]:
         """Return the compilation command and resulting artifact path."""
         ...
-
-
-class CommandCompilePackager(CompilePackagerBase, Protocol):
-    """Focused test seam for a precomputed compile command."""
-
-    def _make_compile_cmd(self, output_path: Path) -> list[str]: ...
-
-
-CompilePackager = NativeCompilePackager | CommandCompilePackager
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,19 +47,6 @@ class CompilePhaseResult:
     compiler_path: str | None = None
     compiler_sha256: str | None = None
     compiler_version: str | None = None
-
-
-def _compile_command(
-    packager: CompilePackager,
-    output_path: Path,
-) -> tuple[list[str], Path]:
-    if hasattr(packager, "_make_compile_cmd"):
-        command_packager = cast(CommandCompilePackager, packager)
-        return command_packager._make_compile_cmd(output_path), output_path
-
-    native_packager = cast(NativeCompilePackager, packager)
-    cmd, artifact_path = native_packager.compile()
-    return cmd, Path(artifact_path)
 
 
 def run_compile_phase(
@@ -98,8 +72,8 @@ def run_compile_phase(
             command=(),
         )
 
-    artifact_path = staging_dir / "benchmark_kernel.so"
-    cmd, artifact_path = _compile_command(packager, artifact_path)
+    cmd, artifact_path_text = packager.compile()
+    artifact_path = Path(artifact_path_text)
     (staging_dir / ".tmp").mkdir(exist_ok=True)
     base = sanitized_subprocess_env(os.environ, staging_dir=staging_dir)
     env = sanitized_subprocess_env(env_builder(base), staging_dir=staging_dir)

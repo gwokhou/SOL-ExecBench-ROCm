@@ -73,6 +73,32 @@ def test_source_collection_selects_triton_rocprofv3_and_records_run_config(
     assert payload["clock_locked"] is False
 
 
+def test_source_request_conversion_preserves_all_execution_inputs(tmp_path):
+    source_request = SourceTimingRequest(
+        application_command=("python", "driver.py"),
+        languages=("hip_cpp",),
+        output_directory=tmp_path,
+        output_file="timing",
+        tool_version="rocprofv3 7.0.0",
+        gpu_architecture="gfx1200",
+        executable="/opt/rocm/bin/rocprofv3",
+        warmup_runs=3,
+        iterations=7,
+        min_measurement_time_seconds=0.25,
+        trial_count=2,
+        clock_locked=True,
+        timeout_seconds=19.0,
+    )
+
+    collection_request = source_request.to_collection_request(
+        select_timing_policy(TimingSourceType.HIP_NATIVE),
+    )
+
+    assert collection_request.execution_arguments() == (
+        source_request.execution_arguments()
+    )
+
+
 def test_source_collection_selects_hip_native_rocprofv3(tmp_path):
     calls: list[list[str]] = []
 

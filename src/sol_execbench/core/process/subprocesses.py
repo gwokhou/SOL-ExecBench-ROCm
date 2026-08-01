@@ -50,6 +50,19 @@ class ProbeCompletedProcess:
     stderr: str = ""
 
 
+class ProbeRunner(Protocol):
+    """Injectable runner for bounded diagnostic and extractor commands."""
+
+    def __call__(
+        self,
+        command: list[str],
+        timeout_seconds: float,
+        /,
+    ) -> ProbeCompletedProcess:
+        """Run ``command`` within ``timeout_seconds`` and capture its result."""
+        ...
+
+
 def run_bounded_probe(
     command: list[str],
     timeout_seconds: float,

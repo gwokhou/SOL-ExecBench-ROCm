@@ -10,11 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 from rich.console import Console
 
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
-from sol_execbench.core.data.base_model import CurrentSchemaModel
+from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.evidence.runtime_evidence import write_json_payload
 from sol_execbench.core.integrity.schema_versions import (
     NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
@@ -35,10 +35,9 @@ class NoTraceDiagnostics:
     stderr: str
 
 
-class NoTraceDiagnosticsSidecar(CurrentSchemaModel):
+class NoTraceDiagnosticsSidecar(CurrentFrozenSchemaModel):
     """Current bounded no-trace diagnostic artifact."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
     current_schema_version = NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.no_trace_diagnostics.v1"] = (

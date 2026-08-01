@@ -340,24 +340,8 @@ class NodeTypeHandlerFactory:
         )
 
 
-class NodeExpansionStrategy:
-    """Strategy for determining which nodes should be expanded."""
-
-    def should_expand(self, node_id: str, node_data: dict[str, Any]) -> bool:
-        """Determine if a node should be expanded.
-
-        Args:
-            node_id: Node identifier.
-            node_data: Node data dictionary.
-
-        Returns:
-            True if node should be expanded, False otherwise.
-        """
-        raise NotImplementedError
-
-
-class DefaultNodeExpansionStrategy(NodeExpansionStrategy):
-    """Default expansion strategy based on node types."""
+class NodeExpansionPolicy:
+    """Configurable rules for deciding which node types to expand."""
 
     def __init__(
         self,
@@ -418,11 +402,10 @@ class DefaultNodeExpansionStrategy(NodeExpansionStrategy):
             "flatten",
         }
 
-    def should_expand(self, node_id: str, node_data: dict[str, Any]) -> bool:
+    def should_expand(self, node_data: dict[str, Any]) -> bool:
         """Determine if a node should be expanded.
 
         Args:
-            node_id: Node identifier.
             node_data: Node data dictionary.
 
         Returns:

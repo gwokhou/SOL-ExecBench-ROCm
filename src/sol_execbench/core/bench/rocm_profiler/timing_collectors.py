@@ -241,21 +241,7 @@ def collect_source_timing_evidence(
         request.languages,
         profiler_available=True,
     )
-    collection_request = Rocprofv3CollectionRequest(
-        application_command=request.application_command,
-        output_directory=request.output_directory,
-        output_file=request.output_file,
-        policy=policy,
-        tool_version=request.tool_version,
-        gpu_architecture=request.gpu_architecture,
-        executable=request.executable,
-        warmup_runs=request.warmup_runs,
-        iterations=request.iterations,
-        min_measurement_time_seconds=request.min_measurement_time_seconds,
-        trial_count=request.trial_count,
-        clock_locked=request.clock_locked,
-        timeout_seconds=request.timeout_seconds,
-    )
+    collection_request = request.to_collection_request(policy)
     return collect_rocprofv3_timing(
         collection_request,
         rocprofv3_available=rocprofv3_available,

@@ -36,7 +36,7 @@ import networkx as nx
 from solar.ir.extended_einsum.operations.analyzer import EinsumAnalyzer
 from solar.ir.extended_einsum.operations.handlers.base import EinsumOp
 from solar.ir.extended_einsum.torchview.node_type_registry import (
-    DefaultNodeExpansionStrategy,
+    NodeExpansionPolicy,
     NodeTypeHandlerFactory,
     NodeTypeRegistry,
 )
@@ -89,7 +89,7 @@ class GraphExpander:
             fail_closed=fail_closed,
             create_cache_dir=create_cache_dir,
         )
-        self._expansion_strategy = DefaultNodeExpansionStrategy(
+        self._expansion_policy = NodeExpansionPolicy(
             self._registry, debug=debug
         )
 
@@ -179,7 +179,7 @@ class GraphExpander:
         # Identify nodes to expand
         for node_id in graph.nodes():
             node_data = graph.nodes[node_id]
-            if self._expansion_strategy.should_expand(node_id, node_data):
+            if self._expansion_policy.should_expand(node_data):
                 nodes_to_expand.append(node_id)
 
         if self._debug:

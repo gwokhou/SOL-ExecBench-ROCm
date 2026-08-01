@@ -21,18 +21,18 @@ from sol_execbench.core.bench.static_kernel.status import (
     aggregate_extractor_reason_value,
     aggregate_extractor_status_value,
 )
+from sol_execbench.core.platform.runtime import Which
 from sol_execbench.core.platform.toolchain import (
-    ProbeRunner,
     ToolchainArtifactType,
     ToolchainCapability,
     ToolchainEvidenceLevel,
     ToolchainRoutingDecision,
     ToolchainRoutingRequest,
     ToolchainStatus,
-    Which,
     build_toolchain_routing_report,
     default_toolchain_registry,
 )
+from sol_execbench.core.process.subprocesses import ProbeRunner
 
 
 @dataclass(frozen=True)

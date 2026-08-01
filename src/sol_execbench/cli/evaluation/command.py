@@ -26,7 +26,7 @@ from sol_execbench.cli.evaluation.diagnostics import (
 )
 from sol_execbench.cli.sidecars.profile import _profile_output_directory
 from sol_execbench.core.bench.clock_lock import (
-    ClockLockLease,
+    ClockLockAcquirer,
     acquire_clock_lock,
 )
 from sol_execbench.core.bench.io import flashinfer_safetensors_env
@@ -69,7 +69,6 @@ __all__ = [
 console = Console(stderr=True)
 logger = logging.getLogger(__name__)
 EnvironmentBuilder = Callable[[Mapping[str, str]], dict[str, str]]
-ClockLocker = Callable[[], ClockLockLease]
 ProfileApplicationPreparer = Callable[[], None]
 
 
@@ -77,7 +76,7 @@ ProfileApplicationPreparer = Callable[[], None]
 class ProfileLifecycle:
     """Injected clock and replay-restaging lifecycle hooks."""
 
-    clock_locker: ClockLocker = acquire_clock_lock
+    clock_locker: ClockLockAcquirer = acquire_clock_lock
     prepare_profiled_application: ProfileApplicationPreparer | None = None
 
 

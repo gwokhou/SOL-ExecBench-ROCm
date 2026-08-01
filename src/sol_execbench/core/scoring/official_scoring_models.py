@@ -7,19 +7,19 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from sol_execbench.core.data.base_model import (
-    CurrentSchemaModel,
-    StrictArtifactModel,
+    CurrentFrozenSchemaModel,
+    FrozenArtifactModel,
 )
 from sol_execbench.core.integrity.schema_versions import (
     OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION,
 )
 
 
-class _AvailabilityModel(StrictArtifactModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+class _AvailabilityModel(FrozenArtifactModel):
+    """Immutable component of the availability report."""
 
 
 class OfficialVerifierAvailability(_AvailabilityModel):
@@ -50,10 +50,9 @@ class PublishedReleaseAvailability(_AvailabilityModel):
     path: str | None
 
 
-class OfficialScoreAvailability(CurrentSchemaModel):
+class OfficialScoreAvailability(CurrentFrozenSchemaModel):
     """Current machine-readable official-score availability report."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
     current_schema_version = OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.official_score_availability.v3"] = (

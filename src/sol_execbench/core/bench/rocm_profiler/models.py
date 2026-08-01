@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -380,43 +380,54 @@ class DefaultTimingSelection:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class Rocprofv3CollectionRequest:
-    """Request to collect live profiler timing evidence for one command."""
+class Rocprofv3ExecutionRequest:
+    """Shared execution inputs for profiler timing request variants."""
 
     application_command: tuple[str, ...]
     output_directory: Path
     output_file: str
-    policy: TimingPolicy
     tool_version: str
     gpu_architecture: str
     executable: str = ROCPROFV3_EXECUTABLE
-    include_hip_runtime: bool = True
     warmup_runs: int | None = None
     iterations: int | None = None
     min_measurement_time_seconds: float | None = None
     trial_count: int | None = None
     clock_locked: bool | None = None
-    compact_rows: bool = False
     timeout_seconds: float = 300.0
+
+    def execution_arguments(self) -> dict[str, Any]:
+        """Return every shared field for lossless request conversion."""
+        return {
+            item.name: getattr(self, item.name)
+            for item in fields(Rocprofv3ExecutionRequest)
+        }
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class SourceTimingRequest:
+class Rocprofv3CollectionRequest(Rocprofv3ExecutionRequest):
+    """Request to collect live profiler timing evidence for one command."""
+
+    policy: TimingPolicy
+    include_hip_runtime: bool = True
+    compact_rows: bool = False
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SourceTimingRequest(Rocprofv3ExecutionRequest):
     """Immutable source-level inputs used to select a timing policy."""
 
-    application_command: tuple[str, ...]
     languages: tuple[str, ...]
-    output_directory: Path
-    output_file: str
-    tool_version: str
-    gpu_architecture: str
-    executable: str = ROCPROFV3_EXECUTABLE
-    warmup_runs: int | None = None
-    iterations: int | None = None
-    min_measurement_time_seconds: float | None = None
-    trial_count: int | None = None
-    clock_locked: bool | None = None
-    timeout_seconds: float = 300.0
+
+    def to_collection_request(
+        self,
+        policy: TimingPolicy,
+    ) -> Rocprofv3CollectionRequest:
+        """Bind a selected timing policy without dropping execution inputs."""
+        return Rocprofv3CollectionRequest(
+            **self.execution_arguments(),
+            policy=policy,
+        )
 
 
 @dataclass(frozen=True, slots=True)

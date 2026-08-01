@@ -7,19 +7,16 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import ConfigDict
-
-from sol_execbench.core.data.base_model import CurrentSchemaModel
+from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
     ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION,
 )
 
 
-class Rocprofv3CounterProvenance(CurrentSchemaModel):
+class Rocprofv3CounterProvenance(CurrentFrozenSchemaModel):
     """Hashes for every executable and configuration admitted to replay."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
     current_schema_version = ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.rocprofv3_counter_provenance.v5"] = (

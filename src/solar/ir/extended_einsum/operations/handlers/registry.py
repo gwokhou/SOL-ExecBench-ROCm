@@ -54,28 +54,72 @@ class EinsumOpRegistry:
         """Initialize the registry.
 
         Args:
-            debug: Enable debug output for handlers.
+            debug: Print handler registration diagnostics.
 
         """
         self.debug = debug
-        self._handlers: dict[str, EinsumOpHandler] = {}
-        self._handler_classes: list[type[EinsumOpHandler]] = []
         self._op_to_handler: dict[str, EinsumOpHandler] = {}
 
-    def register_handler(self, handler_class: type[EinsumOpHandler]) -> None:
+    def register_handler(
+        self,
+        handler_class: type[EinsumOpHandler],
+        *,
+        replace_ops: frozenset[str] = frozenset(),
+    ) -> None:
         """Register a handler class.
 
         Args:
             handler_class: Handler class to register.
+            replace_ops: Existing operation mappings this class intentionally
+                replaces.
 
         """
-        # Instantiate the handler
-        handler = handler_class(debug=self.debug)
-        self._handler_classes.append(handler_class)
+        op_keys = tuple(
+            op_name.lower() for op_name in handler_class.supported_ops
+        )
+        if not op_keys:
+            raise ValueError(
+                f"{handler_class.__name__} must declare supported_ops",
+            )
+        if len(set(op_keys)) != len(op_keys):
+            raise ValueError(
+                f"{handler_class.__name__} declares duplicate supported_ops",
+            )
+        normalized_replacements = frozenset(
+            op_name.lower() for op_name in replace_ops
+        )
+        unknown_replacements = normalized_replacements - set(op_keys)
+        if unknown_replacements:
+            raise ValueError(
+                "replace_ops must be declared by the replacement handler: "
+                f"{sorted(unknown_replacements)}",
+            )
+        conflicts = {
+            op_key: self._op_to_handler[op_key]
+            for op_key in op_keys
+            if op_key in self._op_to_handler
+        }
+        undeclared_conflicts = set(conflicts) - normalized_replacements
+        if undeclared_conflicts:
+            details = ", ".join(
+                f"{op_key} ({type(conflicts[op_key]).__name__})"
+                for op_key in sorted(undeclared_conflicts)
+            )
+            raise ValueError(
+                f"{handler_class.__name__} would replace registered handlers: "
+                f"{details}",
+            )
+        missing_replacements = normalized_replacements - set(conflicts)
+        if missing_replacements:
+            raise ValueError(
+                "replace_ops do not name registered handlers: "
+                f"{sorted(missing_replacements)}",
+            )
+
+        handler = handler_class()
 
         # Map each supported operation to this handler
-        for op_name in handler.supported_ops:
-            op_key = op_name.lower()
+        for op_key in op_keys:
             self._op_to_handler[op_key] = handler
             if self.debug:
                 print(
@@ -162,10 +206,17 @@ def _register_builtin_handlers(registry: EinsumOpRegistry) -> None:
     """Register the explicit built-in inventory in precedence order."""
     from solar.ir.extended_einsum.operations.handlers.builtin_handlers import (
         BUILTIN_HANDLER_CLASSES,
+        BUILTIN_HANDLER_OVERRIDE_OPS,
     )
 
     for handler_class in BUILTIN_HANDLER_CLASSES:
-        registry.register_handler(handler_class)
+        registry.register_handler(
+            handler_class,
+            replace_ops=BUILTIN_HANDLER_OVERRIDE_OPS.get(
+                handler_class,
+                frozenset(),
+            ),
+        )
 
 
 def build_builtin_registry(*, debug: bool = False) -> EinsumOpRegistry:

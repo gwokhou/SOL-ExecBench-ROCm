@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Callable
 from pathlib import Path
 
 from sol_execbench.core.bench.static_kernel.artifacts import (
@@ -21,10 +20,10 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
 from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.process.subprocesses import (
     ProbeCompletedProcess,
+    ProbeRunner,
     run_bounded_probe,
 )
 
-ExtractorRunner = Callable[[list[str], float], ProbeCompletedProcess]
 RAW_OUTPUT_LIMIT = 64 * 1024
 TAIL_LIMIT = 4000
 
@@ -37,7 +36,7 @@ def run_static_extractor(
     evidence_root: Path,
     sidecar_base: Path,
     timeout_seconds: float,
-    runner: ExtractorRunner | None,
+    runner: ProbeRunner | None,
 ) -> tuple[StaticKernelEvidenceToolRun, StaticKernelEvidenceArtifact | None]:
     """Run one bounded extractor and persist its raw output."""
     effective_runner = runner or run_bounded_probe

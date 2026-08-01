@@ -8,15 +8,16 @@ from __future__ import annotations
 import shutil
 import subprocess
 
-from sol_execbench.core.platform.runtime import resolve_tool_path
+from sol_execbench.core.platform.runtime import Which, resolve_tool_path
 from sol_execbench.core.platform.toolchain.models import (
     DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
-    ProbeRunner,
     ToolchainProbeResult,
     ToolchainStatus,
-    Which,
 )
-from sol_execbench.core.process.subprocesses import run_bounded_probe
+from sol_execbench.core.process.subprocesses import (
+    ProbeRunner,
+    run_bounded_probe,
+)
 from sol_execbench.core.text_utils import text_tail
 
 

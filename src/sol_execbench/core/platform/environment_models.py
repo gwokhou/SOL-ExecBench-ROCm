@@ -5,15 +5,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentSchemaModel,
+    FrozenArtifactModel,
 )
 from sol_execbench.core.integrity.schema_versions import (
     ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION,
@@ -23,7 +23,6 @@ from sol_execbench.core.platform.arch_capabilities import (
     ArchCapabilityBudgetStatus,
     ArchISABudget,
 )
-from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
 DEFAULT_PROBE_TIMEOUT_SECONDS = 3.0
 
@@ -40,8 +39,6 @@ class EnvironmentEvidenceStatus(StrEnum):
 
 class ToolProbeResult(BaseModelWithDocstrings):
     """Captured result from one environment-probing command."""
-
-    model_config = ConfigDict(use_attribute_docstrings=True)
 
     tool: str
     """Logical tool name, such as ``rocminfo``."""
@@ -66,8 +63,6 @@ class ToolProbeResult(BaseModelWithDocstrings):
 class GPUEnvironmentSummary(BaseModelWithDocstrings):
     """Best-effort summary for one detected AMD GPU agent."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
-
     source: str
     """Probe source that produced this summary."""
     index: int | None = None
@@ -81,8 +76,6 @@ class GPUEnvironmentSummary(BaseModelWithDocstrings):
 class RocmEnvironmentSummary(BaseModelWithDocstrings):
     """Best-effort ROCm runtime and visibility summary."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
-
     version: str | None = None
     """ROCm version when detected."""
     hip_visible_devices: str | None = None
@@ -95,8 +88,6 @@ class RocmEnvironmentSummary(BaseModelWithDocstrings):
 
 class PytorchRocmSummary(BaseModelWithDocstrings):
     """Best-effort PyTorch ROCm environment summary."""
-
-    model_config = ConfigDict(use_attribute_docstrings=True)
 
     available: bool
     """Whether PyTorch ROCm reports an available device."""
@@ -116,14 +107,8 @@ class PytorchRocmSummary(BaseModelWithDocstrings):
     """Import or runtime error captured while probing PyTorch."""
 
 
-class EnvironmentCapabilityBudget(BaseModelWithDocstrings):
+class EnvironmentCapabilityBudget(FrozenArtifactModel):
     """Derived arch capability budget for one detected GPU."""
-
-    model_config = ConfigDict(
-        use_attribute_docstrings=True,
-        extra="forbid",
-        frozen=True,
-    )
 
     status: ArchCapabilityBudgetStatus
     """Availability of the capability budget."""
@@ -140,7 +125,6 @@ class EnvironmentCapabilityBudget(BaseModelWithDocstrings):
 class EnvironmentSnapshot(CurrentSchemaModel):
     """Optional ROCm environment evidence snapshot."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
     current_schema_version = ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.environment_snapshot.v2"] = (
@@ -172,8 +156,6 @@ class EnvironmentSnapshot(CurrentSchemaModel):
 class EnvironmentCheckResult(BaseModelWithDocstrings):
     """One diagnostic preflight check result."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
-
     name: str
     """Stable check name."""
     status: EnvironmentEvidenceStatus
@@ -187,7 +169,6 @@ class EnvironmentCheckResult(BaseModelWithDocstrings):
 class EnvironmentDiagnostics(CurrentSchemaModel):
     """Standalone environment diagnostic payload."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
     current_schema_version = ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION
 
     schema_version: Literal["sol_execbench.environment_diagnostics.v1"] = (
@@ -202,7 +183,3 @@ class EnvironmentDiagnostics(CurrentSchemaModel):
     """Environment snapshot evidence."""
     checks: list[EnvironmentCheckResult] = Field(default_factory=list)
     """Preflight check results."""
-
-
-ProbeRunner = Callable[[list[str], float], ProbeCompletedProcess]
-Which = Callable[[str], str | None]

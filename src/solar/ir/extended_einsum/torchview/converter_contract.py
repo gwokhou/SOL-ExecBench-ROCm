@@ -171,6 +171,32 @@ if TYPE_CHECKING:
         ) -> None: ...
 
 else:
+    from solar.mixin_contracts import runtime_mixin_contract
 
-    class ConverterMixinContract:
-        """Runtime-empty base for Torchview converter mixins."""
+    ConverterMixinContract = runtime_mixin_contract(
+        "ConverterMixinContract",
+        (
+            "_as_list",
+            "_parse_einsum_from_raw_attributes",
+            "_parse_reduction_args_from_raw_attributes",
+            "_repair_torchview_quirks",
+            "_validate_tensor_shape_consistency",
+            "_find_entry_node_for_predecessor",
+            "_add_start_nodes",
+            "_validate_input_types_alignment",
+            "_should_split_linear_with_bias",
+            "_split_linear_with_bias",
+            "_should_expand_groupwise_conv",
+            "_expand_groupwise_conv",
+            "_should_expand_mha",
+            "_should_expand_sdpa",
+            "_should_expand_lstm",
+            "_should_expand_gru",
+            "_expand_sdpa",
+            "_expand_mha",
+            "_expand_lstm",
+            "_expand_gru",
+            "_convert_operation",
+            "_fix_split_connections",
+        ),
+    )
