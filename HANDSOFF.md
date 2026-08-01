@@ -20,12 +20,12 @@ The v6 expansion no longer needs a separate worktree. The leftover
 prunable and may be removed once confirmed unneeded. Do not reset `main`.
 
 The software implementation, full test suite, static checks, real gfx1200
-calibration, and immutable 660-case corpus design are complete. Eleven-family
-smoke artifacts are already present on disk under
-`data/outputs/microarchitecture-diagnostics-v6/smoke/` plus
-`diagnostic-smoke.json`, but they have not yet been re-verified green on
-hardware under the current `main` HEAD, and their hash is not yet recorded
-here.
+calibration, and the eleven-family smoke are complete. The 660-case corpus
+design was frozen before collection; on 2026-08-01 it was re-frozen once to
+correct a graph-family shape universe that produced duplicate workload
+UUIDs (see "Pilot findings"). Smoke was re-verified green on real gfx1200
+hardware on 2026-07-31 and again after the authoring fixes on 2026-08-01; its
+content hashes are recorded in "Completed evidence" below.
 
 The remaining blocking outcome is the v6 hardware statistical acceptance:
 
@@ -39,6 +39,13 @@ The remaining blocking outcome is the v6 hardware statistical acceptance:
 ```
 
 Do not describe v6 as hardware-accepted until this sequence completes.
+
+The 33-case timing pilot ran on 2026-08-01. A first pass exposed authoring
+defects in six families; the corpus was then re-preregistered (graph-family
+shape universe corrected) and the authored definitions and solutions were
+fixed, after which the pilot re-passed all eleven families end-to-end with
+zero failures. The full 660-case run may now begin. See "Pilot findings" and
+"Runtime and batching" below.
 
 ## Boundaries that must not change
 
@@ -143,8 +150,15 @@ data/outputs/microarchitecture-diagnostics-v6/
 ```
 
 ```text
-SHA256 45cae9e06a4c247e452f9ec5401701b4979a1bec47e20bb0818443ba8d06cd5c
+SHA256 eee743ed7ab876f9aaea267d688a318a659454b29f75290f721d55e1700c1ed4
 ```
+
+The 2026-08-01 re-registration replaced the original design
+(`45cae9e0...`) because the graph-family `_shape` used only 16 distinct M
+values for 20 cases per phase, duplicating 16 workload UUIDs per family
+(see "Pilot findings"). The re-frozen design gives every graph-family case a
+distinct M; the other eight families' case entries are byte-identical, so
+their already-collected pilot evidence remains valid.
 
 It defines 60 cases per family:
 
@@ -156,8 +170,10 @@ held-out                    220
 total                       660
 ```
 
-The separate `preregister` stage is immutable. Later stages require the exact
-design and never overwrite a mismatch.
+The separate `preregister` stage never overwrites a mismatch and later stages
+require the exact frozen design. The one 2026-08-01 re-registration occurred
+before any blocked-family evidence existed; the design is now frozen for the
+full collection.
 
 ### Verification
 
@@ -177,17 +193,145 @@ git diff --check
 
 The HIP probe compiled for gfx1200 and all new modes ran on the real device.
 
+### Eleven-family smoke
+
+Re-verified green on real gfx1200 hardware under the current `main` HEAD on
+2026-07-31, and again on 2026-08-01 after the softmax and cross_entropy
+authoring fixes (which now also cover the wider corpus shapes):
+
+```text
+test_real_gfx1200_diagnostics_cover_all_supported_families  1 passed in 2.33s
+```
+
+Artifacts under `data/outputs/microarchitecture-diagnostics-v6/smoke/`
+(composite, concurrent, cross_entropy, elementwise, indexed_read,
+indexed_update, matmul, reduction, softmax, transformer, transpose) plus
+`diagnostic-smoke.json` indexing all eleven.
+
+```text
+diagnostic-smoke.json (index)  SHA256 126debcd604b28ef57ffeeedc527797c1128d4ce1201e1b07b0d05c237ab24c6
+smoke/ tree (613 files)        SHA256 3086fde8cc5c09c3e7258ac106146bf39afe2efe51d142df8aac8592ab927cb8
+```
+
+The 2026-08-01 tree hash reflects the softmax solution generalization
+(width up to 1024) and the cross_entropy definition/solution/workload
+alignment to the M/N axis convention.
+
+Every family passed with `AVAILABLE` status: correct SOLAR descriptor and
+family classification, current evidence, IR/HW predictions, `C` and `R`, and
+scope-verified concurrent scheduling.
+
+### 33-case timing pilot (2026-08-01)
+
+Three held-out cases per family ran through SOLAR plus GPU collect
+(`--unsafe-local-execution --lock-clocks --profile rocprofv3-counters
+--static-evidence auto`), mirroring the governed corpus commands. Driver and
+results are under `data/outputs/` (ignored, not committed):
+
+```text
+data/outputs/microarchitecture-diagnostics-v6/pilot/run_pilot.py
+data/outputs/microarchitecture-diagnostics-v6/pilot/timing.json
+```
+
+A first pass measured five families before six were blocked by corpus
+defects; after the re-preregistration and authoring fixes below, a second
+pass measured the remaining six. All 33 cases resolved (18 collected fresh,
+15 re-skipped as already collected) with zero failures. Merged per-family
+collect wall time:
+
+```text
+family            n   P50 (s)   P90 (s)
+elementwise       2   55.1      55.3
+transpose         3   50.0      56.6
+reduction_norm    3   45.9      48.2
+matmul            3   46.2      84.3
+indexed_read      3   51.7      52.6
+softmax           3   43.0      43.1
+cross_entropy     3   43.2      43.6
+indexed_update    3   58.0      60.1
+composite_graph    3   43.2      43.9
+transformer_block  3   45.8      46.1
+concurrent_graph  3   46.9      46.9
+```
+
+`elementwise` shows `n=2` because its first case was already collected by an
+earlier interrupted attempt. SOLAR is cheap (roughly 3 s/case, 8-10 s for
+transformer blocks). All eleven families collect end-to-end.
+
+## Pilot findings: corpus defects, now resolved
+
+The pilot is the first exercise of the full case universe, and it exposed
+authoring defects that a one-case-per-family smoke cannot see. Six of eleven
+families initially failed closed; all defects were in the authored corpus
+(design, definition, solution, workload), not in the pilot driver or the
+profiler. All were fixed on 2026-08-01 and the pilot re-passed all eleven
+families with zero failures.
+
+### 1. Graph families reused workload UUIDs (fixed by re-preregistration)
+
+`composite_graph`, `transformer_block`, and `concurrent_graph` each had 60
+cases but only 44 distinct `workload_uuid`s; 16 UUIDs were reused by two
+cases within the same phase because the shape universe produced only 16
+distinct M values for 20 cases per phase. This broke collect
+("workload UUIDs must be unique within a problem") and SOLAR ("workload UUID
+must match exactly once").
+
+Fix: `_shape` now derives M as `32 + 8 * (global_index - UNIVERSE_START)`,
+giving every graph-family case a distinct M (32..504). The corpus was
+re-preregistered (design `eee743ed...`, see "Corpus design"); the affected
+held-out case dirs were cleared before the re-run.
+
+### 2. `indexed_update` output-name mismatch (fixed in the generator)
+
+`definition.json` declares output `result`, while the generated workload
+checks covered `output`, so `_validate_output_inventory` failed with
+`missing=['result'], extra=['output']`. Fix: `_workload` now threads the
+definition's declared output tensor name into the numeric check, so the
+check covers `result`.
+
+### 3. `softmax` solution was width-128 only (fixed in the solution)
+
+The bundled `diagnostic_block_softmax_f32` solution hard-coded a 128-wide row
+block (`TORCH_CHECK(input.size(1) == 128, ...)`). Fix: the kernel now accepts
+any width up to 1024 (the corpus maximum width is 544) using a power-of-two
+block with `-INFINITY`/zero padding so non-power-of-two widths reduce
+correctly.
+
+### 4. `cross_entropy` definition/solution/workload mismatches (fixed)
+
+Three linked problems were fixed:
+
+- The definition used axis tokens `B`/`C` while the workloads provide only
+  `{M, N}`, so SOLAR died with `KeyError: 'B'`. The definition now uses
+  `M`/`N` (the corpus-wide convention).
+- The generated workload named the inputs `logits`/`target` and the check
+  `output`; they now match the definition's `predictions`/`targets` and
+  `loss`.
+- The solution hard-coded `256x128` (`TORCH_CHECK(..., == 256 && == 128)`)
+  and a fixed 256-thread single-block reduction. It was rewritten to one
+  block per row with an atomic row-sum, supporting rows up to the corpus
+  maximum (2672) and classes up to 1024.
+
+### Working families
+
+`elementwise`, `transpose`, `reduction_norm`, `matmul`, `indexed_read`
+collected cleanly in the first pass; their design entries, problem files,
+and workload UUIDs are byte-identical after the re-registration, so their
+evidence remains valid. The six fixed families collected cleanly in the
+second pass. All changes are in the authored corpus and the generator
+(`scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`), not in `main`
+runtime behavior.
+
 ## Remaining work
 
-### 1. Verify the eleven smoke cases on hardware
+### 1. ✅ Eleven-case hardware smoke (done)
 
-One problem/solution pair per family is already authored and staged under
+One problem/solution pair per family is authored and staged under
 `data/outputs/microarchitecture-diagnostics-v6/smoke/` (composite, concurrent,
 cross_entropy, elementwise, indexed_read, indexed_update, matmul, reduction,
 softmax, transformer, transpose), with `diagnostic-smoke.json` indexing all
-eleven. The remaining task is to re-run them on real gfx1200 hardware under
-the current `main` HEAD, confirm every case is green, and record the smoke
-content hash here.
+eleven. Re-run on real gfx1200 hardware under the current `main` HEAD passed
+green on 2026-07-31; hashes recorded in "Completed evidence".
 
 Special requirements still apply to the existing artifacts:
 
@@ -195,7 +339,7 @@ Special requirements still apply to the existing artifacts:
 - Concurrent cases must emit controlled lane identity and marker scope.
 - Indexed cases must exercise trusted summaries without retaining raw indices.
 
-### 2. Pass the eleven-family hardware smoke
+### 2. ✅ Pass the eleven-family hardware smoke (done)
 
 For every case require:
 
@@ -206,12 +350,14 @@ For every case require:
 - scope-verified concurrent scheduling;
 - no profiler-duration or achieved-rate dependency.
 
-Do not begin the long collection until all eleven pass.
+All eleven passed on 2026-07-31; the long collection may begin.
 
 ### 3. Collect development
 
 Collect 20 point-fit and 20 conformal cases per family, 440 total. Work in
-recoverable `family x phase x 20` batches and validate each batch immediately.
+recoverable `family x phase x 20` batches and validate each batch
+immediately. The pilot no longer blocks collection: all eleven families
+collect end-to-end on the re-frozen design.
 
 GPU collection must remain serial. SOLAR may use bounded parallelism only
 after memory behavior is verified.
@@ -279,30 +425,29 @@ hashes plus every family/action statistic in this file.
 
 ## Runtime and batching
 
-GPU evidence collection is the dominant cost:
+GPU evidence collection is the dominant cost. The 2026-08-01 pilot measured
+per-family collect wall time for all eleven families (two-pass merged table
+in "Completed evidence"). Applying `sum(family P50 x 60)` /
+`sum(family P90 x 60)` to the full table:
 
 ```text
-estimated wall time ~= per-case P50 x 660
+development (440 cases):     expected ~5.9 h,  conservative ~6.5 h
+held-out    (220 cases):     expected ~2.9 h,  conservative ~3.2 h
+full corpus (660 cases):     expected ~8.8 h,  conservative ~9.7 h
 ```
 
-Illustrative totals:
-
-```text
-2 minutes/case   about 22 hours
-5 minutes/case   about 55 hours
-10 minutes/case  about 110 hours
-```
-
-Development is approximately 15-73 hours and held-out 7-37 hours under those
-assumptions. The other potentially expensive stage is 660-case SOLAR analysis,
-especially MiniGPT and composite graphs.
+SOLAR analysis adds roughly 3 s/case (8-10 s for transformer blocks), about
+0.5 hour. These are pilot-based projections from three cases per family, not
+full measurements; re-measure during the early batches of the full run.
 
 Before the full run:
 
-1. complete the eleven-case smoke;
-2. run a 33-case pilot, three cases per family;
-3. record per-family P50 and P90 wall time;
-4. estimate:
+1. complete the eleven-case smoke (done, hashes recorded and re-verified
+   after the authoring fixes);
+2. run a 33-case pilot, three cases per family (done, all eleven families
+   collect end-to-end);
+3. record per-family P50 and P90 wall time (done, all eleven families);
+4. estimate per the formulas above (full eleven-family estimate above);
 
    ```text
    expected = sum(family P50 x 60)
