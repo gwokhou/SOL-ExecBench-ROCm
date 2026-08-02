@@ -472,14 +472,28 @@ def _conformal_score(
     *,
     calibration: FamilyConformalCalibration,
 ) -> float:
+    """Standard split-conformal score: the raw log-residual of the point fit.
+
+    The previous score measured only the excess beyond the base prediction
+    interval and floored the result at zero. When every calibration point lands
+    inside the base interval, that score degenerates to ``q95 == 0`` and the
+    conformal factor collapses to ``exp(0) == 1``, so the interval reflects only
+    the base model band and under-covers on held-out data with higher residual
+    scatter -- the documented "zero quantile" failure mode of conformal
+    calibration (Berkeley StatLearn conformal notes; jammi_ai ``conformal.rs``).
+
+    The raw absolute log-residual never collapses: ``q95`` is the
+    ``(n + 1)``-corrected order statistic of the true point-model residual
+    magnitude, the standard split-conformal conformity score (Vovk, Gammerman,
+    Shafer, "Algorithmic Learning in a Random World"; the ``(n + 1)`` rank is
+    required for the finite-sample coverage guarantee rather than an optional
+    cosmetic). Residuals outside the calibration sample remain a distribution-
+    shift risk that static conformal cannot certify (Gibbs & Candes, ACI, 2021;
+    Barber, Candes, Ramdas, Tibshirani, NexCP, 2023); for a frozen preregistered
+    corpus, ``q95`` from the maximum raw residual is the honest static choice.
+    """
     point = _calibrated_point(calibration, observation.point_features)
-    lower_ratio = observation.base_lower_ms / observation.base_predicted_ms
-    upper_ratio = observation.base_upper_ms / observation.base_predicted_ms
-    return max(
-        math.log(point * lower_ratio / observation.measured_ms),
-        math.log(observation.measured_ms / (point * upper_ratio)),
-        0.0,
-    )
+    return abs(math.log(observation.measured_ms / point))
 
 
 def _fit_action_threshold(

@@ -105,11 +105,47 @@ def test_inference_profile_requires_exact_family_support() -> None:
         }
         for item in profile.conformal
     )
-    assert {item.q95 for item in profile.conformal} == {0.0}
+    assert all(item.q95 <= 1e-12 for item in profile.conformal)
     assert {
         item.action_code for item in profile.action_thresholds
     } == CODE_CHANGING_ACTION_CODES
     assert profile.enabled_action_codes == frozenset()
+
+
+def test_conformal_score_reflects_residual_scatter_not_interval_violation() -> (
+    None
+):
+    """The raw-residual score never collapses to a zero quantile.
+
+    The previous score measured only excess beyond the base prediction interval
+    and floored at zero, so q95 collapsed to ``0.0`` whenever every calibration
+    point landed inside the base interval. The raw absolute log-residual keeps
+    q95 proportional to the true point-model scatter, which is what expands the
+    held-out interval when the base band under-covers.
+    """
+    observations = [
+        item.model_copy(
+            update={
+                # Deviate measured from the (constant) point prediction by a
+                # small index-scaled factor kept inside the wide base band. The
+                # old score floored at the base-interval boundary would read
+                # zero for every point; the raw log-residual is non-zero.
+                "measured_ms": 1.0 + 0.005 * (position % 8),
+                "base_predicted_ms": 1.0,
+                "base_lower_ms": 0.5,
+                "base_upper_ms": 1.5,
+            }
+        )
+        for position, item in enumerate(_observations())
+    ]
+    profile = build_inference_profile(
+        observations,
+        model_identity=_identity(),
+        calibration_profile_sha256="d" * 64,
+        calibration_audit_sha256="e" * 64,
+        development_corpus_sha256="f" * 64,
+    )
+    assert all(item.q95 > 0.0 for item in profile.conformal)
 
 
 def test_family_point_model_corrects_hw_prediction() -> None:
