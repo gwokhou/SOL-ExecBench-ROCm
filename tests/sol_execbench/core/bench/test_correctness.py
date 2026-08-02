@@ -42,6 +42,68 @@ def _spec(
     )
 
 
+class TestSkippedSliceDetection:
+    """correctness-b1: contiguous skipped output slices must fail on sight."""
+
+    def test_contiguous_skipped_slice_rejected(self):
+        # 1/128 of a large output left unwritten: the ratio clears 0.99 but the
+        # single contiguous run trips the slice-skip gate.
+        n = 128 * 1024
+        reference = torch.ones(n)
+        output = torch.ones(n)
+        output[1000 : 1000 + 1024].zero_()  # one skipped slice of 1024 elements
+        _, exceeds = compute_error_stats(
+            output,
+            reference,
+            _spec(required_matched_ratio=0.99),
+        )
+        assert (
+            exceeds
+        )  # ratio ~= 0.9922 >= 0.99, yet the contiguous run fails it
+
+    def test_scattered_outliers_same_count_not_flagged(self):
+        # Same 1024 wrong elements but scattered (run length 1): the slice-skip
+        # gate does not trip, so the result follows the ratio gate alone.
+        n = 128 * 1024
+        reference = torch.ones(n)
+        output = torch.ones(n)
+        scattered = torch.arange(0, n, n // 1024)[:1024]
+        output[scattered].zero_()
+        _, exceeds = compute_error_stats(
+            output,
+            reference,
+            _spec(required_matched_ratio=0.99),
+        )
+        assert not exceeds  # 0.992 >= 0.99 and every run is length 1
+
+    def test_short_run_on_small_output_unaffected(self):
+        # A single wrong element on a small output never reaches the absolute
+        # floor (256), so behavior matches the ratio-only path.
+        reference = torch.ones(100)
+        output = torch.ones(100)
+        output[5].zero_()
+        _, exceeds = compute_error_stats(
+            output,
+            reference,
+            _spec(required_matched_ratio=0.99),
+        )
+        assert not exceeds  # 0.99 >= 0.99 and run == 1 < floor
+
+    @pytest.mark.requires_rocm_gpu
+    def test_contiguous_run_detection_on_gpu_tensors(self):
+        """The run detector must stay on the mask device (no CPU/GPU mix)."""
+        n = 128 * 1024
+        reference = torch.ones(n, device="cuda")
+        output = torch.ones(n, device="cuda")
+        output[1000 : 1000 + 1024].zero_()
+        _, exceeds = compute_error_stats(
+            output,
+            reference,
+            _spec(required_matched_ratio=0.99),
+        )
+        assert exceeds
+
+
 class TestComputeErrorStats:
     """Tests for compute_error_stats, focusing on near-zero edge cases."""
 
