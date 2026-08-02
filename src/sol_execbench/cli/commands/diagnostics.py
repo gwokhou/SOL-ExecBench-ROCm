@@ -23,7 +23,9 @@ from sol_execbench.core.bench.agent_feedback import (
     build_agent_feedback_sidecar,
 )
 from sol_execbench.core.bench.performance_model.acceptance import (
+    DiagnosticAcceptanceManifest,
     DiagnosticAcceptanceResult,
+    evaluate_diagnostic_acceptance,
 )
 from sol_execbench.core.bench.performance_model.authoring import (
     build_diagnostic_acceptance,
@@ -51,7 +53,7 @@ from sol_execbench.core.data.json_utils import (
     load_jsonl_file,
 )
 from sol_execbench.core.data.trace import Trace
-from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.solar_bridge.performance import (
     load_manifest_semantic_characterization,
 )
@@ -206,11 +208,21 @@ def accept_performance_model_cli(
 @click.option("--performance-diagnostic", type=_FILE, required=True)
 @click.option("--evidence-manifest", type=_FILE, required=True)
 @click.option("--acceptance", type=_FILE)
+@click.option(
+    "--acceptance-manifest",
+    "acceptance_manifest_path",
+    type=_FILE,
+    help=(
+        "Source manifest for --acceptance. When supplied, the admission "
+        "re-derives the verdict from the manifest and rejects any drift."
+    ),
+)
 @click.option("--output", type=_OUTPUT, required=True)
 def performance_agent_feedback_cli(
     performance_diagnostic: Path,
     evidence_manifest: Path,
     acceptance: Path | None,
+    acceptance_manifest_path: Path | None,
     output: Path,
 ) -> CliResult:
     """Build Agent actions from a governed and accepted performance model."""
@@ -222,16 +234,16 @@ def performance_agent_feedback_cli(
         manifest = load_and_verify_performance_evidence_manifest(
             evidence_manifest
         )
-        acceptance_result = (
-            load_json_file(DiagnosticAcceptanceResult, acceptance)
-            if acceptance is not None
-            else None
+        acceptance_result, acceptance_manifest = _load_acceptance_inputs(
+            acceptance,
+            acceptance_manifest_path,
         )
         trace_path = _manifest_trace_path(evidence_manifest, manifest)
         traces = load_jsonl_file(Trace, trace_path)
         acceptance_status, enabled_actions = _acceptance_admission(
             acceptance_result,
             diagnostic,
+            acceptance_manifest,
         )
         freshness = validate_performance_diagnostic_freshness(
             diagnostic,
@@ -282,6 +294,28 @@ def performance_agent_feedback_cli(
     )
 
 
+def _load_acceptance_inputs(
+    acceptance_path: Path | None,
+    manifest_path: Path | None,
+) -> tuple[
+    DiagnosticAcceptanceResult | None, DiagnosticAcceptanceManifest | None
+]:
+    """Load the acceptance result and its optional source manifest."""
+    result = (
+        load_json_file(DiagnosticAcceptanceResult, acceptance_path)
+        if acceptance_path is not None
+        else None
+    )
+    manifest = (
+        load_json_file(DiagnosticAcceptanceManifest, manifest_path)
+        if manifest_path is not None
+        else None
+    )
+    if result is None and manifest is not None:
+        raise ValueError("--acceptance-manifest requires --acceptance")
+    return result, manifest
+
+
 def _manifest_trace_path(
     manifest_path: Path,
     manifest: PerformanceEvidenceManifest,
@@ -292,9 +326,55 @@ def _manifest_trace_path(
     return (manifest_path.parent / trace.path).resolve()
 
 
+_ACCEPTANCE_RECOMPUTED_FIELDS = (
+    "accepted",
+    "case_count",
+    "family_case_counts",
+    "family_empirical_coverage",
+    "median_absolute_percentage_error",
+    "p90_absolute_percentage_error",
+    "action_metrics",
+    "enabled_action_codes",
+    "reason_codes",
+)
+
+
+def _verify_acceptance_against_manifest(
+    acceptance: DiagnosticAcceptanceResult,
+    manifest: DiagnosticAcceptanceManifest,
+) -> None:
+    """Re-derive the verdict from the cited manifest and reject any drift.
+
+    Closes the shape-not-substance and self-checksum gaps (audit
+    ``acceptance.py:170`` / ``acceptance.py:217``): when the source manifest is
+    available the admission no longer trusts the result's self-declared metrics
+    or its self-stamped ``manifest_sha256``.
+    """
+    expected_manifest_sha = stable_json_checksum(
+        manifest.model_dump(mode="json")
+    )
+    if acceptance.manifest_sha256 != expected_manifest_sha:
+        raise ValueError(
+            "acceptance manifest hash does not match the cited manifest",
+        )
+    recomputed = evaluate_diagnostic_acceptance(manifest)
+    if recomputed.accepted and not recomputed.enabled_action_codes:
+        raise ValueError(
+            "accepted manifest enables no code-changing action; a vacuous "
+            "action policy cannot be certified accepted",
+        )
+    for field in _ACCEPTANCE_RECOMPUTED_FIELDS:
+        if getattr(recomputed, field) != getattr(acceptance, field):
+            raise ValueError(
+                f"acceptance result field '{field}' disagrees with the cited "
+                f"manifest",
+            )
+
+
 def _acceptance_admission(
     acceptance: DiagnosticAcceptanceResult | None,
     diagnostic: PerformanceDiagnosticSidecar,
+    manifest: DiagnosticAcceptanceManifest | None = None,
 ) -> tuple[
     Literal["omitted", "failed", "accepted"],
     frozenset[str],
@@ -323,6 +403,8 @@ def _acceptance_admission(
         or calibration_refs[0].sha256 != acceptance.calibration_profile_sha256
     ):
         raise ValueError("diagnostic acceptance profile hash mismatch")
+    if manifest is not None:
+        _verify_acceptance_against_manifest(acceptance, manifest)
     if not acceptance.accepted:
         return "failed", frozenset()
     return "accepted", frozenset(acceptance.enabled_action_codes)
