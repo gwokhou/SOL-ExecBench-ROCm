@@ -70,6 +70,14 @@ def _classification(relative_path: str, line: str) -> str | None:
         or ".is_cuda()" in line
     ):
         return "PyTorch ROCm compatibility namespace"
+    if "pin_cuda_device" in line:
+        return "ROCm-compatible PyTorch device pin helper"
+    if "CUDA device" in line or "CUDA is unavailable" in line:
+        return "PyTorch ROCm device vocabulary (cuda alias for HIP)"
+    if "cuda=SimpleNamespace" in line:
+        return "mock torch.cuda namespace in unit tests"
+    if "cuda_mod" in line:
+        return "native constructor test patching the torch.cuda namespace"
     if relative_path.startswith("src/solar/"):
         return (
             "SOLAR PyTorch ROCm compatibility or vendored upstream vocabulary"

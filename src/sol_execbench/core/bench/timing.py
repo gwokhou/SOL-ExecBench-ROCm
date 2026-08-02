@@ -25,6 +25,7 @@ from typing import Any, Literal
 import torch
 
 from sol_execbench.core.bench.io import ShiftingMemoryPoolAllocator
+from sol_execbench.core.bench.reward_hack import RewardHackError
 from sol_execbench.core.platform.runtime import (
     CacheClearPolicy,
     cache_clear_policy_for_device,
@@ -74,6 +75,32 @@ def _measurement_budget_reached(
     )
 
 
+def _timing_device_index(device: str) -> int | None:
+    """Resolve the CUDA device index a timed callable must remain pinned to."""
+    if not torch.cuda.is_available():
+        return None
+    resolved = torch.device(device).index
+    return resolved if resolved is not None else torch.cuda.current_device()
+
+
+def _assert_timing_device_unchanged(target_index: int | None) -> None:
+    """Fail closed if the candidate switched the active CUDA device mid-timing."""
+    if target_index is not None and torch.cuda.current_device() != target_index:
+        raise RewardHackError(
+            "candidate switched the active CUDA device during timed execution",
+        )
+
+
+def _pin_timing_device(target_index: int | None) -> None:
+    """Re-pin the active device before a timed iteration on multi-GPU hosts.
+
+    Single-GPU targets skip the call entirely so legitimate kernels traverse a
+    zero-overhead path and frozen timing evidence is byte-for-byte unaffected.
+    """
+    if target_index is not None and torch.cuda.device_count() > 1:
+        torch.cuda.set_device(target_index)
+
+
 def clone_args(args: list[Any]) -> list[Any]:
     """Clone tensor arguments to prevent cross-iteration data contamination.
 
@@ -113,6 +140,7 @@ def bench_time_with_device_events(
     ):
         raise ValueError("min_measurement_time_seconds must be > 0 or None")
     cache = _get_empty_cache_for_benchmark(device, cache_clear_policy)
+    target_device_index = _timing_device_index(device)
     torch.cuda.synchronize()
 
     if setup is None:
@@ -128,6 +156,7 @@ def bench_time_with_device_events(
         args = setup()
         _clear_cache(cache)
         fn(args)
+        _assert_timing_device_unchanged(target_device_index)
     torch.cuda.synchronize()
 
     times: list[float] = []
@@ -135,10 +164,12 @@ def bench_time_with_device_events(
         args = setup()
         _clear_cache(cache)
         torch.cuda.synchronize()
+        _pin_timing_device(target_device_index)
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
         start_event.record()
         result = fn(args)
+        _assert_timing_device_unchanged(target_device_index)
         torch.cuda.synchronize()
         end_event.record()
         end_event.synchronize()

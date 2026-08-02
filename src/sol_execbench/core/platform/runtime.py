@@ -119,6 +119,28 @@ def detect_rocm_device(
     )
 
 
+def pin_cuda_device(device: str, *, torch_module: Any | None = None) -> None:
+    """Pin the active CUDA device before candidate or reference code runs.
+
+    No-op for CPU targets and when CUDA is unavailable, so single-device and
+    CPU-only executions are unaffected. On a multi-GPU host this fixes the
+    active device so a candidate cannot direct timed work onto an idle device
+    while producing its correct output elsewhere. A ``cuda:N`` index that is out
+    of range is allowed to surface from ``set_device`` as a fail-closed error.
+    """
+    if torch_module is None:
+        import torch as torch_module
+    parsed = torch_module.device(device)
+    if parsed.type != "cuda" or not torch_module.cuda.is_available():
+        return
+    index = (
+        parsed.index
+        if parsed.index is not None
+        else torch_module.cuda.current_device()
+    )
+    torch_module.cuda.set_device(index)
+
+
 def cache_clear_policy_for_device(device: str) -> CacheClearPolicy:
     """Detect the device L2 and resolve its benchmark cache-clear policy."""
     return derive_cache_clear_policy(detect_rocm_device(device).l2_cache_bytes)

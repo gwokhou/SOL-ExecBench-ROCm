@@ -75,6 +75,7 @@ from sol_execbench.driver.eval_runtime_api import (  # noqa: F401
     load_user_function,
     make_eval,
     measure_latency,
+    pin_cuda_device,
     review_solution_sources,
     run_reward_hack_check,
     snapshot_runtime_integrity,
@@ -109,6 +110,10 @@ _device = os.environ.get(
     "SOL_EXECBENCH_DEVICE",
     "cuda:0" if torch.cuda.is_available() else "cpu",
 )
+# Pin the active CUDA device before the reference channel or candidate code
+# runs so a multi-GPU candidate cannot direct timed work onto an idle device
+# while its correct output is produced elsewhere (device-b3).
+pin_cuda_device(_device)
 _output_names = list(definition.outputs.keys())
 _output_dtypes_torch = {
     k: dtype_str_to_torch_dtype(v.dtype) for k, v in definition.outputs.items()
