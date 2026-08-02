@@ -21,6 +21,7 @@ from sol_execbench.core.bench.evaluation_requests import (
 from sol_execbench.core.bench.io import allocate_outputs, gen_inputs
 from sol_execbench.core.bench.reference_protocol import connect_reference_worker
 from sol_execbench.core.bench.reward_hack import (
+    RewardHackError,
     check_eval_integrity,
     check_lazy_outputs,
     check_monkey_patch,
@@ -29,6 +30,7 @@ from sol_execbench.core.bench.reward_hack import (
     review_solution_sources,
     snapshot_critical_functions,
     snapshot_runtime_integrity,
+    verify_timing_function_intact,
 )
 from sol_execbench.core.bench.utils import call_and_collect_outputs, make_eval
 from sol_execbench.core.data.definition import Definition
@@ -43,6 +45,7 @@ __all__ = [
     "Definition",
     "EvaluationDependencies",
     "EvaluationStatus",
+    "RewardHackError",
     "Solution",
     "Trace",
     "Workload",
@@ -69,4 +72,5 @@ __all__ = [
     "run_reward_hack_check",
     "snapshot_critical_functions",
     "snapshot_runtime_integrity",
+    "verify_timing_function_intact",
 ]

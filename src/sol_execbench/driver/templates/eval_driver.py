@@ -53,6 +53,7 @@ from sol_execbench.driver.eval_runtime_api import (  # noqa: F401
     Definition,
     EvaluationDependencies,
     EvaluationStatus,
+    RewardHackError,
     Solution,
     Trace,
     Workload,
@@ -77,6 +78,7 @@ from sol_execbench.driver.eval_runtime_api import (  # noqa: F401
     review_solution_sources,
     run_reward_hack_check,
     snapshot_runtime_integrity,
+    verify_timing_function_intact,
 )
 
 # ── Load problem ─────────────────────────────────────────────────────────────
@@ -152,6 +154,31 @@ try:
     # Resolve candidate code only after the trusted reference channel exists.
     # The reference implementation itself is never imported in this process.
     user_fn = load_user_function(_solution, STAGING_DIR)
+    # A native __attribute__((constructor)) loaded during the dlopen above can
+    # replace torch.cuda.Event.elapsed_time. Re-confirm the pristine identity
+    # captured before candidate import before any workload is timed; emit a
+    # REWARD_HACK trace for every workload if the timing function was swapped.
+    try:
+        verify_timing_function_intact()
+    except RewardHackError as _timing_forge:
+        _timing_msg = str(_timing_forge)
+        for _wl in workloads:
+            emit_trace_jsonl(
+                Trace(
+                    definition=definition.name,
+                    solution=_solution_name,
+                    workload=_wl,
+                    evaluation=make_eval(
+                        EvaluationStatus.REWARD_HACK,
+                        _device,
+                        None,
+                        extra_msg=_timing_msg,
+                    ),
+                ),
+                _real_stdout,
+            )
+        _reference_client.close()
+        os._exit(0)
     _timing_records = []
     evaluate_workloads(
         WorkloadEvaluationRequest(

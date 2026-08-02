@@ -35,6 +35,49 @@ NATIVE_LANGUAGES = ["hip_cpp", "hipblas", "miopen", "ck", "rocwmma"]
 CDNA3_TARGETS = ["gfx940", "gfx941", "gfx942"]
 
 
+class TestSourcePathValidation:
+    """SourceFile path security: absolute, traversal, and reserved filenames.
+
+    The reserved-filename guard (audit cli-c1 / staging.py:59) prevents a
+    candidate source named ``config.json``/``definition.json``/etc. from
+    overwriting trusted harness files at the staging root.
+    """
+
+    @pytest.mark.parametrize("path", ["/etc/passwd", "/abs/kernel.py"])
+    def test_rejects_absolute_paths(self, path: str) -> None:
+        with pytest.raises(ValidationError, match="absolute path"):
+            SourceFile(path=path, content="x")
+
+    @pytest.mark.parametrize("path", ["../kernel.py", "src/../../etc/passwd"])
+    def test_rejects_parent_traversal(self, path: str) -> None:
+        with pytest.raises(ValidationError, match="parent directory traversal"):
+            SourceFile(path=path, content="x")
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "definition.json",
+            "reference_definition.json",
+            "workload.jsonl",
+            "solution.json",
+            "config.json",
+            "./config.json",
+        ],
+    )
+    def test_rejects_reserved_harness_filenames(self, path: str) -> None:
+        with pytest.raises(ValidationError, match="reserved harness filename"):
+            SourceFile(path=path, content="x")
+
+    def test_accepts_reserved_basename_inside_subdirectory(self) -> None:
+        """A reserved name nested in a subdirectory does not collide at root."""
+        sf = SourceFile(path="src/config.json", content="x")
+        assert sf.path == "src/config.json"
+
+    def test_accepts_normal_kernel_paths(self) -> None:
+        sf = SourceFile(path="kernel.hip", content="void run(){}")
+        assert sf.path == "kernel.hip"
+
+
 class TestLanguageValidation:
     """BuildSpec accepts only ROCm-native language categories."""
 

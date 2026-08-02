@@ -41,6 +41,8 @@ from sol_execbench.core.bench.reward_hack.runtime import (
     check_thread_injection_from_monitor,
     snapshot_critical_functions,
     snapshot_runtime_integrity,
+    timing_function_available,
+    verify_timing_function_intact,
 )
 from sol_execbench.core.bench.reward_hack.static_review import (
     review_solution_sources,
@@ -62,4 +64,6 @@ __all__ = [
     "review_solution_sources",
     "snapshot_critical_functions",
     "snapshot_runtime_integrity",
+    "timing_function_available",
+    "verify_timing_function_intact",
 ]

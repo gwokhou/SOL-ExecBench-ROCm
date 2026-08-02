@@ -36,6 +36,7 @@ from sol_execbench.core.bench.reward_hack.models import (
     _GRAPH_METHODS,
     _INDIRECT_STREAM_ATTRS,
     _JIT_FORK_CALLS,
+    _OS_DICT_ATTRS,
     _PARALLEL_IMPORT_ROOTS,
     _PRECISION_ATTRS,
     _PRECISION_DOWNGRADE_RULE,
@@ -46,6 +47,10 @@ from sol_execbench.core.bench.reward_hack.models import (
     _RISKY_FILE_CALLS,
     _RISKY_IMPORT_ROOTS,
     _RISKY_METHODS,
+    _RISKY_NATIVE_MODULE_ROOTS,
+    _RISKY_OS_EXIT_CALLS,
+    _RISKY_OS_IO_CALLS,
+    _RISKY_TYPES_ATTRS,
     _RULE_BY_NAME,
     _STATIC_RULES,
     SourceReview,
@@ -140,14 +145,17 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
-        if _assignment_creates_semantic_cache(node.targets, node.value):
+        if _assignment_creates_semantic_cache(
+            node.targets,
+            node.value,
+        ) or _writes_to_cache_container(node.targets):
             self._add("semantic_output_cache", node, self._node_source(node))
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
-        if node.value is not None and _assignment_creates_semantic_cache(
-            [node.target],
-            node.value,
+        if node.value is not None and (
+            _assignment_creates_semantic_cache([node.target], node.value)
+            or _writes_to_cache_container([node.target])
         ):
             self._add("semantic_output_cache", node, self._node_source(node))
         self.generic_visit(node)
@@ -250,6 +258,10 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
         return name in {
             "functools.lru_cache",
             "lru_cache",
+            "functools.cache",
+            "cache",
+            "functools.cached_property",
+            "cached_property",
             "hashlib.md5",
             "hashlib.sha1",
             "hashlib.sha256",
@@ -283,7 +295,25 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             tuple(f".{method}" for method in _RISKY_METHODS),
         ):
             return True
-        if name.startswith("os.") and _is_process_attr(name.rsplit(".", 1)[-1]):
+        if name.startswith("os."):
+            tail = name.rsplit(".", 1)[-1]
+            if (
+                _is_process_attr(tail)
+                or tail in _RISKY_OS_IO_CALLS
+                or tail in _RISKY_OS_EXIT_CALLS
+                or tail in _OS_DICT_ATTRS
+            ):
+                return True
+        if name.startswith(
+            tuple(f"{root}." for root in _RISKY_NATIVE_MODULE_ROOTS),
+        ):
+            return True
+        if (
+            name.startswith("types.")
+            and name.rsplit(".", 1)[-1] in _RISKY_TYPES_ATTRS
+        ):
+            return True
+        if name == "__builtins__" or name.startswith("__builtins__."):
             return True
         if name.startswith(("subprocess.", "socket.")):
             return True
@@ -309,7 +339,14 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
                 if isinstance(decorator, ast.Call)
                 else decorator,
             )
-            if name in {"functools.lru_cache", "lru_cache"}:
+            if name in {
+                "functools.lru_cache",
+                "lru_cache",
+                "functools.cache",
+                "cache",
+                "functools.cached_property",
+                "cached_property",
+            }:
                 self._add(
                     "semantic_output_cache",
                     decorator,
@@ -326,7 +363,29 @@ class _PythonSourceReviewVisitor(ast.NodeVisitor):
             return False
         attr = node.args[1].value
         base = self._resolved_name(node.args[0])
-        return base == "os" and _is_process_attr(attr)
+        # ``getattr(os, "__dict__")`` / ``getattr(os, "__getattribute__")``
+        # re-expose ``os.system``/``os.popen`` after direct-name blocking
+        # (audit static-b7).
+        return base == "os" and (
+            _is_process_attr(attr) or attr in _OS_DICT_ATTRS
+        )
+
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        """Block ``os.__dict__[...]`` / ``__builtins__[...]`` re-dispatch.
+
+        A candidate that cannot call ``os.system`` directly can still recover it
+        via ``os.__dict__["system"]`` or re-enter ``__import__``/``eval`` via
+        ``__builtins__[...]`` (audit static-b1 / static-b7).  These subscript
+        forms never appear in a compute kernel.
+        """
+        base = self._resolved_name(node.value)
+        if base in {"os.__dict__", "os.__getattribute__", "__builtins__"}:
+            self._add(
+                "unauthorized_file_or_loader",
+                node,
+                self._node_source(node),
+            )
+        self.generic_visit(node)
 
     def _resolved_name(self, node: ast.AST) -> str:
         return _resolve_alias(_dotted_name(node), self.aliases)
@@ -352,9 +411,27 @@ def _target_is_cache(target: ast.AST) -> bool:
         return _name_is_cache_container(target.id)
     if isinstance(target, ast.Attribute):
         return _name_is_cache_container(target.attr)
+    if isinstance(target, ast.Subscript):
+        # ``_cache[key]`` / ``self.memo[key]`` — the container is the base.
+        return _target_is_cache(target.value)
     if isinstance(target, (ast.Tuple, ast.List)):
         return any(_target_is_cache(elt) for elt in target.elts)
     return False
+
+
+def _writes_to_cache_container(targets: Iterable[ast.AST]) -> bool:
+    """Return True if any target writes *into* a named cache container.
+
+    Catches cache POPULATION — ``_cache[key] = output`` — which is the write
+    that makes a value-keyed cache actually collapse timing latency (audit
+    seed-seed2).  Cache INITIALIZATION (``_cache = {}``) is caught separately
+    by :func:`_assignment_creates_semantic_cache`; this catches the per-call
+    store that a data-pointer OR value-keyed cache needs.
+    """
+    return any(
+        isinstance(target, ast.Subscript) and _target_is_cache(target.value)
+        for target in targets
+    )
 
 
 def _name_is_cache_container(name: str) -> bool:

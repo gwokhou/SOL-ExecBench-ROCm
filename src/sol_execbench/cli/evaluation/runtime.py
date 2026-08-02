@@ -41,6 +41,7 @@ class EvaluationRuntimeFailureReason(StrEnum):
     TIMEOUT = "evaluation_timeout"
     FAILED_NO_STDOUT = "evaluation_failed_no_stdout"
     NO_PARSEABLE_TRACES = "no_parseable_traces"
+    EVALUATION_INCOMPLETE = "evaluation_incomplete"
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,11 +98,29 @@ class EvaluationRuntimeNoParseableTraces(EvaluationRuntimeNoTraceFailure):
     )
 
 
+@dataclass(frozen=True, slots=True)
+class EvaluationRuntimeIncomplete(EvaluationRuntimeNoTraceFailure):
+    """Execution whose trace count or exit code cannot be trusted.
+
+    The eval driver emits exactly one trace per workload and always exits 0, so
+    a trace-count mismatch or a non-zero exit (despite parseable output) means
+    the run did not complete every workload — a partial run, a mid-run crash,
+    or forged/injected traces (audit eval_driver.py:34 / cli-c2 / cli-c3).  The
+    separate release-scoring path already enforces trace identity and count;
+    the evaluate path previously did not.
+    """
+
+    reason: ClassVar[EvaluationRuntimeFailureReason] = (
+        EvaluationRuntimeFailureReason.EVALUATION_INCOMPLETE
+    )
+
+
 EvaluationRuntimeResult = (
     EvaluationRuntimeSuccess
     | EvaluationRuntimeTimeout
     | EvaluationRuntimeFailedNoStdout
     | EvaluationRuntimeNoParseableTraces
+    | EvaluationRuntimeIncomplete
 )
 
 
@@ -136,25 +155,37 @@ def _run_profiled_or_none(
     )
 
 
-def run_evaluation_runtime(
-    packager: EvaluationPackager,
+def _failure_result[FailureT: EvaluationRuntimeNoTraceFailure](
+    cls: type[FailureT],
+    message: str,
+    proc: subprocess.CompletedProcess[str],
     *,
-    eval_cmd: list[str],
-    staging_dir: Path,
-    output_file: Path | None,
-    timeout: int,
-    profile: ProfileMode,
-) -> EvaluationRuntimeResult:
-    """Run evaluation and classify subprocess outcomes without CLI side effects."""
-    profiled_proc, profile_result = _run_profiled_or_none(
-        eval_cmd,
-        staging_dir=staging_dir,
-        output_file=output_file,
-        timeout=timeout,
-        profile=profile,
+    filtered_stderr: str,
+    profile_result: Rocprofv3ProfileResult | None,
+) -> FailureT:
+    """Build a classified failure carrying the standard proc diagnostics."""
+    return cls(
+        message=message,
+        returncode=proc.returncode,
+        stdout=proc.stdout,
+        stderr=proc.stderr,
+        filtered_stderr=filtered_stderr,
+        profile_result=profile_result,
+        profile_fallback_reason=_profile_fallback_reason(profile_result),
     )
+
+
+def _run_eval_subprocess(
+    eval_cmd: list[str],
+    *,
+    staging_dir: Path,
+    timeout: int,
+    profiled_proc: subprocess.CompletedProcess[str] | None,
+    profile_result: Rocprofv3ProfileResult | None,
+) -> subprocess.CompletedProcess[str] | EvaluationRuntimeTimeout:
+    """Run the eval subprocess, classifying a timeout as a failure result."""
     try:
-        proc = profiled_proc or cli_evaluation._run_evaluation_command(
+        return profiled_proc or cli_evaluation._run_evaluation_command(
             eval_cmd,
             staging_dir=staging_dir,
             timeout=timeout,
@@ -172,28 +203,102 @@ def run_evaluation_runtime(
             profile_fallback_reason=_profile_fallback_reason(profile_result),
         )
 
+
+def _trace_count_guard(
+    proc: subprocess.CompletedProcess[str],
+    traces: list[Trace],
+    expected_trace_count: int | None,
+    *,
+    filtered_stderr: str,
+    profile_result: Rocprofv3ProfileResult | None,
+) -> EvaluationRuntimeIncomplete | None:
+    """Return an incomplete classification when a run cannot be trusted.
+
+    The eval driver emits one trace per workload and always exits 0, so a
+    trace-count mismatch or a non-zero exit means the run did not complete
+    every workload — a partial run, a mid-run crash, or forged/injected traces
+    (audit eval_driver.py:34 / cli-c2 / cli-c3).  Returns ``None`` when no
+    guard is active or the run is complete and clean.
+    """
+    if expected_trace_count is None:
+        return None
+    if len(traces) == expected_trace_count and proc.returncode == 0:
+        return None
+    if len(traces) != expected_trace_count:
+        message = (
+            f"Expected {expected_trace_count} trace(s) but parsed "
+            f"{len(traces)}; evaluation did not complete every workload"
+        )
+    else:
+        message = (
+            f"Evaluation exited with code {proc.returncode} despite "
+            f"complete trace output; result cannot be trusted"
+        )
+    return _failure_result(
+        EvaluationRuntimeIncomplete,
+        message,
+        proc,
+        filtered_stderr=filtered_stderr,
+        profile_result=profile_result,
+    )
+
+
+def run_evaluation_runtime(
+    packager: EvaluationPackager,
+    *,
+    eval_cmd: list[str],
+    staging_dir: Path,
+    output_file: Path | None,
+    timeout: int,
+    profile: ProfileMode,
+    expected_trace_count: int | None = None,
+) -> EvaluationRuntimeResult:
+    """Run evaluation and classify subprocess outcomes without CLI side effects."""
+    profiled_proc, profile_result = _run_profiled_or_none(
+        eval_cmd,
+        staging_dir=staging_dir,
+        output_file=output_file,
+        timeout=timeout,
+        profile=profile,
+    )
+    proc_or_timeout = _run_eval_subprocess(
+        eval_cmd,
+        staging_dir=staging_dir,
+        timeout=timeout,
+        profiled_proc=profiled_proc,
+        profile_result=profile_result,
+    )
+    if isinstance(proc_or_timeout, EvaluationRuntimeTimeout):
+        return proc_or_timeout
+    proc = proc_or_timeout
+
     filtered_stderr = filter_benign_rocm_stderr(proc.stderr)
     if proc.returncode != 0 and not proc.stdout.strip():
-        return EvaluationRuntimeFailedNoStdout(
-            message="Evaluation failed",
-            returncode=proc.returncode,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
+        return _failure_result(
+            EvaluationRuntimeFailedNoStdout,
+            "Evaluation failed",
+            proc,
             filtered_stderr=filtered_stderr,
             profile_result=profile_result,
-            profile_fallback_reason=_profile_fallback_reason(profile_result),
         )
 
     traces = packager.convert_stdout_to_traces(proc.stdout)
+    incomplete = _trace_count_guard(
+        proc,
+        traces,
+        expected_trace_count,
+        filtered_stderr=filtered_stderr,
+        profile_result=profile_result,
+    )
+    if incomplete is not None:
+        return incomplete
     if not traces:
-        return EvaluationRuntimeNoParseableTraces(
-            message="No traces produced",
-            returncode=proc.returncode,
-            stdout=proc.stdout,
-            stderr=proc.stderr,
+        return _failure_result(
+            EvaluationRuntimeNoParseableTraces,
+            "No traces produced",
+            proc,
             filtered_stderr=filtered_stderr,
             profile_result=profile_result,
-            profile_fallback_reason=_profile_fallback_reason(profile_result),
         )
 
     apply_reference_speedups(traces)

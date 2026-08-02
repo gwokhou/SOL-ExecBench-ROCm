@@ -128,7 +128,8 @@ _STATIC_RULES = (
         "semantic_output_cache",
         SourceReviewSeverity.BLOCK,
         re.compile(
-            r"(\bdata_ptr\s*\(|\blru_cache\b|\bglobal\s+[_A-Za-z0-9]*cache\b|"
+            r"(\bdata_ptr\s*\(|\blru_cache\b|\bfunctools\.cache\b|\bcached_property\b|"
+            r"\bglobal\s+[_A-Za-z0-9]*cache\b|"
             r"[_A-Za-z0-9]*cache\s*=\s*\{|\btobytes\s*\(|\bhashlib\b)",
         ),
         "data-pointer or content-keyed caching can reuse outputs across phases",
@@ -153,8 +154,15 @@ _STATIC_RULES = (
             r"\bctypes\.cdll\b|\bdlopen\b|\btorch\.ops\.load_library\b|"
             r"\bload_inline\s*\(|\bcpp_extension\.load\s*\(|\bsubprocess\b|"
             r"\b__import__\s*\(|\bimportlib\.(import_module|util)\b|"
-            r"\bgetattr\s*\(\s*os\s*,\s*['\"](system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*)['\"]\s*\)|"
-            r"\bos\.(system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*)\s*\(|"
+            r"\bgetattr\s*\(\s*os\s*,\s*['\"](system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*|"
+            r"__dict__|__getattribute__)['\"]\s*\)|"
+            r"\bos\.(system|popen|spawn[a-zA-Z_]*|exec[a-zA-Z_]*|"
+            r"write|dup|dup2|dup3|fdopen|open|_exit|abort)\s*\(|"
+            r"\bos\.__dict__\b|\bos\.__getattribute__\b|"
+            r"\b__builtins__\b|"
+            r"\b(mmap|fcntl)\b|"
+            r"\btypes\.(FunctionType|CodeType|MethodType)\b|"
+            r"\b(system|popen|fork)\s*\(|"
             r"\bpty\.spawn\s*\(|\bsocket\b|\burllib\b|\brequests\b)",
         ),
         "file I/O, embedded payload decoding, dynamic native loading, or process/network access is not allowed in submitted sources",
@@ -189,9 +197,11 @@ _RISKY_IMPORT_ROOTS = {
     "base64",
     "builtins",
     "ctypes",
+    "fcntl",
     "marshal",
     "gc",
     "inspect",
+    "mmap",
     "pickle",
     "pty",
     "requests",
@@ -225,6 +235,36 @@ _RISKY_METHODS = {
     "load",
     "load_inline",
 }
+
+
+# ``os`` module calls that forge traces or duplicate trusted file descriptors
+# (audit static-b8): the exact primitives a candidate uses to write forged
+# JSONL to the preserved real-stdout fd.  Never required by a compute kernel.
+_RISKY_OS_IO_CALLS = frozenset(
+    {"write", "dup", "dup2", "dup3", "fdopen", "open"}
+)
+
+
+# ``os`` calls that short-circuit the process after emitting forged traces or
+# before a reward-hack check runs (audit eval_driver.py:34).  A normal eval
+# driver exits 0 only via its own ``os._exit``; a candidate never needs these.
+_RISKY_OS_EXIT_CALLS = frozenset({"_exit", "abort"})
+
+
+# Module roots whose direct use manipulates file descriptors, memory mappings,
+# or advisory locks, bypassing the authorized-call allowlist (audit static-b8).
+_RISKY_NATIVE_MODULE_ROOTS = frozenset({"mmap", "fcntl"})
+
+
+# ``types`` attributes that construct callables/code objects from raw bytecode
+# (audit static-b6), enabling marshal-based obfuscation to hide exploits.
+_RISKY_TYPES_ATTRS = frozenset({"FunctionType", "CodeType", "MethodType"})
+
+
+# ``os`` attribute lookups that re-expose process-execution or storage machinery
+# after direct-name blocking (audit static-b7): ``os.__dict__`` and
+# ``os.__getattribute__`` restore access to ``os.system``/``os.popen``.
+_OS_DICT_ATTRS = frozenset({"__dict__", "__getattribute__"})
 
 
 _CACHE_METHODS = {"data_ptr", "tobytes"}
