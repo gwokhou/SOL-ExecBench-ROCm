@@ -28,10 +28,62 @@ from sol_execbench.core.data.workload import ToleranceSpec
 
 _CORRECTNESS_CHUNK_ELEMENTS = 1 << 20
 
+# A contiguous block of tolerance-exceeding elements this large signals a
+# destination-passing kernel that skipped an entire output slice (audit
+# correctness-b1): legit numerical errors scatter as isolated points, while a
+# skipped slice reads as one long run of wrong values. Both the absolute floor
+# and the relative fraction must be met so small outputs and short noise runs
+# never trip the gate.
+_SLICE_SKIP_RUN_FLOOR = 256
+_SLICE_SKIP_RUN_FRACTION = 0.005
+
 
 def _tensor_chunks(tensor: torch.Tensor) -> tuple[torch.Tensor, ...]:
     """Yield bounded flat views so correctness checks do not scale VRAM overhead."""
     return tensor.reshape(-1).split(_CORRECTNESS_CHUNK_ELEMENTS)
+
+
+def _fold_exceeds_run(
+    mask: torch.Tensor,
+    pending_run: int,
+    longest_run: int,
+) -> tuple[int, int]:
+    """Fold one chunk's exceed-mask into cross-chunk longest-run state.
+
+    Returns ``(new_pending_run, new_longest_run)``. *pending_run* carries a
+    trailing run into the next chunk because chunks are sequential slices of
+    the flattened tensor, so a skipped slice can straddle a chunk boundary.
+    """
+    n = mask.numel()
+    if n == 0:
+        return pending_run, longest_run
+    if bool(mask.all()):
+        merged = pending_run + n
+        return merged, max(longest_run, merged)
+    inverted = (~mask).int()
+    leading = int(inverted.argmax().item())
+    trailing = int(inverted.flip(0).argmax().item())
+    padded = torch.cat(
+        (
+            torch.zeros(1, dtype=torch.int32, device=mask.device),
+            mask.to(torch.int32),
+            torch.zeros(1, dtype=torch.int32, device=mask.device),
+        ),
+    )
+    delta = torch.diff(padded)
+    starts = (delta == 1).nonzero(as_tuple=True)[0]
+    ends = (delta == -1).nonzero(as_tuple=True)[0]
+    internal = int((ends - starts).max().item()) if starts.numel() else 0
+    longest_run = max(longest_run, pending_run + leading, internal)
+    return trailing, longest_run
+
+
+def _slice_skip_violated(longest_run: int, total_elements: int) -> bool:
+    """True when one contiguous exceed run implies a skipped output slice."""
+    return longest_run >= max(
+        _SLICE_SKIP_RUN_FLOOR,
+        _SLICE_SKIP_RUN_FRACTION * total_elements,
+    )
 
 
 def set_seed(seed: int) -> None:
@@ -143,6 +195,8 @@ def compute_error_stats(
     exceeds_count = 0
     max_abs = 0.0
     max_rel = 0.0
+    pending = 0
+    longest = 0
     for output_chunk, reference_chunk in zip(
         _tensor_chunks(output),
         _tensor_chunks(reference),
@@ -162,6 +216,7 @@ def compute_error_stats(
         tol_bound = tolerance.max_atol + tolerance.max_rtol * torch.abs(y)
         exceeds_tol_mask = (abs_error > tol_bound) | ~torch.isfinite(abs_error)
         exceeds_count += int(exceeds_tol_mask.sum().item())
+        pending, longest = _fold_exceeds_run(exceeds_tol_mask, pending, longest)
         rel_error = abs_error / torch.clamp(
             torch.abs(y),
             min=tolerance.max_atol,
@@ -172,6 +227,7 @@ def compute_error_stats(
         return Correctness(), False
     matched_ratio = 1.0 - (exceeds_count / float(total_elements))
     matched_ratio = max(0.0, min(1.0, matched_ratio))
+    longest = max(longest, pending)
 
     # Hard ceiling on max absolute error for library-style kernels.
     # Prevents accepting solutions where most elements match but rare outliers
@@ -181,6 +237,9 @@ def compute_error_stats(
         tolerance.max_error_cap is not None
         and max_abs > tolerance.max_error_cap
     ):
+        exceeds_tol = True
+    # Reject a DPS kernel that skipped a whole output slice (correctness-b1).
+    if _slice_skip_violated(longest, total_elements):
         exceeds_tol = True
 
     return Correctness(
