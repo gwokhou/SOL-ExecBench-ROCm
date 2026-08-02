@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <random>
 #include <vector>
 
 namespace {
@@ -437,11 +438,27 @@ __global__ void atomic_update_kernel(float* output, const int* indices, size_t c
 }
 
 int emit_atomic_metrics(float* output, int* device_indices, size_t count,
-                        size_t output_count, const char* variant) {
+                        size_t output_count, const char* variant,
+                        bool random_indices) {
   std::vector<int> indices(count);
-  const size_t multiplicity = count / output_count;
-  for (size_t index = 0; index < count; ++index) {
-    indices[index] = static_cast<int>(index / multiplicity);
+  if (random_indices) {
+    // Canonical-input-bound uniform-with-replacement index draw matching the
+    // diagnostic corpus: output_count rows, count samples drawn from
+    // [0, output_count). This yields duplicate_fraction ~ 1 - 1/e and a
+    // multiplicity tail that grows logarithmically with output_count, so the
+    // measured (collision, multiplicity) coordinates are self-consistent with
+    // the declared cell ranges instead of being forced into a synthetic point.
+    std::mt19937 generator(0xC0FFEEu);
+    std::uniform_int_distribution<int> distribution(
+        0, static_cast<int>(output_count) - 1);
+    for (size_t index = 0; index < count; ++index) {
+      indices[index] = distribution(generator);
+    }
+  } else {
+    const size_t multiplicity = count / output_count;
+    for (size_t index = 0; index < count; ++index) {
+      indices[index] = static_cast<int>(index / multiplicity);
+    }
   }
   if (!hip_ok(hipMemcpy(device_indices, indices.data(), count * sizeof(int),
                         hipMemcpyHostToDevice))) {
@@ -469,14 +486,15 @@ int run_atomic_update() {
       !hip_ok(hipMalloc(&indices, count * sizeof(int)))) {
     return 2;
   }
-  const size_t output_counts[] = {count, count / 4, count / 32};
+  const size_t output_counts[] = {count, count, count / 32};
   const char* variants[] = {
       "collision_fraction=0:0.25,max_multiplicity=1:2,element_bytes=4:4",
-      "collision_fraction=0.250001:0.85,max_multiplicity=3:8,element_bytes=4:4",
-      "collision_fraction=0.850001:1,max_multiplicity=9:1.0995e12,element_bytes=4:4"};
+      "collision_fraction=0.250001:0.85,max_multiplicity=3:16,element_bytes=4:4",
+      "collision_fraction=0.850001:1,max_multiplicity=17:1.0995e12,element_bytes=4:4"};
+  const bool random_indices[] = {false, true, false};
   for (int pattern = 0; pattern < 3; ++pattern) {
     if (emit_atomic_metrics(output, indices, count, output_counts[pattern],
-                            variants[pattern]) != 0) {
+                            variants[pattern], random_indices[pattern]) != 0) {
       return 2;
     }
   }
