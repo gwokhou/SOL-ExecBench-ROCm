@@ -23,6 +23,7 @@ import pytest
 import torch
 
 from sol_execbench.core.bench.io import ShiftingMemoryPoolAllocator
+from sol_execbench.core.bench.reward_hack import RewardHackError
 from sol_execbench.core.bench.timing import (
     _measurement_budget_reached,
     _summarize_statistics,
@@ -231,6 +232,69 @@ class TestBenchTimeWithDeviceEvents:
             "end_record",
             "end_sync",
         ]
+
+    @staticmethod
+    def _patch_timing_device_mocks(monkeypatch, current_device):
+        class MockEvent:
+            def __init__(self, enable_timing=False):
+                del enable_timing
+
+            def record(self):
+                pass
+
+            def synchronize(self):
+                pass
+
+            def elapsed_time(self, end):
+                del end
+                return 0.5
+
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+        monkeypatch.setattr(torch.cuda, "device_count", lambda: 2)
+        monkeypatch.setattr(torch.cuda, "current_device", current_device)
+        monkeypatch.setattr(torch.cuda, "set_device", lambda index: None)
+        monkeypatch.setattr(torch.cuda, "Event", MockEvent)
+        monkeypatch.setattr(torch.cuda, "synchronize", lambda: None)
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._get_empty_cache_for_benchmark",
+            lambda device, policy: None,
+        )
+        monkeypatch.setattr(
+            "sol_execbench.core.bench.timing._clear_cache",
+            lambda cache: None,
+        )
+
+    def test_rejects_candidate_that_switches_active_device(self, monkeypatch):
+        """Switching the active CUDA device mid-timing is a reward hack (device-b3)."""
+        current = {"index": 0}
+        self._patch_timing_device_mocks(
+            monkeypatch,
+            current_device=lambda: current["index"],
+        )
+
+        def switch_device():
+            current["index"] = 1  # candidate directs timed work onto device 1
+
+        with pytest.raises(RewardHackError):
+            bench_time_with_device_events(
+                switch_device,
+                warmup=0,
+                rep=1,
+                device="cuda:0",
+            )
+
+    def test_allows_candidate_that_keeps_device_pinned(self, monkeypatch):
+        """A candidate that leaves the active device unchanged times normally."""
+        self._patch_timing_device_mocks(monkeypatch, current_device=lambda: 0)
+
+        times = bench_time_with_device_events(
+            lambda: None,
+            warmup=0,
+            rep=1,
+            device="cuda:0",
+        )
+
+        assert times == [0.5]
 
 
 # ---------------------------------------------------------------------------

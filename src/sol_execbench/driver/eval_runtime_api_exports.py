@@ -39,6 +39,7 @@ from sol_execbench.core.data.json_utils import atomic_write_jsonl_values
 from sol_execbench.core.data.solution import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
+from sol_execbench.core.platform.runtime import pin_cuda_device
 
 __all__ = [
     "BenchmarkConfig",
@@ -68,6 +69,7 @@ __all__ = [
     "load_user_function",
     "make_eval",
     "measure_latency",
+    "pin_cuda_device",
     "review_solution_sources",
     "run_reward_hack_check",
     "snapshot_critical_functions",

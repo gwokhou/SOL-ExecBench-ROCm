@@ -8,6 +8,7 @@ from sol_execbench.core.platform.runtime import (
     detect_rocm_device,
     discover_rocm_root,
     hardware_from_device,
+    pin_cuda_device,
     resolve_rocm_tool,
     resolve_rocm_tool_command,
     resolve_tool_path,
@@ -147,3 +148,65 @@ def test_rocm_search_roots_puts_discovered_root_first(tmp_path) -> None:
     )
 
     assert roots[0] == root.resolve()
+
+
+def test_pin_cuda_device_noop_for_cpu_target() -> None:
+    sink: list[int] = []
+    fake = SimpleNamespace(
+        cuda=SimpleNamespace(set_device=lambda index: sink.append(index)),
+        device=lambda value: SimpleNamespace(type="cpu", index=None),
+    )
+
+    pin_cuda_device("cpu", torch_module=fake)
+
+    assert sink == []
+
+
+def test_pin_cuda_device_noop_when_cuda_unavailable() -> None:
+    sink: list[int] = []
+    fake = SimpleNamespace(
+        cuda=SimpleNamespace(
+            is_available=lambda: False,
+            set_device=lambda index: sink.append(index),
+        ),
+        device=lambda value: SimpleNamespace(type="cuda", index=0),
+    )
+
+    pin_cuda_device("cuda:0", torch_module=fake)
+
+    assert sink == []
+
+
+def test_pin_cuda_device_pins_explicit_index() -> None:
+    sink: list[int] = []
+    fake = SimpleNamespace(
+        cuda=SimpleNamespace(
+            is_available=lambda: True,
+            current_device=lambda: 0,
+            set_device=lambda index: sink.append(index),
+        ),
+        device=lambda value: SimpleNamespace(
+            type="cuda",
+            index=int(value.split(":")[1]),
+        ),
+    )
+
+    pin_cuda_device("cuda:1", torch_module=fake)
+
+    assert sink == [1]
+
+
+def test_pin_cuda_device_pins_current_device_when_index_unspecified() -> None:
+    sink: list[int] = []
+    fake = SimpleNamespace(
+        cuda=SimpleNamespace(
+            is_available=lambda: True,
+            current_device=lambda: 2,
+            set_device=lambda index: sink.append(index),
+        ),
+        device=lambda value: SimpleNamespace(type="cuda", index=None),
+    )
+
+    pin_cuda_device("cuda", torch_module=fake)
+
+    assert sink == [2]

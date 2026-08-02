@@ -73,3 +73,22 @@ def test_emit_uses_strict_json():
 
     assert "emit_trace_jsonl(_trace, _real_stdout)" in source
     assert "_sanitize_floats" not in source
+
+
+def test_eval_driver_pins_device_before_candidate_import():
+    """The driver pins the active CUDA device before importing candidate code.
+
+    Guarantees the device-b3 fix is not silently dropped during template
+    refactors: the pin call must be present and must precede load_user_function.
+    """
+    source = _driver_source()
+    assert "pin_cuda_device(_device)" in source
+    assert source.index("pin_cuda_device(_device)") < source.index(
+        "load_user_function(",
+    )
+
+
+def test_reference_worker_pins_device():
+    """The trusted reference worker pins its device for parity with the driver."""
+    source = (_TEMPLATES_DIR / "reference_worker.py").read_text()
+    assert "pin_cuda_device(_device)" in source

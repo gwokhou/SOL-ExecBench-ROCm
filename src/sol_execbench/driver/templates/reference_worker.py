@@ -14,6 +14,7 @@ from pathlib import Path
 
 import torch
 
+from sol_execbench.core.platform.runtime import pin_cuda_device
 from sol_execbench.driver.reference_runtime_api import (
     REFERENCE_REQUEST_FD_ENV,
     REFERENCE_RESPONSE_FD_ENV,
@@ -26,6 +27,9 @@ _device = os.environ.get(
     "SOL_EXECBENCH_DEVICE",
     "cuda:0" if torch.cuda.is_available() else "cpu",
 )
+# Pin the active device so reference outputs are always produced on the same
+# device the candidate is timed on (device-b3 parity with the eval driver).
+pin_cuda_device(_device)
 _token = os.environ[REFERENCE_TOKEN_ENV]
 _request_stream = Connection(
     int(os.environ[REFERENCE_REQUEST_FD_ENV]),
