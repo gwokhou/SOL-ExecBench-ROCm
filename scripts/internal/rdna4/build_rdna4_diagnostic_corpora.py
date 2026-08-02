@@ -129,6 +129,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--force", action="store_true")
     parser.add_argument(
+        "--confirm-recollect-held-out",
+        action="store_true",
+        help=(
+            "explicitly allow --force to overwrite a frozen held-out corpus; "
+            "any prior acceptance artifact citing it is thereby invalidated"
+        ),
+    )
+    parser.add_argument(
         "--source-corpus",
         type=Path,
         action="append",
@@ -482,10 +490,34 @@ def _remove_trace_artifacts(trace: Path) -> None:
             artifact.unlink()
 
 
+def _refuse_frozen_held_out_recollect(arguments: argparse.Namespace) -> None:
+    """Refuse to overwrite a frozen held-out corpus unless explicitly confirmed.
+
+    Guards rerun-until-acceptance (audit ``build_rdna4_diagnostic_corpora:446``):
+    once held-out evidence is frozen it must not be silently deleted and
+    re-collected, because any prior acceptance artifact cited the frozen
+    evidence and its ``held_out_corpus_sha256`` would silently drift.
+    """
+    frozen_held_out = arguments.root / "held_out.json"
+    if (
+        arguments.stage == "collect"
+        and arguments.role == "held_out"
+        and arguments.force
+        and frozen_held_out.exists()
+        and not arguments.confirm_recollect_held_out
+    ):
+        raise ValueError(
+            "refusing --force re-collection of a frozen held-out corpus "
+            f"({frozen_held_out}); delete it first to explicitly invalidate "
+            "prior acceptance, or pass --confirm-recollect-held-out",
+        )
+
+
 def _execute_cases(arguments: argparse.Namespace) -> None:
     if arguments.role is None:
         raise ValueError(f"{arguments.stage} requires --role")
     _require_frozen_design(arguments.root)
+    _refuse_frozen_held_out_recollect(arguments)
     selected = _cases(arguments.role)
     if arguments.family is not None:
         selected = [

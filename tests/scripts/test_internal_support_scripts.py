@@ -368,3 +368,61 @@ def test_rdna4_validation_timeout_and_argument_checks(
         validation.main(
             ["--output-dir", str(tmp_path / "out"), "--timeout", "0"],
         )
+
+
+def test_force_refuses_to_recollect_frozen_held_out(
+    tmp_path: Path,
+    load_script: Any,
+) -> None:
+    """Gap 5: --force cannot silently overwrite a frozen held-out corpus."""
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py"
+    )
+    (tmp_path / "held_out.json").write_text("{}", encoding="utf-8")
+
+    forced = SimpleNamespace(
+        stage="collect",
+        role="held_out",
+        force=True,
+        root=tmp_path,
+        confirm_recollect_held_out=False,
+    )
+    with pytest.raises(ValueError, match="frozen held-out corpus"):
+        corpus._refuse_frozen_held_out_recollect(forced)
+
+
+def test_force_recollect_held_out_requires_explicit_confirmation(
+    tmp_path: Path,
+    load_script: Any,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py"
+    )
+    (tmp_path / "held_out.json").write_text("{}", encoding="utf-8")
+
+    confirmed = SimpleNamespace(
+        stage="collect",
+        role="held_out",
+        force=True,
+        root=tmp_path,
+        confirm_recollect_held_out=True,
+    )
+    corpus._refuse_frozen_held_out_recollect(confirmed)  # must not raise
+
+
+def test_force_held_out_without_frozen_corpus_is_allowed(
+    tmp_path: Path,
+    load_script: Any,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py"
+    )
+
+    fresh = SimpleNamespace(
+        stage="collect",
+        role="held_out",
+        force=True,
+        root=tmp_path,
+        confirm_recollect_held_out=False,
+    )
+    corpus._refuse_frozen_held_out_recollect(fresh)  # must not raise
