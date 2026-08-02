@@ -230,6 +230,7 @@ def run_evaluation_phase(
             output_file=context.output_file,
             timeout=timeout,
             profile=profile,
+            expected_trace_count=workload_count,
         )
         progress.update(task, completed=True)
 

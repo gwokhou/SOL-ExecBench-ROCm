@@ -13,6 +13,7 @@ from typing import Any
 from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.solution import Solution
+from sol_execbench.core.data.solution_models import RESERVED_STAGING_FILENAMES
 from sol_execbench.core.data.workload import SafetensorsInput, Workload
 
 
@@ -53,9 +54,23 @@ def stage_trusted_definition_file(
 
 
 def stage_solution_sources(solution: Solution, output_dir: Path) -> None:
-    """Write solution source files to the staging directory."""
+    """Write solution source files to the staging directory.
+
+    Defense-in-depth for the reserved-filename guard enforced at the
+    :class:`SourceFile` validator (audit cli-c1 / staging.py:59): a source that
+    would overwrite a trusted top-level file is rejected even if a
+    ``Solution`` was constructed bypassing pydantic validation.
+    """
     for src in solution.sources:
         dest = output_dir / src.path
+        if (
+            dest.parent == output_dir
+            and dest.name in RESERVED_STAGING_FILENAMES
+        ):
+            raise ValueError(
+                f"Refusing to stage candidate source over reserved harness "
+                f"file: {src.path}",
+            )
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(src.content)
 

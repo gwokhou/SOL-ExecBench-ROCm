@@ -102,6 +102,91 @@ def test_run_evaluation_runtime_returns_success_for_parseable_traces(
     assert result.profile_result is None
 
 
+def _install_command(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    returncode: int,
+    stdout: str,
+) -> None:
+    def _run_command(eval_cmd, *, staging_dir, timeout):
+        return subprocess.CompletedProcess(
+            args=eval_cmd,
+            returncode=returncode,
+            stdout=stdout,
+            stderr="",
+        )
+
+    monkeypatch.setattr(cli_evaluation, "_run_evaluation_command", _run_command)
+
+
+def test_run_evaluation_runtime_rejects_trace_count_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A partial run (fewer traces than workloads) is classified incomplete."""
+    packager = _FakePackager(traces=[_trace(), _trace()])  # 2 of 3 workloads
+    _install_command(monkeypatch, returncode=0, stdout='{"trace": 1}\n')
+
+    result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=["python", "candidate.py"],
+        staging_dir=tmp_path,
+        output_file=None,
+        timeout=7,
+        profile=ProfileMode.NONE,
+        expected_trace_count=3,
+    )
+
+    assert isinstance(result, evaluation_runtime.EvaluationRuntimeIncomplete)
+    assert result.reason is (
+        evaluation_runtime.EvaluationRuntimeFailureReason.EVALUATION_INCOMPLETE
+    )
+    assert "Expected 3 trace(s) but parsed 2" in result.message
+
+
+def test_run_evaluation_runtime_rejects_nonzero_exit_with_full_count(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A non-zero exit despite a full trace count cannot be trusted."""
+    packager = _FakePackager(traces=[_trace(), _trace(), _trace()])
+    _install_command(monkeypatch, returncode=2, stdout='{"trace": 1}\n')
+
+    result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=["python", "candidate.py"],
+        staging_dir=tmp_path,
+        output_file=None,
+        timeout=7,
+        profile=ProfileMode.NONE,
+        expected_trace_count=3,
+    )
+
+    assert isinstance(result, evaluation_runtime.EvaluationRuntimeIncomplete)
+    assert "exited with code 2" in result.message
+
+
+def test_run_evaluation_runtime_accepts_matching_count_and_clean_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A full count with a clean exit is accepted (no false positive)."""
+    packager = _FakePackager(traces=[_trace(), _trace()])
+    _install_command(monkeypatch, returncode=0, stdout='{"trace": 1}\n')
+
+    result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=["python", "candidate.py"],
+        staging_dir=tmp_path,
+        output_file=None,
+        timeout=7,
+        profile=ProfileMode.NONE,
+        expected_trace_count=2,
+    )
+
+    assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
+
+
 def test_runtime_derives_reference_speedup_after_worker_exit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -12,6 +12,7 @@ import torch
 
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.bench.reference_protocol import ReferenceClient
+from sol_execbench.core.bench.reward_hack.runtime import _IntegritySnapshot
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 
@@ -22,8 +23,8 @@ class EvaluationDependencies:
 
     reference_client: ReferenceClient
     user_fn: Callable[..., Any]
-    integrity_snapshot: dict[str, int]
-    check_integrity: Callable[[dict[str, int], dict[str, Any]], None]
+    integrity_snapshot: _IntegritySnapshot
+    check_integrity: Callable[[_IntegritySnapshot, dict[str, Any]], None]
     driver_globals: dict[str, Any]
     real_stdout: TextIO
     timing_recorder: Callable[[dict[str, object]], None] | None = None

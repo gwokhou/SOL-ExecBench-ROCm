@@ -684,3 +684,228 @@ class TestStaticSourceReview:
         )
 
         assert review.blocked is False
+
+
+# ── sealed timing / integrity guards (dlopen-b1, static-b2) ──────────────────
+
+
+class TestSealedIntegrityGuards:
+    """Regression coverage for the immutable strong-reference guards.
+
+    These replace the former ``id()``-in-a-mutable-global pattern that a native
+    dlopen constructor or a ``sys.modules['__main__']`` write could defeat
+    (audit findings ``runtime.py:40`` / dlopen-b1 and ``runtime.py:322`` /
+    static-b2).
+    """
+
+    def test_sealed_reference_rejects_attribute_mutation(self):
+        from sol_execbench.core.bench.reward_hack.runtime import (
+            _SealedReference,
+        )
+
+        guard = _SealedReference(len)
+        with pytest.raises(AttributeError):
+            guard._reference = print  # type: ignore[misc]
+        with pytest.raises(AttributeError):
+            del guard._reference
+        assert guard.is_intact(len)
+        assert not guard.is_intact(print)
+
+    def test_snapshot_is_immutable_to_attribute_or_item_write(self):
+        from sol_execbench.core.bench.reward_hack.runtime import (
+            _IntegritySnapshot,
+        )
+
+        def original() -> None:
+            return None
+
+        snapshot = snapshot_critical_functions({"fn": original}, ["fn"])
+        assert isinstance(snapshot, _IntegritySnapshot)
+        # A candidate reaching the snapshot via __main__ cannot rewrite the
+        # stored reference to match a patched live function.
+        with pytest.raises(AttributeError):
+            snapshot._references = {"fn": print}  # type: ignore[misc]
+        with pytest.raises(AttributeError):
+            del snapshot._references
+        with pytest.raises(TypeError):
+            snapshot["fn"] = print  # ty: ignore[invalid-assignment]  # read-only
+
+    def test_snapshot_holds_strong_reference_not_id(self):
+        """Strong ref survives deletion + gc; an id()-based guard would not."""
+        import gc
+
+        def original() -> str:
+            return "real"
+
+        ns = {"fn": original}
+        snapshot = snapshot_critical_functions(ns, ["fn"])
+        # Drop every other reference to the function and collect garbage so its
+        # id() address may be reused by a later allocation.
+        del ns["fn"]
+        del original
+        gc.collect()
+        # The captured reference is still alive and identity still resolves.
+        ns_after = {"fn": snapshot.reference_of("fn")}
+        check_eval_integrity(snapshot, ns_after)  # must not raise
+
+    def test_check_uses_identity_not_id_value(self):
+        """Replacement is detected even if a new object reuses the address."""
+
+        def real() -> None:
+            return None
+
+        ns: dict[str, Any] = {"fn": real}
+        snapshot = snapshot_critical_functions(ns, ["fn"])
+        ns["fn"] = lambda: None  # attacker swaps in a fresh callable
+        with pytest.raises(RewardHackError, match="fn"):
+            check_eval_integrity(snapshot, ns)
+
+    def test_verify_timing_function_intact_is_callable(self):
+        from sol_execbench.core.bench.reward_hack import (
+            verify_timing_function_intact,
+        )
+
+        # CPU-only target: guard no-ops. GPU target: pristine fn is intact.
+        verify_timing_function_intact()  # must not raise
+
+
+# ── static-review bypass closures (static-b1/b6/b7/b8) ───────────────────────
+
+
+class TestStaticBypassClosures:
+    """Block the five static-obfuscation families the follow-up audit confirmed.
+
+    Each parametrized snippet is a representative exploit primitive that must be
+    rejected with ``unauthorized_file_or_loader`` (audit static-b1/b6/b7/b8).
+    """
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            # static-b8: trace-forgery fd primitives + native fd/mapping modules
+            "import os\ndef run(x):\n    os.write(3, b'forged')\n    return x\n",
+            "import os\ndef run(x):\n    os.dup(1)\n    return x\n",
+            "import os\ndef run(x):\n    os.fdopen(3, 'w')\n    return x\n",
+            "import mmap\ndef run(x):\n    mmap.mmap(-1, 4096)\n    return x\n",
+            "import fcntl\ndef run(x):\n    fcntl.fcntl(1, 0)\n    return x\n",
+            # static-b1: __builtins__ re-exposes __import__/eval after blocking
+            "def run(x):\n    return __builtins__.__import__('os')\n",
+            "def run(x):\n    return __builtins__['__import__']('os')\n",
+            # static-b6: types constructs callables from raw bytecode
+            "import types\ndef run(x):\n    return types.FunctionType(x, {})\n",
+            "import types\ndef run(x):\n    return types.CodeType(*x)\n",
+            # static-b7: os.__dict__ / os.__getattribute__ restore os.system
+            "import os\ndef run(x):\n    return os.__dict__['system']('true')\n",
+            "import os\ndef run(x):\n    return os.__getattribute__(os, 'system')('true')\n",
+            "import os\ndef run(x):\n    return getattr(os, '__dict__')['system']('true')\n",
+        ],
+    )
+    def test_blocks_obfuscation_primitives(self, content):
+        review = review_solution_sources(_solution_with_source(content))
+        assert review.blocked is True
+        assert "unauthorized_file_or_loader" in {
+            issue.rule for issue in review.issues
+        }
+
+    @pytest.mark.parametrize(
+        "path",
+        ["kernel.hip", "main.cpp", "kernel.cu"],
+    )
+    def test_blocks_native_process_and_loader_primitives(self, path):
+        """HIP/C++ sources must be reviewed for loader/process primitives too."""
+        review = review_solution_sources(
+            _solution_with_source(
+                'extern "C" void run() {\n'
+                '    system("rm -rf /");\n'
+                '    popen("ls", "r");\n'
+                '    dlopen("/tmp/x.so", 1);\n'
+                "}\n",
+                path=path,
+            ),
+        )
+        assert review.blocked is True
+        assert "unauthorized_file_or_loader" in {
+            issue.rule for issue in review.issues
+        }
+
+    def test_native_data_ptr_still_allowed_in_cpp(self):
+        """Tightened rules must not block legitimate C++ library data_ptr calls."""
+        review = review_solution_sources(
+            _solution_with_source(
+                'extern "C" void run(float* a) {\n'
+                "    hipblasSgemm(handle, m, n, k, a);\n"
+                "}\n",
+                path="main.cpp",
+            ),
+        )
+        assert review.blocked is False
+
+
+# ── value-keyed output-cache closure (seed-seed2) ────────────────────────────
+
+
+class TestValueKeyedCacheClosure:
+    """Block value-keyed output caches (unbounded decorators + population writes).
+
+    Audit seed-seed2: the memory pool already varies ``data_ptr`` per iteration
+    but re-presents byte-identical VALUES, so a value-keyed cache collapses
+    in-trial latency. Static detection closes the construction surface (the
+    within-trial identical-values residual is documented as boundary-constrained).
+    """
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            # cache POPULATION: the write that makes a value/data-keyed cache work
+            (
+                "def run(x):\n"
+                "    key = x.sum().item()\n"
+                "    if key not in _cache:\n"
+                "        _cache[key] = x + 1\n"
+                "    return _cache[key]\n"
+                "_cache = {}\n"
+            ),
+            (
+                "class K:\n"
+                "    def run(self, x):\n"
+                "        self.memo[x.int().sum().item()] = x + 1\n"
+                "        return self.memo[x.int().sum().item()]\n"
+            ),
+            # unbounded value-keyed decorators (sibling of lru_cache)
+            (
+                "import functools\n"
+                "@functools.cache\n"
+                "def run(x):\n"
+                "    return x + 1\n"
+            ),
+            (
+                "from functools import cache\n"
+                "@cache\n"
+                "def run(x):\n"
+                "    return x + 1\n"
+            ),
+            ("import functools\nrun = functools.cache(lambda x: x + 1)\n"),
+        ],
+    )
+    def test_blocks_value_keyed_cache_construction(self, content):
+        review = review_solution_sources(_solution_with_source(content))
+        assert review.blocked is True
+        assert "semantic_output_cache" in {
+            issue.rule for issue in review.issues
+        }
+
+    def test_legitimate_tensor_subscript_write_is_allowed(self):
+        """A normal output-element write must not be mistaken for a cache write."""
+        review = review_solution_sources(
+            _solution_with_source(
+                "import torch\n"
+                "def run(x):\n"
+                "    out = torch.empty_like(x)\n"
+                "    out[0] = x[0] + 1\n"
+                "    out[1:] = x[1:]\n"
+                "    return out\n",
+            ),
+        )
+        assert "semantic_output_cache" not in {
+            issue.rule for issue in review.issues
+        }

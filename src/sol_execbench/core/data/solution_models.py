@@ -158,6 +158,22 @@ def _validate_compile_flag(flag: str) -> None:
         raise ValueError(f"Compile option can reference host paths: {flag}")
 
 
+# Filenames the harness owns at the top level of the staging directory. A
+# candidate source must never claim one of these (audit cli-c1 / staging.py:59):
+# doing so would let the candidate overwrite trusted ground truth, the worker
+# reference definition, the workload manifest, the solution descriptor, or the
+# benchmark config — and thereby set its own near-zero reference latency.
+RESERVED_STAGING_FILENAMES = frozenset(
+    {
+        "definition.json",
+        "reference_definition.json",
+        "workload.jsonl",
+        "solution.json",
+        "config.json",
+    },
+)
+
+
 class SourceFile(BaseModelWithDocstrings):
     """A single source code file in a solution implementation.
 
@@ -180,7 +196,8 @@ class SourceFile(BaseModelWithDocstrings):
         Raises:
         ------
         ValueError
-            If the path contains security issues (absolute paths or path traversal).
+            If the path contains security issues (absolute paths, path
+            traversal, or a reserved harness filename at the staging root).
 
         """
         src_path = Path(self.path)
@@ -191,6 +208,10 @@ class SourceFile(BaseModelWithDocstrings):
         if ".." in src_path.parts:
             raise ValueError(
                 f"Invalid source path (parent directory traversal not allowed): {self.path}",
+            )
+        if any(src_path == Path(name) for name in RESERVED_STAGING_FILENAMES):
+            raise ValueError(
+                f"Invalid source path (reserved harness filename): {self.path}",
             )
         return self
 

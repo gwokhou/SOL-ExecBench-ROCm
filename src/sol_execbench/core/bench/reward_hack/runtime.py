@@ -26,46 +26,136 @@ from __future__ import annotations
 
 import _thread
 import threading
+from collections.abc import Iterator
 from typing import Any, Self
 
 import torch
 
 from sol_execbench.core.bench.reward_hack.models import RewardHackError
 
-_ELAPSED_TIME_ADDR: int | None = None
 
-try:
-    import torch.cuda
+class _Sealed:
+    """Base for holders that freeze their state at construction.
 
-    _ELAPSED_TIME_ADDR = id(torch.cuda.Event.elapsed_time)
-except (AttributeError, RuntimeError):
-    pass
+    Subclasses populate fields via ``object.__setattr__(self, name, value)``
+    in ``__init__`` and then call :meth:`_seal`.  Afterwards any attribute
+    mutation raises :class:`AttributeError`.  This denies a candidate reaching
+    the holder via ``sys.modules['__main__']`` the trivial ``holder.x = forged``
+    rewrite (audit findings dlopen-b1 / static-b2); only an
+    ``object.__setattr__`` bypass defeats it, a substantially higher bar layered
+    behind the static-source review.
+    """
+
+    __slots__ = ("_sealed",)
+
+    def _seal(self) -> None:
+        """Lock the holder against further attribute mutation."""
+        object.__setattr__(self, "_sealed", True)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        raise AttributeError("sealed holder is immutable")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("sealed holder is immutable")
+
+
+class _SealedReference(_Sealed):
+    """Immutable, identity-comparable holder for a captured function reference.
+
+    Reward-hack defenses previously stored ``id()`` integers in mutable module
+    globals.  A native ``__attribute__((constructor))`` loaded during candidate
+    ``dlopen`` can both replace ``torch.cuda.Event.elapsed_time`` and rewrite a
+    reachable module global, neutralizing an id()-based guard (audit finding
+    ``runtime.py:40`` / dlopen-b1).  This holder instead keeps a **strong
+    reference** to the pristine object captured before any candidate code runs
+    and compares with identity (``is``), which also defeats CPython address
+    reuse (audit finding ``runtime.py:302``).
+    """
+
+    __slots__ = ("_reference",)
+
+    _reference: Any
+
+    def __init__(self, reference: Any) -> None:
+        """Store *reference* strongly, then seal the holder against mutation."""
+        object.__setattr__(self, "_reference", reference)
+        self._seal()
+
+    @property
+    def reference(self) -> Any:
+        """Return the captured pristine object."""
+        return self._reference
+
+    def is_intact(self, current: Any) -> bool:
+        """Return True only when *current* is the exact captured object."""
+        return current is self._reference
+
+
+def _resolve_elapsed_time() -> Any:
+    """Return the live ``torch.cuda.Event.elapsed_time``, or None if unavailable."""
+    try:
+        import torch.cuda
+
+        return torch.cuda.Event.elapsed_time
+    except (AttributeError, RuntimeError):
+        return None
+
+
+# Sealed strong reference captured at import, before any candidate code runs.
+# This is the authoritative guard used by check_monkey_patch / verify below.
+_TIMING_GUARD = _SealedReference(_resolve_elapsed_time())
+
+# Deprecated diagnostic alias for the captured id(); retained for back-compat
+# with tooling and tests. NOT security-critical: check_monkey_patch reads the
+# sealed strong reference above, not this integer, so rewriting the module
+# global cannot defeat the guard.
+_ELAPSED_TIME_ADDR: int | None = (
+    id(_TIMING_GUARD.reference) if _TIMING_GUARD.reference is not None else None
+)
+
+
+def timing_function_available() -> bool:
+    """Return True when a pristine timing function was captured at import."""
+    return _TIMING_GUARD.reference is not None
 
 
 def check_monkey_patch() -> None:
     """Detect if torch.cuda.Event.elapsed_time has been patched.
 
-    Compares the current function identity against the address captured at
-    module load time.  Must be called before the timed section.
+    Compares the **live** function object against the pristine strong reference
+    captured at module import (before any candidate code runs).  Must be called
+    before every timed section.
 
     Raises:
-        RewardHackError: If the timing function has been replaced.
+        RewardHackError: If the timing function identity has changed, or if it
+            only became available after the guard was captured.
 
     """
-    try:
-        import torch.cuda
+    current = _resolve_elapsed_time()
+    pristine = _TIMING_GUARD.reference
+    if current is None:
+        return  # torch.cuda unavailable on this target (e.g. CPU-only run)
+    if pristine is None:
+        raise RewardHackError(
+            "torch.cuda.Event.elapsed_time became available after the integrity "
+            "guard was captured; timing function cannot be trusted",
+        )
+    if not _TIMING_GUARD.is_intact(current):
+        raise RewardHackError(
+            "torch.cuda.Event.elapsed_time has been monkey-patched",
+        )
 
-        if (
-            _ELAPSED_TIME_ADDR is not None
-            and id(torch.cuda.Event.elapsed_time) != _ELAPSED_TIME_ADDR
-        ):
-            raise RewardHackError(
-                "torch.cuda.Event.elapsed_time has been monkey-patched",
-            )
-    except RewardHackError:
-        raise
-    except (AttributeError, RuntimeError):
-        pass
+
+def verify_timing_function_intact() -> None:
+    """Re-confirm the timing function survived candidate import / dlopen.
+
+    Call immediately after :func:`load_user_function` so a patch installed by a
+    native ``__attribute__((constructor))`` during ``dlopen`` is caught before
+    any workload is timed.  Functionally equivalent to :func:`check_monkey_patch`
+    (the per-workload check would also detect it); named separately to make the
+    post-load verification point explicit at call sites.
+    """
+    check_monkey_patch()
 
 
 def check_thread_injection(threads_before: int, threads_after: int) -> None:
@@ -282,13 +372,55 @@ def check_lazy_outputs(outputs: list[Any]) -> None:
             )
 
 
+class _IntegritySnapshot(_Sealed):
+    """Frozen, identity-checked snapshot of critical eval functions.
+
+    Holds **strong references** (not ``id()`` integers) to every snapshotted
+    function captured before candidate code runs.  ``check_eval_integrity``
+    compares each live namespace entry against the stored reference with
+    identity (``is``), defeating both CPython address reuse and the
+    "rewrite-the-snapshot-in-__main__" attack (audit finding ``runtime.py:322``
+    / static-b2): the holder is sealed and exposes a read-only
+    :class:`types.MappingProxyType`, so a candidate reaching it via
+    ``sys.modules['__main__']`` cannot mutate the stored references to match
+    patched live functions without ``object.__setattr__`` (layered behind the
+    static-source review).
+    """
+
+    __slots__ = ("_proxy", "_references")
+
+    _proxy: Any
+    _references: dict[str, Any]
+
+    def __init__(self, references: dict[str, Any]) -> None:
+        """Store a private copy of *references* and expose a read-only view."""
+        from types import MappingProxyType
+
+        object.__setattr__(self, "_references", dict(references))
+        object.__setattr__(self, "_proxy", MappingProxyType(self._references))
+        self._seal()
+
+    def __contains__(self, name: object) -> bool:
+        return name in self._proxy
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._proxy)
+
+    def __len__(self) -> int:
+        return len(self._proxy)
+
+    def reference_of(self, name: str) -> Any:
+        """Return the captured reference for *name*."""
+        return self._references[name]
+
+
 def snapshot_critical_functions(
     namespace: dict[str, Any],
     names: list[str],
-) -> dict[str, int]:
-    """Capture ``id()`` of named functions from a namespace.
+) -> _IntegritySnapshot:
+    """Capture strong references to named callables from a namespace.
 
-    Call this **before** user code is imported.  Pass the returned dict to
+    Call this **before** user code is imported.  Pass the returned snapshot to
     :func:`check_eval_integrity` after user code runs.
 
     Args:
@@ -296,32 +428,42 @@ def snapshot_critical_functions(
         names: Function names to capture.
 
     Returns:
-        Mapping of name → ``id()`` for each name present in *namespace*.
+        Frozen snapshot mapping each present name to its captured reference.
 
     """
-    return {name: id(namespace[name]) for name in names if name in namespace}
+    return _IntegritySnapshot(
+        {name: namespace[name] for name in names if name in namespace},
+    )
 
 
 def check_eval_integrity(
-    snapshot: dict[str, int],
+    snapshot: dict[str, Any] | _IntegritySnapshot,
     namespace: dict[str, Any],
 ) -> None:
     """Verify that critical eval-driver functions have not been replaced.
 
-    Compares the current ``id()`` of each snapshotted name against the
-    value captured before user code was imported.
+    Compares the **live** object for each snapshotted name against the stored
+    strong reference using identity (``is``).  Accepts the
+    :class:`_IntegritySnapshot` returned by :func:`snapshot_critical_functions`
+    or a plain mapping (an empty dict always passes, for test/initial use).
 
     Args:
-        snapshot: The dict returned by :func:`snapshot_critical_functions`.
+        snapshot: The snapshot returned by :func:`snapshot_critical_functions`.
         namespace: The current globals dict to check.
 
     Raises:
-        RewardHackError: If any function identity has changed.
+        RewardHackError: If any function identity has changed or been deleted.
 
     """
-    for name, expected_id in snapshot.items():
+    if isinstance(snapshot, _IntegritySnapshot):
+        names = list(snapshot)
+        get_reference = snapshot.reference_of
+    else:
+        names = list(snapshot.keys())
+        get_reference = snapshot.__getitem__  # type: ignore[union-attr]
+    for name in names:
         current = namespace.get(name)
-        if current is None or id(current) != expected_id:
+        if current is None or current is not get_reference(name):
             raise RewardHackError(
                 f"Eval driver integrity violated: '{name}' has been monkey-patched",
             )
@@ -357,14 +499,14 @@ def _runtime_integrity_namespace(
 
 def snapshot_runtime_integrity(
     driver_namespace: dict[str, Any],
-) -> dict[str, int]:
+) -> _IntegritySnapshot:
     """Snapshot driver and cross-module timing/correctness functions."""
     namespace = _runtime_integrity_namespace(driver_namespace)
     return snapshot_critical_functions(namespace, list(namespace))
 
 
 def check_runtime_integrity(
-    snapshot: dict[str, int],
+    snapshot: dict[str, Any] | _IntegritySnapshot,
     driver_namespace: dict[str, Any],
 ) -> None:
     """Detect monkey-patching across the complete evaluation call graph."""

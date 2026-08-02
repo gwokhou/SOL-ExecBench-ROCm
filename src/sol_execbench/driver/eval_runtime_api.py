@@ -7,6 +7,7 @@ from sol_execbench.driver.eval_runtime_api_exports import (
     Definition,
     EvaluationDependencies,
     EvaluationStatus,
+    RewardHackError,
     Solution,
     Trace,
     Workload,
@@ -33,6 +34,7 @@ from sol_execbench.driver.eval_runtime_api_exports import (
     run_reward_hack_check,
     snapshot_critical_functions,
     snapshot_runtime_integrity,
+    verify_timing_function_intact,
 )
 
 __all__ = [
@@ -40,6 +42,7 @@ __all__ = [
     "Definition",
     "EvaluationDependencies",
     "EvaluationStatus",
+    "RewardHackError",
     "Solution",
     "Trace",
     "Workload",
@@ -66,4 +69,5 @@ __all__ = [
     "run_reward_hack_check",
     "snapshot_critical_functions",
     "snapshot_runtime_integrity",
+    "verify_timing_function_intact",
 ]
