@@ -1390,14 +1390,6 @@ def _elementwise_parameter(
         ) from error
 
 
-def _semantic_compute_dtype(descriptor: object) -> TensorDType:
-    if isinstance(descriptor, ElementwiseDescriptor):
-        return descriptor.dtype
-    if isinstance(descriptor, ReductionDescriptor):
-        return descriptor.input_dtype
-    return TensorDType.FLOAT32
-
-
 def _scaled_component(
     name: str,
     amount: float,
@@ -1770,17 +1762,6 @@ def _unexpected_invalid_dispatch(dispatch: DispatchEvidence) -> bool:
     return set(dispatch.reason_codes) != {
         "dispatch_static_kernel_identity_mismatch"
     }
-
-
-def _shape_elements(shape: Sequence[int]) -> int:
-    result = 1
-    for dimension in shape:
-        result *= dimension
-    return result
-
-
-def _dtype_bytes(dtype: TensorDType) -> int:
-    return 4 if dtype is TensorDType.FLOAT32 else 2
 
 
 def _unavailable(

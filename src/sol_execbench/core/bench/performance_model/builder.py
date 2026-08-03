@@ -550,34 +550,6 @@ def _verify_counter_provenance(
     )
 
 
-def _traces_by_workload(traces: list[Trace]) -> dict[str, Trace]:
-    result: dict[str, Trace] = {}
-    for trace in traces:
-        workload_uuid = trace.workload.uuid
-        if workload_uuid in result:
-            raise ValueError(
-                f"duplicate workload UUID in trace: {workload_uuid}"
-            )
-        if trace.evaluation is None or trace.evaluation.performance is None:
-            raise ValueError(
-                f"workload {workload_uuid} lacks canonical performance timing",
-            )
-        result[workload_uuid] = trace
-    return result
-
-
-def _require_exact_workload_mapping(
-    traces: dict[str, Trace],
-    solar_paths: dict[str, Path],
-) -> None:
-    missing = sorted(traces.keys() - solar_paths.keys())
-    extra = sorted(solar_paths.keys() - traces.keys())
-    if missing or extra:
-        raise ValueError(
-            f"solar workload mapping mismatch: missing={missing}, extra={extra}",
-        )
-
-
 def _require_current_profile(
     profile: ProfileSummarySidecar,
     trace_path: Path,
@@ -609,17 +581,6 @@ def _require_trace_citation(
     ]
     if not matches or all(citation.sha256 != expected for citation in matches):
         raise ValueError("profile_summary_trace_sha256_mismatch")
-
-
-def _gpu_architecture(traces: list[Trace]) -> str:
-    architectures = {
-        trace.evaluation.environment.hardware
-        for trace in traces
-        if trace.evaluation is not None
-    }
-    if len(architectures) != 1:
-        raise ValueError("canonical trace GPU architecture mismatch")
-    return next(iter(architectures))
 
 
 def _compiled_characterizations(
@@ -875,40 +836,6 @@ def _rocm_version(trace: Trace) -> str | None:
         return None
     libraries = trace.evaluation.environment.libs
     return libraries.get("rocm") or libraries.get("ROCm")
-
-
-def _dispatch_evidence(
-    profile: ProfileSummarySidecar,
-    profile_path: Path,
-    traces: dict[str, Trace],
-    candidate_sha256: str,
-    compiled: list[CompiledCharacterization],
-) -> tuple[dict[str, list[DispatchEvidence]], list[str]]:
-    if len(traces) != 1:
-        return {}, ["counter_workload_alignment_unavailable"]
-    workload_uuid = next(iter(traces))
-    counter_paths = _counter_artifact_paths(profile, profile_path)
-    if not counter_paths:
-        return {}, ["counter_csv_missing"]
-    passes = []
-    for path in counter_paths:
-        pass_index = counter_pass_index(path)
-        if pass_index is None:
-            raise ValueError(f"counter_csv_pass_identity_missing:{path.name}")
-        passes.append(CounterPassCSV(pass_index, path))
-    dispatches = parse_and_align_counter_passes(
-        passes,
-        workload_uuid=workload_uuid,
-        candidate_sha256=candidate_sha256,
-    )
-    return {
-        workload_uuid: _collapse_replayed_dispatches(
-            _record_static_runtime_conflicts(
-                dispatches,
-                compiled,
-            ),
-        ),
-    }, []
 
 
 def _record_static_runtime_conflicts(
