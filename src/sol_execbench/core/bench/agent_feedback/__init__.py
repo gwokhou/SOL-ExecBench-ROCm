@@ -13,10 +13,6 @@ from sol_execbench.core.bench.agent_feedback.builder import (
     AgentFeedbackBuildRequest,
     build_agent_feedback_sidecar,
 )
-from sol_execbench.core.bench.agent_feedback.governance import (
-    evaluate_agent_feedback_governance,
-    validate_agent_feedback_freshness,
-)
 from sol_execbench.core.bench.agent_feedback.models import (
     _MODEL_CONFIG,
     AgentFeedbackBottleneck,
@@ -59,6 +55,4 @@ __all__ = [
     "PerformanceAcceptanceStatus",
     "artifact_citation_from_path",
     "build_agent_feedback_sidecar",
-    "evaluate_agent_feedback_governance",
-    "validate_agent_feedback_freshness",
 ]

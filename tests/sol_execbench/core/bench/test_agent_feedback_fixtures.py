@@ -4,12 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 
 from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackSidecar,
-    evaluate_agent_feedback_governance,
-    validate_agent_feedback_freshness,
 )
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
@@ -59,65 +56,6 @@ def test_agent_feedback_valid_fixtures_parse(name: str, expected_status: str):
 
     assert sidecar.status == expected_status
     assert sidecar.authority == "diagnostic"
-
-
-def test_agent_feedback_stale_fixture_classifies_as_stale_diagnostic():
-    sidecar = AgentFeedbackSidecar.model_validate(
-        _json(FIXTURE_DIR / "stale.agent-feedback.json"),
-    )
-
-    freshness = validate_agent_feedback_freshness(
-        sidecar,
-        trace_path="trace.jsonl",
-        run_id="run-current",
-        candidate_id="candidate-current",
-        source_sha256="source-current",
-        sol_version="v3.0.0",
-    )
-    guardrail = evaluate_agent_feedback_governance(
-        sidecar=sidecar,
-        freshness=freshness,
-    )
-
-    assert freshness.status == "stale"
-    assert guardrail.status == "stale_diagnostic"
-    assert guardrail.score_authority is False
-
-
-def test_agent_feedback_negative_fixtures_downgrade_to_invalid_or_missing():
-    with pytest.raises(ValidationError):
-        AgentFeedbackSidecar.model_validate(
-            _json(FIXTURE_DIR / "contradictory-authority.agent-feedback.json"),
-        )
-    contradictory_guardrail = evaluate_agent_feedback_governance(
-        sidecar=None,
-        parse_error="score_authority must be false",
-    )
-
-    with pytest.raises(json.JSONDecodeError):
-        _json(FIXTURE_DIR / "malformed.agent-feedback.json")
-    malformed_guardrail = evaluate_agent_feedback_governance(
-        sidecar=None,
-        parse_error="malformed json",
-    )
-
-    missing_case = _json(FIXTURE_DIR / "missing.agent-feedback.case.json")
-    missing_guardrail = evaluate_agent_feedback_governance(sidecar=None)
-
-    assert contradictory_guardrail.status == "invalid_diagnostic"
-    assert malformed_guardrail.status == "invalid_diagnostic"
-    assert (
-        missing_guardrail.status == missing_case["expected_governance_status"]
-    )
-    assert missing_guardrail.reason_codes == [
-        missing_case["expected_reason_code"],
-    ]
-    for guardrail in (
-        contradictory_guardrail,
-        malformed_guardrail,
-        missing_guardrail,
-    ):
-        assert guardrail.score_authority is False
 
 
 def test_agent_feedback_fixtures_are_prompt_safe_and_deterministic():
