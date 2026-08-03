@@ -6,7 +6,7 @@ publisher-authored, content-addressed release bundle.
 
 ## Pending v2 scoring contract
 
-The schema v6 RX 9060 XT corpus contains 43 scored problems and 163 scored
+The schema v7 RX 9060 XT corpus contains 43 scored problems and 163 scored
 workloads. The FP8 compatibility sentinel and the provenance-retained
 `l2n55_matmul_maxpool_sum_scale` target-incompatible problem are excluded from
 the denominator. The latter keeps its original AKA shapes; it is excluded

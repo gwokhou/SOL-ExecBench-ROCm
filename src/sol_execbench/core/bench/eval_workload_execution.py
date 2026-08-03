@@ -77,6 +77,7 @@ def evaluate_one_workload(
         request,
         emitter,
         workload,
+        row_index,
         resolved_axes,
         timing_case,
         correctness_result.correctness,
@@ -119,12 +120,12 @@ def _measure_and_emit(
     request: WorkloadEvaluationRequest,
     emitter: WorkloadTraceEmitter,
     workload: Workload,
+    row_index: int,
     resolved_axes: dict[str, int],
     timing_case: ReferenceTimingCase,
     correctness: Any,
 ) -> None:
     _release_device_cache()
-    inputs = timing_case.inputs
     # Event guards catch every standard Python thread start during timing,
     # including workers shorter than the sampling interval. Concurrent count
     # sampling remains defense in depth for alternate entry points.
@@ -134,9 +135,8 @@ def _measure_and_emit(
             solution_timing = measure_solution_latency(
                 request=request,
                 workload=workload,
+                row_index=row_index,
                 resolved_axes=resolved_axes,
-                inputs=inputs,
-                expected_outputs=timing_case.outputs,
             )
         except RewardHackError as exc:
             emitter.emit_status(

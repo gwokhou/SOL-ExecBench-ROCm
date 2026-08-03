@@ -43,5 +43,5 @@
       "description": "tanh(a * v) * max."
     }
   },
-  "reference": "import torch\n\n\ndef run(v, a, max):\n    return torch.tanh(a * v) * max\n"
+  "reference": "import torch\n\n\ndef run(v, a, max):  # noqa: A002 - benchmark ABI\n    return torch.tanh(a * v) * max\n"
 }

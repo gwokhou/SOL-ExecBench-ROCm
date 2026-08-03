@@ -81,6 +81,7 @@ def test_runtime_observation_can_only_widen_dtype_floors():
 
     assert calibrated.max_atol == 0.025
     assert calibrated.max_rtol == 0.0375
+    assert calibrated.required_matched_ratio == 1.0
     assert calibrated.max_atol >= dtype_default_tolerance("bfloat16").max_atol
 
 

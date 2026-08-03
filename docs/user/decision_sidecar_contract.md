@@ -32,7 +32,7 @@ The Decision sidecar consumes facts from the diagnostic data sidecars:
 
 The current Layer R builder does not consume profile-summary or Agent-feedback
 sidecars. Runtime bottleneck hints remain owned by `profile_summary.v3`, while
-accepted performance actions remain owned by `agent_feedback.v6`. Consumers may
+accepted performance actions remain owned by `agent_feedback.v7`. Consumers may
 present those independent diagnostic surfaces together only after validating
 each artifact's freshness and authority.
 

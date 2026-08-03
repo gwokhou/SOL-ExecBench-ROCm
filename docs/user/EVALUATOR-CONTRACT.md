@@ -33,19 +33,29 @@ counts:
 - 10 warmup calls per trial;
 - 50 timed calls per trial;
 - three trials aggregated by arithmetic mean;
-- every timed result checked against the reference output;
+- a secret 256-bit input nonce generated before candidate execution;
+- fresh input values fetched from the trusted reference worker for every
+  warmup and timed invocation;
+- every timed result checked against the matching per-iteration reference
+  output;
 - serialized access to the selected GPU.
 
 The standard ROCm protocol is labeled
-`sol_execbench.rocm_event_timing.paper_counts.v3`; it uses a cache-clear buffer
+`sol_execbench.rocm_event_timing.paper_counts.v4`; it uses a cache-clear buffer
 equal to twice the detected L2 size (256 MiB only when L2 detection is unavailable)
 and a 300-second whole-evaluation timeout. Custom counts,
 adaptive duration, or unlocked clocks use
-`sol_execbench.rocm_event_timing.custom.v3`. Direct host execution is rejected
+`sol_execbench.rocm_event_timing.custom.v4`. Direct host execution is rejected
 unless `--unsafe-local-execution` is explicitly supplied, and such traces are
 diagnostic. Performance metadata records the actual adaptive sample count for
 every trial in `timed_iterations_per_trial`; `timed_iterations` is populated
 only when that count is identical across all trials.
+
+The nonce is removed from the candidate environment. A workload whose input
+generator yields repeated content (including an all-fixed safetensors case)
+fails closed during timing because it cannot satisfy the v4 variation
+contract; it must provide a seed-sensitive custom input route before it is
+publication eligible.
 
 During the timed region, standard Python thread-start entry points are guarded
 synchronously, so a worker that starts and exits between count samples is still

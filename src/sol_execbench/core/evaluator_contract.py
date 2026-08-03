@@ -26,7 +26,7 @@ class EvaluatorContract(CurrentSchemaModel):
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
     current_schema_version = EVALUATOR_CONTRACT_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.evaluator_contract.v5"] = (
+    schema_version: Literal["sol_execbench.evaluator_contract.v6"] = (
         SOL_EXECBENCH_CONTRACT_SCHEMA_VERSION
     )
     contract_version: Literal["4.0"] = SOL_EXECBENCH_CONTRACT_VERSION

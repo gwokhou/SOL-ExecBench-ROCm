@@ -38,5 +38,5 @@
       "dtype": "float32"
     }
   },
-  "reference": "import torch\n\n\ndef run(input):\n    value = input.float()\n    scale = value.abs().amax(dim=-1, keepdim=True) / 127.0\n    scale = torch.where(scale == 0, torch.ones_like(scale), scale)\n    codes = torch.clamp(value / scale, -128.0, 127.0).to(torch.int8)\n    return codes, scale.float()\n"
+  "reference": "import torch\n\n\ndef run(input):  # noqa: A002 - benchmark ABI\n    value = input.float()\n    scale = value.abs().amax(dim=-1, keepdim=True) / 127.0\n    scale = torch.where(scale == 0, torch.ones_like(scale), scale)\n    codes = torch.clamp(value / scale, -128.0, 127.0).to(torch.int8)\n    return codes, scale.float()\n"
 }

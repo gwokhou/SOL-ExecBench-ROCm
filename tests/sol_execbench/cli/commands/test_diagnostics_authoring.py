@@ -4,12 +4,15 @@ import json
 from pathlib import Path
 from typing import Literal
 
+import pytest
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
 from sol_execbench.core.bench.performance_model import authoring
 from sol_execbench.core.bench.performance_model.acceptance import (
     DiagnosticAcceptanceCase,
+    DiagnosticAcceptanceManifest,
+    DiagnosticAcceptanceResult,
 )
 from sol_execbench.core.bench.performance_model.inference import (
     InferenceObservation,
@@ -28,8 +31,14 @@ from sol_execbench.core.bench.performance_model.validation_corpus import (
     ValidationArtifactReference,
     validation_pair_id,
 )
-from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.data.json_utils import (
+    atomic_write_json_value,
+    load_json_file,
+)
 from sol_execbench.core.integrity import stable_json_checksum
+from sol_execbench.core.solar_bridge.performance import (
+    load_manifest_semantic_characterization,
+)
 
 _FAMILIES = (
     WorkloadKind.ELEMENTWISE,
@@ -112,6 +121,7 @@ def _development_observation(
     case: DiagnosticValidationCase,
     **_kwargs,
 ) -> InferenceObservation:
+    action_positive = int(case.case_id.rsplit(":", maxsplit=1)[1]) < 20
     return InferenceObservation(
         case_id=case.case_id,
         workload_kind=case.workload_kind,
@@ -133,6 +143,8 @@ def _development_observation(
             "outer_rows_width_512": 0.0,
             "outer_rows_width_1024": 0.0,
         },
+        action_scores={"wmma_missing": float(action_positive)},
+        gold_action_codes=(["restore_wmma_path"] if action_positive else []),
     )
 
 
@@ -140,6 +152,7 @@ def _acceptance_case(
     case: DiagnosticValidationCase,
     **_kwargs,
 ) -> DiagnosticAcceptanceCase:
+    action_positive = int(case.case_id.rsplit(":", maxsplit=1)[1]) < 10
     return DiagnosticAcceptanceCase(
         case_id=case.case_id,
         pair_id=case.pair_id,
@@ -152,6 +165,10 @@ def _acceptance_case(
         lower_ms=0.9,
         upper_ms=1.1,
         measured_ms=1.0,
+        predicted_action_codes=(
+            ["restore_wmma_path"] if action_positive else []
+        ),
+        gold_action_codes=(["restore_wmma_path"] if action_positive else []),
     )
 
 
@@ -232,3 +249,49 @@ def test_inference_and_acceptance_authoring_cli_workflow(
     assert response["data"] == {"accepted": True, "case_count": 220}
     assert acceptance_manifest_path.is_file()
     assert acceptance_path.is_file()
+
+    manifest = load_json_file(
+        DiagnosticAcceptanceManifest,
+        acceptance_manifest_path,
+    )
+    accepted = load_json_file(DiagnosticAcceptanceResult, acceptance_path)
+    authoring.verify_diagnostic_acceptance(
+        acceptance=accepted,
+        manifest=manifest,
+        development_corpus_path=development_path,
+        held_out_corpus_path=held_out_path,
+        calibration_profile_path=calibration_path,
+        inference_profile_path=inference_path,
+        semantic_loader=load_manifest_semantic_characterization,
+    )
+
+    path_alias_case = manifest.cases[0].model_copy(
+        update={"performance_diagnostic_sha256": "f" * 64}
+    )
+    path_alias_manifest = manifest.model_copy(
+        update={"cases": [path_alias_case, *manifest.cases[1:]]}
+    )
+    authoring.verify_diagnostic_acceptance(
+        acceptance=accepted,
+        manifest=path_alias_manifest,
+        development_corpus_path=development_path,
+        held_out_corpus_path=held_out_path,
+        calibration_profile_path=calibration_path,
+        inference_profile_path=inference_path,
+        semantic_loader=load_manifest_semantic_characterization,
+    )
+
+    forged_case = manifest.cases[0].model_copy(update={"measured_ms": 1.05})
+    forged_manifest = manifest.model_copy(
+        update={"cases": [forged_case, *manifest.cases[1:]]}
+    )
+    with pytest.raises(ValueError, match="source corpus evidence"):
+        authoring.verify_diagnostic_acceptance(
+            acceptance=accepted,
+            manifest=forged_manifest,
+            development_corpus_path=development_path,
+            held_out_corpus_path=held_out_path,
+            calibration_profile_path=calibration_path,
+            inference_profile_path=inference_path,
+            semantic_loader=load_manifest_semantic_characterization,
+        )

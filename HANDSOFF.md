@@ -2,63 +2,96 @@
 
 ## Current state
 
-Handoff date: 2026-07-31.
+Handoff date: 2026-08-03.
 
-`main` is in sync with `origin/main` at `321978f1`. The v6 semantic-range
-expansion has been merged into `main` and pushed:
+### Superseding v7 closure (2026-08-03)
+
+The v6 acceptance described below is historical and is no longer consumable by
+the current tree. A reward-hacking follow-up required a breaking transition to
+per-run entropy and per-invocation input/reference validation. Current
+publication identifiers are the v7 diagnostic family, BenchmarkConfig v2,
+reference IPC v2, and ROCm event timing v4. There are no compatibility readers.
+
+The five requested follow-ups are closed at the security/governance boundary:
+
+1. **Acceptance evidence:** acceptance rejects vacuous action evidence, and
+   Agent feedback rebuilds every cited development, held-out, calibration, and
+   inference source before it can admit an accepted result.
+2. **Tolerance/MoE:** numeric, code-distance, and top-k routing checks require
+   100% matched elements/tokens. The AKA corpus and tolerance artifacts were
+   re-authored and equivalence-checked on the real device.
+3. **Candidate isolation:** a fresh 256-bit run nonce remains inside the
+   trusted reference worker and is scrubbed before candidate `exec`. Expected
+   outputs never enter the candidate process. The Docker boundary has no
+   network, private IPC, the default seccomp profile, `no-new-privileges`, all
+   capabilities dropped, an 8 GiB shm allocation, and a 512-PID ceiling.
+4. **Timing protocol:** every warmup and timed invocation receives fresh input
+   content; the reference worker performs one-shot validation and returns only
+   pass/fail. Repeated input hashes fail closed, and CUDA outputs must be on the
+   selected GPU before the end timing event.
+5. **v7 hardware evidence:** calibration, all 440 development cases, frozen
+   inference, and all 220 pair-disjoint held-out cases were rebuilt under the
+   v7 contracts. The complete rejection path was then reconstructed through
+   Agent feedback.
+
+Current v7 hardware evidence under ignored
+`data/outputs/microarchitecture-diagnostics-v7/`:
 
 ```text
-321978f1 Enforce acyclic architecture domains
-f124b1d2 Tighten schema and reuse governance
-3cc00558 Expand gfx1200 performance diagnostics
-13085b42 Harden performance diagnostic governance
-fe95530e Implement governed gfx1200 performance diagnostics
+calibration profile  e9ba5e76bda2843cbac213f1404ca9f197942b476612dc26bbf6ec50273920d9
+calibration audit    fce918aa953aafee1fbe5a496b69f32cb46753b56a8de6ca5b94f9907d41a004
+frozen design        eee743ed7ab876f9aaea267d688a318a659454b29f75290f721d55e1700c1ed4
+development (440)     12e5cb1431f4b6092fbc5d6ebfc414c14b861ddaa485e6eb40c3500929f6518c
+inference             b5cc35587409406333cd6bee2d8caf8ebce4cb6fe18d31570912201d2d1a5191
+held-out (220)        e71bd958f0374d8014a83f9a65fdfdd9a1641fb9452795c75ddef99009e54e8f
+acceptance manifest   720e91bc8dcda5949c993a8b86f187aa6f4b370fc72c6575f70fa5406e14e29c
+acceptance            990922a96d09e60e5f8f42f7016bf927d8eee5a4f14e6b2408d0673f74164894
+rejection diagnostic  d20f46f02776be2cf74f726dc2d3ca5e5362dcd038088e8743736092fde3e1fa
+rejection feedback    733bb0f1e29bfb71cc079ebacbecaca0a60f2d6b5b3489c08f7549cfce72f897
+container image      sha256:476d88704a51c55459d28286073f53b41fefcc8018f1d8f219f291536a7e5321
 ```
 
-The v6 expansion no longer needs a separate worktree. The leftover
-`.worktrees/task4-live-test` (`codex/task4-live-test`, `806c9878`) is marked
-prunable and may be removed once confirmed unneeded. Do not reset `main`.
+Every v7 trace declares `sol_execbench.rocm_event_timing.paper_counts.v4`.
+Because the isolated container cannot download the optional ISA specification,
+the collector now preserves already extracted code-object/disassembly identity
+and a resumable offline repair rebuilt it for all 660 cases. Two development
+cases required bounded recapture: one had empty profiler CSVs, and one exposed
+nondeterministic cross-queue ordering. Dispatch identity now preserves order
+within each queue while ignoring semantically irrelevant inter-queue
+interleaving.
 
-The software implementation, full test suite, static checks, real gfx1200
-calibration, and the eleven-family smoke are complete. The 660-case corpus
-design was frozen before collection; on 2026-08-01 it was re-frozen once to
-correct a graph-family shape universe that produced duplicate workload
-UUIDs (see "Pilot findings"). Smoke was re-verified green on real gfx1200
-hardware on 2026-07-31 and again after the authoring fixes on 2026-08-01; its
-content hashes are recorded in "Completed evidence" below.
-
-The remaining blocking outcome is the v6 hardware statistical acceptance:
+The v7 statistical result is deliberately **rejected**, not unfinished:
 
 ```text
-11-family smoke
--> 440 development cases
--> frozen inference
--> 220 held-out cases
--> acceptance
--> accepted Agent feedback smoke
+accepted                 false
+case count               220
+median APE               3.303951%
+P90 APE                  15.186039%
+reason                   family_empirical_coverage_below_90_percent
+composite_graph coverage 0.70
+concurrent_graph coverage 0.85
+cross_entropy coverage   0.90
+softmax coverage         0.95
+indexed_read coverage    0.95
+all other coverage       1.00
+enabled actions          []
 ```
 
-Do not describe v6 as hardware-accepted until this sequence completes.
+`restore_wmma_path` independently has 20 positive/predicted cases with
+precision 1.0 and recall 1.0, but the failed family-coverage gate prevents it
+from being enabled. The persisted rejection feedback reports
+`performance_acceptance_status: failed` and `enabled_performance_actions: []`.
+Do not tune against this revealed held-out set: obtaining an accepted model
+requires a new governed cycle that promotes the current evidence to
+development and preregisters a fresh independent held-out set.
 
-Status on 2026-08-02: **v6 is hardware-accepted.** The 440 development cases
-are frozen (`development.json` SHA `f8e2b07d...`). A conformal-policy defect
-exposed by the first held-out run was root-caused and fixed (see "Conformal
-score collapse"), inference refitted (`inference.json` SHA `d216fe86...`), all
-220 held-out cases re-collected fresh, and acceptance passed
-(`acceptance.json` SHA `91e65dd7...`, `accepted: true`, every family `>= 0.90`).
-The accepted `agent-feedback` smoke passed (`feedback.json` SHA `6bfc5093...`).
-
-A follow-up reward-hacking audit of the whole harness ran on 2026-08-02; its
-conclusions are recorded under "Reward-hacking audit". The live gameable
-vectors it confirmed are confined to the in-process candidate-execution
-boundary and the diagnostic governance layer, not the kernel SOL score.
-
-The 33-case timing pilot ran on 2026-08-01. A first pass exposed authoring
-defects in six families; the corpus was then re-preregistered (graph-family
-shape universe corrected) and the authored definitions and solutions were
-fixed, after which the pilot re-passed all eleven families end-to-end with
-zero failures. The full 660-case run may now begin. See "Pilot findings" and
-"Runtime and batching" below.
+The final software verification is green: Ruff check and format, `ty`,
+coupling, readability, targeted security/governance tests, and the complete
+suite (`2134 passed, 21 skipped`). The only available host is one RX 9060 XT;
+multi-GPU device isolation is covered by unit/contract tests but was not
+empirically exercised on a multi-GPU ROCm host. Historical v6 evidence and
+audit narrative remain below for provenance and are not current admission
+authority.
 
 ## Boundaries that must not change
 
@@ -82,11 +115,11 @@ zero failures. The full 660-case run may now begin. See "Pilot findings" and
 
 Current schema names and versions are canonical only in
 `src/sol_execbench/core/integrity/schema_versions.py`. The performance
-diagnostic model is `sol_execbench.performance_diagnostic.v6`, surrounded by
-`sol_execbench.diagnostic_calibration.v6`,
-`sol_execbench.diagnostic_calibration_audit.v6`,
-`sol_execbench.diagnostic_inference_profile.v8`, and
-`sol_execbench.agent_feedback.v6`. Do not add old-schema compatibility
+diagnostic model is `sol_execbench.performance_diagnostic.v7`, surrounded by
+`sol_execbench.diagnostic_calibration.v7`,
+`sol_execbench.diagnostic_calibration_audit.v7`,
+`sol_execbench.diagnostic_inference_profile.v9`, and
+`sol_execbench.agent_feedback.v7`. Do not add old-schema compatibility
 readers.
 
 Reuse `core.data.definition_models.DType` for integer indices. Deterministic

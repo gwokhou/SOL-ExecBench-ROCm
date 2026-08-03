@@ -307,26 +307,36 @@ def counter_pass_index(path: str | Path) -> int | None:
 
 
 def counter_dispatch_sequence_digest(path: str | Path) -> str:
-    """Hash ordered dispatch identity without profiler-assigned dispatch IDs."""
+    """Hash per-queue dispatch order without nondeterministic queue interleaving."""
     parsed = _parse_counter_pass(
         CounterPassCSV(1, Path(path)),
         workload_uuid="digest",
         candidate_sha256="0" * 64,
     )
-    sequence = [
-        {
-            "kernel_symbol": item.kernel_symbol,
-            "grid": item.grid,
-            "workgroup": item.workgroup,
-            "iteration_ordinal": item.iteration_ordinal,
-            "queue_id": item.queue_id,
-            "stream_id": item.stream_id,
-        }
-        for item in parsed
-    ]
-    if len(sequence) > 5 * 256:
+    channels: dict[tuple[str | None, str | None], list[dict[str, object]]] = {}
+    for item in parsed:
+        channel = (item.queue_id, item.stream_id)
+        channels.setdefault(channel, []).append(
+            {
+                "kernel_symbol": item.kernel_symbol,
+                "grid": item.grid,
+                "workgroup": item.workgroup,
+                "iteration_ordinal": item.iteration_ordinal,
+            }
+        )
+    if len(parsed) > 5 * 256:
         raise ValueError("counter_dispatch_limit_exceeded")
-    return stable_json_checksum(sequence)
+    topology = [
+        {
+            "queue_id": queue_id,
+            "stream_id": stream_id,
+            "dispatches": dispatches,
+        }
+        for (queue_id, stream_id), dispatches in sorted(
+            channels.items(), key=lambda item: str(item[0])
+        )
+    ]
+    return stable_json_checksum(topology)
 
 
 def normalize_counter_name(value: str) -> str:

@@ -85,7 +85,7 @@ class DiagnosticCalibrationAudit(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_calibration_audit.v6"] = (
+    schema_version: Literal["sol_execbench.diagnostic_calibration_audit.v7"] = (
         DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION
     )
     probe_identity: CalibrationProbeIdentity

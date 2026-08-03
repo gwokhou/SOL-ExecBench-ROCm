@@ -27,7 +27,7 @@ from sol_execbench.core.integrity.schema_versions import (
     PERFORMANCE_SCHEDULE_EVIDENCE_SCHEMA_VERSION,
 )
 
-PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v6"
+PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v7"
 
 _MODEL_CONFIG = ConfigDict(
     extra="forbid",
@@ -746,10 +746,10 @@ class DiagnosticCalibrationProfile(CurrentSchemaModel):
     model_config = _MODEL_CONFIG
     current_schema_version = DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_calibration.v6"] = (
+    schema_version: Literal["sol_execbench.diagnostic_calibration.v7"] = (
         DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     identity: CalibrationIdentity
     parameters: list[CalibrationParameter] = Field(min_length=1)
     surfaces: list[CalibrationSurface] = Field(default_factory=list)
@@ -952,7 +952,7 @@ class PerformancePrediction(BaseModelWithDocstrings):
     lower_ms: float | None = Field(default=None, ge=0.0)
     upper_ms: float | None = Field(default=None, ge=0.0)
     components: list[PredictionComponent] = Field(default_factory=list)
-    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     reason_codes: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
 
@@ -1064,11 +1064,11 @@ class PerformanceDiagnosticSidecar(CurrentDiagnosticSidecarAuthority):
     model_config = _MODEL_CONFIG
     current_schema_version = PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.performance_diagnostic.v6"] = (
+    schema_version: Literal["sol_execbench.performance_diagnostic.v7"] = (
         PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION
     )
     status: DiagnosticSidecarStatus
-    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     inference_profile_sha256: SHA256Digest | None = None
     run_id: str

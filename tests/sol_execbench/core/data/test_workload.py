@@ -21,10 +21,12 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.data.workload import (
+    CodeDistanceCheck,
     GeneratedInput,
     NumericCheck,
     RandomInput,
     ScalarInput,
+    TopKRoutingCheck,
     Workload,
 )
 from sol_execbench.core.integrity.schema_versions import WORKLOAD_SCHEMA_VERSION
@@ -113,14 +115,34 @@ class TestOutputChecks:
                 },
             )
 
+    def test_numeric_checks_require_every_element_to_match(self):
+        with pytest.raises(ValidationError, match="greater than or equal to 1"):
+            NumericCheck(output="output", required_matched_ratio=0.97)
+
+    def test_code_distance_checks_require_every_element_to_match(self):
+        with pytest.raises(ValidationError, match="greater than or equal to 1"):
+            CodeDistanceCheck(
+                output="output",
+                max_distance=1,
+                required_matched_ratio=0.99,
+            )
+
+    def test_topk_routing_rejects_nonzero_mismatch_budget(self):
+        with pytest.raises(ValidationError, match="less than or equal to 0"):
+            TopKRoutingCheck(
+                ids_output="ids",
+                weights_output="weights",
+                gating_input="gating",
+                topk=2,
+                max_mismatch_ratio=0.05,
+            )
+
     def test_allows_partial_custom_inputs(self):
         workload = Workload(
             uuid="test-uuid",
             axes={},
             inputs={"x": RandomInput(), "offsets": {"type": "custom"}},
-            checks=[NumericCheck(output="output", required_matched_ratio=0.97)],
+            checks=[NumericCheck(output="output")],
         )
 
-        check = workload.checks[0]
-        assert isinstance(check, NumericCheck)
-        assert check.required_matched_ratio == 0.97
+        assert workload.inputs["offsets"].type == "custom"

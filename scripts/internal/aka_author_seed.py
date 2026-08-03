@@ -906,7 +906,7 @@ SPECS: list[Spec] = [
                 "description": "sigmoid(a * v) * max.",
             },
         },
-        reference="import torch\n\ndef run(v, a, max):\n    return torch.sigmoid(a * v) * max\n",
+        reference="import torch\n\ndef run(v, a, max):  # noqa: A002 - benchmark ABI\n    return torch.sigmoid(a * v) * max\n",
         workloads=[
             _wl(
                 {"M": 1024, "N": 1024},
@@ -962,7 +962,7 @@ SPECS: list[Spec] = [
                 "description": "tanh(a * v) * max.",
             },
         },
-        reference="import torch\n\ndef run(v, a, max):\n    return torch.tanh(a * v) * max\n",
+        reference="import torch\n\ndef run(v, a, max):  # noqa: A002 - benchmark ABI\n    return torch.tanh(a * v) * max\n",
         workloads=[
             _wl(
                 {"M": 1024, "N": 1024},
@@ -1740,7 +1740,7 @@ SPECS: list[Spec] = [
         },
         reference=(
             "import torch\nimport torch.nn.functional as F\n\n"
-            "def run(input):\n"
+            "def run(input):  # noqa: A002 - benchmark ABI\n"
             "    d = input.shape[-1] // 2\n"
             "    x, y = input.split([d, d], dim=-1)\n"
             "    return (F.silu(x.float()) * y.float()).to(torch.bfloat16)\n"
@@ -1887,7 +1887,7 @@ SPECS: list[Spec] = [
             },
         },
         reference=(
-            "def run(input, dim1, dim2):\n"
+            "def run(input, dim1, dim2):  # noqa: A002 - benchmark ABI\n"
             "    return input.transpose(int(dim1), int(dim2)).contiguous()\n"
         ),
         workloads=[
@@ -2978,7 +2978,7 @@ SPECS.extend(
             outputs={"loss": {"shape": [], "dtype": "float32"}},
             reference=(
                 "import torch.nn.functional as F\n\n"
-                "def run(input, target, temperature):\n"
+                "def run(input, target, temperature):  # noqa: A002 - benchmark ABI\n"
                 "    log_p = F.log_softmax(input / temperature, dim=1)\n"
                 "    return F.kl_div(log_p, target, reduction='sum') * "
                 "(temperature * temperature) / input.size(0)\n"
@@ -3024,7 +3024,7 @@ SPECS.extend(
             },
             reference=(
                 "import torch\n\n"
-                "def run(input, weight, residual, eps):\n"
+                "def run(input, weight, residual, eps):  # noqa: A002 - benchmark ABI\n"
                 "    residual_out = input + residual\n"
                 "    value = residual_out.float()\n"
                 "    rstd = torch.rsqrt(value.pow(2).mean(-1, keepdim=True) + eps)\n"
@@ -3069,7 +3069,7 @@ SPECS.extend(
             },
             reference=(
                 "import torch\n\n"
-                "def run(input):\n"
+                "def run(input):  # noqa: A002 - benchmark ABI\n"
                 "    value = input.float()\n"
                 "    scale = value.abs().amax(dim=-1, keepdim=True) / 127.0\n"
                 "    scale = torch.where(scale == 0, torch.ones_like(scale), scale)\n"
@@ -3141,7 +3141,7 @@ SPECS.extend(
                 "    freqs = torch.einsum('i,j->ij', pos, inv).view("
                 "values['T'], 1, 1, half).to(torch.bfloat16)\n"
                 "    return {'cu_seqlens': cu, 'freqs': freqs}\n\n"
-                "def run(input, cu_seqlens, freqs):\n"
+                "def run(input, cu_seqlens, freqs):  # noqa: A002 - benchmark ABI\n"
                 "    lengths = (cu_seqlens[1:] - cu_seqlens[:-1]).tolist()\n"
                 "    outputs = []\n"
                 "    for value in torch.split(input, lengths):\n"
@@ -3196,7 +3196,7 @@ SPECS.extend(
             },
             reference=(
                 "import torch\n\n"
-                "def run(input):\n"
+                "def run(input):  # noqa: A002 - benchmark ABI\n"
                 "    value = input.float()\n"
                 "    m, k = value.shape\n"
                 "    blocks = value.reshape(m, k // 32, 32)\n"
@@ -3295,7 +3295,7 @@ SPECS.extend(
                             "topk": k,
                             "tie_atol": 1e-4,
                             "weight_atol": 1e-2,
-                            "max_mismatch_ratio": 0.05 if use_bias else 0.0,
+                            "max_mismatch_ratio": 0.0,
                         },
                     ],
                 }
@@ -3520,12 +3520,12 @@ def _format_authored_references(
         record["definition_sha256"] = sha256_file(definition_path)
 
 
-def _rebind_format_only_calibration(
+def _rebind_calibration_contracts(
     calibration_path: Path,
     *,
     problems_root: Path,
 ) -> None:
-    """Rebind calibration contracts after AST-equivalent reference formatting."""
+    """Rebind retained observations after a non-numeric contract change."""
     payload = load_tolerance_calibration(calibration_path)
     raw_records = payload["records"]
     if not isinstance(raw_records, list):
@@ -3867,11 +3867,11 @@ def main() -> None:
         help="write provisional problems for the runtime probe, but not the manifest",
     )
     parser.add_argument(
-        "--rebind-format-only-calibration",
+        "--rebind-calibration-contracts",
         action="store_true",
         help=(
-            "migrate calibration contract hashes after AST-equivalent Ruff "
-            "formatting; preserves all measured values"
+            "rebind contract hashes when a schema or formatting-only change "
+            "preserves every measured tolerance observation"
         ),
     )
     args = parser.parse_args()
@@ -3905,8 +3905,8 @@ def main() -> None:
     if args.bootstrap_calibration:
         print("bootstrap complete; manifest intentionally left unchanged")
         return
-    if args.rebind_format_only_calibration:
-        _rebind_format_only_calibration(
+    if args.rebind_calibration_contracts:
+        _rebind_calibration_contracts(
             calibration_path,
             problems_root=problems_root,
         )

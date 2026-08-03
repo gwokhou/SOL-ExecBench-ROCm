@@ -19,11 +19,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "1cc3c422f90699989db900dccebda4c8d7097d25f07bd9991d2912a762da611f",
+      "contract_sha256": "1294f99e9f71d9959e68335e180bf8e01a8ec3a13534f96d517d484d862e0ffb",
       "observed_outputs": {
         "output": [
           0.0,
@@ -34,6 +34,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/3267_doubled_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-3267_doubled_matmul-w0"
@@ -48,11 +49,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "3c5f955d9c395ce77d46b8b471cc743958a169b770028892ec18b930fa52c4fb",
+      "contract_sha256": "9d3f744eaf72f4c3c5339d64613cf0469afcdb7626d841847cc97b9217efd033",
       "observed_outputs": {
         "output": [
           0.0,
@@ -63,6 +64,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/3267_doubled_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-3267_doubled_matmul-w1"
@@ -77,11 +79,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "42969f4fd38e0dfcfdad332b5a001cfd0d2af91177928ebffd478ce134fb0e5a",
+      "contract_sha256": "ec26cca242428f19bfa85a81d299a976428c9df5ce4943892b17fb4b4e6c0e40",
       "observed_outputs": {
         "output": [
           0.0,
@@ -92,6 +94,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/3267_doubled_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-3267_doubled_matmul-w2"
@@ -106,11 +109,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "9137345b930f94e62ae54683b1c5caa0ade6db3edd2d055b395efca0e017c857",
+      "contract_sha256": "f66b9a859bd42724fc939f1b3fcbb6318438ee03060dc98d270d75715f065f4f",
       "observed_outputs": {
         "output": [
           0.0,
@@ -121,6 +124,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/3267_doubled_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-3267_doubled_matmul-w3"
@@ -135,11 +139,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "7addfc31b21cca379dec405995035b1436db800f0ff240ee0be0c91c09f9d28b",
+      "contract_sha256": "28a9036dde496645e21b586cd0f4d59d18e87913680e4759a899dc69e2130a80",
       "observed_outputs": {
         "output": [
           0.0,
@@ -150,6 +154,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n1_square_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n1_square_matmul-w0"
@@ -164,11 +169,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "df1624f16b499bc56808647ba2f29c68437afac34b5badf9d4275f9fd8a13bd2",
+      "contract_sha256": "377c30078b32db2e46011c35e2a42c3ee4bd968e83410358f65e74170f7a4b78",
       "observed_outputs": {
         "output": [
           0.0,
@@ -179,6 +184,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n1_square_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n1_square_matmul-w1"
@@ -193,11 +199,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "ccf98c314a1fd2a74854d2a9776e709103598f1cd9e882e30e738efd80b9f699",
+      "contract_sha256": "6459571a0eb22f88fd5c0dca7e34718b4d2b4e1d0f7ed52e3d53d37d441ba605",
       "observed_outputs": {
         "output": [
           0.0,
@@ -208,6 +214,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n1_square_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n1_square_matmul-w2"
@@ -222,11 +229,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "f24f2148e3536011edc7b24400cd29f971824517790a2fd08daadf95b405e7ec",
+      "contract_sha256": "dd3eedda9bae958eecaa22ca2e6ba7bd1754499984c5bdd15e12c9c585d8e874",
       "observed_outputs": {
         "output": [
           0.0,
@@ -237,6 +244,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n1_square_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n1_square_matmul-w3"
@@ -251,11 +259,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "94a705e3c6a1b8af5af11d38c6b5d6fee849f655079645ad0e88444b18d7a167",
+      "contract_sha256": "b63c2736c0b723278b4bdadd3c3525bfc894764667821f7c236b55ba7fc65858",
       "observed_outputs": {
         "output": [
           0.0,
@@ -266,6 +274,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2hip/l1n2_standard_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n2_standard_matmul-w0"
@@ -280,11 +289,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "93e13f23f7361a03cf77d6bcb5cabc66d9d4b89831bbe01f57ad70e59c4ce4b0",
+      "contract_sha256": "85aac3e3b5a9f57d378bd6e6b749912b7bceaf91c106790f36eb23de167fda04",
       "observed_outputs": {
         "output": [
           0.0,
@@ -295,6 +304,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2hip/l1n2_standard_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n2_standard_matmul-w1"
@@ -309,11 +319,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "219d53de332a597f94d217ae419eb13dd958cedd068af7cae40ee53e5c434207",
+      "contract_sha256": "c3a951009e33075d71b69bf21b63e2b314a8b1710fdebd58cf4cac34eef56f8e",
       "observed_outputs": {
         "output": [
           0.0,
@@ -324,6 +334,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2hip/l1n2_standard_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n2_standard_matmul-w2"
@@ -338,11 +349,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "3302032edc3255f25a5d0705372155e107bebfc1872c86a9a32fbf67b85d3a25",
+      "contract_sha256": "abe77bdd9695bf3cd9ef9804859cfedddd9f038156a0aeda6c7d819cba276fd8",
       "observed_outputs": {
         "output": [
           0.0,
@@ -353,6 +364,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2hip/l1n3_batched_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n3_batched_matmul-w0"
@@ -367,11 +379,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c54abcdcf350adf8be5ccf95ea92a03d355db203764ccf5cb992673dd1d06480",
+      "contract_sha256": "c478ca67d7671a5fda10b3af29743b41d3bba51a3ad527e8619f5ae09e2fa217",
       "observed_outputs": {
         "output": [
           0.0,
@@ -382,6 +394,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2hip/l1n3_batched_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n3_batched_matmul-w1"
@@ -396,11 +409,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "6a1c390453de51fc452e1e1b6de9ce1553b611a234cdbe4fa2e460b88547e341",
+      "contract_sha256": "f0c9f59985bf000566996dbbd2a386a40de33ea9a363cc3c3b343ec66329f2ee",
       "observed_outputs": {
         "output": [
           0.0,
@@ -411,6 +424,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2hip/l1n3_batched_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n3_batched_matmul-w2"
@@ -425,11 +439,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "120595733faa51dc5c8ce801a2ef1ddb2369fa1b79671dc3f40160646f10b0b2",
+      "contract_sha256": "5040368ff01e05314f53b964e8820b47d87c096ed6cf1039256d95b3022900c0",
       "observed_outputs": {
         "output": [
           0.0,
@@ -440,6 +454,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n4_matrix_vector",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n4_matrix_vector-w0"
@@ -454,11 +469,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "7d82ef9f2f96f074dc38d7d2d29109c82139ba4d9c244ce0c3bbaaab09a213fd",
+      "contract_sha256": "f11a655d06ecf1ee50716fa1cd0f413960e7343268d89447a45fe0efd0ef3ec8",
       "observed_outputs": {
         "output": [
           0.0,
@@ -469,6 +484,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n4_matrix_vector",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n4_matrix_vector-w1"
@@ -483,11 +499,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "9715f10de0515a068f0ad5179f993f59ef1f222c36f9a2d7d922a8278210c71f",
+      "contract_sha256": "e260130b7aff95b50119d736c002921b9d52cde27ce58ede35e140bfa42f412c",
       "observed_outputs": {
         "output": [
           0.0,
@@ -498,6 +514,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n4_matrix_vector",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n4_matrix_vector-w2"
@@ -512,11 +529,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "b71f3628d82a0a0868e9d72feea91d54d860eafb962e41e12da3f56e8d414425",
+      "contract_sha256": "2987bcf77e415adc2ae6937628003a4327e11f96b246fac34fc5fed0aba5b83c",
       "observed_outputs": {
         "output": [
           0.0,
@@ -527,6 +544,7 @@
         "float16"
       ],
       "problem_path": "torch2hip/l1n8_matmul_irregular",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n8_matmul_irregular-w0"
@@ -541,11 +559,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "8fcfbb15e7726da78dea5bd1e8374ca0bdfe5294412e683723a79f78027f0632",
+      "contract_sha256": "75eeb18712781ebb59114150f630e046fac17a88e84243ad4d6d4c7e8eaf0c41",
       "observed_outputs": {
         "output": [
           0.0,
@@ -556,6 +574,7 @@
         "float16"
       ],
       "problem_path": "torch2hip/l1n8_matmul_irregular",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n8_matmul_irregular-w1"
@@ -570,11 +589,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "d800a71f93b57261c249d6ddd8a461b40609a684a9bd5d350dbcd8789d87ca33",
+      "contract_sha256": "fb3d83eeeea8370f45d4bf104aa6a934e39f23839ef3131b98487a4a987f82f3",
       "observed_outputs": {
         "output": [
           0.0,
@@ -585,6 +604,7 @@
         "float16"
       ],
       "problem_path": "torch2hip/l1n8_matmul_irregular",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n8_matmul_irregular-w2"
@@ -599,11 +619,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "49c387743d67f442876c519fd187e370ad2a53c5222161acc322dd7aa06055eb",
+      "contract_sha256": "cb671f804f2271e364a6b9ddc5df36f33471f4d9c1290ea9df4de94b202c864a",
       "observed_outputs": {
         "output": [
           0.0,
@@ -614,6 +634,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n9_tall_skinny_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n9_tall_skinny_matmul-w0"
@@ -628,11 +649,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "769983969a9c02ec899d649139c5562c83d73656373b22de37d32f4b1b885547",
+      "contract_sha256": "26cf8733e3774ed9a5798c943ffce9c7296b9b3ec4da2844e1ab831bc030f457",
       "observed_outputs": {
         "output": [
           0.0,
@@ -643,6 +664,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n9_tall_skinny_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n9_tall_skinny_matmul-w1"
@@ -657,11 +679,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "bf2a45564671f02d19f8eb41649ca0f6778a13251ff9f0a181c7999eab5cbc37",
+      "contract_sha256": "d893d2c04d4f4a3e0b2fd1fcfaaf1f8fef4f13041d638256b925b65588e7d9e3",
       "observed_outputs": {
         "output": [
           0.0,
@@ -672,6 +694,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n9_tall_skinny_matmul",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n9_tall_skinny_matmul-w2"
@@ -686,11 +709,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "ad0a30ca9934c0f416ffab6fb567593a3794ba003eef97d2cf06ab537e60eb65",
+      "contract_sha256": "b48c7bf96c34319777e742aa563cb2a703eaa3ee88afa655d8040982d9081c66",
       "observed_outputs": {
         "output": [
           0.0,
@@ -701,6 +724,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n23_softmax",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n23_softmax-w0"
@@ -715,11 +739,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "209d1bb1df597b671871bac37f13cf5ceaef32c77a1f13a21e2af00666bc7632",
+      "contract_sha256": "4cc119fcda21498e8f4c14f4ca8adace5b0a726568af2eb2a041671ada560322",
       "observed_outputs": {
         "output": [
           0.0,
@@ -730,6 +754,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n23_softmax",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n23_softmax-w1"
@@ -744,11 +769,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "7fea7ea0eb9d59d9d0dcb65bdba44eaf4f613368d639f6f338e7469ffc7683d2",
+      "contract_sha256": "a20395cbe78c0f61e8817ce51cbf15618b0e2a4da818ce91e415b72c6ccbb272",
       "observed_outputs": {
         "output": [
           0.0,
@@ -759,6 +784,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n23_softmax",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n23_softmax-w2"
@@ -773,11 +799,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "d85a53f8aafa9cfbedcf312bdf1347b4f8391204462423dcfbf992dee1e10294",
+      "contract_sha256": "514adc6d3d16c84d1c93a5e1eb304286f285c782931419a5ce521ee4e96d6ac5",
       "observed_outputs": {
         "output": [
           0.0,
@@ -788,6 +814,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n23_softmax",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n23_softmax-w3"
@@ -802,11 +829,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "6162f2cdbf78666dec1ff6e31dec4a984e39431b4eeec7693210b6e9e7781f96",
+      "contract_sha256": "c1ea6ae4fdaa1a5722e92eec0da31f24f7317116b68379ec5f0a0267ddea5414",
       "observed_outputs": {
         "output": [
           0.0,
@@ -817,6 +844,7 @@
         "float16"
       ],
       "problem_path": "torch2hip/l1n26_gelu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n26_gelu-w0"
@@ -831,11 +859,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "509852c6af1eeb35f4d136a86c5ec5b9821d7bb740a995c12b58684a2222a21c",
+      "contract_sha256": "1f86cefcabb6c56f287889b463f18cd05ee311caed56d5eea6189c1a7ce8057e",
       "observed_outputs": {
         "output": [
           0.0,
@@ -846,6 +874,7 @@
         "float16"
       ],
       "problem_path": "torch2hip/l1n26_gelu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n26_gelu-w1"
@@ -860,11 +889,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "f9dce6b6624bbe11df493dac267871217382b62b186740a0151b5e8c0fe33139",
+      "contract_sha256": "fc709890ce209ae801922c08f4b274b5d87278e7a70d1aa6c5748e2076d26070",
       "observed_outputs": {
         "output": [
           0.0,
@@ -875,6 +904,7 @@
         "float16"
       ],
       "problem_path": "torch2hip/l1n26_gelu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n26_gelu-w2"
@@ -889,11 +919,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "0a63604378b87cbe31b0984337809b15cf7b286a451d25244517603eee3c0f31",
+      "contract_sha256": "496cedd9f8cfcb9dfeb179dc49f2c6ccf1de2391587554116a00b946139c8d32",
       "observed_outputs": {
         "output": [
           0.0,
@@ -904,6 +934,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2hip/l1n36_rmsnorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n36_rmsnorm-w0"
@@ -918,11 +949,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "9d0b39f7f73c519f1d677065238ecf5ff9553a98ef7714aaeab7b86bd6332956",
+      "contract_sha256": "5b268a3c66c86ba60f8a5ca7e6393b5a3b1d055e7099d9dcfc881fc1c650781e",
       "observed_outputs": {
         "output": [
           0.0,
@@ -933,6 +964,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2hip/l1n36_rmsnorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n36_rmsnorm-w1"
@@ -947,11 +979,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "6478bed9dfa2be97e8e822b1a6e972bcdfe87ac59dc6b249aa0503c8300f8885",
+      "contract_sha256": "54167932bcebf59b5f7d8fe73906754a9389461a06780eea56489c621710ff19",
       "observed_outputs": {
         "output": [
           0.0,
@@ -962,6 +994,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2hip/l1n36_rmsnorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n36_rmsnorm-w2"
@@ -976,11 +1009,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "03e0776b061d5d59dbf4a3c58aad2e699b11f246b95481ba8c9a5dc0d59c5025",
+      "contract_sha256": "0f066a52742552a455bd5f3d069d9cd4e9e2d09aea82fc5d66803fb088767f89",
       "observed_outputs": {
         "output": [
           0.0,
@@ -991,6 +1024,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n40_layernorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n40_layernorm-w0"
@@ -1005,11 +1039,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "b341ce15888bf401f1d5b539378852cd834e5bb8cf3056b52907a0b7f3bed636",
+      "contract_sha256": "baa4f2219151c43edec37ee4576bba5a7fe0bc9773862ba5f3ed158b80d31e96",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1020,6 +1054,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n40_layernorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n40_layernorm-w1"
@@ -1034,11 +1069,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "9afb5186abdfe42d765c097a6f9f5367693b40ce6a7fb62208cd327e32fb11c4",
+      "contract_sha256": "01c0725b79fdda5403c935577051ec1d35de8395239b66832db7010a1540bc96",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1049,6 +1084,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n40_layernorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n40_layernorm-w2"
@@ -1063,11 +1099,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "595d475cb1dc36dce2f0852bb7ac0d0f2e304be75b8e85a8b322ddb5d8ba15f8",
+      "contract_sha256": "1e68f5530a437c63e10467e5523d8ba1d3311f0bee1e75a3ce5f1a5e1a397c63",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1078,6 +1114,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n47_sum_reduction",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n47_sum_reduction-w0"
@@ -1092,11 +1129,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "0d843c5a72b64489b941b2ee60c274a9b297cc48242472136f1f13c79ba23c68",
+      "contract_sha256": "2f6745879c5fc0f0b2df7295996de40b2bc466268ab70f24eed909d3f49bedd2",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1107,6 +1144,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n47_sum_reduction",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n47_sum_reduction-w1"
@@ -1121,11 +1159,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c38da6b0eb07646c0c3d39f672a01af26ada34cccb21b4ad7991e55db8006e7f",
+      "contract_sha256": "e4dac1eb3c6d5b11059149574ad5827431fe530ad8e30c007afa25c23a44c699",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1136,6 +1174,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n47_sum_reduction",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n47_sum_reduction-w2"
@@ -1150,11 +1189,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "b9984c2f167a663b1319a91fdf3815ed5f624d7f35538e5505673ab7a2f002a5",
+      "contract_sha256": "776f0afc6ed0de55260927c1df5f1feda47da3c9e384ef2f525f3be907a63b2f",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1165,6 +1204,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n42_maxpool2d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n42_maxpool2d-w0"
@@ -1179,11 +1219,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "b6b5a8e7f30d7711dfe7d464e00c3f6b6c2b24053582405576383f567a506585",
+      "contract_sha256": "ad5505f7211fc30543073a574b4670e125c7674bca45aecd127859521ff076a1",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1194,6 +1234,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n42_maxpool2d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n42_maxpool2d-w1"
@@ -1208,11 +1249,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "d9de1af7270f603e9b5d4b0803a104d89c178e1eef60ca867adc276c1129232b",
+      "contract_sha256": "f0cb9094d015986074ff219c6acaa1f6a1fcf4c0ec6a47411bad8ddf1c6c4cd9",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1223,6 +1264,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n42_maxpool2d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n42_maxpool2d-w2"
@@ -1237,11 +1279,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "00a5f0f673a29a0888e48f9d86cd0dc0455942baa534f8775b419aa5350cf367",
+      "contract_sha256": "5d14db1a24314c74678e1874900f5ef1d8a2fa561d12271bba48b958e0aa3c08",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1252,6 +1294,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n63_conv2d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n63_conv2d-w0"
@@ -1266,11 +1309,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "15790419cc7a81277c5d677f342aba0a9a6b14822b3f3343adb97b842d71ce5a",
+      "contract_sha256": "161be35087a55e007f10c0e0a66f14be131fd88680262e2d38cd9d9227377408",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1281,6 +1324,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n63_conv2d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n63_conv2d-w1"
@@ -1295,11 +1339,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "1923a143dbad51463c340acc0f1564f95c99675d9f14095688466269658fc8d8",
+      "contract_sha256": "4fce48aad29b89dce080f6b701c380c2df4ec828ebcfd0b567cf27283d7da881",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1310,6 +1354,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n63_conv2d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n63_conv2d-w2"
@@ -1324,11 +1369,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "f553960579913f9517331f5660dede8c5ff10c96c8a3f281fc149e005c059089",
+      "contract_sha256": "c6ffef0445a732eb2002c54eebaa1063eabeeed8c121a680dd02fc9d719e8d4e",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1339,6 +1384,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n82_conv_depthwise",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n82_conv_depthwise-w0"
@@ -1353,11 +1399,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "0b6f5b469d8830dd3a70eee2c1fea2782c39d4a1ca640c93aa271b6a46131fed",
+      "contract_sha256": "87e708680e76b79cd7218935c5712a977f6c4f1982486679596068c07f4123b6",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1368,6 +1414,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n82_conv_depthwise",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n82_conv_depthwise-w1"
@@ -1382,11 +1429,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "fddd2d7c9ec2bf5cb08a23a163cb06398d8ff5858a36ce55eb724138a7ebd5c0",
+      "contract_sha256": "41bde6b1c7fd184b21b0724e4fabbed0bdc403e24d9c11687514512fc44bf256",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1397,6 +1444,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n82_conv_depthwise",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n82_conv_depthwise-w2"
@@ -1411,11 +1459,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "652c71b28a862d574772b384e81d1bb5704b0b9f7cd5f2b7bea42109825b7131",
+      "contract_sha256": "b50a7e14ef1641c6af8369c772f859d81393f90d8529ef385e460a63c2fba51d",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1426,6 +1474,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_silu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_silu-w0"
@@ -1440,11 +1489,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "e6d2d214b44214dd7d83950f8f007be1efd1b5e1a63a9c734c739fce718a390b",
+      "contract_sha256": "06ff0dc107677ac06dd6c9376577127c4516d5e8cdd6456ce929ec79b50dcd89",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1455,6 +1504,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_silu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_silu-w1"
@@ -1469,11 +1519,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "ce5e5cba7fbbd9c3da31dea591637ad2011dca30bf98f867596183765bb506b1",
+      "contract_sha256": "044fe2bf32abda6cffff5effb8ddf70b1ad78ab3ec60217d06d57b6c19aad384",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1484,6 +1534,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_silu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_silu-w2"
@@ -1498,11 +1549,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "e767b7e8ea66b957528a0b7e74d9932abfed330270f65885d2e1bd832a80d034",
+      "contract_sha256": "03bbc93c4a1feed51a0eb7b2bc38f5daf8e0a89936e74b8455c65b2ffea2a643",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1513,6 +1564,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_silu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_silu-w3"
@@ -1527,11 +1579,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "e83d5cdcd248c34e1fb17baaab8d3b6c752e6f3a0fca9259680d65ee0c3efde7",
+      "contract_sha256": "3a6f027ab93a9510510d531faf77bcc951cb63fdf7a147d592df2e9065efe22b",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1542,6 +1594,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_sigmoid",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_sigmoid-w0"
@@ -1556,11 +1609,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "b0c087386bf34e5ab82961874762f61db640a996b08a358d02bcb63490cfc808",
+      "contract_sha256": "0b4ff11c376b4ec9a5f9b86b789051e7c9a89f7ae580fbfa233d1efc282bb142",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1571,6 +1624,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_sigmoid",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_sigmoid-w1"
@@ -1585,11 +1639,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "8d86ecac9ffe163f49aafcca1c2ea3dd6a1b939613caab13dcdf9f3dcfa7b1df",
+      "contract_sha256": "dbcc01557f0d2dcb210adc334d351fdc4c849188c0c1e43cd37f8747a478adb1",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1600,6 +1654,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_sigmoid",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_sigmoid-w2"
@@ -1614,11 +1669,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "d2a6e227f56a46532e8e35f697e4712d37ff0574ccd8bf60652266c8045c0d06",
+      "contract_sha256": "ef7fffe9bc78cf1ae64a824dee6aa6de9cd755255609635977870e881f679434",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1629,6 +1684,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_sigmoid",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_sigmoid-w3"
@@ -1643,11 +1699,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c650f728ade03ea6dabe723aee4232bdbfb77caa3c7b4f6cfbd970f7367156a9",
+      "contract_sha256": "1ae13c59abcfdf3353ab42bcb7cede3206dbf5c33950fc9d60c30d52f9598c1a",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1658,6 +1714,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_tanh",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_tanh-w0"
@@ -1672,11 +1729,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "9ecfd3cf2234ec62203ee8e24a1e3bfcb691434b5d2ea9260cc7c85518e1fe22",
+      "contract_sha256": "755ce6114282cbfc8ce2d357402c5bfdf27548da4bf3f5c4e0c26ddd9fd9b02a",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1687,6 +1744,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_tanh",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_tanh-w1"
@@ -1701,11 +1759,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c522c0e17d10d0f3bee7f6cfa0ba2238057cd339cda9f9c2b5be0bd1bd623392",
+      "contract_sha256": "940527dcc2202e115a7ed063798a3a35cda86ed4d8b7f4cdc76d1a276d2ffb92",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1716,6 +1774,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_tanh",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_tanh-w2"
@@ -1730,11 +1789,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "acd9fa866554aaeffc2fafb3537f74b1b0e3966ca5e2f215f2eaacf0f3e6fe24",
+      "contract_sha256": "4abbe016336befbfe7751783f4896d4970d1484570b4560c7201862a4de8f833",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1745,6 +1804,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_tanh",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_tanh-w3"
@@ -1759,11 +1819,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "11ecb431a918722c635a7a12280e18049811000959280911b2c61bdfdbe39f2f",
+      "contract_sha256": "295faf7c8edb0b8f359521a4d121e920ad6515580c7f791bf1e83992897ec1b6",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1774,6 +1834,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n99_matmul_gelu_softmax",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n99_matmul_gelu_softmax-w0"
@@ -1788,11 +1849,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "87b368b0bdf507ac8863c39517b3aab4186debac2b583bb7646aef3bebe7aa89",
+      "contract_sha256": "66563657720a2ce2f606b4d739f6fc97506bdbcf0b83dc061f040c12a5e22898",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1803,6 +1864,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n99_matmul_gelu_softmax",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n99_matmul_gelu_softmax-w1"
@@ -1817,11 +1879,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "553b3dd66c3ceb10cc305c31e55f372ce6bf6031bb71d61b08deff013b073ae7",
+      "contract_sha256": "4c75a8fea7e80a5f7164eb742d12a74d6e80c25f59277794c88879d1b0a2e5ca",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1832,6 +1894,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n99_matmul_gelu_softmax",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n99_matmul_gelu_softmax-w2"
@@ -1846,11 +1909,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c0f3892078d72cb441d7aa7a400c47dcaa6d6dc0e0a502e605b3e263f93ba20f",
+      "contract_sha256": "ba9208129ec3271970fdfd2a4b31bfd17ae31726248f336024eb1b6125f0af35",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1861,6 +1924,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n86_matmul_divide_gelu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n86_matmul_divide_gelu-w0"
@@ -1875,11 +1939,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "ccbf19e0792563381a00dfed5c5610b92005e8c3e91afac17173baa81027c214",
+      "contract_sha256": "0b72cfe60b5a4c1b552fb18193bb3c9823be97ee4db712256a78950e598a4374",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1890,6 +1954,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n86_matmul_divide_gelu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n86_matmul_divide_gelu-w1"
@@ -1904,11 +1969,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "5afc610877d95b7acc5b3bb95bbeef28cad36b6e0a8f529ba575dbd514027f88",
+      "contract_sha256": "f2f87c5dd0605cd030b184c42ff15ae8c468ae5b9b3d517f5426a2b2618826d2",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1919,6 +1984,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n86_matmul_divide_gelu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n86_matmul_divide_gelu-w2"
@@ -1933,11 +1999,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "0a23f05a1b6978b70be83bda435ed0a272b5cfb78f36c4d234bdf47586f50ff1",
+      "contract_sha256": "12429d092f82258ea7592c16e69d2bfe057c9d6ecf5389d0fcdbe82f051a47eb",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1948,6 +2014,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n40_matmul_scaling_residual",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n40_matmul_scaling_residual-w0"
@@ -1962,11 +2029,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "2c78220e2e36d1d8c96d1833cf06815833b6a11d3c06e8c7d5d62a407a14302a",
+      "contract_sha256": "68e73cede6082406b70e43ee34cfb7ef22b4a4300feef2e6090b26f8d9f63722",
       "observed_outputs": {
         "output": [
           0.0,
@@ -1977,6 +2044,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n40_matmul_scaling_residual",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n40_matmul_scaling_residual-w1"
@@ -1991,11 +2059,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "273f7d0d937cf1ffed39d1283c470a9c4b774122fe9e9b0c4a6f604393087004",
+      "contract_sha256": "823103cbda71c7b909d5cd00d482f1a2dff2ad89efad1a7c66b714504b6663a4",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2006,6 +2074,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n40_matmul_scaling_residual",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n40_matmul_scaling_residual-w2"
@@ -2020,11 +2089,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "0af0646597d738002d52491aae819d5de6e12bc06c201b97b08a969bbc2b4c50",
+      "contract_sha256": "d9a687c310d5c87894a9126e2f29e82cb43409956c87b2e5c67c877cf71dec12",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2035,6 +2104,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n37_groupnorm_fused",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n37_groupnorm_fused-w0"
@@ -2049,11 +2119,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "6820ae1c6afea6bea9db1a99a19b58be6dc9ccc77b9051f97ff17ea1dadf0a00",
+      "contract_sha256": "152f154b85d48a35d65d5b7e215bb48b0f6d5cf8926246b6fc9152079d8266d3",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2064,6 +2134,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n37_groupnorm_fused",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n37_groupnorm_fused-w1"
@@ -2078,11 +2149,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "2ff4ab9b19304b3fd229cd22bc09592754f67e2c5eb591eaf0335442dae6fb3e",
+      "contract_sha256": "746dd0d566a39912ad5ba5a3c63593a793bd1b4e1830c2fd0baf8c562396fc41",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2093,6 +2164,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n37_groupnorm_fused",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n37_groupnorm_fused-w2"
@@ -2107,11 +2179,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "cfd6b83c70ec8450bcbf5e28b57d8181744584833a808a80742e882d97ce9d40",
+      "contract_sha256": "28c27f544199a237c88d3b3b829d59c643d1a0a1e351b0d56b952c33eec49f46",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2122,6 +2194,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n17_instancenorm_fused",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n17_instancenorm_fused-w0"
@@ -2136,11 +2209,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "e18bf191a0559cdd99c76a5effd443850aacdaf8c36566b95149faff6ce91e1d",
+      "contract_sha256": "cb4415af0d66964e1dcd715ed1462fa0e274db11290810142433e6b542513868",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2151,6 +2224,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n17_instancenorm_fused",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n17_instancenorm_fused-w1"
@@ -2165,11 +2239,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "b4be22a879acc1542d0e68273ce2aff6326e78123b3e2504a823fbfc558cdc40",
+      "contract_sha256": "080a52f4313d38219ed0470c251707d98a450bf3d4eb04621cecb1ec88f70709",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2180,6 +2254,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n17_instancenorm_fused",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n17_instancenorm_fused-w2"
@@ -2194,11 +2269,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "ab029a903425c217a19919eba0e1fdf14a9a37c40510d41662c4e0091d057207",
+      "contract_sha256": "14b6087d8fcf3648477cb69d9585a4c1c4eadae40644315e2121173954f2d6c6",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2209,6 +2284,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/dot_product_attention",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-dot_product_attention-w0"
@@ -2223,11 +2299,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "4129c8046a3ed04999e543ebf6d1b10dab94566e207c6be72f41e73ef16f4b98",
+      "contract_sha256": "f9a9e5a0e61c8ced6795624d1e6cd4de21ae5178c70b392fa8f51d4e5f5c780d",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2238,6 +2314,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/dot_product_attention",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-dot_product_attention-w1"
@@ -2252,11 +2329,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "a29f28377df2c08eb1d96f8f72228b5f07e6bb0225f736817e7967e83aec68f1",
+      "contract_sha256": "bafd6c53820371862cdb57ce2ee9591c2da794021594e1bbbd10915b1d29f776",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2267,6 +2344,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/dot_product_attention",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-dot_product_attention-w2"
@@ -2281,11 +2359,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "63e85658f122ec24e93e5da1c0a3cde5b25329ce5c4aef501b199564205d6f0d",
+      "contract_sha256": "623c555d62226ab17a56cf436d1f76bbec0fc2c42227531a2aac8023714f041d",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2296,6 +2374,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/dot_product_attention",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-dot_product_attention-w3"
@@ -2310,11 +2389,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "2ac900321a9cf37e5159b59eab1dfebaa663560fecc7e927c6c3893d12556e12",
+      "contract_sha256": "963e394055e97ca74a7bf615f11c982f6079c5d872fc77dc6f3561b3406802eb",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2325,6 +2404,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_gelu_4d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_gelu_4d-w0"
@@ -2339,11 +2419,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "79b2d79923820a3dc69af485498602d1ed9efa41262a41256e08dd16799f0818",
+      "contract_sha256": "289267a63ce4d4a17c6e05586466f1bdf197af431a187e74a13d3e72d36ab208",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2354,6 +2434,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_gelu_4d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_gelu_4d-w1"
@@ -2368,11 +2449,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "d44c1053a40acf72e5e1ff599c734149520947885b7a5fe6d945ff4053522f9a",
+      "contract_sha256": "956f28a433a6991823b69937d5c677a07e1465d8168b066e1d069be3609114ce",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2383,6 +2464,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_gelu_4d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_gelu_4d-w2"
@@ -2397,11 +2479,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "f7aa857400af7c088ca53c9749bcd9cfcc16a9b8a9e9a9882f482c39c262bbd7",
+      "contract_sha256": "b501a8fd10ddfc8b3fe6aeb88172499cea5709888b9541e8ac99a104c3e21ce3",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2412,6 +2494,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_gelu_4d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_gelu_4d-w3"
@@ -2426,11 +2509,11 @@
           "max_rtol": 0.125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "a8a634d9e0305ac16e2a0b8fd867024ed5058de50bd7da8c3697d7c21bce6061",
+      "contract_sha256": "99492a5c30127bd5aadbf5ae8e2858d7f3110fad69485fdd57116bb9c8f80f09",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2441,6 +2524,7 @@
         "float8_e4m3fn"
       ],
       "problem_path": "instruction2triton/fp8_cast_sentinel",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-fp8_cast_sentinel-w0"
@@ -2455,11 +2539,11 @@
           "max_rtol": 0.125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "baa7ed8e6f045d1553f53d7dfff9d7cd2d35682dbbc2a928cbaa368fba94cfa1",
+      "contract_sha256": "f345b7dde5293241bbe6362c6f875ce264eb60c3eecfba24693158b5279dad27",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2470,6 +2554,7 @@
         "float8_e4m3fn"
       ],
       "problem_path": "instruction2triton/fp8_cast_sentinel",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-fp8_cast_sentinel-w1"
@@ -2484,11 +2569,11 @@
           "max_rtol": 0.125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "3e0c3aae00bca47cae10c067d79d65f9e862bada1dafb9cb0d41bb5e90a23bc8",
+      "contract_sha256": "9a99623ea8e9620ebdf41215da9a086d02ffa0b0f0b56ce3f60ca1540e66c6f2",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2499,6 +2584,7 @@
         "float8_e4m3fn"
       ],
       "problem_path": "instruction2triton/fp8_cast_sentinel",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-fp8_cast_sentinel-w2"
@@ -2513,7 +2599,7 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "grad_x",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         },
         {
@@ -2524,11 +2610,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "grad_g",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "2e5e4fae717867d2a5e91517f634cdeec9616ace07124ae1d8361c353366937f",
+      "contract_sha256": "902909296a2331da091072a378c051f9aa0db68cfedee030414bf5e7b464c14b",
       "observed_outputs": {
         "grad_g": [
           0.0,
@@ -2544,6 +2630,7 @@
         "float16"
       ],
       "problem_path": "instruction2triton/rmsnorm_bwd",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-rmsnorm_bwd-w0"
@@ -2558,7 +2645,7 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "grad_x",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         },
         {
@@ -2569,11 +2656,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "grad_g",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "3b3e17ed835b6de0b6b4fda4aa34915106547d2d51aa86e170027ee7c151b0b6",
+      "contract_sha256": "bf70702daa67a875bf903795a10ae6bf766542344b27590488d86d7e9c08ab9c",
       "observed_outputs": {
         "grad_g": [
           0.0,
@@ -2589,6 +2676,7 @@
         "float16"
       ],
       "problem_path": "instruction2triton/rmsnorm_bwd",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-rmsnorm_bwd-w1"
@@ -2603,7 +2691,7 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "grad_x",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         },
         {
@@ -2614,11 +2702,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "grad_g",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "803b46590afa43ba1481d997cb9dbe46423c9e94b78c482baa52edbdd466e9e3",
+      "contract_sha256": "8a2a6f3633d6cdc6bc0dd156186ab73c649dfad85b52740c63575df540003b11",
       "observed_outputs": {
         "grad_g": [
           0.0,
@@ -2634,6 +2722,7 @@
         "float16"
       ],
       "problem_path": "instruction2triton/rmsnorm_bwd",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-rmsnorm_bwd-w2"
@@ -2648,7 +2737,7 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "grad_x",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         },
         {
@@ -2659,11 +2748,11 @@
           "max_rtol": 0.00125,
           "mode": "elementwise",
           "output": "grad_g",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "64c63600c2b39b6c0a6a95553cbb0b741103d656005bdf973be637076951fff8",
+      "contract_sha256": "50a492548bec48ed1357b53dfb1d366f155615f53485dd045865976954311080",
       "observed_outputs": {
         "grad_g": [
           0.0,
@@ -2679,6 +2768,7 @@
         "float16"
       ],
       "problem_path": "instruction2triton/rmsnorm_bwd",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-rmsnorm_bwd-w3"
@@ -2693,11 +2783,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "bd20bc3473522578de85270ddceb62214d7a31d6d6c4621c1d45560b6996050f",
+      "contract_sha256": "f39cd0860938e2dd951b01c21b63bd9c14eb0a38965af4e7027e60ff085b38f9",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2708,6 +2798,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/silu_and_mul_bf16",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-silu_and_mul_bf16-w0"
@@ -2722,11 +2813,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "4d92a0759c9694c7c950cae02787246af604ea9b4ada058990ff30ec7944c212",
+      "contract_sha256": "a5594661b80d161408d63bff4d90a552d6c9a76c81f49470f660d15296cb6489",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2737,6 +2828,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/silu_and_mul_bf16",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-silu_and_mul_bf16-w1"
@@ -2751,11 +2843,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c33d680642009d71361607eab813a79345161ca12c7eed276914f235215bbfd4",
+      "contract_sha256": "c0174e1429602a09075740814b1b15bcb3065f238f29101835f7525700f121bf",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2766,6 +2858,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/silu_and_mul_bf16",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-silu_and_mul_bf16-w2"
@@ -2780,11 +2873,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "d4172bf25529e153efd9ee8f18ba8d18da4a1d12d66ddc6b1dcdd8a8c3ab2c60",
+      "contract_sha256": "3af5e25c76ad3d4dd5541b8c3cf6020b89c4cc9f7e9ad3862116b4edcf811355",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2795,6 +2888,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/silu_and_mul_bf16",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-silu_and_mul_bf16-w3"
@@ -2809,11 +2903,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c98bd55bc669c2839330d587b40b9215b92465facc2421322c4289583548e8fe",
+      "contract_sha256": "1bac03e6bd49df4dc7099d9577127ea24f88a22ba92d3092c30945fb8003363b",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2824,6 +2918,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_fused_leaky_relu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_fused_leaky_relu-w0"
@@ -2838,11 +2933,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "68287adea8dd71dece554783bcae47ba42cbd8194878f64224ab801aeb7779e8",
+      "contract_sha256": "366eb6e124a4dc1e4d4dd60243f3d35e192e6df7fc31b3a3d153fc24e97d3698",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2853,6 +2948,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_fused_leaky_relu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_fused_leaky_relu-w1"
@@ -2867,11 +2963,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "9272cec109aeeda8c3fc0453248bafcdda9c84878fecc654c1690451f9f20a88",
+      "contract_sha256": "1106fbee934fbe88d1fe7cc70aef9c15ffbd637cd0b086acd26df83fa739c1c4",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2882,6 +2978,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_fused_leaky_relu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_fused_leaky_relu-w2"
@@ -2896,11 +2993,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "184805b0960a56eaa0edc4c404a0686e6084f9dd3ffae2fabd23638426a56b6f",
+      "contract_sha256": "9a1599577fbdd7e0ee5012c962cb319579b6d12096d793caa8cbc68beabd345f",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2911,6 +3008,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_fused_leaky_relu",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_fused_leaky_relu-w3"
@@ -2925,11 +3023,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "291e4af35d81f3e1e932f835c02f11646add76015394a1fc458f59709a40972e",
+      "contract_sha256": "425e910c2ae0c44d56e927e9be0761c6050908ab2bca6364f94e8e87f5366319",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2940,6 +3038,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_transpose",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_transpose-w0"
@@ -2954,11 +3053,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "bc3a2618057449041ae1f7510bd2299b6584d59b816a903989bb9db41efe34ec",
+      "contract_sha256": "860ff466f4ec67994bf41771e59b18bd0dd59dafe842f6b9bdd28aaf7ca159ce",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2969,6 +3068,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_transpose",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_transpose-w1"
@@ -2983,11 +3083,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "aa1b421acc0ab59321a8497af880254769c2d41d0e8fd9ee4aef1ca7f15e5dd6",
+      "contract_sha256": "f514e7e447b01941505b8aff54b150d344b9626dfde53e6cb23d127be84f8847",
       "observed_outputs": {
         "output": [
           0.0,
@@ -2998,6 +3098,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_transpose",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_transpose-w2"
@@ -3012,11 +3113,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "12c51a8c5a31d59112dd6d946ab0e9f6fdda33a152799b9b949ea8066b1b1be1",
+      "contract_sha256": "973e68e4f7c1da42fa4eb0cf45afc43e7e09f23d1804eee252566587cd5ba266",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3027,6 +3128,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_transpose",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_transpose-w3"
@@ -3041,11 +3143,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "1ccc3f31cae85fc4e1b1ccc07d262916c08f87ea13abc26d74015765beddbdb3",
+      "contract_sha256": "26fb2a3a6ba236a53f926c19107fcc71c47f0c5802b2bfdcf772717450c04118",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3056,6 +3158,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_softmax_3d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_softmax_3d-w0"
@@ -3070,11 +3173,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "8c3fc114bc2ce6192e5ba0387fbb0780ccb345082c6b334b6c43f5782b45c8dd",
+      "contract_sha256": "42910984ddc3b7c7f85215081e7217c486f9172aa3be0ec9c760eaa36f7a2296",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3085,6 +3188,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_softmax_3d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_softmax_3d-w1"
@@ -3099,11 +3203,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "f5db391bf3edc3eca53e6ba4e68bde41c7619d24e9d2345a36a919bbc17dcc88",
+      "contract_sha256": "a5dd0543ea6aee97001a098f47a06a59f45924e6cdf9615e9d71d1f9000a915e",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3114,6 +3218,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_softmax_3d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_softmax_3d-w2"
@@ -3128,11 +3233,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "39eb99ff392b430e205a9438e0054376689971247a2ed07b73879d1200b27ada",
+      "contract_sha256": "caca9470a7faf7b2f0addd95483f9e4cb1b584d8f785f1f870670fc858881561",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3143,6 +3248,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_softmax_3d",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_softmax_3d-w3"
@@ -3157,11 +3263,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "66ffafca9787d1a33a7c13ca8f15447d2094b82e59c0fd5afba246658827de77",
+      "contract_sha256": "806174385802f3a211ed2d905b49ea5a38123d152cd5afa402f00cc9b4fec7e7",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3172,6 +3278,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_feedforward",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_feedforward-w0"
@@ -3186,11 +3293,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "d39f87d1024ea43df7f45f0c9541ac3b779d58a5ddc429766ca0569e81fa07ef",
+      "contract_sha256": "41e604e71767b5a9b05a2d56d4408057025634e936f6c2caa20c0ad20d95d43d",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3201,6 +3308,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_feedforward",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_feedforward-w1"
@@ -3215,11 +3323,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "ca6578e2f619ec1d5c6f3d4ea104306167e9dee3827592a8037b3cef4829bf6a",
+      "contract_sha256": "c43921cf340cb1e40be1f54eb39ec83f5cc701de47e9b351db4cf5019b9f5733",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3230,6 +3338,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_feedforward",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_feedforward-w2"
@@ -3244,11 +3353,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "3672ae9edd59b55d1eb6c8a6098f8115f77c11bdbb9b3e1564695faf6bfc79ea",
+      "contract_sha256": "e5345f7f5ca6b73d763ab9239c0a69cc79f98e25affe7744952e9da02f86e8a8",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3259,6 +3368,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_feedforward",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_feedforward-w3"
@@ -3273,11 +3383,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "6bbabe006850a7bff96b28448d34bf1c9017ad43271f8be44641e2e39376af44",
+      "contract_sha256": "b7aa3cb9ff379f153bfb9a748ced51e6c095647e5a0d9032e91c16add4168e0e",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3288,6 +3398,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_positionwise_ffn",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_positionwise_ffn-w0"
@@ -3302,11 +3413,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "bf476fa383f7e3a0d6a5c0198133eba8de5cbd33a08851b26f0684b8eef437b0",
+      "contract_sha256": "169bdecad3630ee41a159e052fa1a3bcacc50c37ef91f69dfae94d162cb431df",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3317,6 +3428,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_positionwise_ffn",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_positionwise_ffn-w1"
@@ -3331,11 +3443,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "e736a0570a8cff1237467663442a4f2fc49e3cd5e1f8d2d8a37dda2fff78461b",
+      "contract_sha256": "341954866a8835ccdf49a6d6c76b3367186ca9471ff36e284b1a92e9ad04e5fe",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3346,6 +3458,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_positionwise_ffn",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_positionwise_ffn-w2"
@@ -3360,11 +3473,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "affb976c303a10a018c407d028347a43dce57d92b08c1e6d074cfa23d2a5f6fd",
+      "contract_sha256": "221896d095f9e68c279c48409412fb11f3db4799deb5c96422f7f4175494fdb6",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3375,6 +3488,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_positionwise_ffn",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_positionwise_ffn-w3"
@@ -3389,11 +3503,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "aa6ba60d256d9590ef318cc514a9a6860ff48ee46bf6de8a1e5eac9a131f6c96",
+      "contract_sha256": "3ad9e3049c81ea88d7e6bc7853b03891a9fbf1b0d4a1a6668056f011fcfe7b5f",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3404,6 +3518,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_mlp",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_mlp-w0"
@@ -3418,11 +3533,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c131c6efeb21af57204c7d437ac4b62b24495bed4432cb5086d0223980424789",
+      "contract_sha256": "6dc6fe30a86b546d9a58c47be438cfd00136c781a024a3bbef66e88eb14b32e2",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3433,6 +3548,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_mlp",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_mlp-w1"
@@ -3447,11 +3563,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "7a1950d9220f12f7321c1fede3190e82736361fe78e957db1a44a4562d5297c1",
+      "contract_sha256": "35d7081386f987626af3de6f581021f33be69ae96fc7f081d3f00eba857b9b89",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3462,6 +3578,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_mlp",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_mlp-w2"
@@ -3476,11 +3593,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "7c9f413d5557cab355cc4b1e4c42671e26c0bf8a38f65d941d4010e42b329cde",
+      "contract_sha256": "6e4a147336e2c90d8ae77d98c4f7bbcda35649c3c3ab8f1c61304b2fb62c58e0",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3491,28 +3608,41 @@
         "float32"
       ],
       "problem_path": "torch2hip/gpumode_mlp",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-gpumode_mlp-w3"
     },
     {
-      "contract_sha256": "c38b906a3d7e31e514caac309423d226d921f371b6ba818252c656ba6216c9ad",
+      "checks": null,
+      "contract_sha256": "b3e7607373af71eff8c0ff00b78144198a4ec23bbb4ee6df5ceaaeb784e0044c",
+      "observed_outputs": null,
+      "output_dtypes": null,
       "problem_path": "torch2hip/l2n55_matmul_maxpool_sum_scale",
       "reason_code": "reference_ipc_payload_limit",
+      "samples": null,
       "status": "excluded",
       "workload_uuid": "aka-l2n55_matmul_maxpool_sum_scale-w0"
     },
     {
-      "contract_sha256": "c06c7b8670973fc53d2eabc3798f5ab06b4b7c69de848e9a03dc83867cb041fd",
+      "checks": null,
+      "contract_sha256": "427064afeb1f4cbe94956b7a0cb9d28ec43895fd24b51646335c8ef68cf4e39a",
+      "observed_outputs": null,
+      "output_dtypes": null,
       "problem_path": "torch2hip/l2n55_matmul_maxpool_sum_scale",
       "reason_code": "reference_ipc_payload_limit",
+      "samples": null,
       "status": "excluded",
       "workload_uuid": "aka-l2n55_matmul_maxpool_sum_scale-w1"
     },
     {
-      "contract_sha256": "9317a2a81fb8b8722741291d58b4940d99564d4b4a9f13710de52f8b755f6d83",
+      "checks": null,
+      "contract_sha256": "a2aaf46fe512d8b7ae8e59ce0c9148fda3f60f1b4f731671c509bf85a447e67b",
+      "observed_outputs": null,
+      "output_dtypes": null,
       "problem_path": "torch2hip/l2n55_matmul_maxpool_sum_scale",
       "reason_code": "reference_ipc_payload_limit",
+      "samples": null,
       "status": "excluded",
       "workload_uuid": "aka-l2n55_matmul_maxpool_sum_scale-w2"
     },
@@ -3526,11 +3656,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c7a08363d636af79e5958559d39d6b971df9259c36c5ab9ac25413a23d6abf7f",
+      "contract_sha256": "a3211a26fc3cb2682720d788ef776c869911a5e44b3aefe6a9bf661ac1176528",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3541,6 +3671,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n98_matmul_avgpool_gelu_scale_max",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n98_matmul_avgpool_gelu_scale_max-w0"
@@ -3555,11 +3686,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "aeac0b44afde2271f3f191ac84d0b4e0b525759339f11df59b656bb5d3e2b248",
+      "contract_sha256": "9da4ebfadc48e28c9afde975bf83ba03f326b34fca466e5bb78db947484a07a6",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3570,6 +3701,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n98_matmul_avgpool_gelu_scale_max",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n98_matmul_avgpool_gelu_scale_max-w1"
@@ -3584,11 +3716,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "6cbf8725c5e4dac8fa27c55e3121eb04ad5eed5da7fcd53eea26fda115055ecd",
+      "contract_sha256": "2427249387203f7b2bb04c03bc581b4d490672b18543bf65e204222bb24987bb",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3599,6 +3731,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n98_matmul_avgpool_gelu_scale_max",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n98_matmul_avgpool_gelu_scale_max-w2"
@@ -3613,11 +3746,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "e71bc415faa1db86672578b42c1ea4bb8f10442f9e33a5a1bfb6845e8d33c98a",
+      "contract_sha256": "cdc99c10c7a796571d7633dd38aef18f244c2021d21b9c0df704b8fcc9a91b1c",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3628,6 +3761,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l3n44_mingpt_block",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l3n44_mingpt_block-w0"
@@ -3642,11 +3776,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "8e9853bb341caab06ff173608d115272aec46b798de2165f4be9ef4f1fe66ac8",
+      "contract_sha256": "dc44246e80767714296d6969da0963946bdf091e6a0cc8915667e39fd92c2a71",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3657,6 +3791,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l3n44_mingpt_block",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l3n44_mingpt_block-w1"
@@ -3671,11 +3806,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "0379b2ecf526b5d7ca80d6c0a5332166eec5dd08f6137a9f62f50176bd43872d",
+      "contract_sha256": "8a946562eb6c869ed0b62bcfe5c9d6b7f2b5736488c39a298ad1c47d7ab57201",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3686,6 +3821,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l3n44_mingpt_block",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l3n44_mingpt_block-w2"
@@ -3700,11 +3836,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "73f30da9d61abfd54700e4fe754cf4431938a6f25441a263221f4e5c66b649e7",
+      "contract_sha256": "b549f564c691d47b760c77e616acb6c282f7072ea4b053e146485bf8be0bd520",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3715,6 +3851,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l3n44_mingpt_block",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l3n44_mingpt_block-w3"
@@ -3729,11 +3866,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "loss",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "fb5a0e9bf7dc571a0c62b807a71244c61e185f527e8be95ca262638b4f9bb19c",
+      "contract_sha256": "768da0e4c5b773bdf592c208ca0caadb506de6afa24f75de4dca4e44187281d2",
       "observed_outputs": {
         "loss": [
           0.0,
@@ -3744,6 +3881,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n95_cross_entropy",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n95_cross_entropy-w0"
@@ -3758,11 +3896,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "loss",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "2b4e13fa2f5234599ba77e21f1338ac43d43ec825a0046654aca3c40fbd11559",
+      "contract_sha256": "3aed9922f1bfb01cdc1a325fe4f8be103ca4c04a49d03aa9180fd212d480cb69",
       "observed_outputs": {
         "loss": [
           0.0,
@@ -3773,6 +3911,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n95_cross_entropy",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n95_cross_entropy-w1"
@@ -3787,11 +3926,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "loss",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "0ed2394f762aa2e8ffa22dbe7c462c095fe3258027d1b504d5757ae5ec6170f8",
+      "contract_sha256": "1a8959774dfc584fc94982019a928584c2d3328aa9e67f435e23c79d9219cb59",
       "observed_outputs": {
         "loss": [
           0.0,
@@ -3802,6 +3941,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n95_cross_entropy",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n95_cross_entropy-w2"
@@ -3816,11 +3956,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "loss",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "f948e8ee9d89db3c4090be5b1d66391a51750cd2bac055e2d968d3fb4fb6194f",
+      "contract_sha256": "2d292c554c39ba5e9c5c1fa8e2c9c6959f7ae1d63f9448f9be05d5d985751e31",
       "observed_outputs": {
         "loss": [
           0.0,
@@ -3831,6 +3971,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n95_cross_entropy",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n95_cross_entropy-w3"
@@ -3845,11 +3986,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "loss",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "1351de9b54542b5fb3e13e4426d27e24a625d9e327dd2ce8fcdd6afaec416a9d",
+      "contract_sha256": "411cc701ab9002dd9136a97e297b9f4e76b3587acd62255ad006f3d80ce506ac",
       "observed_outputs": {
         "loss": [
           0.0,
@@ -3860,6 +4001,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l1n95_cross_entropy",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l1n95_cross_entropy-w4"
@@ -3874,11 +4016,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "8dfdb9c9be2ad8dcd890e998e95e8965ca87734874a0495a1eb2adee3f28d01d",
+      "contract_sha256": "c1e96e8b750e88972ee6fb782d5a055a6556818234f4b1ec04e15816bfcb8398",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3889,6 +4031,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n52_conv_activation_batchnorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n52_conv_activation_batchnorm-w0"
@@ -3903,11 +4046,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "bbd2a9fd51a52d8601a51f6f1fa35f6a94fd20ce113ed1b94743f38ff6ff0e56",
+      "contract_sha256": "0552b247dc00670cd42ede629812427cb0a64b9e9b3ce5c0e75a43b7da4115fa",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3918,6 +4061,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n52_conv_activation_batchnorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n52_conv_activation_batchnorm-w1"
@@ -3932,11 +4076,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "a9f96de309092bb4f6933cb21909b705cadc5d7b021f1171f46b71cacc4ffb21",
+      "contract_sha256": "a59d70faa015d54bde1d3efdcce799608e6931110d6ec47a5b13021f4ea6eec3",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3947,6 +4091,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n52_conv_activation_batchnorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n52_conv_activation_batchnorm-w2"
@@ -3961,11 +4106,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "9fd54ebaabfcb6d39b4054d84a68381d6924781530e4c2d069dc1dbc8854e588",
+      "contract_sha256": "945b61db986223877811d2691f18285c532fcfd68cb3eb428fa12f194e13dd94",
       "observed_outputs": {
         "output": [
           0.0,
@@ -3976,6 +4121,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n52_conv_activation_batchnorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n52_conv_activation_batchnorm-w3"
@@ -3990,11 +4136,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "72332eeb9b3a500c0b8654ef3ad0a4d6513428a36f7346f5148f571c96dbdc48",
+      "contract_sha256": "136277d6394ce89d2b22325703aeb86e5b9815596352ae12897f3d8cb1724666",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4005,6 +4151,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/l2n52_conv_activation_batchnorm",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-l2n52_conv_activation_batchnorm-w4"
@@ -4019,11 +4166,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "loss",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "6d4dfa86874d0d4d383746c5169f5c0b3ba6bdcd19baa6612f2adda452df9ddd",
+      "contract_sha256": "7ecbfbc53c87301e95a1db7d3bbdd4a8f447a728f43df8e0f7d783194a97772a",
       "observed_outputs": {
         "loss": [
           0.0,
@@ -4034,6 +4181,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/14007_kd_loss",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-14007_kd_loss-w0"
@@ -4048,11 +4196,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "loss",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "919345ba6a586834e4d3c2f0e742c799036d0e7f13a7ecef5f629ee309d68a6b",
+      "contract_sha256": "852e691fd734d78f4cb662ba3ee9cf6601405f8a76f429bc03c85db7a324c23e",
       "observed_outputs": {
         "loss": [
           0.0,
@@ -4063,6 +4211,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/14007_kd_loss",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-14007_kd_loss-w1"
@@ -4077,11 +4226,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "loss",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "41c8e69b41e2919c6bda986f8baf083a1b3daaf4daa72cc0946aef98f25e7bed",
+      "contract_sha256": "aa7f63b21c7921a7688705d5ed0659f7812603686f74795ae6d8b302dc8c5d2f",
       "observed_outputs": {
         "loss": [
           0.0,
@@ -4092,6 +4241,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/14007_kd_loss",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-14007_kd_loss-w2"
@@ -4106,11 +4256,11 @@
           "max_rtol": 1.25e-05,
           "mode": "elementwise",
           "output": "loss",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c9abad5643ed781d8a3ff9686e23356710839d8ece5787610e9f107401c8ee88",
+      "contract_sha256": "00356e850365f4742d17c65e6f3a502d4db6eec1b68a75cf56754aaca2c1ae0a",
       "observed_outputs": {
         "loss": [
           0.0,
@@ -4121,6 +4271,7 @@
         "float32"
       ],
       "problem_path": "torch2hip/14007_kd_loss",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-14007_kd_loss-w3"
@@ -4150,7 +4301,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "4ca01ae6c130564364332ce543a009daf978aeb2f8f1a34189fe999012c0833c",
+      "contract_sha256": "80597d426557156c46e279abf9b845ab3a605743d2404b5278143f039fbf1751",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4166,6 +4317,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/fused_add_rmsnorm_bf16",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-fused_add_rmsnorm_bf16-w0"
@@ -4195,7 +4347,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "93f5354918801d1053b4d53bf4913d6f751181dbae5fcba66ab7a536f5e41b92",
+      "contract_sha256": "4462feade55c229755f9bbe8f76ca2fde769c0df2d0d0c3a7a179def455d7066",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4211,6 +4363,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/fused_add_rmsnorm_bf16",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-fused_add_rmsnorm_bf16-w1"
@@ -4240,7 +4393,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "a87ae8bafeceea3d2c60fd728a74ad7872976ee7c2f4069127f84df2bff8237d",
+      "contract_sha256": "657b4bf6256981ba38422ae6407cabd74bbd68a65cba4f306d3c0228d5ea7b42",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4256,6 +4409,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/fused_add_rmsnorm_bf16",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-fused_add_rmsnorm_bf16-w2"
@@ -4285,7 +4439,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "8317bfa8ef9b46440ea416bebd9c9a541bbfbe48c3e86854b82273015dc6f117",
+      "contract_sha256": "74767f18be82ec8b0f779283b5ba28a38d18cffd7b83e198890fad44da3cfb47",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4301,6 +4455,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/fused_add_rmsnorm_bf16",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-fused_add_rmsnorm_bf16-w3"
@@ -4330,7 +4485,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "0dcbf73a5638c00f7ed625e4a49e9c8db01dad4d5526d0cc40681f406a6d4ccc",
+      "contract_sha256": "3e0b75e38d06dae9c9575a5efc311112b71b86671b5ffaa2f3521ef6c5e47eab",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4346,6 +4501,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/fused_add_rmsnorm_bf16",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-fused_add_rmsnorm_bf16-w4"
@@ -4375,7 +4531,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "72f549d819e6c720accaa5cc96d110fdacbbb12d6142331bbeee51a0bcb01761",
+      "contract_sha256": "fa15092f63ebf12981ed44cf1b1c75f8dc0c4dabd253cc087c26fa06b19bd2ed",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4391,6 +4547,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/fused_add_rmsnorm_bf16",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-fused_add_rmsnorm_bf16-w5"
@@ -4416,7 +4573,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "7ca31097362696e245f2aee53a4e5037f3ca8b6e674c0d7aa8a70b839594a0df",
+      "contract_sha256": "693d36cc8fc24608fecba8579c4e50d6e9fa2e60332588cbc208cb247328282f",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4432,6 +4589,7 @@
         "float32"
       ],
       "problem_path": "torch2flydsl/per_token_i8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-per_token_i8_quant-w0"
@@ -4457,7 +4615,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "7a89417fbfd72361430021d34493cd7933786f91d5d21b6e2150b6d48eb28c9b",
+      "contract_sha256": "24b762b1ba65b4b1c14418c011dc5e78321d0e05a3c2d342ab3282f923053597",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4473,6 +4631,7 @@
         "float32"
       ],
       "problem_path": "torch2flydsl/per_token_i8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-per_token_i8_quant-w1"
@@ -4498,7 +4657,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "f2927f9c10451c140e0bf6430a0cdc6f70cd1af70e6f079d80df41819e63c8da",
+      "contract_sha256": "599ced18d55a25bef2a54ef5d193526835860863f77783bc252a063fddae0889",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4514,6 +4673,7 @@
         "float32"
       ],
       "problem_path": "torch2flydsl/per_token_i8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-per_token_i8_quant-w2"
@@ -4539,7 +4699,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "bc0a405f10f6bf2a83d5eb9bd9167a549572a4ac448d2fe5b2d157cb90696b81",
+      "contract_sha256": "e49e76a5eba2baf44d7ec93008c52c653161de34baba74265842b6daada657b2",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4555,6 +4715,7 @@
         "float32"
       ],
       "problem_path": "torch2flydsl/per_token_i8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-per_token_i8_quant-w3"
@@ -4580,7 +4741,7 @@
           "type": "numeric"
         }
       ],
-      "contract_sha256": "c9fa2c1fe4b85a7825084d40c18d0a2f43bd6df07beb6df1811416edb40b9801",
+      "contract_sha256": "db445f1daa0982b92088bc565835594ed73831eb5e800194943ea476aad12a51",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4596,6 +4757,7 @@
         "float32"
       ],
       "problem_path": "torch2flydsl/per_token_i8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-per_token_i8_quant-w4"
@@ -4610,11 +4772,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "9674dd404534d8438a8914d25d046f8e417591db5b7cbac7809433ea941e5f41",
+      "contract_sha256": "5a9794127a666d5065f7360a64b25d6f96362b252d56822e2d77831a447b2e4e",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4625,6 +4787,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/rope_thd_fwd_bf16",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-rope_thd_fwd_bf16-w0"
@@ -4639,11 +4802,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "b80bdd630b93585c7740cabbef6c75ce3ee819dce17cc1be92a80fa531f9c56f",
+      "contract_sha256": "3023142ed010a6d97b056030d3f544ea1a64db481901a1d81c523da6fdbe93e8",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4654,6 +4817,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/rope_thd_fwd_bf16",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-rope_thd_fwd_bf16-w1"
@@ -4668,11 +4832,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "e727c64764b3f89e20a451729fd9a2ade2f5ebe2f895818669e35abd386e81d4",
+      "contract_sha256": "298533e2a80f48602dcf3df606975b6a3481dbb1b94294542e5608362cbd2dc8",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4683,6 +4847,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/rope_thd_fwd_bf16",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-rope_thd_fwd_bf16-w2"
@@ -4697,11 +4862,11 @@
           "max_rtol": 0.0125,
           "mode": "elementwise",
           "output": "output",
-          "required_matched_ratio": 0.99,
+          "required_matched_ratio": 1.0,
           "type": "numeric"
         }
       ],
-      "contract_sha256": "60fce502968b3c171279160b162085623bf47c957bc2ee1ae4b72fa65daea466",
+      "contract_sha256": "4b0fef5d336291625189ca155808b194628f70545911060b3e32b3e31d0a4698",
       "observed_outputs": {
         "output": [
           0.0,
@@ -4712,6 +4877,7 @@
         "bfloat16"
       ],
       "problem_path": "torch2flydsl/rope_thd_fwd_bf16",
+      "reason_code": null,
       "samples": 6,
       "status": "calibrated",
       "workload_uuid": "aka-rope_thd_fwd_bf16-w3"
@@ -4730,7 +4896,7 @@
           "type": "exact"
         }
       ],
-      "contract_sha256": "41cc72142deae357700aced88b9e147baeac4221457a3a7e9c90ead351c28915",
+      "contract_sha256": "250d5982f6116205f762658624bf1bd9c0f1fc711b3637dcec22e103327e91d7",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4746,6 +4912,7 @@
         "uint8"
       ],
       "problem_path": "torch2flydsl/dynamic_mxfp8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-dynamic_mxfp8_quant-w0"
@@ -4764,7 +4931,7 @@
           "type": "exact"
         }
       ],
-      "contract_sha256": "28fdeae94d078acd036637fa740a68ea8f0dcdb96467b88162763495e94d5def",
+      "contract_sha256": "f73600f07364d7ad6a9380c5529c65b8c33dd270958d737fe019148bd919d7fd",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4780,6 +4947,7 @@
         "uint8"
       ],
       "problem_path": "torch2flydsl/dynamic_mxfp8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-dynamic_mxfp8_quant-w1"
@@ -4798,7 +4966,7 @@
           "type": "exact"
         }
       ],
-      "contract_sha256": "46dd16d2b5b705908ab6326753ba39ef66700fe9d5904fd42c62009f8b864799",
+      "contract_sha256": "00caf4bc0a8eb78895c2dca6d2177e7a5ed5672412fb1694774991e5cf7c0c30",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4814,6 +4982,7 @@
         "uint8"
       ],
       "problem_path": "torch2flydsl/dynamic_mxfp8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-dynamic_mxfp8_quant-w2"
@@ -4832,7 +5001,7 @@
           "type": "exact"
         }
       ],
-      "contract_sha256": "1204d1fa3358ef1f5df575b360656897f3114f35eccbfa65699ed7257b84af70",
+      "contract_sha256": "95dcdb9402c45b6bd182d8a3c86b25bf8ba82fca114f43b4333f00c8657409d3",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4848,6 +5017,7 @@
         "uint8"
       ],
       "problem_path": "torch2flydsl/dynamic_mxfp8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-dynamic_mxfp8_quant-w3"
@@ -4866,7 +5036,7 @@
           "type": "exact"
         }
       ],
-      "contract_sha256": "0d85815befdeae9186cfb7e028a4e918c552634748d418429bdcbb78b2d049c3",
+      "contract_sha256": "59e16af3996b82988402f4f265fcd74eacaadcd196dfa9a28d9350726848b174",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4882,6 +5052,7 @@
         "uint8"
       ],
       "problem_path": "torch2flydsl/dynamic_mxfp8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-dynamic_mxfp8_quant-w4"
@@ -4900,7 +5071,7 @@
           "type": "exact"
         }
       ],
-      "contract_sha256": "626d3d6d33aae31001a4e07f2b9007a703606e728b43fff133239ecf87755e54",
+      "contract_sha256": "72a99a1c42f002005cb799d6bf6d667c865438ea6d8c94519c5e442140ccf0f3",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4916,6 +5087,7 @@
         "uint8"
       ],
       "problem_path": "torch2flydsl/dynamic_mxfp8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-dynamic_mxfp8_quant-w5"
@@ -4934,7 +5106,7 @@
           "type": "exact"
         }
       ],
-      "contract_sha256": "591fc4145ca1c48a5aa8ece33d0656daeadae94344c73c491a45622d6200a323",
+      "contract_sha256": "4e76411205d173b5c578f0c67aafc4af8fbc2a2667117de48de56b781df9f49b",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4950,6 +5122,7 @@
         "uint8"
       ],
       "problem_path": "torch2flydsl/dynamic_mxfp8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-dynamic_mxfp8_quant-w6"
@@ -4968,7 +5141,7 @@
           "type": "exact"
         }
       ],
-      "contract_sha256": "1ff4ebfb38eb979a4f26fd04fec30c31918b864472a67a2fffdce40ef79fc3f7",
+      "contract_sha256": "f60d0915aaa27ebcea219044d747b2edfc92ac648a234343bee8ec509f7bedeb",
       "observed_outputs": {
         "codes": [
           0.0,
@@ -4984,6 +5157,7 @@
         "uint8"
       ],
       "problem_path": "torch2flydsl/dynamic_mxfp8_quant",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-dynamic_mxfp8_quant-w7"
@@ -4994,7 +5168,7 @@
           "bias_input": "bias",
           "gating_input": "gating",
           "ids_output": "ids",
-          "max_mismatch_ratio": 0.05,
+          "max_mismatch_ratio": 0.0,
           "tie_atol": 0.0001,
           "topk": 8,
           "type": "topk_routing",
@@ -5002,7 +5176,7 @@
           "weights_output": "weights"
         }
       ],
-      "contract_sha256": "151b987418cff1d2bfca80492e3314a7c7727f4b4ccd660d0c378ac0ef3fe1d5",
+      "contract_sha256": "3e3a0e453e598de764a686c6fce71671b6a352fc550e93a255b96b77ea3d36c6",
       "observed_outputs": {
         "ids": [
           0.0,
@@ -5018,6 +5192,7 @@
         "int32"
       ],
       "problem_path": "torch2flydsl/moe_topk_softmax",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-moe_topk_softmax-w0"
@@ -5028,7 +5203,7 @@
           "bias_input": "bias",
           "gating_input": "gating",
           "ids_output": "ids",
-          "max_mismatch_ratio": 0.05,
+          "max_mismatch_ratio": 0.0,
           "tie_atol": 0.0001,
           "topk": 8,
           "type": "topk_routing",
@@ -5036,7 +5211,7 @@
           "weights_output": "weights"
         }
       ],
-      "contract_sha256": "73a876f8d67f665378e482226c09766e9ea374c3a6c9e11d78a4fd5f896376ca",
+      "contract_sha256": "4bbfae3f27c573e30ab957e5079bc78f16f3399fd9fcef6eb5eaafd71dcda043",
       "observed_outputs": {
         "ids": [
           0.0,
@@ -5052,6 +5227,7 @@
         "int32"
       ],
       "problem_path": "torch2flydsl/moe_topk_softmax",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-moe_topk_softmax-w1"
@@ -5062,7 +5238,7 @@
           "bias_input": "bias",
           "gating_input": "gating",
           "ids_output": "ids",
-          "max_mismatch_ratio": 0.05,
+          "max_mismatch_ratio": 0.0,
           "tie_atol": 0.0001,
           "topk": 4,
           "type": "topk_routing",
@@ -5070,7 +5246,7 @@
           "weights_output": "weights"
         }
       ],
-      "contract_sha256": "9941fe61969582e20d568f34f68f2f4deb5549d76a19dae3be22ab151c20972f",
+      "contract_sha256": "a1cdde3461a36351b91579a929dfd50399ca9eb31fcf48848c116a96062e700f",
       "observed_outputs": {
         "ids": [
           0.0,
@@ -5086,6 +5262,7 @@
         "int32"
       ],
       "problem_path": "torch2flydsl/moe_topk_softmax",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-moe_topk_softmax-w2"
@@ -5104,7 +5281,7 @@
           "weights_output": "weights"
         }
       ],
-      "contract_sha256": "a252f9b8c363796b6b4ddac15c620939909da1115d753d6b680f1753367e60d7",
+      "contract_sha256": "476d761b1ba88bc7b419c42aa60b98f34d96c8a6d8086e09f7c9920fc30a8d8e",
       "observed_outputs": {
         "ids": [
           0.0,
@@ -5120,12 +5297,13 @@
         "int32"
       ],
       "problem_path": "torch2flydsl/moe_topk_softmax",
+      "reason_code": null,
       "samples": 12,
       "status": "calibrated",
       "workload_uuid": "aka-moe_topk_softmax-w3"
     }
   ],
   "repeats_per_seed": 3,
-  "schema_version": 2,
+  "schema_version": 3,
   "seed_count": 3
 }

@@ -116,7 +116,7 @@ the default executor calls public PyTorch APIs independently of the ATen path.
 
 ## Official score
 
-The schema v6 corpus pins the pending
+The schema v7 corpus pins the pending
 `rx9060xt-gfx1200-reference-v2` baseline identity. Official scoring remains
 unauthorized until its v2 release evidence is published. Once authorized, the
 fail-closed scorer accepts a publisher-authored release bundle whose SHA-256

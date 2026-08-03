@@ -110,7 +110,7 @@ current evaluator contract capability `runtime.evidence`.
   "definition": "rmsnorm",
   "solution": "rmsnorm_triton_rocm_v1",
   "workload": {
-    "schema_version": "sol_execbench.workload.v1",
+    "schema_version": "sol_execbench.workload.v2",
     "uuid": "6120f144-b973-4bd9-b884-77ecb132914e",
     "axes": {
       "batch_size": 32

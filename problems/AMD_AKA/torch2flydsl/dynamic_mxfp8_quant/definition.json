@@ -43,5 +43,5 @@
       "dtype": "uint8"
     }
   },
-  "reference": "import torch\n\n\ndef run(input):\n    value = input.float()\n    m, k = value.shape\n    blocks = value.reshape(m, k // 32, 32)\n    amax = blocks.abs().amax(dim=-1, keepdim=True)\n    bits = (amax.contiguous().view(torch.int32) + 0x200000) & -8388608\n    power = bits.view(torch.float32)\n    exponent = torch.clamp(power.log2().floor() - 8, -127, 127)\n    scale = (exponent.to(torch.int32) + 127).to(torch.uint8)\n    codes = (blocks * torch.exp2(-exponent)).reshape(m, k)\n    return codes.to(torch.float8_e4m3fn), scale.reshape(m, k // 32)\n"
+  "reference": "import torch\n\n\ndef run(input):  # noqa: A002 - benchmark ABI\n    value = input.float()\n    m, k = value.shape\n    blocks = value.reshape(m, k // 32, 32)\n    amax = blocks.abs().amax(dim=-1, keepdim=True)\n    bits = (amax.contiguous().view(torch.int32) + 0x200000) & -8388608\n    power = bits.view(torch.float32)\n    exponent = torch.clamp(power.log2().floor() - 8, -127, 127)\n    scale = (exponent.to(torch.int32) + 127).to(torch.uint8)\n    codes = (blocks * torch.exp2(-exponent)).reshape(m, k)\n    return codes.to(torch.float8_e4m3fn), scale.reshape(m, k // 32)\n"
 }

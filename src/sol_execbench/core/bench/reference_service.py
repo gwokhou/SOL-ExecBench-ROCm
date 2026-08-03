@@ -14,6 +14,7 @@ from typing import Any, TextIO
 import torch
 
 from sol_execbench.core.bench.config import BenchmarkConfig
+from sol_execbench.core.bench.correctness import check_output_shape_dtype
 from sol_execbench.core.bench.eval_output_integrity import (
     stable_reference_outputs,
 )
@@ -28,6 +29,7 @@ from sol_execbench.core.bench.io import (
     gen_inputs,
     load_safetensors,
 )
+from sol_execbench.core.bench.output_checks import compare_output_checks
 from sol_execbench.core.bench.performance_model.access_evidence import (
     summarize_integer_inputs,
 )
@@ -37,6 +39,7 @@ from sol_execbench.core.bench.reference_protocol import (
     ReferenceCase,
     ReferenceFailureKind,
     ReferenceProtocolError,
+    receive_case,
     receive_json,
     send_case,
     send_failure,
@@ -77,11 +80,21 @@ class ReferenceService:
         staging_dir: Path,
         *,
         device: str,
+        input_nonce: str,
         definition_path: Path | None = None,
     ) -> None:
         """Initialize trusted reference execution for a staged problem."""
+        try:
+            nonce_bytes = bytes.fromhex(input_nonce)
+        except ValueError as error:
+            raise ValueError(
+                "reference input nonce is not hexadecimal"
+            ) from error
+        if len(nonce_bytes) != 32:
+            raise ValueError("reference input nonce must contain 32 bytes")
         self.staging_dir = staging_dir
         self.device = device
+        self.input_nonce = input_nonce
         trusted_definition = (
             definition_path or staging_dir / TRUSTED_DEFINITION_FILE
         )
@@ -119,14 +132,58 @@ class ReferenceService:
             for name, spec in self.definition.outputs.items()
         }
         self._safetensors: dict[str, dict[str, Any]] = {}
+        self._pending_timing_validation: (
+            tuple[
+                Workload,
+                list[Any],
+                list[torch.Tensor],
+            ]
+            | None
+        ) = None
 
     def handle(
         self,
         request: dict[str, Any],
     ) -> tuple[str, ReferenceCase, float, str | None]:
         """Validate one request and produce its trusted response."""
+        operation, row_index, round_index, workload = self._request_context(
+            request,
+        )
+        variation_index = self._variation_index(request, operation)
+        self._require_validation_complete(operation)
+        inputs = self._requested_inputs(
+            workload,
+            row_index,
+            round_index,
+            variation_index,
+        )
+        outputs = self._reference_outputs(workload, inputs)
+        response_outputs = self._stage_timing_validation(
+            operation,
+            workload,
+            inputs,
+            outputs,
+        )
+        latency, failure = (
+            self._timing(inputs) if operation == "timing" else (0.0, None)
+        )
+        return (
+            operation,
+            ReferenceCase(inputs=inputs, outputs=response_outputs),
+            latency,
+            failure,
+        )
+
+    def _request_context(
+        self,
+        request: dict[str, Any],
+    ) -> tuple[str, int, int, Workload]:
         operation = request.get("operation")
-        if operation not in {"correctness", "timing"}:
+        if not isinstance(operation, str) or operation not in {
+            "correctness",
+            "timing",
+            "timing_iteration",
+        }:
             raise ReferenceRequestError(
                 f"unsupported reference operation: {operation!r}",
             )
@@ -142,8 +199,30 @@ class ReferenceService:
         workload = self.workloads[row_index]
         if workload_uuid != workload.uuid:
             raise ReferenceRequestError("reference workload identity mismatch")
+        return operation, row_index, round_index, workload
+
+    def _require_validation_complete(self, operation: str) -> None:
+        if operation == "timing_iteration" and (
+            self._pending_timing_validation is not None
+        ):
+            raise ReferenceRequestError(
+                "previous timing iteration has not been validated",
+            )
+
+    def _requested_inputs(
+        self,
+        workload: Workload,
+        row_index: int,
+        round_index: int,
+        variation_index: int | None,
+    ) -> list[Any]:
         try:
-            inputs = self.prepare_inputs(workload, row_index, round_index)
+            return self.prepare_inputs(
+                workload,
+                row_index,
+                round_index,
+                variation_index=variation_index,
+            )
         except CustomInputGenerationError as exc:
             raise InputGenerationError(
                 f"{exc}\n{exc.provenance.log_text()}",
@@ -154,6 +233,12 @@ class ReferenceService:
                 str(exc),
                 failure_class=CustomInputFailureClass.ERROR,
             ) from exc
+
+    def _reference_outputs(
+        self,
+        workload: Workload,
+        inputs: list[Any],
+    ) -> list[torch.Tensor]:
         resolved_axes = self.definition.get_resolved_axes_values(workload.axes)
         outputs = call_and_collect_outputs(
             self.reference,
@@ -165,22 +250,73 @@ class ReferenceService:
             output_names=self.output_names,
             output_dtypes=self.output_dtypes,
         )
-        outputs = stable_reference_outputs(outputs, inputs)
-        latency, failure = (
-            self._timing(inputs) if operation == "timing" else (0.0, None)
+        return stable_reference_outputs(outputs, inputs)
+
+    def _stage_timing_validation(
+        self,
+        operation: str,
+        workload: Workload,
+        inputs: list[Any],
+        outputs: list[torch.Tensor],
+    ) -> list[torch.Tensor]:
+        if operation == "timing_iteration":
+            self._pending_timing_validation = (workload, inputs, outputs)
+            return []
+        return outputs
+
+    def validate_timing_outputs(self, actual: list[torch.Tensor]) -> None:
+        """Validate one candidate result without disclosing the reference."""
+        pending = self._pending_timing_validation
+        if pending is None:
+            raise ReferenceRequestError("no timing iteration awaits validation")
+        self._pending_timing_validation = None
+        workload, inputs, expected = pending
+        issue = check_output_shape_dtype(expected, actual)
+        if issue is not None:
+            raise ReferenceRequestError(
+                f"timed output shape or dtype is invalid: {issue}",
+            )
+        _, exceeds = compare_output_checks(
+            self.definition,
+            workload,
+            inputs,
+            expected,
+            actual,
+            0,
         )
-        return (
-            operation,
-            ReferenceCase(inputs=inputs, outputs=outputs),
-            latency,
-            failure,
-        )
+        if exceeds:
+            raise ReferenceRequestError(
+                "timed output differs from the trusted reference",
+            )
+
+    def _variation_index(
+        self,
+        request: dict[str, Any],
+        operation: str,
+    ) -> int | None:
+        if operation != "timing_iteration":
+            return None
+        trial_index = request.get("trial_index")
+        iteration_index = request.get("iteration_index")
+        if not isinstance(trial_index, int) or not 0 <= trial_index < max(
+            self.config.trials,
+            1,
+        ):
+            raise ReferenceRequestError("reference trial_index is invalid")
+        iteration_count = self.config.warmup_runs + self.config.iterations
+        if not isinstance(iteration_index, int) or not 0 <= iteration_index < (
+            iteration_count
+        ):
+            raise ReferenceRequestError("reference iteration_index is invalid")
+        return trial_index * iteration_count + iteration_index
 
     def prepare_inputs(
         self,
         workload: Workload,
         row_index: int,
         round_index: int,
+        *,
+        variation_index: int | None = None,
     ) -> list[Any]:
         """Generate one trusted, deterministically seeded workload input set."""
         safe_tensors = self._safetensors_for(workload)
@@ -190,6 +326,8 @@ class ReferenceService:
             row_index=row_index,
             base_seed=self.config.seed,
             round_index=round_index,
+            run_nonce=self.input_nonce,
+            variation_index=variation_index,
         )
         return gen_inputs(
             self.definition,
@@ -266,6 +404,18 @@ def _serve_connection(
             if request.get("operation") == "shutdown":
                 send_json(writer, {"ok": True, "protocol": PROTOCOL_VERSION})
                 return
+            if request.get("operation") == "timing_validation":
+                actual = receive_case(reader, device=service.device)
+                if actual.inputs:
+                    raise ReferenceRequestError(
+                        "timing validation payload must contain outputs only",
+                    )
+                service.validate_timing_outputs(actual.outputs)
+                send_json(
+                    writer,
+                    {"ok": True, "protocol": PROTOCOL_VERSION},
+                )
+                continue
             operation, case, latency, failure = service.handle(request)
             access_patterns = (
                 summarize_integer_inputs(
@@ -318,11 +468,16 @@ def serve_reference_worker(
     request_stream: Connection,
     response_stream: Connection,
     token: str,
+    input_nonce: str,
     device: str,
     ready_stream: TextIO,
 ) -> None:
     """Serve one authenticated candidate worker over inherited private pipes."""
-    service = ReferenceService(Path(staging_dir), device=device)
+    service = ReferenceService(
+        Path(staging_dir),
+        device=device,
+        input_nonce=input_nonce,
+    )
     ready_stream.write("READY\n")
     ready_stream.flush()
     _serve_connection(request_stream, response_stream, service, token=token)

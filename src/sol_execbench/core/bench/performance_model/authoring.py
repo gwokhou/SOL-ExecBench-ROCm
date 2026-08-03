@@ -140,6 +140,63 @@ def build_diagnostic_acceptance(
     return manifest, evaluate_diagnostic_acceptance(manifest)
 
 
+def verify_diagnostic_acceptance(
+    *,
+    acceptance: DiagnosticAcceptanceResult,
+    manifest: DiagnosticAcceptanceManifest,
+    development_corpus_path: Path,
+    held_out_corpus_path: Path,
+    calibration_profile_path: Path,
+    inference_profile_path: Path,
+    semantic_loader: SemanticCharacterizationLoader,
+) -> None:
+    """Rebuild held-out acceptance from source evidence and reject any drift."""
+    rebuilt_manifest, rebuilt_result = build_diagnostic_acceptance(
+        development_corpus_path=development_corpus_path,
+        held_out_corpus_path=held_out_corpus_path,
+        calibration_profile_path=calibration_profile_path,
+        inference_profile_path=inference_profile_path,
+        semantic_loader=semantic_loader,
+    )
+    if not _acceptance_manifests_equivalent(rebuilt_manifest, manifest):
+        raise ValueError(
+            "acceptance manifest disagrees with source corpus evidence"
+        )
+    if rebuilt_result.model_dump(
+        exclude={"manifest_sha256"}
+    ) != acceptance.model_dump(exclude={"manifest_sha256"}):
+        raise ValueError(
+            "acceptance result disagrees with source corpus evidence"
+        )
+
+
+def _acceptance_manifests_equivalent(
+    rebuilt: DiagnosticAcceptanceManifest,
+    submitted: DiagnosticAcceptanceManifest,
+) -> bool:
+    """Compare authoritative case values while ignoring path-bound citations.
+
+    A diagnostic sidecar's evidence list retains the caller's artifact path, so
+    identical content loaded through an alias has a different whole-sidecar
+    checksum. Acceptance authority comes from the re-derived prediction,
+    measurement, actions, and cited evidence hashes, not that path-bound audit
+    citation.
+    """
+    if rebuilt.model_dump(exclude={"cases"}) != submitted.model_dump(
+        exclude={"cases"}
+    ):
+        return False
+    return all(
+        rebuilt_case.model_dump(exclude={"performance_diagnostic_sha256"})
+        == submitted_case.model_dump(exclude={"performance_diagnostic_sha256"})
+        for rebuilt_case, submitted_case in zip(
+            rebuilt.cases,
+            submitted.cases,
+            strict=True,
+        )
+    )
+
+
 def _development_observation(
     case: DiagnosticValidationCase,
     *,
@@ -155,7 +212,10 @@ def _development_observation(
         semantic_loader=semantic_loader,
     )
     workload = diagnostic.workloads[0]
-    predicted_ms, lower_ms, upper_ms = _prediction_values(workload.t_pred_hw)
+    predicted_ms, lower_ms, upper_ms = _prediction_values(
+        workload.t_pred_hw,
+        case_id=case.case_id,
+    )
     return InferenceObservation(
         case_id=case.case_id,
         workload_kind=case.workload_kind,
@@ -190,7 +250,10 @@ def _acceptance_case(
         semantic_loader=semantic_loader,
     )
     workload = diagnostic.workloads[0]
-    predicted_ms, lower_ms, upper_ms = _prediction_values(workload.t_pred_hw)
+    predicted_ms, lower_ms, upper_ms = _prediction_values(
+        workload.t_pred_hw,
+        case_id=case.case_id,
+    )
     return DiagnosticAcceptanceCase(
         case_id=case.case_id,
         pair_id=case.pair_id,
@@ -272,13 +335,18 @@ def _verified_case_path(
 
 def _prediction_values(
     prediction: PerformancePrediction,
+    *,
+    case_id: str,
 ) -> tuple[float, float, float]:
     if (
         prediction.predicted_time_ms is None
         or prediction.lower_ms is None
         or prediction.upper_ms is None
     ):
-        raise ValueError("validation case lacks an available HW prediction")
+        raise ValueError(
+            f"{case_id} validation case lacks an available HW prediction: "
+            f"{prediction.reason_codes}"
+        )
     return (
         prediction.predicted_time_ms,
         prediction.lower_ms,
@@ -289,4 +357,5 @@ def _prediction_values(
 __all__ = [
     "build_diagnostic_acceptance",
     "fit_diagnostic_inference_profile",
+    "verify_diagnostic_acceptance",
 ]

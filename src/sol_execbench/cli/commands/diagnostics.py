@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -20,6 +21,7 @@ from sol_execbench.cli.protocol import (
 from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackBuildIdentity,
     AgentFeedbackBuildRequest,
+    AgentFeedbackSidecar,
     build_agent_feedback_sidecar,
 )
 from sol_execbench.core.bench.performance_model.acceptance import (
@@ -30,6 +32,7 @@ from sol_execbench.core.bench.performance_model.acceptance import (
 from sol_execbench.core.bench.performance_model.authoring import (
     build_diagnostic_acceptance,
     fit_diagnostic_inference_profile,
+    verify_diagnostic_acceptance,
 )
 from sol_execbench.core.bench.performance_model.builder import (
     PerformanceDiagnosticBuildRequest,
@@ -213,63 +216,37 @@ def accept_performance_model_cli(
     "acceptance_manifest_path",
     type=_FILE,
     help=(
-        "Source manifest for --acceptance. When supplied, the admission "
-        "re-derives the verdict from the manifest and rejects any drift."
+        "Source manifest for --acceptance. Code-changing admission requires "
+        "this and all four frozen source artifacts below."
     ),
 )
+@click.option("--development-corpus", type=_FILE)
+@click.option("--held-out-corpus", type=_FILE)
+@click.option("--calibration-profile", type=_FILE)
+@click.option("--inference-profile", type=_FILE)
 @click.option("--output", type=_OUTPUT, required=True)
 def performance_agent_feedback_cli(
     performance_diagnostic: Path,
     evidence_manifest: Path,
     acceptance: Path | None,
     acceptance_manifest_path: Path | None,
+    development_corpus: Path | None,
+    held_out_corpus: Path | None,
+    calibration_profile: Path | None,
+    inference_profile: Path | None,
     output: Path,
 ) -> CliResult:
     """Build Agent actions from a governed and accepted performance model."""
     try:
-        diagnostic = load_json_file(
-            PerformanceDiagnosticSidecar,
+        feedback = _build_performance_agent_feedback(
             performance_diagnostic,
-        )
-        manifest = load_and_verify_performance_evidence_manifest(
-            evidence_manifest
-        )
-        acceptance_result, acceptance_manifest = _load_acceptance_inputs(
             acceptance,
             acceptance_manifest_path,
-        )
-        trace_path = _manifest_trace_path(evidence_manifest, manifest)
-        traces = load_jsonl_file(Trace, trace_path)
-        acceptance_status, enabled_actions = _acceptance_admission(
-            acceptance_result,
-            diagnostic,
-            acceptance_manifest,
-        )
-        freshness = validate_performance_diagnostic_freshness(
-            diagnostic,
-            run_id=manifest.identity.run_id,
-            candidate_sha256=manifest.identity.candidate_sha256,
-            gpu_architecture=manifest.identity.gpu_architecture,
-            trace_sha256=sha256_file(trace_path),
-        )
-        governance = evaluate_performance_diagnostic_governance(
-            sidecar=diagnostic,
-            freshness=freshness,
-        )
-        feedback = build_agent_feedback_sidecar(
-            AgentFeedbackBuildRequest(
-                traces=traces,
-                identity=AgentFeedbackBuildIdentity(
-                    trace_path=str(trace_path),
-                    run_id=manifest.identity.run_id,
-                    candidate_id=manifest.identity.candidate_sha256,
-                    source_sha256=sha256_file(performance_diagnostic),
-                ),
-                performance_diagnostic=diagnostic,
-                performance_governance=governance,
-                performance_acceptance_status=acceptance_status,
-                enabled_performance_actions=enabled_actions,
-            )
+            development_corpus,
+            held_out_corpus,
+            calibration_profile,
+            inference_profile,
+            evidence_manifest,
         )
         atomic_write_json_value(output, feedback.to_dict())
     except (OSError, ValueError) as error:
@@ -278,7 +255,7 @@ def performance_agent_feedback_cli(
             code="performance_agent_feedback_input_invalid",
             hint=(
                 "Use a current diagnostic, its exact evidence manifest, and "
-                "an accepted current model report for the same calibration."
+                "the complete frozen source bundle for an accepted report."
             ),
         ) from error
     console.print(
@@ -294,26 +271,116 @@ def performance_agent_feedback_cli(
     )
 
 
+def _build_performance_agent_feedback(
+    performance_diagnostic: Path,
+    acceptance: Path | None,
+    acceptance_manifest_path: Path | None,
+    development_corpus: Path | None,
+    held_out_corpus: Path | None,
+    calibration_profile: Path | None,
+    inference_profile: Path | None,
+    evidence_manifest: Path,
+) -> AgentFeedbackSidecar:
+    diagnostic = load_json_file(
+        PerformanceDiagnosticSidecar,
+        performance_diagnostic,
+    )
+    manifest = load_and_verify_performance_evidence_manifest(evidence_manifest)
+    acceptance_result, acceptance_sources = _load_acceptance_inputs(
+        acceptance,
+        acceptance_manifest_path,
+        development_corpus,
+        held_out_corpus,
+        calibration_profile,
+        inference_profile,
+    )
+    trace_path = _manifest_trace_path(evidence_manifest, manifest)
+    traces = load_jsonl_file(Trace, trace_path)
+    acceptance_status, enabled_actions = _acceptance_admission(
+        acceptance_result,
+        diagnostic,
+        acceptance_sources,
+    )
+    freshness = validate_performance_diagnostic_freshness(
+        diagnostic,
+        run_id=manifest.identity.run_id,
+        candidate_sha256=manifest.identity.candidate_sha256,
+        gpu_architecture=manifest.identity.gpu_architecture,
+        trace_sha256=sha256_file(trace_path),
+    )
+    governance = evaluate_performance_diagnostic_governance(
+        sidecar=diagnostic,
+        freshness=freshness,
+    )
+    return build_agent_feedback_sidecar(
+        AgentFeedbackBuildRequest(
+            traces=traces,
+            identity=AgentFeedbackBuildIdentity(
+                trace_path=str(trace_path),
+                run_id=manifest.identity.run_id,
+                candidate_id=manifest.identity.candidate_sha256,
+                source_sha256=sha256_file(performance_diagnostic),
+            ),
+            performance_diagnostic=diagnostic,
+            performance_governance=governance,
+            performance_acceptance_status=acceptance_status,
+            enabled_performance_actions=enabled_actions,
+        )
+    )
+
+
+@dataclass(frozen=True)
+class _AcceptanceSources:
+    """All frozen inputs needed to reconstruct an acceptance verdict."""
+
+    manifest: DiagnosticAcceptanceManifest
+    development_corpus: Path
+    held_out_corpus: Path
+    calibration_profile: Path
+    inference_profile: Path
+
+
 def _load_acceptance_inputs(
     acceptance_path: Path | None,
     manifest_path: Path | None,
-) -> tuple[
-    DiagnosticAcceptanceResult | None, DiagnosticAcceptanceManifest | None
-]:
-    """Load the acceptance result and its optional source manifest."""
-    result = (
-        load_json_file(DiagnosticAcceptanceResult, acceptance_path)
-        if acceptance_path is not None
-        else None
+    development_corpus: Path | None,
+    held_out_corpus: Path | None,
+    calibration_profile: Path | None,
+    inference_profile: Path | None,
+) -> tuple[DiagnosticAcceptanceResult | None, _AcceptanceSources | None]:
+    """Require the complete source bundle whenever acceptance is supplied."""
+    source_paths = (
+        manifest_path,
+        development_corpus,
+        held_out_corpus,
+        calibration_profile,
+        inference_profile,
     )
-    manifest = (
-        load_json_file(DiagnosticAcceptanceManifest, manifest_path)
-        if manifest_path is not None
-        else None
+    if acceptance_path is None:
+        if any(path is not None for path in source_paths):
+            raise ValueError("acceptance source inputs require --acceptance")
+        return None, None
+    if (
+        manifest_path is None
+        or development_corpus is None
+        or held_out_corpus is None
+        or calibration_profile is None
+        or inference_profile is None
+    ):
+        raise ValueError(
+            "--acceptance requires --acceptance-manifest, "
+            "--development-corpus, --held-out-corpus, "
+            "--calibration-profile, and --inference-profile"
+        )
+    result = load_json_file(DiagnosticAcceptanceResult, acceptance_path)
+    sources = _AcceptanceSources(
+        manifest=load_json_file(DiagnosticAcceptanceManifest, manifest_path),
+        development_corpus=development_corpus,
+        held_out_corpus=held_out_corpus,
+        calibration_profile=calibration_profile,
+        inference_profile=inference_profile,
     )
-    if result is None and manifest is not None:
-        raise ValueError("--acceptance-manifest requires --acceptance")
-    return result, manifest
+    return result, sources
 
 
 def _manifest_trace_path(
@@ -374,13 +441,15 @@ def _verify_acceptance_against_manifest(
 def _acceptance_admission(
     acceptance: DiagnosticAcceptanceResult | None,
     diagnostic: PerformanceDiagnosticSidecar,
-    manifest: DiagnosticAcceptanceManifest | None = None,
+    sources: _AcceptanceSources | None = None,
 ) -> tuple[
     Literal["omitted", "failed", "accepted"],
     frozenset[str],
 ]:
     if acceptance is None:
         return "omitted", frozenset()
+    if sources is None:
+        raise ValueError("accepted actions require complete source evidence")
     if acceptance.model_version != diagnostic.model_version:
         raise ValueError("diagnostic acceptance model mismatch")
     if acceptance.model_identity != diagnostic.model_identity:
@@ -403,8 +472,16 @@ def _acceptance_admission(
         or calibration_refs[0].sha256 != acceptance.calibration_profile_sha256
     ):
         raise ValueError("diagnostic acceptance profile hash mismatch")
-    if manifest is not None:
-        _verify_acceptance_against_manifest(acceptance, manifest)
+    _verify_acceptance_against_manifest(acceptance, sources.manifest)
+    verify_diagnostic_acceptance(
+        acceptance=acceptance,
+        manifest=sources.manifest,
+        development_corpus_path=sources.development_corpus,
+        held_out_corpus_path=sources.held_out_corpus,
+        calibration_profile_path=sources.calibration_profile,
+        inference_profile_path=sources.inference_profile,
+        semantic_loader=load_manifest_semantic_characterization,
+    )
     if not acceptance.accepted:
         return "failed", frozenset()
     return "accepted", frozenset(acceptance.enabled_action_codes)

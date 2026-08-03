@@ -13,6 +13,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_INPUT_NONCE,
+)
 from sol_execbench.driver.reference_runtime_api import (
     REFERENCE_PID_ENV,
     REFERENCE_REQUEST_FD_ENV,
@@ -29,6 +32,9 @@ _worker_environment = dict(os.environ)
 _worker_environment[REFERENCE_REQUEST_FD_ENV] = str(_request_read)
 _worker_environment[REFERENCE_RESPONSE_FD_ENV] = str(_response_write)
 _worker_environment[REFERENCE_TOKEN_ENV] = _token
+_worker_environment[ENV_SOL_EXECBENCH_INPUT_NONCE] = os.environ.get(
+    ENV_SOL_EXECBENCH_INPUT_NONCE,
+) or secrets.token_hex(32)
 
 _worker = subprocess.Popen(
     [sys.executable, "reference_worker.py"],
@@ -55,6 +61,9 @@ try:
     os.set_inheritable(_request_write, True)
     os.set_inheritable(_response_read, True)
     _candidate_environment = dict(os.environ)
+    # The worker retains the per-run entropy used to generate inputs. Candidate
+    # code must not receive it or it could reproduce timed inputs ahead of use.
+    _candidate_environment.pop(ENV_SOL_EXECBENCH_INPUT_NONCE, None)
     _candidate_environment[REFERENCE_REQUEST_FD_ENV] = str(_request_write)
     _candidate_environment[REFERENCE_RESPONSE_FD_ENV] = str(_response_read)
     _candidate_environment[REFERENCE_TOKEN_ENV] = _token

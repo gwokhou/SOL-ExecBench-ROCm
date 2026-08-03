@@ -562,8 +562,10 @@ DOCKER_COMMON_ARGS=(
     --group-add video
     --network=none
     --cap-drop=ALL
-    --security-opt seccomp=unconfined
-    --ipc=host
+    --security-opt no-new-privileges=true
+    --pids-limit=512
+    --ipc=private
+    --shm-size=8g
     --ulimit memlock=-1
     --ulimit stack=67108864
     --workdir "${CONTAINER_PROJECT}"

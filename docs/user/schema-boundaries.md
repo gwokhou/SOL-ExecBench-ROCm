@@ -28,9 +28,9 @@ adding generic nested-payload access helpers.
 The canonical benchmark inputs are versioned wire contracts:
 
 - `sol_execbench.definition.v1`
-- `sol_execbench.workload.v1`
+- `sol_execbench.workload.v2`
 - `sol_execbench.solution.v1`
-- `sol_execbench.benchmark_config.v1`
+- `sol_execbench.benchmark_config.v2`
 - `sol_execbench.trace.v1`
 
 Every persisted instance must carry its exact `schema_version`. Readers reject

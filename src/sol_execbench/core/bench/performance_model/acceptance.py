@@ -103,10 +103,10 @@ class DiagnosticAcceptanceManifest(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_acceptance.v5"] = (
+    schema_version: Literal["sol_execbench.diagnostic_acceptance.v6"] = (
         DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     calibration_profile_sha256: SHA256Digest
     calibration_identity: CalibrationIdentity
@@ -146,10 +146,10 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_acceptance.v5"] = (
+    schema_version: Literal["sol_execbench.diagnostic_acceptance.v6"] = (
         DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     manifest_sha256: SHA256Digest
     calibration_profile_sha256: SHA256Digest
@@ -197,6 +197,7 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
         if self.accepted:
             if (
                 set(metric_actions) != set(self.enabled_action_codes)
+                or not self.action_metrics
                 or self.reason_codes
                 or any(
                     value < MINIMUM_EMPIRICAL_COVERAGE
@@ -245,6 +246,8 @@ def evaluate_diagnostic_acceptance(
         reasons.append("p90_absolute_percentage_error_exceeded")
     if any(not metric.passed for metric in action_metrics):
         reasons.append("held_out_action_quality_gate_failed")
+    if not action_metrics:
+        reasons.append("held_out_action_evidence_missing")
     accepted = not reasons
     return DiagnosticAcceptanceResult(
         model_identity=manifest.model_identity,

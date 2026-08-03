@@ -35,7 +35,7 @@ _FAMILIES = (
 
 def _identity() -> DiagnosticModelIdentity:
     return DiagnosticModelIdentity(
-        model_version="gfx1200_diagnostic.v6",
+        model_version="gfx1200_diagnostic.v7",
         policy_files={"policy.py": "a" * 64},
         counter_semantics_sha256="b" * 64,
         policy_bundle_sha256="c" * 64,

@@ -195,7 +195,7 @@ class ToleranceSpec(BaseModelWithDocstrings):
     """The maximum absolute error allowed for the problem."""
     max_rtol: float = Field(default=1e-2)
     """The maximum relative error allowed for the problem."""
-    required_matched_ratio: float = Field(default=0.99)
+    required_matched_ratio: float = Field(default=1.0)
     """The ratio of elements that must pass the correctness bounds to be considered correct."""
     max_error_cap: float | None = Field(default=None)
     """Hard ceiling on maximum absolute error. If set, correctness fails when any
@@ -218,6 +218,7 @@ class NumericCheck(ToleranceSpec):
 
     type: Literal["numeric"] = "numeric"
     output: NonEmptyString
+    required_matched_ratio: float = Field(default=1.0, ge=1.0, le=1.0)
     mode: NumericCheckMode = NumericCheckMode.ELEMENTWISE
     denominator_epsilon: float = Field(default=1e-12, gt=0.0)
 
@@ -243,7 +244,7 @@ class CodeDistanceCheck(BaseModelWithDocstrings):
     output: NonEmptyString
     mode: CodeDistanceMode = CodeDistanceMode.VALUE
     max_distance: NonNegativeInt
-    required_matched_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    required_matched_ratio: float = Field(default=1.0, ge=1.0, le=1.0)
 
 
 class TopKRoutingCheck(BaseModelWithDocstrings):
@@ -257,7 +258,7 @@ class TopKRoutingCheck(BaseModelWithDocstrings):
     topk: int = Field(gt=0)
     tie_atol: float = Field(default=1e-4, ge=0.0)
     weight_atol: float = Field(default=1e-2, ge=0.0)
-    max_mismatch_ratio: float = Field(default=0.0, ge=0.0, le=1.0)
+    max_mismatch_ratio: float = Field(default=0.0, ge=0.0, le=0.0)
 
 
 OutputCheck = Annotated[
@@ -298,7 +299,7 @@ class Workload(CurrentSchemaModel):
 
     current_schema_version = WORKLOAD_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.workload.v1"] = (
+    schema_version: Literal["sol_execbench.workload.v2"] = (
         WORKLOAD_SCHEMA_VERSION
     )
     axes: dict[str, NonNegativeInt]

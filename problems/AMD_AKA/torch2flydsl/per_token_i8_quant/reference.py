@@ -3,7 +3,7 @@
 import torch
 
 
-def run(input):  # noqa: A002 - benchmark ABI names this argument
+def run(input):  # noqa: A002 - benchmark ABI
     value = input.float()
     scale = value.abs().amax(dim=-1, keepdim=True) / 127.0
     scale = torch.where(scale == 0, torch.ones_like(scale), scale)

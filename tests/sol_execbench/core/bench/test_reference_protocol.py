@@ -66,7 +66,7 @@ def test_reference_failure_is_not_deserialized_as_pickle() -> None:
 
 
 def test_protocol_version_is_explicit() -> None:
-    assert PROTOCOL_VERSION == "sol_execbench.reference_ipc.v1"
+    assert PROTOCOL_VERSION == "sol_execbench.reference_ipc.v2"
 
 
 def test_invalid_failure_category_is_rejected_as_protocol_error() -> None:

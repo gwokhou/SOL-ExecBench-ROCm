@@ -314,8 +314,8 @@ def test_custom_inputs_success_path_is_cpu_safe(tmp_path):
     definition = _custom_inputs_definition(
         "def generate_inputs(axes, device):\n"
         "    return {\n"
-        "        'a': torch.ones((axes['m'], axes['k']), device=device),\n"
-        "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
+        "        'a': torch.rand((axes['m'], axes['k']), device=device),\n"
+        "        'b': torch.rand((axes['k'], axes['n']), device=device),\n"
         "    }\n",
     )
     kernel = "import torch\ndef run(a, b):\n    return a @ b\n"
@@ -329,6 +329,26 @@ def test_custom_inputs_success_path_is_cpu_safe(tmp_path):
 
     assert len(traces) == 1
     assert traces[0]["evaluation"]["status"] == "PASSED"
+
+
+def test_fixed_custom_inputs_fail_closed_during_timing(tmp_path):
+    """A generator that ignores iteration seeds cannot claim v4 timing."""
+    definition = _custom_inputs_definition(
+        "def generate_inputs(axes, device):\n"
+        "    return {\n"
+        "        'a': torch.ones((axes['m'], axes['k']), device=device),\n"
+        "        'b': torch.ones((axes['k'], axes['n']), device=device),\n"
+        "    }\n",
+    )
+    traces = _run_eval_driver(
+        tmp_path,
+        "def run(a, b):\n    return a @ b\n",
+        definition=definition,
+        workload=_custom_inputs_workload(),
+    )
+
+    assert traces[0]["evaluation"]["status"] == "REWARD_HACK"
+    assert "unique input values" in traces[0]["evaluation"].get("log", "")
 
 
 def test_custom_inputs_schema_mismatch_preempts_reference_run(tmp_path):
@@ -452,9 +472,8 @@ def test_reference_timing_failure_is_explicit_when_requested(tmp_path):
 
     assert len(traces) == 1
     ev = traces[0]["evaluation"]
-    assert ev["status"] == "PASSED"
-    assert ev["performance"]["reference_latency_ms"] == 0.0
-    assert "Reference timing failed: reference timing boom" in ev.get("log", "")
+    assert ev["status"] == "RUNTIME_ERROR"
+    assert "reference timing boom" in ev.get("log", "")
 
 
 def test_phase_counting_cannot_skip_timed_computation(tmp_path):

@@ -44,6 +44,7 @@ def collect_static_isa_analyses(
     evidence_root: Path,
     sidecar_base: Path,
     timeout_seconds: float,
+    allow_spec_download: bool = True,
 ) -> tuple[
     list[StaticISAAnalysis],
     list[StaticKernelEvidenceToolRun],
@@ -79,6 +80,7 @@ def collect_static_isa_analyses(
                     sidecar_base=sidecar_base,
                     timeout_seconds=timeout_seconds,
                     seen=seen,
+                    allow_spec_download=allow_spec_download,
                 )
                 if collected is None:
                     continue
@@ -105,6 +107,7 @@ def _collect_architecture(
     sidecar_base: Path,
     timeout_seconds: float,
     seen: set[tuple[str, str]],
+    allow_spec_download: bool,
 ) -> (
     tuple[
         StaticISAAnalysis,
@@ -130,40 +133,74 @@ def _collect_architecture(
     disassembly_path = workspace / f"{architecture}.isa.txt"
     disassembly_path.parent.mkdir(parents=True, exist_ok=True)
     disassembly_path.write_text(extracted.disassembly, encoding="utf-8")
-    decoded = analyze_isa_disassembly(
+    generated = _generated_artifacts(
+        artifact.artifact_id,
         architecture,
-        extracted.disassembly,
-        allow_download=True,
+        extracted.path,
+        disassembly_path,
+        sidecar_base,
     )
-    analysis = StaticISAAnalysis(
+    analysis, tool_run = _decode_extracted_isa(
         artifact_id=artifact.artifact_id,
         architecture=architecture,
-        status=StaticKernelEvidenceStatus.COLLECTED,
-        decoded_instruction_count=decoded.decoded_instruction_count,
-        functional_group_counts=dict(decoded.functional_group_counts),
-        functional_subgroup_counts=dict(decoded.functional_subgroup_counts),
-        observed_matrix_units=list(decoded.observed_matrix_units),
+        disassembly=extracted.disassembly,
         code_object_sha256=extracted.sha256,
         disassembly_sha256=extracted.disassembly_sha256,
-        spec_provenance=decoded.provenance.to_dict(),
-    )
-    tool_run = StaticKernelEvidenceToolRun(
-        tool_id="amd-isa",
-        command=["amd-isa", architecture],
-        status=StaticKernelEvidenceStatus.COLLECTED,
-        reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
-        stdout_tail=f"decoded {decoded.decoded_instruction_count} instructions",
         timeout_seconds=timeout_seconds,
+        allow_spec_download=allow_spec_download,
     )
-    return (
-        analysis,
-        tool_run,
-        _generated_artifacts(
-            artifact.artifact_id,
+    return analysis, tool_run, generated
+
+
+def _decode_extracted_isa(
+    *,
+    artifact_id: str,
+    architecture: str,
+    disassembly: str,
+    code_object_sha256: str,
+    disassembly_sha256: str,
+    timeout_seconds: float,
+    allow_spec_download: bool,
+) -> tuple[StaticISAAnalysis, StaticKernelEvidenceToolRun]:
+    try:
+        decoded = analyze_isa_disassembly(
             architecture,
-            extracted.path,
-            disassembly_path,
-            sidecar_base,
+            disassembly,
+            allow_download=allow_spec_download,
+        )
+    except Exception as exc:  # noqa: BLE001 -- optional semantic decoding
+        return (
+            _failed_analysis(
+                artifact_id,
+                exc,
+                architecture,
+                code_object_sha256=code_object_sha256,
+                disassembly_sha256=disassembly_sha256,
+            ),
+            _failed_tool_run(exc, timeout_seconds, architecture),
+        )
+    return (
+        StaticISAAnalysis(
+            artifact_id=artifact_id,
+            architecture=architecture,
+            status=StaticKernelEvidenceStatus.COLLECTED,
+            decoded_instruction_count=decoded.decoded_instruction_count,
+            functional_group_counts=dict(decoded.functional_group_counts),
+            functional_subgroup_counts=dict(decoded.functional_subgroup_counts),
+            observed_matrix_units=list(decoded.observed_matrix_units),
+            code_object_sha256=code_object_sha256,
+            disassembly_sha256=disassembly_sha256,
+            spec_provenance=decoded.provenance.to_dict(),
+        ),
+        StaticKernelEvidenceToolRun(
+            tool_id="amd-isa",
+            command=["amd-isa", architecture],
+            status=StaticKernelEvidenceStatus.COLLECTED,
+            reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
+            stdout_tail=(
+                f"decoded {decoded.decoded_instruction_count} instructions"
+            ),
+            timeout_seconds=timeout_seconds,
         ),
     )
 
@@ -240,12 +277,17 @@ def _failed_analysis(
     artifact_id: str,
     exc: Exception,
     architecture: str = "unknown",
+    *,
+    code_object_sha256: str | None = None,
+    disassembly_sha256: str | None = None,
 ) -> StaticISAAnalysis:
     return StaticISAAnalysis(
         artifact_id=artifact_id,
         architecture=architecture,
         status=StaticKernelEvidenceStatus.UNAVAILABLE,
         reason_code=_reason_code(exc),
+        code_object_sha256=code_object_sha256,
+        disassembly_sha256=disassembly_sha256,
     )
 
 

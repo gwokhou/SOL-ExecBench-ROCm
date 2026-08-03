@@ -90,8 +90,10 @@ def derive_custom_input_seed(
     row_index: int | None = None,
     base_seed: int | None = None,
     round_index: int | None = None,
+    run_nonce: str | None = None,
+    variation_index: int | None = None,
 ) -> int:
-    """Derive a stable per-workload and per-round seed."""
+    """Derive a workload seed blinded by run and iteration entropy."""
     parts = [
         definition.name,
         getattr(workload, "uuid", "") or "",
@@ -104,6 +106,10 @@ def derive_custom_input_seed(
                 "" if round_index is None else str(round_index),
             ),
         )
+    if run_nonce is not None:
+        parts.append(run_nonce)
+    if variation_index is not None:
+        parts.append(str(variation_index))
     digest = hashlib.sha256("\0".join(parts).encode("utf-8")).digest()
     return int.from_bytes(digest[:8], "big") & 0x7FFF_FFFF_FFFF_FFFF
 

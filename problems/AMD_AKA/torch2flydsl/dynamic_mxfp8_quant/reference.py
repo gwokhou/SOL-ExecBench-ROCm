@@ -3,7 +3,7 @@
 import torch
 
 
-def run(input):  # noqa: A002 - benchmark ABI names this argument
+def run(input):  # noqa: A002 - benchmark ABI
     value = input.float()
     m, k = value.shape
     blocks = value.reshape(m, k // 32, 32)

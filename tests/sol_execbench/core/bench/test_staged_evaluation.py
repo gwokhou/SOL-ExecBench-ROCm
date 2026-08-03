@@ -61,6 +61,14 @@ class ReferenceClientStub:
             raise self.timing
         return self.timing
 
+    def timing_iteration_case(self, **kwargs):
+        if isinstance(self.timing, BaseException):
+            raise self.timing
+        return self.timing
+
+    def validate_timing_outputs(self, outputs):
+        del outputs
+
 
 def _request(
     client: ReferenceClientStub,
@@ -348,6 +356,7 @@ def test_measure_and_emit_classifies_timing_errors(
         request,
         emitter,
         request.workloads[0],
+        0,
         {},
         ReferenceTimingCase([tensor], [tensor], 2.0, "a" * 64),
         Correctness(),
@@ -389,6 +398,7 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
         request,
         emitter,
         request.workloads[0],
+        0,
         {},
         ReferenceTimingCase(
             [tensor],

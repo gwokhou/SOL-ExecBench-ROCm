@@ -205,10 +205,10 @@ class DiagnosticInferenceProfile(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_inference_profile.v8"] = (
+    schema_version: Literal["sol_execbench.diagnostic_inference_profile.v9"] = (
         DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION
     )
-    model_version: Literal["gfx1200_diagnostic.v6"] = PERFORMANCE_MODEL_VERSION
+    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     calibration_profile_sha256: SHA256Digest
     calibration_audit_sha256: SHA256Digest

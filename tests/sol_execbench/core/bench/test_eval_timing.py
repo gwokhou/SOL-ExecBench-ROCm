@@ -12,7 +12,13 @@ from sol_execbench.core.bench.eval_runtime import TimingResult
 from sol_execbench.core.bench.evaluation_requests import (
     WorkloadEvaluationRequest,
 )
+from sol_execbench.core.bench.reference_protocol import (
+    ReferenceExecutionError,
+    ReferenceFailureKind,
+    ReferenceTimingCase,
+)
 from sol_execbench.core.bench.reward_hack import RewardHackError
+from sol_execbench.core.bench.timing_contracts import TimingCallbacks
 from sol_execbench.core.data.workload import Workload
 
 
@@ -33,9 +39,13 @@ def _request(*, destination_passing_style: bool = False):
             bench_config=SimpleNamespace(
                 warmup_runs=2,
                 iterations=3,
+                trials=2,
                 min_measurement_time_seconds=0.25,
             ),
             dependencies=SimpleNamespace(
+                reference_client=SimpleNamespace(
+                    validate_timing_outputs=lambda _outputs: None,
+                ),
                 user_fn=lambda value: value,
                 check_integrity=check_integrity,
                 integrity_snapshot={"reference": 1},
@@ -90,9 +100,8 @@ def test_solution_timing_records_actual_iterations_for_each_trial(monkeypatch):
     result = eval_timing.measure_solution_latency(
         request=request,
         workload=workload,
+        row_index=0,
         resolved_axes={},
-        inputs=[],
-        expected_outputs=[],
     )
 
     assert result.latency_ms == pytest.approx(2.0)
@@ -120,26 +129,19 @@ def test_solution_timing_reports_uniform_actual_iteration_count(monkeypatch):
     result = eval_timing.measure_solution_latency(
         request=request,
         workload=workload,
+        row_index=0,
         resolved_axes={},
-        inputs=[],
-        expected_outputs=[],
     )
 
     assert result.timed_iterations_per_trial == (4, 4)
     assert result.uniform_timed_iterations == 4
 
 
-def test_measure_solution_trial_passes_outputs_and_benchmark_config(
+def test_measure_solution_trial_passes_provider_and_benchmark_config(
     monkeypatch,
 ):
     request, _ = _request(destination_passing_style=True)
-    allocated = [torch.empty(4)]
     observed: dict[str, object] = {}
-    monkeypatch.setattr(
-        eval_timing,
-        "allocate_outputs",
-        lambda *_args: allocated,
-    )
 
     def measure(fn, inputs, outputs, device, **kwargs):
         observed.update(
@@ -156,19 +158,25 @@ def test_measure_solution_trial_passes_outputs_and_benchmark_config(
     def validator(*_args) -> None:
         return None
 
+    def provider():
+        return [torch.ones(4)]
+
     result = eval_timing._measure_solution_trial(
         request,
-        {"N": 4},
-        [torch.ones(4)],
+        provider,
         validator,
     )
 
     assert result.latency_ms == 1.5
-    assert observed["outputs"] is allocated
+    assert observed["inputs"] == []
+    assert observed["outputs"] == []
     assert observed["warmup"] == 2
     assert observed["rep"] == 3
     assert observed["min_measurement_time_seconds"] == 0.25
-    assert observed["validator"] is validator
+    callbacks = observed["callbacks"]
+    assert isinstance(callbacks, TimingCallbacks)
+    assert callbacks.validator is validator
+    assert callbacks.argument_provider is provider
 
 
 def test_measure_solution_trial_maps_timing_failure(monkeypatch):
@@ -185,20 +193,87 @@ def test_measure_solution_trial_maps_timing_failure(monkeypatch):
     with pytest.raises(RuntimeError, match="timing failed"):
         eval_timing._measure_solution_trial(
             request,
-            {},
-            [],
+            list,
             lambda *_args: None,
         )
 
 
-def test_timed_validator_accepts_matching_functional_output() -> None:
-    request, integrity_calls = _request()
-    expected = [torch.ones(4)]
-    validator = eval_timing._build_timed_output_validator(
+def test_iteration_provider_fetches_unique_reference_per_invocation() -> None:
+    request, _ = _request()
+    calls: list[dict[str, int | str]] = []
+    cases = iter(
+        [
+            ReferenceTimingCase(
+                [torch.tensor([1.0])],
+                [],
+                0.0,
+                "a" * 64,
+            ),
+            ReferenceTimingCase(
+                [torch.tensor([3.0])],
+                [],
+                0.0,
+                "b" * 64,
+            ),
+        ],
+    )
+
+    def timing_iteration_case(**kwargs):
+        calls.append(kwargs)
+        return next(cases)
+
+    request.dependencies.reference_client = SimpleNamespace(
+        timing_iteration_case=timing_iteration_case,
+    )
+    state = eval_timing._TimedReferenceState()
+    provider = eval_timing._build_iteration_provider(
         request=request,
         workload=_workload(),
+        row_index=7,
+        trial_index=1,
+        resolved_axes={},
+        state=state,
+    )
+
+    assert torch.equal(provider()[0], torch.tensor([1.0]))
+    assert torch.equal(provider()[0], torch.tensor([3.0]))
+    assert [call["iteration_index"] for call in calls] == [0, 1]
+    assert all(call["row_index"] == 7 for call in calls)
+
+
+def test_iteration_provider_rejects_repeated_input_content() -> None:
+    request, _ = _request()
+    case = ReferenceTimingCase(
+        [torch.tensor([1.0])],
+        [],
+        0.0,
+        "a" * 64,
+    )
+    request.dependencies.reference_client = SimpleNamespace(
+        timing_iteration_case=lambda **_kwargs: case,
+    )
+    provider = eval_timing._build_iteration_provider(
+        request=request,
+        workload=_workload(),
+        row_index=0,
+        trial_index=0,
+        resolved_axes={},
+        state=eval_timing._TimedReferenceState(),
+    )
+
+    provider()
+    with pytest.raises(RewardHackError, match="unique input values"):
+        provider()
+
+
+def test_timed_validator_accepts_matching_functional_output() -> None:
+    request, integrity_calls = _request()
+    state = eval_timing._TimedReferenceState(
         inputs=[torch.zeros(4)],
-        expected=expected,
+    )
+    validator = eval_timing._build_timed_output_validator(
+        request=request,
+        state=state,
     )
 
     validator([torch.zeros(4)], torch.ones(4))
@@ -220,14 +295,23 @@ def test_timed_validator_rejects_shape_and_numerical_changes(
     message,
 ) -> None:
     request, _ = _request()
+    request.dependencies.reference_client = SimpleNamespace(
+        validate_timing_outputs=lambda _outputs: (_ for _ in ()).throw(
+            ReferenceExecutionError(
+                message,
+                kind=ReferenceFailureKind.REFERENCE_EXECUTION,
+            ),
+        ),
+    )
+    state = eval_timing._TimedReferenceState(
+        inputs=[torch.zeros(4)],
+    )
     validator = eval_timing._build_timed_output_validator(
         request=request,
-        workload=_workload(),
-        inputs=[torch.zeros(4)],
-        expected=[torch.ones(4)],
+        state=state,
     )
 
-    with pytest.raises(RewardHackError, match=message):
+    with pytest.raises(RewardHackError, match="failed trusted validation"):
         validator([torch.zeros(4)], actual)
 
 
@@ -245,3 +329,21 @@ def test_timed_outputs_reads_destination_passing_buffer() -> None:
 
     assert len(result) == 1
     assert result[0] is output_tensor
+
+
+def test_device_guard_rejects_host_output_before_end_event() -> None:
+    request = cast(
+        WorkloadEvaluationRequest,
+        SimpleNamespace(
+            device="cuda:0",
+            definition=SimpleNamespace(inputs={"input": object()}),
+            destination_passing_style=False,
+        ),
+    )
+    guarded = eval_timing._device_guarded_callable(
+        request,
+        lambda _value: torch.ones(1),
+    )
+
+    with pytest.raises(RewardHackError, match="timed GPU"):
+        guarded(torch.ones(1))

@@ -9,9 +9,12 @@ re-derives the verdict from the manifest and rejects drift, a forged
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from sol_execbench.cli.commands.diagnostics import (
+    _load_acceptance_inputs,
     _verify_acceptance_against_manifest,
 )
 from sol_execbench.core.bench.performance_model.acceptance import (
@@ -55,7 +58,7 @@ def _identity() -> CalibrationIdentity:
 
 def _model_identity() -> DiagnosticModelIdentity:
     return DiagnosticModelIdentity(
-        model_version="gfx1200_diagnostic.v6",
+        model_version="gfx1200_diagnostic.v7",
         policy_files={"policy.py": "d" * 64},
         counter_semantics_sha256="e" * 64,
         policy_bundle_sha256="f" * 64,
@@ -123,12 +126,23 @@ def test_forged_metric_rejected() -> None:
 
 
 def test_vacuous_action_policy_rejected() -> None:
-    """Gap 3: an accepted manifest that enables no action is rejected."""
+    """Gap 3: the core evaluator rejects a vacuous action policy."""
     manifest = _manifest(vacuous=True)
     result = evaluate_diagnostic_acceptance(manifest)
-    assert (
-        result.accepted is True
-    )  # current evaluator still admits it vacuously
+    assert result.accepted is False
+    assert result.reason_codes == ["held_out_action_evidence_missing"]
 
-    with pytest.raises(ValueError, match="vacuous action policy"):
-        _verify_acceptance_against_manifest(result, manifest)
+    _verify_acceptance_against_manifest(result, manifest)
+
+
+def test_acceptance_requires_complete_source_bundle() -> None:
+    """Code-changing admission cannot rely on a result artifact alone."""
+    with pytest.raises(ValueError, match="requires --acceptance-manifest"):
+        _load_acceptance_inputs(
+            Path("acceptance.json"),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )

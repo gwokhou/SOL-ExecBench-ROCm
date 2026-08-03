@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -36,8 +37,10 @@ from sol_execbench.core.bench.static_kernel.evidence import (
 )
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_DEVICE,
+    ENV_SOL_EXECBENCH_INPUT_NONCE,
     ENV_SOL_EXECBENCH_SANDBOXED,
     ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION,
+    EVALUATION_INPUT_NONCE_BYTES,
 )
 from sol_execbench.driver import ProblemPackager
 
@@ -85,6 +88,7 @@ def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
     """Mark unsafe runs and serialize access to the selected GPU."""
     unsafe_name = ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION
     device_name = ENV_SOL_EXECBENCH_DEVICE
+    nonce_name = ENV_SOL_EXECBENCH_INPUT_NONCE
     try:
         with (
             acquire_evaluation_gpu_lock(
@@ -94,7 +98,11 @@ def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
         ):
             previous_unsafe = os.environ.get(unsafe_name)
             previous_device = os.environ.get(device_name)
+            previous_nonce = os.environ.get(nonce_name)
             os.environ[device_name] = request.device
+            os.environ[nonce_name] = secrets.token_hex(
+                EVALUATION_INPUT_NONCE_BYTES
+            )
             if (
                 request.unsafe_local_execution
                 and os.environ.get(ENV_SOL_EXECBENCH_SANDBOXED) != "1"
@@ -111,6 +119,10 @@ def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
                     os.environ.pop(device_name, None)
                 else:
                     os.environ[device_name] = previous_device
+                if previous_nonce is None:
+                    os.environ.pop(nonce_name, None)
+                else:
+                    os.environ[nonce_name] = previous_nonce
     except TimeoutError as exc:
         raise CliFailure(
             str(exc),

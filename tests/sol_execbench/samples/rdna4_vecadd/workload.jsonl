@@ -1,1 +1,1 @@
-{"schema_version": "sol_execbench.workload.v1", "axes":{},"checks":[{"output":"z","type":"numeric"}],"inputs":{"x":{"type":"random"},"y":{"type":"random"}},"uuid":"rdna4-vecadd-4096"}
+{"schema_version": "sol_execbench.workload.v2", "axes":{},"checks":[{"output":"z","type":"numeric"}],"inputs":{"x":{"type":"random"},"y":{"type":"random"}},"uuid":"rdna4-vecadd-4096"}
