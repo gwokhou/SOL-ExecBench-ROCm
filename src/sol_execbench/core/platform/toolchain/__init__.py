@@ -12,7 +12,6 @@ from datetime import datetime
 from sol_execbench.core.platform.runtime import Which
 from sol_execbench.core.platform.toolchain.models import (
     DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS,
-    TOOLCHAIN_ROUTING_SCHEMA_VERSION,
     ToolchainArtifactType,
     ToolchainCapability,
     ToolchainEvidenceLevel,
@@ -58,7 +57,6 @@ def build_toolchain_routing_report(
 
 __all__ = [
     "DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS",
-    "TOOLCHAIN_ROUTING_SCHEMA_VERSION",
     "ToolLifecycle",
     "ToolchainArtifactType",
     "ToolchainCapability",

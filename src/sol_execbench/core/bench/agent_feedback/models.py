@@ -23,8 +23,7 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import (
-    AGENT_FEEDBACK_SCHEMA_VERSION,
-    AgentFeedbackSchemaVersion,
+    SchemaVersion,
 )
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
@@ -58,6 +57,14 @@ class AgentFeedbackBottleneck(StrEnum):
     POLICY_VIOLATION = "policy_violation"
     REFERENCE_FAILURE = "reference_failure"
     PERFORMANCE = "performance"
+
+
+class PerformanceAcceptanceStatus(StrEnum):
+    """Admission state for performance-driven feedback actions."""
+
+    OMITTED = "omitted"
+    FAILED = "failed"
+    ACCEPTED = "accepted"
 
 
 class AgentFeedbackItem(BaseModelWithDocstrings):
@@ -96,11 +103,9 @@ class AgentFeedbackSummary(BaseModelWithDocstrings):
     """Optional static evidence sidecar status."""
     performance_diagnostic_status: DiagnosticSidecarStatus | None = None
     """Optional governed performance diagnostic status."""
-    performance_acceptance_status: Literal[
-        "omitted",
-        "failed",
-        "accepted",
-    ] = "omitted"
+    performance_acceptance_status: PerformanceAcceptanceStatus = (
+        PerformanceAcceptanceStatus.OMITTED
+    )
     """Whether held-out acceptance admitted code-changing actions."""
     enabled_performance_actions: list[str] = Field(default_factory=list)
     """Accepted action codes that may reach an Agent."""
@@ -110,9 +115,11 @@ class AgentFeedbackSidecar(CurrentDiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for agent next-experiment guidance."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = AGENT_FEEDBACK_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.AGENT_FEEDBACK
 
-    schema_version: AgentFeedbackSchemaVersion = AGENT_FEEDBACK_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.AGENT_FEEDBACK] = (
+        SchemaVersion.AGENT_FEEDBACK
+    )
     status: DiagnosticSidecarStatus
     reason_code: AgentFeedbackReasonCode
     identity: ExtendedDiagnosticIdentity

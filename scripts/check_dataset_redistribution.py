@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sol_execbench.core.integrity.schema_versions import (
-    DATASET_REDISTRIBUTION_CHECK_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -57,7 +57,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         import json
 
         payload = {
-            "schema_version": DATASET_REDISTRIBUTION_CHECK_SCHEMA_VERSION,
+            "schema_version": SchemaVersion.DATASET_REDISTRIBUTION_CHECK,
             "overall_status": "blocking" if findings else "passed",
             "findings": [finding.__dict__ for finding in findings],
         }

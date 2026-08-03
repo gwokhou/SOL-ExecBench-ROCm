@@ -15,7 +15,7 @@ from sol_execbench.core.data.base_model import (
     FrozenArtifactModel,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    CLI_RESPONSE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 
@@ -78,10 +78,10 @@ class CliError(FrozenArtifactModel):
 class CliSuccessResponse(CurrentFrozenSchemaModel):
     """Current successful CLI response envelope."""
 
-    current_schema_version = CLI_RESPONSE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.CLI_RESPONSE
 
-    schema_version: Literal["sol_execbench.cli_response.v1"] = (
-        "sol_execbench.cli_response.v1"
+    schema_version: Literal[SchemaVersion.CLI_RESPONSE] = (
+        SchemaVersion.CLI_RESPONSE
     )
     ok: Literal[True]
     command: str = Field(min_length=1)
@@ -93,10 +93,10 @@ class CliSuccessResponse(CurrentFrozenSchemaModel):
 class CliFailureResponse(CurrentFrozenSchemaModel):
     """Current failed CLI response envelope."""
 
-    current_schema_version = CLI_RESPONSE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.CLI_RESPONSE
 
-    schema_version: Literal["sol_execbench.cli_response.v1"] = (
-        "sol_execbench.cli_response.v1"
+    schema_version: Literal[SchemaVersion.CLI_RESPONSE] = (
+        SchemaVersion.CLI_RESPONSE
     )
     ok: Literal[False]
     command: str = Field(min_length=1)
@@ -114,7 +114,7 @@ def response_success(command: str, result: CliResult | None) -> dict[str, Any]:
     """Build a successful machine-readable CLI response."""
     result = result or CliResult()
     response = {
-        "schema_version": CLI_RESPONSE_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.CLI_RESPONSE,
         "ok": True,
         "command": command,
         "data": result.data,
@@ -143,7 +143,7 @@ def response_failure(command: str, error: BaseException) -> dict[str, Any]:
         details = {"exception_type": type(error).__name__}
         hint = None
     response = {
-        "schema_version": CLI_RESPONSE_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.CLI_RESPONSE,
         "ok": False,
         "command": command,
         "error": {

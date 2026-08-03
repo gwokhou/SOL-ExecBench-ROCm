@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field, fields
 from enum import StrEnum
@@ -22,13 +21,11 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    ROCPROFV3_PROFILE_SCHEMA_VERSION,
-    ROCPROFV3_TIMING_SCHEMA_VERSION,
+    SchemaVersion,
 )
-from sol_execbench.core.text_utils import text_tail
+from sol_execbench.core.text_utils import normalize_ascii_alnum, text_tail
 
 ROCPROFV3_EXECUTABLE = "rocprofv3"
-ROCPROFV3_EVIDENCE_SCHEMA_VERSION = ROCPROFV3_TIMING_SCHEMA_VERSION
 ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS = (
     "rocprofv3 returned success but produced no profiler data artifacts"
 )
@@ -180,7 +177,7 @@ class Rocprofv3ProfileResult:
     environment_snapshots: tuple[RuntimeGPUTelemetry, ...] = ()
     schema_version: str = field(
         init=False,
-        default=ROCPROFV3_PROFILE_SCHEMA_VERSION,
+        default=SchemaVersion.ROCPROFV3_PROFILE,
     )
 
     def __post_init__(self) -> None:
@@ -285,7 +282,7 @@ class Rocprofv3TimingRow:
     @property
     def is_kernel_activity(self) -> bool:
         """Whether this row represents kernel activity."""
-        normalized = _normalize_header(self.domain)
+        normalized = normalize_ascii_alnum(self.domain)
         return "kernel" in normalized
 
     def to_dict(self) -> dict[str, Any]:
@@ -321,7 +318,7 @@ class Rocprofv3TimingEvidence:
     profiler_overhead_ms: float | None = None
     schema_version: str = field(
         init=False,
-        default=ROCPROFV3_EVIDENCE_SCHEMA_VERSION,
+        default=SchemaVersion.ROCPROFV3_TIMING,
     )
     derived: bool = True
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT
@@ -481,10 +478,6 @@ class Rocprofv3CollectionResult:
 
 def _tail(text: str, *, max_chars: int = 4096) -> str:
     return text_tail(text, limit=max_chars)
-
-
-def _normalize_header(header: str | None) -> str:
-    return re.sub(r"[^a-z0-9]", "", (header or "").lower())
 
 
 def is_profiler_data_artifact(artifact: Rocprofv3ProfileArtifact) -> bool:

@@ -46,7 +46,6 @@ from sol_execbench.core.solar_bridge.models import (
 from solar.artifacts import load_yaml_artifact
 from solar.schema_versions import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
-    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
 )
 
 _SIMPLE_OPS = frozenset(
@@ -1153,8 +1152,6 @@ def _dtype_bytes(dtype: TensorDType) -> int:
 
 
 __all__ = [
-    "SOLAR_ANALYSIS_SCHEMA_VERSION",
-    "SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION",
     "load_manifest_semantic_characterization",
     "load_semantic_characterization",
 ]

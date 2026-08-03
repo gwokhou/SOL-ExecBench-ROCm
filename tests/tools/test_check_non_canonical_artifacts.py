@@ -8,6 +8,9 @@ from __future__ import annotations
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from solar.schema_versions import SchemaVersion as SolarSchemaVersion
+
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
     / "scripts/check_non_canonical_artifacts.py"
@@ -26,7 +29,7 @@ collect_findings = MODULE.collect_findings
 def test_accepts_current_schema_identifier():
     findings = audit_text(
         Path("example.json"),
-        '{"schema_version": "sol_execbench.environment_snapshot.v2"}',
+        f'{{"schema_version": "{SchemaVersion.ENVIRONMENT_SNAPSHOT.value}"}}',
     )
 
     assert findings == []
@@ -59,7 +62,10 @@ def test_rejects_numeric_schema_artifact():
 def test_accepts_solar_current_schema_identifier():
     findings = audit_text(
         Path("audit.json"),
-        '{"schema_version": "solar.resource_peak_calibration.v4"}',
+        (
+            '{"schema_version": '
+            f'"{SolarSchemaVersion.RESOURCE_PEAK_CALIBRATION.value}"}}'
+        ),
     )
 
     assert findings == []

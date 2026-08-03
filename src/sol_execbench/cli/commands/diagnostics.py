@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 import click
 from rich.console import Console
@@ -22,6 +21,7 @@ from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackBuildIdentity,
     AgentFeedbackBuildRequest,
     AgentFeedbackSidecar,
+    PerformanceAcceptanceStatus,
     build_agent_feedback_sidecar,
 )
 from sol_execbench.core.bench.performance_model.acceptance import (
@@ -442,12 +442,9 @@ def _acceptance_admission(
     acceptance: DiagnosticAcceptanceResult | None,
     diagnostic: PerformanceDiagnosticSidecar,
     sources: _AcceptanceSources | None = None,
-) -> tuple[
-    Literal["omitted", "failed", "accepted"],
-    frozenset[str],
-]:
+) -> tuple[PerformanceAcceptanceStatus, frozenset[str]]:
     if acceptance is None:
-        return "omitted", frozenset()
+        return PerformanceAcceptanceStatus.OMITTED, frozenset()
     if sources is None:
         raise ValueError("accepted actions require complete source evidence")
     if acceptance.model_version != diagnostic.model_version:
@@ -483,8 +480,10 @@ def _acceptance_admission(
         semantic_loader=load_manifest_semantic_characterization,
     )
     if not acceptance.accepted:
-        return "failed", frozenset()
-    return "accepted", frozenset(acceptance.enabled_action_codes)
+        return PerformanceAcceptanceStatus.FAILED, frozenset()
+    return PerformanceAcceptanceStatus.ACCEPTED, frozenset(
+        acceptance.enabled_action_codes
+    )
 
 
 __all__ = [

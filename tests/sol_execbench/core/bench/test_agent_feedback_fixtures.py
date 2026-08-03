@@ -11,6 +11,7 @@ from sol_execbench.core.bench.agent_feedback import (
     evaluate_agent_feedback_governance,
     validate_agent_feedback_freshness,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DIR = REPO_ROOT / "tests/sol_execbench/fixtures/agent_feedback"
@@ -164,7 +165,7 @@ def test_agent_feedback_docs_explain_hip_mapping_and_fixture_semantics():
         "solution content hash",
         "compile_failure",
         "profile_summary.sidecar",
-        "sol_execbench.profile_summary.v3",
+        SchemaVersion.PROFILE_SUMMARY,
         "SOL does not duplicate those hints into",
         "unknown values must be downgraded",
         "valid.agent-feedback.json",

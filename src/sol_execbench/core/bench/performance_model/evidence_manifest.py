@@ -26,7 +26,7 @@ from sol_execbench.core.integrity import (
     verify_artifact_file,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
@@ -84,11 +84,11 @@ class PerformanceEvidenceManifest(CurrentDiagnosticSidecarAuthority):
     """Root manifest binding one workload to all diagnostic evidence."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.PERFORMANCE_EVIDENCE_MANIFEST
 
-    schema_version: Literal[
-        "sol_execbench.performance_evidence_manifest.v5"
-    ] = PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.PERFORMANCE_EVIDENCE_MANIFEST] = (
+        SchemaVersion.PERFORMANCE_EVIDENCE_MANIFEST
+    )
     status: DiagnosticSidecarStatus
     identity: PerformanceRunIdentity
     artifacts: list[PerformanceEvidenceArtifact] = Field(min_length=1)

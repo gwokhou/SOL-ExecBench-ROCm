@@ -9,10 +9,7 @@ import pytest
 from sol_execbench.cli.evaluation import problem_io
 from sol_execbench.core import BenchmarkConfig
 from sol_execbench.core.integrity.schema_versions import (
-    BENCHMARK_CONFIG_SCHEMA_VERSION,
-    DEFINITION_SCHEMA_VERSION,
-    SOLUTION_SCHEMA_VERSION,
-    WORKLOAD_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 
@@ -22,7 +19,7 @@ def _write_json(path: Path, payload: dict) -> None:
 
 def _definition_payload() -> dict:
     return {
-        "schema_version": DEFINITION_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.DEFINITION,
         "name": "toy_vecadd",
         "axes": {"n": {"type": "const", "value": 1}},
         "inputs": {
@@ -36,7 +33,7 @@ def _definition_payload() -> dict:
 
 def _workload_payload(uuid: str = "w0") -> dict:
     return {
-        "schema_version": WORKLOAD_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.WORKLOAD,
         "uuid": uuid,
         "axes": {},
         "inputs": {"x": {"type": "random"}, "y": {"type": "random"}},
@@ -46,7 +43,7 @@ def _workload_payload(uuid: str = "w0") -> dict:
 
 def _solution_payload() -> dict:
     return {
-        "schema_version": SOLUTION_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.SOLUTION,
         "name": "candidate",
         "definition": "toy_vecadd",
         "author": "agent",
@@ -96,7 +93,7 @@ def test_load_config_reads_json(tmp_path: Path) -> None:
     _write_json(
         config_path,
         {
-            "schema_version": BENCHMARK_CONFIG_SCHEMA_VERSION,
+            "schema_version": SchemaVersion.BENCHMARK_CONFIG,
             "warmup_runs": 3,
             "iterations": 7,
         },

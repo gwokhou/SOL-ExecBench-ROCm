@@ -54,6 +54,17 @@ def test_missing_connected_dtypes_are_padded_from_model() -> None:
     assert dtypes == (["torch.float64"], ["torch.float64"])
 
 
+def test_model_default_dtype_does_not_leak_between_models() -> None:
+    processor = TorchviewProcessor()
+
+    assert processor._model_default_dtype(
+        nn.Linear(1, 1, dtype=torch.float64),
+    ) == str(torch.float64)
+    assert processor._model_default_dtype(
+        nn.Linear(1, 1, dtype=torch.float32),
+    ) == str(torch.float32)
+
+
 def test_topology_stages_preserve_recorded_input_order_and_weight_type() -> (
     None
 ):

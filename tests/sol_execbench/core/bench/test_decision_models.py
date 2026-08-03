@@ -9,7 +9,6 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.bench.decision.decision_models import (
-    DECISION_SCHEMA_VERSION,
     DecisionBottleneckClass,
     DecisionConfidence,
     DecisionHint,
@@ -21,6 +20,7 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSidecarStatus,
     ExtendedDiagnosticIdentity,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _sidecar(**overrides) -> DecisionSidecar:
@@ -43,13 +43,13 @@ def _sidecar(**overrides) -> DecisionSidecar:
 
 
 def test_schema_version_is_current():
-    assert DECISION_SCHEMA_VERSION == "sol_execbench.decision.v2"
+    assert SchemaVersion.DECISION == SchemaVersion.DECISION
 
 
 def test_sidecar_authority_is_diagnostic():
     sidecar = _sidecar()
     assert sidecar.authority == "diagnostic"
-    assert sidecar.schema_version == "sol_execbench.decision.v2"
+    assert sidecar.schema_version == SchemaVersion.DECISION
 
 
 def test_sidecar_round_trip():

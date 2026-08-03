@@ -20,8 +20,8 @@ from sol_execbench.core.data.json_utils import load_jsonl_file
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.workload import TopKRoutingCheck, Workload
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
-DESIGN_SCHEMA = "rdna4_diagnostic_corpus_design.v1"
 DESIGN_KIND = "adjacent_shape_stratified_three_way_rotation"
 CASES_PER_BATCH = 20
 PHASES_PER_FAMILY = 3
@@ -125,9 +125,9 @@ class DiagnosticCorpusDesign(CurrentSchemaModel):
     """Frozen 11-family, three-phase diagnostic corpus design."""
 
     model_config = _CONFIG
-    current_schema_version = DESIGN_SCHEMA
+    current_schema_version = SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN
 
-    schema_version: Literal["rdna4_diagnostic_corpus_design.v1"]
+    schema_version: Literal[SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN]
     design: Literal["adjacent_shape_stratified_three_way_rotation"]
     cases_per_family: DiagnosticPhaseCaseCounts
     universe_cases_per_family: Literal[60]

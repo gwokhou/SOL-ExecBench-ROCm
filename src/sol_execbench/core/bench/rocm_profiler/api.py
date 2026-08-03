@@ -21,9 +21,7 @@ from sol_execbench.core.bench.rocm_profiler.commands import (
 from sol_execbench.core.bench.rocm_profiler.models import (
     ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE,
     ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS,
-    ROCPROFV3_EVIDENCE_SCHEMA_VERSION,
     ROCPROFV3_EXECUTABLE,
-    ROCPROFV3_PROFILE_SCHEMA_VERSION,
     DefaultTimingSelection,
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
@@ -60,9 +58,7 @@ from sol_execbench.core.bench.rocm_profiler.timing import (
 )
 
 __all__ = [
-    "ROCPROFV3_EVIDENCE_SCHEMA_VERSION",
     "ROCPROFV3_EXECUTABLE",
-    "ROCPROFV3_PROFILE_SCHEMA_VERSION",
     "ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE",
     "ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS",
     "DefaultTimingSelection",

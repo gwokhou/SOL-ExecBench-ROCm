@@ -18,7 +18,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
 )
 from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
-    DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
@@ -83,10 +83,10 @@ class DiagnosticCalibrationAudit(CurrentSchemaModel):
     """Current diagnostic calibration audit artifact."""
 
     model_config = _CONFIG
-    current_schema_version = DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT
 
-    schema_version: Literal["sol_execbench.diagnostic_calibration_audit.v7"] = (
-        DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT] = (
+        SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT
     )
     probe_identity: CalibrationProbeIdentity
     protocol: CalibrationProtocol

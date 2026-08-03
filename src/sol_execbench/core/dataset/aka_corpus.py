@@ -90,7 +90,7 @@ AKA_PROVENANCE_CLASS = "ecosystem_grounded"
 FORMAL_ARCHITECTURE = "solar:RX_9060_XT"
 FORMAL_GFX_TARGET = "gfx1200"
 FORMAL_ARCHITECTURE_SHA256 = (
-    "92c68d96f043c1a606ae170608b9974a1305b4c53d91dd4b40969a74e61f131b"
+    "25ad977df7a7206bd9d8caf60d2cd85d4f5c5fdc47368a22efb881c0250d0877"
 )
 
 # Corpus-size bounds. The initial seed landed at 15 problems; the friendliness

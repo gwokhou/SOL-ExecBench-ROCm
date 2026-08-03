@@ -18,7 +18,6 @@ from rich.console import Console
 
 from sol_execbench.cli.evaluation.diagnostics import (
     _DIAGNOSTIC_TAIL_LIMIT,
-    NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
     NoTraceDiagnostics,
     _diagnostic_tail,
     _no_trace_diagnostics_sidecar_path,
@@ -55,7 +54,6 @@ from sol_execbench.core.process.subprocesses import (
 )
 
 __all__ = [
-    "NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION",
     "_DIAGNOSTIC_TAIL_LIMIT",
     "NoTraceDiagnostics",
     "_diagnostic_tail",

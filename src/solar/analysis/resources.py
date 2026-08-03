@@ -37,9 +37,9 @@ from solar.ir.contracts import (
     operation_operands,
 )
 from solar.precision import normalize_dtype
-from solar.schema_versions import AMD_RESOURCE_MODEL_VERSION
-
-RESOURCE_MODEL_VERSION = AMD_RESOURCE_MODEL_VERSION
+from solar.schema_versions import (
+    ResourceModelVersion as SolarResourceModelVersion,
+)
 
 
 def is_mfma_operation(target: str) -> bool:
@@ -256,14 +256,14 @@ class _ResourceAccumulator:
     def result(self, exemption_reason: str | None = None) -> dict[str, Any]:
         if exemption_reason is not None:
             return {
-                "model_version": RESOURCE_MODEL_VERSION,
+                "model_version": SolarResourceModelVersion.AMD.value,
                 "work": {},
                 "classification": "exempt",
                 "exemption_reason": exemption_reason,
                 "formulas": [],
             }
         return {
-            "model_version": RESOURCE_MODEL_VERSION,
+            "model_version": SolarResourceModelVersion.AMD.value,
             "work": {
                 name: dict(sorted(modes.items()))
                 for name, modes in sorted(self.work.items())
@@ -942,7 +942,7 @@ def classify_layer_resources(
     if strict:
         raise ResourceClassificationError(
             f"operation {context.target or '<missing>'!r} has no "
-            f"{RESOURCE_MODEL_VERSION} rule",
+            f"{SolarResourceModelVersion.AMD} rule",
         )
     return accumulator.result()
 
@@ -980,7 +980,6 @@ def validate_resource_work(value: Any) -> dict[str, dict[str, float]]:
 
 
 __all__ = [
-    "RESOURCE_MODEL_VERSION",
     "ResourceClassificationError",
     "classify_layer_resources",
     "is_mfma_operation",

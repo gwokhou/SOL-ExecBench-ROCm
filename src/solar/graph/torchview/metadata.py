@@ -325,18 +325,17 @@ class TorchviewMetadataMixin(TorchviewProcessorContract):
             return [str(dtype) for dtype in value]
         return [str(value)]
 
-    def _model_default_dtype(self, model: nn.Module) -> str:
-        """Cache the first model parameter dtype for missing graph metadata."""
-        if self._cached_default_dtype is None:
-            self._cached_default_dtype = next(
-                (
-                    str(parameter.dtype)
-                    for parameter in model.parameters()
-                    if parameter.dtype is not None
-                ),
-                "torch.float32",
-            )
-        return self._cached_default_dtype
+    @staticmethod
+    def _model_default_dtype(model: nn.Module) -> str:
+        """Return the first model parameter dtype for missing graph metadata."""
+        return next(
+            (
+                str(parameter.dtype)
+                for parameter in model.parameters()
+                if parameter.dtype is not None
+            ),
+            "torch.float32",
+        )
 
     @staticmethod
     def _pad_dtypes(

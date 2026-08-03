@@ -8,9 +8,6 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from sol_execbench.core.bench.config.benchmark_config import (
-    OFFICIAL_ROCM_TIMING_PROTOCOL,
-)
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.data.json_utils import (
@@ -50,8 +47,7 @@ from sol_execbench.core.dataset.aka_corpus import (
 )
 from sol_execbench.core.integrity import sha256_bytes, sha256_file
 from sol_execbench.core.integrity.schema_versions import (
-    RELEASE_BUNDLE_SCHEMA_VERSION,
-    RELEASE_ENVIRONMENT_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.platform.rdna4_validation import (
     RDNA4_VALIDATION_GFX_TARGET,
@@ -85,9 +81,9 @@ from sol_execbench.core.scoring.release_solar import verify_solar_index
 from sol_execbench.core.scoring.release_verifier import verify_and_score_release
 from sol_execbench.core.solar_bridge.models import (
     FORMAL_BOUND_KIND,
-    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
     IRPath,
 )
+from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 _SOURCE_REVISION = "a" * 40
 _BASELINE_ID = "rx9060xt-test-baseline"
@@ -431,7 +427,7 @@ def test_release_bundle_schema_rejects_legacy_signature_fields(
     with pytest.raises(ValidationError):
         ReleaseBundle.model_validate(
             {
-                "schema_version": RELEASE_BUNDLE_SCHEMA_VERSION,
+                "schema_version": SchemaVersion.RELEASE_BUNDLE,
                 "corpus_manifest": artifact_reference(
                     workspace,
                     workspace / "corpus" / "manifest.yaml",
@@ -595,7 +591,7 @@ def _trace(
         },
         execution_isolation="container",
         clocks_locked=True,
-        timing_protocol=OFFICIAL_ROCM_TIMING_PROTOCOL,
+        timing_protocol=SchemaVersion.ROCM_EVENT_TIMING_PAPER_COUNTS,
     )
     performance = Performance(
         latency_ms=latency,
@@ -630,7 +626,7 @@ def _environment_evidence() -> dict[str, object]:
     return {
         "status": "available",
         "release_execution": {
-            "schema_version": RELEASE_ENVIRONMENT_SCHEMA_VERSION,
+            "schema_version": SchemaVersion.RELEASE_ENVIRONMENT,
             "source_revision": _SOURCE_REVISION,
             "source_tree_clean": True,
             "container_image_id": "sha256:" + "d" * 64,

@@ -17,7 +17,6 @@ from sol_execbench.core.bench.static_kernel.evidence_builders import (
     build_static_kernel_evidence_unsupported,
 )
 from sol_execbench.core.bench.static_kernel.evidence_models import (
-    STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
     StaticISAAnalysis,
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceClassification,
@@ -34,7 +33,6 @@ from sol_execbench.core.bench.static_kernel.extractors import (
 )
 
 __all__ = [
-    "STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION",
     "StaticISAAnalysis",
     "StaticKernelEvidenceArtifact",
     "StaticKernelEvidenceClassification",

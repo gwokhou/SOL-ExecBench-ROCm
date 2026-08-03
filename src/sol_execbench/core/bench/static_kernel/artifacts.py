@@ -29,7 +29,7 @@ from sol_execbench.core.data.base_model import (
 )
 from sol_execbench.core.integrity.checksums import sha256_file
 from sol_execbench.core.integrity.schema_versions import (
-    STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 _PRIMARY_ARTIFACT_NAME = "benchmark_kernel.so"
@@ -50,10 +50,10 @@ class StaticArtifactManifestEntry(StrictArtifactModel):
 class StaticArtifactManifest(CurrentSchemaModel):
     """Current explicit static-artifact selection manifest."""
 
-    current_schema_version = STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.STATIC_ARTIFACT_MANIFEST
 
-    schema_version: Literal["sol_execbench.static_artifact_manifest.v1"] = (
-        STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.STATIC_ARTIFACT_MANIFEST] = (
+        SchemaVersion.STATIC_ARTIFACT_MANIFEST
     )
     artifacts: list[str | StaticArtifactManifestEntry]
 

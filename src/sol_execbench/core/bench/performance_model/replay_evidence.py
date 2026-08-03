@@ -26,7 +26,7 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    PERFORMANCE_REPLAY_EVIDENCE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 REPLAY_PROTOCOL_VERSION = "gfx1200_counter_replay.v1"
@@ -99,10 +99,10 @@ class PerformanceReplayEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     """Fail-closed replay identity and alignment evidence."""
 
     model_config = _CONFIG
-    current_schema_version = PERFORMANCE_REPLAY_EVIDENCE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.PERFORMANCE_REPLAY_EVIDENCE
 
-    schema_version: Literal["sol_execbench.performance_replay_evidence.v4"] = (
-        PERFORMANCE_REPLAY_EVIDENCE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.PERFORMANCE_REPLAY_EVIDENCE] = (
+        SchemaVersion.PERFORMANCE_REPLAY_EVIDENCE
     )
     status: DiagnosticSidecarStatus
     run_id: SHA256Digest

@@ -14,7 +14,6 @@ from typing import Any, cast
 
 import yaml
 
-from solar import schema_versions
 from solar.artifacts import sha256_file, stable_json_checksum
 from solar.precision import normalize_dtype
 from solar.rocm.audit_validation import (
@@ -23,12 +22,10 @@ from solar.rocm.audit_validation import (
     audit_sha256,
     audit_string_set,
 )
-
-# The hash-bound calibration script imports this legacy path. Keep the explicit
-# compatibility binding until a new calibration artifact is published.
-RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION = (
-    schema_versions.RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION
+from solar.schema_versions import (
+    ResourceModelVersion as SolarResourceModelVersion,
 )
+
 RESOURCE_PEAK_TIMING_PROFILE = "official"
 UNTHROTTLED_RESOURCE_PEAK_SCOPE = "unthrottled_resource_peak"
 INSTRUCTION_RUNTIME_AUDIT_SCOPE = "instruction_and_runtime_corroboration_only"
@@ -587,12 +584,10 @@ class ArchitectureProfile:
             raise ValueError(
                 "at least one positive peak throughput is required",
             )
-        from solar.schema_versions import AMD_RESOURCE_MODEL_VERSION
-
-        if self.resource_model_version != AMD_RESOURCE_MODEL_VERSION:
+        if self.resource_model_version != SolarResourceModelVersion.AMD:
             raise ValueError(
                 "architecture resource_model_version must be "
-                f"{AMD_RESOURCE_MODEL_VERSION}",
+                f"{SolarResourceModelVersion.AMD}",
             )
         self._validate_resource_limits()
         self._validate_precision_support()

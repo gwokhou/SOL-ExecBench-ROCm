@@ -11,7 +11,6 @@ import torch
 
 from sol_execbench.core.bench import reference_protocol
 from sol_execbench.core.bench.reference_protocol import (
-    PROTOCOL_VERSION,
     ReferenceCase,
     ReferenceExecutionError,
     ReferenceFailureKind,
@@ -21,6 +20,7 @@ from sol_execbench.core.bench.reference_protocol import (
     send_failure,
     send_json,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 @contextmanager
@@ -66,7 +66,9 @@ def test_reference_failure_is_not_deserialized_as_pickle() -> None:
 
 
 def test_protocol_version_is_explicit() -> None:
-    assert PROTOCOL_VERSION == "sol_execbench.reference_ipc.v2"
+    assert reference_protocol.SchemaVersion.REFERENCE_IPC == (
+        SchemaVersion.REFERENCE_IPC
+    )
 
 
 def test_invalid_failure_category_is_rejected_as_protocol_error() -> None:
@@ -89,7 +91,7 @@ def test_send_json_wraps_closed_pipe_as_protocol_error() -> None:
             ReferenceProtocolError,
             match="control channel closed",
         ):
-            send_json(sender, {"protocol": PROTOCOL_VERSION})
+            send_json(sender, {"protocol": SchemaVersion.REFERENCE_IPC})
     finally:
         sender.close()
 
@@ -103,7 +105,7 @@ def test_receive_case_rejects_oversized_payload_before_allocation(
             sender,
             {
                 "ok": True,
-                "protocol": PROTOCOL_VERSION,
+                "protocol": SchemaVersion.REFERENCE_IPC,
                 "inputs": [],
                 "outputs": [],
                 "payload_bytes": 5,

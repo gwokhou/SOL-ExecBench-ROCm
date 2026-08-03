@@ -25,6 +25,7 @@ from sol_execbench.core.bench.timing_policy import (
     TimingSourceType,
 )
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _make_policy(**overrides) -> TimingPolicy:
@@ -117,7 +118,7 @@ class TestReadOverheadCalibration:
     @staticmethod
     def _payload(**overrides):
         payload = {
-            "schema_version": "sol_execbench.rocprofv3_overhead_calibration.v2",
+            "schema_version": SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION,
             "generated_at": "2026-07-20T00:00:00Z",
             "baseline_median_ms": 0.05,
             "profiler_median_ms": 0.073,
@@ -334,8 +335,8 @@ class TestCalibrationJSONSchema:
         mod = module_from_spec(spec)
         spec.loader.exec_module(mod)
         assert (
-            mod.CALIBRATION_SCHEMA_VERSION
-            == "sol_execbench.rocprofv3_overhead_calibration.v2"
+            mod.Rocprofv3OverheadCalibration.current_schema_version
+            == SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION
         )
 
 

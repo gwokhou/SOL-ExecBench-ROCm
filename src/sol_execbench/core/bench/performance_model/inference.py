@@ -25,7 +25,7 @@ from sol_execbench.core.data.base_model import (
 )
 from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
-    DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 MINIMUM_POINT_FIT_CASES = 20
@@ -203,10 +203,10 @@ class DiagnosticInferenceProfile(CurrentSchemaModel):
     """Frozen interval and action policy built before held-out acceptance."""
 
     model_config = _CONFIG
-    current_schema_version = DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.DIAGNOSTIC_INFERENCE_PROFILE
 
-    schema_version: Literal["sol_execbench.diagnostic_inference_profile.v9"] = (
-        DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.DIAGNOSTIC_INFERENCE_PROFILE] = (
+        SchemaVersion.DIAGNOSTIC_INFERENCE_PROFILE
     )
     model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity

@@ -11,7 +11,6 @@ from sol_execbench.core.platform.environment_diagnostics import (
 )
 from sol_execbench.core.platform.environment_models import (
     DEFAULT_PROBE_TIMEOUT_SECONDS,
-    ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
     EnvironmentCheckResult,
     EnvironmentDiagnostics,
     EnvironmentEvidenceStatus,
@@ -31,7 +30,6 @@ from sol_execbench.core.platform.environment_snapshot import (
 
 __all__ = [
     "DEFAULT_PROBE_TIMEOUT_SECONDS",
-    "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION",
     "EnvironmentCheckResult",
     "EnvironmentDiagnostics",
     "EnvironmentEvidenceStatus",

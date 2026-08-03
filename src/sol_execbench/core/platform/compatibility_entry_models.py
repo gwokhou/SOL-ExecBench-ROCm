@@ -13,9 +13,11 @@ from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentSchemaModel,
 )
+from sol_execbench.core.integrity.schema_versions import (
+    SchemaVersion,
+)
 from sol_execbench.core.platform.compatibility_enums import (
     MATRIX_MODEL_CONFIG,
-    ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
     MatrixCompatibilityReasonCodeField,
     MatrixCompatibilityStatus,
     MatrixCompatibilityStatusField,
@@ -53,10 +55,10 @@ class MatrixEntry(CurrentSchemaModel):
     """Strict diagnostic compatibility Matrix Entry."""
 
     model_config = MATRIX_MODEL_CONFIG
-    current_schema_version = ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.ROCM_COMPATIBILITY_MATRIX
 
-    schema_version: Literal["sol_execbench.rocm_compatibility_matrix.v1"] = (
-        ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.ROCM_COMPATIBILITY_MATRIX] = (
+        SchemaVersion.ROCM_COMPATIBILITY_MATRIX
     )
     """Compatibility Matrix Entry schema version."""
     target: MatrixTarget
@@ -224,10 +226,10 @@ class RocmCompatibilityMatrixReport(CurrentSchemaModel):
     """Aggregate ROCm compatibility matrix report."""
 
     model_config = MATRIX_MODEL_CONFIG
-    current_schema_version = ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.ROCM_COMPATIBILITY_MATRIX
 
-    schema_version: Literal["sol_execbench.rocm_compatibility_matrix.v1"] = (
-        ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.ROCM_COMPATIBILITY_MATRIX] = (
+        SchemaVersion.ROCM_COMPATIBILITY_MATRIX
     )
     """Compatibility matrix report schema version."""
     generated_at: str

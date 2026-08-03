@@ -20,6 +20,8 @@ from solar.ir.contracts import IRPath
 from solar.schema_versions import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
     SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+    ResourceModelVersion as SolarResourceModelVersion,
+    SchemaVersion as SolarSchemaVersion,
 )
 
 
@@ -104,7 +106,7 @@ def _analysis(
         "metadata": {
             "bound_kind": "roofline_eq1_v1",
             "resource_model": {
-                "version": "amd_resource_v3",
+                "version": SolarResourceModelVersion.AMD.value,
                 "coverage": {"modeled": 1},
                 "fail_closed": True,
             },
@@ -126,7 +128,7 @@ def _attestation(graph_name: str, graph_sha256: str) -> dict:
         ],
         "predicate": {
             "status": "passed",
-            "verifier": "solar.verification.ir.v5",
+            "verifier": SolarSchemaVersion.IR_VERIFICATION.value,
             "execution": {"device_type": "cuda", "gfx_target": "gfx1200"},
             "cases": [{"seed": 11, "pattern": "random", "parameters": {}}],
         },

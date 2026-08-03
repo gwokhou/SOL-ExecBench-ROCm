@@ -4,10 +4,10 @@
 """ROCm profiler timing parsing and live timing collection."""
 
 import csv
-import re
 from pathlib import Path
 
 from sol_execbench.core.bench.rocm_profiler.models import Rocprofv3TimingRow
+from sol_execbench.core.text_utils import normalize_ascii_alnum
 
 
 def parse_rocprofv3_csv(content: str) -> tuple[Rocprofv3TimingRow, ...]:
@@ -16,7 +16,7 @@ def parse_rocprofv3_csv(content: str) -> tuple[Rocprofv3TimingRow, ...]:
     rows: list[Rocprofv3TimingRow] = []
     for raw_row in reader:
         normalized = {
-            _normalize_header(key): value for key, value in raw_row.items()
+            normalize_ascii_alnum(key): value for key, value in raw_row.items()
         }
         name = _first_value(
             normalized,
@@ -52,7 +52,8 @@ def summarize_rocprofv3_csv(path: Path) -> tuple[int, float]:
         reader = csv.DictReader(handle)
         for raw_row in reader:
             normalized = {
-                _normalize_header(key): value for key, value in raw_row.items()
+                normalize_ascii_alnum(key): value
+                for key, value in raw_row.items()
             }
             domain = _first_value(
                 normalized,
@@ -64,15 +65,11 @@ def summarize_rocprofv3_csv(path: Path) -> tuple[int, float]:
             row_duration_ns = _duration_ns(normalized)
             if domain is None or row_duration_ns is None:
                 continue
-            if "kernel" not in _normalize_header(domain):
+            if "kernel" not in normalize_ascii_alnum(domain):
                 continue
             kernel_rows += 1
             duration_ns += row_duration_ns
     return kernel_rows, duration_ns
-
-
-def _normalize_header(header: str | None) -> str:
-    return re.sub(r"[^a-z0-9]", "", (header or "").lower())
 
 
 def _first_value(row: dict[str, str], *keys: str) -> str | None:

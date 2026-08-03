@@ -8,7 +8,7 @@ from typing import cast
 import pytest
 
 from sol_execbench.core.integrity.schema_versions import (
-    SOLAR_WORKER_IPC_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.solar_bridge import stage_worker, worker
 from sol_execbench.core.solar_bridge.models import (
@@ -47,7 +47,7 @@ def _write_request(tmp_path: Path) -> tuple[Path, Path]:
     request.write_text(
         json.dumps(
             {
-                "schema_version": SOLAR_WORKER_IPC_SCHEMA_VERSION,
+                "schema_version": SchemaVersion.SOLAR_WORKER_IPC,
                 "problem_dir": str(tmp_path / "problem"),
                 "workload_uuid": "workload-1",
                 "output_dir": str(tmp_path / "output"),
@@ -65,7 +65,7 @@ def _write_stage_request(tmp_path: Path) -> tuple[Path, Path]:
     request.write_text(
         json.dumps(
             {
-                "schema_version": SOLAR_WORKER_IPC_SCHEMA_VERSION,
+                "schema_version": SchemaVersion.SOLAR_WORKER_IPC,
                 "problem_dir": str(tmp_path / "problem"),
                 "workload_uuid": "workload-1",
                 "output_dir": str(tmp_path / "output"),
@@ -143,7 +143,7 @@ def test_analysis_worker_converts_exception_to_stable_failure(
         "output_dir": None,
         "publication_eligible": False,
         "reason_code": "bridge_failed",
-        "schema_version": SOLAR_WORKER_IPC_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.SOLAR_WORKER_IPC,
         "stage": "outer_bridge",
         "status": "failed",
     }

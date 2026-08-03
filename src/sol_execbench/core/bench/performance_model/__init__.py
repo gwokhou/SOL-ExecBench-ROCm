@@ -12,7 +12,6 @@ from sol_execbench.core.bench.performance_model.governance import (
     validate_performance_diagnostic_freshness,
 )
 from sol_execbench.core.bench.performance_model.models import (
-    PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION,
     PERFORMANCE_MODEL_VERSION,
     CalibrationIdentity,
     CalibrationParameter,
@@ -40,7 +39,6 @@ from sol_execbench.core.bench.performance_model.prediction import (
 )
 
 __all__ = [
-    "PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION",
     "PERFORMANCE_MODEL_VERSION",
     "CalibrationIdentity",
     "CalibrationParameter",

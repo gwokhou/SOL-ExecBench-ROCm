@@ -2,10 +2,17 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from sol_execbench.core.text_utils import (
+    normalize_ascii_alnum,
     ordered_unique,
     subprocess_text,
     text_tail,
 )
+
+
+def test_normalize_ascii_alnum_is_case_and_separator_insensitive() -> None:
+    assert normalize_ascii_alnum("Start_Timestamp (ns)") == "starttimestampns"
+    assert normalize_ascii_alnum(None) == ""
+    assert normalize_ascii_alnum("μs") == "s"
 
 
 def test_text_tail_normalizes_none_bytes_and_strings() -> None:

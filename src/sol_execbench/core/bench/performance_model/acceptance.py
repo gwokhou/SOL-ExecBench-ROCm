@@ -30,7 +30,7 @@ from sol_execbench.core.data.base_model import (
 )
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import (
-    DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 MINIMUM_EMPIRICAL_COVERAGE = 0.90
@@ -101,10 +101,10 @@ class DiagnosticAcceptanceManifest(CurrentSchemaModel):
     """Frozen identities and evidence-derived held-out observations."""
 
     model_config = _CONFIG
-    current_schema_version = DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.DIAGNOSTIC_ACCEPTANCE
 
-    schema_version: Literal["sol_execbench.diagnostic_acceptance.v6"] = (
-        DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.DIAGNOSTIC_ACCEPTANCE] = (
+        SchemaVersion.DIAGNOSTIC_ACCEPTANCE
     )
     model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
@@ -144,10 +144,10 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
     """Content-bound aggregate acceptance verdict and Agent admission set."""
 
     model_config = _CONFIG
-    current_schema_version = DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.DIAGNOSTIC_ACCEPTANCE
 
-    schema_version: Literal["sol_execbench.diagnostic_acceptance.v6"] = (
-        DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.DIAGNOSTIC_ACCEPTANCE] = (
+        SchemaVersion.DIAGNOSTIC_ACCEPTANCE
     )
     model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity

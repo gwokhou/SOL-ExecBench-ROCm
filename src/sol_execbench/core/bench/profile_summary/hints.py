@@ -5,10 +5,13 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticConfidence
+from sol_execbench.core.bench.profile_summary.metric_values import (
+    finite_number_or_none,
+    normalize_metric_key,
+)
 from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryBottleneckHint,
     ProfileSummaryHintCategory,
@@ -38,7 +41,7 @@ def derive_bottleneck_hints(
 
     by_name: dict[str, list[ProfileSummaryKernelMetric]] = {}
     for metric in counter_metrics:
-        by_name.setdefault(_normalize_key(metric.name), []).append(metric)
+        by_name.setdefault(normalize_metric_key(metric.name), []).append(metric)
     hints: list[ProfileSummaryBottleneckHint] = []
     l2_metrics = by_name.get("l2cachehitrate", [])
     if l2_metrics:
@@ -106,7 +109,7 @@ def _is_low_l2_hit_rate(metric: ProfileSummaryKernelMetric) -> bool:
     value = _numeric_value(metric.value)
     if value is None:
         return False
-    unit = _normalize_key(metric.unit)
+    unit = normalize_metric_key(metric.unit)
     if unit in {"fraction", "ratio"}:
         return value < 0.6
     if unit in {"percent", "pct"}:
@@ -123,24 +126,15 @@ def _metric_artifacts(
     return sorted(artifacts)
 
 
-def _normalize_key(value: str | None) -> str:
-    return "".join(ch for ch in (value or "").lower() if ch.isalnum())
-
-
-def _finite_or_none(value: float) -> int | float | None:
-    """Pass through finite numbers; reject NaN/Inf so they never reach sidecar JSON."""
-    return value if math.isfinite(value) else None
-
-
 def _numeric_value(value: object) -> float | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, int | float):
-        return _finite_or_none(float(value))
+        return finite_number_or_none(float(value))
     if isinstance(value, str):
         try:
             number = float(value)
         except ValueError:
             return None
-        return _finite_or_none(number)
+        return finite_number_or_none(number)
     return None

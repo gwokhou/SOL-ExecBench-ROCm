@@ -6,8 +6,7 @@ import pytest
 
 from sol_execbench.core import Trace
 from sol_execbench.core.integrity.schema_versions import (
-    TRACE_SCHEMA_VERSION,
-    WORKLOAD_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.driver.trace_output import parse_trace_jsonl
 
@@ -15,10 +14,10 @@ from sol_execbench.driver.trace_output import parse_trace_jsonl
 def _trace_json(uuid: str = "wkl-0001") -> str:
     return json.dumps(
         {
-            "schema_version": TRACE_SCHEMA_VERSION,
+            "schema_version": SchemaVersion.TRACE,
             "definition": "test_vecadd",
             "workload": {
-                "schema_version": WORKLOAD_SCHEMA_VERSION,
+                "schema_version": SchemaVersion.WORKLOAD,
                 "axes": {},
                 "inputs": {
                     "x": {"type": "random"},

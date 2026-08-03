@@ -26,7 +26,7 @@ from solar.graph.registry import extraction_backends
 from solar.ir.contracts import DEFAULT_IR_KIND, DEFAULT_IR_PATH, IRKind, IRPath
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.registry import ir_backends
-from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
+from solar.schema_versions import SchemaVersion as SolarSchemaVersion
 from solar.verification.registry import verification_backend
 
 
@@ -98,7 +98,8 @@ def test_fixed_paths_publish_their_canonical_ir_artifacts(
     assert operator["extraction_kind"] == ir_path.extraction_kind.value
     assert graph["ir_kind"] == ir_path.ir_kind.value
     assert (
-        attestation["predicate"]["verifier"] == IR_VERIFICATION_SCHEMA_VERSION
+        attestation["predicate"]["verifier"]
+        == SolarSchemaVersion.IR_VERIFICATION
     )
     assert manifest["analysis_contract"]["ir_path"] == ir_path.value
     assert (

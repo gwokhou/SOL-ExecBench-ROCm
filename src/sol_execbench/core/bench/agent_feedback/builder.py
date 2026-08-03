@@ -8,7 +8,6 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
 
 from sol_execbench.core.bench.agent_feedback.items import trace_feedback_items
 from sol_execbench.core.bench.agent_feedback.models import (
@@ -18,6 +17,7 @@ from sol_execbench.core.bench.agent_feedback.models import (
     AgentFeedbackSeverity,
     AgentFeedbackSidecar,
     AgentFeedbackSummary,
+    PerformanceAcceptanceStatus,
 )
 from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticArtifactCitation,
@@ -70,17 +70,24 @@ class AgentFeedbackBuildRequest:
     artifact_citations: Sequence[DiagnosticArtifactCitation] = ()
     performance_diagnostic: PerformanceDiagnosticSidecar | None = None
     performance_governance: DiagnosticGovernanceGuardrail | None = None
-    performance_acceptance_status: Literal[
-        "omitted",
-        "failed",
-        "accepted",
-    ] = "omitted"
+    performance_acceptance_status: PerformanceAcceptanceStatus = (
+        PerformanceAcceptanceStatus.OMITTED
+    )
     enabled_performance_actions: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         """Reject inconsistent or unknown performance-action admission."""
+        object.__setattr__(
+            self,
+            "performance_acceptance_status",
+            PerformanceAcceptanceStatus(self.performance_acceptance_status),
+        )
         actions = self.enabled_performance_actions
-        if actions and self.performance_acceptance_status != "accepted":
+        if (
+            actions
+            and self.performance_acceptance_status
+            is not PerformanceAcceptanceStatus.ACCEPTED
+        ):
             raise ValueError(
                 "performance actions require an accepted model report",
             )
@@ -89,7 +96,10 @@ class AgentFeedbackBuildRequest:
             raise ValueError(
                 f"unknown accepted performance actions: {sorted(unknown)}",
             )
-        if self.performance_acceptance_status == "accepted" and (
+        if (
+            self.performance_acceptance_status
+            is PerformanceAcceptanceStatus.ACCEPTED
+        ) and (
             self.performance_diagnostic is None
             or self.performance_governance is None
             or self.performance_governance.status
@@ -358,7 +368,7 @@ def _usable_performance_attribution(
     attribution: PerformanceAttribution,
     *,
     diagnostic_status: DiagnosticSidecarStatus,
-    acceptance_status: Literal["omitted", "failed", "accepted"],
+    acceptance_status: PerformanceAcceptanceStatus,
     enabled_actions: frozenset[str],
 ) -> bool:
     action = attribution.action_code
@@ -369,7 +379,10 @@ def _usable_performance_attribution(
         "model_gap_no_kernel_action",
     }:
         return True
-    if acceptance_status != "accepted" or action not in enabled_actions:
+    if (
+        acceptance_status is not PerformanceAcceptanceStatus.ACCEPTED
+        or action not in enabled_actions
+    ):
         return False
     if diagnostic_status is not DiagnosticSidecarStatus.AVAILABLE:
         return False

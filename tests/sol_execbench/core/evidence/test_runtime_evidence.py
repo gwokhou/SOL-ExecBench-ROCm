@@ -13,6 +13,7 @@ from sol_execbench.core.evidence.runtime_evidence import cli
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeFailureEvidence,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
 )
@@ -113,7 +114,7 @@ def test_runtime_evidence_io_round_trips_entry_and_aggregate(tmp_path) -> None:
 
     assert loaded == entry
     assert json.loads(entry_path.read_text())["schema_version"] == (
-        "sol_execbench.rocm_compatibility_matrix.v1"
+        SchemaVersion.ROCM_COMPATIBILITY_MATRIX
     )
     assert json.loads(report_path.read_text())["status_counts"] == {
         "not_tested": 1,

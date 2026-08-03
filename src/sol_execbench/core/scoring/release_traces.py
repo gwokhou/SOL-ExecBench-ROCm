@@ -9,9 +9,6 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
-from sol_execbench.core.bench.config.benchmark_config import (
-    OFFICIAL_ROCM_TIMING_PROTOCOL,
-)
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import load_json_value
 from sol_execbench.core.data.solution_instance import Solution
@@ -24,6 +21,7 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKACorpusManifest,
 )
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.rdna4_validation import (
     RDNA4_VALIDATION_GFX_TARGET,
     RDNA4_VALIDATION_HIP_VERSION,
@@ -361,7 +359,8 @@ def _verify_trace_environment(
         )
     if require_timing and (
         environment.clocks_locked is not True
-        or environment.timing_protocol != OFFICIAL_ROCM_TIMING_PROTOCOL
+        or environment.timing_protocol
+        != SchemaVersion.ROCM_EVENT_TIMING_PAPER_COUNTS
     ):
         raise ValueError(
             "passing release trace lacks publication timing controls",

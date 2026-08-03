@@ -17,7 +17,7 @@ from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.evidence.runtime_evidence import write_json_payload
 from sol_execbench.core.integrity.schema_versions import (
-    NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 _DIAGNOSTIC_TAIL_LIMIT = 8192
@@ -38,10 +38,10 @@ class NoTraceDiagnostics:
 class NoTraceDiagnosticsSidecar(CurrentFrozenSchemaModel):
     """Current bounded no-trace diagnostic artifact."""
 
-    current_schema_version = NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.NO_TRACE_DIAGNOSTICS
 
-    schema_version: Literal["sol_execbench.no_trace_diagnostics.v1"] = (
-        "sol_execbench.no_trace_diagnostics.v1"
+    schema_version: Literal[SchemaVersion.NO_TRACE_DIAGNOSTICS] = (
+        SchemaVersion.NO_TRACE_DIAGNOSTICS
     )
     diagnostic_only: Literal[True]
     canonical_trace_jsonl: Literal[False]
@@ -97,7 +97,7 @@ def _write_no_trace_diagnostics_sidecar(
     filtered_stderr = filter_benign_rocm_stderr(diagnostics.stderr)
     payload = NoTraceDiagnosticsSidecar.model_validate(
         {
-            "schema_version": NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION,
+            "schema_version": SchemaVersion.NO_TRACE_DIAGNOSTICS,
             "diagnostic_only": True,
             "canonical_trace_jsonl": False,
             "reason": diagnostics.reason,

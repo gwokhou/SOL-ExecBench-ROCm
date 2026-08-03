@@ -18,8 +18,7 @@ from sol_execbench.cli.protocol import (
 )
 from sol_execbench.core.evaluator_contract import build_evaluator_contract
 from sol_execbench.core.integrity.schema_versions import (
-    CLI_CONTRACT_SCHEMA_VERSION,
-    CLI_RESPONSE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.platform.environment import (
     build_environment_diagnostics,
@@ -86,9 +85,9 @@ def cli_contract_cli() -> CliResult:
 
     context = click.Context(cli, info_name="sol-execbench")
     payload = {
-        "schema_version": CLI_CONTRACT_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.CLI_CONTRACT,
         "root_options_before_subcommand": True,
-        "response_schema": CLI_RESPONSE_SCHEMA_VERSION,
+        "response_schema": SchemaVersion.CLI_RESPONSE,
         "exit_codes": {
             "0": "success",
             "1": "valid evaluation or verification result did not pass",

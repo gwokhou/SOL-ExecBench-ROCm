@@ -31,6 +31,7 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceStatus,
     StaticResourceFootprint,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.arch_capabilities import (
     load_packaged_arch_capability_budget,
 )
@@ -55,7 +56,7 @@ def _environment_sidecar(path: Path, archs: list[str]) -> None:
 
 def _static_evidence(detected: list[str]) -> StaticKernelEvidenceSidecar:
     return StaticKernelEvidenceSidecar(
-        schema_version="sol_execbench.static_kernel_evidence.v4",
+        schema_version=SchemaVersion.STATIC_KERNEL_EVIDENCE,
         status=StaticKernelEvidenceStatus.COLLECTED,
         reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
         classification=StaticKernelEvidenceClassification(
@@ -93,7 +94,7 @@ def test_decision_auto_writes_sidecar_with_matched_budget(
     assert path is not None
     assert path == tmp_path / "trace.jsonl.decision.json"
     decision = json.loads(path.read_text(encoding="utf-8"))
-    assert decision["schema_version"] == "sol_execbench.decision.v2"
+    assert decision["schema_version"] == SchemaVersion.DECISION
     assert decision["summary"]["architecture"] == "gfx942"  # matched target
     assert decision["authority"] == "diagnostic"
     assert any(
@@ -122,7 +123,7 @@ def test_decision_auto_without_footprints_writes_nothing(
     output = tmp_path / "trace.jsonl"
     output.write_text("{}\n")
     empty = StaticKernelEvidenceSidecar(
-        schema_version="sol_execbench.static_kernel_evidence.v4",
+        schema_version=SchemaVersion.STATIC_KERNEL_EVIDENCE,
         status=StaticKernelEvidenceStatus.COLLECTED,
         reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
     )

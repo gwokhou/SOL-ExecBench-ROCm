@@ -17,6 +17,7 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
 from sol_execbench.core.bench.static_kernel.footprint_parsers import (
     parse_roc_objdump_resource_usage,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DIR = REPO_ROOT / "tests/sol_execbench/fixtures/static_kernel"
@@ -90,7 +91,7 @@ def test_valid_footprint_fixture_loads_as_v3_sidecar():
     )
     sidecar = StaticKernelEvidenceSidecar.model_validate(payload)
 
-    assert sidecar.schema_version == "sol_execbench.static_kernel_evidence.v4"
+    assert sidecar.schema_version == SchemaVersion.STATIC_KERNEL_EVIDENCE
     assert len(sidecar.footprints) == 1
     footprint = sidecar.footprints[0]
     assert footprint.vgpr_used == 32

@@ -3,9 +3,11 @@ from typing import Any
 import pytest
 
 from solar.analysis.resources import (
-    RESOURCE_MODEL_VERSION,
     ResourceClassificationError,
     classify_layer_resources,
+)
+from solar.schema_versions import (
+    ResourceModelVersion as SolarResourceModelVersion,
 )
 
 
@@ -111,7 +113,7 @@ def test_exempt_rules_return_stable_reason(
     reason: str,
 ) -> None:
     assert _classify(layer) == {
-        "model_version": RESOURCE_MODEL_VERSION,
+        "model_version": SolarResourceModelVersion.AMD.value,
         "work": {},
         "classification": "exempt",
         "exemption_reason": reason,

@@ -28,7 +28,6 @@ from sol_execbench.core.bench.clock_lock import (
 )
 from sol_execbench.core.bench.pid_lock import acquire_pid_lock
 from sol_execbench.core.bench.rocm_profiler.calibration import (
-    ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
     Rocprofv3OverheadCalibration,
 )
 from sol_execbench.core.bench.timing_isolation import (
@@ -37,6 +36,7 @@ from sol_execbench.core.bench.timing_isolation import (
     verify_clock_state_with_warning,
 )
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.runtime import (
     RocmDeviceInfo,
     detect_rocm_device,
@@ -46,7 +46,6 @@ from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 logger = logging.getLogger(__name__)
 
-CALIBRATION_SCHEMA_VERSION = ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION
 DEFAULT_ITERATIONS = 100
 DEFAULT_WARMUP_RUNS = 10
 DEFAULT_GPU_ARCHITECTURE = "gfx1200"
@@ -296,7 +295,7 @@ def _calibration_payload(
     overhead_ms = profiler_median - baseline_median
     payload = Rocprofv3OverheadCalibration.model_validate(
         {
-            "schema_version": CALIBRATION_SCHEMA_VERSION,
+            "schema_version": SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION,
             "generated_at": _utc_timestamp(),
             "baseline_median_ms": round(baseline_median, 6),
             "profiler_median_ms": round(profiler_median, 6),

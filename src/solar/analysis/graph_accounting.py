@@ -45,7 +45,6 @@ from solar.analysis.graph_models import (
 )
 from solar.analysis.mixin_contract import AnalysisMixinContract
 from solar.analysis.resources import (
-    RESOURCE_MODEL_VERSION,
     classify_layer_resources,
     merge_resource_work,
 )
@@ -53,6 +52,9 @@ from solar.ir.contracts import layer_operation
 from solar.precision import (
     BYTES_PER_ELEMENT,
     normalize_dtype,
+)
+from solar.schema_versions import (
+    ResourceModelVersion as SolarResourceModelVersion,
 )
 
 
@@ -128,7 +130,7 @@ class GraphAccountingMixin(AnalysisMixinContract):
         )
         if orphaned:
             resources = {
-                "model_version": RESOURCE_MODEL_VERSION,
+                "model_version": SolarResourceModelVersion.AMD.value,
                 "work": {},
                 "classification": "exempt",
                 "exemption_reason": "orphaned_dead_end",

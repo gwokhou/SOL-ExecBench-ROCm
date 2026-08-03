@@ -52,6 +52,7 @@ from sol_execbench.core.data.json_utils import (
     load_json_value,
 )
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.solar_bridge.performance import (
     load_manifest_semantic_characterization,
 )
@@ -75,7 +76,6 @@ FAMILIES = (
 CASES_PER_PHASE = 20
 UNIVERSE_START = 100
 UNIVERSE_CASES_PER_FAMILY = 3 * CASES_PER_PHASE
-CORPUS_DESIGN_SCHEMA_VERSION = "rdna4_diagnostic_corpus_design.v1"
 _PHASE_ROTATIONS: tuple[tuple[Phase, Phase, Phase], ...] = (
     ("point_fit", "conformal", "held_out"),
     ("conformal", "held_out", "point_fit"),
@@ -266,7 +266,7 @@ def _phase(global_index: int) -> Phase:
 def _design_payload() -> dict[str, object]:
     cases = [*_cases("development"), *_cases("held_out")]
     return {
-        "schema_version": CORPUS_DESIGN_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN.value,
         "design": "adjacent_shape_stratified_three_way_rotation",
         "universe_start": UNIVERSE_START,
         "universe_cases_per_family": UNIVERSE_CASES_PER_FAMILY,
@@ -366,7 +366,7 @@ def _workload(case: CaseSpec, output_name: str) -> dict[str, object]:
         inputs = {"input": {"type": "random"}}
         tolerance = 0.01 if case.family is WorkloadKind.REDUCTION else 1e-5
     return {
-        "schema_version": "sol_execbench.workload.v2",
+        "schema_version": SchemaVersion.WORKLOAD,
         "axes": case.axes,
         "inputs": inputs,
         "uuid": case.workload_uuid,

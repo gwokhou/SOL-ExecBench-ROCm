@@ -11,7 +11,6 @@ import pytest
 
 from sol_execbench.core.bench.performance_model.corpus_preflight import (
     CASES_PER_BATCH,
-    DESIGN_SCHEMA,
     FAMILIES,
     PHASE_ROLES,
     PHASES,
@@ -19,6 +18,7 @@ from sol_execbench.core.bench.performance_model.corpus_preflight import (
     validate_design,
     validate_status_log,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _design() -> dict[str, Any]:
@@ -38,7 +38,7 @@ def _design() -> dict[str, Any]:
                     }
                 )
     return {
-        "schema_version": DESIGN_SCHEMA,
+        "schema_version": SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN.value,
         "design": "adjacent_shape_stratified_three_way_rotation",
         "cases_per_family": {
             "point_fit": 20,

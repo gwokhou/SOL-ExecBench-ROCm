@@ -19,9 +19,9 @@ from sol_execbench.core.bench.performance_model.models import (
 )
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.solar_bridge.performance import (
-    SOLAR_ANALYSIS_SCHEMA_VERSION,
     load_semantic_characterization,
 )
+from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
 
 
 def _analysis() -> dict[str, object]:

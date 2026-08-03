@@ -12,6 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.bench.decision.decision_models import DecisionSidecar
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 FIXTURE_DIR = (
     Path(__file__).resolve().parents[4]
@@ -31,7 +32,7 @@ def test_decision_fixtures_parse(name: str, expected_status: str):
     payload = json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
     sidecar = DecisionSidecar.model_validate(payload)
 
-    assert sidecar.schema_version == "sol_execbench.decision.v2"
+    assert sidecar.schema_version == SchemaVersion.DECISION
     assert sidecar.status == expected_status
     assert sidecar.authority == "diagnostic"
 

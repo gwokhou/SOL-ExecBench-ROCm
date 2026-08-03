@@ -17,7 +17,7 @@ from sol_execbench.core.dataset.aka_corpus import (
 )
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.integrity.schema_versions import (
-    OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.scoring.official_scoring_models import (
     OfficialScoreAvailability,
@@ -26,7 +26,7 @@ from sol_execbench.core.scoring.official_scoring_models import (
 from sol_execbench.core.solar_bridge.analyzer import formal_producer_readiness
 
 OFFICIAL_CORPUS_MANIFEST_SHA256 = (
-    "bd7db085ae3b462d9427e2f3ac25e7ed3a99efd0569bf2ea4eaedd485392f0b6"
+    "3f69181a39509ee588d1de666786188d5e97ec1eba40031bd24293bb3b76ecde"
 )
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 _PUBLISHED_RELEASE_BUNDLE = _REPOSITORY_ROOT / "RELEASE" / "release-bundle.json"
@@ -64,7 +64,7 @@ def official_score_availability(
     producer_ready, producer_reason = formal_producer_readiness()
     release_published = _PUBLISHED_RELEASE_BUNDLE.is_file()
     report = {
-        "schema_version": OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.OFFICIAL_SCORE_AVAILABILITY,
         "corpus_manifest_sha256": observed_manifest_sha256,
         "trusted_corpus_manifest_sha256": OFFICIAL_CORPUS_MANIFEST_SHA256,
         "verifier": {

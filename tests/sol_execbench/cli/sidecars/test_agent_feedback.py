@@ -20,6 +20,7 @@ from sol_execbench.core.data.trace import (
     Trace,
 )
 from sol_execbench.core.data.workload import ScalarInput, Workload
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _solution(source: str = "def run(x):\n    return x\n") -> Solution:
@@ -92,7 +93,7 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.agent-feedback.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == "sol_execbench.agent_feedback.v7"
+    assert payload["schema_version"] == SchemaVersion.AGENT_FEEDBACK
     assert payload["authority"] == "diagnostic"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["target_id"] == "gemm"

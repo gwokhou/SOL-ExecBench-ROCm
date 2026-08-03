@@ -8,6 +8,7 @@ from typing import Self
 from sol_execbench.cli import evaluation as cli_evaluation
 from sol_execbench.cli.evaluation.command import ProfileLifecycle
 from sol_execbench.core.bench.clock_lock import ClockLockLease
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 class _FakeClockLease(ClockLockLease):
@@ -257,10 +258,7 @@ def test_no_trace_diagnostics_sidecar_records_bounded_failure_output(
     assert written == tmp_path / "traces.jsonl.no-trace-diagnostics.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert (
-        payload["schema_version"]
-        == cli_evaluation.NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION
-    )
+    assert payload["schema_version"] == SchemaVersion.NO_TRACE_DIAGNOSTICS
     assert payload["diagnostic_only"] is True
     assert payload["canonical_trace_jsonl"] is False
     assert payload["reason"] == "no_parseable_traces"

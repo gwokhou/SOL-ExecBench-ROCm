@@ -12,7 +12,7 @@ from solar.rocm.architecture import (
     resource_peak_payload_sha256,
     verify_resource_peak_audit,
 )
-from solar.schema_versions import RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION
+from solar.schema_versions import SchemaVersion as SolarSchemaVersion
 
 _EXPECTED_PRECISIONS = ("fp16",)
 _EXPECTED_RESOURCE_MODES = ("valu/fp16",)
@@ -219,7 +219,7 @@ def _add_tuning_evidence(payload: dict) -> None:
 
 def _payload() -> dict:
     payload = {
-        "schema_version": RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
+        "schema_version": SolarSchemaVersion.RESOURCE_PEAK_CALIBRATION.value,
         "timing_profile": RESOURCE_PEAK_TIMING_PROFILE,
         "device": {
             "device_name": "AMD Radeon RX 9060 XT",
@@ -311,7 +311,9 @@ def _verify(
     return verify_resource_peak_audit(
         path,
         expected_sha256=digest,
-        expected_schema_version=RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
+        expected_schema_version=(
+            SolarSchemaVersion.RESOURCE_PEAK_CALIBRATION.value
+        ),
         expected_timing_profile=RESOURCE_PEAK_TIMING_PROFILE,
         expected_clocks_locked=True,
         expected_unthrottled=expected_unthrottled,
