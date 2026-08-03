@@ -53,6 +53,7 @@ def _run_probe(args: argparse.Namespace) -> None:
         service = ReferenceService(
             args.problem_dir,
             device=args.device,
+            input_nonce="0" * 64,
             definition_path=args.problem_dir / "definition.json",
         )
         if not 0 <= args.row_index < len(service.workloads):

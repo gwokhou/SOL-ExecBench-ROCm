@@ -44,7 +44,7 @@ def _identity() -> CalibrationIdentity:
 
 def _model_identity() -> DiagnosticModelIdentity:
     return DiagnosticModelIdentity(
-        model_version="gfx1200_diagnostic.v6",
+        model_version="gfx1200_diagnostic.v7",
         policy_files={"policy.py": "d" * 64},
         counter_semantics_sha256="e" * 64,
         policy_bundle_sha256="f" * 64,

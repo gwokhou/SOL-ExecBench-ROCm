@@ -51,5 +51,5 @@
       "dtype": "float32"
     }
   },
-  "reference": "import torch.nn.functional as F\n\n\ndef run(input, target, temperature):\n    log_p = F.log_softmax(input / temperature, dim=1)\n    return (\n        F.kl_div(log_p, target, reduction=\"sum\")\n        * (temperature * temperature)\n        / input.size(0)\n    )\n"
+  "reference": "import torch.nn.functional as F\n\n\ndef run(input, target, temperature):  # noqa: A002 - benchmark ABI\n    log_p = F.log_softmax(input / temperature, dim=1)\n    return (\n        F.kl_div(log_p, target, reduction=\"sum\")\n        * (temperature * temperature)\n        / input.size(0)\n    )\n"
 }

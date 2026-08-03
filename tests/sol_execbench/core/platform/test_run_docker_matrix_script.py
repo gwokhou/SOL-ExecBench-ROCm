@@ -352,8 +352,11 @@ def test_run_docker_default_build_preview_uses_rocm_7_2_build_args() -> None:
     assert "--device=/dev/kfd" in completed.stdout
     assert "--device=/dev/dri" in completed.stdout
     assert "--group-add video" in completed.stdout
-    assert "--security-opt seccomp=unconfined" in completed.stdout
-    assert "--ipc=host" in completed.stdout
+    assert "--security-opt no-new-privileges=true" in completed.stdout
+    assert "--security-opt seccomp=unconfined" not in completed.stdout
+    assert "--pids-limit=512" in completed.stdout
+    assert "--ipc=private" in completed.stdout
+    assert "--shm-size=8g" in completed.stdout
     assert "--privileged" not in completed.stdout
 
 

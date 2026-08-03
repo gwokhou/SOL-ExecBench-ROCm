@@ -124,7 +124,7 @@ suites:
 
 ### Provenance binding note (Cat2)
 
-Manifest schema v6 gives every entry exactly three typed, content-addressed
+Manifest schema v7 gives every entry exactly three typed, content-addressed
 `aka_artifacts`: `config`, `semantic_reference`, and `correctness_runner`.
 `audit_aka_provenance` resolves and verifies all three roles at the pinned AKA
 revision for torch2hip, instruction2triton, and torch2flydsl alike. The latter

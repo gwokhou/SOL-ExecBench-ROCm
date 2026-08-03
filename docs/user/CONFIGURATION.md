@@ -16,7 +16,7 @@ options follow it.
 
 ```json
 {
-  "schema_version": "sol_execbench.benchmark_config.v1",
+  "schema_version": "sol_execbench.benchmark_config.v2",
   "warmup_runs": 10,
   "iterations": 50,
   "trials": 3,

@@ -93,7 +93,7 @@ class PerformanceTimingEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     model_config = _MODEL_CONFIG
     current_schema_version = PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.performance_timing_evidence.v2"] = (
+    schema_version: Literal["sol_execbench.performance_timing_evidence.v3"] = (
         PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION
     )
     run_id: SHA256Digest

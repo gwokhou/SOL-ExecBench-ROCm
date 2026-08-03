@@ -59,6 +59,7 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
     first_inside = threading.Event()
     second_attempted = threading.Event()
     observed: list[str | None] = []
+    observed_nonces: list[str] = []
 
     @contextmanager
     def fake_gpu_lock(**kwargs):
@@ -74,6 +75,7 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
             observed.append(
                 os.environ.get("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"),
             )
+            observed_nonces.append(os.environ["SOL_EXECBENCH_INPUT_NONCE"])
             first_inside.set()
             assert second_attempted.wait(timeout=2)
 
@@ -82,6 +84,7 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
             observed.append(
                 os.environ.get("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"),
             )
+            observed_nonces.append(os.environ["SOL_EXECBENCH_INPUT_NONCE"])
 
     first = threading.Thread(target=evaluate_first, name="first")
     second = threading.Thread(target=evaluate_second, name="second")
@@ -92,5 +95,8 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
     second.join(timeout=2)
 
     assert observed == ["1", "1"]
+    assert len(set(observed_nonces)) == 2
+    assert all(len(value) == 64 for value in observed_nonces)
     assert "SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION" not in os.environ
     assert "SOL_EXECBENCH_DEVICE" not in os.environ
+    assert "SOL_EXECBENCH_INPUT_NONCE" not in os.environ

@@ -112,7 +112,7 @@ def test_agent_feedback_sidecar_model_defaults_remain_stable() -> None:
 
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == "sol_execbench.agent_feedback.v6"
+    assert payload["schema_version"] == "sol_execbench.agent_feedback.v7"
     assert payload["authority"] == "diagnostic"
     assert payload["items"] == []
     assert payload["limitations"] == []

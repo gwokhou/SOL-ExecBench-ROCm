@@ -12,19 +12,19 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Final, Literal
 
-AKA_CORPUS_MANIFEST_SCHEMA_VERSION: Final = 6
+AKA_CORPUS_MANIFEST_SCHEMA_VERSION: Final = 7
 AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION: Final = 2
-AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION: Final = 2
+AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION: Final = 3
 COVERAGE_POLICY_SCHEMA_VERSION: Final = 1
 
-AGENT_FEEDBACK_SCHEMA_VERSION: Final = "sol_execbench.agent_feedback.v6"
+AGENT_FEEDBACK_SCHEMA_VERSION: Final = "sol_execbench.agent_feedback.v7"
 AMD_ISA_RELEASE_LOCK_SCHEMA_VERSION: Final = (
     "sol_execbench.amd_isa_release_lock.v1"
 )
 ARCH_CAPABILITY_BUDGET_SCHEMA_VERSION: Final = (
     "sol_execbench.arch_capability_budget.v1"
 )
-BENCHMARK_CONFIG_SCHEMA_VERSION: Final = "sol_execbench.benchmark_config.v1"
+BENCHMARK_CONFIG_SCHEMA_VERSION: Final = "sol_execbench.benchmark_config.v2"
 CLI_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.cli_contract.v1"
 CLI_RESPONSE_SCHEMA_VERSION: Final = "sol_execbench.cli_response.v1"
 DATASET_PROVENANCE_POLICY_SCHEMA_VERSION: Final = (
@@ -42,19 +42,19 @@ DERIVED_EVIDENCE_SCHEMA_VERSION: Final = "sol_execbench.derived_evidence.v1"
 SOLUTION_SCHEMA_VERSION: Final = "sol_execbench.solution.v1"
 SOLAR_WORKER_IPC_SCHEMA_VERSION: Final = "sol_execbench.solar_worker_ipc.v1"
 TRACE_SCHEMA_VERSION: Final = "sol_execbench.trace.v1"
-WORKLOAD_SCHEMA_VERSION: Final = "sol_execbench.workload.v1"
+WORKLOAD_SCHEMA_VERSION: Final = "sol_execbench.workload.v2"
 PROFILE_SUMMARY_SCHEMA_VERSION: Final = "sol_execbench.profile_summary.v3"
 PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION: Final = (
-    "sol_execbench.performance_diagnostic.v6"
+    "sol_execbench.performance_diagnostic.v7"
 )
 PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION: Final = (
-    "sol_execbench.performance_evidence_manifest.v4"
+    "sol_execbench.performance_evidence_manifest.v5"
 )
 PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION: Final = (
-    "sol_execbench.performance_timing_evidence.v2"
+    "sol_execbench.performance_timing_evidence.v3"
 )
 PERFORMANCE_REPLAY_EVIDENCE_SCHEMA_VERSION: Final = (
-    "sol_execbench.performance_replay_evidence.v3"
+    "sol_execbench.performance_replay_evidence.v4"
 )
 PERFORMANCE_ACCESS_EVIDENCE_SCHEMA_VERSION: Final = (
     "sol_execbench.performance_access_evidence.v1"
@@ -63,19 +63,19 @@ PERFORMANCE_SCHEDULE_EVIDENCE_SCHEMA_VERSION: Final = (
     "sol_execbench.performance_schedule_evidence.v1"
 )
 DIAGNOSTIC_ACCEPTANCE_SCHEMA_VERSION: Final = (
-    "sol_execbench.diagnostic_acceptance.v5"
+    "sol_execbench.diagnostic_acceptance.v6"
 )
 DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION: Final = (
-    "sol_execbench.diagnostic_calibration.v6"
+    "sol_execbench.diagnostic_calibration.v7"
 )
 DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION: Final = (
-    "sol_execbench.diagnostic_calibration_audit.v6"
+    "sol_execbench.diagnostic_calibration_audit.v7"
 )
 DIAGNOSTIC_INFERENCE_PROFILE_SCHEMA_VERSION: Final = (
-    "sol_execbench.diagnostic_inference_profile.v8"
+    "sol_execbench.diagnostic_inference_profile.v9"
 )
 DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION: Final = (
-    "sol_execbench.diagnostic_validation_corpus.v5"
+    "sol_execbench.diagnostic_validation_corpus.v6"
 )
 DOCKER_PREFLIGHT_SCHEMA_VERSION: Final = "sol_execbench.docker_preflight.v1"
 ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
@@ -84,7 +84,7 @@ ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION: Final = (
 ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION: Final = (
     "sol_execbench.environment_snapshot.v2"
 )
-EVALUATOR_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.evaluator_contract.v5"
+EVALUATOR_CONTRACT_SCHEMA_VERSION: Final = "sol_execbench.evaluator_contract.v6"
 GPU_DEVICE_ISOLATION_SCHEMA_VERSION: Final = (
     "sol_execbench.gpu_device_isolation.v1"
 )
@@ -94,7 +94,7 @@ NO_TRACE_DIAGNOSTICS_SCHEMA_VERSION: Final = (
 OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION: Final = (
     "sol_execbench.official_score_availability.v3"
 )
-REFERENCE_IPC_SCHEMA_VERSION: Final = "sol_execbench.reference_ipc.v1"
+REFERENCE_IPC_SCHEMA_VERSION: Final = "sol_execbench.reference_ipc.v2"
 ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION: Final = (
     "sol_execbench.rocm_compatibility_matrix.v1"
 )
@@ -138,10 +138,10 @@ ROCM_DOCKER_TARGETS_SCHEMA_VERSION: Final = (
     "sol_execbench.rocm_docker_targets.v1"
 )
 ROCM_EVENT_TIMING_CUSTOM_SCHEMA_VERSION: Final = (
-    "sol_execbench.rocm_event_timing.custom.v3"
+    "sol_execbench.rocm_event_timing.custom.v4"
 )
 ROCM_EVENT_TIMING_PAPER_COUNTS_SCHEMA_VERSION: Final = (
-    "sol_execbench.rocm_event_timing.paper_counts.v3"
+    "sol_execbench.rocm_event_timing.paper_counts.v4"
 )
 STATIC_ARTIFACT_MANIFEST_SCHEMA_VERSION: Final = (
     "sol_execbench.static_artifact_manifest.v1"
@@ -227,7 +227,7 @@ SCHEMA_VERSIONS: Final[Mapping[str, str]] = MappingProxyType(
     }
 )
 
-type AgentFeedbackSchemaVersion = Literal["sol_execbench.agent_feedback.v6"]
+type AgentFeedbackSchemaVersion = Literal["sol_execbench.agent_feedback.v7"]
 type DecisionSchemaVersion = Literal["sol_execbench.decision.v2"]
 type ProfileSummarySchemaVersion = Literal["sol_execbench.profile_summary.v3"]
 

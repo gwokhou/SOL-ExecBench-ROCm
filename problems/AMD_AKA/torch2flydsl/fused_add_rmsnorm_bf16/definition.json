@@ -55,5 +55,5 @@
       "dtype": "bfloat16"
     }
   },
-  "reference": "import torch\n\n\ndef run(input, weight, residual, eps):\n    residual_out = input + residual\n    value = residual_out.float()\n    rstd = torch.rsqrt(value.pow(2).mean(-1, keepdim=True) + eps)\n    output = value * rstd * weight.float()\n    return output.to(input.dtype), residual_out.to(input.dtype)\n"
+  "reference": "import torch\n\n\ndef run(input, weight, residual, eps):  # noqa: A002 - benchmark ABI\n    residual_out = input + residual\n    value = residual_out.float()\n    rstd = torch.rsqrt(value.pow(2).mean(-1, keepdim=True) + eps)\n    output = value * rstd * weight.float()\n    return output.to(input.dtype), residual_out.to(input.dtype)\n"
 }

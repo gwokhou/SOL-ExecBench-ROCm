@@ -38,7 +38,7 @@ CALIBRATION_METHOD = "repeated_reference_runs"
 DEFAULT_MARGIN = 1.25
 DEFAULT_SEED_COUNT = 3
 DEFAULT_REPEATS_PER_SEED = 3
-_REQUIRED_MATCHED_RATIO = 0.99
+_REQUIRED_MATCHED_RATIO = 1.0
 _MIN_ATOL_FLOOR = 1e-9
 
 # Floors bound the candidate/reference comparison when a deterministic reference

@@ -26,7 +26,7 @@ class BenchmarkConfig(CurrentSchemaModel):
 
     current_schema_version = BENCHMARK_CONFIG_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.benchmark_config.v1"] = (
+    schema_version: Literal["sol_execbench.benchmark_config.v2"] = (
         BENCHMARK_CONFIG_SCHEMA_VERSION
     )
     warmup_runs: int = Field(default=10, ge=0)

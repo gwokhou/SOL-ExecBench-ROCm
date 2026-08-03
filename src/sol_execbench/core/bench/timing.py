@@ -26,6 +26,7 @@ import torch
 
 from sol_execbench.core.bench.io import ShiftingMemoryPoolAllocator
 from sol_execbench.core.bench.reward_hack import RewardHackError
+from sol_execbench.core.bench.timing_contracts import TimingCallbacks
 from sol_execbench.core.platform.runtime import (
     CacheClearPolicy,
     cache_clear_policy_for_device,
@@ -155,8 +156,10 @@ def bench_time_with_device_events(
     for _ in range(warmup):
         args = setup()
         _clear_cache(cache)
-        fn(args)
+        result = fn(args)
         _assert_timing_device_unchanged(target_device_index)
+        if validator is not None:
+            validator(args, result)
     torch.cuda.synchronize()
 
     times: list[float] = []
@@ -192,7 +195,7 @@ def time_runnable(
     min_measurement_time_seconds: float | None = None,
     return_mode: Literal["mean", "median", "all"] = "mean",
     methodology: Literal["events"] = "events",
-    validator: Callable[[list[Any], Any], None] | None = None,
+    callbacks: TimingCallbacks | None = None,
     cache_clear_policy: CacheClearPolicy | None = None,
 ) -> float | list[float]:
     """Time a callable using ROCm-compatible PyTorch device events.
@@ -202,8 +205,15 @@ def time_runnable(
     Allocator setup time is excluded from measurements, and tensors are
     pre-allocated before the benchmark loop.
     """
-    total_iterations = warmup + rep
-    allocator = ShiftingMemoryPoolAllocator(inputs, outputs, total_iterations)
+    setup = callbacks.argument_provider if callbacks is not None else None
+    if setup is None:
+        total_iterations = warmup + rep
+        allocator = ShiftingMemoryPoolAllocator(
+            inputs,
+            outputs,
+            total_iterations,
+        )
+        setup = allocator.get_unique_args
     with torch.cuda.device(device):
         if methodology != "events":
             raise ValueError(f"Unknown timing methodology: {methodology}")
@@ -211,10 +221,10 @@ def time_runnable(
             fn=lambda args: fn(*args),
             warmup=warmup,
             rep=rep,
-            setup=allocator.get_unique_args,
+            setup=setup,
             device=device,
             min_measurement_time_seconds=min_measurement_time_seconds,
-            validator=validator,
+            validator=callbacks.validator if callbacks is not None else None,
             cache_clear_policy=cache_clear_policy,
         )
         if not times:

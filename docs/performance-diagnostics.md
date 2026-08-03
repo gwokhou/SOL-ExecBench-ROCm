@@ -50,7 +50,7 @@ ROCm 7.2 containers set `ROCPROF_TMPDIR=/tmp`. This avoids the upstream
 rocprofv3 ring-buffer failure caused by constructing profiler temporary paths
 from an unsuitable container working directory.
 
-## Freeze inference and build the v6 diagnostic
+## Freeze inference and build the v7 diagnostic
 
 Development and held-out corpora contain only labels and content-addressed
 evidence/SOLAR references. They cannot contain supplied predictions. For each
@@ -127,8 +127,8 @@ counter-pass misalignment, missing queue identity, or unverified overlap scope p
 `partial`/`unavailable` reason codes. No representative shape, achieved-rate,
 profiler-duration, or measured-runtime fallback is permitted.
 
-The output contract is `sol_execbench.performance_diagnostic.v6` using model
-`gfx1200_diagnostic.v6`. It contains `T_pred(IR)`, `T_pred(HW)`, the canonical
+The output contract is `sol_execbench.performance_diagnostic.v7` using model
+`gfx1200_diagnostic.v7`. It contains `T_pred(IR)`, `T_pred(HW)`, the canonical
 measured confidence interval, optional trusted frontier, uncertainty-aware
 `L/C/R`, bounded attribution, and stable action codes.
 
@@ -142,13 +142,21 @@ sol-execbench --format json diagnostics agent-feedback \
   --performance-diagnostic TRACE.performance-diagnostic.json \
   --evidence-manifest TRACE.jsonl.performance-evidence.json \
   --acceptance ACCEPTANCE.json \
+  --acceptance-manifest ACCEPTANCE-MANIFEST.json \
+  --development-corpus DEVELOPMENT.json \
+  --held-out-corpus HELD_OUT.json \
+  --calibration-profile CALIBRATION.json \
+  --inference-profile INFERENCE.json \
   --output TRACE.performance-agent-feedback.json
 ```
 
 Partial diagnostics may only produce reprofile/model-gap actions. They cannot
 request a kernel change. If `--acceptance` is omitted, or a matching report
 records a failed verdict, the output is still generated but contains only
-those safe actions. Identity or hash mismatch is an input error.
+those safe actions. Supplying `--acceptance` requires all five source inputs;
+the command rebuilds every held-out case from the cited corpus evidence and
+rejects any measurement, prediction, action, identity, or aggregate drift.
+Identity or hash mismatch is an input error.
 
 ## Calibration and acceptance
 
@@ -190,7 +198,7 @@ content-addressed case from each supported family. Set
 ```json
 {
   "schema_version": "diagnostic_smoke_test.v1",
-  "calibration_profile": "calibration/gfx1200-diagnostic-v6.json",
+  "calibration_profile": "calibration/gfx1200-diagnostic-v7.json",
   "cases": [
     {
       "workload_kind": "elementwise",

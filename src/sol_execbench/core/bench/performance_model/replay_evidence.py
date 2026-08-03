@@ -101,7 +101,7 @@ class PerformanceReplayEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     model_config = _CONFIG
     current_schema_version = PERFORMANCE_REPLAY_EVIDENCE_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.performance_replay_evidence.v3"] = (
+    schema_version: Literal["sol_execbench.performance_replay_evidence.v4"] = (
         PERFORMANCE_REPLAY_EVIDENCE_SCHEMA_VERSION
     )
     status: DiagnosticSidecarStatus

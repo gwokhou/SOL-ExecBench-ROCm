@@ -111,6 +111,49 @@ def test_collect_static_isa_analysis_is_soft_when_tooling_is_unavailable(
     assert generated == []
 
 
+def test_collect_static_isa_analysis_preserves_identity_when_decode_unavailable(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    binary = tmp_path / "kernel.bin"
+    binary.write_bytes(b"binary")
+    code_object = tmp_path / "kernel.hsaco"
+    code_object.write_bytes(b"hsaco")
+    extracted = ExtractedCodeObject(
+        architecture="gfx1200",
+        path=code_object,
+        sha256="a" * 64,
+        disassembly="v_add_f32 v0, v1, v2",
+        disassembly_sha256="b" * 64,
+    )
+    monkeypatch.setattr(
+        "sol_execbench.core.bench.static_kernel.isa_analysis.extract_code_object",
+        lambda *_, **__: extracted,
+    )
+    monkeypatch.setattr(
+        "sol_execbench.core.bench.static_kernel.isa_analysis.analyze_isa_disassembly",
+        lambda *_, **__: (_ for _ in ()).throw(
+            RuntimeError("offline ISA specification unavailable")
+        ),
+    )
+
+    analyses, tool_runs, generated = collect_static_isa_analyses(
+        artifacts=[_artifact(binary)],
+        evidence_root=tmp_path / "evidence",
+        sidecar_base=tmp_path,
+        timeout_seconds=30.0,
+    )
+
+    assert analyses[0].status == StaticKernelEvidenceStatus.UNAVAILABLE
+    assert analyses[0].code_object_sha256 == "a" * 64
+    assert analyses[0].disassembly_sha256 == "b" * 64
+    assert tool_runs[0].status == StaticKernelEvidenceStatus.UNAVAILABLE
+    assert {item.artifact_type for item in generated} == {
+        "code_object",
+        "isa_disassembly",
+    }
+
+
 def test_collect_static_isa_analysis_rejects_unsafe_target_path(
     tmp_path,
 ) -> None:

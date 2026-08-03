@@ -123,8 +123,11 @@ requires the native Linux Docker daemon. It runs containers with:
 - `--device=/dev/kfd`
 - `--device=/dev/dri`
 - `--group-add video`
-- `--security-opt seccomp=unconfined`
-- `--ipc=host`
+- `--network=none` and `--cap-drop=ALL`
+- the Docker default seccomp policy plus
+  `--security-opt no-new-privileges=true`
+- private IPC with an 8 GiB shared-memory allocation
+- a 512-process/container PID ceiling
 
 The default declared target is based on
 `rocm/dev-ubuntu-24.04:7.2-complete` and builds the local image as

@@ -8,24 +8,27 @@ from __future__ import annotations
 import os
 import statistics
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import torch
 
-from sol_execbench.core.bench.correctness import check_output_shape_dtype
 from sol_execbench.core.bench.eval_runtime import TimingResult, measure_latency
 from sol_execbench.core.bench.evaluation_requests import (
     WorkloadEvaluationRequest,
 )
 from sol_execbench.core.bench.io import allocate_outputs, normalize_outputs
-from sol_execbench.core.bench.output_checks import compare_output_checks
 from sol_execbench.core.bench.performance_model.replay_evidence import (
     REPLAY_EVIDENCE_ITERATIONS,
     REPLAY_WARMUP_RUNS,
 )
+from sol_execbench.core.bench.reference_protocol import (
+    ReferenceExecutionError,
+    ReferenceTimingCase,
+)
 from sol_execbench.core.bench.reward_hack import RewardHackError
 from sol_execbench.core.bench.roctx_control import ROCTxReplayController
+from sol_execbench.core.bench.timing_contracts import TimingCallbacks
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.platform.runtime import (
     CacheClearPolicy,
@@ -52,21 +55,21 @@ class SolutionTimingResult:
         return counts.pop() if len(counts) == 1 else 0
 
 
+@dataclass
+class _TimedReferenceState:
+    """Reference material bound to the current candidate invocation."""
+
+    inputs: list[Any] = field(default_factory=list)
+
+
 def measure_solution_latency(
     *,
     request: WorkloadEvaluationRequest,
     workload: Workload,
+    row_index: int,
     resolved_axes: dict[str, int],
-    inputs: list[Any],
-    expected_outputs: list[torch.Tensor],
 ) -> SolutionTimingResult:
     """Measure all paper trials and validate every timed invocation's output."""
-    validator = _build_timed_output_validator(
-        request=request,
-        workload=workload,
-        inputs=inputs,
-        expected=expected_outputs,
-    )
     cache_policy = (
         cache_clear_policy_for_device(request.device)
         if request.device.split(":", maxsplit=1)[0] == "cuda"
@@ -75,17 +78,30 @@ def measure_solution_latency(
     replay = _counter_replay_enabled()
     trial_count = 1 if replay else request.bench_config.trials
     trial_kwargs = {"workload": workload} if replay else {}
-    trials = [
-        _measure_solution_trial(
-            request,
-            resolved_axes,
-            inputs,
-            validator,
-            cache_policy,
-            **trial_kwargs,
+    trials: list[TimingResult] = []
+    for trial_index in range(trial_count):
+        state = _TimedReferenceState()
+        provider = _build_iteration_provider(
+            request=request,
+            workload=workload,
+            row_index=row_index,
+            trial_index=trial_index,
+            resolved_axes=resolved_axes,
+            state=state,
         )
-        for _ in range(trial_count)
-    ]
+        validator = _build_timed_output_validator(
+            request=request,
+            state=state,
+        )
+        trials.append(
+            _measure_solution_trial(
+                request,
+                provider,
+                validator,
+                cache_policy,
+                **trial_kwargs,
+            )
+        )
     return SolutionTimingResult(
         latency_ms=statistics.mean(trial.latency_ms for trial in trials),
         timed_iterations_per_trial=tuple(
@@ -96,20 +112,58 @@ def measure_solution_latency(
     )
 
 
+def _build_iteration_provider(
+    *,
+    request: WorkloadEvaluationRequest,
+    workload: Workload,
+    row_index: int,
+    trial_index: int,
+    resolved_axes: dict[str, int],
+    state: _TimedReferenceState,
+) -> Callable[[], list[Any]]:
+    invocation = 0
+    input_hashes: set[str] = set()
+
+    def provide() -> list[Any]:
+        nonlocal invocation
+        case: ReferenceTimingCase = (
+            request.dependencies.reference_client.timing_iteration_case(
+                workload_uuid=workload.uuid,
+                row_index=row_index,
+                trial_index=trial_index,
+                iteration_index=invocation,
+            )
+        )
+        invocation += 1
+        if case.input_sha256 in input_hashes:
+            raise RewardHackError(
+                "timing protocol requires unique input values for every "
+                "candidate invocation",
+            )
+        input_hashes.add(case.input_sha256)
+        state.inputs = case.inputs
+        if case.outputs:
+            raise RewardHackError(
+                "trusted worker disclosed timing reference outputs",
+            )
+        outputs = (
+            allocate_outputs(request.definition, resolved_axes, request.device)
+            if request.destination_passing_style
+            else []
+        )
+        return [*case.inputs, *outputs]
+
+    return provide
+
+
 def _measure_solution_trial(
     request: WorkloadEvaluationRequest,
-    resolved_axes: dict[str, int],
-    inputs: list[Any],
+    argument_provider: Callable[[], list[Any]],
     validator: Callable[[list[Any], Any], None],
     cache_clear_policy: CacheClearPolicy | None = None,
     *,
     workload: Workload | None = None,
 ) -> TimingResult:
-    outputs = (
-        allocate_outputs(request.definition, resolved_axes, request.device)
-        if request.destination_passing_style
-        else []
-    )
     config = request.bench_config
     replay = _counter_replay_enabled()
     if replay and workload is None:
@@ -123,22 +177,66 @@ def _measure_solution_trial(
         if replay
         else request.dependencies.user_fn
     )
+    timed_fn = _device_guarded_callable(request, timed_fn)
     timing = measure_latency(
         timed_fn,
-        inputs,
-        outputs,
+        [],
+        [],
         request.device,
         warmup=REPLAY_WARMUP_RUNS if replay else config.warmup_runs,
         rep=REPLAY_EVIDENCE_ITERATIONS if replay else config.iterations,
         min_measurement_time_seconds=(
             None if replay else config.min_measurement_time_seconds
         ),
-        validator=validator,
+        callbacks=TimingCallbacks(
+            argument_provider=argument_provider,
+            validator=validator,
+        ),
         cache_clear_policy=cache_clear_policy,
     )
     if timing.failure is not None:
         raise RuntimeError(timing.failure)
     return timing
+
+
+def _device_guarded_callable(
+    request: WorkloadEvaluationRequest,
+    fn: Callable[..., Any],
+) -> Callable[..., Any]:
+    """Reject host-resident outputs before the timed invocation completes."""
+    if request.device.split(":", maxsplit=1)[0] != "cuda":
+        return fn
+    target = torch.device(request.device)
+
+    def run(*args: Any) -> Any:
+        result = fn(*args)
+        values = (
+            args[len(request.definition.inputs) :]
+            if request.destination_passing_style
+            else _result_tensors(result)
+        )
+        if not values or any(value.device != target for value in values):
+            raise RewardHackError(
+                "candidate outputs must reside on the timed GPU before "
+                "the end event",
+            )
+        return result
+
+    return run
+
+
+def _result_tensors(value: Any) -> list[torch.Tensor]:
+    if isinstance(value, torch.Tensor):
+        return [value]
+    if isinstance(value, dict):
+        return [
+            tensor
+            for item in value.values()
+            for tensor in _result_tensors(item)
+        ]
+    if isinstance(value, (list, tuple)):
+        return [tensor for item in value for tensor in _result_tensors(item)]
+    return []
 
 
 def replay_marker_ranges(workload_uuid: str) -> list[str]:
@@ -181,34 +279,23 @@ def _marked_replay_callable(
 def _build_timed_output_validator(
     *,
     request: WorkloadEvaluationRequest,
-    workload: Workload,
-    inputs: list[Any],
-    expected: list[torch.Tensor],
+    state: _TimedReferenceState,
 ) -> Callable[[list[Any], Any], None]:
     def validate(args: list[Any], result: Any) -> None:
         request.dependencies.check_integrity(
             request.dependencies.integrity_snapshot,
             request.dependencies.driver_globals,
         )
-        actual = _timed_outputs(request, inputs, args, result)
-        issue = check_output_shape_dtype(expected, actual)
-        if issue is not None:
-            raise RewardHackError(
-                f"timed invocation returned invalid output shape or dtype: {issue}",
+        actual = _timed_outputs(request, state.inputs, args, result)
+        try:
+            request.dependencies.reference_client.validate_timing_outputs(
+                actual,
             )
-        _, exceeds = compare_output_checks(
-            request.definition,
-            workload,
-            inputs,
-            expected,
-            actual,
-            0,
-        )
-        if exceeds:
+        except ReferenceExecutionError as exc:
             raise RewardHackError(
-                "timed invocation output differs from the reference; "
+                f"timed invocation failed trusted validation: {exc}; "
                 "correctness and timing phases must execute identical behavior",
-            )
+            ) from exc
 
     return validate
 

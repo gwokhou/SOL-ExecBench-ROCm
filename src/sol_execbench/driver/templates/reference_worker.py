@@ -15,6 +15,9 @@ from pathlib import Path
 import torch
 
 from sol_execbench.core.platform.runtime import pin_cuda_device
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_INPUT_NONCE,
+)
 from sol_execbench.driver.reference_runtime_api import (
     REFERENCE_REQUEST_FD_ENV,
     REFERENCE_RESPONSE_FD_ENV,
@@ -31,6 +34,7 @@ _device = os.environ.get(
 # device the candidate is timed on (device-b3 parity with the eval driver).
 pin_cuda_device(_device)
 _token = os.environ[REFERENCE_TOKEN_ENV]
+_input_nonce = os.environ.pop(ENV_SOL_EXECBENCH_INPUT_NONCE)
 _request_stream = Connection(
     int(os.environ[REFERENCE_REQUEST_FD_ENV]),
     readable=True,
@@ -48,6 +52,7 @@ try:
         request_stream=_request_stream,
         response_stream=_response_stream,
         token=_token,
+        input_nonce=_input_nonce,
         device=_device,
         ready_stream=sys.stdout,
     )

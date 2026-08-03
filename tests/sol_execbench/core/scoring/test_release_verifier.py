@@ -703,7 +703,7 @@ def _write_solar_artifacts(
                 "verification_seeds": [11, 29, 47],
                 "atol": 1e-2,
                 "rtol": 1e-2,
-                "required_matched_ratio": 0.99,
+                "required_matched_ratio": 1.0,
                 "max_error_cap": None,
                 "allow_negative_inf": False,
                 "preserved_input_indices": [],

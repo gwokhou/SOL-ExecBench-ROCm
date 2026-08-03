@@ -126,6 +126,23 @@ def receive_json(connection: Connection) -> dict[str, Any]:
     return value
 
 
+def _validate_success_header(header: dict[str, Any]) -> None:
+    if header.get("ok") is not True:
+        raw_kind = header.get("failure_kind")
+        try:
+            failure_kind = ReferenceFailureKind(raw_kind)
+        except (TypeError, ValueError) as exc:
+            raise ReferenceProtocolError(
+                "reference IPC failure category is invalid",
+            ) from exc
+        raise ReferenceExecutionError(
+            str(header.get("error") or "reference failed"),
+            kind=failure_kind,
+        )
+    if header.get("protocol") != PROTOCOL_VERSION:
+        raise ReferenceProtocolError("reference IPC protocol version mismatch")
+
+
 def _storage_span(tensor: torch.Tensor) -> int:
     if tensor.numel() == 0:
         return 0
@@ -284,20 +301,7 @@ def send_case(
 def receive_case(connection: Connection, *, device: str) -> ReferenceTimingCase:
     """Receive and validate one trusted reference response."""
     header = receive_json(connection)
-    if header.get("ok") is not True:
-        raw_kind = header.get("failure_kind")
-        try:
-            failure_kind = ReferenceFailureKind(raw_kind)
-        except (TypeError, ValueError) as exc:
-            raise ReferenceProtocolError(
-                "reference IPC failure category is invalid",
-            ) from exc
-        raise ReferenceExecutionError(
-            str(header.get("error") or "reference failed"),
-            kind=failure_kind,
-        )
-    if header.get("protocol") != PROTOCOL_VERSION:
-        raise ReferenceProtocolError("reference IPC protocol version mismatch")
+    _validate_success_header(header)
     expected_size = header.get("payload_bytes")
     if not isinstance(expected_size, int) or expected_size < 0:
         raise ReferenceProtocolError("reference IPC payload length is invalid")
@@ -422,6 +426,42 @@ class ReferenceClient:
             row_index=row_index,
             round_index=round_index,
         )
+
+    def timing_iteration_case(
+        self,
+        *,
+        workload_uuid: str,
+        row_index: int,
+        trial_index: int,
+        iteration_index: int,
+    ) -> ReferenceTimingCase:
+        """Request the unique input and reference for one timed invocation."""
+        return self._request(
+            "timing_iteration",
+            workload_uuid=workload_uuid,
+            row_index=row_index,
+            round_index=9,
+            trial_index=trial_index,
+            iteration_index=iteration_index,
+        )
+
+    def validate_timing_outputs(self, outputs: list[torch.Tensor]) -> None:
+        """Ask the trusted worker to validate one timed result once."""
+        if self._closed:
+            raise ReferenceProtocolError("reference IPC client is closed")
+        send_json(
+            self._writer,
+            {
+                "protocol": PROTOCOL_VERSION,
+                "token": self._token,
+                "operation": "timing_validation",
+            },
+        )
+        send_case(
+            self._writer,
+            ReferenceCase(inputs=[], outputs=outputs),
+        )
+        _validate_success_header(receive_json(self._reader))
 
     def _request(self, operation: str, **values: Any) -> ReferenceTimingCase:
         if self._closed:

@@ -8,6 +8,7 @@ import yaml
 from sol_execbench.core.bench.rocm_profiler.counters import (
     CounterPassCSV,
     build_rocprofv3_counter_command,
+    counter_dispatch_sequence_digest,
     parse_and_align_counter_passes,
     parse_available_architectures,
     parse_available_counters,
@@ -77,6 +78,27 @@ def test_counter_parser_invalidates_cross_pass_misalignment(
         "cross_pass_alignment_mismatch" in dispatch.reason_codes
         for dispatch in dispatches
     )
+
+
+def test_dispatch_digest_ignores_only_cross_queue_interleaving(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "first.csv"
+    interleaved = tmp_path / "interleaved.csv"
+    reordered = tmp_path / "reordered.csv"
+    rows = {
+        "a": "1,1,1,1024,kernel_a,64,SQ_WAVES,1,100,200,100\n",
+        "b": "2,2,2,1024,kernel_b,64,SQ_WAVES,1,100,200,100\n",
+        "c": "3,3,1,1024,kernel_c,64,SQ_WAVES,1,100,200,100\n",
+    }
+    first.write_text(_HEADER + rows["a"] + rows["b"] + rows["c"])
+    interleaved.write_text(_HEADER + rows["b"] + rows["a"] + rows["c"])
+    reordered.write_text(_HEADER + rows["c"] + rows["b"] + rows["a"])
+
+    digest = counter_dispatch_sequence_digest(first)
+
+    assert counter_dispatch_sequence_digest(interleaved) == digest
+    assert counter_dispatch_sequence_digest(reordered) != digest
 
 
 def test_availability_and_controlled_job_formats(tmp_path: Path) -> None:

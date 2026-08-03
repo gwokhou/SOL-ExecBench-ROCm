@@ -154,14 +154,16 @@ from error computation. Positions where only one tensor has `-inf` still fail.
     "mode": "elementwise",
     "max_atol": 1e-3,
     "max_rtol": 1e-3,
-    "required_matched_ratio": 0.95,
-    "max_error_cap": 0.1
+    "required_matched_ratio": 1.0,
+    "max_error_cap": null
   }
 ]
 ```
 
-Check parameters remain per-workload, so numerically challenging shapes can use
-different calibrated bounds without weakening unrelated outputs.
+Every numeric and code-distance check requires all elements to satisfy its
+bound. Check parameters remain per-workload, so numerically challenging shapes
+can use different calibrated `max_atol`/`max_rtol` values without creating an
+unbounded skipped-element allowance.
 
 ---
 
@@ -169,7 +171,7 @@ different calibrated bounds without weakening unrelated outputs.
 
 ```json
 {
-  "schema_version": "sol_execbench.workload.v1",
+  "schema_version": "sol_execbench.workload.v2",
   "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "axes": {"M": 1024},
   "inputs": {
@@ -186,7 +188,7 @@ different calibrated bounds without weakening unrelated outputs.
 
 ```json
 {
-  "schema_version": "sol_execbench.workload.v1",
+  "schema_version": "sol_execbench.workload.v2",
   "uuid": "6120f144-b973-4bd9-b884-77ecb132914e",
   "axes": {
     "B": 4,
@@ -209,7 +211,7 @@ different calibrated bounds without weakening unrelated outputs.
 
 ```json
 {
-  "schema_version": "sol_execbench.workload.v1",
+  "schema_version": "sol_execbench.workload.v2",
   "uuid": "deadbeef-0000-1111-2222-333344445555",
   "axes": {"T": 256},
   "inputs": {

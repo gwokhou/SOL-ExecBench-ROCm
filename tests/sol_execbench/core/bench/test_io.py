@@ -21,6 +21,7 @@ import pytest
 import torch
 from sol_execbench_type_helpers import make_definition, make_workload
 
+from sol_execbench.core.bench.custom_inputs import derive_custom_input_seed
 from sol_execbench.core.bench.io import (
     FLASHINFER_TRACE_ENV,
     CustomInputFailureClass,
@@ -48,6 +49,50 @@ def test_flashinfer_safetensors_env_preserves_user_root():
     env = flashinfer_safetensors_env({FLASHINFER_TRACE_ENV: "/custom/root"})
 
     assert env[FLASHINFER_TRACE_ENV] == "/custom/root"
+
+
+def test_per_run_nonce_blinds_custom_input_seed():
+    definition = make_definition(
+        name="seeded",
+        op_type="test",
+        axes={},
+        inputs={},
+        outputs={},
+        reference="def run():\n    return ()\n",
+    )
+    workload = make_workload(
+        uuid="seeded-workload",
+        axes={},
+        inputs={},
+    )
+    common = {
+        "row_index": 0,
+        "base_seed": 200,
+        "round_index": 9,
+    }
+
+    first = derive_custom_input_seed(
+        definition,
+        workload,
+        run_nonce="a" * 64,
+        **common,
+    )
+    second = derive_custom_input_seed(
+        definition,
+        workload,
+        run_nonce="b" * 64,
+        **common,
+    )
+    next_iteration = derive_custom_input_seed(
+        definition,
+        workload,
+        run_nonce="a" * 64,
+        variation_index=1,
+        **common,
+    )
+
+    assert first != second
+    assert first != next_iteration
 
 
 # ------------------------------------------------------------------

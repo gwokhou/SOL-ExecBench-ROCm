@@ -79,7 +79,7 @@ def test_rejects_non_current_tracked_numeric_artifact():
     assert findings == [
         (
             "problems/AMD_AKA/manifest.yaml: aka_corpus_manifest must contain "
-            "only schema version 6"
+            "only schema version 7"
         ),
     ]
 

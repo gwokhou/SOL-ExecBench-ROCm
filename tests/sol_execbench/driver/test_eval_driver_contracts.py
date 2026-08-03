@@ -37,6 +37,14 @@ def test_candidate_driver_never_loads_or_calls_reference_code():
     assert "reference_client=" in source
 
 
+def test_orchestrator_scrubs_reference_input_entropy_from_candidate():
+    source = (_TEMPLATES_DIR / "evaluation_orchestrator.py").read_text()
+
+    scrub = "_candidate_environment.pop(ENV_SOL_EXECBENCH_INPUT_NONCE, None)"
+    assert scrub in source
+    assert source.index(scrub) < source.index("os.execve(")
+
+
 def test_eval_driver_supports_profiler_graceful_exit_switch():
     source = _driver_source()
 

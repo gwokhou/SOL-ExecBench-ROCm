@@ -17,7 +17,7 @@ scores belonging to the same problem are averaged first. Those per-problem
 means are then averaged with equal problem weight. Problems flagged as
 compatibility sentinels never enter either denominator.
 
-The checked-in schema v6 corpus defines 43 scored problems and 163 scored
+The checked-in schema v7 corpus defines 43 scored problems and 163 scored
 workloads. The verifier accepts only a publisher release bundle that binds the
 canonical baseline run, candidate run, per-workload SOLAR manifests, public
 corpus, and architecture identities. It does not accept caller-supplied runtime
@@ -27,7 +27,7 @@ JSON.
 availability flag: verifier availability, corpus-policy authorization, formal
 producer readiness, and whether a repository release bundle is published. The
 verifier and formal producer are available, but the v2 baseline evidence has
-not been published. The schema v6 manifest therefore keeps policy authorization
+not been published. The schema v7 manifest therefore keeps policy authorization
 fail-closed with reason `baseline_v2_release_evidence_pending`.
 
 ## SOLAR bound policy

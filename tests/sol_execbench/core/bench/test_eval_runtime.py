@@ -10,6 +10,7 @@ import json
 import math
 import sys
 import types
+from collections.abc import Iterator
 from io import StringIO
 from pathlib import Path
 from typing import cast
@@ -38,6 +39,20 @@ from sol_execbench.core.data.solution import (
     SupportedLanguages,
 )
 from sol_execbench.core.data.trace import Trace
+
+
+@pytest.fixture(autouse=True)
+def _restore_cpp_extension_hooks() -> Iterator[None]:
+    """Keep GPU-server hook installation local to each runtime test."""
+    import torch.utils.cpp_extension as cpp_ext
+
+    original_load = cpp_ext.load
+    original_load_inline = cpp_ext.load_inline
+    try:
+        yield
+    finally:
+        cpp_ext.load = original_load
+        cpp_ext.load_inline = original_load_inline
 
 
 def _solution(

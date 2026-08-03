@@ -20,6 +20,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from sol_execbench.core.bench.reward_hack import RewardHackError
+from sol_execbench.core.bench.timing_contracts import TimingCallbacks
 from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES, Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.platform.runtime import CacheClearPolicy
@@ -51,21 +52,32 @@ def _cpu_time_runnable(
     warmup: int,
     rep: int,
     min_measurement_time_seconds: float | None,
-    validator: Callable[[list[Any], Any], None] | None,
+    callbacks: TimingCallbacks | None,
 ) -> TimingResult:
     from sol_execbench.core.bench.timing import clone_args
 
     for _ in range(warmup):
-        fn(*clone_args(inputs), *clone_args(outputs))
+        args = (
+            callbacks.argument_provider()
+            if callbacks is not None and callbacks.argument_provider is not None
+            else [*clone_args(inputs), *clone_args(outputs)]
+        )
+        result = fn(*args)
+        if callbacks is not None and callbacks.validator is not None:
+            callbacks.validator(args, result)
 
     samples: list[float] = []
     for _ in range(rep):
-        args = [*clone_args(inputs), *clone_args(outputs)]
+        args = (
+            callbacks.argument_provider()
+            if callbacks is not None and callbacks.argument_provider is not None
+            else [*clone_args(inputs), *clone_args(outputs)]
+        )
         start = time.perf_counter()
         result = fn(*args)
         samples.append(time.perf_counter() - start)
-        if validator is not None:
-            validator(args, result)
+        if callbacks is not None and callbacks.validator is not None:
+            callbacks.validator(args, result)
         if (
             min_measurement_time_seconds is not None
             and sum(samples) >= min_measurement_time_seconds
@@ -88,7 +100,7 @@ def measure_latency(
     rep: int,
     min_measurement_time_seconds: float | None = None,
     time_fn: Callable[..., Any] | None = None,
-    validator: Callable[[list[Any], Any], None] | None = None,
+    callbacks: TimingCallbacks | None = None,
     cache_clear_policy: CacheClearPolicy | None = None,
 ) -> TimingResult:
     """Measure callable latency with an opt-in CPU fallback for subprocess tests."""
@@ -105,7 +117,7 @@ def measure_latency(
                 warmup=warmup,
                 rep=rep,
                 min_measurement_time_seconds=min_measurement_time_seconds,
-                validator=validator,
+                callbacks=callbacks,
             )
 
         timer = _resolve_timer(time_fn, cache_clear_policy)
@@ -118,7 +130,7 @@ def measure_latency(
             warmup=warmup,
             rep=rep,
             min_measurement_time_seconds=min_measurement_time_seconds,
-            validator=validator,
+            callbacks=callbacks,
         )
         return _timing_result(latency_raw, rep, min_measurement_time_seconds)
     except RewardHackError:
@@ -148,7 +160,7 @@ def _run_timer(
     warmup: int,
     rep: int,
     min_measurement_time_seconds: float | None,
-    validator: Callable[[list[Any], Any], None] | None,
+    callbacks: TimingCallbacks | None,
 ) -> Any:
     options: dict[str, Any] = {
         "warmup": warmup,
@@ -156,8 +168,8 @@ def _run_timer(
         "min_measurement_time_seconds": min_measurement_time_seconds,
         "return_mode": "all",
     }
-    if validator is not None:
-        options["validator"] = validator
+    if callbacks is not None:
+        options["callbacks"] = callbacks
     return timer(fn, inputs, outputs, device, **options)
 
 

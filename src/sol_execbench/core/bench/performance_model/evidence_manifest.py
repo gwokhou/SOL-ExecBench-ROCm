@@ -87,7 +87,7 @@ class PerformanceEvidenceManifest(CurrentDiagnosticSidecarAuthority):
     current_schema_version = PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION
 
     schema_version: Literal[
-        "sol_execbench.performance_evidence_manifest.v4"
+        "sol_execbench.performance_evidence_manifest.v5"
     ] = PERFORMANCE_EVIDENCE_MANIFEST_SCHEMA_VERSION
     status: DiagnosticSidecarStatus
     identity: PerformanceRunIdentity

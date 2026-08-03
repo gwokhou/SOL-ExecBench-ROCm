@@ -67,7 +67,7 @@ class DiagnosticValidationCorpus(CurrentSchemaModel):
     model_config = _CONFIG
     current_schema_version = DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION
 
-    schema_version: Literal["sol_execbench.diagnostic_validation_corpus.v5"] = (
+    schema_version: Literal["sol_execbench.diagnostic_validation_corpus.v6"] = (
         DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION
     )
     role: Literal["development", "held_out"]
