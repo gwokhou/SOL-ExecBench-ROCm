@@ -422,11 +422,3 @@ def extract_amdgpu_targets(data: bytes) -> tuple[str, ...]:
         if match is not None:
             targets.add(match.split(":", maxsplit=1)[0])
     return tuple(sorted(targets))
-
-
-def _metadata_int(
-    kernel: Mapping[object, object],
-    key: str,
-) -> int | None:
-    value = kernel.get(key)
-    return value if isinstance(value, int) and value >= 0 else None
