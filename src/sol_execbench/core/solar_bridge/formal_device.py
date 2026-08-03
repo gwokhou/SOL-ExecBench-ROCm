@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+# Canonical architecture id passed to solar.api (no namespace prefix).
+# aka_corpus.FORMAL_ARCHITECTURE carries the manifest label "solar:RX_9060_XT";
+# the two are deliberately different views of the same target.
 FORMAL_ARCHITECTURE, FORMAL_GFX_TARGET = "RX_9060_XT", "gfx1200"
 
 

@@ -87,6 +87,9 @@ AKA_REVISION = "869228138e07e773b61dd7fc1d8cdc0435c7b405"
 AKA_LICENSE = "Apache-2.0"
 AKA_PROVENANCE_CLASS = "ecosystem_grounded"
 
+# Manifest label (with solar: namespace) compared against the corpus
+# manifest's architecture_profile; the canonical id without the prefix lives
+# in solar_bridge.formal_device.FORMAL_ARCHITECTURE.
 FORMAL_ARCHITECTURE = "solar:RX_9060_XT"
 FORMAL_GFX_TARGET = "gfx1200"
 FORMAL_ARCHITECTURE_SHA256 = (

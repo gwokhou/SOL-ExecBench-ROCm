@@ -7,10 +7,12 @@ from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarWorkerRequest,
 )
-
-__all__ = ["SolarAnalysisOutcome", "SolarWorkerRequest"]
 from sol_execbench.core.solar_bridge.performance import (
     load_semantic_characterization,
 )
 
-__all__ = ["load_semantic_characterization"]
+__all__ = [
+    "SolarAnalysisOutcome",
+    "SolarWorkerRequest",
+    "load_semantic_characterization",
+]
