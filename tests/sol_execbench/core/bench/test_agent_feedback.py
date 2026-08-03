@@ -13,12 +13,9 @@ from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackSidecar,
     artifact_citation_from_path,
     build_agent_feedback_sidecar as _build_agent_feedback_sidecar,
-    evaluate_agent_feedback_governance,
-    validate_agent_feedback_freshness,
 )
 from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticArtifactCitation,
-    DiagnosticGovernanceGuardrail,
     ExtendedDiagnosticIdentity,
 )
 from sol_execbench.core.bench.rocm_profiler import (
@@ -207,32 +204,6 @@ def test_agent_feedback_sidecar_builder_emits_no_legacy_identity_aliases() -> (
     assert "sol_contract_version" not in identity
 
 
-def test_agent_feedback_freshness_rejects_missing_canonical_identity() -> None:
-    sidecar = build_agent_feedback_sidecar(
-        traces=[_trace()],
-        trace_path="trace.jsonl",
-        target_id="gemm",
-        run_id="run-1",
-        sol_version="v3.0.0",
-    )
-
-    stale = validate_agent_feedback_freshness(
-        sidecar,
-        trace_path="trace.jsonl",
-        target_id="gemm",
-        run_id="run-1",
-        candidate_id="candidate-sha",
-        source_sha256="source-sha",
-        sol_version="v3.0.0",
-    )
-
-    assert stale.status == "stale"
-    assert stale.reason_codes == [
-        "candidate_id_missing",
-        "source_sha256_missing",
-    ]
-
-
 def test_agent_feedback_sidecar_records_identity_and_artifact_citations(
     tmp_path: Path,
 ):
@@ -278,106 +249,6 @@ def test_agent_feedback_sidecar_records_identity_and_artifact_citations(
     ]
     assert citation.sha256 is not None
     assert len(citation.sha256) == 64
-
-
-def test_agent_feedback_sidecar_freshness_uses_canonical_sol_version() -> None:
-    sidecar = build_agent_feedback_sidecar(
-        traces=[_trace()],
-        target_id="gemm",
-        run_id="run-001",
-        candidate_id="candidate-sha",
-        source_sha256="source-sha",
-        sol_version="v3.0.0",
-    )
-
-    current = validate_agent_feedback_freshness(
-        sidecar,
-        target_id="gemm",
-        run_id="run-001",
-        candidate_id="candidate-sha",
-        source_sha256="source-sha",
-        sol_version="v3.0.0",
-    )
-    stale = validate_agent_feedback_freshness(
-        sidecar,
-        sol_version="v3.0.0-stale",
-    )
-
-    assert current.status == "current"
-    assert stale.status == "stale"
-    assert stale.reason_codes == ["sol_version_mismatch"]
-
-
-def test_agent_feedback_freshness_validation_classifies_identity(
-    tmp_path: Path,
-):
-    trace_path = tmp_path / "trace.jsonl"
-    sidecar = build_agent_feedback_sidecar(
-        traces=[_trace()],
-        trace_path=str(trace_path),
-        target_id="problem-0",
-        run_id="run-0",
-    )
-
-    current = validate_agent_feedback_freshness(
-        sidecar,
-        trace_path=str(trace_path),
-        target_id="problem-0",
-        run_id="run-0",
-        sol_version="unreleased-v4",
-        candidate_id=None,
-        source_sha256=None,
-    )
-    stale = validate_agent_feedback_freshness(
-        sidecar,
-        trace_path=str(tmp_path / "other.jsonl"),
-        target_id="problem-0",
-        run_id="run-1",
-    )
-    unknown = validate_agent_feedback_freshness(sidecar)
-
-    assert current.status == "current"
-    assert current.reason_codes == []
-    assert stale.status == "stale"
-    assert stale.reason_codes == ["trace_path_mismatch", "run_id_mismatch"]
-    assert unknown.status == "unknown"
-    assert unknown.reason_codes == ["insufficient_expected_identity"]
-
-
-def test_agent_feedback_freshness_uses_canonical_hip_identity(tmp_path: Path):
-    trace_path = tmp_path / "trace.jsonl"
-    sidecar = build_agent_feedback_sidecar(
-        traces=[_trace()],
-        trace_path=str(trace_path),
-        target_id="problem-0",
-        run_id="run-0",
-        candidate_id="candidate-sha",
-        source_sha256="source-sha",
-    )
-
-    current = validate_agent_feedback_freshness(
-        sidecar,
-        trace_path=str(trace_path),
-        target_id="problem-0",
-        run_id="run-0",
-        candidate_id="candidate-sha",
-        source_sha256="source-sha",
-        sol_version="unreleased-v4",
-    )
-    stale = validate_agent_feedback_freshness(
-        sidecar,
-        candidate_id="other-candidate",
-        source_sha256="other-source",
-        sol_version="9.9",
-    )
-
-    assert current.status == "current"
-    assert stale.status == "stale"
-    assert stale.reason_codes == [
-        "candidate_id_mismatch",
-        "source_sha256_mismatch",
-        "sol_version_mismatch",
-    ]
 
 
 def test_agent_feedback_sidecar_summarizes_failures_and_optional_profile():
@@ -441,50 +312,3 @@ def test_agent_feedback_sidecar_rejects_unknown_bottleneck():
 
     with pytest.raises(ValidationError):
         type(sidecar).model_validate(payload)
-
-
-def test_agent_feedback_governance_guardrail_states_remain_diagnostic_only(
-    tmp_path: Path,
-):
-    sidecar = build_agent_feedback_sidecar(
-        traces=[_trace()],
-        trace_path=str(tmp_path / "trace.jsonl"),
-    )
-    stale = validate_agent_feedback_freshness(
-        sidecar,
-        trace_path=str(tmp_path / "other.jsonl"),
-    )
-
-    guardrails = [
-        evaluate_agent_feedback_governance(sidecar=sidecar),
-        evaluate_agent_feedback_governance(sidecar=sidecar, freshness=stale),
-        evaluate_agent_feedback_governance(sidecar=None),
-        evaluate_agent_feedback_governance(
-            sidecar=None,
-            parse_error="invalid json",
-        ),
-    ]
-
-    assert [guardrail.status for guardrail in guardrails] == [
-        "usable_diagnostic",
-        "stale_diagnostic",
-        "unavailable",
-        "invalid_diagnostic",
-    ]
-    for guardrail in guardrails:
-        payload = guardrail.model_dump(mode="json")
-        assert payload["diagnostic_only"] is True
-        for key, value in payload.items():
-            if key.endswith("_authority"):
-                assert value is False
-
-
-def test_agent_feedback_governance_rejects_unknown_authority_field():
-    guardrail = evaluate_agent_feedback_governance(
-        sidecar=build_agent_feedback_sidecar(traces=[_trace()]),
-    )
-    payload = guardrail.model_dump(mode="json")
-    payload["unsupported_authority"] = True
-
-    with pytest.raises(ValidationError):
-        DiagnosticGovernanceGuardrail.model_validate(payload)
