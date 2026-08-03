@@ -24,6 +24,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileStatus,
     Rocprofv3ReasonCode,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _profile_result(
@@ -118,7 +119,7 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     )
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == "sol_execbench.profile_summary.v3"
+    assert payload["schema_version"] == SchemaVersion.PROFILE_SUMMARY
     assert payload["status"] == "available"
     assert payload["reason_code"] == "profile_summary_generated"
     assert payload["identity"]["trace_path"] == "trace.jsonl"

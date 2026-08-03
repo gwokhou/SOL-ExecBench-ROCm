@@ -45,7 +45,7 @@ def build_decision_sidecar(
     """Build a diagnostic-only Layer R decision sidecar from static facts.
 
     Derives hints via :func:`derive_decision_hints` and aggregates them into a
-    ``sol_execbench.decision.v2`` sidecar. Never re-asserts benchmark authority.
+    current decision sidecar. Never re-asserts benchmark authority.
     """
     hints = derive_decision_hints(footprints, budget)
     status, reason_code = _aggregate(footprints, budget)

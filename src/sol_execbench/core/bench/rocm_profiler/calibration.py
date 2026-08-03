@@ -12,7 +12,7 @@ from sol_execbench.core.data.base_model import (
     StrictArtifactModel,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 
@@ -27,11 +27,11 @@ class CalibrationClockSetup(StrictArtifactModel):
 class Rocprofv3OverheadCalibration(CurrentSchemaModel):
     """One current profiler-overhead calibration artifact."""
 
-    current_schema_version = ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION
 
-    schema_version: Literal[
-        "sol_execbench.rocprofv3_overhead_calibration.v2"
-    ] = ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION] = (
+        SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION
+    )
     generated_at: str
     baseline_median_ms: float
     profiler_median_ms: float
@@ -51,7 +51,6 @@ class Rocprofv3OverheadCalibration(CurrentSchemaModel):
 
 
 __all__ = [
-    "ROCPROFV3_OVERHEAD_CALIBRATION_SCHEMA_VERSION",
     "CalibrationClockSetup",
     "Rocprofv3OverheadCalibration",
 ]

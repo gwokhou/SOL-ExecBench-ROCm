@@ -5,8 +5,8 @@ import json
 from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.toolchain import (
-    TOOLCHAIN_ROUTING_SCHEMA_VERSION,
     ToolchainArtifactType,
     ToolchainCapability,
     ToolchainEvidenceLevel,
@@ -61,7 +61,7 @@ def test_routing_selects_available_tool_and_preserves_authority_boundaries():
     )
     payload = report.model_dump(mode="json")
 
-    assert payload["schema_version"] == TOOLCHAIN_ROUTING_SCHEMA_VERSION
+    assert payload["schema_version"] == SchemaVersion.TOOLCHAIN_ROUTING
     assert payload["selected_tool_id"] == "rocprofv3"
     assert payload["diagnostic_only"] is True
     assert payload["correctness_authority"] is False
@@ -181,7 +181,7 @@ def test_toolchain_cli_prints_routing_json(monkeypatch):
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)["data"]
-    assert payload["schema_version"] == TOOLCHAIN_ROUTING_SCHEMA_VERSION
+    assert payload["schema_version"] == SchemaVersion.TOOLCHAIN_ROUTING
     assert payload["request"]["gpu_architecture"] == "gfx1200"
     assert payload["correctness_authority"] is False
 

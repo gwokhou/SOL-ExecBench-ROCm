@@ -70,8 +70,7 @@ from sol_execbench.core.dataset.aka_tolerance import (
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.integrity.schema_versions import (
     AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
-    DEFINITION_SCHEMA_VERSION,
-    WORKLOAD_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.platform.runtime import resolve_tool_path
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
@@ -3408,7 +3407,7 @@ def _workload_records(
             for name, meta in workload["inputs"].items()
         }
         record = {
-            "schema_version": WORKLOAD_SCHEMA_VERSION,
+            "schema_version": SchemaVersion.WORKLOAD,
             "axes": workload["axes"],
             "inputs": inputs,
             "checks": _workload_checks(spec, workload, uuid, calibrated),
@@ -3421,7 +3420,7 @@ def _workload_records(
 
 def _definition_payload(spec: Spec) -> dict[str, Any]:
     payload = {
-        "schema_version": DEFINITION_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.DEFINITION,
         "name": spec.name,
         "op_type": spec.op_type,
         "description": spec.description,

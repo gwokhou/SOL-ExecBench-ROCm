@@ -42,10 +42,7 @@ import torch
 from sol_execbench import driver
 from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
 from sol_execbench.core.integrity.schema_versions import (
-    BENCHMARK_CONFIG_SCHEMA_VERSION,
-    DEFINITION_SCHEMA_VERSION,
-    SOLUTION_SCHEMA_VERSION,
-    WORKLOAD_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 _TEMPLATES_DIR = Path(driver.__file__).parent / "templates"
@@ -114,7 +111,7 @@ _SOLUTION_SPEC = {
 def _stage_definitions(tmp_path: Path, definition: dict) -> None:
     """Stage a worker-only definition and a candidate-visible redacted copy."""
     definition = {
-        "schema_version": DEFINITION_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.DEFINITION,
         **definition,
     }
     (tmp_path / TRUSTED_DEFINITION_FILE).write_text(json.dumps(definition))
@@ -193,13 +190,13 @@ def _run_eval_driver_process(
     (tmp_path / "workload.jsonl").write_text(
         json.dumps(
             {
-                "schema_version": WORKLOAD_SCHEMA_VERSION,
+                "schema_version": SchemaVersion.WORKLOAD,
                 **(workload if workload is not None else _MINIMAL_WORKLOAD),
             },
         ),
     )
     solution = {
-        "schema_version": SOLUTION_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.SOLUTION,
         **_SOLUTION_SPEC,
         "sources": [{"path": "kernel.py", "content": kernel_code}],
     }
@@ -217,7 +214,7 @@ def _run_eval_driver_process(
     (tmp_path / "config.json").write_text(
         json.dumps(
             {
-                "schema_version": BENCHMARK_CONFIG_SCHEMA_VERSION,
+                "schema_version": SchemaVersion.BENCHMARK_CONFIG,
                 **cfg,
             },
         ),
@@ -554,12 +551,12 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     _stage_definitions(tmp_path, definition)
     (tmp_path / "workload.jsonl").write_text(
         json.dumps(
-            {"schema_version": WORKLOAD_SCHEMA_VERSION, **workload},
+            {"schema_version": SchemaVersion.WORKLOAD, **workload},
         ),
     )
     kernel = "def run(x):\n    original = x.clone()\n    x.add_(1)\n    return original\n"
     solution = {
-        "schema_version": SOLUTION_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.SOLUTION,
         **_SOLUTION_SPEC,
         "definition": "test_alias_freeze",
         "sources": [{"path": "kernel.py", "content": kernel}],
@@ -569,7 +566,7 @@ def test_reference_outputs_are_frozen_before_user_call(tmp_path):
     (tmp_path / "config.json").write_text(
         json.dumps(
             {
-                "schema_version": BENCHMARK_CONFIG_SCHEMA_VERSION,
+                "schema_version": SchemaVersion.BENCHMARK_CONFIG,
                 "lock_clocks": False,
                 "benchmark_reference": False,
             },

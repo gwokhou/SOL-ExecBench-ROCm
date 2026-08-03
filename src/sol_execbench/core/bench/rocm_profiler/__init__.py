@@ -5,9 +5,7 @@ from __future__ import annotations
 from sol_execbench.core.bench.rocm_profiler.api import (
     ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE,
     ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS,
-    ROCPROFV3_EVIDENCE_SCHEMA_VERSION,
     ROCPROFV3_EXECUTABLE,
-    ROCPROFV3_PROFILE_SCHEMA_VERSION,
     DefaultTimingSelection,
     ProfilerRunner,
     ProfileRunner,
@@ -51,7 +49,6 @@ from sol_execbench.core.bench.rocm_profiler.counter_collection import (
     collect_rocprofv3_counters,
 )
 from sol_execbench.core.bench.rocm_profiler.counters import (
-    COUNTER_MANIFEST_SCHEMA_VERSION,
     ROCPROFV3_AVAIL_EXECUTABLE,
     CounterManifest,
     CounterPassCSV,
@@ -69,11 +66,8 @@ from sol_execbench.core.bench.rocm_profiler.counters import (
 )
 
 __all__ = [
-    "COUNTER_MANIFEST_SCHEMA_VERSION",
     "ROCPROFV3_AVAIL_EXECUTABLE",
-    "ROCPROFV3_EVIDENCE_SCHEMA_VERSION",
     "ROCPROFV3_EXECUTABLE",
-    "ROCPROFV3_PROFILE_SCHEMA_VERSION",
     "ROCPROF_WARNING_INCOMPLETE_ARTIFACT_COVERAGE",
     "ROCPROF_WARNING_NO_PROFILER_DATA_ARTIFACTS",
     "CounterManifest",

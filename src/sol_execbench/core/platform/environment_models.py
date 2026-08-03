@@ -16,8 +16,7 @@ from sol_execbench.core.data.base_model import (
     FrozenArtifactModel,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION,
-    ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.platform.arch_capabilities import (
     ArchCapabilityBudgetStatus,
@@ -125,10 +124,10 @@ class EnvironmentCapabilityBudget(FrozenArtifactModel):
 class EnvironmentSnapshot(CurrentSchemaModel):
     """Optional ROCm environment evidence snapshot."""
 
-    current_schema_version = ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.ENVIRONMENT_SNAPSHOT
 
-    schema_version: Literal["sol_execbench.environment_snapshot.v2"] = (
-        ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.ENVIRONMENT_SNAPSHOT] = (
+        SchemaVersion.ENVIRONMENT_SNAPSHOT
     )
     """Environment snapshot schema version."""
     generated_at: str
@@ -169,10 +168,10 @@ class EnvironmentCheckResult(BaseModelWithDocstrings):
 class EnvironmentDiagnostics(CurrentSchemaModel):
     """Standalone environment diagnostic payload."""
 
-    current_schema_version = ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.ENVIRONMENT_DIAGNOSTICS
 
-    schema_version: Literal["sol_execbench.environment_diagnostics.v1"] = (
-        ENVIRONMENT_DIAGNOSTICS_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.ENVIRONMENT_DIAGNOSTICS] = (
+        SchemaVersion.ENVIRONMENT_DIAGNOSTICS
     )
     """Diagnostics schema version."""
     generated_at: str

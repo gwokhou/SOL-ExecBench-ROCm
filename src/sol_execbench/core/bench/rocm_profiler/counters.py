@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import ConfigDict, Field, model_validator
@@ -31,13 +32,12 @@ from sol_execbench.core.data.base_model import (
 )
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import (
-    ROCPROFV3_COUNTER_MANIFEST_SCHEMA_VERSION,
+    SchemaVersion,
 )
+from sol_execbench.core.text_utils import normalize_ascii_alnum
 
 MAX_COUNTER_CSV_BYTES = 128 * 1024 * 1024
 ROCPROFV3_AVAIL_EXECUTABLE = "rocprofv3-avail"
-COUNTER_MANIFEST_SCHEMA_VERSION = ROCPROFV3_COUNTER_MANIFEST_SCHEMA_VERSION
-_FIELD_TOKEN = re.compile(r"[^a-z0-9]+")
 _COUNTER_TOKEN = re.compile(r"[^A-Za-z0-9]+")
 _NUMBER = re.compile(
     r"^\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)\s*([A-Za-z%]*)\s*$",
@@ -82,9 +82,11 @@ class CounterManifest(CurrentSchemaModel):
     """Versioned per-architecture counter selection policy."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = COUNTER_MANIFEST_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.ROCPROFV3_COUNTER_MANIFEST
 
-    schema_version: str = COUNTER_MANIFEST_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.ROCPROFV3_COUNTER_MANIFEST] = (
+        SchemaVersion.ROCPROFV3_COUNTER_MANIFEST
+    )
     architecture: str
     rocm_compatibility: str
     groups: list[CounterGroup] = Field(min_length=1)
@@ -138,7 +140,7 @@ def load_counter_manifest(path: str | Path) -> CounterManifest:
     """Load a strict versioned counter manifest."""
     payload = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     manifest = CounterManifest.model_validate(payload)
-    if manifest.schema_version != COUNTER_MANIFEST_SCHEMA_VERSION:
+    if manifest.schema_version != SchemaVersion.ROCPROFV3_COUNTER_MANIFEST:
         raise ValueError("unsupported_counter_manifest_schema")
     return manifest
 
@@ -568,7 +570,7 @@ def _merged_counters(
 
 
 def _normalize_field(value: str | None) -> str:
-    return _FIELD_TOKEN.sub("", value.lower()) if value else ""
+    return normalize_ascii_alnum(value)
 
 
 def _field(row: Mapping[str, str], *names: str) -> str | None:
@@ -643,7 +645,6 @@ def _optional_int(value: str | None) -> int | None:
 
 
 __all__ = [
-    "COUNTER_MANIFEST_SCHEMA_VERSION",
     "MAX_COUNTER_CSV_BYTES",
     "ROCPROFV3_AVAIL_EXECUTABLE",
     "CounterAlternative",

@@ -4,8 +4,8 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.environment import (
-    ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION,
     EnvironmentCheckResult,
     EnvironmentDiagnostics,
     EnvironmentEvidenceStatus,
@@ -29,7 +29,7 @@ def test_minimal_environment_snapshot_round_trips():
     )
 
     payload = snapshot.model_dump(mode="json")
-    assert payload["schema_version"] == ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
+    assert payload["schema_version"] == SchemaVersion.ENVIRONMENT_SNAPSHOT
     assert payload["collection_status"] == "skipped"
     assert EnvironmentSnapshot.model_validate(payload) == snapshot
 
@@ -219,7 +219,7 @@ def test_collect_environment_snapshot_uses_injected_runner_and_is_gpu_free():
         now=lambda: datetime(2026, 5, 25, tzinfo=UTC),
     )
 
-    assert snapshot.schema_version == ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION
+    assert snapshot.schema_version == SchemaVersion.ENVIRONMENT_SNAPSHOT
     assert snapshot.collection_status == EnvironmentEvidenceStatus.AVAILABLE
     assert [gpu.gfx_target for gpu in snapshot.gpus] == ["gfx1200"]
     assert ["/fake/amd-smi", "static", "-a"] in commands

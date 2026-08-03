@@ -36,9 +36,7 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION,
-    CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION,
-    CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.process import exclusive_file_lock
 from sol_execbench.core.solar_bridge.analyzer import (
@@ -100,10 +98,10 @@ class CorpusTraceIdentity(CurrentSchemaModel):
     """Current content identity used to address a readiness trace."""
 
     model_config = _SCHEMA_CONFIG
-    current_schema_version = CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.CORPUS_STAGE_TRACE_IDENTITY
 
-    schema_version: Literal["sol_execbench.corpus_stage_trace_identity.v3"] = (
-        CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.CORPUS_STAGE_TRACE_IDENTITY] = (
+        SchemaVersion.CORPUS_STAGE_TRACE_IDENTITY
     )
     corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     definition_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -123,11 +121,11 @@ class CorpusReadinessRecord(CurrentSchemaModel):
     """Current per-workload readiness matrix record."""
 
     model_config = _SCHEMA_CONFIG
-    current_schema_version = CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.CORPUS_STAGE_READINESS_RECORD
 
-    schema_version: Literal[
-        "sol_execbench.corpus_stage_readiness_record.v4"
-    ] = CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.CORPUS_STAGE_READINESS_RECORD] = (
+        SchemaVersion.CORPUS_STAGE_READINESS_RECORD
+    )
     problem_path: str
     workload_uuid: str
     corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -162,11 +160,11 @@ class CorpusReadinessSummary(CurrentSchemaModel):
     """Current aggregate readiness summary."""
 
     model_config = _SCHEMA_CONFIG
-    current_schema_version = CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.CORPUS_STAGE_READINESS_SUMMARY
 
-    schema_version: Literal[
-        "sol_execbench.corpus_stage_readiness_summary.v2"
-    ] = CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.CORPUS_STAGE_READINESS_SUMMARY] = (
+        SchemaVersion.CORPUS_STAGE_READINESS_SUMMARY
+    )
     generated_at: str
     status: CorpusReadinessStatus
     corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -365,7 +363,7 @@ def _identity(
         "ir_kind": context.ir_path.ir_kind,
     }
     trace_contract = {
-        "schema_version": CORPUS_STAGE_TRACE_IDENTITY_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.CORPUS_STAGE_TRACE_IDENTITY,
         **{
             key: identity[key]
             for key in (
@@ -411,7 +409,7 @@ def _record(
         for stage in outcome.stages
     ]
     record = {
-        "schema_version": CORPUS_STAGE_READINESS_RECORD_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.CORPUS_STAGE_READINESS_RECORD,
         **identity,
         "status": (
             SolarReadinessStatus.READY if ready else SolarReadinessStatus.FAILED
@@ -555,7 +553,7 @@ def _summary(
         )
     ready = all(_record_ready(record) for record in records)
     summary = {
-        "schema_version": CORPUS_STAGE_READINESS_SUMMARY_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.CORPUS_STAGE_READINESS_SUMMARY,
         "generated_at": utc_timestamp(),
         "status": (
             CorpusReadinessStatus.READY

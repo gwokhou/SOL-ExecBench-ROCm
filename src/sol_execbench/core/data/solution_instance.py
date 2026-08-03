@@ -17,13 +17,13 @@
 """Strong-typed data definitions for solution implementations."""
 
 import hashlib
+from functools import cached_property
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import (
     ConfigDict,
     Field,
-    PrivateAttr,
     model_validator,
 )
 
@@ -32,7 +32,9 @@ from sol_execbench.core.data.base_model import (
     NonEmptyString,
 )
 from sol_execbench.core.data.solution_models import BuildSpec, SourceFile
-from sol_execbench.core.integrity.schema_versions import SOLUTION_SCHEMA_VERSION
+from sol_execbench.core.integrity.schema_versions import (
+    SchemaVersion,
+)
 
 
 class Solution(CurrentSchemaModel):
@@ -47,14 +49,9 @@ class Solution(CurrentSchemaModel):
     model_config = ConfigDict(use_attribute_docstrings=True, frozen=True)
     """Treat Solution as immutable to safely memoize derived fields."""
 
-    _hash_cache: str = PrivateAttr()
-    """Memoized hash of the solution content."""
+    current_schema_version = SchemaVersion.SOLUTION
 
-    current_schema_version = SOLUTION_SCHEMA_VERSION
-
-    schema_version: Literal["sol_execbench.solution.v1"] = (
-        SOLUTION_SCHEMA_VERSION
-    )
+    schema_version: Literal[SchemaVersion.SOLUTION] = SchemaVersion.SOLUTION
     name: NonEmptyString
     """A unique, human-readable name for this specific solution (e.g., 'rmsnorm_hip_v1_gfx1200')."""
     definition: NonEmptyString
@@ -123,13 +120,9 @@ class Solution(CurrentSchemaModel):
         """
         return self.spec.entry_point.split("::")[-1]
 
-    def model_post_init(self, __context: Any, /) -> None:
-        """Cache the deterministic content hash after model validation."""
-        # Precompute hash once since the model is frozen/immutable.
-        object.__setattr__(self, "_hash_cache", self._compute_hash())
-
-    def _compute_hash(self) -> str:
-        """Compute a deterministic hash of the solution content."""
+    @cached_property
+    def _content_hash(self) -> str:
+        """Return the lazily memoized deterministic content hash."""
         h = hashlib.sha1()
         for s in (
             self.name,
@@ -167,12 +160,12 @@ class Solution(CurrentSchemaModel):
             A SHA1 hash (40 hex characters) uniquely identifying this solution's content.
 
         """
-        return self._hash_cache
+        return self._content_hash
 
     def __hash__(self) -> int:  # pragma: no cover - trivial wrapper
         """Return a native hash derived from the cached content digest."""
         # Use the memoized content hash for fast hashing in dict/set keys.
-        return hash(self._hash_cache)
+        return hash(self._content_hash)
 
     def __eq__(
         self, other: object
@@ -180,4 +173,4 @@ class Solution(CurrentSchemaModel):
         """Compare solutions by their deterministic content digest."""
         if not isinstance(other, Solution):
             return NotImplemented
-        return self._hash_cache == other._hash_cache
+        return self._content_hash == other._content_hash

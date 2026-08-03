@@ -22,9 +22,7 @@ from sol_execbench.core.data.base_model import (
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
-    DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION,
-    PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION,
-    PERFORMANCE_SCHEDULE_EVIDENCE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v7"
@@ -566,11 +564,11 @@ class PerformanceScheduleEvidence(CurrentSchemaModel):
     """Controlled-replay dispatch topology used by the overlap model."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = PERFORMANCE_SCHEDULE_EVIDENCE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.PERFORMANCE_SCHEDULE_EVIDENCE
 
-    schema_version: Literal[
-        "sol_execbench.performance_schedule_evidence.v1"
-    ] = PERFORMANCE_SCHEDULE_EVIDENCE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.PERFORMANCE_SCHEDULE_EVIDENCE] = (
+        SchemaVersion.PERFORMANCE_SCHEDULE_EVIDENCE
+    )
     status: DiagnosticSidecarStatus
     workload_uuid: str = Field(min_length=1)
     candidate_sha256: SHA256Digest
@@ -744,10 +742,10 @@ class DiagnosticCalibrationProfile(CurrentSchemaModel):
     """Content-addressed gfx1200 diagnostic calibration."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.DIAGNOSTIC_CALIBRATION
 
-    schema_version: Literal["sol_execbench.diagnostic_calibration.v7"] = (
-        DIAGNOSTIC_CALIBRATION_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.DIAGNOSTIC_CALIBRATION] = (
+        SchemaVersion.DIAGNOSTIC_CALIBRATION
     )
     model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     identity: CalibrationIdentity
@@ -1062,10 +1060,10 @@ class PerformanceDiagnosticSidecar(CurrentDiagnosticSidecarAuthority):
     """Diagnostic-only microarchitecture sidecar."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.PERFORMANCE_DIAGNOSTIC
 
-    schema_version: Literal["sol_execbench.performance_diagnostic.v7"] = (
-        PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.PERFORMANCE_DIAGNOSTIC] = (
+        SchemaVersion.PERFORMANCE_DIAGNOSTIC
     )
     status: DiagnosticSidecarStatus
     model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
@@ -1112,7 +1110,6 @@ class PerformanceDiagnosticSidecar(CurrentDiagnosticSidecarAuthority):
 
 
 __all__ = [
-    "PERFORMANCE_DIAGNOSTIC_SCHEMA_VERSION",
     "PERFORMANCE_MODEL_VERSION",
     "ApplicabilityDimension",
     "CalibrationIdentity",

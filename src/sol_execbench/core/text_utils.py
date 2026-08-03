@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
+
+_ASCII_ALNUM = re.compile(r"[^a-z0-9]")
 
 
 def subprocess_text(value: str | bytes | None) -> str:
@@ -31,3 +34,8 @@ def text_tail(value: object, *, limit: int = 4000) -> str:
 def ordered_unique[T](values: Iterable[T]) -> list[T]:
     """Return values with duplicates removed while preserving first-seen order."""
     return list(dict.fromkeys(values))
+
+
+def normalize_ascii_alnum(value: str | None) -> str:
+    """Lowercase text and retain only ASCII letters and decimal digits."""
+    return _ASCII_ALNUM.sub("", (value or "").lower())

@@ -36,13 +36,11 @@ from sol_execbench.core.bench.profile_summary.models import (
 from sol_execbench.core.bench.profile_summary.sidecar_models import (
     _MODEL_CONFIG,
     _PROFILE_SUMMARY_MODEL_EXPORTS,
-    PROFILE_SUMMARY_SCHEMA_VERSION,
     ProfileSummaryReasonCode,
     ProfileSummarySidecar,
 )
 
 __all__ = [
-    "PROFILE_SUMMARY_SCHEMA_VERSION",
     "_MODEL_CONFIG",
     "_PROFILE_SUMMARY_MODEL_EXPORTS",
     "DiagnosticFreshnessStatus",

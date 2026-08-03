@@ -14,7 +14,6 @@ from sol_execbench.core.platform.compatibility_entry_models import (
 from sol_execbench.core.platform.compatibility_enums import (
     MATRIX_ENTRY_JSON_SCHEMA_ID,
     ROCM_COMPATIBILITY_MATRIX_REPORT_JSON_SCHEMA_ID,
-    ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
     MatrixCompatibilityReasonCode,
     MatrixCompatibilityReasonCodeField,
     MatrixCompatibilityStatus,
@@ -46,7 +45,6 @@ from sol_execbench.core.platform.compatibility_schema import (
 __all__ = [
     "MATRIX_ENTRY_JSON_SCHEMA_ID",
     "ROCM_COMPATIBILITY_MATRIX_REPORT_JSON_SCHEMA_ID",
-    "ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION",
     "MatrixArtifactReference",
     "MatrixClaimBoundary",
     "MatrixCompatibilityReasonCode",

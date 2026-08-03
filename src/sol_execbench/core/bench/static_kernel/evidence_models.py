@@ -16,7 +16,7 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import (
-    STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 _STATIC_MODEL_CONFIG = ConfigDict(
@@ -311,10 +311,10 @@ class StaticKernelEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     """Strict diagnostic-only static kernel evidence sidecar."""
 
     model_config = _STATIC_MODEL_CONFIG
-    current_schema_version = STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.STATIC_KERNEL_EVIDENCE
 
-    schema_version: Literal["sol_execbench.static_kernel_evidence.v4"] = (
-        STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.STATIC_KERNEL_EVIDENCE] = (
+        SchemaVersion.STATIC_KERNEL_EVIDENCE
     )
     """Static kernel evidence schema version."""
     status: StaticKernelEvidenceStatusField

@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from sol_execbench.cli.main import cli
 from sol_execbench.cli.protocol import CliResult, artifact
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def test_root_help_and_version_are_stable() -> None:
@@ -34,7 +35,7 @@ def test_unknown_command_has_suggestion_and_json_error() -> None:
     assert result.exit_code == 2
     payload = json.loads(result.output)
     assert payload["ok"] is False
-    assert payload["schema_version"] == "sol_execbench.cli_response.v1"
+    assert payload["schema_version"] == SchemaVersion.CLI_RESPONSE
     assert payload["error"]["code"] == "usage_error"
     assert "Did you mean 'evaluate'" in payload["error"]["message"]
     assert result.stderr == ""

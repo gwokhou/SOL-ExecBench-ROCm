@@ -20,11 +20,7 @@ from sol_execbench.core.integrity import (
     validate_sha256,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    RELEASE_BASELINE_SCHEMA_VERSION,
-    RELEASE_BUNDLE_SCHEMA_VERSION,
-    RELEASE_CANDIDATE_SCHEMA_VERSION,
-    RELEASE_EXECUTION_PLAN_SCHEMA_VERSION,
-    RELEASE_SOLAR_INDEX_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.solar_bridge.models import DEFAULT_IR_PATH, IRPath
 from sol_execbench.core.timestamps import validate_utc_timestamp
@@ -113,12 +109,10 @@ class ExecutionPlanProblem(ReleaseModel):
 class ReleaseExecutionPlan(CurrentSchemaMixin, ReleaseModel):
     """Exact full-corpus plan consumed by the trusted release runner."""
 
-    current_schema_version: ClassVar[str] = (
-        RELEASE_EXECUTION_PLAN_SCHEMA_VERSION
-    )
+    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_EXECUTION_PLAN
 
-    schema_version: Literal["sol_execbench.release_execution_plan.v2"] = (
-        RELEASE_EXECUTION_PLAN_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.RELEASE_EXECUTION_PLAN] = (
+        SchemaVersion.RELEASE_EXECUTION_PLAN
     )
     generated_at: str
     source_revision: str
@@ -190,10 +184,10 @@ class ReleaseRunStatement(ReleaseModel):
 class BaselineStatement(CurrentSchemaMixin, ReleaseRunStatement):
     """Release-defined scoring baseline execution."""
 
-    current_schema_version: ClassVar[str] = RELEASE_BASELINE_SCHEMA_VERSION
+    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_BASELINE
 
-    schema_version: Literal["sol_execbench.release_baseline.v1"] = (
-        RELEASE_BASELINE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.RELEASE_BASELINE] = (
+        SchemaVersion.RELEASE_BASELINE
     )
     baseline_id: str = Field(min_length=1)
 
@@ -201,10 +195,10 @@ class BaselineStatement(CurrentSchemaMixin, ReleaseRunStatement):
 class CandidateStatement(CurrentSchemaMixin, ReleaseRunStatement):
     """Trusted execution evidence for one full-corpus candidate."""
 
-    current_schema_version: ClassVar[str] = RELEASE_CANDIDATE_SCHEMA_VERSION
+    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_CANDIDATE
 
-    schema_version: Literal["sol_execbench.release_candidate.v1"] = (
-        RELEASE_CANDIDATE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.RELEASE_CANDIDATE] = (
+        SchemaVersion.RELEASE_CANDIDATE
     )
     candidate_id: str = Field(min_length=1)
 
@@ -225,10 +219,10 @@ class SolarManifestEvidence(ReleaseModel):
 class SolarIndexStatement(CurrentSchemaMixin, ReleaseModel):
     """Exact formal-bound manifest inventory for the scoring denominator."""
 
-    current_schema_version: ClassVar[str] = RELEASE_SOLAR_INDEX_SCHEMA_VERSION
+    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_SOLAR_INDEX
 
-    schema_version: Literal["sol_execbench.release_solar_index.v2"] = (
-        RELEASE_SOLAR_INDEX_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.RELEASE_SOLAR_INDEX] = (
+        SchemaVersion.RELEASE_SOLAR_INDEX
     )
     generated_at: str
     source_revision: str
@@ -261,10 +255,10 @@ class SolarIndexStatement(CurrentSchemaMixin, ReleaseModel):
 class ReleaseBundle(CurrentSchemaMixin, ReleaseModel):
     """Publisher-authored content-addressed evidence for one official score."""
 
-    current_schema_version: ClassVar[str] = RELEASE_BUNDLE_SCHEMA_VERSION
+    current_schema_version: ClassVar[str] = SchemaVersion.RELEASE_BUNDLE
 
-    schema_version: Literal["sol_execbench.release_bundle.v2"] = (
-        RELEASE_BUNDLE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.RELEASE_BUNDLE] = (
+        SchemaVersion.RELEASE_BUNDLE
     )
     corpus_manifest: ArtifactReference
     baseline: ArtifactReference

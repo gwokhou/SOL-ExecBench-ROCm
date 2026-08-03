@@ -9,14 +9,16 @@ from pathlib import Path
 import pytest
 import yaml
 
-from solar.analysis.resources import RESOURCE_MODEL_VERSION
 from solar.rocm import architecture
 from solar.rocm.architecture import (
     ArchitectureProfile,
     MemoryLevel,
     resource_peak_payload_sha256,
 )
-from solar.schema_versions import RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION
+from solar.schema_versions import (
+    ResourceModelVersion as SolarResourceModelVersion,
+    SchemaVersion as SolarSchemaVersion,
+)
 
 _RESOURCES = {
     "mfma",
@@ -174,7 +176,7 @@ def _profile_data() -> dict:
         "l2_bytes": 64,
         "last_level_cache_bytes": 128,
         "peak_ops_per_second": {"fp16": 100.0, "fp8": 200.0},
-        "resource_model_version": RESOURCE_MODEL_VERSION,
+        "resource_model_version": SolarResourceModelVersion.AMD.value,
         "resource_limits": {
             resource: {"generic": 10.0} for resource in _RESOURCES
         },
@@ -480,7 +482,7 @@ def test_verified_audit_evidence_is_content_addressed(
         if mode not in data["calibration_exempt_modes"].get(resource, {})
     )
     payload = {
-        "schema_version": RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
+        "schema_version": SolarSchemaVersion.RESOURCE_PEAK_CALIBRATION.value,
         "timing_profile": "official",
         "device": {"device_name": "test gpu", "gfx_target": "gfx1200"},
         "clock_setup": {"clock_locked_verified": True},
@@ -564,7 +566,9 @@ def test_verified_audit_evidence_is_content_addressed(
         "status": "verified",
         "path": "evidence.json",
         "sha256": digest,
-        "required_schema_version": RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
+        "required_schema_version": (
+            SolarSchemaVersion.RESOURCE_PEAK_CALIBRATION.value
+        ),
         "required_timing_profile": "official",
         "required_clocks_locked": True,
         "required_unthrottled": True,

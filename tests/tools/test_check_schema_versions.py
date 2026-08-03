@@ -3,6 +3,9 @@ from __future__ import annotations
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from solar.schema_versions import SchemaVersion as SolarSchemaVersion
+
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2] / "scripts/check_schema_versions.py"
 )
@@ -16,13 +19,13 @@ audit_text = MODULE.audit_text
 def test_accepts_current_schema_identifier():
     findings, families = audit_text(
         Path("example.json"),
-        '{"schema_version": "sol_execbench.environment_snapshot.v2"}',
+        f'{{"schema_version": "{SchemaVersion.ENVIRONMENT_SNAPSHOT}"}}',
     )
 
     assert findings == []
     assert families == {
         "sol_execbench.environment_snapshot": {
-            "sol_execbench.environment_snapshot.v2",
+            SchemaVersion.ENVIRONMENT_SNAPSHOT,
         },
     }
 
@@ -40,15 +43,30 @@ def test_rejects_unregistered_schema_identifier():
 def test_accepts_current_solar_schema_identifier():
     findings, families = audit_text(
         Path("audit.json"),
-        '{"schema_version": "solar.resource_peak_calibration.v4"}',
+        (
+            '{"schema_version": '
+            f'"{SolarSchemaVersion.RESOURCE_PEAK_CALIBRATION.value}"}}'
+        ),
     )
 
     assert findings == []
     assert families == {
         "solar.resource_peak_calibration": {
-            "solar.resource_peak_calibration.v4",
+            SolarSchemaVersion.RESOURCE_PEAK_CALIBRATION.value,
         },
     }
+
+
+def test_accepts_current_non_namespaced_schema_identifier():
+    version = SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN.value
+
+    findings, families = audit_text(
+        Path("design.json"),
+        f'{{"schema_version": "{version}"}}',
+    )
+
+    assert findings == []
+    assert families == {"rdna4_diagnostic_corpus_design": {version}}
 
 
 def test_accepts_current_numeric_schema_prose():
@@ -104,7 +122,7 @@ def test_rejects_raw_numeric_schema_in_production_python():
     assert findings == [
         (
             "src/example.py:1: raw numeric schema version must use the "
-            "current family constant"
+            "matching family constant"
         ),
     ]
 
@@ -122,7 +140,7 @@ def test_rejects_raw_numeric_schema_in_all_python_contract_positions():
         assert findings == [
             (
                 "src/example.py:1: raw numeric schema version must use the "
-                "current family constant"
+                "matching family constant"
             ),
         ]
 
@@ -135,8 +153,36 @@ def test_rejects_string_keyed_schema_registry_access():
 
     assert findings == [
         (
-            "src/example.py:1: import the named schema-version constant "
+            "src/example.py:1: import the named schema-version enum member "
             "instead of indexing SCHEMA_VERSIONS"
+        ),
+    ]
+
+
+def test_rejects_schema_enum_member_relay_constant():
+    findings, _ = audit_text(
+        Path("src/example.py"),
+        "EXAMPLE_SCHEMA_VERSION = SchemaVersion.WORKLOAD\n",
+    )
+
+    assert findings == [
+        (
+            "src/example.py:1: use SchemaVersion.WORKLOAD directly instead "
+            "of relaying it through EXAMPLE_SCHEMA_VERSION"
+        ),
+    ]
+
+
+def test_rejects_schema_identifier_literal_outside_registry():
+    findings, _ = audit_text(
+        Path("src/example.py"),
+        f'SCHEMA = "{SchemaVersion.WORKLOAD}"\n',
+    )
+
+    assert findings == [
+        (
+            f"src/example.py: schema identifier {SchemaVersion.WORKLOAD} "
+            "must be referenced through SchemaVersion"
         ),
     ]
 

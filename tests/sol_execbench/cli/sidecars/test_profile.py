@@ -12,6 +12,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileStatus,
     Rocprofv3ReasonCode,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def test_profile_sidecar_is_disabled_when_no_profile_result(tmp_path: Path):
@@ -39,7 +40,7 @@ def test_profile_sidecar_records_diagnostic_metadata(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.profile.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == "sol_execbench.rocprofv3_profile.v1"
+    assert payload["schema_version"] == SchemaVersion.ROCPROFV3_PROFILE
     assert payload["status"] == "unavailable"
     assert payload["diagnostic_only"] is True
     assert payload["score_authority"] is False
@@ -60,7 +61,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     output.write_text('{"definition":"toy"}\n')
     profile_metadata = tmp_path / "trace.jsonl.profile.json"
     profile_metadata.write_text(
-        '{"schema_version":"sol_execbench.rocprofv3_profile.v1"}\n',
+        '{"schema_version":SchemaVersion.ROCPROFV3_PROFILE}\n',
     )
     profile_artifact_dir = tmp_path / "trace.jsonl.rocprofv3" / "trace"
     profile_artifact_dir.mkdir(parents=True)
@@ -108,7 +109,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.profile-summary.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == "sol_execbench.profile_summary.v3"
+    assert payload["schema_version"] == SchemaVersion.PROFILE_SUMMARY
     assert payload["status"] == "available"
     assert payload["authority"] == "diagnostic"
     assert payload["identity"]["trace_path"] == "trace.jsonl"

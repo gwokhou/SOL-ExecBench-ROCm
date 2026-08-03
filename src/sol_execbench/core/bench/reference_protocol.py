@@ -25,10 +25,9 @@ from sol_execbench.core.bench.performance_model.access_evidence import (
 )
 from sol_execbench.core.integrity import sha256_bytes, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import (
-    REFERENCE_IPC_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
-PROTOCOL_VERSION = REFERENCE_IPC_SCHEMA_VERSION
 REFERENCE_REQUEST_FD_ENV = "SOL_EXECBENCH_REFERENCE_REQUEST_FD"
 REFERENCE_RESPONSE_FD_ENV = "SOL_EXECBENCH_REFERENCE_RESPONSE_FD"
 REFERENCE_TOKEN_ENV = "SOL_EXECBENCH_REFERENCE_TOKEN"
@@ -139,7 +138,7 @@ def _validate_success_header(header: dict[str, Any]) -> None:
             str(header.get("error") or "reference failed"),
             kind=failure_kind,
         )
-    if header.get("protocol") != PROTOCOL_VERSION:
+    if header.get("protocol") != SchemaVersion.REFERENCE_IPC:
         raise ReferenceProtocolError("reference IPC protocol version mismatch")
 
 
@@ -284,7 +283,7 @@ def send_case(
         connection,
         {
             "ok": True,
-            "protocol": PROTOCOL_VERSION,
+            "protocol": SchemaVersion.REFERENCE_IPC,
             "inputs": input_metadata,
             "outputs": output_metadata,
             "payload_bytes": len(payload),
@@ -369,7 +368,7 @@ def send_failure(
         connection,
         {
             "ok": False,
-            "protocol": PROTOCOL_VERSION,
+            "protocol": SchemaVersion.REFERENCE_IPC,
             "error": message[:4096],
             "failure_kind": kind,
         },
@@ -452,7 +451,7 @@ class ReferenceClient:
         send_json(
             self._writer,
             {
-                "protocol": PROTOCOL_VERSION,
+                "protocol": SchemaVersion.REFERENCE_IPC,
                 "token": self._token,
                 "operation": "timing_validation",
             },
@@ -469,7 +468,7 @@ class ReferenceClient:
         send_json(
             self._writer,
             {
-                "protocol": PROTOCOL_VERSION,
+                "protocol": SchemaVersion.REFERENCE_IPC,
                 "token": self._token,
                 "operation": operation,
                 **values,
@@ -491,7 +490,7 @@ class ReferenceClient:
                 send_json(
                     self._writer,
                     {
-                        "protocol": PROTOCOL_VERSION,
+                        "protocol": SchemaVersion.REFERENCE_IPC,
                         "token": self._token,
                         "operation": "shutdown",
                     },
@@ -529,7 +528,6 @@ def connect_reference_worker(*, device: str) -> ReferenceClient:
 
 
 __all__ = [
-    "PROTOCOL_VERSION",
     "REFERENCE_PID_ENV",
     "REFERENCE_REQUEST_FD_ENV",
     "REFERENCE_RESPONSE_FD_ENV",

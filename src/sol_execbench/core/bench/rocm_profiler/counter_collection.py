@@ -59,7 +59,7 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.platform.runtime import (
     resolve_rocm_tool,
@@ -69,7 +69,7 @@ from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_COUNTER_REPLAY,
     ENV_SOL_EXECBENCH_REPLAY_PASS_INDEX,
 )
-from sol_execbench.core.text_utils import subprocess_text
+from sol_execbench.core.text_utils import normalize_ascii_alnum, subprocess_text
 
 
 def collect_rocprofv3_counters(
@@ -304,7 +304,7 @@ def _write_provenance(
     )
     payload = Rocprofv3CounterProvenance.model_validate(
         {
-            "schema_version": ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION,
+            "schema_version": SchemaVersion.ROCPROFV3_COUNTER_PROVENANCE,
             "diagnostic_only": True,
             "score_authority": False,
             "replay_phase": "evidence",
@@ -581,7 +581,7 @@ def _select_counter_rows_in_marker_ranges(
         if reader.fieldnames is None:
             raise ValueError("counter_csv_header_missing")
         fieldnames = list(reader.fieldnames)
-        normalized = {_normalize_csv_header(name): name for name in fieldnames}
+        normalized = {normalize_ascii_alnum(name): name for name in fieldnames}
         start_key = normalized.get("starttimestamp")
         end_key = normalized.get("endtimestamp")
         if start_key is None or end_key is None:
@@ -609,7 +609,7 @@ def _candidate_marker_intervals(path: Path) -> list[tuple[int, int]]:
         if reader.fieldnames is None:
             raise ValueError("marker_csv_header_missing")
         normalized = {
-            _normalize_csv_header(name): name for name in reader.fieldnames
+            normalize_ascii_alnum(name): name for name in reader.fieldnames
         }
         domain_key = normalized.get("domain")
         function_key = normalized.get("function") or normalized.get("name")
@@ -638,12 +638,6 @@ def _candidate_marker_intervals(path: Path) -> list[tuple[int, int]]:
     if not intervals:
         raise ValueError("candidate_marker_intervals_missing")
     return intervals
-
-
-def _normalize_csv_header(value: str) -> str:
-    return "".join(
-        character for character in value.lower() if character.isalnum()
-    )
 
 
 def _parse_timestamp(value: str | None) -> int:

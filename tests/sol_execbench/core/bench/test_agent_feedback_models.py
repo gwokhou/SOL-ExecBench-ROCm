@@ -5,7 +5,6 @@ from pydantic import BaseModel, ValidationError
 
 from sol_execbench.core.bench.agent_feedback import (
     _MODEL_CONFIG as FacadeModelConfig,
-    AGENT_FEEDBACK_SCHEMA_VERSION as FacadeSchemaVersion,
     AgentFeedbackBottleneck as FacadeBottleneck,
     AgentFeedbackItem as FacadeItem,
     AgentFeedbackReasonCode as FacadeReasonCode,
@@ -15,7 +14,6 @@ from sol_execbench.core.bench.agent_feedback import (
 )
 from sol_execbench.core.bench.agent_feedback.models import (
     _MODEL_CONFIG,
-    AGENT_FEEDBACK_SCHEMA_VERSION,
     AgentFeedbackBottleneck,
     AgentFeedbackItem,
     AgentFeedbackReasonCode,
@@ -33,10 +31,10 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSourceRef,
     ExtendedDiagnosticIdentity,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def test_agent_feedback_model_names_remain_reexported_from_facade() -> None:
-    assert FacadeSchemaVersion == AGENT_FEEDBACK_SCHEMA_VERSION
     assert FacadeModelConfig is _MODEL_CONFIG
     assert FacadeReasonCode is AgentFeedbackReasonCode
     assert FacadeSeverity is AgentFeedbackSeverity
@@ -112,7 +110,7 @@ def test_agent_feedback_sidecar_model_defaults_remain_stable() -> None:
 
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == "sol_execbench.agent_feedback.v7"
+    assert payload["schema_version"] == SchemaVersion.AGENT_FEEDBACK
     assert payload["authority"] == "diagnostic"
     assert payload["items"] == []
     assert payload["limitations"] == []

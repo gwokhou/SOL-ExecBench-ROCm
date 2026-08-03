@@ -13,6 +13,7 @@ authority. See ``docs/user/decision_sidecar_contract.md`` and
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import ConfigDict, Field
 
@@ -25,8 +26,7 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import (
-    DECISION_SCHEMA_VERSION,
-    DecisionSchemaVersion,
+    SchemaVersion,
 )
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
@@ -136,9 +136,9 @@ class DecisionSidecar(CurrentDiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for Layer R optimization hints."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = DECISION_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.DECISION
 
-    schema_version: DecisionSchemaVersion = DECISION_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.DECISION] = SchemaVersion.DECISION
     status: DiagnosticSidecarStatus
     reason_code: DecisionReasonCode
     identity: ExtendedDiagnosticIdentity

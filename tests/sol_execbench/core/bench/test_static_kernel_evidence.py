@@ -10,7 +10,6 @@ import pytest
 from pydantic import ValidationError
 
 from sol_execbench.core.bench.static_kernel.evidence import (
-    STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION,
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceClassification,
     StaticKernelEvidenceReasonCode,
@@ -40,6 +39,7 @@ from sol_execbench.core.bench.static_kernel.status import (
     aggregate_extractor_reason_value,
     aggregate_extractor_status_value,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.process.subprocesses import ProbeCompletedProcess
 
 EXPECTED_STATUSES = {
@@ -202,10 +202,8 @@ def test_static_kernel_evidence_round_trips_strict_json_payload():
     sidecar = _representative_sidecar()
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == STATIC_KERNEL_EVIDENCE_SCHEMA_VERSION
-    assert (
-        payload["schema_version"] == "sol_execbench.static_kernel_evidence.v4"
-    )
+    assert payload["schema_version"] == SchemaVersion.STATIC_KERNEL_EVIDENCE
+    assert payload["schema_version"] == SchemaVersion.STATIC_KERNEL_EVIDENCE
     assert StaticKernelEvidenceSidecar.model_validate(payload) == sidecar
 
 
@@ -515,7 +513,7 @@ def test_static_artifact_collection_can_use_explicit_artifact_manifest(
     manifest_path.write_text(
         json.dumps(
             {
-                "schema_version": "sol_execbench.static_artifact_manifest.v1",
+                "schema_version": SchemaVersion.STATIC_ARTIFACT_MANIFEST,
                 "artifacts": [
                     {"path": "benchmark_kernel.so"},
                     "registered/kernel.hsaco",

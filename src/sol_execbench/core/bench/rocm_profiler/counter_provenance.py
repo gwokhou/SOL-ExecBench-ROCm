@@ -10,17 +10,17 @@ from typing import Literal
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
-    ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 
 class Rocprofv3CounterProvenance(CurrentFrozenSchemaModel):
     """Hashes for every executable and configuration admitted to replay."""
 
-    current_schema_version = ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.ROCPROFV3_COUNTER_PROVENANCE
 
-    schema_version: Literal["sol_execbench.rocprofv3_counter_provenance.v5"] = (
-        ROCPROFV3_COUNTER_PROVENANCE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.ROCPROFV3_COUNTER_PROVENANCE] = (
+        SchemaVersion.ROCPROFV3_COUNTER_PROVENANCE
     )
     diagnostic_only: Literal[True] = True
     score_authority: Literal[False] = False

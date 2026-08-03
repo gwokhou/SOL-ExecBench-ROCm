@@ -5,7 +5,6 @@ from __future__ import annotations
 from sol_execbench.core.platform.docker_matrix.cli import main
 from sol_execbench.core.platform.docker_matrix.models import (
     DEFAULT_DOCKER_TARGET_MANIFEST,
-    ROCM_DOCKER_TARGETS_SCHEMA_VERSION,
     DockerPreflightObservation,
     DockerPreflightResult,
     DockerTargetManifest,
@@ -25,7 +24,6 @@ from sol_execbench.core.platform.docker_matrix.targets import (
 
 __all__ = [
     "DEFAULT_DOCKER_TARGET_MANIFEST",
-    "ROCM_DOCKER_TARGETS_SCHEMA_VERSION",
     "DockerPreflightObservation",
     "DockerPreflightResult",
     "DockerTargetManifest",

@@ -11,6 +11,7 @@ from sol_execbench.core.bench.profile_summary import (
     evaluate_profile_summary_governance,
     validate_profile_summary_freshness,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DIR = REPO_ROOT / "tests/sol_execbench/fixtures/profile_summary"
@@ -153,7 +154,7 @@ def test_profile_summary_docs_explain_hip_mapping_and_fixture_semantics():
     for expected in (
         "HIP Consumer Mapping",
         "profile_summary.sidecar",
-        "sol_execbench.profile_summary.v3",
+        SchemaVersion.PROFILE_SUMMARY,
         "summary.profiler_status",
         "summary.metrics[]",
         "summary.workload_metrics[]",

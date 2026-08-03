@@ -9,10 +9,10 @@ import math
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from sol_execbench.core.integrity.schema_versions import (
-    SOLAR_WORKER_IPC_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from solar.contracts import (
     FORMAL_BOUND_KIND,
@@ -28,18 +28,22 @@ from solar.ir.contracts import (
     IRPath,
     normalize_ir_path,
 )
-from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
 
 def _require_worker_schema(value: Mapping[str, Any]) -> None:
-    if value.get("schema_version") != SOLAR_WORKER_IPC_SCHEMA_VERSION:
+    if value.get("schema_version") != SchemaVersion.SOLAR_WORKER_IPC:
         raise ValueError("SOLAR worker IPC schema mismatch")
 
 
 def _normalize_worker_outcome(value: Any) -> None:
     """Normalize fields shared by distinct worker outcome state machines."""
-    if value.schema_version != SOLAR_WORKER_IPC_SCHEMA_VERSION:
+    if value.schema_version != SchemaVersion.SOLAR_WORKER_IPC:
         raise ValueError("SOLAR worker IPC schema mismatch")
+    object.__setattr__(
+        value,
+        "schema_version",
+        SchemaVersion(value.schema_version),
+    )
     object.__setattr__(value, "ir_path", normalize_ir_path(value.ir_path))
 
 
@@ -97,7 +101,7 @@ class _SolarWorkerRequestBase:
         """Reject requests that bypassed process-boundary normalization."""
         if (
             getattr(self, "schema_version", None)
-            != SOLAR_WORKER_IPC_SCHEMA_VERSION
+            != SchemaVersion.SOLAR_WORKER_IPC
         ):
             raise ValueError("SOLAR worker IPC schema mismatch")
         if not isinstance(getattr(self, "ir_path", None), IRPath):
@@ -115,7 +119,7 @@ class _SolarWorkerRequestBase:
             "ir_path": normalize_ir_path(
                 value.get("ir_path", DEFAULT_IR_PATH),
             ),
-            "schema_version": value["schema_version"],
+            "schema_version": SchemaVersion(value["schema_version"]),
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -129,7 +133,9 @@ class SolarWorkerRequest(_SolarWorkerRequestBase):
 
     orojenesis_home: str | None
     ir_path: IRPath = DEFAULT_IR_PATH
-    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.SOLAR_WORKER_IPC] = (
+        SchemaVersion.SOLAR_WORKER_IPC
+    )
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarWorkerRequest:
@@ -149,7 +155,9 @@ class SolarStageAuditRequest(_SolarWorkerRequestBase):
     """One corpus workload request for the isolated three-stage audit."""
 
     ir_path: IRPath = DEFAULT_IR_PATH
-    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.SOLAR_WORKER_IPC] = (
+        SchemaVersion.SOLAR_WORKER_IPC
+    )
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarStageAuditRequest:
@@ -174,7 +182,9 @@ class SolarAnalysisOutcome:
     reason_code: str | None = None
     message: str | None = None
     publication_eligible: bool = False
-    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.SOLAR_WORKER_IPC] = (
+        SchemaVersion.SOLAR_WORKER_IPC
+    )
 
     def __post_init__(self) -> None:
         """Normalize worker payload values and reject unknown states."""
@@ -251,7 +261,9 @@ class SolarStageAuditOutcome:
     failure_stage: SolarStage | None = None
     reason_code: str | None = None
     message: str | None = None
-    schema_version: str = SOLAR_WORKER_IPC_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.SOLAR_WORKER_IPC] = (
+        SchemaVersion.SOLAR_WORKER_IPC
+    )
 
     def __post_init__(self) -> None:
         """Normalize worker payload values and reject unknown states."""
@@ -344,7 +356,6 @@ __all__ = [
     "DEFAULT_IR_PATH",
     "FORMAL_BOUND_KIND",
     "READINESS_STAGES",
-    "SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION",
     "IRPath",
     "SolarAnalysisOutcome",
     "SolarAnalysisStatus",

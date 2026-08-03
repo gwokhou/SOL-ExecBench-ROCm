@@ -14,7 +14,7 @@ from sol_execbench.core.data.base_model import (
     FrozenArtifactModel,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 
@@ -53,10 +53,10 @@ class PublishedReleaseAvailability(_AvailabilityModel):
 class OfficialScoreAvailability(CurrentFrozenSchemaModel):
     """Current machine-readable official-score availability report."""
 
-    current_schema_version = OFFICIAL_SCORE_AVAILABILITY_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.OFFICIAL_SCORE_AVAILABILITY
 
-    schema_version: Literal["sol_execbench.official_score_availability.v3"] = (
-        "sol_execbench.official_score_availability.v3"
+    schema_version: Literal[SchemaVersion.OFFICIAL_SCORE_AVAILABILITY] = (
+        SchemaVersion.OFFICIAL_SCORE_AVAILABILITY
     )
     corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     trusted_corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")

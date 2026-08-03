@@ -45,12 +45,14 @@ def test_only_solar_bridge_imports_solar_from_outer_package():
     for root in roots:
         for path in root.rglob("*.py"):
             # The bridge's own contract tests under .../core/solar_bridge/ may
-            # reference public solar.api types to verify outcome mapping; every
-            # other file must reach solar only through the bridge.
+            # reference public SOLAR types. Canonical wire identifiers are the
+            # sole cross-boundary exception: callers import their defining
+            # registry directly instead of relying on compatibility re-exports.
             if "solar_bridge" in path.parts:
                 continue
             if any(
-                name == "solar" or name.startswith("solar.")
+                (name == "solar" or name.startswith("solar."))
+                and name != "solar.schema_versions"
                 for name in _imports(path)
             ):
                 offenders.append(path)

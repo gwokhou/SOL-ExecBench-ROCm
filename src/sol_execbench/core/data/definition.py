@@ -54,7 +54,7 @@ from sol_execbench.core.data.definition_reference import (
     verify_custom_inputs_entrypoint,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    DEFINITION_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 if TYPE_CHECKING:
@@ -73,11 +73,9 @@ __all__ = [
 class Definition(CurrentSchemaModel):
     """Complete definition of a computational workload."""
 
-    current_schema_version = DEFINITION_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.DEFINITION
 
-    schema_version: Literal["sol_execbench.definition.v1"] = (
-        DEFINITION_SCHEMA_VERSION
-    )
+    schema_version: Literal[SchemaVersion.DEFINITION] = SchemaVersion.DEFINITION
     name: NonEmptyString
     """A unique, human-readable name for the kernel definition."""
     op_type: NonEmptyString

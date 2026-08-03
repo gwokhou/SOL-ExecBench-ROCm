@@ -11,16 +11,16 @@ from typing import Annotated
 from pydantic import BeforeValidator, ConfigDict
 
 from sol_execbench.core.integrity.schema_versions import (
-    ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 MATRIX_ENTRY_JSON_SCHEMA_ID = (
     "https://sol-execbench.local/schemas/"
-    f"{ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION}.matrix_entry.schema.json"
+    f"{SchemaVersion.ROCM_COMPATIBILITY_MATRIX}.matrix_entry.schema.json"
 )
 ROCM_COMPATIBILITY_MATRIX_REPORT_JSON_SCHEMA_ID = (
     "https://sol-execbench.local/schemas/"
-    f"{ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION}.report.schema.json"
+    f"{SchemaVersion.ROCM_COMPATIBILITY_MATRIX}.report.schema.json"
 )
 MATRIX_MODEL_CONFIG = ConfigDict(
     extra="forbid",

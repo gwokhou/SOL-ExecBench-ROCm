@@ -7,13 +7,16 @@ from __future__ import annotations
 
 import csv
 import json
-import math
 from pathlib import Path
 
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.profile_summary.hints import (
     derive_bottleneck_hints,
+)
+from sol_execbench.core.bench.profile_summary.metric_values import (
+    finite_number_or_none,
+    normalize_metric_key,
 )
 from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryBottleneckHint,
@@ -25,6 +28,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 _PROFILE_SUMMARY_MAX_PARSE_BYTES = 1_000_000
@@ -94,7 +98,7 @@ def structured_profile_evidence(
         }:
             parse_warnings.append(
                 f"{artifact.path.name}: {artifact.kind} artifacts are "
-                "citation-only in sol_execbench.profile_summary.v3",
+                f"citation-only in {SchemaVersion.PROFILE_SUMMARY}",
             )
         elif artifact.kind is Rocprofv3ArtifactKind.OTHER:
             parse_warnings.append(
@@ -135,9 +139,11 @@ def _parse_trace_csv_artifact(
     rows, warnings = _parse_limited_csv(path)
     metrics: list[ProfileSummaryKernelMetric] = []
     for row in rows:
-        normalized = {_normalize_key(key): value for key, value in row.items()}
+        normalized = {
+            normalize_metric_key(key): value for key, value in row.items()
+        }
         domain = _first_text(normalized, "domain", "kind", "type", "category")
-        if domain is None or "kernel" not in _normalize_key(domain):
+        if domain is None or "kernel" not in normalize_metric_key(domain):
             continue
         duration_ns = _first_number(
             normalized,
@@ -174,7 +180,9 @@ def _parse_counter_csv_artifact(
     rows, warnings = _parse_limited_csv(path)
     metrics: list[ProfileSummaryKernelMetric] = []
     for row in rows:
-        normalized = {_normalize_key(key): value for key, value in row.items()}
+        normalized = {
+            normalize_metric_key(key): value for key, value in row.items()
+        }
         name = _first_text(normalized, "metric", "name", "counter")
         value = _first_number(normalized, "value", "countervalue", "result")
         if name is None or value is None:
@@ -272,10 +280,6 @@ def _artifact_parse_preflight(path: Path) -> list[str]:
     return []
 
 
-def _normalize_key(value: str | None) -> str:
-    return "".join(ch for ch in (value or "").lower() if ch.isalnum())
-
-
 def _first_text(row: dict[str, str], *keys: str) -> str | None:
     for key in keys:
         value = row.get(key)
@@ -293,11 +297,6 @@ def _first_number(row: dict[str, str], *keys: str) -> int | float | None:
     return None
 
 
-def _finite_or_none(value: float) -> int | float | None:
-    """Pass through finite numbers; reject NaN/Inf so they never reach sidecar JSON."""
-    return value if math.isfinite(value) else None
-
-
 def _coerce_scalar(value: object) -> int | float | str | None:
     # bool is intentionally rejected: Python bool is an int subclass, but a JSON
     # `true` / CSV "true" is not a numeric metric value. Non-finite floats
@@ -305,7 +304,7 @@ def _coerce_scalar(value: object) -> int | float | str | None:
     if isinstance(value, bool) or value is None:
         return None
     if isinstance(value, int | float):
-        return _finite_or_none(value)
+        return finite_number_or_none(value)
     if not isinstance(value, str):
         return None
     stripped = value.strip()
@@ -321,4 +320,4 @@ def _coerce_scalar(value: object) -> int | float | str | None:
         number = float(stripped)
     except ValueError:
         return stripped
-    return _finite_or_none(number)
+    return finite_number_or_none(number)

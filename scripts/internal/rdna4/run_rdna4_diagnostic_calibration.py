@@ -52,7 +52,7 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.platform.amd_smi import parse_gpu_identity
 from sol_execbench.core.platform.amdgpu_code_object import extract_code_object
@@ -379,7 +379,7 @@ def _audit_payload(
     environment: Sequence[RuntimeGPUTelemetry],
 ) -> dict[str, object]:
     return {
-        "schema_version": DIAGNOSTIC_CALIBRATION_AUDIT_SCHEMA_VERSION,
+        "schema_version": SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT,
         "probe_identity": {
             "source_sha256": sha256_file(PROBE_SOURCE),
             "binary_sha256": sha256_file(binary),

@@ -51,7 +51,6 @@ _EXPORTS = {
     "GeneratedInput": ".data",
     "Trace": ".data",
     "Workload": ".data",
-    "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION": ".platform.environment",
     "EnvironmentCheckResult": ".platform.environment",
     "EnvironmentDiagnostics": ".platform.environment",
     "EnvironmentEvidenceStatus": ".platform.environment",
@@ -64,7 +63,6 @@ _EXPORTS = {
     "collect_environment_snapshot": ".platform.environment",
     "collect_pytorch_rocm_summary": ".platform.environment",
     "probe_tool": ".platform.environment",
-    "TOOLCHAIN_ROUTING_SCHEMA_VERSION": ".platform.toolchain",
     "ToolLifecycle": ".platform.toolchain",
     "ToolchainArtifactType": ".platform.toolchain",
     "ToolchainCapability": ".platform.toolchain",
@@ -82,9 +80,7 @@ _EXPORTS = {
 
 __all__ = [
     # Optional environment evidence
-    "ENVIRONMENT_SNAPSHOT_SCHEMA_VERSION",
     # Optional toolchain routing evidence
-    "TOOLCHAIN_ROUTING_SCHEMA_VERSION",
     # Data models
     "AxisConst",
     "AxisSpec",

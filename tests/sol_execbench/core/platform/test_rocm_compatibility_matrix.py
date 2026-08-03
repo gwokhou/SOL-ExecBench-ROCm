@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.compatibility import (
-    ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION,
     MatrixArtifactReference,
     MatrixClaimBoundary,
     MatrixCompatibilityReasonCode,
@@ -96,11 +96,8 @@ def test_matrix_entry_serializes_target_and_observed_evidence_separately():
     entry = _representative_entry()
     payload = entry.model_dump(mode="json")
 
-    assert payload["schema_version"] == ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
-    assert (
-        payload["schema_version"]
-        == "sol_execbench.rocm_compatibility_matrix.v1"
-    )
+    assert payload["schema_version"] == SchemaVersion.ROCM_COMPATIBILITY_MATRIX
+    assert payload["schema_version"] == SchemaVersion.ROCM_COMPATIBILITY_MATRIX
     assert payload["target"]["requested_rocm_user_space_version"] == "7.1.0"
     assert (
         payload["target"]["docker_image_repository"] == "rocm/dev-ubuntu-24.04"
@@ -155,7 +152,7 @@ def test_matrix_report_contains_entries_and_status_counts():
     )
     payload = report.model_dump(mode="json")
 
-    assert payload["schema_version"] == ROCM_COMPATIBILITY_MATRIX_SCHEMA_VERSION
+    assert payload["schema_version"] == SchemaVersion.ROCM_COMPATIBILITY_MATRIX
     assert payload["entries"][0] == entry.model_dump(mode="json")
     assert payload["status_counts"] == {"container_validated": 1}
     assert report.to_dict() == payload

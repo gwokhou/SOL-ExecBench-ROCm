@@ -19,13 +19,13 @@ from sol_execbench.core.bench.agent_feedback.governance import (
 )
 from sol_execbench.core.bench.agent_feedback.models import (
     _MODEL_CONFIG,
-    AGENT_FEEDBACK_SCHEMA_VERSION,
     AgentFeedbackBottleneck,
     AgentFeedbackItem,
     AgentFeedbackReasonCode,
     AgentFeedbackSeverity,
     AgentFeedbackSidecar,
     AgentFeedbackSummary,
+    PerformanceAcceptanceStatus,
 )
 from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticArtifactCitation,
@@ -39,7 +39,6 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
 )
 
 __all__ = [
-    "AGENT_FEEDBACK_SCHEMA_VERSION",
     "_MODEL_CONFIG",
     "AgentFeedbackBottleneck",
     "AgentFeedbackBuildIdentity",
@@ -57,6 +56,7 @@ __all__ = [
     "DiagnosticSidecarStatus",
     "DiagnosticSourceRef",
     "ExtendedDiagnosticIdentity",
+    "PerformanceAcceptanceStatus",
     "artifact_citation_from_path",
     "build_agent_feedback_sidecar",
     "evaluate_agent_feedback_governance",

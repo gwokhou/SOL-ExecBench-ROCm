@@ -65,7 +65,8 @@ from sol_execbench.core.data.trace import (
 )
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.solar_bridge.performance import (
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from solar.schema_versions import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
     SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
 )
@@ -279,7 +280,7 @@ def _evidence_manifest(
     atomic_write_json_value(
         provenance,
         {
-            "schema_version": "sol_execbench.rocprofv3_counter_provenance.v5",
+            "schema_version": SchemaVersion.ROCPROFV3_COUNTER_PROVENANCE,
             "diagnostic_only": True,
             "score_authority": False,
             "replay_phase": "evidence",

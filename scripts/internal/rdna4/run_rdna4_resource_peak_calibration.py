@@ -59,10 +59,10 @@ from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.process.logs import redacted_text_tail
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 from solar.rocm.architecture import (
-    RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION,
     RESOURCE_PEAK_TIMING_PROFILE,
     resource_peak_payload_sha256,
 )
+from solar.schema_versions import SchemaVersion as SolarSchemaVersion
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SOLAR_ROOT = REPO_ROOT / "src" / "solar"
@@ -70,7 +70,6 @@ PROBE_DIR = (
     REPO_ROOT / "src" / "sol_execbench" / "data" / "hardware_calibration_probes"
 )
 
-SCHEMA_VERSION = RESOURCE_PEAK_CALIBRATION_SCHEMA_VERSION
 TIMING_PROFILE = RESOURCE_PEAK_TIMING_PROFILE
 COMMAND_TIMEOUT_SECONDS = 120.0
 MAX_CAPTURE_BYTES = 1024 * 1024
@@ -1204,7 +1203,7 @@ def _build_artifact(
     held_out_execution_order: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": SolarSchemaVersion.RESOURCE_PEAK_CALIBRATION.value,
         "timing_profile": TIMING_PROFILE,
         "generated_at": datetime.now(UTC).isoformat(),
         "profile": args.profile,
@@ -1301,7 +1300,8 @@ def _write_artifact(args: argparse.Namespace, artifact: dict[str, Any]) -> None:
         "  status: verified\n"
         f"  path: {relative_path}\n"
         f"  sha256: {digest}\n"
-        f"  required_schema_version: {SCHEMA_VERSION}\n"
+        "  required_schema_version: "
+        f"{SolarSchemaVersion.RESOURCE_PEAK_CALIBRATION}\n"
         f"  required_timing_profile: {TIMING_PROFILE}\n"
         "  required_clocks_locked: true\n"
         f"  required_unthrottled: {str(required_unthrottled).lower()}\n"

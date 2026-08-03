@@ -40,7 +40,7 @@ from sol_execbench.core.bench.rocm_profiler.models import (
 )
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.integrity.schema_versions import (
-    ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION,
+    SchemaVersion,
 )
 from sol_execbench.core.text_utils import subprocess_text, text_tail
 
@@ -48,10 +48,10 @@ from sol_execbench.core.text_utils import subprocess_text, text_tail
 class Rocprofv3Diagnostics(CurrentFrozenSchemaModel):
     """Current bounded no-data profiler diagnostic artifact."""
 
-    current_schema_version = ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.ROCPROFV3_DIAGNOSTICS
 
-    schema_version: Literal["sol_execbench.rocprofv3_diagnostics.v1"] = (
-        "sol_execbench.rocprofv3_diagnostics.v1"
+    schema_version: Literal[SchemaVersion.ROCPROFV3_DIAGNOSTICS] = (
+        SchemaVersion.ROCPROFV3_DIAGNOSTICS
     )
     generated_at: str
     diagnostic_only: Literal[True]
@@ -353,7 +353,7 @@ def write_rocprofv3_diagnostic_artifact(
     path = request.output_directory / f"{request.output_file}.diagnostics.json"
     payload = Rocprofv3Diagnostics.model_validate(
         {
-            "schema_version": ROCPROFV3_DIAGNOSTICS_SCHEMA_VERSION,
+            "schema_version": SchemaVersion.ROCPROFV3_DIAGNOSTICS,
             "generated_at": datetime.now(UTC)
             .isoformat()
             .replace("+00:00", "Z"),

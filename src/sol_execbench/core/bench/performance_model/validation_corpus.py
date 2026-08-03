@@ -16,7 +16,7 @@ from sol_execbench.core.data.base_model import (
 )
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import (
-    DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 MINIMUM_CASES_PER_FAMILY = 20
@@ -65,10 +65,10 @@ class DiagnosticValidationCorpus(CurrentSchemaModel):
     """Frozen development or held-out cases for every admitted family."""
 
     model_config = _CONFIG
-    current_schema_version = DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.DIAGNOSTIC_VALIDATION_CORPUS
 
-    schema_version: Literal["sol_execbench.diagnostic_validation_corpus.v6"] = (
-        DIAGNOSTIC_VALIDATION_CORPUS_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.DIAGNOSTIC_VALIDATION_CORPUS] = (
+        SchemaVersion.DIAGNOSTIC_VALIDATION_CORPUS
     )
     role: Literal["development", "held_out"]
     cases: list[DiagnosticValidationCase] = Field(

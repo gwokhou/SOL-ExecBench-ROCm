@@ -26,7 +26,7 @@ from sol_execbench.core.data.json_utils import load_jsonl_file
 from sol_execbench.core.data.trace import CacheClearEvidence, Trace
 from sol_execbench.core.integrity import SHA256Digest, sha256_file
 from sol_execbench.core.integrity.schema_versions import (
-    PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION,
+    SchemaVersion,
 )
 
 TIMING_BOOTSTRAP_SEED = 20_260_729
@@ -91,10 +91,10 @@ class PerformanceTimingEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     """Diagnostic sample evidence from the same events as canonical Trace."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.PERFORMANCE_TIMING_EVIDENCE
 
-    schema_version: Literal["sol_execbench.performance_timing_evidence.v3"] = (
-        PERFORMANCE_TIMING_EVIDENCE_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.PERFORMANCE_TIMING_EVIDENCE] = (
+        SchemaVersion.PERFORMANCE_TIMING_EVIDENCE
     )
     run_id: SHA256Digest
     trace_sha256: SHA256Digest

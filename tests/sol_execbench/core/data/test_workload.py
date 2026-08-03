@@ -29,7 +29,7 @@ from sol_execbench.core.data.workload import (
     TopKRoutingCheck,
     Workload,
 )
-from sol_execbench.core.integrity.schema_versions import WORKLOAD_SCHEMA_VERSION
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _wkl(**inputs):
@@ -106,7 +106,7 @@ class TestOutputChecks:
         with pytest.raises(ValidationError, match="extra_forbidden"):
             Workload.model_validate(
                 {
-                    "schema_version": WORKLOAD_SCHEMA_VERSION,
+                    "schema_version": SchemaVersion.WORKLOAD,
                     "uuid": "test-uuid",
                     "axes": {},
                     "inputs": {"x": {"type": "random"}},

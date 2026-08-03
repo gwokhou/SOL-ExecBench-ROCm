@@ -12,6 +12,7 @@ from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceStatus,
     build_static_kernel_evidence_sidecar,
 )
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def test_static_evidence_paths_track_trace_output(tmp_path: Path):
@@ -65,9 +66,7 @@ def test_static_evidence_sidecar_writes_summary(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.static-evidence.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert (
-        payload["schema_version"] == "sol_execbench.static_kernel_evidence.v4"
-    )
+    assert payload["schema_version"] == SchemaVersion.STATIC_KERNEL_EVIDENCE
     assert payload["summary"]["status"] == "collected"
     assert payload["summary"]["artifact_count"] == 1
     assert payload["summary"]["claim_boundaries"]["diagnostic_only"] is True

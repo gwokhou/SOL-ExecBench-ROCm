@@ -70,7 +70,6 @@ class TorchviewProcessor(
         self._matched_modules: set[str] = set()
         self._node_counter: dict[str, int] = {}
         self._original_to_clean_id: dict[str, str] = {}
-        self._cached_default_dtype: str | None = None
 
     def process_graph(
         self,

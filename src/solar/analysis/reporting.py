@@ -16,12 +16,14 @@ from solar.analysis.graph_models import (
     GraphIoTotals,
     LowerBound,
 )
-from solar.analysis.resources import RESOURCE_MODEL_VERSION
 from solar.artifacts import sha256_file
 from solar.artifacts.yaml import NoAliasDumper
 from solar.contracts import FORMAL_BOUND_KIND, ROOFLINE_BOUND_KIND
 from solar.rocm.architecture import ArchitectureProfile
-from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
+from solar.schema_versions import (
+    SOLAR_ANALYSIS_SCHEMA_VERSION,
+    ResourceModelVersion as SolarResourceModelVersion,
+)
 from solar.types import NodeDict
 
 
@@ -168,7 +170,7 @@ def _analysis_metadata(
             prepared.profile.to_dict() if prepared.profile is not None else None
         ),
         "resource_model": {
-            "version": RESOURCE_MODEL_VERSION,
+            "version": SolarResourceModelVersion.AMD.value,
             "coverage": dict(accumulator.resource_coverage),
             "fail_closed": prepared.strict,
         },

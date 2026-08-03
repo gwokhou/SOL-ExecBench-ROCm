@@ -9,30 +9,47 @@ import subprocess
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
-from types import MappingProxyType
+from types import MappingProxyType, ModuleType
 
+from sol_execbench.core.integrity import schema_versions as exec_schema_versions
 from sol_execbench.core.integrity.schema_versions import (
     CURRENT_NUMERIC_SCHEMA_VERSIONS as EXECBENCH_NUMERIC_SCHEMA_VERSIONS,
     CURRENT_SCHEMA_VERSIONS,
     SCHEMA_VERSIONS,
+    SchemaVersion,
 )
+from solar import schema_versions as solar_schema_versions
 from solar.schema_versions import (
     CURRENT_NUMERIC_SCHEMA_VERSIONS as SOLAR_NUMERIC_SCHEMA_VERSIONS,
     CURRENT_STRING_SCHEMA_VERSIONS,
+    SchemaVersion as SolarSchemaVersion,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_ID_RE = re.compile(
-    r"(?:sol_execbench|solar)(?:\.[a-z0-9_]+)+\.v\d+",
-)
 VERSION_SUFFIX_RE = re.compile(r"\.v\d+$")
 CURRENT_SCHEMA_IDENTIFIERS = (
     CURRENT_SCHEMA_VERSIONS | CURRENT_STRING_SCHEMA_VERSIONS
+)
+NON_NAMESPACED_SCHEMA_FAMILIES = frozenset(
+    VERSION_SUFFIX_RE.sub("", schema_id)
+    for schema_id in CURRENT_SCHEMA_IDENTIFIERS
+    if not schema_id.startswith(("sol_execbench.", "solar."))
+)
+SCHEMA_ID_RE = re.compile(
+    r"(?:"
+    r"(?:sol_execbench|solar)(?:\.[a-z0-9_]+)+"
+    r"|"
+    + "|".join(map(re.escape, sorted(NON_NAMESPACED_SCHEMA_FAMILIES)))
+    + r")\.v\d+",
 )
 CURRENT_NUMERIC_SCHEMA_VERSIONS = (
     EXECBENCH_NUMERIC_SCHEMA_VERSIONS | SOLAR_NUMERIC_SCHEMA_VERSIONS
 )
 READ_ONLY_MAPPING_TYPE = type(MappingProxyType({}))
+EXECBENCH_SCHEMA_REGISTRY = Path(
+    "src/sol_execbench/core/integrity/schema_versions.py"
+)
+SOLAR_SCHEMA_REGISTRY = Path("src/solar/schema_versions.py")
 NUMERIC_SCHEMA_FIELD_RE = re.compile(
     r'(?m)^[ \t]*(?:"schema_version"|schema_version)[ \t]*:[ \t]*(\d+)\b',
 )
@@ -117,7 +134,7 @@ class _NumericSchemaLiteralVisitor(ast.NodeVisitor):
     def _record(self, node: ast.Constant) -> None:
         self.findings.append(
             f"{self.path}:{node.lineno}: raw numeric schema version "
-            "must use the current family constant",
+            "must use the matching family constant",
         )
 
     def visit_Dict(self, node: ast.Dict) -> None:
@@ -202,8 +219,37 @@ class _SchemaAccessPolicyVisitor(ast.NodeVisitor):
         ):
             self.findings.append(
                 f"{self.path}:{node.lineno}: import the named schema-version "
-                "constant instead of indexing SCHEMA_VERSIONS",
+                "enum member instead of indexing SCHEMA_VERSIONS",
             )
+        self.generic_visit(node)
+
+    def _reject_enum_relay(
+        self,
+        targets: Iterable[ast.AST],
+        value: ast.AST | None,
+    ) -> None:
+        if not (
+            isinstance(value, ast.Attribute)
+            and isinstance(value.value, ast.Name)
+            and value.value.id in {"SchemaVersion", "SolarSchemaVersion"}
+        ):
+            return
+        for target in targets:
+            if isinstance(target, ast.Name) and target.id.endswith(
+                "_SCHEMA_VERSION"
+            ):
+                self.findings.append(
+                    f"{self.path}:{target.lineno}: use {value.value.id}."
+                    f"{value.attr} directly instead of relaying it through "
+                    f"{target.id}",
+                )
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        self._reject_enum_relay(node.targets, node.value)
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        self._reject_enum_relay((node.target,), node.value)
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
@@ -224,8 +270,8 @@ def _python_numeric_schema_findings(path: Path, content: str) -> list[str]:
     if path.suffix != ".py" or path.parts[0] not in {"src", "scripts"}:
         return []
     if path in {
-        Path("src/sol_execbench/core/integrity/schema_versions.py"),
-        Path("src/solar/schema_versions.py"),
+        EXECBENCH_SCHEMA_REGISTRY,
+        SOLAR_SCHEMA_REGISTRY,
     }:
         return []
     try:
@@ -240,7 +286,7 @@ def _python_numeric_schema_findings(path: Path, content: str) -> list[str]:
 
 
 def registry_findings() -> list[str]:
-    """Require every current-version registry to be immutable at runtime."""
+    """Require immutable registries derived exactly from their enums."""
     registries = {
         "sol_execbench SCHEMA_VERSIONS": SCHEMA_VERSIONS,
         "sol_execbench CURRENT_NUMERIC_SCHEMA_VERSIONS": (
@@ -248,11 +294,53 @@ def registry_findings() -> list[str]:
         ),
         "solar CURRENT_NUMERIC_SCHEMA_VERSIONS": SOLAR_NUMERIC_SCHEMA_VERSIONS,
     }
-    return [
+    findings = [
         f"{name} must be a read-only mapping"
         for name, registry in registries.items()
         if not isinstance(registry, READ_ONLY_MAPPING_TYPE)
     ]
+    expected_strings = {
+        version.name.lower(): version.value for version in SchemaVersion
+    }
+    expected_numeric = _numeric_schema_constants(exec_schema_versions)
+    expected_solar_numeric = _numeric_schema_constants(solar_schema_versions)
+    if dict(SCHEMA_VERSIONS) != expected_strings:
+        findings.append(
+            "sol_execbench SCHEMA_VERSIONS must derive from SchemaVersion"
+        )
+    if dict(EXECBENCH_NUMERIC_SCHEMA_VERSIONS) != expected_numeric:
+        findings.append(
+            "sol_execbench CURRENT_NUMERIC_SCHEMA_VERSIONS must contain every "
+            "family constant",
+        )
+    if dict(SOLAR_NUMERIC_SCHEMA_VERSIONS) != expected_solar_numeric:
+        findings.append(
+            "solar CURRENT_NUMERIC_SCHEMA_VERSIONS must contain every family "
+            "constant",
+        )
+    if len(CURRENT_SCHEMA_VERSIONS) != len(SchemaVersion):
+        findings.append("SchemaVersion values must be unique")
+    if (
+        frozenset(version.value for version in SolarSchemaVersion)
+        != CURRENT_STRING_SCHEMA_VERSIONS
+    ):
+        findings.append(
+            "solar CURRENT_STRING_SCHEMA_VERSIONS must derive from SchemaVersion"
+        )
+    if len(CURRENT_STRING_SCHEMA_VERSIONS) != len(SolarSchemaVersion):
+        findings.append("solar SchemaVersion values must be unique")
+    return findings
+
+
+def _numeric_schema_constants(module: ModuleType) -> dict[str, int]:
+    suffix = "_SCHEMA_VERSION"
+    return {
+        name.removesuffix(suffix).lower(): value
+        for name, value in vars(module).items()
+        if name.endswith(suffix)
+        and isinstance(value, int)
+        and not isinstance(value, bool)
+    }
 
 
 def _numeric_schema_findings(path: Path, content: str) -> list[str]:
@@ -299,6 +387,24 @@ def audit_text(
         if schema_id not in CURRENT_SCHEMA_IDENTIFIERS:
             findings.append(
                 f"{path}: unsupported schema identifier {schema_id}",
+            )
+        elif (
+            path.suffix == ".py"
+            and path.parts[0] in {"src", "scripts"}
+            and (
+                (
+                    schema_id in CURRENT_SCHEMA_VERSIONS
+                    and path != EXECBENCH_SCHEMA_REGISTRY
+                )
+                or (
+                    schema_id in CURRENT_STRING_SCHEMA_VERSIONS
+                    and path != SOLAR_SCHEMA_REGISTRY
+                )
+            )
+        ):
+            findings.append(
+                f"{path}: schema identifier {schema_id} must be referenced "
+                "through SchemaVersion",
             )
     if (
         UPSTREAM_TOLERANCE_FIELD in content

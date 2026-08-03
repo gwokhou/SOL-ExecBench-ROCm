@@ -12,22 +12,17 @@ from pydantic import Field, model_validator
 
 from sol_execbench.core.data.base_model import CurrentSchemaModel
 from sol_execbench.core.integrity.schema_versions import (
-    BENCHMARK_CONFIG_SCHEMA_VERSION,
-    ROCM_EVENT_TIMING_CUSTOM_SCHEMA_VERSION,
-    ROCM_EVENT_TIMING_PAPER_COUNTS_SCHEMA_VERSION,
+    SchemaVersion,
 )
-
-OFFICIAL_ROCM_TIMING_PROTOCOL = ROCM_EVENT_TIMING_PAPER_COUNTS_SCHEMA_VERSION
-CUSTOM_ROCM_TIMING_PROTOCOL = ROCM_EVENT_TIMING_CUSTOM_SCHEMA_VERSION
 
 
 class BenchmarkConfig(CurrentSchemaModel):
     """Configuration for benchmark runs."""
 
-    current_schema_version = BENCHMARK_CONFIG_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.BENCHMARK_CONFIG
 
-    schema_version: Literal["sol_execbench.benchmark_config.v2"] = (
-        BENCHMARK_CONFIG_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.BENCHMARK_CONFIG] = (
+        SchemaVersion.BENCHMARK_CONFIG
     )
     warmup_runs: int = Field(default=10, ge=0)
     iterations: int = Field(default=50, gt=0)
@@ -63,5 +58,5 @@ class BenchmarkConfig(CurrentSchemaModel):
             and self.min_measurement_time_seconds is None
             and self.lock_clocks
         ):
-            return OFFICIAL_ROCM_TIMING_PROTOCOL
-        return CUSTOM_ROCM_TIMING_PROTOCOL
+            return SchemaVersion.ROCM_EVENT_TIMING_PAPER_COUNTS
+        return SchemaVersion.ROCM_EVENT_TIMING_CUSTOM

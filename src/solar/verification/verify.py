@@ -23,7 +23,7 @@ import yaml
 
 from solar.artifacts import sha256_file, stable_json_checksum
 from solar.ir.contracts import layer_operation
-from solar.schema_versions import IR_VERIFICATION_SCHEMA_VERSION
+from solar.schema_versions import SchemaVersion as SolarSchemaVersion
 from solar.verification.contracts import (
     IRVerificationBackend,
     TolerancePolicy,
@@ -487,7 +487,7 @@ def _file_attestation(
         ),
         "predicate": {
             "status": "passed",
-            "verifier": IR_VERIFICATION_SCHEMA_VERSION,
+            "verifier": SolarSchemaVersion.IR_VERIFICATION.value,
             "reference": {
                 "entry_point": reference_entry_point,
                 "input_factory": input_factory_name,
@@ -572,7 +572,7 @@ def _callable_attestation(
         "predicateType": "https://solar-rocm.dev/attestations/callable-to-einsum/v1",
         "predicate": {
             "status": "passed",
-            "verifier": IR_VERIFICATION_SCHEMA_VERSION,
+            "verifier": SolarSchemaVersion.IR_VERIFICATION.value,
             "tolerance": dict(tolerance),
             "execution": dict(execution),
             "cases": list(cases),
@@ -651,7 +651,7 @@ def _validated_replay_predicate(
     predicate = artifact.get("predicate") or {}
     if (
         predicate.get("status") != "passed"
-        or predicate.get("verifier") != IR_VERIFICATION_SCHEMA_VERSION
+        or predicate.get("verifier") != SolarSchemaVersion.IR_VERIFICATION
     ):
         raise VerificationError(
             "verification artifact is not a trusted passing result",

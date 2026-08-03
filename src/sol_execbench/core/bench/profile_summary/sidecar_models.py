@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import ConfigDict, Field
 
@@ -22,8 +23,7 @@ from sol_execbench.core.bench.profile_summary.models import (
     ProfileSummaryStructuredMetric,
 )
 from sol_execbench.core.integrity.schema_versions import (
-    PROFILE_SUMMARY_SCHEMA_VERSION,
-    ProfileSummarySchemaVersion,
+    SchemaVersion,
 )
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
@@ -47,9 +47,11 @@ class ProfileSummarySidecar(CurrentDiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for normalized profiler metadata."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = PROFILE_SUMMARY_SCHEMA_VERSION
+    current_schema_version = SchemaVersion.PROFILE_SUMMARY
 
-    schema_version: ProfileSummarySchemaVersion = PROFILE_SUMMARY_SCHEMA_VERSION
+    schema_version: Literal[SchemaVersion.PROFILE_SUMMARY] = (
+        SchemaVersion.PROFILE_SUMMARY
+    )
     status: DiagnosticSidecarStatus
     reason_code: ProfileSummaryReasonCode
     identity: DiagnosticIdentity
