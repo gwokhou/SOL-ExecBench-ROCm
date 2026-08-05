@@ -52,7 +52,7 @@ unreferenced by `src/`, `scripts/`, or `tests/`, and carry schema identifiers
 - `hardware_profile_requirements` v1
 - `representative_suite` v1
 
-Governance decision (2026-08-01): these are non-canonical local evidence, not
+Governance rule: these are non-canonical local evidence, not
 corpus. Their identifiers must **not** be registered, and the files must **not**
 be wired into evaluation or SOLAR consumption. A `NON_CANONICAL.md` marker in
 each directory records the same decision on disk.

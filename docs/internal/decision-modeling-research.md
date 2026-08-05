@@ -167,7 +167,7 @@ deterministic facts (`spill_detected`, a granularity-boundary occupancy jump),
 occupancy signals default to `inferred_low`, because static analysis cannot tell
 whether the kernel is latency-bound.
 
-## 8. Proposed Decision Model
+## 8. Current decision model
 
 ### 8.1 Bottleneck taxonomy (closed enum, three layers)
 
@@ -180,7 +180,7 @@ Layer R — Resource (static-inferable; backed by the current data layer)
   SPILL_DETECTED                # scratch > 0 (deterministic)
   WAVEFRONT_MISALIGNED          # block not a multiple of wavefront size
   CACHE_LINE_MISALIGNED         # RDNA 128 B / CDNA 64 B coalescing risk
-Layer C — Compile-time (disassembly-derived; partially deferred)
+Layer C — Compile-time (disassembly-derived; outside the static decision path)
   INSTRUCTION_MIX_SKEW          # low MFMA/WMMA or high scalar share
 Layer M — Runtime measured (injected from profile_summary.v3; static path never emits)
   COMPUTE_BOUND / MEMORY_BOUND / LATENCY_BOUND
@@ -244,13 +244,11 @@ Current populated values:
 | `register_file_per_cu_bytes` | 524288 (VGPR+AGPR combined) | `null` (no reliable primary source) | `null` (dynamic allocation) |
 | `lds_per_workgroup_bytes` | 65536 | `null` (RDNA3.5 LDS/L1 split unconfirmed) | 65536 |
 
-**Known gap (deferred to the decision modeling workflow)**: the closed-form
-occupancy formula needs `nW` (waves per workgroup = block size / wavefront
-size), which is not in the static footprint. Three resolution options, in
-ascending cost: (a) use the `Occupancy` value roc-objdump reports directly and
-skip the formula; (b) extend the footprint with workgroup size from disassembly;
-(c) declare precise occupancy a deferred limitation and emit only spill,
-granularity-boundary, and wavefront-alignment signals.
+The closed-form occupancy formula needs `nW` (waves per workgroup = block size /
+wavefront size), which is not part of the static footprint contract. The current
+model therefore uses the `Occupancy` value reported by roc-objdump when present
+and does not claim a separately derived precise occupancy. Without that value it
+emits only the supported spill, resource-ratio, and wavefront-alignment signals.
 
 **Semantic note**: `vgpr_limit` is the architected *addressing* limit (256), not
 the physical register file. The formula needs the physical file
@@ -320,7 +318,7 @@ The only values it gets right (`wavefrontSize`, `ldsPerCU`, the "RDNA 3.5" /
 the database adds no coverage. It is recorded here as "sampled and excluded"
 rather than silently dropped.
 
-## 11. Conclusions and Next Steps
+## 11. Current implementation conclusions
 
 - AMD official material fully covers the decision model: Omniperf supplies the
   taxonomy, the MI300X doc supplies the CDNA3 occupancy formula, GPUOpen
@@ -331,9 +329,10 @@ rather than silently dropped.
 - The data layer is decision-ready: the `ArchISABudget` divergence fields let
   the formula pick a tier, and `register_allocation_model` gates RDNA4 dynamic
   fallback.
-- **Resolved — implemented in `src/sol_execbench/core/bench/decision/` (quick
-  task `260710-decision-sidecar`):** (a) `nW` gap — uses the roc-objdump
-  `Occupancy` value directly, precise closed-form deferred; (b) `vgpr_limit`
+- **Implemented in `src/sol_execbench/core/bench/decision/`:** (a) the `nW`
+  boundary uses the roc-objdump
+  `Occupancy` value directly and does not claim a precise closed-form result;
+  (b) `vgpr_limit`
   documented as the architected addressing limit (occupancy uses
   `register_file_per_cu_bytes`); (c) `sol_execbench.decision.v2` schema + builder
   + `--decision auto` CLI; (d) cross-sidecar precedence via

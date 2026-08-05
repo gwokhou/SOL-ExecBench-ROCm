@@ -138,19 +138,18 @@ device and toolchain. The CDNA3 marker contract lives at
 `tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py`; passing it is
 not full MI300X hardware-validation evidence, and RDNA4 is not a `gfx94*` validation target.
 
-The current host ROCm 7.2.x environment is the default recorded environment;
-default validation does not require host reinstall. ROCm 7.0.x or
-ROCm 7.1.x native-host validation requires a matching host. Container rows are
-ROCm user-space evidence on the recorded host driver/devices, not native-host
+The configured default container target is ROCm 7.2.x. ROCm 7.0.x, 7.1.x, or
+7.2.x native-host validation requires a matching host. Container records are
+ROCm user-space evidence on their observed host driver/devices, not native-host
 authority.
 
-### Compatibility Matrix Summary
+### Configured container target catalog
 
-| Target id | Local image tag | Requested ROCm user-space | Evidence summary |
+| Target id | Local image tag | Requested ROCm user-space | PyTorch ROCm dependency |
 | --- | --- | --- | --- |
-| `rocm-7.0.2-ubuntu-24.04-container` | `sol-execbench:rocm-7.0.2-complete` | 7.0.2 | `linear_backward` passed 3/3 workloads with `--record-container-validation`; `container_validated` evidence recorded `CLOCKS_LOCKED=0`. |
-| `rocm-7.1.1-ubuntu-24.04-container` | `sol-execbench:rocm-7.1.1-complete` | 7.1.1 | Declared container target with target-specific PyTorch ROCm dependencies and `CLOCKS_LOCKED=1` evidence. |
-| `rocm-7.2.0-ubuntu-24.04-container` | `sol-execbench:rocm-7.2-complete` | 7.2.0 | Default target; `linear_backward` passed 3/3 workloads with `CLOCKS_LOCKED=1` evidence. |
+| `rocm-7.0.2-ubuntu-24.04-container` | `sol-execbench:rocm-7.0.2-complete` | 7.0.2 | `torch==2.10.0+rocm7.0` |
+| `rocm-7.1.1-ubuntu-24.04-container` | `sol-execbench:rocm-7.1.1-complete` | 7.1.1 | `torch==2.10.0+rocm7.1` |
+| `rocm-7.2.0-ubuntu-24.04-container` | `sol-execbench:rocm-7.2-complete` | 7.2.0 | `torch==2.11.0+rocm7.2` (default) |
 
 Smoke runs selected by `--allow-untested-target-smoke` or
 `--allow-mixed-version-dependencies` are diagnostic. A mixed stack reports
@@ -158,10 +157,6 @@ Smoke runs selected by `--allow-untested-target-smoke` or
 PyTorch ROCm pins include `torch==2.10.0+rocm7.0` and
 `torch==2.11.0+rocm7.2`.
 
-Recorded official wrapper artifacts use
-`rocm-7.0.2-linear-wrapper-official.jsonl`,
-`rocm-7.0.2-linear-wrapper-official.compatibility.json`,
-`rocm-7.2-linear-wrapper-official.jsonl`, and
-`rocm-7.2-linear-wrapper-official.compatibility.json`. Diagnostic smoke names
-include `rocm-7.2-linear-wrapper-smoke.jsonl` and
-`rocm-7.2-linear-wrapper-smoke.compatibility.json`.
+Use `--record-container-validation` to create evidence for a concrete run. The
+resulting artifact, rather than this catalog, owns observed versions, clock
+state, workload results, and validation status.

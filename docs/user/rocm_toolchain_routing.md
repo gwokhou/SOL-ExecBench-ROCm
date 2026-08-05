@@ -26,7 +26,7 @@ does not prove benchmark correctness or performance.
 | `active` | Current tool or source used by the project. |
 | `deprecated` | Historical tool retained for routing and migration notes. |
 | `migrated` | Tool or repository moved to a new source of truth. |
-| `planned` | Tool is intentionally deferred to a future milestone. |
+| `planned` | Tool is registered but has no active collection route. |
 | `candidate` | Tool may be used if local packaging and evidence requirements work. |
 | `rejected` | Tool is documented as intentionally not used. |
 
@@ -45,7 +45,7 @@ components.
 | `unsupported_artifact` | The tool does not handle the requested artifact type. |
 | `deprecated` | The entry is retained for history but should not be selected. |
 | `migrated` | The entry moved to a replacement or source-of-truth repository. |
-| `planned` | The route is documented for future work and not selected by current evidence collection. |
+| `planned` | The route is registered but not selected by current evidence collection. |
 | `rejected` | The tool is intentionally not used. |
 | `failed` | A bounded probe ran and failed. |
 
@@ -87,7 +87,7 @@ uv run sol-execbench --format json toolchain route \
 | ROCm Systems | active | runtime/profiling | Repository source-of-truth signal, not a direct executable route. |
 | `rocminfo` | active | runtime | Runtime/device discovery. |
 | `rocm_agent_enumerator` | active | runtime | Architecture discovery. |
-| RGA | planned | static | Rich resource extraction is deferred until local packaging and parser evidence exist. |
+| RGA | planned | static | Registered but inactive: no bounded packaging or parser contract feeds Static Kernel Evidence. |
 | `llvm-objdump` | active | static | Bounded object-inspection route for persisted HIP/C++ build artifacts. |
 | `roc-objdump` | candidate | static | Distribution-dependent object-inspection candidate. |
 | `readelf` | active | static | Generic ELF metadata fallback for persisted HIP/C++ build artifacts. |

@@ -52,22 +52,21 @@ languages in the same solution.
 | `gfx1200` | RDNA 4 | Exact RX 9060 XT/ROCm 7.2 local hardware gate passed; engineering evidence only, not an RDNA4-family or publisher-release claim. |
 | `gfx940` | CDNA 3 | Code/schema support; no recorded hardware-validation pass on this exact target. |
 | `gfx941` | CDNA 3 | Code/schema support; no recorded hardware-validation pass on this exact target. |
-| `gfx942` | CDNA 3 | MI308X validation infrastructure evidence exists, including a passed pytest suite and a full dataset run with known timeout blockers; not a full MI300X hardware-validation pass. |
+| `gfx942` | CDNA 3 | Code/schema support and limited MI308X infrastructure evidence; no full MI300X hardware-validation pass. |
 | `LOCAL` | Local AMD GPU detected at packaging time | Uses the detected local AMD gfx target. |
 
 CDNA 3 entries allow solution metadata and HIP offload flag staging to target
 `gfx94*` devices. Schema/build support is not hardware-validation evidence by
-itself. The recorded MI308X (`gfx942`) cloud runs show that CDNA3 validation
-infrastructure is operational, but the remaining dataset timeout blockers and
-exact-hardware MI300X evidence requirements prevent a full MI300X validation
-claim under the CDNA 3 family.
+itself. The available MI308X (`gfx942`) infrastructure evidence has timeout
+gaps and is not exact-hardware MI300X evidence, so it cannot support a full
+MI300X validation claim under the CDNA 3 family.
 
 The `gfx1200` scope is likewise exact. Other `gfx12*` products and different
 ROCm/PyTorch stacks require new evidence; see
 [RDNA4 Validation Scope](RDNA4-VALIDATION.md).
 
-NVFP4/MXFP4 Quant benchmark ROCm adaptation is deferred until CDNA4-class
-hardware is available. CDNA3 validation should skip those problems with the
+NVFP4/MXFP4 Quant benchmark ROCm adaptation has no representative CDNA4
+hardware evidence. CDNA3 validation must skip those problems with the
 documented hardware-unsupported reason instead of treating CPU or dequantized
 fallbacks as benchmark validation.
 

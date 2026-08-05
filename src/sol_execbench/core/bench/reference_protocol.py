@@ -1,7 +1,19 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Authenticated, pickle-free IPC for trusted reference evaluation."""
+"""Authenticated, pickle-free IPC for trusted reference evaluation.
+
+This boundary exists to keep reference source, expected outputs, and the secret
+per-run input nonce out of the candidate process. Control frames are bounded
+JSON and tensors use safetensors; pickle and candidate-chosen object decoding
+are never part of the protocol. Timing inputs may cross into the candidate, but
+the matching expected output stays in the reference service and only a
+validation verdict returns.
+
+The service permits at most one unvalidated timing case. Callers must validate
+it before requesting the next case, so an input/output pair is single-use and
+cannot be replayed across measured invocations.
+"""
 
 from __future__ import annotations
 

@@ -12,7 +12,7 @@ ROCm 7.2 wheels.
 - `hipcc` is available when building HIP/C++ solutions.
 - ROCm library development headers are installed when running native library
   examples: `hipblas/hipblas.h`, `miopen/miopen.h`, `ck/ck.hpp`, and
-  `rocwmma/rocwmma.hpp` for the supported/planned library categories.
+  `rocwmma/rocwmma.hpp` for the supported library categories.
 
 Quick host checks:
 
@@ -147,9 +147,9 @@ to HIP itself:
 | Library category | Headers | Link/runtime library | Notes |
 | --- | --- | --- | --- |
 | hipBLAS | `hipblas/hipblas.h` | `-lhipblas` | Supported by the existing SGEMM example. |
-| MIOpen | `miopen/miopen.h` | `-lMIOpen` | Dependency readiness is checked in the ROCm container; v3 does not ship a dedicated MIOpen sample. |
-| Composable Kernel | `ck/ck.hpp` | Header-driven | Dependency readiness is checked in the ROCm container; v3 does not ship a dedicated CK sample. |
-| rocWMMA | `rocwmma/rocwmma.hpp` | Header-driven | Dependency readiness is checked in the ROCm container; v3 does not ship a dedicated rocWMMA sample. |
+| MIOpen | `miopen/miopen.h` | `-lMIOpen` | Focused solution metadata is checked in under `tests/sol_execbench/samples/rdna4_vecadd/`. |
+| Composable Kernel | `ck/ck.hpp` | Header-driven | Focused solution metadata is checked in under `tests/sol_execbench/samples/rdna4_vecadd/`. |
+| rocWMMA | `rocwmma/rocwmma.hpp` | Header-driven | A focused RDNA4 sample is checked in under `tests/sol_execbench/samples/rdna4_rocwmma/`. |
 
 Run `uv run pytest tests/docker/dependencies/test_rocm_libraries.py` inside the
 ROCm container before evaluating a solution that uses these libraries.

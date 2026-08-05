@@ -81,13 +81,13 @@ Official-score status is reported as four independent facts:
 - a repository release exists only when a verified publisher bundle is
   distributed under `RELEASE/`.
 
-The current policy is authorized and the verifier is available, while the empty
-mapper allowlist blocks release production and no repository release bundle is
-published. Formula-helper results, diagnostic speedups, and raw caller timing
-JSON are not official scores. Release execution additionally requires a clean
-source tree at the declared Git revision, records the immutable Docker image
-ID, and requires baseline and candidate evidence to use the same environment
-identity.
+The verifier and formal producer are ready. Corpus-policy authorization remains
+false with `baseline_v2_release_evidence_pending`, and no repository release
+bundle is published. Formula-helper results, diagnostic speedups, and raw caller
+timing JSON are not official scores. Release execution additionally requires a
+clean source tree at the declared Git revision, records the immutable Docker
+image ID, and requires baseline and candidate evidence to use the same
+environment identity.
 
 This repository imports a pinned upstream corpus; it does not implement the
 paper's dataset extraction/curation pipeline. Candidate static review uses
@@ -95,8 +95,9 @@ deterministic AST rules, not the paper's LLM judge. The ROCm formal profile also
 requires pinned Orojenesis evidence as a port-specific publication policy.
 The formal CLI sets that requirement unconditionally, and the worker, bridge,
 and CLI reject diagnostic bounds independently. A reviewed mapper binary and
-its pinned provenance/build manifest are both required; the current empty
-binary allowlist keeps publication unavailable.
+its pinned provenance/build manifest are both required. The repository
+allowlist contains the reproducibly built trusted digest; any other binary
+remains unavailable.
 
 The implemented formula is:
 

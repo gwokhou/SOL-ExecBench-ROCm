@@ -1,7 +1,19 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Trusted reference execution service for the staged evaluator."""
+"""Trusted reference execution and per-invocation validation state machine.
+
+The service owns the reference definition, reference callable, expected
+outputs, input nonce, and pending-validation state. Candidate code receives a
+fresh input for each warmup or timed invocation but never receives the nonce or
+matching expected output. A timing case must be validated exactly once before
+another can be issued; repeated or out-of-order requests fail closed.
+
+Keep this ownership boundary intact when changing input generation or timing.
+Moving expected outputs or nonce-derived state into the evaluator process would
+re-open precomputation and value-cache attacks even if static source review
+continued to reject known cache spellings.
+"""
 
 from __future__ import annotations
 
@@ -73,7 +85,14 @@ class InputGenerationError(RuntimeError):
 
 
 class ReferenceService:
-    """Own trusted reference code, input generation, output, and timing state."""
+    """Own all trusted state and enforce the one-case timing protocol.
+
+    ``_pending_timing_validation`` is the state-machine lock: creating a timing
+    iteration stores its expected outputs here and returns no reference output;
+    validation consumes the state before the next iteration is allowed.
+    ``input_nonce`` is accepted only by this worker and is mixed into generated
+    input seeds so values differ across runs and measured invocations.
+    """
 
     def __init__(
         self,

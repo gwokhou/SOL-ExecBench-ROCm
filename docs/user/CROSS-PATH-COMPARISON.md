@@ -53,41 +53,18 @@ Coverage is also fail-closed. Missing workloads are listed under
 the command exits nonzero even when all dual-ready workloads agree on
 authoritative accounting.
 
-## Focused dual-path result
+## Current coverage boundary
 
-The reviewed accounting comparison covers 32 workloads that were ready on both
-paths when it was generated. For those 32:
+The current focused readiness matrix is 41/41 on both paths. The last generated
+repository-owned accounting report covered an earlier 32-workload subset, so it
+is historical evidence rather than a result for the current denominator. This
+document intentionally does not preserve that snapshot's mismatch counts; use
+Git history when auditing it.
 
-| Dimension | Mismatches |
-| --- | ---: |
-| External reference/I/O identity | 0 |
-| Graph-level model I/O | 0 |
-| Mandatory resource work | 0 |
-| Limiting resource and formal bound | 0 |
-| Internal fusion/intermediate accounting | 32 |
-
-The remaining internal differences are dialect decomposition differences:
-ATen preserves exact granular operations, aliases, and views, while
-extended-einsum normalizes or combines some of that topology. All 32 differ in
-layer count, unfused traffic, and intermediate traffic; 21 differ in the number
-of intermediate tensors and four differ in zero-work orphan counts. Audited
-fused/prefetched traffic agrees, so these internal differences do not change
-mandatory resource work, the limiting resource, or the final bound.
-
-Three generic fixes established that result:
-
-- graph producer topology, rather than missing tensor-role metadata, determines
-  whether an input is internal;
-- only layers reachable from declared graph outputs contribute work or I/O;
-- a Torchview dtype-view preserves its explicit destination dtype instead of
-  being normalized as a shape-only view.
-
-Those nine Torchview conversion/replay failures have since been fixed through
-generic scalar-edge, tensor-keyword, and root-identity handling. The current
-focused readiness matrix is 41/41 on both paths, and the complete Torchview
-matrix is 159/163. The nine newly ready workloads have not yet been reanalyzed
-and added to a repository-owned accounting comparison, so the 32-workload
-accounting result above must not be generalized to all 41 workloads.
+Until a new 41-workload report is generated, no repository-wide equality claim
+may be made for model I/O, mandatory work, internal fusion accounting, limiting
+resource, or formal bounds. The refresh is tracked in the
+[active backlog](../../HANDSOFF.md).
 
 The four remaining full-corpus Torchview failures are explicit backward
 references in `instruction2triton/rmsnorm_bwd`. They remain fail-closed at graph

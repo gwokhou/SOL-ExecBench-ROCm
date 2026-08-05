@@ -37,8 +37,8 @@ HIP/C++ or Triton JIT, executed as `fn(*inputs)` / `fn(*inputs,*outputs)` on the
 **default stream** under PyTorch's **eager allocator**, timed with HIP events
 (10 warmup / 50 iters × 3 trials), target-derived 2×L2 clear (256 MiB fallback) + shifting-`data_ptr`
 allocator before each iteration, STABLE_PEAK clocks, reference materialized in a
-**trusted IPC worker**, correctness = `(atol, rtol, matched_ratio,
-max_error_cap)`. Static + dynamic **reward-hack defenses** reject streams,
+**trusted IPC worker**, and named per-output numeric, exact, code-distance, or
+coupled top-k checks. Static + dynamic **reward-hack defenses** reject streams,
 CUDAGraph, semantic caches, threading, precision downcasts, and file/loader
 smuggling. There is **no** multi-stage-entry-point, custom-allocator,
 non-default-stream, or repo-level-multi-file-edit path.
@@ -83,97 +83,81 @@ triton2flydsl 51 + flydsl2flydsl 7 + repository 9).
 
 ---
 
-## 3. I/O representability (the second, independent axis)
+## 3. I/O representability
 
-Even when the paradigm/ecosystem fit (Cat1/Cat2 candidates), a task's
-`(Input Representation, Output Representation)` must round-trip the on-disk
-schema with structural advantage. Classification observed across the convertible
-suites:
+Paradigm fit and on-disk representability are independent. The current workload
+contract supports more than the original random-tensor/single-output envelope:
 
-- **Cat1-friendly — C1–C4:** single random tensor; +scalars; +weight/bias
-  tensors; multiple random tensors → single tensor. All harness strengths
-  preserved: symbolic shape generalization, per-workload repeated-reference
-  tolerance calibration (`aka_calibrate_tolerances.py`), deterministic
-  all-workload/all-output oracle cross-check (`aka_equivalence_check.py`), and
-  harness-controlled adversarial workload sampling.
-- **Cat2-fragile — C5–C8, C11, C13:**
-  - C5 index/mask tensors → `RandomInput` cannot express index range;
-    adversarial sampling broken (would need `CustomInput`).
-  - C6 structured int32 offsets / paged-KV → needs `CustomInput` (and the
-    all-or-nothing custom-mixing rule forces every input custom).
-  - C7 multi-output tuples → single `ToleranceSpec` mis-calibrates mixed dtypes.
-  - C8 FP8/int8 quant → paper's specialized quant-evaluator not instantiated.
-  - C11 scalar/0-d output → degenerate-output guard can trip.
-  - C13 pytest-parametrized (instruction2triton) → liftable through a
-    task-specific adapter because the source oracle lives in the correctness
-    test rather than a `module_fn`.
-- **Cat3-illegal — C9/C10, C12:**
-  - C9/C10 variable-rank within one Definition → `_validate_tensor_axis_references`
-    pins rank; must **split into rank-pinned problems** (each becomes Cat1).
-  - C12 `uint8` → not in the `DType` enum (`definition_models.py`).
+- bounded integer generators for indices and masks;
+- seed-sensitive custom inputs mixed with ordinary generated inputs;
+- positive and simplex-valued structured inputs;
+- scalar tensors, multi-output results, and mixed output dtypes;
+- per-output numeric or exact checks;
+- value/raw-bit code-distance checks for quantized outputs;
+- coupled top-k ID and weight checks;
+- `uint8`, `int8`, FP8, BF16, FP16, and FP32 schema dtypes where the target
+  catalog permits them.
 
----
+These capabilities admit the previously fragile CrossEntropy, BatchNorm,
+KDLoss, FP8/MXFP, integer-quantization, and MoE routing families without
+weakening their semantic checks. Each admitted capability has a manifest
+coverage floor and focused contract tests.
+
+Two boundaries remain deliberate:
+
+- variable-rank cases must be split into rank-pinned Definitions because a
+  tensor contract has a fixed rank;
+- nondeterministic RNG kernels without a stable counter-based oracle cannot be
+  given reproducible benchmark semantics.
 
 ## 4. Three-category handling policy
 
-| Category | Verdict | Handling in this repo |
+| Category | Verdict | Current handling |
 |---|---|---|
-| **Cat1** legal + structural advantage | keep every harness strength | `role: scored`, full conversion. Primary expansion surface |
-| **Cat2** legal + structural disadvantage | convert and make the disadvantage explicit | mechanical inclusion: rank-split (C9/C10 → Cat1), FP8 as `compatibility_sentinel` (C8), backward pass via an instruction2triton source-oracle adapter (C13), and clean torch2flydsl elementwise (bf16). Every scored task is source-cross-checked; only the deliberately non-equivalent FP8 compatibility sentinel is `not_applicable`. |
-| **Cat3** illegal | cannot represent | **rejected**, recorded below with a `reason_code`. No manifest entry references a Cat3 suite |
-
-### Provenance binding note (Cat2)
+| **Cat1** legal + structural advantage | preserve all harness strengths | Scored conversion with source cross-checking. |
+| **Cat2** legal after explicit modeling | encode the structural requirement | Scored when the manifest declares and satisfies the required input/check capability; use a sentinel only when target compatibility, rather than semantic equivalence, is the intended claim. |
+| **Cat3** outside the benchmark paradigm | do not weaken the benchmark to admit it | Reject; no manifest entry may reference a Cat3 suite. |
 
 Manifest schema v7 gives every entry exactly three typed, content-addressed
 `aka_artifacts`: `config`, `semantic_reference`, and `correctness_runner`.
 `audit_aka_provenance` resolves and verifies all three roles at the pinned AKA
-revision for torch2hip, instruction2triton, and torch2flydsl alike. The latter
-two suites bind their actual test-file/model oracle instead of pretending that a
-`pytorch_code_functional/` path exists.
+revision for torch2hip, instruction2triton, and torch2flydsl. The latter two
+suites bind their actual test-file/model oracle rather than inventing a
+`pytorch_code_functional/` path.
 
-The manifest also binds `tolerance-calibration.json`. Its 128 workload records
-pin the semantic Definition/Workload contract, formal `gfx1200` device identity,
-repeated-run observations, output dtypes, sample count, safety margin, and final
-`ToleranceSpec`. Loading the corpus fails if coverage, hashes, exclusion reasons,
-or authored tolerances drift.
-
----
+The manifest also binds `tolerance-calibration.json`. Its 163 scored workload
+records pin the semantic Definition/Workload contract, formal `gfx1200` device
+identity, repeated-run observations, output dtypes, sample count, and final
+named output checks. Loading the corpus fails if coverage, hashes, exclusions,
+or authored checks drift.
 
 ## 5. Cat3 reject log
 
-These AKA tasks/suites are **deliberately excluded** from the corpus. Each is
-illegal under the envelope; admitting it would require inventing a different
-benchmark (kernel-to-kernel optimization, FlyDSL compilation, repo-level edits,
-or dtype-enum extension).
+These AKA suites or task classes remain outside the benchmark's contract:
 
-| Suite / task class | `reason_code` | Layer violated | Note |
-|---|---|---|---|
-| `hip2hip` (32) | `kernel_to_kernel_paradigm` | Layer 1 | agent is given an existing HIP kernel to optimize; no liftable PyTorch oracle |
-| `triton2triton` (165) | `kernel_to_kernel_paradigm` | Layer 1 | existing Triton kernel → optimized Triton |
-| `triton2flydsl` (51) | `kernel_to_kernel_paradigm` + `unsupported_backend_flydsl` | Layer 1 + 3 | existing Triton kernel; FlyDSL target is prompt-only (harness runs the original Triton entry) |
-| `flydsl2flydsl` (7) | `kernel_to_kernel_paradigm` + `unsupported_backend_flydsl` | Layer 1 + 3 | existing FlyDSL kernel → optimized FlyDSL |
-| `repository` (9: aiter×5, rocprim×4) | `repository_level_multi_file` | Layer 1 + 2 | whole-upstream-repo edits; runtime is single-bundle / single-entry-point |
-| `torch2flydsl` FP8/MoE/MXFP (~30) | `quant_or_structured_io_fragile` (deferred, not rejected) | Layer 2 (evaluator) | C7/C8; legal but the specialized quant/structured evaluator is not instantiated — deferred to a future schema/runtime round, not a Cat3 reject |
-| C12 `uint8` tasks (e.g. packed MXFP codes) | `unsupported_dtype_uint8` | schema | `DType` enum has no `uint8` |
-| RNG kernels (`instruction2triton/test_randn`, `test_random_int`) | `non_deterministic_rng` | Layer 2 | no deterministic oracle (Philox counter sequences) |
-| `CrossEntropy` with integer target (`l1n95`) | `index_tensor_adversarial_sampling` (deferred) | C5 | target is an index tensor; `RandomInput` miscalibrates it. Deferred to a future round with `CustomInput` author support, not a hard reject |
-| `BatchNorm`-with-running-stats (`l2n52`) | `structured_input_positive_variance` (deferred) | C5/C8 | eval-mode `F.batch_norm` takes `running_var` as an input, but `RandomInput` yields `randn` (negative values) → `sqrt(negative)` → NaN. Deferred until `CustomInput` can supply a positive-variance tensor |
-| `KDLoss` probability target (`14007`) | `structured_input_probability` (deferred) | C5/C8 | `F.kl_div` requires the `target` to be a probability distribution; random `target` → `log(negative)` → NaN, and the summed form returns a scalar (breaks the sanity check). Deferred with `CustomInput` + a tensor-output reduction |
+| Suite / task class | Reason | Boundary |
+|---|---|---|
+| `hip2hip` | Existing kernel-to-kernel optimization has no independent PyTorch oracle. | Agent input paradigm |
+| `triton2triton` | Existing kernel-to-kernel optimization has no independent PyTorch oracle. | Agent input paradigm |
+| `triton2flydsl` | Kernel translation plus an unsupported FlyDSL target. | Agent input + compiler ecosystem |
+| `flydsl2flydsl` | Kernel translation plus an unsupported FlyDSL target. | Agent input + compiler ecosystem |
+| `repository` | Whole-repository edits cannot be represented as one solution bundle and entry point. | Agent input + runtime |
+| Unstable RNG tasks | No deterministic semantic oracle is available. | Runtime/correctness |
 
-The hard rejects (first 5 rows + uint8 + RNG) total **264 + a handful** tasks and
-are out of scope for this benchmark's design. The *deferred* items
-(torch2flydsl FP8/MoE, CrossEntropy) are legal-but-fragile Cat2 candidates held
-for a later round that adds per-output `ToleranceSpec`, relaxes the
-custom-input mixing rule, or extends the author to emit `CustomInput` workloads.
+These are scope decisions, not pending implementation promises. A proposal to
+support them must define a new benchmark contract instead of adding a
+compatibility alias to the current one.
 
----
+## 6. Realized corpus
 
-## 6. How this drove the expansion
+The current expansion contains 45 authored problems from the pinned AKA
+revision: 43 scored problems covering 163 workloads, one compatibility
+sentinel, and one target-incompatible sentinel. The scored entries span 37
+torch2hip, six torch2flydsl, and two instruction2triton sources before role and
+target filtering.
 
-The expansion grows the corpus from 15 → 37 problems by drawing **only** from
-the Cat1 and mechanical-Cat2 buckets above. See `scripts/internal/aka_author_seed.py`
-`SPECS` and the manifest's `formal_coverage_requirements.combinations` for the
-realized selection; the floor constraints there encode this policy (attention,
-≥2 norm, a backward pass, an FP8 sentinel, and fused depth). A test in
-`tests/sol_execbench/core/dataset/test_aka_corpus.py` asserts that no entry
-references a Cat3 suite.
+`scripts/internal/aka_author_seed.py` and the manifest's
+`formal_coverage_requirements` define the realized selection and capability
+floors. `tests/sol_execbench/core/dataset/test_aka_corpus.py` verifies the
+denominator, roles, provenance bindings, capability coverage, and absence of
+Cat3 suites.

@@ -1,7 +1,18 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""Validated timing helpers for staged workload evaluation."""
+"""Candidate-side timing with trusted per-invocation validation.
+
+Only the candidate call is enclosed by device events. Input generation,
+reference execution, IPC, and correctness comparison stay outside the timed
+region, but every warmup and timed call receives a fresh reference-service case
+and must return a result on the selected GPU before the end event. The helper
+then sends candidate outputs back for one-shot validation before advancing.
+
+This module must not cache timing inputs, expose reference outputs, validate
+only a sample of iterations, or let a candidate switch devices mid-timing.
+Those changes would invalidate the v4 timing protocol rather than optimize it.
+"""
 
 from __future__ import annotations
 

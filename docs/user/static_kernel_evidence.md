@@ -76,7 +76,9 @@ cache on first use. If the helper, XML, network, or ROCm fat-binary tools are
 unavailable, collection remains diagnostic and the aggregate status becomes
 `partial` rather than failing the benchmark. Set
 `SOL_EXECBENCH_AMD_ISA_OFFLINE=1` to forbid ISA downloads. `rga` remains a
-planned route and is not yet wired as an extractor.
+registered `planned` route; it has no active extractor or sidecar fields. The
+decision to implement or remove that route is tracked in the
+[active backlog](../../HANDSOFF.md).
 
 ## Claim Boundaries
 
@@ -96,15 +98,15 @@ classification and optimization recommendations belong to a separate Decision
 sidecar (see `docs/user/decision_sidecar_contract.md`) that consumes these facts;
 this sidecar does not carry decision fields.
 
-## Deferred Or Unsupported Scope
+## Unsupported or partial scope
 
-The following remain unsupported, partial, or deferred unless direct evidence is
-recorded in a future artifact:
+The current sidecar does not establish:
 
 - CDNA3-family live hardware validation, including MI300X (`gfx942`)
 - CDNA 4 live hardware validation
 - Triton ROCm cache capture
-- `rga`-rich resource parsing beyond what `roc-objdump --resource-usage` reports (RGA-rich resource parsing itself remains deferred)
+- RGA-rich resource parsing beyond what `roc-objdump --resource-usage` or the
+  ELF metadata path reports
 - paper-scale static coverage for the full original benchmark denominator
 - standalone static analysis of arbitrary pre-existing binaries
 

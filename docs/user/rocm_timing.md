@@ -47,8 +47,8 @@ There are two different reasons a timing sidecar can be fallback-labeled:
 - **Source-policy fallback**: the selected source policy is not raw
   `rocprofv3` kernel activity timing. PyTorch reference solutions are the
   important case: the source policy is PyTorch operator attribution, so default
-  dataset timing records device-event fallback unless a future PyTorch-specific
-  attribution path is explicitly validated.
+  dataset timing records device-event fallback because no validated
+  PyTorch-specific attribution path currently replaces it.
 - **Profiler-unavailable fallback**: the selected source policy supports
   `rocprofv3` kernel activity timing, but `rocprofv3` is unavailable, fails, or
   does not produce parseable evidence.
@@ -66,10 +66,9 @@ NVIDIA CUDA runtime.
 
 ## Current Benchmark Boundary
 
-The current benchmark timing function is `time_runnable()` in
-`src/sol_execbench/core/bench/timing.py`. Phase 23 does not change its execution
-behavior. It defines the policy that later phases use to decide when
-profiler-backed timing should replace fallback event timing.
+The benchmark timing function is `time_runnable()` in
+`src/sol_execbench/core/bench/timing.py`. Profiler-backed evidence remains a
+separate diagnostic path and does not replace canonical event timing.
 
 ## Profiler Evidence
 
@@ -91,8 +90,8 @@ evidence is unavailable or unsupported, but it must keep its backend, fallback
 reason, and interpretation separate from profiler-backed kernel activity.
 
 Canonical trace JSONL remains the benchmark output contract. Timing policy and
-profiler evidence are derived methodology artifacts unless a future phase adds
-an explicit documented output path.
+profiler evidence are derived methodology artifacts with their own documented
+sidecar paths.
 
 ## Optional Profiling Artifacts
 
@@ -134,9 +133,8 @@ correctness failure. When collection falls back or is skipped, the sidecar
 records an explicit fallback reason through `skipped_reason` or `failed_reason`.
 Profile-summary citations compute SHA256 for registered profiler artifacts by
 default, including database artifacts such as `.rocpd`. This makes citations
-auditable but can add measurable cost for very large profiler databases; Phase
-190 intentionally keeps the always-hash behavior and treats any future size
-limit as a deliberate follow-up.
+auditable but can add measurable cost for very large profiler databases. There
+is no size-based hashing exemption in the current contract.
 
 ## Live rocprofv3 Collection
 

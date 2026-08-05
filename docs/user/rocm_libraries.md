@@ -7,17 +7,17 @@ The solution schema accepts these ROCm-facing language categories:
 | `pytorch` | staged Python | `tests/sol_execbench/samples/custom_inputs_matmul` |
 | `triton` | staged Python with Triton ROCm | `tests/sol_execbench/samples/nemotron_rms_norm` |
 | `hip_cpp` | PyTorch HIP/C++ extension | `tests/sol_execbench/samples/rmsnorm/solution_cuda.json` |
-| `hipblas` | native HIP path with caller-declared library flags | none |
-| `miopen` | native HIP path with caller-declared library flags | none |
-| `ck` | native HIP/header path | none |
-| `rocwmma` | native HIP/header path | none |
+| `hipblas` | native HIP path with caller-declared library flags | `tests/sol_execbench/samples/rdna4_vecadd/solution_hipblas.json` |
+| `miopen` | native HIP path with caller-declared library flags | `tests/sol_execbench/samples/rdna4_vecadd/solution_miopen.json` |
+| `ck` | native HIP/header path | `tests/sol_execbench/samples/rdna4_vecadd/solution_ck.json` |
+| `rocwmma` | native HIP/header path | `tests/sol_execbench/samples/rdna4_rocwmma/solution.json` |
 
 Schema acceptance and a shared build route do not prove that every library,
-operation family or hardware architecture is installed or validated. In this
-revision only the paths listed in the final column are checked-in runnable
-samples. Library-specific submissions must declare their source, dependencies,
-compile options and target hardware explicitly and are validated by the same
-solution/build schemas.
+operation family or hardware architecture is installed or validated. The final
+column identifies the focused checked-in samples; it is not a claim of broad
+operation or architecture coverage. Library-specific submissions must declare
+their source, dependencies, compile options and target hardware explicitly and
+are validated by the same solution/build schemas.
 
 Native entry points may use `.hip`, `.cpp`, `.cc`, `.cxx`, `.c`, `.h` and
 `.hpp`. Python/Triton and native categories cannot be mixed in one solution.
