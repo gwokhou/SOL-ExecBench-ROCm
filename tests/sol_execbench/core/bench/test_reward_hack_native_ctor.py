@@ -124,7 +124,6 @@ def test_native_constructor_elapsed_time_patch_is_detected(
             # the shared ~/.cache/torch_extensions namespace.
             build_directory=str(tmp_path),
             verbose=False,
-            with_cuda=True,
         )
         assert extension.hip_runtime_version() > 0
         # The constructor ran during load and replaced elapsed_time.

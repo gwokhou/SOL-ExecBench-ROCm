@@ -1,6 +1,6 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-05 at `dfe02dda35107a74c4c8bc2b374801b91accc28f`.
+Last audited: 2026-08-05; CPU readiness updated through current HEAD.
 
 This file is the single backlog for repository-level work that remains useful.
 Completed investigations, superseded contracts, acceptance attempts, and
@@ -37,6 +37,9 @@ describe the current contract rather than duplicate this backlog.
 - Real-device evidence is strongest on one RX 9060 XT/gfx1200 host. Multi-GPU
   isolation and CDNA-family behavior have contract/unit coverage but narrower
   empirical coverage.
+- The RGA `planned` registry route has been removed. The deliberate static
+  endpoint is the bounded `llvm-objdump`/`readelf`/`roc-objdump`, ELF-note, and
+  pinned ISA coverage documented by Static Kernel Evidence.
 
 ## Active backlog
 
@@ -45,6 +48,11 @@ describe the current contract rather than duplicate this backlog.
 The formula, verifier, release builder, corpus pin, and baseline identity exist,
 but the manifest correctly fails closed with
 `baseline_v2_release_evidence_pending`.
+
+CPU preparation is closed: the release builder deterministically validates and
+plans the exact 43-problem/163-workload denominator. The remaining work is the
+GPU measurement and publisher-authorized release operation; a locally built
+plan or bundle is not publication evidence.
 
 Completion requires a publisher-authored, content-addressed baseline bundle for
 the exact 43-problem/163-workload scored denominator, locked-clock measurement
@@ -70,6 +78,18 @@ The immediate modeling gaps are the under-covered `composite_graph` and
 `concurrent_graph` families; changing gates or reusing held-out pairs is not an
 acceptable fix.
 
+CPU preparation is closed. The authoring command now preregisters an explicit
+fresh universe, regenerates every later stage from the typed frozen design,
+loads all eleven templates from package resources, emits a versioned CPU
+preflight artifact, and content-verifies promotion of the prior development
+then held-out corpora. The documented cycle-2 start is 160, disjoint from the
+prior 100--159 universe.
+
+Remaining work requires governed GPU time: collect fresh SOLAR and performance
+evidence, freeze the current-policy model before reading the new held-out set,
+then run acceptance. The prior rejected acceptance remains evidence, not a
+model or threshold input.
+
 Completion requires all eleven families to meet at least 90% empirical interval
 coverage, median APE at most 15%, P90 APE at most 30%, and every enabled action
 to meet its support, precision, and recall gates. Agent feedback may enable a
@@ -93,6 +113,13 @@ The four backward-reference Torchview cases are an explicit extraction boundary,
 not part of this 41-workload refresh. Supporting them would require a separately
 approved backward-graph contract rather than weakening the fail-closed result.
 
+CPU preparation is closed. The focused runner's `--check` mode validates the
+exact eight scored problems and 41 unique workloads.
+The same runner fixes both IR paths, supports per-workload resume, requires all
+82 worker results to be formal publications, and invokes the hash-verifying
+comparator only after full success. Remaining work is the 82-analysis GPU run
+and publication of its generated comparison.
+
 Authoritative surfaces:
 
 - `docs/user/CROSS-PATH-COMPARISON.md`
@@ -101,31 +128,31 @@ Authoritative surfaces:
 
 ### P1 — Expand empirical hardware and isolation coverage
 
-Run the existing device-pinning and device-switch contract on a real multi-GPU
-ROCm host, including a candidate that attempts to redirect work to another GPU.
-Also run the native constructor/dlopen adversarial path end to end with a real
-HIP/PyTorch extension. Keep the current fail-closed guards regardless of whether
-the attacks reproduce.
+The executable tests and exact skip boundaries are now present. The remaining
+hardware queue is:
 
-Separately, close or explicitly reclassify the documented `gfx942` dataset
-timeouts on exact CDNA3 hardware. CDNA4 NVFP4/MXFP4 adaptation remains blocked
-on access to representative hardware and must not be claimed from a fallback or
-dequantized execution.
+- Multi-GPU isolation: run
+  `test_real_multi_gpu_candidate_device_switch_is_rejected` with at least two
+  visible ROCm GPUs. `HIP_VISIBLE_DEVICES=0` or any equivalent single-device
+  restriction does not satisfy the prerequisite.
+- Native constructor defense: run
+  `test_native_constructor_elapsed_time_patch_is_detected` with a visible ROCm
+  GPU, ROCm development headers, and the real HIP/PyTorch extension toolchain.
+  The test links a `.hip` translation unit and restores the sealed method after
+  the adversarial constructor check.
+- Historical gfx942 timeouts: reacquire the archived dataset and source context
+  for revision `d56fadca`, then rerun on exact gfx942. The unresolved cases are
+  `FlashInfer-Bench/014_gqa_paged_prefill_causal_h32_kv4_d128_ps1` (one),
+  `FlashInfer-Bench/019_mla_paged_prefill_causal_h16_ckv512_kpe64_ps1` (three),
+  `L2/040_altup_predict_correction_cycle_backward` (one), and
+  `L2/055_audio_encoder_conv_positional_layer_stack` (one). They are historical
+  external-evidence debt, not members of the current 43/163 corpus; do not
+  resurrect a retired runner against the current manifest.
+- CDNA4 NVFP4/MXFP4 adaptation remains blocked on representative hardware and
+  must not be claimed from fallback or dequantized execution.
 
 Completion evidence must identify the exact GPU, ROCm/PyTorch stack, test set,
 and skipped prerequisites; generic schema support is insufficient.
-
-### P2 — Decide the RGA static-evidence route
-
-RGA is present in the toolchain registry with lifecycle `planned`, but no
-packaging contract or bounded parser feeds Static Kernel Evidence. Either
-implement a content-addressed, bounded RGA extractor with focused parser and
-failure-mode tests, or remove the planned route and document the existing
-`llvm-objdump`/ELF-note coverage as the deliberate endpoint.
-
-Do not duplicate resource fields already owned by the code-object metadata and
-ISA paths, and do not make optional static tooling a benchmark correctness or
-score dependency.
 
 ## Invariants
 
