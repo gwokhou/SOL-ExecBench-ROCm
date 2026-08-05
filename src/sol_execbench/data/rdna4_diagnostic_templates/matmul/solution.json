@@ -1,0 +1,33 @@
+{
+  "author": "SOL ExecBench diagnostic validation",
+  "definition": "diagnostic_matmul_f16",
+  "description": "Contiguous FP16 matmul with FP32 accumulation and FP16 output.",
+  "name": "diagnostic_naive_matmul_f16",
+  "schema_version": "sol_execbench.solution.v1",
+  "sources": [
+    {
+      "path": "kernel.hip"
+    }
+  ],
+  "spec": {
+    "binding": "torch",
+    "compile_options": {
+      "cflags": [],
+      "hip_cflags": [
+        "--offload-arch=gfx1200",
+        "-O3",
+        "-std=c++17"
+      ],
+      "ld_flags": []
+    },
+    "dependencies": [],
+    "destination_passing_style": false,
+    "entry_point": "kernel.hip::run",
+    "languages": [
+      "hip_cpp"
+    ],
+    "target_hardware": [
+      "gfx1200"
+    ]
+  }
+}

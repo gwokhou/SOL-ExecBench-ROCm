@@ -43,6 +43,7 @@ class SchemaVersion(StrEnum):
     DIAGNOSTIC_CALIBRATION_AUDIT = (
         "sol_execbench.diagnostic_calibration_audit.v7"
     )
+    DIAGNOSTIC_CORPUS_PREFLIGHT = "sol_execbench.diagnostic_corpus_preflight.v1"
     DIAGNOSTIC_INFERENCE_PROFILE = (
         "sol_execbench.diagnostic_inference_profile.v9"
     )

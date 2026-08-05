@@ -1,0 +1,48 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "diagnostic_index_add_f32",
+  "op_type": "indexed_update",
+  "description": "Contiguous FP32 axis-zero index-add with trusted INT64 collision summaries.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Governed M extent."
+    },
+    "N": {
+      "type": "var",
+      "description": "Governed N extent."
+    }
+  },
+  "inputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    },
+    "indices": {
+      "shape": [
+        "M"
+      ],
+      "dtype": "int64"
+    },
+    "updates": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "result": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch\n\n\ndef run(output, indices, updates):\n    return torch.index_add(output, 0, indices, updates)\n"
+}

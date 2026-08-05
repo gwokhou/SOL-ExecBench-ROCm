@@ -1,0 +1,35 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "diagnostic_controlled_concurrent_f32",
+  "op_type": "concurrent_graph",
+  "description": "One-root two-lane FP32 DAG with an explicit join on the caller stream.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Governed M extent."
+    },
+    "N": {
+      "type": "var",
+      "description": "Governed N extent."
+    }
+  },
+  "inputs": {
+    "input": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch\n\n\ndef run(input):\n    root = input * 0.5\n    left = torch.sigmoid(root)\n    right = torch.relu(root)\n    return left + right\n"
+}

@@ -1,0 +1,41 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "diagnostic_index_select_f32",
+  "op_type": "indexed_read",
+  "description": "Contiguous FP32 axis-zero index-select with trusted INT64 access summaries.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Governed M extent."
+    },
+    "N": {
+      "type": "var",
+      "description": "Governed N extent."
+    }
+  },
+  "inputs": {
+    "source": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    },
+    "indices": {
+      "shape": [
+        "M"
+      ],
+      "dtype": "int64"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch\n\n\ndef run(source, indices):\n    return torch.index_select(source, 0, indices)\n"
+}

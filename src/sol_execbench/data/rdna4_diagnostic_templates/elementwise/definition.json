@@ -1,0 +1,47 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "gpumode_sigmoid",
+  "op_type": "elementwise",
+  "description": "Scaled sigmoid: sigmoid(a * x) * max. Derived from AKA torch2hip/gpumode/11184_Sigmoid module_fn.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Governed M extent."
+    },
+    "N": {
+      "type": "var",
+      "description": "Governed N extent."
+    }
+  },
+  "inputs": {
+    "v": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "Input (M, N)."
+    },
+    "a": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Input scale."
+    },
+    "max": {
+      "shape": null,
+      "dtype": "float32",
+      "description": "Output scale."
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32",
+      "description": "sigmoid(a * v) * max."
+    }
+  },
+  "reference": "import torch\n\n\ndef run(v, a, max):  # noqa: A002 - benchmark ABI\n    return torch.sigmoid(a * v) * max\n"
+}

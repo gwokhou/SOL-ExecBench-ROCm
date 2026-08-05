@@ -7,12 +7,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Literal
+from typing import Any, Literal
 
 from sol_execbench.cli.evaluation.compilation import _compiler_provenance
 from sol_execbench.cli.evaluation.problem_io import (
@@ -22,6 +24,9 @@ from sol_execbench.cli.evaluation.problem_io import (
 from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.sidecars.static_evidence import _static_evidence_payload
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
+from sol_execbench.core.bench.performance_model.corpus_preflight import (
+    DiagnosticCorpusDesign,
+)
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceArtifact,
     PerformanceEvidenceArtifactKind,
@@ -74,26 +79,14 @@ FAMILIES = (
     WorkloadKind.CONCURRENT,
 )
 CASES_PER_PHASE = 20
-UNIVERSE_START = 100
+HISTORICAL_UNIVERSE_START = 100
 UNIVERSE_CASES_PER_FAMILY = 3 * CASES_PER_PHASE
 _PHASE_ROTATIONS: tuple[tuple[Phase, Phase, Phase], ...] = (
     ("point_fit", "conformal", "held_out"),
     ("conformal", "held_out", "point_fit"),
     ("held_out", "point_fit", "conformal"),
 )
-SMOKE_DIR_NAMES = {
-    WorkloadKind.ELEMENTWISE: "elementwise",
-    WorkloadKind.TRANSPOSE: "transpose",
-    WorkloadKind.REDUCTION: "reduction",
-    WorkloadKind.MATMUL: "matmul",
-    WorkloadKind.SOFTMAX: "softmax",
-    WorkloadKind.CROSS_ENTROPY: "cross_entropy",
-    WorkloadKind.INDEXED_READ: "indexed_read",
-    WorkloadKind.INDEXED_UPDATE: "indexed_update",
-    WorkloadKind.COMPOSITE: "composite",
-    WorkloadKind.TRANSFORMER: "transformer",
-    WorkloadKind.CONCURRENT: "concurrent",
-}
+_TEMPLATE_PACKAGE = "sol_execbench.data.rdna4_diagnostic_templates"
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,16 +131,7 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument(
-        "--repo-root",
-        type=Path,
-        default=Path(__file__).resolve().parents[3],
-    )
-    parser.add_argument(
-        "--template-root",
-        type=Path,
-        help="Explicit eleven-family smoke template directory.",
-    )
+    parser.add_argument("--universe-start", type=int)
     parser.add_argument(
         "--role",
         choices=("development", "held_out"),
@@ -176,6 +160,7 @@ def _parse_args() -> argparse.Namespace:
         action="append",
         default=[],
     )
+    parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
 
@@ -215,7 +200,7 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
         # share a shape-bearing workload_uuid. The prior ``global_index % 16``
         # universe yielded only 16 distinct M values for 20 cases per phase.
         return {
-            "M": 32 + 8 * (global_index - UNIVERSE_START),
+            "M": 32 + 8 * (global_index - HISTORICAL_UNIVERSE_START),
             "N": 768,
         }
     return {
@@ -225,7 +210,7 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
     }
 
 
-def _cases(role: Role) -> list[CaseSpec]:
+def _cases(role: Role, universe_start: int) -> list[CaseSpec]:
     phases: tuple[Phase, ...] = (
         ("point_fit", "conformal") if role == "development" else ("held_out",)
     )
@@ -234,8 +219,8 @@ def _cases(role: Role) -> list[CaseSpec]:
         for phase in phases:
             selected = [
                 global_index
-                for global_index in _universe_indices()
-                if _phase(global_index) == phase
+                for global_index in _universe_indices(universe_start)
+                if _phase(global_index, universe_start) == phase
             ]
             cases.extend(
                 CaseSpec(
@@ -250,12 +235,15 @@ def _cases(role: Role) -> list[CaseSpec]:
     return cases
 
 
-def _universe_indices() -> range:
-    return range(UNIVERSE_START, UNIVERSE_START + UNIVERSE_CASES_PER_FAMILY)
+def _universe_indices(universe_start: int) -> range:
+    return range(
+        universe_start,
+        universe_start + UNIVERSE_CASES_PER_FAMILY,
+    )
 
 
-def _phase(global_index: int) -> Phase:
-    offset = global_index - UNIVERSE_START
+def _phase(global_index: int, universe_start: int) -> Phase:
+    offset = global_index - universe_start
     if not 0 <= offset < UNIVERSE_CASES_PER_FAMILY:
         raise ValueError("global index is outside preregistered universe")
     block_index, position = divmod(offset, 3)
@@ -263,12 +251,15 @@ def _phase(global_index: int) -> Phase:
     return rotation[position]
 
 
-def _design_payload() -> dict[str, object]:
-    cases = [*_cases("development"), *_cases("held_out")]
+def _design_payload(universe_start: int) -> dict[str, Any]:
+    cases = [
+        *_cases("development", universe_start),
+        *_cases("held_out", universe_start),
+    ]
     return {
         "schema_version": SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN.value,
         "design": "adjacent_shape_stratified_three_way_rotation",
-        "universe_start": UNIVERSE_START,
+        "universe_start": universe_start,
         "universe_cases_per_family": UNIVERSE_CASES_PER_FAMILY,
         "cases_per_family": {
             "point_fit": CASES_PER_PHASE,
@@ -292,28 +283,19 @@ def _design_payload() -> dict[str, object]:
 
 
 def _definition_template(
-    repo_root: Path,
-    template_root: Path,
     family: WorkloadKind,
-) -> tuple[dict[str, object], dict[str, object]]:
-    if family is WorkloadKind.ELEMENTWISE:
-        definition_path = (
-            repo_root
-            / "problems/AMD_AKA/torch2hip/gpumode_sigmoid/definition.json"
-        )
-    else:
-        definition_path = (
-            template_root / SMOKE_DIR_NAMES[family] / "problem/definition.json"
-        )
-    solution_path = template_root / SMOKE_DIR_NAMES[family] / "solution.json"
-    definition = load_json_value(definition_path)
-    solution = load_json_value(solution_path)
-    solution["definition"] = definition["name"]
-    for name in definition["axes"]:
-        definition["axes"][name] = {
-            "type": "var",
-            "description": f"Governed {name} extent.",
-        }
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    resource_root = files(_TEMPLATE_PACKAGE).joinpath(family.value)
+    definition = json.loads(
+        resource_root.joinpath("definition.json").read_text(encoding="utf-8")
+    )
+    solution = json.loads(
+        resource_root.joinpath("solution.json").read_text(encoding="utf-8")
+    )
+    source = solution["sources"][0]
+    source["content"] = resource_root.joinpath("kernel.hip").read_text(
+        encoding="utf-8"
+    )
     return definition, solution
 
 
@@ -384,24 +366,22 @@ def _workload(case: CaseSpec, output_name: str) -> dict[str, object]:
 
 def _prepare(
     root: Path,
-    repo_root: Path,
-    template_root: Path,
     family: WorkloadKind | None = None,
 ) -> None:
-    _require_frozen_design(root)
+    design = _require_frozen_design(root)
+    universe_start = design.universe_start
     selected_families = FAMILIES if family is None else (family,)
     all_cases = [
         case
-        for case in [*_cases("development"), *_cases("held_out")]
+        for case in [
+            *_cases("development", universe_start),
+            *_cases("held_out", universe_start),
+        ]
         if family is None or case.family is family
     ]
     for selected_family in selected_families:
         problem = root / "problems" / selected_family.value
-        definition, solution = _definition_template(
-            repo_root,
-            template_root,
-            selected_family,
-        )
+        definition, solution = _definition_template(selected_family)
         atomic_write_json_value(
             problem / "definition.json",
             definition,
@@ -422,9 +402,9 @@ def _prepare(
     )
 
 
-def _preregister(root: Path) -> None:
+def _preregister(root: Path, universe_start: int) -> None:
     design_path = root / "design.json"
-    design = _design_payload()
+    design = _design_payload(universe_start)
     if design_path.exists():
         if load_json_value(design_path) != design:
             raise ValueError("existing corpus design differs from current plan")
@@ -593,9 +573,9 @@ def _refuse_frozen_held_out_recollect(arguments: argparse.Namespace) -> None:
 def _execute_cases(arguments: argparse.Namespace) -> None:
     if arguments.role is None:
         raise ValueError(f"{arguments.stage} requires --role")
-    _require_frozen_design(arguments.root)
+    design = _require_frozen_design(arguments.root)
     _refuse_frozen_held_out_recollect(arguments)
-    selected = _cases(arguments.role)
+    selected = _cases(arguments.role, design.universe_start)
     if arguments.family is not None:
         selected = [
             case for case in selected if case.family.value == arguments.family
@@ -888,17 +868,21 @@ def _repair_case_identity(
 
 def _repair_role(root: Path, role: Role) -> None:
     compile_identity = _compile_identity(root)
-    cases = _cases(role)
+    design = _require_frozen_design(root)
+    cases = _cases(role, design.universe_start)
     for position, case in enumerate(cases, start=1):
         print(f"[{position}/{len(cases)}] repair {case.case_id}", flush=True)
         _repair_case_identity(root, case, compile_identity)
 
 
 def _freeze(root: Path, role: Role) -> None:
-    _require_frozen_design(root)
+    design = _require_frozen_design(root)
     corpus = DiagnosticValidationCorpus(
         role=role,
-        cases=[_validation_case(root, case) for case in _cases(role)],
+        cases=[
+            _validation_case(root, case)
+            for case in _cases(role, design.universe_start)
+        ],
     )
     destination = root / f"{role}.json"
     atomic_write_json_value(destination, corpus.model_dump(mode="json"))
@@ -908,25 +892,63 @@ def _freeze(root: Path, role: Role) -> None:
     )
 
 
-def _require_frozen_design(root: Path) -> None:
+def _require_frozen_design(root: Path) -> DiagnosticCorpusDesign:
     design_path = root / "design.json"
-    if load_json_value(design_path) != _design_payload():
+    design = DiagnosticCorpusDesign.model_validate_json(
+        design_path.read_text(encoding="utf-8")
+    )
+    if design.model_dump(mode="json") != _design_payload(design.universe_start):
         raise ValueError("corpus design does not match frozen preregistration")
+    return design
+
+
+def _validate_promoted_reference(
+    root: Path,
+    reference: ValidationArtifactReference,
+) -> None:
+    artifact = (root / reference.path).resolve()
+    if not artifact.is_relative_to(root):
+        raise ValueError("promoted corpus reference escapes its corpus root")
+    if not artifact.is_file():
+        raise ValueError(
+            f"promoted corpus artifact is missing: {reference.path}"
+        )
+    if sha256_file(artifact) != reference.sha256:
+        raise ValueError(f"promoted corpus hash mismatch: {reference.path}")
 
 
 def _promote_development(
     root: Path,
     source_paths: list[Path],
+    output: Path,
 ) -> None:
     """Combine prior governed corpora into the next development corpus."""
-    if len(source_paths) < 2:
-        raise ValueError("promote requires at least two --source-corpus inputs")
+    if len(source_paths) != 2:
+        raise ValueError("promote requires development then held-out corpora")
+    root = root.resolve()
+    output = output.resolve()
+    if output.parent != root:
+        raise ValueError("promoted output must be directly under --root")
+    if output.exists():
+        raise ValueError("promoted output already exists")
     cases = []
-    for source_index, source_path in enumerate(source_paths):
+    for source_index, (provided_source, role) in enumerate(
+        zip(source_paths, ("development", "held_out"), strict=True)
+    ):
+        source_path = provided_source.resolve()
+        if source_path.parent != root:
+            raise ValueError("source corpora must be directly under --root")
         corpus = load_json_file(
             DiagnosticValidationCorpus,
-            source_path.resolve(),
+            source_path,
         )
+        if corpus.role != role:
+            raise ValueError(
+                "source corpus order must be development then held_out"
+            )
+        for case in corpus.cases:
+            _validate_promoted_reference(root, case.evidence_manifest)
+            _validate_promoted_reference(root, case.solar_manifest)
         cases.extend(
             case.model_copy(
                 update={
@@ -936,10 +958,9 @@ def _promote_development(
             for case in corpus.cases
         )
     promoted = DiagnosticValidationCorpus(role="development", cases=cases)
-    destination = root / "development.json"
-    atomic_write_json_value(destination, promoted.model_dump(mode="json"))
+    atomic_write_json_value(output, promoted.model_dump(mode="json"))
     print(
-        f"promoted {len(promoted.cases)} cases into {destination}",
+        f"promoted {len(promoted.cases)} cases into {output}",
         flush=True,
     )
 
@@ -949,16 +970,12 @@ def main() -> int:
     arguments = _parse_args()
     root = arguments.root.resolve()
     if arguments.stage == "preregister":
-        _preregister(root)
+        if arguments.universe_start is None:
+            raise ValueError("preregister requires --universe-start")
+        _preregister(root, arguments.universe_start)
     elif arguments.stage == "prepare":
         _prepare(
             root,
-            arguments.repo_root.resolve(),
-            (
-                arguments.template_root.resolve()
-                if arguments.template_root is not None
-                else root.parent / "smoke"
-            ),
             (
                 WorkloadKind(arguments.family)
                 if arguments.family is not None
@@ -976,7 +993,13 @@ def main() -> int:
             raise ValueError("repair-static-identity requires --role")
         _repair_role(root, arguments.role)
     else:
-        _promote_development(root, arguments.source_corpus)
+        if arguments.output is None:
+            raise ValueError("promote requires --output")
+        _promote_development(
+            root,
+            arguments.source_corpus,
+            arguments.output,
+        )
     return 0
 
 
