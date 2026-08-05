@@ -8,7 +8,7 @@ per-run input nonce out of the candidate process. Control frames are bounded
 JSON and tensors use safetensors; pickle and candidate-chosen object decoding
 are never part of the protocol. Timing inputs may cross into the candidate, but
 the matching expected output stays in the reference service and only a
-validation verdict returns.
+bounded validation result returns.
 
 The service permits at most one unvalidated timing case. Callers must validate
 it before requesting the next case, so an input/output pair is single-use and

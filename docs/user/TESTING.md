@@ -60,6 +60,29 @@ uv run pytest tests/ -m requires_rocm -n 0
 uv run pytest tests/ -m 'requires_rdna4 and cpp' -n 0
 ```
 
+The two isolation debts have exact entrypoints. On a host exposing at least two
+ROCm GPUs (do not constrain it with `HIP_VISIBLE_DEVICES=0`), run:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/core/bench/test_timing.py::test_real_multi_gpu_candidate_device_switch_is_rejected \
+  -m requires_rocm_gpu -n 0
+```
+
+For the real HIP translation-unit/dlopen constructor path, run:
+
+```bash
+uv run pytest \
+  tests/sol_execbench/core/bench/test_reward_hack_native_ctor.py::test_native_constructor_elapsed_time_patch_is_detected \
+  -m 'native_extension_serial and requires_rocm and requires_rocm_dev and cpp' \
+  -n 0
+```
+
+The first test skips precisely when fewer than two ROCm GPUs are visible. The
+second requires the ROCm runtime and development toolchain and is excluded from
+the default suite by `native_extension_serial`. A skipped node records an unmet
+prerequisite; it is not successful hardware evidence.
+
 Do not replace unavailable hardware with a broad `xfail`, mock or skip.
 Hardware claims require the exact device/toolchain and should skip only on a
 precisely tested missing prerequisite.
