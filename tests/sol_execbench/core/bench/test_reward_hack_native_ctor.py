@@ -21,6 +21,8 @@ from sol_execbench.core.bench.reward_hack import RewardHackError
 _EVIL_CONSTRUCTOR_CPP = """\
 #include <Python.h>
 
+extern "C" int sol_execbench_hip_runtime_version(void);
+
 static PyObject* _fake_elapsed_time(PyObject* self, PyObject* args) {
     return PyFloat_FromDouble(0.001);
 }
@@ -30,6 +32,15 @@ static PyMethodDef _fake_method = {
     (PyCFunction)_fake_elapsed_time,
     METH_VARARGS,
     "",
+};
+
+static PyObject* _runtime_version(PyObject* self, PyObject* args) {
+    return PyLong_FromLong(sol_execbench_hip_runtime_version());
+}
+
+static PyMethodDef _module_methods[] = {
+    {"hip_runtime_version", (PyCFunction)_runtime_version, METH_NOARGS, ""},
+    {NULL, NULL, 0, NULL},
 };
 
 __attribute__((constructor))
@@ -56,8 +67,7 @@ static PyModuleDef _module_def = {
     "evil_elapsed_time_ctor",
     NULL,
     -1,
-    NULL,
-    NULL,
+    _module_methods,
     NULL,
     NULL,
     NULL,
@@ -68,9 +78,22 @@ PyMODINIT_FUNC PyInit_evil_elapsed_time_ctor(void) {
 }
 """
 
+_HIP_RUNTIME_PROBE = """\
+#include <hip/hip_runtime.h>
+
+__global__ void sol_execbench_linked_hip_kernel(void) {}
+
+extern "C" int sol_execbench_hip_runtime_version(void) {
+    int version = 0;
+    return hipRuntimeGetVersion(&version) == hipSuccess ? version : -1;
+}
+"""
+
 
 @pytest.mark.cpp
+@pytest.mark.requires_rocm
 @pytest.mark.requires_rocm_dev
+@pytest.mark.native_extension_serial
 def test_native_constructor_elapsed_time_patch_is_detected(
     tmp_path: Path,
 ) -> None:
@@ -88,18 +111,22 @@ def test_native_constructor_elapsed_time_patch_is_detected(
     )
 
     source = tmp_path / "evil_elapsed_time_ctor.cpp"
+    hip_source = tmp_path / "linked_runtime_probe.hip"
     source.write_text(_EVIL_CONSTRUCTOR_CPP, encoding="utf-8")
+    hip_source.write_text(_HIP_RUNTIME_PROBE, encoding="utf-8")
 
     original = torch.cuda.Event.elapsed_time
     try:
-        load(
+        extension = load(
             name="evil_elapsed_time_ctor",
-            sources=[str(source)],
+            sources=[str(source), str(hip_source)],
             # Isolate the compile so parallel xdist workers cannot collide on
             # the shared ~/.cache/torch_extensions namespace.
             build_directory=str(tmp_path),
             verbose=False,
+            with_cuda=True,
         )
+        assert extension.hip_runtime_version() > 0
         # The constructor ran during load and replaced elapsed_time.
         assert torch.cuda.Event.elapsed_time is not original
         with pytest.raises(RewardHackError, match="elapsed_time"):
