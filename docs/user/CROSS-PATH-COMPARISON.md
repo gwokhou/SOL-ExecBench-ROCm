@@ -55,11 +55,32 @@ authoritative accounting.
 
 ## Current coverage boundary
 
-The current focused readiness matrix is 41/41 on both paths. The last generated
-repository-owned accounting report covered an earlier 32-workload subset, so it
-is historical evidence rather than a result for the current denominator. This
-document intentionally does not preserve that snapshot's mismatch counts; use
-Git history when auditing it.
+The current focused readiness matrix is 41/41 on both paths across eight scored
+problems. Validate that exact current-manifest denominator without GPU work:
+
+```bash
+uv run python scripts/internal/solar/run_cross_path_focus.py --check
+```
+
+On a publishing host, run the resumable 82-analysis route and produce the
+comparison only after every workload has a formal publication on both paths:
+
+```bash
+uv run python scripts/internal/solar/run_cross_path_focus.py \
+  --output data/outputs/solar-cross-path-focus \
+  --orojenesis-home /path/to/orojenesis --device cuda:0 --resume
+```
+
+The runner validates that all eight entries are scored and retain their exact
+41-workload denominator, fixes path order, isolates output by IR path, and
+fails closed before comparison on any non-formal worker result. Existing
+per-workload directories are skipped only with `--resume`; the final comparator
+then validates their schemas and content hashes.
+
+The last generated repository-owned accounting report covered an earlier
+32-workload subset, so it is historical evidence rather than a result for the
+current denominator. This document intentionally does not preserve that
+snapshot's mismatch counts; use Git history when auditing it.
 
 Until a new 41-workload report is generated, no repository-wide equality claim
 may be made for model I/O, mandatory work, internal fusion accounting, limiting

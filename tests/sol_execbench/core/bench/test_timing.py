@@ -297,6 +297,33 @@ class TestBenchTimeWithDeviceEvents:
         assert times == [0.5]
 
 
+@pytest.mark.requires_rocm_gpu
+def test_real_multi_gpu_candidate_device_switch_is_rejected() -> None:
+    """A real candidate cannot redirect timed work to another ROCm GPU."""
+    if torch.cuda.device_count() < 2:
+        pytest.skip("requires at least two visible ROCm GPUs")
+    original_device = torch.cuda.current_device()
+    other_device = 1
+    work = torch.ones(1, device=f"cuda:{other_device}")
+
+    def switch_device_and_run() -> None:
+        torch.cuda.set_device(other_device)
+        work.add_(1)
+
+    try:
+        torch.cuda.set_device(0)
+        with pytest.raises(RewardHackError, match="switched"):
+            bench_time_with_device_events(
+                switch_device_and_run,
+                warmup=0,
+                rep=1,
+                device="cuda:0",
+            )
+    finally:
+        torch.cuda.synchronize(other_device)
+        torch.cuda.set_device(original_device)
+
+
 # ---------------------------------------------------------------------------
 # bench_time_with_device_events — GPU integration tests
 # ---------------------------------------------------------------------------
