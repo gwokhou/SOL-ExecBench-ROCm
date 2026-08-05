@@ -11,8 +11,10 @@ import csv
 import json
 import os
 import subprocess
+import xml.etree.ElementTree as ET
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from math import isfinite, prod
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +42,7 @@ from solar.analysis.orojenesis.multi_einsum import (
 )
 from solar.analysis.orojenesis.problem import (
     architecture as _build_architecture,
+    compulsory_witness_mapper_config as _build_compulsory_witness_mapper_config,
     mapper_config as _build_mapper_config,
     multi_architecture as _build_multi_architecture,
     multi_mapper_config as _build_multi_mapper_config,
@@ -66,6 +69,23 @@ __all__ = [
     "multi_einsum_region_mapper_role",
     "multi_einsum_region_problem",
 ]
+
+_DIRECT_CONVOLUTION_EQUATIONS = {
+    "conv1d": frozenset({"BC(P+R),OCR->BOP", "BO(P+R),OCR->BOP"}),
+    "conv2d": frozenset(
+        {
+            "BC(P+R)(Q+S),OCRS->BOPQ",
+            "BO(P+R)(Q+S),OCRS->BOPQ",
+        },
+    ),
+    "conv3d": frozenset({"BC(P+T)(Q+R)(U+S),OCTRS->BOPQU"}),
+}
+_WITNESS_OUTPUT_FILES = (
+    "timeloop-mapper.map+stats.xml",
+    "timeloop-mapper.map.txt",
+    "timeloop-mapper.stats.txt",
+    "timeloop-mapper.map.yaml",
+)
 
 
 def _multi_word_bytes(word_bits: int) -> int:
@@ -120,6 +140,274 @@ def _multi_evidence(
         }
         for name, path in paths.items()
     }
+
+
+def _direct_convolution_streaming_dimension(
+    layer: Mapping[str, Any],
+    dimensions: list[str],
+) -> str | None:
+    semantic = layer.get("semantic_op") or {}
+    proof_source = semantic.get("proof_source") or {}
+    target = str(proof_source.get("target") or "")
+    equation = str(semantic.get("equation") or "")
+    effects = semantic.get("effects") or {}
+    if (
+        proof_source.get("kind") != "aten"
+        or equation not in _DIRECT_CONVOLUTION_EQUATIONS.get(target, ())
+        or effects.get("mutates") not in (False, [])
+        or bool(effects.get("aliases"))
+        or bool(effects.get("atomic"))
+        or bool(effects.get("opaque_library_call"))
+        or not dimensions
+    ):
+        return None
+    return dimensions[0]
+
+
+def _exact_nonnegative_integer(value: Any, *, field: str) -> int:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise OrojenesisError(f"{field} is not numeric") from exc
+    if not isfinite(number) or number < 0 or not number.is_integer():
+        raise OrojenesisError(f"{field} must be a finite nonnegative integer")
+    return int(number)
+
+
+def _xml_vector(
+    stats: ET.Element,
+    name: str,
+    spaces: Sequence[str],
+) -> dict[str, int]:
+    items = stats.findall(f"./{name}/PerDataSpace/item")
+    if len(items) != len(spaces):
+        raise OrojenesisError(f"mapper XML has invalid {name} arity")
+    return {
+        space: _exact_nonnegative_integer(item.text, field=f"{name}.{space}")
+        for space, item in zip(spaces, items, strict=True)
+    }
+
+
+def _witness_level_stats(
+    path: Path,
+    spaces: Sequence[str],
+    *,
+    word_bits: int,
+) -> dict[str, dict[str, dict[str, int]]]:
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError) as exc:
+        raise OrojenesisError("invalid mapper map+stats XML") from exc
+    result: dict[str, dict[str, dict[str, int]]] = {}
+    for level in root.findall(".//levels_/item/px"):
+        name = level.findtext("./specs_/LevelSpecs/level_name")
+        if name not in {"Buffer", "MainMemory"}:
+            continue
+        stats = level.find("./stats_")
+        if stats is None:
+            raise OrojenesisError(f"mapper XML omits {name} stats")
+        xml_word_bits = _exact_nonnegative_integer(
+            level.findtext("./specs_/word_bits/t_"),
+            field=f"{name}.word_bits",
+        )
+        if xml_word_bits != int(word_bits):
+            raise OrojenesisError(f"mapper XML {name} word width mismatch")
+        result[name] = {
+            metric: _xml_vector(stats, metric, spaces)
+            for metric in (
+                "keep",
+                "utilized_capacity",
+                "utilized_instances",
+                "reads",
+                "updates",
+                "fills",
+            )
+        }
+    if set(result) != {"Buffer", "MainMemory"}:
+        raise OrojenesisError("mapper XML omits witness memory levels")
+    return result
+
+
+def _tensor_element_counts(layer: Mapping[str, Any]) -> list[int]:
+    shapes = layer.get("tensor_shapes") or {}
+    ordered = [*(shapes.get("inputs") or []), *(shapes.get("outputs") or [])]
+    counts = [prod(int(dimension) for dimension in shape) for shape in ordered]
+    if not counts or any(count <= 0 for count in counts):
+        raise OrojenesisError("proof tensor shapes must be positive")
+    return counts
+
+
+def _audit_compulsory_witness(
+    point: Mapping[str, Any],
+    level_stats: Mapping[str, Mapping[str, Mapping[str, int]]],
+    spaces: Sequence[str],
+    element_counts: Sequence[int],
+    *,
+    capacity_bytes: int,
+    word_bits: int,
+) -> dict[str, Any]:
+    if len(spaces) != 3 or len(element_counts) != 3:
+        raise OrojenesisError(
+            "direct convolution witness requires two inputs and one output",
+        )
+    accesses = point.get("data_space_accesses_words") or {}
+    expected = dict(zip(spaces, element_counts, strict=True))
+    main_memory = level_stats["MainMemory"]
+    buffer = level_stats["Buffer"]
+    input_spaces = list(spaces[:-1])
+    output_space = spaces[-1]
+    main_accesses = {
+        "reads": {
+            space: expected[space] if space in input_spaces else 0
+            for space in spaces
+        },
+        "updates": {
+            space: expected[space] if space == output_space else 0
+            for space in spaces
+        },
+        "fills": dict.fromkeys(spaces, 0),
+    }
+    keep = dict.fromkeys(spaces, 1)
+    instances = dict.fromkeys(spaces, 1)
+    buffer_words = sum(buffer["utilized_capacity"].values())
+    buffer_bytes = buffer_words * (int(word_bits) // 8)
+    if (
+        buffer_bytes != int(point["buffer_bytes"])
+        or buffer_bytes > int(capacity_bytes)
+        or _exact_nonnegative_integer(
+            point["dram_accesses_words"],
+            field="dram_accesses_words",
+        )
+        != sum(element_counts)
+        or accesses != expected
+        or buffer["keep"] != keep
+        or main_memory["keep"] != keep
+        or buffer["utilized_instances"] != instances
+        or main_memory["utilized_instances"] != instances
+        or any(
+            main_memory[metric] != values
+            for metric, values in main_accesses.items()
+        )
+    ):
+        raise OrojenesisError(
+            "direct convolution compulsory witness did not reach the "
+            "selected-capacity optimum",
+        )
+    return {
+        "expected": expected,
+        "main_accesses": main_accesses,
+        "buffer_capacity": buffer["utilized_capacity"],
+        "instances": instances,
+    }
+
+
+def _compulsory_witness_certificate(
+    layer: Mapping[str, Any],
+    point: Mapping[str, Any],
+    level_stats: Mapping[str, Mapping[str, Mapping[str, int]]],
+    spaces: Sequence[str],
+    element_counts: Sequence[int],
+    *,
+    capacity_bytes: int,
+    word_bits: int,
+) -> dict[str, Any]:
+    audit = _audit_compulsory_witness(
+        point,
+        level_stats,
+        spaces,
+        element_counts,
+        capacity_bytes=capacity_bytes,
+        word_bits=word_bits,
+    )
+    return {
+        "kind": "selected_capacity_compulsory_witness_v1",
+        "scope": "selected_capacity_only",
+        "pareto_curve_complete": False,
+        "capacity_bytes": int(capacity_bytes),
+        "buffer_bytes": int(point["buffer_bytes"]),
+        "compulsory_accesses_words": sum(element_counts),
+        "data_space_accesses_words": audit["expected"],
+        "main_memory_accesses_words": audit["main_accesses"],
+        "buffer_utilized_capacity_words": audit["buffer_capacity"],
+        "buffer_utilized_instances": audit["instances"],
+        "proof": "feasible traffic equals the universal compulsory lower bound",
+        "portability": {
+            "compulsory_lower_bound": "architecture_independent",
+            "achievability": "selected_architecture_cache_only",
+        },
+        "theorem_inputs": {
+            "proof_source": dict(
+                (layer.get("semantic_op") or {}).get("proof_source") or {},
+            ),
+            "equation": str(
+                (layer.get("semantic_op") or {}).get("equation") or "",
+            ),
+            "tensor_shapes": layer.get("tensor_shapes"),
+            "data_spaces": list(spaces),
+            "word_bits": int(word_bits),
+            "dense": True,
+            "first_read_elision": True,
+            "instances": 1,
+        },
+    }
+
+
+def _attach_compulsory_witness(
+    result: dict[str, Any],
+    layer: Mapping[str, Any],
+    plan: _LayerRunPlan,
+    curve: Sequence[Mapping[str, Any]],
+    *,
+    word_bits: int,
+) -> None:
+    witness_paths = {name: plan.output / name for name in _WITNESS_OUTPUT_FILES}
+    missing = [
+        name for name, path in witness_paths.items() if not path.is_file()
+    ]
+    if missing:
+        raise OrojenesisError(
+            "compulsory witness omits mapper evidence: " + ", ".join(missing),
+        )
+    result["evidence_files"].update(
+        {
+            name: {"path": name, "sha256": sha256_file(path)}
+            for name, path in witness_paths.items()
+        },
+    )
+    result["environment"] = plan.environment
+    result["optimality_certificate"] = _compulsory_witness_certificate(
+        layer,
+        curve[0],
+        _witness_level_stats(
+            witness_paths["timeloop-mapper.map+stats.xml"],
+            plan.spaces,
+            word_bits=word_bits,
+        ),
+        plan.spaces,
+        _tensor_element_counts(layer),
+        capacity_bytes=int(plan.selected_capacity_bytes or 0),
+        word_bits=word_bits,
+    )
+    result["optimality_certificate"].update(
+        {
+            "streaming_axis": "B",
+            "streaming_dimension": plan.streaming_dimension,
+        },
+    )
+
+
+@dataclass(frozen=True)
+class _LayerRunPlan:
+    output: Path
+    paths: dict[str, Path]
+    spaces: list[str]
+    streaming_dimension: str | None
+    environment: dict[str, str] | None
+    selected_capacity_bytes: int | None
+
+    @property
+    def is_compulsory_witness(self) -> bool:
+        return self.selected_capacity_bytes is not None
 
 
 class OrojenesisRunner:
@@ -177,9 +465,16 @@ class OrojenesisRunner:
         return _build_problem_for_layer(layer)
 
     @staticmethod
-    def architecture(word_bits: int) -> dict[str, Any]:
+    def architecture(
+        word_bits: int,
+        *,
+        buffer_capacity_bytes: int | None = None,
+    ) -> dict[str, Any]:
         """Build the generic Orojenesis memory architecture."""
-        return _build_architecture(word_bits)
+        return _build_architecture(
+            word_bits,
+            buffer_capacity_bytes=buffer_capacity_bytes,
+        )
 
     @staticmethod
     def multi_architecture(word_bits: int) -> dict[str, Any]:
@@ -204,6 +499,7 @@ class OrojenesisRunner:
         path: str | Path,
         *,
         word_bytes: int,
+        spaces: Sequence[str] = (),
     ) -> list[dict[str, Any]]:
         """Parse and Pareto-filter an OAVES traffic curve."""
         source = Path(path)
@@ -215,10 +511,20 @@ class OrojenesisRunner:
                 if len(row) < 3:
                     continue
                 try:
-                    buffer_bytes = int(float(row[0]))
+                    buffer_bytes = _exact_nonnegative_integer(
+                        row[0],
+                        field="buffer_bytes",
+                    )
                     intensity = float(row[1])
-                    accesses = float(row[2])
-                except ValueError:
+                    accesses = _exact_nonnegative_integer(
+                        row[2],
+                        field="dram_accesses_words",
+                    )
+                    if not isfinite(intensity) or intensity < 0:
+                        raise OrojenesisError(
+                            "operational intensity must be finite and nonnegative",
+                        )
+                except (ValueError, OrojenesisError):
                     continue
                 point = {
                     "buffer_bytes": buffer_bytes,
@@ -226,6 +532,27 @@ class OrojenesisRunner:
                     "dram_accesses_words": accesses,
                     "dram_bytes": accesses * word_bytes,
                 }
+                if spaces and len(row) >= 3 + len(spaces):
+                    try:
+                        point["data_space_accesses_words"] = dict(
+                            zip(
+                                spaces,
+                                (
+                                    _exact_nonnegative_integer(
+                                        value,
+                                        field=f"{space} accesses",
+                                    )
+                                    for space, value in zip(
+                                        spaces,
+                                        row[-len(spaces) :],
+                                        strict=True,
+                                    )
+                                ),
+                                strict=True,
+                            ),
+                        )
+                    except (ValueError, OrojenesisError):
+                        continue
                 previous = best.get(buffer_bytes)
                 if (
                     previous is None
@@ -245,42 +572,74 @@ class OrojenesisRunner:
                 best_traffic = float(point["dram_bytes"])
         return pareto
 
-    def run_layer(
+    def _prepare_layer_run(
         self,
         layer: Mapping[str, Any],
-        output_dir: str | Path,
+        output: Path,
         *,
         word_bits: int,
-    ) -> dict[str, Any]:
-        """Run the pinned mapper for one layer and return auditable evidence."""
-        output = Path(output_dir).resolve()
-        output.mkdir(parents=True, exist_ok=True)
+        selected_capacity_bytes: int | None = None,
+    ) -> _LayerRunPlan:
         problem = self.problem_for_layer(layer)
         dimensions = list(problem["problem"]["shape"]["dimensions"])
         spaces = [
             item["name"] for item in problem["problem"]["shape"]["data-spaces"]
         ]
+        streaming_dimension = _direct_convolution_streaming_dimension(
+            layer,
+            dimensions,
+        )
+        witness = (
+            streaming_dimension is not None
+            and selected_capacity_bytes is not None
+        )
+        mapper = (
+            _build_compulsory_witness_mapper_config(
+                problem["problem"]["instance"],
+                dimensions,
+                spaces,
+                streaming_dimension=str(streaming_dimension),
+            )
+            if witness
+            else self.mapper_config(dimensions, spaces)
+        )
         inputs = {
             "problem.yaml": problem,
-            "architecture.yaml": self.architecture(word_bits),
-            "mapper.yaml": self.mapper_config(dimensions, spaces),
+            "architecture.yaml": self.architecture(
+                word_bits,
+                buffer_capacity_bytes=(
+                    int(selected_capacity_bytes) if witness else None
+                ),
+            ),
+            "mapper.yaml": mapper,
         }
-        paths: dict[str, Path] = {}
-        for name, data in inputs.items():
-            path = output / name
-            path.write_text(yaml.safe_dump(data, sort_keys=False))
-            paths[name] = path
+        environment = {"TIMELOOP_ENABLE_FIRST_READ_ELISION": "1"}
+        if witness:
+            inputs["environment.yaml"] = environment
+        return _LayerRunPlan(
+            output=output,
+            paths=_write_yaml_documents(output, inputs),
+            spaces=spaces,
+            streaming_dimension=streaming_dimension,
+            environment=environment if witness else None,
+            selected_capacity_bytes=(
+                int(selected_capacity_bytes) if witness else None
+            ),
+        )
+
+    def _execute_layer_run(self, plan: _LayerRunPlan) -> Path:
         try:
             completed = self._run_mapper(
                 [
                     str(self.mapper),
-                    str(paths["architecture.yaml"]),
-                    str(paths["problem.yaml"]),
-                    str(paths["mapper.yaml"]),
+                    str(plan.paths["architecture.yaml"]),
+                    str(plan.paths["problem.yaml"]),
+                    str(plan.paths["mapper.yaml"]),
                     "-o",
-                    str(output),
+                    str(plan.output),
                 ],
-                cwd=output,
+                cwd=plan.output,
+                env=plan.environment,
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise OrojenesisError("Orojenesis execution failed") from exc
@@ -288,9 +647,32 @@ class OrojenesisRunner:
             raise OrojenesisError(
                 f"Orojenesis exited with status {completed.returncode}",
             )
-        raw = output / "timeloop-mapper.oaves.csv"
-        curve = self.parse_curve(raw, word_bytes=max(1, word_bits // 8))
-        return {
+        return plan.output / "timeloop-mapper.oaves.csv"
+
+    def run_layer(
+        self,
+        layer: Mapping[str, Any],
+        output_dir: str | Path,
+        *,
+        word_bits: int,
+        selected_capacity_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        """Run the pinned mapper for one layer and return auditable evidence."""
+        output = Path(output_dir).resolve()
+        output.mkdir(parents=True, exist_ok=True)
+        plan = self._prepare_layer_run(
+            layer,
+            output,
+            word_bits=word_bits,
+            selected_capacity_bytes=selected_capacity_bytes,
+        )
+        raw = self._execute_layer_run(plan)
+        curve = self.parse_curve(
+            raw,
+            word_bytes=max(1, word_bits // 8),
+            spaces=plan.spaces,
+        )
+        result: dict[str, Any] = {
             "solver": "NVlabs/timeloop oaves_keep_max",
             "commit": OROJENESIS_COMMIT,
             "toolchain": self.toolchain_identity,
@@ -299,7 +681,7 @@ class OrojenesisRunner:
             "evidence_files": {
                 **{
                     name: {"path": name, "sha256": sha256_file(path)}
-                    for name, path in paths.items()
+                    for name, path in plan.paths.items()
                 },
                 "curve": {
                     "path": raw.name,
@@ -307,6 +689,15 @@ class OrojenesisRunner:
                 },
             },
         }
+        if plan.is_compulsory_witness:
+            _attach_compulsory_witness(
+                result,
+                layer,
+                plan,
+                curve,
+                word_bits=word_bits,
+            )
+        return result
 
     def run_multi_chain(
         self,

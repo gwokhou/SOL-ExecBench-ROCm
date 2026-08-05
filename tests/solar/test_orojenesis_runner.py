@@ -4,8 +4,10 @@ import csv
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -56,6 +58,27 @@ def _matmul(
     }
 
 
+def _conv_proof() -> dict:
+    layer = _matmul("x", "w", "y", m=2, k=3, n=4)
+    layer["semantic_op"] = {
+        "kind": "einsum",
+        "target": "einsum",
+        "equation": "BC(P+R)(Q+S),OCRS->BOPQ",
+        "proof_source": {"kind": "aten", "target": "conv2d"},
+        "effects": {
+            "mutates": [],
+            "aliases": [],
+            "atomic": False,
+            "opaque_library_call": False,
+        },
+    }
+    layer["tensor_shapes"] = {
+        "inputs": [[1, 2, 4, 4], [3, 2, 3, 3]],
+        "outputs": [[1, 3, 2, 2]],
+    }
+    return layer
+
+
 def _runner(tmp_path: Path) -> orojenesis.OrojenesisRunner:
     runner = object.__new__(orojenesis.OrojenesisRunner)
     runner.home = tmp_path
@@ -77,6 +100,66 @@ def _write_mapping(path: Path, *, tile: int, word_bytes: int = 2) -> None:
     row[21:24] = [2, 3, 1]
     with path.open("w", newline="") as handle:
         csv.writer(handle).writerow(row)
+
+
+def _write_witness_outputs(
+    output: Path,
+    *,
+    buffer_capacity: tuple[int, int, int] = (32, 54, 12),
+) -> None:
+    def vector(name: str, values: tuple[int, int, int]) -> str:
+        items = "".join(f"<item>{value}</item>" for value in values)
+        return f"<{name}><PerDataSpace>{items}</PerDataSpace></{name}>"
+
+    def level(
+        name: str,
+        *,
+        capacity: tuple[int, int, int],
+        reads: tuple[int, int, int],
+        updates: tuple[int, int, int],
+    ) -> str:
+        stats = "".join(
+            (
+                vector("keep", (1, 1, 1)),
+                vector("utilized_capacity", capacity),
+                vector("utilized_instances", (1, 1, 1)),
+                vector("reads", reads),
+                vector("updates", updates),
+                vector("fills", (0, 0, 0)),
+            ),
+        )
+        return (
+            "<item><px><specs_><LevelSpecs>"
+            f"<level_name>{name}</level_name>"
+            "</LevelSpecs><word_bits><t_>32</t_></word_bits></specs_>"
+            f"<stats_>{stats}</stats_></px></item>"
+        )
+
+    xml = "".join(
+        (
+            "<boost_serialization><engine><topology_><levels_>",
+            level(
+                "Buffer",
+                capacity=buffer_capacity,
+                reads=(0, 0, 0),
+                updates=(0, 0, 0),
+            ),
+            level(
+                "MainMemory",
+                capacity=(32, 54, 12),
+                reads=(32, 54, 0),
+                updates=(0, 0, 12),
+            ),
+            "</levels_></topology_></engine></boost_serialization>",
+        ),
+    )
+    (output / "timeloop-mapper.map+stats.xml").write_text(xml)
+    for name in (
+        "timeloop-mapper.map.txt",
+        "timeloop-mapper.stats.txt",
+        "timeloop-mapper.map.yaml",
+    ):
+        (output / name).write_text("fixed witness\n")
 
 
 def _mapping_subprocess(args, *, cwd, **kwargs):
@@ -115,6 +198,153 @@ def test_run_layer_emits_auditable_evidence(tmp_path, monkeypatch):
     }
     assert not (tmp_path / "layer" / "stdout.log").exists()
     assert not (tmp_path / "layer" / "stderr.log").exists()
+
+
+def test_run_layer_certifies_a_selected_capacity_compulsory_witness(
+    tmp_path,
+    monkeypatch,
+):
+    runner = _runner(tmp_path)
+    observed: dict[str, object] = {}
+
+    def fake_run(args, *, cwd, **kwargs):
+        del args
+        observed.update(kwargs)
+        row: list[object] = [0] * 18
+        row[0] = 392
+        row[1] = 1.0
+        row[2] = 98
+        row[3] = "fixed-compulsory-witness"
+        row[-3:] = [32, 54, 12]
+        with Path(cwd, "timeloop-mapper.oaves.csv").open(
+            "w",
+            newline="",
+        ) as handle:
+            csv.writer(handle).writerow(row)
+        _write_witness_outputs(Path(cwd))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(orojenesis_runner, "_default_mapper_runner", fake_run)
+    result = runner.run_layer(
+        _conv_proof(),
+        tmp_path / "conv",
+        word_bits=32,
+        selected_capacity_bytes=1024,
+    )
+
+    environment = cast(Mapping[str, object], observed["env"])
+    assert environment["TIMELOOP_ENABLE_FIRST_READ_ELISION"] == "1"
+    assert result["optimality_certificate"] == {
+        "kind": "selected_capacity_compulsory_witness_v1",
+        "scope": "selected_capacity_only",
+        "pareto_curve_complete": False,
+        "capacity_bytes": 1024,
+        "buffer_bytes": 392,
+        "compulsory_accesses_words": 98,
+        "data_space_accesses_words": {
+            "Input0": 32,
+            "Input1": 54,
+            "Output": 12,
+        },
+        "main_memory_accesses_words": {
+            "reads": {"Input0": 32, "Input1": 54, "Output": 0},
+            "updates": {"Input0": 0, "Input1": 0, "Output": 12},
+            "fills": {"Input0": 0, "Input1": 0, "Output": 0},
+        },
+        "buffer_utilized_capacity_words": {
+            "Input0": 32,
+            "Input1": 54,
+            "Output": 12,
+        },
+        "buffer_utilized_instances": {
+            "Input0": 1,
+            "Input1": 1,
+            "Output": 1,
+        },
+        "proof": "feasible traffic equals the universal compulsory lower bound",
+        "portability": {
+            "compulsory_lower_bound": "architecture_independent",
+            "achievability": "selected_architecture_cache_only",
+        },
+        "theorem_inputs": {
+            "proof_source": {"kind": "aten", "target": "conv2d"},
+            "equation": "BC(P+R)(Q+S),OCRS->BOPQ",
+            "tensor_shapes": {
+                "inputs": [[1, 2, 4, 4], [3, 2, 3, 3]],
+                "outputs": [[1, 3, 2, 2]],
+            },
+            "data_spaces": ["Input0", "Input1", "Output"],
+            "word_bits": 32,
+            "dense": True,
+            "first_read_elision": True,
+            "instances": 1,
+        },
+        "streaming_axis": "B",
+        "streaming_dimension": "A",
+    }
+    assert "environment.yaml" in result["evidence_files"]
+    assert "timeloop-mapper.map+stats.xml" in result["evidence_files"]
+    mapper = (tmp_path / "conv" / "mapper.yaml").read_text()
+    assert "A=1 B=2 C=3 D=3 E=3 F=2 G=2" in mapper
+    architecture = (tmp_path / "conv" / "architecture.yaml").read_text()
+    assert "sizeKB: 1" in architecture
+
+
+def test_run_layer_rejects_a_noncompulsory_convolution_witness(
+    tmp_path,
+    monkeypatch,
+):
+    runner = _runner(tmp_path)
+
+    def fake_run(args, *, cwd, **kwargs):
+        del args, kwargs
+        row: list[object] = [0] * 18
+        row[0:4] = [392, 1.0, 99, "invalid-witness"]
+        row[-3:] = [33, 54, 12]
+        with Path(cwd, "timeloop-mapper.oaves.csv").open(
+            "w",
+            newline="",
+        ) as handle:
+            csv.writer(handle).writerow(row)
+        _write_witness_outputs(Path(cwd))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(orojenesis_runner, "_default_mapper_runner", fake_run)
+    with pytest.raises(
+        orojenesis.OrojenesisError,
+        match="did not reach the selected-capacity optimum",
+    ):
+        runner.run_layer(
+            _conv_proof(),
+            tmp_path / "invalid-conv",
+            word_bits=32,
+            selected_capacity_bytes=1024,
+        )
+
+
+def test_selected_capacity_witness_rejects_a_spoofed_conv_equation(
+    tmp_path,
+    monkeypatch,
+):
+    runner = _runner(tmp_path)
+    layer = _conv_proof()
+    layer["semantic_op"]["equation"] = "BC(P+R)(Q+S),OCRS->BOQP"
+
+    def fake_run(args, *, cwd, **kwargs):
+        del args, kwargs
+        Path(cwd, "timeloop-mapper.oaves.csv").write_text("392,1.0,98\n")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(orojenesis_runner, "_default_mapper_runner", fake_run)
+    result = runner.run_layer(
+        layer,
+        tmp_path / "spoofed-conv",
+        word_bits=32,
+        selected_capacity_bytes=1024,
+    )
+
+    assert "optimality_certificate" not in result
+    assert "environment.yaml" not in result["evidence_files"]
 
 
 @pytest.mark.parametrize("failure", ["raise", "returncode"])

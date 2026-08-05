@@ -13,12 +13,15 @@ def _aten_layer(
     target: str,
     input_shapes: list[list[int]],
     output_shape: list[int],
+    *,
+    arguments: list[object] | None = None,
 ) -> dict:
     return {
         "type": target,
         "semantic_op": {
             "kind": "aten",
             "target": target,
+            "arguments": arguments or [],
             "effects": {
                 "mutates": [],
                 "aliases": [],
@@ -81,7 +84,107 @@ def test_addmm_proof_excludes_the_non_contraction_bias_operand() -> None:
     assert proof["semantic_op"]["equation"] == "MK,KN->MN"
 
 
-@pytest.mark.parametrize("target", ["conv2d", "scaled_dot_product_attention"])
+def _conv_arguments(
+    *,
+    stride: tuple[int, ...] = (1, 1),
+    padding: tuple[int, ...] = (0, 0),
+    groups: int = 1,
+) -> list[object]:
+    def literal(value: object) -> dict[str, object]:
+        return {"value": value}
+
+    return [
+        {"tensor": 0},
+        {"tensor": 1},
+        literal(None),
+        [literal(value) for value in stride],
+        [literal(value) for value in padding],
+        [literal(1) for _ in stride],
+        literal(False),
+        [literal(0) for _ in stride],
+        literal(groups),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("input_shapes", "output_shape", "groups", "equation"),
+    [
+        (
+            [[2, 3, 8, 8], [5, 3, 3, 3], [5]],
+            [2, 5, 6, 6],
+            1,
+            "BC(P+R)(Q+S),OCRS->BOPQ",
+        ),
+        (
+            [[2, 4, 8, 8], [4, 1, 3, 3], [4]],
+            [2, 4, 6, 6],
+            4,
+            "BO(P+R)(Q+S),OCRS->BOPQ",
+        ),
+    ],
+)
+def test_reviewed_direct_convolutions_gain_exact_proof_views(
+    input_shapes: list[list[int]],
+    output_shape: list[int],
+    groups: int,
+    equation: str,
+) -> None:
+    layer = _aten_layer(
+        "conv2d",
+        input_shapes,
+        output_shape,
+        arguments=_conv_arguments(groups=groups),
+    )
+
+    proof = build_orojenesis_proof_layer(layer, analyzer=EinsumAnalyzer())
+
+    assert proof is not None
+    assert proof["tensor_shapes"]["inputs"] == input_shapes[:2]
+    assert proof["semantic_op"]["equation"] == equation
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        _conv_arguments(stride=(2, 2)),
+        _conv_arguments(padding=(1, 1)),
+        _conv_arguments(groups=2),
+    ],
+)
+def test_unreviewed_convolutions_remain_fail_closed(
+    arguments: list[object],
+) -> None:
+    layer = _aten_layer(
+        "conv2d",
+        [[1, 4, 8, 8], [6, 2, 3, 3]],
+        [1, 6, 6, 6],
+        arguments=arguments,
+    )
+
+    assert requires_tile_evidence(layer)
+    assert (
+        build_orojenesis_proof_layer(layer, analyzer=EinsumAnalyzer()) is None
+    )
+
+
+def test_unreviewed_depthwise_conv3d_remains_fail_closed() -> None:
+    layer = _aten_layer(
+        "conv3d",
+        [[1, 4, 8, 8, 8], [4, 1, 3, 3, 3], [4]],
+        [1, 4, 6, 6, 6],
+        arguments=_conv_arguments(
+            stride=(1, 1, 1),
+            padding=(0, 0, 0),
+            groups=4,
+        ),
+    )
+
+    assert (
+        build_orojenesis_proof_layer(layer, analyzer=EinsumAnalyzer()) is None
+    )
+
+
+@pytest.mark.parametrize("target", ["scaled_dot_product_attention"])
 def test_unmodeled_contractions_are_never_treated_as_proven(
     target: str,
 ) -> None:
