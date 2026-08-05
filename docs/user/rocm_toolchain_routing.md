@@ -12,7 +12,7 @@ which diagnostic surface consumes the route.
 | --- | --- | --- |
 | Runtime | Device and runtime discovery. | `rocminfo`, `rocm_agent_enumerator`, `amd-smi` |
 | Profiling | Diagnostic execution-time artifacts. | `rocprofv3`, `rocprofv3-avail` |
-| Static | Diagnostic current-build artifact metadata and bounded extractor output. | RGA, `llvm-objdump`, `roc-objdump`, `readelf` |
+| Static | Diagnostic current-build artifact metadata and bounded extractor output. | `llvm-objdump`, `roc-objdump`, `readelf` |
 | Derived score | Derived AMD-side score and bound artifacts. | AMD SOL/SOLAR sidecars |
 
 Routing output is diagnostic-only metadata using the authority-class vocabulary
@@ -87,7 +87,6 @@ uv run sol-execbench --format json toolchain route \
 | ROCm Systems | active | runtime/profiling | Repository source-of-truth signal, not a direct executable route. |
 | `rocminfo` | active | runtime | Runtime/device discovery. |
 | `rocm_agent_enumerator` | active | runtime | Architecture discovery. |
-| RGA | planned | static | Registered but inactive: no bounded packaging or parser contract feeds Static Kernel Evidence. |
 | `llvm-objdump` | active | static | Bounded object-inspection route for persisted HIP/C++ build artifacts. |
 | `roc-objdump` | candidate | static | Distribution-dependent object-inspection candidate. |
 | `readelf` | active | static | Generic ELF metadata fallback for persisted HIP/C++ build artifacts. |
@@ -100,10 +99,6 @@ uv run sol-execbench --format json toolchain route \
   https://github.com/ROCm/rocm-systems
 - Deprecated ROCprofiler Systems repository:
   https://github.com/ROCm/rocprofiler-systems
-- Radeon GPU Analyzer repository:
-  https://github.com/GPUOpen-Tools/radeon_gpu_analyzer
-- RGA help manual:
-  https://gpuopen.com/manuals/rga_manual/help_manual/
 - HIP compiler documentation:
   https://rocm.docs.amd.com/projects/HIP/en/develop/understand/compilers.html
 - LLVM `llvm-objdump` documentation:

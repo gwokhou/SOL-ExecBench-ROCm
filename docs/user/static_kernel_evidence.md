@@ -75,10 +75,9 @@ machine-readable XML. Its helper and pinned XML are installed into the user
 cache on first use. If the helper, XML, network, or ROCm fat-binary tools are
 unavailable, collection remains diagnostic and the aggregate status becomes
 `partial` rather than failing the benchmark. Set
-`SOL_EXECBENCH_AMD_ISA_OFFLINE=1` to forbid ISA downloads. `rga` remains a
-registered `planned` route; it has no active extractor or sidecar fields. The
-decision to implement or remove that route is tracked in the
-[active backlog](../../HANDSOFF.md).
+`SOL_EXECBENCH_AMD_ISA_OFFLINE=1` to forbid ISA downloads. The deliberately
+bounded static endpoint is the current `llvm-objdump`/`readelf`/`roc-objdump`
+and ELF-note coverage; no separate RGA route is registered.
 
 ## Claim Boundaries
 
@@ -105,8 +104,6 @@ The current sidecar does not establish:
 - CDNA3-family live hardware validation, including MI300X (`gfx942`)
 - CDNA 4 live hardware validation
 - Triton ROCm cache capture
-- RGA-rich resource parsing beyond what `roc-objdump --resource-usage` or the
-  ELF metadata path reports
 - paper-scale static coverage for the full original benchmark denominator
 - standalone static analysis of arbitrary pre-existing binaries
 

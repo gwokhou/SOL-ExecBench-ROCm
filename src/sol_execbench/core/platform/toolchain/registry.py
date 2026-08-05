@@ -139,7 +139,6 @@ def _static_analysis_capabilities() -> list[ToolchainCapability]:
         _readelf_capability(),
         _llvm_objdump_capability(),
         _roc_objdump_capability(),
-        _rga_capability(),
     ]
 
 
@@ -206,27 +205,4 @@ def _roc_objdump_capability() -> ToolchainCapability:
             "https://rocm.docs.amd.com/projects/HIP/en/develop/understand/compilers.html",
         ],
         notes="Distribution-dependent candidate for static evidence.",
-    )
-
-
-def _rga_capability() -> ToolchainCapability:
-    return ToolchainCapability(
-        tool_id="rga",
-        display_name="Radeon GPU Analyzer",
-        lifecycle=ToolLifecycle.PLANNED,
-        evidence_levels=[ToolchainEvidenceLevel.STATIC],
-        artifact_types=[
-            ToolchainArtifactType.HIP_COMPILER_OUTPUT,
-            ToolchainArtifactType.ROCM_BINARY,
-            ToolchainArtifactType.STATIC_FUTURE,
-        ],
-        hardware_generations=["RDNA 4", "CDNA 3", "CDNA 4"],
-        gpu_arch_patterns=["gfx*"],
-        expected_binaries=["rga"],
-        probe_command=["rga", "--version"],
-        source_refs=[
-            "https://github.com/GPUOpen-Tools/radeon_gpu_analyzer",
-            "https://gpuopen.com/manuals/rga_manual/help_manual/",
-        ],
-        notes="Optional compiler-facing static evidence route.",
     )
