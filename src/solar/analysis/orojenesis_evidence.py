@@ -40,6 +40,7 @@ from solar.analysis.graph_models import (
 from solar.analysis.mixin_contract import AnalysisMixinContract
 from solar.analysis.operand_provenance import (
     contraction_external_source_dtypes,
+    contraction_has_region_boundary_proof,
     contraction_operands_are_graph_external,
 )
 from solar.analysis.orojenesis.multi_einsum import find_multi_einsum_chains
@@ -341,20 +342,31 @@ class OrojenesisEvidenceMixin(AnalysisMixinContract):
                 layer,
                 all_layers,
             )
-            applicable = bool(point and external)
+            region_boundary = contraction_has_region_boundary_proof(
+                layer,
+                region,
+                all_layers,
+            )
+            applicable = bool(point and (external or region_boundary))
+            provenance = (
+                "graph_input_or_recomputable_preprocess"
+                if external
+                else "materialized_region_boundary_and_tile_local_postprocess"
+            )
             result["formal_applicability"] = {
                 "applicable": applicable,
                 "region": region["id"],
                 "graph_input_operands": external,
-                "operand_provenance": (
-                    "graph_input_or_recomputable_preprocess"
-                    if external
-                    else "internal"
-                ),
+                "region_boundary_operands": region_boundary,
+                "operand_provenance": provenance,
                 "reason": (
                     "graph_input_or_recomputable_preprocess_contraction"
-                    if applicable
-                    else "internal_operand_requires_multi_einsum_composition"
+                    if external and point
+                    else (
+                        "materialized_region_boundary_contraction"
+                        if region_boundary and point
+                        else "internal_operand_requires_composition_proof"
+                    )
                 ),
             }
             if not applicable:

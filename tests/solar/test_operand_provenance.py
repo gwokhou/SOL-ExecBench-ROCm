@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
 from solar.analysis.operand_provenance import (
     contraction_external_source_dtypes,
+    contraction_has_region_boundary_proof,
     contraction_operands_are_graph_external,
 )
 
@@ -110,3 +113,95 @@ def test_pointwise_add_operand_is_proven_tile_recomputable():
     assert contraction_external_source_dtypes(contraction, layers) == {
         "torch.float32",
     }
+
+
+def _tensor_layer(
+    target: str,
+    input_name: str,
+    output_name: str,
+    *,
+    shape: list[int] | None = None,
+) -> dict:
+    tensor_shape = shape or [2, 4]
+    return {
+        "type": target,
+        "semantic_op": {
+            "kind": "aten",
+            "target": target,
+            "effects": {
+                "mutates": [],
+                "aliases": [],
+                "atomic": False,
+                "opaque_library_call": False,
+            },
+        },
+        "tensor_names": {
+            "inputs": [input_name],
+            "outputs": [output_name],
+        },
+        "tensor_shapes": {
+            "inputs": [tensor_shape],
+            "outputs": [tensor_shape],
+        },
+        "tensor_dtypes": {
+            "inputs": ["torch.float32"],
+            "outputs": ["torch.float32"],
+        },
+    }
+
+
+def test_region_boundary_proves_tile_local_scalar_output_chain():
+    contraction = {
+        **_tensor_layer("bmm", "left", "product"),
+        "tensor_names": {
+            "inputs": ["left", "right"],
+            "outputs": ["product"],
+        },
+    }
+    layers = {
+        "bmm": contraction,
+        "elu": _tensor_layer("elu", "product", "activated"),
+        "div": _tensor_layer("div", "activated", "scaled"),
+    }
+    region = {
+        "layers": ["bmm", "elu", "div"],
+        "external_inputs": ["left", "right"],
+        "external_outputs": ["scaled"],
+    }
+
+    assert contraction_has_region_boundary_proof(contraction, region, layers)
+
+
+@pytest.mark.parametrize(
+    "failure", ["tensor_operand", "shape", "fanout", "normalization"]
+)
+def test_region_boundary_output_proof_fails_closed(failure: str):
+    contraction = {
+        **_tensor_layer("bmm", "left", "product"),
+        "tensor_names": {
+            "inputs": ["left", "right"],
+            "outputs": ["product"],
+        },
+    }
+    postprocess = _tensor_layer("elu", "product", "result")
+    layers = {"bmm": contraction, "postprocess": postprocess}
+    region = {
+        "layers": ["bmm", "postprocess"],
+        "external_inputs": ["left", "right"],
+        "external_outputs": ["result"],
+    }
+    if failure == "tensor_operand":
+        postprocess["tensor_names"]["inputs"].append("other")
+        postprocess["tensor_shapes"]["inputs"].append([2, 4])
+        postprocess["tensor_dtypes"]["inputs"].append("torch.float32")
+    elif failure == "shape":
+        postprocess["tensor_shapes"]["outputs"] = [[4, 2]]
+    elif failure == "fanout":
+        layers["second_consumer"] = _tensor_layer("relu", "product", "second")
+        region["layers"].append("second_consumer")
+    else:
+        postprocess["semantic_op"]["target"] = "softmax"
+
+    assert not contraction_has_region_boundary_proof(
+        contraction, region, layers
+    )
