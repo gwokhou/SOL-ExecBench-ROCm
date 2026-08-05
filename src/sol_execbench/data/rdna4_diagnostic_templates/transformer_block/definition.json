@@ -1,0 +1,42 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "diagnostic_minigpt_attention_f32",
+  "op_type": "transformer_block",
+  "description": "Preregistered MiniGPT FP32 C=768 projection with eight heads, sequence-axis Softmax, and LayerNorm.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Governed M extent."
+    },
+    "N": {
+      "type": "var",
+      "description": "Governed N extent."
+    }
+  },
+  "inputs": {
+    "input": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    },
+    "weight": {
+      "shape": [
+        "N",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch\nimport torch.nn.functional as F\n\n\ndef run(input, weight):\n    sequence, channels = input.shape\n    heads = 8\n    projected = torch.mm(input, weight)\n    head_channels = projected.transpose(0, 1).reshape(heads, channels // heads, sequence)\n    probabilities = F.softmax(head_channels, dim=-1)\n    rows = probabilities.reshape(channels, sequence).transpose(0, 1).contiguous()\n    return F.layer_norm(rows, (channels,))\n"
+}

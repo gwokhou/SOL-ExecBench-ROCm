@@ -10,6 +10,11 @@ from typing import Any
 import pytest
 import torch
 
+from sol_execbench.core.bench.performance_model.corpus_preflight import (
+    preflight,
+)
+from sol_execbench.core.integrity.schema_versions import SchemaVersion
+
 
 def test_aka_author_seed_helpers_and_coverage_inventory(load_script) -> None:
     author = load_script("scripts/internal/aka_author_seed.py")
@@ -172,8 +177,9 @@ def test_rdna4_diagnostic_corpus_design_is_preregistered_and_stratified(
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
     )
-    development = corpus._cases("development")
-    held_out = corpus._cases("held_out")
+    universe_start = 160
+    development = corpus._cases("development", universe_start)
+    held_out = corpus._cases("held_out", universe_start)
     all_cases = [*development, *held_out]
 
     assert len(development) == 440
@@ -187,8 +193,11 @@ def test_rdna4_diagnostic_corpus_design_is_preregistered_and_stratified(
             ]
             assert len(selected) == 20
 
-    for start in range(corpus.UNIVERSE_START, corpus.UNIVERSE_START + 60, 3):
-        assert {corpus._phase(index) for index in range(start, start + 3)} == {
+    for start in range(universe_start, universe_start + 60, 3):
+        assert {
+            corpus._phase(index, universe_start)
+            for index in range(start, start + 3)
+        } == {
             "point_fit",
             "conformal",
             "held_out",
@@ -206,9 +215,18 @@ def test_rdna4_diagnostic_corpus_design_is_preregistered_and_stratified(
         assert max(widths.count(width) for width in expected_widths) == 4
         assert min(widths.count(width) for width in expected_widths) == 3
 
-    design = corpus._design_payload()
+    design = corpus._design_payload(universe_start)
     assert design["configuration_frozen_before_collection"] is True
     assert len(design["cases"]) == 660
+
+    previous = {
+        case.workload_uuid
+        for case in [
+            *corpus._cases("development", 100),
+            *corpus._cases("held_out", 100),
+        ]
+    }
+    assert previous.isdisjoint(case.workload_uuid for case in all_cases)
 
 
 def test_rdna4_diagnostic_preregistration_is_immutable(
@@ -218,14 +236,122 @@ def test_rdna4_diagnostic_preregistration_is_immutable(
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
     )
-    corpus._preregister(tmp_path)
+    corpus._preregister(tmp_path, 160)
     design_path = tmp_path / "design.json"
 
-    corpus._preregister(tmp_path)
+    corpus._preregister(tmp_path, 160)
+    with pytest.raises(ValueError, match="differs"):
+        corpus._preregister(tmp_path, 220)
     design_path.write_text('{"changed": true}\n', encoding="utf-8")
 
     with pytest.raises(ValueError, match="differs"):
-        corpus._preregister(tmp_path)
+        corpus._preregister(tmp_path, 160)
+
+
+def test_rdna4_diagnostic_packaged_templates_prepare_full_corpus(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    corpus._preregister(tmp_path, 160)
+
+    corpus._prepare(tmp_path)
+
+    summary = preflight(tmp_path)
+    assert summary.schema_version == SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT
+    assert summary.cases == 660
+    assert summary.families == 11
+
+
+def _write_promotion_source(corpus, root: Path, role: str, offset: int) -> Path:
+    cases = []
+    for family_index, family in enumerate(corpus.FAMILIES):
+        for family_case in range(20):
+            index = offset + family_index * 20 + family_case
+            evidence = root / "artifacts" / f"{role}-{index}-evidence.json"
+            solar = root / "artifacts" / f"{role}-{index}-solar.yaml"
+            evidence.parent.mkdir(parents=True, exist_ok=True)
+            evidence.write_text(f"evidence-{index}\n", encoding="utf-8")
+            solar.write_text(f"solar-{index}\n", encoding="utf-8")
+            cases.append(
+                corpus.DiagnosticValidationCase(
+                    case_id=f"{role}-{index}",
+                    pair_id=f"{index + 1:064x}",
+                    workload_kind=family,
+                    evidence_manifest=corpus.ValidationArtifactReference(
+                        path=evidence.relative_to(root).as_posix(),
+                        sha256=corpus.sha256_file(evidence),
+                    ),
+                    solar_manifest=corpus.ValidationArtifactReference(
+                        path=solar.relative_to(root).as_posix(),
+                        sha256=corpus.sha256_file(solar),
+                    ),
+                )
+            )
+    source = corpus.DiagnosticValidationCorpus(role=role, cases=cases)
+    path = root / f"{role}.json"
+    corpus.atomic_write_json_value(path, source.model_dump(mode="json"))
+    return path
+
+
+def test_rdna4_diagnostic_promotion_verifies_roles_order_and_hashes(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    development = _write_promotion_source(corpus, tmp_path, "development", 0)
+    held_out = _write_promotion_source(corpus, tmp_path, "held_out", 220)
+    output = tmp_path / "promoted-development.json"
+
+    corpus._promote_development(
+        tmp_path,
+        [development, held_out],
+        output,
+    )
+
+    promoted = corpus.load_json_file(corpus.DiagnosticValidationCorpus, output)
+    assert promoted.role == "development"
+    assert len(promoted.cases) == 440
+    assert promoted.cases[0].case_id.startswith("promoted-00-")
+    assert promoted.cases[-1].case_id.startswith("promoted-01-")
+    with pytest.raises(ValueError, match="order"):
+        corpus._promote_development(
+            tmp_path,
+            [held_out, development],
+            tmp_path / "wrong-order.json",
+        )
+    with pytest.raises(ValueError, match="already exists"):
+        corpus._promote_development(
+            tmp_path,
+            [development, held_out],
+            output,
+        )
+
+
+def test_rdna4_diagnostic_promotion_rejects_hash_drift(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    development = _write_promotion_source(corpus, tmp_path, "development", 0)
+    held_out = _write_promotion_source(corpus, tmp_path, "held_out", 220)
+    (tmp_path / "artifacts/development-0-evidence.json").write_text(
+        "changed\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="hash mismatch"):
+        corpus._promote_development(
+            tmp_path,
+            [development, held_out],
+            tmp_path / "promoted-development.json",
+        )
 
 
 def _result_output(values: Sequence[object]) -> str:

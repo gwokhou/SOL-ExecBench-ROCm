@@ -1,0 +1,38 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "diagnostic_cross_entropy_f32",
+  "op_type": "cross_entropy",
+  "description": "Mean FP32 cross entropy with class-bounded INT64 labels.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Governed M extent."
+    },
+    "N": {
+      "type": "var",
+      "description": "Governed N extent."
+    }
+  },
+  "inputs": {
+    "predictions": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    },
+    "targets": {
+      "shape": [
+        "M"
+      ],
+      "dtype": "int64"
+    }
+  },
+  "outputs": {
+    "loss": {
+      "shape": [],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch.nn.functional as F\n\n\ndef run(predictions, targets):\n    return F.cross_entropy(predictions, targets)\n"
+}

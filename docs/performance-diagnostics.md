@@ -66,11 +66,40 @@ case:
 
 ```bash
 uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
-  preregister --root CORPUS_ROOT
+  preregister --root CORPUS_ROOT --universe-start 160
+
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  prepare --root CORPUS_ROOT
+
+uv run python scripts/internal/rdna4/preflight_rdna4_diagnostic_corpus.py \
+  --corpus-root CORPUS_ROOT --output CORPUS_ROOT/preflight.json
 ```
 
-`prepare`, `solar`, `collect`, and `freeze` require the exact frozen design;
-an existing mismatched design is never overwritten.
+The universe start is explicit only at preregistration. `prepare`, `solar`,
+`collect`, and `freeze` regenerate their case set from that exact typed frozen
+design; an existing mismatched design is never overwritten. `prepare` loads
+the eleven definitions and HIP sources from installed package resources, so it
+does not depend on an ignored smoke directory. The versioned preflight output
+validates all 660 authored workloads and produces the deterministic 33-batch
+collection plan without accessing a GPU.
+
+After the previous development and held-out corpora have both been frozen,
+promote them in that exact order as the next cycle's development input:
+
+```bash
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  promote --root PREVIOUS_CORPUS_ROOT \
+  --source-corpus PREVIOUS_CORPUS_ROOT/development.json \
+  --source-corpus PREVIOUS_CORPUS_ROOT/held_out.json \
+  --output PREVIOUS_CORPUS_ROOT/promoted-development-cycle2.json
+```
+
+Promotion does not copy large evidence. It requires both source corpus files
+and every referenced evidence/SOLAR artifact to remain beneath the same root,
+verifies their SHA-256 values, preserves development-before-held-out ordering,
+and refuses to overwrite an existing output. The new preregistered universe is
+then reserved for fresh held-out collection; it is not read while fitting from
+the promoted development corpus.
 
 The current corpus contract derives each pair ID from the evidence-bound
 workload SHA-256 and candidate SHA-256. Authoring re-derives that identity,

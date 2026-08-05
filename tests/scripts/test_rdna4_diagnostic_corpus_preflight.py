@@ -5,15 +5,18 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from sol_execbench.core.bench.performance_model import corpus_preflight
 from sol_execbench.core.bench.performance_model.corpus_preflight import (
     CASES_PER_BATCH,
     FAMILIES,
     PHASE_ROLES,
     PHASES,
+    PreflightSummary,
     build_batches,
     validate_design,
     validate_status_log,
@@ -142,3 +145,36 @@ def test_resume_rejects_terminal_status_without_evidence(
 
     with pytest.raises(ValueError, match="terminal status lacks evidence"):
         validate_status_log(status, tmp_path, cases)
+
+
+def test_main_writes_versioned_preflight_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "preflight.json"
+    summary = PreflightSummary(
+        design_sha256="0" * 64,
+        cases=660,
+        families=11,
+        batches=[],
+    )
+    monkeypatch.setattr(
+        corpus_preflight,
+        "_parse_args",
+        lambda: SimpleNamespace(
+            corpus_root=tmp_path,
+            status_log=None,
+            case_root=None,
+            output=output,
+        ),
+    )
+    monkeypatch.setattr(
+        corpus_preflight, "preflight", lambda *args, **kwargs: summary
+    )
+
+    assert corpus_preflight.main() == 0
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert (
+        payload["schema_version"] == SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT
+    )

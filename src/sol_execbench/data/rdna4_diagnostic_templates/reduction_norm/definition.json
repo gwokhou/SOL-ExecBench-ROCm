@@ -1,0 +1,33 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "diagnostic_last_axis_sum_f32",
+  "op_type": "sum",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Governed M extent."
+    },
+    "N": {
+      "type": "var",
+      "description": "Governed N extent."
+    }
+  },
+  "inputs": {
+    "input": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "reference": "def run(input):\n    return input.sum(dim=-1)\n"
+}

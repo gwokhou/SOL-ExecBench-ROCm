@@ -1,0 +1,45 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "diagnostic_matmul_f16",
+  "op_type": "matmul",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Governed M extent."
+    },
+    "N": {
+      "type": "var",
+      "description": "Governed N extent."
+    },
+    "K": {
+      "type": "var",
+      "description": "Governed K extent."
+    }
+  },
+  "inputs": {
+    "a": {
+      "shape": [
+        "M",
+        "K"
+      ],
+      "dtype": "float16"
+    },
+    "b": {
+      "shape": [
+        "K",
+        "N"
+      ],
+      "dtype": "float16"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float16"
+    }
+  },
+  "reference": "def run(a, b):\n    return a @ b\n"
+}

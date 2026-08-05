@@ -1,0 +1,35 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "diagnostic_softmax_f32",
+  "op_type": "softmax",
+  "description": "Row-wise FP32 softmax over the last dimension.",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "Governed M extent."
+    },
+    "N": {
+      "type": "var",
+      "description": "Governed N extent."
+    }
+  },
+  "inputs": {
+    "input": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "float32"
+    }
+  },
+  "reference": "import torch\n\n\ndef run(input):\n    return torch.softmax(input, dim=-1)\n"
+}

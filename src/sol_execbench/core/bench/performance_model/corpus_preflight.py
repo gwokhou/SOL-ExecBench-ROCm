@@ -16,7 +16,10 @@ from sol_execbench.core.data.base_model import (
     StrictArtifactModel,
 )
 from sol_execbench.core.data.definition import Definition
-from sol_execbench.core.data.json_utils import load_jsonl_file
+from sol_execbench.core.data.json_utils import (
+    atomic_write_json_value,
+    load_jsonl_file,
+)
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.workload import TopKRoutingCheck, Workload
 from sol_execbench.core.integrity import sha256_file
@@ -216,11 +219,15 @@ class ResumeSummary(StrictArtifactModel):
     evidence_sha256: dict[str, str]
 
 
-class PreflightSummary(StrictArtifactModel):
+class PreflightSummary(CurrentSchemaModel):
     """Machine-readable result of the complete CPU preflight."""
 
     model_config = _CONFIG
+    current_schema_version = SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT
 
+    schema_version: Literal[SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT] = (
+        SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT
+    )
     ok: Literal[True] = True
     design_sha256: str
     cases: int = Field(ge=0)
@@ -422,6 +429,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--corpus-root", type=Path, required=True)
     parser.add_argument("--status-log", type=Path)
     parser.add_argument("--case-root", type=Path)
+    parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
 
@@ -433,5 +441,10 @@ def main() -> int:
         status_log=arguments.status_log,
         case_root=arguments.case_root,
     )
+    if arguments.output is not None:
+        atomic_write_json_value(
+            arguments.output,
+            result.model_dump(mode="json"),
+        )
     print(result.model_dump_json(indent=2))
     return 0
