@@ -80,3 +80,33 @@ def test_conditional_alias_is_not_treated_as_zero_copy():
         {"tensor_names": {"inputs": ["output"]}},
         layers,
     )
+
+
+def test_pointwise_add_operand_is_proven_tile_recomputable():
+    layers = {
+        "left": _start("left", dtype="torch.float32"),
+        "right": _start("right", dtype="torch.float32"),
+        "add": {
+            "type": "add",
+            "semantic_op": {
+                "kind": "aten",
+                "target": "add",
+                "effects": {
+                    "mutates": [],
+                    "aliases": [],
+                    "atomic": False,
+                    "opaque_library_call": False,
+                },
+            },
+            "tensor_names": {
+                "inputs": ["left", "right"],
+                "outputs": ["sum"],
+            },
+        },
+    }
+    contraction = {"tensor_names": {"inputs": ["left", "sum"]}}
+
+    assert contraction_operands_are_graph_external(contraction, layers)
+    assert contraction_external_source_dtypes(contraction, layers) == {
+        "torch.float32",
+    }

@@ -8,6 +8,7 @@ BOOL_DTYPES = frozenset({"torch.bool", "bool"})
 RECOMPUTABLE_OPERAND_TARGETS = frozenset(
     {
         "abs",
+        "add",
         "amax",
         "clamp",
         "contiguous",
@@ -25,6 +26,12 @@ RECOMPUTABLE_OPERAND_TARGETS = frozenset(
         "view",
     },
 )
+
+# Pointwise preprocessing in this set can be evaluated directly on each
+# contraction tile without materializing an intermediate tensor or repeating
+# cross-element work. Keep this narrower than RECOMPUTABLE_OPERAND_TARGETS:
+# reductions and layout-changing copies need a separate composition proof.
+TILE_RECOMPUTABLE_OPERAND_TARGETS = frozenset({"add"})
 
 LOW_PRECISION_DEQUANT_DTYPES = frozenset(
     {
@@ -148,6 +155,7 @@ __all__ = [
     "RECOMPUTABLE_OPERAND_TARGETS",
     "SCATTER_OPS",
     "SLICE_VIEW_OPS",
+    "TILE_RECOMPUTABLE_OPERAND_TARGETS",
     "TRANSPARENT_OPS",
     "ZERO_COMPUTE_OPS",
     "ZERO_COPY_VIEW_OPS",

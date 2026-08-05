@@ -12,6 +12,7 @@ from typing import Any
 from solar.analysis.graph_rules import (
     LOW_PRECISION_DEQUANT_DTYPES,
     RECOMPUTABLE_OPERAND_TARGETS,
+    TILE_RECOMPUTABLE_OPERAND_TARGETS,
 )
 from solar.ir.contracts import CONTRACTION_KIND, INPUT_KIND, layer_operation
 from solar.types import NodeDict
@@ -85,7 +86,9 @@ class _OperandSourceTracer:
     ) -> SourceTrace | None:
         sources: set[str] = set()
         saw_low_precision = False
-        materialized = True
+        materialized = (
+            semantic.get("target") not in TILE_RECOMPUTABLE_OPERAND_TARGETS
+        )
         for input_name in input_names:
             traced = self.trace(str(input_name), visited)
             if traced is None:
