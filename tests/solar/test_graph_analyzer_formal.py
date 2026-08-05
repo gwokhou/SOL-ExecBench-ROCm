@@ -393,6 +393,78 @@ def test_tile_aware_bound_requires_complete_contraction_coverage(
     }
 
 
+def test_tile_aware_bound_accepts_pointwise_add_operand(tmp_path: Path):
+    matmul = _einsum_layer("left", "sum", "output")
+    add = {
+        "type": "add",
+        "semantic_op": {
+            "kind": "aten",
+            "target": "add",
+            "effects": {
+                "mutates": [],
+                "aliases": [],
+                "atomic": False,
+                "opaque_library_call": False,
+            },
+        },
+        "tensor_names": {
+            "inputs": ["right", "right"],
+            "outputs": ["sum"],
+        },
+    }
+    plan = FusionPlan(
+        fusion={"regions": [{"id": "fusion", "layers": ["matmul"]}]},
+        chains=[],
+        regions=[],
+        proof_layers={"matmul": matmul},
+    )
+    runner = _FakeRunner()
+    result = runner.run_layer(
+        matmul,
+        tmp_path / "orojenesis" / "matmul",
+        word_bits=16,
+    )
+    result["selected_capacity"] = {
+        "level": "l2",
+        "capacity_bytes": 256,
+        "point": result["curve"][-1],
+    }
+    result["evidence_files"]["raw"]["path"] = "orojenesis/matmul/raw.csv"
+    evidence = _empty_orojenesis()
+    evidence.update(
+        {
+            "status": "complete",
+            "toolchain": runner.toolchain_identity,
+        },
+    )
+    evidence["layers"]["matmul"] = result
+    prepared = SimpleNamespace(
+        all_layers={
+            "left": _start("left"),
+            "right": _start("right"),
+            "add": add,
+            "matmul": matmul,
+        },
+        output_dir=tmp_path,
+    )
+
+    _, formal = IRGraphAnalyzer()._audit_orojenesis_evidence(
+        plan,
+        evidence,
+        cast(PreparedAnalysis, prepared),
+        audited_fused_bytes=48.0,
+    )
+
+    assert formal
+    assert evidence["layers"]["matmul"]["formal_applicability"] == {
+        "applicable": True,
+        "region": "fusion",
+        "graph_input_operands": True,
+        "operand_provenance": ("graph_input_or_recomputable_preprocess"),
+        "reason": "graph_input_or_recomputable_preprocess_contraction",
+    }
+
+
 class _Profile:
     memory_bandwidth_bytes_per_second = 100.0
 
