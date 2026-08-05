@@ -62,7 +62,9 @@ There is no git-checkout fallback. The current allowlist contains the digest
 produced identically by two no-cache builds from the pinned source and build
 environment. Any other mapper still fails closed.
 
-For a reviewed direct convolution, the mapper may emit a
+For a reviewed direct convolution, or an exact ATen BMM whose complete
+single-batch input/output footprint fits the selected cache, the mapper may
+emit a
 `selected_capacity_compulsory_witness_v1` instead of enumerating the complete
 low-capacity Pareto curve. This certificate fixes one batch-streaming mapping,
 records first-read elision explicitly, and requires both the total and every
@@ -85,6 +87,15 @@ through a single-consumer chain of pure scalar pointwise operations with
 identical shape and dtype. Tensor-tensor postprocessing, reductions,
 normalizations, mutation, aliasing, fan-out, shape/dtype changes, and unknown
 targets all fail closed and still require an explicit composition proof.
+
+An internal contraction that lacks such a composition proof may use a selected-
+capacity compulsory witness only as a certified zero-excess result. Its solver
+traffic must equal the independently recomputed compulsory traffic exactly, and
+the analyzer adds none of that standalone intermediate traffic to the graph
+bound. This closes formal coverage without assuming that an intermediate must
+materialize; any positive capacity-induced excess still fails closed until a
+composition or materialized-boundary proof exists. Orojenesis analysis schema 5
+records this case as `selected_capacity_compulsory_zero_excess`.
 
 Regardless of this flag, formal publication is *additionally* gated by verified
 architecture audit evidence (`ArchitectureProfile.require_verified_audit_evidence`),

@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import gc
 import importlib.util
 import math
 import re
@@ -165,8 +166,7 @@ def _verify_case(
         reference_tensor_inputs,
         executor_inputs,
     ) = prepared
-    atol = policy.atol
-    rtol = policy.rtol
+    atol, rtol = policy.atol, policy.rtol
     required_ratio = policy.required_matched_ratio
     error_cap = policy.max_error_cap
     allow_negative_inf = policy.allow_negative_inf
@@ -218,15 +218,37 @@ def _verify_case(
                 "output/input alias relationships differ from the reference",
             )
     if isinstance(policy, VerificationPolicy) and policy.verify_gradients:
-        gradient_stats = verify_gradients(
-            reference,
-            executor,
-            graph,
-            reference_inputs,
-            policy,
+        actual = expected = None
+        stats.update(
+            _verify_case_gradients(
+                reference,
+                executor,
+                graph,
+                reference_inputs,
+                policy,
+            )
         )
-        stats.update(gradient_stats)
     return stats
+
+
+def _verify_case_gradients(
+    reference: Callable[..., Any],
+    executor: IRGraphExecutor,
+    graph: Mapping[str, Any],
+    reference_inputs: Sequence[Any],
+    policy: VerificationPolicy,
+) -> dict[str, float]:
+    import torch
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return verify_gradients(
+        reference,
+        executor,
+        graph,
+        reference_inputs,
+        policy,
+    )
 
 
 def _run_cases(
@@ -240,8 +262,6 @@ def _run_cases(
     device: str,
     check_shapes: bool,
 ) -> list[dict[str, Any]]:
-    import torch
-
     executor = IRGraphExecutor(
         graph,
         backend,
@@ -267,11 +287,16 @@ def _run_cases(
             },
         )
         del prepared
-        if torch.cuda.is_available() and str(device).startswith(
-            ("cuda", "rocm"),
-        ):
-            torch.cuda.empty_cache()
+        _release_case_memory(device)
     return results
+
+
+def _release_case_memory(device: str) -> None:
+    import torch
+
+    if torch.cuda.is_available() and str(device).startswith(("cuda", "rocm")):
+        gc.collect()
+        torch.cuda.empty_cache()
 
 
 def _einsum_roundoff_equivalent(

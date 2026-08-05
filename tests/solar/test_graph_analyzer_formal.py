@@ -548,6 +548,96 @@ def test_tile_aware_bound_accepts_materialized_region_boundary(tmp_path: Path):
     }
 
 
+def test_tile_aware_bound_accepts_only_certified_zero_internal_excess(
+    tmp_path: Path,
+):
+    matmul = _einsum_layer("left", "right", "output")
+    plan = FusionPlan(
+        fusion={
+            "regions": [
+                {
+                    "id": "fusion",
+                    "layers": ["matmul"],
+                    "external_inputs": [],
+                    "external_outputs": [],
+                }
+            ]
+        },
+        chains=[],
+        regions=[],
+        proof_layers={"matmul": matmul},
+    )
+    runner = _FakeRunner()
+    result = runner.run_layer(
+        matmul,
+        tmp_path / "orojenesis" / "matmul",
+        word_bits=16,
+    )
+    point = {**result["curve"][-1], "dram_bytes": 52.0}
+    result["selected_capacity"] = {
+        "level": "l2",
+        "capacity_bytes": 256,
+        "point": point,
+    }
+    result["optimality_certificate"] = {
+        "kind": "selected_capacity_compulsory_witness_v1",
+        "scope": "selected_capacity_only",
+        "compulsory_accesses_words": 26,
+    }
+    result["evidence_files"]["raw"]["path"] = "orojenesis/matmul/raw.csv"
+    evidence = _empty_orojenesis()
+    evidence.update(
+        {"status": "complete", "toolchain": runner.toolchain_identity}
+    )
+    evidence["layers"]["matmul"] = result
+    internal_producer = {
+        "type": "relu",
+        "semantic_op": {"kind": "aten", "target": "relu", "effects": {}},
+        "tensor_names": {"inputs": ["root"], "outputs": ["left"]},
+    }
+    prepared = SimpleNamespace(
+        all_layers={
+            "left_producer": internal_producer,
+            "right_producer": {
+                **internal_producer,
+                "tensor_names": {
+                    "inputs": ["root"],
+                    "outputs": ["right"],
+                },
+            },
+            "matmul": matmul,
+        },
+        output_dir=tmp_path,
+    )
+
+    audited, formal = IRGraphAnalyzer()._audit_orojenesis_evidence(
+        plan,
+        evidence,
+        cast(PreparedAnalysis, prepared),
+        audited_fused_bytes=48.0,
+    )
+
+    assert formal
+    assert audited == 48.0
+    assert evidence["layers"]["matmul"]["formal_applicability"] == {
+        "applicable": True,
+        "region": "fusion",
+        "graph_input_operands": False,
+        "region_boundary_operands": False,
+        "operand_provenance": "selected_capacity_compulsory_zero_excess",
+        "reason": "internal_contraction_zero_excess_witness",
+    }
+
+    result["optimality_certificate"]["compulsory_accesses_words"] = 27
+    _, formal = IRGraphAnalyzer()._audit_orojenesis_evidence(
+        plan,
+        evidence,
+        cast(PreparedAnalysis, prepared),
+        audited_fused_bytes=48.0,
+    )
+    assert not formal
+
+
 class _Profile:
     memory_bandwidth_bytes_per_second = 100.0
 
