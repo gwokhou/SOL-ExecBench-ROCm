@@ -33,6 +33,44 @@ RECOMPUTABLE_OPERAND_TARGETS = frozenset(
 # reductions and layout-changing copies need a separate composition proof.
 TILE_RECOMPUTABLE_OPERAND_TARGETS = frozenset({"add"})
 
+# Pure scalar pointwise transforms preserve the tile and materialization
+# obligations of a contraction output.  This deliberately excludes reductions,
+# normalizations, scans, views, and tensor-tensor pointwise operations; callers
+# must additionally prove a single tensor operand and identical shape/dtype.
+TILE_LOCAL_SCALAR_POSTPROCESS_TARGETS = frozenset(
+    {
+        "abs",
+        "add",
+        "clamp",
+        "cos",
+        "div",
+        "elu",
+        "exp",
+        "exp2",
+        "floor",
+        "gelu",
+        "hardsigmoid",
+        "hardswish",
+        "log",
+        "log2",
+        "maximum",
+        "minimum",
+        "mish",
+        "mul",
+        "neg",
+        "pow",
+        "relu",
+        "rsqrt",
+        "sigmoid",
+        "silu",
+        "sin",
+        "sqrt",
+        "square",
+        "sub",
+        "tanh",
+    },
+)
+
 LOW_PRECISION_DEQUANT_DTYPES = frozenset(
     {
         "float8_e4m3fn",
@@ -155,6 +193,7 @@ __all__ = [
     "RECOMPUTABLE_OPERAND_TARGETS",
     "SCATTER_OPS",
     "SLICE_VIEW_OPS",
+    "TILE_LOCAL_SCALAR_POSTPROCESS_TARGETS",
     "TILE_RECOMPUTABLE_OPERAND_TARGETS",
     "TRANSPARENT_OPS",
     "ZERO_COMPUTE_OPS",

@@ -468,8 +468,83 @@ def test_tile_aware_bound_accepts_pointwise_add_operand(tmp_path: Path):
         "applicable": True,
         "region": "fusion",
         "graph_input_operands": True,
+        "region_boundary_operands": False,
         "operand_provenance": ("graph_input_or_recomputable_preprocess"),
         "reason": "graph_input_or_recomputable_preprocess_contraction",
+    }
+
+
+def test_tile_aware_bound_accepts_materialized_region_boundary(tmp_path: Path):
+    matmul = _einsum_layer("left", "right", "output")
+    plan = FusionPlan(
+        fusion={
+            "regions": [
+                {
+                    "id": "fusion",
+                    "layers": ["matmul"],
+                    "external_inputs": ["left", "right"],
+                    "external_outputs": ["output"],
+                }
+            ]
+        },
+        chains=[],
+        regions=[],
+        proof_layers={"matmul": matmul},
+    )
+    runner = _FakeRunner()
+    result = runner.run_layer(
+        matmul,
+        tmp_path / "orojenesis" / "matmul",
+        word_bits=16,
+    )
+    result["selected_capacity"] = {
+        "level": "l2",
+        "capacity_bytes": 256,
+        "point": result["curve"][-1],
+    }
+    result["evidence_files"]["raw"]["path"] = "orojenesis/matmul/raw.csv"
+    evidence = _empty_orojenesis()
+    evidence.update(
+        {"status": "complete", "toolchain": runner.toolchain_identity}
+    )
+    evidence["layers"]["matmul"] = result
+    internal_producer = {
+        "type": "conv2d",
+        "semantic_op": {"kind": "aten", "target": "conv2d", "effects": {}},
+        "tensor_names": {"inputs": ["root"], "outputs": ["left"]},
+    }
+    prepared = SimpleNamespace(
+        all_layers={
+            "left_producer": internal_producer,
+            "right_producer": {
+                **internal_producer,
+                "tensor_names": {
+                    "inputs": ["root"],
+                    "outputs": ["right"],
+                },
+            },
+            "matmul": matmul,
+        },
+        output_dir=tmp_path,
+    )
+
+    _, formal = IRGraphAnalyzer()._audit_orojenesis_evidence(
+        plan,
+        evidence,
+        cast(PreparedAnalysis, prepared),
+        audited_fused_bytes=48.0,
+    )
+
+    assert formal
+    assert evidence["layers"]["matmul"]["formal_applicability"] == {
+        "applicable": True,
+        "region": "fusion",
+        "graph_input_operands": False,
+        "region_boundary_operands": True,
+        "operand_provenance": (
+            "materialized_region_boundary_and_tile_local_postprocess"
+        ),
+        "reason": "materialized_region_boundary_contraction",
     }
 
 

@@ -51,7 +51,7 @@ Eq. 1 result remains available through the benchmark-agnostic Python API and
 has `sol_score_eligible=true`, but cannot cross this port's stricter formal
 bridge.
 
-`solar_request_manifest` schema 2 records `require_orojenesis`,
+`solar_request_manifest` schema 6 records `require_orojenesis`,
 `sol_score_eligible`, and `publication_eligible`. The first eligibility flag
 tracks the paper's SOL Score semantics; the second tracks this port's stricter
 release policy. Formal Orojenesis acceptance requires the
@@ -76,6 +76,15 @@ achievability is bound to the exact architecture profile and selected cache
 domain. In particular, an ISA family such as `gfx942` is not proof of MI300X
 product identity: MI300X publication requires its own verified XCD/cache-domain
 topology, capacity selection, regenerated witness, and HBM-access audit.
+
+Single-contraction evidence may also be scoped to a materialized fusion-region
+boundary rather than the whole graph. Acceptance requires every contraction
+operand to be an external input of that region and requires the contraction
+output either to leave the region directly or to reach its external output
+through a single-consumer chain of pure scalar pointwise operations with
+identical shape and dtype. Tensor-tensor postprocessing, reductions,
+normalizations, mutation, aliasing, fan-out, shape/dtype changes, and unknown
+targets all fail closed and still require an explicit composition proof.
 
 Regardless of this flag, formal publication is *additionally* gated by verified
 architecture audit evidence (`ArchitectureProfile.require_verified_audit_evidence`),
