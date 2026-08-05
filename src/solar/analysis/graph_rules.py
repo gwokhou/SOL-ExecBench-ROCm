@@ -84,6 +84,7 @@ LOW_PRECISION_DEQUANT_DTYPES = frozenset(
 
 TRANSPARENT_OPS = frozenset(
     {
+        "alias",
         "expand",
         "expand_as",
         "view",

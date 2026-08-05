@@ -12,14 +12,14 @@ from typing import Final
 class SchemaVersion(StrEnum):
     """Current string-valued SOLAR wire-schema identifiers."""
 
-    IR_VERIFICATION = "solar.verification.ir.v5"
+    IR_VERIFICATION = "solar.verification.ir.v6"
     RESOURCE_PEAK_CALIBRATION = "solar.resource_peak_calibration.v4"
 
 
 ATEN_IR_SCHEMA_VERSION: Final = 6
 EXTENDED_EINSUM_IR_SCHEMA_VERSION: Final = 6
 OPERATOR_GRAPH_SCHEMA_VERSION: Final = 2
-OROJENESIS_ANALYSIS_SCHEMA_VERSION: Final = 4
+OROJENESIS_ANALYSIS_SCHEMA_VERSION: Final = 5
 OROJENESIS_MULTI_EINSUM_PROBLEM_SCHEMA_VERSION: Final = 1
 OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION: Final = 1
 OROJENESIS_PROVENANCE_SCHEMA_VERSION: Final = 1

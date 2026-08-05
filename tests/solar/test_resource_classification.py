@@ -84,6 +84,7 @@ def test_attention_rule_accounts_for_all_compute_resources() -> None:
 @pytest.mark.parametrize(
     ("layer", "reason"),
     [
+        (_layer("alias"), "metadata_or_alias_only"),
         (_layer("reshape"), "metadata_or_alias_only"),
         (_layer("roll"), "memory_traffic_only"),
         (
@@ -167,6 +168,20 @@ def test_new_scalar_math_rules_count_every_output(target: str) -> None:
     )
 
     assert result["work"] == {"sfu": {"fp32": 6}}
+
+
+def test_leaky_relu_has_a_mandatory_vector_alu_lower_bound() -> None:
+    result = _classify(
+        _layer(
+            "leaky_relu",
+            input_shapes=[[2, 3]],
+            output_shapes=[[2, 3]],
+            input_dtypes=["fp32"],
+            output_dtypes=["fp32"],
+        )
+    )
+
+    assert result["work"] == {"valu": {"fp32": 6}}
 
 
 @pytest.mark.parametrize(

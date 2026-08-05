@@ -6,6 +6,7 @@ import re
 import string
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from math import prod
 
 from solar.analysis.orojenesis.errors import OrojenesisError
 from solar.ir.contracts import layer_operation
@@ -13,6 +14,65 @@ from solar.types import DynamicValue
 
 _TOKEN = re.compile(r"[A-Za-z][0-9]*")
 _AXIS = re.compile(r"\(([^()]*)\)|([A-Za-z][0-9]*)")
+_DIRECT_CONVOLUTION_EQUATIONS = {
+    "conv1d": frozenset({"BC(P+R),OCR->BOP", "BO(P+R),OCR->BOP"}),
+    "conv2d": frozenset(
+        {
+            "BC(P+R)(Q+S),OCRS->BOPQ",
+            "BO(P+R)(Q+S),OCRS->BOPQ",
+        },
+    ),
+    "conv3d": frozenset({"BC(P+T)(Q+R)(U+S),OCTRS->BOPQU"}),
+}
+
+
+def compulsory_witness_streaming_dimension(
+    layer: Mapping[str, DynamicValue],
+    dimensions: list[str],
+    *,
+    capacity_bytes: int,
+    word_bits: int,
+) -> str | None:
+    """Return an independently streamable batch dimension when proven."""
+    semantic = layer.get("semantic_op") or {}
+    proof_source = semantic.get("proof_source") or {}
+    target = str(proof_source.get("target") or "")
+    equation = str(semantic.get("equation") or "")
+    effects = semantic.get("effects") or {}
+    pure = bool(
+        proof_source.get("kind") == "aten"
+        and effects.get("mutates") in (False, [])
+        and not effects.get("aliases")
+        and not effects.get("atomic")
+        and not effects.get("opaque_library_call")
+        and dimensions
+    )
+    if not pure:
+        return None
+    if equation in _DIRECT_CONVOLUTION_EQUATIONS.get(target, ()):
+        return dimensions[0]
+    if target != "bmm" or equation != "BMK,BKN->BMN":
+        return None
+    shapes = layer.get("tensor_shapes") or {}
+    tensors = [*(shapes.get("inputs") or []), *(shapes.get("outputs") or [])]
+    if (
+        len(tensors) != 3
+        or any(len(shape) != 3 for shape in tensors)
+        or int(word_bits) <= 0
+        or int(word_bits) % 8
+    ):
+        return None
+    batch_sizes = {int(shape[0]) for shape in tensors}
+    if len(batch_sizes) != 1 or next(iter(batch_sizes)) <= 0:
+        return None
+    slice_words = sum(
+        prod(int(size) for size in shape[1:]) for shape in tensors
+    )
+    return (
+        dimensions[0]
+        if slice_words * (int(word_bits) // 8) <= int(capacity_bytes)
+        else None
+    )
 
 
 @dataclass

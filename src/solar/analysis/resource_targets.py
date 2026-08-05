@@ -5,6 +5,7 @@
 
 _VIEW_OPS = frozenset(
     {
+        "alias",
         "detach",
         "diagonal",
         "expand",
@@ -170,6 +171,7 @@ _VALU_OPS = frozenset(
         "ge",
         "gt",
         "le",
+        "leaky_relu",
         "lt",
         "maximum",
         "masked_fill",

@@ -86,6 +86,14 @@ deletes its staging directory and publishes no partial result directory. A
 successful run writes a content-addressed manifest and atomically renames the
 complete staging directory into place.
 
+The conversion verifier compares first-order gradients positionally. Its v6
+contract accepts NaN gradients only when reference and replay produce NaN at
+the same positions; finite/non-finite mismatches and infinity mismatches still
+fail closed. Forward outputs are released before gradient replay to bound peak
+accelerator memory. Each accelerator case also collects unreachable Python
+cycles before returning cached blocks to the allocator, without reducing
+verification cases, inputs, or tolerances.
+
 The source operator artifact records its `extraction_kind`, while every request
 records one fixed `IRPath`. `torchview_extended_einsum` binds `torchview_v1` to
 extended-einsum; `make_fx_aten` binds `make_fx_reference_v1` to exact ATen.

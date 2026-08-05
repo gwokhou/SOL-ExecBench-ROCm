@@ -198,7 +198,13 @@ def verify_gradients(
             raise GradientVerificationError("None gradient pattern differs")
         if expected_item is not None:
             try:
-                assert_close(actual_item, expected_item, atol, rtol)
+                assert_close(
+                    actual_item,
+                    expected_item,
+                    atol,
+                    rtol,
+                    allow_matching_nan=True,
+                )
             except VerificationError as exc:
                 raise GradientVerificationError(str(exc)) from exc
     return {"gradient_inputs_verified": float(len(indices))}

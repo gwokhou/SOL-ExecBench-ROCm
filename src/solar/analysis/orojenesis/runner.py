@@ -43,6 +43,7 @@ from solar.analysis.orojenesis.multi_einsum import (
 from solar.analysis.orojenesis.problem import (
     architecture as _build_architecture,
     compulsory_witness_mapper_config as _build_compulsory_witness_mapper_config,
+    compulsory_witness_streaming_dimension as _compulsory_witness_streaming_dimension,
     mapper_config as _build_mapper_config,
     multi_architecture as _build_multi_architecture,
     multi_mapper_config as _build_multi_mapper_config,
@@ -70,16 +71,6 @@ __all__ = [
     "multi_einsum_region_problem",
 ]
 
-_DIRECT_CONVOLUTION_EQUATIONS = {
-    "conv1d": frozenset({"BC(P+R),OCR->BOP", "BO(P+R),OCR->BOP"}),
-    "conv2d": frozenset(
-        {
-            "BC(P+R)(Q+S),OCRS->BOPQ",
-            "BO(P+R)(Q+S),OCRS->BOPQ",
-        },
-    ),
-    "conv3d": frozenset({"BC(P+T)(Q+R)(U+S),OCTRS->BOPQU"}),
-}
 _WITNESS_OUTPUT_FILES = (
     "timeloop-mapper.map+stats.xml",
     "timeloop-mapper.map.txt",
@@ -140,28 +131,6 @@ def _multi_evidence(
         }
         for name, path in paths.items()
     }
-
-
-def _direct_convolution_streaming_dimension(
-    layer: Mapping[str, Any],
-    dimensions: list[str],
-) -> str | None:
-    semantic = layer.get("semantic_op") or {}
-    proof_source = semantic.get("proof_source") or {}
-    target = str(proof_source.get("target") or "")
-    equation = str(semantic.get("equation") or "")
-    effects = semantic.get("effects") or {}
-    if (
-        proof_source.get("kind") != "aten"
-        or equation not in _DIRECT_CONVOLUTION_EQUATIONS.get(target, ())
-        or effects.get("mutates") not in (False, [])
-        or bool(effects.get("aliases"))
-        or bool(effects.get("atomic"))
-        or bool(effects.get("opaque_library_call"))
-        or not dimensions
-    ):
-        return None
-    return dimensions[0]
 
 
 def _exact_nonnegative_integer(value: Any, *, field: str) -> int:
@@ -248,7 +217,7 @@ def _audit_compulsory_witness(
 ) -> dict[str, Any]:
     if len(spaces) != 3 or len(element_counts) != 3:
         raise OrojenesisError(
-            "direct convolution witness requires two inputs and one output",
+            "contraction witness requires two inputs and one output",
         )
     accesses = point.get("data_space_accesses_words") or {}
     expected = dict(zip(spaces, element_counts, strict=True))
@@ -290,7 +259,7 @@ def _audit_compulsory_witness(
         )
     ):
         raise OrojenesisError(
-            "direct convolution compulsory witness did not reach the "
+            "contraction compulsory witness did not reach the "
             "selected-capacity optimum",
         )
     return {
@@ -585,14 +554,23 @@ class OrojenesisRunner:
         spaces = [
             item["name"] for item in problem["problem"]["shape"]["data-spaces"]
         ]
-        streaming_dimension = _direct_convolution_streaming_dimension(
-            layer,
-            dimensions,
+        streaming_dimension = (
+            _compulsory_witness_streaming_dimension(
+                layer,
+                dimensions,
+                capacity_bytes=int(selected_capacity_bytes),
+                word_bits=word_bits,
+            )
+            if selected_capacity_bytes is not None
+            else None
         )
-        witness = (
-            streaming_dimension is not None
+        witness_capacity = (
+            int(selected_capacity_bytes)
+            if streaming_dimension is not None
             and selected_capacity_bytes is not None
+            else None
         )
+        witness = witness_capacity is not None
         mapper = (
             _build_compulsory_witness_mapper_config(
                 problem["problem"]["instance"],
@@ -607,9 +585,7 @@ class OrojenesisRunner:
             "problem.yaml": problem,
             "architecture.yaml": self.architecture(
                 word_bits,
-                buffer_capacity_bytes=(
-                    int(selected_capacity_bytes) if witness else None
-                ),
+                buffer_capacity_bytes=witness_capacity,
             ),
             "mapper.yaml": mapper,
         }
@@ -622,9 +598,7 @@ class OrojenesisRunner:
             spaces=spaces,
             streaming_dimension=streaming_dimension,
             environment=environment if witness else None,
-            selected_capacity_bytes=(
-                int(selected_capacity_bytes) if witness else None
-            ),
+            selected_capacity_bytes=witness_capacity,
         )
 
     def _execute_layer_run(self, plan: _LayerRunPlan) -> Path:

@@ -79,6 +79,27 @@ def _conv_proof() -> dict:
     return layer
 
 
+def _bmm_proof() -> dict:
+    layer = _matmul("x", "w", "y", m=2, k=3, n=4)
+    layer["semantic_op"] = {
+        "kind": "einsum",
+        "target": "einsum",
+        "equation": "BMK,BKN->BMN",
+        "proof_source": {"kind": "aten", "target": "bmm"},
+        "effects": {
+            "mutates": [],
+            "aliases": [],
+            "atomic": False,
+            "opaque_library_call": False,
+        },
+    }
+    layer["tensor_shapes"] = {
+        "inputs": [[2, 2, 3], [2, 3, 4]],
+        "outputs": [[2, 2, 4]],
+    }
+    return layer
+
+
 def _runner(tmp_path: Path) -> orojenesis.OrojenesisRunner:
     runner = object.__new__(orojenesis.OrojenesisRunner)
     runner.home = tmp_path
@@ -106,6 +127,7 @@ def _write_witness_outputs(
     output: Path,
     *,
     buffer_capacity: tuple[int, int, int] = (32, 54, 12),
+    element_counts: tuple[int, int, int] = (32, 54, 12),
 ) -> None:
     def vector(name: str, values: tuple[int, int, int]) -> str:
         items = "".join(f"<item>{value}</item>" for value in values)
@@ -146,9 +168,9 @@ def _write_witness_outputs(
             ),
             level(
                 "MainMemory",
-                capacity=(32, 54, 12),
-                reads=(32, 54, 0),
-                updates=(0, 0, 12),
+                capacity=element_counts,
+                reads=(element_counts[0], element_counts[1], 0),
+                updates=(0, 0, element_counts[2]),
             ),
             "</levels_></topology_></engine></boost_serialization>",
         ),
@@ -320,6 +342,77 @@ def test_run_layer_rejects_a_noncompulsory_convolution_witness(
             word_bits=32,
             selected_capacity_bytes=1024,
         )
+
+
+def test_run_layer_certifies_a_batched_matmul_compulsory_witness(
+    tmp_path,
+    monkeypatch,
+):
+    runner = _runner(tmp_path)
+
+    def fake_run(args, *, cwd, **kwargs):
+        del args, kwargs
+        row: list[object] = [0] * 18
+        row[0:4] = [104, 1.0, 52, "fixed-bmm-compulsory-witness"]
+        row[-3:] = [12, 24, 16]
+        with Path(cwd, "timeloop-mapper.oaves.csv").open(
+            "w",
+            newline="",
+        ) as handle:
+            csv.writer(handle).writerow(row)
+        _write_witness_outputs(
+            Path(cwd),
+            buffer_capacity=(6, 12, 8),
+            element_counts=(12, 24, 16),
+        )
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(orojenesis_runner, "_default_mapper_runner", fake_run)
+    result = runner.run_layer(
+        _bmm_proof(),
+        tmp_path / "bmm",
+        word_bits=32,
+        selected_capacity_bytes=1024,
+    )
+
+    certificate = result["optimality_certificate"]
+    assert certificate["compulsory_accesses_words"] == 52
+    assert certificate["buffer_utilized_capacity_words"] == {
+        "Input0": 6,
+        "Input1": 12,
+        "Output": 8,
+    }
+    assert certificate["theorem_inputs"]["proof_source"] == {
+        "kind": "aten",
+        "target": "bmm",
+    }
+    assert certificate["streaming_dimension"] == "A"
+    mapper = (tmp_path / "bmm" / "mapper.yaml").read_text()
+    assert "A=1 B=2 C=3 D=4" in mapper
+    assert "A=2 B=1 C=1 D=1" in mapper
+
+
+def test_batched_matmul_witness_falls_back_when_slice_exceeds_capacity(
+    tmp_path,
+    monkeypatch,
+):
+    runner = _runner(tmp_path)
+
+    def fake_run(args, *, cwd, **kwargs):
+        del args, kwargs
+        Path(cwd, "timeloop-mapper.oaves.csv").write_text("64,1.0,52\n")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(orojenesis_runner, "_default_mapper_runner", fake_run)
+    result = runner.run_layer(
+        _bmm_proof(),
+        tmp_path / "large-bmm",
+        word_bits=32,
+        selected_capacity_bytes=100,
+    )
+
+    assert "optimality_certificate" not in result
+    assert "environment.yaml" not in result["evidence_files"]
 
 
 def test_selected_capacity_witness_rejects_a_spoofed_conv_equation(

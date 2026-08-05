@@ -23,6 +23,7 @@ formal-evidence contract.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,48 @@ from solar.precision import (
     dtype_bytes,
 )
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
+
+
+def _layer_compulsory_bytes(
+    layer: Mapping[str, Any],
+    *,
+    word_bytes: int,
+) -> float:
+    names = layer.get("tensor_names") or {}
+    shapes = layer.get("tensor_shapes") or {}
+    modeled_tensors = {
+        str(name): list(shape)
+        for side in ("inputs", "outputs")
+        for name, shape in zip(
+            names.get(side) or [],
+            shapes.get(side) or [],
+            strict=True,
+        )
+    }
+    return float(
+        sum(product(shape) for shape in modeled_tensors.values()) * word_bytes
+    )
+
+
+def _is_zero_excess_compulsory_witness(
+    result: Mapping[str, Any],
+    point: Mapping[str, Any] | None,
+    compulsory_bytes: float,
+) -> bool:
+    certificate = result.get("optimality_certificate") or {}
+    try:
+        word_bytes = int(result["word_bits"]) // 8
+        certificate_bytes = (
+            int(certificate["compulsory_accesses_words"]) * word_bytes
+        )
+        solver_bytes = float((point or {})["dram_bytes"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return bool(
+        certificate.get("kind") == "selected_capacity_compulsory_witness_v1"
+        and certificate.get("scope") == "selected_capacity_only"
+        and certificate_bytes == compulsory_bytes == solver_bytes
+    )
 
 
 class OrojenesisEvidenceMixin(AnalysisMixinContract):
@@ -347,27 +390,40 @@ class OrojenesisEvidenceMixin(AnalysisMixinContract):
                 region,
                 all_layers,
             )
-            applicable = bool(point and (external or region_boundary))
-            provenance = (
-                "graph_input_or_recomputable_preprocess"
-                if external
-                else "materialized_region_boundary_and_tile_local_postprocess"
+            word_bytes = int(result["word_bits"]) // 8
+            compulsory_bytes = _layer_compulsory_bytes(
+                layer,
+                word_bytes=word_bytes,
             )
+            zero_excess = _is_zero_excess_compulsory_witness(
+                result,
+                point,
+                compulsory_bytes,
+            )
+            applicable = bool(
+                point and (external or region_boundary or zero_excess)
+            )
+            if external:
+                provenance = "graph_input_or_recomputable_preprocess"
+                reason = "graph_input_or_recomputable_preprocess_contraction"
+            elif region_boundary:
+                provenance = (
+                    "materialized_region_boundary_and_tile_local_postprocess"
+                )
+                reason = "materialized_region_boundary_contraction"
+            elif zero_excess:
+                provenance = "selected_capacity_compulsory_zero_excess"
+                reason = "internal_contraction_zero_excess_witness"
+            else:
+                provenance = "unproven_internal_operand"
+                reason = "internal_operand_requires_composition_proof"
             result["formal_applicability"] = {
                 "applicable": applicable,
                 "region": region["id"],
                 "graph_input_operands": external,
                 "region_boundary_operands": region_boundary,
                 "operand_provenance": provenance,
-                "reason": (
-                    "graph_input_or_recomputable_preprocess_contraction"
-                    if external and point
-                    else (
-                        "materialized_region_boundary_contraction"
-                        if region_boundary and point
-                        else "internal_operand_requires_composition_proof"
-                    )
-                ),
+                "reason": reason,
             }
             if not applicable:
                 continue
@@ -375,22 +431,6 @@ class OrojenesisEvidenceMixin(AnalysisMixinContract):
                 raise ValueError(
                     "applicable layer evidence has no selected point"
                 )
-            word_bytes = int(result["word_bits"]) // 8
-            names = layer.get("tensor_names") or {}
-            shapes = layer.get("tensor_shapes") or {}
-            modeled_tensors = {
-                str(name): list(shape)
-                for side in ("inputs", "outputs")
-                for name, shape in zip(
-                    names.get(side) or [],
-                    shapes.get(side) or [],
-                    strict=True,
-                )
-            }
-            compulsory_bytes = float(
-                sum(product(shape) for shape in modeled_tensors.values())
-                * word_bytes,
-            )
             solver_bytes = float(point["dram_bytes"])
             result["audited_dram_bytes"] = solver_bytes
             result["modeled_compulsory_bytes"] = compulsory_bytes
