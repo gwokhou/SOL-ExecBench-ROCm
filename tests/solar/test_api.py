@@ -464,7 +464,15 @@ def test_formal_api_matmul_requires_and_records_orojenesis_evidence(
         def __init__(self) -> None:
             self.toolchain_identity = {"verification_mode": "fake"}
 
-        def run_layer(self, layer, output_dir, *, word_bits):
+        def run_layer(
+            self,
+            layer,
+            output_dir,
+            *,
+            word_bits,
+            selected_capacity_bytes=None,
+        ):
+            del selected_capacity_bytes
             calls.append(layer["semantic_op"]["equation"])
             output_dir.mkdir(parents=True, exist_ok=True)
             raw = output_dir / "raw.csv"
@@ -523,7 +531,15 @@ def test_incomplete_optional_orojenesis_evidence_falls_back_to_eq1(
         def __init__(self) -> None:
             self.toolchain_identity = {"verification_mode": "fake"}
 
-        def run_layer(self, layer, output_dir, *, word_bits):
+        def run_layer(
+            self,
+            layer,
+            output_dir,
+            *,
+            word_bits,
+            selected_capacity_bytes=None,
+        ):
+            del selected_capacity_bytes
             del layer, output_dir
             return {
                 "word_bits": word_bits,

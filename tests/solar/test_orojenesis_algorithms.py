@@ -180,6 +180,38 @@ def test_problem_architecture_mapper_and_capacity_helpers():
         assert config["mapspace_constraints"][-1]["factors"] == "M=2"
 
 
+def test_problem_for_layer_preserves_exact_convolution_projections():
+    layer = {
+        "semantic_op": {
+            "kind": "einsum",
+            "equation": "BC(P+R)(Q+S),OCRS->BOPQ",
+        },
+        "tensor_shapes": {
+            "inputs": [[2, 3, 8, 9], [5, 3, 3, 3]],
+            "outputs": [[2, 5, 6, 7]],
+        },
+    }
+
+    problem = orojenesis.OrojenesisRunner.problem_for_layer(layer)["problem"]
+
+    assert problem["instance"] == {
+        "A": 2,
+        "B": 3,
+        "C": 5,
+        "D": 3,
+        "E": 3,
+        "F": 6,
+        "G": 7,
+    }
+    input_projection = problem["shape"]["data-spaces"][0]["projection"]
+    assert input_projection == [
+        [["A"]],
+        [["B"]],
+        [["F"], ["D"]],
+        [["G"], ["E"]],
+    ]
+
+
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
@@ -194,6 +226,12 @@ def test_problem_architecture_mapper_and_capacity_helpers():
         (
             lambda layer: layer["tensor_shapes"]["inputs"][1].__setitem__(0, 9),
             "inconsistent dimension",
+        ),
+        (
+            lambda layer: layer["semantic_op"].update(
+                equation="M(K+R),KN->MN",
+            ),
+            "projected einsum dimension",
         ),
         (
             lambda layer: layer["tensor_shapes"].update(outputs=[]),

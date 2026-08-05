@@ -149,6 +149,13 @@ class OrojenesisEvidenceMixin(AnalysisMixinContract):
                 "capacity_bytes": last_cache.capacity_bytes,
                 "point": point,
             }
+            certificate = result.get("optimality_certificate")
+            if isinstance(certificate, dict):
+                certificate["capacity_identity"] = {
+                    "level": last_cache.name,
+                    "capacity_bytes": int(last_cache.capacity_bytes or 0),
+                    "scope": "architecture_profile_cache_domain",
+                }
         for evidence in result.get("evidence_files", {}).values():
             evidence["path"] = str(evidence_root / str(evidence["path"]))
 
@@ -261,6 +268,11 @@ class OrojenesisEvidenceMixin(AnalysisMixinContract):
                 layer,
                 prepared.output_dir / "orojenesis" / layer_id,
                 word_bits=self._word_bits(dtypes, prepared.element_size),
+                selected_capacity_bytes=(
+                    int(last_cache.capacity_bytes or 0)
+                    if last_cache is not None
+                    else None
+                ),
             )
             self._select_capacity_and_rewrite_evidence(
                 result,

@@ -62,6 +62,21 @@ There is no git-checkout fallback. The current allowlist contains the digest
 produced identically by two no-cache builds from the pinned source and build
 environment. Any other mapper still fails closed.
 
+For a reviewed direct convolution, the mapper may emit a
+`selected_capacity_compulsory_witness_v1` instead of enumerating the complete
+low-capacity Pareto curve. This certificate fixes one batch-streaming mapping,
+records first-read elision explicitly, and requires both the total and every
+data-space DRAM access count to equal the independently computed compulsory
+traffic while its utilized buffer remains within the selected last-level-cache
+capacity. Compulsory traffic is a universal lower bound, so a feasible point
+that reaches it is the exact selected-capacity optimum. The artifact marks
+`pareto_curve_complete=false` and makes no claim about other capacities.
+The compulsory lower bound is architecture-independent, but witness
+achievability is bound to the exact architecture profile and selected cache
+domain. In particular, an ISA family such as `gfx942` is not proof of MI300X
+product identity: MI300X publication requires its own verified XCD/cache-domain
+topology, capacity selection, regenerated witness, and HBM-access audit.
+
 Regardless of this flag, formal publication is *additionally* gated by verified
 architecture audit evidence (`ArchitectureProfile.require_verified_audit_evidence`),
 an independent guard the flag does not bypass. The packaged RX_9060_XT profile

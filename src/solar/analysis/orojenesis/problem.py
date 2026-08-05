@@ -12,6 +12,7 @@ from solar.ir.contracts import layer_operation
 from solar.types import DynamicValue
 
 _TOKEN = re.compile(r"[A-Za-z][0-9]*")
+_AXIS = re.compile(r"\(([^()]*)\)|([A-Za-z][0-9]*)")
 
 
 @dataclass
@@ -54,15 +55,23 @@ def problem_for_layer(
             "einsum operand arity does not match tensor metadata",
         )
 
+    input_axes = [_operand_axes(operand) for operand in operands]
+    output_axes = _operand_axes(right_hand_side)
+    _validate_ranks(input_axes, shapes, output_axes, output_shapes[0])
     registry = _DimensionRegistry()
+    for axes, shape in zip(input_axes, shapes, strict=True):
+        _register_simple_dimensions(axes, shape, registry)
+    _register_simple_dimensions(output_axes, output_shapes[0], registry)
+    for token in registry.sizes:
+        registry.symbol(token)
     data_spaces = [
-        _input_data_space(index, operand, shape, registry)
-        for index, (operand, shape) in enumerate(
-            zip(operands, shapes, strict=True),
+        _input_data_space(index, axes, shape, registry)
+        for index, (axes, shape) in enumerate(
+            zip(input_axes, shapes, strict=True),
         )
     ]
     data_spaces.append(
-        _output_data_space(right_hand_side, output_shapes[0], registry),
+        _output_data_space(output_axes, output_shapes[0], registry),
     )
     remapped_sizes = {
         registry.symbols[token]: size for token, size in registry.sizes.items()
@@ -78,41 +87,102 @@ def problem_for_layer(
     }
 
 
+def _operand_axes(operand: str) -> list[tuple[str, ...]]:
+    axes: list[tuple[str, ...]] = []
+    position = 0
+    for match in _AXIS.finditer(operand):
+        if match.start() != position:
+            raise OrojenesisError("unsupported einsum projection syntax")
+        expression = match.group(1)
+        tokens = (
+            tuple(expression.split("+"))
+            if expression is not None
+            else (str(match.group(2)),)
+        )
+        if not tokens or any(
+            _TOKEN.fullmatch(token) is None for token in tokens
+        ):
+            raise OrojenesisError("unsupported einsum projection syntax")
+        axes.append(tokens)
+        position = match.end()
+    if position != len(operand):
+        raise OrojenesisError("unsupported einsum projection syntax")
+    return axes
+
+
+def _validate_ranks(
+    input_axes: Sequence[Sequence[tuple[str, ...]]],
+    input_shapes: Sequence[Sequence[DynamicValue]],
+    output_axes: Sequence[tuple[str, ...]],
+    output_shape: Sequence[DynamicValue],
+) -> None:
+    if any(
+        len(axes) != len(shape)
+        for axes, shape in zip(input_axes, input_shapes, strict=True)
+    ):
+        raise OrojenesisError("einsum rank does not match input shape")
+    if len(output_axes) != len(output_shape):
+        raise OrojenesisError("einsum rank does not match output shape")
+
+
+def _register_simple_dimensions(
+    axes: Sequence[tuple[str, ...]],
+    shape: Sequence[DynamicValue],
+    registry: _DimensionRegistry,
+) -> None:
+    for tokens, size in zip(axes, shape, strict=True):
+        if len(tokens) == 1:
+            registry.add(tokens[0], size)
+
+
+def _axis_projection(
+    tokens: tuple[str, ...],
+    size: DynamicValue,
+    registry: _DimensionRegistry,
+) -> list[list[str]]:
+    if any(token not in registry.sizes for token in tokens):
+        raise OrojenesisError("projected einsum dimension has no exact size")
+    projected_size = 1 + sum(registry.sizes[token] - 1 for token in tokens)
+    if projected_size != int(size):
+        raise OrojenesisError("projected einsum dimension is inconsistent")
+    return [[registry.symbol(token)] for token in tokens]
+
+
 def _input_data_space(
     index: int,
-    operand: str,
+    axes: Sequence[tuple[str, ...]],
     shape: Sequence[DynamicValue],
     registry: _DimensionRegistry,
 ) -> dict[str, DynamicValue]:
-    tokens = _TOKEN.findall(operand)
-    if len(tokens) != len(shape):
-        raise OrojenesisError("einsum rank does not match input shape")
-    for token, size in zip(tokens, shape, strict=True):
-        registry.add(token, size)
     return {
         "name": f"Input{index}",
-        "projection": [[[registry.symbol(token)]] for token in tokens],
+        "projection": [
+            _axis_projection(tokens, size, registry)
+            for tokens, size in zip(axes, shape, strict=True)
+        ],
     }
 
 
 def _output_data_space(
-    operand: str,
+    axes: Sequence[tuple[str, ...]],
     shape: Sequence[DynamicValue],
     registry: _DimensionRegistry,
 ) -> dict[str, DynamicValue]:
-    tokens = _TOKEN.findall(operand)
-    if len(tokens) != len(shape):
-        raise OrojenesisError("einsum rank does not match output shape")
-    for token, size in zip(tokens, shape, strict=True):
-        registry.add(token, size)
     return {
         "name": "Output",
-        "projection": [[[registry.symbol(token)]] for token in tokens],
+        "projection": [
+            _axis_projection(tokens, size, registry)
+            for tokens, size in zip(axes, shape, strict=True)
+        ],
         "read-write": True,
     }
 
 
-def architecture(word_bits: int) -> dict[str, DynamicValue]:
+def architecture(
+    word_bits: int,
+    *,
+    buffer_capacity_bytes: int | None = None,
+) -> dict[str, DynamicValue]:
     """Build the generic Orojenesis memory architecture."""
     return {
         "architecture": {
@@ -125,7 +195,11 @@ def architecture(word_bits: int) -> dict[str, DynamicValue]:
                         {
                             "name": "PE",
                             "local": [
-                                _buffer("Buffer", word_bits),
+                                _buffer(
+                                    "Buffer",
+                                    word_bits,
+                                    capacity_bytes=buffer_capacity_bytes,
+                                ),
                                 _macc(word_bits),
                             ],
                         },
@@ -169,12 +243,27 @@ def _main_memory(word_bits: int) -> dict[str, DynamicValue]:
     }
 
 
-def _buffer(name: str, word_bits: int) -> dict[str, DynamicValue]:
+def _buffer(
+    name: str,
+    word_bits: int,
+    *,
+    capacity_bytes: int | None = None,
+) -> dict[str, DynamicValue]:
+    if capacity_bytes is not None and (
+        int(capacity_bytes) <= 0 or int(capacity_bytes) % 1024
+    ):
+        raise OrojenesisError(
+            "witness buffer capacity must be a positive whole number of KiB",
+        )
     return {
         "name": name,
         "class": "regfile",
         "attributes": {
-            "sizeKB": 2147483648,
+            "sizeKB": (
+                int(capacity_bytes) // 1024
+                if capacity_bytes is not None
+                else 2147483648
+            ),
             "instances": 1,
             "word-bits": int(word_bits),
         },
@@ -271,6 +360,56 @@ def mapper_config(
                 "permutation": "".join(dimensions),
             },
             {"target": "MainMemory", "type": "temporal"},
+            {
+                "target": "MainMemory",
+                "type": "datatype",
+                "keep": spaces,
+                "bypass": [],
+            },
+        ],
+    }
+
+
+def compulsory_witness_mapper_config(
+    instance: Mapping[str, DynamicValue],
+    dimensions: list[str],
+    spaces: list[str],
+    *,
+    streaming_dimension: str,
+) -> dict[str, DynamicValue]:
+    """Constrain one mapping that streams an independent outer dimension."""
+    if streaming_dimension not in dimensions:
+        raise OrojenesisError("streaming dimension is not in the problem")
+    inner_factors = " ".join(
+        f"{dimension}={1 if dimension == streaming_dimension else int(instance[dimension])}"
+        for dimension in dimensions
+    )
+    outer_factors = " ".join(
+        f"{dimension}={int(instance[dimension]) if dimension == streaming_dimension else 1}"
+        for dimension in dimensions
+    )
+    permutation = "".join(dimensions)
+    return {
+        "mapper": _mapper_policy(),
+        "mapspace_constraints": [
+            {
+                "target": "Buffer",
+                "type": "datatype",
+                "keep": spaces,
+                "bypass": [],
+            },
+            {
+                "target": "Buffer",
+                "type": "temporal",
+                "factors": inner_factors,
+                "permutation": permutation,
+            },
+            {
+                "target": "MainMemory",
+                "type": "temporal",
+                "factors": outer_factors,
+                "permutation": permutation,
+            },
             {
                 "target": "MainMemory",
                 "type": "datatype",

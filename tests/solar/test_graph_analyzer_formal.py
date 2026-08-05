@@ -166,7 +166,15 @@ class _FakeRunner:
     def run_multi_region(self, problem, output_dir, *, word_bits):
         return self._base(problem, word_bits, output_dir)
 
-    def run_layer(self, layer, output_dir, *, word_bits):
+    def run_layer(
+        self,
+        layer,
+        output_dir,
+        *,
+        word_bits,
+        selected_capacity_bytes=None,
+    ):
+        del selected_capacity_bytes
         del layer
         return self._base({}, word_bits, output_dir)
 
