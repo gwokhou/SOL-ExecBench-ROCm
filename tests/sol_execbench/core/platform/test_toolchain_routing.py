@@ -35,10 +35,9 @@ def test_default_registry_records_lifecycle_and_static_tools():
     assert registry["rocprofv3"].lifecycle == ToolLifecycle.ACTIVE
     assert registry["rocprofiler-systems"].lifecycle == ToolLifecycle.MIGRATED
     assert registry["rocprofiler-systems"].replacement_tool_id == "rocm-systems"
-    assert registry["rga"].lifecycle == ToolLifecycle.PLANNED
     assert registry["llvm-objdump"].lifecycle == ToolLifecycle.ACTIVE
     assert registry["readelf"].lifecycle == ToolLifecycle.ACTIVE
-    assert ToolchainEvidenceLevel.STATIC in registry["rga"].evidence_levels
+    assert "rga" not in registry
 
 
 def test_routing_selects_available_tool_and_preserves_authority_boundaries():
@@ -146,9 +145,29 @@ def test_static_tools_are_routable_and_optional_candidates_remain_nonmandatory()
     assert statuses["readelf"] == ToolchainStatus.AVAILABLE
     assert statuses["llvm-objdump"] == ToolchainStatus.AVAILABLE
     assert statuses["roc-objdump"] == ToolchainStatus.UNAVAILABLE
-    assert statuses["rga"] == ToolchainStatus.PLANNED
     assert ["/fake/readelf", "--version"] in commands
     assert ["/fake/llvm-objdump", "--version"] in commands
+
+
+def test_routing_preserves_generic_planned_lifecycle_behavior():
+    report = build_toolchain_routing_report(
+        ToolchainRoutingRequest(
+            evidence_level=ToolchainEvidenceLevel.STATIC,
+            artifact_type=ToolchainArtifactType.STATIC_FUTURE,
+        ),
+        registry=[
+            ToolchainCapability(
+                tool_id="future-static-tool",
+                display_name="Future static tool",
+                lifecycle=ToolLifecycle.PLANNED,
+                evidence_levels=[ToolchainEvidenceLevel.STATIC],
+                artifact_types=[ToolchainArtifactType.STATIC_FUTURE],
+            ),
+        ],
+    )
+
+    assert report.selected_tool_id is None
+    assert report.decisions[0].status == ToolchainStatus.PLANNED
 
 
 def test_toolchain_cli_prints_routing_json(monkeypatch):
@@ -192,6 +211,7 @@ def test_toolchain_cli_can_list_registry():
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)["data"]
     tool_ids = {entry["tool_id"] for entry in payload}
-    assert {"rocprofv3", "rocm-systems", "rga", "llvm-objdump"}.issubset(
+    assert {"rocprofv3", "rocm-systems", "llvm-objdump"}.issubset(
         tool_ids,
     )
+    assert "rga" not in tool_ids
