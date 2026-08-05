@@ -1,138 +1,107 @@
-# Copyright and Provenance Policy
+# Copyright and provenance policy
 
-This repository is an Apache-2.0 ROCm port of NVIDIA SOL-ExecBench. The port
-preserves benchmark semantics where practical while replacing CUDA/NVIDIA
-runtime, build, timing, scoring evidence, documentation, and release workflows
-with ROCm-oriented equivalents.
+This repository is an Apache-2.0 ROCm adaptation of SOL-ExecBench. Its active
+authored corpus is derived from AMD AgentKernelArena (AKA), while portions of
+the evaluator and SOLAR implementation retain or adapt earlier SOL-ExecBench
+expression. File-level SPDX notices, upstream artifact bindings, and
+`provenance.toml` must be evaluated together.
 
-This document is engineering provenance guidance, not legal advice. It defines
-how this project classifies active files before SPDX/copyright cleanup.
+This document is engineering provenance guidance, not legal advice.
 
-## Source References
+## Sources of truth
 
-- Upstream project: <https://github.com/NVIDIA/SOL-ExecBench>
-- Upstream reference used for this policy: `upstream/main`
-- License: Apache-2.0, see `LICENSE`
-- Machine-readable classification artifact: `provenance.toml`
+- Project license: `LICENSE`
+- Machine-readable dataset and header policy: `provenance.toml`
+- Active AKA corpus source and revision: `problems/AMD_AKA/manifest.yaml`
+- Dataset redistribution guard: `scripts/check_dataset_redistribution.py`
+- Third-party notices: `THIRD_PARTY_NOTICES.txt`
 
 The SOL-ExecBench paper is the benchmark and methodology citation. It does not
-decide file-level source copyright ownership for independent implementation
-work in this ROCm port.
+decide file-level copyright ownership. The AKA manifest separately binds the
+source repository, revision, license, semantic reference, correctness runner,
+and checksums for every authored problem.
 
-## Classification
+## File classification
 
-### Upstream Retained
+### Upstream retained
 
-Files copied verbatim or nearly verbatim from upstream SOL-ExecBench.
+Files copied verbatim or nearly verbatim from an upstream project retain the
+applicable upstream copyright and Apache-2.0 notices. Do not replace upstream
+attribution with project-only attribution.
 
-Header policy:
+### Derivative modified
 
-- keep applicable NVIDIA `SPDX-FileCopyrightText`;
-- keep `SPDX-License-Identifier: Apache-2.0`;
-- do not replace NVIDIA attribution with project-only attribution.
+Files that retain substantial upstream expression after ROCm adaptation keep
+the applicable upstream notice, add the project notice when appropriate, and
+retain the Apache-2.0 identifier.
 
-### Derivative Modified
+### Independent ROCm work
 
-Files that retain substantial upstream expression after ROCm adaptation.
+New ROCm evidence, scoring, release, Docker, documentation, and test files use
+the project attribution and Apache-2.0 identifier unless a direct source review
+finds retained upstream expression.
 
-Header policy:
+### Generated or planning material
 
-- keep applicable NVIDIA `SPDX-FileCopyrightText`;
-- add this project's attribution where appropriate:
-  `SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port`;
-- keep `SPDX-License-Identifier: Apache-2.0`.
+Generated evidence and planning artifacts may use directory- or artifact-level
+provenance instead of source-style headers. Copied source expression still
+requires its applicable notice.
 
-### Independent ROCm Work
+## Dataset redistribution boundaries
 
-Files created for this ROCm port that do not retain substantial upstream
-expression. Examples include AMD/ROCm evidence models, release readiness tools,
-prerelease artifact tooling, ROCm-only tests, and newly written documentation.
+`provenance.toml` contains the authoritative
+`sol_execbench.dataset_provenance_policy.v1` source table used by automated
+guards. The current table declares four source classes.
 
-Header policy:
+### AMD AgentKernelArena
 
-- use this project's attribution;
-- keep `SPDX-License-Identifier: Apache-2.0`;
-- do not use NVIDIA-only file copyright attribution.
-
-### Generated Or Planning Material
-
-Planning artifacts, generated evidence examples, and release draft materials
-may not need source-style file headers. Their provenance should be documented
-at the artifact, directory, or policy level unless copied source expression
-requires a file-level notice.
-
-## Dataset License And Redistribution Boundaries
-
-`provenance.toml` also contains a machine-readable
-`sol_execbench.dataset_provenance_policy.v1` policy for dataset sources and
-locally generated migration outputs. That policy is authoritative for automated
-guardrails.
-
-### NVIDIA SOL-ExecBench Evaluation Dataset
-
-The NVIDIA SOL-ExecBench evaluation dataset is governed by the NVIDIA
-Evaluation Dataset License. This project does not redistribute original NVIDIA
-dataset rows, definitions, workloads, traces, solutions, blobs, or ROCm-migrated
-derivatives of that dataset. Users must obtain NVIDIA/SOL-ExecBench content
-from upstream and run local migration tooling only when they have applicable
-rights under the NVIDIA Evaluation Dataset License.
-
-The policy classifies NVIDIA original and derivative dataset payloads as
-`excluded` and `release_bundle_blocked`. These files may appear in a local,
-ignored `data/` or `out/` workflow only; they must not be committed, published
-as fixtures, or copied into prerelease or release bundles.
+The pinned AKA source and authored `problems/AMD_AKA/` corpus are Apache-2.0
+and publishable when required AKA attribution and notices are preserved. The
+manifest's content-addressed source bindings are part of that provenance and
+must not be regenerated from an unpinned upstream branch.
 
 ### FlashInfer Trace
 
-FlashInfer Trace is tracked separately from NVIDIA SOL-ExecBench. The
-machine-readable policy records `flashinfer-ai/flashinfer-trace` as Apache-2.0
-content. Apache-2.0 FlashInfer Trace material may be redistributed only when
-the required license and attribution notices are preserved. Migration manifests
-must keep FlashInfer Trace source identity separate from NVIDIA/SOL-ExecBench
-source identity.
+FlashInfer Trace is tracked as separate Apache-2.0 content. Its identity and
+attribution must remain distinct from AKA and project-owned artifacts.
 
-### Generated Local Migration Artifacts
+### Generated local migration artifacts
 
-Generated migration artifacts inherit the redistribution boundary of their
-source dataset. Local manifests may record generated refs, checksums, source
-dataset IDs, source revisions, and license-boundary metadata. Generated payloads
-derived from NVIDIA SOL-ExecBench remain local-only and release-bundle-blocked.
+Artifacts under the policy's generated migration paths are local generated
+data, not project source. They inherit the redistribution boundary of their
+input and are blocked from repository and release-bundle redistribution. A
+local manifest should retain the source dataset ID, revision, checksums, and
+license boundary.
 
-### Project-Owned ROCm Code
+### Project-owned ROCm material
 
-Project-owned ROCm code, tests, scripts, examples, and documentation remain
-Apache-2.0 project material unless a file explicitly records retained upstream
-expression. These files are publishable with this repository's normal Apache-2.0
-attribution.
+Project-owned code, tests, scripts, examples, Docker support, and documentation
+are publishable under Apache-2.0 with the project attribution, subject to any
+more specific file-level upstream notice.
 
-### Guardrails
+## Guardrails
 
-`scripts/check_dataset_redistribution.py` enforces the dataset policy for staged
-repository paths and release-bundle directories. The prerelease readiness check
-also scans bundle contents and blocks restricted NVIDIA dataset paths before
-publication.
+Run the staged-path check before publication:
 
-## NVIDIA Notice Allowlist
+```bash
+uv run python scripts/check_dataset_redistribution.py --staged
+```
 
-`provenance.toml` lists files currently allowed to retain NVIDIA notices under
-`nvidia_notice.allowed`. In Phase 123 these are active files that currently
-carry the NVIDIA SPDX line and also exist at the same path in `upstream/main`.
-They are treated as upstream-retained or derivative-modified candidates.
+Release tooling must also check the assembled bundle root. The guard matches
+paths against the source classes in `provenance.toml`; documentation must not
+claim that an unregistered source or path pattern is protected by that check.
 
-`provenance.toml` also lists `nvidia_notice.cleanup_candidates`: active files
-identified in Phase 123 as carrying a NVIDIA-only SPDX line without existing at
-the same upstream path. Phase 124 replaces those headers with project
-attribution unless direct review finds copied upstream expression that requires
-retaining the notice.
+When introducing a dataset source, update the policy, its path patterns,
+redistribution flags, attribution, documentation, and focused guardrail tests in
+the same change.
 
-## History Policy
+## History policy
 
-Prior blanket headers are corrected through ordinary commits. Git history is
-not rewritten for this metadata cleanup unless a separate legal review requires
-it.
+Correct metadata through ordinary commits. Do not rewrite Git history for
+routine attribution cleanup unless a separate legal review requires it.
 
-## Public Wording Policy
+## Public wording
 
-Public docs should describe this repository as a ROCm port or adaptation of
-NVIDIA SOL-ExecBench. They must not imply NVIDIA or AMD endorsement unless
-explicit approval exists.
+Describe this repository as a ROCm port or adaptation of SOL-ExecBench and
+identify the AKA-derived corpus where relevant. Do not imply NVIDIA or AMD
+endorsement without explicit approval.

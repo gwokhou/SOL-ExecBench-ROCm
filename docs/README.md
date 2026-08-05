@@ -46,6 +46,7 @@ grant official-score authority.
 
 ## Policy and maintenance
 
+- [Active follow-ups](../HANDSOFF.md) is the single repository backlog.
 - [Provenance](user/provenance.md) and [Compliance](user/compliance.md)
 - [Development](user/DEVELOPMENT.md)
 - [Architecture navigation](internal/architecture_navigation.md) and

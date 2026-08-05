@@ -119,8 +119,9 @@ SOLAR publishes an operator graph, the selected path's `einsum_graph.yaml` or
 `aten_graph.yaml`, conversion attestation, formal analysis, and manifest only
 when all stages pass. Select `--backend make_fx_aten` explicitly when required;
 the default is `torchview_extended_einsum`, and there is no fallback. The CLI accepts only the
-publication-eligible capacity-constrained Orojenesis bound; the current empty
-reviewed-mapper allowlist intentionally blocks formal publication.
+publication-eligible capacity-constrained Orojenesis bound; the
+reviewed-mapper allowlist contains the reproducibly built trusted digest, and
+locally substituted binaries fail closed.
 
 ## Audit corpus-wide SOLAR readiness
 

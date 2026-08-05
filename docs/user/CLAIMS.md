@@ -50,10 +50,11 @@ on recorded host driver/devices**. They do not prove native host ROCm validation
 native validation requires direct evidence for the requested host stack. Do not
 describe Docker Matrix Entries as native host ROCm validation.
 
-The 2026-05-29 live checks recorded container evidence for
-`sol-execbench:rocm-7.0.2-complete` and
-`sol-execbench:rocm-7.2-complete` with
-`./scripts/run_docker.sh --record-container-validation`. ROCm 7.0.2 remains unlocked performance evidence. These records are container checks, not native-host ROCm hardware validation.
+`./scripts/run_docker.sh --record-container-validation` writes a
+content-addressed container-validation artifact for the selected target. Claim
+only what that artifact records, including clock state and observed host/GPU
+identity. A successful container record remains container evidence, not
+native-host ROCm hardware validation.
 
 Illegal mixed-version Targets are blocked by default. The explicit debug
 override permits bounded probes or smoke diagnostics only. It cannot create `container_validated` or

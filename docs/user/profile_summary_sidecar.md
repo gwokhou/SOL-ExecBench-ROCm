@@ -34,9 +34,9 @@ The summary may also include structured diagnostic evidence:
 - `summary.parse_warnings[]`: bounded parse warnings for malformed,
   unsupported, too-large, or citation-only artifacts.
 
-Phase 191 parses only registered CSV and JSON text artifacts. `.rocpd`,
+The parser reads only registered CSV and JSON text artifacts. `.rocpd`,
 database, Perfetto/PFTrace, and OTF2 artifacts remain citation-only evidence
-pointers in this version.
+pointers in the current schema.
 
 The sidecar is not correctness authority, timing authority, performance
 authority, score authority, evidence-tier authority, confirmed-improvement
@@ -95,9 +95,9 @@ full kernel source, prompt text, or absolute temporary paths from SOL profile
 summaries. They should include only normalized status, bounded metrics,
 limitations, and compact citations after freshness and authority checks pass.
 Profiler artifact citations use compact file names and compute SHA256 by
-default. Hashing large `.rocpd` or database artifacts can be expensive; SOL
-currently prefers auditability over skipping hashes, and any future size limit
-should be treated as a contract change rather than inferred by HIP.
+default. Hashing large `.rocpd` or database artifacts can be expensive, but the
+current contract has no size-based hashing exemption. HIP consumers must not
+infer one.
 
 For all closed HIP taxonomies, unknown values must be downgraded rather than
 promoted.

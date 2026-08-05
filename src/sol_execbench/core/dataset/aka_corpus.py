@@ -96,10 +96,10 @@ FORMAL_ARCHITECTURE_SHA256 = (
     "25ad977df7a7206bd9d8caf60d2cd85d4f5c5fdc47368a22efb881c0250d0877"
 )
 
-# Corpus-size bounds. The initial seed landed at 15 problems; the friendliness
-# expansion (docs/internal/aka-expansion-friendliness.md) grows it to 37 across
-# the three handling categories. The upper bound leaves room for growth
-# while still bounding the manifest validator's check.
+# Corpus-size bounds. The initial seed landed at 15 problems; the current
+# friendliness expansion contains 45 authored problems across the three
+# handling categories. The upper bound leaves room for growth while still
+# bounding the manifest validator's check.
 SEED_SET_MIN_PROBLEMS = 15
 SEED_SET_MAX_PROBLEMS = 48
 

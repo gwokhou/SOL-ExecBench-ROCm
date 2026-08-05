@@ -130,7 +130,7 @@ uv run pytest tests -m requires_ck -n 0
 uv run pytest tests -m requires_rocwmma -n 0
 ```
 
-Place future CDNA3-specific live tests near related package coverage under
+Place new CDNA3-specific live tests near related package coverage under
 `tests/sol_execbench/` and mark them with both `requires_rocm` and
 `requires_cdna3` when they need a real `gfx94*` GPU. Use
 `tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py` as the minimal marker-gate
@@ -139,7 +139,7 @@ metadata behavior, but those tests must not claim hardware validation.
 
 For hardware-sensitive changes, record the ROCm version, GPU architecture, GPU
 product, container target if used, exact test commands, ROCm timing evidence,
-AMD-native score, and any NVFP4/MXFP4 deferred status in the PR.
+AMD-native score, and any NVFP4/MXFP4 unsupported status in the PR.
 
 Current CDNA3 evidence is MI308X (`gfx942`) validation infrastructure evidence,
 not MI300X validation. MI300X and MI308X are sibling GPU products under the
@@ -147,13 +147,13 @@ CDNA3 architecture family and share `gfx942`, but do not describe MI308X runs
 as MI300X hardware validation. For any CDNA3 validation change, record whether
 the run produced the relevant evidence chain: full pytest log, dataset summary,
 environment report, clock-lock evidence, per-problem traces, ROCm timing evidence,
-AMD-native score report, FP8 status, and NVFP4/MXFP4 deferred status. Until that
+AMD-native score report, FP8 status, and NVFP4/MXFP4 unsupported status. Until that
 evidence exists for the exact claim, describe CDNA3 work as schema support, test
-readiness, infrastructure evidence, or deferred validation.
+readiness, infrastructure evidence, or a bounded validation gap.
 
-NVFP4/MXFP4 Quant ROCm adaptation and hardware validation are deferred until
-CDNA4-class hardware is available. CDNA3 expected skips for those problems are
-not CPU validation, dequantized benchmark validation, or performance evidence.
+NVFP4/MXFP4 Quant ROCm adaptation has no representative CDNA4 hardware
+evidence. CDNA3 expected skips for those problems are not CPU validation,
+dequantized benchmark validation, or performance evidence.
 
 ## Documentation
 

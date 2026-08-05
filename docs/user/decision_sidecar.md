@@ -90,9 +90,10 @@ occupancy-related recommendations.
 `vgpr_limit` is the architected addressing limit, not the physical register file;
 derivation uses it as a static pressure proxy.
 
-## Deferred Or Unsupported Scope
+## Unsupported by the static decision path
 
-The following are not produced from static facts and remain deferred:
+The following are not produced from static facts under the current ownership
+contract:
 
 - Layer C (instruction-mix from disassembly statistics)
 - Layer M (runtime compute-bound / memory-bound / latency-bound)
