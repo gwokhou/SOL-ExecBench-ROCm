@@ -91,20 +91,15 @@ def _convolution_kwargs(
 ) -> dict[str, GraphValue] | None:
     """Return exact handler parameters for the reviewed direct-conv subset."""
     target = str(semantic.get("target") or "").lower()
-    arguments = semantic.get("arguments")
-    if (
-        target not in _CONVOLUTION_TARGETS
-        or not isinstance(arguments, list)
-        or len(arguments) < 9
-    ):
+    if target not in _CONVOLUTION_TARGETS:
         return None
-    values = [_literal(arguments[index]) for index in range(3, 9)]
-    if _MISSING in values or len(input_shapes) != 2 or len(output_shapes) != 1:
-        return None
-    stride, padding, dilation, transposed, output_padding, groups = values
     dimensions = int(target[-2])
     unit = (1,) * dimensions
     zero = (0,) * dimensions
+    values = _convolution_values(semantic, unit=unit, zero=zero)
+    if values is None or len(input_shapes) != 2 or len(output_shapes) != 1:
+        return None
+    stride, padding, dilation, transposed, output_padding, groups = values
     if (
         stride != unit
         or padding != zero
@@ -152,6 +147,29 @@ def _convolution_kwargs(
             "out_channels": out_channels,
         },
     }
+
+
+def _convolution_values(
+    semantic: Mapping[str, GraphValue],
+    *,
+    unit: tuple[int, ...],
+    zero: tuple[int, ...],
+) -> tuple[GraphValue, ...] | None:
+    """Read exact convolution controls from ATen or default native semantics."""
+    arguments = semantic.get("arguments")
+    if isinstance(arguments, list) and len(arguments) >= 9:
+        values = tuple(_literal(arguments[index]) for index in range(3, 9))
+        return None if _MISSING in values else values
+    operands = semantic.get("operands")
+    attributes = semantic.get("attributes")
+    if (
+        semantic.get("kind") == "operation"
+        and isinstance(operands, list)
+        and len(operands) in {2, 3}
+        and attributes == {}
+    ):
+        return unit, zero, unit, False, zero, 1
+    return None
 
 
 def build_orojenesis_proof_layer(
@@ -205,6 +223,11 @@ def build_orojenesis_proof_layer(
         or "->" not in operation_proof.equation
     ):
         return None
+    proof_source_kind = (
+        "aten"
+        if isinstance(semantic.get("arguments"), list)
+        else "extended_native"
+    )
     proof["semantic_op"] = {
         "kind": "einsum",
         "target": "einsum",
@@ -212,7 +235,7 @@ def build_orojenesis_proof_layer(
         "arguments": [{"tensor": index} for index in range(len(indices))],
         "kwargs": {},
         "effects": deepcopy(dict(semantic.get("effects") or {})),
-        "proof_source": {"kind": "aten", "target": target},
+        "proof_source": {"kind": proof_source_kind, "target": target},
     }
     proof["einsum_equation"] = operation_proof.equation
     proof["is_real_einsum"] = True

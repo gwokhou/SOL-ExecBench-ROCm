@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
 from collections.abc import Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
@@ -30,11 +29,10 @@ from sol_execbench.core.solar_bridge.models import (
     normalize_ir_path,
 )
 from sol_execbench.core.solar_bridge.resource_policy import (
+    available_formal_mapper_logical_cpu_count,
     formal_mapper_thread_count,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
-
-_CPU_TOPOLOGY_ROOT = Path("/sys/devices/system/cpu")
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,38 +128,38 @@ def _validate_release_jobs(jobs: int) -> None:
         raise ValueError("SOLAR release jobs must be positive")
     if jobs == 1:
         return
-    physical_cores = _available_physical_cpu_count()
-    if physical_cores is None:
+    logical_cpus = available_formal_mapper_logical_cpu_count()
+    if logical_cpus is None:
         raise ValueError(
             "SOLAR release cannot safely run jobs above 1 because available "
-            "physical CPU cores could not be detected",
+            "logical CPUs could not be detected",
         )
     mapper_threads = formal_mapper_thread_count()
-    maximum, remaining_cores = _safe_release_jobs_limit(
-        physical_cores,
+    maximum, remaining_cpus = _safe_release_jobs_limit(
+        logical_cpus,
         mapper_threads=mapper_threads,
     )
     if jobs > maximum:
         remainder = (
-            f", leaving {remaining_cores} physical cores outside complete "
+            f", leaving {remaining_cpus} logical CPUs outside complete "
             "mapper slots"
-            if remaining_cores
+            if remaining_cpus
             else ""
         )
         raise ValueError(
             f"SOLAR release jobs {jobs} exceed the safe limit {maximum}: "
-            f"{physical_cores} available physical CPU cores / "
+            f"{logical_cpus} available logical CPUs / "
             f"{mapper_threads} mapper threads per workload{remainder}",
         )
 
 
 def _safe_release_jobs_limit(
-    physical_cores: int,
+    logical_cpus: int,
     *,
     mapper_threads: int | None = None,
 ) -> tuple[int, int]:
-    if physical_cores <= 0:
-        raise ValueError("available physical CPU cores must be positive")
+    if logical_cpus <= 0:
+        raise ValueError("available logical CPUs must be positive")
     threads = (
         formal_mapper_thread_count()
         if mapper_threads is None
@@ -169,43 +167,11 @@ def _safe_release_jobs_limit(
     )
     if threads <= 0:
         raise ValueError("formal mapper threads must be positive")
-    complete_slots, remaining_cores = divmod(
-        physical_cores,
+    complete_slots, remaining_cpus = divmod(
+        logical_cpus,
         threads,
     )
-    return max(1, complete_slots), remaining_cores
-
-
-def _available_physical_cpu_count(
-    *,
-    cpu_ids: frozenset[int] | None = None,
-    topology_root: Path = _CPU_TOPOLOGY_ROOT,
-) -> int | None:
-    available = _process_cpu_ids() if cpu_ids is None else cpu_ids
-    if not available:
-        return None
-    identities: set[tuple[int, int]] = set()
-    for cpu_id in available:
-        topology = topology_root / f"cpu{cpu_id}" / "topology"
-        try:
-            package_id = int(
-                (topology / "physical_package_id").read_text(encoding="utf-8"),
-            )
-            core_id = int(
-                (topology / "core_id").read_text(encoding="utf-8"),
-            )
-        except (OSError, ValueError):
-            return None
-        identities.add((package_id, core_id))
-    return len(identities) or None
-
-
-def _process_cpu_ids() -> frozenset[int]:
-    try:
-        return frozenset(os.sched_getaffinity(0))
-    except (AttributeError, OSError):
-        logical_cpus = os.cpu_count()
-        return frozenset(range(logical_cpus)) if logical_cpus else frozenset()
+    return max(1, complete_slots), remaining_cpus
 
 
 def _release_work_items(

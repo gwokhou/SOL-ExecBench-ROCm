@@ -235,7 +235,7 @@ def analyze_cli(
     show_default=True,
     help=(
         "Run this many CPU analysis workers; the safe maximum is derived "
-        "from available physical cores and the fixed mapper thread count."
+        "from process-visible logical CPUs and the adaptive mapper thread count."
     ),
 )
 def release_build_cli(

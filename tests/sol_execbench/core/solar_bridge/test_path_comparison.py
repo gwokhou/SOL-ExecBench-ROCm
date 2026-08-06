@@ -66,7 +66,10 @@ def _graph(prefix: str) -> dict:
 
 
 def _analysis(
-    *, intermediate_bytes: float, model_io_bytes: float = 32.0
+    *,
+    intermediate_bytes: float,
+    model_io_bytes: float = 32.0,
+    fused_bytes: float = 32.0,
 ) -> dict:
     return {
         "schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION,
@@ -91,7 +94,7 @@ def _analysis(
             "unfused_bytes": 32.0 + intermediate_bytes,
             "orojenesis_elements": None,
             "fused_elements": 16,
-            "fused_bytes": 32.0,
+            "fused_bytes": fused_bytes,
             "fused_prefetched_elements": 16,
             "fused_prefetched_bytes": 32.0,
             "model_io_elements": 16,
@@ -142,6 +145,7 @@ def _write_workload(
     *,
     intermediate_bytes: float,
     model_io_bytes: float = 32.0,
+    fused_bytes: float = 32.0,
 ) -> None:
     directory = root / relative
     graph_name = ir_path.graph_filename
@@ -151,6 +155,7 @@ def _write_workload(
         "solar-analysis.yaml": _analysis(
             intermediate_bytes=intermediate_bytes,
             model_io_bytes=model_io_bytes,
+            fused_bytes=fused_bytes,
         ),
     }
     for name, value in artifacts.items():
@@ -275,7 +280,7 @@ def test_comparison_fails_closed_on_coverage_and_accounting(
         "problem/missing",
     )
     assert result.comparisons[0].model_io_accounting.classification is (
-        DifferenceCategory.RESOURCE_MODEL_BUG
+        DifferenceCategory.DIALECT_DECOMPOSITION_DIFFERENCE
     )
     cli_result = CliRunner().invoke(
         cli,
@@ -292,6 +297,37 @@ def test_comparison_fails_closed_on_coverage_and_accounting(
     )
     assert cli_result.exit_code == 1
     assert json.loads(cli_result.output)["data"]["status"] == "incomplete"
+
+
+def test_comparison_classifies_fused_io_drift_as_resource_model_bug(
+    tmp_path: Path,
+) -> None:
+    make_fx = tmp_path / "make_fx"
+    torchview = tmp_path / "torchview"
+    relative = "problem/workload"
+    _write_workload(
+        make_fx,
+        relative,
+        IRPath.MAKE_FX_ATEN,
+        intermediate_bytes=16.0,
+        fused_bytes=48.0,
+    )
+    _write_workload(
+        torchview,
+        relative,
+        IRPath.TORCHVIEW_EXTENDED_EINSUM,
+        intermediate_bytes=16.0,
+    )
+
+    result = compare_solar_ir_paths(
+        make_fx,
+        torchview,
+        tmp_path / "comparison.json",
+    )
+
+    assert result.comparisons[0].model_io_accounting.classification is (
+        DifferenceCategory.RESOURCE_MODEL_BUG
+    )
 
 
 def test_comparison_rejects_artifact_hash_drift(tmp_path: Path) -> None:

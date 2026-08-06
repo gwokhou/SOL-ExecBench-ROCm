@@ -7,10 +7,56 @@ from pathlib import Path
 import pytest
 
 from solar.analysis import orojenesis
-from solar.analysis.orojenesis import runner as orojenesis_runner
+from solar.analysis.orojenesis import (
+    configuration as orojenesis_configuration,
+    problem as orojenesis_problem,
+    runner as orojenesis_runner,
+)
 from solar.schema_versions import OROJENESIS_PROVENANCE_SCHEMA_VERSION
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_mapper_threads_follow_process_visible_logical_cpus() -> None:
+    assert (
+        orojenesis_configuration.available_logical_cpu_count(
+            cpu_ids=frozenset({0, 2, 7}),
+        )
+        == 3
+    )
+    assert (
+        orojenesis_configuration.orojenesis_mapper_thread_count(
+            cpu_ids=frozenset(range(32)),
+        )
+        == 32
+    )
+
+
+def test_mapper_threads_fall_back_conservatively_without_cpu_detection() -> (
+    None
+):
+    assert (
+        orojenesis_configuration.available_logical_cpu_count(
+            cpu_ids=frozenset(),
+        )
+        is None
+    )
+    assert (
+        orojenesis_configuration.orojenesis_mapper_thread_count(
+            cpu_ids=frozenset(),
+        )
+        == 1
+    )
+
+
+def test_mapper_policy_uses_adaptive_thread_count(monkeypatch) -> None:
+    monkeypatch.setattr(
+        orojenesis_problem,
+        "orojenesis_mapper_thread_count",
+        lambda: 7,
+    )
+
+    assert orojenesis_problem._mapper_policy()["num-threads"] == 7
 
 
 def _write_toolchain(

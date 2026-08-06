@@ -59,6 +59,18 @@ def formal_artifact_paths(ir_path: IRPath) -> frozenset[str]:
     )
 
 
+def formal_auxiliary_artifact_paths(ir_path: IRPath) -> frozenset[str]:
+    """Return reviewed optional top-level artifacts for one fixed IR path."""
+    if ir_path is IRPath.TORCHVIEW_EXTENDED_EINSUM:
+        return frozenset(
+            {
+                "af_einsum_graph.yaml",
+                "einsum_graph_renamed.yaml",
+            },
+        )
+    return frozenset()
+
+
 def valid_formal_artifact_paths(
     paths: set[str],
     ir_path: IRPath,
@@ -67,7 +79,8 @@ def valid_formal_artifact_paths(
     required = formal_artifact_paths(ir_path)
     if not required.issubset(paths):
         return False
-    for value in paths - required:
+    reviewed = required | formal_auxiliary_artifact_paths(ir_path)
+    for value in paths - reviewed:
         parts = Path(value).parts
         if len(parts) < 2 or parts[0] != "orojenesis":
             return False
@@ -384,6 +397,7 @@ __all__ = [
     "SolarStageStatus",
     "SolarWorkerRequest",
     "formal_artifact_paths",
+    "formal_auxiliary_artifact_paths",
     "formal_precision_for_definition",
     "normalize_ir_path",
     "readiness_stage_artifacts",

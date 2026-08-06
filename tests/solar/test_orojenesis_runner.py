@@ -312,6 +312,61 @@ def test_run_layer_certifies_a_selected_capacity_compulsory_witness(
     assert "sizeKB: 1" in architecture
 
 
+def test_default_extended_native_conv_uses_compulsory_witness_plan(
+    tmp_path,
+):
+    runner = _runner(tmp_path)
+    layer = _conv_proof()
+    layer["semantic_op"]["proof_source"] = {
+        "kind": "extended_native",
+        "target": "conv2d",
+    }
+    layer["semantic_op"]["effects"] = {
+        "mutates": [],
+        "aliases": [],
+        "atomic": False,
+        "opaque_library_call": True,
+    }
+    output = tmp_path / "extended-native-conv"
+    output.mkdir()
+
+    plan = runner._prepare_layer_run(
+        layer,
+        output,
+        word_bits=32,
+        selected_capacity_bytes=1024,
+    )
+
+    assert plan.is_compulsory_witness
+    assert plan.streaming_dimension == "A"
+    mapper = plan.paths["mapper.yaml"].read_text()
+    assert "A=1 B=2 C=3 D=3 E=3 F=2 G=2" in mapper
+
+
+def test_effectful_extended_native_conv_rejects_compulsory_witness_plan(
+    tmp_path,
+):
+    runner = _runner(tmp_path)
+    layer = _conv_proof()
+    layer["semantic_op"]["proof_source"] = {
+        "kind": "extended_native",
+        "target": "conv2d",
+    }
+    layer["semantic_op"]["effects"] = {"atomic": True}
+    output = tmp_path / "effectful-extended-native-conv"
+    output.mkdir()
+
+    plan = runner._prepare_layer_run(
+        layer,
+        output,
+        word_bits=32,
+        selected_capacity_bytes=1024,
+    )
+
+    assert not plan.is_compulsory_witness
+    assert plan.streaming_dimension is None
+
+
 def test_run_layer_rejects_a_noncompulsory_convolution_witness(
     tmp_path,
     monkeypatch,

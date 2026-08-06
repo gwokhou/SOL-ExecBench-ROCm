@@ -974,6 +974,7 @@ def _dispatch_components(
             _memory_component(
                 memory_bytes,
                 calibration,
+                working_set_bytes=semantic.semantic_bytes,
                 dispatch_id=dispatch.dispatch_id,
             ),
         )
@@ -1232,16 +1233,20 @@ def _append_serial_penalties(
 
 
 def _memory_component(
-    working_set_bytes: float,
+    amount_bytes: float,
     calibration: DiagnosticCalibrationProfile,
     *,
+    working_set_bytes: float | None = None,
     efficiency_name: CalibrationParameterName | None = None,
     dispatch_id: str | None = None,
 ) -> PredictionComponent:
-    parameter = _memory_parameter(working_set_bytes, calibration)
+    parameter = _memory_parameter(
+        amount_bytes if working_set_bytes is None else working_set_bytes,
+        calibration,
+    )
     component = _scaled_component(
         "memory",
-        working_set_bytes,
+        amount_bytes,
         parameter,
         dispatch_id=dispatch_id,
     )

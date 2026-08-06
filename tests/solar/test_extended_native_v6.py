@@ -21,7 +21,10 @@ from solar.graph.extraction import extract_operator_graph
 from solar.ir.contracts import IRKind
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.extended_einsum.backend import backend as extended_backend
-from solar.ir.extended_einsum.native_registry import NATIVE_OP_REGISTRY
+from solar.ir.extended_einsum.native_registry import (
+    NATIVE_OP_REGISTRY,
+    canonical_native_target,
+)
 from solar.ir.registry import ir_backend
 from solar.schema_versions import EXTENDED_EINSUM_IR_SCHEMA_VERSION
 from solar.verification.executor import IRGraphExecutor
@@ -47,6 +50,24 @@ def _cases() -> list[tuple[str, Callable[..., Any], tuple[torch.Tensor, ...]]]:
             lambda x, y: torch.add(x, y, alpha=2),
             (matrix, matrix.clone()),
         ),
+        ("bfloat16", lambda x: x.bfloat16(), (matrix,)),
+        ("float", lambda x: x.float(), (matrix.to(torch.bfloat16),)),
+        ("half", lambda x: x.half(), (matrix,)),
+        ("int", lambda x: x.int(), (matrix,)),
+        ("long", lambda x: x.long(), (matrix,)),
+        ("ones_like", torch.ones_like, (matrix,)),
+        ("eq", lambda x: x == 2, (matrix,)),
+        ("reshape", lambda x: x.reshape(2, 2, 3), (matrix,)),
+        (
+            "amax",
+            lambda x: torch.amax(x, dim=-1, keepdim=True),
+            (matrix,),
+        ),
+        (
+            "clamp",
+            lambda x: torch.clamp(x, -2.0, 5.0),
+            (matrix - 4.0,),
+        ),
         (
             "matmul",
             torch.matmul,
@@ -58,6 +79,11 @@ def _cases() -> list[tuple[str, Callable[..., Any], tuple[torch.Tensor, ...]]]:
             (matrix, torch.ones(4)),
         ),
         ("silu", functional.silu, (matrix,)),
+        (
+            "softplus",
+            lambda x: functional.softplus(x, beta=1.5, threshold=12.0),
+            (matrix,),
+        ),
         ("softmax", lambda x: functional.softmax(x, dim=-1), (matrix,)),
         (
             "sort",
@@ -323,6 +349,28 @@ def test_native_registry_and_executor_are_independent_from_aten() -> None:
     source = inspect.getsource(extended)
     assert "execute_aten_layer" not in source
     assert "torch.ops.aten" not in source
+
+
+@pytest.mark.parametrize(
+    ("public_name", "canonical"),
+    [
+        ("__and__", "bitwise_and"),
+        ("__eq__", "eq"),
+        ("__ge__", "ge"),
+        ("__gt__", "gt"),
+        ("__invert__", "bitwise_not"),
+        ("__le__", "le"),
+        ("__lt__", "lt"),
+        ("__matmul__", "matmul"),
+        ("__ne__", "ne"),
+        ("__neg__", "neg"),
+    ],
+)
+def test_supported_python_operators_keep_public_aliases(
+    public_name: str,
+    canonical: str,
+) -> None:
+    assert canonical_native_target(public_name) == canonical
 
 
 @pytest.mark.parametrize(("name", "reference", "inputs"), _cases())
