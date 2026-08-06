@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from sol_execbench.cli.commands import solar as solar_commands
 from sol_execbench.cli.main import cli
+from sol_execbench.core.scoring.release_solar_runner import SolarReleaseResult
 from sol_execbench.core.solar_bridge.corpus_readiness import (
     CorpusReadinessStatus,
     CorpusStageAuditResult,
@@ -317,3 +318,54 @@ def test_solar_corpus_audit_returns_incomplete_matrix(
         str(matrix),
         str(summary),
     }
+
+
+def test_solar_release_build_forwards_explicit_jobs(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "release"
+    workspace.mkdir()
+    manifest = tmp_path / "manifest.yaml"
+    manifest.write_text("manifest: test\n")
+    orojenesis = tmp_path / "orojenesis"
+    orojenesis.mkdir()
+    observed: dict[str, object] = {}
+
+    def build(*args, **kwargs):
+        observed["args"] = args
+        observed["jobs"] = kwargs["jobs"]
+        return SolarReleaseResult(
+            problems=2,
+            workloads=4,
+            generated=4,
+            resumed=0,
+            index_path=workspace / "statements" / "solar.json",
+        )
+
+    monkeypatch.setattr(
+        solar_commands,
+        "build_release_solar_manifests",
+        build,
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "solar",
+            "release-build",
+            str(workspace),
+            "--manifest",
+            str(manifest),
+            "--orojenesis-home",
+            str(orojenesis),
+            "--jobs",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert observed["jobs"] == 2
+    assert json.loads(result.output)["data"]["workloads"] == 4

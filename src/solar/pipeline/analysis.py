@@ -5,10 +5,18 @@
 
 from __future__ import annotations
 
+import fcntl
+import time
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from solar.contracts import AnalysisRequest, SolarStage
+from solar.contracts import (
+    AnalysisExecutionPolicy,
+    AnalysisRequest,
+    SolarStage,
+)
 from solar.ir.contracts import IRGraphArtifact
 from solar.pipeline.stages import (
     analyze_request_graph,
@@ -39,6 +47,42 @@ class PipelineStageError(RuntimeError):
         self.error = error
 
 
+@contextmanager
+def _exclusive_device_stage(
+    policy: AnalysisExecutionPolicy,
+) -> Iterator[None]:
+    """Serialize device-backed stages without affecting published evidence."""
+    path = policy.device_stage_lock_path
+    if path is None:
+        yield
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + policy.device_stage_lock_timeout_seconds
+    with path.open("a+", encoding="utf-8") as handle:
+        while True:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        "SOLAR device-stage lock wait exceeded "
+                        f"{policy.device_stage_lock_timeout_seconds:g} seconds",
+                    ) from None
+                time.sleep(0.05)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _device_stage_guard(
+    request: AnalysisRequest,
+) -> AbstractContextManager[None]:
+    """Return the configured guard for extraction through verification."""
+    return _exclusive_device_stage(request.execution_policy)
+
+
 def run_pipeline(
     request: AnalysisRequest,
     profile: ArchitectureProfile,
@@ -47,15 +91,19 @@ def run_pipeline(
     """Run the graph, IR, verification, and analysis stages."""
     stage = SolarStage.GRAPH_EXTRACTION
     try:
-        operator = extract_request_graph(request, staging)
-        stage = SolarStage.IR_CONVERSION
-        ir_graph = convert_request_graph(request, operator, staging)
-        stage = SolarStage.CONVERSION_VERIFICATION
-        verify_request_graph(
-            request,
-            ir_graph,
-            staging / "conversion-attestation.yaml",
-        )
+        with _device_stage_guard(request):
+            operator = extract_request_graph(request, staging)
+            stage = SolarStage.IR_CONVERSION
+            ir_graph = convert_request_graph(request, operator, staging)
+            stage = SolarStage.CONVERSION_VERIFICATION
+            verify_request_graph(
+                request,
+                ir_graph,
+                staging / "conversion-attestation.yaml",
+            )
+            cleanup = request.execution_policy.device_stage_cleanup
+            if cleanup is not None:
+                cleanup()
         stage = SolarStage.FORMAL_ANALYSIS
         analysis = analyze_request_graph(request, profile, staging, ir_graph)
         return PipelineResult(ir_graph, analysis)

@@ -6,13 +6,12 @@
 from __future__ import annotations
 
 import shutil
+from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from sol_execbench.core.data.workload import conservative_numeric_tolerance
-from sol_execbench.core.integrity import sha256_bytes
 from sol_execbench.core.solar_bridge.formal_device import (
     FORMAL_ARCHITECTURE,
+    release_formal_device_memory,
     require_formal_device,
 )
 from sol_execbench.core.solar_bridge.models import (
@@ -28,11 +27,9 @@ from sol_execbench.core.solar_bridge.semantic_metadata import (
 from sol_execbench.core.solar_bridge.workload_context import (
     SolarWorkloadContext,
     load_solar_workload_context,
+    solar_conversion_request,
 )
 from solar.ir.contracts import DEFAULT_IR_PATH, IRPath, normalize_ir_path
-
-if TYPE_CHECKING:
-    from solar.api import ConversionRequest
 
 
 def formal_producer_readiness() -> tuple[bool, str]:
@@ -60,6 +57,8 @@ def analyze_workload(
     device: str,
     orojenesis_home: str | Path | None,
     ir_path: IRPath | str = DEFAULT_IR_PATH,
+    device_stage_lock_path: str | Path | None = None,
+    device_stage_lock_timeout_seconds: float = 14_400.0,
 ) -> SolarAnalysisOutcome:
     """Adapt one workload and invoke SOLAR's benchmark-agnostic API."""
     require_formal_device(device)
@@ -70,6 +69,8 @@ def analyze_workload(
         device=device,
         orojenesis_home=orojenesis_home,
         ir_path=normalize_ir_path(ir_path),
+        device_stage_lock_path=device_stage_lock_path,
+        device_stage_lock_timeout_seconds=device_stage_lock_timeout_seconds,
     )
 
 
@@ -89,7 +90,11 @@ def audit_workload_stages(
     context = load_solar_workload_context(problem_dir, workload_uuid, device)
     result = audit_conversion(
         ConversionReadinessRequest(
-            conversion=_conversion_request(context, device, selected_path),
+            conversion=solar_conversion_request(
+                context,
+                device,
+                selected_path,
+            ),
             architecture=FORMAL_ARCHITECTURE,
             output_dir=Path(output_dir),
         ),
@@ -104,18 +109,40 @@ def _invoke_solar(
     device: str,
     orojenesis_home: str | Path | None,
     ir_path: IRPath = DEFAULT_IR_PATH,
+    device_stage_lock_path: str | Path | None = None,
+    device_stage_lock_timeout_seconds: float = 14_400.0,
 ) -> SolarAnalysisOutcome:
-    from solar.api import AnalysisFailure, AnalysisRequest, analyze
+    from solar.api import (
+        AnalysisExecutionPolicy,
+        AnalysisFailure,
+        AnalysisRequest,
+        analyze,
+    )
 
     definition = context.definition
     request = AnalysisRequest(
-        conversion=_conversion_request(context, device, ir_path),
+        conversion=solar_conversion_request(context, device, ir_path),
         architecture=FORMAL_ARCHITECTURE,
         output_dir=output_dir,
         precision=formal_precision_for_definition(definition),
         require_orojenesis=True,
         orojenesis_home=orojenesis_home,
         analysis_metadata=performance_analysis_metadata(context),
+        execution_policy=AnalysisExecutionPolicy(
+            device_stage_lock_path=(
+                Path(device_stage_lock_path)
+                if device_stage_lock_path is not None
+                else None
+            ),
+            device_stage_lock_timeout_seconds=(
+                device_stage_lock_timeout_seconds
+            ),
+            device_stage_cleanup=(
+                partial(release_formal_device_memory, device)
+                if device_stage_lock_path is not None
+                else None
+            ),
+        ),
     )
     result = analyze(request)
     if isinstance(result, AnalysisFailure):
@@ -150,31 +177,3 @@ def _invoke_solar(
             message="SOLAR formal bridge rejected a non-publication result",
         )
     return outcome
-
-
-def _conversion_request(
-    context: SolarWorkloadContext,
-    device: str,
-    ir_path: IRPath,
-) -> ConversionRequest:
-    from solar.api import ConversionRequest, VerificationPolicy
-
-    definition, workload = context.definition, context.workload
-    tolerance = conservative_numeric_tolerance(workload.checks)
-    return ConversionRequest(
-        analysis_id=f"{definition.name}:{workload.uuid}",
-        reference=context.reference,
-        input_factory=context.input_factory,
-        reference_name=f"{definition.name}/definition.json#reference",
-        reference_sha256=sha256_bytes(definition.reference.encode()),
-        ir_path=ir_path,
-        verification=VerificationPolicy(
-            atol=tolerance.max_atol,
-            rtol=tolerance.max_rtol,
-            required_matched_ratio=tolerance.required_matched_ratio,
-            max_error_cap=tolerance.max_error_cap,
-            allow_negative_inf=tolerance.allow_negative_inf,
-            device=device,
-            preserved_input_indices=context.preserved_input_indices,
-        ),
-    )

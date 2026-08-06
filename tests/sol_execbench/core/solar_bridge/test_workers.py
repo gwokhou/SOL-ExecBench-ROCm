@@ -173,6 +173,25 @@ def test_analysis_worker_replaces_unserializable_outcome_with_failure(
     assert payload["reason_code"] == "worker_response_failed"
 
 
+@pytest.mark.parametrize(("initial", "expected"), [(-100, 500), (800, 800)])
+def test_parallel_worker_prefers_itself_as_oom_victim(
+    tmp_path: Path,
+    initial: int,
+    expected: int,
+) -> None:
+    score = tmp_path / "oom_score_adj"
+    score.write_text(f"{initial}\n")
+
+    worker._prefer_worker_as_oom_victim(score)
+
+    assert int(score.read_text()) == expected
+
+
+def test_parallel_worker_requires_oom_isolation(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="configure OOM isolation"):
+        worker._prefer_worker_as_oom_victim(tmp_path / "missing" / "score")
+
+
 def test_stage_worker_serializes_success(tmp_path, monkeypatch) -> None:
     request, response = _write_stage_request(tmp_path)
     monkeypatch.setattr(

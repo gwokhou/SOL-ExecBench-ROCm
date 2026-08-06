@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import gc
+
 # Canonical architecture id passed to solar.api (no namespace prefix).
 # aka_corpus.FORMAL_ARCHITECTURE carries the manifest label "solar:RX_9060_XT";
 # the two are deliberately different views of the same target.
@@ -33,4 +35,20 @@ def require_formal_device(device: str) -> None:
         )
 
 
-__all__ = ["FORMAL_ARCHITECTURE", "FORMAL_GFX_TARGET", "require_formal_device"]
+def release_formal_device_memory(device: str) -> None:
+    """Release cached ROCm allocations before CPU-only formal analysis."""
+    import torch
+
+    selected = torch.device(device)
+    with torch.cuda.device(selected):
+        torch.cuda.synchronize()
+        gc.collect()
+        torch.cuda.empty_cache()
+
+
+__all__ = [
+    "FORMAL_ARCHITECTURE",
+    "FORMAL_GFX_TARGET",
+    "release_formal_device_memory",
+    "require_formal_device",
+]

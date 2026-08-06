@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from math import prod
 
+from solar.analysis.orojenesis.configuration import OROJENESIS_MAPPER_THREADS
 from solar.analysis.orojenesis.errors import OrojenesisError
 from solar.ir.contracts import layer_operation
 from solar.types import DynamicValue
@@ -487,6 +488,6 @@ def _mapper_policy() -> dict[str, DynamicValue]:
         "victory-condition": 0,
         "timeout": 0,
         "log-oaves": True,
-        "num-threads": 8,
+        "num-threads": OROJENESIS_MAPPER_THREADS,
         "log-oaves-mappings": False,
     }
