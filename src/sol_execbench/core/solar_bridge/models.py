@@ -132,10 +132,18 @@ class SolarWorkerRequest(_SolarWorkerRequestBase):
     """Serializable request for one isolated SOLAR analysis."""
 
     orojenesis_home: str | None
+    device_stage_lock_path: str | None = None
+    device_stage_lock_timeout_seconds: float = 14_400.0
     ir_path: IRPath = DEFAULT_IR_PATH
     schema_version: Literal[SchemaVersion.SOLAR_WORKER_IPC] = (
         SchemaVersion.SOLAR_WORKER_IPC
     )
+
+    def __post_init__(self) -> None:
+        """Validate the analysis-specific execution controls."""
+        super().__post_init__()
+        if self.device_stage_lock_timeout_seconds <= 0:
+            raise ValueError("device stage lock timeout must be positive")
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> SolarWorkerRequest:
@@ -146,6 +154,14 @@ class SolarWorkerRequest(_SolarWorkerRequestBase):
                 str(value["orojenesis_home"])
                 if value.get("orojenesis_home")
                 else None
+            ),
+            device_stage_lock_path=(
+                str(value["device_stage_lock_path"])
+                if value.get("device_stage_lock_path")
+                else None
+            ),
+            device_stage_lock_timeout_seconds=float(
+                value.get("device_stage_lock_timeout_seconds", 14_400.0),
             ),
         )
 

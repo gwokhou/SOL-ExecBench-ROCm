@@ -228,6 +228,16 @@ def analyze_cli(
     show_default=True,
 )
 @click.option("--resume", is_flag=True)
+@click.option(
+    "--jobs",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help=(
+        "Run this many CPU analysis workers; the safe maximum is derived "
+        "from available physical cores and the fixed mapper thread count."
+    ),
+)
 def release_build_cli(
     workspace: Path,
     manifest_path: Path,
@@ -236,6 +246,7 @@ def release_build_cli(
     backend: str,
     timeout_seconds: float,
     resume: bool,
+    jobs: int,
 ) -> CliResult:
     """Generate the exact content-addressed release SOLAR denominator."""
     try:
@@ -247,6 +258,7 @@ def release_build_cli(
             resume=resume,
             device=device,
             ir_path=backend,
+            jobs=jobs,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         raise CliFailure(
@@ -254,8 +266,8 @@ def release_build_cli(
             code="solar_release_build_failed",
             exit_code=CliExitCode.RESULT_FAILED,
             hint=(
-                "Use the clean declared source revision and reviewed "
-                "Orojenesis artifact."
+                "Use a safe --jobs value, the clean declared source revision, "
+                "and the reviewed Orojenesis artifact."
             ),
         ) from exc
     report = {

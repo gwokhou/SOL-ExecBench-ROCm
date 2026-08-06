@@ -168,14 +168,22 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
     monkeypatch,
 ) -> None:
     result_dir = tmp_path / "result"
+    cleanup_devices: list[str] = []
     monkeypatch.setattr(
         analyzer,
         "formal_precision_for_definition",
         lambda value: "fp16",
     )
+    monkeypatch.setattr(
+        analyzer,
+        "release_formal_device_memory",
+        cleanup_devices.append,
+    )
 
     def fake_analyze(request):
         assert request.require_orojenesis is True
+        assert request.execution_policy.device_stage_cleanup is not None
+        request.execution_policy.device_stage_cleanup()
         return AnalysisResult(
             status=SolarAnalysisStatus.ANALYZED,
             analysis_id=request.analysis_id,
@@ -196,12 +204,14 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
         output_dir=result_dir,
         device="hip:0",
         orojenesis_home=None,
+        device_stage_lock_path=tmp_path / "device.lock",
     )
 
     assert outcome.status == "analyzed"
     assert outcome.lower_bound_seconds == 0.001
     assert outcome.limiting_resource == "memory"
     assert outcome.publication_eligible is True
+    assert cleanup_devices == ["hip:0"]
     assert {artifact["path"] for artifact in outcome.artifacts} == {
         artifact.path for artifact in _FORMAL_ARTIFACTS
     }

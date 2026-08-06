@@ -90,8 +90,20 @@ Build the formal 163-workload denominator:
 ```bash
 uv run sol-execbench solar release-build out/release \
   --backend torchview_extended_einsum \
+  --jobs 2 \
   --orojenesis-home /path/to/reviewed/orojenesis
 ```
+
+`--jobs` defaults to `1`, preserving the serial release path. Values above one
+serialize graph extraction, conversion, and replay on the selected GPU while
+overlapping CPU-heavy formal analysis across workloads. Each mapper continues
+to use the canonical eight-thread configuration. The builder rejects values
+above `max(1, floor(available physical CPU cores / 8))`, using the current
+process CPU affinity when counting available cores. Only complete eight-core
+mapper slots increase the limit: 20 physical cores permit two jobs and leave
+four cores for other work. Hosts with fewer than eight available physical cores
+retain the serial path only. If physical topology cannot be detected, only one
+job is accepted.
 
 Each workload record binds the selected fixed IR path, operator graph, dynamic
 IR graph name, conversion attestation, formal analysis, and request manifest.

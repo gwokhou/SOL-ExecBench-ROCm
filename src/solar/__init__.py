@@ -27,6 +27,7 @@ __version__ = "4.0.0"
 # remain importable for in-repository development, but are deliberately not
 # advertised as stable entry points because they bypass pipeline attestations.
 _LAZY_IMPORTS = {
+    "AnalysisExecutionPolicy": ("solar.api", "AnalysisExecutionPolicy"),
     "AnalysisFailure": ("solar.api", "AnalysisFailure"),
     "AnalysisRequest": ("solar.api", "AnalysisRequest"),
     "AnalysisResult": ("solar.api", "AnalysisResult"),
@@ -62,6 +63,7 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
+    "AnalysisExecutionPolicy",
     "AnalysisFailure",
     "AnalysisRequest",
     "AnalysisResult",

@@ -10,6 +10,7 @@ import solar.ir.extended_einsum
 
 def test_solar_public_api_exposes_only_atomic_pipeline() -> None:
     assert set(solar.__all__) == {
+        "AnalysisExecutionPolicy",
         "AnalysisFailure",
         "AnalysisRequest",
         "AnalysisResult",

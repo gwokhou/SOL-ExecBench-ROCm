@@ -194,6 +194,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
     assert "score" not in manifest
     assert manifest["analysis_contract"]["precision"] == "fp16"
     assert manifest["analysis_contract"]["require_orojenesis"] is False
+    assert "execution_policy" not in manifest
     assert manifest["sol_score_eligible"] is True
     assert manifest["publication_eligible"] is True
 

@@ -93,7 +93,7 @@ class SchemaVersion(StrEnum):
     )
     ROCPROFV3_PROFILE = "sol_execbench.rocprofv3_profile.v1"
     ROCPROFV3_TIMING = "sol_execbench.rocprofv3_timing.v1"
-    SOLAR_WORKER_IPC = "sol_execbench.solar_worker_ipc.v1"
+    SOLAR_WORKER_IPC = "sol_execbench.solar_worker_ipc.v2"
     SOLUTION = "sol_execbench.solution.v1"
     STATIC_ARTIFACT_MANIFEST = "sol_execbench.static_artifact_manifest.v1"
     STATIC_KERNEL_EVIDENCE = "sol_execbench.static_kernel_evidence.v4"

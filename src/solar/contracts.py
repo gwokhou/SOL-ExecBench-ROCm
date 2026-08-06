@@ -171,6 +171,20 @@ class ConversionRequestEnvelope:
 
 
 @dataclass(frozen=True)
+class AnalysisExecutionPolicy:
+    """Non-semantic controls for one analysis execution."""
+
+    device_stage_lock_path: Path | None = None
+    device_stage_lock_timeout_seconds: float = 14_400.0
+    device_stage_cleanup: Callable[[], None] | None = None
+
+    def __post_init__(self) -> None:
+        """Reject execution controls that cannot provide a bounded wait."""
+        if self.device_stage_lock_timeout_seconds <= 0:
+            raise ValueError("device stage lock timeout must be positive")
+
+
+@dataclass(frozen=True)
 class AnalysisRequest(ConversionRequestEnvelope):
     """Formal-analysis inputs composed around one conversion request."""
 
@@ -182,6 +196,9 @@ class AnalysisRequest(ConversionRequestEnvelope):
     orojenesis_home: str | Path | None = None
     analysis_metadata: Mapping[str, DynamicValue] = field(
         default_factory=dict,
+    )
+    execution_policy: AnalysisExecutionPolicy = field(
+        default_factory=AnalysisExecutionPolicy,
     )
 
 
@@ -396,6 +413,7 @@ __all__ = [
     "FORMAL_BOUND_KIND",
     "ROOFLINE_BOUND_KIND",
     "SOL_BOUND_KINDS",
+    "AnalysisExecutionPolicy",
     "AnalysisFailure",
     "AnalysisRequest",
     "AnalysisResult",

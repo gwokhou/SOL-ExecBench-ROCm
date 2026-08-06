@@ -28,6 +28,7 @@ OROJENESIS_TRUSTED_MAPPER_SHA256: frozenset[str] = frozenset(
     {"18591892b1ecec3264ec729b0e457ec9f22422993f656ece40dba809c032d77a"},
 )
 OROJENESIS_PROVENANCE_FILENAME = "orojenesis-provenance.json"
+OROJENESIS_MAPPER_THREADS = 8
 
 MULTI_EINSUM_SOLVER = "NVlabs/Orojenesis tiled-fusion"
 MULTI_EINSUM_COMPOSITION = "linear_matmul_compatible_tiles_sum_capacity_v1"
