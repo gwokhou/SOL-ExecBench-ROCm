@@ -239,12 +239,7 @@ def _compare_workload(
         path_names,
         DifferenceCategory.EXTRACTION_TOPOLOGY_LOSS,
     )
-    model_io = _section(
-        _model_io(left),
-        _model_io(right),
-        path_names,
-        DifferenceCategory.RESOURCE_MODEL_BUG,
-    )
+    model_io = _model_io_section(left, right, path_names)
     resources = _resource_section(left, right, path_names)
     fusion = _section(
         _fusion_intermediates(left),
@@ -436,6 +431,25 @@ def _model_io(item: _WorkloadArtifacts) -> dict[str, object]:
             "fused_bytes",
         )
     }
+
+
+def _model_io_section(
+    left: _WorkloadArtifacts,
+    right: _WorkloadArtifacts,
+    path_names: tuple[str, str],
+) -> ComparisonSection:
+    left_value = _model_io(left)
+    right_value = _model_io(right)
+    fused_matches = all(
+        left_value[key] == right_value[key]
+        for key in ("fused_elements", "fused_bytes")
+    )
+    category = (
+        DifferenceCategory.DIALECT_DECOMPOSITION_DIFFERENCE
+        if fused_matches
+        else DifferenceCategory.RESOURCE_MODEL_BUG
+    )
+    return _section(left_value, right_value, path_names, category)
 
 
 def _mandatory_resources(item: _WorkloadArtifacts) -> dict[str, object]:

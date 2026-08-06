@@ -91,6 +91,62 @@ def test_run_solar_worker_accepts_nested_orojenesis_evidence(
     assert outcome.is_formal_publication
 
 
+def test_run_solar_worker_accepts_reviewed_torchview_auxiliary_graphs(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    def fake_run(command, stdout_path, stderr_path, **kwargs):
+        del stdout_path, stderr_path, kwargs
+        payload = _formal_payload()
+        payload["artifacts"].extend(
+            [
+                {
+                    "path": "af_einsum_graph.yaml",
+                    "sha256": "c" * 64,
+                },
+                {
+                    "path": "einsum_graph_renamed.yaml",
+                    "sha256": "d" * 64,
+                },
+            ],
+        )
+        Path(command[-1]).write_text(json.dumps(payload))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner, "run_in_process_group_to_files", fake_run)
+
+    outcome = runner.run_solar_worker(_request(tmp_path))
+
+    assert outcome.status == "analyzed"
+    assert outcome.is_formal_publication
+
+
+def test_run_solar_worker_rejects_torchview_auxiliary_graph_on_aten_path(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    def fake_run(command, stdout_path, stderr_path, **kwargs):
+        del stdout_path, stderr_path, kwargs
+        payload = _formal_payload()
+        payload["ir_path"] = "make_fx_aten"
+        payload["artifacts"][1]["path"] = "aten_graph.yaml"
+        payload["artifacts"].append(
+            {
+                "path": "einsum_graph_renamed.yaml",
+                "sha256": "c" * 64,
+            },
+        )
+        Path(command[-1]).write_text(json.dumps(payload))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(runner, "run_in_process_group_to_files", fake_run)
+
+    outcome = runner.run_solar_worker(_request(tmp_path))
+
+    assert outcome.status == "failed"
+    assert outcome.reason_code == "worker_response_invalid"
+
+
 def test_run_solar_worker_rejects_unexpected_formal_artifact(
     tmp_path,
     monkeypatch,

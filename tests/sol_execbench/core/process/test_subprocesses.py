@@ -220,6 +220,44 @@ def test_file_runner_cleans_successful_leader_descendants(
     assert _wait_for_process_exit(int(child_pid_path.read_text()))
 
 
+def test_file_runner_cleans_up_on_keyboard_interrupt(tmp_path, monkeypatch):
+    pid_path = tmp_path / "file-leader.pid"
+    program = (
+        "import os, pathlib, time; "
+        f"pathlib.Path({str(pid_path)!r}).write_text(str(os.getpid())); "
+        "time.sleep(60)"
+    )
+    real_wait = subprocesses._wait_for_exit_without_reaping
+    first_wait = True
+
+    def interrupt_once(process, timeout):
+        nonlocal first_wait
+        if not first_wait:
+            return real_wait(process, timeout)
+        first_wait = False
+        deadline = time.monotonic() + 2
+        while not pid_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        subprocesses,
+        "_wait_for_exit_without_reaping",
+        interrupt_once,
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_in_process_group_to_files(
+            (sys.executable, "-c", program),
+            tmp_path / "stdout.log",
+            tmp_path / "stderr.log",
+            cwd=tmp_path,
+            timeout=5,
+        )
+
+    assert _wait_for_process_exit(int(pid_path.read_text()))
+
+
 def test_group_signal_is_disabled_after_leader_is_reaped(monkeypatch):
     process = subprocess.Popen(
         (sys.executable, "-c", "pass"),

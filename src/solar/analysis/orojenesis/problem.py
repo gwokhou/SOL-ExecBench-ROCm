@@ -8,7 +8,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from math import prod
 
-from solar.analysis.orojenesis.configuration import OROJENESIS_MAPPER_THREADS
+from solar.analysis.orojenesis.configuration import (
+    orojenesis_mapper_thread_count,
+)
 from solar.analysis.orojenesis.errors import OrojenesisError
 from solar.ir.contracts import layer_operation
 from solar.types import DynamicValue
@@ -40,14 +42,29 @@ def compulsory_witness_streaming_dimension(
     target = str(proof_source.get("target") or "")
     equation = str(semantic.get("equation") or "")
     effects = semantic.get("effects") or {}
-    pure = bool(
-        proof_source.get("kind") == "aten"
+    source_kind = str(proof_source.get("kind") or "")
+    aten_pure = bool(
+        source_kind == "aten"
         and effects.get("mutates") in (False, [])
         and not effects.get("aliases")
         and not effects.get("atomic")
         and not effects.get("opaque_library_call")
-        and dimensions
     )
+    extended_native_pure = bool(
+        source_kind == "extended_native"
+        and target in _DIRECT_CONVOLUTION_EQUATIONS
+        and effects
+        in (
+            {},
+            {
+                "mutates": [],
+                "aliases": [],
+                "atomic": False,
+                "opaque_library_call": True,
+            },
+        )
+    )
+    pure = bool((aten_pure or extended_native_pure) and dimensions)
     if not pure:
         return None
     if equation in _DIRECT_CONVOLUTION_EQUATIONS.get(target, ()):
@@ -488,6 +505,6 @@ def _mapper_policy() -> dict[str, DynamicValue]:
         "victory-condition": 0,
         "timeout": 0,
         "log-oaves": True,
-        "num-threads": OROJENESIS_MAPPER_THREADS,
+        "num-threads": orojenesis_mapper_thread_count(),
         "log-oaves-mappings": False,
     }

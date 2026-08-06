@@ -143,6 +143,59 @@ def test_reviewed_direct_convolutions_gain_exact_proof_views(
     assert proof["semantic_op"]["equation"] == equation
 
 
+def test_default_extended_native_conv_gains_the_same_exact_proof_view() -> None:
+    layer = _aten_layer(
+        "conv2d",
+        [[2, 3, 8, 8], [5, 3, 3, 3], [5]],
+        [2, 5, 6, 6],
+    )
+    layer["semantic_op"] = {
+        "kind": "operation",
+        "target": "conv2d",
+        "operands": [{"tensor": 0}, {"tensor": 1}, {"tensor": 2}],
+        "attributes": {},
+        "effects": {
+            "mutates": [],
+            "aliases": [],
+            "atomic": False,
+            "opaque_library_call": True,
+        },
+    }
+
+    proof = build_orojenesis_proof_layer(layer, analyzer=EinsumAnalyzer())
+
+    assert proof is not None
+    assert proof["tensor_shapes"]["inputs"] == [
+        [2, 3, 8, 8],
+        [5, 3, 3, 3],
+    ]
+    assert proof["semantic_op"]["equation"] == "BC(P+R)(Q+S),OCRS->BOPQ"
+    assert proof["semantic_op"]["proof_source"] == {
+        "kind": "extended_native",
+        "target": "conv2d",
+    }
+    assert proof["semantic_op"]["effects"]["opaque_library_call"] is True
+
+
+def test_nondefault_extended_native_conv_remains_fail_closed() -> None:
+    layer = _aten_layer(
+        "conv2d",
+        [[2, 3, 8, 8], [5, 3, 3, 3]],
+        [2, 5, 4, 4],
+    )
+    layer["semantic_op"] = {
+        "kind": "operation",
+        "target": "conv2d",
+        "operands": [{"tensor": 0}, {"tensor": 1}],
+        "attributes": {"stride": [2, 2]},
+        "effects": {},
+    }
+
+    assert (
+        build_orojenesis_proof_layer(layer, analyzer=EinsumAnalyzer()) is None
+    )
+
+
 @pytest.mark.parametrize(
     "arguments",
     [

@@ -1,6 +1,7 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-05; CPU readiness updated through current HEAD.
+Last audited: 2026-08-06; CPU and local-evidence readiness updated through
+current HEAD.
 
 This file is the single backlog for repository-level work that remains useful.
 Completed investigations, superseded contracts, acceptance attempts, and
@@ -13,27 +14,42 @@ describe the current contract rather than duplicate this backlog.
   compatibility sentinel, and one target-incompatible problem. The official
   `rx9060xt-gfx1200-reference-v2` score remains unavailable because its
   publisher-authored release evidence has not been published.
+- A complete local gfx1200 v2 publication candidate now exists at source
+  revision `36e44fb6`: all 163 locked-clock baseline records pass, and the
+  current verifier accepts both the 163-workload baseline statement and the
+  163-workload `make_fx_aten` SOLAR statement. These ignored local artifacts
+  are not publisher authority and are not an official release.
 - The current performance-diagnostic family is v7, with BenchmarkConfig v2,
   reference IPC v2, and ROCm event timing v4. There are no compatibility
   readers for the superseded timing or diagnostic schemas.
-- The last governed gfx1200 v7 cycle completed calibration, 440 development
-  cases, frozen inference, and 220 pair-disjoint held-out cases. Its acceptance
-  result was deliberately rejected, not incomplete: median APE 3.303951%, P90
-  APE 15.186039%, `composite_graph` coverage 0.70, and `concurrent_graph`
-  coverage 0.85. The required per-family coverage is 0.90.
-- That local cycle is no longer current admission authority. Its recorded
-  `prediction.py` and `inference.py` policy hashes differ from the current tree
-  after later contract/helper consolidation. The ignored artifacts remain
-  useful only as governed source evidence for a newly built cycle.
+- The last statistically evaluated gfx1200 v7 cycle completed calibration, 440
+  development cases, frozen inference, and 220 pair-disjoint held-out cases. It
+  failed the preregistered coverage gates: median APE 3.303951%, P90 APE
+  15.186039%, `composite_graph` coverage 0.70, and `concurrent_graph` coverage
+  0.85, against a required per-family coverage of 0.90.
+- Cycle 2 promoted all 660 prior development and revealed held-out cases to
+  development, preregistered the fresh universe beginning at 160, froze the
+  inference profile, and collected all 220 fresh held-out cases with both
+  SOLAR and performance evidence. Acceptance was input-invalid, not a
+  statistical rejection: four `elementwise` and all twenty `transformer_block`
+  cases selected a calibration tier using accumulated hardware traffic as the
+  working-set coordinate and exceeded the registered range.
+- Hardware prediction now keeps counter-derived traffic as the byte amount but
+  uses SOLAR semantic bytes as the working-set coordinate. This changes the
+  model policy identity after held-out reveal, so Cycle 2 cannot be repaired or
+  accepted retrospectively; its ignored artifacts are source evidence only.
 - Candidate inputs now use per-run entropy and per-invocation trusted-reference
   validation. The candidate process does not receive the nonce or expected
   outputs. Publication runs additionally use the networkless, capability-free,
   private-IPC Docker boundary described in the evaluator contract.
-- The current focused SOLAR readiness set is 41/41 on both extraction paths.
-  The last repository-owned accounting comparison covers only the earlier 32
-  dual-ready workloads. Four additional Torchview failures are backward
-  references whose gradient dependencies cannot be represented by the
-  forward-only Torchview extractor.
+- The focused SOLAR comparison completed all 82 path analyses for 41 unique
+  workloads. Coverage is complete on both extraction paths: 27 workloads match
+  with legitimate dialect/decomposition differences and 14 remain different
+  because of normalization differences. There are no external-I/O or fused-I/O
+  accounting mismatches and no remaining resource-model-bug classification.
+  Four additional Torchview failures remain outside this denominator because
+  their backward references cannot be represented by the forward-only
+  extractor.
 - Real-device evidence is strongest on one RX 9060 XT/gfx1200 host. Multi-GPU
   isolation and CDNA-family behavior have contract/unit coverage but narrower
   empirical coverage.
@@ -49,10 +65,18 @@ The formula, verifier, release builder, corpus pin, and baseline identity exist,
 but the manifest correctly fails closed with
 `baseline_v2_release_evidence_pending`.
 
-CPU preparation is closed: the release builder deterministically validates and
-plans the exact 43-problem/163-workload denominator. The remaining work is the
-GPU measurement and publisher-authorized release operation; a locally built
-plan or bundle is not publication evidence.
+CPU preparation and the local GPU candidate are closed. At source revision
+`36e44fb6`, the exact 43-problem/163-workload baseline run is complete with all
+records passing under locked clocks, and the current verifier accepts its
+baseline and 163-workload formal-SOLAR statements. The bundled corpus hash is
+identical to the current manifest.
+
+The remaining work is the publisher-authorized release operation. The existing
+candidate is ignored local evidence, binds a revision before the current HEAD,
+and cannot authorize the manifest. A publisher must either adopt that exact
+revision and its verified artifacts consistently or rebuild the release under
+the revision it intends to publish; a locally built plan, statement, or bundle
+is not publication evidence.
 
 Completion requires a publisher-authored, content-addressed baseline bundle for
 the exact 43-problem/163-workload scored denominator, locked-clock measurement
@@ -67,28 +91,23 @@ Authoritative surfaces:
 - `docs/SCORING-V3.md`
 - `docs/user/RELEASE-SCORING.md`
 
-### P1 — Start a new governed performance-diagnostic cycle
+### P1 — Start Cycle 3 after the Cycle 2 input invalidation
 
-Do not tune against the revealed v7 held-out set or reuse its frozen inference
-and acceptance artifacts. Rebuild diagnostics from the source evidence under
-the current policy identity, promote the revealed cases to development,
-preregister a fresh pair-disjoint held-out universe, freeze the model and action
-thresholds before reading it, then recollect and run the same acceptance gates.
-The immediate modeling gaps are the under-covered `composite_graph` and
-`concurrent_graph` families; changing gates or reusing held-out pairs is not an
-acceptable fix.
+Do not tune against either revealed held-out set or reuse either frozen
+inference/acceptance artifact. Promote the 220 revealed Cycle 2 pairs to
+development, preregister a fresh pair-disjoint universe, and rebuild the model
+under the current policy identity. Freeze the model and action thresholds
+before collecting or reading the new held-out evidence, then run the same
+acceptance gates. Changing gates, excluding the 24 exposed cases, or reusing
+held-out pairs is not an acceptable fix.
 
-CPU preparation is closed. The authoring command now preregisters an explicit
-fresh universe, regenerates every later stage from the typed frozen design,
-loads all eleven templates from package resources, emits a versioned CPU
-preflight artifact, and content-verifies promotion of the prior development
-then held-out corpora. The documented cycle-2 start is 160, disjoint from the
-prior 100--159 universe.
-
-Remaining work requires governed GPU time: collect fresh SOLAR and performance
-evidence, freeze the current-policy model before reading the new held-out set,
-then run acceptance. The prior rejected acceptance remains evidence, not a
-model or threshold input.
+Cycle 2 GPU collection itself is complete: every one of the eleven families has
+20 content-addressed SOLAR manifests and 20 performance-evidence manifests.
+The working-set/traffic feature asymmetry is fixed in production with a focused
+regression test, but that post-reveal code change invalidates the Cycle 2 frozen
+identity. A CPU preflight should first prove every newly generated development
+case produces an available prediction under the corrected feature contract;
+only then is governed GPU time justified for the fresh 220-case held-out set.
 
 Completion requires all eleven families to meet at least 90% empirical interval
 coverage, median APE at most 15%, P90 APE at most 30%, and every enabled action
@@ -102,30 +121,6 @@ Authoritative surfaces:
 - `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
 - `scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py`
 
-### P1 — Refresh the dual-path SOLAR accounting comparison
-
-Regenerate both extraction roots for the current 41-workload dual-ready set and
-run `sol-execbench solar compare-paths`. Publish a repository-owned comparison
-whose coverage denominator is 41, with verified artifact hashes and conversion
-attestations. Do not generalize the older 32-workload accounting result.
-
-The four backward-reference Torchview cases are an explicit extraction boundary,
-not part of this 41-workload refresh. Supporting them would require a separately
-approved backward-graph contract rather than weakening the fail-closed result.
-
-CPU preparation is closed. The focused runner's `--check` mode validates the
-exact eight scored problems and 41 unique workloads.
-The same runner fixes both IR paths, supports per-workload resume, requires all
-82 worker results to be formal publications, and invokes the hash-verifying
-comparator only after full success. Remaining work is the 82-analysis GPU run
-and publication of its generated comparison.
-
-Authoritative surfaces:
-
-- `docs/user/CROSS-PATH-COMPARISON.md`
-- `src/sol_execbench/core/solar_bridge/path_comparison.py`
-- `src/sol_execbench/core/solar_bridge/corpus_readiness.py`
-
 ### P1 — Expand empirical hardware and isolation coverage
 
 The executable tests and exact skip boundaries are now present. The remaining
@@ -135,11 +130,6 @@ hardware queue is:
   `test_real_multi_gpu_candidate_device_switch_is_rejected` with at least two
   visible ROCm GPUs. `HIP_VISIBLE_DEVICES=0` or any equivalent single-device
   restriction does not satisfy the prerequisite.
-- Native constructor defense: run
-  `test_native_constructor_elapsed_time_patch_is_detected` with a visible ROCm
-  GPU, ROCm development headers, and the real HIP/PyTorch extension toolchain.
-  The test links a `.hip` translation unit and restores the sealed method after
-  the adversarial constructor check.
 - Historical gfx942 timeouts: reacquire the archived dataset and source context
   for revision `d56fadca`, then rerun on exact gfx942. The unresolved cases are
   `FlashInfer-Bench/014_gqa_paged_prefill_causal_h32_kv4_d128_ps1` (one),

@@ -115,10 +115,15 @@ def _arithmetic_specs() -> list[NativeOpSpec]:
         ),
         _spec("div", aliases=("__truediv__", "__rtruediv__"), inputs=(1, 2)),
         _spec("pow", aliases=("__pow__", "__rpow__"), inputs=(1, 2)),
-        _spec("matmul", inputs=(2, 2)),
+        _spec(
+            "matmul",
+            aliases=("__matmul__", "__rmatmul__"),
+            inputs=(2, 2),
+        ),
         _spec("mm", inputs=(2, 2), resource_rule_key="matmul"),
         _spec("bmm", inputs=(2, 2), resource_rule_key="matmul"),
         _spec("addmm", inputs=(3, 3), resource_rule_key="matmul"),
+        _spec("clamp", aliases=("clip",), attributes=("min", "max")),
     ]
 
 
@@ -391,9 +396,21 @@ def _compatibility_elementwise_specs() -> list[NativeOpSpec]:
         "prod",
         "sum",
     }
+    aliases = {
+        "bitwise_and": ("__and__", "__rand__"),
+        "bitwise_not": ("__invert__",),
+        "eq": ("__eq__",),
+        "ge": ("__ge__",),
+        "gt": ("__gt__",),
+        "le": ("__le__",),
+        "lt": ("__lt__",),
+        "ne": ("__ne__",),
+        "neg": ("__neg__",),
+    }
     return [
         _spec(
             target,
+            aliases=aliases.get(target, ()),
             outputs=(1, 2) if target in {"max", "min"} else (1, 1),
         )
         for target in sorted(unary | comparisons | reductions)
@@ -415,6 +432,7 @@ def _compatibility_functional_specs() -> list[NativeOpSpec]:
         "mish",
         "nll_loss",
         "relu",
+        "softplus",
     }
     functional_attributes = {
         "batch_norm": (
@@ -441,6 +459,7 @@ def _compatibility_functional_specs() -> list[NativeOpSpec]:
             "reduce",
             "reduction",
         ),
+        "softplus": ("beta", "threshold"),
     }
     return [
         _spec(
@@ -500,6 +519,11 @@ def _compatibility_library_specs() -> list[NativeOpSpec]:
             executor="special",
         ),
         _spec("masked_fill", executor="method"),
+        *(
+            _spec(target, executor="method")
+            for target in ("bfloat16", "float", "half", "int", "long")
+        ),
+        _spec("ones_like"),
         _spec("to", executor="method"),
         _spec("type_as", inputs=(2, 2), executor="method"),
         _spec("cumsum"),

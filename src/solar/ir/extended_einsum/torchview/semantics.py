@@ -39,7 +39,12 @@ def _plain_value(value: Any) -> Any:
 
 
 def _canonical_target(layer: Mapping[str, Any]) -> str:
-    raw = str(layer.get("type", "")).lower().rsplit(".", maxsplit=1)[-1]
+    module_args = layer.get("module_args") or {}
+    raw = (
+        str(module_args.get("function_name") or layer.get("type", ""))
+        .lower()
+        .rsplit(".", maxsplit=1)[-1]
+    )
     output_count = len(
         (layer.get("tensor_names") or {}).get("outputs") or [],
     )
@@ -164,6 +169,8 @@ def build_semantic_operation(layer: Mapping[str, Any]) -> dict[str, Any]:
     target = _canonical_target(layer)
     if target in {"flip", "roll"} and "dim" in attributes:
         attributes["dims"] = attributes.pop("dim")
+    if target == "reshape" and len(operands) > 2 and "shape" not in attributes:
+        operands = [operands[0], operands[1:]]
     if (
         layer.get("is_real_einsum") is True
         and layer.get("einsum_equation")

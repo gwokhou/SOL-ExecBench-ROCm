@@ -65,8 +65,13 @@ def _patch_release_inputs(
 ) -> None:
     monkeypatch.setattr(
         release_solar_runner,
-        "_available_physical_cpu_count",
-        lambda: 16,
+        "available_formal_mapper_logical_cpu_count",
+        lambda: 64,
+    )
+    monkeypatch.setattr(
+        release_solar_runner,
+        "formal_mapper_thread_count",
+        lambda: 32,
     )
     monkeypatch.setattr(
         release_solar_runner.AKACorpusManifest,
@@ -285,40 +290,19 @@ def test_release_rejects_nonpositive_jobs_before_running(
         )
 
 
-def test_available_physical_cpu_count_respects_affinity(
-    tmp_path: Path,
-) -> None:
-    topology_root = tmp_path / "cpu"
-    for cpu_id, core_id in ((0, 0), (1, 0), (2, 1), (3, 1)):
-        topology = topology_root / f"cpu{cpu_id}" / "topology"
-        topology.mkdir(parents=True)
-        (topology / "physical_package_id").write_text("0\n")
-        (topology / "core_id").write_text(f"{core_id}\n")
-
-    assert (
-        release_solar_runner._available_physical_cpu_count(
-            cpu_ids=frozenset({0, 1, 2, 3}),
-            topology_root=topology_root,
-        )
-        == 2
-    )
-    assert (
-        release_solar_runner._available_physical_cpu_count(
-            cpu_ids=frozenset({1, 2}),
-            topology_root=topology_root,
-        )
-        == 2
-    )
-
-
 def test_release_rejects_jobs_above_mapper_cpu_budget(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         release_solar_runner,
-        "_available_physical_cpu_count",
-        lambda: 16,
+        "available_formal_mapper_logical_cpu_count",
+        lambda: 64,
+    )
+    monkeypatch.setattr(
+        release_solar_runner,
+        "formal_mapper_thread_count",
+        lambda: 32,
     )
 
     with pytest.raises(ValueError, match="jobs 3 exceed the safe limit 2"):
@@ -331,30 +315,30 @@ def test_release_rejects_jobs_above_mapper_cpu_budget(
 
 
 @pytest.mark.parametrize(
-    ("physical_cores", "maximum_jobs", "remaining_cores"),
+    ("logical_cpus", "maximum_jobs", "remaining_cpus"),
     (
-        pytest.param(7, 1, 7, id="fewer-than-one-mapper"),
-        pytest.param(8, 1, 0, id="one-exact-mapper"),
-        pytest.param(15, 1, 7, id="one-mapper-with-remainder"),
-        pytest.param(16, 2, 0, id="two-exact-mappers"),
-        pytest.param(20, 2, 4, id="two-mappers-with-remainder"),
-        pytest.param(24, 3, 0, id="three-exact-mappers"),
+        pytest.param(31, 1, 31, id="fewer-than-one-mapper"),
+        pytest.param(32, 1, 0, id="one-exact-mapper"),
+        pytest.param(63, 1, 31, id="one-mapper-with-remainder"),
+        pytest.param(64, 2, 0, id="two-exact-mappers"),
+        pytest.param(80, 2, 16, id="two-mappers-with-remainder"),
+        pytest.param(96, 3, 0, id="three-exact-mappers"),
     ),
 )
 def test_safe_release_jobs_limit_uses_only_complete_mapper_slots(
-    physical_cores: int,
+    logical_cpus: int,
     maximum_jobs: int,
-    remaining_cores: int,
+    remaining_cpus: int,
 ) -> None:
-    assert release_solar_runner._safe_release_jobs_limit(physical_cores) == (
-        maximum_jobs,
-        remaining_cores,
-    )
+    assert release_solar_runner._safe_release_jobs_limit(
+        logical_cpus,
+        mapper_threads=32,
+    ) == (maximum_jobs, remaining_cpus)
 
 
-def test_safe_release_jobs_limit_rejects_nonpositive_core_count() -> None:
-    with pytest.raises(ValueError, match="physical CPU cores must be positive"):
-        release_solar_runner._safe_release_jobs_limit(0)
+def test_safe_release_jobs_limit_rejects_nonpositive_cpu_count() -> None:
+    with pytest.raises(ValueError, match="logical CPUs must be positive"):
+        release_solar_runner._safe_release_jobs_limit(0, mapper_threads=32)
 
 
 def test_safe_release_jobs_limit_rejects_nonpositive_mapper_threads() -> None:
@@ -365,33 +349,38 @@ def test_safe_release_jobs_limit_rejects_nonpositive_mapper_threads() -> None:
         )
 
 
-def test_jobs_limit_reports_nondivisible_core_remainder(
+def test_jobs_limit_reports_nondivisible_cpu_remainder(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         release_solar_runner,
-        "_available_physical_cpu_count",
-        lambda: 20,
+        "available_formal_mapper_logical_cpu_count",
+        lambda: 80,
+    )
+    monkeypatch.setattr(
+        release_solar_runner,
+        "formal_mapper_thread_count",
+        lambda: 32,
     )
 
     with pytest.raises(
         ValueError,
-        match="safe limit 2.*leaving 4 physical cores",
+        match="safe limit 2.*leaving 16 logical CPUs",
     ):
         release_solar_runner._validate_release_jobs(3)
 
 
-def test_parallel_release_fails_closed_without_cpu_topology(
+def test_parallel_release_fails_closed_without_cpu_detection(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         release_solar_runner,
-        "_available_physical_cpu_count",
+        "available_formal_mapper_logical_cpu_count",
         lambda: None,
     )
 
-    with pytest.raises(ValueError, match="physical CPU cores could not"):
+    with pytest.raises(ValueError, match="logical CPUs could not"):
         release_solar_runner.build_release_solar_manifests(
             tmp_path / "release",
             corpus_manifest_path=tmp_path / "manifest.yaml",

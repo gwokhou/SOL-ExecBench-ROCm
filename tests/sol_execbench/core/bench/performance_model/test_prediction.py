@@ -203,6 +203,34 @@ def test_predictions_are_deterministic_and_exclude_measured_duration() -> None:
     assert hw.predicted_time_ms == pytest.approx(1.034)
 
 
+def test_hw_memory_tier_uses_semantic_working_set_not_counter_traffic() -> None:
+    semantic = _semantic()
+    calibration = _calibration()
+    traffic_bytes = float(2**21)
+    dispatch = DispatchEvidence(
+        workload_uuid="workload-1",
+        candidate_sha256="c" * 64,
+        dispatch_id="1",
+        queue_id="0",
+        kernel_symbol="kernel",
+        grid=(32, 1, 1),
+        workgroup=(32, 1, 1),
+        iteration_ordinal=0,
+        counter_passes=[1],
+        counters={"FETCH_SIZE": traffic_bytes},
+    )
+
+    result = predict_hw(semantic, [], [dispatch], calibration)
+
+    assert result.status is not DiagnosticSidecarStatus.UNAVAILABLE
+    memory = next(
+        component
+        for component in result.components
+        if component.name == "memory"
+    )
+    assert memory.time_ms == pytest.approx(traffic_bytes / 2_000.0)
+
+
 def test_hw_prediction_matches_static_mangled_symbol_and_warm_gl2_traffic() -> (
     None
 ):

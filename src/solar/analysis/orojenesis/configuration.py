@@ -1,5 +1,7 @@
 """Pinned Orojenesis toolchain and composition configuration."""
 
+import os
+
 from solar.analysis.orojenesis.identity import OrojenesisIdentityPolicy
 
 OROJENESIS_COMMIT = "97d52178bf9a9c209bf79be96b87c164bcd35625"
@@ -28,7 +30,7 @@ OROJENESIS_TRUSTED_MAPPER_SHA256: frozenset[str] = frozenset(
     {"18591892b1ecec3264ec729b0e457ec9f22422993f656ece40dba809c032d77a"},
 )
 OROJENESIS_PROVENANCE_FILENAME = "orojenesis-provenance.json"
-OROJENESIS_MAPPER_THREADS = 8
+OROJENESIS_FALLBACK_MAPPER_THREADS = 1
 
 MULTI_EINSUM_SOLVER = "NVlabs/Orojenesis tiled-fusion"
 MULTI_EINSUM_COMPOSITION = "linear_matmul_compatible_tiles_sum_capacity_v1"
@@ -50,3 +52,31 @@ IDENTITY_POLICY = OrojenesisIdentityPolicy(
     provenance_filename=OROJENESIS_PROVENANCE_FILENAME,
     trusted_mapper_sha256=OROJENESIS_TRUSTED_MAPPER_SHA256,
 )
+
+
+def available_logical_cpu_count(
+    *,
+    cpu_ids: frozenset[int] | None = None,
+) -> int | None:
+    """Return logical CPUs available to this process, respecting affinity."""
+    available = _process_cpu_ids() if cpu_ids is None else cpu_ids
+    return len(available) or None
+
+
+def orojenesis_mapper_thread_count(
+    *,
+    cpu_ids: frozenset[int] | None = None,
+) -> int:
+    """Use all process-visible logical CPUs, with a conservative fallback."""
+    return (
+        available_logical_cpu_count(cpu_ids=cpu_ids)
+        or OROJENESIS_FALLBACK_MAPPER_THREADS
+    )
+
+
+def _process_cpu_ids() -> frozenset[int]:
+    try:
+        return frozenset(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        logical_cpus = os.cpu_count()
+        return frozenset(range(logical_cpus)) if logical_cpus else frozenset()
