@@ -1,7 +1,7 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-06; CPU and local-evidence readiness updated through
-current HEAD.
+Last audited: 2026-08-07 against source revision `ed04a4a2`; CPU and
+local-evidence readiness were rechecked at that revision.
 
 This file is the single backlog for repository-level work that remains useful.
 Completed investigations, superseded contracts, acceptance attempts, and
@@ -14,11 +14,16 @@ describe the current contract rather than duplicate this backlog.
   compatibility sentinel, and one target-incompatible problem. The official
   `rx9060xt-gfx1200-reference-v2` score remains unavailable because its
   publisher-authored release evidence has not been published.
-- A complete local gfx1200 v2 publication candidate now exists at source
-  revision `36e44fb6`: all 163 locked-clock baseline records pass, and the
-  current verifier accepts both the 163-workload baseline statement and the
-  163-workload `make_fx_aten` SOLAR statement. These ignored local artifacts
-  are not publisher authority and are not an official release.
+- Local gfx1200 v2 baseline and SOLAR publication inputs exist under the ignored
+  `data/outputs/p0-release-36e44fb/` root at source revision `36e44fb6`: all 163
+  locked-clock baseline records pass, and the current verifier accepts both the
+  163-workload baseline statement and the 163-workload `make_fx_aten` SOLAR
+  statement. The root has no candidate statement or assembled
+  `release-bundle.json`; it is not a complete official-score release and is not
+  publisher authority. The baseline-statement SHA-256 is
+  `b6da525d0bf493476ee7df44f7f3691df3cb9ca81a70700f35062a70c96ef92b`
+  and the SOLAR-statement SHA-256 is
+  `4c85d5e223ebd6f84e52a2d7f21da2fdf776f0cebbcc371b09b0f3fe7b8e6d9b`.
 - The current performance-diagnostic family is v7, with BenchmarkConfig v2,
   reference IPC v2, and ROCm event timing v4. There are no compatibility
   readers for the superseded timing or diagnostic schemas.
@@ -30,10 +35,17 @@ describe the current contract rather than duplicate this backlog.
 - Cycle 2 promoted all 660 prior development and revealed held-out cases to
   development, preregistered the fresh universe beginning at 160, froze the
   inference profile, and collected all 220 fresh held-out cases with both
-  SOLAR and performance evidence. Acceptance was input-invalid, not a
-  statistical rejection: four `elementwise` and all twenty `transformer_block`
-  cases selected a calibration tier using accumulated hardware traffic as the
-  working-set coordinate and exceeded the registered range.
+  SOLAR and performance evidence. The prior 660-case corpus is under the
+  ignored `data/outputs/microarchitecture-diagnostics-v7/` root and the Cycle 2
+  inference and held-out corpus are under the ignored
+  `data/outputs/microarchitecture-diagnostics-v7-cycle2/` root. Their
+  development and held-out corpus SHA-256 values are respectively
+  `a0a3a5b24eb620d76ade646d64a7219dc6c53b6cd31f66e7ef6a64dd17ef7a7a`
+  and `3fe7797229d180d0f824f14866b6aaaca5cc4940050960fbf896045f9f5a2b4b`.
+  Acceptance was input-invalid, not a statistical rejection: four
+  `elementwise` and all twenty `transformer_block` cases selected a calibration
+  tier using accumulated hardware traffic as the working-set coordinate and
+  exceeded the registered range.
 - Hardware prediction now keeps counter-derived traffic as the byte amount but
   uses SOLAR semantic bytes as the working-set coordinate. This changes the
   model policy identity after held-out reveal, so Cycle 2 cannot be repaired or
@@ -45,8 +57,14 @@ describe the current contract rather than duplicate this backlog.
 - The focused SOLAR comparison completed all 82 path analyses for 41 unique
   workloads. Coverage is complete on both extraction paths: 27 workloads match
   with legitimate dialect/decomposition differences and 14 remain different
-  because of normalization differences. There are no external-I/O or fused-I/O
-  accounting mismatches and no remaining resource-model-bug classification.
+  because of normalization differences. Review found no external-reference-I/O
+  defect and no remaining resource-model-bug classification; raw
+  fusion/intermediate and mandatory-work differences are classified as dialect,
+  decomposition, or normalization effects rather than silently treated as
+  equal. The ignored report is
+  `data/outputs/solar-cross-path-focus-cycle2-c84869e/path-comparison.json`,
+  SHA-256
+  `7329cf39ad86937fd19a88a9b9ee39c9597ebf33ff244a2d660588c341765b60`.
   Four additional Torchview failures remain outside this denominator because
   their backward references cannot be represented by the forward-only
   extractor.
@@ -59,28 +77,41 @@ describe the current contract rather than duplicate this backlog.
 
 ## Active backlog
 
-### P0 — Publish the official gfx1200 v2 scoring baseline
+### P0 — Authorize gfx1200 v2 scoring and publish its first release
 
 The formula, verifier, release builder, corpus pin, and baseline identity exist,
 but the manifest correctly fails closed with
 `baseline_v2_release_evidence_pending`.
 
-CPU preparation and the local GPU candidate are closed. At source revision
-`36e44fb6`, the exact 43-problem/163-workload baseline run is complete with all
-records passing under locked clocks, and the current verifier accepts its
-baseline and 163-workload formal-SOLAR statements. The bundled corpus hash is
-identical to the current manifest.
+CPU preparation and the local GPU source-evidence run are closed. At source
+revision `36e44fb6`, the exact 43-problem/163-workload baseline run is complete
+with all records passing under locked clocks, and the current verifier accepts
+its baseline and 163-workload formal-SOLAR statements. The bundled corpus hash
+is identical to the current pending manifest.
 
-The remaining work is the publisher-authorized release operation. The existing
-candidate is ignored local evidence, binds a revision before the current HEAD,
-and cannot authorize the manifest. A publisher must either adopt that exact
-revision and its verified artifacts consistently or rebuild the release under
-the revision it intends to publish; a locally built plan, statement, or bundle
-is not publication evidence.
+The remaining work is a publisher-authorized release rebuild and repository
+cutover. The existing local root binds the pending manifest and revision
+`36e44fb6`. Authorizing scoring changes that manifest and its repository pin,
+so the existing baseline and SOLAR statements cannot be copied unchanged into
+the final bundle. They are source evidence for the publication rebuild, not
+adoptable final statements.
 
-Completion requires a publisher-authored, content-addressed baseline bundle for
-the exact 43-problem/163-workload scored denominator, locked-clock measurement
-evidence, pinned SOLAR manifests, publisher release statements, and successful
+The current release policy is candidate-specific: `release-bundle.json` must
+contain baseline, candidate, and SOLAR statements. A publisher must choose the
+candidate being scored, prepare the final `official_scoring` manifest contract
+(`status: available`, `content_addressed_publisher_v1`, and the canonical three
+required-evidence values), update `OFFICIAL_CORPUS_MANIFEST_SHA256`, and rebuild
+baseline, candidate, and SOLAR evidence from one clean publication revision
+against that exact manifest. The verified complete bundle and every referenced
+artifact must then be distributed under `RELEASE/`, with pending-state docs and
+tests updated in the same publication change. If baseline-only publication is
+desired instead, it requires a separately reviewed contract; the current
+official-score API does not represent it.
+
+Completion requires a publisher-authored, content-addressed official release
+bundle for the exact 43-problem/163-workload scored denominator, including the
+selected candidate, locked-clock baseline and candidate measurement evidence,
+pinned SOLAR manifests, publisher release statements, and successful
 verification through the documented release-scoring workflow. Local diagnostic
 or validation sidecars cannot authorize this score.
 
@@ -94,20 +125,38 @@ Authoritative surfaces:
 ### P1 — Start Cycle 3 after the Cycle 2 input invalidation
 
 Do not tune against either revealed held-out set or reuse either frozen
-inference/acceptance artifact. Promote the 220 revealed Cycle 2 pairs to
-development, preregister a fresh pair-disjoint universe, and rebuild the model
-under the current policy identity. Freeze the model and action thresholds
-before collecting or reading the new held-out evidence, then run the same
-acceptance gates. Changing gates, excluding the 24 exposed cases, or reusing
-held-out pairs is not an acceptable fix.
+inference/acceptance artifact. Combine the existing 660-case promoted
+development corpus with the 220 revealed Cycle 2 pairs into an 880-case Cycle 3
+development corpus, preregister the pair-disjoint universe beginning at 220,
+and rebuild the model under the current policy identity. Freeze the model and
+action thresholds before collecting or reading the new held-out evidence, then
+run the same acceptance gates. Changing gates, excluding the 24 exposed cases,
+or reusing held-out pairs is not an acceptable fix.
 
 Cycle 2 GPU collection itself is complete: every one of the eleven families has
 20 content-addressed SOLAR manifests and 20 performance-evidence manifests.
 The working-set/traffic feature asymmetry is fixed in production with a focused
 regression test, but that post-reveal code change invalidates the Cycle 2 frozen
-identity. A CPU preflight should first prove every newly generated development
-case produces an available prediction under the corrected feature contract;
-only then is governed GPU time justified for the fresh 220-case held-out set.
+identity.
+
+Two CPU prerequisites are not implemented yet and must close before any Cycle 3
+GPU collection:
+
+- Extend governed promotion to verify and combine corpora whose artifacts live
+  under the two distinct ignored roots above. The current `promote` stage
+  accepts exactly one directly rooted development corpus followed by one
+  directly rooted held-out corpus, so it cannot produce the required 880-case
+  Cycle 3 input.
+- Add a versioned prediction-preflight artifact and entrypoint that rebuilds all
+  220 newly promoted Cycle 2 cases with the selected calibration and current
+  model policy, and requires an available prediction for every case. The
+  existing corpus preflight validates authored shapes and collection batches;
+  it does not execute prediction and is not evidence for this gate.
+
+After those gates pass, preregister start 220, freeze inference and action
+thresholds from the verified 880-case development corpus, and only then collect
+or inspect the fresh 220-case held-out set. Governed GPU time is not justified
+before the CPU gates pass.
 
 Completion requires all eleven families to meet at least 90% empirical interval
 coverage, median APE at most 15%, P90 APE at most 30%, and every enabled action
@@ -144,6 +193,25 @@ hardware queue is:
 Completion evidence must identify the exact GPU, ROCm/PyTorch stack, test set,
 and skipped prerequisites; generic schema support is insufficient.
 
+### P2 — Resolve the compressed code-object metadata boundary
+
+Static AMDGPU metadata extraction currently scans bounded gzip/zlib variants of
+clang-offload-bundler Compressed Code Object Bundles (CCOBs). It does not parse
+the CCOB manifest, even though the implementation describes full manifest
+parsing as a documented follow-up.
+
+Either implement bounded CCOB manifest parsing with exact target selection,
+decompression limits, malformed-input handling, and real compressed-bundle
+fixtures, or explicitly classify full CCOB parsing as unsupported and remove
+the follow-up claim. Heuristic embedded-zlib scanning must not be described as
+complete CCOB coverage.
+
+Authoritative surfaces:
+
+- `src/sol_execbench/core/bench/static_kernel/amdgpu_metadata.py`
+- `tests/sol_execbench/core/bench/test_amdgpu_metadata.py`
+- `docs/user/static_kernel_evidence.md`
+
 ## Invariants
 
 - Performance diagnostics never change canonical Trace timing, `T_SOL`, SOL
@@ -172,6 +240,9 @@ uv run --with ruff ruff format --check .
 uv run ty check
 uv run python scripts/check_coupling.py
 uv run python scripts/check_readability.py
+uv run python scripts/check_production_reachability.py
+uv run python scripts/check_non_canonical_artifacts.py
+uv run python scripts/check_python_reuse.py
 uv run pytest tests/
 git diff --check
 ```

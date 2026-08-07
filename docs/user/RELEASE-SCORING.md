@@ -31,6 +31,44 @@ Content hashes prove that bundle artifacts have not changed. They do not prove
 who published a bundle. Publisher authenticity therefore comes from the
 repository or release channel that distributes the bundle.
 
+## Publication cutover
+
+The pending manifest cannot be promoted in place into a final release. Baseline
+plans and statements bind the exact corpus-manifest hash, while authorizing the
+v2 policy changes that manifest and the repository-owned
+`OFFICIAL_CORPUS_MANIFEST_SHA256` pin. Any baseline or SOLAR statement built
+against the pending manifest is reproducibility source evidence only and must
+be rebuilt for the publication revision.
+
+The current `content_addressed_publisher_v1` contract is candidate-specific. A
+complete `release-bundle.json` always binds these three evidence classes:
+
+- `content_addressed_release_baseline`;
+- `content_addressed_candidate_execution`;
+- `pinned_solar_manifests`.
+
+A publisher cutover therefore has the following atomic contract:
+
+1. Select the concrete candidate to score and prepare the final corpus manifest
+   with `status: available`, release policy
+   `content_addressed_publisher_v1`, the canonical baseline ID, and the three
+   required-evidence values above.
+2. Update `OFFICIAL_CORPUS_MANIFEST_SHA256` and all pending-state tests and docs,
+   then establish one clean source revision containing that exact policy.
+3. Build and run baseline, candidate, and SOLAR evidence from that clean
+   revision against the final manifest. All three statements must bind the same
+   source revision and validated runtime environment where required.
+4. Assemble and verify the complete bundle, then distribute
+   `RELEASE/release-bundle.json` and every referenced regular file through the
+   publisher-controlled repository or release channel.
+5. Verify that `sol-execbench score status` reports both policy authorization
+   and the published release, and that `sol-execbench score official` accepts
+   the distributed bundle.
+
+A baseline-and-SOLAR-only directory is not a complete official-score release.
+Publishing a reusable baseline independently would require a separate reviewed
+contract; it is not represented by the current official-score API.
+
 ## Reproduce the formal mapper
 
 Before generating formal manifests, build the pinned mapper twice from the

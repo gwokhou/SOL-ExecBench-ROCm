@@ -77,15 +77,21 @@ fails closed before comparison on any non-formal worker result. Existing
 per-workload directories are skipped only with `--resume`; the final comparator
 then validates their schemas and content hashes.
 
-The last generated repository-owned accounting report covered an earlier
-32-workload subset, so it is historical evidence rather than a result for the
-current denominator. This document intentionally does not preserve that
-snapshot's mismatch counts; use Git history when auditing it.
+The current ignored report at
+`data/outputs/solar-cross-path-focus-cycle2-c84869e/path-comparison.json` covers
+all 82 path analyses for the 41 unique workloads and has SHA-256
+`7329cf39ad86937fd19a88a9b9ee39c9597ebf33ff244a2d660588c341765b60`.
+Twenty-seven workloads have status `matched_with_dialect_differences`;
+fourteen have status `different` because of normalization differences. All 41
+record legitimate dialect/decomposition differences, and the fourteen
+normalization differences remain visible rather than being coerced to equality.
 
-Until a new 41-workload report is generated, no repository-wide equality claim
-may be made for model I/O, mandatory work, internal fusion accounting, limiting
-resource, or formal bounds. The refresh is tracked in the
-[active backlog](../../HANDSOFF.md).
+The report has no external-reference-I/O mismatch and review found no remaining
+resource-model-bug classification. Raw model-I/O, mandatory-work,
+fusion/intermediate, limiting-resource, and formal-bound fields may still differ
+as consequences of the recorded dialect, decomposition, or normalization
+boundary. The report is content-addressed local evidence under the ignored
+`data/outputs/` tree, not publisher release authority.
 
 The four remaining full-corpus Torchview failures are explicit backward
 references in `instruction2triton/rmsnorm_bwd`. They remain fail-closed at graph
