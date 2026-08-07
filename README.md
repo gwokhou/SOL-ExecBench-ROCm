@@ -67,10 +67,12 @@ publication policy requires the pinned Orojenesis toolchain; that is an
 explicit ROCm release constraint, not a claim that the paper mandates this
 tool for every SOLAR use. The architecture audit is packaged and
 content-addressed, with its throttled resource measurements explicitly limited
-to instruction/runtime corroboration. Formal publication remains deliberately
-blocked because no reviewed Orojenesis mapper artifact digest has been added to
-the release allowlist. An executable whose digest is only self-declared by its
-local provenance manifest is rejected:
+to instruction/runtime corroboration. The reproducibly built mapper digest is
+reviewed and present in the release allowlist, so the formal producer reports
+ready. Official scoring remains unavailable because the corpus policy is still
+pending and no repository release bundle has been published. An executable
+whose digest is only self-declared by its local provenance manifest is still
+rejected:
 
 ```bash
 uv run sol-execbench solar analyze \

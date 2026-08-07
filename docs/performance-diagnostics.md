@@ -62,7 +62,8 @@ must come from a bounded, collection-time preregistered and stratified shape
 universe, and their workload/candidate pair IDs must be disjoint.
 
 Freeze that universe before preparing problem templates or collecting any
-case:
+case. The concrete start at 160 below records the completed Cycle 2 design; it
+is not the next fresh universe:
 
 ```bash
 uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
@@ -83,8 +84,8 @@ does not depend on an ignored smoke directory. The versioned preflight output
 validates all 660 authored workloads and produces the deterministic 33-batch
 collection plan without accessing a GPU.
 
-After the previous development and held-out corpora have both been frozen,
-promote them in that exact order as the next cycle's development input:
+For the completed Cycle 2 preparation, the previous development and held-out
+corpora lived beneath one root and were promoted in that exact order:
 
 ```bash
 uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
@@ -94,12 +95,39 @@ uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
   --output PREVIOUS_CORPUS_ROOT/promoted-development-cycle2.json
 ```
 
-Promotion does not copy large evidence. It requires both source corpus files
-and every referenced evidence/SOLAR artifact to remain beneath the same root,
-verifies their SHA-256 values, preserves development-before-held-out ordering,
-and refuses to overwrite an existing output. The new preregistered universe is
-then reserved for fresh held-out collection; it is not read while fitting from
-the promoted development corpus.
+Promotion does not copy large evidence. The current command requires both
+source corpus files and every referenced evidence/SOLAR artifact to remain
+beneath the same root, verifies their SHA-256 values, preserves
+development-before-held-out ordering, and refuses to overwrite an existing
+output. The new preregistered universe is then reserved for fresh held-out
+collection; it is not read while fitting from the promoted development corpus.
+
+### Cycle 3 boundary
+
+Cycle 2 revealed its 220 held-out pairs and was input-invalid after a
+working-set-coordinate model-policy fix. Cycle 3 must therefore combine the
+existing 660-case promoted development corpus with those 220 revealed pairs,
+for 880 development cases, and use the fresh universe beginning at 220.
+
+The current authoring command cannot perform that promotion: the 660-case input
+and Cycle 2 held-out artifacts live under different ignored roots, while
+`promote` accepts exactly two corpus files directly beneath one root. Do not
+copy paths into a hand-authored corpus or treat the existing promotion command
+as Cycle 3-ready. First add a governed cross-root promotion path that verifies
+every content reference and writes one versioned 880-case development corpus.
+
+Cycle 3 also requires a new CPU-only prediction preflight. It must rebuild all
+220 newly promoted Cycle 2 cases from their cited SOLAR and performance
+evidence with the selected calibration and current model policy, write a
+versioned content-addressed result, and fail unless every prediction is
+available. `preflight_rdna4_diagnostic_corpus.py` validates the authored
+660-case universe and collection plan only; passing it does not satisfy the
+prediction gate.
+
+Only after both CPU prerequisites pass may the operator preregister start 220,
+fit and freeze inference plus action thresholds from the 880-case development
+corpus, and collect or inspect the new 220 held-out cases. The exact remaining
+work is tracked in `HANDSOFF.md`.
 
 The current corpus contract derives each pair ID from the evidence-bound
 workload SHA-256 and candidate SHA-256. Authoring re-derives that identity,

@@ -106,6 +106,8 @@ The current sidecar does not establish:
 - Triton ROCm cache capture
 - paper-scale static coverage for the full original benchmark denominator
 - standalone static analysis of arbitrary pre-existing binaries
+- complete clang-offload-bundler Compressed Code Object Bundle (CCOB) manifest
+  parsing and exact per-target member selection
 
 Per-kernel VGPR, SGPR, LDS, scratch, spill, and wavefront-size fields are
 collected into `footprints[]` from routed `roc-objdump` output, or — on ROCm 7.x
@@ -114,6 +116,12 @@ a native pure-Python msgpack parser. `occupancy_estimate_waves_per_cu` stays
 `null` on the metadata path (the note does not carry occupancy); the decision
 layer derives resource pressure from the vgpr/limit ratio instead. Uncovered
 fields stay `null` rather than being speculated.
+
+For compressed bundles, the native parser currently performs bounded
+best-effort gzip/zlib decompression, including a limited scan for embedded zlib
+streams. It does not parse the CCOB manifest and must not be treated as complete
+CCOB coverage. Full manifest parsing or an explicit permanent unsupported
+classification remains tracked in `HANDSOFF.md`.
 
 ## CPU-Safe Coverage
 

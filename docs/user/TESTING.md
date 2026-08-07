@@ -60,8 +60,9 @@ uv run pytest tests/ -m requires_rocm -n 0
 uv run pytest tests/ -m 'requires_rdna4 and cpp' -n 0
 ```
 
-The two isolation debts have exact entrypoints. On a host exposing at least two
-ROCm GPUs (do not constrain it with `HIP_VISIBLE_DEVICES=0`), run:
+The remaining multi-GPU isolation debt has an exact entrypoint. On a host
+exposing at least two ROCm GPUs (do not constrain it with
+`HIP_VISIBLE_DEVICES=0`), run:
 
 ```bash
 uv run pytest \
@@ -69,7 +70,9 @@ uv run pytest \
   -m requires_rocm_gpu -n 0
 ```
 
-For the real HIP translation-unit/dlopen constructor path, run:
+The real HIP translation-unit/dlopen constructor path is a retained regression
+entrypoint rather than an active handoff debt. To reproduce that hardware
+evidence, run:
 
 ```bash
 uv run pytest \
