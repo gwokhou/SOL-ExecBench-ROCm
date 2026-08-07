@@ -106,6 +106,20 @@ describe the current contract rather than duplicate this backlog.
   archive preserves the publication tree, and the real Cycle 3 collection work
   re-promotes and re-projects into the v7 world. The old v6 schema identifier is
   removed with no compatibility reader.
+- A lifecycle orchestrator now automates the monotonic chain with
+  verification-based status: `diagnostics lifecycle run --design <design.json>
+  [--stages ...] [--store-root ...] [--max-attempts N]`, `diagnostics
+  lifecycle status --run <run.json>`, and `diagnostics lifecycle resume --run
+  <run.json>`. The orchestrator owns the DAG, bounded attempts, typed receipts,
+  legal transitions, and an atomic per-generation run-state object
+  (`data/store/runs/<collection_run_id>/run.json`,
+  `sol_execbench.diagnostic_lifecycle_run.v1`). Each stage delegates to a thin
+  handler: the CPU stages (model build, acceptance, publication, release) call
+  the existing production functions, while the collection stages validate the
+  operator-collected evidence and frozen corpora. Status and resume re-verify
+  every recorded stage through the handler; a missing receipt or drifted input
+  is re-executed, never reported complete by file existence. The real GPU
+  collection itself remains operator-run through the corpus authoring script.
 - Candidate inputs now use per-run entropy and per-invocation trusted-reference
   validation. The candidate process does not receive the nonce or expected
   outputs. Publication runs additionally use the networkless, capability-free,
@@ -225,11 +239,13 @@ permissions and is not a durable diagnostic publication workflow.
    recollection, repair, source-policy change, or identity correction must
    create a new `collection_run_id` and `corpus_snapshot_id`; the prior
    generation remains immutable and becomes `superseded`.
-2. **Stage completion is inferred from file existence.** Existing SOLAR or
-   performance manifest files can cause a case stage to return without a
-   complete stage-level receipt. Resume must instead verify a typed receipt,
-   all input identities, and the exact output inventory before treating a case
-   as complete.
+2. **Stage completion is inferred from file existence.** The lifecycle
+   orchestrator now closes this gap at the chain level: `status` and `resume`
+   re-verify a typed receipt, every input identity, and the exact output
+   inventory, and re-execute any stage whose receipt is missing or whose
+   inputs or outputs drifted. Within the corpus authoring script, per-case
+   evidence is still adopted through the collection-run handler rather than
+   typed per-case receipts; the chain-level contract is authoritative.
 3. **Promotion is content-addressed but the on-disk corpus is path-coupled.**
    The `promote` command now imports artifacts into the content-addressed blob
    store and emits blob-backed v7 references, so new promotions extend no
@@ -245,11 +261,12 @@ permissions and is not a durable diagnostic publication workflow.
    software identity when applicable, stage status, exact inventory, and
    retention class. Human aliases such as `cycle3` may point to an ID but may
    not define identity.
-5. **There is no lifecycle orchestrator.** Replace the operator-maintained
-   command sequence with one resumable DAG entry point, for example
-   `diagnostics lifecycle run/status/resume`. Low-level stages may remain
-   independently testable, but the orchestrator must own dependencies,
-   attempts, bounded retries, stage receipts, and legal state transitions.
+5. **There is no lifecycle orchestrator.** Now delivered: one resumable DAG
+   entry point, `diagnostics lifecycle run/status/resume`, owns dependencies,
+   attempts, bounded retries, typed stage receipts, legal monotonic
+   transitions, and an atomic per-generation run-state object. Low-level
+   stages remain independently testable; the real GPU collection stays
+   operator-run and is adopted by the orchestrator's collection handler.
 6. **There is no executable retention or garbage-collection policy.** The
    ignored output tree mixes governed evidence, superseded releases, debug
    experiments, caches, and temporary probes. A GC command must operate only
@@ -355,7 +372,7 @@ archive decision, and explicit approval for the resolved targets.
    blob references without compatibility re-exports or multi-version readers.
    **(complete: Phase 4)**
 4. Add lifecycle `run`, `status`, and `resume` orchestration; make status
-   verification-based rather than existence-based. **(pending: Phase 5)**
+   verification-based rather than existence-based. **(complete: Phase 5)**
 5. Add registry-driven `gc --dry-run`, then retire only the explicitly
    unreachable legacy/debug/cache roots. **(pending: Phase 6)**
 6. Add governed archive/checksum/attestation creation and a least-privilege

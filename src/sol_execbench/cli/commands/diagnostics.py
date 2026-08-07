@@ -50,6 +50,12 @@ from sol_execbench.core.bench.performance_model.governance import (
 from sol_execbench.core.bench.performance_model.lifecycle import (
     BlobStore,
     BlobStoreResolver,
+    DiagnosticLifecycleStage,
+    build_run_context,
+    build_stage_handlers,
+    diagnostic_lifecycle_status,
+    resume_diagnostic_lifecycle,
+    run_diagnostic_lifecycle,
     store_root,
 )
 from sol_execbench.core.bench.performance_model.models import (
@@ -345,6 +351,170 @@ def release_verify_cli(
             "uncompressed_size_bytes": projection.uncompressed_size_bytes,
             "verified": True,
             "diagnostic_only": True,
+        },
+    )
+
+
+@diagnostics_cli.group(
+    "lifecycle",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+def lifecycle_cli() -> None:
+    """Resumable diagnostic lifecycle run, status, and resume."""
+
+
+@lifecycle_cli.command("run")
+@click.option("--design", type=_FILE, required=True)
+@click.option("--store-root", type=_OUTPUT_DIRECTORY)
+@click.option(
+    "--max-attempts",
+    type=int,
+    default=3,
+    show_default=True,
+)
+@click.option(
+    "--stages",
+    multiple=True,
+    type=click.Choice([stage.value for stage in DiagnosticLifecycleStage]),
+    help="Chain stages to run; defaults to the full monotonic chain.",
+)
+@click.option("--corpus-root", type=_OUTPUT_DIRECTORY)
+@click.option("--calibration-profile", type=_FILE)
+@click.option("--development-corpus", type=_FILE)
+@click.option("--held-out-corpus", type=_FILE)
+@click.option("--output-root", type=_OUTPUT_DIRECTORY)
+@click.option("--source-revision", default="unknown")
+def lifecycle_run_cli(
+    design: Path,
+    store_root: Path | None,
+    max_attempts: int,
+    stages: tuple[str, ...],
+    corpus_root: Path | None,
+    calibration_profile: Path | None,
+    development_corpus: Path | None,
+    held_out_corpus: Path | None,
+    output_root: Path | None,
+    source_revision: str,
+) -> CliResult:
+    """Execute the selected lifecycle chain and persist its run-state."""
+    try:
+        context = build_run_context(
+            design_manifest_path=design,
+            store_root_path=store_root,
+            corpus_root=corpus_root,
+            calibration_profile_path=calibration_profile,
+            development_corpus_path=development_corpus,
+            held_out_corpus_path=held_out_corpus,
+            output_root=output_root,
+            source_revision=source_revision,
+        )
+        selected = (
+            tuple(DiagnosticLifecycleStage(value) for value in stages)
+            if stages
+            else None
+        )
+        run_state = run_diagnostic_lifecycle(
+            design_manifest_path=design,
+            store_root_path=context.store_root,
+            stages=selected,
+            max_attempts=max_attempts,
+            handlers=build_stage_handlers(
+                semantic_loader=load_manifest_semantic_characterization,
+                solar_verifier=verify_projected_solar_manifest,
+                solar_projector=project_solar_manifest,
+                blob_resolver=_blob_resolver(),
+            ),
+            context=context,
+        )
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_lifecycle_run_invalid",
+            hint=(
+                "Verify the design manifest, the selected chain stages, and "
+                "that every earlier stage is verified."
+            ),
+        ) from error
+    return CliResult(
+        data={
+            "run_id": run_state.run_id,
+            "collection_run_id": run_state.collection_run_id,
+            "design_id": run_state.design_id,
+            "generation": run_state.generation,
+            "stages": [
+                {
+                    "stage": item.stage.value,
+                    "status": item.status.value,
+                    "attempts": item.attempts,
+                }
+                for item in run_state.stages
+            ],
+        },
+    )
+
+
+@lifecycle_cli.command("status")
+@click.option("--run", type=_FILE, required=True)
+def lifecycle_status_cli(run: Path) -> CliResult:
+    """Re-verify the recorded run and report the current chain state."""
+    try:
+        status = diagnostic_lifecycle_status(
+            run_state_path=run,
+            handlers=build_stage_handlers(
+                semantic_loader=load_manifest_semantic_characterization,
+                solar_verifier=verify_projected_solar_manifest,
+                solar_projector=project_solar_manifest,
+                blob_resolver=_blob_resolver(),
+            ),
+        )
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_lifecycle_invalid",
+            hint="Verify the run-state object path and store layout.",
+        ) from error
+    return CliResult(data=status)
+
+
+@lifecycle_cli.command("resume")
+@click.option("--run", type=_FILE, required=True)
+@click.option(
+    "--max-attempts",
+    type=int,
+    default=3,
+    show_default=True,
+)
+def lifecycle_resume_cli(run: Path, max_attempts: int) -> CliResult:
+    """Re-verify and continue a previously interrupted lifecycle run."""
+    try:
+        run_state = resume_diagnostic_lifecycle(
+            run_state_path=run,
+            max_attempts=max_attempts,
+            handlers=build_stage_handlers(
+                semantic_loader=load_manifest_semantic_characterization,
+                solar_verifier=verify_projected_solar_manifest,
+                solar_projector=project_solar_manifest,
+                blob_resolver=_blob_resolver(),
+            ),
+        )
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_lifecycle_run_invalid",
+            hint="Verify the run-state object and any drifted stage inputs.",
+        ) from error
+    return CliResult(
+        data={
+            "run_id": run_state.run_id,
+            "collection_run_id": run_state.collection_run_id,
+            "stages": [
+                {
+                    "stage": item.stage.value,
+                    "status": item.status.value,
+                    "attempts": item.attempts,
+                }
+                for item in run_state.stages
+            ],
         },
     )
 

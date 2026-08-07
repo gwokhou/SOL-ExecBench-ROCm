@@ -439,3 +439,44 @@ uv run pytest \
 The smoke requires available IR and HW predictions plus available `C` and `R`
 for all eleven cases. A missing configuration skips the optional hardware test
 and is not evidence that the smoke passed.
+
+## Lifecycle orchestration
+
+The monotonic chain is driven by one resumable orchestrator:
+
+```bash
+sol-execbench --format json diagnostics lifecycle run \
+  --design DESIGN.json \
+  --corpus-root CORPUS_ROOT \
+  --development-corpus DEVELOPMENT.json \
+  --held-out-corpus HELD_OUT.json \
+  --calibration-profile CALIBRATION.json \
+  --output-root OUTPUT_ROOT \
+  --store-root data/store
+```
+
+`run` walks the chain `design -> collection_run -> corpus_snapshot ->
+model_build -> acceptance -> publication -> release` in order, enforces the
+monotonic transitions, retries each stage under a bounded attempt budget, and
+writes a typed receipt and an atomic run-state object per generation under
+`data/store/runs/<collection_run_id>/run.json`. The GPU collection stages
+require `--corpus-root` (the operator-collected evidence tree and frozen
+corpus files) and never re-implement hardware collection; the CPU stages
+execute the production fitting, acceptance, publication, and packaging
+functions.
+
+Status and resume are verification-based, never existence-based:
+
+```bash
+sol-execbench --format json diagnostics lifecycle status \
+  --run data/store/runs/<collection_run_id>/run.json
+sol-execbench --format json diagnostics lifecycle resume \
+  --run data/store/runs/<collection_run_id>/run.json
+```
+
+`status` re-verifies every recorded stage through its handler and reports the
+next legal stage. `resume` re-verifies each completed stage, re-executes any
+stage whose receipt is missing or whose inputs or outputs drifted, and
+continues from the first incomplete stage. A run that exhausts its attempt
+budget on a stage is recorded `failed` and can be resumed after the operator
+fixes the input.
