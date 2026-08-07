@@ -336,20 +336,23 @@ Retire the following behaviors after callers are migrated:
   caches were cleaned**).
 
 The local ignored data audit measured `data/outputs/` at approximately 40.8 GB.
-The following are retirement candidates, not authorized deletions in the
-current worktree:
+The following retirement candidates were reclaimed on 2026-08-07 per the
+reviewed plan `docs/ops/retirement-plan-2026-08-07.md` (explicit approval
+recorded; dry-run was 17.57 GB over nine targets, all registry-unreachable;
+v3/v6 source evidence plus the non-canonical calibration/evidence files were
+cold-archived to `data/cold-archive/superseded-source-evidence-2026-08-07.tar.zst`
+and byte-verified before deletion). `data/outputs/` is now approximately
+24 GB:
 
-- superseded, unreferenced `microarchitecture-diagnostics-v3/` and
-  `microarchitecture-diagnostics-v6/`, approximately 8.0 GB and 6.6 GB;
-- `data/calibration/` and `data/local-evidence/`, which are already marked
-  non-canonical and have no production consumers;
-- reproducible caches, counter probes, smoke output, and directories named as
-  debug/fix experiments;
-- old `p0-release-*` attempts other than the currently documented
-  `p0-release-36e44fb/`, approximately 695 MB in total;
-- the currently unreferenced
-  `orojenesis-reproducible-9d17c17/`, approximately 1.4 GB, after any desired
-  audit copy is moved to cold storage.
+- **reclaimed**: `microarchitecture-diagnostics-v3/` (8.0 GB),
+  `microarchitecture-diagnostics-v6/` (6.6 GB),
+  `orojenesis-reproducible-9d17c17/` (1.4 GB), `data/calibration/`,
+  `data/local-evidence/`, and `p0-release-*` attempts other than
+  `p0-release-36e44fb/` (~695 MB);
+- still present (not in scope): reproducible caches, counter probes, smoke
+  output, and directories named as debug/fix experiments that remain
+  unreferenced; future candidates are re-measured with
+  `sol-execbench --format json diagnostics lifecycle retirement-plan`.
 
 The retired v3/v6 roots and the unreferenced Orojenesis root alone account for
 roughly 16 GB. Do not delete `microarchitecture-diagnostics-v7/` or
@@ -387,10 +390,11 @@ source evidence first.
    verification-based rather than existence-based. **(complete: Phase 5)**
 5. Add registry-driven `gc --dry-run`, then retire only the explicitly
    unreachable legacy/debug/cache roots. **(complete: Phase 6; the reviewed
-   retirement plan is delivered at `docs/ops/retirement-plan-2026-08-07.md`
-   with the exact inventory and reachability proof, regenerable via
-   `scripts/plan_diagnostic_retirement.py`; deleting the resolved targets
-   awaits the explicit approval checklist)**
+   retirement plan at `docs/ops/retirement-plan-2026-08-07.md` was approved
+   and executed on 2026-08-07 — the nine targets (17.57 GB) were reclaimed
+   after a byte-verified cold archive of the v3/v6 source evidence, with the
+   inventory regenerable via
+   `sol-execbench --format json diagnostics lifecycle retirement-plan`)**
 6. Add governed archive/checksum/attestation creation and a least-privilege
    draft GitHub Release workflow. **(complete: Phases 1-2)**
 7. Generate current-cycle status from the registry and remove duplicated
