@@ -15,7 +15,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     GCRefusedError,
     gc as gc_module,
     plan_gc,
-    publications_dir,
+    publication_registry_dir,
     run_gc,
     runs_dir,
     snapshots_dir,
@@ -61,7 +61,7 @@ def _write_publication(
             ),
         ),
     )
-    path = publications_dir(root) / stage_id / "manifest.json"
+    path = publication_registry_dir(root) / stage_id / "manifest.json"
     atomic_write_json_value(path, manifest.model_dump(mode="json"))
 
 

@@ -10,7 +10,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticPublicationLifecycleManifest,
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
-    publications_dir,
+    publication_registry_dir,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
@@ -52,7 +52,9 @@ def test_consistent_store_reports_no_findings(
     store = BlobStore(tmp_path)
     digest = store.put_bytes(b"evidence")
     manifest = _publication_manifest("p" * 64, digest, 9)
-    path = publications_dir(tmp_path) / manifest.stage_id / "manifest.json"
+    path = (
+        publication_registry_dir(tmp_path) / manifest.stage_id / "manifest.json"
+    )
     atomic_write_json_value(path, manifest.model_dump(mode="json"))
 
     assert script.check_store(tmp_path) == []

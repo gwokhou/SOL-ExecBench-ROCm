@@ -7,7 +7,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     blobs_dir,
     builds_dir,
     designs_dir,
-    publications_dir,
+    publication_registry_dir,
     releases_dir,
     runs_dir,
     snapshots_dir,
@@ -32,7 +32,7 @@ def test_store_layout_follows_the_governed_tree(monkeypatch, tmp_path) -> None:
     assert snapshots_dir() == root / "snapshots"
     assert builds_dir() == root / "builds"
     assert acceptances_dir() == root / "acceptances"
-    assert publications_dir() == root / "publications"
+    assert publication_registry_dir() == root / "publication-registry"
     assert releases_dir() == root / "releases"
 
 

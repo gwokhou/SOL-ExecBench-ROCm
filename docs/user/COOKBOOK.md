@@ -126,7 +126,7 @@ locally substituted binaries fail closed.
 ## Audit corpus-wide SOLAR readiness
 
 ```bash
-uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
+uv run sol-execbench solar corpus-audit out/solar/corpus-readiness \
   --device cuda:0 \
   --timeout 14400
 ```

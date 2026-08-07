@@ -46,10 +46,10 @@ Run the same content-addressed gate directly on the validated host:
 
 ```bash
 uv run python scripts/internal/rdna4/run_rdna4_validation.py \
-  --output-dir out/rdna4-local
+  --output-dir out/diagnostics/rdna4-local
 
 uv run python scripts/internal/rdna4/run_rdna4_validation.py \
-  --verify out/rdna4-local \
+  --verify out/diagnostics/rdna4-local \
   --expected-source-revision "$(git rev-parse HEAD)"
 ```
 

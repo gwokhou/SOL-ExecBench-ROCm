@@ -193,6 +193,23 @@ The evaluator ownership contract is available from
 `sol_execbench.core.evaluator_contract.build_evaluator_contract` and through
 `sol-execbench --format json contract evaluator`.
 
+## Scratch and workspace layout
+
+`out/` is gitignored operator scratch, not a governed store. Immutable
+diagnostic artifacts live under `data/store/` (content-addressed by SHA-256),
+and mutable process evidence lives under `data/outputs/`. Nothing under `out/`
+acquires canonical or scoring authority.
+
+Multi-output command workspaces follow `out/<group>/<run-id>/`:
+
+- release workspaces (`baseline` + `solar` + `score`) → `out/release/<run-id>/`;
+- SOLAR analysis trees → `out/solar/<run-id>/`;
+- diagnostics collection runs → `out/diagnostics/<run-id>/`.
+
+`<group>` is a single command group, or a purpose name such as `release` for
+multi-command workflows. Single ad-hoc files such as one
+`--trace-output out/foo.trace.jsonl` may stay flat under `out/`.
+
 ## Verification
 
 Run the CPU-safe architecture checks after changing a boundary:

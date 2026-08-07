@@ -33,7 +33,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.store import (
     blob_path,
     builds_dir,
     designs_dir,
-    publications_dir,
+    publication_registry_dir,
     releases_dir,
     runs_dir,
     snapshots_dir,
@@ -46,7 +46,7 @@ _DIR_TO_STAGE: Final[dict[str, DiagnosticLifecycleStage]] = {
     "snapshots": DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
     "builds": DiagnosticLifecycleStage.MODEL_BUILD,
     "acceptances": DiagnosticLifecycleStage.ACCEPTANCE,
-    "publications": DiagnosticLifecycleStage.PUBLICATION,
+    "publication-registry": DiagnosticLifecycleStage.PUBLICATION,
     "releases": DiagnosticLifecycleStage.RELEASE,
 }
 
@@ -161,7 +161,7 @@ def check_store(root: Path) -> list[str]:
         snapshots_dir(root),
         builds_dir(root),
         acceptances_dir(root),
-        publications_dir(root),
+        publication_registry_dir(root),
         releases_dir(root),
     ):
         for manifest_path in sorted(directory.glob("*/manifest.json")):

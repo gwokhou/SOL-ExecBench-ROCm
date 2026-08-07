@@ -21,7 +21,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.store import (
     acceptances_dir,
     builds_dir,
     designs_dir,
-    publications_dir,
+    publication_registry_dir,
     releases_dir,
     runs_dir,
     snapshots_dir,
@@ -163,7 +163,7 @@ def _registry_files(store: Path) -> list[Path]:
         snapshots_dir(store),
         builds_dir(store),
         acceptances_dir(store),
-        publications_dir(store),
+        publication_registry_dir(store),
         releases_dir(store),
     ):
         files.extend(sorted(directory.glob("*/manifest.json")))

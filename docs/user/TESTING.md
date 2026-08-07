@@ -96,9 +96,9 @@ runner labeled `linux`, `x64`, `rocm`, and `gfx1200`, or run:
 
 ```bash
 uv run python scripts/internal/rdna4/run_rdna4_validation.py \
-  --output-dir out/rdna4-local
+  --output-dir out/diagnostics/rdna4-local
 uv run python scripts/internal/rdna4/run_rdna4_validation.py \
-  --verify out/rdna4-local
+  --verify out/diagnostics/rdna4-local
 ```
 
 The same self-hosted workflow also runs the complete SOLAR three-stage corpus
@@ -106,7 +106,7 @@ audit and uploads its content-addressed `gfx1200` readiness matrix. For a local
 equivalent:
 
 ```bash
-uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
+uv run sol-execbench solar corpus-audit out/solar/corpus-readiness \
   --device cuda:0 \
   --backend torchview_extended_einsum \
   --timeout 14400

@@ -13,7 +13,7 @@ from sol_execbench.core.data.json_utils import atomic_write_json_value
 
 def _write_referencing_manifest(store: Path, target: Path) -> None:
     """Write a publication manifest whose content cites *target* by path."""
-    directory = store / "publications" / ("p" * 64)
+    directory = store / "publication-registry" / ("p" * 64)
     atomic_write_json_value(
         directory / "manifest.json",
         {"policy_hashes": {"root": str(target.resolve())}, "stage": "x"},
