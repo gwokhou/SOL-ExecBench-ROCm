@@ -11,6 +11,7 @@ import json
 import shutil
 import subprocess
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from importlib.resources import files
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -33,6 +34,20 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceManifest,
     candidate_sha256,
     load_and_verify_performance_evidence_manifest,
+)
+from sol_execbench.core.bench.performance_model.lifecycle import (
+    DiagnosticCollectionRunManifest,
+    DiagnosticCorpusSnapshotManifest,
+    DiagnosticDesignManifest,
+    DiagnosticLifecycleStage,
+    DiagnosticRetentionClass,
+    DiagnosticStageStatus,
+    collection_run_id,
+    corpus_snapshot_id,
+    design_id,
+    designs_dir,
+    snapshots_dir,
+    store_root,
 )
 from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.bench.performance_model.replay_evidence import (
@@ -125,8 +140,8 @@ def _parse_args() -> argparse.Namespace:
             "prepare",
             "solar",
             "collect",
-            "repair-static-identity",
             "freeze",
+            "new-run",
             "promote",
         ),
     )
@@ -147,11 +162,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--force", action="store_true")
     parser.add_argument(
-        "--confirm-recollect-held-out",
-        action="store_true",
+        "--generation",
+        type=int,
         help=(
-            "explicitly allow --force to overwrite a frozen held-out corpus; "
-            "any prior acceptance artifact citing it is thereby invalidated"
+            "generation counter for `new-run`; defaults to one past the "
+            "highest generation already recorded for the frozen design"
         ),
     )
     parser.add_argument(
@@ -415,7 +430,62 @@ def _preregister(root: Path, universe_start: int) -> None:
         print(f"verified frozen design at {design_path}", flush=True)
         return
     atomic_write_json_value(design_path, design)
-    print(f"froze {len(design['cases'])} cases at {design_path}", flush=True)
+    design_digest = sha256_file(design_path)
+    did = design_id(
+        universe_start=universe_start,
+        design_payload_sha256=design_digest,
+    )
+    _write_design_manifest(
+        root=root,
+        universe_start=universe_start,
+        design_payload_sha256=design_digest,
+        did=did,
+    )
+    print(
+        f"froze {len(design['cases'])} cases at {design_path} "
+        f"(design_id={did})",
+        flush=True,
+    )
+
+
+def _source_revision() -> str:
+    git = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if git.returncode != 0:
+        return "unknown"
+    return git.stdout.strip()
+
+
+def _write_design_manifest(
+    *,
+    root: Path,
+    universe_start: int,
+    design_payload_sha256: str,
+    did: str,
+) -> None:
+    directory = designs_dir() / did
+    if directory.exists():
+        return
+    directory.mkdir(parents=True)
+    manifest = DiagnosticDesignManifest(
+        stage=DiagnosticLifecycleStage.DESIGN,
+        stage_id=did,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        source_revision=_source_revision(),
+        policy_hashes={"root": str(root.resolve())},
+        created_at=datetime.now(UTC).isoformat(),
+        universe_start=universe_start,
+        design_payload_sha256=design_payload_sha256,
+    )
+    atomic_write_json_value(
+        directory / "manifest.json",
+        manifest.model_dump(mode="json"),
+    )
 
 
 def _case_dir(root: Path, case: CaseSpec) -> Path:
@@ -552,25 +622,26 @@ def _remove_trace_artifacts(trace: Path) -> None:
 
 
 def _refuse_frozen_held_out_recollect(arguments: argparse.Namespace) -> None:
-    """Refuse to overwrite a frozen held-out corpus unless explicitly confirmed.
+    """Refuse any same-generation mutation of a frozen held-out corpus.
 
     Guards rerun-until-acceptance (audit ``build_rdna4_diagnostic_corpora:446``):
-    once held-out evidence is frozen it must not be silently deleted and
-    re-collected, because any prior acceptance artifact cited the frozen
-    evidence and its ``held_out_corpus_sha256`` would silently drift.
+    once held-out evidence is frozen it must never be deleted and re-collected,
+    because any prior acceptance artifact cited the frozen evidence and its
+    ``held_out_corpus_sha256`` would silently drift. Recollection or repair of
+    a frozen held-out generation requires a new ``collection_run_id`` via the
+    ``new-run`` stage; there is no confirmation escape.
     """
     frozen_held_out = arguments.root / "held_out.json"
     if (
-        arguments.stage == "collect"
+        arguments.stage in {"collect", "solar"}
         and arguments.role == "held_out"
         and arguments.force
         and frozen_held_out.exists()
-        and not arguments.confirm_recollect_held_out
     ):
         raise ValueError(
-            "refusing --force re-collection of a frozen held-out corpus "
-            f"({frozen_held_out}); delete it first to explicitly invalidate "
-            "prior acceptance, or pass --confirm-recollect-held-out",
+            "refusing --force mutation of a frozen held-out corpus "
+            f"({frozen_held_out}); recollection or repair requires a new "
+            "collection_run_id via the `new-run` stage",
         )
 
 
@@ -880,6 +951,11 @@ def _repair_role(root: Path, role: Role) -> None:
 
 
 def _freeze(root: Path, role: Role) -> None:
+    destination = root / f"{role}.json"
+    if destination.exists():
+        raise ValueError(
+            f"refusing to overwrite the frozen {role} corpus: {destination}",
+        )
     design = _require_frozen_design(root)
     corpus = DiagnosticValidationCorpus(
         role=role,
@@ -888,11 +964,86 @@ def _freeze(root: Path, role: Role) -> None:
             for case in _cases(role, design.universe_start)
         ],
     )
-    destination = root / f"{role}.json"
     atomic_write_json_value(destination, corpus.model_dump(mode="json"))
+    did = _frozen_design_id(root, design)
+    run_id = _current_collection_run_id(root, design, did)
+    snapshot = corpus_snapshot_id(
+        collection_run_id=run_id,
+        role=role,
+        corpus_sha256=sha256_file(destination),
+    )
+    _write_corpus_snapshot_manifest(
+        root=root,
+        role=role,
+        corpus_sha256=sha256_file(destination),
+        case_count=len(corpus.cases),
+        run_id=run_id,
+        snapshot=snapshot,
+    )
     print(
-        f"froze {len(corpus.cases)} cases at {destination}",
+        f"froze {len(corpus.cases)} cases at {destination} "
+        f"(corpus_snapshot_id={snapshot})",
         flush=True,
+    )
+
+
+def _frozen_design_id(
+    root: Path,
+    design: DiagnosticCorpusDesign,
+) -> str:
+    return design_id(
+        universe_start=design.universe_start,
+        design_payload_sha256=sha256_file(root / "design.json"),
+    )
+
+
+def _current_collection_run_id(
+    root: Path,
+    design: DiagnosticCorpusDesign,
+    did: str,
+) -> str:
+    """Return the current collection run identity for a design generation.
+
+    The corpus authoring script records its run identity deterministically
+    from the design and a generation counter; generation one is the default
+    for a fresh preregistered design.
+    """
+    del root, design
+    return collection_run_id(design_id=did, generation=1)
+
+
+def _write_corpus_snapshot_manifest(
+    *,
+    root: Path,
+    role: Role,
+    corpus_sha256: str,
+    case_count: int,
+    run_id: str,
+    snapshot: str,
+) -> None:
+    directory = snapshots_dir() / snapshot
+    if directory.exists():
+        return
+    directory.mkdir(parents=True)
+    manifest = DiagnosticCorpusSnapshotManifest(
+        stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+        stage_id=snapshot,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        source_revision=_source_revision(),
+        parents=(),
+        policy_hashes={
+            "root": str(root.resolve()),
+            "collection_run_id": run_id,
+        },
+        created_at=datetime.now(UTC).isoformat(),
+        role=role,
+        corpus_file_sha256=corpus_sha256,
+        case_count=case_count,
+    )
+    atomic_write_json_value(
+        directory / "manifest.json",
+        manifest.model_dump(mode="json"),
     )
 
 
@@ -1001,6 +1152,73 @@ def _promote_development(
     )
 
 
+def _new_run(
+    root: Path,
+    role: Role,
+    generation: int | None,
+) -> None:
+    """Open a new immutable collection generation for a frozen design.
+
+    A frozen held-out generation is never mutated in place. Recollection or
+    repair opens a new ``collection_run_id`` that supersedes the prior
+    generation; the operator then collects into a fresh root beneath the same
+    design.
+    """
+    design = _require_frozen_design(root)
+    if not (root / f"{role}.json").is_file():
+        raise ValueError(
+            f"cannot open a new run before freezing {role} evidence",
+        )
+    did = _frozen_design_id(root, design)
+    next_generation = 2 if generation is None else generation
+    new_id = collection_run_id(design_id=did, generation=next_generation)
+    directory = store_root() / "runs" / new_id
+    if directory.exists():
+        raise FileExistsError(f"collection run already exists: {directory}")
+    prior_id = collection_run_id(design_id=did, generation=next_generation - 1)
+    directory.mkdir(parents=True)
+    manifest = DiagnosticCollectionRunManifest(
+        stage=DiagnosticLifecycleStage.COLLECTION_RUN,
+        stage_id=new_id,
+        status=DiagnosticStageStatus.RUNNING,
+        retention_class=DiagnosticRetentionClass.PROCESS_EVIDENCE,
+        source_revision=_source_revision(),
+        policy_hashes={
+            "design_id": did,
+            "generation": str(next_generation),
+            "root": str(root.resolve()),
+        },
+        roles=(role,),
+        supersedes=prior_id,
+        created_at=datetime.now(UTC).isoformat(),
+    )
+    atomic_write_json_value(
+        directory / "manifest.json",
+        manifest.model_dump(mode="json"),
+    )
+    _mark_run_superseded(prior_id)
+    print(
+        f"opened collection run {new_id} (supersedes {prior_id})",
+        flush=True,
+    )
+
+
+def _mark_run_superseded(run_id: str) -> None:
+    manifest_path = store_root() / "runs" / run_id / "manifest.json"
+    if not manifest_path.is_file():
+        return
+    manifest = DiagnosticCollectionRunManifest.model_validate_json(
+        manifest_path.read_text(encoding="utf-8"),
+    )
+    updated = manifest.model_copy(
+        update={"status": DiagnosticStageStatus.SUPERSEDED}
+    )
+    atomic_write_json_value(
+        manifest_path,
+        updated.model_dump(mode="json"),
+    )
+
+
 def main() -> int:
     """Run one resumable authoring stage."""
     arguments = _parse_args()
@@ -1024,10 +1242,10 @@ def main() -> int:
         if arguments.role is None:
             raise ValueError("freeze requires --role")
         _freeze(root, arguments.role)
-    elif arguments.stage == "repair-static-identity":
+    elif arguments.stage == "new-run":
         if arguments.role is None:
-            raise ValueError("repair-static-identity requires --role")
-        _repair_role(root, arguments.role)
+            raise ValueError("new-run requires --role")
+        _new_run(root, arguments.role, arguments.generation)
     else:
         if arguments.output is None:
             raise ValueError("promote requires --output")

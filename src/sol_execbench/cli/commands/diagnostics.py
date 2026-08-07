@@ -55,6 +55,10 @@ from sol_execbench.core.bench.performance_model.publication import (
     build_diagnostic_publication_projection,
     verify_diagnostic_publication_projection,
 )
+from sol_execbench.core.bench.performance_model.release import (
+    package_diagnostic_publication,
+    verify_diagnostic_release_archive,
+)
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     load_json_file,
@@ -233,6 +237,102 @@ def verify_publication_projection_cli(manifest: Path) -> CliResult:
             "diagnostic_only": True,
         },
         artifacts=(artifact(manifest, "diagnostic_publication_json"),),
+    )
+
+
+@diagnostics_cli.group(
+    "release",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+def release_cli() -> None:
+    """Governed deterministic release archive packaging."""
+
+
+@release_cli.command("package")
+@click.option("--manifest", type=_FILE, required=True)
+@click.option("--archive-output", type=_OUTPUT, required=True)
+@click.option("--attestation-output", type=_OUTPUT, required=True)
+@click.option(
+    "--source-revision",
+    required=True,
+    help="Source revision the publication tree was built at.",
+)
+@click.option("--store-root", type=_OUTPUT_DIRECTORY)
+def release_package_cli(
+    manifest: Path,
+    archive_output: Path,
+    attestation_output: Path,
+    source_revision: str,
+    store_root: Path | None,
+) -> CliResult:
+    """Package one verified publication into a deterministic release object."""
+    try:
+        attestation = package_diagnostic_publication(
+            manifest_path=manifest,
+            archive_output=archive_output,
+            attestation_output=attestation_output,
+            source_revision=source_revision,
+            semantic_loader=load_manifest_semantic_characterization,
+            solar_verifier=verify_projected_solar_manifest,
+            store_root_path=store_root,
+        )
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_release_input_invalid",
+            hint=(
+                "Verify the publication tree, its exact inventory, and that "
+                "the archive output does not already exist."
+            ),
+        ) from error
+    return CliResult(
+        data={
+            "release_id": attestation.release_id,
+            "archive_sha256": attestation.archive.sha256,
+            "archive_size_bytes": attestation.archive.size_bytes,
+            "case_count": attestation.case_count,
+            "diagnostic_only": True,
+        },
+        artifacts=(
+            artifact(
+                attestation_output,
+                "diagnostic_release_attestation_json",
+            ),
+        ),
+    )
+
+
+@release_cli.command("verify")
+@click.option("--archive", type=_FILE, required=True)
+@click.option("--expected-sha256")
+@click.option("--unpack-root", type=_OUTPUT_DIRECTORY)
+def release_verify_cli(
+    archive: Path,
+    expected_sha256: str | None,
+    unpack_root: Path | None,
+) -> CliResult:
+    """Verify a downloaded release archive against its publication contract."""
+    try:
+        projection = verify_diagnostic_release_archive(
+            archive_path=archive,
+            semantic_loader=load_manifest_semantic_characterization,
+            solar_verifier=verify_projected_solar_manifest,
+            expected_sha256=expected_sha256,
+            unpack_root=unpack_root,
+        )
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_release_archive_invalid",
+            hint="Restore the exact archive or supply the correct SHA-256.",
+        ) from error
+    return CliResult(
+        data={
+            "cases": projection.case_count,
+            "uncompressed_size_bytes": projection.uncompressed_size_bytes,
+            "verified": True,
+            "diagnostic_only": True,
+        },
     )
 
 
@@ -573,4 +673,7 @@ __all__ = [
     "fit_performance_inference_cli",
     "performance_agent_feedback_cli",
     "performance_diagnostics_cli",
+    "release_cli",
+    "release_package_cli",
+    "release_verify_cli",
 ]

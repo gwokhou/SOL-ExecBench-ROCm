@@ -30,6 +30,10 @@ from sol_execbench.core.bench.performance_model.publication import (
     DiagnosticPublicationArtifact,
     DiagnosticPublicationProjection,
 )
+from sol_execbench.core.bench.performance_model.release import (
+    DiagnosticReleaseArchive,
+    DiagnosticReleaseAttestation,
+)
 from sol_execbench.core.bench.performance_model.validation_corpus import (
     DiagnosticValidationCase,
     DiagnosticValidationCorpus,
@@ -411,3 +415,100 @@ def test_inference_and_acceptance_authoring_cli_workflow(
             inference_profile_path=inference_path,
             semantic_loader=load_manifest_semantic_characterization,
         )
+
+
+def _release_attestation() -> DiagnosticReleaseAttestation:
+    return DiagnosticReleaseAttestation(
+        release_id="aa" * 32,
+        publication_id="ab" * 32,
+        archive=DiagnosticReleaseArchive(
+            name="release.tar.zst",
+            sha256="ac" * 32,
+            size_bytes=1024,
+            publication_manifest_sha256="ad" * 32,
+            source_revision="19f195a8",
+        ),
+        uncompressed_size_bytes=2048,
+        case_count=880,
+        inventory_sha256="ae" * 32,
+        source_revision="19f195a8",
+        created_at="2026-08-07T00:00:00+00:00",
+    )
+
+
+def test_release_package_cli_command(tmp_path: Path, monkeypatch) -> None:
+    manifest = tmp_path / "publication.json"
+    manifest.write_text("{}", encoding="utf-8")
+    archive_output = tmp_path / "release.tar.zst"
+    attestation_output = tmp_path / "attestation.json"
+
+    def fake_package(**kwargs) -> DiagnosticReleaseAttestation:
+        assert kwargs["manifest_path"] == manifest
+        assert kwargs["archive_output"] == archive_output
+        assert kwargs["attestation_output"] == attestation_output
+        assert kwargs["source_revision"] == "19f195a8"
+        return _release_attestation()
+
+    monkeypatch.setattr(
+        diagnostics_commands,
+        "package_diagnostic_publication",
+        fake_package,
+    )
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "diagnostics",
+            "release",
+            "package",
+            "--manifest",
+            str(manifest),
+            "--archive-output",
+            str(archive_output),
+            "--attestation-output",
+            str(attestation_output),
+            "--source-revision",
+            "19f195a8",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["release_id"] == "aa" * 32
+    assert data["archive_sha256"] == "ac" * 32
+    assert data["case_count"] == 880
+    assert data["diagnostic_only"] is True
+
+
+def test_release_verify_cli_command(tmp_path: Path, monkeypatch) -> None:
+    archive = tmp_path / "release.tar.zst"
+    archive.write_bytes(b"not-a-real-archive")
+
+    def fake_verify(**kwargs) -> DiagnosticPublicationProjection:
+        assert kwargs["archive_path"] == archive
+        assert kwargs["expected_sha256"] is None
+        return _publication(tmp_path / "publication")
+
+    monkeypatch.setattr(
+        diagnostics_commands,
+        "verify_diagnostic_release_archive",
+        fake_verify,
+    )
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "diagnostics",
+            "release",
+            "verify",
+            "--archive",
+            str(archive),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["verified"] is True
+    assert data["cases"] == 220

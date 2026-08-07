@@ -203,22 +203,29 @@ the unpacked publication tree; the 22 GB process roots are not distribution
 dependencies.
 
 For the current 880-case Cycle 3 input, the governed inventory is 74,253,001
-bytes, excluding the self-describing `publication.json`. A deterministic zstd
-archive is 6,116,405 bytes, so publish that archive as a GitHub Release asset
-and record its SHA-256 in the release notes rather than committing generated
-evidence to Git:
+bytes, excluding the self-describing `publication.json`. Package that archive
+with the governed release packager, which re-verifies the publication, creates
+the deterministic zstd archive, and writes the release attestation; it never
+commits generated evidence to Git:
 
 ```bash
-tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
-  --zstd -cf \
+sol-execbench --format json diagnostics release package \
+  --manifest \
+  data/publications/microarchitecture-diagnostics-v7-cycle3/publication.json \
+  --archive-output \
   data/publications/microarchitecture-diagnostics-v7-cycle3.tar.zst \
-  -C data/publications microarchitecture-diagnostics-v7-cycle3
+  --attestation-output \
+  data/publications/microarchitecture-diagnostics-v7-cycle3.attestation.json \
+  --source-revision <source revision>
 ```
 
-After download, verify the externally published archive SHA-256, unpack it, and
-run `verify-publication-projection` before consuming `development.json`,
-`calibration/profile.json`, or `inference.json`. This publication remains
-diagnostic-only and cannot authorize an official score or leaderboard result.
+After download, verify the externally published archive SHA-256 and unpack it
+with `diagnostics release verify`, which re-runs
+`verify-publication-projection` on the unpacked tree before you consume
+`development.json`, `calibration/profile.json`, or `inference.json`. This
+publication remains diagnostic-only and cannot authorize an official score or
+leaderboard result. See `docs/user/diagnostic-release.md` for the full contract
+and the draft-first GitHub Release workflow.
 
 Only after those CPU gates pass and inference plus action thresholds are frozen
 may the operator collect or inspect the new 220 held-out cases. The exact local

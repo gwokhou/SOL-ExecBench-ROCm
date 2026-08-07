@@ -47,9 +47,34 @@ class SchemaVersion(StrEnum):
     DIAGNOSTIC_INFERENCE_PROFILE = (
         "sol_execbench.diagnostic_inference_profile.v9"
     )
+    DIAGNOSTIC_LIFECYCLE_ACCEPTANCE = (
+        "sol_execbench.diagnostic_lifecycle_acceptance.v1"
+    )
+    DIAGNOSTIC_LIFECYCLE_COLLECTION_RUN = (
+        "sol_execbench.diagnostic_lifecycle_collection_run.v1"
+    )
+    DIAGNOSTIC_LIFECYCLE_CORPUS_SNAPSHOT = (
+        "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v1"
+    )
+    DIAGNOSTIC_LIFECYCLE_DESIGN = "sol_execbench.diagnostic_lifecycle_design.v1"
+    DIAGNOSTIC_LIFECYCLE_MODEL_BUILD = (
+        "sol_execbench.diagnostic_lifecycle_model_build.v1"
+    )
+    DIAGNOSTIC_LIFECYCLE_PUBLICATION = (
+        "sol_execbench.diagnostic_lifecycle_publication.v1"
+    )
+    DIAGNOSTIC_LIFECYCLE_RELEASE = (
+        "sol_execbench.diagnostic_lifecycle_release.v1"
+    )
+    DIAGNOSTIC_LIFECYCLE_RUN = "sol_execbench.diagnostic_lifecycle_run.v1"
     DIAGNOSTIC_PUBLICATION_PROJECTION = (
         "sol_execbench.diagnostic_publication_projection.v1"
     )
+    DIAGNOSTIC_RELEASE_ARCHIVE = "sol_execbench.diagnostic_release_archive.v1"
+    DIAGNOSTIC_RELEASE_ATTESTATION = (
+        "sol_execbench.diagnostic_release_attestation.v1"
+    )
+    DIAGNOSTIC_STAGE_RECEIPT = "sol_execbench.diagnostic_stage_receipt.v1"
     DIAGNOSTIC_VALIDATION_CORPUS = (
         "sol_execbench.diagnostic_validation_corpus.v6"
     )

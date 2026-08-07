@@ -1,0 +1,113 @@
+name: Diagnostic Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag of the draft release to verify and publish"
+        required: true
+
+permissions:
+  # Only this GitHub-hosted job holds release authority. The self-hosted GPU
+  # runner (rdna4-hardware.yml) stays read-only and only produces evidence.
+  contents: write
+
+concurrency:
+  group: diagnostic-release
+  cancel-in-progress: false
+
+env:
+  UV_NO_PROGRESS: "1"
+
+jobs:
+  verify-and-publish-draft:
+    name: Verify checksum and publication, then publish draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: "${{ inputs.tag }}"
+      - name: Validate the release tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          case "$RELEASE_TAG" in
+            *[!A-Za-z0-9._/-]*)
+              echo "release tag contains disallowed characters" >&2
+              exit 1
+              ;;
+          esac
+          echo "release tag validated: $RELEASE_TAG"
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install locked environment
+        run: uv sync --locked --all-groups
+      - name: Download draft release assets
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/release"
+      - name: Verify archive SHA-256 against the attestation
+        run: |
+          uv run --no-sync python - <<'PY'
+          import hashlib, json, pathlib
+          assets = pathlib.Path("$RUNNER_TEMP/release")
+          attestation = json.loads(
+              (assets / "attestation.json").read_text(encoding="utf-8")
+          )
+          expected = attestation["archive"]["sha256"]
+          archive = next(assets.glob("*.tar.zst"))
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          if digest != expected:
+              raise SystemExit(
+                  f"archive SHA-256 {digest} != attestation {expected}"
+              )
+          pathlib.Path("$RUNNER_TEMP/expected-sha256").write_text(expected)
+          print(f"verified archive SHA-256: {expected}")
+          PY
+      - name: Unpack and verify the publication (CPU-only)
+        run: |
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          tar --zstd -xf "$RUNNER_TEMP/release"/*.tar.zst \
+            -C "$RUNNER_TEMP/unpacked"
+          manifest="$(find "$RUNNER_TEMP/unpacked" -name publication.json \
+            | head -n 1)"
+          uv run --no-sync sol-execbench --format json diagnostics \
+            verify-publication-projection --manifest "$manifest"
+      - name: Rebuild the release attestation from the verified tree
+        run: |
+          manifest="$(find "$RUNNER_TEMP/unpacked" -name publication.json \
+            | head -n 1)"
+          uv run --no-sync sol-execbench --format json diagnostics release \
+            package \
+            --manifest "$manifest" \
+            --archive-output "$RUNNER_TEMP/rebuilt.tar.zst" \
+            --attestation-output "$RUNNER_TEMP/rebuilt.attestation.json" \
+            --source-revision "${{ github.sha }}"
+      - name: Require deterministic rebuild
+        run: |
+          uv run --no-sync python - <<'PY'
+          import hashlib, pathlib
+          expected = pathlib.Path("$RUNNER_TEMP/expected-sha256").read_text()
+          rebuilt = hashlib.sha256(
+              pathlib.Path("$RUNNER_TEMP/rebuilt.tar.zst").read_bytes()
+          ).hexdigest()
+          if rebuilt != expected:
+              raise SystemExit(
+                  f"rebuilt archive {rebuilt} != published {expected}"
+              )
+          print("rebuilt archive is byte-identical")
+          PY
+      - name: Publish the draft release
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          gh release edit "$RELEASE_TAG" --draft=false \
+            --notes-file "$RUNNER_TEMP/rebuilt.attestation.json"
