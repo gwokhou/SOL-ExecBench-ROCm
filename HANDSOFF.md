@@ -294,7 +294,7 @@ implementation may use:
 data/store/blobs/sha256/<digest>
 data/store/runs/<collection_run_id>/
 data/store/snapshots/<corpus_snapshot_id>/manifest.json
-data/store/publications/<publication_id>/manifest.json
+data/store/publication-registry/<publication_id>/manifest.json
 data/store/releases/<release_id>/manifest.json
 ```
 

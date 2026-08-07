@@ -117,7 +117,7 @@ Audit the complete scored corpus through extraction, strict conversion, and
 multi-seed replay on the formal target with:
 
 ```bash
-uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
+uv run sol-execbench solar corpus-audit out/solar/corpus-readiness \
   --device cuda:0 \
   --timeout 14400
 ```

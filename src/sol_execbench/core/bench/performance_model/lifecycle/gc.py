@@ -40,7 +40,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.store import (
     blob_path,
     builds_dir,
     designs_dir,
-    publications_dir,
+    publication_registry_dir,
     releases_dir,
     runs_dir,
     snapshots_dir,
@@ -125,7 +125,7 @@ def _reachability(
         snapshots_dir(root),
         builds_dir(root),
         acceptances_dir(root),
-        publications_dir(root),
+        publication_registry_dir(root),
         releases_dir(root),
     ):
         for manifest_path in sorted(directory.glob("*/manifest.json")):

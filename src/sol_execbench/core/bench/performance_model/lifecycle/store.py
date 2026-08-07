@@ -72,9 +72,13 @@ def acceptances_dir(root: Path | None = None) -> Path:
     return (root or store_root()) / "acceptances"
 
 
-def publications_dir(root: Path | None = None) -> Path:
-    """Return the registry directory for publication objects."""
-    return (root or store_root()) / "publications"
+def publication_registry_dir(root: Path | None = None) -> Path:
+    """Return the registry directory for publication lifecycle manifests.
+
+    Named ``publication-registry`` (not ``publications``) to avoid colliding
+    with the distributable projection trees under ``data/publications/``.
+    """
+    return (root or store_root()) / "publication-registry"
 
 
 def releases_dir(root: Path | None = None) -> Path:
@@ -89,7 +93,7 @@ __all__ = [
     "blobs_dir",
     "builds_dir",
     "designs_dir",
-    "publications_dir",
+    "publication_registry_dir",
     "releases_dir",
     "repo_root",
     "runs_dir",
