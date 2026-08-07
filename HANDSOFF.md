@@ -267,12 +267,18 @@ permissions and is not a durable diagnostic publication workflow.
    transitions, and an atomic per-generation run-state object. Low-level
    stages remain independently testable; the real GPU collection stays
    operator-run and is adopted by the orchestrator's collection handler.
-6. **There is no executable retention or garbage-collection policy.** The
-   ignored output tree mixes governed evidence, superseded releases, debug
-   experiments, caches, and temporary probes. A GC command must operate only
-   from registry reachability, default to dry-run, explain every retained and
-   reclaimable object, and refuse to delete blobs reachable from a frozen
-   snapshot, acceptance, publication, or release.
+6. **There is no executable retention or garbage-collection policy.** Now
+   delivered: `diagnostics lifecycle gc` operates only from registry
+   reachability (every lifecycle manifest, run-state object, and typed
+   receipt), defaults to a dry-run plan that explains every retained and
+   reclaimable blob with its retention class and reason, and refuses any
+   deletion of a blob reachable from a frozen snapshot, acceptance,
+   publication, or release. `--delete` re-verifies reachability immediately
+   before removal and refuses the entire operation if a planned blob became
+   reachable. The ignored output tree still mixes governed evidence,
+   superseded releases, debug experiments, caches, and temporary probes;
+   retiring the audited v3/v6 and Orojenesis roots still requires an explicit,
+   reviewed GC run over the resolved targets.
 7. **Packaging and publication are only partially automated.** Add a governed
    packager that emits the archive, checksum, and release attestation from one
    verified publication manifest. A separate GitHub-hosted release job may
@@ -374,7 +380,8 @@ archive decision, and explicit approval for the resolved targets.
 4. Add lifecycle `run`, `status`, and `resume` orchestration; make status
    verification-based rather than existence-based. **(complete: Phase 5)**
 5. Add registry-driven `gc --dry-run`, then retire only the explicitly
-   unreachable legacy/debug/cache roots. **(pending: Phase 6)**
+   unreachable legacy/debug/cache roots. **(complete: Phase 6; the audited
+   root retirement itself requires a reviewed operational GC run)**
 6. Add governed archive/checksum/attestation creation and a least-privilege
    draft GitHub Release workflow. **(complete: Phases 1-2)**
 7. Generate current-cycle status from the registry and remove duplicated

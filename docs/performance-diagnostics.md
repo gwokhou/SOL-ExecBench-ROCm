@@ -480,3 +480,28 @@ stage whose receipt is missing or whose inputs or outputs drifted, and
 continues from the first incomplete stage. A run that exhausts its attempt
 budget on a stage is recorded `failed` and can be resumed after the operator
 fixes the input.
+
+## Registry-driven blob GC
+
+Blob retention is decided only by registry reachability, never by directory
+layout:
+
+```bash
+sol-execbench --format json diagnostics lifecycle gc --store-root data/store
+```
+
+The plan lists every blob with its retention class, retained flag, and reason.
+A blob referenced by any non-superseded lifecycle manifest, run-state object,
+or typed receipt is retained; a blob reachable only from superseded
+generations or referenced by nothing is reclaimable. Deletion is explicit and
+re-verified:
+
+```bash
+sol-execbench --format json diagnostics lifecycle gc \
+  --store-root data/store --delete
+```
+
+`--delete` recomputes reachability immediately before removing any blob and
+refuses the entire operation if a planned blob became reachable since
+planning. The audited legacy roots (v3/v6 and unreferenced Orojenesis output)
+remain retirement candidates until a reviewed GC run resolves them.

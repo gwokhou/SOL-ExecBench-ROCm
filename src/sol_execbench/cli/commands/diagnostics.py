@@ -56,6 +56,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     diagnostic_lifecycle_status,
     resume_diagnostic_lifecycle,
     run_diagnostic_lifecycle,
+    run_gc,
     store_root,
 )
 from sol_execbench.core.bench.performance_model.models import (
@@ -517,6 +518,32 @@ def lifecycle_resume_cli(run: Path, max_attempts: int) -> CliResult:
             ],
         },
     )
+
+
+@lifecycle_cli.command("gc")
+@click.option("--store-root", type=_OUTPUT_DIRECTORY)
+@click.option(
+    "--delete",
+    is_flag=True,
+    help="Delete reclaimable blobs after re-verifying reachability.",
+)
+def lifecycle_gc_cli(
+    store_root: Path | None,
+    delete: bool,
+) -> CliResult:
+    """Report or execute registry-driven blob garbage collection."""
+    try:
+        plan = run_gc(store_root_path=store_root, delete=delete)
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_gc_refused",
+            hint=(
+                "A blob became reachable since planning; re-run and inspect "
+                "the dry-run plan before deleting."
+            ),
+        ) from error
+    return CliResult(data=plan.model_dump(mode="json"))
 
 
 @diagnostics_cli.command("accept-performance-model")
