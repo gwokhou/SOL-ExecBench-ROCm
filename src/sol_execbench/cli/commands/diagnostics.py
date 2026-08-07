@@ -54,6 +54,9 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     build_run_context,
     build_stage_handlers,
     diagnostic_lifecycle_status,
+    plan_retirement,
+    repo_root,
+    resolved_retirement_targets,
     resume_diagnostic_lifecycle,
     run_diagnostic_lifecycle,
     run_gc,
@@ -95,6 +98,11 @@ _OUTPUT_DIRECTORY = click.Path(file_okay=False, path_type=Path)
 def _blob_resolver() -> BlobStoreResolver:
     """Return the lifecycle blob resolver bound to the configured store."""
     return BlobStoreResolver(BlobStore(store_root()))
+
+
+def _store_root_path() -> Path:
+    """Return the configured lifecycle store root."""
+    return store_root()
 
 
 @click.group(
@@ -542,6 +550,29 @@ def lifecycle_gc_cli(
                 "A blob became reachable since planning; re-run and inspect "
                 "the dry-run plan before deleting."
             ),
+        ) from error
+    return CliResult(data=plan.model_dump(mode="json"))
+
+
+@lifecycle_cli.command("retirement-plan")
+@click.option("--store-root", type=_OUTPUT_DIRECTORY)
+def lifecycle_retirement_plan_cli(
+    store_root: Path | None,
+) -> CliResult:
+    """Print the audit-only dry-run plan for the resolved retirement targets."""
+    try:
+        plan = plan_retirement(
+            store_root_path=(
+                store_root.resolve() if store_root else _store_root_path()
+            ),
+            targets=resolved_retirement_targets(repo_root()),
+            repo_root=repo_root(),
+        )
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_retirement_invalid",
+            hint="Re-run after resolving the lifecycle store and target roots.",
         ) from error
     return CliResult(data=plan.model_dump(mode="json"))
 
