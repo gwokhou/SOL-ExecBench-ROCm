@@ -53,6 +53,7 @@ jobs:
           uv run --no-sync python scripts/check_schema_versions.py
           uv run --no-sync python scripts/check_non_canonical_artifacts.py
           uv run --no-sync python scripts/check_python_reuse.py
+          uv run --no-sync python scripts/check_diagnostic_store_consistency.py
 
   package-tests:
     name: Package tests

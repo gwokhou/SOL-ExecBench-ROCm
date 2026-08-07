@@ -59,6 +59,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleParent,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
+    runs_dir,
     store_root,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.transitions import (
@@ -872,22 +873,56 @@ def diagnostic_lifecycle_status(
     run_state = load_json_file(DiagnosticRunManifest, run_state_path)
     context = _context_from_run_state(run_state, run_state_path)
     verified = _reverify_past_stages(run_state, context, handlers)
+    stages = [
+        {
+            "stage": item.stage.value,
+            "status": item.status.value,
+            "attempts": item.attempts,
+            "stage_id": _produced_stage_id(context, item),
+        }
+        for item in verified.stages
+    ]
     next_stage = _next_pending(verified)
-    return {
+    status = {
         "run_id": verified.run_id,
         "collection_run_id": verified.collection_run_id,
         "design_id": verified.design_id,
         "generation": verified.generation,
-        "stages": [
-            {
-                "stage": item.stage.value,
-                "status": item.status.value,
-                "attempts": item.attempts,
-            }
-            for item in verified.stages
+        "stages": stages,
+        "parent_chain": [
+            entry["stage_id"]
+            for entry in stages
+            if entry["status"] == DiagnosticStageStatus.VERIFIED.value
+            and entry["stage_id"] is not None
         ],
         "next_stage": next_stage.value if next_stage is not None else None,
     }
+    _write_status_json(context, status)
+    return status
+
+
+def _produced_stage_id(
+    context: StageRunContext,
+    state: DiagnosticRunStageState,
+) -> str | None:
+    if state.status is not DiagnosticStageStatus.VERIFIED:
+        return None
+    receipt = _load_receipt(
+        context.collection_run_id,
+        state.stage,
+        context.store_root,
+    )
+    return receipt.stage_id if receipt is not None else None
+
+
+def _write_status_json(
+    context: StageRunContext,
+    status: dict[str, object],
+) -> None:
+    path = (
+        runs_dir(context.store_root) / context.collection_run_id / "status.json"
+    )
+    atomic_write_json_value(path, status)
 
 
 def _now() -> str:

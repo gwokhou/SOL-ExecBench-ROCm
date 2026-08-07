@@ -31,6 +31,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleParent,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.store import runs_dir
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 
 _NOW = "2026-01-01T00:00:00+00:00"
@@ -339,6 +340,10 @@ def test_status_reports_drift_and_next_stage(tmp_path: Path) -> None:
             by_stage[str(entry["stage"])] = str(entry["status"])
     assert by_stage["acceptance"] == DiagnosticStageStatus.FAILED.value
     assert by_stage["design"] == DiagnosticStageStatus.VERIFIED.value
+    status_file = (
+        runs_dir(tmp_path) / run_state.collection_run_id / "status.json"
+    )
+    assert status_file.is_file()
 
 
 def test_status_next_stage_none_when_complete(tmp_path: Path) -> None:
@@ -353,3 +358,13 @@ def test_status_next_stage_none_when_complete(tmp_path: Path) -> None:
     )
     assert status["next_stage"] is None
     assert status["collection_run_id"] == run_state.collection_run_id
+    chain: object = status["parent_chain"]
+    assert isinstance(chain, list)
+    assert len(chain) == len(CHAIN)
+    stages: object = status["stages"]
+    assert isinstance(stages, list)
+    for item in stages:
+        if isinstance(item, dict):
+            entry = cast(dict[str, object], item)
+            if entry["status"] == DiagnosticStageStatus.VERIFIED.value:
+                assert isinstance(entry["stage_id"], str)
