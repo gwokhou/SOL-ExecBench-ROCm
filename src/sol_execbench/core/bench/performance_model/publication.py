@@ -31,10 +31,15 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
 from sol_execbench.core.bench.performance_model.inference import (
     DiagnosticInferenceProfile,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
+    ReferenceResolver,
+    resolve_corpus_reference,
+)
 from sol_execbench.core.bench.performance_model.models import (
     DiagnosticCalibrationProfile,
 )
 from sol_execbench.core.bench.performance_model.validation_corpus import (
+    CorpusArtifactReference,
     DiagnosticValidationCase,
     DiagnosticValidationCorpus,
     ValidationArtifactReference,
@@ -170,6 +175,7 @@ def build_diagnostic_publication_projection(
     semantic_loader: SemanticCharacterizationLoader,
     solar_projector: SolarManifestProjector,
     solar_verifier: SolarManifestProjectionVerifier,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> Path:
     """Build and atomically publish a compact, self-verifying corpus tree."""
     corpus_path = development_corpus_path.resolve()
@@ -203,6 +209,7 @@ def build_diagnostic_publication_projection(
                     corpus_path,
                     staging,
                     solar_projector=solar_projector,
+                    blob_resolver=blob_resolver,
                 )
                 for index, case in enumerate(corpus.cases)
             ],
@@ -212,7 +219,9 @@ def build_diagnostic_publication_projection(
             projected_corpus.model_dump(mode="json"),
         )
         projected_inference = _fit_projected_inference(
-            staging, semantic_loader=semantic_loader
+            staging,
+            semantic_loader=semantic_loader,
+            blob_resolver=blob_resolver,
         )
         _require_inference_equivalence(source_inference, projected_inference)
         _write_publication_manifest(
@@ -224,6 +233,7 @@ def build_diagnostic_publication_projection(
             staging / PUBLICATION_MANIFEST_NAME,
             semantic_loader=semantic_loader,
             solar_verifier=solar_verifier,
+            blob_resolver=blob_resolver,
         )
         staging.replace(output)
     except Exception:
@@ -237,6 +247,7 @@ def verify_diagnostic_publication_projection(
     *,
     semantic_loader: SemanticCharacterizationLoader,
     solar_verifier: SolarManifestProjectionVerifier,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> DiagnosticPublicationProjection:
     """Verify the exact tree and reproduce its projected inference profile."""
     path = manifest_path.resolve()
@@ -260,7 +271,12 @@ def verify_diagnostic_publication_projection(
     ):
         raise ValueError("publication corpus role or case count mismatch")
     for case in corpus.cases:
-        _verify_projected_case(case, corpus_path, solar_verifier=solar_verifier)
+        _verify_projected_case(
+            case,
+            corpus_path,
+            solar_verifier=solar_verifier,
+            blob_resolver=blob_resolver,
+        )
     source_profile = load_json_file(
         DiagnosticInferenceProfile, source_profile_path
     )
@@ -276,6 +292,7 @@ def verify_diagnostic_publication_projection(
         development_corpus_path=corpus_path,
         calibration_profile_path=calibration_path,
         semantic_loader=semantic_loader,
+        blob_resolver=blob_resolver,
     )
     if rebuilt != projected_profile:
         raise ValueError("publication inference does not reproduce")
@@ -345,11 +362,14 @@ def _project_case(
     staging: Path,
     *,
     solar_projector: SolarManifestProjector,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> DiagnosticValidationCase:
     source_evidence = _verified_corpus_reference(
-        corpus_path, case.evidence_manifest
+        corpus_path, case.evidence_manifest, blob_resolver=blob_resolver
     )
-    source_solar = _verified_corpus_reference(corpus_path, case.solar_manifest)
+    source_solar = _verified_corpus_reference(
+        corpus_path, case.solar_manifest, blob_resolver=blob_resolver
+    )
     destination = staging / "cases" / f"{index:04d}"
     evidence_path, evidence = _project_performance_manifest(
         source_evidence, destination / "performance"
@@ -370,22 +390,15 @@ def _project_case(
 
 def _verified_corpus_reference(
     corpus_path: Path,
-    reference: ValidationArtifactReference,
+    reference: CorpusArtifactReference,
+    *,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> Path:
-    root = corpus_path.parent.resolve()
-    relative = validate_relative_artifact_path(reference.path)
-    path = root / relative
-    if (
-        path.is_symlink()
-        or not path.is_file()
-        or not path.resolve().is_relative_to(root)
-    ):
-        raise ValueError(
-            "validation corpus artifact is missing or escapes root"
-        )
-    if sha256_file(path) != reference.sha256:
-        raise ValueError("validation corpus artifact SHA-256 mismatch")
-    return path
+    return resolve_corpus_reference(
+        reference,
+        resolver=blob_resolver,
+        corpus_root=corpus_path.parent,
+    )
 
 
 def _project_performance_manifest(
@@ -499,17 +512,23 @@ def _validation_reference(
     root: Path, path: Path
 ) -> ValidationArtifactReference:
     return ValidationArtifactReference(
-        path=path.relative_to(root).as_posix(), sha256=sha256_file(path)
+        path=path.relative_to(root).as_posix(),
+        sha256=sha256_file(path),
+        size_bytes=path.stat().st_size,
     )
 
 
 def _fit_projected_inference(
-    staging: Path, *, semantic_loader: SemanticCharacterizationLoader
+    staging: Path,
+    *,
+    semantic_loader: SemanticCharacterizationLoader,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> DiagnosticInferenceProfile:
     profile = fit_diagnostic_inference_profile(
         development_corpus_path=staging / _CORPUS_PATH,
         calibration_profile_path=staging / _CALIBRATION_PATH,
         semantic_loader=semantic_loader,
+        blob_resolver=blob_resolver,
     )
     atomic_write_json_value(
         staging / _PROJECTED_INFERENCE_PATH, profile.model_dump(mode="json")
@@ -599,11 +618,14 @@ def _verify_projected_case(
     corpus_path: Path,
     *,
     solar_verifier: SolarManifestProjectionVerifier,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> None:
     evidence_path = _verified_corpus_reference(
-        corpus_path, case.evidence_manifest
+        corpus_path, case.evidence_manifest, blob_resolver=blob_resolver
     )
-    solar_path = _verified_corpus_reference(corpus_path, case.solar_manifest)
+    solar_path = _verified_corpus_reference(
+        corpus_path, case.solar_manifest, blob_resolver=blob_resolver
+    )
     evidence = load_and_verify_performance_evidence_manifest(
         evidence_path, require_complete=True
     )

@@ -93,6 +93,19 @@ describe the current contract rather than duplicate this backlog.
   is the first candidate this flow can package and round-trip verify. The
   immutable lifecycle contracts, store layout, and identity chain live under
   `src/sol_execbench/core/bench/performance_model/lifecycle/`.
+- Promotion now targets the local SHA-256 blob store
+  (`data/store/blobs/sha256/<digest>` by default, overridable with
+  `SOL_EXECBENCH_DIAGNOSTIC_STORE`): `promote` imports every cited artifact into
+  the write-once store and emits blob-backed corpus references
+  (`CorpusArtifactReference` with `blob_backed: true`), so a promoted corpus
+  depends on no historical physical path tree. The corpus schema is now
+  `diagnostic_validation_corpus.v7`. The pre-migration Cycle 3 artifacts on disk
+  (the path-rebased `data/outputs/promoted-development-cycle3.json` and the
+  projected corpus inside `data/publications/.../publication.json`) are v6 and
+  therefore archival-only records for the current toolchain; the Phase 1 release
+  archive preserves the publication tree, and the real Cycle 3 collection work
+  re-promotes and re-projects into the v7 world. The old v6 schema identifier is
+  removed with no compatibility reader.
 - Candidate inputs now use per-run entropy and per-invocation trusted-reference
   validation. The candidate process does not receive the nonce or expected
   outputs. Publication runs additionally use the networkless, capability-free,
@@ -217,13 +230,13 @@ permissions and is not a durable diagnostic publication workflow.
    complete stage-level receipt. Resume must instead verify a typed receipt,
    all input identities, and the exact output inventory before treating a case
    as complete.
-3. **Promotion is content-addressed but path-lifetime-coupled.** The Cycle 3
-   promoted corpus rebases references beneath `data/outputs/`, so its source
-   model still depends on the physical Cycle 1/2 directory layout. The compact
-   publication is independently distributable, but internal source rebuilds
-   cannot move or retire the two roughly 22 GB roots. Promotion must target a
-   content-addressed blob store rather than extend the lifetime of historical
-   path trees.
+3. **Promotion is content-addressed but the on-disk corpus is path-coupled.**
+   The `promote` command now imports artifacts into the content-addressed blob
+   store and emits blob-backed v7 references, so new promotions extend no
+   historical path tree. The pre-migration on-disk Cycle 3 corpus
+   (`data/outputs/promoted-development-cycle3.json`) is v6 and path-rebased;
+   it is archival-only until the real Cycle 3 work re-promotes it, at which
+   point the two roughly 22 GB roots become governed GC candidates.
 4. **There is no monotonic lifecycle registry.** Introduce one current
    `DiagnosticLifecycleManifest` family whose immutable objects form the chain
    `design_id -> collection_run_id -> corpus_snapshot_id -> model_build_id ->
@@ -335,16 +348,18 @@ archive decision, and explicit approval for the resolved targets.
 
 1. Remove every same-generation mutation path for frozen held-out data and add
    tests proving that recollection or repair requires a new generation ID.
+   **(complete: Phases 0-3)**
 2. Define the lifecycle manifest, stage receipt, retention enum, and legal
-   monotonic transitions in production code.
+   monotonic transitions in production code. **(complete: Phases 0-3)**
 3. Introduce the local SHA-256 blob store and migrate promotion to immutable
    blob references without compatibility re-exports or multi-version readers.
+   **(complete: Phase 4)**
 4. Add lifecycle `run`, `status`, and `resume` orchestration; make status
-   verification-based rather than existence-based.
+   verification-based rather than existence-based. **(pending: Phase 5)**
 5. Add registry-driven `gc --dry-run`, then retire only the explicitly
-   unreachable legacy/debug/cache roots.
+   unreachable legacy/debug/cache roots. **(pending: Phase 6)**
 6. Add governed archive/checksum/attestation creation and a least-privilege
-   draft GitHub Release workflow.
+   draft GitHub Release workflow. **(complete: Phases 1-2)**
 7. Generate current-cycle status from the registry and remove duplicated
    hashes and one-time run snapshots from this handoff once Git history retains
    them.
@@ -383,12 +398,13 @@ identity.
 
 Cycle 3 CPU gates are closed. The governed `promote` stage now accepts the two
 source corpora beneath one explicit common `--root`, verifies every source
-artifact against its original corpus root, rebases references under the common
-root, and emits the 880-case development corpus. The existing
-`fit-performance-inference` command is the prediction gate: it rebuilds all 880
-cases, fails on any unavailable hardware prediction, and writes the versioned
-inference profile bound to the corpus, calibration, audit, and model-policy
-hashes. A separate prediction-preflight command is neither required nor used.
+artifact against its original corpus root, imports each cited artifact into the
+immutable lifecycle blob store, and emits the 880-case development corpus with
+blob-backed v7 references. The existing `fit-performance-inference` command is
+the prediction gate: it rebuilds all 880 cases, fails on any unavailable
+hardware prediction, and writes the versioned inference profile bound to the
+corpus, calibration, audit, and model-policy hashes. A separate
+prediction-preflight command is neither required nor used.
 The governed publication stage additionally verifies the complete source tree,
 then projects model inputs into a separate `data/publications/` tree, omits raw
 ROCPD and nested Orojenesis artifacts, sanitizes private static-evidence paths,

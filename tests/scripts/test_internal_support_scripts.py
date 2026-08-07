@@ -283,10 +283,12 @@ def _write_promotion_source(corpus, root: Path, role: str, offset: int) -> Path:
                     evidence_manifest=corpus.ValidationArtifactReference(
                         path=evidence.relative_to(root).as_posix(),
                         sha256=corpus.sha256_file(evidence),
+                        size_bytes=evidence.stat().st_size,
                     ),
                     solar_manifest=corpus.ValidationArtifactReference(
                         path=solar.relative_to(root).as_posix(),
                         sha256=corpus.sha256_file(solar),
+                        size_bytes=solar.stat().st_size,
                     ),
                 )
             )
@@ -299,9 +301,14 @@ def _write_promotion_source(corpus, root: Path, role: str, offset: int) -> Path:
 def test_rdna4_diagnostic_promotion_verifies_roles_order_and_hashes(
     load_script,
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_DIAGNOSTIC_STORE",
+        str(tmp_path / "store"),
     )
     development = _write_promotion_source(corpus, tmp_path, "development", 0)
     held_out = _write_promotion_source(corpus, tmp_path, "held_out", 220)
@@ -318,6 +325,10 @@ def test_rdna4_diagnostic_promotion_verifies_roles_order_and_hashes(
     assert len(promoted.cases) == 440
     assert promoted.cases[0].case_id.startswith("promoted-00-")
     assert promoted.cases[-1].case_id.startswith("promoted-01-")
+    # Promotion emits content-addressed blob references, not path trees.
+    for case in promoted.cases:
+        assert case.evidence_manifest.blob_backed is True
+        assert case.solar_manifest.blob_backed is True
     with pytest.raises(ValueError, match="order"):
         corpus._promote_development(
             tmp_path,
@@ -335,9 +346,14 @@ def test_rdna4_diagnostic_promotion_verifies_roles_order_and_hashes(
 def test_rdna4_diagnostic_promotion_rejects_hash_drift(
     load_script,
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_DIAGNOSTIC_STORE",
+        str(tmp_path / "store"),
     )
     development = _write_promotion_source(corpus, tmp_path, "development", 0)
     held_out = _write_promotion_source(corpus, tmp_path, "held_out", 220)
@@ -354,12 +370,17 @@ def test_rdna4_diagnostic_promotion_rejects_hash_drift(
         )
 
 
-def test_rdna4_diagnostic_promotion_rebases_cross_root_references(
+def test_rdna4_diagnostic_promotion_independent_of_historical_paths(
     load_script,
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_DIAGNOSTIC_STORE",
+        str(tmp_path / "store"),
     )
     output_root = tmp_path / "outputs"
     development_root = output_root / "cycle1"
@@ -377,23 +398,27 @@ def test_rdna4_diagnostic_promotion_rebases_cross_root_references(
     )
 
     promoted = corpus.load_json_file(corpus.DiagnosticValidationCorpus, output)
-    first = promoted.cases[0]
-    last = promoted.cases[-1]
-    assert first.evidence_manifest.path.startswith("cycle1/artifacts/")
-    assert last.evidence_manifest.path.startswith("cycle2/artifacts/")
     for case in promoted.cases:
         for reference in (case.evidence_manifest, case.solar_manifest):
-            artifact = (output_root / reference.path).resolve()
-            assert artifact.is_relative_to(output_root.resolve())
-            assert corpus.sha256_file(artifact) == reference.sha256
+            # Blob references carry no path and depend on no historical tree.
+            assert reference.blob_backed is True
+            store = corpus.BlobStore(tmp_path / "store")
+            resolved = store.get(reference.sha256)
+            assert resolved.stat().st_size == reference.size_bytes
+            assert corpus.sha256_file(resolved) == reference.sha256
 
 
 def test_rdna4_diagnostic_promotion_rejects_source_outside_root(
     load_script,
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_DIAGNOSTIC_STORE",
+        str(tmp_path / "store"),
     )
     output_root = tmp_path / "outputs"
     development = _write_promotion_source(
@@ -414,9 +439,14 @@ def test_rdna4_diagnostic_promotion_rejects_source_outside_root(
 def test_rdna4_diagnostic_promotion_rejects_artifact_outside_source_root(
     load_script,
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_DIAGNOSTIC_STORE",
+        str(tmp_path / "store"),
     )
     output_root = tmp_path / "outputs"
     development_root = output_root / "cycle1"

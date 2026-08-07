@@ -124,6 +124,13 @@ uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
   --output data/outputs/promoted-development-cycle3.json
 ```
 
+Promotion imports every cited artifact into the immutable lifecycle blob store
+(`data/store/blobs/sha256/<digest>` by default; override with the
+`SOL_EXECBENCH_DIAGNOSTIC_STORE` environment variable) and emits
+blob-backed corpus references, so the promoted corpus depends on no historical
+physical path tree. The old source roots stay readable until a governed GC
+proves them unreachable.
+
 Preregister the fresh start-220 universe before preparing its cases; prepare and
 structurally preflight that universe before any collection, then fit against the
 880-case development corpus:

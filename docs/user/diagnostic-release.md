@@ -37,6 +37,17 @@ sol-execbench --format json diagnostics release package \
   --source-revision 19f195a8
 ```
 
+## Blob identity
+
+Promoted source corpora reference their case artifacts by content-addressed
+blob keys (`sha256`), not by path. The lifecycle blob store lives under
+`data/store/blobs/sha256/<digest>` by default and is overridable with the
+`SOL_EXECBENCH_DIAGNOSTIC_STORE` environment variable. Every read re-verifies
+the stored content against its key, and a promoted corpus depends on no
+historical physical path tree. Compact publications remain self-contained:
+their projected corpora use tree-backed references resolved relative to the
+publication root.
+
 ## Verifying a downloaded archive
 
 After download, verify the external archive SHA-256 and the unpacked

@@ -41,10 +41,12 @@ def _case(
         evidence_manifest=ValidationArtifactReference(
             path=evidence.name,
             sha256=sha256_file(evidence),
+            size_bytes=evidence.stat().st_size,
         ),
         solar_manifest=ValidationArtifactReference(
             path=solar.name,
             sha256=sha256_file(solar),
+            size_bytes=solar.stat().st_size,
         ),
     )
 
