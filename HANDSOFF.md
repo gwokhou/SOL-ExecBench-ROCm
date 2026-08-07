@@ -1,6 +1,6 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-07 against source revision `d0d07e0c` and the current
+Last audited: 2026-08-07 against source revision `19f195a8` and the current
 worktree; CPU and local-evidence readiness were rechecked in that state.
 
 This file is the single backlog for repository-level work that remains useful.
@@ -70,6 +70,18 @@ describe the current contract rather than duplicate this backlog.
   `59167a6f0acb8c8e2754f01d9e89873f2cd0bc66724a3c1c82bd126b01770c26`
   and preflight SHA-256
   `f83243a56bc33d0c9926cef3aba9f37de925eff594fc06bb7a9af977cb7df834`.
+  A governed, directory-isolated diagnostic publication projection now exists
+  under the ignored
+  `data/publications/microarchitecture-diagnostics-v7-cycle3/`. Its exact
+  inventory contains 880 cases and 74,253,001 bytes excluding the
+  self-describing manifest. It was rebuilt from and compared with the frozen
+  inference profile, and the production verifier accepts it. The publication
+  manifest SHA-256 is
+  `827162cf1432a7df69dca8b23d5ad7737e04a3f8d07dc02a98d77dbe230ca62b`.
+  The deterministic zstd release archive is 6,116,405 bytes with SHA-256
+  `7f68f56772ed03d6922a80d34ed3a30c14103eea6cf582092b40bfb3e651894d`.
+  These are local diagnostic artifacts, not publisher authority or an official
+  score release.
 - Candidate inputs now use per-run entropy and per-invocation trusted-reference
   validation. The candidate process does not receive the nonce or expected
   outputs. Publication runs additionally use the networkless, capability-free,
@@ -142,6 +154,206 @@ Authoritative surfaces:
 - `docs/SCORING-V3.md`
 - `docs/user/RELEASE-SCORING.md`
 
+### P0 — Establish an immutable diagnostic data lifecycle and automated flow
+
+The repository has strong artifact-level integrity but no unified lifecycle
+control plane. Individual designs, corpora, calibration profiles, inference
+profiles, acceptance results, and publication projections are typed and
+content-addressed. The repository does not yet have one machine-readable object
+that records which immutable generation is current, which stage produced it,
+its complete parent chain, whether it may still be mutated, its retention
+class, or the only legal next stage. Directory names, file existence, manual
+command order, and this handoff still carry too much operational state.
+
+The current effective flow is:
+
+```text
+preregister
+  -> prepare
+  -> SOLAR / GPU collect
+  -> freeze corpus
+  -> promote prior development plus revealed held-out
+  -> fit inference
+  -> collect and freeze fresh held-out
+  -> acceptance
+  -> publication projection
+  -> deterministic archive
+  -> GitHub Release
+```
+
+The publication end of this flow is now governed: it fully verifies the source
+tree, projects only reproducible model inputs, refits inference, requires exact
+semantic equivalence, writes an exact inventory, and keeps process and release
+directories disjoint. The preceding stages remain a manually orchestrated
+script pipeline, and archive creation, checksum publication, and GitHub Release
+upload remain manual. The existing `RDNA4 Hardware` workflow performs a
+different job: it writes 30-day Actions artifacts under read-only repository
+permissions and is not a durable diagnostic publication workflow.
+
+#### Lifecycle gaps that must close before fresh Cycle 3 held-out collection
+
+1. **Frozen generations are not completely immutable.** The corpus authoring
+   script guards one `collect --force` path after held-out freeze, but the
+   normal interface still represents confirmed overwrite as valid behavior.
+   `solar --force`, `repair-static-identity`, and a subsequent `freeze` can
+   replace artifacts or corpus declarations within the same filesystem
+   generation. A frozen held-out generation must never be modified. Any
+   recollection, repair, source-policy change, or identity correction must
+   create a new `collection_run_id` and `corpus_snapshot_id`; the prior
+   generation remains immutable and becomes `superseded`.
+2. **Stage completion is inferred from file existence.** Existing SOLAR or
+   performance manifest files can cause a case stage to return without a
+   complete stage-level receipt. Resume must instead verify a typed receipt,
+   all input identities, and the exact output inventory before treating a case
+   as complete.
+3. **Promotion is content-addressed but path-lifetime-coupled.** The Cycle 3
+   promoted corpus rebases references beneath `data/outputs/`, so its source
+   model still depends on the physical Cycle 1/2 directory layout. The compact
+   publication is independently distributable, but internal source rebuilds
+   cannot move or retire the two roughly 22 GB roots. Promotion must target a
+   content-addressed blob store rather than extend the lifetime of historical
+   path trees.
+4. **There is no monotonic lifecycle registry.** Introduce one current
+   `DiagnosticLifecycleManifest` family whose immutable objects form the chain
+   `design_id -> collection_run_id -> corpus_snapshot_id -> model_build_id ->
+   acceptance_id -> publication_id -> release_id`. Each object must bind its
+   parent digests, source revision, producer version, policy hashes, GPU and
+   software identity when applicable, stage status, exact inventory, and
+   retention class. Human aliases such as `cycle3` may point to an ID but may
+   not define identity.
+5. **There is no lifecycle orchestrator.** Replace the operator-maintained
+   command sequence with one resumable DAG entry point, for example
+   `diagnostics lifecycle run/status/resume`. Low-level stages may remain
+   independently testable, but the orchestrator must own dependencies,
+   attempts, bounded retries, stage receipts, and legal state transitions.
+6. **There is no executable retention or garbage-collection policy.** The
+   ignored output tree mixes governed evidence, superseded releases, debug
+   experiments, caches, and temporary probes. A GC command must operate only
+   from registry reachability, default to dry-run, explain every retained and
+   reclaimable object, and refuse to delete blobs reachable from a frozen
+   snapshot, acceptance, publication, or release.
+7. **Packaging and publication are only partially automated.** Add a governed
+   packager that emits the archive, checksum, and release attestation from one
+   verified publication manifest. A separate GitHub-hosted release job may
+   create a draft release after tag/revision and checksum verification. The
+   self-hosted GPU runner must remain a collection producer and must not receive
+   durable `contents: write` release authority.
+8. **Operational state is duplicated in prose.** Corpus hashes, current stage,
+   archive size, and the next legal action must come from the lifecycle
+   registry and a generated status command. `HANDSOFF.md` should retain human
+   decisions, external blockers, risks, and authorization points rather than
+   serve as the run database.
+
+#### Target storage and retention model
+
+Use immutable manifests over a replaceable storage backend. A local first
+implementation may use:
+
+```text
+data/store/blobs/sha256/<digest>
+data/store/runs/<collection_run_id>/
+data/store/snapshots/<corpus_snapshot_id>/manifest.json
+data/store/publications/<publication_id>/manifest.json
+data/store/releases/<release_id>/manifest.json
+```
+
+The blob key, not a mutable path, is the durable identity. The same contracts
+must later support an object-store backend without changing corpus or release
+semantics. Assign every object one closed retention class:
+
+- **cache**: reproducible and unreferenced; deletable at any time;
+- **debug**: bounded short retention and never admissible as governed input;
+- **process evidence**: hot while its generation is active, then cold after a
+  successor is accepted and a grace period expires;
+- **frozen source evidence**: retained while reachable from a governed corpus,
+  model, acceptance, or unreleased publication;
+- **publication/release**: retained durably with its external archive digest
+  and release attestation.
+
+ROCPD databases and nested Orojenesis output must not return to the compact
+GitHub artifact, but they must not be treated as disposable merely because the
+projection omits them. They move from hot process storage to cold source-audit
+storage until registry policy proves them unreachable and past retention.
+
+#### Flows and data that should be retired
+
+Retire the following behaviors after callers are migrated:
+
+- using `cycleN` directories or filenames as the primary identity;
+- overwriting any frozen held-out generation, even behind a confirmation flag;
+- using `repair-static-identity` as a normal post-freeze lifecycle stage;
+- treating an existing output filename as proof that a stage completed;
+- manually maintaining the preregister/prepare/collect/freeze/fit/accept chain;
+- manually creating tar archives and copying their hashes into prose;
+- keeping `HANDSOFF.md` as the only record of current run state;
+- the unreferenced standalone
+  `scripts/internal/rdna4/verify_rdna4_diagnostic_acceptance.py` wrapper after
+  migration to the stronger production acceptance authoring/verifier path.
+
+The local ignored data audit measured `data/outputs/` at approximately 40.8 GB.
+The following are retirement candidates, not authorized deletions in the
+current worktree:
+
+- superseded, unreferenced `microarchitecture-diagnostics-v3/` and
+  `microarchitecture-diagnostics-v6/`, approximately 8.0 GB and 6.6 GB;
+- `data/calibration/` and `data/local-evidence/`, which are already marked
+  non-canonical and have no production consumers;
+- reproducible caches, counter probes, smoke output, and directories named as
+  debug/fix experiments;
+- old `p0-release-*` attempts other than the currently documented
+  `p0-release-36e44fb/`, approximately 695 MB in total;
+- the currently unreferenced
+  `orojenesis-reproducible-9d17c17/`, approximately 1.4 GB, after any desired
+  audit copy is moved to cold storage.
+
+The retired v3/v6 roots and the unreferenced Orojenesis root alone account for
+roughly 16 GB. Do not delete `microarchitecture-diagnostics-v7/` or
+`microarchitecture-diagnostics-v7-cycle2/` yet: the promoted Cycle 3 source
+corpus still reaches them by path. First import their reachable artifacts into
+the blob store, emit and verify a replacement corpus snapshot, and prove that
+the old paths have no registry references. After a diagnostic publication is
+uploaded and round-trip verified, its local expanded directory is also staging
+rather than a second permanent copy; retain the durable archive/release object
+according to policy.
+
+No data was removed by this audit. Deletion work requires a separate reviewed
+GC plan with an exact dry-run inventory, byte totals, reachability proof, cold
+archive decision, and explicit approval for the resolved targets.
+
+#### Implementation order and completion criteria
+
+1. Remove every same-generation mutation path for frozen held-out data and add
+   tests proving that recollection or repair requires a new generation ID.
+2. Define the lifecycle manifest, stage receipt, retention enum, and legal
+   monotonic transitions in production code.
+3. Introduce the local SHA-256 blob store and migrate promotion to immutable
+   blob references without compatibility re-exports or multi-version readers.
+4. Add lifecycle `run`, `status`, and `resume` orchestration; make status
+   verification-based rather than existence-based.
+5. Add registry-driven `gc --dry-run`, then retire only the explicitly
+   unreachable legacy/debug/cache roots.
+6. Add governed archive/checksum/attestation creation and a least-privilege
+   draft GitHub Release workflow.
+7. Generate current-cycle status from the registry and remove duplicated
+   hashes and one-time run snapshots from this handoff once Git history retains
+   them.
+
+Completion requires a fresh diagnostic generation to move from preregistration
+through release using one immutable lineage, with an interrupted run resuming
+only after receipt verification, a frozen held-out overwrite failing
+unconditionally, promotion independent of historical physical paths, release
+creation consuming only a verified publication object, and GC proving the
+reachability and retention decision for every candidate before deletion.
+
+Authoritative surfaces:
+
+- `src/sol_execbench/core/bench/performance_model/`
+- `src/sol_execbench/core/integrity/`
+- `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
+- `src/sol_execbench/cli/commands/diagnostics.py`
+- `.github/workflows/rdna4-hardware.yml`
+- `docs/performance-diagnostics.md`
+
 ### P1 — Complete Cycle 3 held-out collection and acceptance
 
 The 880-case development corpus, start-220 pair-disjoint universe, current-policy
@@ -166,6 +378,12 @@ root, and emits the 880-case development corpus. The existing
 cases, fails on any unavailable hardware prediction, and writes the versioned
 inference profile bound to the corpus, calibration, audit, and model-policy
 hashes. A separate prediction-preflight command is neither required nor used.
+The governed publication stage additionally verifies the complete source tree,
+then projects model inputs into a separate `data/publications/` tree, omits raw
+ROCPD and nested Orojenesis artifacts, sanitizes private static-evidence paths,
+and proves inference equivalence by refitting from the projected corpus. Its
+exact-inventory verifier is the distribution gate; the two 22 GB process roots
+are not GitHub release inputs.
 
 The frozen calibration is reusable only on its exact recorded identity: RX 9060
 XT/gfx1200 GPU `a3ff7590-0000-1000-800f-a29c1cca1511` at BDF
@@ -244,7 +462,9 @@ Authoritative surfaces:
 - `L` remains unavailable without an explicitly supplied trusted frontier.
 - Partial or ungoverned diagnostics cannot request kernel code changes.
 - Tuning and parameter-estimation samples cannot enter held-out acceptance.
-- Generated evidence under `data/outputs/` remains ignored and uncommitted.
+- Mutable process evidence stays under ignored `data/outputs/`; immutable
+  diagnostic release projections stay under ignored `data/publications/`.
+  Neither is committed to Git.
 - Current `sol_execbench.*` schema identifiers are defined only in
   `src/sol_execbench/core/integrity/schema_versions.py`; current SOLAR string
   and numeric artifact versions are defined only in

@@ -7,6 +7,7 @@ from typing import Literal
 import pytest
 from click.testing import CliRunner
 
+from sol_execbench.cli.commands import diagnostics as diagnostics_commands
 from sol_execbench.cli.main import cli
 from sol_execbench.core.bench.performance_model import authoring
 from sol_execbench.core.bench.performance_model.acceptance import (
@@ -25,6 +26,10 @@ from sol_execbench.core.bench.performance_model.models import (
     DiagnosticCalibrationProfile,
     WorkloadKind,
 )
+from sol_execbench.core.bench.performance_model.publication import (
+    DiagnosticPublicationArtifact,
+    DiagnosticPublicationProjection,
+)
 from sol_execbench.core.bench.performance_model.validation_corpus import (
     DiagnosticValidationCase,
     DiagnosticValidationCorpus,
@@ -35,7 +40,7 @@ from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     load_json_file,
 )
-from sol_execbench.core.integrity import stable_json_checksum
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.solar_bridge.performance import (
     load_manifest_semantic_characterization,
 )
@@ -170,6 +175,117 @@ def _acceptance_case(
         ),
         gold_action_codes=(["restore_wmma_path"] if action_positive else []),
     )
+
+
+def _publication(root: Path) -> DiagnosticPublicationProjection:
+    paths = (
+        "development.json",
+        "calibration/profile.json",
+        "calibration/profile.audit.json",
+        "source-inference.json",
+        "inference.json",
+    )
+    artifacts: list[DiagnosticPublicationArtifact] = []
+    for relative in sorted(paths):
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(relative, encoding="utf-8")
+        artifacts.append(
+            DiagnosticPublicationArtifact(
+                path=relative,
+                sha256=sha256_file(path),
+                size_bytes=path.stat().st_size,
+            )
+        )
+    indexed = {item.path: item for item in artifacts}
+    return DiagnosticPublicationProjection(
+        case_count=220,
+        source_corpus_sha256="a" * 64,
+        corpus=indexed[paths[0]],
+        calibration_profile=indexed[paths[1]],
+        calibration_audit=indexed[paths[2]],
+        source_inference_profile=indexed[paths[3]],
+        inference_profile=indexed[paths[4]],
+        artifacts=artifacts,
+        uncompressed_size_bytes=sum(item.size_bytes for item in artifacts),
+    )
+
+
+def test_publication_projection_cli_commands(
+    tmp_path: Path, monkeypatch
+) -> None:
+    inputs = [tmp_path / f"input-{index}.json" for index in range(3)]
+    for path in inputs:
+        path.write_text("{}", encoding="utf-8")
+    output = tmp_path / "publication"
+    manifest_path = output / "publication.json"
+
+    def fake_build(**kwargs) -> Path:
+        assert (
+            kwargs["semantic_loader"] is load_manifest_semantic_characterization
+        )
+        assert callable(kwargs["solar_projector"])
+        assert callable(kwargs["solar_verifier"])
+        projection = _publication(kwargs["output_root"])
+        atomic_write_json_value(
+            manifest_path, projection.model_dump(mode="json")
+        )
+        return manifest_path
+
+    monkeypatch.setattr(
+        diagnostics_commands,
+        "build_diagnostic_publication_projection",
+        fake_build,
+    )
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "diagnostics",
+            "build-publication-projection",
+            "--development-corpus",
+            str(inputs[0]),
+            "--calibration-profile",
+            str(inputs[1]),
+            "--source-inference-profile",
+            str(inputs[2]),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["data"]["cases"] == 220
+
+    projection = load_json_file(DiagnosticPublicationProjection, manifest_path)
+
+    def fake_verify(_path: Path, **kwargs) -> DiagnosticPublicationProjection:
+        assert (
+            kwargs["semantic_loader"] is load_manifest_semantic_characterization
+        )
+        assert callable(kwargs["solar_verifier"])
+        return projection
+
+    monkeypatch.setattr(
+        diagnostics_commands,
+        "verify_diagnostic_publication_projection",
+        fake_verify,
+    )
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "diagnostics",
+            "verify-publication-projection",
+            "--manifest",
+            str(manifest_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["data"]["verified"] is True
 
 
 def test_inference_and_acceptance_authoring_cli_workflow(

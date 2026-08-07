@@ -102,12 +102,13 @@ def test_unmarked_directory_fails(tmp_path: Path):
 
 
 def test_exempt_generated_root(tmp_path: Path):
-    outputs = tmp_path / "outputs"
-    outputs.mkdir()
     retired = "sol_execbench.hardware_calibration." + "v1"
-    (outputs / "generated.json").write_text(
-        f'{{"schema_version": "{retired}"}}',
-    )
+    for name in ("outputs", "publications"):
+        generated = tmp_path / name
+        generated.mkdir()
+        (generated / "generated.json").write_text(
+            f'{{"schema_version": "{retired}"}}',
+        )
 
     assert collect_findings(tmp_path) == []
 

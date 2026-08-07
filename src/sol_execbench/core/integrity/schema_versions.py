@@ -47,6 +47,9 @@ class SchemaVersion(StrEnum):
     DIAGNOSTIC_INFERENCE_PROFILE = (
         "sol_execbench.diagnostic_inference_profile.v9"
     )
+    DIAGNOSTIC_PUBLICATION_PROJECTION = (
+        "sol_execbench.diagnostic_publication_projection.v1"
+    )
     DIAGNOSTIC_VALIDATION_CORPUS = (
         "sol_execbench.diagnostic_validation_corpus.v6"
     )

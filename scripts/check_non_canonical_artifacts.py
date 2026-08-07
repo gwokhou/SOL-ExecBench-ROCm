@@ -28,13 +28,15 @@ from solar.schema_versions import CURRENT_STRING_SCHEMA_VERSIONS
 ROOT = Path(__file__).resolve().parents[1]
 SCAN_ROOT = ROOT / "data"
 # Generated / vendored data roots are out of scope: outputs/ holds transient
-# diagnostic artifacts, AgentKernelArena/ is a vendored corpus clone, and
-# fusion-sample/ is a sample problem.
+# diagnostic artifacts, publications/ holds immutable generated projections,
+# AgentKernelArena/ is a vendored corpus clone, and fusion-sample/ is a sample
+# problem.
 EXEMPT_DATA_ROOTS = frozenset(
     {
         "AgentKernelArena",
         "fusion-sample",
         "outputs",
+        "publications",
     }
 )
 MARKER = "NON_CANONICAL.md"
