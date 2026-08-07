@@ -354,6 +354,92 @@ def test_rdna4_diagnostic_promotion_rejects_hash_drift(
         )
 
 
+def test_rdna4_diagnostic_promotion_rebases_cross_root_references(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    output_root = tmp_path / "outputs"
+    development_root = output_root / "cycle1"
+    held_out_root = output_root / "cycle2"
+    development = _write_promotion_source(
+        corpus, development_root, "development", 0
+    )
+    held_out = _write_promotion_source(corpus, held_out_root, "held_out", 220)
+    output = output_root / "promoted-development.json"
+
+    corpus._promote_development(
+        output_root,
+        [development, held_out],
+        output,
+    )
+
+    promoted = corpus.load_json_file(corpus.DiagnosticValidationCorpus, output)
+    first = promoted.cases[0]
+    last = promoted.cases[-1]
+    assert first.evidence_manifest.path.startswith("cycle1/artifacts/")
+    assert last.evidence_manifest.path.startswith("cycle2/artifacts/")
+    for case in promoted.cases:
+        for reference in (case.evidence_manifest, case.solar_manifest):
+            artifact = (output_root / reference.path).resolve()
+            assert artifact.is_relative_to(output_root.resolve())
+            assert corpus.sha256_file(artifact) == reference.sha256
+
+
+def test_rdna4_diagnostic_promotion_rejects_source_outside_root(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    output_root = tmp_path / "outputs"
+    development = _write_promotion_source(
+        corpus, tmp_path / "outside", "development", 0
+    )
+    held_out = _write_promotion_source(
+        corpus, output_root / "cycle2", "held_out", 220
+    )
+
+    with pytest.raises(ValueError, match="remain under --root"):
+        corpus._promote_development(
+            output_root,
+            [development, held_out],
+            output_root / "promoted-development.json",
+        )
+
+
+def test_rdna4_diagnostic_promotion_rejects_artifact_outside_source_root(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    output_root = tmp_path / "outputs"
+    development_root = output_root / "cycle1"
+    development = _write_promotion_source(
+        corpus, development_root, "development", 0
+    )
+    held_out = _write_promotion_source(
+        corpus, output_root / "cycle2", "held_out", 220
+    )
+    escaped = output_root / "escaped-evidence.json"
+    escaped.write_text("evidence-0\n", encoding="utf-8")
+    evidence = development_root / "artifacts/development-0-evidence.json"
+    evidence.unlink()
+    evidence.symlink_to(escaped)
+
+    with pytest.raises(ValueError, match="escapes its corpus root"):
+        corpus._promote_development(
+            output_root,
+            [development, held_out],
+            output_root / "promoted-development.json",
+        )
+
+
 def _result_output(values: Sequence[object]) -> str:
     return "\n".join(f"RESULT {value}" for value in values)
 

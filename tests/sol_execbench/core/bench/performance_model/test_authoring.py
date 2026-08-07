@@ -5,8 +5,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
 from sol_execbench.core.bench.performance_model import authoring
-from sol_execbench.core.bench.performance_model.models import WorkloadKind
+from sol_execbench.core.bench.performance_model.models import (
+    PerformancePrediction,
+    PredictionKind,
+    WorkloadKind,
+)
 from sol_execbench.core.bench.performance_model.validation_corpus import (
     DiagnosticValidationCase,
     ValidationArtifactReference,
@@ -143,3 +148,14 @@ def test_case_rejects_forged_pair_or_family(
             inference_path=None,
             semantic_loader=_unused_semantic_loader,
         )
+
+
+def test_inference_authoring_requires_available_hardware_prediction() -> None:
+    unavailable = PerformancePrediction(
+        kind=PredictionKind.HW,
+        status=DiagnosticSidecarStatus.UNAVAILABLE,
+        reason_codes=["calibration_point_outside_range"],
+    )
+
+    with pytest.raises(ValueError, match="lacks an available HW prediction"):
+        authoring._prediction_values(unavailable, case_id="development-case")

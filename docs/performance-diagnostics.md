@@ -95,12 +95,14 @@ uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
   --output PREVIOUS_CORPUS_ROOT/promoted-development-cycle2.json
 ```
 
-Promotion does not copy large evidence. The current command requires both
-source corpus files and every referenced evidence/SOLAR artifact to remain
-beneath the same root, verifies their SHA-256 values, preserves
-development-before-held-out ordering, and refuses to overwrite an existing
-output. The new preregistered universe is then reserved for fresh held-out
-collection; it is not read while fitting from the promoted development corpus.
+Promotion does not copy large evidence. The command requires both source corpus
+files and every referenced evidence/SOLAR artifact to remain beneath one
+explicit common `--root`. It validates each reference against its source corpus
+directory, verifies SHA-256 values, rebases references under the common root,
+preserves development-before-held-out ordering, and refuses to overwrite an
+existing output. The new preregistered universe is then reserved for fresh
+held-out collection; it is not read while fitting from the promoted development
+corpus.
 
 ### Cycle 3 boundary
 
@@ -109,25 +111,58 @@ working-set-coordinate model-policy fix. Cycle 3 must therefore combine the
 existing 660-case promoted development corpus with those 220 revealed pairs,
 for 880 development cases, and use the fresh universe beginning at 220.
 
-The current authoring command cannot perform that promotion: the 660-case input
-and Cycle 2 held-out artifacts live under different ignored roots, while
-`promote` accepts exactly two corpus files directly beneath one root. Do not
-copy paths into a hand-authored corpus or treat the existing promotion command
-as Cycle 3-ready. First add a governed cross-root promotion path that verifies
-every content reference and writes one versioned 880-case development corpus.
+Create the combined corpus from the common ignored evidence root; do not copy
+paths into a hand-authored corpus:
 
-Cycle 3 also requires a new CPU-only prediction preflight. It must rebuild all
-220 newly promoted Cycle 2 cases from their cited SOLAR and performance
-evidence with the selected calibration and current model policy, write a
-versioned content-addressed result, and fail unless every prediction is
-available. `preflight_rdna4_diagnostic_corpus.py` validates the authored
-660-case universe and collection plan only; passing it does not satisfy the
-prediction gate.
+```bash
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  promote --root data/outputs \
+  --source-corpus \
+  data/outputs/microarchitecture-diagnostics-v7/preregistered-corpus/promoted-development-cycle2.json \
+  --source-corpus \
+  data/outputs/microarchitecture-diagnostics-v7-cycle2/preregistered-corpus/held_out.json \
+  --output data/outputs/promoted-development-cycle3.json
+```
 
-Only after both CPU prerequisites pass may the operator preregister start 220,
-fit and freeze inference plus action thresholds from the 880-case development
-corpus, and collect or inspect the new 220 held-out cases. The exact remaining
-work is tracked in `HANDSOFF.md`.
+Preregister the fresh start-220 universe before preparing its cases; prepare and
+structurally preflight that universe before any collection, then fit against the
+880-case development corpus:
+
+```bash
+mkdir -p \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  preregister \
+  --root \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus \
+  --universe-start 220
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  prepare \
+  --root \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus
+uv run python scripts/internal/rdna4/preflight_rdna4_diagnostic_corpus.py \
+  --corpus-root \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus \
+  --output \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus/preflight.json
+uv run sol-execbench --format json diagnostics fit-performance-inference \
+  --development-corpus data/outputs/promoted-development-cycle3.json \
+  --calibration-profile \
+  data/outputs/microarchitecture-diagnostics-v7/calibration/gfx1200-diagnostic-v7.json \
+  --output \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-inference.json
+```
+
+The selected calibration's recorded hardware and software identity must match
+the intended collection host. Inference fitting is also the prediction gate: it
+rebuilds every development case from cited SOLAR and performance evidence and
+fails if any hardware prediction is unavailable. The resulting versioned
+profile binds the development corpus, calibration, calibration audit, and
+current model-policy hashes; no separate prediction preflight is required.
+
+Only after those CPU gates pass and inference plus action thresholds are frozen
+may the operator collect or inspect the new 220 held-out cases. The exact local
+readiness evidence and remaining GPU work are tracked in `HANDSOFF.md`.
 
 The current corpus contract derives each pair ID from the evidence-bound
 workload SHA-256 and candidate SHA-256. Authoring re-derives that identity,
@@ -145,8 +180,11 @@ sol-execbench --format json diagnostics fit-performance-inference \
 This fits the family point models only from the point-fit phase, freezes 95%
 split-conformal expansion factors only from the following independent
 conformal-calibration phase, and fits deterministic action thresholds before
-held-out data is read. The current reduction point model has a separate
-outer-row slope for each calibrated width; unsupported widths fail closed.
+held-out data is read. A code-changing action is enabled only with at least 10
+development positives, at least 10 development negatives, at least 90%
+precision, and at least 70% recall. The current reduction point model has a
+separate outer-row slope for each calibrated width; unsupported widths fail
+closed.
 
 ```bash
 sol-execbench --format json diagnostics performance \
@@ -238,8 +276,9 @@ observations. Inference authoring separately requires at least 20 point-fit and
 20 conformal-calibration cases per family. Acceptance requires at least 20
 held-out cases per family (220 total), at least 90% empirical interval coverage
 in every family, median absolute percentage error at most 15%, P90 at most
-30%, and at least 90% precision plus 70% recall for every enabled
-code-changing action.
+30%, and at least one enabled code-changing action metric. Every enabled action
+requires at least 10 held-out positives, at least 90% precision, and at least
+70% recall.
 
 The overlap surface stores measured `resource_mix` points, not broad bins.
 Prediction uses piecewise-linear interpolation only inside the measured
