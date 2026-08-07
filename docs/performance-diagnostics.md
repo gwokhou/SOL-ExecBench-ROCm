@@ -160,6 +160,66 @@ fails if any hardware prediction is unavailable. The resulting versioned
 profile binds the development corpus, calibration, calibration audit, and
 current model-policy hashes; no separate prediction preflight is required.
 
+### Publish frozen diagnostic inputs
+
+Process evidence and release artifacts use disjoint roots. Keep raw collection,
+ROCPD databases, Orojenesis search output, and other mutable intermediates under
+`data/outputs/`. Build the immutable publication tree under
+`data/publications/`; the command rejects an output located in or above any
+input directory and refuses to overwrite an existing tree.
+
+```bash
+uv run sol-execbench --format json diagnostics \
+  build-publication-projection \
+  --development-corpus data/outputs/promoted-development-cycle3.json \
+  --calibration-profile \
+  data/outputs/microarchitecture-diagnostics-v7/calibration/gfx1200-diagnostic-v7.json \
+  --source-inference-profile \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-inference.json \
+  --output \
+  data/publications/microarchitecture-diagnostics-v7-cycle3
+
+uv run sol-execbench --format json diagnostics \
+  verify-publication-projection \
+  --manifest \
+  data/publications/microarchitecture-diagnostics-v7-cycle3/publication.json
+```
+
+The builder first verifies every artifact cited by the source corpus, including
+the large ROCPD and nested Orojenesis inputs. It then retains the canonical
+trace, timing, access, replay, profile summary, counter CSV/provenance, compact
+static evidence, and formal top-level SOLAR artifacts. ROCPD databases and
+nested Orojenesis output are omitted. Static evidence is rewritten to remove
+source paths, tool commands/output, warnings, and nested artifact paths. The
+projected corpus is content-addressed, its inference profile is refitted, and
+the build fails unless that profile is exactly equivalent to the frozen source
+profile apart from the new corpus digest.
+
+`publication.json` records the exact regular-file inventory, hashes, byte
+counts, source-corpus digest, projection policy, and diagnostic-only authority.
+The verifier rejects extra files, symlinks, hash drift, restored raw evidence,
+case-identity drift, or a non-reproducible inference profile. It requires only
+the unpacked publication tree; the 22 GB process roots are not distribution
+dependencies.
+
+For the current 880-case Cycle 3 input, the governed inventory is 74,253,001
+bytes, excluding the self-describing `publication.json`. A deterministic zstd
+archive is 6,116,405 bytes, so publish that archive as a GitHub Release asset
+and record its SHA-256 in the release notes rather than committing generated
+evidence to Git:
+
+```bash
+tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+  --zstd -cf \
+  data/publications/microarchitecture-diagnostics-v7-cycle3.tar.zst \
+  -C data/publications microarchitecture-diagnostics-v7-cycle3
+```
+
+After download, verify the externally published archive SHA-256, unpack it, and
+run `verify-publication-projection` before consuming `development.json`,
+`calibration/profile.json`, or `inference.json`. This publication remains
+diagnostic-only and cannot authorize an official score or leaderboard result.
+
 Only after those CPU gates pass and inference plus action thresholds are frozen
 may the operator collect or inspect the new 220 held-out cases. The exact local
 readiness evidence and remaining GPU work are tracked in `HANDSOFF.md`.

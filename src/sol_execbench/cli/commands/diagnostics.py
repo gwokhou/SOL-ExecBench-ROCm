@@ -50,6 +50,11 @@ from sol_execbench.core.bench.performance_model.governance import (
 from sol_execbench.core.bench.performance_model.models import (
     PerformanceDiagnosticSidecar,
 )
+from sol_execbench.core.bench.performance_model.publication import (
+    DiagnosticPublicationProjection,
+    build_diagnostic_publication_projection,
+    verify_diagnostic_publication_projection,
+)
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     load_json_file,
@@ -60,10 +65,15 @@ from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.solar_bridge.performance import (
     load_manifest_semantic_characterization,
 )
+from sol_execbench.core.solar_bridge.publication import (
+    project_solar_manifest,
+    verify_projected_solar_manifest,
+)
 
 console = Console(stderr=True)
 _FILE = click.Path(exists=True, dir_okay=False, path_type=Path)
 _OUTPUT = click.Path(dir_okay=False, path_type=Path)
+_OUTPUT_DIRECTORY = click.Path(file_okay=False, path_type=Path)
 
 
 @click.group(
@@ -152,6 +162,77 @@ def fit_performance_inference_cli(
             "enabled_actions": len(profile.enabled_action_codes),
         },
         artifacts=(artifact(output, "diagnostic_inference_profile_json"),),
+    )
+
+
+@diagnostics_cli.command("build-publication-projection")
+@click.option("--development-corpus", type=_FILE, required=True)
+@click.option("--calibration-profile", type=_FILE, required=True)
+@click.option("--source-inference-profile", type=_FILE, required=True)
+@click.option("--output", type=_OUTPUT_DIRECTORY, required=True)
+def build_publication_projection_cli(
+    development_corpus: Path,
+    calibration_profile: Path,
+    source_inference_profile: Path,
+    output: Path,
+) -> CliResult:
+    """Publish the compact, reproducible inputs of a frozen diagnostic."""
+    try:
+        manifest_path = build_diagnostic_publication_projection(
+            development_corpus_path=development_corpus,
+            calibration_profile_path=calibration_profile,
+            source_inference_profile_path=source_inference_profile,
+            output_root=output,
+            semantic_loader=load_manifest_semantic_characterization,
+            solar_projector=project_solar_manifest,
+            solar_verifier=verify_projected_solar_manifest,
+        )
+        projection = load_json_file(
+            DiagnosticPublicationProjection, manifest_path
+        )
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_publication_input_invalid",
+            hint=(
+                "Verify the frozen corpus, calibration audit, source "
+                "inference, and every cited evidence artifact."
+            ),
+        ) from error
+    return CliResult(
+        data={
+            "cases": projection.case_count,
+            "uncompressed_size_bytes": projection.uncompressed_size_bytes,
+            "diagnostic_only": True,
+        },
+        artifacts=(artifact(manifest_path, "diagnostic_publication_json"),),
+    )
+
+
+@diagnostics_cli.command("verify-publication-projection")
+@click.option("--manifest", type=_FILE, required=True)
+def verify_publication_projection_cli(manifest: Path) -> CliResult:
+    """Verify a distributed compact diagnostic publication tree."""
+    try:
+        projection = verify_diagnostic_publication_projection(
+            manifest,
+            semantic_loader=load_manifest_semantic_characterization,
+            solar_verifier=verify_projected_solar_manifest,
+        )
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_publication_invalid",
+            hint="Restore the exact content-addressed publication tree.",
+        ) from error
+    return CliResult(
+        data={
+            "cases": projection.case_count,
+            "uncompressed_size_bytes": projection.uncompressed_size_bytes,
+            "verified": True,
+            "diagnostic_only": True,
+        },
+        artifacts=(artifact(manifest, "diagnostic_publication_json"),),
     )
 
 
