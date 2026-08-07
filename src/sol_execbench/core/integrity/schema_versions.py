@@ -76,7 +76,7 @@ class SchemaVersion(StrEnum):
     )
     DIAGNOSTIC_STAGE_RECEIPT = "sol_execbench.diagnostic_stage_receipt.v1"
     DIAGNOSTIC_VALIDATION_CORPUS = (
-        "sol_execbench.diagnostic_validation_corpus.v6"
+        "sol_execbench.diagnostic_validation_corpus.v7"
     )
     DOCKER_PREFLIGHT = "sol_execbench.docker_preflight.v1"
     ENVIRONMENT_DIAGNOSTICS = "sol_execbench.environment_diagnostics.v1"

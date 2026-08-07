@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
+    BlobStore,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticLifecycleStage,
     DiagnosticRetentionClass,
@@ -36,6 +39,12 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticCaseReceipt,
     DiagnosticStageReceipt,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
+    BlobReference,
+    BlobStoreResolver,
+    ReferenceResolver,
+    resolve_corpus_reference,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.retention import (
     retention_duration_days,
@@ -69,6 +78,9 @@ __all__ = [
     "DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER",
     "LEGAL_TRANSITIONS",
     "SOL_EXECBENCH_DIAGNOSTIC_STORE",
+    "BlobReference",
+    "BlobStore",
+    "BlobStoreResolver",
     "CurrentDiagnosticLifecycleManifest",
     "DiagnosticAcceptanceLifecycleManifest",
     "DiagnosticCaseReceipt",
@@ -87,6 +99,7 @@ __all__ = [
     "DiagnosticStageReceipt",
     "DiagnosticStageStatus",
     "GpuLifecycleIdentity",
+    "ReferenceResolver",
     "SoftwareLifecycleIdentity",
     "acceptance_id",
     "acceptances_dir",
@@ -104,6 +117,7 @@ __all__ = [
     "release_id",
     "releases_dir",
     "require_legal_transition",
+    "resolve_corpus_reference",
     "retention_duration_days",
     "retention_reclaimable",
     "runs_dir",

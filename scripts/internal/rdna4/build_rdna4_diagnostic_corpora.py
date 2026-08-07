@@ -36,6 +36,7 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
     load_and_verify_performance_evidence_manifest,
 )
 from sol_execbench.core.bench.performance_model.lifecycle import (
+    BlobStore,
     DiagnosticCollectionRunManifest,
     DiagnosticCorpusSnapshotManifest,
     DiagnosticDesignManifest,
@@ -54,6 +55,7 @@ from sol_execbench.core.bench.performance_model.replay_evidence import (
     PerformanceReplayEvidenceSidecar,
 )
 from sol_execbench.core.bench.performance_model.validation_corpus import (
+    BlobArtifactReference,
     DiagnosticValidationCase,
     DiagnosticValidationCorpus,
     ValidationArtifactReference,
@@ -1059,22 +1061,29 @@ def _require_frozen_design(root: Path) -> DiagnosticCorpusDesign:
 
 def _validate_promoted_reference(
     source_root: Path,
-    destination_root: Path,
     reference: ValidationArtifactReference,
-) -> ValidationArtifactReference:
+) -> BlobArtifactReference:
+    """Import one source artifact into the blob store and emit its key.
+
+    Promotion targets the content-addressed blob store so the promoted corpus
+    does not extend the lifetime of the historical path trees.
+    """
     artifact = (source_root / reference.path).resolve()
     if not artifact.is_relative_to(source_root):
         raise ValueError("promoted corpus reference escapes its corpus root")
-    if not artifact.is_relative_to(destination_root):
-        raise ValueError("promoted corpus artifact escapes --root")
     if not artifact.is_file():
         raise ValueError(
             f"promoted corpus artifact is missing: {reference.path}"
         )
     if sha256_file(artifact) != reference.sha256:
         raise ValueError(f"promoted corpus hash mismatch: {reference.path}")
-    return reference.model_copy(
-        update={"path": artifact.relative_to(destination_root).as_posix()}
+    digest = BlobStore(store_root()).put_file(
+        artifact,
+        expected_sha256=reference.sha256,
+    )
+    return BlobArtifactReference(
+        sha256=digest,
+        size_bytes=artifact.stat().st_size,
     )
 
 
@@ -1083,19 +1092,16 @@ def _promoted_case(
     *,
     source_index: int,
     source_root: Path,
-    destination_root: Path,
 ) -> DiagnosticValidationCase:
     return case.model_copy(
         update={
             "case_id": f"promoted-{source_index:02d}-{case.case_id}",
             "evidence_manifest": _validate_promoted_reference(
                 source_root,
-                destination_root,
                 case.evidence_manifest,
             ),
             "solar_manifest": _validate_promoted_reference(
                 source_root,
-                destination_root,
                 case.solar_manifest,
             ),
         }
@@ -1109,8 +1115,8 @@ def _promote_development(
 ) -> None:
     """Combine governed corpora beneath one root into the next development set.
 
-    Source artifact references are verified relative to their original corpus
-    directories, then rebased beneath the explicit common root.
+    Source artifacts are imported into the content-addressed blob store, so the
+    promoted corpus depends on no historical physical path tree.
     """
     if len(source_paths) != 2:
         raise ValueError("promote requires development then held-out corpora")
@@ -1140,7 +1146,6 @@ def _promote_development(
                 case,
                 source_index=source_index,
                 source_root=source_path.parent,
-                destination_root=root,
             )
             for case in corpus.cases
         )

@@ -53,10 +53,12 @@ def _corpus(
                     sha256=stable_json_checksum(
                         [prefix, kind, index, "evidence"]
                     ),
+                    size_bytes=8,
                 ),
                 solar_manifest=ValidationArtifactReference(
                     path=f"{kind}-{index}.solar.json",
                     sha256=stable_json_checksum([prefix, kind, index, "solar"]),
+                    size_bytes=8,
                 ),
             )
             for kind in _FAMILIES

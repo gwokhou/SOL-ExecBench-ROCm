@@ -47,6 +47,11 @@ from sol_execbench.core.bench.performance_model.governance import (
     evaluate_performance_diagnostic_governance,
     validate_performance_diagnostic_freshness,
 )
+from sol_execbench.core.bench.performance_model.lifecycle import (
+    BlobStore,
+    BlobStoreResolver,
+    store_root,
+)
 from sol_execbench.core.bench.performance_model.models import (
     PerformanceDiagnosticSidecar,
 )
@@ -78,6 +83,11 @@ console = Console(stderr=True)
 _FILE = click.Path(exists=True, dir_okay=False, path_type=Path)
 _OUTPUT = click.Path(dir_okay=False, path_type=Path)
 _OUTPUT_DIRECTORY = click.Path(file_okay=False, path_type=Path)
+
+
+def _blob_resolver() -> BlobStoreResolver:
+    """Return the lifecycle blob resolver bound to the configured store."""
+    return BlobStoreResolver(BlobStore(store_root()))
 
 
 @click.group(
@@ -152,6 +162,7 @@ def fit_performance_inference_cli(
             development_corpus_path=development_corpus,
             calibration_profile_path=calibration_profile,
             semantic_loader=load_manifest_semantic_characterization,
+            blob_resolver=_blob_resolver(),
         )
         atomic_write_json_value(output, profile.model_dump(mode="json"))
     except (OSError, ValueError) as error:
@@ -190,6 +201,7 @@ def build_publication_projection_cli(
             semantic_loader=load_manifest_semantic_characterization,
             solar_projector=project_solar_manifest,
             solar_verifier=verify_projected_solar_manifest,
+            blob_resolver=_blob_resolver(),
         )
         projection = load_json_file(
             DiagnosticPublicationProjection, manifest_path
@@ -222,6 +234,7 @@ def verify_publication_projection_cli(manifest: Path) -> CliResult:
             manifest,
             semantic_loader=load_manifest_semantic_characterization,
             solar_verifier=verify_projected_solar_manifest,
+            blob_resolver=_blob_resolver(),
         )
     except (OSError, ValueError) as error:
         raise CliFailure(
@@ -359,6 +372,7 @@ def accept_performance_model_cli(
             calibration_profile_path=calibration_profile,
             inference_profile_path=inference_profile,
             semantic_loader=load_manifest_semantic_characterization,
+            blob_resolver=_blob_resolver(),
         )
         atomic_write_json_value(
             manifest_output,
@@ -659,6 +673,7 @@ def _acceptance_admission(
         calibration_profile_path=sources.calibration_profile,
         inference_profile_path=sources.inference_profile,
         semantic_loader=load_manifest_semantic_characterization,
+        blob_resolver=_blob_resolver(),
     )
     if not acceptance.accepted:
         return PerformanceAcceptanceStatus.FAILED, frozenset()

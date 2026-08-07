@@ -28,6 +28,10 @@ from sol_execbench.core.bench.performance_model.inference import (
     build_inference_profile,
     point_features,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
+    ReferenceResolver,
+    resolve_corpus_reference,
+)
 from sol_execbench.core.bench.performance_model.model_identity import (
     build_diagnostic_model_identity,
 )
@@ -52,6 +56,7 @@ def fit_diagnostic_inference_profile(
     development_corpus_path: Path,
     calibration_profile_path: Path,
     semantic_loader: SemanticCharacterizationLoader,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> DiagnosticInferenceProfile:
     """Fit only from a declared development corpus and frozen calibration."""
     corpus = load_json_file(
@@ -73,6 +78,7 @@ def fit_diagnostic_inference_profile(
             corpus_path=development_corpus_path,
             calibration_path=calibration_profile_path,
             semantic_loader=semantic_loader,
+            blob_resolver=blob_resolver,
         )
         for case in corpus.cases
     ]
@@ -94,6 +100,7 @@ def build_diagnostic_acceptance(
     calibration_profile_path: Path,
     inference_profile_path: Path,
     semantic_loader: SemanticCharacterizationLoader,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> tuple[DiagnosticAcceptanceManifest, DiagnosticAcceptanceResult]:
     """Evaluate the frozen profile once against disjoint held-out evidence."""
     development = load_json_file(
@@ -124,6 +131,7 @@ def build_diagnostic_acceptance(
             calibration_path=calibration_profile_path,
             inference_path=inference_profile_path,
             semantic_loader=semantic_loader,
+            blob_resolver=blob_resolver,
         )
         for case in held_out.cases
     ]
@@ -149,6 +157,7 @@ def verify_diagnostic_acceptance(
     calibration_profile_path: Path,
     inference_profile_path: Path,
     semantic_loader: SemanticCharacterizationLoader,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> None:
     """Rebuild held-out acceptance from source evidence and reject any drift."""
     rebuilt_manifest, rebuilt_result = build_diagnostic_acceptance(
@@ -157,6 +166,7 @@ def verify_diagnostic_acceptance(
         calibration_profile_path=calibration_profile_path,
         inference_profile_path=inference_profile_path,
         semantic_loader=semantic_loader,
+        blob_resolver=blob_resolver,
     )
     if not _acceptance_manifests_equivalent(rebuilt_manifest, manifest):
         raise ValueError(
@@ -203,6 +213,7 @@ def _development_observation(
     corpus_path: Path,
     calibration_path: Path,
     semantic_loader: SemanticCharacterizationLoader,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> InferenceObservation:
     diagnostic = _build_case_diagnostic(
         case,
@@ -210,6 +221,7 @@ def _development_observation(
         calibration_path=calibration_path,
         inference_path=None,
         semantic_loader=semantic_loader,
+        blob_resolver=blob_resolver,
     )
     workload = diagnostic.workloads[0]
     predicted_ms, lower_ms, upper_ms = _prediction_values(
@@ -241,6 +253,7 @@ def _acceptance_case(
     calibration_path: Path,
     inference_path: Path,
     semantic_loader: SemanticCharacterizationLoader,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> DiagnosticAcceptanceCase:
     diagnostic = _build_case_diagnostic(
         case,
@@ -248,6 +261,7 @@ def _acceptance_case(
         calibration_path=calibration_path,
         inference_path=inference_path,
         semantic_loader=semantic_loader,
+        blob_resolver=blob_resolver,
     )
     workload = diagnostic.workloads[0]
     predicted_ms, lower_ms, upper_ms = _prediction_values(
@@ -282,16 +296,17 @@ def _build_case_diagnostic(
     calibration_path: Path,
     inference_path: Path | None,
     semantic_loader: SemanticCharacterizationLoader,
+    blob_resolver: ReferenceResolver | None = None,
 ) -> PerformanceDiagnosticSidecar:
-    evidence = _verified_case_path(
-        corpus_path,
-        case.evidence_manifest.path,
-        case.evidence_manifest.sha256,
+    evidence = resolve_corpus_reference(
+        case.evidence_manifest,
+        resolver=blob_resolver,
+        corpus_root=corpus_path.parent,
     )
-    solar = _verified_case_path(
-        corpus_path,
-        case.solar_manifest.path,
-        case.solar_manifest.sha256,
+    solar = resolve_corpus_reference(
+        case.solar_manifest,
+        resolver=blob_resolver,
+        corpus_root=corpus_path.parent,
     )
     manifest = load_and_verify_performance_evidence_manifest(evidence)
     expected_pair_id = validation_pair_id(
@@ -316,21 +331,6 @@ def _build_case_diagnostic(
     if diagnostic.workloads[0].semantic.workload_kind is not case.workload_kind:
         raise ValueError("validation case workload family mismatch")
     return diagnostic
-
-
-def _verified_case_path(
-    corpus_path: Path,
-    relative_path: str,
-    expected_sha256: str,
-) -> Path:
-    path = (corpus_path.parent / relative_path).resolve()
-    try:
-        path.relative_to(corpus_path.parent.resolve())
-    except ValueError as error:
-        raise ValueError("validation artifact escapes corpus root") from error
-    if sha256_file(path) != expected_sha256:
-        raise ValueError("validation artifact hash mismatch")
-    return path
 
 
 def _prediction_values(

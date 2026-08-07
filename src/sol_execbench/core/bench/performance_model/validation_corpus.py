@@ -5,7 +5,8 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from pathlib import Path
+from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -14,7 +15,12 @@ from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     StrictArtifactModel,
 )
-from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
+from sol_execbench.core.integrity import (
+    SHA256Digest,
+    sha256_file,
+    stable_json_checksum,
+    validate_relative_artifact_path,
+)
 from sol_execbench.core.integrity.schema_versions import (
     SchemaVersion,
 )
@@ -40,12 +46,40 @@ _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
 class ValidationArtifactReference(StrictArtifactModel):
-    """One immutable artifact input to a validation case."""
+    """One immutable tree-backed artifact input to a validation case.
+
+    Tree-backed references resolve relative to the corpus root and are used by
+    self-contained compact publications, where the case files live beside the
+    corpus.
+    """
 
     model_config = _CONFIG
 
     path: str = Field(min_length=1)
     sha256: SHA256Digest
+    size_bytes: int = Field(ge=0)
+    blob_backed: Literal[False] = False
+
+
+class BlobArtifactReference(StrictArtifactModel):
+    """One immutable blob-backed artifact input to a validation case.
+
+    Blob-backed references carry no path; the SHA-256 key in the lifecycle
+    blob store is the durable identity. Promotion targets these so historical
+    path trees can be retired once unreachable.
+    """
+
+    model_config = _CONFIG
+
+    sha256: SHA256Digest
+    size_bytes: int = Field(ge=0)
+    blob_backed: Literal[True] = True
+
+
+CorpusArtifactReference = Annotated[
+    BlobArtifactReference | ValidationArtifactReference,
+    Field(discriminator="blob_backed"),
+]
 
 
 class DiagnosticValidationCase(StrictArtifactModel):
@@ -56,8 +90,8 @@ class DiagnosticValidationCase(StrictArtifactModel):
     case_id: str = Field(min_length=1)
     pair_id: SHA256Digest
     workload_kind: WorkloadKind
-    evidence_manifest: ValidationArtifactReference
-    solar_manifest: ValidationArtifactReference
+    evidence_manifest: CorpusArtifactReference
+    solar_manifest: CorpusArtifactReference
     gold_action_codes: list[str] = Field(default_factory=list)
 
 
@@ -99,6 +133,30 @@ class DiagnosticValidationCorpus(CurrentSchemaModel):
         return self
 
 
+def verify_tree_reference(
+    corpus_root: Path,
+    reference: ValidationArtifactReference,
+) -> Path:
+    """Resolve and verify one tree-backed reference below the corpus root."""
+    root = corpus_root.resolve()
+    relative = validate_relative_artifact_path(reference.path)
+    path = root / relative
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(
+            "validation corpus artifact is missing or escapes root",
+        )
+    resolved = path.resolve()
+    if not resolved.is_relative_to(root):
+        raise ValueError(
+            "validation corpus artifact escapes its corpus root",
+        )
+    if resolved.stat().st_size != reference.size_bytes:
+        raise ValueError("validation corpus artifact size mismatch")
+    if sha256_file(resolved) != reference.sha256:
+        raise ValueError("validation corpus artifact SHA-256 mismatch")
+    return resolved
+
+
 def require_disjoint_corpora(
     development: DiagnosticValidationCorpus,
     held_out: DiagnosticValidationCorpus,
@@ -135,6 +193,8 @@ def validation_pair_id(
 __all__ = [
     "MINIMUM_CASES_PER_FAMILY",
     "MINIMUM_CORPUS_CASES",
+    "BlobArtifactReference",
+    "CorpusArtifactReference",
     "DiagnosticValidationCase",
     "DiagnosticValidationCorpus",
     "ValidationArtifactReference",
