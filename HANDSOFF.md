@@ -51,37 +51,23 @@ describe the current contract rather than duplicate this backlog.
   model policy identity after held-out reveal, so Cycle 2 cannot be repaired or
   accepted retrospectively; its ignored artifacts are source evidence only.
 - Cycle 3 CPU preparation is complete. Governed cross-root promotion produced
-  the ignored 880-case `data/outputs/promoted-development-cycle3.json`, SHA-256
-  `a7f9407fbf2dd72f83b5779defcab4fcccef2c355bfa67ddad363e351fc0cc99`.
-  Production inference fitting rebuilt every cited case successfully and wrote
-  `data/outputs/microarchitecture-diagnostics-v7-cycle3-inference.json`,
-  SHA-256
-  `f437d50946a97e28c0d954f2210e7b2d770537f2c5175909b9348cf531248085`.
-  The frozen profile enables `restore_wmma_path` from 80 development positives
-  and 800 negatives with 1.0 precision and 1.0 recall; all other code-changing
-  actions remain disabled.
-  The profile binds calibration
-  `e9ba5e76bda2843cbac213f1404ca9f197942b476612dc26bbf6ec50273920d9`
-  and audit
-  `fce918aa953aafee1fbe5a496b69f32cb46753b56a8de6ca5b94f9907d41a004`.
-  The start-220 design and CPU preflight are frozen under the ignored
-  `data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus/`
-  root with design SHA-256
-  `59167a6f0acb8c8e2754f01d9e89873f2cd0bc66724a3c1c82bd126b01770c26`
-  and preflight SHA-256
-  `f83243a56bc33d0c9926cef3aba9f37de925eff594fc06bb7a9af977cb7df834`.
-  A governed, directory-isolated diagnostic publication projection now exists
-  under the ignored
-  `data/publications/microarchitecture-diagnostics-v7-cycle3/`. Its exact
-  inventory contains 880 cases and 74,253,001 bytes excluding the
-  self-describing manifest. It was rebuilt from and compared with the frozen
-  inference profile, and the production verifier accepts it. The publication
-  manifest SHA-256 is
-  `827162cf1432a7df69dca8b23d5ad7737e04a3f8d07dc02a98d77dbe230ca62b`.
-  The deterministic zstd release archive is 6,116,405 bytes with SHA-256
-  `7f68f56772ed03d6922a80d34ed3a30c14103eea6cf582092b40bfb3e651894d`.
-  These are local diagnostic artifacts, not publisher authority or an official
-  score release.
+  the ignored 880-case `data/outputs/promoted-development-cycle3.json`;
+  production inference fitting rebuilt every cited case successfully and wrote
+  the frozen inference profile, which enables `restore_wmma_path` from 80
+  development positives and 800 negatives with 1.0 precision and 1.0 recall;
+  all other code-changing actions remain disabled. The start-220 design and
+  CPU preflight are frozen under the ignored preregistered root. A governed,
+  directory-isolated publication projection exists under
+  `data/publications/microarchitecture-diagnostics-v7-cycle3/` with 880 cases
+  and 74,253,001 bytes excluding the self-describing manifest; the production
+  verifier accepts it, and the deterministic zstd archive is 6,116,405 bytes.
+  These pre-migration artifacts are the archival v6 generation; their exact
+  digests live in the lifecycle registry, the release attestation
+  (`sol_execbench.diagnostic_release_attestation.v1`), and the
+  registry-generated `diagnostics lifecycle status --run
+  data/store/runs/<collection_run_id>/run.json` output, not duplicated in
+  this handoff. They are local diagnostic artifacts, not publisher authority
+  or an official score release.
 - A governed release packager now packages a verified publication into a
   deterministic zstd archive, a release attestation
   (`sol_execbench.diagnostic_release_attestation.v1`), and an immutable release
@@ -120,6 +106,14 @@ describe the current contract rather than duplicate this backlog.
   every recorded stage through the handler; a missing receipt or drifted input
   is re-executed, never reported complete by file existence. The real GPU
   collection itself remains operator-run through the corpus authoring script.
+- The registry is now the run truth. `diagnostics lifecycle status` writes a
+  registry-generated `status.json` under
+  `data/store/runs/<collection_run_id>/` with the current generation, every
+  stage's status and produced stage identity, the parent chain, and the next
+  legal action. `scripts/check_diagnostic_store_consistency.py` fails CI when
+  a lifecycle manifest's stage, `stage_id`, directory placement, or referenced
+  blob disagrees with the store layout; it runs in the code-quality
+  architecture-guardrails step.
 - Candidate inputs now use per-run entropy and per-invocation trusted-reference
   validation. The candidate process does not receive the nonce or expected
   outputs. Publication runs additionally use the networkless, capability-free,
@@ -386,7 +380,9 @@ archive decision, and explicit approval for the resolved targets.
    draft GitHub Release workflow. **(complete: Phases 1-2)**
 7. Generate current-cycle status from the registry and remove duplicated
    hashes and one-time run snapshots from this handoff once Git history retains
-   them.
+   them. **(complete: Phase 7; `diagnostics lifecycle status` emits
+   registry-generated status.json, the Cycle 3 hash enumerations are replaced
+   by registry pointers, and the store consistency gate runs in CI)**
 
 Completion requires a fresh diagnostic generation to move from preregistration
 through release using one immutable lineage, with an interrupted run resuming
