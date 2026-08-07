@@ -1,7 +1,7 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-07 against source revision `ed04a4a2`; CPU and
-local-evidence readiness were rechecked at that revision.
+Last audited: 2026-08-07 against source revision `d0d07e0c` and the current
+worktree; CPU and local-evidence readiness were rechecked in that state.
 
 This file is the single backlog for repository-level work that remains useful.
 Completed investigations, superseded contracts, acceptance attempts, and
@@ -50,6 +50,26 @@ describe the current contract rather than duplicate this backlog.
   uses SOLAR semantic bytes as the working-set coordinate. This changes the
   model policy identity after held-out reveal, so Cycle 2 cannot be repaired or
   accepted retrospectively; its ignored artifacts are source evidence only.
+- Cycle 3 CPU preparation is complete. Governed cross-root promotion produced
+  the ignored 880-case `data/outputs/promoted-development-cycle3.json`, SHA-256
+  `a7f9407fbf2dd72f83b5779defcab4fcccef2c355bfa67ddad363e351fc0cc99`.
+  Production inference fitting rebuilt every cited case successfully and wrote
+  `data/outputs/microarchitecture-diagnostics-v7-cycle3-inference.json`,
+  SHA-256
+  `f437d50946a97e28c0d954f2210e7b2d770537f2c5175909b9348cf531248085`.
+  The frozen profile enables `restore_wmma_path` from 80 development positives
+  and 800 negatives with 1.0 precision and 1.0 recall; all other code-changing
+  actions remain disabled.
+  The profile binds calibration
+  `e9ba5e76bda2843cbac213f1404ca9f197942b476612dc26bbf6ec50273920d9`
+  and audit
+  `fce918aa953aafee1fbe5a496b69f32cb46753b56a8de6ca5b94f9907d41a004`.
+  The start-220 design and CPU preflight are frozen under the ignored
+  `data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus/`
+  root with design SHA-256
+  `59167a6f0acb8c8e2754f01d9e89873f2cd0bc66724a3c1c82bd126b01770c26`
+  and preflight SHA-256
+  `f83243a56bc33d0c9926cef3aba9f37de925eff594fc06bb7a9af977cb7df834`.
 - Candidate inputs now use per-run entropy and per-invocation trusted-reference
   validation. The candidate process does not receive the nonce or expected
   outputs. Publication runs additionally use the networkless, capability-free,
@@ -122,16 +142,15 @@ Authoritative surfaces:
 - `docs/SCORING-V3.md`
 - `docs/user/RELEASE-SCORING.md`
 
-### P1 — Start Cycle 3 after the Cycle 2 input invalidation
+### P1 — Complete Cycle 3 held-out collection and acceptance
 
-Do not tune against either revealed held-out set or reuse either frozen
-inference/acceptance artifact. Combine the existing 660-case promoted
-development corpus with the 220 revealed Cycle 2 pairs into an 880-case Cycle 3
-development corpus, preregister the pair-disjoint universe beginning at 220,
-and rebuild the model under the current policy identity. Freeze the model and
-action thresholds before collecting or reading the new held-out evidence, then
-run the same acceptance gates. Changing gates, excluding the 24 exposed cases,
-or reusing held-out pairs is not an acceptable fix.
+The 880-case development corpus, start-220 pair-disjoint universe, current-policy
+inference profile, and action thresholds are frozen. Do not tune against either
+revealed held-out set or reuse either prior inference/acceptance artifact. The
+next governed step is to collect and freeze the fresh 220 held-out cases without
+reading partial results, then run the same acceptance gates. Changing gates,
+excluding the 24 exposed Cycle 2 cases, or reusing held-out pairs is not an
+acceptable fix.
 
 Cycle 2 GPU collection itself is complete: every one of the eleven families has
 20 content-addressed SOLAR manifests and 20 performance-evidence manifests.
@@ -139,29 +158,30 @@ The working-set/traffic feature asymmetry is fixed in production with a focused
 regression test, but that post-reveal code change invalidates the Cycle 2 frozen
 identity.
 
-Two CPU prerequisites are not implemented yet and must close before any Cycle 3
-GPU collection:
+Cycle 3 CPU gates are closed. The governed `promote` stage now accepts the two
+source corpora beneath one explicit common `--root`, verifies every source
+artifact against its original corpus root, rebases references under the common
+root, and emits the 880-case development corpus. The existing
+`fit-performance-inference` command is the prediction gate: it rebuilds all 880
+cases, fails on any unavailable hardware prediction, and writes the versioned
+inference profile bound to the corpus, calibration, audit, and model-policy
+hashes. A separate prediction-preflight command is neither required nor used.
 
-- Extend governed promotion to verify and combine corpora whose artifacts live
-  under the two distinct ignored roots above. The current `promote` stage
-  accepts exactly one directly rooted development corpus followed by one
-  directly rooted held-out corpus, so it cannot produce the required 880-case
-  Cycle 3 input.
-- Add a versioned prediction-preflight artifact and entrypoint that rebuilds all
-  220 newly promoted Cycle 2 cases with the selected calibration and current
-  model policy, and requires an available prediction for every case. The
-  existing corpus preflight validates authored shapes and collection batches;
-  it does not execute prediction and is not evidence for this gate.
-
-After those gates pass, preregister start 220, freeze inference and action
-thresholds from the verified 880-case development corpus, and only then collect
-or inspect the fresh 220-case held-out set. Governed GPU time is not justified
-before the CPU gates pass.
+The frozen calibration is reusable only on its exact recorded identity: RX 9060
+XT/gfx1200 GPU `a3ff7590-0000-1000-800f-a29c1cca1511` at BDF
+`0000:03:00.0`, ROCm 7.2.0, compiler identity
+`HIP version: 7.2.26015-fc0010cf6a`, locked clocks,
+and `stable_peak` power. A different collection identity requires a new governed
+calibration and a new inference fit before held-out collection. Do not collect
+or inspect the preregistered start-220 held-out cases until those frozen inputs
+match the collection host.
 
 Completion requires all eleven families to meet at least 90% empirical interval
-coverage, median APE at most 15%, P90 APE at most 30%, and every enabled action
-to meet its support, precision, and recall gates. Agent feedback may enable a
-code-changing action only after rebuilding and verifying every cited source.
+coverage, median APE at most 15%, and P90 APE at most 30%. At least one
+code-changing action metric must exist; every enabled action must have at least
+10 held-out positives, at least 90% precision, and at least 70% recall. Agent
+feedback may enable a code-changing action only after rebuilding and verifying
+every cited source.
 
 Authoritative surfaces:
 
@@ -225,8 +245,10 @@ Authoritative surfaces:
 - Partial or ungoverned diagnostics cannot request kernel code changes.
 - Tuning and parameter-estimation samples cannot enter held-out acceptance.
 - Generated evidence under `data/outputs/` remains ignored and uncommitted.
-- Current schema identifiers are defined only in
-  `src/sol_execbench/core/integrity/schema_versions.py`.
+- Current `sol_execbench.*` schema identifiers are defined only in
+  `src/sol_execbench/core/integrity/schema_versions.py`; current SOLAR string
+  and numeric artifact versions are defined only in
+  `src/solar/schema_versions.py`.
 
 ## Verification before handoff
 

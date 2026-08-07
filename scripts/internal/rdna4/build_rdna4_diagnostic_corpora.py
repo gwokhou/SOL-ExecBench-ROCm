@@ -159,6 +159,10 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         action="append",
         default=[],
+        help=(
+            "development then held-out corpora beneath the common --root; "
+            "promotion verifies and rebases their artifact references"
+        ),
     )
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
@@ -903,18 +907,48 @@ def _require_frozen_design(root: Path) -> DiagnosticCorpusDesign:
 
 
 def _validate_promoted_reference(
-    root: Path,
+    source_root: Path,
+    destination_root: Path,
     reference: ValidationArtifactReference,
-) -> None:
-    artifact = (root / reference.path).resolve()
-    if not artifact.is_relative_to(root):
+) -> ValidationArtifactReference:
+    artifact = (source_root / reference.path).resolve()
+    if not artifact.is_relative_to(source_root):
         raise ValueError("promoted corpus reference escapes its corpus root")
+    if not artifact.is_relative_to(destination_root):
+        raise ValueError("promoted corpus artifact escapes --root")
     if not artifact.is_file():
         raise ValueError(
             f"promoted corpus artifact is missing: {reference.path}"
         )
     if sha256_file(artifact) != reference.sha256:
         raise ValueError(f"promoted corpus hash mismatch: {reference.path}")
+    return reference.model_copy(
+        update={"path": artifact.relative_to(destination_root).as_posix()}
+    )
+
+
+def _promoted_case(
+    case: DiagnosticValidationCase,
+    *,
+    source_index: int,
+    source_root: Path,
+    destination_root: Path,
+) -> DiagnosticValidationCase:
+    return case.model_copy(
+        update={
+            "case_id": f"promoted-{source_index:02d}-{case.case_id}",
+            "evidence_manifest": _validate_promoted_reference(
+                source_root,
+                destination_root,
+                case.evidence_manifest,
+            ),
+            "solar_manifest": _validate_promoted_reference(
+                source_root,
+                destination_root,
+                case.solar_manifest,
+            ),
+        }
+    )
 
 
 def _promote_development(
@@ -922,7 +956,11 @@ def _promote_development(
     source_paths: list[Path],
     output: Path,
 ) -> None:
-    """Combine prior governed corpora into the next development corpus."""
+    """Combine governed corpora beneath one root into the next development set.
+
+    Source artifact references are verified relative to their original corpus
+    directories, then rebased beneath the explicit common root.
+    """
     if len(source_paths) != 2:
         raise ValueError("promote requires development then held-out corpora")
     root = root.resolve()
@@ -936,8 +974,8 @@ def _promote_development(
         zip(source_paths, ("development", "held_out"), strict=True)
     ):
         source_path = provided_source.resolve()
-        if source_path.parent != root:
-            raise ValueError("source corpora must be directly under --root")
+        if not source_path.is_relative_to(root):
+            raise ValueError("source corpora must remain under --root")
         corpus = load_json_file(
             DiagnosticValidationCorpus,
             source_path,
@@ -946,14 +984,12 @@ def _promote_development(
             raise ValueError(
                 "source corpus order must be development then held_out"
             )
-        for case in corpus.cases:
-            _validate_promoted_reference(root, case.evidence_manifest)
-            _validate_promoted_reference(root, case.solar_manifest)
         cases.extend(
-            case.model_copy(
-                update={
-                    "case_id": (f"promoted-{source_index:02d}-{case.case_id}")
-                }
+            _promoted_case(
+                case,
+                source_index=source_index,
+                source_root=source_path.parent,
+                destination_root=root,
             )
             for case in corpus.cases
         )
