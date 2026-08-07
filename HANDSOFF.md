@@ -329,7 +329,11 @@ Retire the following behaviors after callers are migrated:
 - keeping `HANDSOFF.md` as the only record of current run state;
 - the unreferenced standalone
   `scripts/internal/rdna4/verify_rdna4_diagnostic_acceptance.py` wrapper after
-  migration to the stronger production acceptance authoring/verifier path.
+  migration to the stronger production acceptance authoring/verifier path
+  (**retired: removed in commit d93406f2's follow-up; the production
+  `diagnostics accept-performance-model` path and
+  `verify_diagnostic_acceptance` are authoritative, and stale `scripts/*.pyc`
+  caches were cleaned**).
 
 The local ignored data audit measured `data/outputs/` at approximately 40.8 GB.
 The following are retirement candidates, not authorized deletions in the
