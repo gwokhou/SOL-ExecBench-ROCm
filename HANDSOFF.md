@@ -357,9 +357,17 @@ uploaded and round-trip verified, its local expanded directory is also staging
 rather than a second permanent copy; retain the durable archive/release object
 according to policy.
 
-No data was removed by this audit. Deletion work requires a separate reviewed
-GC plan with an exact dry-run inventory, byte totals, reachability proof, cold
-archive decision, and explicit approval for the resolved targets.
+No data was removed by this audit. The reviewed retirement plan now exists:
+`docs/ops/retirement-plan-2026-08-07.md` supplies the exact dry-run inventory,
+byte totals (17.57 GB across nine targets), reachability proof (all targets
+are registry-unreachable; the store holds only one test-root design manifest
+and an empty blob store), cold-archive decision, and the explicit approval
+checklist. The inventory is regenerable through the lifecycle toolchain:
+`sol-execbench --format json diagnostics lifecycle retirement-plan` (or the
+thin `scripts/plan_diagnostic_retirement.py` wrapper), which is audit-only and
+never deletes or moves data. Deletion of the resolved targets still requires
+explicit approval per the plan's checklist, including a cold copy of the v3/v6
+source evidence first.
 
 #### Implementation order and completion criteria
 
@@ -374,8 +382,11 @@ archive decision, and explicit approval for the resolved targets.
 4. Add lifecycle `run`, `status`, and `resume` orchestration; make status
    verification-based rather than existence-based. **(complete: Phase 5)**
 5. Add registry-driven `gc --dry-run`, then retire only the explicitly
-   unreachable legacy/debug/cache roots. **(complete: Phase 6; the audited
-   root retirement itself requires a reviewed operational GC run)**
+   unreachable legacy/debug/cache roots. **(complete: Phase 6; the reviewed
+   retirement plan is delivered at `docs/ops/retirement-plan-2026-08-07.md`
+   with the exact inventory and reachability proof, regenerable via
+   `scripts/plan_diagnostic_retirement.py`; deleting the resolved targets
+   awaits the explicit approval checklist)**
 6. Add governed archive/checksum/attestation creation and a least-privilege
    draft GitHub Release workflow. **(complete: Phases 1-2)**
 7. Generate current-cycle status from the registry and remove duplicated

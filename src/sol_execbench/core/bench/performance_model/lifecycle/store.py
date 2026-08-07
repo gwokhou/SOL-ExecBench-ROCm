@@ -19,6 +19,11 @@ _REPO_ROOT = Path(__file__).resolve().parents[6]
 _DEFAULT_STORE_ROOT = _REPO_ROOT / "data" / "store"
 
 
+def repo_root() -> Path:
+    """Return the repository root that hosts the lifecycle store."""
+    return _REPO_ROOT
+
+
 def store_root() -> Path:
     """Return the configured lifecycle store root.
 
@@ -86,6 +91,7 @@ __all__ = [
     "designs_dir",
     "publications_dir",
     "releases_dir",
+    "repo_root",
     "runs_dir",
     "snapshots_dir",
     "store_root",
