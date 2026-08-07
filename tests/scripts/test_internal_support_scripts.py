@@ -603,10 +603,11 @@ def test_force_refuses_to_recollect_frozen_held_out(
         corpus._refuse_frozen_held_out_recollect(forced)
 
 
-def test_force_recollect_held_out_requires_explicit_confirmation(
+def test_force_recollect_held_out_cannot_be_confirmed(
     tmp_path: Path,
     load_script: Any,
 ) -> None:
+    """Gap 1: no confirmation flag can mutate a frozen held-out generation."""
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py"
     )
@@ -617,9 +618,43 @@ def test_force_recollect_held_out_requires_explicit_confirmation(
         role="held_out",
         force=True,
         root=tmp_path,
-        confirm_recollect_held_out=True,
     )
-    corpus._refuse_frozen_held_out_recollect(confirmed)  # must not raise
+    with pytest.raises(ValueError, match="frozen held-out corpus"):
+        corpus._refuse_frozen_held_out_recollect(confirmed)
+
+
+def test_solar_force_refuses_frozen_held_out(
+    tmp_path: Path,
+    load_script: Any,
+) -> None:
+    """Gap 1: solar --force cannot rewrite a frozen held-out generation."""
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py"
+    )
+    (tmp_path / "held_out.json").write_text("{}", encoding="utf-8")
+
+    forced = SimpleNamespace(
+        stage="solar",
+        role="held_out",
+        force=True,
+        root=tmp_path,
+    )
+    with pytest.raises(ValueError, match="frozen held-out corpus"):
+        corpus._refuse_frozen_held_out_recollect(forced)
+
+
+def test_freeze_refuses_to_overwrite_a_frozen_corpus(
+    tmp_path: Path,
+    load_script: Any,
+) -> None:
+    """Gap 1: freeze never overwrites an existing frozen corpus file."""
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py"
+    )
+    (tmp_path / "held_out.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="refusing to overwrite"):
+        corpus._freeze(tmp_path, "held_out")
 
 
 def test_force_held_out_without_frozen_corpus_is_allowed(

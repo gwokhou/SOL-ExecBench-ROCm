@@ -82,6 +82,17 @@ describe the current contract rather than duplicate this backlog.
   `7f68f56772ed03d6922a80d34ed3a30c14103eea6cf582092b40bfb3e651894d`.
   These are local diagnostic artifacts, not publisher authority or an official
   score release.
+- A governed release packager now packages a verified publication into a
+  deterministic zstd archive, a release attestation
+  (`sol_execbench.diagnostic_release_attestation.v1`), and an immutable release
+  manifest under the lifecycle store: `diagnostics release package` /
+  `diagnostics release verify`. A GitHub-hosted `diagnostic-release.yml`
+  workflow verifies the archive checksum and publication and then publishes a
+  draft GitHub Release; the self-hosted `rdna4-hardware.yml` workflow stays
+  `contents: read`. The current `microarchitecture-diagnostics-v7-cycle3.tar.zst`
+  is the first candidate this flow can package and round-trip verify. The
+  immutable lifecycle contracts, store layout, and identity chain live under
+  `src/sol_execbench/core/bench/performance_model/lifecycle/`.
 - Candidate inputs now use per-run entropy and per-invocation trusted-reference
   validation. The candidate process does not receive the nonce or expected
   outputs. Publication runs additionally use the networkless, capability-free,
