@@ -1,0 +1,23 @@
+{
+  "baseline": {
+    "path": "statements/baseline.json",
+    "sha256": "1665b32030fc6cc9641b1d9254c580445506dfcbcf34b85fb0e9843be12392dc",
+    "size_bytes": 31022
+  },
+  "candidate": {
+    "path": "statements/candidate.json",
+    "sha256": "03842297529dc6c2503903459ddfc9663aad991c439ec7a9534244509543d985",
+    "size_bytes": 31124
+  },
+  "corpus_manifest": {
+    "path": "corpus/manifest.yaml",
+    "sha256": "8f057f7890016239456e137e639e4538df22733ecf49721a919f8f6877acc857",
+    "size_bytes": 60729
+  },
+  "schema_version": "sol_execbench.release_bundle.v2",
+  "solar": {
+    "path": "statements/solar.json",
+    "sha256": "6c9b2d75ef768b191b7ab647807fa80ca55945ff9602735a9aa85ecf2ef17224",
+    "size_bytes": 60374
+  }
+}
