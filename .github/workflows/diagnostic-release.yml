@@ -18,6 +18,9 @@ concurrency:
 
 env:
   GH_TOKEN: ${{ github.token }}
+  MKL_NUM_THREADS: "1"
+  OMP_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
   UV_NO_PROGRESS: "1"
 
 jobs:
