@@ -26,9 +26,9 @@ JSON.
 `score status` reports four separate states instead of a single overloaded
 availability flag: verifier availability, corpus-policy authorization, formal
 producer readiness, and whether a repository release bundle is published. The
-verifier and formal producer are available, but the v2 baseline evidence has
-not been published. The schema v7 manifest therefore keeps policy authorization
-fail-closed with reason `baseline_v2_release_evidence_pending`.
+verifier and formal producer are available, and the schema v7 manifest
+authorizes the corpus policy. No repository release bundle has been published
+yet.
 
 ## SOLAR bound policy
 

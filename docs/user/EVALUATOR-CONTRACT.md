@@ -81,9 +81,8 @@ Official-score status is reported as four independent facts:
 - a repository release exists only when a verified publisher bundle is
   distributed under `RELEASE/`.
 
-The verifier and formal producer are ready. Corpus-policy authorization remains
-false with `baseline_v2_release_evidence_pending`, and no repository release
-bundle is published. Formula-helper results, diagnostic speedups, and raw caller
+The verifier and formal producer are ready. Corpus-policy authorization is
+open; a repository release bundle is not yet published. Formula-helper results, diagnostic speedups, and raw caller
 timing JSON are not official scores. Release execution additionally requires a
 clean source tree at the declared Git revision, records the immutable Docker
 image ID, and requires baseline and candidate evidence to use the same

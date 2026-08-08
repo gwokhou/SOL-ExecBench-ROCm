@@ -26,7 +26,7 @@ from sol_execbench.core.scoring.official_scoring_models import (
 from sol_execbench.core.solar_bridge.analyzer import formal_producer_readiness
 
 OFFICIAL_CORPUS_MANIFEST_SHA256 = (
-    "3f69181a39509ee588d1de666786188d5e97ec1eba40031bd24293bb3b76ecde"
+    "8f057f7890016239456e137e639e4538df22733ecf49721a919f8f6877acc857"
 )
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 _PUBLISHED_RELEASE_BUNDLE = _REPOSITORY_ROOT / "RELEASE" / "release-bundle.json"

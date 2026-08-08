@@ -111,7 +111,7 @@ def test_aka_manifest_loads_and_pins_revision():
     )
     assert (
         manifest.official_scoring["status"]
-        == AKAOfficialScoringStatus.UNAVAILABLE
+        == AKAOfficialScoringStatus.AVAILABLE
     )
     assert set(manifest.execution_targets) == {"gfx942", "gfx1150", "gfx1200"}
     assert manifest.formal_analysis["formal_gfx_target"] == "gfx1200"
@@ -319,18 +319,15 @@ def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
         )
 
 
-def test_official_score_reports_pending_v2_policy_without_raw_inputs():
+def test_official_score_reports_authorized_v2_policy_without_release():
     report = official_score_availability(MANIFEST)
 
-    assert report["policy"]["authorized"] is False
+    assert report["policy"]["authorized"] is True
     assert (
         report["policy"]["manifest_status"]
-        == AKAOfficialScoringStatus.UNAVAILABLE
+        == AKAOfficialScoringStatus.AVAILABLE
     )
-    assert (
-        report["policy"]["reason_code"]
-        == "baseline_v2_release_evidence_pending"
-    )
+    assert report["policy"]["reason_code"] == "authorized"
     assert report["verifier"]["available"] is True
     assert report["verifier"]["accepts_caller_authored_inputs"] is False
     assert report["verifier"]["requires_signatures"] is False
@@ -346,7 +343,11 @@ def test_official_score_reports_pending_v2_policy_without_raw_inputs():
         "reason_code": "repository_release_not_published",
         "path": None,
     }
-    assert report["policy"]["required_evidence"] == []
+    assert report["policy"]["required_evidence"] == [
+        "content_addressed_release_baseline",
+        "content_addressed_candidate_execution",
+        "pinned_solar_manifests",
+    ]
 
 
 def test_audit_rejects_incomplete_local_problem_inventory(tmp_path):
