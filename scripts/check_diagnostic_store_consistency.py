@@ -29,6 +29,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.identity import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER,
+    DiagnosticReleaseLifecycleManifest,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticStageReceipt,
@@ -45,10 +46,14 @@ from sol_execbench.core.bench.performance_model.lifecycle.store import (
     designs_dir,
     orchestrations_dir,
     publication_registry_dir,
+    published_releases_dir,
     releases_dir,
     runs_dir,
     snapshots_dir,
     store_root,
+)
+from sol_execbench.core.bench.performance_model.release.published import (
+    DiagnosticPublishedRelease,
 )
 from sol_execbench.core.integrity import sha256_file
 
@@ -241,6 +246,57 @@ def _check_attempt(root: Path, attempt_path: Path) -> list[str]:
     return findings
 
 
+def _check_published_release(root: Path, receipt_path: Path) -> list[str]:
+    try:
+        receipt = DiagnosticPublishedRelease.model_validate_json(
+            receipt_path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as error:
+        return [f"unreadable published-release receipt {receipt_path}: {error}"]
+    findings: list[str] = []
+    if receipt_path.parent.name != receipt.release_id:
+        findings.append(f"{receipt_path}: directory does not match release_id")
+    candidate_path = releases_dir(root) / receipt.release_id / "manifest.json"
+    if not candidate_path.is_file():
+        findings.append(
+            f"{receipt_path}: missing local release candidate {candidate_path}"
+        )
+    else:
+        try:
+            candidate = DiagnosticReleaseLifecycleManifest.model_validate_json(
+                candidate_path.read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError) as error:
+            findings.append(
+                f"{receipt_path}: unreadable local release candidate: {error}"
+            )
+        else:
+            assets = {asset.name: asset for asset in receipt.assets}
+            archive = assets["diagnostic-lifecycle-p0-conformance-v1.tar.zst"]
+            attestation = assets[
+                "diagnostic-lifecycle-p0-conformance-v1.attestation.json"
+            ]
+            if (
+                candidate.source_revision != receipt.source_revision
+                or candidate.archive_sha256 != archive.sha256
+                or candidate.archive_size_bytes != archive.size_bytes
+                or candidate.attestation_sha256 != attestation.sha256
+            ):
+                findings.append(
+                    f"{receipt_path}: assets differ from local release candidate"
+                )
+    for asset in receipt.assets:
+        if not _blob_exists(root, asset.sha256):
+            findings.append(
+                f"{receipt_path}: published asset blob is missing: {asset.name}"
+            )
+    if not _blob_exists(root, sha256_file(receipt_path)):
+        findings.append(
+            f"{receipt_path}: published receipt object is missing from CAS"
+        )
+    return findings
+
+
 def check_store(root: Path) -> list[str]:
     """Return every consistency finding for one lifecycle store."""
     findings: list[str] = []
@@ -269,9 +325,10 @@ def check_store(root: Path) -> list[str]:
             releases_dir(root),
             orchestrations_dir(root),
             attempts_dir(root),
+            published_releases_dir(root),
         )
     }
-    ignored = {"blobs", "locks", "published-releases", "promotions"}
+    ignored = {"blobs", "locks", "promotions"}
     if root.is_dir():
         for child in sorted(root.iterdir()):
             if child.is_dir() and child.name not in known | ignored:
@@ -284,6 +341,16 @@ def check_store(root: Path) -> list[str]:
         findings.extend(_check_receipt(root, receipt_path))
     for attempt_path in sorted(attempts_dir(root).glob("*/*/*.json")):
         findings.extend(_check_attempt(root, attempt_path))
+    published = published_releases_dir(root)
+    for entry in sorted(published.iterdir()) if published.is_dir() else ():
+        if not entry.is_dir():
+            findings.append(f"unexpected published-release object: {entry}")
+            continue
+        children = tuple(sorted(entry.iterdir()))
+        if tuple(path.name for path in children) != ("receipt.json",):
+            findings.append(f"unexpected published-release inventory: {entry}")
+            continue
+        findings.extend(_check_published_release(root, children[0]))
     return findings
 
 

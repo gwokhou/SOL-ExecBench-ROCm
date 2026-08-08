@@ -8,8 +8,17 @@ from pathlib import Path
 import pytest
 
 from sol_execbench.core.bench.performance_model.lifecycle import (
+    BlobStore,
     DiagnosticEvidencePurpose,
+    DiagnosticLifecycleArtifact,
+    DiagnosticLifecycleParent,
+    DiagnosticLifecycleStage,
+    DiagnosticReleaseLifecycleManifest,
+    DiagnosticRetentionClass,
+    DiagnosticStageStatus,
     published_releases_dir,
+    release_id,
+    releases_dir,
 )
 from sol_execbench.core.bench.performance_model.release import (
     DiagnosticReleaseArchive,
@@ -30,16 +39,47 @@ class _Runner:
     def __call__(
         self, arguments: list[str]
     ) -> subprocess.CompletedProcess[str]:
+        if arguments[0] == "api":
+            return subprocess.CompletedProcess(arguments, 0, "a" * 40, "")
         if arguments[1] == "view":
+            attestation = self.assets / f"{_TAG}.attestation.json"
+            archive = self.assets / f"{_TAG}.tar.zst"
             payload = {
                 "assets": [
-                    {"name": f"{_TAG}.tar.zst"},
-                    {"name": f"{_TAG}.attestation.json"},
+                    {
+                        "apiUrl": "https://api.example.invalid/assets/1",
+                        "id": "asset-attestation",
+                        "name": attestation.name,
+                        "size": attestation.stat().st_size,
+                        "state": "uploaded",
+                        "url": "https://example.invalid/attestation",
+                    },
+                    {
+                        "apiUrl": "https://api.example.invalid/assets/2",
+                        "id": "asset-archive",
+                        "name": archive.name,
+                        "size": archive.stat().st_size,
+                        "state": "uploaded",
+                        "url": "https://example.invalid/archive",
+                    },
                 ],
+                "apiUrl": "https://api.example.invalid/releases/1",
+                "body": json.dumps(
+                    {
+                        "attestation_sha256": sha256_file(attestation),
+                        "workflow_run_attempt": 1,
+                        "workflow_run_id": 123,
+                        "workflow_url": "https://example.invalid/actions/123",
+                    }
+                ),
+                "id": "release-node-id",
                 "isDraft": self.draft,
+                "isPrerelease": False,
+                "name": "Diagnostic lifecycle P0 conformance v1",
+                "publishedAt": "2026-08-09T00:01:00Z",
                 "tagName": _TAG,
                 "url": "https://example.invalid/release",
-                "targetCommitish": "a" * 40,
+                "targetCommitish": "main",
             }
             return subprocess.CompletedProcess(
                 arguments, 0, json.dumps(payload), ""
@@ -54,13 +94,23 @@ def _assets(root: Path) -> Path:
     root.mkdir()
     archive = root / f"{_TAG}.tar.zst"
     archive.write_bytes(b"archive")
-    attestation = DiagnosticReleaseAttestation(
-        release_id="1" * 64,
+    publication_id = "2" * 64
+    archive_digest = sha256_file(archive)
+    release_identity = release_id(
+        publication_id=publication_id,
+        archive_sha256=archive_digest,
+        source_revision="a" * 40,
+        producer_version="4.0.0",
+        archive_size_bytes=archive.stat().st_size,
         purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
-        publication_id="2" * 64,
+    )
+    attestation = DiagnosticReleaseAttestation(
+        release_id=release_identity,
+        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+        publication_id=publication_id,
         archive=DiagnosticReleaseArchive(
             name=archive.name,
-            sha256=sha256_file(archive),
+            sha256=archive_digest,
             size_bytes=archive.stat().st_size,
             publication_manifest_sha256="3" * 64,
             source_revision="a" * 40,
@@ -78,11 +128,58 @@ def _assets(root: Path) -> Path:
     return root
 
 
+def _seed_local_candidate(store: Path, assets: Path) -> None:
+    archive = assets / f"{_TAG}.tar.zst"
+    attestation_path = assets / f"{_TAG}.attestation.json"
+    attestation = DiagnosticReleaseAttestation.model_validate_json(
+        attestation_path.read_text(encoding="utf-8")
+    )
+    blob_store = BlobStore(store)
+    blob_store.put_file(archive)
+    blob_store.put_file(attestation_path)
+    manifest = DiagnosticReleaseLifecycleManifest(
+        stage=DiagnosticLifecycleStage.RELEASE,
+        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+        stage_id=attestation.release_id,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.PUBLICATION_RELEASE,
+        source_revision=attestation.source_revision,
+        parents=(
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.PUBLICATION,
+                purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+                stage_id=attestation.publication_id,
+                sha256="5" * 64,
+            ),
+        ),
+        exact_inventory=(
+            DiagnosticLifecycleArtifact(
+                relative_path=archive.name,
+                sha256=attestation.archive.sha256,
+                size_bytes=archive.stat().st_size,
+            ),
+            DiagnosticLifecycleArtifact(
+                relative_path=attestation_path.name,
+                sha256=sha256_file(attestation_path),
+                size_bytes=attestation_path.stat().st_size,
+            ),
+        ),
+        created_at="2026-08-09T00:00:00+00:00",
+        archive_sha256=attestation.archive.sha256,
+        archive_size_bytes=attestation.archive.size_bytes,
+        attestation_sha256=sha256_file(attestation_path),
+    )
+    destination = releases_dir(store) / attestation.release_id / "manifest.json"
+    destination.parent.mkdir(parents=True)
+    atomic_write_json_value(destination, manifest.model_dump(mode="json"))
+
+
 def test_ingest_published_release_reconstructs_remote_receipt(
     tmp_path: Path,
 ) -> None:
     assets = _assets(tmp_path / "assets")
     store = tmp_path / "store"
+    _seed_local_candidate(store, assets)
 
     receipt = ingest_github_published_release(
         repository="owner/repository",
@@ -94,6 +191,15 @@ def test_ingest_published_release_reconstructs_remote_receipt(
     assert (
         receipt.purpose is DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE
     )
+    assert receipt.repository == "owner/repository"
+    assert receipt.github_release_id == "release-node-id"
+    assert receipt.target_commit_sha == "a" * 40
+    assert receipt.workflow_run_id == 123
+    assert receipt.round_trip_verified is True
+    assert {asset.github_id for asset in receipt.assets} == {
+        "asset-archive",
+        "asset-attestation",
+    }
     assert (
         published_releases_dir(store) / receipt.release_id / "receipt.json"
     ).is_file()
@@ -101,6 +207,7 @@ def test_ingest_published_release_reconstructs_remote_receipt(
 
 def test_ingest_refuses_a_draft_release(tmp_path: Path) -> None:
     assets = _assets(tmp_path / "assets")
+    _seed_local_candidate(tmp_path / "store", assets)
     with pytest.raises(ValueError, match="expected published tag"):
         ingest_github_published_release(
             repository="owner/repository",

@@ -13,12 +13,14 @@ from sol_execbench.core.bench.performance_model.release.packaging import (
 )
 from sol_execbench.core.bench.performance_model.release.published import (
     DiagnosticPublishedRelease,
+    DiagnosticPublishedReleaseAsset,
     GitHubRunner,
     ingest_github_published_release,
 )
 
 __all__ = [
     "DiagnosticPublishedRelease",
+    "DiagnosticPublishedReleaseAsset",
     "DiagnosticReleaseArchive",
     "DiagnosticReleaseAttestation",
     "GitHubRunner",

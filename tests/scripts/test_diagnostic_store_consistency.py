@@ -167,3 +167,18 @@ def test_mutated_blob_content_is_detected(
     # The tampered blob is referenced by the manifest inventory and is now
     # reported as missing because its content no longer verifies to its key.
     assert any("missing blob" in item for item in findings)
+
+
+def test_malformed_published_release_receipt_is_detected(
+    load_script: ScriptLoader,
+    tmp_path: Path,
+) -> None:
+    script = load_script("scripts/check_diagnostic_store_consistency.py")
+    receipt = tmp_path / "published-releases" / ("1" * 64) / "receipt.json"
+    atomic_write_json_value(receipt, {})
+
+    findings = script.check_store(tmp_path)
+
+    assert any(
+        "unreadable published-release receipt" in item for item in findings
+    )
