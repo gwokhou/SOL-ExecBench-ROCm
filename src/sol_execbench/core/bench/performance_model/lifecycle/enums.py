@@ -54,6 +54,23 @@ class DiagnosticStageStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class DiagnosticAttemptStatus(StrEnum):
+    """Terminal outcome of one append-only stage attempt."""
+
+    FAILED = "failed"
+    VERIFIED = "verified"
+
+
+class DiagnosticAttemptFailureCode(StrEnum):
+    """Stable failure categories recorded by lifecycle orchestration."""
+
+    INPUT_PREPARATION_ERROR = "input_preparation_error"
+    STAGE_EXECUTION_ERROR = "stage_execution_error"
+    INPUT_IDENTITY_CHANGED = "input_identity_changed"
+    STAGE_VERIFICATION_FAILED = "stage_verification_failed"
+    STAGE_COMMIT_ERROR = "stage_commit_error"
+
+
 class DiagnosticRetentionClass(StrEnum):
     """Closed retention policy classes for lifecycle objects.
 
@@ -76,6 +93,8 @@ class DiagnosticRetentionClass(StrEnum):
 
 
 __all__ = [
+    "DiagnosticAttemptFailureCode",
+    "DiagnosticAttemptStatus",
     "DiagnosticEvidencePurpose",
     "DiagnosticLifecycleStage",
     "DiagnosticRetentionClass",

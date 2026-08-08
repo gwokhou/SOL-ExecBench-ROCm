@@ -330,6 +330,49 @@ def test_p0_conformance_currentizes_tree_references(
     assert case["evidence_manifest"]["size_bytes"] == artifact.stat().st_size
 
 
+def test_p0_conformance_rebinds_currentized_calibration_audit(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    conformance = load_script(
+        "scripts/internal/build_diagnostic_p0_conformance.py",
+    )
+    calibration = tmp_path / "calibration"
+    calibration.mkdir()
+    audit = {
+        "parameter_estimation_evidence": [{"batch": 1}],
+        "tuning_evidence": [{"batch": 2}],
+        "probe_identity": {"gpu": "gfx1200"},
+    }
+    conformance.atomic_write_json_value(
+        calibration / "profile.audit.json", audit
+    )
+    conformance.atomic_write_json_value(
+        calibration / "profile.json",
+        {
+            "parameter_estimation_evidence_sha256": ["stale"],
+            "tuning_evidence_sha256": ["stale"],
+            "probe_evidence_sha256": ["stale"],
+        },
+    )
+
+    conformance._rebind_calibration_audit_hashes(calibration)
+
+    profile = conformance._load_object(calibration / "profile.json")
+    assert profile["parameter_estimation_evidence_sha256"] == [
+        conformance.stable_json_checksum(
+            audit["parameter_estimation_evidence"]
+        ),
+        conformance.sha256_file(calibration / "profile.audit.json"),
+    ]
+    assert profile["tuning_evidence_sha256"] == [
+        conformance.stable_json_checksum(audit["tuning_evidence"])
+    ]
+    assert profile["probe_evidence_sha256"] == [
+        conformance.stable_json_checksum(audit["probe_identity"])
+    ]
+
+
 def test_rdna4_diagnostic_promotion_verifies_roles_order_and_hashes(
     load_script,
     tmp_path: Path,

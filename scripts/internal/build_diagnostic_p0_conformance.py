@@ -126,12 +126,32 @@ def _prepare_inputs(source: Path, root: Path) -> None:
         schema=SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT,
         purpose=_PURPOSE,
     )
+    _rebind_calibration_audit_hashes(root / "calibration")
     for stale in (
         "publication.json",
         "inference.json",
         "source-inference.json",
     ):
         (root / stale).unlink(missing_ok=True)
+
+
+def _rebind_calibration_audit_hashes(calibration_root: Path) -> None:
+    """Bind the currentized profile to the exact currentized audit bytes."""
+    profile_path = calibration_root / "profile.json"
+    audit_path = calibration_root / "profile.audit.json"
+    profile = _load_object(profile_path)
+    audit = _load_object(audit_path)
+    profile["parameter_estimation_evidence_sha256"] = [
+        stable_json_checksum(audit["parameter_estimation_evidence"]),
+        sha256_file(audit_path),
+    ]
+    profile["tuning_evidence_sha256"] = [
+        stable_json_checksum(audit["tuning_evidence"])
+    ]
+    profile["probe_evidence_sha256"] = [
+        stable_json_checksum(audit["probe_identity"])
+    ]
+    atomic_write_json_value(profile_path, profile)
 
 
 def _write_design(root: Path, store: Path, revision: str) -> Path:

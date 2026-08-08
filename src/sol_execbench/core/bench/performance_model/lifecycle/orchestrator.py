@@ -38,6 +38,8 @@ from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
     BlobStore,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticAttemptFailureCode,
+    DiagnosticAttemptStatus,
     DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
     DiagnosticRetentionClass,
@@ -69,7 +71,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
 from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticRunManifest,
     DiagnosticRunStageState,
+    DiagnosticStageAttempt,
     run_state_path,
+    stage_attempt_path,
     stage_receipt_path,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
@@ -95,7 +99,7 @@ from sol_execbench.core.data.json_utils import (
     load_json_file,
 )
 from sol_execbench.core.integrity import sha256_file
-from sol_execbench.core.process import exclusive_file_lock
+from sol_execbench.core.process import exclusive_file_lock, redacted_text_tail
 
 CHAIN: tuple[DiagnosticLifecycleStage, ...] = (
     DiagnosticLifecycleStage.DESIGN,
@@ -1312,40 +1316,27 @@ def _execute_stage(
         _write_run_state(context, running)
         started = clock()
         try:
-            prepared_inputs = handler.prepare(context, running)
-            completion = handler.run(context)
-            _import_completion_outputs(context, completion)
-        except (OSError, ValueError):
-            current = _replace_stage(
+            completion = _complete_stage_attempt(
+                handler,
+                context,
                 running,
-                DiagnosticRunStageState(
-                    stage=stage,
-                    status=DiagnosticStageStatus.FAILED,
-                    attempts=attempts,
-                    receipt_path="",
-                ),
+                stage,
+                attempts,
+                started,
+                clock,
             )
-            _write_run_state(context, current)
+        except _StageAttemptError as error:
+            current = _record_failed_attempt(
+                running,
+                context,
+                stage,
+                attempts,
+                started,
+                clock(),
+                error.failure_code,
+                error,
+            )
             continue
-        receipt = _build_receipt(
-            handler,
-            completion,
-            context,
-            running,
-            attempts,
-            started,
-            clock(),
-        )
-        if receipt.input_identities != prepared_inputs:
-            current = _failed_stage(running, stage, attempts)
-            _write_run_state(context, current)
-            continue
-        if not handler.verify(context, receipt):
-            current = _failed_stage(running, stage, attempts)
-            _write_run_state(context, current)
-            continue
-        _write_receipt(context, stage, receipt)
-        _commit_stage_manifests(context, completion, receipt)
         current = _replace_stage(
             running,
             DiagnosticRunStageState(
@@ -1356,9 +1347,117 @@ def _execute_stage(
                 outputs=completion.outputs,
             ),
         )
+        _write_attempt(
+            context,
+            DiagnosticStageAttempt(
+                run_id=context.collection_run_id,
+                stage=stage,
+                attempt=attempts,
+                status=DiagnosticAttemptStatus.VERIFIED,
+                started_at=started,
+                finished_at=clock(),
+            ),
+        )
         _write_run_state(context, current)
         return current
     return current
+
+
+class _StageAttemptError(ValueError):
+    """One classified failure raised while completing a stage attempt."""
+
+    def __init__(
+        self, failure_code: DiagnosticAttemptFailureCode, detail: str
+    ) -> None:
+        super().__init__(detail)
+        self.failure_code = failure_code
+
+
+def _complete_stage_attempt(
+    handler: DiagnosticStageHandler,
+    context: StageRunContext,
+    running: DiagnosticRunManifest,
+    stage: DiagnosticLifecycleStage,
+    attempts: int,
+    started_at: str,
+    clock: Callable[[], str],
+) -> StageCompletion:
+    try:
+        prepared = handler.prepare(context, running)
+    except (OSError, ValueError) as error:
+        raise _StageAttemptError(
+            DiagnosticAttemptFailureCode.INPUT_PREPARATION_ERROR, str(error)
+        ) from error
+    try:
+        completion = handler.run(context)
+        _import_completion_outputs(context, completion)
+    except (OSError, ValueError) as error:
+        raise _StageAttemptError(
+            DiagnosticAttemptFailureCode.STAGE_EXECUTION_ERROR, str(error)
+        ) from error
+    receipt = _build_receipt(
+        stage,
+        completion,
+        context,
+        prepared,
+        attempts,
+        started_at,
+        clock(),
+    )
+    try:
+        unchanged = handler.prepare(context, running)
+    except (OSError, ValueError) as error:
+        raise _StageAttemptError(
+            DiagnosticAttemptFailureCode.INPUT_PREPARATION_ERROR, str(error)
+        ) from error
+    if unchanged != prepared:
+        raise _StageAttemptError(
+            DiagnosticAttemptFailureCode.INPUT_IDENTITY_CHANGED,
+            "stage inputs changed during execution",
+        )
+    try:
+        if not handler.verify(context, receipt):
+            raise ValueError("stage verifier rejected output inventory")
+    except (OSError, ValueError) as error:
+        raise _StageAttemptError(
+            DiagnosticAttemptFailureCode.STAGE_VERIFICATION_FAILED, str(error)
+        ) from error
+    try:
+        _write_receipt(context, stage, receipt)
+        _commit_stage_manifests(context, completion, receipt)
+    except (OSError, ValueError) as error:
+        raise _StageAttemptError(
+            DiagnosticAttemptFailureCode.STAGE_COMMIT_ERROR, str(error)
+        ) from error
+    return completion
+
+
+def _record_failed_attempt(
+    run_state: DiagnosticRunManifest,
+    context: StageRunContext,
+    stage: DiagnosticLifecycleStage,
+    attempt: int,
+    started_at: str,
+    finished_at: str,
+    failure_code: DiagnosticAttemptFailureCode,
+    error: Exception,
+) -> DiagnosticRunManifest:
+    failed = _failed_stage(run_state, stage, attempt)
+    _write_attempt(
+        context,
+        DiagnosticStageAttempt(
+            run_id=context.collection_run_id,
+            stage=stage,
+            attempt=attempt,
+            status=DiagnosticAttemptStatus.FAILED,
+            started_at=started_at,
+            finished_at=finished_at,
+            failure_code=failure_code,
+            detail=redacted_text_tail(str(error), limit=4096),
+        ),
+    )
+    _write_run_state(context, failed)
+    return failed
 
 
 def _failed_stage(
@@ -1693,28 +1792,50 @@ def _write_receipt(
     BlobStore(context.store_root).put_file(path)
 
 
+def _write_attempt(
+    context: StageRunContext,
+    attempt: DiagnosticStageAttempt,
+) -> None:
+    path = stage_attempt_path(
+        context.collection_run_id,
+        attempt.stage,
+        attempt.attempt,
+        context.store_root,
+    )
+    if path.is_file():
+        existing = load_json_file(DiagnosticStageAttempt, path)
+        if existing != attempt:
+            raise ValueError(f"append-only lifecycle attempt differs: {path}")
+        return
+    with exclusive_file_lock(store_lock_path(context.store_root)):
+        if path.exists():
+            raise ValueError(f"lifecycle attempt path is not a file: {path}")
+        atomic_write_json_value(path, attempt.model_dump(mode="json"))
+    BlobStore(context.store_root).put_file(path)
+
+
 def _receipt_name(stage: DiagnosticLifecycleStage) -> str:
     return f"{stage.value}.json"
 
 
 def _build_receipt(
-    handler: DiagnosticStageHandler,
+    stage: DiagnosticLifecycleStage,
     completion: StageCompletion,
     context: StageRunContext,
-    run_state: DiagnosticRunManifest,
+    input_identities: tuple[DiagnosticLifecycleParent, ...],
     attempts: int,
     started_at: str,
     finished_at: str,
 ) -> DiagnosticStageReceipt:
     return DiagnosticStageReceipt(
-        stage=handler.stage,
+        stage=stage,
         purpose=context.purpose,
         stage_id=completion.stage_id,
-        command=f"diagnostics lifecycle {handler.stage.value}",
+        command=f"diagnostics lifecycle {stage.value}",
         started_at=started_at,
         finished_at=finished_at,
         attempts=attempts,
-        input_identities=handler.prepare(context, run_state),
+        input_identities=input_identities,
         output_inventory=completion.outputs,
         verification="receipt_verified",
     )

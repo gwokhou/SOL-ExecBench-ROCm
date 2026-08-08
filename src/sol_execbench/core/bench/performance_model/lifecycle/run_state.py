@@ -14,9 +14,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticAttemptFailureCode,
+    DiagnosticAttemptStatus,
     DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
     DiagnosticStageStatus,
@@ -25,6 +27,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
+    attempts_dir,
     orchestrations_dir,
 )
 from sol_execbench.core.data.base_model import (
@@ -44,6 +47,33 @@ class DiagnosticRunStageState(FrozenArtifactModel):
     attempts: int = Field(ge=0)
     receipt_path: str = ""
     outputs: tuple[DiagnosticLifecycleArtifact, ...] = ()
+
+
+class DiagnosticStageAttempt(CurrentFrozenSchemaModel):
+    """One immutable append-only execution attempt for a lifecycle stage."""
+
+    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_ATTEMPT
+
+    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_ATTEMPT] = (
+        SchemaVersion.DIAGNOSTIC_LIFECYCLE_ATTEMPT
+    )
+    run_id: SHA256Digest
+    stage: DiagnosticLifecycleStage
+    attempt: int = Field(ge=1)
+    status: DiagnosticAttemptStatus
+    started_at: str = Field(min_length=1)
+    finished_at: str = Field(min_length=1)
+    failure_code: DiagnosticAttemptFailureCode | None = None
+    detail: str = Field(default="", max_length=4096)
+
+    @model_validator(mode="after")
+    def _failure_fields_match_status(self) -> DiagnosticStageAttempt:
+        if self.status is DiagnosticAttemptStatus.FAILED:
+            if self.failure_code is None or not self.detail:
+                raise ValueError("failed attempt requires code and detail")
+        elif self.failure_code is not None or self.detail:
+            raise ValueError("verified attempt cannot carry failure fields")
+        return self
 
 
 class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
@@ -137,10 +167,27 @@ def stage_receipt_path(
     )
 
 
+def stage_attempt_path(
+    collection_run_id: str,
+    stage: DiagnosticLifecycleStage,
+    attempt: int,
+    store_root_path: Path | None = None,
+) -> Path:
+    """Return the immutable event path for one numbered stage attempt."""
+    return (
+        attempts_dir(store_root_path)
+        / collection_run_id
+        / stage.value
+        / f"{attempt:04d}.json"
+    )
+
+
 __all__ = [
     "DiagnosticLifecyclePlan",
     "DiagnosticRunManifest",
     "DiagnosticRunStageState",
+    "DiagnosticStageAttempt",
     "run_state_path",
+    "stage_attempt_path",
     "stage_receipt_path",
 ]

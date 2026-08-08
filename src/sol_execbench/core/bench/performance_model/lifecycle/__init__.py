@@ -9,6 +9,8 @@ from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
     BlobStore,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticAttemptFailureCode,
+    DiagnosticAttemptStatus,
     DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
     DiagnosticRetentionClass,
@@ -93,7 +95,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticLifecyclePlan,
     DiagnosticRunManifest,
     DiagnosticRunStageState,
+    DiagnosticStageAttempt,
     run_state_path,
+    stage_attempt_path,
     stage_receipt_path,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
@@ -105,6 +109,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.shared import (
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     SOL_EXECBENCH_DIAGNOSTIC_STORE,
     acceptances_dir,
+    attempts_dir,
     blob_path,
     blobs_dir,
     builds_dir,
@@ -141,6 +146,8 @@ __all__ = [
     "CurrentDiagnosticLifecycleManifest",
     "DesignHandler",
     "DiagnosticAcceptanceLifecycleManifest",
+    "DiagnosticAttemptFailureCode",
+    "DiagnosticAttemptStatus",
     "DiagnosticCalibrationLifecycleManifest",
     "DiagnosticCaseReceipt",
     "DiagnosticCollectionRunManifest",
@@ -159,6 +166,7 @@ __all__ = [
     "DiagnosticRetentionClass",
     "DiagnosticRunManifest",
     "DiagnosticRunStageState",
+    "DiagnosticStageAttempt",
     "DiagnosticStageHandler",
     "DiagnosticStageReceipt",
     "DiagnosticStageStatus",
@@ -178,6 +186,7 @@ __all__ = [
     "acceptance_id",
     "acceptances_dir",
     "apply_gc_plan",
+    "attempts_dir",
     "blob_path",
     "blobs_dir",
     "build_run_context",
@@ -215,6 +224,7 @@ __all__ = [
     "run_state_path",
     "runs_dir",
     "snapshots_dir",
+    "stage_attempt_path",
     "stage_receipt_path",
     "store_root",
 ]
