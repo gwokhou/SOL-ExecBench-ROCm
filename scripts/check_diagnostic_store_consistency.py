@@ -41,22 +41,24 @@ from sol_execbench.core.bench.performance_model.lifecycle.store import (
     builds_dir,
     calibrations_dir,
     designs_dir,
+    orchestrations_dir,
     publication_registry_dir,
     releases_dir,
     runs_dir,
     snapshots_dir,
     store_root,
 )
+from sol_execbench.core.integrity import sha256_file
 
 _DIR_TO_STAGE: Final[dict[str, DiagnosticLifecycleStage]] = {
     "designs": DiagnosticLifecycleStage.DESIGN,
-    "runs": DiagnosticLifecycleStage.COLLECTION_RUN,
+    "collection-runs": DiagnosticLifecycleStage.COLLECTION_RUN,
     "snapshots": DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
     "calibrations": DiagnosticLifecycleStage.CALIBRATION,
     "builds": DiagnosticLifecycleStage.MODEL_BUILD,
     "acceptances": DiagnosticLifecycleStage.ACCEPTANCE,
     "publication-registry": DiagnosticLifecycleStage.PUBLICATION,
-    "releases": DiagnosticLifecycleStage.RELEASE,
+    "release-candidates": DiagnosticLifecycleStage.RELEASE,
 }
 
 _SHA_FIELDS: Final[tuple[str, ...]] = (
@@ -120,6 +122,20 @@ def _check_manifest(root: Path, manifest_path: Path) -> list[str]:
         digests.add(item.sha256)
     for parent in manifest.parents:
         digests.add(parent.sha256)
+        if parent.purpose is not manifest.purpose:
+            findings.append(
+                f"{manifest_path}: parent {parent.stage_id} crosses purpose"
+            )
+        parent_path = _parent_manifest_path(root, parent.stage, parent.stage_id)
+        if not parent_path.is_file():
+            findings.append(
+                f"{manifest_path}: missing parent manifest {parent_path}"
+            )
+        elif sha256_file(parent_path) != parent.sha256:
+            findings.append(
+                f"{manifest_path}: parent manifest digest mismatch "
+                f"for {parent.stage_id}"
+            )
     for field in _SHA_FIELDS:
         value = getattr(manifest, field, None)
         if isinstance(value, str) and value:
@@ -130,6 +146,24 @@ def _check_manifest(root: Path, manifest_path: Path) -> list[str]:
                 f"{manifest_path}: missing blob referenced by {digest}",
             )
     return findings
+
+
+def _parent_manifest_path(
+    root: Path,
+    stage: DiagnosticLifecycleStage,
+    stage_id: str,
+) -> Path:
+    directories = {
+        DiagnosticLifecycleStage.DESIGN: designs_dir(root),
+        DiagnosticLifecycleStage.COLLECTION_RUN: runs_dir(root),
+        DiagnosticLifecycleStage.CORPUS_SNAPSHOT: snapshots_dir(root),
+        DiagnosticLifecycleStage.CALIBRATION: calibrations_dir(root),
+        DiagnosticLifecycleStage.MODEL_BUILD: builds_dir(root),
+        DiagnosticLifecycleStage.ACCEPTANCE: acceptances_dir(root),
+        DiagnosticLifecycleStage.PUBLICATION: publication_registry_dir(root),
+        DiagnosticLifecycleStage.RELEASE: releases_dir(root),
+    }
+    return directories[stage] / stage_id / "manifest.json"
 
 
 def _check_run_state(root: Path, run_state_path: Path) -> list[str]:
@@ -172,6 +206,16 @@ def _check_receipt(root: Path, receipt_path: Path) -> list[str]:
             findings.append(
                 f"{receipt_path}: missing blob {parent.sha256} in inputs",
             )
+        parent_path = _parent_manifest_path(root, parent.stage, parent.stage_id)
+        if not parent_path.is_file():
+            findings.append(
+                f"{receipt_path}: missing parent manifest {parent_path}"
+            )
+        elif sha256_file(parent_path) != parent.sha256:
+            findings.append(
+                f"{receipt_path}: parent manifest digest mismatch "
+                f"for {parent.stage_id}"
+            )
     return findings
 
 
@@ -190,9 +234,30 @@ def check_store(root: Path) -> list[str]:
     ):
         for manifest_path in sorted(directory.glob("*/manifest.json")):
             findings.extend(_check_manifest(root, manifest_path))
-    for run_state_path in sorted(runs_dir(root).glob("*/run.json")):
+    known = {
+        path.name
+        for path in (
+            designs_dir(root),
+            runs_dir(root),
+            snapshots_dir(root),
+            calibrations_dir(root),
+            builds_dir(root),
+            acceptances_dir(root),
+            publication_registry_dir(root),
+            releases_dir(root),
+            orchestrations_dir(root),
+        )
+    }
+    ignored = {"blobs", "locks", "attempts", "published-releases", "promotions"}
+    if root.is_dir():
+        for child in sorted(root.iterdir()):
+            if child.is_dir() and child.name not in known | ignored:
+                findings.append(f"unexpected registry directory: {child}")
+    for run_state_path in sorted(orchestrations_dir(root).glob("*/run.json")):
         findings.extend(_check_run_state(root, run_state_path))
-    for receipt_path in sorted(runs_dir(root).glob("*/receipts/*.json")):
+    for receipt_path in sorted(
+        orchestrations_dir(root).glob("*/receipts/*.json")
+    ):
         findings.extend(_check_receipt(root, receipt_path))
     return findings
 
@@ -200,7 +265,7 @@ def check_store(root: Path) -> list[str]:
 def main() -> int:
     """Report lifecycle store inconsistencies and return a CI exit code."""
     root = store_root()
-    if not (root / "blobs").is_dir():
+    if not root.exists():
         print(f"diagnostic store absent at {root}; nothing to check")
         return 0
     findings = check_store(root)

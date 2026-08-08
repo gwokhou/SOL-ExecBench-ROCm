@@ -38,48 +38,52 @@ class SchemaVersion(StrEnum):
     DEPENDENCY_PREFLIGHT = "sol_execbench.dependency_preflight.v1"
     DECISION = "sol_execbench.decision.v2"
     DERIVED_EVIDENCE = "sol_execbench.derived_evidence.v1"
-    DIAGNOSTIC_ACCEPTANCE = "sol_execbench.diagnostic_acceptance.v6"
-    DIAGNOSTIC_CALIBRATION = "sol_execbench.diagnostic_calibration.v7"
+    DIAGNOSTIC_ACCEPTANCE = "sol_execbench.diagnostic_acceptance.v7"
+    DIAGNOSTIC_CALIBRATION = "sol_execbench.diagnostic_calibration.v8"
     DIAGNOSTIC_CALIBRATION_AUDIT = (
-        "sol_execbench.diagnostic_calibration_audit.v7"
+        "sol_execbench.diagnostic_calibration_audit.v8"
     )
     DIAGNOSTIC_CORPUS_PREFLIGHT = "sol_execbench.diagnostic_corpus_preflight.v1"
     DIAGNOSTIC_INFERENCE_PROFILE = (
-        "sol_execbench.diagnostic_inference_profile.v9"
+        "sol_execbench.diagnostic_inference_profile.v10"
     )
     DIAGNOSTIC_LIFECYCLE_ACCEPTANCE = (
-        "sol_execbench.diagnostic_lifecycle_acceptance.v1"
+        "sol_execbench.diagnostic_lifecycle_acceptance.v2"
     )
     DIAGNOSTIC_LIFECYCLE_CALIBRATION = (
-        "sol_execbench.diagnostic_lifecycle_calibration.v1"
+        "sol_execbench.diagnostic_lifecycle_calibration.v2"
     )
     DIAGNOSTIC_LIFECYCLE_COLLECTION_RUN = (
-        "sol_execbench.diagnostic_lifecycle_collection_run.v1"
+        "sol_execbench.diagnostic_lifecycle_collection_run.v2"
     )
     DIAGNOSTIC_LIFECYCLE_CORPUS_SNAPSHOT = (
-        "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v1"
+        "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v2"
     )
-    DIAGNOSTIC_LIFECYCLE_DESIGN = "sol_execbench.diagnostic_lifecycle_design.v1"
+    DIAGNOSTIC_LIFECYCLE_DESIGN = "sol_execbench.diagnostic_lifecycle_design.v2"
     DIAGNOSTIC_LIFECYCLE_MODEL_BUILD = (
-        "sol_execbench.diagnostic_lifecycle_model_build.v1"
+        "sol_execbench.diagnostic_lifecycle_model_build.v2"
     )
+    DIAGNOSTIC_LIFECYCLE_PLAN = "sol_execbench.diagnostic_lifecycle_plan.v1"
     DIAGNOSTIC_LIFECYCLE_PUBLICATION = (
-        "sol_execbench.diagnostic_lifecycle_publication.v1"
+        "sol_execbench.diagnostic_lifecycle_publication.v2"
     )
     DIAGNOSTIC_LIFECYCLE_RELEASE = (
-        "sol_execbench.diagnostic_lifecycle_release.v1"
+        "sol_execbench.diagnostic_lifecycle_release.v2"
     )
-    DIAGNOSTIC_LIFECYCLE_RUN = "sol_execbench.diagnostic_lifecycle_run.v1"
+    DIAGNOSTIC_LIFECYCLE_RUN = "sol_execbench.diagnostic_lifecycle_run.v2"
     DIAGNOSTIC_PUBLICATION_PROJECTION = (
-        "sol_execbench.diagnostic_publication_projection.v1"
+        "sol_execbench.diagnostic_publication_projection.v2"
     )
-    DIAGNOSTIC_RELEASE_ARCHIVE = "sol_execbench.diagnostic_release_archive.v1"
+    DIAGNOSTIC_PUBLISHED_RELEASE = (
+        "sol_execbench.diagnostic_published_release.v1"
+    )
+    DIAGNOSTIC_RELEASE_ARCHIVE = "sol_execbench.diagnostic_release_archive.v2"
     DIAGNOSTIC_RELEASE_ATTESTATION = (
-        "sol_execbench.diagnostic_release_attestation.v1"
+        "sol_execbench.diagnostic_release_attestation.v2"
     )
-    DIAGNOSTIC_STAGE_RECEIPT = "sol_execbench.diagnostic_stage_receipt.v1"
+    DIAGNOSTIC_STAGE_RECEIPT = "sol_execbench.diagnostic_stage_receipt.v2"
     DIAGNOSTIC_VALIDATION_CORPUS = (
-        "sol_execbench.diagnostic_validation_corpus.v7"
+        "sol_execbench.diagnostic_validation_corpus.v8"
     )
     DOCKER_PREFLIGHT = "sol_execbench.docker_preflight.v1"
     ENVIRONMENT_DIAGNOSTICS = "sol_execbench.environment_diagnostics.v1"

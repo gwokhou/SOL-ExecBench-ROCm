@@ -232,9 +232,13 @@ def test_rdna4_diagnostic_corpus_design_is_preregistered_and_stratified(
 def test_rdna4_diagnostic_preregistration_is_immutable(
     load_script,
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_DIAGNOSTIC_STORE", str(tmp_path / "store")
     )
     corpus._preregister(tmp_path, 160)
     design_path = tmp_path / "design.json"
@@ -251,9 +255,13 @@ def test_rdna4_diagnostic_preregistration_is_immutable(
 def test_rdna4_diagnostic_packaged_templates_prepare_full_corpus(
     load_script,
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     corpus = load_script(
         "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_DIAGNOSTIC_STORE", str(tmp_path / "store")
     )
     corpus._preregister(tmp_path, 160)
 

@@ -15,7 +15,7 @@ things:
   `tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --zstd`
   makes the archive byte-for-byte reproducible; no timestamps, owners, or
   directory order leak into the bytes.
-- `NAME.attestation.json` — a `sol_execbench.diagnostic_release_attestation.v1`
+- `NAME.attestation.json` — a `sol_execbench.diagnostic_release_attestation.v2`
   object that binds the release identity, publication digest, archive digest and
   size, the exact sorted inventory digest, case count, source revision, and
   producer version.

@@ -22,12 +22,13 @@ def test_self_hosted_runner_never_holds_release_authority() -> None:
     assert "write" not in hardware.get("permissions", {})
 
 
-def test_only_the_hosted_release_job_holds_contents_write() -> None:
+def test_only_hosted_release_jobs_hold_contents_write() -> None:
     workflows = _workflows()
+    authorized = {"diagnostic-release.yml", "score-release.yml"}
     for name, definition in workflows.items():
         write = definition.get("permissions", {}).get("contents") == "write"
-        assert write == (name == "diagnostic-release.yml"), (
-            f"{name} must be the only workflow with contents: write"
+        assert write == (name in authorized), (
+            f"{name} contents permission does not match release authority"
         )
 
 

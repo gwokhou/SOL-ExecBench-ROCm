@@ -20,9 +20,9 @@ inside an identity call.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
 
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
@@ -36,6 +36,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DiagnosticPublicationLifecycleManifest,
     DiagnosticReleaseLifecycleManifest,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.shared import (
+    GpuLifecycleIdentity,
+    SoftwareLifecycleIdentity,
+)
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
 
 
@@ -47,23 +51,25 @@ def diagnostic_lifecycle_id(
     return stable_json_checksum({"kind": kind, **payload})
 
 
-def _dump(value: Any) -> Any:
+def _dump(
+    value: GpuLifecycleIdentity | SoftwareLifecycleIdentity,
+) -> object:
     """Return a stable JSON-serializable form for nested identity models."""
-    if hasattr(value, "model_dump"):
-        return value.model_dump(mode="json")
-    return value
+    return value.model_dump(mode="json")
 
 
 def design_id(
     *,
     universe_start: int,
     design_payload_sha256: SHA256Digest,
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one preregistered diagnostic design."""
     return diagnostic_lifecycle_id(
         "design",
         {
             "design_payload_sha256": design_payload_sha256,
+            "purpose": purpose,
             "universe_start": universe_start,
         },
     )
@@ -75,6 +81,7 @@ def collection_run_id(
     generation: int,
     roles: tuple[str, ...] = ("development", "held_out"),
     frozen_held_out_sha256: SHA256Digest | None = None,
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one collection generation beneath a design.
 
@@ -90,6 +97,7 @@ def collection_run_id(
             "generation": generation,
             "roles": list(roles),
             "frozen_held_out_sha256": frozen_held_out_sha256,
+            "purpose": purpose,
         },
     )
 
@@ -100,6 +108,7 @@ def corpus_snapshot_id(
     corpus_sha256: SHA256Digest,
     collection_run_id: SHA256Digest | None = None,
     source_snapshot_ids: tuple[SHA256Digest, ...] = (),
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one frozen development or held-out corpus snapshot.
 
@@ -126,6 +135,7 @@ def corpus_snapshot_id(
             "corpus_snapshot",
             {
                 "corpus_sha256": corpus_sha256,
+                "purpose": purpose,
                 "role": role,
                 "source_snapshot_ids": list(source_snapshot_ids),
             },
@@ -135,6 +145,7 @@ def corpus_snapshot_id(
         {
             "collection_run_id": collection_run_id,
             "corpus_sha256": corpus_sha256,
+            "purpose": purpose,
             "role": role,
         },
     )
@@ -144,8 +155,9 @@ def calibration_id(
     *,
     calibration_profile_sha256: SHA256Digest,
     calibration_audit_sha256: SHA256Digest,
-    gpu_identity: Any,
-    software_identity: Any,
+    gpu_identity: GpuLifecycleIdentity,
+    software_identity: SoftwareLifecycleIdentity,
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one frozen hardware calibration object.
 
@@ -161,6 +173,7 @@ def calibration_id(
             "calibration_audit_sha256": calibration_audit_sha256,
             "gpu_identity": _dump(gpu_identity),
             "software_identity": _dump(software_identity),
+            "purpose": purpose,
         },
     )
 
@@ -171,6 +184,7 @@ def model_build_id(
     calibration_audit_sha256: SHA256Digest,
     inference_profile_sha256: SHA256Digest,
     model_version: str,
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one frozen inference model build.
 
@@ -184,6 +198,7 @@ def model_build_id(
             "calibration_audit_sha256": calibration_audit_sha256,
             "inference_profile_sha256": inference_profile_sha256,
             "model_version": model_version,
+            "purpose": purpose,
         },
     )
 
@@ -194,6 +209,7 @@ def acceptance_id(
     held_out_corpus_snapshot_id: SHA256Digest,
     accepted: bool,
     verdict_sha256: SHA256Digest,
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one held-out acceptance verdict.
 
@@ -210,6 +226,7 @@ def acceptance_id(
             "held_out_corpus_snapshot_id": held_out_corpus_snapshot_id,
             "model_build_id": model_build_id,
             "verdict_sha256": verdict_sha256,
+            "purpose": purpose,
         },
     )
 
@@ -220,6 +237,7 @@ def publication_id(
     publication_manifest_sha256: SHA256Digest,
     uncompressed_size_bytes: int,
     case_count: int,
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one compact publication projection."""
     return diagnostic_lifecycle_id(
@@ -229,6 +247,7 @@ def publication_id(
             "publication_manifest_sha256": publication_manifest_sha256,
             "source_corpus_sha256": source_corpus_sha256,
             "uncompressed_size_bytes": uncompressed_size_bytes,
+            "purpose": purpose,
         },
     )
 
@@ -240,6 +259,7 @@ def release_id(
     source_revision: str,
     producer_version: str,
     archive_size_bytes: int,
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one deterministic release archive.
 
@@ -257,6 +277,7 @@ def release_id(
             "producer_version": producer_version,
             "publication_id": publication_id,
             "source_revision": source_revision,
+            "purpose": purpose,
         },
     )
 
@@ -290,6 +311,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
         return design_id(
             universe_start=manifest.universe_start,
             design_payload_sha256=manifest.design_payload_sha256,
+            purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticCollectionRunManifest):
         return collection_run_id(
@@ -299,6 +321,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             generation=manifest.generation,
             roles=manifest.roles,
             frozen_held_out_sha256=manifest.frozen_held_out_sha256,
+            purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticCorpusSnapshotManifest):
         if manifest.source_snapshot_ids:
@@ -306,6 +329,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
                 role=manifest.role,
                 corpus_sha256=manifest.corpus_file_sha256,
                 source_snapshot_ids=manifest.source_snapshot_ids,
+                purpose=manifest.purpose,
             )
         return corpus_snapshot_id(
             collection_run_id=_single_parent_id(
@@ -314,13 +338,24 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             ),
             role=manifest.role,
             corpus_sha256=manifest.corpus_file_sha256,
+            purpose=manifest.purpose,
         )
+    return _recompute_downstream_stage_id(manifest)
+
+
+def _recompute_downstream_stage_id(
+    manifest: DiagnosticLifecycleManifest,
+) -> SHA256Digest:
+    """Recompute calibration and its governed downstream identities."""
     if isinstance(manifest, DiagnosticCalibrationLifecycleManifest):
+        if manifest.gpu_identity is None or manifest.software_identity is None:
+            raise ValueError("calibration identity is incomplete")
         return calibration_id(
             calibration_profile_sha256=manifest.calibration_profile_sha256,
             calibration_audit_sha256=manifest.calibration_audit_sha256,
             gpu_identity=manifest.gpu_identity,
             software_identity=manifest.software_identity,
+            purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticModelBuildManifest):
         return model_build_id(
@@ -328,6 +363,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             calibration_audit_sha256=manifest.calibration_audit_sha256,
             inference_profile_sha256=manifest.inference_profile_sha256,
             model_version=manifest.model_version,
+            purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticAcceptanceLifecycleManifest):
         return acceptance_id(
@@ -338,6 +374,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             held_out_corpus_snapshot_id=manifest.held_out_corpus_snapshot_id,
             accepted=manifest.accepted,
             verdict_sha256=manifest.verdict_sha256,
+            purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticPublicationLifecycleManifest):
         return publication_id(
@@ -345,6 +382,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             publication_manifest_sha256=manifest.publication_manifest_sha256,
             uncompressed_size_bytes=manifest.uncompressed_size_bytes,
             case_count=manifest.case_count,
+            purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticReleaseLifecycleManifest):
         return release_id(
@@ -356,6 +394,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             source_revision=manifest.source_revision,
             producer_version=manifest.producer_version,
             archive_size_bytes=manifest.archive_size_bytes,
+            purpose=manifest.purpose,
         )
     raise ValueError(
         f"unknown lifecycle manifest type: {type(manifest).__name__}"

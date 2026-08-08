@@ -19,27 +19,27 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
 )
 
 _SCHEMA_BY_STAGE = {
-    DiagnosticLifecycleStage.DESIGN: "sol_execbench.diagnostic_lifecycle_design.v1",
+    DiagnosticLifecycleStage.DESIGN: "sol_execbench.diagnostic_lifecycle_design.v2",
     DiagnosticLifecycleStage.COLLECTION_RUN: (
-        "sol_execbench.diagnostic_lifecycle_collection_run.v1"
+        "sol_execbench.diagnostic_lifecycle_collection_run.v2"
     ),
     DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
-        "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v1"
+        "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v2"
     ),
     DiagnosticLifecycleStage.CALIBRATION: (
-        "sol_execbench.diagnostic_lifecycle_calibration.v1"
+        "sol_execbench.diagnostic_lifecycle_calibration.v2"
     ),
     DiagnosticLifecycleStage.MODEL_BUILD: (
-        "sol_execbench.diagnostic_lifecycle_model_build.v1"
+        "sol_execbench.diagnostic_lifecycle_model_build.v2"
     ),
     DiagnosticLifecycleStage.ACCEPTANCE: (
-        "sol_execbench.diagnostic_lifecycle_acceptance.v1"
+        "sol_execbench.diagnostic_lifecycle_acceptance.v2"
     ),
     DiagnosticLifecycleStage.PUBLICATION: (
-        "sol_execbench.diagnostic_lifecycle_publication.v1"
+        "sol_execbench.diagnostic_lifecycle_publication.v2"
     ),
     DiagnosticLifecycleStage.RELEASE: (
-        "sol_execbench.diagnostic_lifecycle_release.v1"
+        "sol_execbench.diagnostic_lifecycle_release.v2"
     ),
 }
 
@@ -160,7 +160,7 @@ def test_lifecycle_manifest_dispatch_matches_its_stage(
 
 def test_lifecycle_manifest_rejects_wrong_schema_version() -> None:
     payload = _design_payload()
-    payload["schema_version"] = "sol_execbench.diagnostic_lifecycle_release.v1"
+    payload["schema_version"] = "sol_execbench.diagnostic_lifecycle_release.v2"
     with pytest.raises(ValidationError, match="archive_sha256"):
         DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER.validate_python(payload)
 

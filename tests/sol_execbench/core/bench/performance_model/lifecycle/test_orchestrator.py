@@ -31,7 +31,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleParent,
 )
-from sol_execbench.core.bench.performance_model.lifecycle.store import runs_dir
+from sol_execbench.core.bench.performance_model.lifecycle.store import (
+    orchestrations_dir,
+)
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 
 _NOW = "2026-01-01T00:00:00+00:00"
@@ -63,11 +65,14 @@ class FakeHandler:
         order: list[DiagnosticLifecycleStage] | None = None,
         fail_first: int = 0,
         verify_result: bool = True,
+        verify_fail_first: int = 0,
     ) -> None:
         self.stage = stage
         self.order = order if order is not None else []
         self.fail_first = fail_first
         self.verify_result = verify_result
+        self.verify_fail_first = verify_fail_first
+        self.verify_calls = 0
         self.calls = 0
 
     def run(self, context: StageRunContext) -> StageCompletion:
@@ -90,6 +95,9 @@ class FakeHandler:
         context: StageRunContext,
         receipt: DiagnosticStageReceipt,
     ) -> bool:
+        self.verify_calls += 1
+        if self.verify_calls <= self.verify_fail_first:
+            return False
         return self.verify_result
 
 
@@ -249,19 +257,20 @@ def test_resume_reruns_stage_with_missing_receipt(tmp_path: Path) -> None:
 def test_resume_reruns_drifted_stage(tmp_path: Path) -> None:
     design_path = _design(tmp_path)
     order: list[DiagnosticLifecycleStage] = []
-    drift = FakeHandler(
-        DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
-        order=order,
-        verify_result=False,
-    )
-    handlers = _handlers(
-        order,
-        {DiagnosticLifecycleStage.CORPUS_SNAPSHOT: drift},
-    )
+    handlers = _handlers(order)
     run_state = _run(design_path, tmp_path, handlers)
 
     resumed_order: list[DiagnosticLifecycleStage] = []
-    resumed_handlers = _handlers(resumed_order)
+    resumed_handlers = _handlers(
+        resumed_order,
+        {
+            DiagnosticLifecycleStage.CORPUS_SNAPSHOT: FakeHandler(
+                DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+                order=resumed_order,
+                verify_fail_first=1,
+            )
+        },
+    )
     resumed = resume_diagnostic_lifecycle(
         run_state_path=run_state_path(run_state.collection_run_id, tmp_path),
         handlers=resumed_handlers,
@@ -341,7 +350,9 @@ def test_status_reports_drift_and_next_stage(tmp_path: Path) -> None:
     assert by_stage["acceptance"] == DiagnosticStageStatus.FAILED.value
     assert by_stage["design"] == DiagnosticStageStatus.VERIFIED.value
     status_file = (
-        runs_dir(tmp_path) / run_state.collection_run_id / "status.json"
+        orchestrations_dir(tmp_path)
+        / run_state.collection_run_id
+        / "status.json"
     )
     assert status_file.is_file()
 

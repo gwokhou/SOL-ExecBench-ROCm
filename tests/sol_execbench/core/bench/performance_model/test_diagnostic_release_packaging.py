@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+import io
+import tarfile
 from pathlib import Path
 from typing import NoReturn
 
 import pytest
+import zstandard
 
 from sol_execbench.core.bench.performance_model import release as release_module
 from sol_execbench.core.bench.performance_model.lifecycle import (
+    DiagnosticLifecycleStage,
+    DiagnosticPublicationLifecycleManifest,
     DiagnosticReleaseLifecycleManifest,
+    DiagnosticRetentionClass,
+    DiagnosticStageStatus,
+    publication_id,
+    publication_registry_dir,
     releases_dir,
 )
 from sol_execbench.core.bench.performance_model.publication import (
@@ -18,7 +27,10 @@ from sol_execbench.core.bench.performance_model.release import (
     DiagnosticReleaseAttestation,
     packaging,
 )
-from sol_execbench.core.data.json_utils import load_json_file
+from sol_execbench.core.data.json_utils import (
+    atomic_write_json_value,
+    load_json_file,
+)
 from sol_execbench.core.integrity import sha256_file
 
 
@@ -134,6 +146,28 @@ def test_package_writes_an_immutable_release_manifest(
         lambda *_args, **_kwargs: projection,
     )
     store = tmp_path / "store"
+    pub_id = publication_id(
+        source_corpus_sha256=projection.source_corpus_sha256,
+        publication_manifest_sha256=sha256_file(root / "publication.json"),
+        uncompressed_size_bytes=projection.uncompressed_size_bytes,
+        case_count=projection.case_count,
+    )
+    publication_manifest = DiagnosticPublicationLifecycleManifest(
+        stage=DiagnosticLifecycleStage.PUBLICATION,
+        stage_id=pub_id,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.PUBLICATION_RELEASE,
+        source_revision="19f195a8",
+        created_at="2026-01-01T00:00:00+00:00",
+        source_corpus_sha256=projection.source_corpus_sha256,
+        publication_manifest_sha256=sha256_file(root / "publication.json"),
+        uncompressed_size_bytes=projection.uncompressed_size_bytes,
+        case_count=projection.case_count,
+    )
+    atomic_write_json_value(
+        publication_registry_dir(store) / pub_id / "manifest.json",
+        publication_manifest.model_dump(mode="json"),
+    )
 
     _, attestation_path, attestation = _package(
         root,
@@ -225,3 +259,41 @@ def test_package_refuses_an_unverified_publication(
     )
     with pytest.raises(ValueError, match="not verified"):
         _package(root, tmp_path)
+
+
+def _write_malicious_archive(
+    path: Path, member: tarfile.TarInfo, content: bytes = b"x"
+) -> None:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w") as archive:
+        archive.addfile(member, io.BytesIO(content) if member.isreg() else None)
+    path.write_bytes(zstandard.ZstdCompressor().compress(buffer.getvalue()))
+
+
+def test_verify_rejects_archive_path_traversal(tmp_path: Path) -> None:
+    archive = tmp_path / "traversal.tar.zst"
+    member = tarfile.TarInfo("../publication.json")
+    member.size = 1
+    _write_malicious_archive(archive, member)
+
+    with pytest.raises(ValueError, match="unsafe release archive member"):
+        release_module.verify_diagnostic_release_archive(
+            archive_path=archive,
+            semantic_loader=_noop_semantic_loader,
+            solar_verifier=lambda path: None,
+        )
+
+
+def test_verify_rejects_archive_links(tmp_path: Path) -> None:
+    archive = tmp_path / "link.tar.zst"
+    member = tarfile.TarInfo("publication/publication.json")
+    member.type = tarfile.SYMTYPE
+    member.linkname = "/etc/passwd"
+    _write_malicious_archive(archive, member)
+
+    with pytest.raises(ValueError, match="unsupported release archive member"):
+        release_module.verify_diagnostic_release_archive(
+            archive_path=archive,
+            semantic_loader=_noop_semantic_loader,
+            solar_verifier=lambda path: None,
+        )

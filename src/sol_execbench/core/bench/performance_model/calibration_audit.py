@@ -9,6 +9,9 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
+)
 from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     StrictArtifactModel,
@@ -88,6 +91,7 @@ class DiagnosticCalibrationAudit(CurrentSchemaModel):
     schema_version: Literal[SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT] = (
         SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT
     )
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     probe_identity: CalibrationProbeIdentity
     protocol: CalibrationProtocol
     frozen_configuration: dict[str, str]

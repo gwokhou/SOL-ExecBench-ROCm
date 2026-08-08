@@ -54,7 +54,17 @@ def designs_dir(root: Path | None = None) -> Path:
 
 def runs_dir(root: Path | None = None) -> Path:
     """Return the registry directory for collection-run objects."""
-    return (root or store_root()) / "runs"
+    return (root or store_root()) / "collection-runs"
+
+
+def orchestrations_dir(root: Path | None = None) -> Path:
+    """Return the registry directory for mutable orchestration state."""
+    return (root or store_root()) / "orchestrations"
+
+
+def promotions_dir(root: Path | None = None) -> Path:
+    """Return the immutable promotion registry directory."""
+    return (root or store_root()) / "promotions"
 
 
 def snapshots_dir(root: Path | None = None) -> Path:
@@ -87,22 +97,48 @@ def publication_registry_dir(root: Path | None = None) -> Path:
 
 
 def releases_dir(root: Path | None = None) -> Path:
-    """Return the registry directory for release objects."""
-    return (root or store_root()) / "releases"
+    """Return the registry directory for release-candidate objects."""
+    return (root or store_root()) / "release-candidates"
+
+
+def published_releases_dir(root: Path | None = None) -> Path:
+    """Return the immutable externally observed release receipt registry."""
+    return (root or store_root()) / "published-releases"
+
+
+def attempts_dir(root: Path | None = None) -> Path:
+    """Return the append-only orchestration attempt event directory."""
+    return (root or store_root()) / "attempts"
+
+
+def locks_dir(root: Path | None = None) -> Path:
+    """Return the directory containing store-wide coordination locks."""
+    return (root or store_root()) / "locks"
+
+
+def store_lock_path(root: Path | None = None) -> Path:
+    """Return the shared writer/GC exclusion lock path."""
+    return locks_dir(root) / "registry.lock"
 
 
 __all__ = [
     "SOL_EXECBENCH_DIAGNOSTIC_STORE",
     "acceptances_dir",
+    "attempts_dir",
     "blob_path",
     "blobs_dir",
     "builds_dir",
     "calibrations_dir",
     "designs_dir",
+    "locks_dir",
+    "orchestrations_dir",
+    "promotions_dir",
     "publication_registry_dir",
+    "published_releases_dir",
     "releases_dir",
     "repo_root",
     "runs_dir",
     "snapshots_dir",
+    "store_lock_path",
     "store_root",
 ]

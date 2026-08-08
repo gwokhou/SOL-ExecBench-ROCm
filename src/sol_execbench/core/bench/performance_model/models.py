@@ -15,6 +15,9 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticConfidence,
     DiagnosticSidecarStatus,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
+)
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentSchemaModel,
@@ -747,6 +750,7 @@ class DiagnosticCalibrationProfile(CurrentSchemaModel):
     schema_version: Literal[SchemaVersion.DIAGNOSTIC_CALIBRATION] = (
         SchemaVersion.DIAGNOSTIC_CALIBRATION
     )
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     identity: CalibrationIdentity
     parameters: list[CalibrationParameter] = Field(min_length=1)

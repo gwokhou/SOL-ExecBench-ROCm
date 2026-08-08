@@ -13,11 +13,12 @@ than trusting that an output filename exists.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypedDict, runtime_checkable
 
 from pydantic import TypeAdapter
 
@@ -33,19 +34,34 @@ if TYPE_CHECKING:
         SolarManifestProjector,
     )
 
+from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
+    BlobStore,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
+    DiagnosticRetentionClass,
     DiagnosticStageStatus,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.identity import (
     acceptance_id,
+    calibration_id,
     collection_run_id as derive_collection_run_id,
     corpus_snapshot_id,
     model_build_id,
     publication_id,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
+    DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER,
+    PRODUCER_VERSION,
+    DiagnosticAcceptanceLifecycleManifest,
+    DiagnosticCalibrationLifecycleManifest,
+    DiagnosticCollectionRunManifest,
+    DiagnosticCorpusSnapshotManifest,
     DiagnosticDesignManifest,
+    DiagnosticLifecycleManifest,
+    DiagnosticModelBuildManifest,
+    DiagnosticPublicationLifecycleManifest,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticStageReceipt,
@@ -59,22 +75,31 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
+    GpuLifecycleIdentity,
+    SoftwareLifecycleIdentity,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
+    acceptances_dir,
+    builds_dir,
+    calibrations_dir,
+    designs_dir,
+    orchestrations_dir,
+    publication_registry_dir,
     runs_dir,
+    snapshots_dir,
+    store_lock_path,
     store_root,
-)
-from sol_execbench.core.bench.performance_model.lifecycle.transitions import (
-    require_legal_transition,
 )
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     load_json_file,
 )
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.process import exclusive_file_lock
 
 CHAIN: tuple[DiagnosticLifecycleStage, ...] = (
     DiagnosticLifecycleStage.DESIGN,
+    DiagnosticLifecycleStage.CALIBRATION,
     DiagnosticLifecycleStage.COLLECTION_RUN,
     DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
     DiagnosticLifecycleStage.MODEL_BUILD,
@@ -82,6 +107,29 @@ CHAIN: tuple[DiagnosticLifecycleStage, ...] = (
     DiagnosticLifecycleStage.PUBLICATION,
     DiagnosticLifecycleStage.RELEASE,
 )
+
+DEPENDENCIES: dict[
+    DiagnosticLifecycleStage, tuple[DiagnosticLifecycleStage, ...]
+] = {
+    DiagnosticLifecycleStage.DESIGN: (),
+    DiagnosticLifecycleStage.CALIBRATION: (DiagnosticLifecycleStage.DESIGN,),
+    DiagnosticLifecycleStage.COLLECTION_RUN: (DiagnosticLifecycleStage.DESIGN,),
+    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
+        DiagnosticLifecycleStage.COLLECTION_RUN,
+    ),
+    DiagnosticLifecycleStage.MODEL_BUILD: (
+        DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+        DiagnosticLifecycleStage.CALIBRATION,
+    ),
+    DiagnosticLifecycleStage.ACCEPTANCE: (
+        DiagnosticLifecycleStage.MODEL_BUILD,
+        DiagnosticLifecycleStage.CALIBRATION,
+    ),
+    DiagnosticLifecycleStage.PUBLICATION: (
+        DiagnosticLifecycleStage.ACCEPTANCE,
+    ),
+    DiagnosticLifecycleStage.RELEASE: (DiagnosticLifecycleStage.PUBLICATION,),
+}
 
 _CHAIN_INDEX = {stage: index for index, stage in enumerate(CHAIN)}
 
@@ -96,6 +144,7 @@ class StageRunContext:
     design_manifest_path: Path
     collection_run_id: str
     generation: int
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     corpus_root: Path | None = None
     calibration_profile_path: Path | None = None
     calibration_audit_path: Path | None = None
@@ -116,7 +165,10 @@ class StageRunContext:
 
     def inputs_record(self) -> dict[str, str]:
         """Return the operational input paths persisted in the run-state."""
-        record: dict[str, str] = {"source_revision": self.source_revision}
+        record: dict[str, str] = {
+            "source_revision": self.source_revision,
+            "purpose": self.purpose.value,
+        }
         for name, path in (
             ("corpus_root", self.corpus_root),
             ("calibration_profile", self.calibration_profile_path),
@@ -136,6 +188,7 @@ class StageCompletion:
 
     stage_id: str
     outputs: tuple[DiagnosticLifecycleArtifact, ...]
+    output_paths: tuple[Path, ...] = ()
 
 
 @runtime_checkable
@@ -202,6 +255,7 @@ class DesignHandler:
         return StageCompletion(
             stage_id=design.stage_id,
             outputs=(_artifact(context.design_manifest_path),),
+            output_paths=(context.design_manifest_path,),
         )
 
     def prepare(
@@ -242,7 +296,17 @@ class CollectionRunHandler:
             raise ValueError(
                 f"no collected evidence tree beneath {context.corpus_root}",
             )
-        return StageCompletion(stage_id=context.collection_run_id, outputs=())
+        corpus_paths = tuple(
+            context.corpus_root / f"{role}.json"
+            for role in ("development", "held_out")
+        )
+        if any(not path.is_file() for path in corpus_paths):
+            raise ValueError("collection run is missing frozen role corpora")
+        return StageCompletion(
+            stage_id=context.collection_run_id,
+            outputs=tuple(_artifact(path) for path in corpus_paths),
+            output_paths=corpus_paths,
+        )
 
     def prepare(
         self,
@@ -258,10 +322,61 @@ class CollectionRunHandler:
         receipt: DiagnosticStageReceipt,
     ) -> bool:
         """Re-check that the collected evidence tree still exists."""
-        del receipt
         if context.corpus_root is None:
             return False
-        return (context.corpus_root / "cases").is_dir()
+        return (context.corpus_root / "cases").is_dir() and _verify_artifacts(
+            receipt.output_inventory, context.corpus_root
+        )
+
+
+class CalibrationHandler:
+    """Adopt and verify one immutable hardware calibration pair."""
+
+    stage = DiagnosticLifecycleStage.CALIBRATION
+
+    def run(self, context: StageRunContext) -> StageCompletion:
+        """Validate the calibration pair and derive its bound identity."""
+        profile_path = _required(
+            context.calibration_profile_path,
+            "calibration requires --calibration-profile",
+        )
+        audit_path = _required(
+            context.calibration_audit_path,
+            "calibration requires --calibration-audit",
+        )
+        gpu, software = _calibration_identities(profile_path, audit_path)
+        stage_id = calibration_id(
+            calibration_profile_sha256=sha256_file(profile_path),
+            calibration_audit_sha256=sha256_file(audit_path),
+            gpu_identity=gpu,
+            software_identity=software,
+            purpose=context.purpose,
+        )
+        return StageCompletion(
+            stage_id=stage_id,
+            outputs=(_artifact(profile_path), _artifact(audit_path)),
+            output_paths=(profile_path, audit_path),
+        )
+
+    def prepare(
+        self,
+        context: StageRunContext,
+        run_state: DiagnosticRunManifest,
+    ) -> tuple[DiagnosticLifecycleParent, ...]:
+        """Return the immutable design dependency."""
+        return _parents_of(context, run_state, self.stage)
+
+    def verify(
+        self,
+        context: StageRunContext,
+        receipt: DiagnosticStageReceipt,
+    ) -> bool:
+        """Re-verify both calibration artifacts from the receipt."""
+        profile = context.calibration_profile_path
+        audit = context.calibration_audit_path
+        if profile is None or audit is None or profile.parent != audit.parent:
+            return False
+        return _verify_artifacts(receipt.output_inventory, profile.parent)
 
 
 class CorpusSnapshotHandler:
@@ -292,8 +407,16 @@ class CorpusSnapshotHandler:
             collection_run_id=context.collection_run_id,
             role="development",
             corpus_sha256=digests["development"],
+            purpose=context.purpose,
         )
-        return StageCompletion(stage_id=digest, outputs=tuple(outputs))
+        return StageCompletion(
+            stage_id=digest,
+            outputs=tuple(outputs),
+            output_paths=tuple(
+                context.corpus_root / f"{role}.json"
+                for role in ("development", "held_out")
+            ),
+        )
 
     def prepare(
         self,
@@ -363,10 +486,12 @@ class ModelBuildHandler:
             calibration_audit_sha256=sha256_file(calibration_audit),
             inference_profile_sha256=sha256_file(output),
             model_version=context.model_version,
+            purpose=context.purpose,
         )
         return StageCompletion(
             stage_id=stage_id,
             outputs=(_artifact(output),),
+            output_paths=(output,),
         )
 
     def prepare(
@@ -458,10 +583,12 @@ class AcceptanceHandler:
             held_out_corpus_snapshot_id=held_out_snapshot_id,
             accepted=result.accepted,
             verdict_sha256=sha256_file(result_output),
+            purpose=context.purpose,
         )
         return StageCompletion(
             stage_id=stage_id,
             outputs=outputs,
+            output_paths=(manifest_output, result_output),
         )
 
     def prepare(
@@ -506,10 +633,20 @@ class PublicationHandler:
 
     def run(self, context: StageRunContext) -> StageCompletion:
         """Build the publication tree and record its projection identity."""
+        from sol_execbench.core.bench.performance_model.acceptance import (
+            DiagnosticAcceptanceResult,
+        )
         from sol_execbench.core.bench.performance_model.publication import (
             DiagnosticPublicationProjection,
             build_diagnostic_publication_projection,
         )
+
+        acceptance_result = _require_output_root(context) / "acceptance.json"
+        verdict = load_json_file(DiagnosticAcceptanceResult, acceptance_result)
+        if not verdict.accepted:
+            raise ValueError(
+                "publication refused: held-out acceptance is terminally rejected"
+            )
 
         development = _required(
             context.development_corpus_path,
@@ -544,10 +681,12 @@ class PublicationHandler:
             publication_manifest_sha256=sha256_file(manifest_path),
             uncompressed_size_bytes=projection.uncompressed_size_bytes,
             case_count=projection.case_count,
+            purpose=context.purpose,
         )
         return StageCompletion(
             stage_id=stage_id,
             outputs=(_artifact(manifest_path),),
+            output_paths=(manifest_path,),
         )
 
     def prepare(
@@ -625,11 +764,13 @@ class ReleaseHandler:
             semantic_loader=self._semantic_loader,
             solar_verifier=self._solar_verifier,
             store_root_path=context.store_root,
+            purpose=context.purpose,
         )
         context.set_output(self.stage, archive)
         return StageCompletion(
             stage_id=attestation.release_id,
             outputs=(_artifact(archive), _artifact(attestation_path)),
+            output_paths=(archive, attestation_path),
         )
 
     def prepare(
@@ -684,31 +825,80 @@ def _parents_of(
     run_state: DiagnosticRunManifest,
     stage: DiagnosticLifecycleStage,
 ) -> tuple[DiagnosticLifecycleParent, ...]:
-    previous = _immediate_predecessor(stage)
-    if previous is None:
-        return ()
-    prior = run_state.stage_state(previous)
-    if prior is None or prior.receipt_path == "":
-        return ()
-    receipt = _load_receipt(
-        context.collection_run_id,
-        previous,
-        context.store_root,
-    )
-    if receipt is None:
-        return ()
-    path = stage_receipt_path(
-        context.collection_run_id,
-        previous,
-        context.store_root,
-    )
-    return (
-        DiagnosticLifecycleParent(
-            stage=previous,
-            stage_id=receipt.stage_id,
-            sha256=sha256_file(path),
-        ),
-    )
+    parents: list[DiagnosticLifecycleParent] = []
+    for dependency in DEPENDENCIES[stage]:
+        prior = run_state.stage_state(dependency)
+        if prior is None or prior.receipt_path == "":
+            raise ValueError(
+                f"{stage.value} requires verified {dependency.value}"
+            )
+        receipt = _load_receipt(
+            context.collection_run_id, dependency, context.store_root
+        )
+        if receipt is None or receipt.purpose is not context.purpose:
+            raise ValueError(
+                f"{stage.value} has missing or cross-purpose {dependency.value}"
+            )
+        manifest_path = _stage_manifest_path(
+            context.store_root, dependency, receipt.stage_id
+        )
+        if not manifest_path.is_file():
+            raise ValueError(
+                f"{stage.value} dependency manifest is missing: {manifest_path}"
+            )
+        parents.append(
+            DiagnosticLifecycleParent(
+                stage=dependency,
+                purpose=context.purpose,
+                stage_id=receipt.stage_id,
+                sha256=sha256_file(manifest_path),
+            )
+        )
+    if stage is DiagnosticLifecycleStage.ACCEPTANCE:
+        held_out = _required(
+            context.held_out_corpus_path, "acceptance requires held-out corpus"
+        )
+        held_out_id = corpus_snapshot_id(
+            collection_run_id=context.collection_run_id,
+            role="held_out",
+            corpus_sha256=sha256_file(held_out),
+            purpose=context.purpose,
+        )
+        manifest_path = _stage_manifest_path(
+            context.store_root,
+            DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+            held_out_id,
+        )
+        if not manifest_path.is_file():
+            raise ValueError("acceptance held-out snapshot manifest is missing")
+        parents.append(
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+                purpose=context.purpose,
+                stage_id=held_out_id,
+                sha256=sha256_file(manifest_path),
+            )
+        )
+    return tuple(parents)
+
+
+def _stage_manifest_path(
+    root: Path, stage: DiagnosticLifecycleStage, stage_id: str
+) -> Path:
+    directories = {
+        DiagnosticLifecycleStage.DESIGN: designs_dir(root),
+        DiagnosticLifecycleStage.CALIBRATION: calibrations_dir(root),
+        DiagnosticLifecycleStage.COLLECTION_RUN: runs_dir(root),
+        DiagnosticLifecycleStage.CORPUS_SNAPSHOT: snapshots_dir(root),
+        DiagnosticLifecycleStage.MODEL_BUILD: builds_dir(root),
+        DiagnosticLifecycleStage.ACCEPTANCE: acceptances_dir(root),
+        DiagnosticLifecycleStage.PUBLICATION: publication_registry_dir(root),
+    }
+    try:
+        directory = directories[stage]
+    except KeyError as error:
+        raise ValueError(f"no manifest registry for {stage.value}") from error
+    return directory / stage_id / "manifest.json"
 
 
 def build_stage_handlers(
@@ -725,6 +915,7 @@ def build_stage_handlers(
     """
     return {
         DiagnosticLifecycleStage.DESIGN: DesignHandler(),
+        DiagnosticLifecycleStage.CALIBRATION: CalibrationHandler(),
         DiagnosticLifecycleStage.COLLECTION_RUN: CollectionRunHandler(),
         DiagnosticLifecycleStage.CORPUS_SNAPSHOT: CorpusSnapshotHandler(),
         DiagnosticLifecycleStage.MODEL_BUILD: ModelBuildHandler(
@@ -768,14 +959,18 @@ def build_run_context(
     """
     design = _load_design_manual(design_manifest_path)
     root = Path(store_root_path).resolve() if store_root_path else store_root()
+    purpose = design.purpose
+    generation = _next_generation(root, design.stage_id, purpose)
     return StageRunContext(
         store_root=root,
         design_manifest_path=Path(design_manifest_path).resolve(),
         collection_run_id=derive_collection_run_id(
             design_id=design.stage_id,
-            generation=1,
+            generation=generation,
+            purpose=purpose,
         ),
-        generation=1,
+        generation=generation,
+        purpose=purpose,
         corpus_root=corpus_root,
         calibration_profile_path=calibration_profile_path,
         calibration_audit_path=calibration_audit_path,
@@ -785,6 +980,27 @@ def build_run_context(
         source_revision=source_revision,
         model_version=model_version,
     )
+
+
+def _next_generation(
+    root: Path,
+    design_id: str,
+    purpose: DiagnosticEvidencePurpose,
+) -> int:
+    """Return max(existing generation)+1 for one design and authority domain."""
+    generations: list[int] = []
+    for path in sorted(runs_dir(root).glob("*/manifest.json")):
+        manifest = load_json_file(DiagnosticCollectionRunManifest, path)
+        if manifest.purpose is not purpose:
+            continue
+        parent_ids = {
+            parent.stage_id
+            for parent in manifest.parents
+            if parent.stage is DiagnosticLifecycleStage.DESIGN
+        }
+        if design_id in parent_ids:
+            generations.append(manifest.generation)
+    return max(generations, default=0) + 1
 
 
 def _base_context(
@@ -951,7 +1167,9 @@ def _write_status_json(
     status: dict[str, object],
 ) -> None:
     path = (
-        runs_dir(context.store_root) / context.collection_run_id / "status.json"
+        orchestrations_dir(context.store_root)
+        / context.collection_run_id
+        / "status.json"
     )
     atomic_write_json_value(path, status)
 
@@ -990,6 +1208,7 @@ def _initial_run_state(
         collection_run_id=context.collection_run_id,
         design_id=design.stage_id,
         generation=context.generation,
+        purpose=context.purpose,
         created_at=created_at,
         updated_at=created_at,
         design_manifest_path=str(context.design_manifest_path),
@@ -1011,15 +1230,15 @@ def _validate_predecessor(
     run_state: DiagnosticRunManifest,
     stage: DiagnosticLifecycleStage,
 ) -> None:
-    previous = _immediate_predecessor(stage)
-    if previous is None:
-        return
-    if _stage_status(run_state, previous) is not DiagnosticStageStatus.VERIFIED:
-        raise ValueError(
-            f"illegal lifecycle transition: {stage.value} requires "
-            f"verified {previous.value}",
-        )
-    require_legal_transition(previous, stage)
+    for dependency in DEPENDENCIES[stage]:
+        if (
+            _stage_status(run_state, dependency)
+            is not DiagnosticStageStatus.VERIFIED
+        ):
+            raise ValueError(
+                f"illegal lifecycle transition: {stage.value} requires "
+                f"verified {dependency.value}",
+            )
 
 
 def _execute_stage(
@@ -1032,7 +1251,8 @@ def _execute_stage(
 ) -> DiagnosticRunManifest:
     handler = handlers[stage]
     current = run_state
-    attempts = 0
+    prior = run_state.stage_state(stage)
+    attempts = prior.attempts if prior is not None else 0
     while attempts < max_attempts:
         attempts += 1
         running = _replace_stage(
@@ -1047,7 +1267,9 @@ def _execute_stage(
         _write_run_state(context, running)
         started = clock()
         try:
+            prepared_inputs = handler.prepare(context, running)
             completion = handler.run(context)
+            _import_completion_outputs(context, completion)
         except (OSError, ValueError):
             current = _replace_stage(
                 running,
@@ -1069,7 +1291,16 @@ def _execute_stage(
             started,
             clock(),
         )
+        if receipt.input_identities != prepared_inputs:
+            current = _failed_stage(running, stage, attempts)
+            _write_run_state(context, current)
+            continue
+        if not handler.verify(context, receipt):
+            current = _failed_stage(running, stage, attempts)
+            _write_run_state(context, current)
+            continue
         _write_receipt(context, stage, receipt)
+        _commit_stage_manifests(context, completion, receipt)
         current = _replace_stage(
             running,
             DiagnosticRunStageState(
@@ -1085,6 +1316,292 @@ def _execute_stage(
     return current
 
 
+def _failed_stage(
+    run_state: DiagnosticRunManifest,
+    stage: DiagnosticLifecycleStage,
+    attempts: int,
+) -> DiagnosticRunManifest:
+    return _replace_stage(
+        run_state,
+        DiagnosticRunStageState(
+            stage=stage,
+            status=DiagnosticStageStatus.FAILED,
+            attempts=attempts,
+            receipt_path="",
+        ),
+    )
+
+
+def _import_completion_outputs(
+    context: StageRunContext,
+    completion: StageCompletion,
+) -> None:
+    """Import every declared output into CAS before committing a receipt."""
+    if len(completion.output_paths) != len(completion.outputs):
+        if completion.outputs:
+            raise ValueError("stage completion omitted output paths")
+        return
+    store = BlobStore(context.store_root)
+    for path, artifact in zip(
+        completion.output_paths, completion.outputs, strict=True
+    ):
+        store.put_file(path, expected_sha256=artifact.sha256)
+
+
+class _ManifestCommon(TypedDict):
+    stage: DiagnosticLifecycleStage
+    purpose: DiagnosticEvidencePurpose
+    stage_id: str
+    status: DiagnosticStageStatus
+    retention_class: DiagnosticRetentionClass
+    source_revision: str
+    parents: tuple[DiagnosticLifecycleParent, ...]
+    exact_inventory: tuple[DiagnosticLifecycleArtifact, ...]
+    receipt: DiagnosticStageReceipt
+    created_at: str
+
+
+def _manifest_common(
+    context: StageRunContext,
+    receipt: DiagnosticStageReceipt,
+    retention: DiagnosticRetentionClass,
+) -> _ManifestCommon:
+    return {
+        "stage": receipt.stage,
+        "purpose": context.purpose,
+        "stage_id": receipt.stage_id,
+        "status": DiagnosticStageStatus.VERIFIED,
+        "retention_class": retention,
+        "source_revision": context.source_revision,
+        "parents": receipt.input_identities,
+        "exact_inventory": receipt.output_inventory,
+        "receipt": receipt,
+        "created_at": receipt.finished_at,
+    }
+
+
+def _commit_stage_manifests(
+    context: StageRunContext,
+    completion: StageCompletion,
+    receipt: DiagnosticStageReceipt,
+) -> None:
+    """Materialize immutable stage objects only after verified receipt commit."""
+    if not completion.output_paths:
+        return
+    manifests = _stage_manifests(context, completion, receipt)
+    for manifest in manifests:
+        path = _stage_manifest_path(
+            context.store_root, manifest.stage, manifest.stage_id
+        )
+        if path.is_file():
+            existing = DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER.validate_json(
+                path.read_text(encoding="utf-8")
+            )
+            if existing != manifest:
+                raise ValueError(f"immutable lifecycle object differs: {path}")
+            continue
+        with exclusive_file_lock(store_lock_path(context.store_root)):
+            atomic_write_json_value(path, manifest.model_dump(mode="json"))
+        BlobStore(context.store_root).put_file(path)
+
+
+def _stage_manifests(
+    context: StageRunContext,
+    completion: StageCompletion,
+    receipt: DiagnosticStageReceipt,
+) -> tuple[DiagnosticLifecycleManifest, ...]:
+    stage = receipt.stage
+    if stage is DiagnosticLifecycleStage.DESIGN:
+        design = _load_design(context)
+        return (design.model_copy(update={"receipt": receipt}),)
+    if stage is DiagnosticLifecycleStage.CALIBRATION:
+        return (_calibration_manifest(context, receipt),)
+    if stage is DiagnosticLifecycleStage.COLLECTION_RUN:
+        return (_collection_manifest(context, receipt),)
+    if stage is DiagnosticLifecycleStage.CORPUS_SNAPSHOT:
+        return _snapshot_manifests(context, completion, receipt)
+    if stage is DiagnosticLifecycleStage.MODEL_BUILD:
+        return (_model_manifest(context, completion, receipt),)
+    if stage is DiagnosticLifecycleStage.ACCEPTANCE:
+        return (_acceptance_manifest(context, completion, receipt),)
+    if stage is DiagnosticLifecycleStage.PUBLICATION:
+        return (_publication_manifest(context, completion, receipt),)
+    if stage is DiagnosticLifecycleStage.RELEASE:
+        return ()
+    raise ValueError(f"unsupported lifecycle manifest stage: {stage.value}")
+
+
+def _calibration_manifest(
+    context: StageRunContext, receipt: DiagnosticStageReceipt
+) -> DiagnosticCalibrationLifecycleManifest:
+    profile = _required(context.calibration_profile_path, "missing calibration")
+    audit = _required(
+        context.calibration_audit_path, "missing calibration audit"
+    )
+    gpu, software = _calibration_identities(profile, audit)
+    return DiagnosticCalibrationLifecycleManifest(
+        **_manifest_common(
+            context, receipt, DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE
+        ),
+        gpu_identity=gpu,
+        software_identity=software,
+        calibration_profile_sha256=sha256_file(profile),
+        calibration_audit_sha256=sha256_file(audit),
+    )
+
+
+def _collection_manifest(
+    context: StageRunContext, receipt: DiagnosticStageReceipt
+) -> DiagnosticCollectionRunManifest:
+    return DiagnosticCollectionRunManifest(
+        **_manifest_common(
+            context, receipt, DiagnosticRetentionClass.PROCESS_EVIDENCE
+        ),
+        generation=context.generation,
+    )
+
+
+def _snapshot_manifests(
+    context: StageRunContext,
+    completion: StageCompletion,
+    receipt: DiagnosticStageReceipt,
+) -> tuple[DiagnosticCorpusSnapshotManifest, ...]:
+    manifests: list[DiagnosticCorpusSnapshotManifest] = []
+    for role, artifact in zip(
+        ("development", "held_out"), completion.outputs, strict=True
+    ):
+        stage_id = corpus_snapshot_id(
+            collection_run_id=context.collection_run_id,
+            role=role,
+            corpus_sha256=artifact.sha256,
+            purpose=context.purpose,
+        )
+        common = _manifest_common(
+            context, receipt, DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE
+        )
+        common.update(
+            stage_id=stage_id,
+            exact_inventory=(artifact,),
+        )
+        manifests.append(
+            DiagnosticCorpusSnapshotManifest(
+                **common,
+                role=role,
+                corpus_file_sha256=artifact.sha256,
+                case_count=_corpus_case_count(
+                    completion.output_paths[len(manifests)]
+                ),
+            )
+        )
+    return tuple(manifests)
+
+
+def _corpus_case_count(path: Path) -> int:
+    from sol_execbench.core.bench.performance_model.validation_corpus import (
+        DiagnosticValidationCorpus,
+    )
+
+    return len(load_json_file(DiagnosticValidationCorpus, path).cases)
+
+
+def _model_manifest(
+    context: StageRunContext,
+    completion: StageCompletion,
+    receipt: DiagnosticStageReceipt,
+) -> DiagnosticModelBuildManifest:
+    calibration = _required(
+        context.calibration_profile_path, "missing calibration"
+    )
+    audit = _required(
+        context.calibration_audit_path, "missing calibration audit"
+    )
+    inference = completion.output_paths[0]
+    return DiagnosticModelBuildManifest(
+        **_manifest_common(
+            context, receipt, DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE
+        ),
+        calibration_profile_sha256=sha256_file(calibration),
+        calibration_audit_sha256=sha256_file(audit),
+        inference_profile_sha256=sha256_file(inference),
+        model_version=context.model_version,
+    )
+
+
+def _acceptance_manifest(
+    context: StageRunContext,
+    completion: StageCompletion,
+    receipt: DiagnosticStageReceipt,
+) -> DiagnosticAcceptanceLifecycleManifest:
+    from sol_execbench.core.bench.performance_model.acceptance import (
+        DiagnosticAcceptanceResult,
+    )
+
+    result_path = completion.output_paths[1]
+    result = load_json_file(DiagnosticAcceptanceResult, result_path)
+    held_out = _required(
+        context.held_out_corpus_path, "missing held-out corpus"
+    )
+    held_out_id = corpus_snapshot_id(
+        collection_run_id=context.collection_run_id,
+        role="held_out",
+        corpus_sha256=sha256_file(held_out),
+        purpose=context.purpose,
+    )
+    return DiagnosticAcceptanceLifecycleManifest(
+        **_manifest_common(
+            context, receipt, DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE
+        ),
+        held_out_corpus_snapshot_id=held_out_id,
+        accepted=result.accepted,
+        verdict_sha256=sha256_file(result_path),
+    )
+
+
+def _publication_manifest(
+    context: StageRunContext,
+    completion: StageCompletion,
+    receipt: DiagnosticStageReceipt,
+) -> DiagnosticPublicationLifecycleManifest:
+    from sol_execbench.core.bench.performance_model.publication import (
+        DiagnosticPublicationProjection,
+    )
+
+    manifest_path = completion.output_paths[0]
+    projection = load_json_file(DiagnosticPublicationProjection, manifest_path)
+    return DiagnosticPublicationLifecycleManifest(
+        **_manifest_common(
+            context, receipt, DiagnosticRetentionClass.PUBLICATION_RELEASE
+        ),
+        source_corpus_sha256=projection.source_corpus_sha256,
+        publication_manifest_sha256=sha256_file(manifest_path),
+        uncompressed_size_bytes=projection.uncompressed_size_bytes,
+        case_count=projection.case_count,
+    )
+
+
+def _calibration_identities(
+    profile_path: Path,
+    audit_path: Path,
+) -> tuple[GpuLifecycleIdentity, SoftwareLifecycleIdentity]:
+    from sol_execbench.core.bench.performance_model.calibration_audit import (
+        DiagnosticCalibrationAudit,
+    )
+    from sol_execbench.core.bench.performance_model.models import (
+        DiagnosticCalibrationProfile,
+    )
+
+    profile = load_json_file(DiagnosticCalibrationProfile, profile_path)
+    audit = load_json_file(DiagnosticCalibrationAudit, audit_path)
+    if profile.identity.gpu_id != audit.probe_identity.gpu_id:
+        raise ValueError("calibration profile/audit GPU identity mismatch")
+    gpu = GpuLifecycleIdentity(**profile.identity.model_dump(mode="python"))
+    software = SoftwareLifecycleIdentity(
+        sol_version=PRODUCER_VERSION,
+        python_version=sys.version.split()[0],
+    )
+    return gpu, software
+
+
 def _replace_stage(
     run_state: DiagnosticRunManifest,
     state: DiagnosticRunStageState,
@@ -1097,10 +1614,11 @@ def _write_run_state(
     context: StageRunContext,
     run_state: DiagnosticRunManifest,
 ) -> None:
-    atomic_write_json_value(
-        run_state_path(context.collection_run_id, context.store_root),
-        run_state.model_dump(mode="json"),
-    )
+    with exclusive_file_lock(store_lock_path(context.store_root)):
+        atomic_write_json_value(
+            run_state_path(context.collection_run_id, context.store_root),
+            run_state.model_dump(mode="json"),
+        )
 
 
 def _write_receipt(
@@ -1108,14 +1626,17 @@ def _write_receipt(
     stage: DiagnosticLifecycleStage,
     receipt: DiagnosticStageReceipt,
 ) -> None:
-    atomic_write_json_value(
-        stage_receipt_path(
-            context.collection_run_id,
-            stage,
-            context.store_root,
-        ),
-        _RECEIPT_ADAPTER.dump_python(receipt, mode="json"),
+    path = stage_receipt_path(
+        context.collection_run_id,
+        stage,
+        context.store_root,
     )
+    with exclusive_file_lock(store_lock_path(context.store_root)):
+        atomic_write_json_value(
+            path,
+            _RECEIPT_ADAPTER.dump_python(receipt, mode="json"),
+        )
+    BlobStore(context.store_root).put_file(path)
 
 
 def _receipt_name(stage: DiagnosticLifecycleStage) -> str:
@@ -1133,6 +1654,7 @@ def _build_receipt(
 ) -> DiagnosticStageReceipt:
     return DiagnosticStageReceipt(
         stage=handler.stage,
+        purpose=context.purpose,
         stage_id=completion.stage_id,
         command=f"diagnostics lifecycle {handler.stage.value}",
         started_at=started_at,
@@ -1150,8 +1672,24 @@ def _reverify_past_stages(
     handlers: Mapping[DiagnosticLifecycleStage, DiagnosticStageHandler],
 ) -> DiagnosticRunManifest:
     current = run_state
-    for state in run_state.stages:
+    invalid: set[DiagnosticLifecycleStage] = set()
+    for stage in CHAIN:
+        state = run_state.stage_state(stage)
+        if state is None:
+            invalid.add(stage)
+            continue
         if state.status is not DiagnosticStageStatus.VERIFIED:
+            invalid.add(stage)
+            continue
+        if any(dependency in invalid for dependency in DEPENDENCIES[stage]):
+            invalid.add(stage)
+            current = current.set_stage(
+                DiagnosticRunStageState(
+                    stage=state.stage,
+                    status=DiagnosticStageStatus.FAILED,
+                    attempts=state.attempts,
+                )
+            )
             continue
         receipt = _load_receipt(
             context.collection_run_id,
@@ -1162,6 +1700,7 @@ def _reverify_past_stages(
             context, receipt
         )
         if not verified:
+            invalid.add(stage)
             current = current.set_stage(
                 DiagnosticRunStageState(
                     stage=state.stage,
@@ -1252,12 +1791,14 @@ def _context_from_run_state(
         calibration_profile_path=_optional_path(
             inputs.get("calibration_profile")
         ),
+        calibration_audit_path=_optional_path(inputs.get("calibration_audit")),
         development_corpus_path=_optional_path(
             inputs.get("development_corpus")
         ),
         held_out_corpus_path=_optional_path(inputs.get("held_out_corpus")),
         output_root=_optional_path(inputs.get("output_root")),
         source_revision=inputs.get("source_revision", "unknown"),
+        purpose=run_state.purpose,
     )
 
 
@@ -1268,6 +1809,7 @@ def _optional_path(value: str | None) -> Path | None:
 __all__ = [
     "CHAIN",
     "AcceptanceHandler",
+    "CalibrationHandler",
     "CollectionRunHandler",
     "CorpusSnapshotHandler",
     "DesignHandler",

@@ -28,12 +28,12 @@ def test_store_layout_follows_the_governed_tree(monkeypatch, tmp_path) -> None:
     assert blobs_dir() == root / "blobs" / "sha256"
     assert blob_path("a" * 64) == root / "blobs" / "sha256" / ("a" * 64)
     assert designs_dir() == root / "designs"
-    assert runs_dir() == root / "runs"
+    assert runs_dir() == root / "collection-runs"
     assert snapshots_dir() == root / "snapshots"
     assert builds_dir() == root / "builds"
     assert acceptances_dir() == root / "acceptances"
     assert publication_registry_dir() == root / "publication-registry"
-    assert releases_dir() == root / "releases"
+    assert releases_dir() == root / "release-candidates"
 
 
 def test_blob_path_is_content_addressed() -> None:

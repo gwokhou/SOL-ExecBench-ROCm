@@ -168,7 +168,7 @@ def test_legacy_entry_shapes_are_removed() -> None:
     assert runner.invoke(cli, ["official-score"]).exit_code == 2
 
 
-def test_score_exposes_authorized_v2_policy_without_release() -> None:
+def test_score_exposes_authorized_v2_policy_with_published_release() -> None:
     result = CliRunner().invoke(cli, ["--format", "json", "score", "status"])
 
     assert result.exit_code == 0, result.output
@@ -184,6 +184,10 @@ def test_score_exposes_authorized_v2_policy_without_release() -> None:
         "ready": True,
         "reason_code": "ready",
     }
-    assert payload["data"]["published_release"]["available"] is False
+    assert payload["data"]["published_release"] == {
+        "available": True,
+        "reason_code": "published",
+        "path": "RELEASE/release-bundle.json",
+    }
 
     assert CliRunner().invoke(cli, ["score", "official"]).exit_code == 2

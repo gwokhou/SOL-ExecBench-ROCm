@@ -17,6 +17,7 @@ from typing import Literal
 from pydantic import Field
 
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
     DiagnosticStageStatus,
 )
@@ -24,7 +25,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
-    runs_dir,
+    orchestrations_dir,
 )
 from sol_execbench.core.data.base_model import (
     CurrentFrozenSchemaModel,
@@ -38,10 +39,33 @@ class DiagnosticRunStageState(FrozenArtifactModel):
     """Progress recorded for one stage of a lifecycle run."""
 
     stage: DiagnosticLifecycleStage
+    node_key: str = ""
     status: DiagnosticStageStatus
     attempts: int = Field(ge=0)
     receipt_path: str = ""
     outputs: tuple[DiagnosticLifecycleArtifact, ...] = ()
+
+
+class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
+    """One immutable, reviewable set of lifecycle execution inputs."""
+
+    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN
+
+    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN] = (
+        SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN
+    )
+    plan_id: SHA256Digest
+    design_manifest_path: str = Field(min_length=1)
+    corpus_root: str = Field(min_length=1)
+    calibration_profile_path: str = Field(min_length=1)
+    calibration_audit_path: str = Field(min_length=1)
+    development_corpus_path: str = Field(min_length=1)
+    held_out_corpus_path: str = Field(min_length=1)
+    output_root: str = Field(min_length=1)
+    source_revision: str = Field(min_length=40, max_length=64)
+    purpose: DiagnosticEvidencePurpose
+    model_version: str = Field(min_length=1)
+    max_attempts: int = Field(ge=1, le=10)
 
 
 class DiagnosticRunManifest(CurrentFrozenSchemaModel):
@@ -62,6 +86,7 @@ class DiagnosticRunManifest(CurrentFrozenSchemaModel):
     collection_run_id: SHA256Digest
     design_id: SHA256Digest
     generation: int = Field(ge=1)
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     created_at: str = Field(min_length=1)
     updated_at: str = Field(min_length=1)
     design_manifest_path: str = ""
@@ -95,7 +120,7 @@ def run_state_path(
     store_root_path: Path | None = None,
 ) -> Path:
     """Return the run-state file path for one collection generation."""
-    return runs_dir(store_root_path) / collection_run_id / "run.json"
+    return orchestrations_dir(store_root_path) / collection_run_id / "run.json"
 
 
 def stage_receipt_path(
@@ -105,7 +130,7 @@ def stage_receipt_path(
 ) -> Path:
     """Return the typed receipt file path for one stage of a run."""
     return (
-        runs_dir(store_root_path)
+        orchestrations_dir(store_root_path)
         / collection_run_id
         / "receipts"
         / f"{stage.value}.json"
@@ -113,6 +138,7 @@ def stage_receipt_path(
 
 
 __all__ = [
+    "DiagnosticLifecyclePlan",
     "DiagnosticRunManifest",
     "DiagnosticRunStageState",
     "run_state_path",
