@@ -11,15 +11,20 @@ from enum import StrEnum
 class DiagnosticLifecycleStage(StrEnum):
     """One immutable object in the monotonic diagnostic chain.
 
-    The chain is ``design -> collection_run -> corpus_snapshot ->
-    model_build -> acceptance -> publication -> release``. Every stage
-    object binds its parents, source revision, producer version, policy
-    hashes, exact inventory, retention class, and typed receipt.
+    The linear spine is ``design -> collection_run -> corpus_snapshot ->
+    model_build -> acceptance -> publication -> release``. ``calibration``
+    is a first-class immutable input that sits beside the promoted
+    development snapshot: a model build cites both, and a held-out
+    acceptance cites calibration, development, model-build, and held-out
+    identities. Every stage object binds its parents, source revision,
+    producer version, policy hashes, exact inventory, retention class,
+    and typed receipt.
     """
 
     DESIGN = "design"
     COLLECTION_RUN = "collection_run"
     CORPUS_SNAPSHOT = "corpus_snapshot"
+    CALIBRATION = "calibration"
     MODEL_BUILD = "model_build"
     ACCEPTANCE = "acceptance"
     PUBLICATION = "publication"

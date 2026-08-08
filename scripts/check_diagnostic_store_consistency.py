@@ -4,11 +4,13 @@
 The lifecycle store is the authoritative registry for the diagnostic chain.
 Every lifecycle manifest must live under ``<store>/<stage_dir>/<stage_id>/
 manifest.json`` with a directory and ``stage_id`` that match its own
-``stage`` and ``stage_id``, and every digest it cites (inventory, parents,
-and stage-specific SHA fields) must exist in the content-addressed blob
-store. Run-state objects and typed receipts must likewise cite blobs that
-exist. A missing store is not an error; a store that contradicts its own
-registry layout or blobs is.
+``stage`` and ``stage_id``, its stored ``stage_id`` must recompute from its
+own identity inputs (parents and manifest fields), and every digest it
+cites (inventory, parents, and stage-specific SHA fields) must exist in the
+content-addressed blob store *and* verify its content against its key.
+Run-state objects and typed receipts must likewise cite blobs that exist and
+verify. A missing store is not an error; a store that contradicts its own
+registry layout, identity, or blobs is.
 """
 
 from __future__ import annotations
@@ -16,8 +18,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Final
 
+from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
+    BlobStore,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticLifecycleStage,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.identity import (
+    recompute_stage_id,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER,
@@ -30,8 +38,8 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     acceptances_dir,
-    blob_path,
     builds_dir,
+    calibrations_dir,
     designs_dir,
     publication_registry_dir,
     releases_dir,
@@ -44,6 +52,7 @@ _DIR_TO_STAGE: Final[dict[str, DiagnosticLifecycleStage]] = {
     "designs": DiagnosticLifecycleStage.DESIGN,
     "runs": DiagnosticLifecycleStage.COLLECTION_RUN,
     "snapshots": DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+    "calibrations": DiagnosticLifecycleStage.CALIBRATION,
     "builds": DiagnosticLifecycleStage.MODEL_BUILD,
     "acceptances": DiagnosticLifecycleStage.ACCEPTANCE,
     "publication-registry": DiagnosticLifecycleStage.PUBLICATION,
@@ -58,6 +67,7 @@ _SHA_FIELDS: Final[tuple[str, ...]] = (
     "calibration_audit_sha256",
     "inference_profile_sha256",
     "verdict_sha256",
+    "source_corpus_sha256",
     "publication_manifest_sha256",
     "archive_sha256",
     "attestation_sha256",
@@ -65,8 +75,8 @@ _SHA_FIELDS: Final[tuple[str, ...]] = (
 
 
 def _blob_exists(root: Path, digest: str) -> bool:
-    path = blob_path(digest, root)
-    return path.is_file() and not path.is_symlink()
+    """Return whether the blob exists and its content verifies to its key."""
+    return BlobStore(root).contains(digest)
 
 
 def _check_manifest(root: Path, manifest_path: Path) -> list[str]:
@@ -92,6 +102,23 @@ def _check_manifest(root: Path, manifest_path: Path) -> list[str]:
             f"{manifest_path}: directory {stage_id_dir!r} does not match "
             f"stage_id {manifest.stage_id!r}",
         )
+    # Acceptance currently derives its stage_id outside the identity family
+    # (see orchestrator); until the runtime layer routes it through
+    # acceptance_id, it is exempt from the recomputation closure.
+    if manifest.stage is not DiagnosticLifecycleStage.ACCEPTANCE:
+        try:
+            expected_stage_id = recompute_stage_id(manifest)
+        except ValueError as error:
+            findings.append(
+                f"{manifest_path}: cannot recompute stage_id: {error}",
+            )
+        else:
+            if expected_stage_id != manifest.stage_id:
+                findings.append(
+                    f"{manifest_path}: stored stage_id {manifest.stage_id!r} "
+                    f"does not match recomputed identity "
+                    f"{expected_stage_id!r}",
+                )
     digests: set[str] = set()
     for item in manifest.exact_inventory:
         digests.add(item.sha256)
@@ -159,6 +186,7 @@ def check_store(root: Path) -> list[str]:
         designs_dir(root),
         runs_dir(root),
         snapshots_dir(root),
+        calibrations_dir(root),
         builds_dir(root),
         acceptances_dir(root),
         publication_registry_dir(root),

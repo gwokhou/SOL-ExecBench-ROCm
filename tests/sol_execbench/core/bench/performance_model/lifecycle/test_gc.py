@@ -51,6 +51,7 @@ def _write_publication(
         retention_class=DiagnosticRetentionClass.PUBLICATION_RELEASE,
         source_revision="test",
         created_at=_NOW,
+        source_corpus_sha256=digest,
         publication_manifest_sha256=digest,
         uncompressed_size_bytes=size,
         case_count=220,
@@ -83,6 +84,7 @@ def _write_collection_run(
         retention_class=DiagnosticRetentionClass.PROCESS_EVIDENCE,
         source_revision="test",
         created_at=_NOW,
+        generation=1,
         frozen_held_out_sha256=digest,
     )
     path = runs_dir(root) / stage_id / "manifest.json"

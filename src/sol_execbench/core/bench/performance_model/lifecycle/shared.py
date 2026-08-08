@@ -63,9 +63,42 @@ class SoftwareLifecycleIdentity(FrozenArtifactModel):
     python_version: str | None = None
 
 
+def require_complete_gpu_identity(
+    gpu: GpuLifecycleIdentity | None,
+    *,
+    stage: DiagnosticLifecycleStage,
+) -> None:
+    """When a stage binds hardware, every fingerprint field must be set.
+
+    ``None`` is the only acceptable value for stages that never touch a GPU.
+    A partial fingerprint — any of ``gpu_id``, ``gpu_bdf``, ``rocm_version``,
+    ``compiler_version``, ``clock_mode``, ``power_profile`` missing — is not
+    an authoritative production identity. Calibration, collection, and model
+    build stages that use hardware must therefore carry a complete, immutable
+    GPU fingerprint that participates in the stage identity.
+    """
+    if gpu is None:
+        return
+    required = (
+        "gpu_id",
+        "gpu_bdf",
+        "rocm_version",
+        "compiler_version",
+        "clock_mode",
+        "power_profile",
+    )
+    missing = [name for name in required if getattr(gpu, name) is None]
+    if missing:
+        raise ValueError(
+            f"{stage.value} bound hardware but gpu_identity is missing "
+            f"required fields: {', '.join(missing)}",
+        )
+
+
 __all__ = [
     "DiagnosticLifecycleArtifact",
     "DiagnosticLifecycleParent",
     "GpuLifecycleIdentity",
     "SoftwareLifecycleIdentity",
+    "require_complete_gpu_identity",
 ]

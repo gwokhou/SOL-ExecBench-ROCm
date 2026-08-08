@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from sol_execbench.core.bench.performance_model.lifecycle import (
     DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER,
     DiagnosticAcceptanceLifecycleManifest,
+    DiagnosticCalibrationLifecycleManifest,
     DiagnosticCollectionRunManifest,
     DiagnosticCorpusSnapshotManifest,
     DiagnosticDesignManifest,
@@ -24,6 +25,9 @@ _SCHEMA_BY_STAGE = {
     ),
     DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
         "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v1"
+    ),
+    DiagnosticLifecycleStage.CALIBRATION: (
+        "sol_execbench.diagnostic_lifecycle_calibration.v1"
     ),
     DiagnosticLifecycleStage.MODEL_BUILD: (
         "sol_execbench.diagnostic_lifecycle_model_build.v1"
@@ -68,6 +72,7 @@ def _design_payload() -> dict[str, object]:
             {
                 **_base(DiagnosticLifecycleStage.COLLECTION_RUN),
                 "roles": ("development", "held_out"),
+                "generation": 1,
             },
             DiagnosticCollectionRunManifest,
         ),
@@ -79,6 +84,27 @@ def _design_payload() -> dict[str, object]:
                 "case_count": 880,
             },
             DiagnosticCorpusSnapshotManifest,
+        ),
+        (
+            {
+                **_base(DiagnosticLifecycleStage.CALIBRATION),
+                "calibration_profile_sha256": "0a" * 32,
+                "calibration_audit_sha256": "0b" * 32,
+                "gpu_identity": {
+                    "gpu_architecture": "gfx1200",
+                    "gpu_id": "a3ff7590-0000-1000-800f-a29c1cca1511",
+                    "gpu_bdf": "0000:03:00.0",
+                    "rocm_version": "7.2.0",
+                    "compiler_version": "HIP version: 7.2.26015-fc0010cf6a",
+                    "clock_mode": "locked",
+                    "power_profile": "stable_peak",
+                },
+                "software_identity": {
+                    "sol_version": "4.0.0",
+                    "python_version": "3.13",
+                },
+            },
+            DiagnosticCalibrationLifecycleManifest,
         ),
         (
             {
@@ -102,6 +128,7 @@ def _design_payload() -> dict[str, object]:
         (
             {
                 **_base(DiagnosticLifecycleStage.PUBLICATION),
+                "source_corpus_sha256": "e1" * 32,
                 "publication_manifest_sha256": "b1" * 32,
                 "uncompressed_size_bytes": 1234,
                 "case_count": 880,
