@@ -8,6 +8,9 @@ from sol_execbench.core.bench.performance_model.acceptance import (
     DiagnosticAcceptanceManifest,
     evaluate_diagnostic_acceptance,
 )
+from sol_execbench.core.bench.performance_model.lifecycle import (
+    DiagnosticEvidencePurpose,
+)
 from sol_execbench.core.bench.performance_model.models import (
     CalibrationIdentity,
     DiagnosticModelIdentity,
@@ -122,3 +125,30 @@ def test_wrong_action_fails_acceptance() -> None:
 
     assert result.accepted is False
     assert "held_out_action_quality_gate_failed" in result.reason_codes
+
+
+def test_control_plane_conformance_does_not_claim_production_quality() -> None:
+    manifest = _manifest()
+    cases = [
+        case.model_copy(update={"measured_ms": 2.0}) for case in manifest.cases
+    ]
+
+    production = evaluate_diagnostic_acceptance(
+        manifest.model_copy(update={"cases": cases})
+    )
+    conformance = evaluate_diagnostic_acceptance(
+        manifest.model_copy(
+            update={
+                "purpose": DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+                "cases": cases,
+            }
+        )
+    )
+
+    assert production.accepted is False
+    assert conformance.accepted is True
+    assert set(conformance.family_empirical_coverage.values()) == {0.0}
+    assert (
+        conformance.purpose
+        is DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE
+    )
