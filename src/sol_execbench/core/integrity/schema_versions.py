@@ -78,7 +78,7 @@ class SchemaVersion(StrEnum):
         "sol_execbench.diagnostic_publication_projection.v2"
     )
     DIAGNOSTIC_PUBLISHED_RELEASE = (
-        "sol_execbench.diagnostic_published_release.v1"
+        "sol_execbench.diagnostic_published_release.v2"
     )
     DIAGNOSTIC_RELEASE_ARCHIVE = "sol_execbench.diagnostic_release_archive.v2"
     DIAGNOSTIC_RELEASE_ATTESTATION = (
