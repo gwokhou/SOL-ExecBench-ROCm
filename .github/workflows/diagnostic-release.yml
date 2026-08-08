@@ -109,6 +109,12 @@ jobs:
         run: |
           uv run --no-sync python - <<'PY'
           import json, os, pathlib
+          from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+              DiagnosticEvidencePurpose,
+          )
+          from sol_execbench.core.bench.performance_model.lifecycle.identity import (
+              release_id,
+          )
           runner = pathlib.Path(os.environ["RUNNER_TEMP"])
           published = json.loads((
               runner / "release" /
@@ -119,14 +125,71 @@ jobs:
           )
           if rebuilt["archive"]["sha256"] != published["archive"]["sha256"]:
               raise SystemExit("rebuilt archive bytes differ from release asset")
-          if rebuilt["release_id"] != published["release_id"]:
-              raise SystemExit("rebuilt release identity differs")
-          print("rebuilt archive and release identity are byte-identical")
+          comparable_fields = (
+              "purpose",
+              "uncompressed_size_bytes",
+              "case_count",
+              "inventory_sha256",
+              "source_revision",
+              "producer_version",
+              "retention_class",
+              "diagnostic_only",
+              "score_authority",
+              "leaderboard_authority",
+          )
+          for field in comparable_fields:
+              if rebuilt[field] != published[field]:
+                  raise SystemExit(f"rebuilt attestation field differs: {field}")
+          comparable_archive_fields = (
+              "sha256",
+              "size_bytes",
+              "algorithm",
+              "publication_manifest_sha256",
+              "source_revision",
+          )
+          for field in comparable_archive_fields:
+              if rebuilt["archive"][field] != published["archive"][field]:
+                  raise SystemExit(f"rebuilt archive field differs: {field}")
+          expected_release_id = release_id(
+              publication_id=published["publication_id"],
+              archive_sha256=published["archive"]["sha256"],
+              source_revision=published["source_revision"],
+              producer_version=published["producer_version"],
+              archive_size_bytes=published["archive"]["size_bytes"],
+              purpose=DiagnosticEvidencePurpose(published["purpose"]),
+          )
+          if expected_release_id != published["release_id"]:
+              raise SystemExit("published release identity does not recompute")
+          print("rebuilt archive is byte-identical and release identity is valid")
           PY
       - name: Publish the draft release
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
+          uv run --no-sync python - <<'PY'
+          import hashlib, json, os, pathlib
+          runner = pathlib.Path(os.environ["RUNNER_TEMP"])
+          attestation = (
+              runner / "release" /
+              "diagnostic-lifecycle-p0-conformance-v1.attestation.json"
+          )
+          notes = {
+              "attestation_sha256": hashlib.sha256(
+                  attestation.read_bytes()
+              ).hexdigest(),
+              "workflow_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "workflow_run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "workflow_url": (
+                  f"{os.environ['GITHUB_SERVER_URL']}/"
+                  f"{os.environ['GITHUB_REPOSITORY']}/actions/runs/"
+                  f"{os.environ['GITHUB_RUN_ID']}"
+              ),
+          }
+          (runner / "release-notes.json").write_text(
+              json.dumps(notes, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
           gh release edit "$RELEASE_TAG" --draft=false \
             --notes-file \
-            "$RUNNER_TEMP/release/diagnostic-lifecycle-p0-conformance-v1.attestation.json"
+            "$RUNNER_TEMP/release-notes.json"
