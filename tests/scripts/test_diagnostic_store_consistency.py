@@ -6,15 +6,19 @@ from types import ModuleType
 
 from sol_execbench.core.bench.performance_model.lifecycle import (
     BlobStore,
+    DiagnosticDesignManifest,
     DiagnosticLifecycleStage,
     DiagnosticPublicationLifecycleManifest,
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
+    design_id,
+    designs_dir,
     publication_id,
     publication_registry_dir,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
+    DiagnosticLifecycleParent,
 )
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 
@@ -33,6 +37,28 @@ def _publication_manifest(
         status=DiagnosticStageStatus.VERIFIED,
         retention_class=DiagnosticRetentionClass.PUBLICATION_RELEASE,
         source_revision="test",
+        parents=(
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.ACCEPTANCE,
+                stage_id="a" * 64,
+                sha256="1" * 64,
+            ),
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.CALIBRATION,
+                stage_id="b" * 64,
+                sha256="2" * 64,
+            ),
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+                stage_id="c" * 64,
+                sha256="3" * 64,
+            ),
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.MODEL_BUILD,
+                stage_id="d" * 64,
+                sha256="4" * 64,
+            ),
+        ),
         created_at="2026-01-01T00:00:00+00:00",
         source_corpus_sha256=source_digest,
         publication_manifest_sha256=manifest_digest,
@@ -53,20 +79,29 @@ def test_consistent_store_reports_no_findings(
 ) -> None:
     script = load_script("scripts/check_diagnostic_store_consistency.py")
     store = BlobStore(tmp_path)
-    manifest_digest = store.put_bytes(b"manifest")
-    source_digest = store.put_bytes(b"source")
-    stage_id = publication_id(
-        source_corpus_sha256=source_digest,
-        publication_manifest_sha256=manifest_digest,
-        uncompressed_size_bytes=9,
-        case_count=220,
+    payload_digest = store.put_bytes(b"design")
+    stage_id = design_id(
+        universe_start=0,
+        design_payload_sha256=payload_digest,
+        source_revision="test",
     )
-    manifest = _publication_manifest(
-        stage_id, manifest_digest, source_digest, 9
+    manifest = DiagnosticDesignManifest(
+        stage=DiagnosticLifecycleStage.DESIGN,
+        stage_id=stage_id,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        source_revision="test",
+        created_at="2026-01-01T00:00:00+00:00",
+        universe_start=0,
+        design_payload_sha256=payload_digest,
+        exact_inventory=(
+            DiagnosticLifecycleArtifact(
+                sha256=payload_digest,
+                size_bytes=6,
+            ),
+        ),
     )
-    path = (
-        publication_registry_dir(tmp_path) / manifest.stage_id / "manifest.json"
-    )
+    path = designs_dir(tmp_path) / manifest.stage_id / "manifest.json"
     atomic_write_json_value(path, manifest.model_dump(mode="json"))
 
     assert script.check_store(tmp_path) == []
@@ -110,10 +145,15 @@ def test_mutated_blob_content_is_detected(
     blob_path = tmp_path / "blobs" / "sha256" / manifest_digest
     blob_path.write_bytes(b"tampered")
     stage_id = publication_id(
+        acceptance_id="a" * 64,
+        calibration_id="b" * 64,
+        development_snapshot_id="c" * 64,
+        model_build_id="d" * 64,
         source_corpus_sha256=source_digest,
         publication_manifest_sha256=manifest_digest,
         uncompressed_size_bytes=9,
         case_count=220,
+        source_revision="test",
     )
     manifest = _publication_manifest(
         stage_id, manifest_digest, source_digest, 9

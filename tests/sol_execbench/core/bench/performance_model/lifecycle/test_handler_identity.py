@@ -57,6 +57,7 @@ def test_corpus_snapshot_handler_derives_identity(tmp_path: Path) -> None:
         collection_run_id=collection_run_id,
         role="development",
         corpus_sha256=sha256_file(development),
+        source_revision="unknown",
     )
 
 
@@ -66,6 +67,8 @@ def test_acceptance_handler_derives_identity(
 ) -> None:
     collection_run_id = "a" * 64
     model_build_id = "b" * 64
+    calibration_id = "c" * 64
+    development_snapshot_id = "d" * 64
     store = tmp_path
     receipt = DiagnosticStageReceipt(
         stage=DiagnosticLifecycleStage.MODEL_BUILD,
@@ -83,6 +86,17 @@ def test_acceptance_handler_derives_identity(
         ),
         receipt.model_dump(mode="json"),
     )
+    for stage, stage_id in (
+        (DiagnosticLifecycleStage.CALIBRATION, calibration_id),
+        (DiagnosticLifecycleStage.CORPUS_SNAPSHOT, development_snapshot_id),
+    ):
+        dependency_receipt = receipt.model_copy(
+            update={"stage": stage, "stage_id": stage_id}
+        )
+        atomic_write_json_value(
+            stage_receipt_path(collection_run_id, stage, store),
+            dependency_receipt.model_dump(mode="json"),
+        )
     held_out = tmp_path / "held_out.json"
     held_out.write_text("held out", encoding="utf-8")
     held_out_sha = sha256_file(held_out)
@@ -118,13 +132,17 @@ def test_acceptance_handler_derives_identity(
     completion = handler.run(context)
 
     expected = acceptance_id(
+        calibration_id=calibration_id,
+        development_snapshot_id=development_snapshot_id,
         model_build_id=model_build_id,
         held_out_corpus_snapshot_id=corpus_snapshot_id(
             collection_run_id=collection_run_id,
             role="held_out",
             corpus_sha256=held_out_sha,
+            source_revision="unknown",
         ),
         accepted=True,
         verdict_sha256=sha256_file(output_root / "acceptance.json"),
+        source_revision="unknown",
     )
     assert completion.stage_id == expected

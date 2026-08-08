@@ -112,7 +112,7 @@ DEPENDENCIES: dict[
     DiagnosticLifecycleStage, tuple[DiagnosticLifecycleStage, ...]
 ] = {
     DiagnosticLifecycleStage.DESIGN: (),
-    DiagnosticLifecycleStage.CALIBRATION: (DiagnosticLifecycleStage.DESIGN,),
+    DiagnosticLifecycleStage.CALIBRATION: (),
     DiagnosticLifecycleStage.COLLECTION_RUN: (DiagnosticLifecycleStage.DESIGN,),
     DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
         DiagnosticLifecycleStage.COLLECTION_RUN,
@@ -124,9 +124,13 @@ DEPENDENCIES: dict[
     DiagnosticLifecycleStage.ACCEPTANCE: (
         DiagnosticLifecycleStage.MODEL_BUILD,
         DiagnosticLifecycleStage.CALIBRATION,
+        DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
     ),
     DiagnosticLifecycleStage.PUBLICATION: (
         DiagnosticLifecycleStage.ACCEPTANCE,
+        DiagnosticLifecycleStage.CALIBRATION,
+        DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+        DiagnosticLifecycleStage.MODEL_BUILD,
     ),
     DiagnosticLifecycleStage.RELEASE: (DiagnosticLifecycleStage.PUBLICATION,),
 }
@@ -350,6 +354,7 @@ class CalibrationHandler:
             calibration_audit_sha256=sha256_file(audit_path),
             gpu_identity=gpu,
             software_identity=software,
+            source_revision=context.source_revision,
             purpose=context.purpose,
         )
         return StageCompletion(
@@ -407,6 +412,7 @@ class CorpusSnapshotHandler:
             collection_run_id=context.collection_run_id,
             role="development",
             corpus_sha256=digests["development"],
+            source_revision=context.source_revision,
             purpose=context.purpose,
         )
         return StageCompletion(
@@ -482,10 +488,19 @@ class ModelBuildHandler:
         atomic_write_json_value(output, profile.model_dump(mode="json"))
         context.set_output(self.stage, output)
         stage_id = model_build_id(
+            calibration_id=_prior_receipt_stage_id(
+                context,
+                DiagnosticLifecycleStage.CALIBRATION,
+            ),
+            development_snapshot_id=_prior_receipt_stage_id(
+                context,
+                DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+            ),
             calibration_profile_sha256=sha256_file(calibration),
             calibration_audit_sha256=sha256_file(calibration_audit),
             inference_profile_sha256=sha256_file(output),
             model_version=context.model_version,
+            source_revision=context.source_revision,
             purpose=context.purpose,
         )
         return StageCompletion(
@@ -574,8 +589,18 @@ class AcceptanceHandler:
             collection_run_id=context.collection_run_id,
             role="held_out",
             corpus_sha256=manifest.held_out_corpus_sha256,
+            source_revision=context.source_revision,
+            purpose=context.purpose,
         )
         stage_id = acceptance_id(
+            calibration_id=_prior_receipt_stage_id(
+                context,
+                DiagnosticLifecycleStage.CALIBRATION,
+            ),
+            development_snapshot_id=_prior_receipt_stage_id(
+                context,
+                DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+            ),
             model_build_id=_prior_receipt_stage_id(
                 context,
                 DiagnosticLifecycleStage.MODEL_BUILD,
@@ -583,6 +608,7 @@ class AcceptanceHandler:
             held_out_corpus_snapshot_id=held_out_snapshot_id,
             accepted=result.accepted,
             verdict_sha256=sha256_file(result_output),
+            source_revision=context.source_revision,
             purpose=context.purpose,
         )
         return StageCompletion(
@@ -677,10 +703,27 @@ class PublicationHandler:
             manifest_path,
         )
         stage_id = publication_id(
+            acceptance_id=_prior_receipt_stage_id(
+                context,
+                DiagnosticLifecycleStage.ACCEPTANCE,
+            ),
+            calibration_id=_prior_receipt_stage_id(
+                context,
+                DiagnosticLifecycleStage.CALIBRATION,
+            ),
+            development_snapshot_id=_prior_receipt_stage_id(
+                context,
+                DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+            ),
+            model_build_id=_prior_receipt_stage_id(
+                context,
+                DiagnosticLifecycleStage.MODEL_BUILD,
+            ),
             source_corpus_sha256=projection.source_corpus_sha256,
             publication_manifest_sha256=sha256_file(manifest_path),
             uncompressed_size_bytes=projection.uncompressed_size_bytes,
             case_count=projection.case_count,
+            source_revision=context.source_revision,
             purpose=context.purpose,
         )
         return StageCompletion(
@@ -862,6 +905,7 @@ def _parents_of(
             collection_run_id=context.collection_run_id,
             role="held_out",
             corpus_sha256=sha256_file(held_out),
+            source_revision=context.source_revision,
             purpose=context.purpose,
         )
         manifest_path = _stage_manifest_path(
@@ -967,6 +1011,7 @@ def build_run_context(
         collection_run_id=derive_collection_run_id(
             design_id=design.stage_id,
             generation=generation,
+            source_revision=source_revision,
             purpose=purpose,
         ),
         generation=generation,
@@ -1474,10 +1519,18 @@ def _snapshot_manifests(
             collection_run_id=context.collection_run_id,
             role=role,
             corpus_sha256=artifact.sha256,
+            source_revision=context.source_revision,
             purpose=context.purpose,
         )
         common = _manifest_common(
-            context, receipt, DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE
+            context,
+            receipt.model_copy(
+                update={
+                    "stage_id": stage_id,
+                    "output_inventory": (artifact,),
+                }
+            ),
+            DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
         )
         common.update(
             stage_id=stage_id,
@@ -1545,6 +1598,7 @@ def _acceptance_manifest(
         collection_run_id=context.collection_run_id,
         role="held_out",
         corpus_sha256=sha256_file(held_out),
+        source_revision=context.source_revision,
         purpose=context.purpose,
     )
     return DiagnosticAcceptanceLifecycleManifest(

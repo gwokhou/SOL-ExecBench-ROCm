@@ -40,6 +40,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.identity import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
     PRODUCER_VERSION,
+    DiagnosticPublicationLifecycleManifest,
     DiagnosticReleaseLifecycleManifest,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
@@ -56,7 +57,10 @@ from sol_execbench.core.bench.performance_model.publication import (
     verify_diagnostic_publication_projection,
 )
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
-from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.data.json_utils import (
+    atomic_write_json_value,
+    load_json_file,
+)
 from sol_execbench.core.integrity import (
     SHA256Digest,
     sha256_file,
@@ -261,12 +265,12 @@ def package_diagnostic_publication(
     if projection.purpose is not purpose:
         raise ValueError("release purpose does not match publication purpose")
     manifest_sha256 = sha256_file(manifest)
-    pub_id = lifecycle_publication_id(
-        source_corpus_sha256=projection.source_corpus_sha256,
-        publication_manifest_sha256=manifest_sha256,
-        uncompressed_size_bytes=projection.uncompressed_size_bytes,
-        case_count=projection.case_count,
+    pub_id = _publication_identity(
+        projection=projection,
+        manifest_sha256=manifest_sha256,
+        source_revision=source_revision,
         purpose=purpose,
+        store_root_path=store_root_path,
     )
     _run_deterministic_tar(
         manifest.parent,
@@ -296,6 +300,50 @@ def package_diagnostic_publication(
             attestation_path=attestation_output,
         )
     return attestation
+
+
+def _publication_identity(
+    *,
+    projection: DiagnosticPublicationProjection,
+    manifest_sha256: SHA256Digest,
+    source_revision: str,
+    purpose: DiagnosticEvidencePurpose,
+    store_root_path: Path | None,
+) -> SHA256Digest:
+    """Resolve the governed publication node consumed by a release."""
+    if store_root_path is None:
+        missing_parent = "0" * 64
+        return lifecycle_publication_id(
+            acceptance_id=missing_parent,
+            calibration_id=missing_parent,
+            development_snapshot_id=missing_parent,
+            model_build_id=missing_parent,
+            source_corpus_sha256=projection.source_corpus_sha256,
+            publication_manifest_sha256=manifest_sha256,
+            uncompressed_size_bytes=projection.uncompressed_size_bytes,
+            case_count=projection.case_count,
+            source_revision=source_revision,
+            purpose=purpose,
+        )
+    matches: list[DiagnosticPublicationLifecycleManifest] = []
+    for path in sorted(
+        publication_registry_dir(store_root_path).glob("*/manifest.json")
+    ):
+        candidate = load_json_file(DiagnosticPublicationLifecycleManifest, path)
+        if (
+            candidate.purpose is purpose
+            and candidate.source_revision == source_revision
+            and candidate.publication_manifest_sha256 == manifest_sha256
+            and candidate.source_corpus_sha256
+            == projection.source_corpus_sha256
+        ):
+            matches.append(candidate)
+    if len(matches) != 1:
+        raise ValueError(
+            "release candidate requires exactly one matching lifecycle "
+            f"publication manifest, found {len(matches)}"
+        )
+    return matches[0].stage_id
 
 
 def _build_attestation(
