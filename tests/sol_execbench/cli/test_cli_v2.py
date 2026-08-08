@@ -168,16 +168,13 @@ def test_legacy_entry_shapes_are_removed() -> None:
     assert runner.invoke(cli, ["official-score"]).exit_code == 2
 
 
-def test_score_exposes_pending_v2_policy_without_score_inputs() -> None:
+def test_score_exposes_authorized_v2_policy_without_release() -> None:
     result = CliRunner().invoke(cli, ["--format", "json", "score", "status"])
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert payload["data"]["policy"]["authorized"] is False
-    assert (
-        payload["data"]["policy"]["reason_code"]
-        == "baseline_v2_release_evidence_pending"
-    )
+    assert payload["data"]["policy"]["authorized"] is True
+    assert payload["data"]["policy"]["reason_code"] == "authorized"
     assert payload["data"]["verifier"]["available"] is True
     assert (
         payload["data"]["verifier"]["accepts_caller_authored_inputs"] is False

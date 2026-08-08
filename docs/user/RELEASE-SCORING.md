@@ -4,7 +4,7 @@ Canonical Trace JSONL is the execution artifact. A numeric formula result is
 official only when it is derived from the repository-pinned corpus and a
 publisher-authored, content-addressed release bundle.
 
-## Pending v2 scoring contract
+## v2 scoring contract
 
 The schema v7 RX 9060 XT corpus contains 43 scored problems and 163 scored
 workloads. The FP8 compatibility sentinel and the provenance-retained
@@ -12,14 +12,18 @@ workloads. The FP8 compatibility sentinel and the provenance-retained
 the denominator. The latter keeps its original AKA shapes; it is excluded
 because its trusted-reference IPC payload exceeds the bounded protocol.
 
-The v2 baseline evidence has not been published yet, so the manifest
-deliberately keeps official scoring fail-closed:
+The manifest authorizes official scoring. A publisher release bundle must
+still be distributed under `RELEASE/` before a numeric result is official:
 
 ```yaml
 official_scoring:
-  status: unavailable
+  status: available
   baseline_id: rx9060xt-gfx1200-reference-v2
-  reason_code: baseline_v2_release_evidence_pending
+  release_policy: content_addressed_publisher_v1
+  required_evidence:
+    - content_addressed_release_baseline
+    - content_addressed_candidate_execution
+    - pinned_solar_manifests
 ```
 
 The release policy follows the paper's release-defined baseline `T_b`,

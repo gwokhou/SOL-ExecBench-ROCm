@@ -49,9 +49,13 @@ tolerance_calibration:
   path: tolerance-calibration.json
   sha256: 3144fac284adbdf789ea88811d69ec5e888e489da562286e6dcf150e5e51c5d2
 official_scoring:
-  status: unavailable
+  status: available
   baseline_id: rx9060xt-gfx1200-reference-v2
-  reason_code: baseline_v2_release_evidence_pending
+  release_policy: content_addressed_publisher_v1
+  required_evidence:
+    - content_addressed_release_baseline
+    - content_addressed_candidate_execution
+    - pinned_solar_manifests
 formal_coverage_requirements:
   axes:
     operation:
