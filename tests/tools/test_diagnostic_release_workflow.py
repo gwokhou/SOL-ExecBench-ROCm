@@ -51,3 +51,4 @@ def test_release_workflow_publishes_with_the_fixed_attestation_asset() -> None:
     assert 'TAG_SHA="$(git rev-parse HEAD)"' in workflow
     assert 'os.environ["TAG_SHA"]' in workflow
     assert "${{ github.sha }}" not in workflow
+    assert "GH_TOKEN: ${{ github.token }}" in workflow
