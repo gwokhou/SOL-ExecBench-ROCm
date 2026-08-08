@@ -306,6 +306,30 @@ def _write_promotion_source(corpus, root: Path, role: str, offset: int) -> Path:
     return path
 
 
+def test_p0_conformance_currentizes_tree_references(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    conformance = load_script(
+        "scripts/internal/build_diagnostic_p0_conformance.py",
+    )
+    artifact = tmp_path / "artifact.json"
+    artifact.write_text("evidence\n", encoding="utf-8")
+    reference = {
+        "path": artifact.name,
+        "sha256": conformance.sha256_file(artifact),
+    }
+    case = {
+        "evidence_manifest": dict(reference),
+        "solar_manifest": dict(reference),
+    }
+
+    conformance._currentize_case_references(case, tmp_path)
+
+    assert case["evidence_manifest"]["blob_backed"] is False
+    assert case["evidence_manifest"]["size_bytes"] == artifact.stat().st_size
+
+
 def test_rdna4_diagnostic_promotion_verifies_roles_order_and_hashes(
     load_script,
     tmp_path: Path,

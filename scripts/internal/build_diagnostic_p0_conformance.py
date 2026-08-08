@@ -27,7 +27,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     design_id,
 )
 from sol_execbench.core.data.json_utils import atomic_write_json_value
-from sol_execbench.core.integrity import stable_json_checksum
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 _PURPOSE = DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE
@@ -62,6 +62,7 @@ def _split_cases(
             case.get("workload_kind"), str
         ):
             raise ValueError("source corpus contains an invalid case")
+        _currentize_case_references(case, source.parent)
         grouped[case["workload_kind"]].append(case)
     if len(grouped) != _FAMILY_COUNT:
         raise ValueError("conformance source must cover exactly 11 families")
@@ -75,6 +76,25 @@ def _split_cases(
         development.extend(cases[:_DEVELOPMENT_PER_FAMILY])
         held_out.extend(cases[_DEVELOPMENT_PER_FAMILY:required])
     return development, held_out
+
+
+def _currentize_case_references(case: dict[str, Any], root: Path) -> None:
+    """Add the current explicit tree-reference discriminator and size."""
+    for field in ("evidence_manifest", "solar_manifest"):
+        reference = case.get(field)
+        if not isinstance(reference, dict) or not isinstance(
+            reference.get("path"), str
+        ):
+            raise ValueError(f"conformance case has invalid {field}")
+        path = (root / reference["path"]).resolve()
+        if not path.is_relative_to(root.resolve()):
+            raise ValueError(f"conformance case {field} escapes source root")
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"conformance case {field} is not regular")
+        if sha256_file(path) != reference.get("sha256"):
+            raise ValueError(f"conformance case {field} digest mismatch")
+        reference["blob_backed"] = False
+        reference["size_bytes"] = path.stat().st_size
 
 
 def _write_corpus(path: Path, role: str, cases: list[dict[str, Any]]) -> None:
