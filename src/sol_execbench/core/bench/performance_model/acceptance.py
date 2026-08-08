@@ -174,7 +174,7 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
 
     @model_validator(mode="after")
     def verdict_is_internally_consistent(self) -> DiagnosticAcceptanceResult:
-        """Reject a promoted verdict that contradicts its reported metrics."""
+        """Reject a verdict that contradicts its authority-domain policy."""
         if self.model_identity.model_version != self.model_version:
             raise ValueError("acceptance result model identity mismatch")
         expected_families = set(_SUPPORTED_FAMILIES)
@@ -204,7 +204,11 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
                 set(metric_actions) != set(self.enabled_action_codes)
                 or not self.action_metrics
                 or self.reason_codes
-                or any(
+                or any(not metric.passed for metric in self.action_metrics)
+            ):
+                raise ValueError("accepted result contradicts quality metrics")
+            if self.purpose is DiagnosticEvidencePurpose.PRODUCTION and (
+                any(
                     value < MINIMUM_EMPIRICAL_COVERAGE
                     for value in self.family_empirical_coverage.values()
                 )
@@ -212,7 +216,6 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
                 > MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR
                 or self.p90_absolute_percentage_error
                 > MAXIMUM_P90_ABSOLUTE_PERCENTAGE_ERROR
-                or any(not metric.passed for metric in self.action_metrics)
             ):
                 raise ValueError("accepted result contradicts quality metrics")
         elif self.enabled_action_codes:
@@ -243,12 +246,15 @@ def evaluate_diagnostic_acceptance(
         for action in sorted(set(manifest.enabled_action_codes))
     ]
     reasons: list[str] = []
-    if any(value < MINIMUM_EMPIRICAL_COVERAGE for value in coverage.values()):
-        reasons.append("family_empirical_coverage_below_90_percent")
-    if median_error > MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR:
-        reasons.append("median_absolute_percentage_error_exceeded")
-    if p90_error > MAXIMUM_P90_ABSOLUTE_PERCENTAGE_ERROR:
-        reasons.append("p90_absolute_percentage_error_exceeded")
+    if manifest.purpose is DiagnosticEvidencePurpose.PRODUCTION:
+        if any(
+            value < MINIMUM_EMPIRICAL_COVERAGE for value in coverage.values()
+        ):
+            reasons.append("family_empirical_coverage_below_90_percent")
+        if median_error > MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR:
+            reasons.append("median_absolute_percentage_error_exceeded")
+        if p90_error > MAXIMUM_P90_ABSOLUTE_PERCENTAGE_ERROR:
+            reasons.append("p90_absolute_percentage_error_exceeded")
     if any(not metric.passed for metric in action_metrics):
         reasons.append("held_out_action_quality_gate_failed")
     if not action_metrics:
