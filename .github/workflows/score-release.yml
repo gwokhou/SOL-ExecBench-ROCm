@@ -18,6 +18,8 @@ concurrency:
 
 env:
   UV_NO_PROGRESS: "1"
+  # Authenticate the gh CLI (release download/edit) with the workflow token.
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
   verify-and-publish-draft:
