@@ -446,24 +446,7 @@ def _recompute_downstream_stage_id(
             purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticPublicationLifecycleManifest):
-        return publication_id(
-            acceptance_id=_single_parent_id(
-                manifest, DiagnosticLifecycleStage.ACCEPTANCE
-            ),
-            calibration_id=_single_parent_id(
-                manifest, DiagnosticLifecycleStage.CALIBRATION
-            ),
-            development_snapshot_id=_development_snapshot_parent_id(manifest),
-            model_build_id=_single_parent_id(
-                manifest, DiagnosticLifecycleStage.MODEL_BUILD
-            ),
-            source_corpus_sha256=manifest.source_corpus_sha256,
-            publication_manifest_sha256=manifest.publication_manifest_sha256,
-            uncompressed_size_bytes=manifest.uncompressed_size_bytes,
-            case_count=manifest.case_count,
-            source_revision=manifest.source_revision,
-            purpose=manifest.purpose,
-        )
+        return _recompute_publication_id(manifest)
     if isinstance(manifest, DiagnosticReleaseLifecycleManifest):
         return release_id(
             publication_id=_single_parent_id(
@@ -476,8 +459,30 @@ def _recompute_downstream_stage_id(
             archive_size_bytes=manifest.archive_size_bytes,
             purpose=manifest.purpose,
         )
-    raise ValueError(
-        f"unknown lifecycle manifest type: {type(manifest).__name__}"
+    name = type(manifest).__name__
+    raise ValueError(f"unknown lifecycle manifest type: {name}")
+
+
+def _recompute_publication_id(
+    manifest: DiagnosticPublicationLifecycleManifest,
+) -> SHA256Digest:
+    return publication_id(
+        acceptance_id=_single_parent_id(
+            manifest, DiagnosticLifecycleStage.ACCEPTANCE
+        ),
+        calibration_id=_single_parent_id(
+            manifest, DiagnosticLifecycleStage.CALIBRATION
+        ),
+        development_snapshot_id=_development_snapshot_parent_id(manifest),
+        model_build_id=_single_parent_id(
+            manifest, DiagnosticLifecycleStage.MODEL_BUILD
+        ),
+        source_corpus_sha256=manifest.source_corpus_sha256,
+        publication_manifest_sha256=manifest.publication_manifest_sha256,
+        uncompressed_size_bytes=manifest.uncompressed_size_bytes,
+        case_count=manifest.case_count,
+        source_revision=manifest.source_revision,
+        purpose=manifest.purpose,
     )
 
 

@@ -50,6 +50,9 @@ class SchemaVersion(StrEnum):
     DIAGNOSTIC_LIFECYCLE_ACCEPTANCE = (
         "sol_execbench.diagnostic_lifecycle_acceptance.v2"
     )
+    DIAGNOSTIC_LIFECYCLE_ATTEMPT = (
+        "sol_execbench.diagnostic_lifecycle_attempt.v1"
+    )
     DIAGNOSTIC_LIFECYCLE_CALIBRATION = (
         "sol_execbench.diagnostic_lifecycle_calibration.v2"
     )

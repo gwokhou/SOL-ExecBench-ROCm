@@ -53,6 +53,8 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticDesignManifest,
     DiagnosticEvidencePurpose,
     DiagnosticLifecyclePlan,
+    DiagnosticRunManifest,
+    DiagnosticStageStatus,
     GCPlan,
     apply_gc_plan,
     build_run_context,
@@ -454,6 +456,7 @@ def lifecycle_run_cli(
             ),
             context=context,
         )
+        _require_lifecycle_success(run_state)
     except (OSError, ValueError) as error:
         raise CliFailure(
             str(error),
@@ -529,6 +532,7 @@ def lifecycle_resume_cli(
                 blob_resolver=_blob_resolver(store_root),
             ),
         )
+        _require_lifecycle_success(run_state)
     except (OSError, ValueError) as error:
         raise CliFailure(
             str(error),
@@ -549,6 +553,21 @@ def lifecycle_resume_cli(
             ],
         },
     )
+
+
+def _require_lifecycle_success(run_state: DiagnosticRunManifest) -> None:
+    failed = [
+        item
+        for item in run_state.stages
+        if item.status is DiagnosticStageStatus.FAILED
+    ]
+    if failed:
+        item = failed[0]
+        raise ValueError(
+            f"lifecycle stage {item.stage.value} exhausted "
+            f"{item.attempts} attempts for run {run_state.run_id}; "
+            "inspect the append-only attempt ledger"
+        )
 
 
 @lifecycle_cli.group("gc")

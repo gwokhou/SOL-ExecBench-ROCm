@@ -35,9 +35,11 @@ from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticRunManifest,
+    DiagnosticStageAttempt,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     acceptances_dir,
+    attempts_dir,
     builds_dir,
     calibrations_dir,
     designs_dir,
@@ -219,6 +221,26 @@ def _check_receipt(root: Path, receipt_path: Path) -> list[str]:
     return findings
 
 
+def _check_attempt(root: Path, attempt_path: Path) -> list[str]:
+    try:
+        attempt = DiagnosticStageAttempt.model_validate_json(
+            attempt_path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as error:
+        return [f"unreadable stage attempt {attempt_path}: {error}"]
+    findings: list[str] = []
+    if attempt_path.parents[1].name != attempt.run_id:
+        findings.append(f"{attempt_path}: directory does not match run_id")
+    if attempt_path.parent.name != attempt.stage.value:
+        findings.append(f"{attempt_path}: directory does not match stage")
+    if attempt_path.stem != f"{attempt.attempt:04d}":
+        findings.append(f"{attempt_path}: filename does not match attempt")
+    digest = sha256_file(attempt_path)
+    if not _blob_exists(root, digest):
+        findings.append(f"{attempt_path}: attempt object is missing from CAS")
+    return findings
+
+
 def check_store(root: Path) -> list[str]:
     """Return every consistency finding for one lifecycle store."""
     findings: list[str] = []
@@ -246,9 +268,10 @@ def check_store(root: Path) -> list[str]:
             publication_registry_dir(root),
             releases_dir(root),
             orchestrations_dir(root),
+            attempts_dir(root),
         )
     }
-    ignored = {"blobs", "locks", "attempts", "published-releases", "promotions"}
+    ignored = {"blobs", "locks", "published-releases", "promotions"}
     if root.is_dir():
         for child in sorted(root.iterdir()):
             if child.is_dir() and child.name not in known | ignored:
@@ -259,6 +282,8 @@ def check_store(root: Path) -> list[str]:
         orchestrations_dir(root).glob("*/receipts/*.json")
     ):
         findings.extend(_check_receipt(root, receipt_path))
+    for attempt_path in sorted(attempts_dir(root).glob("*/*/*.json")):
+        findings.extend(_check_attempt(root, attempt_path))
     return findings
 
 

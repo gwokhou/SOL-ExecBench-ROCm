@@ -35,9 +35,11 @@ from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticRunManifest,
+    DiagnosticStageAttempt,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     acceptances_dir,
+    attempts_dir,
     blob_path,
     builds_dir,
     calibrations_dir,
@@ -179,6 +181,15 @@ def _reachability(
                 parent.sha256,
                 DiagnosticRetentionClass.PROCESS_EVIDENCE,
             )
+    for attempt_path in sorted(attempts_dir(root).glob("*/*/*.json")):
+        _load_attempt(attempt_path)
+        digest = sha256_file(attempt_path)
+        live.add(digest)
+        _record_referrer(
+            referrers,
+            digest,
+            DiagnosticRetentionClass.PROCESS_EVIDENCE,
+        )
     return live, superseded, referrers
 
 
@@ -211,6 +222,15 @@ def _load_receipt(path: Path) -> DiagnosticStageReceipt:
         )
     except (OSError, ValueError) as error:
         raise ValueError(f"unreadable stage receipt {path}: {error}") from error
+
+
+def _load_attempt(path: Path) -> DiagnosticStageAttempt:
+    try:
+        return DiagnosticStageAttempt.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as error:
+        raise ValueError(f"unreadable stage attempt {path}: {error}") from error
 
 
 def _manifest_digests(

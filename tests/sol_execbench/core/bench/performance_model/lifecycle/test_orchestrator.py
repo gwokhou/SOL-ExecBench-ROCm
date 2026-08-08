@@ -10,6 +10,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     CHAIN,
     DiagnosticLifecycleStage,
     DiagnosticRunManifest,
+    DiagnosticStageAttempt,
     DiagnosticStageStatus,
     StageCompletion,
     StageRunContext,
@@ -17,6 +18,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     resume_diagnostic_lifecycle,
     run_diagnostic_lifecycle,
     run_state_path,
+    stage_attempt_path,
     stage_receipt_path,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
@@ -220,6 +222,23 @@ def test_exhausted_attempts_mark_failed_and_stop(tmp_path: Path) -> None:
     assert acceptance.attempts == 3
     assert bad.calls == 3
     assert run_state.stage_state(DiagnosticLifecycleStage.PUBLICATION) is None
+    attempts = [
+        DiagnosticStageAttempt.model_validate_json(
+            stage_attempt_path(
+                run_state.collection_run_id,
+                DiagnosticLifecycleStage.ACCEPTANCE,
+                attempt,
+                tmp_path,
+            ).read_text(encoding="utf-8")
+        )
+        for attempt in range(1, 4)
+    ]
+    assert [item.failure_code for item in attempts] == [
+        "stage_execution_error",
+        "stage_execution_error",
+        "stage_execution_error",
+    ]
+    assert all(len(item.detail) <= 4096 for item in attempts)
 
 
 def test_resume_reruns_stage_with_missing_receipt(tmp_path: Path) -> None:
