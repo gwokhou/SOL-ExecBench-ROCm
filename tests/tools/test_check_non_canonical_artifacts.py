@@ -103,7 +103,14 @@ def test_unmarked_directory_fails(tmp_path: Path):
 
 def test_exempt_generated_root(tmp_path: Path):
     retired = "sol_execbench.hardware_calibration." + "v1"
-    for name in ("outputs", "publications"):
+    for name in (
+        "cold-archive",
+        "conformance",
+        "outputs",
+        "publications",
+        "releases",
+        "store",
+    ):
         generated = tmp_path / name
         generated.mkdir()
         (generated / "generated.json").write_text(
