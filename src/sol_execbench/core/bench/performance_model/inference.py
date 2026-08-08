@@ -12,6 +12,9 @@ from typing import Literal
 import numpy as np
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
+)
 from sol_execbench.core.bench.performance_model.models import (
     PERFORMANCE_MODEL_VERSION,
     DiagnosticModelIdentity,
@@ -208,6 +211,7 @@ class DiagnosticInferenceProfile(CurrentSchemaModel):
     schema_version: Literal[SchemaVersion.DIAGNOSTIC_INFERENCE_PROFILE] = (
         SchemaVersion.DIAGNOSTIC_INFERENCE_PROFILE
     )
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     calibration_profile_sha256: SHA256Digest
@@ -264,9 +268,11 @@ def build_inference_profile(
     calibration_profile_sha256: str,
     calibration_audit_sha256: str,
     development_corpus_sha256: str,
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> DiagnosticInferenceProfile:
     """Freeze conformal quantiles and independently fitted action thresholds."""
     return DiagnosticInferenceProfile(
+        purpose=purpose,
         model_identity=model_identity,
         calibration_profile_sha256=calibration_profile_sha256,
         calibration_audit_sha256=calibration_audit_sha256,

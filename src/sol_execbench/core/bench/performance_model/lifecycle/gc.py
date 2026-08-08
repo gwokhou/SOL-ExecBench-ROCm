@@ -13,6 +13,7 @@ immediately before removing any blob.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -39,15 +40,23 @@ from sol_execbench.core.bench.performance_model.lifecycle.store import (
     acceptances_dir,
     blob_path,
     builds_dir,
+    calibrations_dir,
     designs_dir,
+    orchestrations_dir,
     publication_registry_dir,
     releases_dir,
     runs_dir,
     snapshots_dir,
+    store_lock_path,
     store_root,
 )
 from sol_execbench.core.data.base_model import FrozenArtifactModel
-from sol_execbench.core.integrity import SHA256Digest
+from sol_execbench.core.integrity import (
+    SHA256Digest,
+    sha256_file,
+    stable_json_checksum,
+)
+from sol_execbench.core.process import exclusive_file_lock
 
 _RETENTION_PRIORITY: Final[tuple[DiagnosticRetentionClass, ...]] = (
     DiagnosticRetentionClass.CACHE,
@@ -89,6 +98,9 @@ class GCPlan(FrozenArtifactModel):
     """One dry-run or executed blob retention plan for a store."""
 
     store_root: str = Field(min_length=1)
+    created_at: str = Field(min_length=1)
+    expires_at: str = Field(min_length=1)
+    registry_sha256: SHA256Digest
     total_blobs: int = Field(ge=0)
     total_bytes: int = Field(ge=0)
     retained_count: int = Field(ge=0)
@@ -123,6 +135,7 @@ def _reachability(
         designs_dir(root),
         runs_dir(root),
         snapshots_dir(root),
+        calibrations_dir(root),
         builds_dir(root),
         acceptances_dir(root),
         publication_registry_dir(root),
@@ -130,8 +143,6 @@ def _reachability(
     ):
         for manifest_path in sorted(directory.glob("*/manifest.json")):
             manifest = _load_manifest(manifest_path)
-            if manifest is None:
-                continue
             is_superseded = manifest.status is DiagnosticStageStatus.SUPERSEDED
             digests, retention = _manifest_digests(manifest)
             for digest in digests:
@@ -140,10 +151,8 @@ def _reachability(
                 else:
                     live.add(digest)
                     _record_referrer(referrers, digest, retention)
-    for run_state_path in sorted(runs_dir(root).glob("*/run.json")):
+    for run_state_path in sorted(orchestrations_dir(root).glob("*/run.json")):
         run_state = _load_run_state(run_state_path)
-        if run_state is None:
-            continue
         for state in run_state.stages:
             for item in state.outputs:
                 live.add(item.sha256)
@@ -152,10 +161,10 @@ def _reachability(
                     item.sha256,
                     DiagnosticRetentionClass.PROCESS_EVIDENCE,
                 )
-    for receipt_path in sorted(runs_dir(root).glob("*/receipts/*.json")):
+    for receipt_path in sorted(
+        orchestrations_dir(root).glob("*/receipts/*.json")
+    ):
         receipt = _load_receipt(receipt_path)
-        if receipt is None:
-            continue
         for item in receipt.output_inventory:
             live.add(item.sha256)
             _record_referrer(
@@ -175,31 +184,33 @@ def _reachability(
 
 def _load_manifest(
     path: Path,
-) -> DiagnosticLifecycleManifest | None:
+) -> DiagnosticLifecycleManifest:
     try:
         return DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER.validate_json(
             path.read_text(encoding="utf-8"),
         )
-    except (OSError, ValueError):
-        return None
+    except (OSError, ValueError) as error:
+        raise ValueError(
+            f"unreadable lifecycle manifest {path}: {error}"
+        ) from error
 
 
-def _load_run_state(path: Path) -> DiagnosticRunManifest | None:
+def _load_run_state(path: Path) -> DiagnosticRunManifest:
     try:
         return DiagnosticRunManifest.model_validate_json(
             path.read_text(encoding="utf-8"),
         )
-    except (OSError, ValueError):
-        return None
+    except (OSError, ValueError) as error:
+        raise ValueError(f"unreadable run-state {path}: {error}") from error
 
 
-def _load_receipt(path: Path) -> DiagnosticStageReceipt | None:
+def _load_receipt(path: Path) -> DiagnosticStageReceipt:
     try:
         return DiagnosticStageReceipt.model_validate_json(
             path.read_text(encoding="utf-8"),
         )
-    except (OSError, ValueError):
-        return None
+    except (OSError, ValueError) as error:
+        raise ValueError(f"unreadable stage receipt {path}: {error}") from error
 
 
 def _manifest_digests(
@@ -278,8 +289,12 @@ def _summarize(root: Path, entries: list[GCEntry]) -> GCPlan:
     total = sum(entry.size_bytes for entry in entries)
     retained = [entry for entry in entries if entry.retained]
     reclaimable = [entry for entry in entries if not entry.retained]
+    created = datetime.now(UTC)
     return GCPlan(
         store_root=str(root),
+        created_at=created.isoformat(),
+        expires_at=(created + timedelta(hours=24)).isoformat(),
+        registry_sha256=_registry_sha256(root),
         total_blobs=len(entries),
         total_bytes=total,
         retained_count=len(retained),
@@ -288,6 +303,43 @@ def _summarize(root: Path, entries: list[GCEntry]) -> GCPlan:
         reclaimable_bytes=sum(entry.size_bytes for entry in reclaimable),
         entries=tuple(entries),
     )
+
+
+def _registry_sha256(root: Path) -> SHA256Digest:
+    """Hash every registry control file, excluding CAS payloads and locks."""
+    inventory: list[dict[str, str]] = []
+    if root.is_dir():
+        for path in sorted(root.rglob("*.json")):
+            if "blobs" in path.parts or "locks" in path.parts:
+                continue
+            inventory.append(
+                {
+                    "path": path.relative_to(root).as_posix(),
+                    "sha256": sha256_file(path),
+                }
+            )
+    return stable_json_checksum(inventory)
+
+
+def apply_gc_plan(plan: GCPlan) -> GCPlan:
+    """Apply one reviewed, unexpired plan under the shared store lock."""
+    root = Path(plan.store_root).resolve()
+    if datetime.now(UTC) > datetime.fromisoformat(plan.expires_at):
+        raise GCRefusedError("diagnostic_gc_refused: GC plan expired")
+    with exclusive_file_lock(store_lock_path(root)):
+        if _registry_sha256(root) != plan.registry_sha256:
+            raise GCRefusedError(
+                "diagnostic_gc_refused: registry changed since planning"
+            )
+        fresh = plan_gc(root)
+        if fresh.entries != plan.entries:
+            raise GCRefusedError(
+                "diagnostic_gc_refused: reachability changed since planning"
+            )
+        for entry in plan.entries:
+            if not entry.retained:
+                blob_path(entry.digest, root).unlink(missing_ok=True)
+    return plan
 
 
 def run_gc(
@@ -301,30 +353,32 @@ def run_gc(
     removal and a still-reachable blob refuses the entire operation.
     """
     root = Path(store_root_path).resolve() if store_root_path else store_root()
-    plan = plan_gc(root)
     if not delete:
+        return plan_gc(root)
+    with exclusive_file_lock(store_lock_path(root)):
+        plan = plan_gc(root)
+        live, _ = compute_reachable_blobs(root)
+        refused = [
+            entry.digest
+            for entry in plan.entries
+            if not entry.retained and entry.digest in live
+        ]
+        if refused:
+            raise GCRefusedError(
+                "diagnostic_gc_refused: "
+                f"{len(refused)} blobs became reachable since planning",
+            )
+        for entry in plan.entries:
+            if not entry.retained:
+                blob_path(entry.digest, root).unlink(missing_ok=True)
         return plan
-    live, _ = compute_reachable_blobs(root)
-    refused = [
-        entry.digest
-        for entry in plan.entries
-        if not entry.retained and entry.digest in live
-    ]
-    if refused:
-        raise GCRefusedError(
-            "diagnostic_gc_refused: "
-            f"{len(refused)} blobs became reachable since planning",
-        )
-    for entry in plan.entries:
-        if not entry.retained:
-            blob_path(entry.digest, root).unlink(missing_ok=True)
-    return plan
 
 
 __all__ = [
     "GCEntry",
     "GCPlan",
     "GCRefusedError",
+    "apply_gc_plan",
     "compute_reachable_blobs",
     "plan_gc",
     "run_gc",

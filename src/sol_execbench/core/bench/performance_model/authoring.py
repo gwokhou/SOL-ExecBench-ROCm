@@ -65,10 +65,12 @@ def fit_diagnostic_inference_profile(
     )
     if corpus.role != "development":
         raise ValueError("inference fitting requires development corpus")
-    load_json_file(
+    calibration = load_json_file(
         DiagnosticCalibrationProfile,
         calibration_profile_path,
     )
+    if calibration.purpose is not corpus.purpose:
+        raise ValueError("development corpus/calibration purpose mismatch")
     audit_path = calibration_profile_path.with_name(
         f"{calibration_profile_path.stem}.audit.json"
     )
@@ -90,6 +92,7 @@ def fit_diagnostic_inference_profile(
         calibration_profile_sha256=sha256_file(calibration_profile_path),
         calibration_audit_sha256=sha256_file(audit_path),
         development_corpus_sha256=sha256_file(development_corpus_path),
+        purpose=corpus.purpose,
     )
 
 
@@ -120,6 +123,14 @@ def build_diagnostic_acceptance(
         DiagnosticCalibrationProfile,
         calibration_profile_path,
     )
+    purposes = {
+        development.purpose,
+        held_out.purpose,
+        profile.purpose,
+        calibration.purpose,
+    }
+    if len(purposes) != 1:
+        raise ValueError("acceptance inputs cross evidence purpose domains")
     if profile.development_corpus_sha256 != sha256_file(
         development_corpus_path
     ):
@@ -136,6 +147,7 @@ def build_diagnostic_acceptance(
         for case in held_out.cases
     ]
     manifest = DiagnosticAcceptanceManifest(
+        purpose=development.purpose,
         model_identity=profile.model_identity,
         calibration_profile_sha256=sha256_file(calibration_profile_path),
         calibration_identity=calibration.identity,

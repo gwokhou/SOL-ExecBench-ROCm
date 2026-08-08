@@ -15,6 +15,9 @@ from sol_execbench.core.bench.performance_model.inference import (
     ACTION_PRECISION_GATE,
     ACTION_RECALL_GATE,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
+)
 from sol_execbench.core.bench.performance_model.models import (
     PERFORMANCE_MODEL_VERSION,
     CalibrationIdentity,
@@ -106,6 +109,7 @@ class DiagnosticAcceptanceManifest(CurrentSchemaModel):
     schema_version: Literal[SchemaVersion.DIAGNOSTIC_ACCEPTANCE] = (
         SchemaVersion.DIAGNOSTIC_ACCEPTANCE
     )
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     calibration_profile_sha256: SHA256Digest
@@ -149,6 +153,7 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
     schema_version: Literal[SchemaVersion.DIAGNOSTIC_ACCEPTANCE] = (
         SchemaVersion.DIAGNOSTIC_ACCEPTANCE
     )
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     manifest_sha256: SHA256Digest
@@ -250,6 +255,7 @@ def evaluate_diagnostic_acceptance(
         reasons.append("held_out_action_evidence_missing")
     accepted = not reasons
     return DiagnosticAcceptanceResult(
+        purpose=manifest.purpose,
         model_identity=manifest.model_identity,
         manifest_sha256=stable_json_checksum(manifest.model_dump(mode="json")),
         calibration_profile_sha256=manifest.calibration_profile_sha256,

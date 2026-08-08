@@ -16,6 +16,7 @@ from typing import Annotated, ClassVar, Literal
 from pydantic import ConfigDict, Field, TypeAdapter, model_validator
 
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
@@ -46,6 +47,7 @@ class DiagnosticLifecycleManifestBase(StrictArtifactModel):
     model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
     expected_stage: ClassVar[DiagnosticLifecycleStage | None] = None
     stage: DiagnosticLifecycleStage
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     stage_id: str = Field(min_length=1)
     human_alias: str | None = None
     status: DiagnosticStageStatus
@@ -81,6 +83,21 @@ class DiagnosticLifecycleManifestBase(StrictArtifactModel):
         missing field is not an authoritative production identity.
         """
         require_complete_gpu_identity(self.gpu_identity, stage=self.stage)
+        return self
+
+    @model_validator(mode="after")
+    def _parents_share_authority_domain(
+        self,
+    ) -> DiagnosticLifecycleManifestBase:
+        mismatched = [
+            parent.stage_id
+            for parent in self.parents
+            if parent.purpose is not self.purpose
+        ]
+        if mismatched:
+            raise ValueError(
+                "lifecycle parents must have the same evidence purpose"
+            )
         return self
 
 

@@ -8,6 +8,13 @@ from __future__ import annotations
 from enum import StrEnum
 
 
+class DiagnosticEvidencePurpose(StrEnum):
+    """Authority domain carried by every lifecycle identity."""
+
+    PRODUCTION = "production"
+    CONTROL_PLANE_CONFORMANCE = "control_plane_conformance"
+
+
 class DiagnosticLifecycleStage(StrEnum):
     """One immutable object in the monotonic diagnostic chain.
 
@@ -69,6 +76,7 @@ class DiagnosticRetentionClass(StrEnum):
 
 
 __all__ = [
+    "DiagnosticEvidencePurpose",
     "DiagnosticLifecycleStage",
     "DiagnosticRetentionClass",
     "DiagnosticStageStatus",

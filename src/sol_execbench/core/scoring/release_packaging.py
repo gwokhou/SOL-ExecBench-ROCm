@@ -269,21 +269,12 @@ def package_score_release(
     )
 
     inventory = collect_release_evidence(bundle, bundle_root=bundle_root)
-    staging_parent = Path(
-        tempfile.mkdtemp(prefix="score-release-stage-"),
+    _archive_score_inventory(
+        inventory,
+        bundle_root=bundle_root,
+        archive_output=archive_output,
+        tar_runner=tar_runner,
     )
-    staging_root = staging_parent / _ARCHIVE_ROOT_NAME
-    staging_root.mkdir()
-    try:
-        for reference in inventory:
-            destination = staging_root / reference.path
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(bundle_root / reference.path, destination)
-        _deterministic_zstd_tar(
-            staging_root, archive_output, tar_runner=tar_runner
-        )
-    finally:
-        shutil.rmtree(staging_parent, ignore_errors=True)
 
     bundle_sha256 = sha256_file(bundle)
     archive_sha256 = sha256_file(archive_output)
@@ -330,6 +321,28 @@ def package_score_release(
         attestation.model_dump(mode="json"),
     )
     return attestation
+
+
+def _archive_score_inventory(
+    inventory: tuple[ArtifactReference, ...],
+    *,
+    bundle_root: Path,
+    archive_output: Path,
+    tar_runner: TarRunner,
+) -> None:
+    staging_parent = Path(tempfile.mkdtemp(prefix="score-release-stage-"))
+    staging_root = staging_parent / _ARCHIVE_ROOT_NAME
+    staging_root.mkdir()
+    try:
+        for reference in inventory:
+            destination = staging_root / reference.path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(bundle_root / reference.path, destination)
+        _deterministic_zstd_tar(
+            staging_root, archive_output, tar_runner=tar_runner
+        )
+    finally:
+        shutil.rmtree(staging_parent, ignore_errors=True)
 
 
 def verify_score_release_archive(

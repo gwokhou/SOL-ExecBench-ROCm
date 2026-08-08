@@ -319,7 +319,7 @@ def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
         )
 
 
-def test_official_score_reports_authorized_v2_policy_without_release():
+def test_official_score_reports_authorized_v2_policy_with_release():
     report = official_score_availability(MANIFEST)
 
     assert report["policy"]["authorized"] is True
@@ -339,9 +339,9 @@ def test_official_score_reports_authorized_v2_policy_without_release():
         "reason_code": "ready",
     }
     assert report["published_release"] == {
-        "available": False,
-        "reason_code": "repository_release_not_published",
-        "path": None,
+        "available": True,
+        "reason_code": "published",
+        "path": "RELEASE/release-bundle.json",
     }
     assert report["policy"]["required_evidence"] == [
         "content_addressed_release_baseline",

@@ -31,6 +31,9 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
 from sol_execbench.core.bench.performance_model.inference import (
     DiagnosticInferenceProfile,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
     ReferenceResolver,
     resolve_corpus_reference,
@@ -122,6 +125,7 @@ class DiagnosticPublicationProjection(CurrentDiagnosticSidecarAuthority):
     schema_version: Literal[SchemaVersion.DIAGNOSTIC_PUBLICATION_PROJECTION] = (
         SchemaVersion.DIAGNOSTIC_PUBLICATION_PROJECTION
     )
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     policy: Literal[DiagnosticPublicationPolicy.COMPACT_MODEL_INPUTS_V1] = (
         DiagnosticPublicationPolicy.COMPACT_MODEL_INPUTS_V1
     )
@@ -201,6 +205,7 @@ def build_diagnostic_publication_projection(
             source_inference_path,
         )
         projected_corpus = DiagnosticValidationCorpus(
+            purpose=corpus.purpose,
             role="development",
             cases=[
                 _project_case(
@@ -228,6 +233,7 @@ def build_diagnostic_publication_projection(
             staging,
             source_corpus_sha256=sha256_file(corpus_path),
             case_count=len(corpus.cases),
+            purpose=corpus.purpose,
         )
         verify_diagnostic_publication_projection(
             staging / PUBLICATION_MANIFEST_NAME,
@@ -265,6 +271,7 @@ def verify_diagnostic_publication_projection(
         root, projection.inference_profile
     )
     corpus = load_json_file(DiagnosticValidationCorpus, corpus_path)
+    calibration = load_json_file(DiagnosticCalibrationProfile, calibration_path)
     if (
         corpus.role != "development"
         or len(corpus.cases) != projection.case_count
@@ -283,6 +290,19 @@ def verify_diagnostic_publication_projection(
     projected_profile = load_json_file(
         DiagnosticInferenceProfile, projected_profile_path
     )
+    if (
+        len(
+            {
+                projection.purpose,
+                corpus.purpose,
+                calibration.purpose,
+                source_profile.purpose,
+                projected_profile.purpose,
+            }
+        )
+        != 1
+    ):
+        raise ValueError("publication inputs cross evidence purpose domains")
     if (
         source_profile.development_corpus_sha256
         != projection.source_corpus_sha256
@@ -328,8 +348,10 @@ def _load_source_inputs(
     corpus = load_json_file(DiagnosticValidationCorpus, corpus_path)
     if corpus.role != "development":
         raise ValueError("diagnostic publication requires development corpus")
-    load_json_file(DiagnosticCalibrationProfile, calibration_path)
+    calibration = load_json_file(DiagnosticCalibrationProfile, calibration_path)
     inference = load_json_file(DiagnosticInferenceProfile, inference_path)
+    if len({corpus.purpose, calibration.purpose, inference.purpose}) != 1:
+        raise ValueError("publication inputs cross evidence purpose domains")
     audit_path = calibration_path.with_name(
         f"{calibration_path.stem}.audit.json"
     )
@@ -552,11 +574,16 @@ def _require_inference_equivalence(
 
 
 def _write_publication_manifest(
-    staging: Path, *, source_corpus_sha256: str, case_count: int
+    staging: Path,
+    *,
+    source_corpus_sha256: str,
+    case_count: int,
+    purpose: DiagnosticEvidencePurpose,
 ) -> None:
     artifacts = _artifact_inventory(staging)
     indexed = {item.path: item for item in artifacts}
     projection = DiagnosticPublicationProjection(
+        purpose=purpose,
         case_count=case_count,
         source_corpus_sha256=source_corpus_sha256,
         corpus=indexed[_CORPUS_PATH],

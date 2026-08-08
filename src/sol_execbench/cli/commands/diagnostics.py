@@ -50,7 +50,11 @@ from sol_execbench.core.bench.performance_model.governance import (
 from sol_execbench.core.bench.performance_model.lifecycle import (
     BlobStore,
     BlobStoreResolver,
-    DiagnosticLifecycleStage,
+    DiagnosticDesignManifest,
+    DiagnosticEvidencePurpose,
+    DiagnosticLifecyclePlan,
+    GCPlan,
+    apply_gc_plan,
     build_run_context,
     build_stage_handlers,
     diagnostic_lifecycle_status,
@@ -60,6 +64,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     resume_diagnostic_lifecycle,
     run_diagnostic_lifecycle,
     run_gc,
+    run_state_path,
     store_root,
 )
 from sol_execbench.core.bench.performance_model.models import (
@@ -71,6 +76,7 @@ from sol_execbench.core.bench.performance_model.publication import (
     verify_diagnostic_publication_projection,
 )
 from sol_execbench.core.bench.performance_model.release import (
+    ingest_github_published_release,
     package_diagnostic_publication,
     verify_diagnostic_release_archive,
 )
@@ -81,6 +87,7 @@ from sol_execbench.core.data.json_utils import (
 )
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
+from sol_execbench.core.platform.source_state import verify_git_source_state
 from sol_execbench.core.solar_bridge.performance import (
     load_manifest_semantic_characterization,
 )
@@ -95,9 +102,9 @@ _OUTPUT = click.Path(dir_okay=False, path_type=Path)
 _OUTPUT_DIRECTORY = click.Path(file_okay=False, path_type=Path)
 
 
-def _blob_resolver() -> BlobStoreResolver:
+def _blob_resolver(root: Path | None = None) -> BlobStoreResolver:
     """Return the lifecycle blob resolver bound to the configured store."""
-    return BlobStoreResolver(BlobStore(store_root()))
+    return BlobStoreResolver(BlobStore(root or store_root()))
 
 
 def _store_root_path() -> Path:
@@ -286,12 +293,19 @@ def release_cli() -> None:
     help="Source revision the publication tree was built at.",
 )
 @click.option("--store-root", type=_OUTPUT_DIRECTORY)
+@click.option(
+    "--purpose",
+    type=click.Choice([purpose.value for purpose in DiagnosticEvidencePurpose]),
+    default=DiagnosticEvidencePurpose.PRODUCTION.value,
+    show_default=True,
+)
 def release_package_cli(
     manifest: Path,
     archive_output: Path,
     attestation_output: Path,
     source_revision: str,
     store_root: Path | None,
+    purpose: str,
 ) -> CliResult:
     """Package one verified publication into a deterministic release object."""
     try:
@@ -303,6 +317,7 @@ def release_package_cli(
             semantic_loader=load_manifest_semantic_characterization,
             solar_verifier=verify_projected_solar_manifest,
             store_root_path=store_root,
+            purpose=DiagnosticEvidencePurpose(purpose),
         )
     except (OSError, ValueError) as error:
         raise CliFailure(
@@ -364,6 +379,28 @@ def release_verify_cli(
     )
 
 
+@release_cli.command("ingest-published")
+@click.option("--repository", required=True)
+@click.option("--store-root", type=_OUTPUT_DIRECTORY, required=True)
+def release_ingest_published_cli(
+    repository: str,
+    store_root: Path,
+) -> CliResult:
+    """Download and persist the verified public conformance release receipt."""
+    try:
+        receipt = ingest_github_published_release(
+            repository=repository,
+            store_root_path=store_root,
+        )
+    except (OSError, RuntimeError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_published_release_invalid",
+            hint="Verify the fixed tag, exact two assets, and public release state.",
+        ) from error
+    return CliResult(data=receipt.model_dump(mode="json"))
+
+
 @diagnostics_cli.group(
     "lifecycle",
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -373,65 +410,47 @@ def lifecycle_cli() -> None:
 
 
 @lifecycle_cli.command("run")
-@click.option("--design", type=_FILE, required=True)
+@click.option("--plan", "plan_path", type=_FILE, required=True)
 @click.option("--store-root", type=_OUTPUT_DIRECTORY)
-@click.option(
-    "--max-attempts",
-    type=int,
-    default=3,
-    show_default=True,
-)
-@click.option(
-    "--stages",
-    multiple=True,
-    type=click.Choice([stage.value for stage in DiagnosticLifecycleStage]),
-    help="Chain stages to run; defaults to the full monotonic chain.",
-)
-@click.option("--corpus-root", type=_OUTPUT_DIRECTORY)
-@click.option("--calibration-profile", type=_FILE)
-@click.option("--development-corpus", type=_FILE)
-@click.option("--held-out-corpus", type=_FILE)
-@click.option("--output-root", type=_OUTPUT_DIRECTORY)
-@click.option("--source-revision", default="unknown")
 def lifecycle_run_cli(
-    design: Path,
+    plan_path: Path,
     store_root: Path | None,
-    max_attempts: int,
-    stages: tuple[str, ...],
-    corpus_root: Path | None,
-    calibration_profile: Path | None,
-    development_corpus: Path | None,
-    held_out_corpus: Path | None,
-    output_root: Path | None,
-    source_revision: str,
 ) -> CliResult:
-    """Execute the selected lifecycle chain and persist its run-state."""
+    """Execute one reviewed lifecycle plan and persist its run-state."""
     try:
-        context = build_run_context(
-            design_manifest_path=design,
-            store_root_path=store_root,
-            corpus_root=corpus_root,
-            calibration_profile_path=calibration_profile,
-            development_corpus_path=development_corpus,
-            held_out_corpus_path=held_out_corpus,
-            output_root=output_root,
-            source_revision=source_revision,
+        plan = load_json_file(DiagnosticLifecyclePlan, plan_path)
+        design = load_json_file(
+            DiagnosticDesignManifest, Path(plan.design_manifest_path)
         )
-        selected = (
-            tuple(DiagnosticLifecycleStage(value) for value in stages)
-            if stages
-            else None
+        if design.purpose is not plan.purpose:
+            raise ValueError("lifecycle plan/design purpose mismatch")
+        verify_git_source_state(
+            repo_root(),
+            expected_revision=plan.source_revision,
+            paths=("src", "scripts", "pyproject.toml", "uv.lock"),
+        )
+        root = store_root.resolve() if store_root else _store_root_path()
+        context = build_run_context(
+            design_manifest_path=Path(plan.design_manifest_path),
+            store_root_path=root,
+            corpus_root=Path(plan.corpus_root),
+            calibration_profile_path=Path(plan.calibration_profile_path),
+            calibration_audit_path=Path(plan.calibration_audit_path),
+            development_corpus_path=Path(plan.development_corpus_path),
+            held_out_corpus_path=Path(plan.held_out_corpus_path),
+            output_root=Path(plan.output_root),
+            source_revision=plan.source_revision,
+            model_version=plan.model_version,
         )
         run_state = run_diagnostic_lifecycle(
-            design_manifest_path=design,
+            design_manifest_path=Path(plan.design_manifest_path),
             store_root_path=context.store_root,
-            stages=selected,
-            max_attempts=max_attempts,
+            max_attempts=plan.max_attempts,
             handlers=build_stage_handlers(
                 semantic_loader=load_manifest_semantic_characterization,
                 solar_verifier=verify_projected_solar_manifest,
                 solar_projector=project_solar_manifest,
-                blob_resolver=_blob_resolver(),
+                blob_resolver=_blob_resolver(root),
             ),
             context=context,
         )
@@ -463,17 +482,18 @@ def lifecycle_run_cli(
 
 
 @lifecycle_cli.command("status")
-@click.option("--run", type=_FILE, required=True)
-def lifecycle_status_cli(run: Path) -> CliResult:
+@click.option("--run-id", required=True)
+@click.option("--store-root", type=_OUTPUT_DIRECTORY)
+def lifecycle_status_cli(run_id: str, store_root: Path | None) -> CliResult:
     """Re-verify the recorded run and report the current chain state."""
     try:
         status = diagnostic_lifecycle_status(
-            run_state_path=run,
+            run_state_path=run_state_path(run_id, store_root),
             handlers=build_stage_handlers(
                 semantic_loader=load_manifest_semantic_characterization,
                 solar_verifier=verify_projected_solar_manifest,
                 solar_projector=project_solar_manifest,
-                blob_resolver=_blob_resolver(),
+                blob_resolver=_blob_resolver(store_root),
             ),
         )
     except (OSError, ValueError) as error:
@@ -486,24 +506,27 @@ def lifecycle_status_cli(run: Path) -> CliResult:
 
 
 @lifecycle_cli.command("resume")
-@click.option("--run", type=_FILE, required=True)
+@click.option("--run-id", required=True)
+@click.option("--store-root", type=_OUTPUT_DIRECTORY)
 @click.option(
     "--max-attempts",
     type=int,
     default=3,
     show_default=True,
 )
-def lifecycle_resume_cli(run: Path, max_attempts: int) -> CliResult:
+def lifecycle_resume_cli(
+    run_id: str, store_root: Path | None, max_attempts: int
+) -> CliResult:
     """Re-verify and continue a previously interrupted lifecycle run."""
     try:
         run_state = resume_diagnostic_lifecycle(
-            run_state_path=run,
+            run_state_path=run_state_path(run_id, store_root),
             max_attempts=max_attempts,
             handlers=build_stage_handlers(
                 semantic_loader=load_manifest_semantic_characterization,
                 solar_verifier=verify_projected_solar_manifest,
                 solar_projector=project_solar_manifest,
-                blob_resolver=_blob_resolver(),
+                blob_resolver=_blob_resolver(store_root),
             ),
         )
     except (OSError, ValueError) as error:
@@ -528,20 +551,22 @@ def lifecycle_resume_cli(run: Path, max_attempts: int) -> CliResult:
     )
 
 
-@lifecycle_cli.command("gc")
+@lifecycle_cli.group("gc")
+def lifecycle_gc_cli() -> None:
+    """Plan and apply registry-bound garbage collection."""
+
+
+@lifecycle_gc_cli.command("plan")
 @click.option("--store-root", type=_OUTPUT_DIRECTORY)
-@click.option(
-    "--delete",
-    is_flag=True,
-    help="Delete reclaimable blobs after re-verifying reachability.",
-)
-def lifecycle_gc_cli(
+@click.option("--output", type=_OUTPUT, required=True)
+def lifecycle_gc_plan_cli(
     store_root: Path | None,
-    delete: bool,
+    output: Path,
 ) -> CliResult:
-    """Report or execute registry-driven blob garbage collection."""
+    """Write a 24-hour registry-bound GC plan without deleting data."""
     try:
-        plan = run_gc(store_root_path=store_root, delete=delete)
+        plan = run_gc(store_root_path=store_root, delete=False)
+        atomic_write_json_value(output, plan.model_dump(mode="json"))
     except (OSError, ValueError) as error:
         raise CliFailure(
             str(error),
@@ -552,6 +577,22 @@ def lifecycle_gc_cli(
             ),
         ) from error
     return CliResult(data=plan.model_dump(mode="json"))
+
+
+@lifecycle_gc_cli.command("apply")
+@click.option("--plan", "plan_path", type=_FILE, required=True)
+def lifecycle_gc_apply_cli(plan_path: Path) -> CliResult:
+    """Apply exactly one reviewed, unexpired GC plan."""
+    try:
+        plan = load_json_file(GCPlan, plan_path)
+        applied = apply_gc_plan(plan)
+    except (OSError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_gc_refused",
+            hint="Create and review a fresh GC plan before applying it.",
+        ) from error
+    return CliResult(data=applied.model_dump(mode="json"))
 
 
 @lifecycle_cli.command("retirement-plan")

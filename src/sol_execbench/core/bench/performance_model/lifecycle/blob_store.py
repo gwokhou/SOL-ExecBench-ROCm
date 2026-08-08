@@ -10,14 +10,17 @@ SHA-256 key, and every read re-verifies the stored content against its key.
 
 from __future__ import annotations
 
-import shutil
+import os
+import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     blobs_dir,
+    store_lock_path,
 )
 from sol_execbench.core.integrity import SHA256Digest, sha256_bytes, sha256_file
+from sol_execbench.core.process import exclusive_file_lock
 
 
 class BlobStore:
@@ -87,20 +90,27 @@ class BlobStore:
         directory = blobs_dir(self._root)
         directory.mkdir(parents=True, exist_ok=True)
         destination = directory / digest
-        if destination.exists():
-            existing = destination.read_bytes()
-            if existing != data:
-                raise ValueError(
-                    f"blob overwrite refused for digest {digest}",
-                )
-            return
-        staging = directory / f".{digest}.tmp"
-        staging.write_bytes(data)
-        try:
-            shutil.move(str(staging), str(destination))
-        except OSError:
-            staging.unlink(missing_ok=True)
-            raise
+        with exclusive_file_lock(store_lock_path(self._root)):
+            if destination.exists():
+                existing = destination.read_bytes()
+                if existing != data:
+                    raise ValueError(
+                        f"blob overwrite refused for digest {digest}",
+                    )
+                return
+            descriptor, staging_name = tempfile.mkstemp(
+                prefix=f".{digest}.", suffix=".tmp", dir=directory
+            )
+            staging = Path(staging_name)
+            try:
+                with os.fdopen(descriptor, "wb") as handle:
+                    handle.write(data)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(staging, destination)
+            except Exception:
+                staging.unlink(missing_ok=True)
+                raise
 
 
 __all__ = ["BlobStore"]

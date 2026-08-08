@@ -8,6 +8,7 @@ from __future__ import annotations
 from pydantic import Field, field_validator
 
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
 )
 from sol_execbench.core.data.base_model import FrozenArtifactModel
@@ -40,6 +41,7 @@ class DiagnosticLifecycleParent(FrozenArtifactModel):
     """One immutable parent object cited by a lifecycle manifest."""
 
     stage: DiagnosticLifecycleStage
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     stage_id: str = Field(min_length=1)
     sha256: SHA256Digest
 

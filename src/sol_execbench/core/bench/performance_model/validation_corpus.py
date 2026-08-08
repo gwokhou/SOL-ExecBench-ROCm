@@ -10,6 +10,9 @@ from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
+)
 from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
@@ -104,6 +107,7 @@ class DiagnosticValidationCorpus(CurrentSchemaModel):
     schema_version: Literal[SchemaVersion.DIAGNOSTIC_VALIDATION_CORPUS] = (
         SchemaVersion.DIAGNOSTIC_VALIDATION_CORPUS
     )
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     role: Literal["development", "held_out"]
     cases: list[DiagnosticValidationCase] = Field(
         min_length=MINIMUM_CORPUS_CASES

@@ -15,6 +15,7 @@ from typing import Literal
 from pydantic import Field
 
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
@@ -43,6 +44,7 @@ class DiagnosticStageReceipt(CurrentFrozenSchemaModel):
         SchemaVersion.DIAGNOSTIC_STAGE_RECEIPT
     )
     stage: DiagnosticLifecycleStage
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     stage_id: str = Field(min_length=1)
     producer_version: str = "4.0.0"
     command: str = Field(min_length=1)

@@ -12,18 +12,24 @@ release bundle; it only packages diagnostic publication projections.
 
 from __future__ import annotations
 
-import subprocess
+import shutil
+import tarfile
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import BinaryIO, Literal
 
+import zstandard
 from pydantic import Field
 
 from sol_execbench.core.bench.performance_model.builder import (
     SemanticCharacterizationLoader,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
+    BlobStore,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
@@ -36,7 +42,12 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
     PRODUCER_VERSION,
     DiagnosticReleaseLifecycleManifest,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.shared import (
+    DiagnosticLifecycleArtifact,
+    DiagnosticLifecycleParent,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
+    publication_registry_dir,
     releases_dir,
 )
 from sol_execbench.core.bench.performance_model.publication import (
@@ -79,6 +90,7 @@ class DiagnosticReleaseAttestation(CurrentFrozenSchemaModel):
         SchemaVersion.DIAGNOSTIC_RELEASE_ATTESTATION
     )
     release_id: SHA256Digest
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     publication_id: SHA256Digest
     archive: DiagnosticReleaseArchive
     uncompressed_size_bytes: int = Field(ge=0)
@@ -93,32 +105,49 @@ class DiagnosticReleaseAttestation(CurrentFrozenSchemaModel):
     leaderboard_authority: Literal[False] = False
 
 
-class TarRunner(Protocol):
-    """Boundary adapter for deterministic tar invocations."""
-
-    def __call__(self, argv: list[str], *, cwd: Path | None = None) -> None:
-        """Run ``argv`` and raise ``ValueError`` on any failure."""
-        ...
+_MAX_COMPRESSED_BYTES = 1 << 30
+_MAX_EXPANDED_BYTES = 10 << 30
+_MAX_ARCHIVE_MEMBERS = 100_000
 
 
-def _system_tar(argv: list[str], *, cwd: Path | None = None) -> None:
-    completed = subprocess.run(
-        argv,
-        cwd=cwd,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout).strip()
-        raise ValueError(f"deterministic tar failed: {detail}")
+def _tar_info(path: Path, name: str) -> tarfile.TarInfo:
+    """Build deterministic metadata for one regular file or directory."""
+    info = tarfile.TarInfo(name)
+    info.mtime = 0
+    info.uid = info.gid = 0
+    info.uname = info.gname = ""
+    if path.is_dir():
+        info.type = tarfile.DIRTYPE
+        info.mode = 0o755
+    elif path.is_file() and not path.is_symlink():
+        info.type = tarfile.REGTYPE
+        info.mode = 0o644
+        info.size = path.stat().st_size
+    else:
+        raise ValueError(f"release tree contains a non-regular entry: {path}")
+    return info
+
+
+def _write_tar(source: Path, stream: BinaryIO) -> None:
+    entries = (source, *sorted(source.rglob("*")))
+    if len(entries) > _MAX_ARCHIVE_MEMBERS:
+        raise ValueError("release tree exceeds the archive member limit")
+    with tarfile.open(
+        fileobj=stream, mode="w|", format=tarfile.PAX_FORMAT
+    ) as tar:
+        for path in entries:
+            relative = path.relative_to(source.parent).as_posix()
+            info = _tar_info(path, relative)
+            if info.isreg():
+                with path.open("rb") as source_file:
+                    tar.addfile(info, source_file)
+            else:
+                tar.addfile(info)
 
 
 def _run_deterministic_tar(
     source_dir: Path,
     archive_output: Path,
-    *,
-    tar_runner: TarRunner,
 ) -> None:
     """Create the byte-reproducible zstd archive of one publication tree."""
     source = source_dir.resolve()
@@ -128,47 +157,83 @@ def _run_deterministic_tar(
     if archive.exists():
         raise FileExistsError(f"release archive already exists: {archive}")
     archive.parent.mkdir(parents=True, exist_ok=True)
-    argv = [
-        "tar",
-        "--sort=name",
-        "--mtime=@0",
-        "--owner=0",
-        "--group=0",
-        "--numeric-owner",
-        "--zstd",
-        "-cf",
-        str(archive),
-        "-C",
-        str(source.parent),
-        source.name,
-    ]
-    tar_runner(argv, cwd=source.parent)
+    compressor = zstandard.ZstdCompressor(
+        level=19,
+        threads=0,
+        write_checksum=True,
+        write_content_size=False,
+        write_dict_id=False,
+    )
+    try:
+        with (
+            archive.open("xb") as destination,
+            compressor.stream_writer(destination, closefd=False) as stream,
+        ):
+            _write_tar(source, stream)
+    except Exception:
+        archive.unlink(missing_ok=True)
+        raise
 
 
 def _extract_publication(
     archive_path: Path,
     unpack_root: Path,
-    *,
-    tar_runner: TarRunner,
 ) -> Path:
-    """Unpack one release archive and return its publication manifest path."""
+    """Safely unpack one bounded release and return its manifest path."""
+    if archive_path.stat().st_size > _MAX_COMPRESSED_BYTES:
+        raise ValueError("release archive exceeds the compressed size limit")
     unpack_root.mkdir(parents=True, exist_ok=True)
-    tar_runner(
-        [
-            "tar",
-            "--zstd",
-            "-xf",
-            str(archive_path.resolve()),
-            "-C",
-            str(unpack_root.resolve()),
-        ],
-    )
+    seen: set[str] = set()
+    total_size = 0
+    decoder = zstandard.ZstdDecompressor()
+    with (
+        archive_path.open("rb") as source,
+        decoder.stream_reader(source, closefd=False) as stream,
+        tarfile.open(fileobj=stream, mode="r|") as archive,
+    ):
+        for index, member in enumerate(archive, start=1):
+            if index > _MAX_ARCHIVE_MEMBERS:
+                raise ValueError("release archive has too many members")
+            target = _validated_member_path(member, unpack_root, seen)
+            total_size += member.size
+            if total_size > _MAX_EXPANDED_BYTES:
+                raise ValueError("release archive exceeds expanded limit")
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            extracted = archive.extractfile(member)
+            if extracted is None:
+                raise ValueError(f"cannot read archive member {member.name}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("xb") as destination:
+                shutil.copyfileobj(extracted, destination)
     manifests = list(unpack_root.glob("*/publication.json"))
     if len(manifests) != 1:
         raise ValueError(
             "release archive must contain exactly one publication tree",
         )
     return manifests[0]
+
+
+def _validated_member_path(
+    member: tarfile.TarInfo,
+    root: Path,
+    seen: set[str],
+) -> Path:
+    """Reject traversal, duplicates, links, and special archive members."""
+    path = Path(member.name)
+    if path.is_absolute() or not path.parts or ".." in path.parts:
+        raise ValueError(f"unsafe release archive member: {member.name}")
+    normalized = path.as_posix().rstrip("/")
+    if normalized in seen:
+        raise ValueError(f"duplicate release archive member: {member.name}")
+    seen.add(normalized)
+    if not (member.isdir() or member.isreg()):
+        raise ValueError(f"unsupported release archive member: {member.name}")
+    target = root.joinpath(*path.parts)
+    if not target.resolve().is_relative_to(root.resolve()):
+        raise ValueError(f"unsafe release archive member: {member.name}")
+    return target
 
 
 def package_diagnostic_publication(
@@ -179,8 +244,8 @@ def package_diagnostic_publication(
     source_revision: str,
     semantic_loader: SemanticCharacterizationLoader,
     solar_verifier: SolarManifestProjectionVerifier,
-    tar_runner: TarRunner = _system_tar,
     store_root_path: Path | None = None,
+    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> DiagnosticReleaseAttestation:
     """Package one verified publication into a deterministic release object.
 
@@ -193,26 +258,64 @@ def package_diagnostic_publication(
         semantic_loader=semantic_loader,
         solar_verifier=solar_verifier,
     )
+    if projection.purpose is not purpose:
+        raise ValueError("release purpose does not match publication purpose")
     manifest_sha256 = sha256_file(manifest)
     pub_id = lifecycle_publication_id(
         source_corpus_sha256=projection.source_corpus_sha256,
         publication_manifest_sha256=manifest_sha256,
         uncompressed_size_bytes=projection.uncompressed_size_bytes,
         case_count=projection.case_count,
+        purpose=purpose,
     )
     _run_deterministic_tar(
         manifest.parent,
         archive_output,
-        tar_runner=tar_runner,
     )
+    attestation = _build_attestation(
+        projection=projection,
+        publication_id=pub_id,
+        publication_manifest_sha256=manifest_sha256,
+        archive_output=archive_output,
+        source_revision=source_revision,
+        purpose=purpose,
+    )
+    atomic_write_json_value(
+        attestation_output,
+        attestation.model_dump(mode="json"),
+    )
+    if store_root_path is not None:
+        BlobStore(store_root_path).put_file(
+            manifest, expected_sha256=manifest_sha256
+        )
+        _write_release_manifest(
+            store_root_path,
+            attestation,
+            attestation_sha256=sha256_file(attestation_output),
+            archive_path=archive_output,
+            attestation_path=attestation_output,
+        )
+    return attestation
+
+
+def _build_attestation(
+    *,
+    projection: DiagnosticPublicationProjection,
+    publication_id: SHA256Digest,
+    publication_manifest_sha256: SHA256Digest,
+    archive_output: Path,
+    source_revision: str,
+    purpose: DiagnosticEvidencePurpose,
+) -> DiagnosticReleaseAttestation:
     archive_sha256 = sha256_file(archive_output)
     archive_size = archive_output.stat().st_size
-    rel_id = lifecycle_release_id(
-        publication_id=pub_id,
+    release_id = lifecycle_release_id(
+        publication_id=publication_id,
         archive_sha256=archive_sha256,
         source_revision=source_revision,
         producer_version=PRODUCER_VERSION,
         archive_size_bytes=archive_size,
+        purpose=purpose,
     )
     inventory_sha256 = stable_json_checksum(
         [
@@ -222,16 +325,17 @@ def package_diagnostic_publication(
                 "size_bytes": item.size_bytes,
             }
             for item in projection.artifacts
-        ],
+        ]
     )
-    attestation = DiagnosticReleaseAttestation(
-        release_id=rel_id,
-        publication_id=pub_id,
+    return DiagnosticReleaseAttestation(
+        release_id=release_id,
+        purpose=purpose,
+        publication_id=publication_id,
         archive=DiagnosticReleaseArchive(
             name=archive_output.name,
             sha256=archive_sha256,
             size_bytes=archive_size,
-            publication_manifest_sha256=manifest_sha256,
+            publication_manifest_sha256=publication_manifest_sha256,
             source_revision=source_revision,
         ),
         uncompressed_size_bytes=projection.uncompressed_size_bytes,
@@ -240,17 +344,6 @@ def package_diagnostic_publication(
         source_revision=source_revision,
         created_at=datetime.now(UTC).isoformat(),
     )
-    atomic_write_json_value(
-        attestation_output,
-        attestation.model_dump(mode="json"),
-    )
-    if store_root_path is not None:
-        _write_release_manifest(
-            store_root_path,
-            attestation,
-            attestation_sha256=sha256_file(attestation_output),
-        )
-    return attestation
 
 
 def verify_diagnostic_release_archive(
@@ -260,7 +353,6 @@ def verify_diagnostic_release_archive(
     solar_verifier: SolarManifestProjectionVerifier,
     expected_sha256: str | None = None,
     unpack_root: Path | None = None,
-    tar_runner: TarRunner = _system_tar,
 ) -> DiagnosticPublicationProjection:
     """Verify a downloaded release archive against its publication contract."""
     archive = archive_path.resolve()
@@ -273,9 +365,7 @@ def verify_diagnostic_release_archive(
         temporary = tempfile.TemporaryDirectory(prefix="release-verify-")
         root = Path(temporary.name)
     try:
-        manifest_path = _extract_publication(
-            archive, root, tar_runner=tar_runner
-        )
+        manifest_path = _extract_publication(archive, root)
         return verify_diagnostic_publication_projection(
             manifest_path,
             semantic_loader=semantic_loader,
@@ -291,18 +381,55 @@ def _write_release_manifest(
     attestation: DiagnosticReleaseAttestation,
     *,
     attestation_sha256: SHA256Digest,
+    archive_path: Path,
+    attestation_path: Path,
 ) -> None:
     directory = releases_dir(store_root_path) / attestation.release_id
     if directory.exists():
         raise FileExistsError(f"release object already exists: {directory}")
+    blob_store = BlobStore(store_root_path)
+    blob_store.put_file(
+        archive_path, expected_sha256=attestation.archive.sha256
+    )
+    blob_store.put_file(attestation_path, expected_sha256=attestation_sha256)
+    publication_manifest = (
+        publication_registry_dir(store_root_path)
+        / attestation.publication_id
+        / "manifest.json"
+    )
+    if not publication_manifest.is_file():
+        raise ValueError(
+            "release candidate requires its lifecycle publication manifest"
+        )
+    publication_object_sha256 = blob_store.put_file(publication_manifest)
     directory.mkdir(parents=True)
     manifest = DiagnosticReleaseLifecycleManifest(
         stage=DiagnosticLifecycleStage.RELEASE,
+        purpose=attestation.purpose,
         stage_id=attestation.release_id,
         status=DiagnosticStageStatus.VERIFIED,
         retention_class=DiagnosticRetentionClass.PUBLICATION_RELEASE,
         source_revision=attestation.source_revision,
-        parents=(),
+        parents=(
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.PUBLICATION,
+                purpose=attestation.purpose,
+                stage_id=attestation.publication_id,
+                sha256=publication_object_sha256,
+            ),
+        ),
+        exact_inventory=(
+            DiagnosticLifecycleArtifact(
+                relative_path=archive_path.name,
+                sha256=attestation.archive.sha256,
+                size_bytes=attestation.archive.size_bytes,
+            ),
+            DiagnosticLifecycleArtifact(
+                relative_path=attestation_path.name,
+                sha256=attestation_sha256,
+                size_bytes=attestation_path.stat().st_size,
+            ),
+        ),
         created_at=attestation.created_at,
         archive_sha256=attestation.archive.sha256,
         archive_size_bytes=attestation.archive.size_bytes,
@@ -318,7 +445,6 @@ def _write_release_manifest(
 __all__ = [
     "DiagnosticReleaseArchive",
     "DiagnosticReleaseAttestation",
-    "TarRunner",
     "package_diagnostic_publication",
     "verify_diagnostic_release_archive",
 ]
