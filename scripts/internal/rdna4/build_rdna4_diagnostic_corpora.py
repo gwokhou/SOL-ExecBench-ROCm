@@ -436,6 +436,7 @@ def _preregister(root: Path, universe_start: int) -> None:
     did = design_id(
         universe_start=universe_start,
         design_payload_sha256=design_digest,
+        source_revision=_source_revision(),
     )
     _write_design_manifest(
         root=root,
@@ -973,6 +974,7 @@ def _freeze(root: Path, role: Role) -> None:
         collection_run_id=run_id,
         role=role,
         corpus_sha256=sha256_file(destination),
+        source_revision=_source_revision(),
     )
     _write_corpus_snapshot_manifest(
         root=root,
@@ -996,6 +998,7 @@ def _frozen_design_id(
     return design_id(
         universe_start=design.universe_start,
         design_payload_sha256=sha256_file(root / "design.json"),
+        source_revision=_source_revision(),
     )
 
 
@@ -1011,7 +1014,11 @@ def _current_collection_run_id(
     for a fresh preregistered design.
     """
     del root, design
-    return collection_run_id(design_id=did, generation=1)
+    return collection_run_id(
+        design_id=did,
+        generation=1,
+        source_revision=_source_revision(),
+    )
 
 
 def _write_corpus_snapshot_manifest(
@@ -1176,11 +1183,19 @@ def _new_run(
         )
     did = _frozen_design_id(root, design)
     next_generation = 2 if generation is None else generation
-    new_id = collection_run_id(design_id=did, generation=next_generation)
+    new_id = collection_run_id(
+        design_id=did,
+        generation=next_generation,
+        source_revision=_source_revision(),
+    )
     directory = store_root() / "runs" / new_id
     if directory.exists():
         raise FileExistsError(f"collection run already exists: {directory}")
-    prior_id = collection_run_id(design_id=did, generation=next_generation - 1)
+    prior_id = collection_run_id(
+        design_id=did,
+        generation=next_generation - 1,
+        source_revision=_source_revision(),
+    )
     directory.mkdir(parents=True)
     manifest = DiagnosticCollectionRunManifest(
         stage=DiagnosticLifecycleStage.COLLECTION_RUN,

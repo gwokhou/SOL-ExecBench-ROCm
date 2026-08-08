@@ -128,7 +128,11 @@ def _parent(
 
 
 def test_design_identity_recomputes() -> None:
-    did = design_id(universe_start=160, design_payload_sha256=D_DESIGN_PAYLOAD)
+    did = design_id(
+        universe_start=160,
+        design_payload_sha256=D_DESIGN_PAYLOAD,
+        source_revision=_SOURCE,
+    )
     manifest = DiagnosticDesignManifest.model_validate(
         _manifest_data(
             DiagnosticLifecycleStage.DESIGN,
@@ -141,7 +145,11 @@ def test_design_identity_recomputes() -> None:
 
 
 def test_collection_run_identity_recomputes() -> None:
-    cid = collection_run_id(design_id=D_DESIGN_PARENT, generation=1)
+    cid = collection_run_id(
+        design_id=D_DESIGN_PARENT,
+        generation=1,
+        source_revision=_SOURCE,
+    )
     manifest = DiagnosticCollectionRunManifest.model_validate(
         _manifest_data(
             DiagnosticLifecycleStage.COLLECTION_RUN,
@@ -160,6 +168,7 @@ def test_corpus_snapshot_direct_identity_recomputes() -> None:
         collection_run_id=D_RUN_PARENT,
         role="held_out",
         corpus_sha256=D_CORPUS_HELD,
+        source_revision=_SOURCE,
     )
     manifest = DiagnosticCorpusSnapshotManifest.model_validate(
         _manifest_data(
@@ -181,6 +190,7 @@ def test_corpus_snapshot_promoted_identity_recomputes() -> None:
         role="development",
         corpus_sha256=D_CORPUS_PROMO,
         source_snapshot_ids=(D_SOURCE_ONE, D_SOURCE_TWO),
+        source_revision=_SOURCE,
     )
     manifest = DiagnosticCorpusSnapshotManifest.model_validate(
         _manifest_data(
@@ -205,11 +215,13 @@ def test_promoted_snapshot_is_distinct_from_direct_child() -> None:
         collection_run_id=D_RUN_PARENT,
         role="development",
         corpus_sha256=D_CORPUS_PROMO,
+        source_revision=_SOURCE,
     )
     promoted = corpus_snapshot_id(
         role="development",
         corpus_sha256=D_CORPUS_PROMO,
         source_snapshot_ids=(D_RUN_PARENT,),
+        source_revision=_SOURCE,
     )
     assert direct != promoted
 
@@ -221,6 +233,7 @@ def test_corpus_snapshot_rejects_both_kinds() -> None:
             role="development",
             corpus_sha256=D_CORPUS_PROMO,
             source_snapshot_ids=(D_SOURCE_ONE,),
+            source_revision=_SOURCE,
         )
 
 
@@ -230,6 +243,7 @@ def test_calibration_identity_recomputes_and_binds_hardware() -> None:
         calibration_audit_sha256=D_CAL_AUDIT,
         gpu_identity=_GPU,
         software_identity=_SW,
+        source_revision=_SOURCE,
     )
     manifest = DiagnosticCalibrationLifecycleManifest.model_validate(
         _manifest_data(
@@ -261,10 +275,13 @@ def test_calibration_rejects_partial_gpu_identity() -> None:
 
 def test_model_build_identity_recomputes() -> None:
     mb = model_build_id(
+        calibration_id=D_CAL_PROFILE,
+        development_snapshot_id=D_CORPUS_PROMO,
         calibration_profile_sha256=D_CAL_PROFILE,
         calibration_audit_sha256=D_CAL_AUDIT,
         inference_profile_sha256=D_INFER,
         model_version="gfx1200_diagnostic.v7",
+        source_revision=_SOURCE,
     )
     manifest = DiagnosticModelBuildManifest.model_validate(
         _manifest_data(
@@ -274,6 +291,12 @@ def test_model_build_identity_recomputes() -> None:
             calibration_audit_sha256=D_CAL_AUDIT,
             inference_profile_sha256=D_INFER,
             model_version="gfx1200_diagnostic.v7",
+            parents=(
+                _parent(DiagnosticLifecycleStage.CALIBRATION, D_CAL_PROFILE),
+                _parent(
+                    DiagnosticLifecycleStage.CORPUS_SNAPSHOT, D_CORPUS_PROMO
+                ),
+            ),
         ),
     )
     assert recompute_stage_id(manifest) == mb
@@ -281,10 +304,13 @@ def test_model_build_identity_recomputes() -> None:
 
 def test_acceptance_identity_recomputes() -> None:
     aid = acceptance_id(
+        calibration_id=D_CAL_PROFILE,
+        development_snapshot_id=D_CORPUS_PROMO,
         model_build_id=D_MODEL_BUILD,
         held_out_corpus_snapshot_id=D_CORPUS_HELD,
         accepted=True,
         verdict_sha256=D_VERDICT,
+        source_revision=_SOURCE,
     )
     manifest = DiagnosticAcceptanceLifecycleManifest.model_validate(
         _manifest_data(
@@ -295,6 +321,13 @@ def test_acceptance_identity_recomputes() -> None:
             verdict_sha256=D_VERDICT,
             parents=(
                 _parent(DiagnosticLifecycleStage.MODEL_BUILD, D_MODEL_BUILD),
+                _parent(DiagnosticLifecycleStage.CALIBRATION, D_CAL_PROFILE),
+                _parent(
+                    DiagnosticLifecycleStage.CORPUS_SNAPSHOT, D_CORPUS_PROMO
+                ),
+                _parent(
+                    DiagnosticLifecycleStage.CORPUS_SNAPSHOT, D_CORPUS_HELD
+                ),
             ),
         ),
     )
@@ -303,10 +336,15 @@ def test_acceptance_identity_recomputes() -> None:
 
 def test_publication_identity_recomputes() -> None:
     pid = publication_id(
+        acceptance_id=D_VERDICT,
+        calibration_id=D_CAL_PROFILE,
+        development_snapshot_id=D_CORPUS_PROMO,
+        model_build_id=D_MODEL_BUILD,
         source_corpus_sha256=D_SOURCE_CORPUS,
         publication_manifest_sha256=D_PUB_MANIFEST,
         uncompressed_size_bytes=1234,
         case_count=880,
+        source_revision=_SOURCE,
     )
     manifest = DiagnosticPublicationLifecycleManifest.model_validate(
         _manifest_data(
@@ -316,6 +354,14 @@ def test_publication_identity_recomputes() -> None:
             publication_manifest_sha256=D_PUB_MANIFEST,
             uncompressed_size_bytes=1234,
             case_count=880,
+            parents=(
+                _parent(DiagnosticLifecycleStage.ACCEPTANCE, D_VERDICT),
+                _parent(DiagnosticLifecycleStage.CALIBRATION, D_CAL_PROFILE),
+                _parent(
+                    DiagnosticLifecycleStage.CORPUS_SNAPSHOT, D_CORPUS_PROMO
+                ),
+                _parent(DiagnosticLifecycleStage.MODEL_BUILD, D_MODEL_BUILD),
+            ),
         ),
     )
     assert recompute_stage_id(manifest) == pid
@@ -341,3 +387,131 @@ def test_release_identity_recomputes() -> None:
         ),
     )
     assert recompute_stage_id(manifest) == rid
+
+
+def test_source_revision_changes_every_stage_identity() -> None:
+    """No immutable node may be reused across producer source revisions."""
+    revisions = ("a" * 40, "b" * 40)
+    assert (
+        len(
+            {
+                design_id(
+                    universe_start=0,
+                    design_payload_sha256=D_DESIGN_PAYLOAD,
+                    source_revision=revision,
+                )
+                for revision in revisions
+            }
+        )
+        == 2
+    )
+    assert (
+        len(
+            {
+                calibration_id(
+                    calibration_profile_sha256=D_CAL_PROFILE,
+                    calibration_audit_sha256=D_CAL_AUDIT,
+                    gpu_identity=_GPU,
+                    software_identity=_SW,
+                    source_revision=revision,
+                )
+                for revision in revisions
+            }
+        )
+        == 2
+    )
+    assert (
+        len(
+            {
+                collection_run_id(
+                    design_id=D_DESIGN_PARENT,
+                    generation=1,
+                    source_revision=revision,
+                )
+                for revision in revisions
+            }
+        )
+        == 2
+    )
+    assert (
+        len(
+            {
+                corpus_snapshot_id(
+                    collection_run_id=D_RUN_PARENT,
+                    role="held_out",
+                    corpus_sha256=D_CORPUS_HELD,
+                    source_revision=revision,
+                )
+                for revision in revisions
+            }
+        )
+        == 2
+    )
+    assert (
+        len(
+            {
+                model_build_id(
+                    calibration_id=D_CAL_PROFILE,
+                    development_snapshot_id=D_CORPUS_PROMO,
+                    calibration_profile_sha256=D_CAL_PROFILE,
+                    calibration_audit_sha256=D_CAL_AUDIT,
+                    inference_profile_sha256=D_INFER,
+                    model_version="gfx1200_diagnostic.v7",
+                    source_revision=revision,
+                )
+                for revision in revisions
+            }
+        )
+        == 2
+    )
+    assert (
+        len(
+            {
+                acceptance_id(
+                    calibration_id=D_CAL_PROFILE,
+                    development_snapshot_id=D_CORPUS_PROMO,
+                    model_build_id=D_MODEL_BUILD,
+                    held_out_corpus_snapshot_id=D_CORPUS_HELD,
+                    accepted=True,
+                    verdict_sha256=D_VERDICT,
+                    source_revision=revision,
+                )
+                for revision in revisions
+            }
+        )
+        == 2
+    )
+    assert (
+        len(
+            {
+                publication_id(
+                    acceptance_id=D_VERDICT,
+                    calibration_id=D_CAL_PROFILE,
+                    development_snapshot_id=D_CORPUS_PROMO,
+                    model_build_id=D_MODEL_BUILD,
+                    source_corpus_sha256=D_SOURCE_CORPUS,
+                    publication_manifest_sha256=D_PUB_MANIFEST,
+                    uncompressed_size_bytes=1234,
+                    case_count=880,
+                    source_revision=revision,
+                )
+                for revision in revisions
+            }
+        )
+        == 2
+    )
+    assert (
+        len(
+            {
+                release_id(
+                    publication_id=D_PUB,
+                    archive_sha256=D_ARCHIVE,
+                    source_revision=revision,
+                    producer_version="4.0.0",
+                    archive_size_bytes=99,
+                )
+                for revision in revisions
+            }
+        )
+        == 2
+    )

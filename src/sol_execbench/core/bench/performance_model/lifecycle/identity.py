@@ -62,6 +62,7 @@ def design_id(
     *,
     universe_start: int,
     design_payload_sha256: SHA256Digest,
+    source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one preregistered diagnostic design."""
@@ -70,6 +71,7 @@ def design_id(
         {
             "design_payload_sha256": design_payload_sha256,
             "purpose": purpose,
+            "source_revision": source_revision,
             "universe_start": universe_start,
         },
     )
@@ -81,6 +83,7 @@ def collection_run_id(
     generation: int,
     roles: tuple[str, ...] = ("development", "held_out"),
     frozen_held_out_sha256: SHA256Digest | None = None,
+    source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one collection generation beneath a design.
@@ -98,6 +101,7 @@ def collection_run_id(
             "roles": list(roles),
             "frozen_held_out_sha256": frozen_held_out_sha256,
             "purpose": purpose,
+            "source_revision": source_revision,
         },
     )
 
@@ -108,6 +112,7 @@ def corpus_snapshot_id(
     corpus_sha256: SHA256Digest,
     collection_run_id: SHA256Digest | None = None,
     source_snapshot_ids: tuple[SHA256Digest, ...] = (),
+    source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one frozen development or held-out corpus snapshot.
@@ -137,6 +142,7 @@ def corpus_snapshot_id(
                 "corpus_sha256": corpus_sha256,
                 "purpose": purpose,
                 "role": role,
+                "source_revision": source_revision,
                 "source_snapshot_ids": list(source_snapshot_ids),
             },
         )
@@ -147,6 +153,7 @@ def corpus_snapshot_id(
             "corpus_sha256": corpus_sha256,
             "purpose": purpose,
             "role": role,
+            "source_revision": source_revision,
         },
     )
 
@@ -157,6 +164,7 @@ def calibration_id(
     calibration_audit_sha256: SHA256Digest,
     gpu_identity: GpuLifecycleIdentity,
     software_identity: SoftwareLifecycleIdentity,
+    source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one frozen hardware calibration object.
@@ -174,16 +182,20 @@ def calibration_id(
             "gpu_identity": _dump(gpu_identity),
             "software_identity": _dump(software_identity),
             "purpose": purpose,
+            "source_revision": source_revision,
         },
     )
 
 
 def model_build_id(
     *,
+    calibration_id: SHA256Digest,
+    development_snapshot_id: SHA256Digest,
     calibration_profile_sha256: SHA256Digest,
     calibration_audit_sha256: SHA256Digest,
     inference_profile_sha256: SHA256Digest,
     model_version: str,
+    source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one frozen inference model build.
@@ -194,21 +206,27 @@ def model_build_id(
     return diagnostic_lifecycle_id(
         "model_build",
         {
+            "calibration_id": calibration_id,
             "calibration_profile_sha256": calibration_profile_sha256,
             "calibration_audit_sha256": calibration_audit_sha256,
+            "development_snapshot_id": development_snapshot_id,
             "inference_profile_sha256": inference_profile_sha256,
             "model_version": model_version,
             "purpose": purpose,
+            "source_revision": source_revision,
         },
     )
 
 
 def acceptance_id(
     *,
+    calibration_id: SHA256Digest,
+    development_snapshot_id: SHA256Digest,
     model_build_id: SHA256Digest,
     held_out_corpus_snapshot_id: SHA256Digest,
     accepted: bool,
     verdict_sha256: SHA256Digest,
+    source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one held-out acceptance verdict.
@@ -223,31 +241,44 @@ def acceptance_id(
         "acceptance",
         {
             "accepted": accepted,
+            "calibration_id": calibration_id,
+            "development_snapshot_id": development_snapshot_id,
             "held_out_corpus_snapshot_id": held_out_corpus_snapshot_id,
             "model_build_id": model_build_id,
             "verdict_sha256": verdict_sha256,
             "purpose": purpose,
+            "source_revision": source_revision,
         },
     )
 
 
 def publication_id(
     *,
+    acceptance_id: SHA256Digest,
+    calibration_id: SHA256Digest,
+    development_snapshot_id: SHA256Digest,
+    model_build_id: SHA256Digest,
     source_corpus_sha256: SHA256Digest,
     publication_manifest_sha256: SHA256Digest,
     uncompressed_size_bytes: int,
     case_count: int,
+    source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one compact publication projection."""
     return diagnostic_lifecycle_id(
         "publication",
         {
+            "acceptance_id": acceptance_id,
+            "calibration_id": calibration_id,
             "case_count": case_count,
+            "development_snapshot_id": development_snapshot_id,
+            "model_build_id": model_build_id,
             "publication_manifest_sha256": publication_manifest_sha256,
             "source_corpus_sha256": source_corpus_sha256,
             "uncompressed_size_bytes": uncompressed_size_bytes,
             "purpose": purpose,
+            "source_revision": source_revision,
         },
     )
 
@@ -297,6 +328,26 @@ def _single_parent_id(
     return matches[0]
 
 
+def _development_snapshot_parent_id(
+    manifest: DiagnosticLifecycleManifest,
+    *,
+    held_out_snapshot_id: SHA256Digest | None = None,
+) -> SHA256Digest:
+    """Return the one development snapshot parent of a downstream object."""
+    matches = [
+        parent.stage_id
+        for parent in manifest.parents
+        if parent.stage is DiagnosticLifecycleStage.CORPUS_SNAPSHOT
+        and parent.stage_id != held_out_snapshot_id
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"{manifest.stage.value} identity expects exactly one "
+            f"development corpus_snapshot parent, found {len(matches)}",
+        )
+    return matches[0]
+
+
 def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
     """Re-derive the canonical stage_id from a persisted manifest.
 
@@ -311,6 +362,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
         return design_id(
             universe_start=manifest.universe_start,
             design_payload_sha256=manifest.design_payload_sha256,
+            source_revision=manifest.source_revision,
             purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticCollectionRunManifest):
@@ -321,6 +373,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             generation=manifest.generation,
             roles=manifest.roles,
             frozen_held_out_sha256=manifest.frozen_held_out_sha256,
+            source_revision=manifest.source_revision,
             purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticCorpusSnapshotManifest):
@@ -329,6 +382,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
                 role=manifest.role,
                 corpus_sha256=manifest.corpus_file_sha256,
                 source_snapshot_ids=manifest.source_snapshot_ids,
+                source_revision=manifest.source_revision,
                 purpose=manifest.purpose,
             )
         return corpus_snapshot_id(
@@ -338,6 +392,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             ),
             role=manifest.role,
             corpus_sha256=manifest.corpus_file_sha256,
+            source_revision=manifest.source_revision,
             purpose=manifest.purpose,
         )
     return _recompute_downstream_stage_id(manifest)
@@ -355,18 +410,31 @@ def _recompute_downstream_stage_id(
             calibration_audit_sha256=manifest.calibration_audit_sha256,
             gpu_identity=manifest.gpu_identity,
             software_identity=manifest.software_identity,
+            source_revision=manifest.source_revision,
             purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticModelBuildManifest):
         return model_build_id(
+            calibration_id=_single_parent_id(
+                manifest, DiagnosticLifecycleStage.CALIBRATION
+            ),
+            development_snapshot_id=_development_snapshot_parent_id(manifest),
             calibration_profile_sha256=manifest.calibration_profile_sha256,
             calibration_audit_sha256=manifest.calibration_audit_sha256,
             inference_profile_sha256=manifest.inference_profile_sha256,
             model_version=manifest.model_version,
+            source_revision=manifest.source_revision,
             purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticAcceptanceLifecycleManifest):
         return acceptance_id(
+            calibration_id=_single_parent_id(
+                manifest, DiagnosticLifecycleStage.CALIBRATION
+            ),
+            development_snapshot_id=_development_snapshot_parent_id(
+                manifest,
+                held_out_snapshot_id=manifest.held_out_corpus_snapshot_id,
+            ),
             model_build_id=_single_parent_id(
                 manifest,
                 DiagnosticLifecycleStage.MODEL_BUILD,
@@ -374,14 +442,26 @@ def _recompute_downstream_stage_id(
             held_out_corpus_snapshot_id=manifest.held_out_corpus_snapshot_id,
             accepted=manifest.accepted,
             verdict_sha256=manifest.verdict_sha256,
+            source_revision=manifest.source_revision,
             purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticPublicationLifecycleManifest):
         return publication_id(
+            acceptance_id=_single_parent_id(
+                manifest, DiagnosticLifecycleStage.ACCEPTANCE
+            ),
+            calibration_id=_single_parent_id(
+                manifest, DiagnosticLifecycleStage.CALIBRATION
+            ),
+            development_snapshot_id=_development_snapshot_parent_id(manifest),
+            model_build_id=_single_parent_id(
+                manifest, DiagnosticLifecycleStage.MODEL_BUILD
+            ),
             source_corpus_sha256=manifest.source_corpus_sha256,
             publication_manifest_sha256=manifest.publication_manifest_sha256,
             uncompressed_size_bytes=manifest.uncompressed_size_bytes,
             case_count=manifest.case_count,
+            source_revision=manifest.source_revision,
             purpose=manifest.purpose,
         )
     if isinstance(manifest, DiagnosticReleaseLifecycleManifest):

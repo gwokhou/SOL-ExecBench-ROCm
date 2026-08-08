@@ -149,6 +149,7 @@ def _write_design(root: Path, store: Path, revision: str) -> Path:
     stage_id = design_id(
         universe_start=0,
         design_payload_sha256=payload_digest,
+        source_revision=revision,
         purpose=_PURPOSE,
     )
     manifest = DiagnosticDesignManifest(

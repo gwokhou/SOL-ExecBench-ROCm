@@ -19,6 +19,9 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     publication_registry_dir,
     releases_dir,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.shared import (
+    DiagnosticLifecycleParent,
+)
 from sol_execbench.core.bench.performance_model.publication import (
     DiagnosticPublicationArtifact,
     DiagnosticPublicationProjection,
@@ -147,10 +150,15 @@ def test_package_writes_an_immutable_release_manifest(
     )
     store = tmp_path / "store"
     pub_id = publication_id(
+        acceptance_id="a" * 64,
+        calibration_id="b" * 64,
+        development_snapshot_id="c" * 64,
+        model_build_id="d" * 64,
         source_corpus_sha256=projection.source_corpus_sha256,
         publication_manifest_sha256=sha256_file(root / "publication.json"),
         uncompressed_size_bytes=projection.uncompressed_size_bytes,
         case_count=projection.case_count,
+        source_revision="19f195a8",
     )
     publication_manifest = DiagnosticPublicationLifecycleManifest(
         stage=DiagnosticLifecycleStage.PUBLICATION,
@@ -158,6 +166,28 @@ def test_package_writes_an_immutable_release_manifest(
         status=DiagnosticStageStatus.VERIFIED,
         retention_class=DiagnosticRetentionClass.PUBLICATION_RELEASE,
         source_revision="19f195a8",
+        parents=(
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.ACCEPTANCE,
+                stage_id="a" * 64,
+                sha256="1" * 64,
+            ),
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.CALIBRATION,
+                stage_id="b" * 64,
+                sha256="2" * 64,
+            ),
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+                stage_id="c" * 64,
+                sha256="3" * 64,
+            ),
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.MODEL_BUILD,
+                stage_id="d" * 64,
+                sha256="4" * 64,
+            ),
+        ),
         created_at="2026-01-01T00:00:00+00:00",
         source_corpus_sha256=projection.source_corpus_sha256,
         publication_manifest_sha256=sha256_file(root / "publication.json"),
