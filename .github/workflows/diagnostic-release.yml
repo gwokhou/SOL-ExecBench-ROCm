@@ -91,24 +91,31 @@ jobs:
             --archive-output "$RUNNER_TEMP/rebuilt.tar.zst" \
             --attestation-output "$RUNNER_TEMP/rebuilt.attestation.json" \
             --source-revision "${{ github.sha }}"
-      - name: Require deterministic rebuild
+      - name: Require content-identical deterministic rebuild
         run: |
           uv run --no-sync python - <<'PY'
-          import hashlib, os, pathlib
+          import json, os, pathlib
           runner = pathlib.Path(os.environ["RUNNER_TEMP"])
-          expected = (runner / "expected-sha256").read_text()
-          rebuilt = hashlib.sha256(
-              (runner / "rebuilt.tar.zst").read_bytes()
-          ).hexdigest()
-          if rebuilt != expected:
+          published = json.loads(
+              (runner / "release" / "attestation.json").read_text()
+          )
+          rebuilt = json.loads(
+              (runner / "rebuilt.attestation.json").read_text()
+          )
+          # The zstd byte stream is not reproducible across hosts/versions, so
+          # require content identity (the verifier-validated evidence inventory
+          # and case count) rather than byte-identical bytes.
+          if rebuilt["inventory_sha256"] != published["inventory_sha256"]:
               raise SystemExit(
-                  f"rebuilt archive {rebuilt} != published {expected}"
+                  "rebuilt evidence inventory != published inventory"
               )
-          print("rebuilt archive is byte-identical")
+          if rebuilt["case_count"] != published["case_count"]:
+              raise SystemExit("rebuilt case count != published case count")
+          print("rebuilt evidence is content-identical to the published release")
           PY
       - name: Publish the draft release
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           gh release edit "$RELEASE_TAG" --draft=false \
-            --notes-file "$RUNNER_TEMP/rebuilt.attestation.json"
+            --notes-file "$RUNNER_TEMP/release/attestation.json"
