@@ -62,12 +62,37 @@ A publisher cutover therefore has the following atomic contract:
 3. Build and run baseline, candidate, and SOLAR evidence from that clean
    revision against the final manifest. All three statements must bind the same
    source revision and validated runtime environment where required.
-4. Assemble and verify the complete bundle, then distribute
-   `RELEASE/release-bundle.json` and every referenced regular file through the
-   publisher-controlled repository or release channel.
+4. Assemble and verify the complete bundle, then package it into a
+   deterministic, self-verifying release archive:
+
+   ```bash
+   uv run sol-execbench score release-package out/release/release-bundle.json \
+     --archive-output score-release.tar.zst \
+     --attestation-output attestation.json \
+     --source-revision SOURCE_GIT_SHA
+   ```
+
+   `release-package` first re-runs the fail-closed verifier, then collects the
+   exact transitively-referenced evidence set (the same files the verifier
+   checks — execution plans and trace sidecars are excluded by construction) and
+   writes a byte-reproducible zstd archive plus a content-addressed attestation
+   binding the bundle, archive, inventory, source revision, and reproduced
+   official score. Upload the archive and attestation as a **draft** GitHub
+   Release, then trigger the `Score Release` workflow
+   (`.github/workflows/score-release.yml`): it downloads the draft, verifies the
+   archive SHA-256 against the attestation, reproduces the official score with
+   `score release-verify`, requires a byte-identical deterministic rebuild, and
+   promotes the draft to published. The GitHub-hosted workflow job is the only
+   component that holds release authority; the self-hosted GPU runner only
+   produces evidence.
 5. Verify that `sol-execbench score status` reports both policy authorization
-   and the published release, and that `sol-execbench score official` accepts
-   the distributed bundle.
+   and the published release. Anyone can reproduce the official score from the
+   distributed archive:
+
+   ```bash
+   uv run sol-execbench score release-verify score-release.tar.zst \
+     --expected-sha256 "$(python -c 'import json;print(json.load(open("attestation.json"))["archive"]["sha256"])')"
+   ```
 
 A baseline-and-SOLAR-only directory is not a complete official-score release.
 Publishing a reusable baseline independently would require a separate reviewed

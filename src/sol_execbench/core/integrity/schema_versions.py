@@ -99,6 +99,8 @@ class SchemaVersion(StrEnum):
     RDNA4_DIAGNOSTIC_CORPUS_DESIGN = "rdna4_diagnostic_corpus_design.v1"
     RDNA4_VALIDATION = "sol_execbench.rdna4_validation.v2"
     REFERENCE_IPC = "sol_execbench.reference_ipc.v2"
+    RELEASE_ARCHIVE = "sol_execbench.release_archive.v1"
+    RELEASE_ATTESTATION = "sol_execbench.release_attestation.v1"
     RELEASE_BASELINE = "sol_execbench.release_baseline.v1"
     RELEASE_BUNDLE = "sol_execbench.release_bundle.v2"
     RELEASE_CANDIDATE = "sol_execbench.release_candidate.v1"

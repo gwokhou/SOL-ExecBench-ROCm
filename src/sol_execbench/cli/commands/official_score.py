@@ -25,6 +25,10 @@ from sol_execbench.core.scoring.release_assembly import (
 )
 from sol_execbench.core.scoring.release_builders import load_execution_plan
 from sol_execbench.core.scoring.release_models import ReleaseArtifactKind
+from sol_execbench.core.scoring.release_packaging import (
+    package_score_release,
+    verify_score_release_archive,
+)
 from sol_execbench.core.scoring.release_verifier import verify_and_score_release
 
 console = Console(stderr=True)
@@ -174,6 +178,121 @@ def assemble_bundle_cli(workspace: Path, manifest_path: Path) -> CliResult:
         data={"bundle": str(path)},
         artifacts=(artifact(path, "json_file"),),
     )
+
+
+@score_cli.command("release-package")
+@click.argument(
+    "bundle",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--archive-output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    required=True,
+)
+@click.option(
+    "--attestation-output",
+    type=click.Path(dir_okay=False, path_type=Path),
+    required=True,
+)
+@click.option("--source-revision", required=True)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("problems/AMD_AKA/manifest.yaml"),
+    show_default=True,
+)
+def release_package_cli(
+    bundle: Path,
+    archive_output: Path,
+    attestation_output: Path,
+    source_revision: str,
+    manifest_path: Path,
+) -> CliResult:
+    """Package a verified release bundle into a deterministic zstd archive."""
+    try:
+        attestation = package_score_release(
+            bundle_path=bundle,
+            corpus_manifest_path=manifest_path,
+            archive_output=archive_output,
+            attestation_output=attestation_output,
+            source_revision=source_revision,
+        )
+    except (OSError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="score_release_packaging_failed",
+            exit_code=CliExitCode.RESULT_FAILED,
+            hint=(
+                "Verify the bundle with 'score official', then choose archive "
+                "and attestation output paths that do not already exist."
+            ),
+        ) from exc
+    console.print(
+        f"[green]Score release archive: {archive_output} "
+        f"(official score {attestation.official_score:.9g}).[/green]",
+    )
+    return CliResult(
+        data={
+            "release_id": attestation.release_id,
+            "bundle_sha256": attestation.bundle_sha256,
+            "archive": attestation.archive.model_dump(mode="json"),
+            "official_score": attestation.official_score,
+            "scored_workloads": attestation.scored_workloads,
+            "baseline_id": attestation.baseline_id,
+            "candidate_id": attestation.candidate_id,
+        },
+        artifacts=(
+            artifact(archive_output, "score_release_archive"),
+            artifact(attestation_output, "score_release_attestation_json"),
+        ),
+    )
+
+
+@score_cli.command("release-verify")
+@click.argument(
+    "archive",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option("--expected-sha256", default=None)
+@click.option(
+    "--unpack-root",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("problems/AMD_AKA/manifest.yaml"),
+    show_default=True,
+)
+def release_verify_cli(
+    archive: Path,
+    expected_sha256: str | None,
+    unpack_root: Path | None,
+    manifest_path: Path,
+) -> CliResult:
+    """Extract a release archive and reproduce its official score."""
+    try:
+        result = verify_score_release_archive(
+            archive_path=archive,
+            corpus_manifest_path=manifest_path,
+            expected_sha256=expected_sha256,
+            unpack_root=unpack_root,
+        )
+    except (OSError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="score_release_verification_failed",
+            exit_code=CliExitCode.RESULT_FAILED,
+            hint="Restore the exact content-addressed score release archive.",
+        ) from exc
+    console.print(
+        f"[green]Official SOL score: {result.suite.score:.9g}[/green]",
+    )
+    return CliResult(data=result.to_dict())
 
 
 __all__ = ["score_cli"]
