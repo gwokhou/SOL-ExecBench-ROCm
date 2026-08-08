@@ -196,6 +196,7 @@ def _write_design(root: Path, store: Path, revision: str) -> Path:
 
 
 def _write_plan(root: Path, store: Path, revision: str, design: Path) -> Path:
+    output_root = root.parent / f"{root.name}-lifecycle-output"
     values: dict[str, object] = {
         "design_manifest_path": str(design.resolve()),
         "corpus_root": str(root.resolve()),
@@ -207,7 +208,7 @@ def _write_plan(root: Path, store: Path, revision: str, design: Path) -> Path:
         ),
         "development_corpus_path": str((root / "development.json").resolve()),
         "held_out_corpus_path": str((root / "held_out.json").resolve()),
-        "output_root": str((root / "lifecycle-output").resolve()),
+        "output_root": str(output_root.resolve()),
         "source_revision": revision,
         "purpose": _PURPOSE,
         "model_version": "gfx1200_diagnostic.v7",
