@@ -1,6 +1,6 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-08 against `98dd100c` and the current worktree.
+Last audited: 2026-08-08 against `de579a6b` and the current worktree.
 
 This file records only unresolved repository-level work, the decisions that
 constrain it, and its completion criteria. Generated run state belongs in the
@@ -37,17 +37,22 @@ inventories belong in Git history.
   workflow exist. They are building blocks, not yet an authoritative production
   control plane: the P0 gaps below prevent a fresh generation from having one
   complete, re-verifiable immutable lineage.
-- The identity foundation closed on 2026-08-08. Every stage identity now
-  recomputes from its manifest inputs (single source of truth), calibration
-  and corpus-snapshot promotion are first-class identity-bearing objects,
-  GPU fingerprints must be complete whenever hardware is bound, and the
-  consistency gate verifies blob content against its digest and rejects a
-  stored stage_id that no longer matches its recomputed identity. Acceptance
-  still derives its stage_id outside the identity family, the runtime layer
-  has not yet routed every handler through its identity function or filled
-  complete hardware inputs, and collection-run/corpus-snapshot parent sets
-  are not yet populated by the authoring scripts, so the P0 runtime-semantic
-  gaps below still stand.
+- The identity foundation closed on 2026-08-08 and the runtime stage_id
+  routing closed on 2026-08-09: every stage identity recomputes from its
+  manifest inputs (single source of truth), calibration and corpus-snapshot
+  promotion are first-class identity-bearing objects, GPU fingerprints must
+  be complete whenever hardware is bound, the consistency gate verifies blob
+  content against its digest and rejects a stored stage_id that no longer
+  matches its recomputed identity, and every orchestrator handler (including
+  corpus-snapshot and acceptance) now derives its stage_id through the
+  identity family instead of an ad-hoc output digest. The CLI already
+  supplies a real source revision. What still stands in the P0
+  runtime-semantic gaps below: the authoring scripts (build_rdna4) do not
+  yet populate corpus-snapshot/collection-run parent sets or bind complete
+  GPU fingerprints when writing stage manifests, and the model-build,
+  acceptance, and publication stage manifest writers do not yet exist, so a
+  fresh generation written through them would still trip the consistency
+  gate.
 - The reviewed 2026-08-07 retirement plan was executed. Superseded v3/v6 and
   unreferenced Orojenesis roots were cold-archived and reclaimed. Do not remove
   `microarchitecture-diagnostics-v7/` or
@@ -86,10 +91,11 @@ and calibration is a first-class immutable input rather than an unowned file.
 
 #### Lifecycle topology and authority
 
-1. Add first-class calibration and promotion/derivation identities. A model
-   build must cite the calibration object and promoted development snapshot it
-   consumed; a held-out acceptance must cite every input it reads directly,
-   including calibration, development, model-build, and held-out identities.
+1. Route the existing first-class calibration and promoted-snapshot identities
+   through the production DAG. A model build must cite the calibration object
+   and promoted development snapshot it consumed; a held-out acceptance must
+   cite every input it reads directly, including calibration, development,
+   model-build, and held-out identities.
 2. Keep development and held-out snapshots role-specific. Do not collapse both
    roles into one synthetic snapshot identity or attribute the 880 historical
    development cases to the fresh Cycle 3 held-out collection run.
@@ -116,6 +122,10 @@ and calibration is a first-class immutable input rather than an unowned file.
 4. Make the registry object, receipt, and run-state representations agree on
    stage identity and inventory. There must be one canonical current generation
    and one legal next action.
+5. Verify cross-object referential integrity, not only referenced blob
+   existence. Every parent `stage_id` must resolve to exactly one manifest of
+   the declared stage, and the cited parent/receipt digest must match that
+   object's canonical stored representation.
 
 #### Verification and resume semantics
 
@@ -142,6 +152,9 @@ and calibration is a first-class immutable input rather than an unowned file.
 8. Add real-handler tests for calibration/corpus drift, collection mutation,
    missing blobs, changed parent receipts, descendant invalidation, and resumed
    semantic equivalence. State-machine tests using fake handlers are not enough.
+9. Resolve every recorded output beneath its declared root without following a
+   symlink outside that root. Verification must reject path escape, symlink
+   substitution, duplicate inventory paths, and incomplete nested inventories.
 
 #### Acceptance finality and publication admission
 
@@ -159,6 +172,10 @@ and calibration is a first-class immutable input rather than an unowned file.
 4. If Cycle 3 is rejected, record and retain the verdict, stop publication, and
    open a new design/model generation with fresh held-out pairs. Revealed Cycle 3
    cases may become future development evidence but can never be held out again.
+5. Enforce terminality with a canonical acceptance-attempt key derived from the
+   complete pre-verdict input set. The registry must atomically admit at most one
+   terminal verdict for that key even though `accepted` and the verdict digest
+   participate in the resulting acceptance artifact identity.
 
 #### Successor generations and frozen data
 
@@ -209,6 +226,13 @@ and calibration is a first-class immutable input rather than an unowned file.
 4. Keep remote publication least-privilege and one-way: the GPU runner produces
    evidence with read-only repository access; only the hosted publishing job may
    publish, and it must never mutate an existing lifecycle object in place.
+5. Treat every downloaded archive as untrusted until verified. Before extraction,
+   reject absolute or parent-traversing member paths, links and special files,
+   duplicate members, excessive member counts, and archives whose declared or
+   expanded size exceeds a canonical bound; extract only into a fresh directory.
+6. Run archive creation, listing, extraction, and verification with explicit
+   timeouts, process-group cleanup, and bounded redacted output. A workflow job
+   timeout alone is not the subprocess safety contract.
 
 #### P0 completion criteria
 

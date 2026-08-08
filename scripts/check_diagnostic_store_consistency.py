@@ -102,23 +102,19 @@ def _check_manifest(root: Path, manifest_path: Path) -> list[str]:
             f"{manifest_path}: directory {stage_id_dir!r} does not match "
             f"stage_id {manifest.stage_id!r}",
         )
-    # Acceptance currently derives its stage_id outside the identity family
-    # (see orchestrator); until the runtime layer routes it through
-    # acceptance_id, it is exempt from the recomputation closure.
-    if manifest.stage is not DiagnosticLifecycleStage.ACCEPTANCE:
-        try:
-            expected_stage_id = recompute_stage_id(manifest)
-        except ValueError as error:
+    try:
+        expected_stage_id = recompute_stage_id(manifest)
+    except ValueError as error:
+        findings.append(
+            f"{manifest_path}: cannot recompute stage_id: {error}",
+        )
+    else:
+        if expected_stage_id != manifest.stage_id:
             findings.append(
-                f"{manifest_path}: cannot recompute stage_id: {error}",
+                f"{manifest_path}: stored stage_id {manifest.stage_id!r} "
+                f"does not match recomputed identity "
+                f"{expected_stage_id!r}",
             )
-        else:
-            if expected_stage_id != manifest.stage_id:
-                findings.append(
-                    f"{manifest_path}: stored stage_id {manifest.stage_id!r} "
-                    f"does not match recomputed identity "
-                    f"{expected_stage_id!r}",
-                )
     digests: set[str] = set()
     for item in manifest.exact_inventory:
         digests.add(item.sha256)

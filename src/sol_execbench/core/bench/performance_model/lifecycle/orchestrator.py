@@ -38,7 +38,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticStageStatus,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.identity import (
+    acceptance_id,
     collection_run_id as derive_collection_run_id,
+    corpus_snapshot_id,
     model_build_id,
     publication_id,
 )
@@ -268,16 +270,29 @@ class CorpusSnapshotHandler:
     stage = DiagnosticLifecycleStage.CORPUS_SNAPSHOT
 
     def run(self, context: StageRunContext) -> StageCompletion:
-        """Record the frozen corpus files as the snapshot outputs."""
+        """Record the frozen corpus files and derive the snapshot identity.
+
+        The stage produces both the development and held-out corpus files.
+        Its stage_id is the development snapshot identity (the canonical
+        role for the chain); the held-out snapshot identity is recomputed
+        deterministically by the acceptance handler from the held-out file.
+        """
         if context.corpus_root is None:
             raise ValueError("corpus snapshot requires --corpus-root")
         outputs: list[DiagnosticLifecycleArtifact] = []
+        digests: dict[str, str] = {}
         for role in ("development", "held_out"):
             path = context.corpus_root / f"{role}.json"
             if not path.is_file():
                 raise ValueError(f"frozen {role} corpus is missing: {path}")
-            outputs.append(_artifact(path))
-        digest = _joined_digest(outputs)
+            artifact = _artifact(path)
+            outputs.append(artifact)
+            digests[role] = artifact.sha256
+        digest = corpus_snapshot_id(
+            collection_run_id=context.collection_run_id,
+            role="development",
+            corpus_sha256=digests["development"],
+        )
         return StageCompletion(stage_id=digest, outputs=tuple(outputs))
 
     def prepare(
@@ -430,8 +445,22 @@ class AcceptanceHandler:
         atomic_write_json_value(result_output, result.model_dump(mode="json"))
         context.set_output(self.stage, manifest_output)
         outputs = (_artifact(manifest_output), _artifact(result_output))
+        held_out_snapshot_id = corpus_snapshot_id(
+            collection_run_id=context.collection_run_id,
+            role="held_out",
+            corpus_sha256=manifest.held_out_corpus_sha256,
+        )
+        stage_id = acceptance_id(
+            model_build_id=_prior_receipt_stage_id(
+                context,
+                DiagnosticLifecycleStage.MODEL_BUILD,
+            ),
+            held_out_corpus_snapshot_id=held_out_snapshot_id,
+            accepted=result.accepted,
+            verdict_sha256=sha256_file(result_output),
+        )
         return StageCompletion(
-            stage_id=_joined_digest(outputs),
+            stage_id=stage_id,
             outputs=outputs,
         )
 
@@ -648,19 +677,6 @@ def _require_output_root(context: StageRunContext) -> Path:
     root = context.output_root
     root.mkdir(parents=True, exist_ok=True)
     return root
-
-
-def _joined_digest(
-    artifacts: Sequence[DiagnosticLifecycleArtifact],
-) -> str:
-    from sol_execbench.core.integrity import stable_json_checksum
-
-    return stable_json_checksum(
-        [
-            {"sha256": item.sha256, "size_bytes": item.size_bytes}
-            for item in artifacts
-        ]
-    )
 
 
 def _parents_of(
@@ -1172,6 +1188,23 @@ def _load_receipt(
         )
     except (OSError, ValueError):
         return None
+
+
+def _prior_receipt_stage_id(
+    context: StageRunContext,
+    stage: DiagnosticLifecycleStage,
+) -> str:
+    """Return the recorded stage_id of one already-verified predecessor."""
+    receipt = _load_receipt(
+        context.collection_run_id,
+        stage,
+        context.store_root,
+    )
+    if receipt is None:
+        raise ValueError(
+            f"{stage.value} receipt is missing; cannot derive downstream identity",
+        )
+    return receipt.stage_id
 
 
 def _stage_status(
