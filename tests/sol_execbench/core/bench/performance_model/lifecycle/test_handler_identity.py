@@ -142,7 +142,9 @@ def test_acceptance_handler_derives_identity(
             source_revision="unknown",
         ),
         accepted=True,
-        verdict_sha256=sha256_file(output_root / "acceptance.json"),
+        verdict_sha256=sha256_file(
+            output_root / "acceptance" / "acceptance.json"
+        ),
         source_revision="unknown",
     )
     assert completion.stage_id == expected

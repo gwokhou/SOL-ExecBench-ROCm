@@ -482,7 +482,10 @@ class ModelBuildHandler:
             context.calibration_audit_path,
             "model build requires --calibration-audit",
         )
-        output = _require_output_root(context) / "inference.json"
+        output = (
+            _require_output_root(context) / "model-build" / "inference.json"
+        )
+        output.parent.mkdir(parents=True, exist_ok=True)
         profile = fit_diagnostic_inference_profile(
             development_corpus_path=development,
             calibration_profile_path=calibration,
@@ -527,11 +530,12 @@ class ModelBuildHandler:
         receipt: DiagnosticStageReceipt,
     ) -> bool:
         """Re-verify the fitted inference profile against the receipt."""
-        if context.output_root is None:
+        output = context.output(self.stage)
+        if output is None:
             return False
         return _verify_artifacts(
             receipt.output_inventory,
-            context.output_root,
+            output.parent,
         )
 
 
@@ -571,7 +575,8 @@ class AcceptanceHandler:
             context.output(DiagnosticLifecycleStage.MODEL_BUILD),
             "acceptance requires the model-build inference profile",
         )
-        root = _require_output_root(context)
+        root = _require_output_root(context) / "acceptance"
+        root.mkdir(parents=True, exist_ok=True)
         manifest_output = root / "acceptance-manifest.json"
         result_output = root / "acceptance.json"
         manifest, result = build_diagnostic_acceptance(
@@ -635,11 +640,12 @@ class AcceptanceHandler:
         receipt: DiagnosticStageReceipt,
     ) -> bool:
         """Re-verify the acceptance manifest and result files."""
-        if context.output_root is None:
+        output = context.output(self.stage)
+        if output is None:
             return False
         return _verify_artifacts(
             receipt.output_inventory,
-            context.output_root,
+            output.parent,
         )
 
 
@@ -671,7 +677,11 @@ class PublicationHandler:
             build_diagnostic_publication_projection,
         )
 
-        acceptance_result = _require_output_root(context) / "acceptance.json"
+        acceptance_manifest = _required(
+            context.output(DiagnosticLifecycleStage.ACCEPTANCE),
+            "publication requires the acceptance manifest",
+        )
+        acceptance_result = acceptance_manifest.with_name("acceptance.json")
         verdict = load_json_file(DiagnosticAcceptanceResult, acceptance_result)
         if not verdict.accepted:
             raise ValueError(
@@ -1957,7 +1967,7 @@ def _context_from_run_state(
         else state_path.parents[3] / "design.json"
     )
     inputs = run_state.inputs
-    return StageRunContext(
+    context = StageRunContext(
         store_root=root,
         design_manifest_path=design_path,
         collection_run_id=run_state.collection_run_id,
@@ -1975,6 +1985,26 @@ def _context_from_run_state(
         source_revision=inputs.get("source_revision", "unknown"),
         purpose=run_state.purpose,
     )
+    if context.output_root is not None:
+        context.paths.update(
+            {
+                DiagnosticLifecycleStage.MODEL_BUILD.value: (
+                    context.output_root / "model-build" / "inference.json"
+                ),
+                DiagnosticLifecycleStage.ACCEPTANCE.value: (
+                    context.output_root
+                    / "acceptance"
+                    / "acceptance-manifest.json"
+                ),
+                DiagnosticLifecycleStage.PUBLICATION.value: (
+                    context.output_root / "publication"
+                ),
+                DiagnosticLifecycleStage.RELEASE.value: (
+                    context.output_root / "release.tar.zst"
+                ),
+            }
+        )
+    return context
 
 
 def _optional_path(value: str | None) -> Path | None:
