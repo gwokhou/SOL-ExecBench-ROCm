@@ -29,14 +29,21 @@ ROOT = Path(__file__).resolve().parents[1]
 SCAN_ROOT = ROOT / "data"
 # Generated / vendored data roots are out of scope: outputs/ holds transient
 # diagnostic artifacts, publications/ holds immutable generated projections,
+# conformance/ and releases/ hold generated lifecycle/release evidence,
+# store/ is checked by the dedicated fail-closed consistency gate, and
+# cold-archive/ contains reviewed recovery archives,
 # AgentKernelArena/ is a vendored corpus clone, and fusion-sample/ is a sample
 # problem.
 EXEMPT_DATA_ROOTS = frozenset(
     {
         "AgentKernelArena",
+        "cold-archive",
+        "conformance",
         "fusion-sample",
         "outputs",
         "publications",
+        "releases",
+        "store",
     }
 )
 MARKER = "NON_CANONICAL.md"
