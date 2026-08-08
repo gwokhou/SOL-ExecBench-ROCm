@@ -373,6 +373,31 @@ def test_p0_conformance_rebinds_currentized_calibration_audit(
     ]
 
 
+def test_p0_conformance_plan_isolates_publication_output(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    conformance = load_script(
+        "scripts/internal/build_diagnostic_p0_conformance.py",
+    )
+    corpus_root = tmp_path / "conformance-input"
+    corpus_root.mkdir()
+
+    plan_path = conformance._write_plan(
+        corpus_root,
+        tmp_path / "store",
+        "a" * 40,
+        corpus_root / "design.json",
+    )
+
+    plan = conformance._load_object(plan_path)
+    output_value = plan["output_root"]
+    assert isinstance(output_value, str)
+    output_root = Path(output_value)
+    assert output_root.parent == corpus_root.parent
+    assert not output_root.is_relative_to(corpus_root)
+
+
 def test_rdna4_diagnostic_promotion_verifies_roles_order_and_hashes(
     load_script,
     tmp_path: Path,
