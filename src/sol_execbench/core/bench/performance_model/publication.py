@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
+import math
 import shutil
 import tempfile
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
 from pydantic import Field, field_validator, model_validator
 
@@ -68,6 +69,8 @@ from sol_execbench.core.integrity import (
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 PUBLICATION_MANIFEST_NAME = "publication.json"
+_NUMERIC_REPRODUCTION_ABS_TOLERANCE = 1e-9
+_NUMERIC_REPRODUCTION_REL_TOLERANCE = 1e-9
 _SOURCE_INFERENCE_PATH = "source-inference.json"
 _PROJECTED_INFERENCE_PATH = "inference.json"
 _CORPUS_PATH = "development.json"
@@ -314,10 +317,41 @@ def verify_diagnostic_publication_projection(
         semantic_loader=semantic_loader,
         blob_resolver=blob_resolver,
     )
-    if rebuilt != projected_profile:
+    if not _numerically_equivalent(
+        rebuilt.model_dump(mode="python"),
+        projected_profile.model_dump(mode="python"),
+    ):
         raise ValueError("publication inference does not reproduce")
     _require_inference_equivalence(source_profile, projected_profile)
     return projection
+
+
+def _numerically_equivalent(left: object, right: object) -> bool:
+    """Compare a rebuilt profile exactly except for bounded float drift."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, float) and isinstance(right, float):
+        return math.isclose(
+            left,
+            right,
+            rel_tol=_NUMERIC_REPRODUCTION_REL_TOLERANCE,
+            abs_tol=_NUMERIC_REPRODUCTION_ABS_TOLERANCE,
+        )
+    if isinstance(left, dict) and isinstance(right, dict):
+        left_mapping = cast(dict[object, object], left)
+        right_mapping = cast(dict[object, object], right)
+        if left_mapping.keys() != right_mapping.keys():
+            return False
+        return all(
+            _numerically_equivalent(value, right_mapping[key])
+            for key, value in left_mapping.items()
+        )
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(
+            _numerically_equivalent(left_item, right_item)
+            for left_item, right_item in zip(left, right, strict=True)
+        )
+    return left == right
 
 
 def _require_new_output(output: Path, inputs: tuple[Path, ...]) -> None:
