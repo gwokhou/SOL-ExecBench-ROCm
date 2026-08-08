@@ -36,3 +36,15 @@ def test_release_workflow_runs_on_github_hosted_runner() -> None:
     definition = _workflows()["diagnostic-release.yml"]
     job = next(iter(definition["jobs"].values()))
     assert "self-hosted" not in " ".join(job["runs-on"])
+
+
+def test_release_workflow_publishes_with_the_fixed_attestation_asset() -> None:
+    workflow = (WORKFLOW_DIR / "diagnostic-release.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "$RUNNER_TEMP/release/"
+        "diagnostic-lifecycle-p0-conformance-v1.attestation.json"
+    ) in workflow
+    assert '$RUNNER_TEMP/release/attestation.json"' not in workflow

@@ -125,4 +125,5 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           gh release edit "$RELEASE_TAG" --draft=false \
-            --notes-file "$RUNNER_TEMP/release/attestation.json"
+            --notes-file \
+            "$RUNNER_TEMP/release/diagnostic-lifecycle-p0-conformance-v1.attestation.json"
