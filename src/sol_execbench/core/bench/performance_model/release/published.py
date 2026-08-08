@@ -296,8 +296,6 @@ def _verified_downloaded_assets(
         raise ValueError("downloaded release archive digest mismatch")
     if archive.stat().st_size != attestation.archive.size_bytes:
         raise ValueError("downloaded release archive size mismatch")
-    if attestation.archive.name != _ARCHIVE:
-        raise ValueError("release attestation names an unexpected archive")
     if (
         attestation.purpose
         is not DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE

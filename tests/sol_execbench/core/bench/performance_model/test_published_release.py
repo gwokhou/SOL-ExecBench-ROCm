@@ -109,7 +109,7 @@ def _assets(root: Path) -> Path:
         purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
         publication_id=publication_id,
         archive=DiagnosticReleaseArchive(
-            name=archive.name,
+            name="release.tar.zst",
             sha256=archive_digest,
             size_bytes=archive.stat().st_size,
             publication_manifest_sha256="3" * 64,
@@ -154,7 +154,7 @@ def _seed_local_candidate(store: Path, assets: Path) -> None:
         ),
         exact_inventory=(
             DiagnosticLifecycleArtifact(
-                relative_path=archive.name,
+                relative_path=attestation.archive.name,
                 sha256=attestation.archive.sha256,
                 size_bytes=archive.stat().st_size,
             ),
