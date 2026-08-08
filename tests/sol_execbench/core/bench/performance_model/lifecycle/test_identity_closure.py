@@ -1,0 +1,343 @@
+"""Identity closure: every stage_id recomputes from its manifest inputs.
+
+The identity functions and ``recompute_stage_id`` must agree for every
+stage: a manifest whose stored ``stage_id`` was produced by an identity
+function must yield the same digest when recomputed from its own fields
+and cited parents. This is the single-source-of-truth contract that lets
+the consistency gate detect drift.
+"""
+
+from __future__ import annotations
+
+import pytest
+from pydantic import ValidationError
+
+from sol_execbench.core.bench.performance_model.lifecycle import (
+    DiagnosticAcceptanceLifecycleManifest,
+    DiagnosticCalibrationLifecycleManifest,
+    DiagnosticCollectionRunManifest,
+    DiagnosticCorpusSnapshotManifest,
+    DiagnosticDesignManifest,
+    DiagnosticLifecycleParent,
+    DiagnosticLifecycleStage,
+    DiagnosticModelBuildManifest,
+    DiagnosticPublicationLifecycleManifest,
+    DiagnosticReleaseLifecycleManifest,
+    DiagnosticRetentionClass,
+    DiagnosticStageStatus,
+    GpuLifecycleIdentity,
+    SoftwareLifecycleIdentity,
+    acceptance_id,
+    calibration_id,
+    collection_run_id,
+    corpus_snapshot_id,
+    design_id,
+    model_build_id,
+    publication_id,
+    recompute_stage_id,
+    release_id,
+)
+
+_SOURCE = "19f195a8"
+_CREATED = "2026-08-07T00:00:00+00:00"
+
+# Distinct 64-char lowercase-hex digests (the SHA256Digest validator rejects
+# anything outside [0-9a-f]).
+D_DESIGN_PAYLOAD = "b" * 64
+D_DESIGN_PARENT = "a" * 64
+D_RUN_PARENT = "2a" * 32
+D_CORPUS_HELD = "1a" * 32
+D_CORPUS_PROMO = "1b" * 32
+D_SOURCE_ONE = "3a" * 32
+D_SOURCE_TWO = "3b" * 32
+D_CAL_PROFILE = "0a" * 32
+D_CAL_AUDIT = "0b" * 32
+D_INFER = "0c" * 32
+D_VERDICT = "0d" * 32
+D_MODEL_BUILD = "1c" * 32
+D_SOURCE_CORPUS = "0e" * 32
+D_PUB_MANIFEST = "0f" * 32
+D_PUB = "1d" * 32
+D_ARCHIVE = "1e" * 32
+D_ATTEST = "1f" * 32
+
+_GPU = GpuLifecycleIdentity(
+    gpu_architecture="gfx1200",
+    gpu_id="a3ff7590-0000-1000-800f-a29c1cca1511",
+    gpu_bdf="0000:03:00.0",
+    rocm_version="7.2.0",
+    compiler_version="HIP version: 7.2.26015-fc0010cf6a",
+    clock_mode="locked",
+    power_profile="stable_peak",
+)
+_SW = SoftwareLifecycleIdentity(sol_version="4.0.0", python_version="3.13")
+
+
+_SCHEMA_BY_STAGE: dict[DiagnosticLifecycleStage, str] = {
+    DiagnosticLifecycleStage.DESIGN: "sol_execbench.diagnostic_lifecycle_design.v1",
+    DiagnosticLifecycleStage.COLLECTION_RUN: (
+        "sol_execbench.diagnostic_lifecycle_collection_run.v1"
+    ),
+    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
+        "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v1"
+    ),
+    DiagnosticLifecycleStage.CALIBRATION: (
+        "sol_execbench.diagnostic_lifecycle_calibration.v1"
+    ),
+    DiagnosticLifecycleStage.MODEL_BUILD: (
+        "sol_execbench.diagnostic_lifecycle_model_build.v1"
+    ),
+    DiagnosticLifecycleStage.ACCEPTANCE: (
+        "sol_execbench.diagnostic_lifecycle_acceptance.v1"
+    ),
+    DiagnosticLifecycleStage.PUBLICATION: (
+        "sol_execbench.diagnostic_lifecycle_publication.v1"
+    ),
+    DiagnosticLifecycleStage.RELEASE: (
+        "sol_execbench.diagnostic_lifecycle_release.v1"
+    ),
+}
+
+
+def _manifest_data(
+    stage: DiagnosticLifecycleStage,
+    stage_id: str,
+    **extra: object,
+) -> dict[str, object]:
+    """Return a base manifest dict merged with stage-specific fields."""
+    return {
+        "stage": stage,
+        "stage_id": stage_id,
+        "schema_version": _SCHEMA_BY_STAGE[stage],
+        "status": DiagnosticStageStatus.VERIFIED,
+        "retention_class": DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        "source_revision": _SOURCE,
+        "created_at": _CREATED,
+        **extra,
+    }
+
+
+def _parent(
+    stage: DiagnosticLifecycleStage, stage_id: str
+) -> DiagnosticLifecycleParent:
+    return DiagnosticLifecycleParent(
+        stage=stage,
+        stage_id=stage_id,
+        sha256="0" * 64,
+    )
+
+
+def test_design_identity_recomputes() -> None:
+    did = design_id(universe_start=160, design_payload_sha256=D_DESIGN_PAYLOAD)
+    manifest = DiagnosticDesignManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.DESIGN,
+            did,
+            universe_start=160,
+            design_payload_sha256=D_DESIGN_PAYLOAD,
+        ),
+    )
+    assert recompute_stage_id(manifest) == did
+
+
+def test_collection_run_identity_recomputes() -> None:
+    cid = collection_run_id(design_id=D_DESIGN_PARENT, generation=1)
+    manifest = DiagnosticCollectionRunManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.COLLECTION_RUN,
+            cid,
+            generation=1,
+            parents=(
+                _parent(DiagnosticLifecycleStage.DESIGN, D_DESIGN_PARENT),
+            ),
+        ),
+    )
+    assert recompute_stage_id(manifest) == cid
+
+
+def test_corpus_snapshot_direct_identity_recomputes() -> None:
+    sid = corpus_snapshot_id(
+        collection_run_id=D_RUN_PARENT,
+        role="held_out",
+        corpus_sha256=D_CORPUS_HELD,
+    )
+    manifest = DiagnosticCorpusSnapshotManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+            sid,
+            role="held_out",
+            corpus_file_sha256=D_CORPUS_HELD,
+            case_count=220,
+            parents=(
+                _parent(DiagnosticLifecycleStage.COLLECTION_RUN, D_RUN_PARENT),
+            ),
+        ),
+    )
+    assert recompute_stage_id(manifest) == sid
+
+
+def test_corpus_snapshot_promoted_identity_recomputes() -> None:
+    sid = corpus_snapshot_id(
+        role="development",
+        corpus_sha256=D_CORPUS_PROMO,
+        source_snapshot_ids=(D_SOURCE_ONE, D_SOURCE_TWO),
+    )
+    manifest = DiagnosticCorpusSnapshotManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+            sid,
+            role="development",
+            corpus_file_sha256=D_CORPUS_PROMO,
+            case_count=880,
+            source_snapshot_ids=(D_SOURCE_ONE, D_SOURCE_TWO),
+            parents=(
+                _parent(DiagnosticLifecycleStage.CORPUS_SNAPSHOT, D_SOURCE_ONE),
+                _parent(DiagnosticLifecycleStage.CORPUS_SNAPSHOT, D_SOURCE_TWO),
+            ),
+        ),
+    )
+    assert recompute_stage_id(manifest) == sid
+
+
+def test_promoted_snapshot_is_distinct_from_direct_child() -> None:
+    """Promotion must not collapse into the direct-collection identity."""
+    direct = corpus_snapshot_id(
+        collection_run_id=D_RUN_PARENT,
+        role="development",
+        corpus_sha256=D_CORPUS_PROMO,
+    )
+    promoted = corpus_snapshot_id(
+        role="development",
+        corpus_sha256=D_CORPUS_PROMO,
+        source_snapshot_ids=(D_RUN_PARENT,),
+    )
+    assert direct != promoted
+
+
+def test_corpus_snapshot_rejects_both_kinds() -> None:
+    with pytest.raises(ValueError, match="not both"):
+        corpus_snapshot_id(
+            collection_run_id=D_RUN_PARENT,
+            role="development",
+            corpus_sha256=D_CORPUS_PROMO,
+            source_snapshot_ids=(D_SOURCE_ONE,),
+        )
+
+
+def test_calibration_identity_recomputes_and_binds_hardware() -> None:
+    cal = calibration_id(
+        calibration_profile_sha256=D_CAL_PROFILE,
+        calibration_audit_sha256=D_CAL_AUDIT,
+        gpu_identity=_GPU,
+        software_identity=_SW,
+    )
+    manifest = DiagnosticCalibrationLifecycleManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.CALIBRATION,
+            cal,
+            calibration_profile_sha256=D_CAL_PROFILE,
+            calibration_audit_sha256=D_CAL_AUDIT,
+            gpu_identity=_GPU,
+            software_identity=_SW,
+        ),
+    )
+    assert recompute_stage_id(manifest) == cal
+
+
+def test_calibration_rejects_partial_gpu_identity() -> None:
+    partial_gpu = GpuLifecycleIdentity(gpu_architecture="gfx1200")
+    with pytest.raises(ValidationError, match="gpu_identity is missing"):
+        DiagnosticCalibrationLifecycleManifest.model_validate(
+            _manifest_data(
+                DiagnosticLifecycleStage.CALIBRATION,
+                D_CAL_PROFILE,
+                calibration_profile_sha256=D_CAL_PROFILE,
+                calibration_audit_sha256=D_CAL_AUDIT,
+                gpu_identity=partial_gpu,
+                software_identity=_SW,
+            ),
+        )
+
+
+def test_model_build_identity_recomputes() -> None:
+    mb = model_build_id(
+        calibration_profile_sha256=D_CAL_PROFILE,
+        calibration_audit_sha256=D_CAL_AUDIT,
+        inference_profile_sha256=D_INFER,
+        model_version="gfx1200_diagnostic.v7",
+    )
+    manifest = DiagnosticModelBuildManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.MODEL_BUILD,
+            mb,
+            calibration_profile_sha256=D_CAL_PROFILE,
+            calibration_audit_sha256=D_CAL_AUDIT,
+            inference_profile_sha256=D_INFER,
+            model_version="gfx1200_diagnostic.v7",
+        ),
+    )
+    assert recompute_stage_id(manifest) == mb
+
+
+def test_acceptance_identity_recomputes() -> None:
+    aid = acceptance_id(
+        model_build_id=D_MODEL_BUILD,
+        held_out_corpus_snapshot_id=D_CORPUS_HELD,
+        accepted=True,
+        verdict_sha256=D_VERDICT,
+    )
+    manifest = DiagnosticAcceptanceLifecycleManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.ACCEPTANCE,
+            aid,
+            held_out_corpus_snapshot_id=D_CORPUS_HELD,
+            accepted=True,
+            verdict_sha256=D_VERDICT,
+            parents=(
+                _parent(DiagnosticLifecycleStage.MODEL_BUILD, D_MODEL_BUILD),
+            ),
+        ),
+    )
+    assert recompute_stage_id(manifest) == aid
+
+
+def test_publication_identity_recomputes() -> None:
+    pid = publication_id(
+        source_corpus_sha256=D_SOURCE_CORPUS,
+        publication_manifest_sha256=D_PUB_MANIFEST,
+        uncompressed_size_bytes=1234,
+        case_count=880,
+    )
+    manifest = DiagnosticPublicationLifecycleManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.PUBLICATION,
+            pid,
+            source_corpus_sha256=D_SOURCE_CORPUS,
+            publication_manifest_sha256=D_PUB_MANIFEST,
+            uncompressed_size_bytes=1234,
+            case_count=880,
+        ),
+    )
+    assert recompute_stage_id(manifest) == pid
+
+
+def test_release_identity_recomputes() -> None:
+    rid = release_id(
+        publication_id=D_PUB,
+        archive_sha256=D_ARCHIVE,
+        source_revision=_SOURCE,
+        producer_version="4.0.0",
+        archive_size_bytes=99,
+    )
+    manifest = DiagnosticReleaseLifecycleManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.RELEASE,
+            rid,
+            archive_sha256=D_ARCHIVE,
+            archive_size_bytes=99,
+            attestation_sha256=D_ATTEST,
+            producer_version="4.0.0",
+            parents=(_parent(DiagnosticLifecycleStage.PUBLICATION, D_PUB),),
+        ),
+    )
+    assert recompute_stage_id(manifest) == rid

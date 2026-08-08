@@ -197,6 +197,8 @@ def package_diagnostic_publication(
     pub_id = lifecycle_publication_id(
         source_corpus_sha256=projection.source_corpus_sha256,
         publication_manifest_sha256=manifest_sha256,
+        uncompressed_size_bytes=projection.uncompressed_size_bytes,
+        case_count=projection.case_count,
     )
     _run_deterministic_tar(
         manifest.parent,
@@ -210,6 +212,7 @@ def package_diagnostic_publication(
         archive_sha256=archive_sha256,
         source_revision=source_revision,
         producer_version=PRODUCER_VERSION,
+        archive_size_bytes=archive_size,
     )
     inventory_sha256 = stable_json_checksum(
         [

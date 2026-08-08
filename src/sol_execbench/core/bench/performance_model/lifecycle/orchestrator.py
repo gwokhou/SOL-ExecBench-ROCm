@@ -96,10 +96,12 @@ class StageRunContext:
     generation: int
     corpus_root: Path | None = None
     calibration_profile_path: Path | None = None
+    calibration_audit_path: Path | None = None
     development_corpus_path: Path | None = None
     held_out_corpus_path: Path | None = None
     output_root: Path | None = None
     source_revision: str = "unknown"
+    model_version: str = "gfx1200_diagnostic.v7"
     paths: dict[str, Path] = field(default_factory=dict)
 
     def output(self, stage: DiagnosticLifecycleStage) -> Path | None:
@@ -116,6 +118,7 @@ class StageRunContext:
         for name, path in (
             ("corpus_root", self.corpus_root),
             ("calibration_profile", self.calibration_profile_path),
+            ("calibration_audit", self.calibration_audit_path),
             ("development_corpus", self.development_corpus_path),
             ("held_out_corpus", self.held_out_corpus_path),
             ("output_root", self.output_root),
@@ -327,6 +330,10 @@ class ModelBuildHandler:
             context.calibration_profile_path,
             "model build requires --calibration-profile",
         )
+        calibration_audit = _required(
+            context.calibration_audit_path,
+            "model build requires --calibration-audit",
+        )
         output = _require_output_root(context) / "inference.json"
         profile = fit_diagnostic_inference_profile(
             development_corpus_path=development,
@@ -338,7 +345,9 @@ class ModelBuildHandler:
         context.set_output(self.stage, output)
         stage_id = model_build_id(
             calibration_profile_sha256=sha256_file(calibration),
+            calibration_audit_sha256=sha256_file(calibration_audit),
             inference_profile_sha256=sha256_file(output),
+            model_version=context.model_version,
         )
         return StageCompletion(
             stage_id=stage_id,
@@ -504,6 +513,8 @@ class PublicationHandler:
         stage_id = publication_id(
             source_corpus_sha256=projection.source_corpus_sha256,
             publication_manifest_sha256=sha256_file(manifest_path),
+            uncompressed_size_bytes=projection.uncompressed_size_bytes,
+            case_count=projection.case_count,
         )
         return StageCompletion(
             stage_id=stage_id,
@@ -727,10 +738,12 @@ def build_run_context(
     store_root_path: Path | None = None,
     corpus_root: Path | None = None,
     calibration_profile_path: Path | None = None,
+    calibration_audit_path: Path | None = None,
     development_corpus_path: Path | None = None,
     held_out_corpus_path: Path | None = None,
     output_root: Path | None = None,
     source_revision: str = "unknown",
+    model_version: str = "gfx1200_diagnostic.v7",
 ) -> StageRunContext:
     """Build the run context for a fresh lifecycle run from a design.
 
@@ -749,10 +762,12 @@ def build_run_context(
         generation=1,
         corpus_root=corpus_root,
         calibration_profile_path=calibration_profile_path,
+        calibration_audit_path=calibration_audit_path,
         development_corpus_path=development_corpus_path,
         held_out_corpus_path=held_out_corpus_path,
         output_root=output_root,
         source_revision=source_revision,
+        model_version=model_version,
     )
 
 

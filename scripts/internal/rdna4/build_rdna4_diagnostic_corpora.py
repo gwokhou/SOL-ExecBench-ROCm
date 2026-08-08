@@ -1188,6 +1188,7 @@ def _new_run(
         status=DiagnosticStageStatus.RUNNING,
         retention_class=DiagnosticRetentionClass.PROCESS_EVIDENCE,
         source_revision=_source_revision(),
+        generation=next_generation,
         policy_hashes={
             "design_id": did,
             "generation": str(next_generation),

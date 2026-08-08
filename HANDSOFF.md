@@ -37,6 +37,17 @@ inventories belong in Git history.
   workflow exist. They are building blocks, not yet an authoritative production
   control plane: the P0 gaps below prevent a fresh generation from having one
   complete, re-verifiable immutable lineage.
+- The identity foundation closed on 2026-08-08. Every stage identity now
+  recomputes from its manifest inputs (single source of truth), calibration
+  and corpus-snapshot promotion are first-class identity-bearing objects,
+  GPU fingerprints must be complete whenever hardware is bound, and the
+  consistency gate verifies blob content against its digest and rejects a
+  stored stage_id that no longer matches its recomputed identity. Acceptance
+  still derives its stage_id outside the identity family, the runtime layer
+  has not yet routed every handler through its identity function or filled
+  complete hardware inputs, and collection-run/corpus-snapshot parent sets
+  are not yet populated by the authoring scripts, so the P0 runtime-semantic
+  gaps below still stand.
 - The reviewed 2026-08-07 retirement plan was executed. Superseded v3/v6 and
   unreferenced Orojenesis roots were cold-archived and reclaimed. Do not remove
   `microarchitecture-diagnostics-v7/` or

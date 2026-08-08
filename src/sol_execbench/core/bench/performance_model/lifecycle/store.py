@@ -62,6 +62,11 @@ def snapshots_dir(root: Path | None = None) -> Path:
     return (root or store_root()) / "snapshots"
 
 
+def calibrations_dir(root: Path | None = None) -> Path:
+    """Return the registry directory for calibration lifecycle objects."""
+    return (root or store_root()) / "calibrations"
+
+
 def builds_dir(root: Path | None = None) -> Path:
     """Return the registry directory for model build objects."""
     return (root or store_root()) / "builds"
@@ -92,6 +97,7 @@ __all__ = [
     "blob_path",
     "blobs_dir",
     "builds_dir",
+    "calibrations_dir",
     "designs_dir",
     "publication_registry_dir",
     "releases_dir",
