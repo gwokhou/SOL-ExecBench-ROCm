@@ -31,13 +31,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
         with:
-          ref: "${{ inputs.tag }}"
+          fetch-depth: 0
       - name: Validate the release tag
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           test "$RELEASE_TAG" = "diagnostic-lifecycle-p0-conformance-v1"
-          TAG_SHA="$(git rev-parse HEAD)"
+          TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
           echo "TAG_SHA=$TAG_SHA" >> "$GITHUB_ENV"
           echo "release tag validated: $RELEASE_TAG"
       - uses: astral-sh/setup-uv@v9.0.0
