@@ -1,7 +1,7 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-07 against source revision `19f195a8` and the current
-worktree; CPU and local-evidence readiness were rechecked in that state.
+Last audited: 2026-08-08 against source revision `0d380e75` and the current
+worktree; the gfx1200 official-score publication was rechecked in that state.
 
 This file is the single backlog for repository-level work that remains useful.
 Completed investigations, superseded contracts, acceptance attempts, and
@@ -12,18 +12,18 @@ describe the current contract rather than duplicate this backlog.
 
 - The checked-in AKA manifest contains 45 authored problems: 43 scored, one
   compatibility sentinel, and one target-incompatible problem. The official
-  `rx9060xt-gfx1200-reference-v2` score remains unavailable because its
-  publisher-authored release evidence has not been published.
-- Local gfx1200 v2 baseline and SOLAR publication inputs exist under the ignored
-  `data/outputs/p0-release-36e44fb/` root at source revision `36e44fb6`: all 163
-  locked-clock baseline records pass, and the current verifier accepts both the
-  163-workload baseline statement and the 163-workload `make_fx_aten` SOLAR
-  statement. The root has no candidate statement or assembled
-  `release-bundle.json`; it is not a complete official-score release and is not
-  publisher authority. The baseline-statement SHA-256 is
-  `b6da525d0bf493476ee7df44f7f3691df3cb9ca81a70700f35062a70c96ef92b`
-  and the SOLAR-statement SHA-256 is
-  `4c85d5e223ebd6f84e52a2d7f21da2fdf776f0cebbcc371b09b0f3fe7b8e6d9b`.
+  gfx1200 score is published: 0.497818327 for the
+  `rx9060xt-gfx1200-reference-v2` baseline against the
+  `rx9060xt-gfx1200-eager-reference-self-eval` candidate, covering the 43 scored
+  problems and 163 workloads. The manifest is cutover to `status: available`
+  (`content_addressed_publisher_v1`); the repository publish marker is
+  `RELEASE/release-bundle.json`, and the distributed evidence archive is the
+  GitHub Release `gfx1200-official-score-v2` (asset
+  `gfx1200-official-score-release.tar.zst`, verified through
+  `score release-verify` under a content-identical rebuild contract). The
+  pre-publication source-evidence root `data/outputs/p0-release-36e44fb/` is now
+  superseded archival evidence; its per-statement digests are not the published
+  bundle identity.
 - The current performance-diagnostic family is v7, with BenchmarkConfig v2,
   reference IPC v2, and ROCm event timing v4. There are no compatibility
   readers for the superseded timing or diagnostic schemas.
@@ -140,51 +140,6 @@ describe the current contract rather than duplicate this backlog.
   pinned ISA coverage documented by Static Kernel Evidence.
 
 ## Active backlog
-
-### P0 — Authorize gfx1200 v2 scoring and publish its first release
-
-The formula, verifier, release builder, corpus pin, and baseline identity exist,
-but the manifest correctly fails closed with
-`baseline_v2_release_evidence_pending`.
-
-CPU preparation and the local GPU source-evidence run are closed. At source
-revision `36e44fb6`, the exact 43-problem/163-workload baseline run is complete
-with all records passing under locked clocks, and the current verifier accepts
-its baseline and 163-workload formal-SOLAR statements. The bundled corpus hash
-is identical to the current pending manifest.
-
-The remaining work is a publisher-authorized release rebuild and repository
-cutover. The existing local root binds the pending manifest and revision
-`36e44fb6`. Authorizing scoring changes that manifest and its repository pin,
-so the existing baseline and SOLAR statements cannot be copied unchanged into
-the final bundle. They are source evidence for the publication rebuild, not
-adoptable final statements.
-
-The current release policy is candidate-specific: `release-bundle.json` must
-contain baseline, candidate, and SOLAR statements. A publisher must choose the
-candidate being scored, prepare the final `official_scoring` manifest contract
-(`status: available`, `content_addressed_publisher_v1`, and the canonical three
-required-evidence values), update `OFFICIAL_CORPUS_MANIFEST_SHA256`, and rebuild
-baseline, candidate, and SOLAR evidence from one clean publication revision
-against that exact manifest. The verified complete bundle and every referenced
-artifact must then be distributed under `RELEASE/`, with pending-state docs and
-tests updated in the same publication change. If baseline-only publication is
-desired instead, it requires a separately reviewed contract; the current
-official-score API does not represent it.
-
-Completion requires a publisher-authored, content-addressed official release
-bundle for the exact 43-problem/163-workload scored denominator, including the
-selected candidate, locked-clock baseline and candidate measurement evidence,
-pinned SOLAR manifests, publisher release statements, and successful
-verification through the documented release-scoring workflow. Local diagnostic
-or validation sidecars cannot authorize this score.
-
-Authoritative surfaces:
-
-- `problems/AMD_AKA/manifest.yaml`
-- `src/sol_execbench/core/scoring/`
-- `docs/SCORING-V3.md`
-- `docs/user/RELEASE-SCORING.md`
 
 ### P0 — Establish an immutable diagnostic data lifecycle and automated flow
 
