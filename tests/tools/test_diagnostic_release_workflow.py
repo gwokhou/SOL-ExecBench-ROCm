@@ -48,3 +48,6 @@ def test_release_workflow_publishes_with_the_fixed_attestation_asset() -> None:
         "diagnostic-lifecycle-p0-conformance-v1.attestation.json"
     ) in workflow
     assert '$RUNNER_TEMP/release/attestation.json"' not in workflow
+    assert 'TAG_SHA="$(git rev-parse HEAD)"' in workflow
+    assert 'os.environ["TAG_SHA"]' in workflow
+    assert "${{ github.sha }}" not in workflow
