@@ -23,8 +23,12 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticLifecycleStage,
     DiagnosticStageStatus,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.identity import (
+    collection_run_id as derive_collection_run_id,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
+    DiagnosticLifecycleParent,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     attempts_dir,
@@ -34,7 +38,7 @@ from sol_execbench.core.data.base_model import (
     CurrentFrozenSchemaModel,
     FrozenArtifactModel,
 )
-from sol_execbench.core.integrity import SHA256Digest
+from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
@@ -42,7 +46,6 @@ class DiagnosticRunStageState(FrozenArtifactModel):
     """Progress recorded for one stage of a lifecycle run."""
 
     stage: DiagnosticLifecycleStage
-    node_key: str = ""
     status: DiagnosticStageStatus
     attempts: int = Field(ge=0)
     receipt_path: str = ""
@@ -85,17 +88,66 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
         SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN
     )
     plan_id: SHA256Digest
-    design_manifest_path: str = Field(min_length=1)
-    corpus_root: str = Field(min_length=1)
+    design: DiagnosticLifecycleParent
+    development_snapshot: DiagnosticLifecycleParent
+    collection_root: str = Field(min_length=1)
+    collection_inventory: tuple[DiagnosticLifecycleArtifact, ...] = Field(
+        min_length=1
+    )
+    collection_run_id: SHA256Digest
+    generation: int = Field(ge=1)
+    roles: tuple[Literal["held_out"], ...] = ("held_out",)
     calibration_profile_path: str = Field(min_length=1)
+    calibration_profile: DiagnosticLifecycleArtifact
     calibration_audit_path: str = Field(min_length=1)
-    development_corpus_path: str = Field(min_length=1)
+    calibration_audit: DiagnosticLifecycleArtifact
     held_out_corpus_path: str = Field(min_length=1)
+    held_out_corpus: DiagnosticLifecycleArtifact
     output_root: str = Field(min_length=1)
     source_revision: str = Field(min_length=40, max_length=64)
     purpose: DiagnosticEvidencePurpose
     model_version: str = Field(min_length=1)
     max_attempts: int = Field(ge=1, le=10)
+
+    @model_validator(mode="after")
+    def _identities_are_canonical(self) -> DiagnosticLifecyclePlan:
+        if self.design.stage is not DiagnosticLifecycleStage.DESIGN:
+            raise ValueError("lifecycle plan design reference has wrong stage")
+        if (
+            self.development_snapshot.stage
+            is not DiagnosticLifecycleStage.CORPUS_SNAPSHOT
+        ):
+            raise ValueError(
+                "lifecycle plan development reference has wrong stage"
+            )
+        if (
+            self.design.purpose is not self.purpose
+            or self.development_snapshot.purpose is not self.purpose
+        ):
+            raise ValueError("lifecycle plan references cross purpose domains")
+        if self.roles != ("held_out",):
+            raise ValueError("production lifecycle collection is held-out only")
+        paths = tuple(item.relative_path for item in self.collection_inventory)
+        if paths != tuple(sorted(paths)) or len(paths) != len(set(paths)):
+            raise ValueError("collection inventory must be sorted and unique")
+        expected_run_id = derive_collection_run_id(
+            design_id=self.design.stage_id,
+            generation=self.generation,
+            roles=self.roles,
+            frozen_held_out_sha256=self.held_out_corpus.sha256,
+            source_revision=self.source_revision,
+            purpose=self.purpose,
+        )
+        if self.collection_run_id != expected_run_id:
+            raise ValueError(
+                "lifecycle plan collection_run_id is not canonical"
+            )
+        expected_plan_id = stable_json_checksum(
+            self.model_dump(mode="json", exclude={"plan_id"})
+        )
+        if self.plan_id != expected_plan_id:
+            raise ValueError("lifecycle plan plan_id is not canonical")
+        return self
 
 
 class DiagnosticRunManifest(CurrentFrozenSchemaModel):
@@ -119,8 +171,8 @@ class DiagnosticRunManifest(CurrentFrozenSchemaModel):
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     created_at: str = Field(min_length=1)
     updated_at: str = Field(min_length=1)
-    design_manifest_path: str = ""
-    inputs: dict[str, str] = Field(default_factory=dict)
+    plan_id: SHA256Digest
+    plan_sha256: SHA256Digest
     stages: tuple[DiagnosticRunStageState, ...] = ()
 
     def stage_state(
@@ -151,6 +203,14 @@ def run_state_path(
 ) -> Path:
     """Return the run-state file path for one collection generation."""
     return orchestrations_dir(store_root_path) / collection_run_id / "run.json"
+
+
+def lifecycle_plan_path(
+    collection_run_id: str,
+    store_root_path: Path | None = None,
+) -> Path:
+    """Return the immutable reviewed plan copy for one orchestration."""
+    return orchestrations_dir(store_root_path) / collection_run_id / "plan.json"
 
 
 def stage_receipt_path(
@@ -187,6 +247,7 @@ __all__ = [
     "DiagnosticRunManifest",
     "DiagnosticRunStageState",
     "DiagnosticStageAttempt",
+    "lifecycle_plan_path",
     "run_state_path",
     "stage_attempt_path",
     "stage_receipt_path",

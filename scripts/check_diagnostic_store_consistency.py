@@ -18,25 +18,34 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Final
 
+from sol_execbench.core.bench.performance_model.lifecycle.artifact_tree import (
+    DiagnosticArtifactTreeManifest,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
     BlobStore,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticLifecycleStage,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.gc import (
+    compute_reachable_blobs,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.identity import (
     recompute_stage_id,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER,
+    DiagnosticCorpusSnapshotManifest,
     DiagnosticReleaseLifecycleManifest,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticStageReceipt,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
+    DiagnosticLifecyclePlan,
     DiagnosticRunManifest,
     DiagnosticStageAttempt,
+    lifecycle_plan_path,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     acceptances_dir,
@@ -54,6 +63,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.store import (
 )
 from sol_execbench.core.bench.performance_model.release.published import (
     DiagnosticPublishedRelease,
+)
+from sol_execbench.core.bench.performance_model.validation_corpus import (
+    BlobArtifactReference,
+    DiagnosticValidationCorpus,
 )
 from sol_execbench.core.integrity import sha256_file
 
@@ -152,6 +165,70 @@ def _check_manifest(root: Path, manifest_path: Path) -> list[str]:
             findings.append(
                 f"{manifest_path}: missing blob referenced by {digest}",
             )
+    if isinstance(manifest, DiagnosticCorpusSnapshotManifest):
+        findings.extend(_check_corpus_blob_trees(root, manifest, manifest_path))
+    return findings
+
+
+def _check_corpus_blob_trees(
+    root: Path,
+    manifest: DiagnosticCorpusSnapshotManifest,
+    manifest_path: Path,
+) -> list[str]:
+    """Validate each blob-backed case's exact artifact-tree closure."""
+    try:
+        corpus_path = BlobStore(root).get(manifest.corpus_file_sha256)
+        corpus = DiagnosticValidationCorpus.model_validate_json(
+            corpus_path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as error:
+        return [f"{manifest_path}: unreadable corpus blob: {error}"]
+    findings: list[str] = []
+    inventory = {item.sha256 for item in manifest.exact_inventory}
+    for case in corpus.cases:
+        for reference in (case.evidence_manifest, case.solar_manifest):
+            if not isinstance(reference, BlobArtifactReference):
+                findings.append(
+                    f"{manifest_path}: lifecycle corpus contains path-backed case"
+                )
+                continue
+            try:
+                tree_path = BlobStore(root).get(reference.tree_manifest_sha256)
+                tree = DiagnosticArtifactTreeManifest.model_validate_json(
+                    tree_path.read_text(encoding="utf-8")
+                )
+            except (OSError, ValueError) as error:
+                findings.append(
+                    f"{manifest_path}: invalid artifact tree "
+                    f"{reference.tree_manifest_sha256}: {error}"
+                )
+                continue
+            root_member = next(
+                item
+                for item in tree.artifacts
+                if item.relative_path == tree.root_path
+            )
+            if (
+                root_member.sha256 != reference.sha256
+                or root_member.size_bytes != reference.size_bytes
+            ):
+                findings.append(
+                    f"{manifest_path}: artifact-tree root reference mismatch"
+                )
+            required = {
+                reference.tree_manifest_sha256,
+                *(item.sha256 for item in tree.artifacts),
+            }
+            missing_inventory = required - inventory
+            if missing_inventory:
+                findings.append(
+                    f"{manifest_path}: tree closure absent from exact inventory"
+                )
+            for digest in required:
+                if not _blob_exists(root, digest):
+                    findings.append(
+                        f"{manifest_path}: artifact-tree blob missing: {digest}"
+                    )
     return findings
 
 
@@ -185,6 +262,23 @@ def _check_run_state(root: Path, run_state_path: Path) -> list[str]:
         findings.append(
             f"{run_state_path}: directory does not match collection_run_id",
         )
+    plan_path = lifecycle_plan_path(run_state.collection_run_id, root)
+    if not plan_path.is_file():
+        findings.append(f"{run_state_path}: immutable plan is missing")
+    elif sha256_file(plan_path) != run_state.plan_sha256:
+        findings.append(f"{run_state_path}: immutable plan digest mismatch")
+    else:
+        try:
+            plan = DiagnosticLifecyclePlan.model_validate_json(
+                plan_path.read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError) as error:
+            findings.append(f"{run_state_path}: unreadable plan: {error}")
+        else:
+            if plan.plan_id != run_state.plan_id:
+                findings.append(f"{run_state_path}: plan_id mismatch")
+        if not _blob_exists(root, run_state.plan_sha256):
+            findings.append(f"{run_state_path}: plan blob is missing")
     for state in run_state.stages:
         for item in state.outputs:
             if not _blob_exists(root, item.sha256):
@@ -328,11 +422,16 @@ def check_store(root: Path) -> list[str]:
             published_releases_dir(root),
         )
     }
-    ignored = {"blobs", "locks", "promotions"}
+    ignored = {"blobs", "locks"}
     if root.is_dir():
         for child in sorted(root.iterdir()):
             if child.is_dir() and child.name not in known | ignored:
                 findings.append(f"unexpected registry directory: {child}")
+        has_registry_json = any(
+            "blobs" not in path.parts for path in root.rglob("*.json")
+        )
+        if has_registry_json and not (root / "blobs" / "sha256").is_dir():
+            findings.append("registry objects exist but blob store is missing")
     for run_state_path in sorted(orchestrations_dir(root).glob("*/run.json")):
         findings.extend(_check_run_state(root, run_state_path))
     for receipt_path in sorted(
@@ -351,6 +450,10 @@ def check_store(root: Path) -> list[str]:
             findings.append(f"unexpected published-release inventory: {entry}")
             continue
         findings.extend(_check_published_release(root, children[0]))
+    try:
+        compute_reachable_blobs(root)
+    except (OSError, ValueError) as error:
+        findings.append(f"invalid lifecycle reachability: {error}")
     return findings
 
 

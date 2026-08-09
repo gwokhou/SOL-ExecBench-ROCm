@@ -27,6 +27,19 @@ from pydantic import BaseModel
 T = TypeVar("T", bound=BaseModel)
 
 
+def canonical_json_bytes(value: Any, *, sort_keys: bool = True) -> bytes:
+    """Return the canonical UTF-8 representation used by JSON artifacts."""
+    return (
+        json.dumps(
+            value,
+            indent=2,
+            sort_keys=sort_keys,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode()
+
+
 def atomic_write_json_value(
     path: str | Path,
     value: Any,
@@ -45,13 +58,7 @@ def atomic_write_json_value(
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             handle.write(
-                json.dumps(
-                    value,
-                    indent=2,
-                    sort_keys=sort_keys,
-                    allow_nan=False,
-                )
-                + "\n",
+                canonical_json_bytes(value, sort_keys=sort_keys).decode()
             )
             handle.flush()
             os.fsync(handle.fileno())

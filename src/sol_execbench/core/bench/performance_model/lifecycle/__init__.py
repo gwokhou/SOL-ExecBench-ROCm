@@ -5,8 +5,18 @@
 
 from __future__ import annotations
 
+from sol_execbench.core.bench.performance_model.lifecycle.artifact_tree import (
+    DiagnosticArtifactTreeManifest,
+    import_artifact_tree,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
     BlobStore,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.corpus_registry import (
+    corpus_reference_tree_paths,
+    import_corpus_reference,
+    import_validation_corpus_trees,
+    snapshot_blob_inventory,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticAttemptFailureCode,
@@ -36,6 +46,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.identity import (
     publication_id,
     recompute_stage_id,
     release_id,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.inventory import (
+    inventory_regular_tree,
+    verify_regular_tree_inventory,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER,
@@ -70,6 +84,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.orchestrator import (
     resume_diagnostic_lifecycle,
     run_diagnostic_lifecycle,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.planning import (
+    LifecyclePlanInputs,
+    author_lifecycle_plan,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticCaseReceipt,
     DiagnosticStageReceipt,
@@ -78,6 +96,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
     BlobReference,
     BlobStoreResolver,
     ReferenceResolver,
+    materialize_corpus_references,
     resolve_corpus_reference,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.retention import (
@@ -96,6 +115,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticRunManifest,
     DiagnosticRunStageState,
     DiagnosticStageAttempt,
+    lifecycle_plan_path,
     run_state_path,
     stage_attempt_path,
     stage_receipt_path,
@@ -116,7 +136,6 @@ from sol_execbench.core.bench.performance_model.lifecycle.store import (
     calibrations_dir,
     designs_dir,
     orchestrations_dir,
-    promotions_dir,
     publication_registry_dir,
     published_releases_dir,
     releases_dir,
@@ -146,6 +165,7 @@ __all__ = [
     "CurrentDiagnosticLifecycleManifest",
     "DesignHandler",
     "DiagnosticAcceptanceLifecycleManifest",
+    "DiagnosticArtifactTreeManifest",
     "DiagnosticAttemptFailureCode",
     "DiagnosticAttemptStatus",
     "DiagnosticCalibrationLifecycleManifest",
@@ -174,6 +194,7 @@ __all__ = [
     "GCPlan",
     "GCRefusedError",
     "GpuLifecycleIdentity",
+    "LifecyclePlanInputs",
     "ModelBuildHandler",
     "PublicationHandler",
     "ReferenceResolver",
@@ -187,6 +208,7 @@ __all__ = [
     "acceptances_dir",
     "apply_gc_plan",
     "attempts_dir",
+    "author_lifecycle_plan",
     "blob_path",
     "blobs_dir",
     "build_run_context",
@@ -196,16 +218,22 @@ __all__ = [
     "calibrations_dir",
     "collection_run_id",
     "compute_reachable_blobs",
+    "corpus_reference_tree_paths",
     "corpus_snapshot_id",
     "design_id",
     "designs_dir",
     "diagnostic_lifecycle_id",
     "diagnostic_lifecycle_status",
+    "import_artifact_tree",
+    "import_corpus_reference",
+    "import_validation_corpus_trees",
+    "inventory_regular_tree",
+    "lifecycle_plan_path",
+    "materialize_corpus_references",
     "model_build_id",
     "orchestrations_dir",
     "plan_gc",
     "plan_retirement",
-    "promotions_dir",
     "publication_id",
     "publication_registry_dir",
     "published_releases_dir",
@@ -223,8 +251,10 @@ __all__ = [
     "run_gc",
     "run_state_path",
     "runs_dir",
+    "snapshot_blob_inventory",
     "snapshots_dir",
     "stage_attempt_path",
     "stage_receipt_path",
     "store_root",
+    "verify_regular_tree_inventory",
 ]

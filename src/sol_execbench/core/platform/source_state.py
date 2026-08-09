@@ -37,6 +37,23 @@ def verify_git_source_state(
     paths: tuple[str, ...],
 ) -> GitSourceState:
     """Require exact committed source for a content-addressed release run."""
+    state = capture_git_source_state(repository_root, paths=paths)
+    if state.revision != expected_revision:
+        raise ValueError(
+            "release source revision mismatch: "
+            f"expected {expected_revision}, observed {state.revision}",
+        )
+    if not state.clean:
+        raise ValueError("release source paths contain uncommitted changes")
+    return state
+
+
+def capture_git_source_state(
+    repository_root: Path,
+    *,
+    paths: tuple[str, ...],
+) -> GitSourceState:
+    """Capture the committed revision and cleanliness of selected paths."""
     if not paths:
         raise ValueError("release source path inventory must not be empty")
     root = repository_root.resolve()
@@ -61,21 +78,13 @@ def verify_git_source_state(
         "--",
         *paths,
     )
-    state = GitSourceState(
+    return GitSourceState(
         revision=revision,
         tracked_dirty=tracked.returncode == 1,
         untracked_paths=tuple(
             line for line in untracked_output.splitlines() if line
         ),
     )
-    if state.revision != expected_revision:
-        raise ValueError(
-            "release source revision mismatch: "
-            f"expected {expected_revision}, observed {state.revision}",
-        )
-    if not state.clean:
-        raise ValueError("release source paths contain uncommitted changes")
-    return state
 
 
 def _git_output(git: Path, root: Path, *arguments: str) -> str:
@@ -104,4 +113,8 @@ def _run_git(
         ) from exc
 
 
-__all__ = ["GitSourceState", "verify_git_source_state"]
+__all__ = [
+    "GitSourceState",
+    "capture_git_source_state",
+    "verify_git_source_state",
+]

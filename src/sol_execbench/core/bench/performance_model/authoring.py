@@ -30,7 +30,7 @@ from sol_execbench.core.bench.performance_model.inference import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
     ReferenceResolver,
-    resolve_corpus_reference,
+    materialize_corpus_references,
 )
 from sol_execbench.core.bench.performance_model.model_identity import (
     build_diagnostic_model_identity,
@@ -310,34 +310,30 @@ def _build_case_diagnostic(
     semantic_loader: SemanticCharacterizationLoader,
     blob_resolver: ReferenceResolver | None = None,
 ) -> PerformanceDiagnosticSidecar:
-    evidence = resolve_corpus_reference(
+    with materialize_corpus_references(
         case.evidence_manifest,
-        resolver=blob_resolver,
-        corpus_root=corpus_path.parent,
-    )
-    solar = resolve_corpus_reference(
         case.solar_manifest,
         resolver=blob_resolver,
         corpus_root=corpus_path.parent,
-    )
-    manifest = load_and_verify_performance_evidence_manifest(evidence)
-    expected_pair_id = validation_pair_id(
-        workload_sha256=manifest.identity.workload_sha256,
-        candidate_sha256=manifest.identity.candidate_sha256,
-    )
-    if case.pair_id != expected_pair_id:
-        raise ValueError("validation case pair identity mismatch")
-    diagnostic = build_performance_diagnostic(
-        PerformanceDiagnosticBuildRequest(
-            evidence_manifest_path=evidence,
-            solar_manifest_path=solar,
-            output_path=corpus_path.parent
-            / ".diagnostic-authoring-unused.json",
-            calibration_profile_path=calibration_path,
-            inference_profile_path=inference_path,
-        ),
-        semantic_loader=semantic_loader,
-    )
+    ) as (evidence, solar):
+        manifest = load_and_verify_performance_evidence_manifest(evidence)
+        expected_pair_id = validation_pair_id(
+            workload_sha256=manifest.identity.workload_sha256,
+            candidate_sha256=manifest.identity.candidate_sha256,
+        )
+        if case.pair_id != expected_pair_id:
+            raise ValueError("validation case pair identity mismatch")
+        diagnostic = build_performance_diagnostic(
+            PerformanceDiagnosticBuildRequest(
+                evidence_manifest_path=evidence,
+                solar_manifest_path=solar,
+                output_path=corpus_path.parent
+                / ".diagnostic-authoring-unused.json",
+                calibration_profile_path=calibration_path,
+                inference_profile_path=inference_path,
+            ),
+            semantic_loader=semantic_loader,
+        )
     if len(diagnostic.workloads) != 1:
         raise ValueError("validation case must produce one workload")
     if diagnostic.workloads[0].semantic.workload_kind is not case.workload_kind:

@@ -71,21 +71,20 @@ def _write_collection_run(
     stage_id: str,
     digest: str,
     *,
-    superseded: bool,
+    generation: int = 1,
+    supersedes: str | None = None,
+    status: DiagnosticStageStatus = DiagnosticStageStatus.VERIFIED,
 ) -> None:
     manifest = DiagnosticCollectionRunManifest(
         stage=DiagnosticLifecycleStage.COLLECTION_RUN,
         stage_id=stage_id,
-        status=(
-            DiagnosticStageStatus.SUPERSEDED
-            if superseded
-            else DiagnosticStageStatus.VERIFIED
-        ),
+        status=status,
         retention_class=DiagnosticRetentionClass.PROCESS_EVIDENCE,
         source_revision="test",
         created_at=_NOW,
-        generation=1,
+        generation=generation,
         frozen_held_out_sha256=digest,
+        supersedes=supersedes,
     )
     path = runs_dir(root) / stage_id / "manifest.json"
     atomic_write_json_value(path, manifest.model_dump(mode="json"))
@@ -147,17 +146,23 @@ def test_unreferenced_blob_is_reclaimable(tmp_path: Path) -> None:
 def test_superseded_only_blob_is_reclaimable(tmp_path: Path) -> None:
     store = BlobStore(tmp_path)
     old = _put(store, b"superseded generation evidence")
+    current = _put(store, b"successor generation evidence")
+    predecessor_id = "s" * 64
+    _write_collection_run(tmp_path, predecessor_id, old)
     _write_collection_run(
         tmp_path,
-        "s" * 64,
-        old,
-        superseded=True,
+        "n" * 64,
+        current,
+        generation=2,
+        supersedes=predecessor_id,
     )
 
     plan = plan_gc(tmp_path)
 
-    assert plan.entries[0].retained is False
-    assert "superseded" in plan.entries[0].reason
+    by_digest = {entry.digest: entry for entry in plan.entries}
+    assert by_digest[old].retained is False
+    assert "superseded" in by_digest[old].reason
+    assert by_digest[current].retained is True
 
 
 def test_superseded_blob_retained_when_live_references_it(
@@ -165,13 +170,37 @@ def test_superseded_blob_retained_when_live_references_it(
 ) -> None:
     store = BlobStore(tmp_path)
     shared = _put(store, b"shared evidence")
-    _write_collection_run(tmp_path, "s" * 64, shared, superseded=True)
+    current = _put(store, b"successor evidence")
+    predecessor_id = "s" * 64
+    _write_collection_run(tmp_path, predecessor_id, shared)
+    _write_collection_run(
+        tmp_path,
+        "n" * 64,
+        current,
+        generation=2,
+        supersedes=predecessor_id,
+    )
     _write_snapshot(tmp_path, "x" * 64, shared)
 
     plan = plan_gc(tmp_path)
 
-    assert len(plan.entries) == 1
-    assert plan.entries[0].retained is True
+    by_digest = {entry.digest: entry for entry in plan.entries}
+    assert by_digest[shared].retained is True
+
+
+def test_mutated_collection_superseded_status_is_rejected(
+    tmp_path: Path,
+) -> None:
+    digest = _put(BlobStore(tmp_path), b"evidence")
+    _write_collection_run(
+        tmp_path,
+        "s" * 64,
+        digest,
+        status=DiagnosticStageStatus.SUPERSEDED,
+    )
+
+    with pytest.raises(ValueError, match="derived from a successor"):
+        plan_gc(tmp_path)
 
 
 def test_dry_run_does_not_delete(tmp_path: Path) -> None:

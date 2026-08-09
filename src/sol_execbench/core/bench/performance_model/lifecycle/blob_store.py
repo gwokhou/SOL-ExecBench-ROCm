@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import tempfile
 from collections.abc import Iterator
+from hashlib import sha256
 from pathlib import Path
 
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
@@ -47,14 +48,41 @@ class BlobStore:
         expected_sha256: SHA256Digest | None = None,
     ) -> SHA256Digest:
         """Import one regular file and return its content-addressed key."""
-        source = source.resolve()
-        if source.is_symlink() or not source.is_file():
+        provided_source = Path(source)
+        if provided_source.is_symlink():
+            raise ValueError(
+                f"blob source is not a regular file: {provided_source}"
+            )
+        source = provided_source.resolve()
+        if not source.is_file():
             raise ValueError(f"blob source is not a regular file: {source}")
-        digest = sha256_file(source)
-        if expected_sha256 is not None and digest != expected_sha256:
-            raise ValueError("blob source SHA-256 does not match expectation")
-        self._write_once(digest, source.read_bytes())
-        return digest
+        directory = blobs_dir(self._root)
+        directory.mkdir(parents=True, exist_ok=True)
+        descriptor, staging_name = tempfile.mkstemp(
+            prefix=".import.", suffix=".tmp", dir=directory
+        )
+        staging = Path(staging_name)
+        digest = sha256()
+        try:
+            with (
+                source.open("rb") as source_handle,
+                os.fdopen(descriptor, "wb") as destination_handle,
+            ):
+                while chunk := source_handle.read(1024 * 1024):
+                    digest.update(chunk)
+                    destination_handle.write(chunk)
+                destination_handle.flush()
+                os.fsync(destination_handle.fileno())
+            actual = digest.hexdigest()
+            if expected_sha256 is not None and actual != expected_sha256:
+                raise ValueError(
+                    "blob source SHA-256 does not match expectation"
+                )
+            self._commit_staged_file(actual, staging)
+            return actual
+        except Exception:
+            staging.unlink(missing_ok=True)
+            raise
 
     def get(self, digest: SHA256Digest) -> Path:
         """Return the verified local path for one digest."""
@@ -111,6 +139,21 @@ class BlobStore:
             except Exception:
                 staging.unlink(missing_ok=True)
                 raise
+
+    def _commit_staged_file(self, digest: SHA256Digest, staging: Path) -> None:
+        """Commit a fully written staging file without loading it in memory."""
+        destination = blobs_dir(self._root) / digest
+        with exclusive_file_lock(store_lock_path(self._root)):
+            if destination.exists():
+                if destination.is_symlink() or not destination.is_file():
+                    raise ValueError(f"blob path is not regular: {digest}")
+                if sha256_file(destination) != digest:
+                    raise ValueError(
+                        f"blob overwrite refused for digest {digest}"
+                    )
+                staging.unlink()
+                return
+            os.replace(staging, destination)
 
 
 __all__ = ["BlobStore"]

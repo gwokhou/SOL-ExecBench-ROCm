@@ -40,6 +40,8 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticCollectionRunManifest,
     DiagnosticCorpusSnapshotManifest,
     DiagnosticDesignManifest,
+    DiagnosticLifecycleArtifact,
+    DiagnosticLifecycleParent,
     DiagnosticLifecycleStage,
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
@@ -47,8 +49,14 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     corpus_snapshot_id,
     design_id,
     designs_dir,
+    inventory_regular_tree,
+    runs_dir,
     snapshots_dir,
     store_root,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.corpus_registry import (
+    import_corpus_reference,
+    snapshot_blob_inventory,
 )
 from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.bench.performance_model.replay_evidence import (
@@ -56,6 +64,7 @@ from sol_execbench.core.bench.performance_model.replay_evidence import (
 )
 from sol_execbench.core.bench.performance_model.validation_corpus import (
     BlobArtifactReference,
+    CorpusArtifactReference,
     DiagnosticValidationCase,
     DiagnosticValidationCorpus,
     ValidationArtifactReference,
@@ -77,6 +86,9 @@ from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.solar_bridge.performance import (
     load_manifest_semantic_characterization,
+)
+from sol_execbench.core.solar_bridge.publication import (
+    verified_solar_artifact_paths,
 )
 from sol_execbench.driver.problem_packager import ProblemPackager
 
@@ -143,12 +155,16 @@ def _parse_args() -> argparse.Namespace:
             "solar",
             "collect",
             "freeze",
-            "new-run",
+            "adopt",
             "promote",
         ),
     )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--universe-start", type=int)
+    parser.add_argument(
+        "--source-revision",
+        help="Authoritative revision for adopting an existing frozen design.",
+    )
     parser.add_argument(
         "--role",
         choices=("development", "held_out"),
@@ -164,14 +180,6 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--force", action="store_true")
     parser.add_argument(
-        "--generation",
-        type=int,
-        help=(
-            "generation counter for `new-run`; defaults to one past the "
-            "highest generation already recorded for the frozen design"
-        ),
-    )
-    parser.add_argument(
         "--source-corpus",
         type=Path,
         action="append",
@@ -180,6 +188,12 @@ def _parse_args() -> argparse.Namespace:
             "development then held-out corpora beneath the common --root; "
             "promotion verifies and rebases their artifact references"
         ),
+    )
+    parser.add_argument(
+        "--source-snapshot-id",
+        action="append",
+        default=[],
+        help="Registry snapshot ID corresponding to each --source-corpus.",
     )
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
@@ -423,26 +437,43 @@ def _prepare(
     )
 
 
-def _preregister(root: Path, universe_start: int) -> None:
+def _preregister(
+    root: Path, universe_start: int, source_revision: str | None = None
+) -> None:
     design_path = root / "design.json"
     design = _design_payload(universe_start)
     if design_path.exists():
         if load_json_value(design_path) != design:
             raise ValueError("existing corpus design differs from current plan")
+        design_digest = sha256_file(design_path)
+        revision = source_revision or _source_revision()
+        _write_design_manifest(
+            root=root,
+            universe_start=universe_start,
+            design_payload_sha256=design_digest,
+            did=design_id(
+                universe_start=universe_start,
+                design_payload_sha256=design_digest,
+                source_revision=revision,
+            ),
+            source_revision=revision,
+        )
         print(f"verified frozen design at {design_path}", flush=True)
         return
     atomic_write_json_value(design_path, design)
     design_digest = sha256_file(design_path)
+    revision = source_revision or _source_revision()
     did = design_id(
         universe_start=universe_start,
         design_payload_sha256=design_digest,
-        source_revision=_source_revision(),
+        source_revision=revision,
     )
     _write_design_manifest(
         root=root,
         universe_start=universe_start,
         design_payload_sha256=design_digest,
         did=did,
+        source_revision=revision,
     )
     print(
         f"froze {len(design['cases'])} cases at {design_path} "
@@ -469,26 +500,46 @@ def _write_design_manifest(
     universe_start: int,
     design_payload_sha256: str,
     did: str,
+    source_revision: str,
 ) -> None:
     directory = designs_dir() / did
-    if directory.exists():
+    payload = root / "design.json"
+    store = BlobStore(store_root())
+    store.put_file(payload, expected_sha256=design_payload_sha256)
+    path = directory / "manifest.json"
+    if path.is_file():
+        existing = load_json_file(DiagnosticDesignManifest, path)
+        if (
+            existing.stage_id != did
+            or existing.universe_start != universe_start
+            or existing.design_payload_sha256 != design_payload_sha256
+            or existing.source_revision != source_revision
+            or not store.contains(existing.design_payload_sha256)
+        ):
+            raise ValueError(f"immutable design manifest differs: {path}")
+        store.put_file(path)
         return
-    directory.mkdir(parents=True)
     manifest = DiagnosticDesignManifest(
         stage=DiagnosticLifecycleStage.DESIGN,
         stage_id=did,
         status=DiagnosticStageStatus.VERIFIED,
         retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
-        source_revision=_source_revision(),
+        source_revision=source_revision,
         policy_hashes={"root": str(root.resolve())},
+        exact_inventory=(
+            DiagnosticLifecycleArtifact(
+                relative_path=f"blobs/{design_payload_sha256}",
+                sha256=design_payload_sha256,
+                size_bytes=payload.stat().st_size,
+            ),
+        ),
         created_at=datetime.now(UTC).isoformat(),
         universe_start=universe_start,
         design_payload_sha256=design_payload_sha256,
     )
-    atomic_write_json_value(
-        directory / "manifest.json",
-        manifest.model_dump(mode="json"),
-    )
+    directory.mkdir(parents=True)
+    atomic_write_json_value(path, manifest.model_dump(mode="json"))
+    store.put_file(path)
 
 
 def _case_dir(root: Path, case: CaseSpec) -> Path:
@@ -696,8 +747,6 @@ def _validation_case(root: Path, case: CaseSpec) -> DiagnosticValidationCase:
         )
     if manifest.identity.workload_uuid != case.workload_uuid:
         raise ValueError(f"{case.case_id} workload identity mismatch")
-    relative_evidence = evidence_path.relative_to(root).as_posix()
-    relative_solar = solar_path.relative_to(root).as_posix()
     return DiagnosticValidationCase(
         case_id=case.case_id,
         pair_id=validation_pair_id(
@@ -705,13 +754,26 @@ def _validation_case(root: Path, case: CaseSpec) -> DiagnosticValidationCase:
             candidate_sha256=manifest.identity.candidate_sha256,
         ),
         workload_kind=case.family,
-        evidence_manifest=ValidationArtifactReference(
-            path=relative_evidence,
-            sha256=sha256_file(evidence_path),
+        evidence_manifest=import_corpus_reference(
+            ValidationArtifactReference(
+                path=evidence_path.relative_to(root).as_posix(),
+                sha256=sha256_file(evidence_path),
+                size_bytes=evidence_path.stat().st_size,
+            ),
+            corpus_root=root,
+            kind="performance",
+            store=BlobStore(store_root()),
         ),
-        solar_manifest=ValidationArtifactReference(
-            path=relative_solar,
-            sha256=sha256_file(solar_path),
+        solar_manifest=import_corpus_reference(
+            ValidationArtifactReference(
+                path=solar_path.relative_to(root).as_posix(),
+                sha256=sha256_file(solar_path),
+                size_bytes=solar_path.stat().st_size,
+            ),
+            corpus_root=root,
+            kind="solar",
+            store=BlobStore(store_root()),
+            solar_artifact_paths=verified_solar_artifact_paths,
         ),
         gold_action_codes=(
             ["restore_wmma_path"] if case.family is WorkloadKind.MATMUL else []
@@ -969,7 +1031,14 @@ def _freeze(root: Path, role: Role) -> None:
     )
     atomic_write_json_value(destination, corpus.model_dump(mode="json"))
     did = _frozen_design_id(root, design)
-    run_id = _current_collection_run_id(root, design, did)
+    run_id = _register_collection_run(
+        root=root,
+        design_id_value=did,
+        roles=(role,),
+        frozen_held_out_sha256=(
+            sha256_file(destination) if role == "held_out" else None
+        ),
+    )
     snapshot = corpus_snapshot_id(
         collection_run_id=run_id,
         role=role,
@@ -983,6 +1052,7 @@ def _freeze(root: Path, role: Role) -> None:
         case_count=len(corpus.cases),
         run_id=run_id,
         snapshot=snapshot,
+        corpus=corpus,
     )
     print(
         f"froze {len(corpus.cases)} cases at {destination} "
@@ -995,30 +1065,82 @@ def _frozen_design_id(
     root: Path,
     design: DiagnosticCorpusDesign,
 ) -> str:
-    return design_id(
-        universe_start=design.universe_start,
-        design_payload_sha256=sha256_file(root / "design.json"),
-        source_revision=_source_revision(),
-    )
+    payload_digest = sha256_file(root / "design.json")
+    matches = [
+        load_json_file(DiagnosticDesignManifest, path)
+        for path in sorted(designs_dir().glob("*/manifest.json"))
+        if load_json_file(DiagnosticDesignManifest, path).design_payload_sha256
+        == payload_digest
+    ]
+    matches = [
+        manifest
+        for manifest in matches
+        if manifest.universe_start == design.universe_start
+    ]
+    if len(matches) != 1:
+        raise ValueError("frozen design has no unique registry provenance")
+    return matches[0].stage_id
 
 
-def _current_collection_run_id(
+def _register_collection_run(
+    *,
     root: Path,
-    design: DiagnosticCorpusDesign,
-    did: str,
+    design_id_value: str,
+    roles: tuple[Role, ...],
+    frozen_held_out_sha256: str | None,
 ) -> str:
-    """Return the current collection run identity for a design generation.
-
-    The corpus authoring script records its run identity deterministically
-    from the design and a generation counter; generation one is the default
-    for a fresh preregistered design.
-    """
-    del root, design
-    return collection_run_id(
-        design_id=did,
-        generation=1,
-        source_revision=_source_revision(),
+    """Import one complete raw collection and append its generation manifest."""
+    design_path = designs_dir() / design_id_value / "manifest.json"
+    if not design_path.is_file():
+        raise ValueError("collection design manifest is missing")
+    prior = _latest_run(design_id_value)
+    generation = 1 if prior is None else prior.generation + 1
+    revision = _source_revision()
+    run_id = collection_run_id(
+        design_id=design_id_value,
+        generation=generation,
+        roles=roles,
+        frozen_held_out_sha256=frozen_held_out_sha256,
+        source_revision=revision,
     )
+    inventory = inventory_regular_tree(root)
+    store = BlobStore(store_root())
+    for item in inventory:
+        store.put_file(root / item.relative_path, expected_sha256=item.sha256)
+    parent = DiagnosticLifecycleParent(
+        stage=DiagnosticLifecycleStage.DESIGN,
+        stage_id=design_id_value,
+        sha256=sha256_file(design_path),
+    )
+    manifest = DiagnosticCollectionRunManifest(
+        stage=DiagnosticLifecycleStage.COLLECTION_RUN,
+        stage_id=run_id,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.PROCESS_EVIDENCE,
+        source_revision=revision,
+        parents=(parent,),
+        exact_inventory=inventory,
+        roles=roles,
+        generation=generation,
+        frozen_held_out_sha256=frozen_held_out_sha256,
+        supersedes=prior.stage_id if prior is not None else None,
+        created_at=datetime.now(UTC).isoformat(),
+    )
+    path = runs_dir() / run_id / "manifest.json"
+    atomic_write_json_value(path, manifest.model_dump(mode="json"))
+    store.put_file(path)
+    return run_id
+
+
+def _latest_run(design_id_value: str) -> DiagnosticCollectionRunManifest | None:
+    candidates: list[DiagnosticCollectionRunManifest] = []
+    for path in sorted(runs_dir().glob("*/manifest.json")):
+        manifest = load_json_file(DiagnosticCollectionRunManifest, path)
+        if any(
+            parent.stage_id == design_id_value for parent in manifest.parents
+        ):
+            candidates.append(manifest)
+    return max(candidates, key=lambda item: item.generation, default=None)
 
 
 def _write_corpus_snapshot_manifest(
@@ -1029,31 +1151,101 @@ def _write_corpus_snapshot_manifest(
     case_count: int,
     run_id: str,
     snapshot: str,
+    corpus: DiagnosticValidationCorpus,
 ) -> None:
     directory = snapshots_dir() / snapshot
-    if directory.exists():
-        return
-    directory.mkdir(parents=True)
+    run_path = runs_dir() / run_id / "manifest.json"
+    if not run_path.is_file():
+        raise ValueError("snapshot collection-run manifest is missing")
+    inventory = snapshot_blob_inventory(
+        root / f"{role}.json", corpus, store=BlobStore(store_root())
+    )
     manifest = DiagnosticCorpusSnapshotManifest(
         stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
         stage_id=snapshot,
         status=DiagnosticStageStatus.VERIFIED,
         retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
         source_revision=_source_revision(),
-        parents=(),
-        policy_hashes={
-            "root": str(root.resolve()),
-            "collection_run_id": run_id,
-        },
+        parents=(
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.COLLECTION_RUN,
+                stage_id=run_id,
+                sha256=sha256_file(run_path),
+            ),
+        ),
+        exact_inventory=inventory,
         created_at=datetime.now(UTC).isoformat(),
         role=role,
         corpus_file_sha256=corpus_sha256,
         case_count=case_count,
     )
-    atomic_write_json_value(
-        directory / "manifest.json",
-        manifest.model_dump(mode="json"),
+    path = directory / "manifest.json"
+    if path.is_file():
+        existing = load_json_file(DiagnosticCorpusSnapshotManifest, path)
+        if existing != manifest:
+            raise ValueError(f"immutable snapshot differs: {path}")
+        return
+    directory.mkdir(parents=True)
+    atomic_write_json_value(path, manifest.model_dump(mode="json"))
+    BlobStore(store_root()).put_file(path)
+
+
+def _adopt_existing(root: Path, output: Path) -> None:
+    """Rebuild current blob-backed corpora from an immutable historical root."""
+    root = root.resolve()
+    output = output.resolve()
+    if output == root or output.is_relative_to(root):
+        raise ValueError("adopt output must not modify the historical root")
+    if output.exists() and any(output.iterdir()):
+        raise ValueError("adopt output directory is not empty")
+    design = _require_frozen_design(root)
+    design_id_value = _frozen_design_id(root, design)
+    roles = tuple(
+        role
+        for role in ("development", "held_out")
+        if (root / f"{role}.json").is_file()
     )
+    if not roles:
+        raise ValueError("historical root has no frozen role corpora")
+    output.mkdir(parents=True, exist_ok=True)
+    corpora: dict[Role, tuple[Path, DiagnosticValidationCorpus]] = {}
+    for role in roles:
+        corpus = DiagnosticValidationCorpus(
+            role=role,
+            cases=[
+                _validation_case(root, case)
+                for case in _cases(role, design.universe_start)
+            ],
+        )
+        path = output / f"{role}.json"
+        atomic_write_json_value(path, corpus.model_dump(mode="json"))
+        corpora[role] = (path, corpus)
+    held_out = corpora.get("held_out")
+    run_id = _register_collection_run(
+        root=root,
+        design_id_value=design_id_value,
+        roles=roles,
+        frozen_held_out_sha256=(
+            sha256_file(held_out[0]) if held_out is not None else None
+        ),
+    )
+    for role, (path, corpus) in corpora.items():
+        snapshot_id = corpus_snapshot_id(
+            collection_run_id=run_id,
+            role=role,
+            corpus_sha256=sha256_file(path),
+            source_revision=_source_revision(),
+        )
+        _write_corpus_snapshot_manifest(
+            root=output,
+            role=role,
+            corpus_sha256=sha256_file(path),
+            case_count=len(corpus.cases),
+            run_id=run_id,
+            snapshot=snapshot_id,
+            corpus=corpus,
+        )
+        print(f"adopted {role} snapshot {snapshot_id} at {path}", flush=True)
 
 
 def _require_frozen_design(root: Path) -> DiagnosticCorpusDesign:
@@ -1068,29 +1260,21 @@ def _require_frozen_design(root: Path) -> DiagnosticCorpusDesign:
 
 def _validate_promoted_reference(
     source_root: Path,
-    reference: ValidationArtifactReference,
+    reference: CorpusArtifactReference,
+    *,
+    kind: str,
 ) -> BlobArtifactReference:
     """Import one source artifact into the blob store and emit its key.
 
     Promotion targets the content-addressed blob store so the promoted corpus
     does not extend the lifetime of the historical path trees.
     """
-    artifact = (source_root / reference.path).resolve()
-    if not artifact.is_relative_to(source_root):
-        raise ValueError("promoted corpus reference escapes its corpus root")
-    if not artifact.is_file():
-        raise ValueError(
-            f"promoted corpus artifact is missing: {reference.path}"
-        )
-    if sha256_file(artifact) != reference.sha256:
-        raise ValueError(f"promoted corpus hash mismatch: {reference.path}")
-    digest = BlobStore(store_root()).put_file(
-        artifact,
-        expected_sha256=reference.sha256,
-    )
-    return BlobArtifactReference(
-        sha256=digest,
-        size_bytes=artifact.stat().st_size,
+    return import_corpus_reference(
+        reference,
+        corpus_root=source_root,
+        kind=kind,
+        store=BlobStore(store_root()),
+        solar_artifact_paths=verified_solar_artifact_paths,
     )
 
 
@@ -1106,10 +1290,12 @@ def _promoted_case(
             "evidence_manifest": _validate_promoted_reference(
                 source_root,
                 case.evidence_manifest,
+                kind="performance",
             ),
             "solar_manifest": _validate_promoted_reference(
                 source_root,
                 case.solar_manifest,
+                kind="solar",
             ),
         }
     )
@@ -1118,6 +1304,7 @@ def _promoted_case(
 def _promote_development(
     root: Path,
     source_paths: list[Path],
+    source_snapshot_ids: list[str],
     output: Path,
 ) -> None:
     """Combine governed corpora beneath one root into the next development set.
@@ -1125,17 +1312,68 @@ def _promote_development(
     Source artifacts are imported into the content-addressed blob store, so the
     promoted corpus depends on no historical physical path tree.
     """
-    if len(source_paths) != 2:
-        raise ValueError("promote requires development then held-out corpora")
+    if len(source_paths) < 2 or len(source_paths) != len(source_snapshot_ids):
+        raise ValueError(
+            "promote requires at least two corpus/snapshot-id pairs"
+        )
+    if len(source_snapshot_ids) != len(set(source_snapshot_ids)):
+        raise ValueError("promote source snapshot IDs must be unique")
     root = root.resolve()
     output = output.resolve()
     if output.parent != root:
         raise ValueError("promoted output must be directly under --root")
     if output.exists():
         raise ValueError("promoted output already exists")
-    cases = []
-    for source_index, (provided_source, role) in enumerate(
-        zip(source_paths, ("development", "held_out"), strict=True)
+    cases, parents = _load_promotion_sources(
+        root, source_paths, source_snapshot_ids
+    )
+    promoted = DiagnosticValidationCorpus(role="development", cases=cases)
+    atomic_write_json_value(output, promoted.model_dump(mode="json"))
+    source_ids = tuple(source_snapshot_ids)
+    snapshot_id = corpus_snapshot_id(
+        role="development",
+        corpus_sha256=sha256_file(output),
+        source_snapshot_ids=source_ids,
+        source_revision=_source_revision(),
+    )
+    manifest = DiagnosticCorpusSnapshotManifest(
+        stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+        stage_id=snapshot_id,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        source_revision=_source_revision(),
+        parents=parents,
+        exact_inventory=snapshot_blob_inventory(
+            output, promoted, store=BlobStore(store_root())
+        ),
+        created_at=datetime.now(UTC).isoformat(),
+        role="development",
+        corpus_file_sha256=sha256_file(output),
+        case_count=len(promoted.cases),
+        source_snapshot_ids=source_ids,
+    )
+    manifest_path = snapshots_dir() / snapshot_id / "manifest.json"
+    atomic_write_json_value(manifest_path, manifest.model_dump(mode="json"))
+    BlobStore(store_root()).put_file(manifest_path)
+    print(
+        f"promoted {len(promoted.cases)} cases into {output} "
+        f"(corpus_snapshot_id={snapshot_id})",
+        flush=True,
+    )
+
+
+def _load_promotion_sources(
+    root: Path,
+    source_paths: list[Path],
+    source_snapshot_ids: list[str],
+) -> tuple[
+    list[DiagnosticValidationCase], tuple[DiagnosticLifecycleParent, ...]
+]:
+    """Load, verify, and currentize every registered promotion source."""
+    cases: list[DiagnosticValidationCase] = []
+    parents: list[DiagnosticLifecycleParent] = []
+    for source_index, (provided_source, source_snapshot_id) in enumerate(
+        zip(source_paths, source_snapshot_ids, strict=True)
     ):
         source_path = provided_source.resolve()
         if not source_path.is_relative_to(root):
@@ -1144,10 +1382,23 @@ def _promote_development(
             DiagnosticValidationCorpus,
             source_path,
         )
-        if corpus.role != role:
-            raise ValueError(
-                "source corpus order must be development then held_out"
+        snapshot_path = snapshots_dir() / source_snapshot_id / "manifest.json"
+        snapshot = load_json_file(
+            DiagnosticCorpusSnapshotManifest, snapshot_path
+        )
+        if (
+            snapshot.corpus_file_sha256 != sha256_file(source_path)
+            or snapshot.role != corpus.role
+        ):
+            raise ValueError("promotion source differs from snapshot registry")
+        parents.append(
+            DiagnosticLifecycleParent(
+                stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+                purpose=snapshot.purpose,
+                stage_id=snapshot.stage_id,
+                sha256=sha256_file(snapshot_path),
             )
+        )
         cases.extend(
             _promoted_case(
                 case,
@@ -1156,88 +1407,7 @@ def _promote_development(
             )
             for case in corpus.cases
         )
-    promoted = DiagnosticValidationCorpus(role="development", cases=cases)
-    atomic_write_json_value(output, promoted.model_dump(mode="json"))
-    print(
-        f"promoted {len(promoted.cases)} cases into {output}",
-        flush=True,
-    )
-
-
-def _new_run(
-    root: Path,
-    role: Role,
-    generation: int | None,
-) -> None:
-    """Open a new immutable collection generation for a frozen design.
-
-    A frozen held-out generation is never mutated in place. Recollection or
-    repair opens a new ``collection_run_id`` that supersedes the prior
-    generation; the operator then collects into a fresh root beneath the same
-    design.
-    """
-    design = _require_frozen_design(root)
-    if not (root / f"{role}.json").is_file():
-        raise ValueError(
-            f"cannot open a new run before freezing {role} evidence",
-        )
-    did = _frozen_design_id(root, design)
-    next_generation = 2 if generation is None else generation
-    new_id = collection_run_id(
-        design_id=did,
-        generation=next_generation,
-        source_revision=_source_revision(),
-    )
-    directory = store_root() / "runs" / new_id
-    if directory.exists():
-        raise FileExistsError(f"collection run already exists: {directory}")
-    prior_id = collection_run_id(
-        design_id=did,
-        generation=next_generation - 1,
-        source_revision=_source_revision(),
-    )
-    directory.mkdir(parents=True)
-    manifest = DiagnosticCollectionRunManifest(
-        stage=DiagnosticLifecycleStage.COLLECTION_RUN,
-        stage_id=new_id,
-        status=DiagnosticStageStatus.RUNNING,
-        retention_class=DiagnosticRetentionClass.PROCESS_EVIDENCE,
-        source_revision=_source_revision(),
-        generation=next_generation,
-        policy_hashes={
-            "design_id": did,
-            "generation": str(next_generation),
-            "root": str(root.resolve()),
-        },
-        roles=(role,),
-        supersedes=prior_id,
-        created_at=datetime.now(UTC).isoformat(),
-    )
-    atomic_write_json_value(
-        directory / "manifest.json",
-        manifest.model_dump(mode="json"),
-    )
-    _mark_run_superseded(prior_id)
-    print(
-        f"opened collection run {new_id} (supersedes {prior_id})",
-        flush=True,
-    )
-
-
-def _mark_run_superseded(run_id: str) -> None:
-    manifest_path = store_root() / "runs" / run_id / "manifest.json"
-    if not manifest_path.is_file():
-        return
-    manifest = DiagnosticCollectionRunManifest.model_validate_json(
-        manifest_path.read_text(encoding="utf-8"),
-    )
-    updated = manifest.model_copy(
-        update={"status": DiagnosticStageStatus.SUPERSEDED}
-    )
-    atomic_write_json_value(
-        manifest_path,
-        updated.model_dump(mode="json"),
-    )
+    return cases, tuple(parents)
 
 
 def main() -> int:
@@ -1247,7 +1417,7 @@ def main() -> int:
     if arguments.stage == "preregister":
         if arguments.universe_start is None:
             raise ValueError("preregister requires --universe-start")
-        _preregister(root, arguments.universe_start)
+        _preregister(root, arguments.universe_start, arguments.source_revision)
     elif arguments.stage == "prepare":
         _prepare(
             root,
@@ -1263,16 +1433,17 @@ def main() -> int:
         if arguments.role is None:
             raise ValueError("freeze requires --role")
         _freeze(root, arguments.role)
-    elif arguments.stage == "new-run":
-        if arguments.role is None:
-            raise ValueError("new-run requires --role")
-        _new_run(root, arguments.role, arguments.generation)
+    elif arguments.stage == "adopt":
+        if arguments.output is None:
+            raise ValueError("adopt requires --output directory")
+        _adopt_existing(root, arguments.output)
     else:
         if arguments.output is None:
             raise ValueError("promote requires --output")
         _promote_development(
             root,
             arguments.source_corpus,
+            arguments.source_snapshot_id,
             arguments.output,
         )
     return 0

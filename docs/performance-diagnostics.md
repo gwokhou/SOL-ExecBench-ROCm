@@ -442,36 +442,48 @@ and is not evidence that the smoke passed.
 
 ## Lifecycle orchestration
 
-The monotonic chain is driven by one resumable orchestrator:
+The lifecycle accepts one immutable, reviewable plan rather than a loose set of
+stage flags:
 
 ```bash
-sol-execbench --format json diagnostics lifecycle run \
-  --design DESIGN.json \
-  --corpus-root CORPUS_ROOT \
-  --development-corpus DEVELOPMENT.json \
-  --held-out-corpus HELD_OUT.json \
-  --calibration-profile CALIBRATION.json \
-  --output-root OUTPUT_ROOT \
+uv run sol-execbench --format json diagnostics lifecycle run \
+  --plan PLAN.json \
   --store-root data/store
 ```
 
-`run` walks the chain `design -> collection_run -> corpus_snapshot ->
-model_build -> acceptance -> publication -> release` in order, enforces the
-monotonic transitions, retries each stage under a bounded attempt budget, and
-writes a typed receipt and an atomic run-state object per generation under
-`data/store/runs/<collection_run_id>/run.json`. The GPU collection stages
-require `--corpus-root` (the operator-collected evidence tree and frozen
-corpus files) and never re-implement hardware collection; the CPU stages
-execute the production fitting, acceptance, publication, and packaging
-functions.
+`PLAN.json` uses the current `sol_execbench.diagnostic_lifecycle_plan` schema
+and binds the design manifest, corpus root, calibration profile and audit,
+development and held-out corpus files, output root, source revision, evidence
+purpose, model version, and bounded attempt count. The design and plan purposes
+must match. The command also verifies that the selected source revision matches
+the current `src/`, `scripts/`, `pyproject.toml`, and `uv.lock` state. Plan
+creation is therefore a governed authoring step; do not replace it with
+hand-translated legacy command flags.
+
+`run` executes `design -> calibration -> collection_run -> corpus_snapshot ->
+model_build -> acceptance -> publication -> release` in monotonic order while
+enforcing the declared multi-parent dependencies. Here `release` is the local
+release candidate; externally observed publication is recorded separately by
+the published-release receipt flow. The collection handler adopts an already
+operator-collected evidence tree and its frozen role corpora; it does not run
+GPU collection itself. CPU stages execute fitting, acceptance, projection, and
+packaging.
+
+Each verified stage has a typed receipt and immutable registry manifest. Mutable
+orchestration state is stored at
+`data/store/orchestrations/<collection_run_id>/run.json`, with receipts beneath
+the same orchestration directory and append-only attempts under
+`data/store/attempts/<collection_run_id>/`.
 
 Status and resume are verification-based, never existence-based:
 
 ```bash
-sol-execbench --format json diagnostics lifecycle status \
-  --run data/store/runs/<collection_run_id>/run.json
-sol-execbench --format json diagnostics lifecycle resume \
-  --run data/store/runs/<collection_run_id>/run.json
+uv run sol-execbench --format json diagnostics lifecycle status \
+  --run-id <collection_run_id> \
+  --store-root data/store
+uv run sol-execbench --format json diagnostics lifecycle resume \
+  --run-id <collection_run_id> \
+  --store-root data/store
 ```
 
 `status` re-verifies every recorded stage through its handler and reports the
@@ -487,21 +499,34 @@ Blob retention is decided only by registry reachability, never by directory
 layout:
 
 ```bash
-sol-execbench --format json diagnostics lifecycle gc --store-root data/store
+uv run sol-execbench --format json diagnostics lifecycle gc plan \
+  --store-root data/store \
+  --output data/outputs/diagnostic-gc-plan.json
 ```
 
-The plan lists every blob with its retention class, retained flag, and reason.
-A blob referenced by any non-superseded lifecycle manifest, run-state object,
-or typed receipt is retained; a blob reachable only from superseded
-generations or referenced by nothing is reclaimable. Deletion is explicit and
-re-verified:
+The 24-hour plan binds the store root, registry snapshot, reachability result,
+and every blob's retention decision. A blob referenced by any retained
+lifecycle manifest, run-state object, typed receipt, or published-release
+receipt remains reachable. Review the persisted plan before applying it:
 
 ```bash
-sol-execbench --format json diagnostics lifecycle gc \
-  --store-root data/store --delete
+uv run sol-execbench --format json diagnostics lifecycle gc apply \
+  --plan data/outputs/diagnostic-gc-plan.json
 ```
 
-`--delete` recomputes reachability immediately before removing any blob and
-refuses the entire operation if a planned blob became reachable since
-planning. The audited legacy roots (v3/v6 and unreferenced Orojenesis output)
-remain retirement candidates until a reviewed GC run resolves them.
+`apply` derives the exact store root from the reviewed plan. It refuses an
+expired plan or any registry/reachability change since planning and deletes
+only the blob identities recorded by that plan.
+
+Blob GC does not delete expanded process-evidence trees under `data/outputs/`.
+Audit path-root retirement separately with:
+
+```bash
+uv run sol-execbench --format json diagnostics lifecycle retirement-plan \
+  --store-root data/store
+```
+
+That command is dry-run only. Any material path deletion still requires exact
+target resolution, reachability proof, review, and explicit approval. In
+particular, retain the current v7 and Cycle 2 roots until governed promotion
+and registry reachability prove them dead.

@@ -40,7 +40,21 @@ RETIRED_REFERENCES = (
     "examples/ck/gemm/",
     "examples/rocwmma/gemm/",
     "tests/sol_execbench/test_cdna3_hardware_marker.py",
+    "data/store/runs/<collection_run_id>/run.json",
+    "diagnostics lifecycle status \\\n  --run data/store/runs/",
+    "diagnostics lifecycle resume \\\n  --run data/store/runs/",
+    "diagnostics lifecycle gc \\\n  --store-root data/store --delete",
 )
+REQUIRED_REFERENCES = {
+    "docs/performance-diagnostics.md": (
+        "diagnostics lifecycle run \\\n  --plan PLAN.json",
+        "data/store/orchestrations/<collection_run_id>/run.json",
+        "diagnostics lifecycle status \\\n  --run-id <collection_run_id>",
+        "diagnostics lifecycle resume \\\n  --run-id <collection_run_id>",
+        "diagnostics lifecycle gc plan",
+        "diagnostics lifecycle gc apply",
+    ),
+}
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\((?P<target>[^)\s]+)")
 EXTERNAL_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 CAPABILITY_KEY_REFERENCE = re.compile(
@@ -80,6 +94,19 @@ def _unknown_capability_claims(path: Path, text: str) -> list[str]:
     ]
 
 
+def _missing_required_references(path: Path, text: str) -> list[str]:
+    """Reject removal of required current-contract documentation."""
+    try:
+        display_path = path.relative_to(ROOT).as_posix()
+    except ValueError:
+        display_path = path.as_posix()
+    return [
+        f"{display_path} is missing current reference {reference!r}"
+        for reference in REQUIRED_REFERENCES.get(display_path, ())
+        if reference not in text
+    ]
+
+
 def main() -> int:
     """Check current documentation content and local links."""
     failures: list[str] = []
@@ -92,6 +119,7 @@ def main() -> int:
                 )
         failures.extend(_broken_local_links(path, text))
         failures.extend(_unknown_capability_claims(path, text))
+        failures.extend(_missing_required_references(path, text))
     if failures:
         print("\n".join(failures))
         return 1

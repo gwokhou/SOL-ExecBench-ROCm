@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import click
 from rich.console import Console
@@ -50,14 +51,12 @@ from sol_execbench.core.bench.performance_model.governance import (
 from sol_execbench.core.bench.performance_model.lifecycle import (
     BlobStore,
     BlobStoreResolver,
-    DiagnosticDesignManifest,
     DiagnosticEvidencePurpose,
     DiagnosticLifecyclePlan,
     DiagnosticRunManifest,
     DiagnosticStageStatus,
     GCPlan,
     apply_gc_plan,
-    build_run_context,
     build_stage_handlers,
     diagnostic_lifecycle_status,
     plan_retirement,
@@ -68,6 +67,10 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     run_gc,
     run_state_path,
     store_root,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.planning import (
+    LifecyclePlanInputs,
+    author_lifecycle_plan,
 )
 from sol_execbench.core.bench.performance_model.models import (
     PerformanceDiagnosticSidecar,
@@ -411,6 +414,52 @@ def lifecycle_cli() -> None:
     """Resumable diagnostic lifecycle run, status, and resume."""
 
 
+@lifecycle_cli.command("plan")
+@click.option("--design-id", required=True)
+@click.option("--development-snapshot-id", required=True)
+@click.option("--collection-root", type=_OUTPUT_DIRECTORY, required=True)
+@click.option("--held-out-corpus", type=_FILE, required=True)
+@click.option("--calibration-profile", type=_FILE, required=True)
+@click.option("--calibration-audit", type=_FILE, required=True)
+@click.option("--output-root", type=_OUTPUT_DIRECTORY, required=True)
+@click.option("--model-version", required=True)
+@click.option("--max-attempts", type=int, default=3, show_default=True)
+@click.option("--store-root", type=_OUTPUT_DIRECTORY)
+@click.option("--output", type=_OUTPUT, required=True)
+def lifecycle_plan_cli(**options: object) -> CliResult:
+    """Author one complete production plan from verified immutable inputs."""
+    store_root_path = cast(Path | None, options["store_root"])
+    output = cast(Path, options["output"])
+    try:
+        plan = author_lifecycle_plan(
+            repository_root=repo_root(),
+            store_root=(store_root_path or _store_root_path()),
+            inputs=LifecyclePlanInputs(
+                design_id=cast(str, options["design_id"]),
+                development_snapshot_id=cast(
+                    str, options["development_snapshot_id"]
+                ),
+                collection_root=cast(Path, options["collection_root"]),
+                held_out_corpus_path=cast(Path, options["held_out_corpus"]),
+                calibration_profile_path=cast(
+                    Path, options["calibration_profile"]
+                ),
+                calibration_audit_path=cast(Path, options["calibration_audit"]),
+                output_root=cast(Path, options["output_root"]),
+                model_version=cast(str, options["model_version"]),
+                max_attempts=cast(int, options["max_attempts"]),
+            ),
+        )
+        atomic_write_json_value(output, plan.model_dump(mode="json"))
+    except (OSError, RuntimeError, ValueError) as error:
+        raise CliFailure(
+            str(error),
+            code="diagnostic_lifecycle_plan_invalid",
+            hint="Verify registry identities, clean source, and exact inputs.",
+        ) from error
+    return CliResult(data=plan.model_dump(mode="json"))
+
+
 @lifecycle_cli.command("run")
 @click.option("--plan", "plan_path", type=_FILE, required=True)
 @click.option("--store-root", type=_OUTPUT_DIRECTORY)
@@ -421,40 +470,21 @@ def lifecycle_run_cli(
     """Execute one reviewed lifecycle plan and persist its run-state."""
     try:
         plan = load_json_file(DiagnosticLifecyclePlan, plan_path)
-        design = load_json_file(
-            DiagnosticDesignManifest, Path(plan.design_manifest_path)
-        )
-        if design.purpose is not plan.purpose:
-            raise ValueError("lifecycle plan/design purpose mismatch")
         verify_git_source_state(
             repo_root(),
             expected_revision=plan.source_revision,
             paths=("src", "scripts", "pyproject.toml", "uv.lock"),
         )
         root = store_root.resolve() if store_root else _store_root_path()
-        context = build_run_context(
-            design_manifest_path=Path(plan.design_manifest_path),
-            store_root_path=root,
-            corpus_root=Path(plan.corpus_root),
-            calibration_profile_path=Path(plan.calibration_profile_path),
-            calibration_audit_path=Path(plan.calibration_audit_path),
-            development_corpus_path=Path(plan.development_corpus_path),
-            held_out_corpus_path=Path(plan.held_out_corpus_path),
-            output_root=Path(plan.output_root),
-            source_revision=plan.source_revision,
-            model_version=plan.model_version,
-        )
         run_state = run_diagnostic_lifecycle(
-            design_manifest_path=Path(plan.design_manifest_path),
-            store_root_path=context.store_root,
-            max_attempts=plan.max_attempts,
+            plan_path=plan_path,
+            store_root_path=root,
             handlers=build_stage_handlers(
                 semantic_loader=load_manifest_semantic_characterization,
                 solar_verifier=verify_projected_solar_manifest,
                 solar_projector=project_solar_manifest,
                 blob_resolver=_blob_resolver(root),
             ),
-            context=context,
         )
         _require_lifecycle_success(run_state)
     except (OSError, ValueError) as error:
@@ -511,20 +541,11 @@ def lifecycle_status_cli(run_id: str, store_root: Path | None) -> CliResult:
 @lifecycle_cli.command("resume")
 @click.option("--run-id", required=True)
 @click.option("--store-root", type=_OUTPUT_DIRECTORY)
-@click.option(
-    "--max-attempts",
-    type=int,
-    default=3,
-    show_default=True,
-)
-def lifecycle_resume_cli(
-    run_id: str, store_root: Path | None, max_attempts: int
-) -> CliResult:
+def lifecycle_resume_cli(run_id: str, store_root: Path | None) -> CliResult:
     """Re-verify and continue a previously interrupted lifecycle run."""
     try:
         run_state = resume_diagnostic_lifecycle(
             run_state_path=run_state_path(run_id, store_root),
-            max_attempts=max_attempts,
             handlers=build_stage_handlers(
                 semantic_loader=load_manifest_semantic_characterization,
                 solar_verifier=verify_projected_solar_manifest,

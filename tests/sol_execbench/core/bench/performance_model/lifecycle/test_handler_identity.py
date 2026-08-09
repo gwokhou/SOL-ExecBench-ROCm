@@ -16,12 +16,15 @@ from typing import Any, cast
 import pytest
 
 from sol_execbench.core.bench.performance_model.lifecycle import (
+    DiagnosticLifecycleArtifact,
+    DiagnosticLifecycleParent,
     DiagnosticLifecycleStage,
     acceptance_id,
     corpus_snapshot_id,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.orchestrator import (
     AcceptanceHandler,
+    CollectionRunHandler,
     CorpusSnapshotHandler,
     StageRunContext,
 )
@@ -35,28 +38,79 @@ from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file
 
 
+def test_collection_handler_requires_exact_reviewed_inventory(
+    tmp_path: Path,
+) -> None:
+    corpus_root = tmp_path / "collection"
+    corpus_root.mkdir()
+    corpus = corpus_root / "held_out.json"
+    corpus.write_text("held out", encoding="utf-8")
+    artifact = DiagnosticLifecycleArtifact(
+        relative_path=corpus.name,
+        sha256=sha256_file(corpus),
+        size_bytes=corpus.stat().st_size,
+    )
+    context = StageRunContext(
+        store_root=tmp_path,
+        plan=cast(
+            Any,
+            SimpleNamespace(
+                collection_inventory=(artifact,),
+                held_out_corpus=artifact,
+            ),
+        ),
+        design_manifest_path=tmp_path / "design.json",
+        collection_run_id="a" * 64,
+        generation=1,
+        corpus_root=corpus_root,
+        held_out_corpus_path=corpus,
+    )
+    handler = CollectionRunHandler()
+    completion = handler.run(context)
+    receipt = DiagnosticStageReceipt(
+        stage=DiagnosticLifecycleStage.COLLECTION_RUN,
+        stage_id=completion.stage_id,
+        command="test",
+        started_at="2026-01-01T00:00:00+00:00",
+        finished_at="2026-01-01T00:00:01+00:00",
+        attempts=1,
+        output_inventory=completion.outputs,
+    )
+    assert handler.verify(context, receipt)
+
+    (corpus_root / "extra.json").write_text("extra", encoding="utf-8")
+    with pytest.raises(ValueError, match="differs from reviewed plan"):
+        handler.run(context)
+    assert not handler.verify(context, receipt)
+
+
 def test_corpus_snapshot_handler_derives_identity(tmp_path: Path) -> None:
     corpus_root = tmp_path / "corpus"
     corpus_root.mkdir()
-    development = corpus_root / "development.json"
     held_out = corpus_root / "held_out.json"
-    development.write_text("development corpus", encoding="utf-8")
     held_out.write_text("held out corpus", encoding="utf-8")
     collection_run_id = "a" * 64
+    held_out_artifact = DiagnosticLifecycleArtifact(
+        relative_path="held_out.json",
+        sha256=sha256_file(held_out),
+        size_bytes=held_out.stat().st_size,
+    )
     context = StageRunContext(
         store_root=tmp_path,
+        plan=cast(Any, SimpleNamespace(held_out_corpus=held_out_artifact)),
         design_manifest_path=tmp_path / "design.json",
         collection_run_id=collection_run_id,
         generation=1,
         corpus_root=corpus_root,
+        held_out_corpus_path=held_out,
     )
 
     completion = CorpusSnapshotHandler().run(context)
 
     assert completion.stage_id == corpus_snapshot_id(
         collection_run_id=collection_run_id,
-        role="development",
-        corpus_sha256=sha256_file(development),
+        role="held_out",
+        corpus_sha256=sha256_file(held_out),
         source_revision="unknown",
     )
 
@@ -115,6 +169,16 @@ def test_acceptance_handler_derives_identity(
     )
     context = StageRunContext(
         store_root=store,
+        plan=cast(
+            Any,
+            SimpleNamespace(
+                development_snapshot=DiagnosticLifecycleParent(
+                    stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+                    stage_id=development_snapshot_id,
+                    sha256="e" * 64,
+                )
+            ),
+        ),
         design_manifest_path=store / "design.json",
         collection_run_id=collection_run_id,
         generation=1,
