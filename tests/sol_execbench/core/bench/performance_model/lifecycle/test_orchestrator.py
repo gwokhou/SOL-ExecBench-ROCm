@@ -22,6 +22,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     StageRunContext,
     collection_run_id,
     diagnostic_lifecycle_status,
+    orchestrator as lifecycle_orchestrator,
     resume_diagnostic_lifecycle,
     run_diagnostic_lifecycle,
     run_state_path,
@@ -278,6 +279,50 @@ def test_run_rejects_tampered_immutable_plan(tmp_path: Path) -> None:
             handlers=_handlers([]),
             now_fn=lambda: _NOW,
         )
+
+
+def test_stage_manifest_preparation_runs_outside_registry_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    design_path = _design(tmp_path)
+    plan_path = _plan(design_path, tmp_path, max_attempts=3)
+    plan = DiagnosticLifecyclePlan.model_validate_json(
+        plan_path.read_text(encoding="utf-8")
+    )
+    context = lifecycle_orchestrator.build_run_context(
+        plan=plan, store_root_path=tmp_path
+    )
+    output = tmp_path / "output.json"
+    output.write_text("output", encoding="utf-8")
+    completion = StageCompletion(
+        stage_id="stage-id",
+        outputs=(
+            DiagnosticLifecycleArtifact(
+                relative_path=output.name,
+                sha256=sha256_file(output),
+                size_bytes=output.stat().st_size,
+            ),
+        ),
+        output_paths=(output,),
+    )
+    receipt = DiagnosticStageReceipt(
+        stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+        stage_id=completion.stage_id,
+        command="test",
+        started_at=_NOW,
+        finished_at=_NOW,
+        attempts=1,
+    )
+
+    def _prepare(*args: object) -> tuple[()]:
+        del args
+        BlobStore(tmp_path).put_bytes(b"nested CAS preparation")
+        return ()
+
+    monkeypatch.setattr(lifecycle_orchestrator, "_stage_manifests", _prepare)
+
+    lifecycle_orchestrator._commit_stage_manifests(context, completion, receipt)
 
 
 def test_run_illegal_transition_rejected(tmp_path: Path) -> None:

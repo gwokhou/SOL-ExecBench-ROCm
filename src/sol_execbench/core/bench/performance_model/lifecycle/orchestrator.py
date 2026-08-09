@@ -1547,8 +1547,8 @@ def _commit_stage_manifests(
     if not completion.output_paths:
         return
     paths: list[Path] = []
+    manifests = _stage_manifests(context, completion, receipt)
     with exclusive_file_lock(store_lock_path(context.store_root)):
-        manifests = _stage_manifests(context, completion, receipt)
         for manifest in manifests:
             path = _stage_manifest_path(
                 context.store_root, manifest.stage, manifest.stage_id
