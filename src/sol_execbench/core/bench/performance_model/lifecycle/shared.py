@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
@@ -16,6 +16,7 @@ from sol_execbench.core.integrity import (
     SHA256Digest,
     validate_relative_artifact_path,
 )
+from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 
 class DiagnosticLifecycleArtifact(FrozenArtifactModel):
@@ -52,10 +53,19 @@ class GpuLifecycleIdentity(FrozenArtifactModel):
     gpu_architecture: str = Field(min_length=1)
     gpu_id: str | None = None
     gpu_bdf: str | None = None
+    pcie_topology: PCIeTopologyIdentity | None = None
     rocm_version: str | None = None
     compiler_version: str | None = None
     clock_mode: str | None = None
     power_profile: str | None = None
+
+    @model_validator(mode="after")
+    def _topology_terminates_at_gpu(self) -> GpuLifecycleIdentity:
+        if self.pcie_topology is None:
+            return self
+        if self.gpu_bdf != self.pcie_topology.links[-1].bdf:
+            raise ValueError("PCIe topology does not terminate at gpu_bdf")
+        return self
 
 
 class SoftwareLifecycleIdentity(FrozenArtifactModel):
@@ -69,6 +79,7 @@ def require_complete_gpu_identity(
     gpu: GpuLifecycleIdentity | None,
     *,
     stage: DiagnosticLifecycleStage,
+    require_pcie_topology: bool = False,
 ) -> None:
     """When a stage binds hardware, every fingerprint field must be set.
 
@@ -80,6 +91,10 @@ def require_complete_gpu_identity(
     GPU fingerprint that participates in the stage identity.
     """
     if gpu is None:
+        if require_pcie_topology:
+            raise ValueError(
+                f"{stage.value} requires a complete gpu_identity",
+            )
         return
     required = (
         "gpu_id",
@@ -90,6 +105,8 @@ def require_complete_gpu_identity(
         "power_profile",
     )
     missing = [name for name in required if getattr(gpu, name) is None]
+    if require_pcie_topology and gpu.pcie_topology is None:
+        missing.append("pcie_topology")
     if missing:
         raise ValueError(
             f"{stage.value} bound hardware but gpu_identity is missing "

@@ -26,6 +26,7 @@ from sol_execbench.core.bench.performance_model.attribution import (
 )
 from sol_execbench.core.bench.performance_model.calibration_audit import (
     DiagnosticCalibrationAudit,
+    calibration_probe_identity_payload,
 )
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceArtifactKind,
@@ -802,7 +803,7 @@ def _verify_calibration_audit(
     if stable_json_checksum(tuning) not in profile.tuning_evidence_sha256:
         raise ValueError("calibration_tuning_evidence_sha256_mismatch")
     if (
-        stable_json_checksum(probe.model_dump(mode="json"))
+        stable_json_checksum(calibration_probe_identity_payload(probe))
         not in profile.probe_evidence_sha256
     ):
         raise ValueError("calibration_probe_evidence_sha256_mismatch")

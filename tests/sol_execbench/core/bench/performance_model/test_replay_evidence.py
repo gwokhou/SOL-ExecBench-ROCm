@@ -20,6 +20,10 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity import stable_json_checksum
+from sol_execbench.core.platform.runtime import (
+    PCIeLinkIdentity,
+    PCIeTopologyIdentity,
+)
 
 _HEADER = (
     "Dispatch_Id,Kernel_Name,Grid_Size,Workgroup_Size,"
@@ -33,6 +37,22 @@ _EMPTY_CACHE_SHA256 = stable_json_checksum(
         "fallback_reason": None,
     }
 )
+
+
+def _topology() -> PCIeTopologyIdentity:
+    link = PCIeLinkIdentity(
+        bdf="0000:03:00.0",
+        current_speed_gtps=32.0,
+        max_speed_gtps=32.0,
+        current_width=8,
+        max_width=16,
+    )
+    return PCIeTopologyIdentity(
+        links=(link,),
+        bottleneck_bdf=link.bdf,
+        effective_speed_gtps=link.current_speed_gtps,
+        effective_width=link.current_width,
+    )
 
 
 def _write_timing(path: Path) -> None:
@@ -62,6 +82,7 @@ def _environment() -> list[RuntimeGPUTelemetry]:
             phase=phase,
             gpu_id="gpu-0",
             gpu_bdf="0000:03:00.0",
+            pcie_topology=_topology(),
             performance_level="AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK",
             temperature_c=50.0,
             foreign_process_count=0,

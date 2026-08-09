@@ -55,7 +55,10 @@ def _dump(
     value: GpuLifecycleIdentity | SoftwareLifecycleIdentity,
 ) -> object:
     """Return a stable JSON-serializable form for nested identity models."""
-    return value.model_dump(mode="json")
+    payload = value.model_dump(mode="json")
+    if isinstance(value, GpuLifecycleIdentity) and value.pcie_topology is None:
+        payload.pop("pcie_topology", None)
+    return payload
 
 
 def design_id(
@@ -83,6 +86,7 @@ def collection_run_id(
     generation: int,
     roles: tuple[str, ...] = ("development", "held_out"),
     frozen_held_out_sha256: SHA256Digest | None = None,
+    gpu_identity: GpuLifecycleIdentity | None = None,
     source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
@@ -93,17 +97,17 @@ def collection_run_id(
     set and any frozen held-out digest participate in identity because they
     change what the run is.
     """
-    return diagnostic_lifecycle_id(
-        "collection_run",
-        {
-            "design_id": design_id,
-            "generation": generation,
-            "roles": list(roles),
-            "frozen_held_out_sha256": frozen_held_out_sha256,
-            "purpose": purpose,
-            "source_revision": source_revision,
-        },
-    )
+    payload: dict[str, object] = {
+        "design_id": design_id,
+        "generation": generation,
+        "roles": list(roles),
+        "frozen_held_out_sha256": frozen_held_out_sha256,
+        "purpose": purpose,
+        "source_revision": source_revision,
+    }
+    if gpu_identity is not None:
+        payload["gpu_identity"] = _dump(gpu_identity)
+    return diagnostic_lifecycle_id("collection_run", payload)
 
 
 def corpus_snapshot_id(
@@ -373,6 +377,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             generation=manifest.generation,
             roles=manifest.roles,
             frozen_held_out_sha256=manifest.frozen_held_out_sha256,
+            gpu_identity=manifest.gpu_identity,
             source_revision=manifest.source_revision,
             purpose=manifest.purpose,
         )

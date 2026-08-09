@@ -1,16 +1,28 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import torch
+from pydantic import ValidationError
 
+from sol_execbench.core.evidence.runtime_evidence import collectors
 from sol_execbench.core.evidence.runtime_evidence.collectors import (
     build_dependency_observation,
     collect_gpu_evidence,
+    collect_runtime_gpu_telemetry,
     collect_visible_device_environment,
+)
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeGPUTelemetry,
 )
 from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
+)
+from sol_execbench.core.platform.runtime import (
+    PCIeLinkIdentity,
+    PCIeTopologyIdentity,
 )
 
 
@@ -101,3 +113,77 @@ def test_visible_device_collector_ignores_unrelated_variables() -> None:
     assert collect_visible_device_environment(
         {"ROCR_VISIBLE_DEVICES": "0", "UNRELATED": "ignored"},
     ) == {"ROCR_VISIBLE_DEVICES": "0"}
+
+
+def test_runtime_gpu_telemetry_captures_pcie_topology(monkeypatch) -> None:
+    link = PCIeLinkIdentity(
+        bdf="0000:03:00.0",
+        current_speed_gtps=32.0,
+        max_speed_gtps=32.0,
+        current_width=8,
+        max_width=16,
+    )
+    topology = PCIeTopologyIdentity(
+        links=(link,),
+        bottleneck_bdf=link.bdf,
+        effective_speed_gtps=link.current_speed_gtps,
+        effective_width=link.current_width,
+    )
+    responses = {
+        "list": '[{"gpu":0,"bdf":"0000:03:00.0","uuid":"gpu-uuid"}]',
+        "metric": (
+            '{"gpu_data":[{"gpu":0,'
+            '"perf_level":"AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK",'
+            '"clock":{"gfx_clock":"3200 MHz","mem_clock":"1250 MHz"},'
+            '"temperature":{"hotspot_temperature":"52.5 C"},'
+            '"power":{"current_socket_power":"101 W",'
+            '"power_cap":"182 W","power_profile":"COMPUTE"}}]}'
+        ),
+        "process": "[]",
+    }
+    observed_bdfs: list[str] = []
+
+    monkeypatch.setattr(
+        collectors,
+        "resolve_rocm_tool",
+        lambda _name: Path("/opt/rocm/bin/amd-smi"),
+    )
+    monkeypatch.setattr(
+        collectors,
+        "_amd_smi_json",
+        lambda _executable, command: responses[command],
+    )
+
+    def collect(bdf: str) -> PCIeTopologyIdentity:
+        observed_bdfs.append(bdf)
+        return topology
+
+    monkeypatch.setattr(collectors, "collect_pcie_topology", collect)
+
+    telemetry = collect_runtime_gpu_telemetry(phase="pre")
+
+    assert observed_bdfs == ["0000:03:00.0"]
+    assert telemetry.pcie_topology == topology
+
+
+def test_runtime_gpu_telemetry_rejects_topology_for_another_device() -> None:
+    link = PCIeLinkIdentity(
+        bdf="0000:03:00.0",
+        current_speed_gtps=32.0,
+        max_speed_gtps=32.0,
+        current_width=8,
+        max_width=16,
+    )
+    topology = PCIeTopologyIdentity(
+        links=(link,),
+        bottleneck_bdf=link.bdf,
+        effective_speed_gtps=link.current_speed_gtps,
+        effective_width=link.current_width,
+    )
+
+    with pytest.raises(ValidationError, match="terminate at gpu_bdf"):
+        RuntimeGPUTelemetry(
+            phase="pre",
+            gpu_bdf="0000:04:00.0",
+            pcie_topology=topology,
+        )

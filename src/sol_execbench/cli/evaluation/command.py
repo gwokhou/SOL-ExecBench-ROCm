@@ -45,6 +45,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
 )
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
 from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_DEVICE,
     ENV_SOL_EXECBENCH_GRACEFUL_EXIT,
     sanitized_subprocess_env,
 )
@@ -276,7 +277,18 @@ def _replay_snapshot(
     phase: Literal["pre", "post"],
 ) -> RuntimeGPUTelemetry | None:
     try:
-        return collect_runtime_gpu_telemetry(phase=phase)
+        return collect_runtime_gpu_telemetry(
+            phase=phase,
+            device_index=_replay_device_index(),
+        )
     except (OSError, TypeError, ValueError):
         logger.warning("Unable to collect %s replay GPU telemetry", phase)
         return None
+
+
+def _replay_device_index() -> int:
+    selected = os.environ.get(ENV_SOL_EXECBENCH_DEVICE, "cuda:0")
+    namespace, separator, index = selected.partition(":")
+    if namespace != "cuda" or separator != ":" or not index.isdecimal():
+        raise ValueError(f"unsupported replay device: {selected!r}")
+    return int(index)

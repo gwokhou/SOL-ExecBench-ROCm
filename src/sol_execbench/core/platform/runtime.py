@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import shutil
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from pydantic import ConfigDict, Field, field_validator, model_validator
+
+from sol_execbench.core.data.base_model import StrictArtifactModel
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_SANDBOXED,
     ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION,
@@ -26,6 +30,80 @@ if TYPE_CHECKING:
 Which = Callable[[str], str | None]
 
 FALLBACK_CACHE_CLEAR_BYTES = 256 * 1024 * 1024
+PCI_DEVICES_ROOT = Path("/sys/bus/pci/devices")
+SYS_DEVICES_ROOT = Path("/sys/devices")
+_PCI_BDF_PATTERN = r"[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]"
+_PCI_BDF_RE = re.compile(f"^{_PCI_BDF_PATTERN}$")
+_PCIE_SPEED_RE = re.compile(r"^([0-9]+(?:\.[0-9]+)?)\s+GT/s(?:\s+PCIe)?$")
+_PCIE_CONFIG = ConfigDict(
+    extra="forbid",
+    frozen=True,
+    strict=True,
+    allow_inf_nan=False,
+)
+
+
+class PCIeLinkIdentity(StrictArtifactModel):
+    """Negotiated and maximum identity of one PCIe link endpoint."""
+
+    model_config = _PCIE_CONFIG
+
+    bdf: str = Field(pattern=f"^{_PCI_BDF_PATTERN}$")
+    current_speed_gtps: float = Field(gt=0)
+    max_speed_gtps: float = Field(gt=0)
+    current_width: int = Field(gt=0)
+    max_width: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _negotiated_values_fit_capability(self) -> PCIeLinkIdentity:
+        if self.current_speed_gtps > self.max_speed_gtps:
+            raise ValueError("PCIe current speed exceeds maximum speed")
+        if self.current_width > self.max_width:
+            raise ValueError("PCIe current width exceeds maximum width")
+        return self
+
+
+class PCIeTopologyIdentity(StrictArtifactModel):
+    """Ordered CPU-root-to-GPU PCIe path and its effective bottleneck."""
+
+    model_config = _PCIE_CONFIG
+
+    links: tuple[PCIeLinkIdentity, ...] = Field(min_length=1)
+    bottleneck_bdf: str = Field(pattern=f"^{_PCI_BDF_PATTERN}$")
+    effective_speed_gtps: float = Field(gt=0)
+    effective_width: int = Field(gt=0)
+
+    @property
+    def endpoint_bdf(self) -> str:
+        """Return the final device BDF in the ordered path."""
+        return self.links[-1].bdf
+
+    @field_validator("links", mode="before")
+    @classmethod
+    def _json_links_are_immutable(
+        cls,
+        value: object,
+    ) -> object:
+        if isinstance(value, list):
+            return tuple(value)
+        return value
+
+    @model_validator(mode="after")
+    def _effective_link_is_derived(self) -> PCIeTopologyIdentity:
+        bdfs = [link.bdf for link in self.links]
+        if len(bdfs) != len(set(bdfs)):
+            raise ValueError("PCIe topology repeats a BDF")
+        bottleneck = min(
+            self.links,
+            key=lambda link: link.current_speed_gtps * link.current_width,
+        )
+        if (
+            self.bottleneck_bdf != bottleneck.bdf
+            or self.effective_speed_gtps != bottleneck.current_speed_gtps
+            or self.effective_width != bottleneck.current_width
+        ):
+            raise ValueError("PCIe effective link is not canonically derived")
+        return self
 
 
 @dataclass(frozen=True)
@@ -50,6 +128,69 @@ class CacheClearPolicy:
     clear_buffer_bytes: int
     source: str
     fallback_reason: str | None = None
+
+
+def _read_pcie_speed(path: Path) -> float:
+    raw = path.read_text(encoding="utf-8").strip()
+    match = _PCIE_SPEED_RE.fullmatch(raw)
+    if match is None:
+        raise ValueError(f"unsupported PCIe link speed: {raw!r}")
+    return float(match.group(1))
+
+
+def _read_pcie_width(path: Path) -> int:
+    raw = path.read_text(encoding="utf-8").strip()
+    try:
+        width = int(raw)
+    except ValueError as error:
+        raise ValueError(f"unsupported PCIe link width: {raw!r}") from error
+    if width <= 0:
+        raise ValueError(f"unsupported PCIe link width: {raw!r}")
+    return width
+
+
+def _pcie_link_identity(path: Path) -> PCIeLinkIdentity:
+    return PCIeLinkIdentity(
+        bdf=path.name,
+        current_speed_gtps=_read_pcie_speed(path / "current_link_speed"),
+        max_speed_gtps=_read_pcie_speed(path / "max_link_speed"),
+        current_width=_read_pcie_width(path / "current_link_width"),
+        max_width=_read_pcie_width(path / "max_link_width"),
+    )
+
+
+def collect_pcie_topology(
+    gpu_bdf: str,
+    *,
+    pci_devices_root: Path = PCI_DEVICES_ROOT,
+    sys_devices_root: Path = SYS_DEVICES_ROOT,
+) -> PCIeTopologyIdentity:
+    """Collect the complete ordered PCIe path for one GPU endpoint BDF."""
+    normalized = gpu_bdf.strip().lower()
+    if _PCI_BDF_RE.fullmatch(normalized) is None:
+        raise ValueError(f"invalid PCI BDF: {gpu_bdf!r}")
+    endpoint = (pci_devices_root / normalized).resolve(strict=True)
+    resolved_sysfs = sys_devices_root.resolve(strict=True)
+    if not endpoint.is_relative_to(resolved_sysfs):
+        raise ValueError("PCI device symlink escapes the sysfs device tree")
+    paths = tuple(
+        path
+        for path in reversed((endpoint, *endpoint.parents))
+        if _PCI_BDF_RE.fullmatch(path.name)
+    )
+    if not paths or paths[-1].name != normalized:
+        raise ValueError("PCIe topology does not terminate at the GPU BDF")
+    links = tuple(_pcie_link_identity(path) for path in paths)
+    bottleneck = min(
+        links,
+        key=lambda link: link.current_speed_gtps * link.current_width,
+    )
+    return PCIeTopologyIdentity(
+        links=links,
+        bottleneck_bdf=bottleneck.bdf,
+        effective_speed_gtps=bottleneck.current_speed_gtps,
+        effective_width=bottleneck.current_width,
+    )
 
 
 def derive_cache_clear_policy(l2_cache_bytes: int | None) -> CacheClearPolicy:

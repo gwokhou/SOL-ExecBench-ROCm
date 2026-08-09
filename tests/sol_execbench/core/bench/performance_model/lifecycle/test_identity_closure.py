@@ -18,6 +18,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticCollectionRunManifest,
     DiagnosticCorpusSnapshotManifest,
     DiagnosticDesignManifest,
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleParent,
     DiagnosticLifecycleStage,
     DiagnosticModelBuildManifest,
@@ -32,10 +33,15 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     collection_run_id,
     corpus_snapshot_id,
     design_id,
+    diagnostic_lifecycle_id,
     model_build_id,
     publication_id,
     recompute_stage_id,
     release_id,
+)
+from sol_execbench.core.platform.runtime import (
+    PCIeLinkIdentity,
+    PCIeTopologyIdentity,
 )
 
 _SOURCE = "19f195a8"
@@ -61,10 +67,25 @@ D_PUB = "1d" * 32
 D_ARCHIVE = "1e" * 32
 D_ATTEST = "1f" * 32
 
+_LINK = PCIeLinkIdentity(
+    bdf="0000:03:00.0",
+    current_speed_gtps=32.0,
+    max_speed_gtps=32.0,
+    current_width=8,
+    max_width=16,
+)
+_TOPOLOGY = PCIeTopologyIdentity(
+    links=(_LINK,),
+    bottleneck_bdf=_LINK.bdf,
+    effective_speed_gtps=_LINK.current_speed_gtps,
+    effective_width=_LINK.current_width,
+)
+
 _GPU = GpuLifecycleIdentity(
     gpu_architecture="gfx1200",
     gpu_id="a3ff7590-0000-1000-800f-a29c1cca1511",
     gpu_bdf="0000:03:00.0",
+    pcie_topology=_TOPOLOGY,
     rocm_version="7.2.0",
     compiler_version="HIP version: 7.2.26015-fc0010cf6a",
     clock_mode="locked",
@@ -161,6 +182,60 @@ def test_collection_run_identity_recomputes() -> None:
         ),
     )
     assert recompute_stage_id(manifest) == cid
+
+
+def test_collection_run_identity_binds_pcie_topology() -> None:
+    cid = collection_run_id(
+        design_id=D_DESIGN_PARENT,
+        generation=1,
+        gpu_identity=_GPU,
+        source_revision=_SOURCE,
+    )
+    manifest = DiagnosticCollectionRunManifest.model_validate(
+        _manifest_data(
+            DiagnosticLifecycleStage.COLLECTION_RUN,
+            cid,
+            generation=1,
+            gpu_identity=_GPU,
+            parents=(
+                _parent(DiagnosticLifecycleStage.DESIGN, D_DESIGN_PARENT),
+            ),
+        ),
+    )
+
+    assert recompute_stage_id(manifest) == cid
+    assert cid != collection_run_id(
+        design_id=D_DESIGN_PARENT,
+        generation=1,
+        source_revision=_SOURCE,
+    )
+
+
+def test_calibration_identity_preserves_legacy_gpu_without_pcie() -> None:
+    legacy_gpu = _GPU.model_copy(update={"pcie_topology": None})
+    legacy_payload = legacy_gpu.model_dump(mode="json")
+    legacy_payload.pop("pcie_topology")
+
+    observed = calibration_id(
+        calibration_profile_sha256=D_CAL_PROFILE,
+        calibration_audit_sha256=D_CAL_AUDIT,
+        gpu_identity=legacy_gpu,
+        software_identity=_SW,
+        source_revision=_SOURCE,
+    )
+    expected = diagnostic_lifecycle_id(
+        "calibration",
+        {
+            "calibration_profile_sha256": D_CAL_PROFILE,
+            "calibration_audit_sha256": D_CAL_AUDIT,
+            "gpu_identity": legacy_payload,
+            "software_identity": _SW.model_dump(mode="json"),
+            "purpose": DiagnosticEvidencePurpose.PRODUCTION,
+            "source_revision": _SOURCE,
+        },
+    )
+
+    assert observed == expected
 
 
 def test_corpus_snapshot_direct_identity_recomputes() -> None:

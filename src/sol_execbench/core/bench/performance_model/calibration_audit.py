@@ -23,6 +23,7 @@ from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
     SchemaVersion,
 )
+from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
@@ -63,9 +64,29 @@ class CalibrationProbeIdentity(StrictArtifactModel):
     device_name: str = Field(min_length=1)
     gpu_id: str = Field(min_length=1)
     gpu_bdf: str = Field(min_length=1)
+    pcie_topology: PCIeTopologyIdentity | None = None
     total_memory_bytes: int = Field(gt=0)
     compiler_version: str = Field(min_length=1)
     isa: dict[str, Any]
+
+    @model_validator(mode="after")
+    def _topology_terminates_at_gpu(self) -> CalibrationProbeIdentity:
+        if (
+            self.pcie_topology is not None
+            and self.pcie_topology.endpoint_bdf != self.gpu_bdf
+        ):
+            raise ValueError("PCIe topology does not terminate at gpu_bdf")
+        return self
+
+
+def calibration_probe_identity_payload(
+    identity: CalibrationProbeIdentity,
+) -> dict[str, Any]:
+    """Return the hash payload while preserving endpoint-only evidence IDs."""
+    payload = identity.model_dump(mode="json")
+    if identity.pcie_topology is None:
+        payload.pop("pcie_topology", None)
+    return payload
 
 
 class CalibrationProtocol(StrictArtifactModel):
@@ -119,7 +140,25 @@ class DiagnosticCalibrationAudit(CurrentSchemaModel):
                 raise ValueError("calibration temperature is unavailable")
             if item.foreign_process_count not in {0, None}:
                 raise ValueError("calibration foreign GPU process detected")
+            if (
+                item.pcie_topology is not None
+                and item.pcie_topology.links[-1].bdf != item.gpu_bdf
+            ):
+                raise ValueError("calibration PCIe endpoint identity mismatch")
+        topologies = [item.pcie_topology for item in self.environment]
+        if any(item is not None for item in topologies):
+            if any(item is None for item in topologies):
+                raise ValueError("calibration PCIe topology is incomplete")
+            if any(item != topologies[0] for item in topologies[1:]):
+                raise ValueError("calibration PCIe topology changed")
+            if identity.pcie_topology != topologies[0]:
+                raise ValueError("calibration probe PCIe topology mismatch")
+        elif identity.pcie_topology is not None:
+            raise ValueError("calibration probe PCIe topology lacks telemetry")
         return self
 
 
-__all__ = ["DiagnosticCalibrationAudit"]
+__all__ = [
+    "DiagnosticCalibrationAudit",
+    "calibration_probe_identity_payload",
+]

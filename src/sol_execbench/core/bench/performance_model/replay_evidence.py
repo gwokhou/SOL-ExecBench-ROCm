@@ -28,6 +28,7 @@ from sol_execbench.core.integrity import (
 from sol_execbench.core.integrity.schema_versions import (
     SchemaVersion,
 )
+from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 REPLAY_PROTOCOL_VERSION = "gfx1200_counter_replay.v1"
 REPLAY_WARMUP_RUNS = 10
@@ -142,6 +143,7 @@ def build_performance_replay_evidence(
     counter_paths: list[Path] | None = None,
     expected_gpu_id: str | None = None,
     expected_gpu_bdf: str | None = None,
+    expected_pcie_topology: PCIeTopologyIdentity | None = None,
     environment: list[RuntimeGPUTelemetry] | None = None,
 ) -> PerformanceReplayEvidenceSidecar:
     """Build replay evidence and reject identity drift without guessing."""
@@ -160,6 +162,7 @@ def build_performance_replay_evidence(
             environment or [],
             expected_gpu_id=expected_gpu_id,
             expected_gpu_bdf=expected_gpu_bdf,
+            expected_pcie_topology=expected_pcie_topology,
         ),
     )
     dispatch_digests = _dispatch_digests(
@@ -326,6 +329,7 @@ def _environment_reasons(
     *,
     expected_gpu_id: str | None,
     expected_gpu_bdf: str | None,
+    expected_pcie_topology: PCIeTopologyIdentity | None,
 ) -> list[str]:
     if {snapshot.phase for snapshot in snapshots} != {"pre", "post"}:
         return ["replay_environment_snapshot_incomplete"]
@@ -344,6 +348,15 @@ def _environment_reasons(
             reasons.append("replay_foreign_gpu_process")
         if snapshot.temperature_c is None:
             reasons.append("replay_temperature_unavailable")
+    topologies = [snapshot.pcie_topology for snapshot in snapshots]
+    if any(topology is None for topology in topologies):
+        reasons.append("replay_pcie_topology_incomplete")
+    elif any(topology != topologies[0] for topology in topologies[1:]):
+        reasons.append("replay_pcie_topology_changed")
+    elif expected_pcie_topology is not None and (
+        topologies[0] != expected_pcie_topology
+    ):
+        reasons.append("replay_pcie_topology_mismatch")
     return list(dict.fromkeys(reasons))
 
 

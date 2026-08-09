@@ -395,13 +395,20 @@ sol-execbench --format json diagnostics accept-performance-model \
 Calibration uses a frozen two-phase protocol: tuning first, then at least five
 fresh parameter-estimation processes. Calibration and replay audits include
 stable pre/post GPU identity, clock, temperature, power, and foreign-process
-observations. Inference authoring separately requires at least 20 point-fit and
-20 conformal-calibration cases per family. Acceptance requires at least 20
-held-out cases per family (220 total), at least 90% empirical interval coverage
-in every family, median absolute percentage error at most 15%, P90 at most
-30%, and at least one enabled code-changing action metric. Every enabled action
-requires at least 10 held-out positives, at least 90% precision, and at least
-70% recall.
+observations. Each GPU observation also records the ordered PCIe path from the
+CPU root port through every bridge to the GPU endpoint. Every link binds its
+BDF, current/max speed, and current/max width; the narrowest negotiated link is
+stored as the effective path. Missing pre/post topology makes new performance
+evidence partial and blocks production calibration, while any link drift makes
+the evidence inconsistent. A current host probe cannot retroactively establish
+the topology of older endpoint-only evidence.
+
+Inference authoring separately requires at least 20 point-fit and 20
+conformal-calibration cases per family. Acceptance requires at least 20 held-out
+cases per family (220 total), at least 90% empirical interval coverage in every
+family, median absolute percentage error at most 15%, P90 at most 30%, and at
+least one enabled code-changing action metric. Every enabled action requires at
+least 10 held-out positives, at least 90% precision, and at least 70% recall.
 
 The overlap surface stores measured `resource_mix` points, not broad bins.
 Prediction uses piecewise-linear interpolation only inside the measured
@@ -521,7 +528,11 @@ development snapshot, and plan purposes must match. The command also verifies
 both registry identities and that the selected source revision matches the
 current `src/`, `scripts/`, `pyproject.toml`, and `uv.lock` state. Plan creation
 is therefore a governed authoring step; do not replace it with hand-translated
-legacy command flags.
+legacy command flags. For production, plan authoring additionally requires one
+complete PCIe-aware GPU identity shared exactly by the calibration profile,
+calibration audit, and every performance-evidence manifest referenced by the
+held-out corpus. That identity participates in both the plan ID and collection
+run ID, and the collection handler rechecks it before adoption and on resume.
 
 `run` executes `design -> calibration -> collection_run -> corpus_snapshot ->
 model_build -> acceptance -> publication -> release` in monotonic order while
@@ -550,11 +561,12 @@ uv run sol-execbench --format json diagnostics lifecycle resume \
 ```
 
 `status` re-verifies every recorded stage through its handler and reports the
-next legal stage. `resume` re-verifies each completed stage, re-executes any
-stage whose receipt is missing or whose inputs or outputs drifted, and
-continues from the first incomplete stage. A run that exhausts its attempt
-budget on a stage is recorded `failed` and can be resumed after the operator
-fixes the input.
+first stage that is not `verified` or `superseded`. This includes a persisted
+`running` stage left by an interrupted process; it is never skipped in favor of
+a later stage. `resume` re-verifies each completed stage, re-executes any stage
+whose receipt is missing or whose inputs or outputs drifted, and continues from
+the first incomplete stage. A run that exhausts its attempt budget on a stage
+is recorded `failed` and can be resumed after the operator fixes the input.
 
 ## Registry-driven blob GC
 

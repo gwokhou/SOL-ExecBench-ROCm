@@ -29,6 +29,8 @@ from sol_execbench.core.bench.performance_model.lifecycle.identity import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
+    GpuLifecycleIdentity,
+    require_complete_gpu_identity,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     attempts_dir,
@@ -95,6 +97,7 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
         min_length=1
     )
     collection_run_id: SHA256Digest
+    gpu_identity: GpuLifecycleIdentity | None = None
     generation: int = Field(ge=1)
     roles: tuple[Literal["held_out"], ...] = ("held_out",)
     calibration_profile_path: str = Field(min_length=1)
@@ -127,6 +130,12 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
             raise ValueError("lifecycle plan references cross purpose domains")
         if self.roles != ("held_out",):
             raise ValueError("production lifecycle collection is held-out only")
+        if self.purpose is DiagnosticEvidencePurpose.PRODUCTION:
+            require_complete_gpu_identity(
+                self.gpu_identity,
+                stage=DiagnosticLifecycleStage.COLLECTION_RUN,
+                require_pcie_topology=True,
+            )
         paths = tuple(item.relative_path for item in self.collection_inventory)
         if paths != tuple(sorted(paths)) or len(paths) != len(set(paths)):
             raise ValueError("collection inventory must be sorted and unique")
@@ -135,6 +144,7 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
             generation=self.generation,
             roles=self.roles,
             frozen_held_out_sha256=self.held_out_corpus.sha256,
+            gpu_identity=self.gpu_identity,
             source_revision=self.source_revision,
             purpose=self.purpose,
         )
@@ -143,11 +153,21 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
                 "lifecycle plan collection_run_id is not canonical"
             )
         expected_plan_id = stable_json_checksum(
-            self.model_dump(mode="json", exclude={"plan_id"})
+            diagnostic_lifecycle_plan_payload(self)
         )
         if self.plan_id != expected_plan_id:
             raise ValueError("lifecycle plan plan_id is not canonical")
         return self
+
+
+def diagnostic_lifecycle_plan_payload(
+    plan: DiagnosticLifecyclePlan,
+) -> dict[str, object]:
+    """Return the canonical plan-ID payload with additive identity support."""
+    payload = plan.model_dump(mode="json", exclude={"plan_id"})
+    if plan.gpu_identity is None:
+        payload.pop("gpu_identity", None)
+    return payload
 
 
 class DiagnosticRunManifest(CurrentFrozenSchemaModel):
@@ -247,6 +267,7 @@ __all__ = [
     "DiagnosticRunManifest",
     "DiagnosticRunStageState",
     "DiagnosticStageAttempt",
+    "diagnostic_lifecycle_plan_payload",
     "lifecycle_plan_path",
     "run_state_path",
     "stage_attempt_path",
