@@ -104,12 +104,16 @@ existing output. The new preregistered universe is then reserved for fresh
 held-out collection; it is not read while fitting from the promoted development
 corpus.
 
-### Cycle 3 boundary
+### Cycle 3 and exploratory-repair boundary
 
 Cycle 2 revealed its 220 held-out pairs and was input-invalid after a
 working-set-coordinate model-policy fix. Cycle 3 must therefore combine the
 existing 660-case promoted development corpus with those 220 revealed pairs,
-for 880 development cases, and use the fresh universe beginning at 220.
+for 880 development cases. The historical fresh universe beginning at 220 was
+then frozen, but its collection stopped after 181 successful held-out cases:
+the next transformer workload was `1032x768`, beyond the packaged candidate's
+sequence limit of 1024. That design is immutable failure evidence and must not
+be repaired, resumed, accepted, or published.
 
 Create the combined corpus from the common ignored evidence root; do not copy
 paths into a hand-authored corpus:
@@ -131,41 +135,72 @@ blob-backed corpus references, so the promoted corpus depends on no historical
 physical path tree. The old source roots stay readable until a governed GC
 proves them unreachable.
 
-Preregister the fresh start-220 universe before preparing its cases; prepare and
-structurally preflight that universe before any collection, then fit against the
-880-case development corpus:
+The first zero-GPU repair draft at start 280 was executable and pair-disjoint,
+but used a synthetic odd-length transformer sweep. It was superseded before any
+GPU execution because executable-domain validity alone does not establish
+real-model representativeness.
+
+The replacement exploratory design begins at 340. Its fixed hidden width 768
+matches GPT-2's `n_embd=768` and BERT-Base's 768-wide encoder. Its explicit
+sequence neighborhoods cover short contexts, BERT's 512 boundary, GPT-2's 1024
+boundary, and vision-token anchors around 197/257/577. Exact previously revealed
+shapes are excluded; adjacent values preserve boundary sensitivity without
+claiming a new held-out pair. The anchors derive from the official
+[GPT-2 implementation](https://github.com/openai/gpt-2/blob/master/src/model.py),
+[BERT implementation](https://github.com/google-research/bert/blob/master/modeling.py),
+and [Google ViT repository](https://github.com/google-research/vision_transformer).
+
+Materialize this repair only in an isolated exploratory store and run all three
+qualification gates before any counter collection:
 
 ```bash
-mkdir -p \
-  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus
+export SOL_EXECBENCH_DIAGNOSTIC_STORE=\
+data/outputs/microarchitecture-diagnostics-v7-cycle3-exploratory-realistic/store
 uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
   preregister \
   --root \
-  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus \
-  --universe-start 220
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-exploratory-realistic/corpus \
+  --universe-start 340
 uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
   prepare \
   --root \
-  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus
-uv run python scripts/internal/rdna4/preflight_rdna4_diagnostic_corpus.py \
-  --corpus-root \
-  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus \
-  --output \
-  data/outputs/microarchitecture-diagnostics-v7-cycle3/preregistered-corpus/preflight.json
-uv run sol-execbench --format json diagnostics fit-performance-inference \
-  --development-corpus data/outputs/promoted-development-cycle3.json \
-  --calibration-profile \
-  data/outputs/microarchitecture-diagnostics-v7/calibration/gfx1200-diagnostic-v7.json \
-  --output \
-  data/outputs/microarchitecture-diagnostics-v7-cycle3-inference.json
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-exploratory-realistic/corpus
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  qualify-static \
+  --root \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-exploratory-realistic/corpus \
+  --qualification-root \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-exploratory-realistic/qualification-v3-smoke
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  qualify-canary --role held_out \
+  --root \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-exploratory-realistic/corpus \
+  --qualification-root \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-exploratory-realistic/qualification-v3-smoke
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  qualify-full --role held_out \
+  --root \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-exploratory-realistic/corpus \
+  --qualification-root \
+  data/outputs/microarchitecture-diagnostics-v7-cycle3-exploratory-realistic/qualification-v3-smoke
 ```
 
-The selected calibration's recorded hardware and software identity must match
-the intended collection host. Inference fitting is also the prediction gate: it
-rebuilds every development case from cited SOLAR and performance evidence and
-fails if any hardware prediction is unavailable. The resulting versioned
-profile binds the development corpus, calibration, calibration audit, and
-current model-policy hashes; no separate prediction preflight is required.
+`qualify-static` is zero-GPU. Canary and full qualification use the canonical
+evaluator with a minimal non-authoritative timing configuration and no profiler.
+Every receipt binds the design, prepared problems, evaluator traces, collector,
+configuration, and parent gate. `collect` refuses to start its first profiler
+case unless the complete chain verifies. Combining 181 historical observations
+with 39 replacement observations is exploratory synthesis only; it cannot
+produce a frozen corpus, inference fit, acceptance verdict, or publication.
+The current real canary contains 34 `PASSED` gfx1200/container Trace rows across
+all eleven families. It used the wrapper's explicit
+`--allow-untested-target-smoke` route and remains non-authoritative. Full-role
+qualification also passed all 220 held-out workloads, 20 per family, with the
+same gfx1200/container identity. Its gate SHA-256 is
+`963d4197965a3f7a01af756066f319b943fef3a145db4a663e6fef0a37048b45`.
+The three gates now admit an explicitly selected exploratory counter
+collection, but they do not make its output eligible for freeze, inference,
+acceptance, or publication.
 
 ### Publish frozen diagnostic inputs
 
@@ -331,7 +366,21 @@ Identity or hash mismatch is an input error.
 
 ```bash
 uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
+  qualify-static --output CALIBRATION.json --gpu-id GPU_UUID \
+  --qualification-root data/outputs/diagnostic-calibration-qualification \
+  --estimation-batches 5
+uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
+  qualify-canary --output CALIBRATION.json --gpu-id GPU_UUID \
+  --qualification-root data/outputs/diagnostic-calibration-qualification \
+  --estimation-batches 5
+uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
+  qualify-full --output CALIBRATION.json --gpu-id GPU_UUID \
+  --qualification-root data/outputs/diagnostic-calibration-qualification \
+  --estimation-batches 5
+uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
+  run \
   --output CALIBRATION.json --gpu-id GPU_UUID \
+  --qualification-root data/outputs/diagnostic-calibration-qualification \
   --estimation-batches 5
 
 sol-execbench --format json diagnostics accept-performance-model \

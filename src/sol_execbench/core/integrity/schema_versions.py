@@ -20,6 +20,10 @@ class SchemaVersion(StrEnum):
     AGENT_FEEDBACK = "sol_execbench.agent_feedback.v7"
     AMD_ISA_RELEASE_LOCK = "sol_execbench.amd_isa_release_lock.v1"
     ARCH_CAPABILITY_BUDGET = "sol_execbench.arch_capability_budget.v1"
+    BATCH_GPU_QUALIFICATION = "sol_execbench.batch_gpu_qualification.v1"
+    BATCH_GPU_QUALIFICATION_RECEIPT = (
+        "sol_execbench.batch_gpu_qualification_receipt.v1"
+    )
     BENCHMARK_CONFIG = "sol_execbench.benchmark_config.v2"
     CLI_CONTRACT = "sol_execbench.cli_contract.v1"
     CLI_RESPONSE = "sol_execbench.cli_response.v1"
@@ -45,6 +49,12 @@ class SchemaVersion(StrEnum):
         "sol_execbench.diagnostic_calibration_audit.v8"
     )
     DIAGNOSTIC_CORPUS_PREFLIGHT = "sol_execbench.diagnostic_corpus_preflight.v1"
+    DIAGNOSTIC_CORPUS_QUALIFICATION = (
+        "sol_execbench.diagnostic_corpus_qualification.v1"
+    )
+    DIAGNOSTIC_CORPUS_QUALIFICATION_RECEIPT = (
+        "sol_execbench.diagnostic_corpus_qualification_receipt.v1"
+    )
     DIAGNOSTIC_INFERENCE_PROFILE = (
         "sol_execbench.diagnostic_inference_profile.v10"
     )

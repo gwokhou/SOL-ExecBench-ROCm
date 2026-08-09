@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import click
@@ -16,11 +17,14 @@ from sol_execbench.cli.protocol import (
     CliResult,
     artifact,
 )
+from sol_execbench.core.bench.batch_gpu_qualification import (
+    BatchGPUQualificationStage,
+)
+from sol_execbench.core.scoring.release_solar_qualification import (
+    run_solar_release_qualification,
+)
 from sol_execbench.core.scoring.release_solar_runner import (
     build_release_solar_manifests,
-)
-from sol_execbench.core.solar_bridge.corpus_readiness import (
-    audit_corpus_stage_readiness,
 )
 from sol_execbench.core.solar_bridge.models import (
     DEFAULT_IR_PATH,
@@ -229,6 +233,11 @@ def analyze_cli(
 )
 @click.option("--resume", is_flag=True)
 @click.option(
+    "--qualification-root",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@click.option(
     "--jobs",
     type=click.IntRange(min=1),
     default=1,
@@ -247,6 +256,7 @@ def release_build_cli(
     timeout_seconds: float,
     resume: bool,
     jobs: int,
+    qualification_root: Path,
 ) -> CliResult:
     """Generate the exact content-addressed release SOLAR denominator."""
     try:
@@ -259,6 +269,7 @@ def release_build_cli(
             device=device,
             ir_path=backend,
             jobs=jobs,
+            qualification_root=qualification_root,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         raise CliFailure(
@@ -287,72 +298,175 @@ def release_build_cli(
     )
 
 
-@solar_cli.command("corpus-audit")
-@click.argument(
-    "output",
-    type=click.Path(file_okay=False, path_type=Path),
-)
-@click.option(
-    "--manifest",
-    "manifest_path",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    default=Path("problems/AMD_AKA/manifest.yaml"),
-    show_default=True,
-)
-@click.option("--device", default="cuda:0", show_default=True)
-@click.option(
-    "--backend",
-    type=_BACKEND_CHOICE,
-    default=DEFAULT_IR_PATH.value,
-    show_default=True,
-)
-@click.option(
-    "--timeout",
-    "timeout_seconds",
-    default=14_400.0,
-    show_default=True,
-)
-@click.option("--resume", is_flag=True)
-def corpus_audit_cli(
-    output: Path,
+def _run_solar_qualification_cli(
+    stage: BatchGPUQualificationStage,
+    workspace: Path,
     manifest_path: Path,
+    orojenesis_home: Path,
+    qualification_root: Path,
     device: str,
     backend: str,
     timeout_seconds: float,
-    resume: bool,
+    jobs: int,
 ) -> CliResult:
-    """Audit extraction, strict conversion, and replay for every scored workload."""
     try:
-        result = audit_corpus_stage_readiness(
-            manifest_path,
-            output,
+        gate = run_solar_release_qualification(
+            workspace,
+            corpus_manifest_path=manifest_path,
+            orojenesis_home=orojenesis_home,
+            qualification_root=qualification_root,
+            stage=stage,
+            timeout_seconds=timeout_seconds,
             device=device,
             ir_path=backend,
-            timeout_seconds=timeout_seconds,
-            resume=resume,
+            jobs=jobs,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         raise CliFailure(
             str(exc),
-            code="solar_corpus_audit_failed",
+            code="solar_qualification_failed",
             exit_code=CliExitCode.RESULT_FAILED,
-            hint="Inspect the failed workload matrix and rerun on gfx1200.",
+            hint="Complete static, canary, and full qualification in order.",
         ) from exc
-    color = "green" if result.ready else "yellow"
-    console.print(
-        f"[{color}]SOLAR corpus readiness: "
-        f"{result.verification_passed}/{result.workloads} workloads verified."
-        f"[/{color}]",
-    )
+    path = qualification_root.resolve() / stage.value / "gate.json"
     return CliResult(
-        data=result.to_dict(),
-        artifacts=(
-            artifact(result.matrix_path, "jsonl_file"),
-            artifact(result.summary_path, "json_file"),
+        data={
+            "stage": stage,
+            "items": len(gate.item_ids),
+            "performance_authority": False,
+        },
+        artifacts=(artifact(path, "qualification_gate_json"),),
+    )
+
+
+def _solar_qualification_options[**P, R](
+    function: Callable[P, R],
+) -> Callable[P, R]:
+    options = (
+        click.option(
+            "--jobs", type=click.IntRange(min=1), default=1, show_default=True
         ),
-        exit_code=(
-            CliExitCode.SUCCESS if result.ready else CliExitCode.RESULT_FAILED
+        click.option(
+            "--timeout", "timeout_seconds", default=14_400.0, show_default=True
         ),
+        click.option(
+            "--backend",
+            type=_BACKEND_CHOICE,
+            default=DEFAULT_IR_PATH.value,
+            show_default=True,
+        ),
+        click.option("--device", default="cuda:0", show_default=True),
+        click.option(
+            "--qualification-root",
+            required=True,
+            type=click.Path(file_okay=False, path_type=Path),
+        ),
+        click.option(
+            "--orojenesis-home",
+            required=True,
+            type=click.Path(exists=True, file_okay=False, path_type=Path),
+            envvar="SOLAR_OROJENESIS_HOME",
+        ),
+        click.option(
+            "--manifest",
+            "manifest_path",
+            type=click.Path(exists=True, dir_okay=False, path_type=Path),
+            default=Path("problems/AMD_AKA/manifest.yaml"),
+            show_default=True,
+        ),
+    )
+    for option in options:
+        function = option(function)
+    return function
+
+
+@solar_cli.command(BatchGPUQualificationStage.STATIC.command)
+@click.argument(
+    "workspace",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@_solar_qualification_options
+def solar_qualify_static_cli(
+    workspace: Path,
+    manifest_path: Path,
+    orojenesis_home: Path,
+    qualification_root: Path,
+    device: str,
+    backend: str,
+    timeout_seconds: float,
+    jobs: int,
+) -> CliResult:
+    """Validate every SOLAR release input without using the GPU."""
+    return _run_solar_qualification_cli(
+        BatchGPUQualificationStage.STATIC,
+        workspace,
+        manifest_path,
+        orojenesis_home,
+        qualification_root,
+        device,
+        backend,
+        timeout_seconds,
+        jobs,
+    )
+
+
+@solar_cli.command(BatchGPUQualificationStage.CANARY.command)
+@click.argument(
+    "workspace",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@_solar_qualification_options
+def solar_qualify_canary_cli(
+    workspace: Path,
+    manifest_path: Path,
+    orojenesis_home: Path,
+    qualification_root: Path,
+    device: str,
+    backend: str,
+    timeout_seconds: float,
+    jobs: int,
+) -> CliResult:
+    """Run risk-first SOLAR conversion and replay canaries."""
+    return _run_solar_qualification_cli(
+        BatchGPUQualificationStage.CANARY,
+        workspace,
+        manifest_path,
+        orojenesis_home,
+        qualification_root,
+        device,
+        backend,
+        timeout_seconds,
+        jobs,
+    )
+
+
+@solar_cli.command(BatchGPUQualificationStage.FULL.command)
+@click.argument(
+    "workspace",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@_solar_qualification_options
+def solar_qualify_full_cli(
+    workspace: Path,
+    manifest_path: Path,
+    orojenesis_home: Path,
+    qualification_root: Path,
+    device: str,
+    backend: str,
+    timeout_seconds: float,
+    jobs: int,
+) -> CliResult:
+    """Qualify extraction, conversion, and replay for every workload."""
+    return _run_solar_qualification_cli(
+        BatchGPUQualificationStage.FULL,
+        workspace,
+        manifest_path,
+        orojenesis_home,
+        qualification_root,
+        device,
+        backend,
+        timeout_seconds,
+        jobs,
     )
 
 

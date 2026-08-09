@@ -123,20 +123,25 @@ publication-eligible capacity-constrained Orojenesis bound; the
 reviewed-mapper allowlist contains the reproducibly built trusted digest, and
 locally substituted binaries fail closed.
 
-## Audit corpus-wide SOLAR readiness
+## Qualify corpus-wide SOLAR readiness
 
 ```bash
-uv run sol-execbench solar corpus-audit out/solar/corpus-readiness \
-  --device cuda:0 \
-  --timeout 14400
+uv run sol-execbench solar qualify-static out/release \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root out/solar-qualification
+uv run sol-execbench solar qualify-canary out/release \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root out/solar-qualification
+uv run sol-execbench solar qualify-full out/release \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root out/solar-qualification
 ```
 
-This command derives the scored denominator from the manifest (currently 163
-workloads), then audits extraction, strict conversion, and multi-seed replay
-without running Orojenesis. It keeps every workload in the content-addressed
-matrix, including failed stages and stable reason codes. Use `--resume` only to
-continue an audit whose recorded input identities and artifact hashes still
-match.
+The chain derives the scored denominator from the manifest (currently 163
+workloads), runs extrema canaries, then audits extraction, strict conversion,
+and replay for every workload without running the formal mapper. The formal
+release command requires the resulting full gate. See
+[Large batch GPU qualification](GPU-QUALIFICATION.md).
 
 ## Inspect official-score availability
 

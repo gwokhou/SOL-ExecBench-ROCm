@@ -11,16 +11,42 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from sol_execbench.core.bench.batch_gpu_qualification import (
+    BatchGPUQualificationGate,
+    BatchGPUQualificationReceipt,
+    BatchGPUQualificationStage,
+    LargeBatchGPUTask,
+    qualification_artifact,
+    qualification_gate_path,
+    qualification_parent_stage,
+    require_isolated_qualification_root,
+    select_risk_first_axis_extrema,
+    verify_qualification_artifact,
+)
+from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.json_utils import (
+    atomic_write_json_value,
+    load_json_file,
+    load_jsonl_file,
+)
+from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import (
+    AKA_REVISION,
     AKACorpusEntry,
     AKACorpusManifest,
+)
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
+from sol_execbench.core.solar_bridge.corpus_readiness import (
+    CorpusReadinessStatus,
+    audit_corpus_stage_readiness,
 )
 from sol_execbench.core.solar_bridge.models import IRPath, SolarWorkerRequest
 from sol_execbench.core.solar_bridge.path_comparison import (
     compare_solar_ir_paths,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
+from sol_execbench.core.timestamps import utc_timestamp
 
 FOCUS_WORKLOAD_COUNTS = {
     "torch2hip/l1n95_cross_entropy": 5,
@@ -191,16 +217,233 @@ def run_focus(
     )
 
 
+def _qualification_root(arguments: argparse.Namespace) -> Path:
+    return require_isolated_qualification_root(
+        arguments.qualification_root,
+        arguments.output,
+    )
+
+
+def _focus_workloads(
+    corpus: AKACorpusManifest,
+) -> dict[str, tuple[Definition, Workload]]:
+    result: dict[str, tuple[Definition, Workload]] = {}
+    for entry in _focus_entries(corpus):
+        problem_path = entry.relative_problem_dir.as_posix()
+        problem = corpus.authored_root / entry.relative_problem_dir
+        definition = load_json_file(Definition, problem / "definition.json")
+        workloads = {
+            item.uuid: item
+            for item in load_jsonl_file(Workload, problem / "workload.jsonl")
+        }
+        for workload_uuid in entry.workload_uuids:
+            result[f"{problem_path}/{workload_uuid}"] = (
+                definition,
+                workloads[workload_uuid],
+            )
+    return result
+
+
+def _selected_focus_ids(
+    corpus: AKACorpusManifest,
+    stage: BatchGPUQualificationStage,
+) -> tuple[str, ...]:
+    items = _focus_workloads(corpus)
+    if stage is not BatchGPUQualificationStage.CANARY:
+        selected = tuple(items)
+    else:
+        by_problem: dict[str, list[tuple[str, Definition, Workload]]] = {}
+        for item_id, (definition, workload) in items.items():
+            problem_path = item_id.rsplit("/", maxsplit=1)[0]
+            by_problem.setdefault(problem_path, []).append(
+                (item_id, definition, workload)
+            )
+        canaries: list[tuple[str, Definition, Workload]] = []
+        for problem_path in sorted(by_problem):
+            canaries.extend(
+                select_risk_first_axis_extrema(
+                    by_problem[problem_path],
+                    item_id=lambda item: item[0],
+                    axes=lambda item: item[1].get_resolved_axes_values(
+                        item[2].axes
+                    ),
+                )
+            )
+        selected = tuple(item[0] for item in canaries)
+    return tuple(
+        f"{ir_path.value}/{item_id}"
+        for ir_path in IR_PATHS
+        for item_id in selected
+    )
+
+
+def _qualification_subject(corpus: AKACorpusManifest) -> str:
+    return stable_json_checksum(
+        {
+            "manifest_sha256": sha256_file(corpus.path),
+            "focus": focus_summary(corpus),
+        }
+    )
+
+
+def _qualification_configuration(arguments: argparse.Namespace) -> str:
+    return stable_json_checksum(
+        {
+            "device": arguments.device,
+            "orojenesis_home": str(arguments.orojenesis_home.resolve()),
+            "timeout_seconds": arguments.timeout,
+            "ir_paths": [path.value for path in IR_PATHS],
+        }
+    )
+
+
+def _run_static_qualification(
+    corpus: AKACorpusManifest,
+    arguments: argparse.Namespace,
+    item_ids: tuple[str, ...],
+) -> BatchGPUQualificationReceipt:
+    root = _qualification_root(arguments)
+    path = root / "static" / "focus.json"
+    payload = {
+        **focus_summary(corpus),
+        "task": LargeBatchGPUTask.SOLAR_CROSS_PATH_FOCUS,
+        "subject_sha256": _qualification_subject(corpus),
+        "item_ids": item_ids,
+    }
+    atomic_write_json_value(path, payload)
+    return BatchGPUQualificationReceipt(
+        stage=BatchGPUQualificationStage.STATIC,
+        partition="cross-path-focus",
+        item_ids=item_ids,
+        input_sha256=stable_json_checksum(payload),
+        artifacts=(qualification_artifact(root, path),),
+    )
+
+
+def _run_path_qualification(
+    corpus: AKACorpusManifest,
+    arguments: argparse.Namespace,
+    stage: BatchGPUQualificationStage,
+    ir_path: IRPath,
+    item_ids: tuple[str, ...],
+) -> BatchGPUQualificationReceipt:
+    root = _qualification_root(arguments)
+    prefix = f"{ir_path.value}/"
+    path_items = tuple(item for item in item_ids if item.startswith(prefix))
+    corpus_items = frozenset(item.removeprefix(prefix) for item in path_items)
+    result = audit_corpus_stage_readiness(
+        corpus.path,
+        root / stage.value / ir_path.value / "readiness",
+        device=arguments.device,
+        timeout_seconds=arguments.timeout,
+        resume=True,
+        ir_path=ir_path,
+        selected_item_ids=corpus_items,
+    )
+    if result.status is not CorpusReadinessStatus.READY:
+        raise ValueError(f"cross-path {ir_path.value} qualification failed")
+    return BatchGPUQualificationReceipt(
+        stage=stage,
+        partition=ir_path.value,
+        item_ids=path_items,
+        input_sha256=_qualification_subject(corpus),
+        artifacts=(
+            qualification_artifact(root, result.matrix_path),
+            qualification_artifact(root, result.summary_path),
+        ),
+    )
+
+
+def _run_qualification(
+    corpus: AKACorpusManifest,
+    arguments: argparse.Namespace,
+    stage: BatchGPUQualificationStage,
+) -> BatchGPUQualificationGate:
+    root = _qualification_root(arguments)
+    path = qualification_gate_path(root, stage)
+    if path.is_file():
+        return _verify_qualification(corpus, arguments, stage)
+    parent = qualification_parent_stage(stage)
+    parent_hash = None
+    if parent is not None:
+        _verify_qualification(corpus, arguments, parent)
+        parent_hash = sha256_file(qualification_gate_path(root, parent))
+    item_ids = _selected_focus_ids(corpus, stage)
+    receipts = (
+        (_run_static_qualification(corpus, arguments, item_ids),)
+        if stage is BatchGPUQualificationStage.STATIC
+        else tuple(
+            _run_path_qualification(corpus, arguments, stage, ir_path, item_ids)
+            for ir_path in IR_PATHS
+        )
+    )
+    gate = BatchGPUQualificationGate(
+        task=LargeBatchGPUTask.SOLAR_CROSS_PATH_FOCUS,
+        stage=stage,
+        scope_id=f"{AKA_REVISION}:cross-path-focus",
+        subject_sha256=_qualification_subject(corpus),
+        runner_sha256=sha256_file(Path(__file__)),
+        configuration_sha256=_qualification_configuration(arguments),
+        source_revision=AKA_REVISION,
+        parent_gate_sha256=parent_hash,
+        item_ids=tuple(
+            item for receipt in receipts for item in receipt.item_ids
+        ),
+        receipts=receipts,
+        created_at=utc_timestamp(),
+    )
+    atomic_write_json_value(path, gate.model_dump(mode="json"))
+    return _verify_qualification(corpus, arguments, stage)
+
+
+def _verify_qualification(
+    corpus: AKACorpusManifest,
+    arguments: argparse.Namespace,
+    stage: BatchGPUQualificationStage,
+) -> BatchGPUQualificationGate:
+    root = _qualification_root(arguments)
+    parent = qualification_parent_stage(stage)
+    parent_hash = None
+    if parent is not None:
+        _verify_qualification(corpus, arguments, parent)
+        parent_hash = sha256_file(qualification_gate_path(root, parent))
+    gate = load_json_file(
+        BatchGPUQualificationGate, qualification_gate_path(root, stage)
+    )
+    if not (
+        gate.task is LargeBatchGPUTask.SOLAR_CROSS_PATH_FOCUS
+        and gate.stage is stage
+        and gate.scope_id == f"{AKA_REVISION}:cross-path-focus"
+        and gate.subject_sha256 == _qualification_subject(corpus)
+        and gate.runner_sha256 == sha256_file(Path(__file__))
+        and gate.configuration_sha256 == _qualification_configuration(arguments)
+        and gate.parent_gate_sha256 == parent_hash
+        and set(gate.item_ids) == set(_selected_focus_ids(corpus, stage))
+    ):
+        raise ValueError(f"cross-path qualification identity drift: {stage}")
+    for receipt in gate.receipts:
+        for artifact in receipt.artifacts:
+            verify_qualification_artifact(root, artifact)
+    return gate
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "stage",
+        choices=(
+            *(stage.command for stage in BatchGPUQualificationStage),
+            "run",
+        ),
+    )
     parser.add_argument(
         "--manifest",
         type=Path,
         default=Path("problems/AMD_AKA/manifest.yaml"),
     )
-    parser.add_argument("--check", action="store_true")
-    parser.add_argument("--output", type=Path)
-    parser.add_argument("--orojenesis-home", type=Path)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--orojenesis-home", type=Path, required=True)
+    parser.add_argument("--qualification-root", type=Path, required=True)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--timeout", type=float, default=14_400)
     parser.add_argument("--resume", action="store_true")
@@ -211,13 +454,16 @@ def main(argv: list[str] | None = None) -> int:
     """Validate the focus or execute and compare both formal IR paths."""
     arguments = _parse_args(argv)
     corpus = AKACorpusManifest.load(arguments.manifest)
-    if arguments.check:
-        print(json.dumps(focus_summary(corpus), indent=2, sort_keys=True))
-        return 0
-    if arguments.output is None or arguments.orojenesis_home is None:
-        raise ValueError("execution requires --output and --orojenesis-home")
     if arguments.timeout <= 0:
         raise ValueError("--timeout must be positive")
+    if arguments.stage != "run":
+        stage = BatchGPUQualificationStage(
+            arguments.stage.removeprefix("qualify-")
+        )
+        gate = _run_qualification(corpus, arguments, stage)
+        print(gate.model_dump_json(indent=2))
+        return 0
+    _verify_qualification(corpus, arguments, BatchGPUQualificationStage.FULL)
     result = run_focus(
         corpus,
         output_root=arguments.output,

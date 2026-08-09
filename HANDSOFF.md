@@ -1,6 +1,6 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-09 against `f4453442` and the current worktree.
+Last audited: 2026-08-09 against `f89b94c2` and the current worktree.
 
 This file records unresolved repository-level work, the decisions that constrain
 it, and the evidence that closed the lifecycle production-topology P0. Generated run
@@ -26,12 +26,74 @@ investigations and one-time inventories belong in Git history.
   not a repairable acceptance attempt: its held-out reveal exposed a change from
   accumulated hardware traffic to SOLAR semantic bytes as the working-set
   coordinate.
-- Cycle 3 has a frozen, pair-disjoint start-220 design. The historical 880-case
-  development corpus and its pre-migration artifacts establish feasibility but
-  do not authorize current held-out collection, acceptance, or publication.
-  The start-220 payload is registered as production design
+- Cycle 3 has a frozen, pair-disjoint start-220 design. Its production
+  collection is now terminally incomplete: the first 181 held-out cases
+  returned, then `held_out-transformer_block-01` failed before timing because
+  the frozen design requested `M=1032` while the packaged candidate contract
+  permits sequence lengths only through 1024. No held-out corpus was frozen,
+  no acceptance verdict exists, and no publication is authorized. The
+  start-220 payload remains registered as production design
   `2bcfa7fc7feadb39a165b03d6a855d73045b9ae536dabda445a1cdbb1dbc60ee`;
-  this records the existing frozen design and does not claim new GPU evidence.
+  this records the immutable failed design and does not authorize repair or
+  reuse of its now-revealed held-out pairs.
+- The current worktree adds mandatory pre-collection qualification. Counter
+  collection now requires an isolated, content-bound chain of three verified
+  gates: zero-GPU validation of all 660 frozen design cases and every prepared
+  problem artifact; risk-first per-axis-extrema canaries; then minimal-profile
+  correctness qualification of every workload in the selected role. Family
+  receipts are written after each success, all incidental qualification timing
+  is explicitly non-authoritative, and any gate/input/collector hash drift
+  blocks `collect` before its first case. Existing collection evidence is
+  resumable only when the complete manifest and all cited artifacts verify as
+  `available` with the current definition/workload/solution identity; partial
+  evidence is a hard error.
+- The same mandatory stage vocabulary now governs every current large batch GPU
+  producer: `qualify-static`, `qualify-canary`, and `qualify-full`. Release
+  baseline/candidate timing, full-corpus SOLAR construction, AKA tolerance
+  calibration, the 82-analysis SOLAR cross-path focus, diagnostic calibration,
+  and future resource-peak calibration all verify the complete content-bound
+  chain before their first formal item. The shared gate schema records the task,
+  subject, runner, configuration, source, exact item denominator, parent gate,
+  and hashed receipts; all qualification timing remains non-authoritative.
+  The historical resource-peak v3 producer remains byte-frozen because the real
+  checked-in audit pins its whole-file SHA-256. New runs use
+  `run_qualified_rdna4_resource_peak_calibration.py`; changing the historical
+  script or rewriting its audit digest is forbidden.
+- The user accepts the 181 completed Cycle 3 cases only as a degraded
+  exploratory observation. They remain ineligible for freeze, production
+  acceptance, inference fitting, or publication. Any optional completion of
+  the remaining 19 transformer and 20 concurrent observations must use a
+  separately labelled exploratory root with valid replacement transformer
+  shapes; it must not amend the frozen start-220 design or create production
+  lifecycle authority.
+- The first isolated repair draft, start 280 / design
+  `a28e0e604d532ecb5f7703cf9cdc586f0a68ec178b2caa4549a8f350802ca956`,
+  passed only the zero-GPU static gate. It used a synthetic odd transformer
+  sweep and was superseded before canary, full qualification, or collection;
+  its old gate is additionally invalid after the collector changed. Retain it
+  only as abandoned process evidence.
+- The current representative exploratory repair is the isolated start-340
+  design `20f86f6c7a0ed6a084a6ff59120acdb1f90dad8f4c8dc4e805ce1c48472ca5f8`.
+  Its 60 transformer shapes are unique, bounded by 1024, and organized into
+  audited neighborhoods around short contexts, BERT/GPT boundaries, and
+  vision-token anchors while remaining disjoint from start 100/160/220/280.
+  Design SHA-256 is
+  `29270b044c2adb06dad462a7e7ee8ba7f3bbe7cd5df537fc4eb2a942f4a2512e`.
+  Its zero-GPU static gate covers all 660 cases, is explicitly
+  non-authoritative for performance. After the qualification runner was bound
+  to the hardened Docker entrypoint and explicit non-authoritative
+  `not_tested`-target smoke routing, the current static gate SHA-256 is
+  `45db95164c401221da1733c1de5d9724d4177c3eb7546d306ee89e79f067aa9c`.
+  The real RX 9060 XT/gfx1200 canary passed all 34 extrema across all 11
+  families in container isolation; every Trace is `PASSED`, and the canary
+  gate SHA-256 is
+  `675dd03390112e05fb60f5470976227bc42fe7e1013575b50e5b529cf0547204`.
+  Full qualification then passed all 220 held-out workloads—20 in each of the
+  11 families—with every Trace reporting `PASSED`, `gfx1200`, and container
+  isolation. Its gate SHA-256 is
+  `963d4197965a3f7a01af756066f319b943fef3a145db4a663e6fef0a37048b45`.
+  Both GPU gates remain `performance_authority=false`; no rocprof or counter
+  collection has run for this repair.
 - The production-topology lifecycle P0 closed on 2026-08-09. Historical v7 and
   Cycle 2 evidence was imported into the content-addressed store without GPU
   recomputation, then promoted as an 880-case, three-parent production snapshot
@@ -40,11 +102,13 @@ investigations and one-time inventories belong in Git history.
   branch, fresh held-out branch, exact collection-tree inventory, role-separated
   model/acceptance parents, immutable receipts, idempotent resume, successor
   generation rules, and fail-closed consistency/GC.
-- P0 closure does not authorize Cycle 3 acceptance or publication. The complete
+- P0 closure did not authorize Cycle 3 acceptance or publication. The complete
   end-to-end run described below has purpose `control_plane_conformance`; the
   production registry objects are the three historical source snapshots, their
   promoted development snapshot, and the start-100/start-160/start-220 designs.
-  Fresh start-220 GPU collection and the production acceptance verdict remain P1.
+  The failed start-220 collection is retained process evidence. A new
+  pair-disjoint successor design and collection are required before a
+  production acceptance verdict can exist.
 - Do not remove `microarchitecture-diagnostics-v7/` or
   `microarchitecture-diagnostics-v7-cycle2/` merely because CAS import
   completed. Expanded source-tree retirement still requires a reviewed path
@@ -159,12 +223,32 @@ diagnostic store consistency checker passed.
 
 ## Active backlog
 
-### P1 — Run Cycle 3 held-out acceptance through the governed chain
+### P1 — Open a successor after terminal Cycle 3 collection failure
 
-The production-topology P0 is closed; Cycle 3 must
-not reuse prior inference or acceptance artifacts, tune after held-out reveal,
-change gates, exclude the 24 Cycle 2 cases that exposed the working-set bug, or
-reuse a held-out pair.
+The production-topology P0 is closed, but Cycle 3 cannot reach acceptance. Its
+failed case is canonical Trace `478a2d6990f188c89f719d8b5215f9d8ade32d3707a7cd6680640df304611772`
+with collection-log SHA-256
+`fb40ebd6a9df4148dc56406d002b5fdba1ecf94b57d4bdda8e60a8af66c13236`
+and partial performance-evidence SHA-256
+`489a02851671e968a4db959c4d4905f0d06d7bd9a2192ffa5c1b459b3735c9bf`.
+The failure is deterministic, not a retryable sandbox or profiler incident.
+The current worktree rejects any such design before GPU collection and has
+focused regression coverage; it also implements the mandatory three-gate
+qualification chain described above. The gates have passed CPU/static and
+simulated-evaluator regression tests. Real static, canary, and full-role
+qualification receipts now exist for the isolated representative start-340
+repair. Two earlier canary attempts stopped before GPU: direct host execution
+was rejected for lacking isolation, then the Docker matrix rejected an
+unvalidated `not_tested` target. Their logs remain intact. The successful runs
+use the repository's explicit non-authoritative smoke route and grant no
+benchmark, score, acceptance, or publication authority. The three qualification
+gates now admit an explicitly selected exploratory counter collection, but no
+such collection has started. This does not mutate the frozen start-220 payload.
+
+Do not force, skip, repair, or resume the Cycle 3 tree. The next production
+attempt must not reuse prior inference or acceptance artifacts, tune after
+held-out reveal, change gates, exclude revealed failures, or reuse a held-out
+pair.
 
 Required sequence:
 
@@ -180,8 +264,13 @@ Required sequence:
 3. Fit and freeze a current-policy v7 inference profile from the promoted
    development snapshot. Rebuild every cited case; unavailable hardware
    prediction is a hard failure.
-4. Collect and freeze the 220 preregistered start-220 held-out cases—20 for each
-   of eleven families—without inspecting partial results.
+4. Register a fresh successor design whose complete generated workload set is
+   statically checked against every packaged candidate contract before freeze.
+   Complete `qualify-static`, `qualify-canary --role held_out`, and
+   `qualify-full --role held_out` into an isolated qualification root. Verify
+   the parent/hash chain, then collect and freeze 220 new held-out cases—20 for
+   each of eleven families—without reusing a Cycle 3 pair or inspecting partial
+   performance results.
 5. Run acceptance once and commit the terminal verdict. Retain and stop on
    `accepted=false`; only `accepted=true` may create a publication and release.
 6. For an accepted verdict, publish through the same lineage and ingest the
@@ -197,10 +286,25 @@ historical development quality does not substitute for held-out acceptance.
 
 Authoritative surfaces:
 
+- `docs/user/GPU-QUALIFICATION.md`
+- `src/sol_execbench/core/bench/batch_gpu_qualification.py`
 - `docs/performance-diagnostics.md`
 - `src/sol_execbench/core/bench/performance_model/`
 - `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
 - `scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py`
+
+### P1 — Bind effective PCIe topology in hardware evidence
+
+The Cycle 3 GPU identity records UUID and endpoint BDF but not the complete
+PCIe parent path. On the collection host, endpoint `0000:03:00.0` reports an
+internal x16 link, while the effective CPU-root path through `0000:00:01.1`
+is PCIe 5.0 x8. Endpoint-only telemetry therefore cannot prove the effective
+host link or detect a mid-run topology change.
+
+A successor generation must bind pre/post observations for every parent link,
+including BDF, current/max speed, and current/max width, and derive the
+effective path from the narrowest negotiated link. A current host observation
+cannot retroactively prove the topology of already collected evidence.
 
 ### P1 — Expand empirical hardware and isolation coverage
 

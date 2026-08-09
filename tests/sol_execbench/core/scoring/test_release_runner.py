@@ -17,7 +17,7 @@ from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
-from sol_execbench.core.scoring import release_runner
+from sol_execbench.core.scoring import release_contract, release_runner
 from sol_execbench.core.scoring.release_models import (
     ExecutionPlanProblem,
     ReleaseExecutionPlan,
@@ -28,6 +28,15 @@ from sol_execbench.core.scoring.release_runner import (
     ReleaseEvaluationRequest,
     ReleaseEvaluationResult,
 )
+
+
+@pytest.fixture(autouse=True)
+def _qualification_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        release_runner,
+        "require_release_qualification",
+        lambda *_args, **_kwargs: None,
+    )
 
 
 class _TraceResult:
@@ -104,6 +113,7 @@ def test_execute_release_plan_summarizes_candidate_results(
     result = release_runner.execute_release_plan(
         tmp_path / "workspace/plans/plan.json",
         corpus_manifest_path=tmp_path / "manifest.yaml",
+        qualification_root=tmp_path / "qualification",
         evaluator=_unused_evaluator,
         timeout_seconds=17,
         resume=True,
@@ -153,8 +163,36 @@ def test_execute_release_plan_rejects_incomplete_baseline(
         release_runner.execute_release_plan(
             tmp_path / "workspace/plans/plan.json",
             corpus_manifest_path=tmp_path / "manifest.yaml",
+            qualification_root=tmp_path / "qualification",
             evaluator=_unused_evaluator,
         )
+
+
+def test_release_qualification_blocks_before_plan_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loaded = False
+
+    def reject(*_args, **_kwargs):
+        raise ValueError("full qualification gate missing")
+
+    def load(*_args, **_kwargs):
+        nonlocal loaded
+        loaded = True
+
+    monkeypatch.setattr(release_runner, "require_release_qualification", reject)
+    monkeypatch.setattr(release_runner, "load_execution_plan", load)
+
+    with pytest.raises(ValueError, match="gate missing"):
+        release_runner.execute_release_plan(
+            tmp_path / "release/candidate/plan.json",
+            corpus_manifest_path=tmp_path / "manifest.yaml",
+            qualification_root=tmp_path / "qualification",
+            evaluator=_unused_evaluator,
+        )
+
+    assert loaded is False
 
 
 def _contract_objects(
@@ -193,11 +231,11 @@ def _contract_objects(
 
 def _stub_contract_io(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
-        release_runner,
+        release_contract,
         "verify_artifact_file",
         lambda *_a, **_k: tmp_path / "bundled.yaml",
     )
-    monkeypatch.setattr(release_runner, "sha256_file", lambda _path: "same")
+    monkeypatch.setattr(release_contract, "sha256_file", lambda _path: "same")
 
 
 def test_verify_plan_contract_accepts_exact_denominator(
@@ -208,14 +246,14 @@ def test_verify_plan_contract_accepts_exact_denominator(
     verified: list[tuple[Path, str]] = []
     _stub_contract_io(monkeypatch, tmp_path)
     monkeypatch.setattr(
-        release_runner,
+        release_contract,
         "verify_release_source_state",
         lambda root, expected_revision: verified.append(
             (root, expected_revision),
         ),
     )
 
-    release_runner._verify_plan_contract(plan, tmp_path, corpus)
+    release_contract.verify_release_plan_contract(plan, tmp_path, corpus)
 
     assert verified == [(tmp_path, "a" * 40)]
 
@@ -248,7 +286,7 @@ def test_verify_plan_contract_rejects_drift(
     _stub_contract_io(monkeypatch, tmp_path)
 
     with pytest.raises(ValueError, match=message):
-        release_runner._verify_plan_contract(plan, tmp_path, corpus)
+        release_contract.verify_release_plan_contract(plan, tmp_path, corpus)
 
 
 def test_verify_plan_contract_rejects_corpus_identity(
@@ -257,12 +295,12 @@ def test_verify_plan_contract_rejects_corpus_identity(
 ) -> None:
     plan, corpus = _contract_objects(tmp_path)
     monkeypatch.setattr(
-        release_runner,
+        release_contract,
         "verify_artifact_file",
         lambda *_a, **_k: tmp_path / "bundled.yaml",
     )
     monkeypatch.setattr(
-        release_runner,
+        release_contract,
         "sha256_file",
         lambda path: (
             "bundled" if path.name == "bundled.yaml" else "authoritative"
@@ -270,7 +308,7 @@ def test_verify_plan_contract_rejects_corpus_identity(
     )
 
     with pytest.raises(ValueError, match="corpus identity mismatch"):
-        release_runner._verify_plan_contract(plan, tmp_path, corpus)
+        release_contract.verify_release_plan_contract(plan, tmp_path, corpus)
 
 
 def test_environment_evidence_is_written_and_resume_validated(

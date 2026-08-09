@@ -101,12 +101,14 @@ uv run python scripts/internal/rdna4/run_rdna4_validation.py \
   --verify out/diagnostics/rdna4-local
 ```
 
-The same self-hosted workflow also runs the complete SOLAR three-stage corpus
-audit and uploads its content-addressed `gfx1200` readiness matrix. For a local
-equivalent:
+The same self-hosted workflow also runs the complete SOLAR qualification chain
+and uploads its content-addressed `gfx1200` readiness matrix. After static and
+canary gates, the local full-stage equivalent is:
 
 ```bash
-uv run sol-execbench solar corpus-audit out/solar/corpus-readiness \
+uv run sol-execbench solar qualify-full out/release \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root out/solar-qualification \
   --device cuda:0 \
   --backend torchview_extended_einsum \
   --timeout 14400

@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
@@ -24,9 +26,14 @@ from sol_execbench.cli.evaluation.problem_io import (
 )
 from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.sidecars.static_evidence import _static_evidence_payload
+from sol_execbench.core.bench.batch_gpu_qualification import (
+    BatchGPUQualificationStage,
+)
+from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
 from sol_execbench.core.bench.performance_model.corpus_preflight import (
     DiagnosticCorpusDesign,
+    preflight,
 )
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceArtifact,
@@ -59,6 +66,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.corpus_registry import
     snapshot_blob_inventory,
 )
 from sol_execbench.core.bench.performance_model.models import WorkloadKind
+from sol_execbench.core.bench.performance_model.qualification import (
+    DiagnosticCorpusQualification,
+    DiagnosticQualificationReceipt,
+)
 from sol_execbench.core.bench.performance_model.replay_evidence import (
     PerformanceReplayEvidenceSidecar,
 )
@@ -76,12 +87,17 @@ from sol_execbench.core.bench.static_kernel.evidence import (
 from sol_execbench.core.bench.static_kernel.isa_analysis import (
     collect_static_isa_analyses,
 )
+from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     atomic_write_jsonl_values,
     load_json_file,
     load_json_value,
+    load_jsonl_file,
 )
+from sol_execbench.core.data.solution_instance import Solution
+from sol_execbench.core.data.trace import Trace
+from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.solar_bridge.performance import (
@@ -94,6 +110,10 @@ from sol_execbench.driver.problem_packager import ProblemPackager
 
 Role = Literal["development", "held_out"]
 Phase = Literal["point_fit", "conformal", "held_out"]
+GPUQualificationStage = Literal[
+    BatchGPUQualificationStage.CANARY,
+    BatchGPUQualificationStage.FULL,
+]
 FAMILIES = (
     WorkloadKind.ELEMENTWISE,
     WorkloadKind.TRANSPOSE,
@@ -110,12 +130,88 @@ FAMILIES = (
 CASES_PER_PHASE = 20
 HISTORICAL_UNIVERSE_START = 100
 UNIVERSE_CASES_PER_FAMILY = 3 * CASES_PER_PHASE
+SOFTMAX_MAXIMUM_COLUMNS = 1024
+CROSS_ENTROPY_MAXIMUM_CLASSES = 1024
+TRANSFORMER_CHANNELS = 768
+TRANSFORMER_MAXIMUM_SEQUENCE = 1024
+PAIR_DISJOINT_SUCCESSOR_START = 280
+SUCCESSOR_TRANSFORMER_SEQUENCE_START = 513
+SUCCESSOR_TRANSFORMER_SEQUENCE_STRIDE = 2
+SUCCESSOR_MATMUL_ROWS_START = 257
+SUCCESSOR_MATMUL_ROWS_STRIDE = 4
+REPRESENTATIVE_SUCCESSOR_START = 340
+_TRANSFORMER_REALISM_NEIGHBORHOODS: tuple[
+    tuple[int, tuple[int, int, int, int]], ...
+] = (
+    (32, (29, 31, 33, 35)),
+    (64, (61, 63, 65, 67)),
+    (77, (75, 76, 77, 78)),
+    (96, (93, 95, 97, 99)),
+    (128, (125, 127, 129, 131)),
+    (192, (189, 191, 193, 195)),
+    (197, (196, 197, 198, 199)),
+    (256, (253, 255, 257, 259)),
+    (384, (381, 383, 385, 387)),
+    (512, (509, 510, 511, 514)),
+    (577, (570, 574, 578, 582)),
+    (640, (637, 639, 641, 643)),
+    (768, (765, 767, 769, 771)),
+    (896, (893, 895, 897, 899)),
+    (1024, (1017, 1019, 1021, 1023)),
+)
+TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS = tuple(
+    sequence
+    for _, neighborhood in _TRANSFORMER_REALISM_NEIGHBORHOODS
+    for sequence in neighborhood
+)
+_TEMPLATE_AXIS_CONTRACTS: tuple[tuple[WorkloadKind, str, int, int], ...] = (
+    (WorkloadKind.SOFTMAX, "N", 1, SOFTMAX_MAXIMUM_COLUMNS),
+    (
+        WorkloadKind.CROSS_ENTROPY,
+        "N",
+        1,
+        CROSS_ENTROPY_MAXIMUM_CLASSES,
+    ),
+    (WorkloadKind.TRANSFORMER, "M", 1, TRANSFORMER_MAXIMUM_SEQUENCE),
+    (
+        WorkloadKind.TRANSFORMER,
+        "N",
+        TRANSFORMER_CHANNELS,
+        TRANSFORMER_CHANNELS,
+    ),
+)
 _PHASE_ROTATIONS: tuple[tuple[Phase, Phase, Phase], ...] = (
     ("point_fit", "conformal", "held_out"),
     ("conformal", "held_out", "point_fit"),
     ("held_out", "point_fit", "conformal"),
 )
 _TEMPLATE_PACKAGE = "sol_execbench.data.rdna4_diagnostic_templates"
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+_CONTAINER_OUTPUT_ROOT = Path("/outputs")
+_QUALIFICATION_CONFIG = BenchmarkConfig(
+    warmup_runs=0,
+    iterations=1,
+    trials=1,
+    min_measurement_time_seconds=None,
+    lock_clocks=False,
+    benchmark_reference=True,
+    seed=200,
+)
+_QUALIFICATION_FAMILY_ORDER = (
+    WorkloadKind.TRANSFORMER,
+    WorkloadKind.SOFTMAX,
+    WorkloadKind.CROSS_ENTROPY,
+    *(
+        family
+        for family in FAMILIES
+        if family
+        not in {
+            WorkloadKind.TRANSFORMER,
+            WorkloadKind.SOFTMAX,
+            WorkloadKind.CROSS_ENTROPY,
+        }
+    ),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +249,9 @@ def _parse_args() -> argparse.Namespace:
             "preregister",
             "prepare",
             "solar",
+            "qualify-static",
+            "qualify-canary",
+            "qualify-full",
             "collect",
             "freeze",
             "adopt",
@@ -160,6 +259,11 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument(
+        "--qualification-root",
+        type=Path,
+        help="Isolated, non-authoritative output root for mandatory gates.",
+    )
     parser.add_argument("--universe-start", type=int)
     parser.add_argument(
         "--source-revision",
@@ -226,17 +330,47 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
             "M": 1024 + 128 * global_index,
             "N": 256 + 32 * (global_index % 16),
         }
-    if family in {
-        WorkloadKind.COMPOSITE,
-        WorkloadKind.TRANSFORMER,
-        WorkloadKind.CONCURRENT,
-    }:
+    if family is WorkloadKind.TRANSFORMER:
+        if global_index >= REPRESENTATIVE_SUCCESSOR_START:
+            offset = global_index - REPRESENTATIVE_SUCCESSOR_START
+            if offset >= len(TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS):
+                raise ValueError(
+                    "transformer representative schedule is not authored "
+                    f"for global index {global_index}"
+                )
+            return {
+                "M": TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS[offset],
+                "N": TRANSFORMER_CHANNELS,
+            }
+        if global_index >= PAIR_DISJOINT_SUCCESSOR_START:
+            return {
+                "M": SUCCESSOR_TRANSFORMER_SEQUENCE_START
+                + SUCCESSOR_TRANSFORMER_SEQUENCE_STRIDE
+                * (global_index - PAIR_DISJOINT_SUCCESSOR_START),
+                "N": TRANSFORMER_CHANNELS,
+            }
+        return {
+            "M": 32 + 8 * (global_index - HISTORICAL_UNIVERSE_START),
+            "N": TRANSFORMER_CHANNELS,
+        }
+    if family in {WorkloadKind.COMPOSITE, WorkloadKind.CONCURRENT}:
         # Each universe case needs a distinct M so no two cases within a phase
         # share a shape-bearing workload_uuid. The prior ``global_index % 16``
         # universe yielded only 16 distinct M values for 20 cases per phase.
         return {
             "M": 32 + 8 * (global_index - HISTORICAL_UNIVERSE_START),
             "N": 768,
+        }
+    if (
+        family is WorkloadKind.MATMUL
+        and global_index >= PAIR_DISJOINT_SUCCESSOR_START
+    ):
+        return {
+            "M": SUCCESSOR_MATMUL_ROWS_START
+            + SUCCESSOR_MATMUL_ROWS_STRIDE
+            * (global_index - PAIR_DISJOINT_SUCCESSOR_START),
+            "N": 80 + 16 * ((7 * global_index) % 10),
+            "K": 64 + 16 * ((3 * global_index) % 13),
         }
     return {
         "M": 64 + 16 * (global_index % 10),
@@ -315,6 +449,47 @@ def _design_payload(universe_start: int) -> dict[str, Any]:
             for case in cases
         ],
     }
+
+
+def _validate_template_axis_contracts(cases: Sequence[CaseSpec]) -> None:
+    """Reject a design that any packaged candidate cannot execute."""
+    for case in cases:
+        for family, axis, minimum, maximum in _TEMPLATE_AXIS_CONTRACTS:
+            if case.family is not family:
+                continue
+            value = case.axes[axis]
+            if not minimum <= value <= maximum:
+                raise ValueError(
+                    f"{case.case_id} axis {axis}={value} violates packaged "
+                    f"candidate contract [{minimum}, {maximum}]"
+                )
+
+
+def _validate_transformer_realism(cases: Sequence[CaseSpec]) -> None:
+    """Require the frozen representative transformer shape schedule."""
+    for case in cases:
+        if (
+            case.family is not WorkloadKind.TRANSFORMER
+            or case.global_index < REPRESENTATIVE_SUCCESSOR_START
+        ):
+            continue
+        offset = case.global_index - REPRESENTATIVE_SUCCESSOR_START
+        if offset >= len(TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS):
+            raise ValueError(
+                "transformer representative schedule does not cover "
+                f"{case.case_id}"
+            )
+        expected = TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS[offset]
+        if case.axes != {"M": expected, "N": TRANSFORMER_CHANNELS}:
+            raise ValueError(
+                f"{case.case_id} violates transformer realism schedule"
+            )
+
+
+def _validate_design_contracts(cases: Sequence[CaseSpec]) -> None:
+    """Apply executable-domain and representative-shape contracts."""
+    _validate_template_axis_contracts(cases)
+    _validate_transformer_realism(cases)
 
 
 def _definition_template(
@@ -441,6 +616,12 @@ def _preregister(
     root: Path, universe_start: int, source_revision: str | None = None
 ) -> None:
     design_path = root / "design.json"
+    _validate_design_contracts(
+        [
+            *_cases("development", universe_start),
+            *_cases("held_out", universe_start),
+        ]
+    )
     design = _design_payload(universe_start)
     if design_path.exists():
         if load_json_value(design_path) != design:
@@ -636,12 +817,647 @@ def _reuse_solar_case(
     return False
 
 
+def _require_qualification_root(root: Path, provided: Path | None) -> Path:
+    """Return a qualification root isolated from collection artifacts."""
+    if provided is None:
+        raise ValueError(
+            "qualification stages and collect require --qualification-root"
+        )
+    resolved_root = root.resolve()
+    qualification_root = provided.resolve()
+    if qualification_root == resolved_root or qualification_root.is_relative_to(
+        resolved_root
+    ):
+        raise ValueError(
+            "qualification root must be outside the collection root"
+        )
+    if resolved_root.is_relative_to(qualification_root):
+        raise ValueError(
+            "qualification root cannot contain the collection root"
+        )
+    return qualification_root
+
+
+def _qualification_gate_path(
+    qualification_root: Path,
+    stage: BatchGPUQualificationStage,
+    role: Role | None = None,
+) -> Path:
+    if stage is BatchGPUQualificationStage.STATIC:
+        return qualification_root / "static" / "gate.json"
+    if role is None:
+        raise ValueError(f"{stage} qualification requires a role")
+    return qualification_root / role / stage.value / "gate.json"
+
+
+def _qualification_stage_dir(
+    qualification_root: Path,
+    stage: BatchGPUQualificationStage,
+    role: Role,
+    family: WorkloadKind,
+) -> Path:
+    return qualification_root / role / stage.value / family.value
+
+
+def _ensure_qualification_config(qualification_root: Path) -> Path:
+    path = qualification_root / "config.json"
+    expected = _QUALIFICATION_CONFIG.model_dump(mode="json")
+    if path.is_file():
+        observed = load_json_file(BenchmarkConfig, path).model_dump(mode="json")
+        if observed != expected:
+            raise ValueError(f"qualification config differs: {path}")
+        return path
+    atomic_write_json_value(path, expected)
+    return path
+
+
+def _qualification_contract(root: Path) -> str:
+    """Bind gates to every frozen design and prepared problem input."""
+    problems = {
+        family.value: {
+            name: sha256_file(root / "problems" / family.value / name)
+            for name in ("definition.json", "solution.json", "workload.jsonl")
+        }
+        for family in FAMILIES
+    }
+    contracts = [
+        {
+            "family": family.value,
+            "axis": axis,
+            "minimum": minimum,
+            "maximum": maximum,
+        }
+        for family, axis, minimum, maximum in _TEMPLATE_AXIS_CONTRACTS
+    ]
+    return stable_json_checksum(
+        {
+            "design_sha256": sha256_file(root / "design.json"),
+            "problems": problems,
+            "template_axis_contracts": contracts,
+            "transformer_realism_neighborhoods": [
+                {"anchor": anchor, "sequences": sequences}
+                for anchor, sequences in _TRANSFORMER_REALISM_NEIGHBORHOODS
+            ],
+        }
+    )
+
+
+def _all_cases(universe_start: int) -> list[CaseSpec]:
+    return [
+        *_cases("development", universe_start),
+        *_cases("held_out", universe_start),
+    ]
+
+
+def _ordered_role_cases(role: Role, universe_start: int) -> list[CaseSpec]:
+    cases = _cases(role, universe_start)
+    return [
+        case
+        for family in _QUALIFICATION_FAMILY_ORDER
+        for case in cases
+        if case.family is family
+    ]
+
+
+def _canary_cases(role: Role, universe_start: int) -> list[CaseSpec]:
+    """Select deterministic per-axis extrema in risk-first family order."""
+    role_cases = _cases(role, universe_start)
+    selected: list[CaseSpec] = []
+    for family in _QUALIFICATION_FAMILY_ORDER:
+        family_cases = [case for case in role_cases if case.family is family]
+        by_id: dict[str, CaseSpec] = {}
+        for axis in sorted(family_cases[0].axes):
+            ordered = sorted(
+                family_cases,
+                key=lambda case: (case.axes[axis], case.global_index),
+            )
+            by_id[ordered[0].case_id] = ordered[0]
+            by_id[ordered[-1].case_id] = ordered[-1]
+        selected.extend(
+            sorted(by_id.values(), key=lambda case: case.global_index)
+        )
+    return selected
+
+
+def _stage_cases(
+    stage: BatchGPUQualificationStage,
+    role: Role | None,
+    universe_start: int,
+) -> list[CaseSpec]:
+    if stage is BatchGPUQualificationStage.STATIC:
+        return _all_cases(universe_start)
+    if role is None:
+        raise ValueError(f"{stage} qualification requires --role")
+    if stage is BatchGPUQualificationStage.CANARY:
+        return _canary_cases(role, universe_start)
+    return _ordered_role_cases(role, universe_start)
+
+
+def _qualification_preflight(root: Path, qualification_root: Path) -> Path:
+    """Persist and verify the zero-GPU structural preflight."""
+    path = qualification_root / "static" / "preflight.json"
+    expected = preflight(root).model_dump(mode="json")
+    if path.is_file():
+        if load_json_value(path) != expected:
+            raise ValueError(f"qualification preflight differs: {path}")
+        return path
+    atomic_write_json_value(path, expected)
+    return path
+
+
+def _current_gate_fields(
+    root: Path,
+    qualification_root: Path,
+) -> dict[str, str]:
+    config_path = qualification_root / "config.json"
+    preflight_path = qualification_root / "static" / "preflight.json"
+    if not config_path.is_file() or not preflight_path.is_file():
+        raise ValueError(
+            "qualification config or preflight artifact is missing"
+        )
+    expected_config = _QUALIFICATION_CONFIG.model_dump(mode="json")
+    if (
+        load_json_file(BenchmarkConfig, config_path).model_dump(mode="json")
+        != expected_config
+    ):
+        raise ValueError(f"qualification config differs: {config_path}")
+    if load_json_value(preflight_path) != preflight(root).model_dump(
+        mode="json"
+    ):
+        raise ValueError(f"qualification preflight differs: {preflight_path}")
+    return {
+        "design_sha256": sha256_file(root / "design.json"),
+        "contract_sha256": _qualification_contract(root),
+        "collector_sha256": sha256_file(Path(__file__).resolve()),
+        "config_sha256": sha256_file(config_path),
+        "preflight_sha256": sha256_file(preflight_path),
+        "source_revision": _source_revision(),
+    }
+
+
+def _trace_is_correct(trace: Trace) -> bool:
+    evaluation = trace.evaluation
+    if evaluation is None or not trace.is_successful():
+        return False
+    correctness = evaluation.correctness
+    return (
+        correctness is not None
+        and bool(correctness.check_results)
+        and all(result.passed for result in correctness.check_results)
+    )
+
+
+def _verify_qualification_traces(
+    trace_path: Path,
+    cases: Sequence[CaseSpec],
+) -> None:
+    traces = load_jsonl_file(Trace, trace_path)
+    expected = {case.workload_uuid for case in cases}
+    observed = {trace.workload.uuid for trace in traces}
+    if len(traces) != len(cases) or observed != expected:
+        raise ValueError(f"qualification trace identity mismatch: {trace_path}")
+    if not all(_trace_is_correct(trace) for trace in traces):
+        raise ValueError(f"qualification correctness failed: {trace_path}")
+
+
+def _qualification_workloads(
+    root: Path,
+    cases: Sequence[CaseSpec],
+) -> list[Workload]:
+    family = cases[0].family
+    source = load_jsonl_file(
+        Workload, root / "problems" / family.value / "workload.jsonl"
+    )
+    by_uuid = {workload.uuid: workload for workload in source}
+    selected = [by_uuid[case.workload_uuid] for case in cases]
+    if any(
+        workload.axes != case.axes
+        for workload, case in zip(selected, cases, strict=True)
+    ):
+        raise ValueError(f"qualification workload axes differ for {family}")
+    return selected
+
+
+def _ensure_qualification_workload(
+    root: Path,
+    path: Path,
+    cases: Sequence[CaseSpec],
+) -> None:
+    workloads = _qualification_workloads(root, cases)
+    expected = [workload.model_dump(mode="json") for workload in workloads]
+    if path.is_file():
+        observed = [
+            workload.model_dump(mode="json")
+            for workload in load_jsonl_file(Workload, path)
+        ]
+        if observed != expected:
+            raise ValueError(f"qualification workload differs: {path}")
+        return
+    atomic_write_jsonl_values(path, expected)
+
+
+def _container_output_path(path: Path) -> Path:
+    """Map one approved host output artifact into the hardened container."""
+    host_output_root = Path(
+        os.environ.get(
+            "SOL_EXECBENCH_OUTPUT_DIR",
+            _REPOSITORY_ROOT / "data" / "outputs",
+        )
+    ).resolve()
+    try:
+        relative = path.resolve().relative_to(host_output_root)
+    except ValueError as error:
+        raise ValueError(
+            f"qualification artifact is outside Docker output root: {path}"
+        ) from error
+    return _CONTAINER_OUTPUT_ROOT / relative
+
+
+def _receipt_paths(
+    qualification_root: Path,
+    stage: BatchGPUQualificationStage,
+    role: Role,
+    family: WorkloadKind,
+) -> tuple[Path, Path, Path, Path]:
+    directory = _qualification_stage_dir(
+        qualification_root, stage, role, family
+    )
+    return (
+        directory / "workload.jsonl",
+        directory / "trace.jsonl",
+        directory / "evaluate.log",
+        directory / "receipt.json",
+    )
+
+
+def _verify_receipt_artifacts(
+    root: Path,
+    qualification_root: Path,
+    receipt: DiagnosticQualificationReceipt,
+    cases: Sequence[CaseSpec],
+) -> None:
+    workload, trace, log, _ = _receipt_paths(
+        qualification_root,
+        receipt.stage,
+        receipt.role,
+        receipt.family,
+    )
+    problem = root / "problems" / receipt.family.value
+    expected_hashes = (
+        (problem / "definition.json", receipt.definition_sha256),
+        (problem / "solution.json", receipt.solution_sha256),
+        (workload, receipt.workload_sha256),
+        (qualification_root / "config.json", receipt.config_sha256),
+        (trace, receipt.trace_sha256),
+        (log, receipt.log_sha256),
+    )
+    if any(
+        not path.is_file() or sha256_file(path) != digest
+        for path, digest in expected_hashes
+    ):
+        raise ValueError(
+            f"qualification receipt artifact drift: {receipt.family}"
+        )
+    _ensure_qualification_workload(root, workload, cases)
+    _verify_qualification_traces(trace, cases)
+
+
+def _load_qualification_receipt(
+    root: Path,
+    qualification_root: Path,
+    stage: GPUQualificationStage,
+    role: Role,
+    cases: Sequence[CaseSpec],
+) -> DiagnosticQualificationReceipt | None:
+    family = cases[0].family
+    *_, receipt_path = _receipt_paths(qualification_root, stage, role, family)
+    if not receipt_path.is_file():
+        return None
+    receipt = load_json_file(DiagnosticQualificationReceipt, receipt_path)
+    if (
+        receipt.stage is not stage
+        or receipt.role != role
+        or receipt.family is not family
+        or receipt.case_ids != tuple(case.case_id for case in cases)
+        or receipt.workload_uuids != tuple(case.workload_uuid for case in cases)
+    ):
+        raise ValueError(
+            f"qualification receipt identity drift: {receipt_path}"
+        )
+    _verify_receipt_artifacts(root, qualification_root, receipt, cases)
+    return receipt
+
+
+def _run_family_qualification(
+    root: Path,
+    qualification_root: Path,
+    stage: GPUQualificationStage,
+    role: Role,
+    cases: Sequence[CaseSpec],
+) -> DiagnosticQualificationReceipt:
+    existing = _load_qualification_receipt(
+        root, qualification_root, stage, role, cases
+    )
+    if existing is not None:
+        return existing
+    family = cases[0].family
+    workload, trace, log, receipt_path = _receipt_paths(
+        qualification_root, stage, role, family
+    )
+    _ensure_qualification_workload(root, workload, cases)
+    problem = root / "problems" / family.value
+    command = [
+        str(_REPOSITORY_ROOT / "scripts" / "run_docker.sh"),
+        "--allow-untested-target-smoke",
+        "--",
+        "sol-execbench",
+        "--format",
+        "json",
+        "evaluate",
+        "--definition",
+        str(_container_output_path(problem / "definition.json")),
+        "--workload",
+        str(_container_output_path(workload)),
+        "--solution",
+        str(_container_output_path(problem / "solution.json")),
+        "--config",
+        str(_container_output_path(qualification_root / "config.json")),
+        "--trace-output",
+        str(_container_output_path(trace)),
+        "--profile",
+        str(ProfileMode.NONE),
+    ]
+    _run_logged(command, log)
+    _verify_qualification_traces(trace, cases)
+    receipt = DiagnosticQualificationReceipt(
+        stage=stage,
+        role=role,
+        family=family,
+        case_ids=tuple(case.case_id for case in cases),
+        workload_uuids=tuple(case.workload_uuid for case in cases),
+        definition_sha256=sha256_file(problem / "definition.json"),
+        solution_sha256=sha256_file(problem / "solution.json"),
+        workload_sha256=sha256_file(workload),
+        config_sha256=sha256_file(qualification_root / "config.json"),
+        trace_sha256=sha256_file(trace),
+        log_sha256=sha256_file(log),
+        trace_count=len(cases),
+        created_at=datetime.now(UTC).isoformat(),
+    )
+    atomic_write_json_value(receipt_path, receipt.model_dump(mode="json"))
+    return receipt
+
+
+def _cases_by_family(cases: Sequence[CaseSpec]) -> list[list[CaseSpec]]:
+    return [
+        [case for case in cases if case.family is family]
+        for family in _QUALIFICATION_FAMILY_ORDER
+        if any(case.family is family for case in cases)
+    ]
+
+
+def _expected_parent_stage(
+    stage: BatchGPUQualificationStage,
+) -> BatchGPUQualificationStage | None:
+    if stage is BatchGPUQualificationStage.STATIC:
+        return None
+    if stage is BatchGPUQualificationStage.CANARY:
+        return BatchGPUQualificationStage.STATIC
+    return BatchGPUQualificationStage.CANARY
+
+
+def _verify_gate_receipts(
+    root: Path,
+    qualification_root: Path,
+    gate: DiagnosticCorpusQualification,
+    role: Role,
+    cases: Sequence[CaseSpec],
+) -> None:
+    receipt_by_family = {receipt.family: receipt for receipt in gate.receipts}
+    for family_cases in _cases_by_family(cases):
+        receipt = receipt_by_family.get(family_cases[0].family)
+        if receipt is None:
+            continue
+        *_, receipt_path = _receipt_paths(
+            qualification_root, gate.stage, role, receipt.family
+        )
+        if (
+            load_json_file(DiagnosticQualificationReceipt, receipt_path)
+            != receipt
+        ):
+            raise ValueError(
+                f"qualification embedded receipt drift: {receipt_path}"
+            )
+        _verify_receipt_artifacts(
+            root, qualification_root, receipt, family_cases
+        )
+
+
+def _verify_qualification_gate(
+    root: Path,
+    qualification_root: Path,
+    stage: BatchGPUQualificationStage,
+    role: Role | None = None,
+) -> DiagnosticCorpusQualification:
+    parent_stage = _expected_parent_stage(stage)
+    parent: DiagnosticCorpusQualification | None = None
+    if parent_stage is not None:
+        parent_role = (
+            None if parent_stage is BatchGPUQualificationStage.STATIC else role
+        )
+        parent = _verify_qualification_gate(
+            root, qualification_root, parent_stage, parent_role
+        )
+    path = _qualification_gate_path(qualification_root, stage, role)
+    gate = load_json_file(DiagnosticCorpusQualification, path)
+    design = _require_frozen_design(root)
+    expected_cases = _stage_cases(stage, role, design.universe_start)
+    expected_role = "all" if role is None else role
+    expected_parent = (
+        sha256_file(
+            _qualification_gate_path(
+                qualification_root,
+                parent_stage,
+                None
+                if parent_stage is BatchGPUQualificationStage.STATIC
+                else role,
+            )
+        )
+        if parent_stage is not None
+        else None
+    )
+    if (
+        gate.stage is not stage
+        or gate.role != expected_role
+        or gate.case_ids != tuple(case.case_id for case in expected_cases)
+        or gate.parent_gate_sha256 != expected_parent
+        or any(
+            getattr(gate, key) != value
+            for key, value in _current_gate_fields(
+                root, qualification_root
+            ).items()
+        )
+    ):
+        raise ValueError(f"qualification gate identity drift: {path}")
+    if parent is not None and gate.parent_gate_sha256 != sha256_file(
+        _qualification_gate_path(
+            qualification_root,
+            parent.stage,
+            None if parent.stage is BatchGPUQualificationStage.STATIC else role,
+        )
+    ):
+        raise ValueError(f"qualification parent drift: {path}")
+    if stage is BatchGPUQualificationStage.STATIC:
+        return gate
+    if role is None:
+        raise ValueError(f"{stage} qualification requires a role")
+    _verify_gate_receipts(root, qualification_root, gate, role, expected_cases)
+    return gate
+
+
+def _run_qualification_stage(
+    root: Path,
+    qualification_root: Path,
+    stage: BatchGPUQualificationStage,
+    role: Role | None,
+) -> None:
+    gate_path = _qualification_gate_path(qualification_root, stage, role)
+    if gate_path.is_file():
+        _verify_qualification_gate(root, qualification_root, stage, role)
+        print(
+            f"verified existing qualification gate at {gate_path}", flush=True
+        )
+        return
+    design = _require_frozen_design(root)
+    cases = _stage_cases(stage, role, design.universe_start)
+    if stage is BatchGPUQualificationStage.STATIC:
+        _ensure_qualification_config(qualification_root)
+        _qualification_preflight(root, qualification_root)
+    parent_stage = _expected_parent_stage(stage)
+    parent_hash: str | None = None
+    if parent_stage is not None:
+        parent_role = (
+            None if parent_stage is BatchGPUQualificationStage.STATIC else role
+        )
+        _verify_qualification_gate(
+            root, qualification_root, parent_stage, parent_role
+        )
+        parent_hash = sha256_file(
+            _qualification_gate_path(
+                qualification_root, parent_stage, parent_role
+            )
+        )
+    receipts: tuple[DiagnosticQualificationReceipt, ...] = ()
+    if stage is not BatchGPUQualificationStage.STATIC:
+        if role is None:
+            raise ValueError(f"{stage} qualification requires --role")
+        gpu_stage: GPUQualificationStage = stage
+        receipts = tuple(
+            _run_family_qualification(
+                root, qualification_root, gpu_stage, role, family_cases
+            )
+            for family_cases in _cases_by_family(cases)
+        )
+    fields = _current_gate_fields(root, qualification_root)
+    gate = DiagnosticCorpusQualification(
+        stage=stage,
+        role="all" if role is None else role,
+        parent_gate_sha256=parent_hash,
+        case_ids=tuple(case.case_id for case in cases),
+        receipts=receipts,
+        created_at=datetime.now(UTC).isoformat(),
+        design_sha256=fields["design_sha256"],
+        contract_sha256=fields["contract_sha256"],
+        collector_sha256=fields["collector_sha256"],
+        config_sha256=fields["config_sha256"],
+        preflight_sha256=fields["preflight_sha256"],
+        source_revision=fields["source_revision"],
+    )
+    atomic_write_json_value(gate_path, gate.model_dump(mode="json"))
+    _verify_qualification_gate(root, qualification_root, stage, role)
+    print(f"completed qualification gate at {gate_path}", flush=True)
+
+
+def _require_collection_qualification(
+    root: Path,
+    qualification_root: Path,
+    role: Role,
+) -> None:
+    """Verify all three gates before the first expensive collection case."""
+    for stage, stage_role in (
+        (BatchGPUQualificationStage.STATIC, None),
+        (BatchGPUQualificationStage.CANARY, role),
+        (BatchGPUQualificationStage.FULL, role),
+    ):
+        _verify_qualification_gate(root, qualification_root, stage, stage_role)
+
+
+def _expected_case_workload(root: Path, case: CaseSpec) -> Workload:
+    workloads = load_jsonl_file(
+        Workload,
+        root / "problems" / case.family.value / "workload.jsonl",
+    )
+    matches = [
+        workload
+        for workload in workloads
+        if workload.uuid == case.workload_uuid
+    ]
+    if len(matches) != 1 or matches[0].axes != case.axes:
+        raise ValueError(f"prepared workload identity mismatch: {case.case_id}")
+    return matches[0]
+
+
+def _verify_resumable_evidence(
+    root: Path,
+    case: CaseSpec,
+    evidence_path: Path,
+) -> None:
+    """Admit only complete evidence bound to the current prepared candidate."""
+    manifest = load_and_verify_performance_evidence_manifest(
+        evidence_path,
+        require_complete=True,
+    )
+    problem = root / "problems" / case.family.value
+    definition = load_json_file(Definition, problem / "definition.json")
+    solution = load_json_file(Solution, problem / "solution.json")
+    workload = _expected_case_workload(root, case)
+    identity = manifest.identity
+    expected = {
+        "definition": definition.name,
+        "definition_sha256": stable_json_checksum(definition.name),
+        "workload_uuid": case.workload_uuid,
+        "workload_sha256": stable_json_checksum(
+            workload.model_dump(mode="json")
+        ),
+        "solution_sha256": stable_json_checksum(
+            solution.model_dump(mode="json")
+        ),
+    }
+    drift = [
+        field
+        for field, value in expected.items()
+        if getattr(identity, field) != value
+    ]
+    if drift:
+        raise ValueError(
+            f"existing evidence identity drift for {case.case_id}: "
+            + ",".join(drift)
+        )
+
+
 def _collect_case(root: Path, case: CaseSpec, *, force: bool) -> None:
     case_dir = _case_dir(root, case)
     trace = case_dir / "trace.jsonl"
     evidence = trace.with_name(f"{trace.name}.performance-evidence.json")
     if evidence.is_file() and not force:
+        _verify_resumable_evidence(root, case, evidence)
         return
+    partial = tuple(trace.parent.glob(f"{trace.name}*"))
+    if partial and not force:
+        raise ValueError(
+            f"partial collection artifacts are not resumable for {case.case_id}: "
+            + ",".join(path.name for path in partial)
+        )
     if force:
         _remove_trace_artifacts(trace)
     problem = root / "problems" / case.family.value
@@ -719,6 +1535,13 @@ def _execute_cases(arguments: argparse.Namespace) -> None:
             raise ValueError(
                 f"case ID is not in the selected role/family: {arguments.case_id}"
             )
+    if arguments.stage == "collect":
+        qualification_root = _require_qualification_root(
+            arguments.root, arguments.qualification_root
+        )
+        _require_collection_qualification(
+            arguments.root, qualification_root, arguments.role
+        )
     for position, case in enumerate(selected, start=1):
         print(
             f"[{position}/{len(selected)}] {arguments.stage} {case.case_id}",
@@ -1140,7 +1963,9 @@ def _latest_run(design_id_value: str) -> DiagnosticCollectionRunManifest | None:
             parent.stage_id == design_id_value for parent in manifest.parents
         ):
             candidates.append(manifest)
-    return max(candidates, key=lambda item: item.generation, default=None)
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: item.generation)
 
 
 def _write_corpus_snapshot_manifest(
@@ -1255,6 +2080,12 @@ def _require_frozen_design(root: Path) -> DiagnosticCorpusDesign:
     )
     if design.model_dump(mode="json") != _design_payload(design.universe_start):
         raise ValueError("corpus design does not match frozen preregistration")
+    _validate_design_contracts(
+        [
+            *_cases("development", design.universe_start),
+            *_cases("held_out", design.universe_start),
+        ]
+    )
     return design
 
 
@@ -1426,6 +2257,24 @@ def main() -> int:
                 if arguments.family is not None
                 else None
             ),
+        )
+    elif arguments.stage.startswith("qualify-"):
+        stage = BatchGPUQualificationStage(
+            arguments.stage.removeprefix("qualify-")
+        )
+        if (
+            stage is not BatchGPUQualificationStage.STATIC
+            and arguments.role is None
+        ):
+            raise ValueError(f"{arguments.stage} requires --role")
+        qualification_root = _require_qualification_root(
+            root, arguments.qualification_root
+        )
+        _run_qualification_stage(
+            root,
+            qualification_root,
+            stage,
+            arguments.role,
         )
     elif arguments.stage in {"solar", "collect"}:
         _execute_cases(arguments)
