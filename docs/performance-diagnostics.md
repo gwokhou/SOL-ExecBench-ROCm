@@ -446,19 +446,33 @@ The lifecycle accepts one immutable, reviewable plan rather than a loose set of
 stage flags:
 
 ```bash
+uv run sol-execbench --format json diagnostics lifecycle plan \
+  --design-id <design_id> \
+  --development-snapshot-id <promoted_development_snapshot_id> \
+  --collection-root <operator_collected_tree> \
+  --held-out-corpus <operator_collected_tree>/held_out.json \
+  --calibration-profile <calibration_profile.json> \
+  --calibration-audit <calibration_profile.audit.json> \
+  --output-root <lifecycle_output_root> \
+  --model-version <model_version> \
+  --max-attempts 3 \
+  --store-root data/store \
+  --output PLAN.json
+
 uv run sol-execbench --format json diagnostics lifecycle run \
   --plan PLAN.json \
   --store-root data/store
 ```
 
 `PLAN.json` uses the current `sol_execbench.diagnostic_lifecycle_plan` schema
-and binds the design manifest, corpus root, calibration profile and audit,
-development and held-out corpus files, output root, source revision, evidence
-purpose, model version, and bounded attempt count. The design and plan purposes
-must match. The command also verifies that the selected source revision matches
-the current `src/`, `scripts/`, `pyproject.toml`, and `uv.lock` state. Plan
-creation is therefore a governed authoring step; do not replace it with
-hand-translated legacy command flags.
+and binds the registered design, promoted development snapshot, exact collection
+tree, held-out corpus, calibration profile and audit, output root, source
+revision, evidence purpose, model version, and bounded attempt count. The design,
+development snapshot, and plan purposes must match. The command also verifies
+both registry identities and that the selected source revision matches the
+current `src/`, `scripts/`, `pyproject.toml`, and `uv.lock` state. Plan creation
+is therefore a governed authoring step; do not replace it with hand-translated
+legacy command flags.
 
 `run` executes `design -> calibration -> collection_run -> corpus_snapshot ->
 model_build -> acceptance -> publication -> release` in monotonic order while

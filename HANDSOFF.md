@@ -1,9 +1,9 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-09 against `ea08f789` and the current worktree.
+Last audited: 2026-08-09 against `f4453442` and the current worktree.
 
 This file records unresolved repository-level work, the decisions that constrain
-it, and the evidence that closed the control-plane conformance P0. Generated run
+it, and the evidence that closed the lifecycle production-topology P0. Generated run
 state belongs in the diagnostic lifecycle registry; detailed completed
 investigations and one-time inventories belong in Git history.
 
@@ -29,20 +29,26 @@ investigations and one-time inventories belong in Git history.
 - Cycle 3 has a frozen, pair-disjoint start-220 design. The historical 880-case
   development corpus and its pre-migration artifacts establish feasibility but
   do not authorize current held-out collection, acceptance, or publication.
-  Do not remove `microarchitecture-diagnostics-v7/` or
-  `microarchitecture-diagnostics-v7-cycle2/` until governed promotion imports
-  every reachable artifact and registry reachability proves both trees are dead.
-- The diagnostic lifecycle control-plane conformance P0 closed on 2026-08-09.
-  It proves the linear stage machinery, immutable receipts, append-only
-  attempts, descendant invalidation, successor-generation handling, fail-closed
-  consistency/GC, hosted publication verification, and external-release receipt
-  ingestion under purpose `control_plane_conformance`.
-- Conformance closure is not production-topology closure. It did not traverse
-  the historical multi-parent promotion required by Cycle 3 or prove an exact
-  inventory for the complete operator-collected evidence tree. The currently
-  audited registry contains no `purpose=production` lifecycle object. Existing
-  ignored Cycle 3 design, promoted-corpus, and inference files are process
-  evidence, not production admission authority.
+  The start-220 payload is registered as production design
+  `2bcfa7fc7feadb39a165b03d6a855d73045b9ae536dabda445a1cdbb1dbc60ee`;
+  this records the existing frozen design and does not claim new GPU evidence.
+- The production-topology lifecycle P0 closed on 2026-08-09. Historical v7 and
+  Cycle 2 evidence was imported into the content-addressed store without GPU
+  recomputation, then promoted as an 880-case, three-parent production snapshot
+  `892be3337f6bf126c7d432208264a7a93120fa4a328e02afb66e82703c7db18a`.
+  A separate production-shaped conformance run proves the two-source promotion
+  branch, fresh held-out branch, exact collection-tree inventory, role-separated
+  model/acceptance parents, immutable receipts, idempotent resume, successor
+  generation rules, and fail-closed consistency/GC.
+- P0 closure does not authorize Cycle 3 acceptance or publication. The complete
+  end-to-end run described below has purpose `control_plane_conformance`; the
+  production registry objects are the three historical source snapshots, their
+  promoted development snapshot, and the start-100/start-160/start-220 designs.
+  Fresh start-220 GPU collection and the production acceptance verdict remain P1.
+- Do not remove `microarchitecture-diagnostics-v7/` or
+  `microarchitecture-diagnostics-v7-cycle2/` merely because CAS import
+  completed. Expanded source-tree retirement still requires a reviewed path
+  retirement plan and explicit deletion approval.
 - Real-device evidence is strongest on one RX 9060 XT/gfx1200 host. Multi-GPU
   isolation and CDNA-family behavior have contract and unit coverage but
   narrower empirical coverage.
@@ -50,7 +56,7 @@ investigations and one-time inventories belong in Git history.
   gzip/zlib scanning. It does not parse the clang-offload-bundler Compressed Code
   Object Bundle (CCOB) manifest or provide exact member selection.
 
-## Control-plane conformance P0 closure evidence
+## Lifecycle P0 closure evidence
 
 The target production data flow requires the following immutable parent
 identities rather than inferred paths:
@@ -66,9 +72,46 @@ accepted acceptance + calibration + development_snapshot + model_build
   -> publication -> release_candidate -> published_release
 ```
 
-The conformance run proved the shared linear mechanisms, but did not exercise
-the `source snapshots -> promotion -> development_snapshot` branch. Its closure
-is supported by the following concrete evidence:
+The original hosted conformance run proved the shared linear mechanisms. The
+2026-08-09 production-shaped closure additionally exercised
+`source snapshots -> promotion -> development_snapshot` beside a distinct
+`design -> held_out_collection_run -> held_out_snapshot` branch. Closure is
+supported by the following concrete evidence:
+
+- The historical source snapshots are
+  `dbf39ce807344ddee2ce79b69beb293b971c402cd4c771103e663751d7eef10f`,
+  `90d7af07b40047f305e1ab0aae3c66224646bb5d33ad628c7c6f6753394eb2ac`,
+  and `1eeeac30a8183b6532f60d254ecdcb8f2ead7cc23ab2205dfc13d29520df3da8`.
+  Their promoted 880-case snapshot is
+  `892be3337f6bf126c7d432208264a7a93120fa4a328e02afb66e82703c7db18a`;
+  its manifest SHA-256 is
+  `5729ff90706302cf873659ae7acbcbfcd5722e8b284d207129bfa52bb0bcb756`.
+- The final production-shaped conformance run is
+  `c96d65d534bdfe51ac23b0fda026721a614fa6f3e03388fa1ca3da533a922096`
+  at source revision `f4453442279b557212b7f6ba44d3d87eafc4796d`. Its
+  canonical plan ID is
+  `356eec29448a96fad0ef32bd1f3da32419733e5294fb08cb0589a87215ff6074`;
+  the reviewed plan file SHA-256 is
+  `6b2fa68903e04f67130d680d142a28a90456dfea8684620db76bccb60943add8`.
+- That run promotes two independent 220-case source snapshots into development
+  snapshot
+  `4c88532c9f0515cabd2eb2b8eeafe951bfa53277328879a4f954613b5dd84c76`
+  and derives held-out snapshot
+  `d3621a29da7d83be05aca99723ce1ca1fb595e434aafa5971a7a2e52d027609c`
+  only from the fresh conformance collection run. The latter binds an exact
+  3,741-file, 18,277,046-byte collection inventory.
+- All eight stages are `verified`. A subsequent `status` reported
+  `next_stage=null`, and `resume` remained a no-op with exactly one attempt per
+  stage. Acceptance
+  `c5770933e1401cfdf31aa9a0df08a1269c1e43f0e16ec5ff2b2135c258805141`
+  recorded `accepted=true`, publication is
+  `6c7fe7d17f9b77d12b6d05c8f4a456414276f3c55a0eeb72ff9e3a629cf48c7f`,
+  and the local release candidate is
+  `5e4eb276dc7ace676fbf8b647d3d3ffdff8033695065db63bbb62bfce01eaa5e`.
+- The final consistency check accepted `data/store`. Its GC dry-run observed
+  37,949 blobs totalling 23,239,103,276 bytes; 37,913 blobs totalling
+  23,229,476,339 bytes were reachable. The 36 unreferenced blobs remain intact:
+  no GC apply or expanded-tree deletion was performed.
 
 - The conformance traversal executes every linear stage with pre/post input
   identity checks, blob-backed persisted stage outputs, verification before
@@ -108,76 +151,17 @@ is supported by the following concrete evidence:
   the latter has SHA-256
   `5b567d7bbabd61eff3b35f63a6121d888f734f511e896b650db09e37e86bb5ab`.
 
-The conformance traversal and hosted publication verification are CPU-only. The
-full repository test run exercised one short ROCm timing integration using a
-4096-by-4096 matrix multiplication, not large-scale GPU computation. That run
-reported 2,341 passed, 23 skipped, and one transient variance assertion; the
-exact failed test passed on isolated retry. Ruff, formatting, `ty`, architecture
-gates, focused lifecycle/release tests, and diagnostic store consistency passed.
+The production-shaped conformance traversal and CAS adoption are CPU and storage
+operations; they did not launch fresh GPU collection or refit Cycle 3 inference.
+The final repository test run reported 2,355 passed and 23 skipped. Ruff,
+formatting, `ty`, architecture gates, focused lifecycle/release tests, and the
+diagnostic store consistency checker passed.
 
 ## Active backlog
 
-### P0 — Close production-topology admission before Cycle 3 collection
-
-Do not begin fresh Cycle 3 GPU collection while this section is open. The
-published conformance release proves reusable control-plane mechanics, but its
-development and held-out corpora followed one linear collection lineage. Cycle
-3 instead requires a promoted development snapshot derived from historical
-source snapshots alongside a fresh held-out snapshot derived only from the new
-collection run.
-
-Required work:
-
-1. Adopt the existing frozen start-220 design into the lifecycle registry
-   without rewriting its payload or silently assigning a new provenance. Its
-   manifest must bind the exact blob-backed design payload and authoritative
-   source revision. If that provenance cannot be proved, preregister a new,
-   pair-disjoint design before any collection or reveal.
-2. Materialize the 880-case development corpus as one governed promoted
-   snapshot whose identity and manifest cite every source snapshot it consumed.
-   Promotion must never attribute historical cases to the fresh Cycle 3
-   collection run.
-3. Provide one canonical production plan authoring path for the current
-   `diagnostics lifecycle run --plan` contract. The plan must bind the promoted
-   development snapshot, fresh held-out collection inputs, calibration and
-   audit, source revision, evidence purpose, model version, output root, and
-   bounded attempts; hand-authored loose stage flags are not an alternative.
-4. Separate the two corpus roles in production orchestration. The model build
-   must cite the exact promoted development snapshot it reads, while acceptance
-   must additionally cite the held-out snapshot produced by the fresh collection
-   generation.
-5. Replace collection completion based on `cases/` existence plus two corpus
-   filenames with an exact typed inventory of all governed collected evidence.
-   Status and resume must detect missing, extra, substituted, or mutated evidence
-   and invalidate every affected descendant.
-6. Migrate or remove direct authoring paths that still emit empty snapshot
-   parents, assume generation one, use the retired `data/store/runs` layout, or
-   return early when an existing frozen design lacks its registry manifest.
-7. Exercise the production-shaped multi-parent topology end to end with public
-   synthetic or development evidence under `control_plane_conformance`. Tests
-   must prove promoted-parent identity, role separation, exact collection
-   inventory, drift invalidation, resume equivalence, and successor generation.
-
-This P0 is complete only when the production authoring path can create and
-reverify the design and promoted-development objects needed before collection;
-a production-shaped conformance run traverses the distinct promotion and
-held-out branches with no inferred path parents; the consistency checker accepts
-the resulting store; and no current caller writes legacy run paths, empty
-parents, or generation-one defaults. Closing it does not itself authorize
-acceptance or publication.
-
-Authoritative surfaces:
-
-- `docs/performance-diagnostics.md`
-- `src/sol_execbench/core/bench/performance_model/lifecycle/`
-- `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
-- `scripts/check_diagnostic_store_consistency.py`
-- `tests/sol_execbench/core/bench/performance_model/lifecycle/`
-- `tests/scripts/test_internal_support_scripts.py`
-
 ### P1 — Run Cycle 3 held-out acceptance through the governed chain
 
-This P1 begins only after the production-topology P0 above closes. Cycle 3 must
+The production-topology P0 is closed; Cycle 3 must
 not reuse prior inference or acceptance artifacts, tune after held-out reveal,
 change gates, exclude the 24 Cycle 2 cases that exposed the working-set bug, or
 reuse a held-out pair.
