@@ -54,6 +54,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.identity import (
     corpus_snapshot_id,
     model_build_id,
     publication_id,
+    recompute_stage_id,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.inventory import (
     verify_regular_tree_inventory,
@@ -718,9 +719,8 @@ class PublicationHandler:
                 context,
                 DiagnosticLifecycleStage.CALIBRATION,
             ),
-            development_snapshot_id=_prior_receipt_stage_id(
-                context,
-                DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+            development_snapshot_id=(
+                context.plan.development_snapshot.stage_id
             ),
             model_build_id=_prior_receipt_stage_id(
                 context,
@@ -1550,6 +1550,12 @@ def _commit_stage_manifests(
     manifests = _stage_manifests(context, completion, receipt)
     with exclusive_file_lock(store_lock_path(context.store_root)):
         for manifest in manifests:
+            recomputed = recompute_stage_id(manifest)
+            if recomputed != manifest.stage_id:
+                raise ValueError(
+                    f"lifecycle stage identity is not canonical: "
+                    f"{manifest.stage.value}"
+                )
             path = _stage_manifest_path(
                 context.store_root, manifest.stage, manifest.stage_id
             )
