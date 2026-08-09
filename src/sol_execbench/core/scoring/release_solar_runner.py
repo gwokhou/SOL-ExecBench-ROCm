@@ -21,6 +21,9 @@ from sol_execbench.core.scoring.release_environment import (
 )
 from sol_execbench.core.scoring.release_models import SolarIndexStatement
 from sol_execbench.core.scoring.release_solar import verify_solar_index
+from sol_execbench.core.scoring.release_solar_qualification import (
+    require_solar_release_qualification,
+)
 from sol_execbench.core.solar_bridge.models import (
     DEFAULT_IR_PATH,
     IRPath,
@@ -63,6 +66,7 @@ def build_release_solar_manifests(
     *,
     corpus_manifest_path: Path,
     orojenesis_home: Path,
+    qualification_root: Path,
     timeout_seconds: float = 14_400,
     resume: bool = False,
     device: str = "cuda:0",
@@ -73,6 +77,16 @@ def build_release_solar_manifests(
     _validate_release_jobs(jobs)
     workspace = workspace_root.resolve()
     selected_path = normalize_ir_path(ir_path)
+    require_solar_release_qualification(
+        workspace,
+        corpus_manifest_path=corpus_manifest_path,
+        orojenesis_home=orojenesis_home,
+        qualification_root=qualification_root,
+        timeout_seconds=timeout_seconds,
+        device=device,
+        ir_path=selected_path,
+        jobs=jobs,
+    )
     corpus = AKACorpusManifest.load(corpus_manifest_path)
     baseline_plan = load_execution_plan(
         workspace / "baseline" / "plan.json",

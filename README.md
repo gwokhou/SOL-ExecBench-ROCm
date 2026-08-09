@@ -90,19 +90,24 @@ content-addressed Orojenesis evidence referenced by the manifest; successful
 mapper logs are not published. The worker never receives candidate runtimes or
 computes scores.
 
-Audit extraction, strict conversion, and replay over every scored workload
-without running the formal bound:
+Before a full SOLAR release, run the mandatory uniform qualification chain:
 
 ```bash
-uv run sol-execbench solar corpus-audit out/solar-corpus-readiness \
-  --device cuda:0 \
-  --timeout 14400
+uv run sol-execbench solar qualify-static out/release \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root out/solar-qualification
+uv run sol-execbench solar qualify-canary out/release \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root out/solar-qualification
+uv run sol-execbench solar qualify-full out/release \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root out/solar-qualification
 ```
 
-The audit derives its 43-problem / 163-workload denominator from the pinned
-manifest and writes a content-addressed `matrix.jsonl` plus `summary.json`.
-Failures remain in the matrix with stable stage and reason codes; `--resume`
-continues only when all recorded identities and artifact hashes still match.
+Full qualification derives its 43-problem / 163-workload denominator from the
+pinned manifest and writes a content-addressed readiness matrix. Formal
+`release-build` refuses to start without the complete content-bound gate chain.
+See [large batch GPU qualification](docs/user/GPU-QUALIFICATION.md).
 
 SOLAR exposes exactly two fixed paths through `--backend`:
 `torchview_extended_einsum` (the default) and `make_fx_aten`. Extraction and IR
@@ -135,7 +140,8 @@ inputs. Bundle hashes provide artifact integrity; publisher authenticity comes
 from the repository or release channel that distributes the bundle.
 
 The release workflow includes `baseline release-build`,
-`baseline candidate-build`, `baseline release-run`, `solar release-build`,
+`baseline candidate-build`, the three `baseline qualify-*` commands,
+`baseline release-run`, the three `solar qualify-*` commands, `solar release-build`,
 `score build-statement`, and `score assemble-bundle`. It has one baseline run
 and one candidate run; it does not require role signatures or an independent
 rerun. See

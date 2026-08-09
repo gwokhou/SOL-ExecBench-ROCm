@@ -29,6 +29,11 @@ def _patch_release_plan(
         problems=[SimpleNamespace(problem_path="synthetic")],
     )
     monkeypatch.setattr(
+        release_runner,
+        "require_release_qualification",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
         release_runner, "load_execution_plan", lambda *a, **k: plan
     )
     monkeypatch.setattr(
@@ -61,6 +66,7 @@ def test_cpu_dry_run_counts_a_complete_baseline(monkeypatch) -> None:
     result = release_runner.execute_release_plan(
         Path("plans/baseline.json"),
         corpus_manifest_path=Path("corpus.json"),
+        qualification_root=Path("qualification"),
         evaluator=lambda request: release_runner.ReleaseEvaluationResult(
             exit_code=0
         ),
@@ -84,6 +90,7 @@ def test_cpu_dry_run_rejects_an_incomplete_baseline(monkeypatch) -> None:
         release_runner.execute_release_plan(
             Path("plans/baseline.json"),
             corpus_manifest_path=Path("corpus.json"),
+            qualification_root=Path("qualification"),
             evaluator=lambda request: release_runner.ReleaseEvaluationResult(
                 exit_code=0
             ),

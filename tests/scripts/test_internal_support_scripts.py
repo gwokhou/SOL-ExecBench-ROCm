@@ -252,7 +252,7 @@ def test_rdna4_diagnostic_preregistration_is_immutable(
 
     corpus._preregister(tmp_path, 160)
     with pytest.raises(ValueError, match="differs"):
-        corpus._preregister(tmp_path, 220)
+        corpus._preregister(tmp_path, 161)
     design_path.write_text('{"changed": true}\n', encoding="utf-8")
 
     with pytest.raises(ValueError, match="differs"):

@@ -18,6 +18,15 @@ from sol_execbench.core.solar_bridge.models import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _qualification_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        release_solar_runner,
+        "require_solar_release_qualification",
+        lambda *_args, **_kwargs: None,
+    )
+
+
 def _corpus(tmp_path: Path) -> SimpleNamespace:
     return SimpleNamespace(
         authored_root=tmp_path / "repo" / "problems" / "AMD_AKA",
@@ -142,6 +151,7 @@ def test_release_parallelism_is_opt_in_and_byte_stable(
         serial,
         corpus_manifest_path=corpus.path,
         orojenesis_home=tmp_path / "orojenesis",
+        qualification_root=tmp_path / "qualification",
     )
     serial_locks = tuple(observed_locks)
     observed_locks.clear()
@@ -149,6 +159,7 @@ def test_release_parallelism_is_opt_in_and_byte_stable(
         parallel,
         corpus_manifest_path=corpus.path,
         orojenesis_home=tmp_path / "orojenesis",
+        qualification_root=tmp_path / "qualification",
         jobs=2,
     )
 
@@ -191,6 +202,7 @@ def test_parallel_release_runs_two_workers_and_keeps_counts_deterministic(
         tmp_path / "release",
         corpus_manifest_path=corpus.path,
         orojenesis_home=tmp_path / "orojenesis",
+        qualification_root=tmp_path / "qualification",
         jobs=2,
     )
 
@@ -231,6 +243,7 @@ def test_parallel_release_stops_submitting_after_failure(
             workspace,
             corpus_manifest_path=corpus.path,
             orojenesis_home=tmp_path / "orojenesis",
+            qualification_root=tmp_path / "qualification",
             jobs=2,
         )
 
@@ -261,6 +274,7 @@ def test_parallel_release_preflights_resume_and_collisions(
             workspace,
             corpus_manifest_path=corpus.path,
             orojenesis_home=tmp_path / "orojenesis",
+            qualification_root=tmp_path / "qualification",
             jobs=2,
         )
     assert observed == []
@@ -269,6 +283,7 @@ def test_parallel_release_preflights_resume_and_collisions(
         workspace,
         corpus_manifest_path=corpus.path,
         orojenesis_home=tmp_path / "orojenesis",
+        qualification_root=tmp_path / "qualification",
         jobs=2,
         resume=True,
     )
@@ -286,8 +301,40 @@ def test_release_rejects_nonpositive_jobs_before_running(
             tmp_path / "release",
             corpus_manifest_path=tmp_path / "manifest.yaml",
             orojenesis_home=tmp_path / "orojenesis",
+            qualification_root=tmp_path / "qualification",
             jobs=0,
         )
+
+
+def test_solar_qualification_blocks_before_corpus_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loaded = False
+
+    def reject(*_args, **_kwargs):
+        raise ValueError("full qualification gate missing")
+
+    def load(*_args, **_kwargs):
+        nonlocal loaded
+        loaded = True
+
+    monkeypatch.setattr(
+        release_solar_runner,
+        "require_solar_release_qualification",
+        reject,
+    )
+    monkeypatch.setattr(release_solar_runner.AKACorpusManifest, "load", load)
+
+    with pytest.raises(ValueError, match="gate missing"):
+        release_solar_runner.build_release_solar_manifests(
+            tmp_path / "release",
+            corpus_manifest_path=tmp_path / "manifest.yaml",
+            orojenesis_home=tmp_path / "orojenesis",
+            qualification_root=tmp_path / "qualification",
+        )
+
+    assert loaded is False
 
 
 def test_release_rejects_jobs_above_mapper_cpu_budget(
@@ -310,6 +357,7 @@ def test_release_rejects_jobs_above_mapper_cpu_budget(
             tmp_path / "release",
             corpus_manifest_path=tmp_path / "manifest.yaml",
             orojenesis_home=tmp_path / "orojenesis",
+            qualification_root=tmp_path / "qualification",
             jobs=3,
         )
 
@@ -385,5 +433,6 @@ def test_parallel_release_fails_closed_without_cpu_detection(
             tmp_path / "release",
             corpus_manifest_path=tmp_path / "manifest.yaml",
             orojenesis_home=tmp_path / "orojenesis",
+            qualification_root=tmp_path / "qualification",
             jobs=2,
         )

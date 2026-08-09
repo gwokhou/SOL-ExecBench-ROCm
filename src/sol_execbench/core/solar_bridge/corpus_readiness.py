@@ -223,6 +223,7 @@ class _CorpusAuditContext:
     timeout_seconds: float
     resume: bool
     ir_path: IRPath
+    selected_item_ids: frozenset[str] | None = None
 
 
 def audit_corpus_stage_readiness(
@@ -233,10 +234,11 @@ def audit_corpus_stage_readiness(
     timeout_seconds: float = 14_400,
     resume: bool = False,
     ir_path: IRPath | str = DEFAULT_IR_PATH,
+    selected_item_ids: frozenset[str] | None = None,
 ) -> CorpusStageAuditResult:
     """Audit every scored workload and publish a deterministic status matrix."""
     output = output_root.resolve()
-    lock_path = output.parent / f".{output.name}.corpus-audit.lock"
+    lock_path = output.parent / f".{output.name}.qualification.lock"
     with exclusive_file_lock(lock_path):
         return _audit_corpus_stage_readiness_locked(
             manifest_path,
@@ -245,6 +247,7 @@ def audit_corpus_stage_readiness(
             timeout_seconds=timeout_seconds,
             resume=resume,
             ir_path=ir_path,
+            selected_item_ids=selected_item_ids,
         )
 
 
@@ -256,6 +259,7 @@ def _audit_corpus_stage_readiness_locked(
     timeout_seconds: float,
     resume: bool,
     ir_path: IRPath | str,
+    selected_item_ids: frozenset[str] | None,
 ) -> CorpusStageAuditResult:
     corpus = AKACorpusManifest.load(manifest_path)
     if output.exists() and not resume:
@@ -272,6 +276,7 @@ def _audit_corpus_stage_readiness_locked(
         timeout_seconds=timeout_seconds,
         resume=resume,
         ir_path=normalize_ir_path(ir_path),
+        selected_item_ids=selected_item_ids,
     )
     records: list[dict[str, Any]] = []
     for entry in corpus.entries:
@@ -294,6 +299,12 @@ def _audit_entry(
     workloads = _workloads(problem_dir / "workload.jsonl")
     records: list[dict[str, Any]] = []
     for workload_uuid in entry.workload_uuids:
+        item_id = f"{problem_path}/{workload_uuid}"
+        if (
+            context.selected_item_ids is not None
+            and item_id not in context.selected_item_ids
+        ):
+            continue
         workload = workloads[workload_uuid]
         workload_output = (
             context.output
@@ -503,10 +514,14 @@ def _finish_audit(
     records: list[dict[str, Any]],
 ) -> CorpusStageAuditResult:
     corpus = context.corpus
-    expected = sum(
-        len(entry.workload_uuids)
-        for entry in corpus.entries
-        if entry.role is AKACorpusRole.SCORED
+    expected = (
+        len(context.selected_item_ids)
+        if context.selected_item_ids is not None
+        else sum(
+            len(entry.workload_uuids)
+            for entry in corpus.entries
+            if entry.role is AKACorpusRole.SCORED
+        )
     )
     if not records or len(records) != expected:
         raise ValueError("corpus readiness workload denominator mismatch")

@@ -131,8 +131,18 @@ solution and rejects any baseline implementation difference.
 Run the baseline inside the hardened container on the pinned GPU:
 
 ```bash
+uv run sol-execbench baseline qualify-static \
+  out/release/baseline/plan.json \
+  --qualification-root out/baseline-qualification
+./scripts/run_docker.sh -- sol-execbench baseline qualify-canary \
+  /outputs/release/baseline/plan.json \
+  --qualification-root /outputs/baseline-qualification
+./scripts/run_docker.sh -- sol-execbench baseline qualify-full \
+  /outputs/release/baseline/plan.json \
+  --qualification-root /outputs/baseline-qualification
 ./scripts/run_docker.sh -- sol-execbench baseline release-run \
-  /outputs/release/baseline/plan.json
+  /outputs/release/baseline/plan.json \
+  --qualification-root /outputs/baseline-qualification
 ```
 
 The wrapper records the immutable Docker image ID. The runner also records the
@@ -145,19 +155,36 @@ uv run sol-execbench baseline candidate-build out/release CANDIDATE_ROOT \
   --candidate-id CANDIDATE_ID \
   --source-revision SOURCE_GIT_SHA
 ./scripts/run_docker.sh -- sol-execbench baseline release-run \
-  /outputs/release/candidate/plan.json
+  /outputs/release/candidate/plan.json \
+  --qualification-root /outputs/candidate-qualification
 ```
 
 Baseline and candidate must use the same source revision and validated runtime
 environment, including the immutable container image. A candidate failure is
 retained in its complete trace denominator and receives zero.
+The candidate plan must first complete its own static, canary, and full
+qualification chain exactly as shown for the baseline; gates are plan-specific
+and cannot be shared between roles or implementations.
 
 Build the formal 163-workload denominator:
 
 ```bash
+uv run sol-execbench solar qualify-static out/release \
+  --backend torchview_extended_einsum \
+  --orojenesis-home /path/to/reviewed/orojenesis \
+  --qualification-root out/solar-qualification
+uv run sol-execbench solar qualify-canary out/release \
+  --backend torchview_extended_einsum \
+  --orojenesis-home /path/to/reviewed/orojenesis \
+  --qualification-root out/solar-qualification
+uv run sol-execbench solar qualify-full out/release \
+  --backend torchview_extended_einsum \
+  --orojenesis-home /path/to/reviewed/orojenesis \
+  --qualification-root out/solar-qualification
 uv run sol-execbench solar release-build out/release \
   --backend torchview_extended_einsum \
-  --orojenesis-home /path/to/reviewed/orojenesis
+  --orojenesis-home /path/to/reviewed/orojenesis \
+  --qualification-root out/solar-qualification
 ```
 
 `--jobs` defaults to `1`, preserving the serial release path. Values above one

@@ -56,19 +56,33 @@ authoritative accounting.
 ## Current coverage boundary
 
 The current focused readiness matrix is 41/41 on both paths across eight scored
-problems. Validate that exact current-manifest denominator without GPU work:
+problems. Validate that exact current-manifest denominator, run risk-first
+canaries, then qualify all 82 path workloads:
 
 ```bash
-uv run python scripts/internal/solar/run_cross_path_focus.py --check
+uv run python scripts/internal/solar/run_cross_path_focus.py qualify-static \
+  --output data/outputs/solar-cross-path-focus \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root data/outputs/solar-cross-path-focus-qualification
+uv run python scripts/internal/solar/run_cross_path_focus.py qualify-canary \
+  --output data/outputs/solar-cross-path-focus \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root data/outputs/solar-cross-path-focus-qualification
+uv run python scripts/internal/solar/run_cross_path_focus.py qualify-full \
+  --output data/outputs/solar-cross-path-focus \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root data/outputs/solar-cross-path-focus-qualification
 ```
 
 On a publishing host, run the resumable 82-analysis route and produce the
 comparison only after every workload has a formal publication on both paths:
 
 ```bash
-uv run python scripts/internal/solar/run_cross_path_focus.py \
+uv run python scripts/internal/solar/run_cross_path_focus.py run \
   --output data/outputs/solar-cross-path-focus \
-  --orojenesis-home /path/to/orojenesis --device cuda:0 --resume
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root data/outputs/solar-cross-path-focus-qualification \
+  --device cuda:0 --resume
 ```
 
 The runner validates that all eight entries are scored and retain their exact

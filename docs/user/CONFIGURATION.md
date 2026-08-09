@@ -113,16 +113,18 @@ gfx1200 architecture audit and the repository-owned Orojenesis binary
 allowlist. The allowlist contains the reviewed reproducible mapper digest;
 locally substituted binaries still fail closed.
 
-Audit the complete scored corpus through extraction, strict conversion, and
-multi-seed replay on the formal target with:
+Qualify the complete scored corpus through extraction, strict conversion, and
+replay on the formal target with the mandatory uniform chain described in
+[Large batch GPU qualification](GPU-QUALIFICATION.md). After static and canary,
+the final stage is:
 
 ```bash
-uv run sol-execbench solar corpus-audit out/solar/corpus-readiness \
-  --device cuda:0 \
-  --timeout 14400
+uv run sol-execbench solar qualify-full out/release \
+  --orojenesis-home /path/to/orojenesis \
+  --qualification-root out/solar-qualification
 ```
 
-The command derives the denominator from the corpus manifest, records the
+The chain derives the denominator from the corpus manifest, records the
 stable target name `gfx1200`, and emits a content-addressed `matrix.jsonl` plus
 `summary.json`. Each workload has stable stage statuses and reason codes,
 source-content identities, a canonical `trace_identity_sha256`, three seeds, and

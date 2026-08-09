@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import json
 import subprocess
+from types import SimpleNamespace
 
 from click.testing import CliRunner
 
 from sol_execbench.cli.commands import solar as solar_commands
 from sol_execbench.cli.main import cli
-from sol_execbench.core.scoring.release_solar_runner import SolarReleaseResult
-from sol_execbench.core.solar_bridge.corpus_readiness import (
-    CorpusReadinessStatus,
-    CorpusStageAuditResult,
+from sol_execbench.core.bench.batch_gpu_qualification import (
+    BatchGPUQualificationStage,
 )
+from sol_execbench.core.scoring.release_solar_runner import SolarReleaseResult
 from sol_execbench.core.solar_bridge.models import (
     IRPath,
     SolarAnalysisOutcome,
@@ -276,27 +276,27 @@ def test_solar_analyze_cli_structures_runner_timeout(
     assert payload["data"]["reason_code"] == "worker_execution_failed"
 
 
-def test_solar_corpus_audit_returns_incomplete_matrix(
+def test_solar_qualification_uses_uniform_command_name(
     tmp_path,
     monkeypatch,
 ) -> None:
-    output = tmp_path / "audit"
-    matrix = output / "matrix.jsonl"
-    summary = output / "summary.json"
+    workspace = tmp_path / "release"
+    workspace.mkdir()
+    manifest = tmp_path / "manifest.yaml"
+    manifest.write_text("manifest: test\n")
+    orojenesis = tmp_path / "orojenesis"
+    orojenesis.mkdir()
+    qualification = tmp_path / "qualification"
+    observed: list[BatchGPUQualificationStage] = []
+
+    def qualify(*_args, **kwargs):
+        observed.append(kwargs["stage"])
+        return SimpleNamespace(item_ids=("p/w",))
+
     monkeypatch.setattr(
         solar_commands,
-        "audit_corpus_stage_readiness",
-        lambda *args, **kwargs: CorpusStageAuditResult(
-            status=CorpusReadinessStatus.INCOMPLETE,
-            problems=43,
-            workloads=163,
-            extraction_passed=118,
-            conversion_passed=84,
-            verification_passed=61,
-            fully_ready_problems=17,
-            matrix_path=matrix,
-            summary_path=summary,
-        ),
+        "run_solar_release_qualification",
+        qualify,
     )
 
     result = CliRunner().invoke(
@@ -305,19 +305,20 @@ def test_solar_corpus_audit_returns_incomplete_matrix(
             "--format",
             "json",
             "solar",
-            "corpus-audit",
-            str(output),
+            "qualify-full",
+            str(workspace),
+            "--manifest",
+            str(manifest),
+            "--orojenesis-home",
+            str(orojenesis),
+            "--qualification-root",
+            str(qualification),
         ],
     )
 
-    payload = json.loads(result.output)
-    assert result.exit_code == 1
-    assert payload["data"]["workloads"] == 163
-    assert payload["data"]["verification_passed"] == 61
-    assert {item["path"] for item in payload["artifacts"]} == {
-        str(matrix),
-        str(summary),
-    }
+    assert result.exit_code == 0
+    assert observed == [BatchGPUQualificationStage.FULL]
+    assert json.loads(result.output)["data"]["items"] == 1
 
 
 def test_solar_release_build_forwards_explicit_jobs(
@@ -330,6 +331,8 @@ def test_solar_release_build_forwards_explicit_jobs(
     manifest.write_text("manifest: test\n")
     orojenesis = tmp_path / "orojenesis"
     orojenesis.mkdir()
+    qualification = tmp_path / "qualification"
+    qualification.mkdir()
     observed: dict[str, object] = {}
 
     def build(*args, **kwargs):
@@ -363,6 +366,8 @@ def test_solar_release_build_forwards_explicit_jobs(
             str(orojenesis),
             "--jobs",
             "2",
+            "--qualification-root",
+            str(qualification),
         ],
     )
 

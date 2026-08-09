@@ -20,9 +20,8 @@ from sol_execbench.core.data.json_utils import (
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
-from sol_execbench.core.integrity import sha256_file, verify_artifact_file
+from sol_execbench.core.integrity import verify_artifact_file
 from sol_execbench.core.platform.environment_diagnostics import (
     build_environment_diagnostics,
 )
@@ -30,15 +29,20 @@ from sol_execbench.core.platform.rdna4_validation import (
     validate_environment_payload,
 )
 from sol_execbench.core.scoring.release_builders import load_execution_plan
+from sol_execbench.core.scoring.release_contract import (
+    verify_release_plan_contract,
+)
 from sol_execbench.core.scoring.release_environment import (
     current_release_execution_identity,
     release_execution_identity_from_payload,
-    verify_release_source_state,
 )
 from sol_execbench.core.scoring.release_models import (
     ExecutionPlanProblem,
     ReleaseExecutionPlan,
     ReleaseRunKind,
+)
+from sol_execbench.core.scoring.release_qualification import (
+    require_release_qualification,
 )
 
 
@@ -96,6 +100,7 @@ def execute_release_plan(
     plan_path: Path,
     *,
     corpus_manifest_path: Path,
+    qualification_root: Path,
     evaluator: ReleaseEvaluator,
     timeout_seconds: int = 900,
     resume: bool = False,
@@ -103,6 +108,13 @@ def execute_release_plan(
 ) -> ReleaseRunResult:
     """Execute one exact plan through the normal hardened evaluator."""
     plan_file = plan_path.resolve()
+    require_release_qualification(
+        plan_file,
+        corpus_manifest_path=corpus_manifest_path,
+        qualification_root=qualification_root,
+        timeout_seconds=timeout_seconds,
+        device=device,
+    )
     workspace = plan_file.parents[1]
     plan = load_execution_plan(plan_file, workspace_root=workspace)
     corpus = AKACorpusManifest.load(corpus_manifest_path)
@@ -139,35 +151,7 @@ def _verify_plan_contract(
     workspace: Path,
     corpus: AKACorpusManifest,
 ) -> None:
-    bundled = verify_artifact_file(
-        workspace,
-        plan.corpus_manifest.path,
-        expected_sha256=plan.corpus_manifest.sha256,
-        expected_size_bytes=plan.corpus_manifest.size_bytes,
-    )
-    if sha256_file(bundled) != sha256_file(corpus.path):
-        raise ValueError("release execution plan corpus identity mismatch")
-    expected = {
-        entry.relative_problem_dir.as_posix(): entry
-        for entry in corpus.entries
-        if entry.role is AKACorpusRole.SCORED
-    }
-    observed = {item.problem_path: item for item in plan.problems}
-    if set(observed) != set(expected):
-        raise ValueError("release execution plan problem denominator mismatch")
-    for path, item in observed.items():
-        identity = corpus.materialized_problem_sha256[path]
-        if (
-            item.definition_sha256 != identity["definition_sha256"]
-            or item.workload_sha256 != identity["workload_sha256"]
-        ):
-            raise ValueError(
-                f"release execution plan identity mismatch: {path}",
-            )
-    verify_release_source_state(
-        corpus.authored_root.parents[1],
-        expected_revision=plan.source_revision,
-    )
+    verify_release_plan_contract(plan, workspace, corpus)
 
 
 def _write_environment_evidence(

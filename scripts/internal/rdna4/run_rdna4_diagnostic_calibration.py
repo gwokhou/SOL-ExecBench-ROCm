@@ -20,6 +20,17 @@ from sol_execbench.cli.protocol import (
     response_failure,
     response_success,
 )
+from sol_execbench.core.bench.batch_gpu_qualification import (
+    BatchGPUQualificationGate,
+    BatchGPUQualificationReceipt,
+    BatchGPUQualificationStage,
+    LargeBatchGPUTask,
+    qualification_artifact,
+    qualification_gate_path,
+    qualification_parent_stage,
+    require_isolated_qualification_root,
+    verify_qualification_artifact,
+)
 from sol_execbench.core.bench.clock_lock import acquire_clock_lock
 from sol_execbench.core.bench.performance_model.calibration import (
     BOOTSTRAP_REPLICATES,
@@ -40,7 +51,11 @@ from sol_execbench.core.bench.performance_model.models import (
 from sol_execbench.core.bench.timing_isolation import (
     verify_clock_state_with_warning,
 )
-from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.data.json_utils import (
+    atomic_write_json_value,
+    load_json_file,
+    load_json_value,
+)
 from sol_execbench.core.evidence.runtime_evidence.collectors import (
     collect_runtime_gpu_telemetry,
 )
@@ -64,6 +79,7 @@ from sol_execbench.core.platform.runtime import (
     resolve_rocm_tool,
 )
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+from sol_execbench.core.timestamps import utc_timestamp
 
 PROBE_SOURCE = (
     Path(__file__).resolve().parents[3]
@@ -89,6 +105,12 @@ MODES = (
 )
 COMMAND_TIMEOUT_SECONDS = 180.0
 COMMAND_NAME = "rdna4 diagnostic calibration"
+_QUALIFICATION_CANARY_MODES = (
+    "wmma",
+    "memory",
+    "atomic_update",
+    "overlap",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -426,9 +448,263 @@ def _gpu_identity(amd_smi: Path, device_index: int) -> tuple[str, str]:
     return identity.uuid, identity.bdf
 
 
+def _qualification_root(arguments: argparse.Namespace) -> Path:
+    return require_isolated_qualification_root(
+        arguments.qualification_root,
+        arguments.output,
+    )
+
+
+def _qualification_subject(hipcc: Path) -> str:
+    return stable_json_checksum(
+        {
+            "probe_source_sha256": sha256_file(PROBE_SOURCE),
+            "compiler_sha256": sha256_file(hipcc),
+        }
+    )
+
+
+def _qualification_configuration(arguments: argparse.Namespace) -> str:
+    return stable_json_checksum(
+        {
+            "gpu_id": arguments.gpu_id,
+            "tuning_batches": arguments.tuning_batches,
+            "estimation_batches": arguments.estimation_batches,
+        }
+    )
+
+
+def _qualification_modes(
+    stage: BatchGPUQualificationStage,
+) -> tuple[str, ...]:
+    if stage is BatchGPUQualificationStage.CANARY:
+        return _QUALIFICATION_CANARY_MODES
+    return MODES
+
+
+def _static_qualification_receipt(
+    arguments: argparse.Namespace,
+    hipcc: Path,
+) -> BatchGPUQualificationReceipt:
+    root = _qualification_root(arguments)
+    binary = root / "static" / "diagnostic_microarchitecture"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    _compile_probe(hipcc, "gfx1200", binary)
+    payload_path = root / "static" / "preflight.json"
+    payload = {
+        "task": LargeBatchGPUTask.RDNA4_DIAGNOSTIC_CALIBRATION,
+        "subject_sha256": _qualification_subject(hipcc),
+        "modes": MODES,
+        "compile_passed": True,
+    }
+    atomic_write_json_value(payload_path, payload)
+    return BatchGPUQualificationReceipt(
+        stage=BatchGPUQualificationStage.STATIC,
+        partition="fixed-probes",
+        item_ids=MODES,
+        input_sha256=stable_json_checksum(payload),
+        artifacts=(
+            qualification_artifact(root, binary),
+            qualification_artifact(root, payload_path),
+        ),
+    )
+
+
+def _gpu_qualification_receipt(
+    arguments: argparse.Namespace,
+    stage: BatchGPUQualificationStage,
+    mode: str,
+    binary: Path,
+    device: RocmDeviceInfo,
+    gpu_id: str,
+    gpu_bdf: str,
+) -> BatchGPUQualificationReceipt:
+    root = _qualification_root(arguments)
+    path = root / stage.value / mode / "evidence.json"
+    input_sha256 = stable_json_checksum(
+        {
+            "subject_sha256": _qualification_subject(_required_tool("hipcc")),
+            "mode": mode,
+            "gpu_id": gpu_id,
+            "gpu_bdf": gpu_bdf,
+        }
+    )
+    if path.is_file():
+        payload = load_json_value(path)
+    else:
+        batch = _run_probe_batch(
+            binary,
+            phase=f"qualification_{stage.value}",
+            process_batch=0,
+            mode=mode,
+        )
+        payload = {
+            "stage": stage,
+            "mode": mode,
+            "input_sha256": input_sha256,
+            "device": _qualification_device(device, gpu_id, gpu_bdf),
+            "batch": batch.to_dict(),
+            "all_passed": True,
+        }
+        atomic_write_json_value(path, payload)
+    if (
+        payload.get("input_sha256") != input_sha256
+        or payload.get("device")
+        != _qualification_device(device, gpu_id, gpu_bdf)
+        or payload.get("all_passed") is not True
+    ):
+        raise ValueError(f"calibration qualification evidence drift: {path}")
+    return BatchGPUQualificationReceipt(
+        stage=stage,
+        partition=mode,
+        item_ids=(mode,),
+        input_sha256=input_sha256,
+        artifacts=(qualification_artifact(root, path),),
+    )
+
+
+def _required_tool(name: str) -> Path:
+    path = resolve_rocm_tool(name)
+    if path is None:
+        raise RuntimeError(f"{name} is unavailable")
+    return path
+
+
+def _qualification_device(
+    device: RocmDeviceInfo,
+    gpu_id: str,
+    gpu_bdf: str,
+) -> dict[str, object]:
+    return {
+        "name": device.name,
+        "gfx_target": device.gfx_target,
+        "total_memory_bytes": device.total_memory_bytes,
+        "torch_version": device.torch_version,
+        "hip_version": device.hip_version,
+        "gpu_id": gpu_id,
+        "gpu_bdf": gpu_bdf,
+    }
+
+
+def _qualification_hardware(
+    arguments: argparse.Namespace,
+) -> tuple[RocmDeviceInfo, str, str]:
+    device = detect_rocm_device()
+    if device.gfx_target != "gfx1200":
+        raise RuntimeError(
+            f"diagnostic calibration requires gfx1200, got {device.gfx_target}"
+        )
+    observed_gpu_id, gpu_bdf = _gpu_identity(
+        _required_tool("amd-smi"), device.index
+    )
+    if arguments.gpu_id != observed_gpu_id:
+        raise RuntimeError("--gpu-id does not match qualification device UUID")
+    return device, observed_gpu_id, gpu_bdf
+
+
+def _run_qualification(
+    arguments: argparse.Namespace,
+    stage: BatchGPUQualificationStage,
+) -> BatchGPUQualificationGate:
+    root = _qualification_root(arguments)
+    gate_path = qualification_gate_path(root, stage)
+    if gate_path.is_file():
+        return _verify_qualification(arguments, stage)
+    hipcc = _required_tool("hipcc")
+    parent = qualification_parent_stage(stage)
+    parent_hash = None
+    if parent is not None:
+        _verify_qualification(arguments, parent)
+        parent_hash = sha256_file(qualification_gate_path(root, parent))
+    if stage is BatchGPUQualificationStage.STATIC:
+        receipts = (_static_qualification_receipt(arguments, hipcc),)
+    else:
+        device, gpu_id, gpu_bdf = _qualification_hardware(arguments)
+        binary = root / "static" / "diagnostic_microarchitecture"
+        with acquire_clock_lock() as lease:
+            if not lease.locked:
+                raise RuntimeError("STABLE_PEAK clock lock is required")
+            receipts = tuple(
+                _gpu_qualification_receipt(
+                    arguments,
+                    stage,
+                    mode,
+                    binary,
+                    device,
+                    gpu_id,
+                    gpu_bdf,
+                )
+                for mode in _qualification_modes(stage)
+            )
+    gate = BatchGPUQualificationGate(
+        task=LargeBatchGPUTask.RDNA4_DIAGNOSTIC_CALIBRATION,
+        stage=stage,
+        scope_id=arguments.gpu_id,
+        subject_sha256=_qualification_subject(hipcc),
+        runner_sha256=sha256_file(Path(__file__)),
+        configuration_sha256=_qualification_configuration(arguments),
+        source_revision=_qualification_subject(hipcc),
+        parent_gate_sha256=parent_hash,
+        item_ids=tuple(
+            item for receipt in receipts for item in receipt.item_ids
+        ),
+        receipts=receipts,
+        created_at=utc_timestamp(),
+    )
+    atomic_write_json_value(gate_path, gate.model_dump(mode="json"))
+    return _verify_qualification(arguments, stage)
+
+
+def _verify_qualification(
+    arguments: argparse.Namespace,
+    stage: BatchGPUQualificationStage,
+) -> BatchGPUQualificationGate:
+    root = _qualification_root(arguments)
+    hipcc = _required_tool("hipcc")
+    parent = qualification_parent_stage(stage)
+    parent_hash = None
+    if parent is not None:
+        _verify_qualification(arguments, parent)
+        parent_hash = sha256_file(qualification_gate_path(root, parent))
+    gate = load_json_file(
+        BatchGPUQualificationGate, qualification_gate_path(root, stage)
+    )
+    if not (
+        gate.task is LargeBatchGPUTask.RDNA4_DIAGNOSTIC_CALIBRATION
+        and gate.stage is stage
+        and gate.scope_id == arguments.gpu_id
+        and gate.subject_sha256 == _qualification_subject(hipcc)
+        and gate.runner_sha256 == sha256_file(Path(__file__))
+        and gate.configuration_sha256 == _qualification_configuration(arguments)
+        and gate.parent_gate_sha256 == parent_hash
+        and gate.item_ids == _qualification_modes(stage)
+    ):
+        raise ValueError(f"calibration qualification identity drift: {stage}")
+    for receipt in gate.receipts:
+        for evidence_artifact in receipt.artifacts:
+            verify_qualification_artifact(root, evidence_artifact)
+    if stage is not BatchGPUQualificationStage.STATIC:
+        device, gpu_id, gpu_bdf = _qualification_hardware(arguments)
+        for receipt in gate.receipts:
+            payload = load_json_value(root / receipt.artifacts[0].path)
+            if payload.get("device") != _qualification_device(
+                device, gpu_id, gpu_bdf
+            ):
+                raise ValueError("calibration qualification hardware drift")
+    return gate
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "stage",
+        choices=(
+            *(stage.command for stage in BatchGPUQualificationStage),
+            "run",
+        ),
+    )
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--qualification-root", type=Path, required=True)
     parser.add_argument("--gpu-id", required=True)
     parser.add_argument("--tuning-batches", type=int, default=3)
     parser.add_argument("--estimation-batches", type=int, default=5)
@@ -443,6 +719,14 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     """Run the command-line calibration workflow."""
     arguments = _parse_args()
+    if arguments.stage != "run":
+        stage = BatchGPUQualificationStage(
+            arguments.stage.removeprefix("qualify-")
+        )
+        gate = _run_qualification(arguments, stage)
+        print(gate.model_dump_json())
+        return 0
+    _verify_qualification(arguments, BatchGPUQualificationStage.FULL)
     path = run_calibration(
         output=arguments.output,
         gpu_id=arguments.gpu_id,

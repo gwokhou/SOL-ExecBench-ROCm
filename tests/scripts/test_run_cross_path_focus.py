@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -21,13 +20,9 @@ def _load_corpus(focus):
 
 def test_focus_check_validates_exact_current_8_problem_41_workload_inventory(
     load_script: Any,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
     focus = _load_focus(load_script)
-
-    assert focus.main(["--check"]) == 0
-
-    payload = json.loads(capsys.readouterr().out)
+    payload = focus.focus_summary(_load_corpus(focus))
     assert payload["ok"] is True
     assert payload["problems"] == 8
     assert payload["workloads"] == 41
@@ -35,6 +30,28 @@ def test_focus_check_validates_exact_current_8_problem_41_workload_inventory(
     assert {item["problem"] for item in payload["selection"]} == set(
         focus.FOCUS_WORKLOAD_COUNTS
     )
+
+
+def test_focus_cli_uses_uniform_qualification_stage_names(
+    load_script: Any,
+    tmp_path: Path,
+) -> None:
+    focus = _load_focus(load_script)
+    orojenesis = tmp_path / "orojenesis"
+    orojenesis.mkdir()
+    arguments = focus._parse_args(
+        [
+            "qualify-static",
+            "--output",
+            str(tmp_path / "output"),
+            "--orojenesis-home",
+            str(orojenesis),
+            "--qualification-root",
+            str(tmp_path / "qualification"),
+        ]
+    )
+
+    assert arguments.stage == "qualify-static"
 
 
 def test_focus_inventory_rejects_missing_and_duplicate_workloads(
