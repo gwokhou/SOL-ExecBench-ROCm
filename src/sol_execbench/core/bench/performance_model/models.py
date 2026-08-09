@@ -27,6 +27,7 @@ from sol_execbench.core.integrity import SHA256Digest
 from sol_execbench.core.integrity.schema_versions import (
     SchemaVersion,
 )
+from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v7"
 
@@ -614,10 +615,20 @@ class CalibrationIdentity(BaseModelWithDocstrings):
     gpu_architecture: Literal["gfx1200"]
     gpu_id: str
     gpu_bdf: str
+    pcie_topology: PCIeTopologyIdentity | None = None
     rocm_version: str
     compiler_version: str
     clock_mode: str
     power_profile: str
+
+    @model_validator(mode="after")
+    def _topology_terminates_at_gpu(self) -> CalibrationIdentity:
+        if (
+            self.pcie_topology is not None
+            and self.pcie_topology.endpoint_bdf != self.gpu_bdf
+        ):
+            raise ValueError("PCIe topology does not terminate at gpu_bdf")
+        return self
 
 
 class CalibrationParameter(BaseModelWithDocstrings):

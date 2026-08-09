@@ -8,7 +8,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from sol_execbench.core.bench.performance_model.lifecycle.calibration_identity import (
+    load_calibration_gpu_identity,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.collection_identity import (
+    load_collection_gpu_identity,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.identity import (
@@ -24,6 +31,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticLifecyclePlan,
+    diagnostic_lifecycle_plan_payload,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
@@ -146,7 +154,7 @@ def _collection_inputs(
 def _finalize_plan(
     provisional: DiagnosticLifecyclePlan,
 ) -> DiagnosticLifecyclePlan:
-    payload = provisional.model_dump(mode="json", exclude={"plan_id"})
+    payload = diagnostic_lifecycle_plan_payload(provisional)
     return DiagnosticLifecyclePlan.model_validate(
         {"plan_id": stable_json_checksum(payload), **payload}
     )
@@ -164,11 +172,27 @@ def _build_plan(
 ) -> DiagnosticLifecyclePlan:
     collection, inventory, held_out = _collection_inputs(inputs)
     generation = _next_generation(root, design.stage_id)
+    gpu_identity = load_calibration_gpu_identity(
+        inputs.calibration_profile_path,
+        inputs.calibration_audit_path,
+        expected_purpose=design.purpose,
+        require_pcie_topology=(
+            design.purpose is DiagnosticEvidencePurpose.PRODUCTION
+        ),
+    )
+    if design.purpose is DiagnosticEvidencePurpose.PRODUCTION:
+        collected_gpu = load_collection_gpu_identity(
+            inputs.held_out_corpus_path,
+            corpus_root=collection,
+        )
+        if collected_gpu != gpu_identity:
+            raise ValueError("collection/calibration GPU identity mismatch")
     run_id = collection_run_id(
         design_id=design.stage_id,
         generation=generation,
         roles=("held_out",),
         frozen_held_out_sha256=held_out.sha256,
+        gpu_identity=gpu_identity,
         source_revision=source.revision,
         purpose=design.purpose,
     )
@@ -182,6 +206,7 @@ def _build_plan(
         collection_root=str(collection),
         collection_inventory=inventory,
         collection_run_id=run_id,
+        gpu_identity=gpu_identity,
         generation=generation,
         roles=("held_out",),
         calibration_profile_path=str(inputs.calibration_profile_path.resolve()),

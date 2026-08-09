@@ -37,6 +37,12 @@ if TYPE_CHECKING:
 from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
     BlobStore,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.calibration_identity import (
+    load_calibration_gpu_identity,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.collection_identity import (
+    load_collection_gpu_identity,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.corpus_registry import (
     snapshot_blob_inventory,
 )
@@ -300,6 +306,10 @@ class CollectionRunHandler:
             context.held_out_corpus_path,
             "collection run is missing frozen held-out corpus",
         )
+        if not _collection_gpu_identity_matches_plan(context):
+            raise ValueError(
+                "collection GPU identity differs from reviewed plan"
+            )
         return StageCompletion(
             stage_id=context.collection_run_id,
             outputs=context.plan.collection_inventory,
@@ -327,7 +337,22 @@ class CollectionRunHandler:
             return False
         return verify_regular_tree_inventory(
             context.corpus_root, receipt.output_inventory
+        ) and _collection_gpu_identity_matches_plan(context)
+
+
+def _collection_gpu_identity_matches_plan(context: StageRunContext) -> bool:
+    if context.purpose is not DiagnosticEvidencePurpose.PRODUCTION:
+        return True
+    if context.corpus_root is None or context.held_out_corpus_path is None:
+        return False
+    try:
+        observed = load_collection_gpu_identity(
+            context.held_out_corpus_path,
+            corpus_root=context.corpus_root,
         )
+    except (OSError, ValueError):
+        return False
+    return observed == context.plan.gpu_identity
 
 
 class CalibrationHandler:
@@ -355,7 +380,11 @@ class CalibrationHandler:
                 or sha256_file(path) != expected.sha256
             ):
                 raise ValueError("calibration input differs from reviewed plan")
-        gpu, software = _calibration_identities(profile_path, audit_path)
+        gpu, software = _calibration_identities(
+            profile_path,
+            audit_path,
+            purpose=context.purpose,
+        )
         stage_id = calibration_id(
             calibration_profile_sha256=sha256_file(profile_path),
             calibration_audit_sha256=sha256_file(audit_path),
@@ -1607,7 +1636,11 @@ def _calibration_manifest(
     audit = _required(
         context.calibration_audit_path, "missing calibration audit"
     )
-    gpu, software = _calibration_identities(profile, audit)
+    gpu, software = _calibration_identities(
+        profile,
+        audit,
+        purpose=context.purpose,
+    )
     return DiagnosticCalibrationLifecycleManifest(
         **_manifest_common(
             context, receipt, DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE
@@ -1627,6 +1660,7 @@ def _collection_manifest(
         **_manifest_common(
             context, receipt, DiagnosticRetentionClass.PROCESS_EVIDENCE
         ),
+        gpu_identity=context.plan.gpu_identity,
         generation=context.generation,
         roles=("held_out",),
         frozen_held_out_sha256=context.plan.held_out_corpus.sha256,
@@ -1761,19 +1795,15 @@ def _publication_manifest(
 def _calibration_identities(
     profile_path: Path,
     audit_path: Path,
+    *,
+    purpose: DiagnosticEvidencePurpose,
 ) -> tuple[GpuLifecycleIdentity, SoftwareLifecycleIdentity]:
-    from sol_execbench.core.bench.performance_model.calibration_audit import (
-        DiagnosticCalibrationAudit,
+    gpu = load_calibration_gpu_identity(
+        profile_path,
+        audit_path,
+        expected_purpose=purpose,
+        require_pcie_topology=(purpose is DiagnosticEvidencePurpose.PRODUCTION),
     )
-    from sol_execbench.core.bench.performance_model.models import (
-        DiagnosticCalibrationProfile,
-    )
-
-    profile = load_json_file(DiagnosticCalibrationProfile, profile_path)
-    audit = load_json_file(DiagnosticCalibrationAudit, audit_path)
-    if profile.identity.gpu_id != audit.probe_identity.gpu_id:
-        raise ValueError("calibration profile/audit GPU identity mismatch")
-    gpu = GpuLifecycleIdentity(**profile.identity.model_dump(mode="python"))
     software = SoftwareLifecycleIdentity(
         sol_version=PRODUCER_VERSION,
         python_version=sys.version.split()[0],
@@ -1978,7 +2008,10 @@ def _next_pending(
 ) -> DiagnosticLifecycleStage | None:
     for stage in CHAIN:
         status = _stage_status(run_state, stage)
-        if status is None or status is DiagnosticStageStatus.FAILED:
+        if status not in {
+            DiagnosticStageStatus.VERIFIED,
+            DiagnosticStageStatus.SUPERSEDED,
+        }:
             return stage
     return None
 

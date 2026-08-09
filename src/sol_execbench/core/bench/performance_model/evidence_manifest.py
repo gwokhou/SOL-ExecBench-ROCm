@@ -28,6 +28,7 @@ from sol_execbench.core.integrity import (
 from sol_execbench.core.integrity.schema_versions import (
     SchemaVersion,
 )
+from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
@@ -73,11 +74,21 @@ class PerformanceRunIdentity(StrictArtifactModel):
     gpu_architecture: str
     gpu_id: str | None = None
     gpu_bdf: str | None = None
+    pcie_topology: PCIeTopologyIdentity | None = None
     rocm_version: str | None = None
     compiler_version: str | None = None
     clock_mode: str
     power_profile: str | None = None
     timing_protocol: str
+
+    @model_validator(mode="after")
+    def _topology_terminates_at_gpu(self) -> PerformanceRunIdentity:
+        if (
+            self.pcie_topology is not None
+            and self.pcie_topology.endpoint_bdf != self.gpu_bdf
+        ):
+            raise ValueError("PCIe topology does not terminate at gpu_bdf")
+        return self
 
 
 class PerformanceEvidenceManifest(CurrentDiagnosticSidecarAuthority):

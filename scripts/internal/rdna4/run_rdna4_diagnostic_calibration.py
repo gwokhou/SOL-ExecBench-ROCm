@@ -43,6 +43,7 @@ from sol_execbench.core.bench.performance_model.calibration import (
 )
 from sol_execbench.core.bench.performance_model.calibration_audit import (
     DiagnosticCalibrationAudit,
+    calibration_probe_identity_payload,
 )
 from sol_execbench.core.bench.performance_model.models import (
     CalibrationIdentity,
@@ -299,7 +300,11 @@ def _run_calibration_workspace(context: _CalibrationContext) -> Path:
         with acquire_clock_lock() as lease:
             if not lease.locked:
                 raise RuntimeError("STABLE_PEAK clock lock is required")
-            environment = [collect_runtime_gpu_telemetry(phase="pre")]
+            environment = [
+                collect_runtime_gpu_telemetry(
+                    phase="pre", device_index=context.device.index
+                )
+            ]
             tuning = _collect_phase(
                 binary,
                 phase="tuning",
@@ -311,7 +316,13 @@ def _run_calibration_workspace(context: _CalibrationContext) -> Path:
                 phase="parameter_estimation_after_configuration_freeze",
                 process_batches=context.estimation_batches,
             )
-            environment.append(collect_runtime_gpu_telemetry(phase="post"))
+            environment.append(
+                collect_runtime_gpu_telemetry(
+                    phase="post", device_index=context.device.index
+                )
+            )
+        if any(item.pcie_topology is None for item in environment):
+            raise RuntimeError("complete PCIe topology evidence is required")
         isa = _isa_evidence(binary, context.device.gfx_target, workspace)
         audit = DiagnosticCalibrationAudit.model_validate(
             _audit_payload(
@@ -355,6 +366,7 @@ def _calibration_profile(
             gpu_architecture="gfx1200",
             gpu_id=context.gpu_id,
             gpu_bdf=context.gpu_bdf,
+            pcie_topology=audit.probe_identity.pcie_topology,
             rocm_version=context.rocm_version,
             compiler_version=context.compiler_version,
             clock_mode="locked",
@@ -381,7 +393,7 @@ def _calibration_profile(
         ],
         probe_evidence_sha256=[
             stable_json_checksum(
-                audit.probe_identity.model_dump(mode="json"),
+                calibration_probe_identity_payload(audit.probe_identity),
             )
         ],
         configuration_frozen_before_estimation=True,
@@ -411,6 +423,7 @@ def _audit_payload(
             "device_name": context.device.name,
             "gpu_id": context.gpu_id,
             "gpu_bdf": context.gpu_bdf,
+            "pcie_topology": environment[0].pcie_topology,
             "total_memory_bytes": context.device.total_memory_bytes,
             "compiler_version": context.compiler_version,
             "isa": isa,

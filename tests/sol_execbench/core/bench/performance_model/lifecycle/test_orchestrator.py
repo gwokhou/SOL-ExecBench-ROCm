@@ -30,6 +30,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     stage_receipt_path,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
+    DiagnosticEvidencePurpose,
     DiagnosticRetentionClass,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
@@ -37,6 +38,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticStageReceipt,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
+    diagnostic_lifecycle_plan_payload,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     designs_dir,
@@ -55,6 +59,7 @@ def _design(tmp_path: Path) -> Path:
         stage_id="a" * 64,
         status=DiagnosticStageStatus.VERIFIED,
         retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
         source_revision="test",
         created_at=_NOW,
         universe_start=0,
@@ -78,6 +83,7 @@ def _plan(design_path: Path, store_root: Path, max_attempts: int) -> Path:
         stage_id="c" * 64,
         status=DiagnosticStageStatus.VERIFIED,
         retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
         source_revision="test",
         created_at=_NOW,
         role="development",
@@ -111,15 +117,18 @@ def _plan(design_path: Path, store_root: Path, max_attempts: int) -> Path:
         roles=("held_out",),
         frozen_held_out_sha256=held_out_artifact.sha256,
         source_revision="0" * 40,
+        purpose=design.purpose,
     )
     values: dict[str, Any] = {
         "design": DiagnosticLifecycleParent(
             stage=DiagnosticLifecycleStage.DESIGN,
+            purpose=design.purpose,
             stage_id=design.stage_id,
             sha256=sha256_file(design_path),
         ),
         "development_snapshot": DiagnosticLifecycleParent(
             stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+            purpose=snapshot.purpose,
             stage_id=snapshot.stage_id,
             sha256=sha256_file(snapshot_path),
         ),
@@ -153,7 +162,7 @@ def _plan(design_path: Path, store_root: Path, max_attempts: int) -> Path:
     )
     plan = DiagnosticLifecyclePlan(
         plan_id=stable_json_checksum(
-            provisional.model_dump(mode="json", exclude={"plan_id"})
+            diagnostic_lifecycle_plan_payload(provisional)
         ),
         **values,
     )
@@ -279,6 +288,40 @@ def test_run_rejects_tampered_immutable_plan(tmp_path: Path) -> None:
             handlers=_handlers([]),
             now_fn=lambda: _NOW,
         )
+
+
+def test_production_plan_requires_complete_pcie_identity(
+    tmp_path: Path,
+) -> None:
+    design_path = _design(tmp_path)
+    plan_path = _plan(design_path, tmp_path, max_attempts=3)
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    payload["purpose"] = DiagnosticEvidencePurpose.PRODUCTION.value
+    payload["design"]["purpose"] = DiagnosticEvidencePurpose.PRODUCTION.value
+    payload["development_snapshot"]["purpose"] = (
+        DiagnosticEvidencePurpose.PRODUCTION.value
+    )
+
+    with pytest.raises(ValueError, match="requires a complete gpu_identity"):
+        DiagnosticLifecyclePlan.model_validate(payload)
+
+
+def test_conformance_plan_preserves_legacy_id_without_gpu_identity(
+    tmp_path: Path,
+) -> None:
+    design_path = _design(tmp_path)
+    plan_path = _plan(design_path, tmp_path, max_attempts=3)
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    payload.pop("gpu_identity")
+    identity_payload = {
+        name: value for name, value in payload.items() if name != "plan_id"
+    }
+    payload["plan_id"] = stable_json_checksum(identity_payload)
+
+    plan = DiagnosticLifecyclePlan.model_validate(payload)
+
+    assert plan.gpu_identity is None
+    assert plan.plan_id == stable_json_checksum(identity_payload)
 
 
 def test_stage_manifest_preparation_runs_outside_registry_lock(
@@ -537,6 +580,44 @@ def test_status_reports_drift_and_next_stage(tmp_path: Path) -> None:
         / "status.json"
     )
     assert status_file.is_file()
+
+
+def test_status_reports_interrupted_running_stage_as_next(
+    tmp_path: Path,
+) -> None:
+    design_path = _design(tmp_path)
+    run_state = _run(design_path, tmp_path, _handlers([]))
+    snapshot = run_state.stage_state(DiagnosticLifecycleStage.CORPUS_SNAPSHOT)
+    assert snapshot is not None
+    interrupted_snapshot = snapshot.model_copy(
+        update={
+            "status": DiagnosticStageStatus.RUNNING,
+            "receipt_path": "",
+            "outputs": (),
+        }
+    )
+    interrupted = run_state.model_copy(
+        update={
+            "stages": (
+                *run_state.stages[:3],
+                interrupted_snapshot,
+            )
+        }
+    )
+    atomic_write_json_value(
+        run_state_path(run_state.collection_run_id, tmp_path),
+        interrupted.model_dump(mode="json"),
+    )
+
+    status = diagnostic_lifecycle_status(
+        run_state_path=run_state_path(run_state.collection_run_id, tmp_path),
+        handlers=_handlers([]),
+    )
+
+    assert (
+        status["next_stage"] == DiagnosticLifecycleStage.CORPUS_SNAPSHOT.value
+    )
+    assert status["held_out_snapshot_id"] is None
 
 
 def test_status_next_stage_none_when_complete(tmp_path: Path) -> None:

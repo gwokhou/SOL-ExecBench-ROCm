@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 from sol_execbench.cli import evaluation as cli_evaluation
 from sol_execbench.cli.evaluation.command import ProfileLifecycle
 from sol_execbench.core.bench.clock_lock import ClockLockLease
+from sol_execbench.core.evidence.runtime_evidence.models import (
+    RuntimeGPUTelemetry,
+)
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
@@ -189,6 +192,27 @@ def test_run_profiled_evaluation_runs_unlocked_when_lock_unavailable(
     assert profile_result.succeeded is True
     assert lease.enter_count == 1
     assert any("STABLE_PEAK" in record.message for record in caplog.records)
+
+
+def test_replay_snapshot_collects_selected_device(monkeypatch) -> None:
+    calls: list[tuple[str, int]] = []
+    monkeypatch.setenv("SOL_EXECBENCH_DEVICE", "cuda:2")
+
+    def collect(
+        *, phase: Literal["pre", "post"], device_index: int
+    ) -> RuntimeGPUTelemetry:
+        calls.append((phase, device_index))
+        return RuntimeGPUTelemetry(phase=phase)
+
+    monkeypatch.setattr(
+        "sol_execbench.cli.evaluation.command.collect_runtime_gpu_telemetry",
+        collect,
+    )
+
+    snapshot = cli_evaluation.command._replay_snapshot("pre")
+
+    assert snapshot is not None
+    assert calls == [("pre", 2)]
 
 
 def test_no_trace_diagnostics_sidecar_uses_trace_output_path(tmp_path: Path):

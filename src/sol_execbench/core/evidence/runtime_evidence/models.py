@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Literal, Protocol
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     StrictArtifactModel,
 )
+from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 MODEL_CONFIG = ConfigDict(
     extra="forbid",
@@ -61,6 +62,7 @@ class RuntimeGPUTelemetry(StrictArtifactModel):
     phase: Literal["pre", "post"]
     gpu_id: str | None = None
     gpu_bdf: str | None = None
+    pcie_topology: PCIeTopologyIdentity | None = None
     performance_level: str | None = None
     sclk_mhz: float | None = Field(default=None, ge=0)
     mclk_mhz: float | None = Field(default=None, ge=0)
@@ -69,3 +71,12 @@ class RuntimeGPUTelemetry(StrictArtifactModel):
     power_cap_w: float | None = Field(default=None, ge=0)
     power_draw_w: float | None = Field(default=None, ge=0)
     foreign_process_count: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _topology_terminates_at_gpu(self) -> RuntimeGPUTelemetry:
+        if (
+            self.pcie_topology is not None
+            and self.pcie_topology.endpoint_bdf != self.gpu_bdf
+        ):
+            raise ValueError("PCIe topology does not terminate at gpu_bdf")
+        return self

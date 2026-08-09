@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from sol_execbench.core.platform.runtime import (
     FALLBACK_CACHE_CLEAR_BYTES,
+    collect_pcie_topology,
     derive_cache_clear_policy,
     detect_rocm_device,
     discover_rocm_root,
@@ -14,6 +18,76 @@ from sol_execbench.core.platform.runtime import (
     resolve_tool_path,
     rocm_search_roots,
 )
+
+
+def _pcie_link(
+    path: Path,
+    *,
+    current_width: int,
+    max_width: int,
+) -> None:
+    path.mkdir(parents=True)
+    values = {
+        "current_link_speed": "32.0 GT/s PCIe\n",
+        "max_link_speed": "32.0 GT/s PCIe\n",
+        "current_link_width": f"{current_width}\n",
+        "max_link_width": f"{max_width}\n",
+    }
+    for name, value in values.items():
+        (path / name).write_text(value, encoding="utf-8")
+
+
+def test_collect_pcie_topology_binds_complete_root_to_endpoint_path(
+    tmp_path: Path,
+) -> None:
+    sys_devices = tmp_path / "sys/devices"
+    root = sys_devices / "pci0000:00/0000:00:01.1"
+    upstream = root / "0000:01:00.0"
+    downstream = upstream / "0000:02:00.0"
+    endpoint = downstream / "0000:03:00.0"
+    _pcie_link(root, current_width=8, max_width=8)
+    _pcie_link(upstream, current_width=8, max_width=16)
+    _pcie_link(downstream, current_width=16, max_width=16)
+    _pcie_link(endpoint, current_width=16, max_width=16)
+    pci_devices = tmp_path / "sys/bus/pci/devices"
+    pci_devices.mkdir(parents=True)
+    (pci_devices / endpoint.name).symlink_to(endpoint, target_is_directory=True)
+
+    topology = collect_pcie_topology(
+        endpoint.name,
+        pci_devices_root=pci_devices,
+        sys_devices_root=sys_devices,
+    )
+
+    assert [link.bdf for link in topology.links] == [
+        "0000:00:01.1",
+        "0000:01:00.0",
+        "0000:02:00.0",
+        "0000:03:00.0",
+    ]
+    assert topology.bottleneck_bdf == "0000:00:01.1"
+    assert topology.effective_speed_gtps == 32.0
+    assert topology.effective_width == 8
+
+
+def test_collect_pcie_topology_rejects_incomplete_parent_link(
+    tmp_path: Path,
+) -> None:
+    sys_devices = tmp_path / "sys/devices"
+    root = sys_devices / "pci0000:00/0000:00:01.1"
+    endpoint = root / "0000:03:00.0"
+    root.mkdir(parents=True)
+    _pcie_link(endpoint, current_width=16, max_width=16)
+    pci_devices = tmp_path / "sys/bus/pci/devices"
+    pci_devices.mkdir(parents=True)
+    (pci_devices / endpoint.name).symlink_to(endpoint, target_is_directory=True)
+
+    with pytest.raises(FileNotFoundError):
+        collect_pcie_topology(
+            endpoint.name,
+            pci_devices_root=pci_devices,
+            sys_devices_root=sys_devices,
+        )
 
 
 def test_cache_clear_policy_uses_twice_detected_l2() -> None:

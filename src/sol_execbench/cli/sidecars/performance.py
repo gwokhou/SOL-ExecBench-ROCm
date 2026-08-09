@@ -51,6 +51,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
+from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 console = Console(stderr=True)
 
@@ -234,6 +235,7 @@ def write_performance_replay_sidecar(
             ],
             expected_gpu_id=identity.gpu_id,
             expected_gpu_bdf=identity.gpu_bdf,
+            expected_pcie_topology=identity.pcie_topology,
             environment=list(profile_result.environment_snapshots),
         )
         atomic_write_json_value(destination, sidecar.to_dict())
@@ -339,59 +341,60 @@ def _manifest_identity(
         compiler_sha256=compiler_hash,
         code_object_sha256=code_hashes,
     )
-    gpu_id, gpu_bdf, gpu_reasons = _gpu_identity(
+    gpu_id, gpu_bdf, pcie_topology, gpu_reasons = _gpu_identity(
         profile_result.environment_snapshots,
     )
     reasons.extend(gpu_reasons)
     timing = _timing_identity(timing_path, trace_path)
     reasons.extend(timing[1])
     environment = trace.evaluation.environment if trace.evaluation else None
-    rocm_version = (
-        environment.libs.get("rocm") or environment.libs.get("ROCm")
-        if environment
-        else None
-    )
+    (
+        gpu_architecture,
+        rocm_version,
+        clock_mode,
+        power_profile,
+        timing_protocol,
+    ) = _trace_environment_identity(environment)
     if rocm_version is None:
         reasons.append("rocm_version_missing")
     if compiler_version is None:
         reasons.append("compiler_version_missing")
     reasons.extend(_environment_reasons(environment, profile_result))
-    return (
-        PerformanceRunIdentity(
-            run_id=sha256_file(trace_path),
-            definition=trace.definition,
-            definition_sha256=stable_json_checksum(trace.definition),
-            workload_uuid=trace.workload.uuid,
-            workload_sha256=stable_json_checksum(
-                trace.workload.model_dump(mode="json")
-            ),
-            solution_sha256=solution_hash,
-            candidate_sha256=candidate_hash,
-            gpu_architecture=(
-                environment.hardware if environment else "unavailable"
-            ),
-            gpu_id=gpu_id,
-            gpu_bdf=gpu_bdf,
-            rocm_version=rocm_version,
-            compiler_version=compiler_version,
-            clock_mode=(
-                "locked"
-                if environment and environment.clocks_locked is True
-                else "unlocked"
-            ),
-            power_profile=(
-                "stable_peak"
-                if environment and environment.clocks_locked is True
-                else None
-            ),
-            timing_protocol=(
-                environment.timing_protocol
-                if environment and environment.timing_protocol
-                else "unverified"
-            ),
+    identity = PerformanceRunIdentity(
+        run_id=sha256_file(trace_path),
+        definition=trace.definition,
+        definition_sha256=stable_json_checksum(trace.definition),
+        workload_uuid=trace.workload.uuid,
+        workload_sha256=stable_json_checksum(
+            trace.workload.model_dump(mode="json")
         ),
-        code_hashes,
-        reasons,
+        solution_sha256=solution_hash,
+        candidate_sha256=candidate_hash,
+        gpu_architecture=gpu_architecture,
+        gpu_id=gpu_id,
+        gpu_bdf=gpu_bdf,
+        pcie_topology=pcie_topology,
+        rocm_version=rocm_version,
+        compiler_version=compiler_version,
+        clock_mode=clock_mode,
+        power_profile=power_profile,
+        timing_protocol=timing_protocol,
+    )
+    return identity, code_hashes, reasons
+
+
+def _trace_environment_identity(
+    environment: Environment | None,
+) -> tuple[str, str | None, str, str | None, str]:
+    if environment is None:
+        return "unavailable", None, "unlocked", None, "unverified"
+    locked = environment.clocks_locked is True
+    return (
+        environment.hardware,
+        environment.libs.get("rocm") or environment.libs.get("ROCm"),
+        "locked" if locked else "unlocked",
+        "stable_peak" if locked else None,
+        environment.timing_protocol or "unverified",
     )
 
 
@@ -519,16 +522,37 @@ def _compiler_identity(
 
 def _gpu_identity(
     snapshots: tuple[RuntimeGPUTelemetry, ...],
-) -> tuple[str | None, str | None, list[str]]:
+) -> tuple[
+    str | None,
+    str | None,
+    PCIeTopologyIdentity | None,
+    list[str],
+]:
     if {snapshot.phase for snapshot in snapshots} != {"pre", "post"}:
-        return None, None, ["gpu_identity_snapshot_incomplete"]
+        return None, None, None, ["gpu_identity_snapshot_incomplete"]
     gpu_ids = {snapshot.gpu_id for snapshot in snapshots}
     gpu_bdfs = {snapshot.gpu_bdf for snapshot in snapshots}
     if None in gpu_ids or len(gpu_ids) != 1:
-        return None, None, ["gpu_id_snapshot_invalid"]
+        return None, None, None, ["gpu_id_snapshot_invalid"]
     if None in gpu_bdfs or len(gpu_bdfs) != 1:
-        return None, None, ["gpu_bdf_snapshot_invalid"]
-    return next(iter(gpu_ids)), next(iter(gpu_bdfs)), []
+        return None, None, None, ["gpu_bdf_snapshot_invalid"]
+    topologies = [snapshot.pcie_topology for snapshot in snapshots]
+    if any(topology is None for topology in topologies):
+        return (
+            next(iter(gpu_ids)),
+            next(iter(gpu_bdfs)),
+            None,
+            ["pcie_topology_snapshot_incomplete"],
+        )
+    topology = topologies[0]
+    if any(candidate != topology for candidate in topologies[1:]):
+        return (
+            next(iter(gpu_ids)),
+            next(iter(gpu_bdfs)),
+            None,
+            ["pcie_topology_snapshot_changed"],
+        )
+    return next(iter(gpu_ids)), next(iter(gpu_bdfs)), topology, []
 
 
 def _timing_identity(

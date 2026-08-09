@@ -24,7 +24,10 @@ from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
     collect_pytorch_dependency_observation,
 )
-from sol_execbench.core.platform.runtime import resolve_rocm_tool
+from sol_execbench.core.platform.runtime import (
+    collect_pcie_topology,
+    resolve_rocm_tool,
+)
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 VISIBLE_DEVICE_ENV_VARS = (
@@ -184,10 +187,19 @@ def collect_runtime_gpu_telemetry(
     levels = parse_performance_levels(metric_raw)
     processes = parse_processes(process_raw) if process_raw is not None else []
     foreign = sum(process["pid"] != os.getpid() for process in processes)
+    try:
+        topology = (
+            collect_pcie_topology(identity.bdf)
+            if identity.bdf is not None
+            else None
+        )
+    except (OSError, ValueError):
+        topology = None
     return RuntimeGPUTelemetry(
         phase=phase,
         gpu_id=identity.uuid,
         gpu_bdf=identity.bdf,
+        pcie_topology=topology,
         performance_level=(
             levels[device_index] if device_index < len(levels) else None
         ),

@@ -1,11 +1,12 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-09 against `f89b94c2` and the current worktree.
+Last audited: 2026-08-10 against `3ca6a542`, the live ignored evidence/store,
+and the remote P0 Release metadata.
 
-This file records unresolved repository-level work, the decisions that constrain
-it, and the evidence that closed the lifecycle production-topology P0. Generated run
-state belongs in the diagnostic lifecycle registry; detailed completed
-investigations and one-time inventories belong in Git history.
+This file records unresolved repository-level work, the decisions that
+constrain it, and the evidence that closed the lifecycle production-topology
+P0. Generated run state belongs in the diagnostic lifecycle registry; detailed
+completed investigations and one-time inventories belong in Git history.
 
 ## Current state
 
@@ -17,10 +18,11 @@ investigations and one-time inventories belong in Git history.
   163 workloads. `RELEASE/release-bundle.json` is the repository publish marker;
   GitHub Release `gfx1200-official-score-v2` is complete and is not part of the
   backlog below.
-- The current performance-diagnostic contracts are diagnostic corpus v7,
-  performance diagnostic v7, BenchmarkConfig v2, reference IPC v2, and ROCm
-  event timing v4. Superseded schema readers and migrations are intentionally
-  absent.
+- The current performance-diagnostic contracts include diagnostic validation
+  corpus v9, performance diagnostic v7, diagnostic calibration v8, diagnostic
+  inference profile v10, lifecycle run v3, BenchmarkConfig v2, reference IPC
+  v2, and ROCm event timing v4. Superseded schema readers and migrations are
+  intentionally absent.
 - The first statistically evaluated gfx1200 v7 cycle failed only the
   preregistered per-family coverage gate. Cycle 2 is immutable source evidence,
   not a repairable acceptance attempt: its held-out reveal exposed a change from
@@ -36,7 +38,7 @@ investigations and one-time inventories belong in Git history.
   `2bcfa7fc7feadb39a165b03d6a855d73045b9ae536dabda445a1cdbb1dbc60ee`;
   this records the immutable failed design and does not authorize repair or
   reuse of its now-revealed held-out pairs.
-- The current worktree adds mandatory pre-collection qualification. Counter
+- HEAD implements mandatory pre-collection qualification. Counter
   collection now requires an isolated, content-bound chain of three verified
   gates: zero-GPU validation of all 660 frozen design cases and every prepared
   problem artifact; risk-first per-axis-extrema canaries; then minimal-profile
@@ -90,10 +92,18 @@ investigations and one-time inventories belong in Git history.
   `675dd03390112e05fb60f5470976227bc42fe7e1013575b50e5b529cf0547204`.
   Full qualification then passed all 220 held-out workloads—20 in each of the
   11 families—with every Trace reporting `PASSED`, `gfx1200`, and container
-  isolation. Its gate SHA-256 is
+  isolation. Its historical gate SHA-256 is
   `963d4197965a3f7a01af756066f319b943fef3a145db4a663e6fef0a37048b45`.
   Both GPU gates remain `performance_authority=false`; no rocprof or counter
-  collection has run for this repair.
+  collection has run for this repair. These three gates bind source revision
+  `f89b94c248edb6a5e2601828e9aa728fde6d87ea` and collector SHA-256
+  `47d4b21b7d1040460ead27236acc21d05a08b585200438fda6e802ce4c52b372`.
+  HEAD now hashes the collector as
+  `4850a4cd953d7fb7df02fad460cb55cb65eda7e21ab5c9b15bf9dfed82a93975`;
+  the production entrypoint therefore rejects the old static gate with
+  `qualification gate identity drift`. The old gates are retained real GPU
+  process evidence, but they no longer admit collection. Any future use of
+  start-340 requires a new isolated current-HEAD static/canary/full chain.
 - The production-topology lifecycle P0 closed on 2026-08-09. Historical v7 and
   Cycle 2 evidence was imported into the content-addressed store without GPU
   recomputation, then promoted as an 880-case, three-parent production snapshot
@@ -102,6 +112,27 @@ investigations and one-time inventories belong in Git history.
   branch, fresh held-out branch, exact collection-tree inventory, role-separated
   model/acceptance parents, immutable receipts, idempotent resume, successor
   generation rules, and fail-closed consistency/GC.
+- HEAD now binds full PCIe topology in all new GPU performance evidence. The
+  runtime collector records the ordered root-port/bridge/GPU path with each
+  link's BDF, current/max speed, and current/max width, then derives the
+  effective bottleneck. On the audited RX 9060 XT host the production collector
+  returned
+  `0000:00:01.1 -> 0000:01:00.0 -> 0000:02:00.0 -> 0000:03:00.0`,
+  all at 32.0 GT/s, with the root port's x8 link as the effective PCIe 5.0 x8
+  path. Calibration and replay require stable pre/post topology; production
+  plan authoring requires the calibration profile/audit and every held-out
+  performance manifest to share that exact identity. The topology is bound into
+  the reviewed plan and collection-run ID and is rechecked during collection
+  adoption/resume. Older endpoint-only evidence remains readable historical
+  evidence but is ineligible for a new production plan; the current host probe
+  does not retroactively prove its collection-time topology.
+- Active-store conformance run
+  `2311f13ea8f7216e44e9514fda41fd09c2682efdfab8fb5641367bddafab1bc5`
+  remains interrupted at `corpus_snapshot=running` and is retained as process
+  evidence; it was not resumed. Status selection now returns that first
+  non-verified stage (`next_stage=corpus_snapshot`) instead of incorrectly
+  jumping to `model_build`. The completed conformance authority remains run
+  `c96d65d534bdfe51ac23b0fda026721a614fa6f3e03388fa1ca3da533a922096`.
 - P0 closure did not authorize Cycle 3 acceptance or publication. The complete
   end-to-end run described below has purpose `control_plane_conformance`; the
   production registry objects are the three historical source snapshots, their
@@ -164,15 +195,17 @@ supported by the following concrete evidence:
   `d3621a29da7d83be05aca99723ce1ca1fb595e434aafa5971a7a2e52d027609c`
   only from the fresh conformance collection run. The latter binds an exact
   3,741-file, 18,277,046-byte collection inventory.
-- All eight stages are `verified`. A subsequent `status` reported
-  `next_stage=null`, and `resume` remained a no-op with exactly one attempt per
-  stage. Acceptance
+- All eight stages are `verified`. At this audit, the same handler-backed
+  verification path used by `sol-execbench diagnostics lifecycle status`
+  again returned `next_stage=null` with exactly one attempt per stage.
+  Acceptance
   `c5770933e1401cfdf31aa9a0df08a1269c1e43f0e16ec5ff2b2135c258805141`
   recorded `accepted=true`, publication is
   `6c7fe7d17f9b77d12b6d05c8f4a456414276f3c55a0eeb72ff9e3a629cf48c7f`,
   and the local release candidate is
   `5e4eb276dc7ace676fbf8b647d3d3ffdff8033695065db63bbb62bfce01eaa5e`.
-- The final consistency check accepted `data/store`. Its GC dry-run observed
+- The current consistency checker accepts `data/store`. A new GC dry-run at
+  this audit observed
   37,949 blobs totalling 23,239,103,276 bytes; 37,913 blobs totalling
   23,229,476,339 bytes were reachable. The 36 unreferenced blobs remain intact:
   no GC apply or expanded-tree deletion was performed.
@@ -185,13 +218,16 @@ supported by the following concrete evidence:
 - Frozen evidence cannot be repaired in place. A changed input opens a new
   generation, while per-design locking, reviewed GC plans, and the append-only
   attempt ledger prevent concurrent overwrite, stale publication, or audit loss.
-- The conformance run ID is
+- The earlier hosted linear conformance run ID is
   `0638897cff2eae889d8fc38fdcb29d1e85dce120c3716d65bda998610ec121cb`.
   Its final publication and release IDs are
   `9a034b2339ca8bb5f24f87e454ed50a2b47c0b886214c2e3ff9423c4cb34040b`
   and
   `f2b7e49441d79731e35700a83109b36129c2d6b848e7e52ec483d9bd0a4c772c`.
-  All eight lifecycle stages reverify and report no next stage.
+  It has been moved out of the active store to
+  `data/store-control-plane-v2-historical-20260809/`. Its v2 run/corpus objects
+  are historical evidence and are intentionally rejected by the current v3/v9
+  readers; it must not be described as a currently reverified active-store run.
 - The deterministic archive contains 440 cases, is 2,348,998 bytes, and has
   SHA-256
   `43072e90c0b501119744a65d726818b58d945a38d4b08254cc15cc2aa502a245`.
@@ -204,10 +240,17 @@ supported by the following concrete evidence:
   [`31272071579`](https://github.com/gwokhou/SOL-ExecBench-ROCm/actions/runs/31272071579)
   verified the exact two assets, safe extraction, semantic reproduction,
   byte-identical deterministic rebuilding, and release identity before publish.
-- `data/store/published-releases/f2b7e49441d79731e35700a83109b36129c2d6b848e7e52ec483d9bd0a4c772c/receipt.json`
-  is a v2 immutable round-trip receipt. It binds repository, tag target, GitHub
-  Release/asset IDs, exact remote names/sizes/digests, workflow run and attempt,
-  publication time, source revision, and the local release candidate/CAS.
+  A live GitHub API check at this audit confirmed the annotated tag target,
+  completed/successful workflow attempt, and the two uploaded assets with the
+  exact 2,348,998-byte archive and 1,142-byte attestation digests above.
+- The retained v2 immutable round-trip receipt is under
+  `data/store-control-plane-v2-historical-20260809/published-releases/` for
+  release ID
+  `f2b7e49441d79731e35700a83109b36129c2d6b848e7e52ec483d9bd0a4c772c`.
+  This receipt binds repository, tag target, GitHub Release/asset IDs, exact
+  remote names/sizes/digests, workflow run and attempt, publication time, source
+  revision, and the historical local release candidate/CAS. It is not a member
+  of the active `data/store` production-shaped run.
 - Test-created start-160 objects and obsolete pre-source-revision conformance
   generations were removed only after archival. They remain recoverable from
   `data/cold-archive/test-created-start-160-2026-08-09.tar.zst` and
@@ -215,11 +258,13 @@ supported by the following concrete evidence:
   the latter has SHA-256
   `5b567d7bbabd61eff3b35f63a6121d888f734f511e896b650db09e37e86bb5ab`.
 
-The production-shaped conformance traversal and CAS adoption are CPU and storage
-operations; they did not launch fresh GPU collection or refit Cycle 3 inference.
-The final repository test run reported 2,355 passed and 23 skipped. Ruff,
-formatting, `ty`, architecture gates, focused lifecycle/release tests, and the
-diagnostic store consistency checker passed.
+The production-shaped conformance traversal and CAS adoption are CPU and
+storage operations; they did not launch fresh GPU collection or refit Cycle 3
+inference. At HEAD, the batch-GPU qualification change passed the full test
+suite plus Ruff, formatting, `ty`, architecture, schema, readability, reuse,
+production-reachability, and documentation gates. This audit additionally
+reverified the active lifecycle status, store consistency, and GC dry-run; it
+did not run GPU qualification, collection, GC apply, or deletion.
 
 ## Active backlog
 
@@ -232,18 +277,19 @@ with collection-log SHA-256
 and partial performance-evidence SHA-256
 `489a02851671e968a4db959c4d4905f0d06d7bd9a2192ffa5c1b459b3735c9bf`.
 The failure is deterministic, not a retryable sandbox or profiler incident.
-The current worktree rejects any such design before GPU collection and has
+HEAD rejects any such design before GPU collection and has
 focused regression coverage; it also implements the mandatory three-gate
 qualification chain described above. The gates have passed CPU/static and
 simulated-evaluator regression tests. Real static, canary, and full-role
-qualification receipts now exist for the isolated representative start-340
-repair. Two earlier canary attempts stopped before GPU: direct host execution
-was rejected for lacking isolation, then the Docker matrix rejected an
-unvalidated `not_tested` target. Their logs remain intact. The successful runs
-use the repository's explicit non-authoritative smoke route and grant no
-benchmark, score, acceptance, or publication authority. The three qualification
-gates now admit an explicitly selected exploratory counter collection, but no
-such collection has started. This does not mutate the frozen start-220 payload.
+qualification receipts exist for the isolated representative start-340 repair.
+Two earlier canary attempts stopped before GPU: direct host execution was
+rejected for lacking isolation, then the Docker matrix rejected an unvalidated
+`not_tested` target. Their logs remain intact. The successful historical runs
+used the repository's explicit non-authoritative smoke route and grant no
+benchmark, score, acceptance, or publication authority. Because HEAD changed
+the bound collector and source revision, the existing three-gate chain now
+fails closed and admits no collection. No exploratory collection has started;
+this does not mutate the frozen start-220 payload.
 
 Do not force, skip, repair, or resume the Cycle 3 tree. The next production
 attempt must not reuse prior inference or acceptance artifacts, tune after
@@ -252,18 +298,22 @@ pair.
 
 Required sequence:
 
-1. Re-promote all 880 prior development and revealed held-out cases through a
-   governed multi-parent derivation into one blob-backed v7 development snapshot.
-   Verify every source before importing it; do not attribute this snapshot to
-   the fresh Cycle 3 collection run.
+1. Reverify and reuse the existing blob-backed 880-case development snapshot
+   `892be3337f6bf126c7d432208264a7a93120fa4a328e02afb66e82703c7db18a`
+   and its three source parents. Current production plan authoring accepts this
+   immutable object through `--development-snapshot-id`; do not repeat
+   promotion unless a source or governing policy actually changes, and never
+   attribute this snapshot to the fresh held-out collection run.
 2. Confirm the collection host exactly matches the frozen calibration object:
    RX 9060 XT/gfx1200 GPU `a3ff7590-0000-1000-800f-a29c1cca1511`, BDF
    `0000:03:00.0`, ROCm 7.2.0, compiler
-   `HIP version: 7.2.26015-fc0010cf6a`, locked clocks, and `stable_peak` power.
-   Any mismatch requires a new governed calibration and inference fit.
-3. Fit and freeze a current-policy v7 inference profile from the promoted
-   development snapshot. Rebuild every cited case; unavailable hardware
-   prediction is a hard failure.
+   `HIP version: 7.2.26015-fc0010cf6a`, the complete ordered PCIe path and
+   effective link, locked clocks, and `stable_peak` power. Every collected case
+   must bind the same pre/post topology. Any mismatch requires a new governed
+   calibration and inference fit.
+3. Fit and freeze a current-schema v10 inference profile for the v7 corpus from
+   the promoted development snapshot. Rebuild every cited case; unavailable
+   hardware prediction is a hard failure.
 4. Register a fresh successor design whose complete generated workload set is
    statically checked against every packaged candidate contract before freeze.
    Complete `qualify-static`, `qualify-canary --role held_out`, and
@@ -293,19 +343,6 @@ Authoritative surfaces:
 - `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
 - `scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py`
 
-### P1 — Bind effective PCIe topology in hardware evidence
-
-The Cycle 3 GPU identity records UUID and endpoint BDF but not the complete
-PCIe parent path. On the collection host, endpoint `0000:03:00.0` reports an
-internal x16 link, while the effective CPU-root path through `0000:00:01.1`
-is PCIe 5.0 x8. Endpoint-only telemetry therefore cannot prove the effective
-host link or detect a mid-run topology change.
-
-A successor generation must bind pre/post observations for every parent link,
-including BDF, current/max speed, and current/max width, and derive the
-effective path from the narrowest negotiated link. A current host observation
-cannot retroactively prove the topology of already collected evidence.
-
 ### P1 — Expand empirical hardware and isolation coverage
 
 - Run `test_real_multi_gpu_candidate_device_switch_is_rejected` with at least
@@ -323,6 +360,28 @@ cannot retroactively prove the topology of already collected evidence.
 
 Completion evidence must name the exact GPU, ROCm/PyTorch stack, test set, and
 skipped prerequisites. A skip or generic schema support is not empirical proof.
+
+### P2 — Close the expanded historical-store archive boundary
+
+`data/store-control-plane-v2-historical-20260809/` is a 7.4 MiB expanded
+historical P0 store, not the active lifecycle registry. Current readers require
+lifecycle run v3 and validation corpus v9, so current store verification
+correctly rejects its v2-era run/corpus objects. The repository-wide
+`check_non_canonical_artifacts.py` gate currently reports five unmarked v2 run
+manifests under this tree. Do not migrate or rewrite those immutable historical
+objects merely to make current readers accept them.
+
+Completion requires one reviewed boundary:
+
+1. archive the exact expanded tree into `data/cold-archive/` with a verified
+   inventory and digest, then use a path retirement plan and explicit deletion
+   approval before removing the expanded copy; or
+2. retain the expanded tree with a `NON_CANONICAL.md` marker that records its
+   identity, immutable historical purpose, schema boundary, inventory/digest,
+   and recovery/retention decision.
+
+After either route, the repository-wide non-canonical artifact check must pass
+without adding superseded schema readers or weakening the current registry.
 
 ### P2 — Resolve the compressed code-object metadata boundary
 
@@ -405,3 +464,8 @@ git diff --check
 
 Hardware claims additionally require the precisely marked ROCm tests on the
 named device. Never treat a skip as passing hardware evidence.
+
+At this audit every command above that was run passed except
+`check_non_canonical_artifacts.py`, whose five historical v2 findings are the
+explicit expanded-store archive-boundary backlog above. Do not report the full
+handoff verification set green until that boundary is closed.

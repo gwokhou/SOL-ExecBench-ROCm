@@ -16,6 +16,7 @@ from typing import Any, cast
 import pytest
 
 from sol_execbench.core.bench.performance_model.lifecycle import (
+    DiagnosticEvidencePurpose,
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
     DiagnosticLifecycleStage,
@@ -59,11 +60,13 @@ def test_collection_handler_requires_exact_reviewed_inventory(
             SimpleNamespace(
                 collection_inventory=(artifact,),
                 held_out_corpus=artifact,
+                purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
             ),
         ),
         design_manifest_path=tmp_path / "design.json",
         collection_run_id="a" * 64,
         generation=1,
+        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
         corpus_root=corpus_root,
         held_out_corpus_path=corpus,
     )
