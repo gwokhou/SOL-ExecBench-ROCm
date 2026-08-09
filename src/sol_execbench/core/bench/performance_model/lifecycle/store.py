@@ -62,11 +62,6 @@ def orchestrations_dir(root: Path | None = None) -> Path:
     return (root or store_root()) / "orchestrations"
 
 
-def promotions_dir(root: Path | None = None) -> Path:
-    """Return the immutable promotion registry directory."""
-    return (root or store_root()) / "promotions"
-
-
 def snapshots_dir(root: Path | None = None) -> Path:
     """Return the registry directory for corpus snapshot objects."""
     return (root or store_root()) / "snapshots"
@@ -132,7 +127,6 @@ __all__ = [
     "designs_dir",
     "locks_dir",
     "orchestrations_dir",
-    "promotions_dir",
     "publication_registry_dir",
     "published_releases_dir",
     "releases_dir",

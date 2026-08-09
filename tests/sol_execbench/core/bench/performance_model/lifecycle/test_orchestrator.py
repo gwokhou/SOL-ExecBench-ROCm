@@ -1,19 +1,26 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
 from sol_execbench.core.bench.performance_model.lifecycle import (
     CHAIN,
+    BlobStore,
+    DiagnosticCorpusSnapshotManifest,
+    DiagnosticLifecycleArtifact,
+    DiagnosticLifecycleParent,
+    DiagnosticLifecyclePlan,
     DiagnosticLifecycleStage,
     DiagnosticRunManifest,
     DiagnosticStageAttempt,
     DiagnosticStageStatus,
     StageCompletion,
     StageRunContext,
+    collection_run_id,
     diagnostic_lifecycle_status,
     resume_diagnostic_lifecycle,
     run_diagnostic_lifecycle,
@@ -30,13 +37,13 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticStageReceipt,
 )
-from sol_execbench.core.bench.performance_model.lifecycle.shared import (
-    DiagnosticLifecycleParent,
-)
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
+    designs_dir,
     orchestrations_dir,
+    snapshots_dir,
 )
 from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 
 _NOW = "2026-01-01T00:00:00+00:00"
 
@@ -52,8 +59,105 @@ def _design(tmp_path: Path) -> Path:
         universe_start=0,
         design_payload_sha256="b" * 64,
     )
-    path = tmp_path / "design.json"
+    path = designs_dir(tmp_path) / design.stage_id / "manifest.json"
     atomic_write_json_value(path, design.model_dump(mode="json"))
+    BlobStore(tmp_path).put_file(path)
+    return path
+
+
+def _plan(design_path: Path, store_root: Path, max_attempts: int) -> Path:
+    design = DiagnosticDesignManifest.model_validate_json(
+        design_path.read_text(encoding="utf-8")
+    )
+    development = store_root / "development.json"
+    development.write_text("{}", encoding="utf-8")
+    development_digest = BlobStore(store_root).put_file(development)
+    snapshot = DiagnosticCorpusSnapshotManifest(
+        stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+        stage_id="c" * 64,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        source_revision="test",
+        created_at=_NOW,
+        role="development",
+        corpus_file_sha256=development_digest,
+        case_count=220,
+        source_snapshot_ids=("d" * 64,),
+    )
+    snapshot_path = (
+        snapshots_dir(store_root) / snapshot.stage_id / "manifest.json"
+    )
+    atomic_write_json_value(snapshot_path, snapshot.model_dump(mode="json"))
+    BlobStore(store_root).put_file(snapshot_path)
+    collection = store_root / "collection"
+    collection.mkdir(exist_ok=True)
+    held_out = collection / "held_out.json"
+    held_out.write_text("{}", encoding="utf-8")
+    held_out_artifact = DiagnosticLifecycleArtifact(
+        relative_path="held_out.json",
+        sha256=sha256_file(held_out),
+        size_bytes=held_out.stat().st_size,
+    )
+    calibration = store_root / "calibration"
+    calibration.mkdir(exist_ok=True)
+    profile = calibration / "profile.json"
+    audit = calibration / "profile.audit.json"
+    profile.write_text("{}", encoding="utf-8")
+    audit.write_text("{}", encoding="utf-8")
+    run_id = collection_run_id(
+        design_id=design.stage_id,
+        generation=1,
+        roles=("held_out",),
+        frozen_held_out_sha256=held_out_artifact.sha256,
+        source_revision="0" * 40,
+    )
+    values: dict[str, Any] = {
+        "design": DiagnosticLifecycleParent(
+            stage=DiagnosticLifecycleStage.DESIGN,
+            stage_id=design.stage_id,
+            sha256=sha256_file(design_path),
+        ),
+        "development_snapshot": DiagnosticLifecycleParent(
+            stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+            stage_id=snapshot.stage_id,
+            sha256=sha256_file(snapshot_path),
+        ),
+        "collection_root": str(collection),
+        "collection_inventory": (held_out_artifact,),
+        "collection_run_id": run_id,
+        "generation": 1,
+        "roles": ("held_out",),
+        "calibration_profile_path": str(profile),
+        "calibration_profile": DiagnosticLifecycleArtifact(
+            relative_path=profile.name,
+            sha256=sha256_file(profile),
+            size_bytes=profile.stat().st_size,
+        ),
+        "calibration_audit_path": str(audit),
+        "calibration_audit": DiagnosticLifecycleArtifact(
+            relative_path=audit.name,
+            sha256=sha256_file(audit),
+            size_bytes=audit.stat().st_size,
+        ),
+        "held_out_corpus_path": str(held_out),
+        "held_out_corpus": held_out_artifact,
+        "output_root": str(store_root / "output"),
+        "source_revision": "0" * 40,
+        "purpose": design.purpose,
+        "model_version": "test",
+        "max_attempts": max_attempts,
+    }
+    provisional = DiagnosticLifecyclePlan.model_construct(
+        plan_id="0" * 64, **values
+    )
+    plan = DiagnosticLifecyclePlan(
+        plan_id=stable_json_checksum(
+            provisional.model_dump(mode="json", exclude={"plan_id"})
+        ),
+        **values,
+    )
+    path = store_root / "plan.json"
+    atomic_write_json_value(path, plan.model_dump(mode="json"))
     return path
 
 
@@ -123,12 +227,12 @@ def _run(
     stages: Sequence[DiagnosticLifecycleStage] | None = None,
     max_attempts: int = 3,
 ) -> DiagnosticRunManifest:
+    plan_path = _plan(design_path, store_root, max_attempts)
     return run_diagnostic_lifecycle(
-        design_manifest_path=design_path,
+        plan_path=plan_path,
         store_root_path=store_root,
         handlers=handlers,
         stages=stages,
-        max_attempts=max_attempts,
         now_fn=lambda: _NOW,
     )
 
@@ -158,6 +262,22 @@ def test_run_executes_chain_in_order_and_persists(
             tmp_path,
         )
         assert receipt.is_file()
+
+
+def test_run_rejects_tampered_immutable_plan(tmp_path: Path) -> None:
+    design_path = _design(tmp_path)
+    plan_path = _plan(design_path, tmp_path, max_attempts=3)
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    payload["max_attempts"] = 4
+    atomic_write_json_value(plan_path, payload)
+
+    with pytest.raises(ValueError, match="plan_id is not canonical"):
+        run_diagnostic_lifecycle(
+            plan_path=plan_path,
+            store_root_path=tmp_path,
+            handlers=_handlers([]),
+            now_fn=lambda: _NOW,
+        )
 
 
 def test_run_illegal_transition_rejected(tmp_path: Path) -> None:
@@ -304,7 +424,7 @@ def test_resume_reruns_drifted_stage(tmp_path: Path) -> None:
     assert model_build.status is DiagnosticStageStatus.VERIFIED
 
 
-def test_interrupted_run_resumes_from_first_incomplete(tmp_path: Path) -> None:
+def test_resume_does_not_exceed_immutable_plan_budget(tmp_path: Path) -> None:
     design_path = _design(tmp_path)
     order: list[DiagnosticLifecycleStage] = []
     failing = FakeHandler(
@@ -331,11 +451,9 @@ def test_interrupted_run_resumes_from_first_incomplete(tmp_path: Path) -> None:
 
     model_build = resumed.stage_state(DiagnosticLifecycleStage.MODEL_BUILD)
     assert model_build is not None
-    assert model_build.status is DiagnosticStageStatus.VERIFIED
-    release = resumed.stage_state(DiagnosticLifecycleStage.RELEASE)
-    assert release is not None
-    assert release.status is DiagnosticStageStatus.VERIFIED
-    assert DiagnosticLifecycleStage.MODEL_BUILD in fixed_order
+    assert model_build.status is DiagnosticStageStatus.FAILED
+    assert model_build.attempts == 2
+    assert fixed_order == []
 
 
 def test_status_reports_drift_and_next_stage(tmp_path: Path) -> None:
@@ -388,9 +506,9 @@ def test_status_next_stage_none_when_complete(tmp_path: Path) -> None:
     )
     assert status["next_stage"] is None
     assert status["collection_run_id"] == run_state.collection_run_id
-    chain: object = status["parent_chain"]
-    assert isinstance(chain, list)
-    assert len(chain) == len(CHAIN)
+    assert "parent_chain" not in status
+    assert status["development_snapshot_id"] == "c" * 64
+    assert isinstance(status["held_out_snapshot_id"], str)
     stages: object = status["stages"]
     assert isinstance(stages, list)
     for item in stages:

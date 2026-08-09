@@ -37,13 +37,12 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
     ReferenceResolver,
-    resolve_corpus_reference,
+    materialize_corpus_references,
 )
 from sol_execbench.core.bench.performance_model.models import (
     DiagnosticCalibrationProfile,
 )
 from sol_execbench.core.bench.performance_model.validation_corpus import (
-    CorpusArtifactReference,
     DiagnosticValidationCase,
     DiagnosticValidationCorpus,
     ValidationArtifactReference,
@@ -420,40 +419,27 @@ def _project_case(
     solar_projector: SolarManifestProjector,
     blob_resolver: ReferenceResolver | None = None,
 ) -> DiagnosticValidationCase:
-    source_evidence = _verified_corpus_reference(
-        corpus_path, case.evidence_manifest, blob_resolver=blob_resolver
-    )
-    source_solar = _verified_corpus_reference(
-        corpus_path, case.solar_manifest, blob_resolver=blob_resolver
-    )
-    destination = staging / "cases" / f"{index:04d}"
-    evidence_path, evidence = _project_performance_manifest(
-        source_evidence, destination / "performance"
-    )
-    solar_path = solar_projector(
-        source_solar,
-        destination / "solar",
-        expected_definition=evidence.identity.definition,
-        expected_workload_uuid=evidence.identity.workload_uuid,
-    )
+    with materialize_corpus_references(
+        case.evidence_manifest,
+        case.solar_manifest,
+        resolver=blob_resolver,
+        corpus_root=corpus_path.parent,
+    ) as (source_evidence, source_solar):
+        destination = staging / "cases" / f"{index:04d}"
+        evidence_path, evidence = _project_performance_manifest(
+            source_evidence, destination / "performance"
+        )
+        solar_path = solar_projector(
+            source_solar,
+            destination / "solar",
+            expected_definition=evidence.identity.definition,
+            expected_workload_uuid=evidence.identity.workload_uuid,
+        )
     return case.model_copy(
         update={
             "evidence_manifest": _validation_reference(staging, evidence_path),
             "solar_manifest": _validation_reference(staging, solar_path),
         }
-    )
-
-
-def _verified_corpus_reference(
-    corpus_path: Path,
-    reference: CorpusArtifactReference,
-    *,
-    blob_resolver: ReferenceResolver | None = None,
-) -> Path:
-    return resolve_corpus_reference(
-        reference,
-        resolver=blob_resolver,
-        corpus_root=corpus_path.parent,
     )
 
 
@@ -681,23 +667,23 @@ def _verify_projected_case(
     solar_verifier: SolarManifestProjectionVerifier,
     blob_resolver: ReferenceResolver | None = None,
 ) -> None:
-    evidence_path = _verified_corpus_reference(
-        corpus_path, case.evidence_manifest, blob_resolver=blob_resolver
-    )
-    solar_path = _verified_corpus_reference(
-        corpus_path, case.solar_manifest, blob_resolver=blob_resolver
-    )
-    evidence = load_and_verify_performance_evidence_manifest(
-        evidence_path, require_complete=True
-    )
-    if evidence.artifacts_of_kind(PerformanceEvidenceArtifactKind.ROCPD):
-        raise ValueError("compact publication retains ROCPD evidence")
-    if case.pair_id != validation_pair_id(
-        workload_sha256=evidence.identity.workload_sha256,
-        candidate_sha256=evidence.identity.candidate_sha256,
-    ):
-        raise ValueError("publication validation pair identity mismatch")
-    solar_verifier(solar_path)
+    with materialize_corpus_references(
+        case.evidence_manifest,
+        case.solar_manifest,
+        resolver=blob_resolver,
+        corpus_root=corpus_path.parent,
+    ) as (evidence_path, solar_path):
+        evidence = load_and_verify_performance_evidence_manifest(
+            evidence_path, require_complete=True
+        )
+        if evidence.artifacts_of_kind(PerformanceEvidenceArtifactKind.ROCPD):
+            raise ValueError("compact publication retains ROCPD evidence")
+        if case.pair_id != validation_pair_id(
+            workload_sha256=evidence.identity.workload_sha256,
+            candidate_sha256=evidence.identity.candidate_sha256,
+        ):
+            raise ValueError("publication validation pair identity mismatch")
+        solar_verifier(solar_path)
 
 
 __all__ = [

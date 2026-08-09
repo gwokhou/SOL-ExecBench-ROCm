@@ -80,6 +80,16 @@ def verify_projected_solar_manifest(path: Path) -> None:
         _verify_solar_artifact(path.parent, artifact)
 
 
+def verified_solar_artifact_paths(path: Path) -> tuple[Path, ...]:
+    """Load one SOLAR manifest and return all checksum-verified members."""
+    manifest = SolarRequestManifest.from_yaml(path.read_text(encoding="utf-8"))
+    _artifact_paths(manifest)
+    return tuple(
+        _verify_solar_artifact(path.parent, artifact)
+        for artifact in manifest.artifacts
+    )
+
+
 def _require_publication_eligible(manifest: SolarRequestManifest) -> None:
     if not manifest.publication_eligible or not manifest.sol_score_eligible:
         raise ValueError("SOLAR manifest is not publication eligible")
@@ -135,5 +145,6 @@ def _write_yaml(path: Path, value: object) -> None:
 
 __all__ = [
     "project_solar_manifest",
+    "verified_solar_artifact_paths",
     "verify_projected_solar_manifest",
 ]

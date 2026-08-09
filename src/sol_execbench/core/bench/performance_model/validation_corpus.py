@@ -76,6 +76,7 @@ class BlobArtifactReference(StrictArtifactModel):
 
     sha256: SHA256Digest
     size_bytes: int = Field(ge=0)
+    tree_manifest_sha256: SHA256Digest
     blob_backed: Literal[True] = True
 
 

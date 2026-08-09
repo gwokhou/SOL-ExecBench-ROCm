@@ -13,6 +13,10 @@ _unknown_capability_claims = cast(
     Callable[[Path, str], list[str]],
     _DOC_CHECK["_unknown_capability_claims"],
 )
+_missing_required_references = cast(
+    Callable[[Path, str], list[str]],
+    _DOC_CHECK["_missing_required_references"],
+)
 
 
 def test_documented_sidecar_capabilities_are_published() -> None:
@@ -31,3 +35,17 @@ def test_unknown_documented_capability_is_rejected(tmp_path: Path) -> None:
     assert failures == [
         f"{path} claims unpublished evaluator capability 'missing.sidecar'"
     ]
+
+
+def test_missing_lifecycle_command_reference_is_rejected() -> None:
+    path = ROOT / "docs/performance-diagnostics.md"
+
+    failures = _missing_required_references(path, "")
+
+    assert failures
+    assert all(
+        failure.startswith(
+            "docs/performance-diagnostics.md is missing current reference "
+        )
+        for failure in failures
+    )

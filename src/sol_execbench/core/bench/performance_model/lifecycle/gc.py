@@ -28,6 +28,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DIAGNOSTIC_LIFECYCLE_MANIFEST_ADAPTER,
+    DiagnosticCollectionRunManifest,
     DiagnosticLifecycleManifest,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
@@ -133,6 +134,7 @@ def _reachability(
     live: set[str] = set()
     superseded: set[str] = set()
     referrers: dict[str, DiagnosticRetentionClass] = {}
+    manifests: list[DiagnosticLifecycleManifest] = []
     for directory in (
         designs_dir(root),
         runs_dir(root),
@@ -144,17 +146,28 @@ def _reachability(
         releases_dir(root),
     ):
         for manifest_path in sorted(directory.glob("*/manifest.json")):
-            manifest = _load_manifest(manifest_path)
-            is_superseded = manifest.status is DiagnosticStageStatus.SUPERSEDED
-            digests, retention = _manifest_digests(manifest)
-            for digest in digests:
-                if is_superseded:
-                    superseded.add(digest)
-                else:
-                    live.add(digest)
-                    _record_referrer(referrers, digest, retention)
+            manifests.append(_load_manifest(manifest_path))
+    superseded_ids = _validated_superseded_collection_ids(manifests)
+    for manifest in manifests:
+        is_superseded = (
+            manifest.status is DiagnosticStageStatus.SUPERSEDED
+            or manifest.stage_id in superseded_ids
+        )
+        digests, retention = _manifest_digests(manifest)
+        for digest in digests:
+            if is_superseded:
+                superseded.add(digest)
+            else:
+                live.add(digest)
+                _record_referrer(referrers, digest, retention)
     for run_state_path in sorted(orchestrations_dir(root).glob("*/run.json")):
         run_state = _load_run_state(run_state_path)
+        live.add(run_state.plan_sha256)
+        _record_referrer(
+            referrers,
+            run_state.plan_sha256,
+            DiagnosticRetentionClass.PROCESS_EVIDENCE,
+        )
         for state in run_state.stages:
             for item in state.outputs:
                 live.add(item.sha256)
@@ -191,6 +204,48 @@ def _reachability(
             DiagnosticRetentionClass.PROCESS_EVIDENCE,
         )
     return live, superseded, referrers
+
+
+def _validated_superseded_collection_ids(
+    manifests: list[DiagnosticLifecycleManifest],
+) -> set[str]:
+    """Validate immutable successor edges and return superseded run IDs."""
+    runs = {
+        manifest.stage_id: manifest
+        for manifest in manifests
+        if isinstance(manifest, DiagnosticCollectionRunManifest)
+    }
+    successors: dict[str, DiagnosticCollectionRunManifest] = {}
+    for run in runs.values():
+        if run.status is DiagnosticStageStatus.SUPERSEDED:
+            raise ValueError(
+                "collection supersession must be derived from a successor"
+            )
+        if run.supersedes is None:
+            continue
+        predecessor = runs.get(run.supersedes)
+        if predecessor is None:
+            raise ValueError(
+                f"collection successor {run.stage_id} has missing predecessor"
+            )
+        if run.supersedes in successors:
+            raise ValueError("collection generation has multiple successors")
+        if (
+            predecessor.purpose is not run.purpose
+            or predecessor.parents != run.parents
+            or run.generation != predecessor.generation + 1
+        ):
+            raise ValueError("collection successor crosses its parent branch")
+        successors[run.supersedes] = run
+    for start in successors:
+        seen: set[str] = set()
+        current = start
+        while current in successors:
+            if current in seen:
+                raise ValueError("collection successor graph contains a cycle")
+            seen.add(current)
+            current = successors[current].stage_id
+    return set(successors)
 
 
 def _load_manifest(

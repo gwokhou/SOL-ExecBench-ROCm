@@ -1,11 +1,11 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-09 against `23bb57e7` and the current worktree.
+Last audited: 2026-08-09 against `ea08f789` and the current worktree.
 
 This file records unresolved repository-level work, the decisions that constrain
-it, and the evidence that closed the diagnostic-lifecycle P0. Generated run state
-belongs in the diagnostic lifecycle registry; detailed completed investigations
-and one-time inventories belong in Git history.
+it, and the evidence that closed the control-plane conformance P0. Generated run
+state belongs in the diagnostic lifecycle registry; detailed completed
+investigations and one-time inventories belong in Git history.
 
 ## Current state
 
@@ -32,14 +32,17 @@ and one-time inventories belong in Git history.
   Do not remove `microarchitecture-diagnostics-v7/` or
   `microarchitecture-diagnostics-v7-cycle2/` until governed promotion imports
   every reachable artifact and registry reachability proves both trees are dead.
-- The immutable diagnostic lifecycle P0 closed on 2026-08-09. The control plane
-  now has a complete typed DAG, content-addressed inventories, immutable
-  receipts, append-only attempts, descendant invalidation, successor-generation
-  handling, fail-closed consistency/GC, hosted publication verification, and an
-  externally observed published-release receipt.
-- P0 closure used only public development evidence under purpose
-  `control_plane_conformance`. It is not a Cycle 3 held-out attempt, production
-  acceptance, score release, or leaderboard authority.
+- The diagnostic lifecycle control-plane conformance P0 closed on 2026-08-09.
+  It proves the linear stage machinery, immutable receipts, append-only
+  attempts, descendant invalidation, successor-generation handling, fail-closed
+  consistency/GC, hosted publication verification, and external-release receipt
+  ingestion under purpose `control_plane_conformance`.
+- Conformance closure is not production-topology closure. It did not traverse
+  the historical multi-parent promotion required by Cycle 3 or prove an exact
+  inventory for the complete operator-collected evidence tree. The currently
+  audited registry contains no `purpose=production` lifecycle object. Existing
+  ignored Cycle 3 design, promoted-corpus, and inference files are process
+  evidence, not production admission authority.
 - Real-device evidence is strongest on one RX 9060 XT/gfx1200 host. Multi-GPU
   isolation and CDNA-family behavior have contract and unit coverage but
   narrower empirical coverage.
@@ -47,10 +50,10 @@ and one-time inventories belong in Git history.
   gzip/zlib scanning. It does not parse the clang-offload-bundler Compressed Code
   Object Bundle (CCOB) manifest or provide exact member selection.
 
-## P0 closure evidence
+## Control-plane conformance P0 closure evidence
 
-The governed data flow is now represented by immutable parent identities rather
-than inferred paths:
+The target production data flow requires the following immutable parent
+identities rather than inferred paths:
 
 ```text
 source collection runs -> source snapshots -> promotion -> development_snapshot
@@ -63,12 +66,15 @@ accepted acceptance + calibration + development_snapshot + model_build
   -> publication -> release_candidate -> published_release
 ```
 
-Closure is supported by the following concrete evidence:
+The conformance run proved the shared linear mechanisms, but did not exercise
+the `source snapshots -> promotion -> development_snapshot` branch. Its closure
+is supported by the following concrete evidence:
 
-- Production handlers traverse every stage with pre/post input identity checks,
-  exact blob-backed output inventories, stage verification before commit, and
-  one legal next action. `status` and `resume` revalidate inputs and descendants;
-  acceptance terminality and `accepted=true` publication admission fail closed.
+- The conformance traversal executes every linear stage with pre/post input
+  identity checks, blob-backed persisted stage outputs, verification before
+  commit, and one legal next action. `status` and `resume` revalidate inputs and
+  descendants; acceptance terminality and `accepted=true` publication admission
+  fail closed.
 - Frozen evidence cannot be repaired in place. A changed input opens a new
   generation, while per-design locking, reviewed GC plans, and the append-only
   attempt ledger prevent concurrent overwrite, stale publication, or audit loss.
@@ -111,11 +117,70 @@ gates, focused lifecycle/release tests, and diagnostic store consistency passed.
 
 ## Active backlog
 
+### P0 — Close production-topology admission before Cycle 3 collection
+
+Do not begin fresh Cycle 3 GPU collection while this section is open. The
+published conformance release proves reusable control-plane mechanics, but its
+development and held-out corpora followed one linear collection lineage. Cycle
+3 instead requires a promoted development snapshot derived from historical
+source snapshots alongside a fresh held-out snapshot derived only from the new
+collection run.
+
+Required work:
+
+1. Adopt the existing frozen start-220 design into the lifecycle registry
+   without rewriting its payload or silently assigning a new provenance. Its
+   manifest must bind the exact blob-backed design payload and authoritative
+   source revision. If that provenance cannot be proved, preregister a new,
+   pair-disjoint design before any collection or reveal.
+2. Materialize the 880-case development corpus as one governed promoted
+   snapshot whose identity and manifest cite every source snapshot it consumed.
+   Promotion must never attribute historical cases to the fresh Cycle 3
+   collection run.
+3. Provide one canonical production plan authoring path for the current
+   `diagnostics lifecycle run --plan` contract. The plan must bind the promoted
+   development snapshot, fresh held-out collection inputs, calibration and
+   audit, source revision, evidence purpose, model version, output root, and
+   bounded attempts; hand-authored loose stage flags are not an alternative.
+4. Separate the two corpus roles in production orchestration. The model build
+   must cite the exact promoted development snapshot it reads, while acceptance
+   must additionally cite the held-out snapshot produced by the fresh collection
+   generation.
+5. Replace collection completion based on `cases/` existence plus two corpus
+   filenames with an exact typed inventory of all governed collected evidence.
+   Status and resume must detect missing, extra, substituted, or mutated evidence
+   and invalidate every affected descendant.
+6. Migrate or remove direct authoring paths that still emit empty snapshot
+   parents, assume generation one, use the retired `data/store/runs` layout, or
+   return early when an existing frozen design lacks its registry manifest.
+7. Exercise the production-shaped multi-parent topology end to end with public
+   synthetic or development evidence under `control_plane_conformance`. Tests
+   must prove promoted-parent identity, role separation, exact collection
+   inventory, drift invalidation, resume equivalence, and successor generation.
+
+This P0 is complete only when the production authoring path can create and
+reverify the design and promoted-development objects needed before collection;
+a production-shaped conformance run traverses the distinct promotion and
+held-out branches with no inferred path parents; the consistency checker accepts
+the resulting store; and no current caller writes legacy run paths, empty
+parents, or generation-one defaults. Closing it does not itself authorize
+acceptance or publication.
+
+Authoritative surfaces:
+
+- `docs/performance-diagnostics.md`
+- `src/sol_execbench/core/bench/performance_model/lifecycle/`
+- `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
+- `scripts/check_diagnostic_store_consistency.py`
+- `tests/sol_execbench/core/bench/performance_model/lifecycle/`
+- `tests/scripts/test_internal_support_scripts.py`
+
 ### P1 — Run Cycle 3 held-out acceptance through the governed chain
 
-P0 is closed, but Cycle 3 still must not reuse prior inference or acceptance
-artifacts, tune after held-out reveal, change gates, exclude the 24 Cycle 2 cases
-that exposed the working-set bug, or reuse a held-out pair.
+This P1 begins only after the production-topology P0 above closes. Cycle 3 must
+not reuse prior inference or acceptance artifacts, tune after held-out reveal,
+change gates, exclude the 24 Cycle 2 cases that exposed the working-set bug, or
+reuse a held-out pair.
 
 Required sequence:
 

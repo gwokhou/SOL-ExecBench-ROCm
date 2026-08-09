@@ -13,6 +13,13 @@ import torch
 from sol_execbench.core.bench.performance_model.corpus_preflight import (
     preflight,
 )
+from sol_execbench.core.bench.performance_model.lifecycle import (
+    DiagnosticCorpusSnapshotManifest,
+    DiagnosticLifecycleStage,
+    DiagnosticRetentionClass,
+    DiagnosticStageStatus,
+    import_artifact_tree,
+)
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
@@ -306,6 +313,59 @@ def _write_promotion_source(corpus, root: Path, role: str, offset: int) -> Path:
     return path
 
 
+def _install_fake_tree_import(corpus, monkeypatch) -> None:
+    def _import(
+        reference,
+        *,
+        corpus_root,
+        kind,
+        store,
+        solar_artifact_paths=None,
+    ):
+        del solar_artifact_paths
+        del kind
+        entry = (corpus_root.resolve() / reference.path).resolve()
+        if not entry.is_relative_to(corpus_root.resolve()):
+            raise ValueError("validation corpus reference escapes its root")
+        if entry.is_symlink() or not entry.is_file():
+            raise ValueError("validation corpus reference escapes its root")
+        if corpus.sha256_file(entry) != reference.sha256:
+            raise ValueError("promoted corpus hash mismatch")
+        tree_digest, _ = import_artifact_tree(
+            root=entry.parent,
+            root_path=entry,
+            member_paths=(entry,),
+            store=store,
+        )
+        return corpus.BlobArtifactReference(
+            sha256=reference.sha256,
+            size_bytes=reference.size_bytes,
+            tree_manifest_sha256=tree_digest,
+        )
+
+    monkeypatch.setattr(corpus, "import_corpus_reference", _import)
+
+
+def _register_promotion_snapshot(corpus, source: Path, stage_id: str) -> str:
+    loaded = corpus.load_json_file(corpus.DiagnosticValidationCorpus, source)
+    manifest = DiagnosticCorpusSnapshotManifest(
+        stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
+        stage_id=stage_id,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        source_revision="test",
+        created_at="2026-01-01T00:00:00+00:00",
+        role=loaded.role,
+        corpus_file_sha256=corpus.sha256_file(source),
+        case_count=len(loaded.cases),
+        source_snapshot_ids=("f" * 64,),
+    )
+    path = corpus.snapshots_dir() / stage_id / "manifest.json"
+    corpus.atomic_write_json_value(path, manifest.model_dump(mode="json"))
+    corpus.BlobStore(corpus.store_root()).put_file(path)
+    return stage_id
+
+
 def test_p0_conformance_currentizes_tree_references(
     load_script,
     tmp_path: Path,
@@ -328,6 +388,53 @@ def test_p0_conformance_currentizes_tree_references(
 
     assert case["evidence_manifest"]["blob_backed"] is False
     assert case["evidence_manifest"]["size_bytes"] == artifact.stat().st_size
+
+
+def test_p0_conformance_isolates_declared_collection_trees(
+    load_script,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conformance = load_script(
+        "scripts/internal/build_diagnostic_p0_conformance.py",
+    )
+    source = tmp_path / "source"
+    entry = source / "manifest.json"
+    member = source / "artifacts" / "trace.json"
+    member.parent.mkdir(parents=True)
+    entry.write_text("manifest", encoding="utf-8")
+    member.write_text("trace", encoding="utf-8")
+    reference = {
+        "blob_backed": False,
+        "path": entry.name,
+        "sha256": conformance.sha256_file(entry),
+        "size_bytes": entry.stat().st_size,
+    }
+    case = {
+        "evidence_manifest": dict(reference),
+        "solar_manifest": dict(reference),
+    }
+
+    monkeypatch.setattr(
+        conformance,
+        "corpus_reference_tree_paths",
+        lambda *args, **kwargs: (entry, (entry, member)),
+    )
+    destination = tmp_path / "heldout-collection"
+    conformance._copy_case_trees([case], source, destination)
+
+    for field, kind in (
+        ("evidence_manifest", "performance"),
+        ("solar_manifest", "solar"),
+    ):
+        relative = case[field]["path"]
+        assert isinstance(relative, str)
+        copied = destination / relative
+        assert copied == destination / f"case-0000/{kind}/manifest.json"
+        assert copied.read_text(encoding="utf-8") == "manifest"
+        assert (copied.parent / "artifacts/trace.json").read_text(
+            encoding="utf-8"
+        ) == "trace"
 
 
 def test_p0_conformance_rebinds_currentized_calibration_audit(
@@ -376,18 +483,32 @@ def test_p0_conformance_rebinds_currentized_calibration_audit(
 def test_p0_conformance_plan_isolates_publication_output(
     load_script,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     conformance = load_script(
         "scripts/internal/build_diagnostic_p0_conformance.py",
     )
     corpus_root = tmp_path / "conformance-input"
     corpus_root.mkdir()
+    captured: dict[str, object] = {}
+
+    def _author(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            source_revision="a" * 40,
+            model_dump=lambda **options: {
+                "output_root": str(kwargs["inputs"].output_root)
+            },
+        )
+
+    monkeypatch.setattr(conformance, "author_lifecycle_plan", _author)
 
     plan_path = conformance._write_plan(
         corpus_root,
         tmp_path / "store",
         "a" * 40,
-        corpus_root / "design.json",
+        SimpleNamespace(stage_id="b" * 64),
+        SimpleNamespace(stage_id="c" * 64),
     )
 
     plan = conformance._load_object(plan_path)
@@ -412,11 +533,18 @@ def test_rdna4_diagnostic_promotion_verifies_roles_order_and_hashes(
     )
     development = _write_promotion_source(corpus, tmp_path, "development", 0)
     held_out = _write_promotion_source(corpus, tmp_path, "held_out", 220)
+    _install_fake_tree_import(corpus, monkeypatch)
+    development_snapshot = _register_promotion_snapshot(
+        corpus, development, "1" * 64
+    )
+    held_out_snapshot = _register_promotion_snapshot(corpus, held_out, "2" * 64)
+    source_snapshots = [development_snapshot, held_out_snapshot]
     output = tmp_path / "promoted-development.json"
 
     corpus._promote_development(
         tmp_path,
         [development, held_out],
+        source_snapshots,
         output,
     )
 
@@ -429,16 +557,18 @@ def test_rdna4_diagnostic_promotion_verifies_roles_order_and_hashes(
     for case in promoted.cases:
         assert case.evidence_manifest.blob_backed is True
         assert case.solar_manifest.blob_backed is True
-    with pytest.raises(ValueError, match="order"):
+    with pytest.raises(ValueError, match="differs from snapshot registry"):
         corpus._promote_development(
             tmp_path,
-            [held_out, development],
+            [development, held_out],
+            [held_out_snapshot, development_snapshot],
             tmp_path / "wrong-order.json",
         )
     with pytest.raises(ValueError, match="already exists"):
         corpus._promote_development(
             tmp_path,
             [development, held_out],
+            source_snapshots,
             output,
         )
 
@@ -457,6 +587,11 @@ def test_rdna4_diagnostic_promotion_rejects_hash_drift(
     )
     development = _write_promotion_source(corpus, tmp_path, "development", 0)
     held_out = _write_promotion_source(corpus, tmp_path, "held_out", 220)
+    _install_fake_tree_import(corpus, monkeypatch)
+    source_snapshots = [
+        _register_promotion_snapshot(corpus, development, "1" * 64),
+        _register_promotion_snapshot(corpus, held_out, "2" * 64),
+    ]
     (tmp_path / "artifacts/development-0-evidence.json").write_text(
         "changed\n",
         encoding="utf-8",
@@ -466,6 +601,7 @@ def test_rdna4_diagnostic_promotion_rejects_hash_drift(
         corpus._promote_development(
             tmp_path,
             [development, held_out],
+            source_snapshots,
             tmp_path / "promoted-development.json",
         )
 
@@ -489,11 +625,17 @@ def test_rdna4_diagnostic_promotion_independent_of_historical_paths(
         corpus, development_root, "development", 0
     )
     held_out = _write_promotion_source(corpus, held_out_root, "held_out", 220)
+    _install_fake_tree_import(corpus, monkeypatch)
+    source_snapshots = [
+        _register_promotion_snapshot(corpus, development, "1" * 64),
+        _register_promotion_snapshot(corpus, held_out, "2" * 64),
+    ]
     output = output_root / "promoted-development.json"
 
     corpus._promote_development(
         output_root,
         [development, held_out],
+        source_snapshots,
         output,
     )
 
@@ -506,6 +648,7 @@ def test_rdna4_diagnostic_promotion_independent_of_historical_paths(
             resolved = store.get(reference.sha256)
             assert resolved.stat().st_size == reference.size_bytes
             assert corpus.sha256_file(resolved) == reference.sha256
+            assert store.get(reference.tree_manifest_sha256).is_file()
 
 
 def test_rdna4_diagnostic_promotion_rejects_source_outside_root(
@@ -527,11 +670,17 @@ def test_rdna4_diagnostic_promotion_rejects_source_outside_root(
     held_out = _write_promotion_source(
         corpus, output_root / "cycle2", "held_out", 220
     )
+    _install_fake_tree_import(corpus, monkeypatch)
+    source_snapshots = [
+        _register_promotion_snapshot(corpus, development, "1" * 64),
+        _register_promotion_snapshot(corpus, held_out, "2" * 64),
+    ]
 
     with pytest.raises(ValueError, match="remain under --root"):
         corpus._promote_development(
             output_root,
             [development, held_out],
+            source_snapshots,
             output_root / "promoted-development.json",
         )
 
@@ -556,16 +705,22 @@ def test_rdna4_diagnostic_promotion_rejects_artifact_outside_source_root(
     held_out = _write_promotion_source(
         corpus, output_root / "cycle2", "held_out", 220
     )
+    _install_fake_tree_import(corpus, monkeypatch)
+    source_snapshots = [
+        _register_promotion_snapshot(corpus, development, "1" * 64),
+        _register_promotion_snapshot(corpus, held_out, "2" * 64),
+    ]
     escaped = output_root / "escaped-evidence.json"
     escaped.write_text("evidence-0\n", encoding="utf-8")
     evidence = development_root / "artifacts/development-0-evidence.json"
     evidence.unlink()
     evidence.symlink_to(escaped)
 
-    with pytest.raises(ValueError, match="escapes its corpus root"):
+    with pytest.raises(ValueError, match="escapes its root"):
         corpus._promote_development(
             output_root,
             [development, held_out],
+            source_snapshots,
             output_root / "promoted-development.json",
         )
 

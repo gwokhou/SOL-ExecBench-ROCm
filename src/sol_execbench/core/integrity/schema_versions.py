@@ -39,6 +39,7 @@ class SchemaVersion(StrEnum):
     DECISION = "sol_execbench.decision.v2"
     DERIVED_EVIDENCE = "sol_execbench.derived_evidence.v1"
     DIAGNOSTIC_ACCEPTANCE = "sol_execbench.diagnostic_acceptance.v7"
+    DIAGNOSTIC_ARTIFACT_TREE = "sol_execbench.diagnostic_artifact_tree.v1"
     DIAGNOSTIC_CALIBRATION = "sol_execbench.diagnostic_calibration.v8"
     DIAGNOSTIC_CALIBRATION_AUDIT = (
         "sol_execbench.diagnostic_calibration_audit.v8"
@@ -66,14 +67,14 @@ class SchemaVersion(StrEnum):
     DIAGNOSTIC_LIFECYCLE_MODEL_BUILD = (
         "sol_execbench.diagnostic_lifecycle_model_build.v2"
     )
-    DIAGNOSTIC_LIFECYCLE_PLAN = "sol_execbench.diagnostic_lifecycle_plan.v1"
+    DIAGNOSTIC_LIFECYCLE_PLAN = "sol_execbench.diagnostic_lifecycle_plan.v2"
     DIAGNOSTIC_LIFECYCLE_PUBLICATION = (
         "sol_execbench.diagnostic_lifecycle_publication.v2"
     )
     DIAGNOSTIC_LIFECYCLE_RELEASE = (
         "sol_execbench.diagnostic_lifecycle_release.v2"
     )
-    DIAGNOSTIC_LIFECYCLE_RUN = "sol_execbench.diagnostic_lifecycle_run.v2"
+    DIAGNOSTIC_LIFECYCLE_RUN = "sol_execbench.diagnostic_lifecycle_run.v3"
     DIAGNOSTIC_PUBLICATION_PROJECTION = (
         "sol_execbench.diagnostic_publication_projection.v2"
     )
@@ -86,7 +87,7 @@ class SchemaVersion(StrEnum):
     )
     DIAGNOSTIC_STAGE_RECEIPT = "sol_execbench.diagnostic_stage_receipt.v2"
     DIAGNOSTIC_VALIDATION_CORPUS = (
-        "sol_execbench.diagnostic_validation_corpus.v8"
+        "sol_execbench.diagnostic_validation_corpus.v9"
     )
     DOCKER_PREFLIGHT = "sol_execbench.docker_preflight.v1"
     ENVIRONMENT_DIAGNOSTICS = "sol_execbench.environment_diagnostics.v1"
