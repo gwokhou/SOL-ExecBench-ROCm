@@ -411,6 +411,49 @@ Authoritative surfaces:
 - `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
 - `scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py`
 
+### P1 — Define the VRAM calibration working-set policy for future successors
+
+The VRAM throughput tier is characterized and capped at a narrow working-set
+range. `calibration.py:139` hardcodes the `vram_byte_per_ms` applicability at
+`[64 MiB, 256 MiB]`, and the memory probe
+(`src/sol_execbench/data/hardware_calibration_probes/diagnostic_microarchitecture.hip`)
+sweeps working-set windows of only `[0, 2 MiB]`, `[2 MiB, 64 MiB]`, and
+`[64 MiB, 128 MiB]`. The start-340 successor revealed the consequence:
+representative memory-bound elementwise neighborhoods have working sets of
+roughly `145–389 MiB`, which exceed the applicability ceiling, so the model
+returns `calibration_out_of_range:working_set_bytes` and the held-out
+acceptance hard-fails (`unavailable hardware prediction is a hard failure`).
+
+This is a forward-looking calibration policy decision, not a defect to patch
+onto a revealed held-out set. Before the next successor attempt (the still-open
+P1 item above), decide and ship one governed contract:
+
+1. widen the VRAM applicability and the memory probe sweep so the characterized
+   range covers the largest memory-bound working set any governed successor
+   design may produce (physically justified: VRAM bandwidth is approximately
+   constant for L3-oversiding working sets, so a wider characterization
+   reflects the same regime, not a different one), with real re-measured
+   probes; or
+2. bound governed successor designs so every memory-bound family's working set
+   stays within the existing `[64 MiB, 256 MiB]` applicability, and emit an
+   exact unsupported reason at design-freeze when a case would exceed it.
+
+Either route must be developed and frozen independently, before the next
+held-out reveal. It must NOT be applied retroactively to start-340: widening
+the calibration, re-collecting, or excluding the revealed elementwise cases
+after the start-340 acceptance failure would be forbidden post-reveal tuning.
+Completion evidence must name the chosen policy, the new applicability/probe
+range (or the design bound), and the pre-reveal calibration run that
+characterizes it.
+
+Authoritative surfaces:
+
+- `src/sol_execbench/core/bench/performance_model/calibration.py`
+- `src/sol_execbench/core/bench/performance_model/prediction.py` (`_memory_parameter`)
+- `src/sol_execbench/data/hardware_calibration_probes/diagnostic_microarchitecture.hip`
+- `scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py`
+- `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
+
 ### P1 — Expand empirical hardware and isolation coverage
 
 - Run `test_real_multi_gpu_candidate_device_switch_is_rejected` with at least
