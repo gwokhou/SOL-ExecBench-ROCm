@@ -409,8 +409,6 @@ class CalibrationHandler:
                 or sha256_file(path) != expected.sha256
             ):
                 raise ValueError("calibration input differs from reviewed plan")
-        policy_outputs: tuple[DiagnosticLifecycleArtifact, ...] = ()
-        policy_paths: tuple[Path, ...] = ()
         if context.plan.vram_policy is not None:
             policy_path = _required(
                 context.vram_policy_path,
@@ -423,8 +421,6 @@ class CalibrationHandler:
                 or sha256_file(policy_path) != expected.sha256
             ):
                 raise ValueError("VRAM policy differs from reviewed plan")
-            policy_outputs = (_artifact(policy_path),)
-            policy_paths = (policy_path,)
         gpu, software = _calibration_identities(
             profile_path,
             audit_path,
@@ -440,12 +436,8 @@ class CalibrationHandler:
         )
         return StageCompletion(
             stage_id=stage_id,
-            outputs=(
-                _artifact(profile_path),
-                _artifact(audit_path),
-                *policy_outputs,
-            ),
-            output_paths=(profile_path, audit_path, *policy_paths),
+            outputs=(_artifact(profile_path), _artifact(audit_path)),
+            output_paths=(profile_path, audit_path),
         )
 
     def prepare(
