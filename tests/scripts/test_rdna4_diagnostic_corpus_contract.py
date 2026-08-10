@@ -145,6 +145,42 @@ def test_capacity_governed_successor_has_disjoint_real_shape_neighborhoods(
         assert max(abs(sequence - anchor) for sequence in neighborhood) <= 11
 
 
+def test_exposure_replacement_successor_has_disjoint_real_shape_neighborhoods(
+    load_script,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    successor = corpus._all_cases(corpus.EXPOSURE_REPLACEMENT_SUCCESSOR_START)
+    earlier = [
+        case
+        for start in (100, 160, 220, 280, 340, 400)
+        for case in corpus._all_cases(start)
+    ]
+
+    corpus._validate_design_contracts(successor)
+    assert {case.workload_uuid for case in successor}.isdisjoint(
+        case.workload_uuid for case in earlier
+    )
+    transformer = sorted(
+        (
+            case
+            for case in successor
+            if case.family is corpus.WorkloadKind.TRANSFORMER
+        ),
+        key=lambda case: case.global_index,
+    )
+    assert tuple(case.axes["M"] for case in transformer) == (
+        corpus.EXPOSURE_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS
+    )
+    for (
+        anchor,
+        neighborhood,
+    ) in corpus._EXPOSURE_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS:
+        assert len(neighborhood) == 4
+        assert max(abs(sequence - anchor) for sequence in neighborhood) <= 15
+
+
 def test_future_transformer_generation_requires_an_authored_realism_policy(
     load_script,
 ) -> None:
@@ -156,7 +192,7 @@ def test_future_transformer_generation_requires_an_authored_realism_policy(
         ValueError,
         match="representative schedule is not authored",
     ):
-        corpus._all_cases(460)
+        corpus._all_cases(520)
 
 
 def test_capacity_policy_rejects_out_of_range_indexed_read(
