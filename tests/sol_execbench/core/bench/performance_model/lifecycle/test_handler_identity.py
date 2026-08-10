@@ -26,6 +26,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
     DiagnosticLifecycleStage,
+    DiagnosticRunManifest,
     acceptance_id,
     corpus_snapshot_id,
     orchestrator as lifecycle_orchestrator,
@@ -41,6 +42,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
     DiagnosticStageReceipt,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
+    run_state_path,
     stage_receipt_path,
 )
 from sol_execbench.core.bench.performance_model.models import WorkloadKind
@@ -94,6 +96,42 @@ def test_collection_handler_requires_exact_reviewed_inventory(
     with pytest.raises(ValueError, match="differs from reviewed plan"):
         handler.run(context)
     assert not handler.verify(context, receipt)
+
+
+def test_collection_generation_counts_failed_precollection_run(
+    tmp_path: Path,
+) -> None:
+    design_id = "d" * 64
+    prior_run_id = "b" * 64
+    current_run_id = "c" * 64
+    prior = DiagnosticRunManifest(
+        run_id=prior_run_id,
+        collection_run_id=prior_run_id,
+        design_id=design_id,
+        generation=1,
+        purpose=DiagnosticEvidencePurpose.PRODUCTION,
+        created_at="2026-01-01T00:00:00+00:00",
+        updated_at="2026-01-01T00:00:01+00:00",
+        plan_id="e" * 64,
+        plan_sha256="f" * 64,
+    )
+    atomic_write_json_value(
+        run_state_path(prior_run_id, tmp_path),
+        prior.model_dump(mode="json"),
+    )
+    context = StageRunContext(
+        store_root=tmp_path,
+        plan=cast(
+            Any,
+            SimpleNamespace(design=SimpleNamespace(stage_id=design_id)),
+        ),
+        design_manifest_path=tmp_path / "design.json",
+        collection_run_id=current_run_id,
+        generation=2,
+        purpose=DiagnosticEvidencePurpose.PRODUCTION,
+    )
+
+    assert lifecycle_orchestrator._latest_collection_run(context) is None
 
 
 def test_corpus_snapshot_handler_derives_identity(tmp_path: Path) -> None:

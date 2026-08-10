@@ -1824,7 +1824,17 @@ def _latest_collection_run(
     predecessor = max(
         candidates, key=lambda item: item.generation, default=None
     )
-    expected = 1 if predecessor is None else predecessor.generation + 1
+    prior_generations = [item.generation for item in candidates]
+    for path in sorted(
+        orchestrations_dir(context.store_root).glob("*/run.json")
+    ):
+        run = load_json_file(DiagnosticRunManifest, path)
+        if (
+            run.design_id == context.plan.design.stage_id
+            and run.run_id != context.collection_run_id
+        ):
+            prior_generations.append(run.generation)
+    expected = max(prior_generations, default=0) + 1
     if context.generation != expected:
         raise ValueError("collection generation changed since plan authoring")
     return predecessor
