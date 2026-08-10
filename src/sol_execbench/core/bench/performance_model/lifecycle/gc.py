@@ -19,6 +19,9 @@ from typing import Final
 
 from pydantic import Field
 
+from sol_execbench.core.bench.performance_model.case_reuse import (
+    DiagnosticAcceptanceExposureReceipt,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
     BlobStore,
 )
@@ -39,6 +42,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticStageAttempt,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
+    acceptance_exposures_dir,
     acceptances_dir,
     attempts_dir,
     blob_path,
@@ -203,7 +207,27 @@ def _reachability(
             digest,
             DiagnosticRetentionClass.PROCESS_EVIDENCE,
         )
+    _add_exposure_receipts(root, live, referrers)
     return live, superseded, referrers
+
+
+def _add_exposure_receipts(
+    root: Path,
+    live: set[str],
+    referrers: dict[str, DiagnosticRetentionClass],
+) -> None:
+    """Validate and retain every immutable acceptance exposure receipt."""
+    for path in sorted(acceptance_exposures_dir(root).glob("*/*.json")):
+        receipt = _load_exposure(path)
+        digest = sha256_file(path)
+        if path.parent.name != receipt.run_id or path.stem != digest:
+            raise ValueError("acceptance exposure registry identity mismatch")
+        live.add(digest)
+        _record_referrer(
+            referrers,
+            digest,
+            DiagnosticRetentionClass.PROCESS_EVIDENCE,
+        )
 
 
 def _validated_superseded_collection_ids(
@@ -286,6 +310,17 @@ def _load_attempt(path: Path) -> DiagnosticStageAttempt:
         )
     except (OSError, ValueError) as error:
         raise ValueError(f"unreadable stage attempt {path}: {error}") from error
+
+
+def _load_exposure(path: Path) -> DiagnosticAcceptanceExposureReceipt:
+    try:
+        return DiagnosticAcceptanceExposureReceipt.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as error:
+        raise ValueError(
+            f"unreadable acceptance exposure {path}: {error}"
+        ) from error
 
 
 def _manifest_digests(

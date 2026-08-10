@@ -82,6 +82,11 @@ def acceptances_dir(root: Path | None = None) -> Path:
     return (root or store_root()) / "acceptances"
 
 
+def acceptance_exposures_dir(root: Path | None = None) -> Path:
+    """Return the immutable pre-verdict exposure receipt registry."""
+    return (root or store_root()) / "acceptance-exposures"
+
+
 def publication_registry_dir(root: Path | None = None) -> Path:
     """Return the registry directory for publication lifecycle manifests.
 
@@ -118,6 +123,7 @@ def store_lock_path(root: Path | None = None) -> Path:
 
 __all__ = [
     "SOL_EXECBENCH_DIAGNOSTIC_STORE",
+    "acceptance_exposures_dir",
     "acceptances_dir",
     "attempts_dir",
     "blob_path",

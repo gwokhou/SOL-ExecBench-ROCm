@@ -19,6 +19,9 @@ from sol_execbench.core.bench.performance_model.builder import (
     SemanticCharacterizationLoader,
     build_performance_diagnostic,
 )
+from sol_execbench.core.bench.performance_model.case_reuse import (
+    AcceptancePreconditionError,
+)
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     load_and_verify_performance_evidence_manifest,
 )
@@ -40,6 +43,7 @@ from sol_execbench.core.bench.performance_model.models import (
     DiagnosticCalibrationProfile,
     PerformanceDiagnosticSidecar,
     PerformancePrediction,
+    WorkloadKind,
 )
 from sol_execbench.core.bench.performance_model.validation_corpus import (
     DiagnosticValidationCase,
@@ -135,17 +139,23 @@ def build_diagnostic_acceptance(
         development_corpus_path
     ):
         raise ValueError("inference profile development corpus mismatch")
-    cases = [
-        _acceptance_case(
-            case,
-            corpus_path=held_out_corpus_path,
-            calibration_path=calibration_profile_path,
-            inference_path=inference_profile_path,
-            semantic_loader=semantic_loader,
-            blob_resolver=blob_resolver,
-        )
-        for case in held_out.cases
-    ]
+    cases: list[DiagnosticAcceptanceCase] = []
+    for case in held_out.cases:
+        try:
+            built = _acceptance_case(
+                case,
+                corpus_path=held_out_corpus_path,
+                calibration_path=calibration_profile_path,
+                inference_path=inference_profile_path,
+                semantic_loader=semantic_loader,
+                blob_resolver=blob_resolver,
+            )
+        except AcceptancePreconditionError as error:
+            error.evaluated_case_ids_before_failure = tuple(
+                item.case_id for item in cases
+            )
+            raise
+        cases.append(built)
     manifest = DiagnosticAcceptanceManifest(
         purpose=development.purpose,
         model_identity=profile.model_identity,
@@ -239,6 +249,7 @@ def _development_observation(
     predicted_ms, lower_ms, upper_ms = _prediction_values(
         workload.t_pred_hw,
         case_id=case.case_id,
+        workload_kind=case.workload_kind,
     )
     return InferenceObservation(
         case_id=case.case_id,
@@ -279,6 +290,7 @@ def _acceptance_case(
     predicted_ms, lower_ms, upper_ms = _prediction_values(
         workload.t_pred_hw,
         case_id=case.case_id,
+        workload_kind=case.workload_kind,
     )
     return DiagnosticAcceptanceCase(
         case_id=case.case_id,
@@ -345,15 +357,17 @@ def _prediction_values(
     prediction: PerformancePrediction,
     *,
     case_id: str,
+    workload_kind: WorkloadKind,
 ) -> tuple[float, float, float]:
     if (
         prediction.predicted_time_ms is None
         or prediction.lower_ms is None
         or prediction.upper_ms is None
     ):
-        raise ValueError(
-            f"{case_id} validation case lacks an available HW prediction: "
-            f"{prediction.reason_codes}"
+        raise AcceptancePreconditionError(
+            case_id=case_id,
+            workload_kind=workload_kind,
+            reason_codes=tuple(prediction.reason_codes),
         )
     return (
         prediction.predicted_time_ms,

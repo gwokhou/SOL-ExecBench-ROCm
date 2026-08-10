@@ -15,7 +15,13 @@ from typing import Any, cast
 
 import pytest
 
+from sol_execbench.core.bench.performance_model.case_reuse import (
+    EXPOSURE_RECEIPT_NAME,
+    AcceptancePreconditionError,
+    DiagnosticAcceptanceExposureReceipt,
+)
 from sol_execbench.core.bench.performance_model.lifecycle import (
+    BlobStore,
     DiagnosticEvidencePurpose,
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
@@ -37,6 +43,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
 from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     stage_receipt_path,
 )
+from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file
 
@@ -217,6 +224,60 @@ def test_acceptance_handler_derives_identity(
         source_revision="unknown",
     )
     assert completion.stage_id == expected
+
+
+def test_acceptance_handler_records_precondition_exposure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    held_out = tmp_path / "held_out.json"
+    held_out.write_text("held out", encoding="utf-8")
+    output_root = tmp_path / "out"
+    error = AcceptancePreconditionError(
+        case_id="held_out-elementwise-01",
+        workload_kind=WorkloadKind.ELEMENTWISE,
+        reason_codes=("calibration_out_of_range:working_set_bytes",),
+    )
+    error.evaluated_case_ids_before_failure = ("held_out-elementwise-00",)
+
+    def _fail(**kwargs: object) -> None:
+        del kwargs
+        raise error
+
+    monkeypatch.setattr(
+        "sol_execbench.core.bench.performance_model.authoring.build_diagnostic_acceptance",
+        _fail,
+    )
+    context = StageRunContext(
+        store_root=tmp_path,
+        plan=cast(Any, SimpleNamespace()),
+        design_manifest_path=tmp_path / "design.json",
+        collection_run_id="a" * 64,
+        generation=1,
+        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+        calibration_profile_path=tmp_path / "calibration.json",
+        development_corpus_path=tmp_path / "development.json",
+        held_out_corpus_path=held_out,
+        output_root=output_root,
+        source_revision="unknown",
+    )
+    context.set_output(
+        DiagnosticLifecycleStage.MODEL_BUILD, tmp_path / "inference.json"
+    )
+
+    with pytest.raises(AcceptancePreconditionError) as captured:
+        AcceptanceHandler(semantic_loader=cast(Any, object())).run(context)
+
+    receipt_path = output_root / "acceptance" / EXPOSURE_RECEIPT_NAME
+    receipt = DiagnosticAcceptanceExposureReceipt.model_validate_json(
+        receipt_path.read_text(encoding="utf-8")
+    )
+    assert receipt.released_case_id == "held_out-elementwise-01"
+    assert receipt.evaluated_case_ids_before_failure == (
+        "held_out-elementwise-00",
+    )
+    assert captured.value.exposure_receipt_sha256 == sha256_file(receipt_path)
+    assert BlobStore(tmp_path).contains(sha256_file(receipt_path))
 
 
 def test_publication_handler_uses_promoted_development_identity(

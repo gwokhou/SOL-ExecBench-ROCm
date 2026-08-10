@@ -43,12 +43,16 @@ class SchemaVersion(StrEnum):
     DECISION = "sol_execbench.decision.v2"
     DERIVED_EVIDENCE = "sol_execbench.derived_evidence.v1"
     DIAGNOSTIC_ACCEPTANCE = "sol_execbench.diagnostic_acceptance.v7"
+    DIAGNOSTIC_ACCEPTANCE_EXPOSURE = (
+        "sol_execbench.diagnostic_acceptance_exposure.v1"
+    )
     DIAGNOSTIC_ARTIFACT_TREE = "sol_execbench.diagnostic_artifact_tree.v1"
     DIAGNOSTIC_CALIBRATION = "sol_execbench.diagnostic_calibration.v8"
     DIAGNOSTIC_CALIBRATION_AUDIT = (
         "sol_execbench.diagnostic_calibration_audit.v8"
     )
     DIAGNOSTIC_CORPUS_PREFLIGHT = "sol_execbench.diagnostic_corpus_preflight.v1"
+    DIAGNOSTIC_CASE_REUSE = "sol_execbench.diagnostic_case_reuse.v1"
     DIAGNOSTIC_CORPUS_QUALIFICATION = (
         "sol_execbench.diagnostic_corpus_qualification.v1"
     )
@@ -57,6 +61,9 @@ class SchemaVersion(StrEnum):
     )
     DIAGNOSTIC_INFERENCE_PROFILE = (
         "sol_execbench.diagnostic_inference_profile.v10"
+    )
+    DIAGNOSTIC_HELD_OUT_FRAGMENT = (
+        "sol_execbench.diagnostic_held_out_fragment.v1"
     )
     DIAGNOSTIC_LIFECYCLE_ACCEPTANCE = (
         "sol_execbench.diagnostic_lifecycle_acceptance.v2"

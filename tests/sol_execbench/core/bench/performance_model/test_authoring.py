@@ -160,4 +160,8 @@ def test_inference_authoring_requires_available_hardware_prediction() -> None:
     )
 
     with pytest.raises(ValueError, match="lacks an available HW prediction"):
-        authoring._prediction_values(unavailable, case_id="development-case")
+        authoring._prediction_values(
+            unavailable,
+            case_id="development-case",
+            workload_kind=WorkloadKind.ELEMENTWISE,
+        )

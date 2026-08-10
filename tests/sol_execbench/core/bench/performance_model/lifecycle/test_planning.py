@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -194,6 +195,30 @@ def test_production_plan_rejects_collection_pcie_drift(
     with pytest.raises(
         ValueError,
         match="collection/calibration GPU identity mismatch",
+    ):
+        author_lifecycle_plan(
+            repository_root=tmp_path,
+            store_root=store,
+            inputs=inputs,
+        )
+
+
+def test_production_plan_rejects_reuse_fragment_from_other_design(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = tmp_path / "store"
+    _write_registry(store)
+    inputs = _inputs(tmp_path)
+    _mock_source(monkeypatch)
+    monkeypatch.setattr(
+        planning,
+        "load_and_verify_case_reuse_bundle",
+        lambda _path: SimpleNamespace(replacement_design_sha256="9" * 64),
+    )
+
+    with pytest.raises(
+        ValueError, match="reuse fragment differs from lifecycle design"
     ):
         author_lifecycle_plan(
             repository_root=tmp_path,

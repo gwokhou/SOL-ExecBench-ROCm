@@ -4,6 +4,10 @@ from pathlib import Path
 
 import pytest
 
+from sol_execbench.core.bench.performance_model.case_reuse import (
+    DiagnosticAcceptanceExposureReceipt,
+    persist_acceptance_exposure,
+)
 from sol_execbench.core.bench.performance_model.lifecycle import (
     BlobStore,
     DiagnosticCollectionRunManifest,
@@ -23,6 +27,7 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
 )
+from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 
 _NOW = "2026-01-01T00:00:00+00:00"
@@ -141,6 +146,27 @@ def test_unreferenced_blob_is_reclaimable(tmp_path: Path) -> None:
     assert plan.entries[0].digest == orphan
     assert plan.entries[0].retained is False
     assert plan.entries[0].retention_class is DiagnosticRetentionClass.CACHE
+
+
+def test_acceptance_exposure_receipt_is_reachable(tmp_path: Path) -> None:
+    receipt = DiagnosticAcceptanceExposureReceipt(
+        run_id="1" * 64,
+        held_out_corpus_sha256="2" * 64,
+        source_revision="3" * 40,
+        released_case_id="held-out-elementwise-01",
+        released_workload_kind=WorkloadKind.ELEMENTWISE,
+        released_reason_codes=("calibration_out_of_range:working_set_bytes",),
+        created_at=_NOW,
+    )
+    receipt_path = tmp_path / "acceptance-exposure.json"
+    atomic_write_json_value(receipt_path, receipt.model_dump(mode="json"))
+
+    digest = persist_acceptance_exposure(receipt, receipt_path, tmp_path)
+    plan = plan_gc(tmp_path)
+
+    entry = next(item for item in plan.entries if item.digest == digest)
+    assert entry.retained is True
+    assert entry.retention_class is DiagnosticRetentionClass.PROCESS_EVIDENCE
 
 
 def test_superseded_only_blob_is_reclaimable(tmp_path: Path) -> None:

@@ -4,6 +4,10 @@ from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
+from sol_execbench.core.bench.performance_model.case_reuse import (
+    DiagnosticAcceptanceExposureReceipt,
+    persist_acceptance_exposure,
+)
 from sol_execbench.core.bench.performance_model.lifecycle import (
     BlobStore,
     DiagnosticDesignManifest,
@@ -20,6 +24,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
 )
+from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 
 ScriptLoader = Callable[[str], ModuleType]
@@ -103,6 +108,27 @@ def test_consistent_store_reports_no_findings(
     )
     path = designs_dir(tmp_path) / manifest.stage_id / "manifest.json"
     atomic_write_json_value(path, manifest.model_dump(mode="json"))
+
+    assert script.check_store(tmp_path) == []
+
+
+def test_acceptance_exposure_registry_is_consistent(
+    load_script: ScriptLoader,
+    tmp_path: Path,
+) -> None:
+    script = load_script("scripts/check_diagnostic_store_consistency.py")
+    receipt = DiagnosticAcceptanceExposureReceipt(
+        run_id="1" * 64,
+        held_out_corpus_sha256="2" * 64,
+        source_revision="3" * 40,
+        released_case_id="held-out-elementwise-01",
+        released_workload_kind=WorkloadKind.ELEMENTWISE,
+        released_reason_codes=("calibration_out_of_range:working_set_bytes",),
+        created_at="2026-01-01T00:00:00+00:00",
+    )
+    receipt_path = tmp_path / "acceptance-exposure.json"
+    atomic_write_json_value(receipt_path, receipt.model_dump(mode="json"))
+    persist_acceptance_exposure(receipt, receipt_path, tmp_path)
 
     assert script.check_store(tmp_path) == []
 
