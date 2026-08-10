@@ -180,6 +180,8 @@ class StageRunContext:
     corpus_root: Path | None = None
     calibration_profile_path: Path | None = None
     calibration_audit_path: Path | None = None
+    vram_policy_path: Path | None = None
+    frozen_inference_profile_path: Path | None = None
     development_corpus_path: Path | None = None
     held_out_corpus_path: Path | None = None
     output_root: Path | None = None
@@ -407,6 +409,22 @@ class CalibrationHandler:
                 or sha256_file(path) != expected.sha256
             ):
                 raise ValueError("calibration input differs from reviewed plan")
+        policy_outputs: tuple[DiagnosticLifecycleArtifact, ...] = ()
+        policy_paths: tuple[Path, ...] = ()
+        if context.plan.vram_policy is not None:
+            policy_path = _required(
+                context.vram_policy_path,
+                "calibration requires the reviewed VRAM policy",
+            )
+            expected = context.plan.vram_policy
+            if (
+                not policy_path.is_file()
+                or policy_path.stat().st_size != expected.size_bytes
+                or sha256_file(policy_path) != expected.sha256
+            ):
+                raise ValueError("VRAM policy differs from reviewed plan")
+            policy_outputs = (_artifact(policy_path),)
+            policy_paths = (policy_path,)
         gpu, software = _calibration_identities(
             profile_path,
             audit_path,
@@ -422,8 +440,12 @@ class CalibrationHandler:
         )
         return StageCompletion(
             stage_id=stage_id,
-            outputs=(_artifact(profile_path), _artifact(audit_path)),
-            output_paths=(profile_path, audit_path),
+            outputs=(
+                _artifact(profile_path),
+                _artifact(audit_path),
+                *policy_outputs,
+            ),
+            output_paths=(profile_path, audit_path, *policy_paths),
         )
 
     def prepare(
@@ -545,6 +567,19 @@ class ModelBuildHandler:
             blob_resolver=self._blob_resolver,
         )
         atomic_write_json_value(output, profile.model_dump(mode="json"))
+        frozen = context.frozen_inference_profile_path
+        if frozen is not None:
+            expected = context.plan.frozen_inference_profile
+            if (
+                expected is None
+                or not frozen.is_file()
+                or frozen.stat().st_size != expected.size_bytes
+                or sha256_file(frozen) != expected.sha256
+                or sha256_file(output) != expected.sha256
+            ):
+                raise ValueError(
+                    "model build differs from pre-frozen inference profile"
+                )
         context.set_output(self.stage, output)
         stage_id = model_build_id(
             calibration_id=_prior_receipt_stage_id(
@@ -1141,6 +1176,16 @@ def build_run_context(
         corpus_root=Path(plan.collection_root),
         calibration_profile_path=Path(plan.calibration_profile_path),
         calibration_audit_path=Path(plan.calibration_audit_path),
+        vram_policy_path=(
+            Path(plan.vram_policy_path)
+            if plan.vram_policy_path is not None
+            else None
+        ),
+        frozen_inference_profile_path=(
+            Path(plan.frozen_inference_profile_path)
+            if plan.frozen_inference_profile_path is not None
+            else None
+        ),
         development_corpus_path=development_corpus,
         held_out_corpus_path=Path(plan.held_out_corpus_path),
         output_root=Path(plan.output_root),

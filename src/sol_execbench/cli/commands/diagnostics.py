@@ -386,15 +386,25 @@ def release_verify_cli(
 
 @release_cli.command("ingest-published")
 @click.option("--repository", required=True)
+@click.option("--tag", required=True)
+@click.option(
+    "--purpose",
+    type=click.Choice([purpose.value for purpose in DiagnosticEvidencePurpose]),
+    required=True,
+)
 @click.option("--store-root", type=_OUTPUT_DIRECTORY, required=True)
 def release_ingest_published_cli(
     repository: str,
+    tag: str,
+    purpose: str,
     store_root: Path,
 ) -> CliResult:
-    """Download and persist the verified public conformance release receipt."""
+    """Download and persist one verified published release receipt."""
     try:
         receipt = ingest_github_published_release(
             repository=repository,
+            tag=tag,
+            purpose=DiagnosticEvidencePurpose(purpose),
             store_root_path=store_root,
         )
     except (OSError, RuntimeError, ValueError) as error:
@@ -423,6 +433,8 @@ def lifecycle_cli() -> None:
 @click.option("--calibration-audit", type=_FILE, required=True)
 @click.option("--output-root", type=_OUTPUT_DIRECTORY, required=True)
 @click.option("--model-version", required=True)
+@click.option("--vram-policy", type=_FILE)
+@click.option("--frozen-inference-profile", type=_FILE)
 @click.option("--max-attempts", type=int, default=3, show_default=True)
 @click.option("--store-root", type=_OUTPUT_DIRECTORY)
 @click.option("--output", type=_OUTPUT, required=True)
@@ -448,6 +460,10 @@ def lifecycle_plan_cli(**options: object) -> CliResult:
                 output_root=cast(Path, options["output_root"]),
                 model_version=cast(str, options["model_version"]),
                 max_attempts=cast(int, options["max_attempts"]),
+                vram_policy_path=cast(Path | None, options["vram_policy"]),
+                frozen_inference_profile_path=cast(
+                    Path | None, options["frozen_inference_profile"]
+                ),
             ),
         )
         atomic_write_json_value(output, plan.model_dump(mode="json"))

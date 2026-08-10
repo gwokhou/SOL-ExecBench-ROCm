@@ -96,7 +96,7 @@ class SchemaVersion(StrEnum):
         "sol_execbench.diagnostic_publication_projection.v2"
     )
     DIAGNOSTIC_PUBLISHED_RELEASE = (
-        "sol_execbench.diagnostic_published_release.v2"
+        "sol_execbench.diagnostic_published_release.v3"
     )
     DIAGNOSTIC_RELEASE_ARCHIVE = "sol_execbench.diagnostic_release_archive.v2"
     DIAGNOSTIC_RELEASE_ATTESTATION = (
@@ -105,6 +105,9 @@ class SchemaVersion(StrEnum):
     DIAGNOSTIC_STAGE_RECEIPT = "sol_execbench.diagnostic_stage_receipt.v2"
     DIAGNOSTIC_VALIDATION_CORPUS = (
         "sol_execbench.diagnostic_validation_corpus.v9"
+    )
+    DIAGNOSTIC_VRAM_WORKING_SET_POLICY = (
+        "sol_execbench.diagnostic_vram_working_set_policy.v1"
     )
     DOCKER_PREFLIGHT = "sol_execbench.docker_preflight.v1"
     ENVIRONMENT_DIAGNOSTICS = "sol_execbench.environment_diagnostics.v1"

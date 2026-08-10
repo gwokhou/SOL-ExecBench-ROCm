@@ -81,6 +81,9 @@ from sol_execbench.core.bench.performance_model.validation_corpus import (
     ValidationArtifactReference,
     validation_pair_id,
 )
+from sol_execbench.core.bench.performance_model.vram_policy import (
+    DiagnosticVRAMWorkingSetPolicy,
+)
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,
 )
@@ -140,6 +143,7 @@ SUCCESSOR_TRANSFORMER_SEQUENCE_STRIDE = 2
 SUCCESSOR_MATMUL_ROWS_START = 257
 SUCCESSOR_MATMUL_ROWS_STRIDE = 4
 REPRESENTATIVE_SUCCESSOR_START = 340
+CAPACITY_GOVERNED_SUCCESSOR_START = 400
 _TRANSFORMER_REALISM_NEIGHBORHOODS: tuple[
     tuple[int, tuple[int, int, int, int]], ...
 ] = (
@@ -300,6 +304,11 @@ def _parse_args() -> argparse.Namespace:
         help="Registry snapshot ID corresponding to each --source-corpus.",
     )
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--vram-policy",
+        type=Path,
+        help="Frozen capacity policy required by new production successors.",
+    )
     return parser.parse_args()
 
 
@@ -420,12 +429,15 @@ def _phase(global_index: int, universe_start: int) -> Phase:
     return rotation[position]
 
 
-def _design_payload(universe_start: int) -> dict[str, Any]:
+def _design_payload(
+    universe_start: int,
+    vram_policy_sha256: str | None = None,
+) -> dict[str, Any]:
     cases = [
         *_cases("development", universe_start),
         *_cases("held_out", universe_start),
     ]
-    return {
+    payload: dict[str, Any] = {
         "schema_version": SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN.value,
         "design": "adjacent_shape_stratified_three_way_rotation",
         "universe_start": universe_start,
@@ -449,6 +461,9 @@ def _design_payload(universe_start: int) -> dict[str, Any]:
             for case in cases
         ],
     }
+    if vram_policy_sha256 is not None:
+        payload["vram_policy_sha256"] = vram_policy_sha256
+    return payload
 
 
 def _validate_template_axis_contracts(cases: Sequence[CaseSpec]) -> None:
@@ -612,8 +627,60 @@ def _prepare(
     )
 
 
+def _freeze_design_vram_policy(
+    root: Path,
+    *,
+    universe_start: int,
+    revision: str,
+    source_path: Path | None,
+) -> str | None:
+    """Copy and validate the pre-design capacity policy for new successors."""
+    if universe_start < CAPACITY_GOVERNED_SUCCESSOR_START:
+        if source_path is not None:
+            raise ValueError("historical design cannot acquire a VRAM policy")
+        return None
+    if source_path is None:
+        raise ValueError("new production successor requires --vram-policy")
+    source = source_path.resolve()
+    policy = load_json_file(DiagnosticVRAMWorkingSetPolicy, source)
+    if policy.source_revision != revision:
+        raise ValueError("VRAM policy source revision differs from design")
+    _validate_design_working_sets(universe_start, policy)
+    destination = root / "vram-policy.json"
+    if destination.is_file():
+        if sha256_file(destination) != sha256_file(source):
+            raise ValueError("existing design VRAM policy differs")
+    else:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+    return sha256_file(destination)
+
+
+def _validate_design_working_sets(
+    universe_start: int,
+    policy: DiagnosticVRAMWorkingSetPolicy,
+) -> None:
+    """Reject elementwise designs outside the pre-frozen VRAM domain."""
+    for case in _all_cases(universe_start):
+        if case.family is not WorkloadKind.ELEMENTWISE:
+            continue
+        semantic_bytes = 2 * case.axes["M"] * case.axes["N"] * 4
+        if not (
+            policy.applicability_min_bytes
+            <= semantic_bytes
+            <= policy.applicability_max_bytes
+        ):
+            raise ValueError(
+                f"{case.case_id} working_set_bytes={semantic_bytes} "
+                "violates frozen VRAM policy"
+            )
+
+
 def _preregister(
-    root: Path, universe_start: int, source_revision: str | None = None
+    root: Path,
+    universe_start: int,
+    source_revision: str | None = None,
+    vram_policy_path: Path | None = None,
 ) -> None:
     design_path = root / "design.json"
     _validate_design_contracts(
@@ -622,12 +689,18 @@ def _preregister(
             *_cases("held_out", universe_start),
         ]
     )
-    design = _design_payload(universe_start)
+    revision = source_revision or _source_revision()
+    policy_digest = _freeze_design_vram_policy(
+        root,
+        universe_start=universe_start,
+        revision=revision,
+        source_path=vram_policy_path,
+    )
+    design = _design_payload(universe_start, policy_digest)
     if design_path.exists():
         if load_json_value(design_path) != design:
             raise ValueError("existing corpus design differs from current plan")
         design_digest = sha256_file(design_path)
-        revision = source_revision or _source_revision()
         _write_design_manifest(
             root=root,
             universe_start=universe_start,
@@ -636,18 +709,20 @@ def _preregister(
                 universe_start=universe_start,
                 design_payload_sha256=design_digest,
                 source_revision=revision,
+                vram_policy_sha256=policy_digest,
             ),
             source_revision=revision,
+            vram_policy_sha256=policy_digest,
         )
         print(f"verified frozen design at {design_path}", flush=True)
         return
     atomic_write_json_value(design_path, design)
     design_digest = sha256_file(design_path)
-    revision = source_revision or _source_revision()
     did = design_id(
         universe_start=universe_start,
         design_payload_sha256=design_digest,
         source_revision=revision,
+        vram_policy_sha256=policy_digest,
     )
     _write_design_manifest(
         root=root,
@@ -655,6 +730,7 @@ def _preregister(
         design_payload_sha256=design_digest,
         did=did,
         source_revision=revision,
+        vram_policy_sha256=policy_digest,
     )
     print(
         f"froze {len(design['cases'])} cases at {design_path} "
@@ -682,6 +758,7 @@ def _write_design_manifest(
     design_payload_sha256: str,
     did: str,
     source_revision: str,
+    vram_policy_sha256: str | None = None,
 ) -> None:
     directory = designs_dir() / did
     payload = root / "design.json"
@@ -695,11 +772,29 @@ def _write_design_manifest(
             or existing.universe_start != universe_start
             or existing.design_payload_sha256 != design_payload_sha256
             or existing.source_revision != source_revision
+            or existing.vram_policy_sha256 != vram_policy_sha256
             or not store.contains(existing.design_payload_sha256)
         ):
             raise ValueError(f"immutable design manifest differs: {path}")
         store.put_file(path)
         return
+    inventory = [
+        DiagnosticLifecycleArtifact(
+            relative_path=f"blobs/{design_payload_sha256}",
+            sha256=design_payload_sha256,
+            size_bytes=payload.stat().st_size,
+        )
+    ]
+    if vram_policy_sha256 is not None:
+        policy_path = root / "vram-policy.json"
+        store.put_file(policy_path, expected_sha256=vram_policy_sha256)
+        inventory.append(
+            DiagnosticLifecycleArtifact(
+                relative_path=f"blobs/{vram_policy_sha256}",
+                sha256=vram_policy_sha256,
+                size_bytes=policy_path.stat().st_size,
+            )
+        )
     manifest = DiagnosticDesignManifest(
         stage=DiagnosticLifecycleStage.DESIGN,
         stage_id=did,
@@ -707,16 +802,13 @@ def _write_design_manifest(
         retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
         source_revision=source_revision,
         policy_hashes={"root": str(root.resolve())},
-        exact_inventory=(
-            DiagnosticLifecycleArtifact(
-                relative_path=f"blobs/{design_payload_sha256}",
-                sha256=design_payload_sha256,
-                size_bytes=payload.stat().st_size,
-            ),
+        exact_inventory=tuple(
+            sorted(inventory, key=lambda item: item.relative_path)
         ),
         created_at=datetime.now(UTC).isoformat(),
         universe_start=universe_start,
         design_payload_sha256=design_payload_sha256,
+        vram_policy_sha256=vram_policy_sha256,
     )
     directory.mkdir(parents=True)
     atomic_write_json_value(path, manifest.model_dump(mode="json"))
@@ -2078,7 +2170,22 @@ def _require_frozen_design(root: Path) -> DiagnosticCorpusDesign:
     design = DiagnosticCorpusDesign.model_validate_json(
         design_path.read_text(encoding="utf-8")
     )
-    if design.model_dump(mode="json") != _design_payload(design.universe_start):
+    expected_policy = design.vram_policy_sha256
+    if design.universe_start >= CAPACITY_GOVERNED_SUCCESSOR_START:
+        policy_path = root / "vram-policy.json"
+        if (
+            expected_policy is None
+            or not policy_path.is_file()
+            or sha256_file(policy_path) != expected_policy
+        ):
+            raise ValueError("capacity-governed design VRAM policy is missing")
+        _validate_design_working_sets(
+            design.universe_start,
+            load_json_file(DiagnosticVRAMWorkingSetPolicy, policy_path),
+        )
+    if design.model_dump(mode="json", exclude_none=True) != _design_payload(
+        design.universe_start, expected_policy
+    ):
         raise ValueError("corpus design does not match frozen preregistration")
     _validate_design_contracts(
         [
@@ -2248,7 +2355,12 @@ def main() -> int:
     if arguments.stage == "preregister":
         if arguments.universe_start is None:
             raise ValueError("preregister requires --universe-start")
-        _preregister(root, arguments.universe_start, arguments.source_revision)
+        _preregister(
+            root,
+            arguments.universe_start,
+            arguments.source_revision,
+            arguments.vram_policy,
+        )
     elif arguments.stage == "prepare":
         _prepare(
             root,

@@ -29,11 +29,19 @@ from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file
 
 _TAG = "diagnostic-lifecycle-p0-conformance-v1"
+_PRODUCTION_TAG = "gfx1200-diagnostics-v7-production-v1"
+_RELEASE_NAMES = {
+    _TAG: "Diagnostic lifecycle P0 conformance v1",
+    _PRODUCTION_TAG: "gfx1200 diagnostics v7 production v1",
+}
 
 
 class _Runner:
-    def __init__(self, assets: Path, *, draft: bool = False) -> None:
+    def __init__(
+        self, assets: Path, *, tag: str = _TAG, draft: bool = False
+    ) -> None:
         self.assets = assets
+        self.tag = tag
         self.draft = draft
 
     def __call__(
@@ -42,8 +50,8 @@ class _Runner:
         if arguments[0] == "api":
             return subprocess.CompletedProcess(arguments, 0, "a" * 40, "")
         if arguments[1] == "view":
-            attestation = self.assets / f"{_TAG}.attestation.json"
-            archive = self.assets / f"{_TAG}.tar.zst"
+            attestation = self.assets / f"{self.tag}.attestation.json"
+            archive = self.assets / f"{self.tag}.tar.zst"
             payload = {
                 "assets": [
                     {
@@ -75,9 +83,9 @@ class _Runner:
                 "id": "release-node-id",
                 "isDraft": self.draft,
                 "isPrerelease": False,
-                "name": "Diagnostic lifecycle P0 conformance v1",
+                "name": _RELEASE_NAMES[self.tag],
                 "publishedAt": "2026-08-09T00:01:00Z",
-                "tagName": _TAG,
+                "tagName": self.tag,
                 "url": "https://example.invalid/release",
                 "targetCommitish": "main",
             }
@@ -90,9 +98,16 @@ class _Runner:
         return subprocess.CompletedProcess(arguments, 0, "", "")
 
 
-def _assets(root: Path) -> Path:
+def _assets(
+    root: Path,
+    *,
+    tag: str = _TAG,
+    purpose: DiagnosticEvidencePurpose = (
+        DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE
+    ),
+) -> Path:
     root.mkdir()
-    archive = root / f"{_TAG}.tar.zst"
+    archive = root / f"{tag}.tar.zst"
     archive.write_bytes(b"archive")
     publication_id = "2" * 64
     archive_digest = sha256_file(archive)
@@ -102,11 +117,11 @@ def _assets(root: Path) -> Path:
         source_revision="a" * 40,
         producer_version="4.0.0",
         archive_size_bytes=archive.stat().st_size,
-        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+        purpose=purpose,
     )
     attestation = DiagnosticReleaseAttestation(
         release_id=release_identity,
-        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+        purpose=purpose,
         publication_id=publication_id,
         archive=DiagnosticReleaseArchive(
             name="release.tar.zst",
@@ -122,15 +137,17 @@ def _assets(root: Path) -> Path:
         created_at="2026-08-09T00:00:00+00:00",
     )
     atomic_write_json_value(
-        root / f"{_TAG}.attestation.json",
+        root / f"{tag}.attestation.json",
         attestation.model_dump(mode="json"),
     )
     return root
 
 
-def _seed_local_candidate(store: Path, assets: Path) -> None:
-    archive = assets / f"{_TAG}.tar.zst"
-    attestation_path = assets / f"{_TAG}.attestation.json"
+def _seed_local_candidate(
+    store: Path, assets: Path, *, tag: str = _TAG
+) -> None:
+    archive = assets / f"{tag}.tar.zst"
+    attestation_path = assets / f"{tag}.attestation.json"
     attestation = DiagnosticReleaseAttestation.model_validate_json(
         attestation_path.read_text(encoding="utf-8")
     )
@@ -139,7 +156,7 @@ def _seed_local_candidate(store: Path, assets: Path) -> None:
     blob_store.put_file(attestation_path)
     manifest = DiagnosticReleaseLifecycleManifest(
         stage=DiagnosticLifecycleStage.RELEASE,
-        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+        purpose=attestation.purpose,
         stage_id=attestation.release_id,
         status=DiagnosticStageStatus.VERIFIED,
         retention_class=DiagnosticRetentionClass.PUBLICATION_RELEASE,
@@ -147,7 +164,7 @@ def _seed_local_candidate(store: Path, assets: Path) -> None:
         parents=(
             DiagnosticLifecycleParent(
                 stage=DiagnosticLifecycleStage.PUBLICATION,
-                purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+                purpose=attestation.purpose,
                 stage_id=attestation.publication_id,
                 sha256="5" * 64,
             ),
@@ -183,6 +200,8 @@ def test_ingest_published_release_reconstructs_remote_receipt(
 
     receipt = ingest_github_published_release(
         repository="owner/repository",
+        tag=_TAG,
+        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
         store_root_path=store,
         runner=_Runner(assets),
     )
@@ -211,6 +230,29 @@ def test_ingest_refuses_a_draft_release(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="expected published tag"):
         ingest_github_published_release(
             repository="owner/repository",
+            tag=_TAG,
+            purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
             store_root_path=tmp_path / "store",
             runner=_Runner(assets, draft=True),
         )
+
+
+def test_ingest_accepts_supported_production_release(tmp_path: Path) -> None:
+    assets = _assets(
+        tmp_path / "assets",
+        tag=_PRODUCTION_TAG,
+        purpose=DiagnosticEvidencePurpose.PRODUCTION,
+    )
+    store = tmp_path / "store"
+    _seed_local_candidate(store, assets, tag=_PRODUCTION_TAG)
+
+    receipt = ingest_github_published_release(
+        repository="owner/repository",
+        tag=_PRODUCTION_TAG,
+        purpose=DiagnosticEvidencePurpose.PRODUCTION,
+        store_root_path=store,
+        runner=_Runner(assets, tag=_PRODUCTION_TAG),
+    )
+
+    assert receipt.tag == _PRODUCTION_TAG
+    assert receipt.purpose is DiagnosticEvidencePurpose.PRODUCTION

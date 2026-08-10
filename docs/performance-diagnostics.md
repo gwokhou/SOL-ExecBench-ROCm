@@ -150,6 +150,23 @@ claiming a new held-out pair. The anchors derive from the official
 [BERT implementation](https://github.com/google-research/bert/blob/master/modeling.py),
 and [Google ViT repository](https://github.com/google-research/vision_transformer).
 
+Production successors beginning at universe start 400 are capacity governed.
+Before design registration, `run_rdna4_diagnostic_calibration.py freeze-policy`
+records the selected gfx1200 device, its observed total physical VRAM, the
+canonical nominal capacity class, and the corresponding probe/applicability
+tier. The only admitted classes are 8 GiB -> 256 MiB and 16 GiB -> 512 MiB;
+runtime free memory is deliberately not an input. Unknown capacities and other
+architectures fail closed. In particular, gfx942/MI300X 192 GB is not inferred
+from the RDNA4 rule and requires a separately authored and validated CDNA3
+policy.
+
+The policy is frozen before `preregister`, copied into the design root, hashed
+into the design identity, and required by calibration and lifecycle planning.
+The successor's elementwise semantic working sets must fit its frozen interval.
+The development-only inference profile is also fit and frozen before held-out
+collection; the lifecycle model-build stage must reproduce its exact bytes
+before acceptance can begin.
+
 Materialize this repair only in an isolated exploratory store and run all three
 qualification gates before any counter collection:
 
@@ -588,6 +605,8 @@ uv run sol-execbench --format json diagnostics lifecycle plan \
   --held-out-corpus <operator_collected_tree>/held_out.json \
   --calibration-profile <calibration_profile.json> \
   --calibration-audit <calibration_profile.audit.json> \
+  --vram-policy <frozen_vram_policy.json> \
+  --frozen-inference-profile <development_only_inference.json> \
   --output-root <lifecycle_output_root> \
   --model-version <model_version> \
   --max-attempts 3 \
@@ -612,6 +631,10 @@ complete PCIe-aware GPU identity shared exactly by the calibration profile,
 calibration audit, and every performance-evidence manifest referenced by the
 held-out corpus. That identity participates in both the plan ID and collection
 run ID, and the collection handler rechecks it before adoption and on resume.
+Capacity-governed successors additionally require the design-bound VRAM policy
+and the pre-held-out inference profile. The policy digest must be present in the
+calibration evidence, and the model-build output must be byte-identical to the
+frozen inference input.
 
 `run` executes `design -> calibration -> collection_run -> corpus_snapshot ->
 model_build -> acceptance -> publication -> release` in monotonic order while

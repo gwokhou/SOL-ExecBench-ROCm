@@ -109,11 +109,14 @@ int measure_copy(size_t bytes, size_t stride, const char* variant) {
   return input_freed && output_freed ? 0 : 2;
 }
 
-int run_memory() {
+int run_memory(size_t maximum_bytes) {
   const size_t sizes[] = {
-      32ULL << 10, 256ULL << 10, 2ULL << 20, 16ULL << 20, 64ULL << 20, 256ULL << 20};
-  const char* names[] = {"32KiB", "256KiB", "2MiB", "16MiB", "64MiB", "256MiB"};
-  for (int index = 0; index < 6; ++index) {
+      32ULL << 10, 256ULL << 10, 2ULL << 20, 16ULL << 20,
+      64ULL << 20, 256ULL << 20, 512ULL << 20};
+  const char* names[] = {
+      "32KiB", "256KiB", "2MiB", "16MiB", "64MiB", "256MiB", "512MiB"};
+  for (int index = 0; index < 7; ++index) {
+    if (sizes[index] > maximum_bytes) continue;
     const int result = measure_copy(sizes[index], 1, names[index]);
     if (result != 0) return result;
   }
@@ -667,12 +670,31 @@ int run_overlap() {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    std::fprintf(stderr, "usage: diagnostic_microarchitecture MODE\n");
+  if (argc < 2 || argc > 3) {
+    std::fprintf(stderr, "usage: diagnostic_microarchitecture MODE [VRAM_BYTES]\n");
     return 1;
   }
   if (std::strcmp(argv[1], "dispatch") == 0) return run_dispatch();
-  if (std::strcmp(argv[1], "memory") == 0) return run_memory();
+  if (std::strcmp(argv[1], "memory") == 0) {
+    if (argc != 3) {
+      std::fprintf(stderr, "memory mode requires a frozen VRAM tier\n");
+      return 1;
+    }
+    size_t maximum_bytes = 0;
+    if (std::strcmp(argv[2], "268435456") == 0) {
+      maximum_bytes = 256ULL << 20;
+    } else if (std::strcmp(argv[2], "536870912") == 0) {
+      maximum_bytes = 512ULL << 20;
+    } else {
+      std::fprintf(stderr, "unsupported frozen VRAM tier: %s\n", argv[2]);
+      return 1;
+    }
+    return run_memory(maximum_bytes);
+  }
+  if (argc != 2) {
+    std::fprintf(stderr, "VRAM_BYTES is valid only for memory mode\n");
+    return 1;
+  }
   if (std::strcmp(argv[1], "access") == 0) return run_access();
   if (std::strcmp(argv[1], "lds") == 0) return run_lds();
   if (std::strcmp(argv[1], "reduction") == 0) return run_reduction();

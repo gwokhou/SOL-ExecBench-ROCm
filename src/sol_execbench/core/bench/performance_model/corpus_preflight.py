@@ -22,7 +22,7 @@ from sol_execbench.core.data.json_utils import (
 )
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.workload import TopKRoutingCheck, Workload
-from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.integrity import SHA256Digest, sha256_file
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 DESIGN_KIND = "adjacent_shape_stratified_three_way_rotation"
@@ -136,6 +136,7 @@ class DiagnosticCorpusDesign(CurrentSchemaModel):
     universe_cases_per_family: Literal[60]
     universe_start: int = Field(ge=0)
     configuration_frozen_before_collection: Literal[True]
+    vram_policy_sha256: SHA256Digest | None = None
     cases: list[DiagnosticCorpusCase] = Field(
         min_length=EXPECTED_CASES,
         max_length=EXPECTED_CASES,

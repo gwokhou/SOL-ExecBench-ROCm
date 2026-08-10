@@ -49,6 +49,11 @@ from sol_execbench.core.bench.performance_model.models import (
     CalibrationIdentity,
     DiagnosticCalibrationProfile,
 )
+from sol_execbench.core.bench.performance_model.vram_policy import (
+    MIB,
+    DiagnosticVRAMWorkingSetPolicy,
+    select_vram_working_set_policy,
+)
 from sol_execbench.core.bench.timing_isolation import (
     verify_clock_state_with_warning,
 )
@@ -125,6 +130,8 @@ class _CalibrationContext:
     compiler_version: str
     tuning_batches: int
     estimation_batches: int
+    vram_policy: DiagnosticVRAMWorkingSetPolicy
+    vram_policy_path: Path
 
 
 def _compile_probe(hipcc: Path, architecture: str, output: Path) -> None:
@@ -153,9 +160,13 @@ def _run_probe_batch(
     phase: str,
     process_batch: int,
     mode: str,
+    vram_policy: DiagnosticVRAMWorkingSetPolicy,
 ) -> ProbeBatch:
+    command = [str(binary), mode]
+    if mode == "memory":
+        command.append(str(vram_policy.probe_working_set_bytes))
     completed = run_in_process_group_bounded(
-        [str(binary), mode],
+        command,
         timeout=COMMAND_TIMEOUT_SECONDS,
     )
     if completed.returncode != 0:
@@ -181,6 +192,7 @@ def _collect_phase(
     *,
     phase: str,
     process_batches: int,
+    vram_policy: DiagnosticVRAMWorkingSetPolicy,
 ) -> list[ProbeBatch]:
     batches: list[ProbeBatch] = []
     for process_batch in range(process_batches):
@@ -195,6 +207,7 @@ def _collect_phase(
                     phase=phase,
                     process_batch=process_batch,
                     mode=mode,
+                    vram_policy=vram_policy,
                 ),
             )
     return batches
@@ -252,6 +265,7 @@ def run_calibration(
     gpu_id: str,
     tuning_batches: int,
     estimation_batches: int,
+    vram_policy_path: Path,
 ) -> Path:
     """Compile, tune, freeze, and collect parameter-estimation evidence."""
     hipcc = resolve_rocm_tool("hipcc")
@@ -270,6 +284,8 @@ def run_calibration(
         raise RuntimeError(
             f"--gpu-id does not match device {device.index} UUID",
         )
+    policy = load_json_file(DiagnosticVRAMWorkingSetPolicy, vram_policy_path)
+    _verify_vram_policy(policy, device, observed_gpu_id)
     compiler_version = _compiler_version(hipcc)
     rocm_version = detect_rocm_version()
     if rocm_version is None:
@@ -285,6 +301,8 @@ def run_calibration(
             compiler_version=compiler_version,
             tuning_batches=tuning_batches,
             estimation_batches=estimation_batches,
+            vram_policy=policy,
+            vram_policy_path=vram_policy_path.resolve(),
         ),
     )
 
@@ -309,12 +327,20 @@ def _run_calibration_workspace(context: _CalibrationContext) -> Path:
                 binary,
                 phase="tuning",
                 process_batches=context.tuning_batches,
+                vram_policy=context.vram_policy,
             )
-            frozen = freeze_probe_configuration(tuning)
+            frozen = freeze_probe_configuration(
+                tuning,
+                vram_variant=(
+                    f"{context.vram_policy.probe_working_set_bytes // MIB}MiB"
+                ),
+            )
+            frozen["vram_policy_sha256"] = sha256_file(context.vram_policy_path)
             estimation = _collect_phase(
                 binary,
                 phase="parameter_estimation_after_configuration_freeze",
                 process_batches=context.estimation_batches,
+                vram_policy=context.vram_policy,
             )
             environment.append(
                 collect_runtime_gpu_telemetry(
@@ -394,7 +420,8 @@ def _calibration_profile(
         probe_evidence_sha256=[
             stable_json_checksum(
                 calibration_probe_identity_payload(audit.probe_identity),
-            )
+            ),
+            sha256_file(context.vram_policy_path),
         ],
         configuration_frozen_before_estimation=True,
         bootstrap_seed=BOOTSTRAP_SEED,
@@ -462,6 +489,8 @@ def _gpu_identity(amd_smi: Path, device_index: int) -> tuple[str, str]:
 
 
 def _qualification_root(arguments: argparse.Namespace) -> Path:
+    if arguments.qualification_root is None:
+        raise ValueError("qualification stages require --qualification-root")
     return require_isolated_qualification_root(
         arguments.qualification_root,
         arguments.output,
@@ -478,11 +507,13 @@ def _qualification_subject(hipcc: Path) -> str:
 
 
 def _qualification_configuration(arguments: argparse.Namespace) -> str:
+    policy_path = _required_vram_policy_path(arguments)
     return stable_json_checksum(
         {
             "gpu_id": arguments.gpu_id,
             "tuning_batches": arguments.tuning_batches,
             "estimation_batches": arguments.estimation_batches,
+            "vram_policy_sha256": sha256_file(policy_path),
         }
     )
 
@@ -550,6 +581,7 @@ def _gpu_qualification_receipt(
             phase=f"qualification_{stage.value}",
             process_batch=0,
             mode=mode,
+            vram_policy=_load_vram_policy(arguments),
         )
         payload = {
             "stage": stage,
@@ -612,7 +644,69 @@ def _qualification_hardware(
     )
     if arguments.gpu_id != observed_gpu_id:
         raise RuntimeError("--gpu-id does not match qualification device UUID")
+    _verify_vram_policy(_load_vram_policy(arguments), device, observed_gpu_id)
     return device, observed_gpu_id, gpu_bdf
+
+
+def _required_vram_policy_path(arguments: argparse.Namespace) -> Path:
+    if arguments.vram_policy is None:
+        raise ValueError("calibration stage requires --vram-policy")
+    return arguments.vram_policy.resolve()
+
+
+def _load_vram_policy(
+    arguments: argparse.Namespace,
+) -> DiagnosticVRAMWorkingSetPolicy:
+    return load_json_file(
+        DiagnosticVRAMWorkingSetPolicy,
+        _required_vram_policy_path(arguments),
+    )
+
+
+def _verify_vram_policy(
+    policy: DiagnosticVRAMWorkingSetPolicy,
+    device: RocmDeviceInfo,
+    gpu_id: str,
+) -> None:
+    expected = select_vram_working_set_policy(
+        gpu_architecture=device.gfx_target,
+        gpu_id=gpu_id,
+        total_memory_bytes=device.total_memory_bytes,
+        source_revision=policy.source_revision,
+        created_at=policy.created_at,
+    )
+    if policy != expected:
+        raise ValueError("frozen VRAM policy differs from observed hardware")
+
+
+def _freeze_vram_policy(arguments: argparse.Namespace) -> Path:
+    output = arguments.output.resolve()
+    if output.exists():
+        raise ValueError(f"refusing to overwrite VRAM policy: {output}")
+    device = detect_rocm_device()
+    observed_gpu_id, _gpu_bdf = _gpu_identity(
+        _required_tool("amd-smi"), device.index
+    )
+    if arguments.gpu_id != observed_gpu_id:
+        raise RuntimeError("--gpu-id does not match policy device UUID")
+    policy = select_vram_working_set_policy(
+        gpu_architecture=device.gfx_target,
+        gpu_id=observed_gpu_id,
+        total_memory_bytes=device.total_memory_bytes,
+        source_revision=_source_revision(),
+    )
+    atomic_write_json_value(output, policy.model_dump(mode="json"))
+    return output
+
+
+def _source_revision() -> str:
+    completed = run_in_process_group_bounded(
+        ["git", "rev-parse", "HEAD"], timeout=30.0
+    )
+    revision = completed.stdout.strip()
+    if completed.returncode != 0 or len(revision) != 40:
+        raise RuntimeError("cannot resolve calibration source revision")
+    return revision
 
 
 def _run_qualification(
@@ -713,11 +807,13 @@ def _parse_args() -> argparse.Namespace:
         "stage",
         choices=(
             *(stage.command for stage in BatchGPUQualificationStage),
+            "freeze-policy",
             "run",
         ),
     )
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--qualification-root", type=Path, required=True)
+    parser.add_argument("--qualification-root", type=Path)
+    parser.add_argument("--vram-policy", type=Path)
     parser.add_argument("--gpu-id", required=True)
     parser.add_argument("--tuning-batches", type=int, default=3)
     parser.add_argument("--estimation-batches", type=int, default=5)
@@ -726,12 +822,23 @@ def _parse_args() -> argparse.Namespace:
         parser.error("--tuning-batches must be positive")
     if arguments.estimation_batches < 5:
         parser.error("--estimation-batches must be at least 5")
+    if arguments.stage != "freeze-policy" and arguments.vram_policy is None:
+        parser.error("calibration stage requires --vram-policy")
+    if (
+        arguments.stage != "freeze-policy"
+        and arguments.qualification_root is None
+    ):
+        parser.error("calibration stage requires --qualification-root")
     return arguments
 
 
 def main() -> int:
     """Run the command-line calibration workflow."""
     arguments = _parse_args()
+    if arguments.stage == "freeze-policy":
+        path = _freeze_vram_policy(arguments)
+        print(path)
+        return 0
     if arguments.stage != "run":
         stage = BatchGPUQualificationStage(
             arguments.stage.removeprefix("qualify-")
@@ -745,6 +852,7 @@ def main() -> int:
         gpu_id=arguments.gpu_id,
         tuning_batches=arguments.tuning_batches,
         estimation_batches=arguments.estimation_batches,
+        vram_policy_path=_required_vram_policy_path(arguments),
     )
     response = response_success(
         COMMAND_NAME,

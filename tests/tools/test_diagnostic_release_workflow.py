@@ -38,12 +38,18 @@ def test_release_workflow_runs_on_github_hosted_runner() -> None:
     assert "self-hosted" not in " ".join(job["runs-on"])
 
 
-def test_release_workflow_publishes_with_the_fixed_attestation_asset() -> None:
+def test_release_workflow_publishes_only_supported_tag_scoped_assets() -> None:
     workflow = (WORKFLOW_DIR / "diagnostic-release.yml").read_text(
         encoding="utf-8"
     )
 
-    assert "diagnostic-lifecycle-p0-conformance-v1.attestation.json" in workflow
+    assert "diagnostic-lifecycle-p0-conformance-v1)" in workflow
+    assert 'RELEASE_PURPOSE="control_plane_conformance"' in workflow
+    assert "gfx1200-diagnostics-v7-production-v1)" in workflow
+    assert 'RELEASE_PURPOSE="production"' in workflow
+    assert 'f"{tag}.attestation.json"' in workflow
+    assert 'f"{tag}.tar.zst"' in workflow
+    assert "unsupported diagnostic release tag" in workflow
     assert '$RUNNER_TEMP/release/attestation.json"' not in workflow
     assert 'TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"' in workflow
     assert 'os.environ["TAG_SHA"]' in workflow

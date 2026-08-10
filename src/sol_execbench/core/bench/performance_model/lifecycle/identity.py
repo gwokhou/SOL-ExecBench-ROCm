@@ -66,18 +66,19 @@ def design_id(
     universe_start: int,
     design_payload_sha256: SHA256Digest,
     source_revision: str,
+    vram_policy_sha256: SHA256Digest | None = None,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one preregistered diagnostic design."""
-    return diagnostic_lifecycle_id(
-        "design",
-        {
-            "design_payload_sha256": design_payload_sha256,
-            "purpose": purpose,
-            "source_revision": source_revision,
-            "universe_start": universe_start,
-        },
-    )
+    payload: dict[str, object] = {
+        "design_payload_sha256": design_payload_sha256,
+        "purpose": purpose,
+        "source_revision": source_revision,
+        "universe_start": universe_start,
+    }
+    if vram_policy_sha256 is not None:
+        payload["vram_policy_sha256"] = vram_policy_sha256
+    return diagnostic_lifecycle_id("design", payload)
 
 
 def collection_run_id(
@@ -368,6 +369,7 @@ def recompute_stage_id(manifest: DiagnosticLifecycleManifest) -> SHA256Digest:
             design_payload_sha256=manifest.design_payload_sha256,
             source_revision=manifest.source_revision,
             purpose=manifest.purpose,
+            vram_policy_sha256=manifest.vram_policy_sha256,
         )
     if isinstance(manifest, DiagnosticCollectionRunManifest):
         return collection_run_id(

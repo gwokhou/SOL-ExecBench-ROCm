@@ -49,10 +49,20 @@ from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
 _GH_TIMEOUT_SECONDS = 60.0
 _MAX_GH_OUTPUT_BYTES = 256 * 1024
-_TAG = "diagnostic-lifecycle-p0-conformance-v1"
-_ARCHIVE = f"{_TAG}.tar.zst"
-_ATTESTATION = f"{_TAG}.attestation.json"
-_RELEASE_NAME = "Diagnostic lifecycle P0 conformance v1"
+_SUPPORTED_RELEASES = {
+    "diagnostic-lifecycle-p0-conformance-v1": (
+        DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+        "Diagnostic lifecycle P0 conformance v1",
+    ),
+    "gfx1200-diagnostics-v7-production-v1": (
+        DiagnosticEvidencePurpose.PRODUCTION,
+        "gfx1200 diagnostics v7 production v1",
+    ),
+}
+
+
+def _asset_names(tag: str) -> tuple[str, str]:
+    return f"{tag}.tar.zst", f"{tag}.attestation.json"
 
 
 class _ReleaseObservation(TypedDict):
@@ -65,10 +75,7 @@ class _ReleaseObservation(TypedDict):
 class DiagnosticPublishedReleaseAsset(FrozenArtifactModel):
     """One exact GitHub asset observed and downloaded during ingestion."""
 
-    name: Literal[
-        "diagnostic-lifecycle-p0-conformance-v1.attestation.json",
-        "diagnostic-lifecycle-p0-conformance-v1.tar.zst",
-    ]
+    name: str = Field(min_length=1, pattern=r"^[a-z0-9][a-z0-9.-]+$")
     github_id: str = Field(min_length=1)
     api_url: str = Field(min_length=1)
     download_url: str = Field(min_length=1)
@@ -85,9 +92,9 @@ class DiagnosticPublishedRelease(CurrentFrozenSchemaModel):
         SchemaVersion.DIAGNOSTIC_PUBLISHED_RELEASE
     )
     release_id: SHA256Digest
-    purpose: Literal[DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE]
+    purpose: DiagnosticEvidencePurpose
     repository: str = Field(min_length=3)
-    tag: Literal["diagnostic-lifecycle-p0-conformance-v1"]
+    tag: str = Field(min_length=1, pattern=r"^[a-z0-9][a-z0-9.-]+$")
     url: str = Field(min_length=1)
     github_release_id: str = Field(min_length=1)
     github_release_api_url: str = Field(min_length=1)
@@ -116,7 +123,10 @@ class DiagnosticPublishedRelease(CurrentFrozenSchemaModel):
     @model_validator(mode="after")
     def _exact_assets(self) -> DiagnosticPublishedRelease:
         names = tuple(asset.name for asset in self.assets)
-        if names != tuple(sorted((_ARCHIVE, _ATTESTATION))):
+        expected = _SUPPORTED_RELEASES.get(self.tag)
+        if expected is None or expected[0] is not self.purpose:
+            raise ValueError("published release tag/purpose is unsupported")
+        if names != tuple(sorted(_asset_names(self.tag))):
             raise ValueError("published release asset inventory is not exact")
         if self.target_commit_sha != self.source_revision:
             raise ValueError(
@@ -150,17 +160,22 @@ def _require_success(
 def ingest_github_published_release(
     *,
     repository: str,
+    tag: str,
+    purpose: DiagnosticEvidencePurpose,
     store_root_path: Path,
     runner: GitHubRunner = _run_gh,
 ) -> DiagnosticPublishedRelease:
-    """Download, verify, and persist the fixed public conformance release."""
+    """Download, verify, and persist one explicitly supported release."""
+    expected = _SUPPORTED_RELEASES.get(tag)
+    if expected is None or expected[0] is not purpose:
+        raise ValueError("unsupported published release tag/purpose")
     metadata = json.loads(
         _require_success(
             runner(
                 [
                     "release",
                     "view",
-                    _TAG,
+                    tag,
                     "--repo",
                     repository,
                     "--json",
@@ -173,12 +188,12 @@ def ingest_github_published_release(
             "metadata read",
         )
     )
-    _validate_metadata(metadata)
+    _validate_metadata(metadata, tag=tag, purpose=purpose)
     target_commit_sha = _require_success(
         runner(
             [
                 "api",
-                f"repos/{repository}/commits/{_TAG}",
+                f"repos/{repository}/commits/{tag}",
                 "--jq",
                 ".sha",
             ]
@@ -194,7 +209,7 @@ def ingest_github_published_release(
                 [
                     "release",
                     "download",
-                    _TAG,
+                    tag,
                     "--repo",
                     repository,
                     "--dir",
@@ -207,20 +222,27 @@ def ingest_github_published_release(
             root,
             cast(dict[str, object], metadata),
             repository=repository,
+            tag=tag,
+            purpose=purpose,
             target_commit_sha=target_commit_sha,
         )
         _persist_receipt(store_root_path.resolve(), receipt)
         return receipt
 
 
-def _validate_metadata(metadata: object) -> None:
+def _validate_metadata(
+    metadata: object,
+    *,
+    tag: str,
+    purpose: DiagnosticEvidencePurpose,
+) -> None:
     if not isinstance(metadata, dict):
         raise ValueError("GitHub release metadata is not an object")
     if (
         metadata.get("isDraft") is not False
         or metadata.get("isPrerelease") is not False
-        or metadata.get("tagName") != _TAG
-        or metadata.get("name") != _RELEASE_NAME
+        or metadata.get("tagName") != tag
+        or metadata.get("name") != _SUPPORTED_RELEASES[tag][1]
     ):
         raise ValueError("GitHub release is not the expected published tag")
     for field in ("apiUrl", "body", "id", "publishedAt", "url"):
@@ -231,7 +253,7 @@ def _validate_metadata(metadata: object) -> None:
     if not isinstance(assets, list):
         raise ValueError("GitHub release assets are unavailable")
     names = {item.get("name") for item in assets if isinstance(item, dict)}
-    if names != {_ARCHIVE, _ATTESTATION}:
+    if names != set(_asset_names(tag)):
         raise ValueError("GitHub release must contain exactly two fixed assets")
     if len(assets) != 2:
         raise ValueError("GitHub release asset inventory is ambiguous")
@@ -251,21 +273,26 @@ def _receipt_from_download(
     metadata: dict[str, object],
     *,
     repository: str,
+    tag: str,
+    purpose: DiagnosticEvidencePurpose,
     target_commit_sha: str,
 ) -> DiagnosticPublishedRelease:
+    _archive_name, attestation_name = _asset_names(tag)
     attestation, local_assets = _verified_downloaded_assets(
         root,
+        tag=tag,
+        purpose=purpose,
         target_commit_sha=target_commit_sha,
     )
     observation = _release_observation(metadata)
-    if observation["attestation_sha256"] != local_assets[_ATTESTATION][1]:
+    if observation["attestation_sha256"] != local_assets[attestation_name][1]:
         raise ValueError("workflow attestation digest differs from asset")
     assets = _published_assets(local_assets, metadata)
     return DiagnosticPublishedRelease(
         release_id=attestation.release_id,
-        purpose=DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE,
+        purpose=purpose,
         repository=repository,
-        tag="diagnostic-lifecycle-p0-conformance-v1",
+        tag=tag,
         url=str(metadata["url"]),
         github_release_id=str(metadata["id"]),
         github_release_api_url=str(metadata["apiUrl"]),
@@ -283,11 +310,17 @@ def _receipt_from_download(
 def _verified_downloaded_assets(
     root: Path,
     *,
+    tag: str,
+    purpose: DiagnosticEvidencePurpose,
     target_commit_sha: str,
 ) -> tuple[DiagnosticReleaseAttestation, dict[str, tuple[Path, SHA256Digest]]]:
-    archive = root / _ARCHIVE
-    attestation_path = root / _ATTESTATION
-    if {path.name for path in root.iterdir()} != {_ARCHIVE, _ATTESTATION}:
+    archive_name, attestation_name = _asset_names(tag)
+    archive = root / archive_name
+    attestation_path = root / attestation_name
+    if {path.name for path in root.iterdir()} != {
+        archive_name,
+        attestation_name,
+    }:
         raise ValueError("downloaded release asset set differs from metadata")
     attestation = load_json_file(DiagnosticReleaseAttestation, attestation_path)
     archive_digest = sha256_file(archive)
@@ -296,13 +329,8 @@ def _verified_downloaded_assets(
         raise ValueError("downloaded release archive digest mismatch")
     if archive.stat().st_size != attestation.archive.size_bytes:
         raise ValueError("downloaded release archive size mismatch")
-    if (
-        attestation.purpose
-        is not DiagnosticEvidencePurpose.CONTROL_PLANE_CONFORMANCE
-    ):
-        raise ValueError(
-            "published diagnostic release has production authority"
-        )
+    if attestation.purpose is not purpose:
+        raise ValueError("published diagnostic release purpose mismatch")
     if attestation.source_revision != target_commit_sha:
         raise ValueError("published tag target differs from source revision")
     expected_release_id = lifecycle_release_id(
@@ -316,8 +344,8 @@ def _verified_downloaded_assets(
     if expected_release_id != attestation.release_id:
         raise ValueError("published release identity does not recompute")
     return attestation, {
-        _ARCHIVE: (archive, archive_digest),
-        _ATTESTATION: (attestation_path, attestation_digest),
+        archive_name: (archive, archive_digest),
+        attestation_name: (attestation_path, attestation_digest),
     }
 
 
@@ -340,13 +368,7 @@ def _published_assets(
             raise ValueError(f"GitHub asset metadata differs for {name}")
         assets.append(
             DiagnosticPublishedReleaseAsset(
-                name=cast(
-                    Literal[
-                        "diagnostic-lifecycle-p0-conformance-v1.attestation.json",
-                        "diagnostic-lifecycle-p0-conformance-v1.tar.zst",
-                    ],
-                    name,
-                ),
+                name=name,
                 github_id=str(item["id"]),
                 api_url=str(item["apiUrl"]),
                 download_url=str(item["url"]),
@@ -393,11 +415,12 @@ def _persist_receipt(root: Path, receipt: DiagnosticPublishedRelease) -> None:
         candidate_path,
     )
     assets = {asset.name: asset for asset in receipt.assets}
+    archive_name, attestation_name = _asset_names(receipt.tag)
     if (
         candidate.source_revision != receipt.source_revision
-        or candidate.archive_sha256 != assets[_ARCHIVE].sha256
-        or candidate.archive_size_bytes != assets[_ARCHIVE].size_bytes
-        or candidate.attestation_sha256 != assets[_ATTESTATION].sha256
+        or candidate.archive_sha256 != assets[archive_name].sha256
+        or candidate.archive_size_bytes != assets[archive_name].size_bytes
+        or candidate.attestation_sha256 != assets[attestation_name].sha256
     ):
         raise ValueError("published assets differ from local release candidate")
     blob_store = BlobStore(root)
