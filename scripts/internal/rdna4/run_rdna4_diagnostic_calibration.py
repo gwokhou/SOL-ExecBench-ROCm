@@ -40,6 +40,7 @@ from sol_execbench.core.bench.performance_model.calibration import (
     build_calibration_surfaces,
     freeze_probe_configuration,
     parse_probe_metrics,
+    validate_indexed_read_surface_capacity,
 )
 from sol_execbench.core.bench.performance_model.calibration_audit import (
     DiagnosticCalibrationAudit,
@@ -47,6 +48,7 @@ from sol_execbench.core.bench.performance_model.calibration_audit import (
 )
 from sol_execbench.core.bench.performance_model.models import (
     CalibrationIdentity,
+    CalibrationSurfaceName,
     DiagnosticCalibrationProfile,
 )
 from sol_execbench.core.bench.performance_model.vram_policy import (
@@ -114,9 +116,11 @@ COMMAND_NAME = "rdna4 diagnostic calibration"
 _QUALIFICATION_CANARY_MODES = (
     "wmma",
     "memory",
+    "indexed_read",
     "atomic_update",
     "overlap",
 )
+_CAPACITY_GOVERNED_MODES = frozenset({"memory", "indexed_read"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,7 +167,7 @@ def _run_probe_batch(
     vram_policy: DiagnosticVRAMWorkingSetPolicy,
 ) -> ProbeBatch:
     command = [str(binary), mode]
-    if mode == "memory":
+    if mode in _CAPACITY_GOVERNED_MODES:
         command.append(str(vram_policy.probe_working_set_bytes))
     completed = run_in_process_group_bounded(
         command,
@@ -387,6 +391,16 @@ def _calibration_profile(
     estimation: Sequence[ProbeBatch],
     frozen: dict[str, str],
 ) -> DiagnosticCalibrationProfile:
+    surfaces = build_calibration_surfaces(estimation)
+    indexed_read = next(
+        surface
+        for surface in surfaces
+        if surface.name is CalibrationSurfaceName.INDEXED_READ
+    )
+    validate_indexed_read_surface_capacity(
+        indexed_read,
+        context.vram_policy.applicability_max_bytes,
+    )
     return DiagnosticCalibrationProfile(
         identity=CalibrationIdentity(
             gpu_architecture="gfx1200",
@@ -399,7 +413,7 @@ def _calibration_profile(
             power_profile="stable_peak",
         ),
         parameters=build_calibration_parameters(estimation, frozen),
-        surfaces=build_calibration_surfaces(estimation),
+        surfaces=surfaces,
         tuning_evidence_sha256=[
             stable_json_checksum(
                 [

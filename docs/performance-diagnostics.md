@@ -429,6 +429,16 @@ evidence partial and blocks production calibration, while any link drift makes
 the evidence inconsistent. A current host probe cannot retroactively establish
 the topology of older endpoint-only evidence.
 
+The frozen capacity tier governs both the scalar VRAM-throughput parameter and
+the indexed-read surface. For every admitted working-set interval, indexed
+read must contain the exact Cartesian matrix of three locality intervals and
+FP16/FP32 element widths through the policy ceiling. Missing, extra, or
+overlapping cells fail profile construction. Indexed read is also part of the
+risk-first canary. Extending the probe never edits an earlier profile in place:
+the old profile remains immutable comparison evidence, while the changed probe
+binary must pass a new qualification chain and a complete two-phase calibration
+run before any new held-out design is collected.
+
 Inference authoring separately requires at least 20 point-fit and 20
 conformal-calibration cases per family. Acceptance requires at least 20 held-out
 cases per family (220 total), at least 90% empirical interval coverage in every

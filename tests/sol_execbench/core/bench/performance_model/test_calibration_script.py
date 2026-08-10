@@ -8,9 +8,14 @@ from sol_execbench.core.bench.performance_model.calibration import (
     build_calibration_parameters,
     build_calibration_surfaces,
     parse_probe_metrics,
+    validate_indexed_read_surface_capacity,
 )
 from sol_execbench.core.bench.performance_model.models import (
     ApplicabilityDimension,
+    CalibrationSurface,
+    CalibrationSurfaceCell,
+    CalibrationSurfaceName,
+    CalibrationUnit,
 )
 
 _METRICS = (
@@ -241,6 +246,43 @@ def test_calibration_uses_frozen_512_mib_policy_tier() -> None:
     )
 
     assert parameter.applicability == (64.0 * 2**20, 512.0 * 2**20)
+
+
+def test_indexed_read_surface_requires_exact_capacity_matrix() -> None:
+    locality = ((0.0, 0.33), (0.34, 0.66), (0.67, 1.0))
+    working_sets = (
+        (0.0, 2.0 * 2**20),
+        (2.0 * 2**20 + 1e-6, 64.0 * 2**20),
+        (64.0 * 2**20 + 1e-6, 128.0 * 2**20),
+        (128.0 * 2**20 + 1e-6, 256.0 * 2**20),
+        (256.0 * 2**20 + 1e-6, 512.0 * 2**20),
+    )
+    cells = [
+        CalibrationSurfaceCell(
+            coordinates={
+                ApplicabilityDimension.INDEX_LOCALITY: locality_interval,
+                ApplicabilityDimension.WORKING_SET_BYTES: working_set_interval,
+                ApplicabilityDimension.ELEMENT_BYTES: element_interval,
+            },
+            value=1.0,
+            confidence_interval=(0.9, 1.1),
+        )
+        for locality_interval in locality
+        for working_set_interval in working_sets
+        for element_interval in ((2.0, 2.0), (4.0, 4.0))
+    ]
+    surface = CalibrationSurface(
+        name=CalibrationSurfaceName.INDEXED_READ,
+        unit=CalibrationUnit.ITEM_PER_MS,
+        cells=cells,
+    )
+
+    validate_indexed_read_surface_capacity(surface, 512 * 2**20)
+    with pytest.raises(ValueError, match="does not exactly cover"):
+        validate_indexed_read_surface_capacity(
+            surface.model_copy(update={"cells": cells[:-1]}),
+            512 * 2**20,
+        )
 
 
 def test_calibration_requires_five_independent_process_batches() -> None:

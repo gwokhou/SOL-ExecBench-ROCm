@@ -26,6 +26,24 @@ from sol_execbench.core.bench.performance_model.vram_policy import MIB
 METRIC_PREFIX = "METRIC "
 BOOTSTRAP_REPLICATES = 10_000
 BOOTSTRAP_SEED = 20_260_729
+_INDEXED_READ_LOCALITY_INTERVALS = (
+    (0.0, 0.33),
+    (0.34, 0.66),
+    (0.67, 1.0),
+)
+_INDEXED_READ_WORKING_SET_INTERVALS = (
+    (0.0, 2.0 * MIB),
+    (2.0 * MIB + 1e-6, 64.0 * MIB),
+    (64.0 * MIB + 1e-6, 128.0 * MIB),
+    (128.0 * MIB + 1e-6, 256.0 * MIB),
+    (256.0 * MIB + 1e-6, 512.0 * MIB),
+)
+_INDEXED_READ_ELEMENT_INTERVALS = ((2.0, 2.0), (4.0, 4.0))
+_INDEXED_READ_DIMENSIONS = (
+    ApplicabilityDimension.INDEX_LOCALITY,
+    ApplicabilityDimension.WORKING_SET_BYTES,
+    ApplicabilityDimension.ELEMENT_BYTES,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,6 +254,48 @@ def build_calibration_surfaces(
         ),
         _overlap_calibration_surface(grouped),
     ]
+
+
+def validate_indexed_read_surface_capacity(
+    surface: CalibrationSurface,
+    maximum_working_set_bytes: int,
+) -> None:
+    """Require the exact capacity-governed indexed-read cell matrix."""
+    if (
+        surface.name is not CalibrationSurfaceName.INDEXED_READ
+        or surface.unit is not CalibrationUnit.ITEM_PER_MS
+    ):
+        raise ValueError(
+            "indexed-read capacity validation received wrong surface"
+        )
+    working_sets = tuple(
+        interval
+        for interval in _INDEXED_READ_WORKING_SET_INTERVALS
+        if interval[1] <= maximum_working_set_bytes
+    )
+    expected = {
+        (
+            locality,
+            working_set,
+            element,
+        )
+        for locality in _INDEXED_READ_LOCALITY_INTERVALS
+        for working_set in working_sets
+        for element in _INDEXED_READ_ELEMENT_INTERVALS
+    }
+    actual = {
+        tuple(
+            cell.coordinates[dimension]
+            for dimension in _INDEXED_READ_DIMENSIONS
+        )
+        for cell in surface.cells
+        if set(cell.coordinates) == set(_INDEXED_READ_DIMENSIONS)
+    }
+    if actual != expected or len(surface.cells) != len(expected):
+        raise ValueError(
+            "indexed-read calibration surface does not exactly cover "
+            "the frozen VRAM capacity tier"
+        )
 
 
 def _overlap_calibration_surface(
@@ -635,4 +695,5 @@ __all__ = [
     "build_calibration_surfaces",
     "freeze_probe_configuration",
     "parse_probe_metrics",
+    "validate_indexed_read_surface_capacity",
 ]
