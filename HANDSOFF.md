@@ -388,7 +388,31 @@ held-out pairs. The authored start-520 policy provides one 660-case universe:
 point-fit, conformal, and held-out splits are fixed before collection;
 elementwise uses a capacity-bounded stratification inside 64–512 MiB; and the
 transformer family uses a fourth audited neighborhood schedule disjoint from
-starts 100/160/220/280/340/400/460. No start-520 evidence exists yet.
+starts 100/160/220/280/340/400/460.
+
+The first start-520 execution root, `p1-successor-start520-r1`, froze design
+`a90288e73ef11d0e871cbe07d47c4652bcab4c9ccb0c17f60da7d3fd1d81c51c`
+at source revision `d1ee4324907aa91172abce737b437a7929c119ca`. It also produced the
+source-bound VRAM policy
+`dbac7df435d95352e4819b2fd6f0b98142867a789690e60fd39fa7f11f6496ab`
+and final calibration
+`297939b560a2f68e65710e1444af1a21a64d23e7a601cd11d6f62c087cd3490a`.
+Its development static and canary gates passed. During full qualification,
+eight family receipts passed, but `indexed_update` twice completed only 31 of
+40 correct evaluations before the CLI's implicit 300-second whole-batch
+timeout. No development counter collection or start-520 held-out qualification
+or collection began.
+
+HEAD therefore makes the qualification batch timeout explicit at 900 seconds;
+it does not reduce the 40-case family batch, change correctness, make
+qualification timing authoritative, or alter any acceptance threshold. The
+source change supersedes the incomplete r1 execution root. Retain r1 as failed
+process evidence, but do not mix its source-bound policy, calibration, gates,
+or receipts into the next run. Recreate those artifacts under a new isolated
+root at the frozen HEAD before collecting development evidence. Because no
+start-520 held-out outcome was accessed, the preregistered start-520 universe
+remains eligible; its case set must not be changed in response to the
+development timeout.
 
 Required sequence:
 
