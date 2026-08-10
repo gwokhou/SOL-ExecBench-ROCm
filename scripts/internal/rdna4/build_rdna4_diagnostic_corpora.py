@@ -693,18 +693,23 @@ def _validate_design_working_sets(
     universe_start: int,
     policy: DiagnosticVRAMWorkingSetPolicy,
 ) -> None:
-    """Reject elementwise designs outside the pre-frozen VRAM domain."""
+    """Reject memory-domain designs outside the pre-frozen VRAM ceiling."""
     for case in _all_cases(universe_start):
-        if case.family is not WorkloadKind.ELEMENTWISE:
+        if case.family is WorkloadKind.ELEMENTWISE:
+            working_set_bytes = 2 * case.axes["M"] * case.axes["N"] * 4
+            in_range = (
+                policy.applicability_min_bytes
+                <= working_set_bytes
+                <= policy.applicability_max_bytes
+            )
+        elif case.family is WorkloadKind.INDEXED_READ:
+            working_set_bytes = case.axes["M"] * case.axes["N"] * 4
+            in_range = working_set_bytes <= policy.applicability_max_bytes
+        else:
             continue
-        semantic_bytes = 2 * case.axes["M"] * case.axes["N"] * 4
-        if not (
-            policy.applicability_min_bytes
-            <= semantic_bytes
-            <= policy.applicability_max_bytes
-        ):
+        if not in_range:
             raise ValueError(
-                f"{case.case_id} working_set_bytes={semantic_bytes} "
+                f"{case.case_id} working_set_bytes={working_set_bytes} "
                 "violates frozen VRAM policy"
             )
 

@@ -388,6 +388,8 @@ int emit_indexed_read_metrics(const T* source, int* device_indices, T* output,
 template <typename T>
 int run_indexed_read_type(int* indices, size_t source_bytes,
                           const size_t* working_set_bytes,
+                          const char* const* working_set_intervals,
+                          int working_set_count,
                           const char* element_interval,
                           bool emit_address_rate) {
   constexpr size_t count = 1ULL << 20;
@@ -399,17 +401,14 @@ int run_indexed_read_type(int* indices, size_t source_bytes,
     return 2;
   }
   const char* locality[] = {"0:0.33", "0.34:0.66", "0.67:1"};
-  const char* working_sets[] = {
-      "0:2097152", "2097152.000001:67108864",
-      "67108864.000001:134217728"};
-  for (int tier = 0; tier < 3; ++tier) {
+  for (int tier = 0; tier < working_set_count; ++tier) {
     const size_t source_count = working_set_bytes[tier] / sizeof(T);
     for (int pattern = 0; pattern < 3; ++pattern) {
       char variant[192];
       std::snprintf(
           variant, sizeof(variant),
           "index_locality=%s,working_set_bytes=%s,element_bytes=%s",
-          locality[pattern], working_sets[tier], element_interval);
+          locality[pattern], working_set_intervals[tier], element_interval);
       if (emit_indexed_read_metrics(
               source, indices, output, source_count, count, pattern, variant,
               emit_address_rate && tier == 0) != 0) {
@@ -421,16 +420,28 @@ int run_indexed_read_type(int* indices, size_t source_bytes,
   return freed ? 0 : 2;
 }
 
-int run_indexed_read() {
-  constexpr size_t source_bytes = 128ULL << 20;
+int run_indexed_read(size_t maximum_bytes) {
   constexpr size_t working_set_bytes[] = {
-      256ULL << 10, 16ULL << 20, 128ULL << 20};
+      256ULL << 10, 16ULL << 20, 128ULL << 20, 256ULL << 20, 512ULL << 20};
+  constexpr const char* working_set_intervals[] = {
+      "0:2097152", "2097152.000001:67108864",
+      "67108864.000001:134217728", "134217728.000001:268435456",
+      "268435456.000001:536870912"};
+  constexpr int working_set_tier_count =
+      sizeof(working_set_bytes) / sizeof(working_set_bytes[0]);
+  int working_set_count = 0;
+  while (working_set_count < working_set_tier_count &&
+         working_set_bytes[working_set_count] <= maximum_bytes) {
+    ++working_set_count;
+  }
   int* indices = nullptr;
   if (!hip_ok(hipMalloc(&indices, (1ULL << 20) * sizeof(int)))) return 2;
   const int fp32_status = run_indexed_read_type<float>(
-      indices, source_bytes, working_set_bytes, "4:4", true);
+      indices, maximum_bytes, working_set_bytes, working_set_intervals,
+      working_set_count, "4:4", true);
   const int fp16_status = run_indexed_read_type<__half>(
-      indices, source_bytes, working_set_bytes, "2:2", false);
+      indices, maximum_bytes, working_set_bytes, working_set_intervals,
+      working_set_count, "2:2", false);
   const bool freed = hip_ok(hipFree(indices));
   return fp32_status == 0 && fp16_status == 0 && freed ? 0 : 2;
 }
@@ -675,9 +686,12 @@ int main(int argc, char** argv) {
     return 1;
   }
   if (std::strcmp(argv[1], "dispatch") == 0) return run_dispatch();
-  if (std::strcmp(argv[1], "memory") == 0) {
+  const bool capacity_governed_mode =
+      std::strcmp(argv[1], "memory") == 0 ||
+      std::strcmp(argv[1], "indexed_read") == 0;
+  if (capacity_governed_mode) {
     if (argc != 3) {
-      std::fprintf(stderr, "memory mode requires a frozen VRAM tier\n");
+      std::fprintf(stderr, "%s mode requires a frozen VRAM tier\n", argv[1]);
       return 1;
     }
     size_t maximum_bytes = 0;
@@ -689,10 +703,13 @@ int main(int argc, char** argv) {
       std::fprintf(stderr, "unsupported frozen VRAM tier: %s\n", argv[2]);
       return 1;
     }
-    return run_memory(maximum_bytes);
+    return std::strcmp(argv[1], "memory") == 0
+               ? run_memory(maximum_bytes)
+               : run_indexed_read(maximum_bytes);
   }
   if (argc != 2) {
-    std::fprintf(stderr, "VRAM_BYTES is valid only for memory mode\n");
+    std::fprintf(stderr,
+                 "VRAM_BYTES is valid only for capacity-governed modes\n");
     return 1;
   }
   if (std::strcmp(argv[1], "access") == 0) return run_access();
@@ -700,7 +717,6 @@ int main(int argc, char** argv) {
   if (std::strcmp(argv[1], "reduction") == 0) return run_reduction();
   if (std::strcmp(argv[1], "wmma") == 0) return run_wmma();
   if (std::strcmp(argv[1], "valu") == 0) return run_valu();
-  if (std::strcmp(argv[1], "indexed_read") == 0) return run_indexed_read();
   if (std::strcmp(argv[1], "atomic_update") == 0) return run_atomic_update();
   if (std::strcmp(argv[1], "fp32_matrix") == 0) return run_fp32_matrix();
   if (std::strcmp(argv[1], "residency") == 0) return run_residency();

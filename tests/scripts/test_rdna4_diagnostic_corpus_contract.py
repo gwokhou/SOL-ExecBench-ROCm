@@ -1,6 +1,7 @@
 """Contract checks for the governed RDNA4 diagnostic corpus design."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -156,3 +157,30 @@ def test_future_transformer_generation_requires_an_authored_realism_policy(
         match="representative schedule is not authored",
     ):
         corpus._all_cases(460)
+
+
+def test_capacity_policy_rejects_out_of_range_indexed_read(
+    load_script,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    case = corpus.CaseSpec(
+        phase="held_out",
+        family=corpus.WorkloadKind.INDEXED_READ,
+        index=0,
+        global_index=460,
+        axes={"M": 200_000, "N": 1024},
+    )
+    monkeypatch.setattr(corpus, "_all_cases", lambda _start: [case])
+    policy = SimpleNamespace(
+        applicability_min_bytes=64 * 2**20,
+        applicability_max_bytes=512 * 2**20,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="held_out-indexed_read-00 working_set_bytes=819200000",
+    ):
+        corpus._validate_design_working_sets(460, policy)
