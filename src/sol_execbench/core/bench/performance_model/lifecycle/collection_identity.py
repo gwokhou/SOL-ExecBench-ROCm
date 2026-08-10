@@ -12,19 +12,25 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceRunIdentity,
     load_and_verify_performance_evidence_manifest,
 )
-from sol_execbench.core.bench.performance_model.lifecycle.corpus_registry import (
-    corpus_reference_tree_paths,
+from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
+    BlobStore,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticLifecycleStage,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.resolver import (
+    BlobStoreResolver,
+    materialize_corpus_references,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     GpuLifecycleIdentity,
     require_complete_gpu_identity,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.store import (
+    store_root,
+)
 from sol_execbench.core.bench.performance_model.validation_corpus import (
     DiagnosticValidationCorpus,
-    ValidationArtifactReference,
 )
 from sol_execbench.core.data.json_utils import load_json_file
 
@@ -34,26 +40,29 @@ def load_collection_gpu_identity(
     *,
     corpus_root: Path,
 ) -> GpuLifecycleIdentity:
-    """Return the one complete GPU identity shared by all collected cases."""
+    """Return the one complete GPU identity shared by all collected cases.
+
+    Both tree-backed (path) and blob-backed corpus references are supported.
+    Blob-backed references are resolved from the lifecycle blob store, which is
+    how ``freeze`` records immutable held-out corpora; tree-backed references
+    resolve relative to ``corpus_root`` for self-contained compact publications.
+    """
     corpus = load_json_file(DiagnosticValidationCorpus, corpus_path)
+    resolver = BlobStoreResolver(BlobStore(store_root()))
     runs: list[PerformanceRunIdentity] = []
     for case in corpus.cases:
-        reference = case.evidence_manifest
-        if not isinstance(reference, ValidationArtifactReference):
-            raise ValueError(
-                "collection hardware identity requires path evidence"
-            )
-        path, _members = corpus_reference_tree_paths(
-            reference,
+        with materialize_corpus_references(
+            case.evidence_manifest,
+            case.solar_manifest,
+            resolver=resolver,
             corpus_root=corpus_root,
-            kind="performance",
-        )
-        runs.append(
-            load_and_verify_performance_evidence_manifest(
-                path,
-                require_complete=True,
-            ).identity
-        )
+        ) as (evidence, _solar):
+            runs.append(
+                load_and_verify_performance_evidence_manifest(
+                    evidence,
+                    require_complete=True,
+                ).identity
+            )
     return require_consistent_collection_gpu_identity(runs)
 
 

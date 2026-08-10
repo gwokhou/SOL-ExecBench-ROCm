@@ -24,7 +24,16 @@ def inventory_regular_tree(
     if not resolved.is_dir():
         raise ValueError(f"collection root is not a directory: {root}")
     artifacts: list[DiagnosticLifecycleArtifact] = []
-    for path in sorted(resolved.rglob("*")):
+    # Sort by the POSIX relative path so the inventory order matches the
+    # string-sorted invariant enforced by lifecycle run-state validators.
+    # Path-object ordering disagrees with relative-path string ordering when a
+    # regular file and a directory share a name prefix (for example
+    # ``solar.log`` beside ``solar/``), because ``.`` (0x2E) precedes ``/``
+    # (0x2F) in the string order but a path component compares as a whole.
+    for path in sorted(
+        resolved.rglob("*"),
+        key=lambda candidate: candidate.relative_to(resolved).as_posix(),
+    ):
         if path.is_symlink():
             raise ValueError(f"collection inventory contains symlink: {path}")
         if path.is_dir():
