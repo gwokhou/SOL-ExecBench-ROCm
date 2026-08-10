@@ -386,20 +386,26 @@ Identity or hash mismatch is an input error.
 
 ```bash
 uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
+  freeze-policy --output VRAM-POLICY.json --gpu-id GPU_UUID
+uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
   qualify-static --output CALIBRATION.json --gpu-id GPU_UUID \
+  --vram-policy VRAM-POLICY.json \
   --qualification-root data/outputs/diagnostic-calibration-qualification \
   --estimation-batches 5
 uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
   qualify-canary --output CALIBRATION.json --gpu-id GPU_UUID \
+  --vram-policy VRAM-POLICY.json \
   --qualification-root data/outputs/diagnostic-calibration-qualification \
   --estimation-batches 5
 uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
   qualify-full --output CALIBRATION.json --gpu-id GPU_UUID \
+  --vram-policy VRAM-POLICY.json \
   --qualification-root data/outputs/diagnostic-calibration-qualification \
   --estimation-batches 5
 uv run python scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py \
   run \
   --output CALIBRATION.json --gpu-id GPU_UUID \
+  --vram-policy VRAM-POLICY.json \
   --qualification-root data/outputs/diagnostic-calibration-qualification \
   --estimation-batches 5
 
@@ -667,8 +673,9 @@ first stage that is not `verified` or `superseded`. This includes a persisted
 `running` stage left by an interrupted process; it is never skipped in favor of
 a later stage. `resume` re-verifies each completed stage, re-executes any stage
 whose receipt is missing or whose inputs or outputs drifted, and continues from
-the first incomplete stage. A run that exhausts its attempt budget on a stage
-is recorded `failed` and can be resumed after the operator fixes the input.
+the first incomplete stage while the immutable attempt budget remains. A run
+that exhausts that budget is terminally `failed`; corrected inputs require a
+new reviewed plan and collection generation rather than resetting attempts.
 
 ## Registry-driven blob GC
 
