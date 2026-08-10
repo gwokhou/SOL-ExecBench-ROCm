@@ -181,6 +181,58 @@ def test_exposure_replacement_successor_has_disjoint_real_shape_neighborhoods(
         assert max(abs(sequence - anchor) for sequence in neighborhood) <= 15
 
 
+def test_full_replacement_successor_is_disjoint_and_capacity_governed(
+    load_script,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    successor = corpus._all_cases(corpus.FULL_REPLACEMENT_SUCCESSOR_START)
+    earlier = [
+        case
+        for start in (100, 160, 220, 280, 340, 400, 460)
+        for case in corpus._all_cases(start)
+    ]
+    policy = SimpleNamespace(
+        applicability_min_bytes=64 * 2**20,
+        applicability_max_bytes=512 * 2**20,
+    )
+
+    corpus._validate_design_contracts(successor)
+    corpus._validate_design_working_sets(
+        corpus.FULL_REPLACEMENT_SUCCESSOR_START,
+        policy,
+    )
+    assert {case.workload_uuid for case in successor}.isdisjoint(
+        case.workload_uuid for case in earlier
+    )
+    elementwise_working_sets = {
+        2 * case.axes["M"] * case.axes["N"] * 4
+        for case in successor
+        if case.family is corpus.WorkloadKind.ELEMENTWISE
+    }
+    assert len(elementwise_working_sets) == 60
+    assert min(elementwise_working_sets) >= policy.applicability_min_bytes
+    assert max(elementwise_working_sets) <= policy.applicability_max_bytes
+    transformer = sorted(
+        (
+            case
+            for case in successor
+            if case.family is corpus.WorkloadKind.TRANSFORMER
+        ),
+        key=lambda case: case.global_index,
+    )
+    assert tuple(case.axes["M"] for case in transformer) == (
+        corpus.FULL_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS
+    )
+    for (
+        anchor,
+        neighborhood,
+    ) in corpus._FULL_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS:
+        assert len(neighborhood) == 4
+        assert max(abs(sequence - anchor) for sequence in neighborhood) <= 21
+
+
 def test_future_transformer_generation_requires_an_authored_realism_policy(
     load_script,
 ) -> None:
@@ -192,7 +244,7 @@ def test_future_transformer_generation_requires_an_authored_realism_policy(
         ValueError,
         match="representative schedule is not authored",
     ):
-        corpus._all_cases(520)
+        corpus._all_cases(580)
 
 
 def test_capacity_policy_rejects_out_of_range_indexed_read(
