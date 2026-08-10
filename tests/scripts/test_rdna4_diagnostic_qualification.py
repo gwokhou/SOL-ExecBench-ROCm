@@ -168,6 +168,11 @@ def test_collect_requires_verified_three_gate_chain_before_first_case(
         "--unsafe-local-execution" not in command for command in commands
     )
     assert all("rocprofv3-counters" not in command for command in commands)
+    assert all(
+        command[command.index("--timeout") + 1]
+        == str(corpus.QUALIFICATION_BATCH_TIMEOUT_SECONDS)
+        for command in commands
+    )
     assert all(command[-1] == "none" for command in commands)
 
     collected: list[str] = []

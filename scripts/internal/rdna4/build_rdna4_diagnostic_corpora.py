@@ -131,6 +131,7 @@ FAMILIES = (
     WorkloadKind.CONCURRENT,
 )
 CASES_PER_PHASE = 20
+QUALIFICATION_BATCH_TIMEOUT_SECONDS = 900
 HISTORICAL_UNIVERSE_START = 100
 UNIVERSE_CASES_PER_FAMILY = 3 * CASES_PER_PHASE
 SOFTMAX_MAXIMUM_COLUMNS = 1024
@@ -1408,6 +1409,8 @@ def _run_family_qualification(
         str(_container_output_path(qualification_root / "config.json")),
         "--trace-output",
         str(_container_output_path(trace)),
+        "--timeout",
+        str(QUALIFICATION_BATCH_TIMEOUT_SECONDS),
         "--profile",
         str(ProfileMode.NONE),
     ]
