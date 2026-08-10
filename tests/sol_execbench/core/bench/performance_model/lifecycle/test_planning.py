@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -25,6 +26,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     GpuLifecycleIdentity,
 )
 from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.platform.runtime import (
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
@@ -225,3 +227,47 @@ def test_production_plan_rejects_reuse_fragment_from_other_design(
             store_root=store,
             inputs=inputs,
         )
+
+
+def test_capacity_governed_plan_binds_prefrozen_policy_and_inference(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _inputs(tmp_path)
+    policy_path = tmp_path / "vram-policy.json"
+    inference_path = tmp_path / "inference.json"
+    atomic_write_json_value(policy_path, {"policy": "frozen"})
+    atomic_write_json_value(inference_path, {"inference": "frozen"})
+    policy_digest = sha256_file(policy_path)
+    design = DiagnosticDesignManifest(
+        stage=DiagnosticLifecycleStage.DESIGN,
+        purpose=DiagnosticEvidencePurpose.PRODUCTION,
+        stage_id=_DESIGN_ID,
+        status=DiagnosticStageStatus.VERIFIED,
+        retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
+        source_revision=_SOURCE_REVISION,
+        created_at=_CREATED_AT,
+        universe_start=400,
+        design_payload_sha256="d" * 64,
+        vram_policy_sha256=policy_digest,
+    )
+    governed_inputs = replace(
+        inputs,
+        vram_policy_path=policy_path,
+        frozen_inference_profile_path=inference_path,
+    )
+
+    def load_prefrozen(model, _path):
+        if model.__name__ == "DiagnosticCalibrationProfile":
+            return SimpleNamespace(probe_evidence_sha256=[policy_digest])
+        if model.__name__ == "DiagnosticInferenceProfile":
+            return SimpleNamespace(model_version=inputs.model_version)
+        return SimpleNamespace()
+
+    monkeypatch.setattr(planning, "load_json_file", load_prefrozen)
+
+    policy, inference = planning._pre_frozen_inputs(design, governed_inputs)
+
+    assert policy is not None and policy.sha256 == policy_digest
+    assert inference is not None
+    assert inference.sha256 == sha256_file(inference_path)

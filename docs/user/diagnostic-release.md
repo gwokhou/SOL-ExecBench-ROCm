@@ -66,8 +66,12 @@ only the archive; the large process roots are not distribution dependencies.
 
 ## Publishing to GitHub
 
-Release publishing uses a draft-first pattern. The operator attaches the
-archive and attestation to a draft GitHub Release bound to a source tag:
+Release publishing uses a draft-first pattern. The diagnostic workflow accepts
+only the fixed conformance tag
+`diagnostic-lifecycle-p0-conformance-v1` and the fixed production tag
+`gfx1200-diagnostics-v7-production-v1`; each tag maps to its declared evidence
+purpose. The two attached assets must be named exactly `<tag>.tar.zst` and
+`<tag>.attestation.json`:
 
 ```bash
 gh release create <tag> \
@@ -88,3 +92,17 @@ The self-hosted GPU runner remains a collection producer and never receives
 durable `contents: write` release authority. Only the GitHub-hosted release job
 scopes `contents: write`, and only after tag/revision and checksum
 verification.
+
+After the workflow publishes the release, ingest the remote state into the
+local lifecycle store. Ingestion independently checks the fixed tag/purpose
+mapping, published (non-draft) state, exact two-asset inventory, tag target,
+workflow identity, asset hashes, archive verification, and attestation before
+persisting the published-release receipt:
+
+```bash
+sol-execbench --format json diagnostics release ingest-published \
+  --repository <owner/repository> \
+  --tag gfx1200-diagnostics-v7-production-v1 \
+  --purpose production \
+  --store-root data/store
+```

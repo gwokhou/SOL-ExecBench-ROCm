@@ -125,6 +125,7 @@ class DiagnosticDesignManifest(CurrentDiagnosticLifecycleManifest):
     )
     universe_start: int = Field(ge=0)
     design_payload_sha256: SHA256Digest
+    vram_policy_sha256: SHA256Digest | None = None
 
 
 class DiagnosticCollectionRunManifest(CurrentDiagnosticLifecycleManifest):

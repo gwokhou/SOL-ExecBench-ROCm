@@ -44,6 +44,10 @@ from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
+def _exclude_none(value: object) -> bool:
+    return value is None
+
+
 class DiagnosticRunStageState(FrozenArtifactModel):
     """Progress recorded for one stage of a lifecycle run."""
 
@@ -111,6 +115,16 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
     purpose: DiagnosticEvidencePurpose
     model_version: str = Field(min_length=1)
     max_attempts: int = Field(ge=1, le=10)
+    vram_policy_path: str | None = Field(default=None, exclude_if=_exclude_none)
+    vram_policy: DiagnosticLifecycleArtifact | None = Field(
+        default=None, exclude_if=_exclude_none
+    )
+    frozen_inference_profile_path: str | None = Field(
+        default=None, exclude_if=_exclude_none
+    )
+    frozen_inference_profile: DiagnosticLifecycleArtifact | None = Field(
+        default=None, exclude_if=_exclude_none
+    )
 
     @model_validator(mode="after")
     def _identities_are_canonical(self) -> DiagnosticLifecyclePlan:
@@ -130,6 +144,14 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
             raise ValueError("lifecycle plan references cross purpose domains")
         if self.roles != ("held_out",):
             raise ValueError("production lifecycle collection is held-out only")
+        if (self.vram_policy_path is None) != (self.vram_policy is None):
+            raise ValueError("VRAM policy path and artifact must be paired")
+        if (self.frozen_inference_profile_path is None) != (
+            self.frozen_inference_profile is None
+        ):
+            raise ValueError(
+                "frozen inference path and artifact must be paired"
+            )
         if self.purpose is DiagnosticEvidencePurpose.PRODUCTION:
             require_complete_gpu_identity(
                 self.gpu_identity,
@@ -167,6 +189,14 @@ def diagnostic_lifecycle_plan_payload(
     payload = plan.model_dump(mode="json", exclude={"plan_id"})
     if plan.gpu_identity is None:
         payload.pop("gpu_identity", None)
+    for field in (
+        "vram_policy_path",
+        "vram_policy",
+        "frozen_inference_profile_path",
+        "frozen_inference_profile",
+    ):
+        if getattr(plan, field) is None:
+            payload.pop(field, None)
     return payload
 
 

@@ -37,6 +37,7 @@ _METRICS = (
     ("memory_byte_per_ms", "256KiB", 4000.0, "byte/ms"),
     ("memory_byte_per_ms", "16MiB", 3000.0, "byte/ms"),
     ("memory_byte_per_ms", "256MiB", 2000.0, "byte/ms"),
+    ("memory_byte_per_ms", "512MiB", 1900.0, "byte/ms"),
     ("memory_byte_per_ms", "contiguous", 2000.0, "byte/ms"),
     ("memory_byte_per_ms", "transpose", 1000.0, "byte/ms"),
     ("lds_byte_per_ms", "normal", 8000.0, "byte/ms"),
@@ -218,6 +219,28 @@ def test_calibration_metric_parser_and_frozen_parameter_build() -> None:
         <= parameter.confidence_interval[1]
         for parameter in parameters
     )
+
+
+def test_calibration_uses_frozen_512_mib_policy_tier() -> None:
+    held_out = [
+        ProbeBatch(
+            phase="parameter_estimation_after_configuration_freeze",
+            process_batch=index,
+            mode="all",
+            metrics=_metrics(1.0 + index * 0.01),
+            clocks_locked=True,
+        )
+        for index in range(5)
+    ]
+    frozen = {**_FROZEN, "vram_variant": "512MiB"}
+
+    parameter = next(
+        item
+        for item in build_calibration_parameters(held_out, frozen)
+        if item.name == "vram_byte_per_ms"
+    )
+
+    assert parameter.applicability == (64.0 * 2**20, 512.0 * 2**20)
 
 
 def test_calibration_requires_five_independent_process_batches() -> None:

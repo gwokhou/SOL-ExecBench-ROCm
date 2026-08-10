@@ -21,6 +21,7 @@ from sol_execbench.core.bench.performance_model.models import (
     CalibrationSurfaceName,
     CalibrationUnit,
 )
+from sol_execbench.core.bench.performance_model.vram_policy import MIB
 
 METRIC_PREFIX = "METRIC "
 BOOTSTRAP_REPLICATES = 10_000
@@ -82,8 +83,16 @@ def parse_probe_metrics(output: str) -> list[MetricSample]:
     return metrics
 
 
+_VRAM_VARIANT_BYTES = {
+    "256MiB": 256 * MIB,
+    "512MiB": 512 * MIB,
+}
+
+
 def freeze_probe_configuration(
     tuning: Sequence[ProbeBatch],
+    *,
+    vram_variant: str = "256MiB",
 ) -> dict[str, str]:
     """Select tuning variants before independent held-out collection."""
     if not tuning or any(
@@ -91,10 +100,14 @@ def freeze_probe_configuration(
     ):
         raise ValueError("tuning evidence must be locked and tuning-only")
     grouped = _group_values(tuning)
+    if vram_variant not in _VRAM_VARIANT_BYTES:
+        raise ValueError(
+            f"unsupported VRAM calibration variant: {vram_variant}"
+        )
     return {
         "wmma_variant": _best_variant(grouped, "wmma_flop_per_ms"),
         "reduction_variant": _best_variant(grouped, "reduction_op_per_ms"),
-        "vram_variant": "256MiB",
+        "vram_variant": vram_variant,
         "l2_variant": "256KiB",
         "l3_variant": "16MiB",
     }
@@ -136,7 +149,10 @@ def build_calibration_parameters(
             variant=frozen["vram_variant"],
             target_name=CalibrationParameterName.VRAM_BYTE_PER_MS,
             expected_unit=CalibrationUnit.BYTE_PER_MS,
-            applicability=(64.0 * 2**20, 256.0 * 2**20),
+            applicability=(
+                64.0 * 2**20,
+                float(_VRAM_VARIANT_BYTES[frozen["vram_variant"]]),
+            ),
             applicability_dimension=(ApplicabilityDimension.WORKING_SET_BYTES),
         ),
         _parameter(

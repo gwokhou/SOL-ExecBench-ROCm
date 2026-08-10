@@ -39,11 +39,18 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
+    GpuLifecycleIdentity,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     designs_dir,
     runs_dir,
     snapshots_dir,
+)
+from sol_execbench.core.bench.performance_model.models import (
+    DiagnosticCalibrationProfile,
+)
+from sol_execbench.core.bench.performance_model.vram_policy import (
+    DiagnosticVRAMWorkingSetPolicy,
 )
 from sol_execbench.core.data.json_utils import load_json_file
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
@@ -69,6 +76,8 @@ class LifecyclePlanInputs:
     output_root: Path
     model_version: str
     max_attempts: int
+    vram_policy_path: Path | None = None
+    frozen_inference_profile_path: Path | None = None
 
 
 def _artifact(path: Path, *, relative_path: str) -> DiagnosticLifecycleArtifact:
@@ -170,18 +179,11 @@ def _finalize_plan(
     )
 
 
-def _build_plan(
-    *,
-    root: Path,
+def _plan_gpu_identity(
     inputs: LifecyclePlanInputs,
     design: DiagnosticDesignManifest,
-    design_path: Path,
-    snapshot: DiagnosticCorpusSnapshotManifest,
-    snapshot_path: Path,
-    source: GitSourceState,
-) -> DiagnosticLifecyclePlan:
-    collection, inventory, held_out = _collection_inputs(inputs, design)
-    generation = _next_generation(root, design.stage_id)
+    collection: Path,
+) -> GpuLifecycleIdentity:
     gpu_identity = load_calibration_gpu_identity(
         inputs.calibration_profile_path,
         inputs.calibration_audit_path,
@@ -197,6 +199,25 @@ def _build_plan(
         )
         if collected_gpu != gpu_identity:
             raise ValueError("collection/calibration GPU identity mismatch")
+    return gpu_identity
+
+
+def _build_plan(
+    *,
+    root: Path,
+    inputs: LifecyclePlanInputs,
+    design: DiagnosticDesignManifest,
+    design_path: Path,
+    snapshot: DiagnosticCorpusSnapshotManifest,
+    snapshot_path: Path,
+    source: GitSourceState,
+) -> DiagnosticLifecyclePlan:
+    collection, inventory, held_out = _collection_inputs(inputs, design)
+    generation = _next_generation(root, design.stage_id)
+    gpu_identity = _plan_gpu_identity(inputs, design, collection)
+    policy_artifact, frozen_inference_artifact = _pre_frozen_inputs(
+        design, inputs
+    )
     run_id = collection_run_id(
         design_id=design.stage_id,
         generation=generation,
@@ -236,8 +257,68 @@ def _build_plan(
         purpose=design.purpose,
         model_version=inputs.model_version,
         max_attempts=inputs.max_attempts,
+        vram_policy_path=(
+            str(inputs.vram_policy_path.resolve())
+            if inputs.vram_policy_path is not None
+            else None
+        ),
+        vram_policy=policy_artifact,
+        frozen_inference_profile_path=(
+            str(inputs.frozen_inference_profile_path.resolve())
+            if inputs.frozen_inference_profile_path is not None
+            else None
+        ),
+        frozen_inference_profile=frozen_inference_artifact,
     )
     return _finalize_plan(provisional)
+
+
+def _pre_frozen_inputs(
+    design: DiagnosticDesignManifest,
+    inputs: LifecyclePlanInputs,
+) -> tuple[
+    DiagnosticLifecycleArtifact | None, DiagnosticLifecycleArtifact | None
+]:
+    from sol_execbench.core.bench.performance_model.inference import (
+        DiagnosticInferenceProfile,
+    )
+
+    if design.vram_policy_sha256 is None:
+        if (
+            inputs.vram_policy_path is not None
+            or inputs.frozen_inference_profile_path is not None
+        ):
+            raise ValueError("legacy design cannot acquire pre-frozen inputs")
+        return None, None
+    if (
+        inputs.vram_policy_path is None
+        or inputs.frozen_inference_profile_path is None
+    ):
+        raise ValueError(
+            "capacity-governed design requires policy and frozen inference"
+        )
+    load_json_file(DiagnosticVRAMWorkingSetPolicy, inputs.vram_policy_path)
+    profile = load_json_file(
+        DiagnosticCalibrationProfile, inputs.calibration_profile_path
+    )
+    inference = load_json_file(
+        DiagnosticInferenceProfile, inputs.frozen_inference_profile_path
+    )
+    policy_digest = sha256_file(inputs.vram_policy_path)
+    if (
+        policy_digest != design.vram_policy_sha256
+        or policy_digest not in profile.probe_evidence_sha256
+    ):
+        raise ValueError("design/calibration VRAM policy identity mismatch")
+    if inference.model_version != inputs.model_version:
+        raise ValueError("frozen inference model version mismatch")
+    return (
+        _artifact(inputs.vram_policy_path, relative_path="vram-policy.json"),
+        _artifact(
+            inputs.frozen_inference_profile_path,
+            relative_path="frozen-inference.json",
+        ),
+    )
 
 
 def author_lifecycle_plan(
