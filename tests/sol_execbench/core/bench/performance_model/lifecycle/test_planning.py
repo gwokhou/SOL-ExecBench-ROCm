@@ -271,3 +271,31 @@ def test_capacity_governed_plan_binds_prefrozen_policy_and_inference(
     assert policy is not None and policy.sha256 == policy_digest
     assert inference is not None
     assert inference.sha256 == sha256_file(inference_path)
+
+
+def test_next_generation_counts_precollection_orchestration_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orchestration = tmp_path / "orchestrations" / "failed" / "run.json"
+    atomic_write_json_value(orchestration, {})
+    monkeypatch.setattr(planning, "runs_dir", lambda _root: tmp_path / "runs")
+    monkeypatch.setattr(
+        planning,
+        "orchestrations_dir",
+        lambda _root: tmp_path / "orchestrations",
+    )
+    monkeypatch.setattr(
+        planning,
+        "load_json_file",
+        lambda model, _path: (
+            SimpleNamespace(
+                design_id=_DESIGN_ID,
+                generation=3,
+            )
+            if model.__name__ == "DiagnosticRunManifest"
+            else pytest.fail(f"unexpected model {model}")
+        ),
+    )
+
+    assert planning._next_generation(tmp_path, _DESIGN_ID) == 4

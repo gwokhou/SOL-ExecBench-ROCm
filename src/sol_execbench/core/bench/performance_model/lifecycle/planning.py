@@ -34,6 +34,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticLifecyclePlan,
+    DiagnosticRunManifest,
     diagnostic_lifecycle_plan_payload,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
@@ -43,6 +44,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.shared import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     designs_dir,
+    orchestrations_dir,
     runs_dir,
     snapshots_dir,
 )
@@ -113,6 +115,10 @@ def _next_generation(root: Path, design_id: str) -> int:
         manifest = load_json_file(DiagnosticCollectionRunManifest, path)
         if any(parent.stage_id == design_id for parent in manifest.parents):
             generations.append(manifest.generation)
+    for path in sorted(orchestrations_dir(root).glob("*/run.json")):
+        run = load_json_file(DiagnosticRunManifest, path)
+        if run.design_id == design_id:
+            generations.append(run.generation)
     return max(generations, default=0) + 1
 
 
