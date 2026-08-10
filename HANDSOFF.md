@@ -1,8 +1,9 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-10 against the live checkout rooted at `87854dfd`, the
-ignored evidence/store, the remote P0 Release metadata, and the exact
-start-340 acceptance exposure boundary.
+Last audited: 2026-08-10 against production lifecycle source revision
+`46042836a59404dc158c3a0fa693f03d071b7685`, the live ignored evidence/store,
+the remote P0 conformance Release metadata, and both exact production
+acceptance exposure boundaries.
 
 This file records unresolved repository-level work, the decisions that
 constrain it, and the evidence that closed the lifecycle production-topology
@@ -147,6 +148,42 @@ completed investigations and one-time inventories belong in Git history.
   reviewed source diff. The conservative statistical unit is a family: replace
   all 20 elementwise cases, while the 200 cases in the ten unexposed and
   source-unaffected families may be reused by exact artifact identity.
+- The capacity-governed start-400 successor closed that elementwise gap on the
+  real RX 9060 XT/gfx1200 host without changing acceptance thresholds. Frozen
+  VRAM policy SHA-256
+  `99dff937b6aad9fec415af52abd488eb567766b6753b811bd33b8e3f81646639`
+  classifies observed total physical memory `17095983104` bytes as the 16 GiB
+  class and binds a `[64 MiB, 512 MiB]` applicability interval; runtime free
+  memory is not an input. Design
+  `fa543e236dea1163adb0b4dfd3588d0e28ac8648ae50b9b129dccdaa565171bb`
+  passed static, 34-case canary, and 220-case full qualification. All 20 fresh
+  elementwise cases were formally collected and received SOLAR manifests. The
+  exact reviewed composition replaced those 20 and reused 200 unaffected
+  start-340 cases; held-out SHA-256 is
+  `bf727aa62dda511ab988b21416a1e08867be166faaad2208e21f6f461d1a9fa7`
+  and the revision-bound reuse-manifest SHA-256 is
+  `1e96962b0b15a012bfd2ac6ba259f40abf8c0712b39f0a2065ff9029be9e8cdf`.
+  The development-only inference profile was frozen before this held-out
+  collection and reproduced byte-identically at model build with SHA-256
+  `f0b3dd95341cf85745b086584e34fd304f09c14c9e3adbeb8cefa5847512caa4`.
+- Production lifecycle generation 3 is run
+  `70f28d3986cd7275a7ae7c62921202da6b0b123fd7a533edfbddacdab10ab7f0`
+  with plan ID
+  `f3419a343dfd680d25dc9f8127d5c6a244b427ceff930cdf119a72f3add4cee4`.
+  DESIGN, CALIBRATION, COLLECTION_RUN, CORPUS_SNAPSHOT, and MODEL_BUILD are
+  verified; held-out snapshot is
+  `7934902da596447a06b9f35fac709e28b872fef219d8af097824e244e83aa860`
+  and model build is
+  `d89d5e6bf6be390362b11ed1dbe1af3bbf1d40c3c06e79f2983f69cccdec7865`.
+  ACCEPTANCE stopped before a verdict at `held_out-indexed_read-14` with
+  `calibration_out_of_range:indexed_read`. No acceptance result, metric,
+  publication, tag, GitHub production Release, or published-release receipt
+  exists. A mistaken overlapping operator resume created two exposure receipts
+  for the same case/reason and prefix; both are retained, with SHA-256
+  `33d6ecc64c2c49dbbaf69259c33a286a7418f3bc41c36cdf1ca12cc4016b3766`
+  and `eeb77c226f20b01664511b39ccdb382d3373b9ed94e5f1717c54b6b69ae0fc69`.
+  Neither contains metric fields or a verdict, and the run must not be resumed
+  for its remaining attempt.
 - `7424243e` records the two lifecycle harness fixes with non-mocked
   regression tests (a 220-case blob-backed corpus for the identity loader and
   an inventory ordering test for the file/directory prefix collision). The full
@@ -181,13 +218,12 @@ completed investigations and one-time inventories belong in Git history.
   non-verified stage (`next_stage=corpus_snapshot`) instead of incorrectly
   jumping to `model_build`. The completed conformance authority remains run
   `c96d65d534bdfe51ac23b0fda026721a614fa6f3e03388fa1ca3da533a922096`.
-- P0 closure did not authorize Cycle 3 acceptance or publication. The complete
-  end-to-end run described below has purpose `control_plane_conformance`; the
-  production registry objects are the three historical source snapshots, their
-  promoted development snapshot, and the start-100/start-160/start-220 designs.
-  The failed start-220 collection is retained process evidence. A new
-  pair-disjoint successor design and collection are required before a
-  production acceptance verdict can exist.
+- P0 closure did not itself authorize production acceptance or publication.
+  The complete end-to-end run described below has purpose
+  `control_plane_conformance`; it remains proof of the mechanism, not a score or
+  production diagnostic release. The later start-340 and start-400 production
+  attempts are retained separately. Start-400 reached model build but stopped
+  pre-verdict as recorded above, so no production publication authority exists.
 - Do not remove `microarchitecture-diagnostics-v7/` or
   `microarchitecture-diagnostics-v7-cycle2/` merely because CAS import
   completed. Expanded source-tree retirement still requires a reviewed path
@@ -316,148 +352,78 @@ did not run GPU qualification, collection, GC apply, or deletion.
 
 ## Active backlog
 
-### P1 — Open a successor after terminal Cycle 3 collection failure
+### P1 — Open a successor for the indexed-read calibration gap
 
-Status (2026-08-10): the representative start-340 corpus cannot itself receive
-an acceptance verdict under the development calibration, but its entire
-220-case raw collection is no longer blanket-invalidated. Lifecycle run
-`9128fa06bef3acaa55b592deb5888b1e0a6e625769c5991d4a9f43694bb84c44` verified
-DESIGN/CALIBRATION/COLLECTION_RUN/CORPUS_SNAPSHOT/MODEL_BUILD, then
-ACCEPTANCE stopped pre-verdict with `calibration_out_of_range:working_set_bytes`:
-start-340 representative elementwise working sets (≈145–389 MB) exceed the
-hardcoded VRAM applicability `[64 MiB, 256 MiB]` (`calibration.py:139`), and
-the development-derived calibration does not cover them. This is an honest
-held-out generalization finding; forcing acceptance by widening the
-calibration, re-collecting, or excluding the revealed cases is refused as
-post-reveal tuning. The exact receipt releases only the elementwise boundary;
-it does not release acceptance metrics for the other ten families. The item
-remains open for a governed composed successor: freeze the new calibration and
-policy first, collect a fresh 20-case elementwise replacement fragment, and
-reuse the other 200 start-340 cases only if an exact base-to-target diff review
-proves their raw and derived evidence paths unaffected. Any affected family is
-added to the replacement set. See the "Current state" entries above.
+The start-400 capacity policy and fresh elementwise stratum are complete, but
+production publication is still blocked. Generation 3 stopped pre-verdict on
+`held_out-indexed_read-14` because its indexed-read point is outside the frozen
+calibration domain. This is an honest generalization failure. Do not resume the
+run, widen the existing calibration, exclude the case, or change acceptance
+thresholds after this reveal. Tag `gfx1200-diagnostics-v7-production-v1` is
+reserved but must not be created until a later immutable run records
+`accepted=true` and completes external receipt ingestion.
 
-The production-topology P0 is closed, but Cycle 3 cannot reach acceptance. Its
-failed case is canonical Trace `478a2d6990f188c89f719d8b5215f9d8ade32d3707a7cd6680640df304611772`
-with collection-log SHA-256
-`fb40ebd6a9df4148dc56406d002b5fdba1ecf94b57d4bdda8e60a8af66c13236`
-and partial performance-evidence SHA-256
-`489a02851671e968a4db959c4d4905f0d06d7bd9a2192ffa5c1b459b3735c9bf`.
-The failure is deterministic, not a retryable sandbox or profiler incident.
-HEAD rejects any such design before GPU collection and has
-focused regression coverage; it also implements the mandatory three-gate
-qualification chain described above. The gates have passed CPU/static and
-simulated-evaluator regression tests. Real static, canary, and full-role
-qualification receipts exist for the isolated representative start-340 repair.
-Two earlier canary attempts stopped before GPU: direct host execution was
-rejected for lacking isolation, then the Docker matrix rejected an unvalidated
-`not_tested` target. Their logs remain intact. The successful historical runs
-used the repository's explicit non-authoritative smoke route and grant no
-benchmark, score, acceptance, or publication authority. Because HEAD changed
-the bound collector and source revision, the existing three-gate chain now
-fails closed and admits no collection. No exploratory collection has started;
-this does not mutate the frozen start-220 payload.
-
-Do not force, skip, repair, or resume the Cycle 3 tree. The next production
-attempt must not reuse prior inference or acceptance artifacts, tune after
-held-out reveal, change gates to admit a failure, or reuse any pair in a
-replacement family. Reusing content-identical cases in an unexposed,
-diff-unaffected family is allowed only through the governed reuse manifest;
-path copying or an operator assertion is not evidence.
+The exposure boundary is now larger than the earlier elementwise-only
+boundary. The durable receipt lists 134 evaluated IDs before the stopping case:
+all 20 cases in elementwise, transpose, reduction_norm, matmul, softmax, and
+cross_entropy, followed by indexed_read 00 through 13; indexed_read 14 is the
+released stopping case. Under the family-level replacement policy, those seven
+families are tainted. A successor therefore needs at least 140 fresh cases and
+may reuse at most the 80 cases in indexed_update, composite_graph,
+transformer_block, and concurrent_graph, subject to an exact source-diff review.
+Any additional diff-affected family also moves into the replacement set.
 
 Required sequence:
 
-1. Reverify and reuse the existing blob-backed 880-case development snapshot
-   `892be3337f6bf126c7d432208264a7a93120fa4a328e02afb66e82703c7db18a`
-   and its three source parents. Current production plan authoring accepts this
-   immutable object through `--development-snapshot-id`; do not repeat
-   promotion unless a source or governing policy actually changes, and never
-   attribute this snapshot to the fresh held-out collection run.
-2. Confirm the collection host exactly matches the frozen calibration object:
-   RX 9060 XT/gfx1200 GPU `a3ff7590-0000-1000-800f-a29c1cca1511`, BDF
-   `0000:03:00.0`, ROCm 7.2.0, compiler
-   `HIP version: 7.2.26015-fc0010cf6a`, the complete ordered PCIe path and
-   effective link, locked clocks, and `stable_peak` power. Every collected case
-   must bind the same pre/post topology. Any mismatch requires a new governed
-   calibration and inference fit.
-3. Fit and freeze a current-schema v10 inference profile for the v7 corpus from
-   the promoted development snapshot. Rebuild every cited development case;
-   unavailable hardware prediction is a hard failure. Freeze the forward VRAM
-   calibration/design policy before generating replacement held-out inputs.
-4. Register and qualify a fresh design for the replacement stratum. After the
-   three qualification gates pass, formally collect counters only for the 20
-   elementwise replacement cases. Freeze that family as a typed fragment.
-   Compose it with the exact start-340 source corpus and exposure receipt. The
-   case-reuse manifest must exactly cover `git diff --name-status` between the
-   collection and target revisions, replace every exposure- or diff-affected
-   family, prove replacement pair disjointness, and bind all 220 final artifact
-   identities. With the current exposure scope this is 20 fresh + 200 reused,
-   not a mandatory 220-case counter rerun. If review finds global impact, the
-   replacement set expands up to all 220 rather than weakening the gate.
-5. Run acceptance once and commit the terminal verdict. Retain and stop on
-   `accepted=false`; only `accepted=true` may create a publication and release.
-6. For an accepted verdict, publish through the same lineage and ingest the
-   external published-release receipt before treating publication as complete.
-7. Use registry reachability to decide whether historical v7 path trees and
-   expanded staging directories are reclaimable.
+1. Retain generation 3, both exposure receipts, and all verified predecessor
+   stages as immutable process evidence. Do not use its final unused attempt.
+2. Before authoring another held-out design, characterize and freeze an
+   indexed-read calibration domain that covers the independently selected
+   successor design, or constrain that design to the already characterized
+   domain. This must use development/calibration data only.
+3. Freeze a new inference profile before collecting or inspecting successor
+   held-out evidence. Register a pair-disjoint successor design and pass the
+   complete static/canary/full qualification chain on the exact collector and
+   source revision.
+4. Collect and build SOLAR for every case in the seven exposed families. Reuse
+   any of the other four families only through a manifest whose impact review
+   exactly matches `git diff --name-status --find-renames`, proves no raw or
+   derived impact, and revalidates every artifact identity.
+5. Run acceptance once. Preserve `accepted=false` or another precondition
+   failure as terminal evidence. Only `accepted=true` may proceed through local
+   publication/release, draft GitHub Release verification, hosted workflow
+   publication, and published-release receipt ingestion.
 
-Acceptance requires at least 90% empirical interval coverage per family, median
-APE at most 15%, P90 APE at most 30%, and at least one code-changing action with
-at least 10 held-out positives, 90% precision, and 70% recall.
-`restore_wmma_path` is the only currently supported code-changing candidate;
-historical development quality does not substitute for held-out acceptance.
+The acceptance thresholds remain unchanged: at least 90% interval coverage per
+family, median APE at most 15%, P90 APE at most 30%, and at least one enabled
+code-changing action with at least 10 held-out positives, 90% precision, and
+70% recall. Historical development quality does not substitute for held-out
+acceptance.
 
-Authoritative surfaces:
+### P1 — Author and validate a separate MI300X capacity policy
 
-- `docs/user/GPU-QUALIFICATION.md`
-- `src/sol_execbench/core/bench/batch_gpu_qualification.py`
-- `docs/performance-diagnostics.md`
-- `src/sol_execbench/core/bench/performance_model/`
-- `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
-- `scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py`
+The current total-memory selection algorithm intentionally admits only
+gfx1200 8 GiB and 16 GiB classes. It rejects gfx942/MI300X rather than scaling
+the 512 MiB RDNA4 probe tier to a 192 GB accelerator. That fail-closed behavior
+is correct, but it leaves MI300X as explicit external hardware debt; current
+gfx1200 evidence is not CDNA3 evidence.
 
-### P1 — Define the VRAM calibration working-set policy for future successors
-
-The VRAM throughput tier is characterized and capped at a narrow working-set
-range. `calibration.py:139` hardcodes the `vram_byte_per_ms` applicability at
-`[64 MiB, 256 MiB]`, and the memory probe
-(`src/sol_execbench/data/hardware_calibration_probes/diagnostic_microarchitecture.hip`)
-sweeps working-set windows of only `[0, 2 MiB]`, `[2 MiB, 64 MiB]`, and
-`[64 MiB, 128 MiB]`. The start-340 successor revealed the consequence:
-representative memory-bound elementwise neighborhoods have working sets of
-roughly `145–389 MiB`, which exceed the applicability ceiling, so the model
-returns `calibration_out_of_range:working_set_bytes` and the held-out
-acceptance hard-fails (`unavailable hardware prediction is a hard failure`).
-
-This is a forward-looking calibration policy decision, not a defect to patch
-onto a revealed held-out set. Before the next successor attempt (the still-open
-P1 item above), decide and ship one governed contract:
-
-1. widen the VRAM applicability and the memory probe sweep so the characterized
-   range covers the largest memory-bound working set any governed successor
-   design may produce (physically justified: VRAM bandwidth is approximately
-   constant for L3-oversiding working sets, so a wider characterization
-   reflects the same regime, not a different one), with real re-measured
-   probes; or
-2. bound governed successor designs so every memory-bound family's working set
-   stays within the existing `[64 MiB, 256 MiB]` applicability, and emit an
-   exact unsupported reason at design-freeze when a case would exceed it.
-
-Either route must be developed and frozen independently, before the next
-held-out reveal. It must NOT be applied retroactively to start-340: widening
-the calibration, re-collecting, or excluding the revealed elementwise cases
-after the start-340 acceptance failure would be forbidden post-reveal tuning.
-Completion evidence must name the chosen policy, the new applicability/probe
-range (or the design bound), and the pre-reveal calibration run that
-characterizes it.
+Closure requires a separately versioned CDNA3 policy authored before any
+held-out design. It must bind observed total physical HBM, the exact gfx942
+device and software identity, topology/isolation, a physically justified probe
+working set and applicability range, and real MI300X qualification/calibration
+receipts. Runtime free memory, a simple capacity ratio, simulator results, or
+schema-only tests are insufficient. The policy must fail closed for unknown
+MI300X capacity/configuration variants and must not change the existing gfx1200
+digest semantics or release boundary.
 
 Authoritative surfaces:
 
+- `src/sol_execbench/core/bench/performance_model/vram_policy.py`
 - `src/sol_execbench/core/bench/performance_model/calibration.py`
-- `src/sol_execbench/core/bench/performance_model/prediction.py` (`_memory_parameter`)
+- `src/sol_execbench/core/bench/performance_model/prediction.py`
 - `src/sol_execbench/data/hardware_calibration_probes/diagnostic_microarchitecture.hip`
 - `scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py`
-- `scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py`
 
 ### P1 — Expand empirical hardware and isolation coverage
 
