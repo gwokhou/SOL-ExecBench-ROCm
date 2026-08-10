@@ -1,7 +1,8 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-10 against `3ca6a542`, the live ignored evidence/store,
-and the remote P0 Release metadata.
+Last audited: 2026-08-10 against `7424243e`, the live ignored evidence/store,
+the remote P0 Release metadata, and the start-340 lifecycle acceptance
+hard-failure (coverage, not a harness defect).
 
 This file records unresolved repository-level work, the decisions that
 constrain it, and the evidence that closed the lifecycle production-topology
@@ -104,6 +105,55 @@ completed investigations and one-time inventories belong in Git history.
   `qualification gate identity drift`. The old gates are retained real GPU
   process evidence, but they no longer admit collection. Any future use of
   start-340 requires a new isolated current-HEAD static/canary/full chain.
+- A new isolated current-HEAD start-340 chain was produced at revision
+  `7424243e`, which first closes two lifecycle harness gaps that had blocked
+  the production plan: `load_collection_gpu_identity` now resolves blob-backed
+  held-out corpus references through the lifecycle blob store (it previously
+  required path-backed evidence, but `freeze` records immutable corpora as
+  blob-backed), and `inventory_regular_tree` now sorts by relative-path string
+  to match the run-state validator (path-object ordering disagreed with string
+  ordering for a regular file that prefixes a sibling directory, e.g.
+  `solar.log` beside `solar/`). With those fixes, the fresh chain passed:
+  static gate `73acd0d15ce8ab7568ad3e65b768e5b683d91c3bf90aea016e0aa01b8dfa1f1f`,
+  canary gate `c40c2051eb2fcac715ff57fffcdb48b0eb2ab83086b446fada05d7b166d845e1`
+  (34 extrema, all `PASSED`), and full gate
+  `291a2814fc6fc58e719100232c959a3465d2b062e8628d121130c73ba9f2db6a` (220
+  held-out workloads, all `PASSED`), binding collector
+  `4850a4cd953d7fb7df02fad460cb55cb65eda7e21ab5c9b15bf9dfed82a93975`. All 220
+  held-out cases were then collected in container isolation (one transient
+  partial counter pass on `held_out-transformer_block-17` was re-collected to
+  `available`), SOLAR manifests generated, and the corpus frozen (held-out
+  corpus snapshot `65754cb308612387bf72dce0ab44d3c9c03d9d681a6b08afae105c2a02047425`).
+  A current-schema calibration pair was produced on the same host.
+- Lifecycle run
+  `9128fa06bef3acaa55b592deb5888b1e0a6e625769c5991d4a9f43694bb84c44`
+  (generation 2, development snapshot `892be333`, design `634dee74`) executed
+  DESIGN, CALIBRATION, COLLECTION_RUN, CORPUS_SNAPSHOT, and MODEL_BUILD, all
+  `verified` (held-out snapshot
+  `d33a3dd0bc8ef8688f955ab4336e10e4e6d5fde20370f396e4a280682a600642`).
+  ACCEPTANCE then hard-failed after three attempts with
+  `calibration_out_of_range:working_set_bytes` on `held_out-elementwise`.
+  This is an honest, terminal coverage finding, not a repairable harness
+  defect: the start-340 representative elementwise neighborhoods have working
+  sets of roughly 145–389 MB, while `calibration.py:139` hardcodes the VRAM
+  throughput applicability at `[64 MiB, 256 MiB]`. The promoted development
+  snapshot derives from the start-100/160/220 corpus, whose elementwise cases
+  are far smaller, so the development-fit calibration does not cover the
+  start-340 held-out elementwise regime and the model cannot predict those
+  cases. The held-out acceptance surfaced this generalization gap exactly as
+  designed (`unavailable hardware prediction is a hard failure`). Widening the
+  calibration applicability, re-collecting, or excluding the revealed
+  elementwise cases would constitute post-reveal tuning and is refused; the
+  start-340 successor is therefore retained as terminal coverage-hard-failure
+  process evidence and is not acceptance-viable against the development
+  calibration. A future viable attempt requires a new governed successor whose
+  working-set range a separately developed, pre-reveal calibration policy
+  covers, with a fresh held-out design; it must not reuse the start-340 pairs.
+- HEAD `7424243e` records the two lifecycle harness fixes with non-mocked
+  regression tests (a 220-case blob-backed corpus for the identity loader and
+  an inventory ordering test for the file/directory prefix collision). The full
+  test suite (2403 passed, 23 skipped) and the repository gates pass except
+  the standing `check_non_canonical_artifacts.py` five-v2-historical boundary.
 - The production-topology lifecycle P0 closed on 2026-08-09. Historical v7 and
   Cycle 2 evidence was imported into the content-addressed store without GPU
   recomputation, then promoted as an 880-case, three-parent production snapshot
@@ -269,6 +319,24 @@ did not run GPU qualification, collection, GC apply, or deletion.
 ## Active backlog
 
 ### P1 — Open a successor after terminal Cycle 3 collection failure
+
+Status (2026-08-10, HEAD `7424243e`): a full isolated successor attempt on the
+representative start-340 design reached a terminal coverage hard-failure and
+is NOT acceptance-viable. The lifecycle run
+`9128fa06bef3acaa55b592deb5888b1e0a6e625769c5991d4a9f43694bb84c44` verified
+DESIGN/CALIBRATION/COLLECTION_RUN/CORPUS_SNAPSHOT/MODEL_BUILD, then
+ACCEPTANCE hard-failed with `calibration_out_of_range:working_set_bytes`:
+start-340 representative elementwise working sets (≈145–389 MB) exceed the
+hardcoded VRAM applicability `[64 MiB, 256 MiB]` (`calibration.py:139`), and
+the development-derived calibration does not cover them. This is an honest
+held-out generalization finding; forcing acceptance by widening the
+calibration, re-collecting, or excluding the revealed cases is refused as
+post-reveal tuning. start-340 is retained as terminal process evidence. The
+item remains open for a NEW governed successor whose working-set range a
+separately developed pre-reveal calibration policy covers (fresh held-out
+pairs; do not reuse start-340's revealed pairs). See the "Current state"
+start-340 entries above for the full chain and the two lifecycle harness
+fixes shipped at `7424243e`.
 
 The production-topology P0 is closed, but Cycle 3 cannot reach acceptance. Its
 failed case is canonical Trace `478a2d6990f188c89f719d8b5215f9d8ade32d3707a7cd6680640df304611772`
