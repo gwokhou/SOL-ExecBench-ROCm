@@ -80,7 +80,10 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument(
-        "--family", choices=tuple(item.value for item in collector.FAMILIES)
+        "--family",
+        action="append",
+        default=[],
+        choices=tuple(item.value for item in collector.FAMILIES),
     )
     parser.add_argument("--source-corpus", type=Path)
     parser.add_argument("--replacement-fragment", type=Path)
@@ -103,13 +106,28 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _freeze_fragment(root: Path, family: WorkloadKind, output: Path) -> None:
-    """Freeze one fully evidenced held-out family without freezing 220 cases."""
+def _freeze_fragment(
+    root: Path,
+    families: tuple[WorkloadKind, ...],
+    output: Path,
+) -> None:
+    """Freeze fully evidenced held-out families as one exact fragment."""
     if output.exists():
         raise ValueError(f"refusing to overwrite held-out fragment: {output}")
+    if not families:
+        raise ValueError("freeze-fragment requires --family")
+    selected = frozenset(families)
+    if len(selected) != len(families):
+        raise ValueError("freeze-fragment families must be unique")
+    ordered_families = tuple(
+        family for family in collector.FAMILIES if family in selected
+    )
+    if len(ordered_families) != len(families):
+        raise ValueError("freeze-fragment contains an unsupported family")
     design = collector._require_frozen_design(root)
     cases = [
         collector._validation_case(root, case)
+        for family in ordered_families
         for case in collector._cases("held_out", design.universe_start)
         if case.family is family
     ]
@@ -325,11 +343,9 @@ def main() -> int:
     """Run one exposure, fragment-freeze, or corpus-composition stage."""
     arguments = _parse_args()
     if arguments.stage == "freeze-fragment":
-        if arguments.family is None:
-            raise ValueError("freeze-fragment requires --family")
         _freeze_fragment(
             arguments.root.resolve(),
-            WorkloadKind(arguments.family),
+            tuple(WorkloadKind(item) for item in arguments.family),
             arguments.output.resolve(),
         )
     elif arguments.stage == "compose-held-out":

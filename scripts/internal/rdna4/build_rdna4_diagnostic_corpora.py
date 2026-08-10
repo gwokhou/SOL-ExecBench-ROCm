@@ -144,6 +144,7 @@ SUCCESSOR_MATMUL_ROWS_START = 257
 SUCCESSOR_MATMUL_ROWS_STRIDE = 4
 REPRESENTATIVE_SUCCESSOR_START = 340
 CAPACITY_GOVERNED_SUCCESSOR_START = 400
+EXPOSURE_REPLACEMENT_SUCCESSOR_START = 460
 _TRANSFORMER_REALISM_NEIGHBORHOODS: tuple[
     tuple[int, tuple[int, int, int, int]], ...
 ] = (
@@ -182,6 +183,25 @@ _CAPACITY_GOVERNED_TRANSFORMER_NEIGHBORHOODS: tuple[
     (896, (892, 894, 898, 900)),
     (1024, (1013, 1014, 1015, 1018)),
 )
+_EXPOSURE_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS: tuple[
+    tuple[int, tuple[int, int, int, int]], ...
+] = (
+    (32, (26, 27, 37, 38)),
+    (64, (58, 59, 69, 70)),
+    (77, (71, 82, 83, 84)),
+    (96, (90, 91, 101, 102)),
+    (128, (122, 123, 133, 134)),
+    (192, (183, 185, 186, 187)),
+    (197, (206, 207, 209, 210)),
+    (256, (250, 251, 261, 262)),
+    (384, (378, 379, 389, 390)),
+    (512, (502, 503, 505, 507)),
+    (577, (562, 564, 588, 590)),
+    (640, (634, 635, 645, 646)),
+    (768, (762, 763, 773, 774)),
+    (896, (890, 891, 901, 902)),
+    (1024, (1011, 1012, 1020, 1022)),
+)
 TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _TRANSFORMER_REALISM_NEIGHBORHOODS
@@ -191,6 +211,28 @@ CAPACITY_GOVERNED_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _CAPACITY_GOVERNED_TRANSFORMER_NEIGHBORHOODS
     for sequence in neighborhood
+)
+EXPOSURE_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
+    sequence
+    for _, neighborhood in _EXPOSURE_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS
+    for sequence in neighborhood
+)
+_TRANSFORMER_REALISM_SCHEDULES = (
+    (
+        REPRESENTATIVE_SUCCESSOR_START,
+        _TRANSFORMER_REALISM_NEIGHBORHOODS,
+        TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS,
+    ),
+    (
+        CAPACITY_GOVERNED_SUCCESSOR_START,
+        _CAPACITY_GOVERNED_TRANSFORMER_NEIGHBORHOODS,
+        CAPACITY_GOVERNED_TRANSFORMER_SEQUENCE_LENGTHS,
+    ),
+    (
+        EXPOSURE_REPLACEMENT_SUCCESSOR_START,
+        _EXPOSURE_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS,
+        EXPOSURE_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS,
+    ),
 )
 _TEMPLATE_AXIS_CONTRACTS: tuple[tuple[WorkloadKind, str, int, int], ...] = (
     (WorkloadKind.SOFTMAX, "N", 1, SOFTMAX_MAXIMUM_COLUMNS),
@@ -407,17 +449,7 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
 
 
 def _representative_transformer_sequence(global_index: int) -> int:
-    schedules = (
-        (
-            REPRESENTATIVE_SUCCESSOR_START,
-            TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS,
-        ),
-        (
-            CAPACITY_GOVERNED_SUCCESSOR_START,
-            CAPACITY_GOVERNED_TRANSFORMER_SEQUENCE_LENGTHS,
-        ),
-    )
-    for start, sequences in schedules:
+    for start, _, sequences in _TRANSFORMER_REALISM_SCHEDULES:
         offset = global_index - start
         if 0 <= offset < len(sequences):
             return sequences[offset]
@@ -1025,16 +1057,11 @@ def _qualification_contract(root: Path) -> str:
             "problems": problems,
             "template_axis_contracts": contracts,
             "transformer_realism_neighborhoods": {
-                str(REPRESENTATIVE_SUCCESSOR_START): [
+                str(start): [
                     {"anchor": anchor, "sequences": sequences}
-                    for anchor, sequences in _TRANSFORMER_REALISM_NEIGHBORHOODS
-                ],
-                str(CAPACITY_GOVERNED_SUCCESSOR_START): [
-                    {"anchor": anchor, "sequences": sequences}
-                    for anchor, sequences in (
-                        _CAPACITY_GOVERNED_TRANSFORMER_NEIGHBORHOODS
-                    )
-                ],
+                    for anchor, sequences in neighborhoods
+                ]
+                for start, neighborhoods, _ in _TRANSFORMER_REALISM_SCHEDULES
             },
         }
     )
