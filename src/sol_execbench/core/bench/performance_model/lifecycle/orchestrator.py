@@ -23,6 +23,10 @@ from typing import TYPE_CHECKING, Protocol, TypedDict, runtime_checkable
 from pydantic import TypeAdapter
 
 if TYPE_CHECKING:
+    from sol_execbench.core.bench.performance_model.acceptance import (
+        DiagnosticAcceptanceManifest,
+        DiagnosticAcceptanceResult,
+    )
     from sol_execbench.core.bench.performance_model.builder import (
         SemanticCharacterizationLoader,
     )
@@ -34,6 +38,13 @@ if TYPE_CHECKING:
         SolarManifestProjector,
     )
 
+from sol_execbench.core.bench.performance_model.case_reuse import (
+    EXPOSURE_RECEIPT_NAME,
+    AcceptancePreconditionError,
+    DiagnosticAcceptanceExposureReceipt,
+    load_and_verify_case_reuse_bundle,
+    persist_acceptance_exposure,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.blob_store import (
     BlobStore,
 )
@@ -302,10 +313,11 @@ class CollectionRunHandler:
             context.corpus_root, context.plan.collection_inventory
         ):
             raise ValueError("collection inventory differs from reviewed plan")
-        _required(
+        held_out = _required(
             context.held_out_corpus_path,
             "collection run is missing frozen held-out corpus",
         )
+        load_and_verify_case_reuse_bundle(held_out)
         if not _collection_gpu_identity_matches_plan(context):
             raise ValueError(
                 "collection GPU identity differs from reviewed plan"
@@ -335,9 +347,13 @@ class CollectionRunHandler:
         """Re-check that the collected evidence tree still exists."""
         if context.corpus_root is None:
             return False
-        return verify_regular_tree_inventory(
-            context.corpus_root, receipt.output_inventory
-        ) and _collection_gpu_identity_matches_plan(context)
+        return (
+            verify_regular_tree_inventory(
+                context.corpus_root, receipt.output_inventory
+            )
+            and _collection_gpu_identity_matches_plan(context)
+            and _case_reuse_bundle_is_valid(context)
+        )
 
 
 def _collection_gpu_identity_matches_plan(context: StageRunContext) -> bool:
@@ -353,6 +369,17 @@ def _collection_gpu_identity_matches_plan(context: StageRunContext) -> bool:
     except (OSError, ValueError):
         return False
     return observed == context.plan.gpu_identity
+
+
+def _case_reuse_bundle_is_valid(context: StageRunContext) -> bool:
+    path = context.held_out_corpus_path
+    if path is None:
+        return False
+    try:
+        load_and_verify_case_reuse_bundle(path)
+    except (OSError, ValueError):
+        return False
+    return True
 
 
 class CalibrationHandler:
@@ -579,10 +606,6 @@ class AcceptanceHandler:
 
     def run(self, context: StageRunContext) -> StageCompletion:
         """Run held-out acceptance and record its manifest and result."""
-        from sol_execbench.core.bench.performance_model.authoring import (
-            build_diagnostic_acceptance,
-        )
-
         development = _required(
             context.development_corpus_path,
             "acceptance requires --development-corpus",
@@ -599,17 +622,9 @@ class AcceptanceHandler:
             context.output(DiagnosticLifecycleStage.MODEL_BUILD),
             "acceptance requires the model-build inference profile",
         )
-        root = _require_output_root(context) / "acceptance"
-        root.mkdir(parents=True, exist_ok=True)
-        manifest_output = root / "acceptance-manifest.json"
-        result_output = root / "acceptance.json"
-        manifest, result = build_diagnostic_acceptance(
-            development_corpus_path=development,
-            held_out_corpus_path=held_out,
-            calibration_profile_path=calibration,
-            inference_profile_path=inference,
-            semantic_loader=self._semantic_loader,
-            blob_resolver=self._blob_resolver,
+        load_and_verify_case_reuse_bundle(held_out)
+        manifest_output, result_output, manifest, result = self._build_outputs(
+            context, development, held_out, calibration, inference
         )
         atomic_write_json_value(
             manifest_output,
@@ -647,6 +662,76 @@ class AcceptanceHandler:
             stage_id=stage_id,
             outputs=outputs,
             output_paths=(manifest_output, result_output),
+        )
+
+    def _build_outputs(
+        self,
+        context: StageRunContext,
+        development: Path,
+        held_out: Path,
+        calibration: Path,
+        inference: Path,
+    ) -> tuple[
+        Path,
+        Path,
+        DiagnosticAcceptanceManifest,
+        DiagnosticAcceptanceResult,
+    ]:
+        """Build acceptance outputs or persist the exact precondition leak."""
+        from sol_execbench.core.bench.performance_model.authoring import (
+            build_diagnostic_acceptance,
+        )
+
+        root = _require_output_root(context) / "acceptance"
+        root.mkdir(parents=True, exist_ok=True)
+        try:
+            manifest, result = build_diagnostic_acceptance(
+                development_corpus_path=development,
+                held_out_corpus_path=held_out,
+                calibration_profile_path=calibration,
+                inference_profile_path=inference,
+                semantic_loader=self._semantic_loader,
+                blob_resolver=self._blob_resolver,
+            )
+        except AcceptancePreconditionError as error:
+            self._record_exposure(context, held_out, root, error)
+            raise
+        return (
+            root / "acceptance-manifest.json",
+            root / "acceptance.json",
+            manifest,
+            result,
+        )
+
+    @staticmethod
+    def _record_exposure(
+        context: StageRunContext,
+        held_out: Path,
+        root: Path,
+        error: AcceptancePreconditionError,
+    ) -> None:
+        """Persist the pre-verdict release as content-addressed evidence."""
+        receipt = DiagnosticAcceptanceExposureReceipt(
+            purpose=context.purpose,
+            run_id=context.collection_run_id,
+            held_out_corpus_sha256=sha256_file(held_out),
+            source_revision=context.source_revision,
+            evaluated_case_ids_before_failure=(
+                error.evaluated_case_ids_before_failure
+            ),
+            released_case_id=error.case_id,
+            released_workload_kind=error.workload_kind,
+            released_reason_codes=error.reason_codes,
+            created_at=_now(),
+        )
+        exposure_output = root / EXPOSURE_RECEIPT_NAME
+        atomic_write_json_value(
+            exposure_output, receipt.model_dump(mode="json")
+        )
+        error.bind_exposure_receipt(
+            persist_acceptance_exposure(
+                receipt, exposure_output, context.store_root
+            )
         )
 
     def prepare(
@@ -1379,6 +1464,8 @@ def _execute_stage(
                 error.failure_code,
                 error,
             )
+            if error.terminal:
+                return current
             continue
         current = _replace_stage(
             running,
@@ -1410,10 +1497,15 @@ class _StageAttemptError(ValueError):
     """One classified failure raised while completing a stage attempt."""
 
     def __init__(
-        self, failure_code: DiagnosticAttemptFailureCode, detail: str
+        self,
+        failure_code: DiagnosticAttemptFailureCode,
+        detail: str,
+        *,
+        terminal: bool = False,
     ) -> None:
         super().__init__(detail)
         self.failure_code = failure_code
+        self.terminal = terminal
 
 
 def _complete_stage_attempt(
@@ -1434,6 +1526,16 @@ def _complete_stage_attempt(
     try:
         completion = handler.run(context)
         _import_completion_outputs(context, completion)
+    except AcceptancePreconditionError as error:
+        if stage is DiagnosticLifecycleStage.ACCEPTANCE:
+            raise _StageAttemptError(
+                DiagnosticAttemptFailureCode.STAGE_EXECUTION_ERROR,
+                str(error),
+                terminal=True,
+            ) from error
+        raise _StageAttemptError(
+            DiagnosticAttemptFailureCode.STAGE_EXECUTION_ERROR, str(error)
+        ) from error
     except (OSError, ValueError) as error:
         raise _StageAttemptError(
             DiagnosticAttemptFailureCode.STAGE_EXECUTION_ERROR, str(error)

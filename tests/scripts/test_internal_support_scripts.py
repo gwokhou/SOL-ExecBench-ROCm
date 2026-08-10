@@ -236,6 +236,28 @@ def test_rdna4_diagnostic_corpus_design_is_preregistered_and_stratified(
     assert previous.isdisjoint(case.workload_uuid for case in all_cases)
 
 
+def test_rdna4_reuse_control_plane_is_separate_from_collector(
+    load_script,
+) -> None:
+    reuse = load_script(
+        "scripts/internal/rdna4/manage_rdna4_diagnostic_reuse.py"
+    )
+
+    assert reuse.collector.__file__.endswith(
+        "build_rdna4_diagnostic_corpora.py"
+    )
+    assert reuse._git_change_identity("M\tHANDSOFF.md") == (
+        "modified",
+        None,
+        "HANDSOFF.md",
+    )
+    assert reuse._git_change_identity("R100\told.py\tnew.py") == (
+        "renamed",
+        "old.py",
+        "new.py",
+    )
+
+
 def test_rdna4_diagnostic_preregistration_is_immutable(
     load_script,
     tmp_path: Path,

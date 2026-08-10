@@ -270,8 +270,11 @@ leaderboard result. See `docs/user/diagnostic-release.md` for the full contract
 and the draft-first GitHub Release workflow.
 
 Only after those CPU gates pass and inference plus action thresholds are frozen
-may the operator collect or inspect the new 220 held-out cases. The exact local
-readiness evidence and remaining GPU work are tracked in `HANDSOFF.md`.
+may the operator collect or inspect new held-out cases. A wholly new corpus is
+220 cases; a governed successor to a pre-verdict failure may instead collect
+only exposure- or diff-affected families under the reuse contract below. The
+exact local readiness evidence and remaining GPU work are tracked in
+`HANDSOFF.md`.
 
 The current corpus contract derives each pair ID from the evidence-bound
 workload SHA-256 and candidate SHA-256. Authoring re-derives that identity,
@@ -409,6 +412,82 @@ cases per family (220 total), at least 90% empirical interval coverage in every
 family, median absolute percentage error at most 15%, P90 at most 30%, and at
 least one enabled code-changing action metric. Every enabled action requires at
 least 10 held-out positives, at least 90% precision, and at least 70% recall.
+
+### Pre-verdict exposure and case reuse
+
+An unavailable prediction stops acceptance before a verdict. It writes no
+acceptance result and releases no metric fields. The lifecycle records a typed
+`precondition_failed` exposure receipt containing only the evaluated case-ID
+prefix, the stopping case/family, and reason codes. This is distinct from a
+completed `accepted=false` verdict. The receipt is imported into CAS and the
+immutable `acceptance-exposures/<run-id>/` registry, so store consistency and GC
+retain the failure boundary.
+
+Historical attempts can be currentized without rerunning acceptance:
+
+```bash
+uv run python scripts/internal/rdna4/manage_rdna4_diagnostic_reuse.py \
+  record-exposure \
+  --root SOURCE_COLLECTION_ROOT \
+  --attempt data/store/attempts/RUN_ID/acceptance/0001.json \
+  --held-out-corpus SOURCE_COLLECTION_ROOT/held_out.json \
+  --released-case-id held_out-elementwise-01 \
+  --reason-code calibration_out_of_range:working_set_bytes \
+  --source-revision COLLECTION_REVISION \
+  --output EXPOSURE.json
+```
+
+Freshness is exposure- and impact-scoped, not age-scoped. The current policy
+uses a family as the smallest statistical replacement unit: an exposed case
+taints its 20-case family. A source change that affects raw collection or
+derived diagnostics must list every affected family; those families are also
+replaced. Unaffected families may reuse exact evidence identities even across a
+version change. Any omitted diff path, reused pair in a replacement family,
+hash drift, wrong family count, or unreviewed affected family fails closed.
+
+After a separately frozen successor design has passed its required
+qualification gates, collect counters and build SOLAR only for each replacement
+family, then freeze a typed fragment:
+
+```bash
+uv run python scripts/internal/rdna4/manage_rdna4_diagnostic_reuse.py \
+  freeze-fragment \
+  --root REPLACEMENT_COLLECTION_ROOT \
+  --family elementwise \
+  --output REPLACEMENT_COLLECTION_ROOT/elementwise-fragment.json
+```
+
+The impact review is a sorted JSON list that exactly matches
+`git diff --name-status --find-renames BASE TARGET`. Each entry records
+`path`, optional `previous_path`, `change`, both impact booleans, exact
+`affected_families`, and a rationale. A documentation-only path has both
+booleans false and an empty family list; a change affecting only elementwise
+raw collection names `affected_families: ["elementwise"]`.
+
+Compose the final 220-case corpus without rewriting either source:
+
+```bash
+uv run python scripts/internal/rdna4/manage_rdna4_diagnostic_reuse.py \
+  compose-held-out \
+  --root REPLACEMENT_COLLECTION_ROOT \
+  --source-corpus SOURCE_COLLECTION_ROOT/held_out.json \
+  --replacement-fragment REPLACEMENT_COLLECTION_ROOT/elementwise-fragment.json \
+  --exposure-receipt EXPOSURE.json \
+  --impact-review IMPACT_REVIEW.json \
+  --base-source-revision BASE \
+  --target-source-revision TARGET \
+  --replace-family elementwise \
+  --output COMPOSED_COLLECTION_ROOT
+```
+
+The output bundle contains canonical copies of the source corpus, replacement
+fragment, and exposure receipt, plus `held_out.json` and
+`case-reuse-manifest.json`. Lifecycle plan authoring and collection adoption
+reverify the whole bundle and require the selected lifecycle design to be the
+exact design cited by the replacement fragment. With one tainted family,
+exactly 20 cases are fresh and 200 are reused. This saves formal counter
+collection; it does not waive the forward calibration decision, qualification
+prerequisites, exact GPU identity, or the one-shot acceptance thresholds.
 
 The overlap surface stores measured `resource_mix` points, not broad bins.
 Prediction uses piecewise-linear interpolation only inside the measured

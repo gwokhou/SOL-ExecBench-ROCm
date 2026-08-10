@@ -1,8 +1,8 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-10 against `7424243e`, the live ignored evidence/store,
-the remote P0 Release metadata, and the start-340 lifecycle acceptance
-hard-failure (coverage, not a harness defect).
+Last audited: 2026-08-10 against the live checkout rooted at `87854dfd`, the
+ignored evidence/store, the remote P0 Release metadata, and the exact
+start-340 acceptance exposure boundary.
 
 This file records unresolved repository-level work, the decisions that
 constrain it, and the evidence that closed the lifecycle production-topology
@@ -131,25 +131,23 @@ completed investigations and one-time inventories belong in Git history.
   DESIGN, CALIBRATION, COLLECTION_RUN, CORPUS_SNAPSHOT, and MODEL_BUILD, all
   `verified` (held-out snapshot
   `d33a3dd0bc8ef8688f955ab4336e10e4e6d5fde20370f396e4a280682a600642`).
-  ACCEPTANCE then hard-failed after three attempts with
-  `calibration_out_of_range:working_set_bytes` on `held_out-elementwise`.
-  This is an honest, terminal coverage finding, not a repairable harness
-  defect: the start-340 representative elementwise neighborhoods have working
-  sets of roughly 145–389 MB, while `calibration.py:139` hardcodes the VRAM
-  throughput applicability at `[64 MiB, 256 MiB]`. The promoted development
-  snapshot derives from the start-100/160/220 corpus, whose elementwise cases
-  are far smaller, so the development-fit calibration does not cover the
-  start-340 held-out elementwise regime and the model cannot predict those
-  cases. The held-out acceptance surfaced this generalization gap exactly as
-  designed (`unavailable hardware prediction is a hard failure`). Widening the
-  calibration applicability, re-collecting, or excluding the revealed
-  elementwise cases would constitute post-reveal tuning and is refused; the
-  start-340 successor is therefore retained as terminal coverage-hard-failure
-  process evidence and is not acceptance-viable against the development
-  calibration. A future viable attempt requires a new governed successor whose
-  working-set range a separately developed, pre-reveal calibration policy
-  covers, with a fresh held-out design; it must not reuse the start-340 pairs.
-- HEAD `7424243e` records the two lifecycle harness fixes with non-mocked
+  ACCEPTANCE stopped before a verdict after three historical retry attempts,
+  each on `calibration_out_of_range:working_set_bytes`. This is now represented
+  as `precondition_failed`, not `accepted=false`: no acceptance result or
+  aggregate/error/action metric was written. The durable exposure receipt
+  records that `held_out-elementwise-00` was evaluated before the stop and that
+  `held_out-elementwise-01` plus the unavailable-reason code were released.
+  Receipt SHA-256 is
+  `1eb56872a70776f5770fffcdc8157ef428032dc7551df3c4695a6b9478effff3`;
+  it is registered under `data/store/acceptance-exposures/` and retained by GC.
+  The cause remains real: start-340 elementwise working sets are roughly
+  145–389 MB, outside the `[64 MiB, 256 MiB]` calibration applicability.
+  However, this does not logically invalidate raw counters from all eleven
+  families. Reuse is now decided from the exact exposure receipt and an exact,
+  reviewed source diff. The conservative statistical unit is a family: replace
+  all 20 elementwise cases, while the 200 cases in the ten unexposed and
+  source-unaffected families may be reused by exact artifact identity.
+- `7424243e` records the two lifecycle harness fixes with non-mocked
   regression tests (a 220-case blob-backed corpus for the identity loader and
   an inventory ordering test for the file/directory prefix collision). The full
   test suite (2403 passed, 23 skipped) and the repository gates pass except
@@ -320,23 +318,24 @@ did not run GPU qualification, collection, GC apply, or deletion.
 
 ### P1 — Open a successor after terminal Cycle 3 collection failure
 
-Status (2026-08-10, HEAD `7424243e`): a full isolated successor attempt on the
-representative start-340 design reached a terminal coverage hard-failure and
-is NOT acceptance-viable. The lifecycle run
+Status (2026-08-10): the representative start-340 corpus cannot itself receive
+an acceptance verdict under the development calibration, but its entire
+220-case raw collection is no longer blanket-invalidated. Lifecycle run
 `9128fa06bef3acaa55b592deb5888b1e0a6e625769c5991d4a9f43694bb84c44` verified
 DESIGN/CALIBRATION/COLLECTION_RUN/CORPUS_SNAPSHOT/MODEL_BUILD, then
-ACCEPTANCE hard-failed with `calibration_out_of_range:working_set_bytes`:
+ACCEPTANCE stopped pre-verdict with `calibration_out_of_range:working_set_bytes`:
 start-340 representative elementwise working sets (≈145–389 MB) exceed the
 hardcoded VRAM applicability `[64 MiB, 256 MiB]` (`calibration.py:139`), and
 the development-derived calibration does not cover them. This is an honest
 held-out generalization finding; forcing acceptance by widening the
 calibration, re-collecting, or excluding the revealed cases is refused as
-post-reveal tuning. start-340 is retained as terminal process evidence. The
-item remains open for a NEW governed successor whose working-set range a
-separately developed pre-reveal calibration policy covers (fresh held-out
-pairs; do not reuse start-340's revealed pairs). See the "Current state"
-start-340 entries above for the full chain and the two lifecycle harness
-fixes shipped at `7424243e`.
+post-reveal tuning. The exact receipt releases only the elementwise boundary;
+it does not release acceptance metrics for the other ten families. The item
+remains open for a governed composed successor: freeze the new calibration and
+policy first, collect a fresh 20-case elementwise replacement fragment, and
+reuse the other 200 start-340 cases only if an exact base-to-target diff review
+proves their raw and derived evidence paths unaffected. Any affected family is
+added to the replacement set. See the "Current state" entries above.
 
 The production-topology P0 is closed, but Cycle 3 cannot reach acceptance. Its
 failed case is canonical Trace `478a2d6990f188c89f719d8b5215f9d8ade32d3707a7cd6680640df304611772`
@@ -361,8 +360,10 @@ this does not mutate the frozen start-220 payload.
 
 Do not force, skip, repair, or resume the Cycle 3 tree. The next production
 attempt must not reuse prior inference or acceptance artifacts, tune after
-held-out reveal, change gates, exclude revealed failures, or reuse a held-out
-pair.
+held-out reveal, change gates to admit a failure, or reuse any pair in a
+replacement family. Reusing content-identical cases in an unexposed,
+diff-unaffected family is allowed only through the governed reuse manifest;
+path copying or an operator assertion is not evidence.
 
 Required sequence:
 
@@ -380,15 +381,19 @@ Required sequence:
    must bind the same pre/post topology. Any mismatch requires a new governed
    calibration and inference fit.
 3. Fit and freeze a current-schema v10 inference profile for the v7 corpus from
-   the promoted development snapshot. Rebuild every cited case; unavailable
-   hardware prediction is a hard failure.
-4. Register a fresh successor design whose complete generated workload set is
-   statically checked against every packaged candidate contract before freeze.
-   Complete `qualify-static`, `qualify-canary --role held_out`, and
-   `qualify-full --role held_out` into an isolated qualification root. Verify
-   the parent/hash chain, then collect and freeze 220 new held-out cases—20 for
-   each of eleven families—without reusing a Cycle 3 pair or inspecting partial
-   performance results.
+   the promoted development snapshot. Rebuild every cited development case;
+   unavailable hardware prediction is a hard failure. Freeze the forward VRAM
+   calibration/design policy before generating replacement held-out inputs.
+4. Register and qualify a fresh design for the replacement stratum. After the
+   three qualification gates pass, formally collect counters only for the 20
+   elementwise replacement cases. Freeze that family as a typed fragment.
+   Compose it with the exact start-340 source corpus and exposure receipt. The
+   case-reuse manifest must exactly cover `git diff --name-status` between the
+   collection and target revisions, replace every exposure- or diff-affected
+   family, prove replacement pair disjointness, and bind all 220 final artifact
+   identities. With the current exposure scope this is 20 fresh + 200 reused,
+   not a mandatory 220-case counter rerun. If review finds global impact, the
+   replacement set expands up to all 220 rather than weakening the gate.
 5. Run acceptance once and commit the terminal verdict. Retain and stop on
    `accepted=false`; only `accepted=true` may create a publication and release.
 6. For an accepted verdict, publish through the same lineage and ingest the

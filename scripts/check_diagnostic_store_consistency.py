@@ -18,6 +18,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Final
 
+from sol_execbench.core.bench.performance_model.case_reuse import (
+    DiagnosticAcceptanceExposureReceipt,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.artifact_tree import (
     DiagnosticArtifactTreeManifest,
 )
@@ -48,6 +51,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     lifecycle_plan_path,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
+    acceptance_exposures_dir,
     acceptances_dir,
     attempts_dir,
     builds_dir,
@@ -340,6 +344,24 @@ def _check_attempt(root: Path, attempt_path: Path) -> list[str]:
     return findings
 
 
+def _check_exposure(root: Path, path: Path) -> list[str]:
+    try:
+        receipt = DiagnosticAcceptanceExposureReceipt.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as error:
+        return [f"unreadable acceptance exposure {path}: {error}"]
+    digest = sha256_file(path)
+    findings: list[str] = []
+    if path.parent.name != receipt.run_id:
+        findings.append(f"{path}: directory does not match run_id")
+    if path.stem != digest:
+        findings.append(f"{path}: filename does not match receipt digest")
+    if not _blob_exists(root, digest):
+        findings.append(f"{path}: exposure receipt is missing from CAS")
+    return findings
+
+
 def _check_published_release(root: Path, receipt_path: Path) -> list[str]:
     try:
         receipt = DiagnosticPublishedRelease.model_validate_json(
@@ -415,6 +437,7 @@ def check_store(root: Path) -> list[str]:
             calibrations_dir(root),
             builds_dir(root),
             acceptances_dir(root),
+            acceptance_exposures_dir(root),
             publication_registry_dir(root),
             releases_dir(root),
             orchestrations_dir(root),
@@ -440,6 +463,10 @@ def check_store(root: Path) -> list[str]:
         findings.extend(_check_receipt(root, receipt_path))
     for attempt_path in sorted(attempts_dir(root).glob("*/*/*.json")):
         findings.extend(_check_attempt(root, attempt_path))
+    for exposure_path in sorted(
+        acceptance_exposures_dir(root).glob("*/*.json")
+    ):
+        findings.extend(_check_exposure(root, exposure_path))
     published = published_releases_dir(root)
     for entry in sorted(published.iterdir()) if published.is_dir() else ():
         if not entry.is_dir():

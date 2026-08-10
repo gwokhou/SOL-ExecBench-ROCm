@@ -7,6 +7,9 @@ from typing import Any, cast
 
 import pytest
 
+from sol_execbench.core.bench.performance_model.case_reuse import (
+    AcceptancePreconditionError,
+)
 from sol_execbench.core.bench.performance_model.lifecycle import (
     CHAIN,
     BlobStore,
@@ -47,6 +50,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.store import (
     orchestrations_dir,
     snapshots_dir,
 )
+from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 
@@ -215,6 +219,19 @@ class FakeHandler:
         if self.verify_calls <= self.verify_fail_first:
             return False
         return self.verify_result
+
+
+class PreconditionHandler(FakeHandler):
+    """Acceptance handler that exposes one deterministic precondition."""
+
+    def run(self, context: StageRunContext) -> StageCompletion:
+        self.calls += 1
+        self.order.append(self.stage)
+        raise AcceptancePreconditionError(
+            case_id="held_out-elementwise-01",
+            workload_kind=WorkloadKind.ELEMENTWISE,
+            reason_codes=("calibration_out_of_range:working_set_bytes",),
+        )
 
 
 def _handlers(
@@ -447,6 +464,25 @@ def test_exhausted_attempts_mark_failed_and_stop(tmp_path: Path) -> None:
         "stage_execution_error",
     ]
     assert all(len(item.detail) <= 4096 for item in attempts)
+
+
+def test_acceptance_precondition_is_terminal_without_retry(
+    tmp_path: Path,
+) -> None:
+    design_path = _design(tmp_path)
+    order: list[DiagnosticLifecycleStage] = []
+    handler = PreconditionHandler(
+        DiagnosticLifecycleStage.ACCEPTANCE, order=order
+    )
+    handlers = _handlers(order, {DiagnosticLifecycleStage.ACCEPTANCE: handler})
+
+    run_state = _run(design_path, tmp_path, handlers, max_attempts=3)
+
+    acceptance = run_state.stage_state(DiagnosticLifecycleStage.ACCEPTANCE)
+    assert acceptance is not None
+    assert acceptance.status is DiagnosticStageStatus.FAILED
+    assert acceptance.attempts == 1
+    assert handler.calls == 1
 
 
 def test_resume_reruns_stage_with_missing_receipt(tmp_path: Path) -> None:

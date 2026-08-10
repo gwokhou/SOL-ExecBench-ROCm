@@ -8,6 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from sol_execbench.core.bench.performance_model.case_reuse import (
+    load_and_verify_case_reuse_bundle,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.calibration_identity import (
     load_calibration_gpu_identity,
 )
@@ -129,6 +132,7 @@ def _load_registry_inputs(
 
 def _collection_inputs(
     inputs: LifecyclePlanInputs,
+    design: DiagnosticDesignManifest,
 ) -> tuple[
     Path, tuple[DiagnosticLifecycleArtifact, ...], DiagnosticLifecycleArtifact
 ]:
@@ -148,6 +152,12 @@ def _collection_inputs(
     )
     if artifact not in inventory:
         raise ValueError("held-out corpus is absent from collection inventory")
+    reuse = load_and_verify_case_reuse_bundle(inputs.held_out_corpus_path)
+    if (
+        reuse is not None
+        and reuse.replacement_design_sha256 != design.design_payload_sha256
+    ):
+        raise ValueError("reuse fragment differs from lifecycle design")
     return collection, inventory, artifact
 
 
@@ -170,7 +180,7 @@ def _build_plan(
     snapshot_path: Path,
     source: GitSourceState,
 ) -> DiagnosticLifecyclePlan:
-    collection, inventory, held_out = _collection_inputs(inputs)
+    collection, inventory, held_out = _collection_inputs(inputs, design)
     generation = _next_generation(root, design.stage_id)
     gpu_identity = load_calibration_gpu_identity(
         inputs.calibration_profile_path,
