@@ -1,9 +1,9 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-10 against production lifecycle source revision
-`46042836a59404dc158c3a0fa693f03d071b7685`, the live ignored evidence/store,
-the remote P0 conformance Release metadata, and both exact production
-acceptance exposure boundaries.
+Last audited: 2026-08-11 against production lifecycle source revision
+`45b4d87cff65211e64bc1e6036814ed1187e7566`, the live ignored evidence/store,
+the remote P0 conformance Release metadata, both pre-verdict exposure
+boundaries, and the completed start-460 rejection described below.
 
 This file records unresolved repository-level work, the decisions that
 constrain it, and the evidence that closed the lifecycle production-topology
@@ -25,6 +25,23 @@ completed investigations and one-time inventories belong in Git history.
   inference profile v10, lifecycle run v3, BenchmarkConfig v2, reference IPC
   v2, and ROCm event timing v4. Superseded schema readers and migrations are
   intentionally absent.
+- The start-460 successor closed the indexed-read applicability precondition
+  without weakening any gate. Its final calibration SHA-256 is
+  `9573c1235ec59752f2454d9b19c0690a9ed59f9fa002c9b1726d8c2ce2377b3a`;
+  the seven-family replacement fragment is
+  `d4ed38e00dd5b200743fcd7b63e2a6f9083859ae5a6d9c6d0228b9683f743ff3`.
+  The production composer replaced 140 exposed cases and reused 80 unaffected
+  cases, producing held-out corpus
+  `627fe009fe16dd19784406062ab2d488b89d872ca22c719abae8e57e9c32466a`.
+  Lifecycle run
+  `753d91a311eb86622a049ef4b4e7ac15f8dbb16340da3561b2c345f3d05f7147`
+  completed a real 220-case verdict with `accepted=false`. Median APE was
+  13.02%, but P90 APE was 61.65%; several families missed 90% empirical
+  coverage, and `restore_wmma_path` recall was 0.55 against the unchanged 0.70
+  gate. Publication correctly refused the terminal rejection, so no local
+  publication, release candidate, GitHub production Release, tag, or
+  published-release receipt exists. The complete rejected held-out corpus is
+  now exposed and is ineligible for reuse in another acceptance run.
 - The first statistically evaluated gfx1200 v7 cycle failed only the
   preregistered per-family coverage gate. Cycle 2 is immutable source evidence,
   not a repairable acceptance attempt: its held-out reveal exposed a change from
@@ -352,43 +369,41 @@ did not run GPU qualification, collection, GC apply, or deletion.
 
 ## Active backlog
 
-### P1 — Open a successor for the indexed-read calibration gap
+### P1 — Build a fully fresh successor after the start-460 rejection
 
-The start-400 capacity policy and fresh elementwise stratum are complete, but
-production publication is still blocked. Generation 3 stopped pre-verdict on
-`held_out-indexed_read-14` because its indexed-read point is outside the frozen
-calibration domain. This is an honest generalization failure. Do not resume the
-run, widen the existing calibration, exclude the case, or change acceptance
-thresholds after this reveal. Tag `gfx1200-diagnostics-v7-production-v1` is
-reserved but must not be created until a later immutable run records
-`accepted=true` and completes external receipt ingestion.
+The indexed-read calibration gap is closed, but production publication remains
+blocked by the completed start-460 `accepted=false` verdict. This is now a
+model-generalization failure, not a missing-prediction precondition. Do not
+resume the exhausted publication stage, refit against the rejected held-out
+corpus, narrow cases, disable the action, or change acceptance thresholds.
+Tag `gfx1200-diagnostics-v7-production-v1` remains reserved and must not be
+created until a later immutable run records `accepted=true` and completes
+external receipt ingestion.
 
-The exposure boundary is now larger than the earlier elementwise-only
-boundary. The durable receipt lists 134 evaluated IDs before the stopping case:
-all 20 cases in elementwise, transpose, reduction_norm, matmul, softmax, and
-cross_entropy, followed by indexed_read 00 through 13; indexed_read 14 is the
-released stopping case. Under the family-level replacement policy, those seven
-families are tainted. A successor therefore needs at least 140 fresh cases and
-may reuse at most the 80 cases in indexed_update, composite_graph,
-transformer_block, and concurrent_graph, subject to an exact source-diff review.
-Any additional diff-affected family also moves into the replacement set.
+Because acceptance released aggregate, family, error, and action metrics for
+all 220 cases, none of the start-460 final corpus may be reused in another
+acceptance. The next inference profile must be fit only from a separately
+frozen development split, and the next verdict must use 220 entirely fresh
+held-out pairs. The authored start-520 policy provides one 660-case universe:
+point-fit, conformal, and held-out splits are fixed before collection;
+elementwise uses a capacity-bounded stratification inside 64–512 MiB; and the
+transformer family uses a fourth audited neighborhood schedule disjoint from
+starts 100/160/220/280/340/400/460. No start-520 evidence exists yet.
 
 Required sequence:
 
-1. Retain generation 3, both exposure receipts, and all verified predecessor
-   stages as immutable process evidence. Do not use its final unused attempt.
-2. Before authoring another held-out design, characterize and freeze an
-   indexed-read calibration domain that covers the independently selected
-   successor design, or constrain that design to the already characterized
-   domain. This must use development/calibration data only.
-3. Freeze a new inference profile before collecting or inspecting successor
-   held-out evidence. Register a pair-disjoint successor design and pass the
-   complete static/canary/full qualification chain on the exact collector and
-   source revision.
-4. Collect and build SOLAR for every case in the seven exposed families. Reuse
-   any of the other four families only through a manifest whose impact review
-   exactly matches `git diff --name-status --find-renames`, proves no raw or
-   derived impact, and revalidates every artifact identity.
+1. Retain generations 3 and start-460 generation 1, their exposure/rejection
+   records, and every verified predecessor stage as immutable process evidence.
+2. Freeze the final source revision, regenerate the source-bound VRAM policy
+   and complete two-phase calibration, then preregister start 520. Run the exact
+   static/canary/full qualification chain for the development role.
+3. Collect all 440 point-fit/conformal cases in container isolation, build all
+   440 SOLAR manifests, freeze the development corpus, promote it through the
+   registry, and author the inference profile without reading future held-out
+   evidence.
+4. Freeze that inference profile before qualifying or collecting start-520
+   held-out. Then qualify and collect all 220 fresh held-out cases and their
+   SOLAR manifests; do not compose or reuse any prior acceptance case.
 5. Run acceptance once. Preserve `accepted=false` or another precondition
    failure as terminal evidence. Only `accepted=true` may proceed through local
    publication/release, draft GitHub Release verification, hosted workflow

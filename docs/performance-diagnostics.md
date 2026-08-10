@@ -456,6 +456,14 @@ completed `accepted=false` verdict. The receipt is imported into CAS and the
 immutable `acceptance-exposures/<run-id>/` registry, so store consistency and GC
 retain the failure boundary.
 
+A completed `accepted=false` verdict exposes the entire held-out corpus: its
+aggregate, per-family, error, and action metrics are release information even
+though publication is forbidden. Those cases remain immutable rejection
+evidence and cannot be composed into another acceptance corpus. A later model
+iteration must use a separately frozen development split and an entirely fresh,
+pre-registered held-out split; lowering thresholds or selecting cases from the
+rejected metrics is not a successor protocol.
+
 Historical attempts can be currentized without rerunning acceptance:
 
 ```bash

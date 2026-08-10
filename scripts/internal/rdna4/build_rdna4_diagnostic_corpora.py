@@ -145,6 +145,13 @@ SUCCESSOR_MATMUL_ROWS_STRIDE = 4
 REPRESENTATIVE_SUCCESSOR_START = 340
 CAPACITY_GOVERNED_SUCCESSOR_START = 400
 EXPOSURE_REPLACEMENT_SUCCESSOR_START = 460
+FULL_REPLACEMENT_SUCCESSOR_START = 520
+FULL_REPLACEMENT_ELEMENTWISE_ROWS_START = 8_208
+FULL_REPLACEMENT_ELEMENTWISE_ROWS_BLOCK_STRIDE = 1_280
+FULL_REPLACEMENT_ELEMENTWISE_ROWS_POSITION_STRIDE = 128
+FULL_REPLACEMENT_ELEMENTWISE_COLUMNS_START = 1_024
+FULL_REPLACEMENT_ELEMENTWISE_COLUMNS_STRIDE = 32
+FULL_REPLACEMENT_ELEMENTWISE_COLUMN_BUCKETS = 31
 _TRANSFORMER_REALISM_NEIGHBORHOODS: tuple[
     tuple[int, tuple[int, int, int, int]], ...
 ] = (
@@ -202,6 +209,25 @@ _EXPOSURE_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS: tuple[
     (896, (890, 891, 901, 902)),
     (1024, (1011, 1012, 1020, 1022)),
 )
+_FULL_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS: tuple[
+    tuple[int, tuple[int, int, int, int]], ...
+] = (
+    (32, (23, 24, 25, 39)),
+    (64, (55, 57, 71, 73)),
+    (77, (85, 86, 87, 89)),
+    (96, (103, 105, 106, 107)),
+    (128, (119, 121, 135, 137)),
+    (192, (179, 180, 181, 182)),
+    (197, (211, 212, 213, 214)),
+    (256, (246, 247, 249, 263)),
+    (384, (375, 377, 391, 393)),
+    (512, (499, 500, 501, 522)),
+    (577, (558, 594, 596, 598)),
+    (640, (633, 647, 649, 650)),
+    (768, (759, 761, 775, 777)),
+    (896, (887, 889, 903, 905)),
+    (1024, (1005, 1006, 1007, 1009)),
+)
 TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _TRANSFORMER_REALISM_NEIGHBORHOODS
@@ -215,6 +241,11 @@ CAPACITY_GOVERNED_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
 EXPOSURE_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _EXPOSURE_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS
+    for sequence in neighborhood
+)
+FULL_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
+    sequence
+    for _, neighborhood in _FULL_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS
     for sequence in neighborhood
 )
 _TRANSFORMER_REALISM_SCHEDULES = (
@@ -232,6 +263,11 @@ _TRANSFORMER_REALISM_SCHEDULES = (
         EXPOSURE_REPLACEMENT_SUCCESSOR_START,
         _EXPOSURE_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS,
         EXPOSURE_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS,
+    ),
+    (
+        FULL_REPLACEMENT_SUCCESSOR_START,
+        _FULL_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS,
+        FULL_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS,
     ),
 )
 _TEMPLATE_AXIS_CONTRACTS: tuple[tuple[WorkloadKind, str, int, int], ...] = (
@@ -378,8 +414,31 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _full_replacement_elementwise_shape(global_index: int) -> dict[str, int]:
+    """Return one pre-authored capacity-bounded start520 shape."""
+    offset = global_index - FULL_REPLACEMENT_SUCCESSOR_START
+    block, position = divmod(offset, 3)
+    return {
+        "M": FULL_REPLACEMENT_ELEMENTWISE_ROWS_START
+        + FULL_REPLACEMENT_ELEMENTWISE_ROWS_BLOCK_STRIDE * block
+        + FULL_REPLACEMENT_ELEMENTWISE_ROWS_POSITION_STRIDE * position,
+        "N": FULL_REPLACEMENT_ELEMENTWISE_COLUMNS_START
+        + FULL_REPLACEMENT_ELEMENTWISE_COLUMNS_STRIDE
+        * (
+            (11 * block + position)
+            % FULL_REPLACEMENT_ELEMENTWISE_COLUMN_BUCKETS
+        ),
+    }
+
+
 def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
     if family is WorkloadKind.ELEMENTWISE:
+        if (
+            FULL_REPLACEMENT_SUCCESSOR_START
+            <= global_index
+            < FULL_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
+        ):
+            return _full_replacement_elementwise_shape(global_index)
         return {
             "M": 512 + 64 * global_index,
             "N": 768 + 32 * ((17 * global_index) % 40),
