@@ -163,9 +163,33 @@ _TRANSFORMER_REALISM_NEIGHBORHOODS: tuple[
     (896, (893, 895, 897, 899)),
     (1024, (1017, 1019, 1021, 1023)),
 )
+_CAPACITY_GOVERNED_TRANSFORMER_NEIGHBORHOODS: tuple[
+    tuple[int, tuple[int, int, int, int]], ...
+] = (
+    (32, (28, 30, 34, 36)),
+    (64, (60, 62, 66, 68)),
+    (77, (73, 74, 79, 81)),
+    (96, (92, 94, 98, 100)),
+    (128, (124, 126, 130, 132)),
+    (192, (188, 190, 194, 202)),
+    (197, (201, 203, 204, 205)),
+    (256, (252, 254, 258, 260)),
+    (384, (380, 382, 386, 388)),
+    (512, (506, 508, 516, 518)),
+    (577, (566, 572, 580, 586)),
+    (640, (636, 638, 642, 644)),
+    (768, (764, 766, 770, 772)),
+    (896, (892, 894, 898, 900)),
+    (1024, (1013, 1014, 1015, 1018)),
+)
 TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _TRANSFORMER_REALISM_NEIGHBORHOODS
+    for sequence in neighborhood
+)
+CAPACITY_GOVERNED_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
+    sequence
+    for _, neighborhood in _CAPACITY_GOVERNED_TRANSFORMER_NEIGHBORHOODS
     for sequence in neighborhood
 )
 _TEMPLATE_AXIS_CONTRACTS: tuple[tuple[WorkloadKind, str, int, int], ...] = (
@@ -341,14 +365,8 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
         }
     if family is WorkloadKind.TRANSFORMER:
         if global_index >= REPRESENTATIVE_SUCCESSOR_START:
-            offset = global_index - REPRESENTATIVE_SUCCESSOR_START
-            if offset >= len(TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS):
-                raise ValueError(
-                    "transformer representative schedule is not authored "
-                    f"for global index {global_index}"
-                )
             return {
-                "M": TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS[offset],
+                "M": _representative_transformer_sequence(global_index),
                 "N": TRANSFORMER_CHANNELS,
             }
         if global_index >= PAIR_DISJOINT_SUCCESSOR_START:
@@ -386,6 +404,27 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
         "N": 80 + 16 * ((7 * global_index) % 10),
         "K": 64 + 16 * ((3 * global_index) % 13),
     }
+
+
+def _representative_transformer_sequence(global_index: int) -> int:
+    schedules = (
+        (
+            REPRESENTATIVE_SUCCESSOR_START,
+            TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS,
+        ),
+        (
+            CAPACITY_GOVERNED_SUCCESSOR_START,
+            CAPACITY_GOVERNED_TRANSFORMER_SEQUENCE_LENGTHS,
+        ),
+    )
+    for start, sequences in schedules:
+        offset = global_index - start
+        if 0 <= offset < len(sequences):
+            return sequences[offset]
+    raise ValueError(
+        "transformer representative schedule is not authored "
+        f"for global index {global_index}"
+    )
 
 
 def _cases(role: Role, universe_start: int) -> list[CaseSpec]:
@@ -488,13 +527,7 @@ def _validate_transformer_realism(cases: Sequence[CaseSpec]) -> None:
             or case.global_index < REPRESENTATIVE_SUCCESSOR_START
         ):
             continue
-        offset = case.global_index - REPRESENTATIVE_SUCCESSOR_START
-        if offset >= len(TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS):
-            raise ValueError(
-                "transformer representative schedule does not cover "
-                f"{case.case_id}"
-            )
-        expected = TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS[offset]
+        expected = _representative_transformer_sequence(case.global_index)
         if case.axes != {"M": expected, "N": TRANSFORMER_CHANNELS}:
             raise ValueError(
                 f"{case.case_id} violates transformer realism schedule"
@@ -986,10 +1019,18 @@ def _qualification_contract(root: Path) -> str:
             "design_sha256": sha256_file(root / "design.json"),
             "problems": problems,
             "template_axis_contracts": contracts,
-            "transformer_realism_neighborhoods": [
-                {"anchor": anchor, "sequences": sequences}
-                for anchor, sequences in _TRANSFORMER_REALISM_NEIGHBORHOODS
-            ],
+            "transformer_realism_neighborhoods": {
+                str(REPRESENTATIVE_SUCCESSOR_START): [
+                    {"anchor": anchor, "sequences": sequences}
+                    for anchor, sequences in _TRANSFORMER_REALISM_NEIGHBORHOODS
+                ],
+                str(CAPACITY_GOVERNED_SUCCESSOR_START): [
+                    {"anchor": anchor, "sequences": sequences}
+                    for anchor, sequences in (
+                        _CAPACITY_GOVERNED_TRANSFORMER_NEIGHBORHOODS
+                    )
+                ],
+            },
         }
     )
 
