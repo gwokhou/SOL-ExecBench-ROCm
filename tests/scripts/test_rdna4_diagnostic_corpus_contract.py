@@ -214,6 +214,13 @@ def test_full_replacement_successor_is_disjoint_and_capacity_governed(
     assert len(elementwise_working_sets) == 60
     assert min(elementwise_working_sets) >= policy.applicability_min_bytes
     assert max(elementwise_working_sets) <= policy.applicability_max_bytes
+    indexed_update_working_sets = {
+        corpus._capacity_governed_working_set_bytes(case)
+        for case in successor
+        if case.family is corpus.WorkloadKind.INDEXED_UPDATE
+    }
+    assert len(indexed_update_working_sets) == 60
+    assert max(indexed_update_working_sets) <= policy.applicability_max_bytes
     transformer = sorted(
         (
             case
@@ -272,3 +279,30 @@ def test_capacity_policy_rejects_out_of_range_indexed_read(
         match="held_out-indexed_read-00 working_set_bytes=819200000",
     ):
         corpus._validate_design_working_sets(460, policy)
+
+
+def test_capacity_policy_rejects_out_of_range_indexed_update(
+    load_script,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    case = corpus.CaseSpec(
+        phase="held_out",
+        family=corpus.WorkloadKind.INDEXED_UPDATE,
+        index=0,
+        global_index=520,
+        axes={"M": 70_272, "N": 672},
+    )
+    monkeypatch.setattr(corpus, "_all_cases", lambda _start: [case])
+    policy = SimpleNamespace(
+        applicability_min_bytes=64 * 2**20,
+        applicability_max_bytes=512 * 2**20,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="held_out-indexed_update-00 working_set_bytes=567235584",
+    ):
+        corpus._validate_design_working_sets(520, policy)
