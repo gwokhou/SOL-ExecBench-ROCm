@@ -2,7 +2,7 @@ schema_version: sol_execbench.rocprofv3_counter_manifest.v3
 architecture: gfx1200
 rocm_compatibility: "7.2"
 groups:
-  - name: compute_wmma
+  - name: compute_memory_traffic
     counters:
       - metric: waves
         alternatives:
@@ -11,8 +11,6 @@ groups:
         scope: dispatch
         aggregation: sum
         sanity: positive
-  - name: memory_traffic
-    counters:
       - metric: bytes_read
         alternatives:
           - {name: FETCH_SIZE, native_unit: kibibytes, multiplier: 1024}
@@ -27,7 +25,7 @@ groups:
         scope: dispatch
         aggregation: sum
         sanity: non_negative
-  - name: cache
+  - name: cache_lds
     counters:
       - metric: cache_misses
         alternatives:
@@ -47,8 +45,6 @@ groups:
         scope: dispatch
         aggregation: sum
         sanity: non_negative
-  - name: lds
-    counters:
       - metric: lds_bank_conflict_percent
         alternatives:
           - {name: LDSBankConflict, native_unit: percent, multiplier: 1}
