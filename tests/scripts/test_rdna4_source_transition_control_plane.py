@@ -363,6 +363,94 @@ def test_equal_development_selection_excludes_changed_and_held_out(
     assert selected == (development,)
 
 
+def test_case_spec_reconstructs_canonical_multi_axis_identity(
+    load_script,
+) -> None:
+    transition = load_script(
+        "scripts/internal/rdna4/manage_rdna4_source_transition.py"
+    )
+    design = transition.DiagnosticCorpusDesign.model_validate(
+        transition.collector._design_payload(520, _digest(72))
+    )
+    case = next(
+        item for item in design.cases if item.case_id == "point_fit-matmul-00"
+    )
+    canonical_json_case = case.model_copy(
+        update={"axes": dict(sorted(case.axes.items()))}
+    )
+
+    spec = transition._case_spec(canonical_json_case)
+
+    assert spec.axes == case.axes
+    assert spec.workload_uuid == case.workload_uuid
+
+
+def test_control_plane_successor_rejects_experiment_stage(
+    load_script,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    transition = load_script(
+        "scripts/internal/rdna4/manage_rdna4_source_transition.py"
+    )
+    review = SimpleNamespace(
+        base_source_revision="1" * 40,
+        target_source_revision="2" * 40,
+        source_changes=(
+            SourcePathStageImpact(
+                path=(
+                    "scripts/internal/rdna4/manage_rdna4_source_transition.py"
+                ),
+                change="modified",
+                affected_stages=(SourceTransitionStage.RAW_COLLECTION,),
+                rationale="misclassified experiment change",
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        transition,
+        "load_and_verify_source_review",
+        lambda *_args, **_kwargs: review,
+    )
+
+    with pytest.raises(ValueError, match="non-control-plane"):
+        transition._verify_control_plane_successor(
+            tmp_path / "review.json",
+            experiment_revision="1" * 40,
+            head="2" * 40,
+        )
+
+
+def test_reviewed_qualification_uses_experiment_revision_and_restores_head(
+    load_script,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    transition = load_script(
+        "scripts/internal/rdna4/manage_rdna4_source_transition.py"
+    )
+    monkeypatch.setattr(
+        transition.collector,
+        "_source_revision",
+        lambda: "head-revision",
+    )
+    observed: list[str] = []
+    monkeypatch.setattr(
+        transition.collector,
+        "_require_collection_qualification",
+        lambda *_args: observed.append(transition.collector._source_revision()),
+    )
+
+    transition._require_reviewed_collection_qualification(
+        tmp_path / "corpus",
+        tmp_path / "qualification",
+        "experiment-revision",
+    )
+
+    assert observed == ["experiment-revision"]
+    assert transition.collector._source_revision() == "head-revision"
+
+
 def test_equal_case_rebind_rolls_back_when_solar_verification_fails(
     load_script,
     monkeypatch: pytest.MonkeyPatch,
