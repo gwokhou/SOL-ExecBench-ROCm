@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib.resources import as_file, files
 from pathlib import Path
 
 import pytest
@@ -9,9 +10,11 @@ from sol_execbench.core.bench.rocm_profiler.counters import (
     CounterPassCSV,
     build_rocprofv3_counter_command,
     counter_dispatch_sequence_digest,
+    load_counter_manifest,
     parse_and_align_counter_passes,
     parse_available_architectures,
     parse_available_counters,
+    select_counter_groups,
     write_counter_job,
 )
 
@@ -129,6 +132,32 @@ def test_availability_and_controlled_job_formats(tmp_path: Path) -> None:
         "--",
         "python",
         "evaluate.py",
+    ]
+
+
+def test_gfx1200_manifest_selects_hardware_validated_two_passes() -> None:
+    resource = files("sol_execbench.data.rocprofv3_counters").joinpath(
+        "gfx1200_v3.yaml",
+    )
+    available = {
+        "SQ_WAVES_sum",
+        "FETCH_SIZE",
+        "GL2C_EA_WRREQ_64B_sum",
+        "GL2C_MISS_sum",
+        "GL2C_HIT_sum",
+        "LDSBankConflict",
+    }
+
+    with as_file(resource) as manifest_path:
+        groups, missing = select_counter_groups(
+            load_counter_manifest(manifest_path),
+            available,
+        )
+
+    assert missing == []
+    assert groups == [
+        ["SQ_WAVES_sum", "FETCH_SIZE", "GL2C_EA_WRREQ_64B_sum"],
+        ["GL2C_MISS_sum", "GL2C_HIT_sum", "LDSBankConflict"],
     ]
 
 

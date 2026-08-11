@@ -180,7 +180,7 @@ def select_counter_groups(
     manifest: CounterManifest,
     available: Iterable[str],
 ) -> tuple[list[list[str]], list[str]]:
-    """Select one supported alternative per metric in at most four passes."""
+    """Select one supported alternative per hardware-compatible pass."""
     supported = set(available)
     groups: list[list[str]] = []
     missing: list[str] = []
