@@ -135,6 +135,17 @@ def compare_paths_cli(
     envvar="SOLAR_OROJENESIS_HOME",
 )
 @click.option(
+    "--device-stage-lock",
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="Serialize the GPU-dependent stage across parallel SOLAR workers.",
+)
+@click.option(
+    "--device-stage-lock-timeout",
+    type=click.FloatRange(min=0.001),
+    default=14_400.0,
+    show_default=True,
+)
+@click.option(
     "--timeout",
     "timeout_seconds",
     default=14_400.0,
@@ -147,6 +158,8 @@ def analyze_cli(
     device: str,
     backend: str,
     orojenesis_home: Path | None,
+    device_stage_lock: Path | None,
+    device_stage_lock_timeout: float,
     timeout_seconds: float,
 ) -> CliResult:
     """Analyze one gfx1200 workload through an isolated fail-closed worker."""
@@ -157,6 +170,10 @@ def analyze_cli(
         device=device,
         ir_path=IRPath(backend),
         orojenesis_home=(str(orojenesis_home) if orojenesis_home else None),
+        device_stage_lock_path=(
+            str(device_stage_lock.resolve()) if device_stage_lock else None
+        ),
+        device_stage_lock_timeout_seconds=device_stage_lock_timeout,
     )
     try:
         outcome = run_solar_worker(request, timeout_seconds=timeout_seconds)

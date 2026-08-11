@@ -120,6 +120,7 @@ class SchemaVersion(StrEnum):
     ENVIRONMENT_SNAPSHOT = "sol_execbench.environment_snapshot.v2"
     EVALUATOR_CONTRACT = "sol_execbench.evaluator_contract.v6"
     GPU_DEVICE_ISOLATION = "sol_execbench.gpu_device_isolation.v1"
+    NATIVE_COMPILE_CACHE = "sol_execbench.native_compile_cache.v1"
     NO_TRACE_DIAGNOSTICS = "sol_execbench.no_trace_diagnostics.v1"
     OFFICIAL_SCORE_AVAILABILITY = "sol_execbench.official_score_availability.v3"
     PERFORMANCE_ACCESS_EVIDENCE = "sol_execbench.performance_access_evidence.v1"

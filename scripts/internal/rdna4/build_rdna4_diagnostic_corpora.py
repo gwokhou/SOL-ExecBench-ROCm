@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 from collections.abc import Sequence
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
@@ -103,11 +104,23 @@ from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE,
+    ENV_SOL_EXECBENCH_SOURCE_REVISION,
+)
+from sol_execbench.core.scoring.release_environment import (
+    verify_release_source_state,
+)
 from sol_execbench.core.solar_bridge.performance import (
     load_manifest_semantic_characterization,
 )
 from sol_execbench.core.solar_bridge.publication import (
     verified_solar_artifact_paths,
+)
+from sol_execbench.core.solar_bridge.resource_policy import (
+    available_formal_mapper_logical_cpu_count,
+    formal_mapper_job_limit,
+    formal_mapper_thread_count,
 )
 from sol_execbench.driver.problem_packager import ProblemPackager
 
@@ -389,6 +402,12 @@ def _parse_args() -> argparse.Namespace:
         help="Select one exact preregistered case ID.",
     )
     parser.add_argument("--limit", type=int)
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="Parallel SOLAR workers bounded by formal mapper CPU slots.",
+    )
     parser.add_argument("--force", action="store_true")
     parser.add_argument(
         "--source-corpus",
@@ -973,6 +992,7 @@ def _solar_case(
     *,
     force: bool,
     source_corpora: list[Path] | None = None,
+    device_stage_lock: Path | None = None,
 ) -> None:
     case_dir = _case_dir(root, case)
     solar_dir = case_dir / "solar"
@@ -1001,6 +1021,15 @@ def _solar_case(
         "--backend",
         "make_fx_aten",
     ]
+    if device_stage_lock is not None:
+        command.extend(
+            [
+                "--device-stage-lock",
+                str(device_stage_lock),
+                "--device-stage-lock-timeout",
+                "14400",
+            ]
+        )
     _run_logged(command, case_dir / "solar.log")
 
 
@@ -1391,9 +1420,14 @@ def _run_family_qualification(
     )
     _ensure_qualification_workload(root, workload, cases)
     problem = root / "problems" / family.value
+    cache_environment = _compile_cache_environment(root, container_path=True)
     command = [
         str(_REPOSITORY_ROOT / "scripts" / "run_docker.sh"),
         "--allow-untested-target-smoke",
+        "-e",
+        cache_environment[0],
+        "-e",
+        cache_environment[1],
         "--",
         "sol-execbench",
         "--format",
@@ -1689,6 +1723,8 @@ def _collect_case(root: Path, case: CaseSpec, *, force: bool) -> None:
         _remove_trace_artifacts(trace)
     problem = root / "problems" / case.family.value
     command = [
+        "env",
+        *_compile_cache_environment(root),
         "sol-execbench",
         "--format",
         "json",
@@ -1707,6 +1743,26 @@ def _collect_case(root: Path, case: CaseSpec, *, force: bool) -> None:
         "auto",
     ]
     _run_logged(command, case_dir / "collect.log")
+
+
+def _compile_cache_environment(
+    root: Path,
+    *,
+    container_path: bool = False,
+) -> tuple[str, str]:
+    """Bind native build reuse to this exact committed collection source."""
+    revision = _source_revision()
+    verify_release_source_state(
+        _REPOSITORY_ROOT,
+        expected_revision=revision,
+    )
+    cache_root = (root.parent / "compile-cache").resolve()
+    if container_path:
+        cache_root = _container_output_path(cache_root)
+    return (
+        f"{ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE}={cache_root}",
+        f"{ENV_SOL_EXECBENCH_SOURCE_REVISION}={revision}",
+    )
 
 
 def _remove_trace_artifacts(trace: Path) -> None:
@@ -1742,6 +1798,130 @@ def _refuse_frozen_held_out_recollect(arguments: argparse.Namespace) -> None:
         )
 
 
+def _validate_solar_jobs(jobs: int) -> None:
+    if jobs <= 0:
+        raise ValueError("SOLAR jobs must be positive")
+    if jobs == 1:
+        return
+    logical_cpus = available_formal_mapper_logical_cpu_count()
+    if logical_cpus is None:
+        raise ValueError(
+            "parallel SOLAR requires a process-visible logical CPU budget"
+        )
+    mapper_threads = formal_mapper_thread_count()
+    maximum, remaining = formal_mapper_job_limit(
+        logical_cpus,
+        mapper_threads=mapper_threads,
+    )
+    if jobs > maximum:
+        raise ValueError(
+            f"SOLAR jobs {jobs} exceed safe limit {maximum}: "
+            f"{logical_cpus} logical CPUs / {mapper_threads} mapper threads"
+            + (f", {remaining} CPUs unused" if remaining else "")
+        )
+
+
+def _submit_solar_case(
+    executor: ThreadPoolExecutor,
+    active: dict[Future[None], tuple[int, CaseSpec]],
+    *,
+    root: Path,
+    case: CaseSpec,
+    position: int,
+    total: int,
+    force: bool,
+    source_corpora: list[Path],
+    device_stage_lock: Path,
+) -> None:
+    print(f"[{position}/{total}] solar {case.case_id}", flush=True)
+    future = executor.submit(
+        _solar_case,
+        root,
+        case,
+        force=force,
+        source_corpora=source_corpora,
+        device_stage_lock=device_stage_lock,
+    )
+    active[future] = (position, case)
+
+
+def _run_parallel_solar_cases(
+    arguments: argparse.Namespace,
+    selected: Sequence[CaseSpec],
+    device_stage_lock: Path,
+) -> None:
+    pending = iter(enumerate(selected, start=1))
+    active: dict[Future[None], tuple[int, CaseSpec]] = {}
+    with ThreadPoolExecutor(
+        max_workers=arguments.jobs,
+        thread_name_prefix="rdna4-solar",
+    ) as executor:
+        for _ in range(min(arguments.jobs, len(selected))):
+            position, case = next(pending)
+            _submit_solar_case(
+                executor,
+                active,
+                root=arguments.root,
+                case=case,
+                position=position,
+                total=len(selected),
+                force=arguments.force,
+                source_corpora=arguments.source_corpus,
+                device_stage_lock=device_stage_lock,
+            )
+        while active:
+            done, _ = wait(active, return_when=FIRST_COMPLETED)
+            completed = sorted(done, key=lambda item: active[item][0])
+            for future in completed:
+                active.pop(future)
+                future.result()
+            for _ in completed:
+                next_item = next(pending, None)
+                if next_item is None:
+                    break
+                position, case = next_item
+                _submit_solar_case(
+                    executor,
+                    active,
+                    root=arguments.root,
+                    case=case,
+                    position=position,
+                    total=len(selected),
+                    force=arguments.force,
+                    source_corpora=arguments.source_corpus,
+                    device_stage_lock=device_stage_lock,
+                )
+
+
+def _execute_solar_cases(
+    arguments: argparse.Namespace,
+    selected: Sequence[CaseSpec],
+) -> None:
+    _validate_solar_jobs(arguments.jobs)
+    if arguments.jobs == 1:
+        for position, case in enumerate(selected, start=1):
+            print(
+                f"[{position}/{len(selected)}] solar {case.case_id}",
+                flush=True,
+            )
+            _solar_case(
+                arguments.root,
+                case,
+                force=arguments.force,
+                source_corpora=arguments.source_corpus,
+            )
+        return
+    with TemporaryDirectory(
+        prefix=".solar-parallel-",
+        dir=arguments.root.parent,
+    ) as temporary:
+        _run_parallel_solar_cases(
+            arguments,
+            selected,
+            Path(temporary) / "device-stage.lock",
+        )
+
+
 def _execute_cases(arguments: argparse.Namespace) -> None:
     if arguments.role is None:
         raise ValueError(f"{arguments.stage} requires --role")
@@ -1763,26 +1943,23 @@ def _execute_cases(arguments: argparse.Namespace) -> None:
                 f"case ID is not in the selected role/family: {arguments.case_id}"
             )
     if arguments.stage == "collect":
+        if arguments.jobs != 1:
+            raise ValueError("--jobs is only valid for the solar stage")
         qualification_root = _require_qualification_root(
             arguments.root, arguments.qualification_root
         )
         _require_collection_qualification(
             arguments.root, qualification_root, arguments.role
         )
+    if arguments.stage == "solar":
+        _execute_solar_cases(arguments, selected)
+        return
     for position, case in enumerate(selected, start=1):
         print(
             f"[{position}/{len(selected)}] {arguments.stage} {case.case_id}",
             flush=True,
         )
-        if arguments.stage == "solar":
-            _solar_case(
-                arguments.root,
-                case,
-                force=arguments.force,
-                source_corpora=arguments.source_corpus,
-            )
-        else:
-            _collect_case(arguments.root, case, force=arguments.force)
+        _collect_case(arguments.root, case, force=arguments.force)
 
 
 def _validation_case(root: Path, case: CaseSpec) -> DiagnosticValidationCase:

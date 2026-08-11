@@ -33,6 +33,7 @@ from sol_execbench.core.solar_bridge.models import (
 )
 from sol_execbench.core.solar_bridge.resource_policy import (
     available_formal_mapper_logical_cpu_count,
+    formal_mapper_job_limit,
     formal_mapper_thread_count,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
@@ -172,20 +173,15 @@ def _safe_release_jobs_limit(
     *,
     mapper_threads: int | None = None,
 ) -> tuple[int, int]:
-    if logical_cpus <= 0:
-        raise ValueError("available logical CPUs must be positive")
     threads = (
         formal_mapper_thread_count()
         if mapper_threads is None
         else mapper_threads
     )
-    if threads <= 0:
-        raise ValueError("formal mapper threads must be positive")
-    complete_slots, remaining_cpus = divmod(
+    return formal_mapper_job_limit(
         logical_cpus,
-        threads,
+        mapper_threads=threads,
     )
-    return max(1, complete_slots), remaining_cpus
 
 
 def _release_work_items(

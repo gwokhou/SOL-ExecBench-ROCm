@@ -93,6 +93,43 @@ def test_solar_analyze_cli_returns_bound_and_artifacts(
     }
 
 
+def test_solar_analyze_cli_forwards_device_stage_lock(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    problem = tmp_path / "problem"
+    problem.mkdir()
+    output = tmp_path / "analysis"
+    lock = tmp_path / "locks" / "device.lock"
+    observed = []
+
+    def analyze(request, **_kwargs):
+        observed.append(request)
+        return _formal_outcome(request.workload_uuid, request.output_dir)
+
+    monkeypatch.setattr(solar_commands, "run_solar_worker", analyze)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "solar",
+            "analyze",
+            str(problem),
+            "--workload",
+            "workload-1",
+            "--output",
+            str(output),
+            "--device-stage-lock",
+            str(lock),
+            "--device-stage-lock-timeout",
+            "123",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert observed[0].device_stage_lock_path == str(lock.resolve())
+    assert observed[0].device_stage_lock_timeout_seconds == 123.0
+
+
 def test_solar_analyze_cli_selects_one_fixed_make_fx_aten_path(
     tmp_path,
     monkeypatch,
