@@ -131,6 +131,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--attestation", type=Path, required=True)
     parser.add_argument("--impact-review", type=Path)
     parser.add_argument("--source-review", type=Path)
+    parser.add_argument("--control-plane-review", type=Path)
     parser.add_argument("--base-source-revision")
     parser.add_argument("--target-source-revision")
     parser.add_argument("--base-policy", type=Path)
@@ -502,12 +503,18 @@ def _author(arguments: argparse.Namespace) -> None:
 
 def _case_spec(case: DiagnosticCorpusCase) -> object:
     index = int(case.case_id.rsplit("-", 1)[1])
+    family = WorkloadKind(case.family.value)
+    axes = collector._shape(family, case.global_index)
+    if axes != case.axes:
+        raise ValueError(
+            f"design axes differ from collector identity: {case.case_id}"
+        )
     spec = collector.CaseSpec(
         phase=case.phase.value,
-        family=WorkloadKind(case.family.value),
+        family=family,
         index=index,
         global_index=case.global_index,
-        axes=case.axes,
+        axes=axes,
     )
     if spec.case_id != case.case_id or spec.workload_uuid != case.workload_uuid:
         raise ValueError(
@@ -778,11 +785,13 @@ def _verify_equal_rebind_source_chain(
         repository_root=_REPOSITORY_ROOT,
     )
     head = str(_run_git(["rev-parse", "HEAD"], text=True)).strip()
-    if (
-        prior.target_source_revision != review.base_source_revision
-        or review.target_source_revision != head
-    ):
+    if prior.target_source_revision != review.base_source_revision:
         raise ValueError("equal-case rebind source-transition chain is invalid")
+    _verify_control_plane_successor(
+        arguments.control_plane_review,
+        experiment_revision=review.target_source_revision,
+        head=head,
+    )
     solar_paths = (
         "src/solar/",
         "src/sol_execbench/core/solar_bridge/",
@@ -794,6 +803,61 @@ def _verify_equal_rebind_source_chain(
     ):
         raise ValueError("equal-case SOLAR reuse crosses changed SOLAR source")
     return review
+
+
+def _verify_control_plane_successor(
+    path: Path | None,
+    *,
+    experiment_revision: str,
+    head: str,
+) -> None:
+    if head == experiment_revision:
+        if path is not None:
+            raise ValueError(
+                "control-plane review is unnecessary at experiment HEAD"
+            )
+        return
+    if path is None:
+        raise ValueError(
+            "control-plane review is required after experiment HEAD"
+        )
+    review = load_and_verify_source_review(
+        path,
+        repository_root=_REPOSITORY_ROOT,
+    )
+    allowed_paths = {
+        "scripts/internal/rdna4/manage_rdna4_source_transition.py",
+        "tests/scripts/test_rdna4_source_transition_control_plane.py",
+    }
+    if (
+        review.base_source_revision != experiment_revision
+        or review.target_source_revision != head
+        or any(item.path not in allowed_paths for item in review.source_changes)
+        or any(
+            stage is not SourceTransitionStage.GOVERNANCE_CONTROL_PLANE
+            for item in review.source_changes
+            for stage in item.affected_stages
+        )
+    ):
+        raise ValueError("successor contains non-control-plane source changes")
+
+
+def _require_reviewed_collection_qualification(
+    root: Path,
+    qualification_root: Path,
+    source_revision: str,
+) -> None:
+    namespace = vars(collector)
+    current_source_revision = namespace["_source_revision"]
+    try:
+        namespace["_source_revision"] = lambda: source_revision
+        collector._require_collection_qualification(
+            root,
+            qualification_root,
+            "development",
+        )
+    finally:
+        namespace["_source_revision"] = current_source_revision
 
 
 def _rebind_equal(arguments: argparse.Namespace) -> None:
@@ -821,8 +885,10 @@ def _rebind_equal(arguments: argparse.Namespace) -> None:
     qualification_root = collector._require_qualification_root(
         arguments.target_root, arguments.qualification_root
     )
-    collector._require_collection_qualification(
-        arguments.target_root, qualification_root, "development"
+    _require_reviewed_collection_qualification(
+        arguments.target_root,
+        qualification_root,
+        review.target_source_revision,
     )
     selected = _equal_development_cases(source_design, target_design)
     for case in selected:
