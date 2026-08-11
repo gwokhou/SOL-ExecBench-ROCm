@@ -59,6 +59,9 @@ class SchemaVersion(StrEnum):
     DIAGNOSTIC_CORPUS_QUALIFICATION_RECEIPT = (
         "sol_execbench.diagnostic_corpus_qualification_receipt.v1"
     )
+    DIAGNOSTIC_DEVELOPMENT_CASE_REBIND = (
+        "sol_execbench.diagnostic_development_case_rebind.v1"
+    )
     DIAGNOSTIC_INFERENCE_PROFILE = (
         "sol_execbench.diagnostic_inference_profile.v10"
     )
@@ -103,6 +106,9 @@ class SchemaVersion(StrEnum):
         "sol_execbench.diagnostic_release_attestation.v2"
     )
     DIAGNOSTIC_STAGE_RECEIPT = "sol_execbench.diagnostic_stage_receipt.v2"
+    DIAGNOSTIC_SOURCE_TRANSITION = (
+        "sol_execbench.diagnostic_source_transition.v1"
+    )
     DIAGNOSTIC_VALIDATION_CORPUS = (
         "sol_execbench.diagnostic_validation_corpus.v9"
     )
