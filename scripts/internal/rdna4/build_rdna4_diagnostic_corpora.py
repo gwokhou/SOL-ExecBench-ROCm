@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from importlib.resources import files
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import MappingProxyType
 from typing import Any, Literal
 
 from sol_execbench.cli.evaluation.compilation import _compiler_provenance
@@ -166,6 +167,26 @@ FULL_REPLACEMENT_ELEMENTWISE_ROWS_POSITION_STRIDE = 128
 FULL_REPLACEMENT_ELEMENTWISE_COLUMNS_START = 1_024
 FULL_REPLACEMENT_ELEMENTWISE_COLUMNS_STRIDE = 32
 FULL_REPLACEMENT_ELEMENTWISE_COLUMN_BUCKETS = 31
+FULL_REPLACEMENT_INDEXED_UPDATE_COLUMN_OVERRIDES = MappingProxyType(
+    {
+        525: 640,
+        526: 640,
+        527: 640,
+        540: 608,
+        541: 608,
+        542: 608,
+        543: 608,
+        556: 608,
+        557: 608,
+        558: 608,
+        559: 608,
+        571: 576,
+        572: 576,
+        573: 576,
+        574: 576,
+        575: 576,
+    }
+)
 _TRANSFORMER_REALISM_NEIGHBORHOODS: tuple[
     tuple[int, tuple[int, int, int, int]], ...
 ] = (
@@ -480,10 +501,16 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
             "N": 64 + 32 * (global_index % 16),
         }
     if family in {WorkloadKind.INDEXED_READ, WorkloadKind.INDEXED_UPDATE}:
-        return {
+        shape = {
             "M": 1024 + 128 * global_index,
             "N": 256 + 32 * (global_index % 16),
         }
+        if family is WorkloadKind.INDEXED_UPDATE:
+            shape["N"] = FULL_REPLACEMENT_INDEXED_UPDATE_COLUMN_OVERRIDES.get(
+                global_index,
+                shape["N"],
+            )
+        return shape
     if family is WorkloadKind.TRANSFORMER:
         if global_index >= REPRESENTATIVE_SUCCESSOR_START:
             return {
@@ -800,24 +827,36 @@ def _freeze_design_vram_policy(
     return sha256_file(destination)
 
 
+def _capacity_governed_working_set_bytes(case: CaseSpec) -> int | None:
+    """Return the semantic resident-byte coordinate governed by the policy."""
+    if case.family is WorkloadKind.ELEMENTWISE:
+        return 2 * case.axes["M"] * case.axes["N"] * 4
+    if case.family is WorkloadKind.INDEXED_READ:
+        return case.axes["M"] * case.axes["N"] * 4
+    if case.family is WorkloadKind.INDEXED_UPDATE:
+        rows = case.axes["M"]
+        columns = case.axes["N"]
+        return 3 * rows * columns * 4 + rows * 8
+    return None
+
+
 def _validate_design_working_sets(
     universe_start: int,
     policy: DiagnosticVRAMWorkingSetPolicy,
 ) -> None:
     """Reject memory-domain designs outside the pre-frozen VRAM ceiling."""
     for case in _all_cases(universe_start):
+        working_set_bytes = _capacity_governed_working_set_bytes(case)
+        if working_set_bytes is None:
+            continue
         if case.family is WorkloadKind.ELEMENTWISE:
-            working_set_bytes = 2 * case.axes["M"] * case.axes["N"] * 4
             in_range = (
                 policy.applicability_min_bytes
                 <= working_set_bytes
                 <= policy.applicability_max_bytes
             )
-        elif case.family is WorkloadKind.INDEXED_READ:
-            working_set_bytes = case.axes["M"] * case.axes["N"] * 4
-            in_range = working_set_bytes <= policy.applicability_max_bytes
         else:
-            continue
+            in_range = working_set_bytes <= policy.applicability_max_bytes
         if not in_range:
             raise ValueError(
                 f"{case.case_id} working_set_bytes={working_set_bytes} "
@@ -927,7 +966,7 @@ def _write_design_manifest(
             raise ValueError(f"immutable design manifest differs: {path}")
         store.put_file(path)
         return
-    inventory = [
+    inventory: list[DiagnosticLifecycleArtifact] = [
         DiagnosticLifecycleArtifact(
             relative_path=f"blobs/{design_payload_sha256}",
             sha256=design_payload_sha256,
@@ -944,6 +983,7 @@ def _write_design_manifest(
                 size_bytes=policy_path.stat().st_size,
             )
         )
+    inventory.sort(key=lambda item: item.relative_path)
     manifest = DiagnosticDesignManifest(
         stage=DiagnosticLifecycleStage.DESIGN,
         stage_id=did,
@@ -951,9 +991,7 @@ def _write_design_manifest(
         retention_class=DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
         source_revision=source_revision,
         policy_hashes={"root": str(root.resolve())},
-        exact_inventory=tuple(
-            sorted(inventory, key=lambda item: item.relative_path)
-        ),
+        exact_inventory=tuple(inventory),
         created_at=datetime.now(UTC).isoformat(),
         universe_start=universe_start,
         design_payload_sha256=design_payload_sha256,

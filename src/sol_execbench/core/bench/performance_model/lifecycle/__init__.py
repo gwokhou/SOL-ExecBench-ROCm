@@ -126,6 +126,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     GpuLifecycleIdentity,
     SoftwareLifecycleIdentity,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.source_review import (
+    DiagnosticSourceReview,
+    load_and_verify_source_review,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     SOL_EXECBENCH_DIAGNOSTIC_STORE,
     acceptances_dir,
@@ -186,6 +190,7 @@ __all__ = [
     "DiagnosticRetentionClass",
     "DiagnosticRunManifest",
     "DiagnosticRunStageState",
+    "DiagnosticSourceReview",
     "DiagnosticStageAttempt",
     "DiagnosticStageHandler",
     "DiagnosticStageReceipt",
@@ -229,6 +234,7 @@ __all__ = [
     "import_validation_corpus_trees",
     "inventory_regular_tree",
     "lifecycle_plan_path",
+    "load_and_verify_source_review",
     "materialize_corpus_references",
     "model_build_id",
     "orchestrations_dir",

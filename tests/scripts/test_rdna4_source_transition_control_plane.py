@@ -326,3 +326,87 @@ def test_staged_rebind_rolls_back_when_target_verification_fails(
     assert staged.is_dir()
     assert not target.exists()
     assert not (tmp_path / "receipt.json").exists()
+
+
+def test_equal_development_selection_excludes_changed_and_held_out(
+    load_script,
+) -> None:
+    transition = load_script(
+        "scripts/internal/rdna4/manage_rdna4_source_transition.py"
+    )
+    development = SimpleNamespace(
+        case_id="point_fit-elementwise-00",
+        phase=SimpleNamespace(value="point_fit"),
+        axes={"M": 1},
+    )
+    changed = SimpleNamespace(
+        case_id="conformal-indexed_update-00",
+        phase=SimpleNamespace(value="conformal"),
+        axes={"M": 2},
+    )
+    held_out = SimpleNamespace(
+        case_id="held_out-elementwise-00",
+        phase=SimpleNamespace(value="held_out"),
+        axes={"M": 3},
+    )
+    target_changed = SimpleNamespace(
+        case_id=changed.case_id,
+        phase=changed.phase,
+        axes={"M": 4},
+    )
+
+    selected = transition._equal_development_cases(
+        SimpleNamespace(cases=(development, changed, held_out)),
+        SimpleNamespace(cases=(development, target_changed, held_out)),
+    )
+
+    assert selected == (development,)
+
+
+def test_equal_case_rebind_rolls_back_when_solar_verification_fails(
+    load_script,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    transition = load_script(
+        "scripts/internal/rdna4/manage_rdna4_source_transition.py"
+    )
+    staged = tmp_path / "staged"
+    staged.mkdir()
+    evidence = staged / "trace.jsonl.performance-evidence.json"
+    evidence.write_text("{}\n", encoding="utf-8")
+    record = DevelopmentCaseRebind(
+        case_id="point_fit-elementwise-00",
+        workload_kind="elementwise",
+        phase="point_fit",
+        workload_uuid="diagnostic-elementwise-point_fit-1x1",
+        evidence_manifest_sha256=_digest(71),
+        inventory=inventory_regular_tree(staged),
+    )
+    target = tmp_path / "target" / record.case_id
+    case = SimpleNamespace(case_id=record.case_id)
+    monkeypatch.setattr(transition, "_case_spec", lambda _case: object())
+    monkeypatch.setattr(
+        transition.collector,
+        "_verify_resumable_evidence",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        transition,
+        "_verify_solar_case_tree",
+        lambda *_args: (_ for _ in ()).throw(ValueError("solar drift")),
+    )
+
+    with pytest.raises(ValueError, match="solar drift"):
+        transition._commit_staged_cases_with_design(
+            ((record, tmp_path / "source", target),),
+            {record.case_id: staged},
+            tmp_path / "target",
+            (case,),
+            tmp_path / "receipt.json",
+            SimpleNamespace(model_dump=lambda **_kwargs: {}),
+            verify_solar=True,
+        )
+
+    assert staged.is_dir()
+    assert not target.exists()

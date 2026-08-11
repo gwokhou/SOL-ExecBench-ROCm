@@ -46,6 +46,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.inventory import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.source_review import (
+    DiagnosticSourceReview,
+    load_and_verify_source_review,
+)
 from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.bench.performance_model.source_transition import (
     DevelopmentCaseRebind,
@@ -70,6 +74,9 @@ from sol_execbench.core.integrity import (
     sha256_bytes,
     sha256_file,
     stable_json_checksum,
+)
+from sol_execbench.core.solar_bridge.publication import (
+    verified_solar_artifact_paths,
 )
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -113,10 +120,17 @@ collector = _load_collector()
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "stage", choices=("author", "verify", "rebind-development-cases")
+        "stage",
+        choices=(
+            "author",
+            "verify",
+            "rebind-development-cases",
+            "rebind-equal-development-cases",
+        ),
     )
     parser.add_argument("--attestation", type=Path, required=True)
     parser.add_argument("--impact-review", type=Path)
+    parser.add_argument("--source-review", type=Path)
     parser.add_argument("--base-source-revision")
     parser.add_argument("--target-source-revision")
     parser.add_argument("--base-policy", type=Path)
@@ -534,6 +548,8 @@ def _prepare_rebind_case(
     target_dir = collector._case_dir(target_root, spec)
     if target_dir.exists() or target_dir.is_symlink():
         raise ValueError(f"refusing to overwrite target case: {target_dir}")
+    if case.phase.value not in {"point_fit", "conformal"}:
+        raise ValueError("held-out evidence cannot use development rebind")
     inventory = inventory_regular_tree(source_dir)
     evidence = source_dir / "trace.jsonl.performance-evidence.json"
     collector._verify_resumable_evidence(source_root, spec, evidence)
@@ -554,6 +570,14 @@ def _prepare_rebind_case(
         source_dir,
         target_dir,
     )
+
+
+def _verify_solar_case_tree(root: Path, case: DiagnosticCorpusCase) -> None:
+    spec = _case_spec(case)
+    manifest = collector._case_dir(root, spec) / "solar/manifest.yaml"
+    if not manifest.is_file():
+        raise ValueError(f"SOLAR manifest is missing: {case.case_id}")
+    verified_solar_artifact_paths(manifest)
 
 
 def _copy_to_staging(
@@ -691,6 +715,8 @@ def _commit_staged_cases_with_design(
     cases: tuple[DiagnosticCorpusCase, ...],
     receipt_path: Path,
     receipt: DiagnosticDevelopmentCaseRebindReceipt,
+    *,
+    verify_solar: bool = False,
 ) -> None:
     case_by_id = {case.case_id: case for case in cases}
     moved: list[tuple[Path, Path]] = []
@@ -713,12 +739,125 @@ def _commit_staged_cases_with_design(
                 _case_spec(case_by_id[record.case_id]),
                 target / "trace.jsonl.performance-evidence.json",
             )
+            if verify_solar:
+                _verify_solar_case_tree(target_root, case_by_id[record.case_id])
         atomic_write_json_value(receipt_path, receipt.model_dump(mode="json"))
     except BaseException:
         for target, original in reversed(moved):
             if target.exists() and not original.exists():
                 target.rename(original)
         raise
+
+
+def _equal_development_cases(
+    source: DiagnosticCorpusDesign,
+    target: DiagnosticCorpusDesign,
+) -> tuple[DiagnosticCorpusCase, ...]:
+    target_by_id = {case.case_id: case for case in target.cases}
+    source_development = tuple(
+        case for case in source.cases if case.phase.value != "held_out"
+    )
+    selected = tuple(
+        case
+        for case in source_development
+        if target_by_id.get(case.case_id) == case
+    )
+    if not selected or len(selected) == len(source_development):
+        raise ValueError(
+            "case-granular rebind requires both equal and changed cases"
+        )
+    return selected
+
+
+def _verify_equal_rebind_source_chain(
+    arguments: argparse.Namespace,
+) -> DiagnosticSourceReview:
+    prior = _verify_attestation(arguments.attestation)
+    review = load_and_verify_source_review(
+        arguments.source_review,
+        repository_root=_REPOSITORY_ROOT,
+    )
+    head = str(_run_git(["rev-parse", "HEAD"], text=True)).strip()
+    if (
+        prior.target_source_revision != review.base_source_revision
+        or review.target_source_revision != head
+    ):
+        raise ValueError("equal-case rebind source-transition chain is invalid")
+    solar_paths = (
+        "src/solar/",
+        "src/sol_execbench/core/solar_bridge/",
+        "src/sol_execbench/cli/commands/solar.py",
+    )
+    if any(
+        item.path == solar_paths[-1] or item.path.startswith(solar_paths[:2])
+        for item in review.source_changes
+    ):
+        raise ValueError("equal-case SOLAR reuse crosses changed SOLAR source")
+    return review
+
+
+def _rebind_equal(arguments: argparse.Namespace) -> None:
+    required = (
+        arguments.source_review,
+        arguments.source_root,
+        arguments.target_root,
+        arguments.qualification_root,
+        arguments.output,
+    )
+    if any(item is None for item in required):
+        raise ValueError(
+            "equal-case rebind requires --source-review, --source-root, "
+            "--target-root, --qualification-root, and --output"
+        )
+    if arguments.output.exists():
+        raise ValueError(
+            f"refusing to overwrite rebind receipt: {arguments.output}"
+        )
+    review = _verify_equal_rebind_source_chain(arguments)
+    source_design_path = arguments.source_root / "design.json"
+    target_design_path = arguments.target_root / "design.json"
+    source_design = load_json_file(DiagnosticCorpusDesign, source_design_path)
+    target_design = load_json_file(DiagnosticCorpusDesign, target_design_path)
+    qualification_root = collector._require_qualification_root(
+        arguments.target_root, arguments.qualification_root
+    )
+    collector._require_collection_qualification(
+        arguments.target_root, qualification_root, "development"
+    )
+    selected = _equal_development_cases(source_design, target_design)
+    for case in selected:
+        _verify_solar_case_tree(arguments.source_root, case)
+    prepared = tuple(
+        _prepare_rebind_case(arguments.source_root, arguments.target_root, case)
+        for case in selected
+    )
+    receipt = DiagnosticDevelopmentCaseRebindReceipt(
+        transition_attestation_sha256=sha256_file(arguments.source_review),
+        base_source_revision=review.base_source_revision,
+        target_source_revision=review.target_source_revision,
+        source_design_sha256=sha256_file(source_design_path),
+        target_design_sha256=sha256_file(target_design_path),
+        source_root=str(arguments.source_root.resolve()),
+        target_root=str(arguments.target_root.resolve()),
+        qualification_root=str(qualification_root),
+        qualification_gates=_qualification_gate_artifacts(qualification_root),
+        cases=tuple(item[0] for item in prepared),
+        created_at=datetime.now(UTC).isoformat(),
+    )
+    with TemporaryDirectory(
+        prefix=".equal-case-rebind-", dir=arguments.target_root
+    ) as name:
+        staging = Path(name)
+        staged = _copy_to_staging(prepared, staging)
+        _commit_staged_cases_with_design(
+            prepared,
+            staged,
+            arguments.target_root,
+            selected,
+            arguments.output,
+            receipt,
+            verify_solar=True,
+        )
 
 
 def main() -> None:
@@ -728,6 +867,8 @@ def main() -> None:
         _author(arguments)
     elif arguments.stage == "verify":
         _verify_attestation(arguments.attestation)
+    elif arguments.stage == "rebind-equal-development-cases":
+        _rebind_equal(arguments)
     else:
         _rebind(arguments)
 
