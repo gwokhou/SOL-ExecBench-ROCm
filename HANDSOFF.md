@@ -406,29 +406,67 @@ or collection began.
 HEAD therefore makes the qualification batch timeout explicit at 900 seconds;
 it does not reduce the 40-case family batch, change correctness, make
 qualification timing authoritative, or alter any acceptance threshold. The
-source change supersedes the incomplete r1 execution root. Retain r1 as failed
-process evidence, but do not mix its source-bound policy, calibration, gates,
-or receipts into the next run. Recreate those artifacts under a new isolated
-root at the frozen HEAD before collecting development evidence. Because no
-start-520 held-out outcome was accessed, the preregistered start-520 universe
-remains eligible; its case set must not be changed in response to the
-development timeout.
+300-to-900 change affects only the monotonic whole-batch qualification
+watchdog: compilation retains its separate timeout, the GPU-lock wait remains
+capped at 60 seconds, and any evaluation that completed before 300 seconds has
+the same result. It does not causally invalidate the r1 policy, calibration,
+design, prepared problems, raw collection, SOLAR, inference, acceptance, or
+publication semantics.
+
+The earlier blanket source-revision invalidation was therefore correct as a
+syntactic identity rule but unnecessarily broad as an experimental rule. The
+r1 policy and r2 policy have identical behavior after removing only
+`source_revision` and `created_at`; their 660-case design projections and every
+prepared problem file are identical. The r1 calibration profile and audit are
+not claimed to be byte-identical to r2—the independently compiled probe binary,
+code object, and disassembly hashes differ—but the r1 bundle still passes the
+current production loader, exact profile/audit linkage, complete GPU identity,
+and PCIe-topology checks. The performance-independent recovery rule therefore
+selects the earliest complete, frozen, pre-collection r1 policy, calibration,
+design, and prepared problems as canonical.
+
+The redundant `p1-successor-start520-r2` rebuild remains immutable process
+evidence. Its development qualification completed 440/440 correct evaluations
+under source revision `b3fa42e44fa960ac8d59621e1bb32a3fc3f4fb7c`; formal
+collection was then stopped at a case boundary after 14 complete point-fit
+elementwise cases and before case 15. All 14 pass the current production
+performance-evidence verifier; none is silently admitted into r1 and none is
+deleted or repaired in place.
+
+The separate source-transition control plane does not modify or re-export the
+collector. Before any GPU write resumes, it must bind the exact Git name-status
+diff and binary patch digest from r1 to the final source revision; classify each
+changed path by lifecycle stage; prove unchanged VRAM-policy, design, prepared-
+problem, and raw-collection AST projections; and independently validate the r1
+calibration. Rebinding r2 raw cases additionally requires exact source/target
+design-case equality, a complete available production manifest, an exact
+regular-file tree inventory, non-overwriting staged copy, post-copy production
+verification, and an immutable receipt. Because no start-520 held-out outcome
+was accessed, the preregistered start-520 universe remains eligible and must not
+change in response to the development timeout.
 
 Required sequence:
 
 1. Retain generations 3 and start-460 generation 1, their exposure/rejection
    records, and every verified predecessor stage as immutable process evidence.
-2. Freeze the final source revision, regenerate the source-bound VRAM policy
-   and complete two-phase calibration, then preregister start 520. Run the exact
-   static/canary/full qualification chain for the development role.
-3. Collect all 440 point-fit/conformal cases in container isolation, build all
+2. Freeze the final governance source revision and author/verify the exact
+   stage-scoped source-transition attestation. Keep the frozen r1 policy,
+   calibration, design, and prepared problems; do not regenerate them merely
+   because the qualification watchdog changed.
+3. Under a new r1 qualification root, rerun the exact static/canary/full
+   qualification chain for all 440 development workloads at the final source
+   revision. Qualification timing remains non-authoritative.
+4. Only after those gates verify, rebind the 14 complete r2 raw cases into empty
+   r1 case directories through the transition tool and verify its immutable
+   receipt. Resume r1 collection at case 15; never overwrite either root.
+5. Collect all 440 point-fit/conformal cases in container isolation, build all
    440 SOLAR manifests, freeze the development corpus, promote it through the
    registry, and author the inference profile without reading future held-out
    evidence.
-4. Freeze that inference profile before qualifying or collecting start-520
+6. Freeze that inference profile before qualifying or collecting start-520
    held-out. Then qualify and collect all 220 fresh held-out cases and their
    SOLAR manifests; do not compose or reuse any prior acceptance case.
-5. Run acceptance once. Preserve `accepted=false` or another precondition
+7. Run acceptance once. Preserve `accepted=false` or another precondition
    failure as terminal evidence. Only `accepted=true` may proceed through local
    publication/release, draft GitHub Release verification, hosted workflow
    publication, and published-release receipt ingestion.
