@@ -339,6 +339,11 @@ def test_equal_development_selection_excludes_changed_and_held_out(
         phase=SimpleNamespace(value="point_fit"),
         axes={"M": 1},
     )
+    alphabetically_first = SimpleNamespace(
+        case_id="conformal-elementwise-00",
+        phase=SimpleNamespace(value="conformal"),
+        axes={"M": 5},
+    )
     changed = SimpleNamespace(
         case_id="conformal-indexed_update-00",
         phase=SimpleNamespace(value="conformal"),
@@ -356,11 +361,20 @@ def test_equal_development_selection_excludes_changed_and_held_out(
     )
 
     selected = transition._equal_development_cases(
-        SimpleNamespace(cases=(development, changed, held_out)),
-        SimpleNamespace(cases=(development, target_changed, held_out)),
+        SimpleNamespace(
+            cases=(development, alphabetically_first, changed, held_out)
+        ),
+        SimpleNamespace(
+            cases=(
+                development,
+                alphabetically_first,
+                target_changed,
+                held_out,
+            )
+        ),
     )
 
-    assert selected == (development,)
+    assert selected == (alphabetically_first, development)
 
 
 def test_case_spec_reconstructs_canonical_multi_axis_identity(

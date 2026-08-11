@@ -765,9 +765,14 @@ def _equal_development_cases(
         case for case in source.cases if case.phase.value != "held_out"
     )
     selected = tuple(
-        case
-        for case in source_development
-        if target_by_id.get(case.case_id) == case
+        sorted(
+            (
+                case
+                for case in source_development
+                if target_by_id.get(case.case_id) == case
+            ),
+            key=lambda case: case.case_id,
+        )
     )
     if not selected or len(selected) == len(source_development):
         raise ValueError(
