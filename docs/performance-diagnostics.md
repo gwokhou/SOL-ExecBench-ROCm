@@ -618,6 +618,31 @@ and is not evidence that the smoke passed.
 
 ## Lifecycle orchestration
 
+When one fresh preregistered run supplies both 220-case point-fit and 220-case
+conformal phases, freeze the complete development corpus first. Then register
+the two phase projections as immutable, disjoint source snapshots and promote
+them through the same multi-parent path used by historical development. The
+registration command verifies that the phase pair sets are disjoint and that
+their union is exactly the original 440 cases; it does not recollect or rewrite
+evidence:
+
+```bash
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  freeze --root CORPUS_ROOT --role development
+
+uv run python scripts/internal/rdna4/register_rdna4_development_sources.py \
+  --root CORPUS_ROOT \
+  --development-snapshot-id <direct_development_snapshot_id>
+
+uv run python scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py \
+  promote --root CORPUS_ROOT \
+  --source-corpus CORPUS_ROOT/development-point-fit.json \
+  --source-snapshot-id <point_fit_snapshot_id> \
+  --source-corpus CORPUS_ROOT/development-conformal.json \
+  --source-snapshot-id <conformal_snapshot_id> \
+  --output CORPUS_ROOT/promoted-development.json
+```
+
 The lifecycle accepts one immutable, reviewable plan rather than a loose set of
 stage flags:
 
