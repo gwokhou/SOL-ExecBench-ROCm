@@ -19,8 +19,11 @@ from sol_execbench.core.platform.source_state import (
     GitSourceState,
     verify_git_source_state,
 )
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_CONTAINER_IMAGE_ID,
+)
 
-CONTAINER_IMAGE_ID_ENV = "SOL_EXECBENCH_CONTAINER_IMAGE_ID"
+CONTAINER_IMAGE_ID_ENV = ENV_SOL_EXECBENCH_CONTAINER_IMAGE_ID
 _CONTAINER_IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
 _RELEASE_SOURCE_PATHS = (
     "docker",

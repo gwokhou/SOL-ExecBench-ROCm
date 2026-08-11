@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -58,6 +59,11 @@ def _successful_trace(corpus: Any, definition: str, workload: Any) -> Trace:
 def _install_successful_evaluator(corpus: Any, monkeypatch) -> list[list[str]]:
     commands: list[list[str]] = []
     monkeypatch.setattr(corpus, "_container_output_path", lambda path: path)
+    monkeypatch.setattr(
+        corpus,
+        "_compile_cache_environment",
+        lambda *_args, **_kwargs: ("CACHE=/cache", "REVISION=" + "1" * 40),
+    )
 
     def run(command: list[str], log_path: Path) -> None:
         commands.append(command)
@@ -191,6 +197,7 @@ def test_collect_requires_verified_three_gate_chain_before_first_case(
         force=False,
         source_corpus=[],
         qualification_root=qualification,
+        jobs=1,
     )
     corpus._execute_cases(arguments)
     assert collected[0] == "held_out-elementwise-00"
@@ -234,6 +241,7 @@ def test_collect_refuses_missing_gates_before_invoking_case(
         force=False,
         source_corpus=[],
         qualification_root=tmp_path / "missing-qualification",
+        jobs=1,
     )
 
     with pytest.raises(FileNotFoundError):
@@ -304,3 +312,90 @@ def test_qualification_root_must_be_isolated(
 
     with pytest.raises(ValueError, match="outside the collection root"):
         corpus._require_qualification_root(root, root / "qualification")
+
+
+def test_compile_cache_requires_clean_exact_source(
+    load_script,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py"
+    )
+    observed: list[tuple[Path, str]] = []
+    monkeypatch.setattr(corpus, "_source_revision", lambda: "a" * 40)
+    monkeypatch.setattr(
+        corpus,
+        "verify_release_source_state",
+        lambda root, *, expected_revision: observed.append(
+            (root, expected_revision)
+        ),
+    )
+
+    environment = corpus._compile_cache_environment(tmp_path / "corpus")
+
+    assert observed == [(corpus._REPOSITORY_ROOT, "a" * 40)]
+    assert environment == (
+        f"SOL_EXECBENCH_NATIVE_COMPILE_CACHE={tmp_path / 'compile-cache'}",
+        f"SOL_EXECBENCH_SOURCE_REVISION={'a' * 40}",
+    )
+
+
+def test_parallel_solar_jobs_are_resource_bounded(
+    load_script,
+    monkeypatch,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py"
+    )
+    monkeypatch.setattr(
+        corpus,
+        "available_formal_mapper_logical_cpu_count",
+        lambda: 64,
+    )
+    monkeypatch.setattr(corpus, "formal_mapper_thread_count", lambda: 32)
+
+    corpus._validate_solar_jobs(2)
+    with pytest.raises(ValueError, match="exceed safe limit 2"):
+        corpus._validate_solar_jobs(3)
+
+
+def test_parallel_solar_uses_shared_device_lock_and_bounded_workers(
+    load_script,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py"
+    )
+    barrier = threading.Barrier(2)
+    state_lock = threading.Lock()
+    active = maximum = 0
+    observed_locks: list[Path | None] = []
+
+    def solar_case(_root, _case, *, device_stage_lock, **_kwargs):
+        nonlocal active, maximum
+        with state_lock:
+            active += 1
+            maximum = max(maximum, active)
+            observed_locks.append(device_stage_lock)
+        barrier.wait(timeout=2)
+        with state_lock:
+            active -= 1
+
+    monkeypatch.setattr(corpus, "_solar_case", solar_case)
+    arguments = SimpleNamespace(
+        jobs=2,
+        root=tmp_path / "corpus",
+        force=False,
+        source_corpus=[],
+    )
+    selected = tuple(
+        SimpleNamespace(case_id=f"case-{index}") for index in range(4)
+    )
+    lock = tmp_path / "device-stage.lock"
+
+    corpus._run_parallel_solar_cases(arguments, selected, lock)
+
+    assert maximum == 2
+    assert observed_locks == [lock] * 4

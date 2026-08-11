@@ -6,16 +6,21 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from sol_execbench.cli.evaluation.native_compile_cache import NativeCompileCache
 from sol_execbench.core.bench.io import flashinfer_safetensors_env
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
-from sol_execbench.core.process.environment import sanitized_subprocess_env
+from sol_execbench.core.process.environment import (
+    ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE,
+    sanitized_subprocess_env,
+)
 from sol_execbench.core.process.subprocesses import (
     TextSubprocessRunner,
     run_in_process_group_bounded,
@@ -77,7 +82,26 @@ def run_compile_phase(
     (staging_dir / ".tmp").mkdir(exist_ok=True)
     base = sanitized_subprocess_env(os.environ, staging_dir=staging_dir)
     env = sanitized_subprocess_env(env_builder(base), staging_dir=staging_dir)
-    if runner is None:
+    cache_requested = os.environ.get(ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE)
+    compiler = (
+        _compiler_provenance()
+        if runner is None or cache_requested is not None
+        else (None, None, None)
+    )
+    cache = _compile_cache(
+        staging_dir=staging_dir,
+        command=cmd,
+        compile_environment=env,
+        compiler=compiler,
+    )
+    if cache is not None and cache.restore(artifact_path):
+        proc = subprocess.CompletedProcess(
+            cmd,
+            0,
+            "restored native artifact from content-addressed cache\n",
+            "",
+        )
+    elif runner is None:
         proc = run_in_process_group_bounded(
             cmd,
             cwd=staging_dir,
@@ -93,12 +117,10 @@ def run_compile_phase(
             timeout=compile_timeout,
             env=env,
         )
-
-    compiler = (
-        _compiler_provenance()
-        if runner is None and proc.returncode == 0
-        else (None, None, None)
-    )
+    if cache is not None and proc.returncode == 0:
+        cache.store(artifact_path)
+    if proc.returncode != 0:
+        compiler = (None, None, None)
     return CompilePhaseResult(
         attempted=True,
         succeeded=proc.returncode == 0,
@@ -110,6 +132,30 @@ def run_compile_phase(
         compiler_path=compiler[0],
         compiler_sha256=compiler[1],
         compiler_version=compiler[2],
+    )
+
+
+def _compile_cache(
+    *,
+    staging_dir: Path,
+    command: list[str],
+    compile_environment: Mapping[str, str],
+    compiler: tuple[str | None, str | None, str | None],
+) -> NativeCompileCache | None:
+    if os.environ.get(ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE) is None:
+        return None
+    if any(value is None for value in compiler):
+        raise ValueError("native compile cache requires compiler provenance")
+    path, digest, version = compiler
+    if path is None or digest is None or version is None:
+        raise ValueError("native compile cache provenance is incomplete")
+    return NativeCompileCache.from_environment(
+        staging_dir=staging_dir,
+        command=command,
+        compile_environment=compile_environment,
+        compiler_path=path,
+        compiler_sha256=digest,
+        compiler_version=version,
     )
 
 
