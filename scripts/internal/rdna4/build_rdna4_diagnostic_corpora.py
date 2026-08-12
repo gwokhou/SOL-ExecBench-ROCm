@@ -161,6 +161,7 @@ REPRESENTATIVE_SUCCESSOR_START = 340
 CAPACITY_GOVERNED_SUCCESSOR_START = 400
 EXPOSURE_REPLACEMENT_SUCCESSOR_START = 460
 FULL_REPLACEMENT_SUCCESSOR_START = 520
+TWO_FAMILY_REPLACEMENT_SUCCESSOR_START = 580
 FULL_REPLACEMENT_ELEMENTWISE_ROWS_START = 8_208
 FULL_REPLACEMENT_ELEMENTWISE_ROWS_BLOCK_STRIDE = 1_280
 FULL_REPLACEMENT_ELEMENTWISE_ROWS_POSITION_STRIDE = 128
@@ -187,6 +188,17 @@ FULL_REPLACEMENT_INDEXED_UPDATE_COLUMN_OVERRIDES = MappingProxyType(
         575: 576,
     }
 )
+TWO_FAMILY_REPLACEMENT_ELEMENTWISE_ROWS_START = 9_000
+TWO_FAMILY_REPLACEMENT_ELEMENTWISE_ROWS_BLOCK_STRIDE = 1_152
+TWO_FAMILY_REPLACEMENT_ELEMENTWISE_ROWS_POSITION_STRIDE = 96
+TWO_FAMILY_REPLACEMENT_ELEMENTWISE_COLUMNS_START = 1_088
+TWO_FAMILY_REPLACEMENT_ELEMENTWISE_COLUMNS_STRIDE = 32
+TWO_FAMILY_REPLACEMENT_ELEMENTWISE_COLUMN_BUCKETS = 29
+TWO_FAMILY_REPLACEMENT_TRANSPOSE_ROWS_START = 32_000
+TWO_FAMILY_REPLACEMENT_TRANSPOSE_ROWS_STRIDE = 61
+TWO_FAMILY_REPLACEMENT_TRANSPOSE_COLUMNS_START = 1_024
+TWO_FAMILY_REPLACEMENT_TRANSPOSE_COLUMNS_STRIDE = 32
+TWO_FAMILY_REPLACEMENT_TRANSPOSE_COLUMN_BUCKETS = 25
 _TRANSFORMER_REALISM_NEIGHBORHOODS: tuple[
     tuple[int, tuple[int, int, int, int]], ...
 ] = (
@@ -263,6 +275,25 @@ _FULL_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS: tuple[
     (896, (887, 889, 903, 905)),
     (1024, (1005, 1006, 1007, 1009)),
 )
+_TWO_FAMILY_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS: tuple[
+    tuple[int, tuple[int, int, int, int]], ...
+] = (
+    (32, (21, 22, 41, 42)),
+    (64, (51, 52, 53, 54)),
+    (77, (46, 47, 49, 50)),
+    (96, (108, 109, 110, 111)),
+    (128, (117, 118, 138, 139)),
+    (192, (174, 175, 177, 178)),
+    (197, (215, 217, 218, 219)),
+    (256, (245, 265, 266, 267)),
+    (384, (373, 374, 394, 395)),
+    (512, (497, 498, 524, 526)),
+    (577, (550, 554, 556, 602)),
+    (640, (628, 630, 651, 652)),
+    (768, (757, 758, 778, 779)),
+    (896, (885, 886, 906, 907)),
+    (1024, (1002, 1003, 1004, 1010)),
+)
 TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _TRANSFORMER_REALISM_NEIGHBORHOODS
@@ -281,6 +312,11 @@ EXPOSURE_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
 FULL_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _FULL_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS
+    for sequence in neighborhood
+)
+TWO_FAMILY_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
+    sequence
+    for _, neighborhood in _TWO_FAMILY_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS
     for sequence in neighborhood
 )
 _TRANSFORMER_REALISM_SCHEDULES = (
@@ -303,6 +339,11 @@ _TRANSFORMER_REALISM_SCHEDULES = (
         FULL_REPLACEMENT_SUCCESSOR_START,
         _FULL_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS,
         FULL_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS,
+    ),
+    (
+        TWO_FAMILY_REPLACEMENT_SUCCESSOR_START,
+        _TWO_FAMILY_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS,
+        TWO_FAMILY_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS,
     ),
 )
 _TEMPLATE_AXIS_CONTRACTS: tuple[tuple[WorkloadKind, str, int, int], ...] = (
@@ -472,8 +513,84 @@ def _full_replacement_elementwise_shape(global_index: int) -> dict[str, int]:
     }
 
 
+def _two_family_replacement_elementwise_shape(
+    global_index: int,
+) -> dict[str, int]:
+    """Return one pre-authored capacity-bounded start580 shape."""
+    offset = global_index - TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
+    block, position = divmod(offset, 3)
+    return {
+        "M": TWO_FAMILY_REPLACEMENT_ELEMENTWISE_ROWS_START
+        + TWO_FAMILY_REPLACEMENT_ELEMENTWISE_ROWS_BLOCK_STRIDE * block
+        + TWO_FAMILY_REPLACEMENT_ELEMENTWISE_ROWS_POSITION_STRIDE * position,
+        "N": TWO_FAMILY_REPLACEMENT_ELEMENTWISE_COLUMNS_START
+        + TWO_FAMILY_REPLACEMENT_ELEMENTWISE_COLUMNS_STRIDE
+        * (
+            (13 * block + position)
+            % TWO_FAMILY_REPLACEMENT_ELEMENTWISE_COLUMN_BUCKETS
+        ),
+    }
+
+
+def _two_family_replacement_transpose_shape(
+    global_index: int,
+) -> dict[str, int]:
+    """Return one pre-authored capacity-bounded start580 transpose shape."""
+    offset = global_index - TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
+    return {
+        "M": TWO_FAMILY_REPLACEMENT_TRANSPOSE_ROWS_START
+        + TWO_FAMILY_REPLACEMENT_TRANSPOSE_ROWS_STRIDE * offset,
+        "N": TWO_FAMILY_REPLACEMENT_TRANSPOSE_COLUMNS_START
+        + TWO_FAMILY_REPLACEMENT_TRANSPOSE_COLUMNS_STRIDE
+        * ((11 * offset) % TWO_FAMILY_REPLACEMENT_TRANSPOSE_COLUMN_BUCKETS),
+    }
+
+
+def _indexed_shape(
+    family: WorkloadKind,
+    global_index: int,
+) -> dict[str, int]:
+    """Return one capacity-governed indexed-family shape."""
+    shape = {
+        "M": 1024 + 128 * global_index,
+        "N": 256 + 32 * (global_index % 16),
+    }
+    if family is not WorkloadKind.INDEXED_UPDATE:
+        return shape
+    if global_index >= TWO_FAMILY_REPLACEMENT_SUCCESSOR_START:
+        shape["N"] = 256 + 32 * (
+            (global_index - TWO_FAMILY_REPLACEMENT_SUCCESSOR_START) % 9
+        )
+    else:
+        shape["N"] = FULL_REPLACEMENT_INDEXED_UPDATE_COLUMN_OVERRIDES.get(
+            global_index,
+            shape["N"],
+        )
+    return shape
+
+
+def _transformer_shape(global_index: int) -> dict[str, int]:
+    """Return one authored transformer shape for the selected generation."""
+    if global_index >= REPRESENTATIVE_SUCCESSOR_START:
+        sequence = _representative_transformer_sequence(global_index)
+    elif global_index >= PAIR_DISJOINT_SUCCESSOR_START:
+        sequence = SUCCESSOR_TRANSFORMER_SEQUENCE_START + (
+            SUCCESSOR_TRANSFORMER_SEQUENCE_STRIDE
+            * (global_index - PAIR_DISJOINT_SUCCESSOR_START)
+        )
+    else:
+        sequence = 32 + 8 * (global_index - HISTORICAL_UNIVERSE_START)
+    return {"M": sequence, "N": TRANSFORMER_CHANNELS}
+
+
 def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
     if family is WorkloadKind.ELEMENTWISE:
+        if (
+            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
+            <= global_index
+            < TWO_FAMILY_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
+        ):
+            return _two_family_replacement_elementwise_shape(global_index)
         if (
             FULL_REPLACEMENT_SUCCESSOR_START
             <= global_index
@@ -485,6 +602,12 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
             "N": 768 + 32 * ((17 * global_index) % 40),
         }
     if family is WorkloadKind.TRANSPOSE:
+        if (
+            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
+            <= global_index
+            < TWO_FAMILY_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
+        ):
+            return _two_family_replacement_transpose_shape(global_index)
         return {
             "M": 513 + 53 * global_index,
             "N": 769 + 37 * ((13 * global_index) % 40),
@@ -501,33 +624,9 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
             "N": 64 + 32 * (global_index % 16),
         }
     if family in {WorkloadKind.INDEXED_READ, WorkloadKind.INDEXED_UPDATE}:
-        shape = {
-            "M": 1024 + 128 * global_index,
-            "N": 256 + 32 * (global_index % 16),
-        }
-        if family is WorkloadKind.INDEXED_UPDATE:
-            shape["N"] = FULL_REPLACEMENT_INDEXED_UPDATE_COLUMN_OVERRIDES.get(
-                global_index,
-                shape["N"],
-            )
-        return shape
+        return _indexed_shape(family, global_index)
     if family is WorkloadKind.TRANSFORMER:
-        if global_index >= REPRESENTATIVE_SUCCESSOR_START:
-            return {
-                "M": _representative_transformer_sequence(global_index),
-                "N": TRANSFORMER_CHANNELS,
-            }
-        if global_index >= PAIR_DISJOINT_SUCCESSOR_START:
-            return {
-                "M": SUCCESSOR_TRANSFORMER_SEQUENCE_START
-                + SUCCESSOR_TRANSFORMER_SEQUENCE_STRIDE
-                * (global_index - PAIR_DISJOINT_SUCCESSOR_START),
-                "N": TRANSFORMER_CHANNELS,
-            }
-        return {
-            "M": 32 + 8 * (global_index - HISTORICAL_UNIVERSE_START),
-            "N": TRANSFORMER_CHANNELS,
-        }
+        return _transformer_shape(global_index)
     if family in {WorkloadKind.COMPOSITE, WorkloadKind.CONCURRENT}:
         # Each universe case needs a distinct M so no two cases within a phase
         # share a shape-bearing workload_uuid. The prior ``global_index % 16``
@@ -830,6 +929,8 @@ def _freeze_design_vram_policy(
 def _capacity_governed_working_set_bytes(case: CaseSpec) -> int | None:
     """Return the semantic resident-byte coordinate governed by the policy."""
     if case.family is WorkloadKind.ELEMENTWISE:
+        return 2 * case.axes["M"] * case.axes["N"] * 4
+    if case.family is WorkloadKind.TRANSPOSE:
         return 2 * case.axes["M"] * case.axes["N"] * 4
     if case.family is WorkloadKind.INDEXED_READ:
         return case.axes["M"] * case.axes["N"] * 4
