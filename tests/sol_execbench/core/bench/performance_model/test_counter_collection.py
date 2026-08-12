@@ -84,7 +84,6 @@ def test_counter_collection_discovers_availability_and_hashes_inputs(
             "Counter_Name,Counter_Value,Start_Timestamp,End_Timestamp\n" + rows,
             encoding="utf-8",
         )
-        (pass_dir / f"{pass_index}_results.rocpd").write_bytes(b"audit")
         (pass_dir / f"{pass_index}_marker_api_trace.csv").write_text(
             "Domain,Function,Start_Timestamp,End_Timestamp\n"
             "MARKER_CORE_RANGE_API,sol_execbench/w0/iteration/0,50,250\n",
@@ -107,7 +106,6 @@ def test_counter_collection_discovers_availability_and_hashes_inputs(
     }
     assert {artifact.kind for artifact in result.artifacts} >= {
         Rocprofv3ArtifactKind.COUNTER_CSV,
-        Rocprofv3ArtifactKind.ROCPD,
         Rocprofv3ArtifactKind.TRACE_CSV,
     }
     provenance = load_json_file(
@@ -154,7 +152,6 @@ def test_counter_collection_selects_only_roctx_marked_candidate_process(
             header + "0,helper,1,1,SQ_WAVES_sum,1,10,20\n" + rows,
             encoding="utf-8",
         )
-        (pass_dir / "101_results.db").write_bytes(b"candidate")
         (pass_dir / "101_marker_api_trace.csv").write_text(
             "Domain,Function,Start_Timestamp,End_Timestamp\n"
             "MARKER_CORE_RANGE_API,sol_execbench/w0/iteration/0,50,250\n",
@@ -164,7 +161,6 @@ def test_counter_collection_selects_only_roctx_marked_candidate_process(
             header + rows,
             encoding="utf-8",
         )
-        (pass_dir / "202_results.db").write_bytes(b"reference")
         return subprocess.CompletedProcess(command, 0, "", "")
 
     result = collect_rocprofv3_counters(_request(tmp_path), runner=runner)
@@ -172,10 +168,7 @@ def test_counter_collection_selects_only_roctx_marked_candidate_process(
     assert result.status is Rocprofv3ProfileStatus.SUCCESS
     registered_paths = {artifact.path.name for artifact in result.artifacts}
     assert "101_counter_collection.csv" in registered_paths
-    assert "101_results.db.gz" in registered_paths
     assert "202_counter_collection.csv" not in registered_paths
-    assert "202_results.db" not in registered_paths
-    assert not (tmp_path / "profile" / "pass_1" / "202_results.db").exists()
     candidate_csv = (
         tmp_path / "profile" / "pass_1" / "101_counter_collection.csv"
     ).read_text(encoding="utf-8")

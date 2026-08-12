@@ -222,7 +222,7 @@ def write_counter_job(
             {
                 "pmc": list(group),
                 "output_directory": output_directory,
-                "output_format": ["csv", "rocpd"],
+                "output_format": ["csv"],
                 "marker_trace": True,
                 "truncate_kernels": False,
             }

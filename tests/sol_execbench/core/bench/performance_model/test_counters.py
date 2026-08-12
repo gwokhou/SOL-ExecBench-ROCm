@@ -121,7 +121,7 @@ def test_availability_and_controlled_job_formats(tmp_path: Path) -> None:
         output_directory=str(tmp_path / "out"),
     )
     payload = yaml.safe_load(job.read_text(encoding="utf-8"))
-    assert payload["jobs"][0]["output_format"] == ["csv", "rocpd"]
+    assert payload["jobs"][0]["output_format"] == ["csv"]
     assert build_rocprofv3_counter_command(
         ["python", "evaluate.py"],
         input_path=job,

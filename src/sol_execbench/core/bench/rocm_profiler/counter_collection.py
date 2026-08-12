@@ -393,7 +393,7 @@ def _counter_completed(
             )
         ),
         warnings=warnings,
-        output_format="csv,rocpd",
+        output_format="csv",
         profiler_data_artifacts=has_profiler_data_artifact(artifacts),
         output_directory_listing=profile_output_directory_listing(
             request.output_directory,
@@ -424,16 +424,6 @@ def _counter_artifact_reasons(
             reasons.extend(
                 _counter_csv_reasons(csv_artifacts[0].path, group, pass_index),
             )
-        if (
-            len(
-                _artifacts_by_pass(artifacts, Rocprofv3ArtifactKind.ROCPD).get(
-                    pass_index,
-                    [],
-                )
-            )
-            != 1
-        ):
-            reasons.append(f"counter_pass_rocpd_count:{pass_index}")
         marker_artifacts = [
             artifact
             for artifact in _artifacts_by_pass(
@@ -471,7 +461,6 @@ def _candidate_replay_artifacts(
     process_kinds = {
         Rocprofv3ArtifactKind.AGENT_INFO_CSV,
         Rocprofv3ArtifactKind.COUNTER_CSV,
-        Rocprofv3ArtifactKind.ROCPD,
         Rocprofv3ArtifactKind.TRACE_CSV,
     }
     for artifact in artifacts:
@@ -491,7 +480,7 @@ def _compact_candidate_replay_artifacts(
     discovered: Sequence[Rocprofv3ProfileArtifact],
     selected: Sequence[Rocprofv3ProfileArtifact],
 ) -> tuple[Rocprofv3ProfileArtifact, ...]:
-    """Keep candidate evidence only and deterministically compress its ROCPD."""
+    """Keep candidate evidence only."""
     selected_paths = {artifact.path for artifact in selected}
     markers = {
         (
@@ -505,7 +494,6 @@ def _compact_candidate_replay_artifacts(
     process_kinds = {
         Rocprofv3ArtifactKind.AGENT_INFO_CSV,
         Rocprofv3ArtifactKind.COUNTER_CSV,
-        Rocprofv3ArtifactKind.ROCPD,
         Rocprofv3ArtifactKind.TRACE_CSV,
     }
     compacted: list[Rocprofv3ProfileArtifact] = []
@@ -522,8 +510,6 @@ def _compact_candidate_replay_artifacts(
                 )
             except (OSError, ValueError):
                 compacted.append(artifact)
-        elif artifact.kind is Rocprofv3ArtifactKind.ROCPD:
-            compacted.append(_compress_rocpd(artifact))
         else:
             compacted.append(artifact)
     for artifact in discovered:
@@ -741,7 +727,7 @@ def _counter_timeout(
         profiler_available=True,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.PARTIAL,
         reason_codes=(Rocprofv3ReasonCode.COMMAND_TIMEOUT,),
-        output_format="csv,rocpd",
+        output_format="csv",
         profiler_data_artifacts=bool(artifacts),
         output_directory_listing=profile_output_directory_listing(
             request.output_directory,
@@ -764,7 +750,7 @@ def _unavailable(
         profiler_available=False,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.UNAVAILABLE,
         reason_codes=(Rocprofv3ReasonCode.UNAVAILABLE,),
-        output_format="csv,rocpd",
+        output_format="csv",
     )
 
 
@@ -786,7 +772,7 @@ def _unsupported(
         profiler_available=True,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.UNAVAILABLE,
         reason_codes=(Rocprofv3ReasonCode.REQUIRED_COUNTERS_UNSUPPORTED,),
-        output_format="csv,rocpd",
+        output_format="csv",
     )
 
 
@@ -814,7 +800,7 @@ def _failed(
         profiler_available=True,
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.NONE,
         reason_codes=(reason_code,),
-        output_format="csv,rocpd",
+        output_format="csv",
     )
 
 
