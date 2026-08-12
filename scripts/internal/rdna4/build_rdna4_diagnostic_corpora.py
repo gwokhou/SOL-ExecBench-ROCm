@@ -162,6 +162,7 @@ CAPACITY_GOVERNED_SUCCESSOR_START = 400
 EXPOSURE_REPLACEMENT_SUCCESSOR_START = 460
 FULL_REPLACEMENT_SUCCESSOR_START = 520
 TWO_FAMILY_REPLACEMENT_SUCCESSOR_START = 580
+REPLAY_RECOVERY_SUCCESSOR_START = 640
 FULL_REPLACEMENT_ELEMENTWISE_ROWS_START = 8_208
 FULL_REPLACEMENT_ELEMENTWISE_ROWS_BLOCK_STRIDE = 1_280
 FULL_REPLACEMENT_ELEMENTWISE_ROWS_POSITION_STRIDE = 128
@@ -199,6 +200,17 @@ TWO_FAMILY_REPLACEMENT_TRANSPOSE_ROWS_STRIDE = 61
 TWO_FAMILY_REPLACEMENT_TRANSPOSE_COLUMNS_START = 1_024
 TWO_FAMILY_REPLACEMENT_TRANSPOSE_COLUMNS_STRIDE = 32
 TWO_FAMILY_REPLACEMENT_TRANSPOSE_COLUMN_BUCKETS = 25
+REPLAY_RECOVERY_ELEMENTWISE_ROWS_START = 11_000
+REPLAY_RECOVERY_ELEMENTWISE_ROWS_BLOCK_STRIDE = 512
+REPLAY_RECOVERY_ELEMENTWISE_ROWS_POSITION_STRIDE = 64
+REPLAY_RECOVERY_ELEMENTWISE_COLUMNS_START = 1_024
+REPLAY_RECOVERY_ELEMENTWISE_COLUMNS_STRIDE = 32
+REPLAY_RECOVERY_ELEMENTWISE_COLUMN_BUCKETS = 20
+REPLAY_RECOVERY_TRANSPOSE_ROWS_START = 30_000
+REPLAY_RECOVERY_TRANSPOSE_ROWS_STRIDE = 37
+REPLAY_RECOVERY_TRANSPOSE_COLUMNS_START = 1_024
+REPLAY_RECOVERY_TRANSPOSE_COLUMNS_STRIDE = 32
+REPLAY_RECOVERY_TRANSPOSE_COLUMN_BUCKETS = 20
 _TRANSFORMER_REALISM_NEIGHBORHOODS: tuple[
     tuple[int, tuple[int, int, int, int]], ...
 ] = (
@@ -294,6 +306,25 @@ _TWO_FAMILY_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS: tuple[
     (896, (885, 886, 906, 907)),
     (1024, (1002, 1003, 1004, 1010)),
 )
+_REPLAY_RECOVERY_TRANSFORMER_NEIGHBORHOODS: tuple[
+    tuple[int, tuple[int, int, int, int]], ...
+] = (
+    (32, (31, 32, 32, 33)),
+    (64, (63, 64, 62, 65)),
+    (77, (77, 77, 76, 76)),
+    (96, (96, 97, 96, 95)),
+    (128, (128, 128, 127, 129)),
+    (192, (191, 192, 192, 193)),
+    (197, (197, 196, 197, 198)),
+    (256, (255, 256, 254, 257)),
+    (384, (384, 384, 383, 383)),
+    (512, (511, 512, 512, 510)),
+    (577, (576, 577, 575, 576)),
+    (640, (639, 640, 640, 641)),
+    (768, (768, 768, 767, 767)),
+    (896, (896, 896, 895, 897)),
+    (1024, (1024, 1024, 1023, 1021)),
+)
 TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _TRANSFORMER_REALISM_NEIGHBORHOODS
@@ -317,6 +348,11 @@ FULL_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
 TWO_FAMILY_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _TWO_FAMILY_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS
+    for sequence in neighborhood
+)
+REPLAY_RECOVERY_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
+    sequence
+    for _, neighborhood in _REPLAY_RECOVERY_TRANSFORMER_NEIGHBORHOODS
     for sequence in neighborhood
 )
 _TRANSFORMER_REALISM_SCHEDULES = (
@@ -344,6 +380,11 @@ _TRANSFORMER_REALISM_SCHEDULES = (
         TWO_FAMILY_REPLACEMENT_SUCCESSOR_START,
         _TWO_FAMILY_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS,
         TWO_FAMILY_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS,
+    ),
+    (
+        REPLAY_RECOVERY_SUCCESSOR_START,
+        _REPLAY_RECOVERY_TRANSFORMER_NEIGHBORHOODS,
+        REPLAY_RECOVERY_TRANSFORMER_SEQUENCE_LENGTHS,
     ),
 )
 _TEMPLATE_AXIS_CONTRACTS: tuple[tuple[WorkloadKind, str, int, int], ...] = (
@@ -546,6 +587,32 @@ def _two_family_replacement_transpose_shape(
     }
 
 
+def _replay_recovery_elementwise_shape(global_index: int) -> dict[str, int]:
+    """Return one pre-authored capacity-bounded start640 shape."""
+    offset = global_index - REPLAY_RECOVERY_SUCCESSOR_START
+    block, position = divmod(offset, 3)
+    return {
+        "M": REPLAY_RECOVERY_ELEMENTWISE_ROWS_START
+        + REPLAY_RECOVERY_ELEMENTWISE_ROWS_BLOCK_STRIDE * block
+        + REPLAY_RECOVERY_ELEMENTWISE_ROWS_POSITION_STRIDE * position,
+        "N": REPLAY_RECOVERY_ELEMENTWISE_COLUMNS_START
+        + REPLAY_RECOVERY_ELEMENTWISE_COLUMNS_STRIDE
+        * ((7 * block + position) % REPLAY_RECOVERY_ELEMENTWISE_COLUMN_BUCKETS),
+    }
+
+
+def _replay_recovery_transpose_shape(global_index: int) -> dict[str, int]:
+    """Return one pre-authored capacity-bounded start640 transpose shape."""
+    offset = global_index - REPLAY_RECOVERY_SUCCESSOR_START
+    return {
+        "M": REPLAY_RECOVERY_TRANSPOSE_ROWS_START
+        + REPLAY_RECOVERY_TRANSPOSE_ROWS_STRIDE * offset,
+        "N": REPLAY_RECOVERY_TRANSPOSE_COLUMNS_START
+        + REPLAY_RECOVERY_TRANSPOSE_COLUMNS_STRIDE
+        * ((13 * offset) % REPLAY_RECOVERY_TRANSPOSE_COLUMN_BUCKETS),
+    }
+
+
 def _indexed_shape(
     family: WorkloadKind,
     global_index: int,
@@ -557,7 +624,11 @@ def _indexed_shape(
     }
     if family is not WorkloadKind.INDEXED_UPDATE:
         return shape
-    if global_index >= TWO_FAMILY_REPLACEMENT_SUCCESSOR_START:
+    if global_index >= REPLAY_RECOVERY_SUCCESSOR_START:
+        shape["N"] = 256 + 32 * (
+            (global_index - REPLAY_RECOVERY_SUCCESSOR_START) % 7
+        )
+    elif global_index >= TWO_FAMILY_REPLACEMENT_SUCCESSOR_START:
         shape["N"] = 256 + 32 * (
             (global_index - TWO_FAMILY_REPLACEMENT_SUCCESSOR_START) % 9
         )
@@ -586,6 +657,12 @@ def _transformer_shape(global_index: int) -> dict[str, int]:
 def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
     if family is WorkloadKind.ELEMENTWISE:
         if (
+            REPLAY_RECOVERY_SUCCESSOR_START
+            <= global_index
+            < REPLAY_RECOVERY_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
+        ):
+            return _replay_recovery_elementwise_shape(global_index)
+        if (
             TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
             <= global_index
             < TWO_FAMILY_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
@@ -602,6 +679,12 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
             "N": 768 + 32 * ((17 * global_index) % 40),
         }
     if family is WorkloadKind.TRANSPOSE:
+        if (
+            REPLAY_RECOVERY_SUCCESSOR_START
+            <= global_index
+            < REPLAY_RECOVERY_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
+        ):
+            return _replay_recovery_transpose_shape(global_index)
         if (
             TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
             <= global_index
@@ -2105,7 +2188,10 @@ def _validation_case(root: Path, case: CaseSpec) -> DiagnosticValidationCase:
     case_dir = _case_dir(root, case)
     evidence_path = case_dir / "trace.jsonl.performance-evidence.json"
     solar_path = case_dir / "solar/manifest.yaml"
-    manifest = load_and_verify_performance_evidence_manifest(evidence_path)
+    manifest = load_and_verify_performance_evidence_manifest(
+        evidence_path,
+        require_complete=True,
+    )
     if manifest.status is not DiagnosticSidecarStatus.AVAILABLE:
         raise ValueError(
             f"{case.case_id} evidence is {manifest.status}: "

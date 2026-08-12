@@ -12,6 +12,9 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
     artifact_reference,
     load_and_verify_performance_evidence_manifest,
 )
+from sol_execbench.core.bench.performance_model.replay_evidence import (
+    PerformanceReplayEvidenceSidecar,
+)
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 
 
@@ -62,3 +65,55 @@ def test_manifest_verifies_all_content_addressed_artifacts(
     )
     with pytest.raises(ValueError, match="(size|SHA-256) mismatch"):
         load_and_verify_performance_evidence_manifest(manifest_path)
+
+
+def test_complete_manifest_rejects_partial_replay(tmp_path: Path) -> None:
+    paths = {}
+    for kind in PerformanceEvidenceArtifactKind:
+        if kind in {
+            PerformanceEvidenceArtifactKind.ROCPD,
+            PerformanceEvidenceArtifactKind.ENVIRONMENT,
+        }:
+            continue
+        path = tmp_path / f"{kind}.json"
+        path.write_text(str(kind), encoding="utf-8")
+        paths[kind] = path
+    replay_path = paths[PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE]
+    replay = PerformanceReplayEvidenceSidecar(
+        status=DiagnosticSidecarStatus.PARTIAL,
+        run_id="a" * 64,
+        candidate_sha256="e" * 64,
+        canonical_input_sha256="f" * 64,
+        reason_codes=["replay_clock_mode_unverified"],
+    )
+    atomic_write_json_value(replay_path, replay.to_dict())
+    manifest = PerformanceEvidenceManifest(
+        status=DiagnosticSidecarStatus.AVAILABLE,
+        identity=PerformanceRunIdentity(
+            run_id="a" * 64,
+            definition="toy",
+            definition_sha256="b" * 64,
+            workload_uuid="w0",
+            workload_sha256="c" * 64,
+            solution_sha256="d" * 64,
+            candidate_sha256="e" * 64,
+            gpu_architecture="gfx1200",
+            clock_mode="locked",
+            timing_protocol="device_event_v1",
+        ),
+        artifacts=[
+            artifact_reference(kind=kind, path=path, root=tmp_path)
+            for kind, path in paths.items()
+        ],
+    )
+    manifest_path = tmp_path / "manifest.json"
+    atomic_write_json_value(manifest_path, manifest.to_dict())
+
+    with pytest.raises(
+        ValueError,
+        match="performance replay evidence is incomplete",
+    ):
+        load_and_verify_performance_evidence_manifest(
+            manifest_path,
+            require_complete=True,
+        )

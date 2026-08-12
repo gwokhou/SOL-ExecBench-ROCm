@@ -15,6 +15,9 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     CurrentDiagnosticSidecarAuthority,
     DiagnosticSidecarStatus,
 )
+from sol_execbench.core.bench.performance_model.replay_evidence import (
+    PerformanceReplayEvidenceSidecar,
+)
 from sol_execbench.core.data.base_model import (
     StrictArtifactModel,
 )
@@ -224,6 +227,27 @@ def load_and_verify_performance_evidence_manifest(
             expected_sha256=artifact.sha256,
             expected_size_bytes=artifact.size_bytes,
         )
+    if require_complete:
+        replay_artifact = manifest.artifact(
+            PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE
+        )
+        if replay_artifact is None:
+            raise ValueError("performance replay evidence is missing")
+        replay = load_json_file(
+            PerformanceReplayEvidenceSidecar,
+            path.parent / replay_artifact.path,
+        )
+        if replay.status is not DiagnosticSidecarStatus.AVAILABLE:
+            reasons = replay.reason_codes or ["replay_evidence_unavailable"]
+            raise ValueError(
+                "performance replay evidence is incomplete: "
+                + ",".join(reasons)
+            )
+        if (
+            replay.run_id != manifest.identity.run_id
+            or replay.candidate_sha256 != manifest.identity.candidate_sha256
+        ):
+            raise ValueError("performance replay evidence identity mismatch")
     return manifest
 
 
