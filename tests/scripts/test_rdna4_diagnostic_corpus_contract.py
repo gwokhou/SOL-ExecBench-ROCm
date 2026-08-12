@@ -373,7 +373,9 @@ def test_future_transformer_generation_requires_an_authored_realism_policy(
         ValueError,
         match="representative schedule is not authored",
     ):
-        corpus._all_cases(700)
+        corpus._all_cases(
+            corpus.FRESH_SUCCESSOR_START + corpus.UNIVERSE_CASES_PER_FAMILY
+        )
 
 
 def test_capacity_policy_rejects_out_of_range_indexed_read(

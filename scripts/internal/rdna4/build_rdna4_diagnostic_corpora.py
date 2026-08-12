@@ -163,6 +163,7 @@ EXPOSURE_REPLACEMENT_SUCCESSOR_START = 460
 FULL_REPLACEMENT_SUCCESSOR_START = 520
 TWO_FAMILY_REPLACEMENT_SUCCESSOR_START = 580
 REPLAY_RECOVERY_SUCCESSOR_START = 640
+FRESH_SUCCESSOR_START = 700
 FULL_REPLACEMENT_ELEMENTWISE_ROWS_START = 8_208
 FULL_REPLACEMENT_ELEMENTWISE_ROWS_BLOCK_STRIDE = 1_280
 FULL_REPLACEMENT_ELEMENTWISE_ROWS_POSITION_STRIDE = 128
@@ -211,6 +212,17 @@ REPLAY_RECOVERY_TRANSPOSE_ROWS_STRIDE = 37
 REPLAY_RECOVERY_TRANSPOSE_COLUMNS_START = 1_024
 REPLAY_RECOVERY_TRANSPOSE_COLUMNS_STRIDE = 32
 REPLAY_RECOVERY_TRANSPOSE_COLUMN_BUCKETS = 20
+FRESH_ELEMENTWISE_ROWS_START = 23_000
+FRESH_ELEMENTWISE_ROWS_BLOCK_STRIDE = 512
+FRESH_ELEMENTWISE_ROWS_POSITION_STRIDE = 64
+FRESH_ELEMENTWISE_COLUMNS_START = 1_024
+FRESH_ELEMENTWISE_COLUMNS_STRIDE = 32
+FRESH_ELEMENTWISE_COLUMN_BUCKETS = 20
+FRESH_TRANSPOSE_ROWS_START = 33_000
+FRESH_TRANSPOSE_ROWS_STRIDE = 37
+FRESH_TRANSPOSE_COLUMNS_START = 1_024
+FRESH_TRANSPOSE_COLUMNS_STRIDE = 32
+FRESH_TRANSPOSE_COLUMN_BUCKETS = 20
 _TRANSFORMER_REALISM_NEIGHBORHOODS: tuple[
     tuple[int, tuple[int, int, int, int]], ...
 ] = (
@@ -325,6 +337,25 @@ _REPLAY_RECOVERY_TRANSFORMER_NEIGHBORHOODS: tuple[
     (896, (896, 896, 895, 897)),
     (1024, (1024, 1024, 1023, 1021)),
 )
+_FRESH_TRANSFORMER_NEIGHBORHOODS: tuple[
+    tuple[int, tuple[int, int, int, int]], ...
+] = (
+    (32, (40, 43, 44, 45)),
+    (64, (48, 56, 72, 80)),
+    (77, (88, 104, 112, 113)),
+    (96, (114, 115, 116, 120)),
+    (128, (136, 140, 141, 142)),
+    (192, (176, 184, 200, 208)),
+    (197, (216, 220, 221, 222)),
+    (256, (248, 264, 268, 269)),
+    (384, (376, 392, 396, 397)),
+    (512, (504, 513, 515, 517)),
+    (577, (551, 565, 587, 599)),
+    (640, (629, 631, 632, 648)),
+    (768, (760, 776, 780, 781)),
+    (896, (888, 904, 908, 909)),
+    (1024, (1000, 1001, 1008, 1016)),
+)
 TRANSFORMER_REPRESENTATIVE_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _TRANSFORMER_REALISM_NEIGHBORHOODS
@@ -353,6 +384,11 @@ TWO_FAMILY_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
 REPLAY_RECOVERY_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
     sequence
     for _, neighborhood in _REPLAY_RECOVERY_TRANSFORMER_NEIGHBORHOODS
+    for sequence in neighborhood
+)
+FRESH_TRANSFORMER_SEQUENCE_LENGTHS = tuple(
+    sequence
+    for _, neighborhood in _FRESH_TRANSFORMER_NEIGHBORHOODS
     for sequence in neighborhood
 )
 _TRANSFORMER_REALISM_SCHEDULES = (
@@ -385,6 +421,11 @@ _TRANSFORMER_REALISM_SCHEDULES = (
         REPLAY_RECOVERY_SUCCESSOR_START,
         _REPLAY_RECOVERY_TRANSFORMER_NEIGHBORHOODS,
         REPLAY_RECOVERY_TRANSFORMER_SEQUENCE_LENGTHS,
+    ),
+    (
+        FRESH_SUCCESSOR_START,
+        _FRESH_TRANSFORMER_NEIGHBORHOODS,
+        FRESH_TRANSFORMER_SEQUENCE_LENGTHS,
     ),
 )
 _TEMPLATE_AXIS_CONTRACTS: tuple[tuple[WorkloadKind, str, int, int], ...] = (
@@ -613,6 +654,31 @@ def _replay_recovery_transpose_shape(global_index: int) -> dict[str, int]:
     }
 
 
+def _fresh_elementwise_shape(global_index: int) -> dict[str, int]:
+    """Return one pre-authored capacity-bounded start700 elementwise shape."""
+    offset = global_index - FRESH_SUCCESSOR_START
+    block, position = divmod(offset, 3)
+    return {
+        "M": FRESH_ELEMENTWISE_ROWS_START
+        + FRESH_ELEMENTWISE_ROWS_BLOCK_STRIDE * block
+        + FRESH_ELEMENTWISE_ROWS_POSITION_STRIDE * position,
+        "N": FRESH_ELEMENTWISE_COLUMNS_START
+        + FRESH_ELEMENTWISE_COLUMNS_STRIDE
+        * ((7 * block + position) % FRESH_ELEMENTWISE_COLUMN_BUCKETS),
+    }
+
+
+def _fresh_transpose_shape(global_index: int) -> dict[str, int]:
+    """Return one pre-authored capacity-bounded start700 transpose shape."""
+    offset = global_index - FRESH_SUCCESSOR_START
+    return {
+        "M": FRESH_TRANSPOSE_ROWS_START + FRESH_TRANSPOSE_ROWS_STRIDE * offset,
+        "N": FRESH_TRANSPOSE_COLUMNS_START
+        + FRESH_TRANSPOSE_COLUMNS_STRIDE
+        * ((13 * offset) % FRESH_TRANSPOSE_COLUMN_BUCKETS),
+    }
+
+
 def _indexed_shape(
     family: WorkloadKind,
     global_index: int,
@@ -657,6 +723,12 @@ def _transformer_shape(global_index: int) -> dict[str, int]:
 def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
     if family is WorkloadKind.ELEMENTWISE:
         if (
+            FRESH_SUCCESSOR_START
+            <= global_index
+            < FRESH_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
+        ):
+            return _fresh_elementwise_shape(global_index)
+        if (
             REPLAY_RECOVERY_SUCCESSOR_START
             <= global_index
             < REPLAY_RECOVERY_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
@@ -679,6 +751,12 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
             "N": 768 + 32 * ((17 * global_index) % 40),
         }
     if family is WorkloadKind.TRANSPOSE:
+        if (
+            FRESH_SUCCESSOR_START
+            <= global_index
+            < FRESH_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
+        ):
+            return _fresh_transpose_shape(global_index)
         if (
             REPLAY_RECOVERY_SUCCESSOR_START
             <= global_index
