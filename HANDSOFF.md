@@ -1,7 +1,7 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-11 against production lifecycle source revision
-`45b4d87cff65211e64bc1e6036814ed1187e7566`, the live ignored evidence/store,
+Last audited: 2026-08-12 against source revision
+`8848d6050b4a46e08c86acaf37333f33d90c8076`, the live ignored evidence/store,
 the remote P0 conformance Release metadata, both pre-verdict exposure
 boundaries, and the completed start-460 rejection described below.
 
@@ -183,6 +183,46 @@ completed investigations and one-time inventories belong in Git history.
   The development-only inference profile was frozen before this held-out
   collection and reproduced byte-identically at model build with SHA-256
   `f0b3dd95341cf85745b086584e34fd304f09c14c9e3adbeb8cefa5847512caa4`.
+- A new successor attempt `p1-successor-start640-pcie5x16-r1` was produced on
+  PCIe 5.0 x16 at source revision
+  `8848d6050b4a46e08c86acaf37333f33d90c8076`. The source transition is
+  documented as
+  `source-review-18535cf-to-8848d60.json` (`14` paths, git patch SHA-256
+  `a5e2c7ed16b003494b6857c9daeb72bb09dc933016d856c23b185f15bb0f7cb7`),
+  and the same revision was used by all qualification gates in
+  `corpus-qualification-8848d60`: static (660 cases), canary (38 cases), and
+  held-out full (220 cases), all with collector SHA-256
+  `1733783495c1e6108502f0e48fb1ac35e16ee9ad24272d0e7f248770a24e763c`.
+  `p1-successor-start640-pcie5x16-r1` has since completed a full production
+  lifecycle at revision `8848d605`. The 20 held-out `elementwise` cases were
+  collected with counter+replay artifacts (`PASSED`) and SOLAR-analyzed
+  (`analyzed`, `publication_eligible`). An `elementwise` fragment was frozen
+  and composed with the 200 unaffected families reused by exact identity from
+  `p1-successor-start580-pcie5x16-r1/composed-held-out` (replace-family
+  `elementwise`, exposure receipt = start580 acceptance `e8486e19` that
+  released `held_out-elementwise-05`). Because the design is fresh (universe
+  640) while calibration/inference/policy are reused, design registration used
+  the recovery path (`preregister_rdna4_recovery.py`): design
+  `be1fed469b7a26d68c1351a65a8b8fb52aa06a37d552daff576032b128c41c03` at
+  `8848d605` reuses the attested `d1ee4324` VRAM policy (`dbac7df4`) via the
+  prior source-transition attestation `d1ee4324→18535cf` (continuous chain
+  `d1ee4324→18535cf→8848d605`, policy/calibration UNCHANGED). Lifecycle run
+  `367696957bf65d48c269aa19822fe40f5fde614519a6c14f3f10361e7fcabadf` verified
+  DESIGN, CALIBRATION, COLLECTION_RUN, CORPUS_SNAPSHOT, and MODEL_BUILD
+  (model_build succeeded, so the reused `d1ee4324` development elementwise is
+  admissible under the `8848d605` replay-completeness admission). ACCEPTANCE
+  manifest
+  `9f740c5bc9a971e736f0f735161bf823a61e071898b9fcfac835a9c711839327` recorded
+  `accepted=false` — a model-generalization quality-gate failure (same class
+  as start-460), not a precondition failure. The run was timeout-interrupted
+  during the terminal publication attempts, but the immutable acceptance
+  verdict is persisted, so this is closed terminal evidence: no local
+  publication, release candidate, GitHub production Release, tag, or
+  published-release receipt exists, and tag
+  `gfx1200-diagnostics-v7-production-v1` must not be created. Per the reuse
+  rule, none of this `accepted=false` held-out corpus may be reused in another
+  acceptance; the next successor must use a separately frozen development
+  split and 220 entirely fresh held-out pairs.
 - Production lifecycle generation 3 is run
   `70f28d3986cd7275a7ae7c62921202da6b0b123fd7a533edfbddacdab10ab7f0`
   with plan ID
@@ -368,6 +408,22 @@ reverified the active lifecycle status, store consistency, and GC dry-run; it
 did not run GPU qualification, collection, GC apply, or deletion.
 
 ## Active backlog
+
+### P1 — start-640 PCIe5.0x16 successor path (closed terminal)
+
+`p1-successor-start640-pcie5x16-r1` completed its full production lifecycle at
+`8848d6050b4a46e08c86acaf37333f33d90c8076` and is **closed terminal evidence**,
+no longer active. The previously listed next sequence was executed end-to-end:
+the source-transition recovery chain (`d1ee4324→18535cf→8848d605`) proved
+policy/calibration continuity; the held-out corpus was recomposed (20 fresh
+`elementwise` + 200 reused by exact identity); SOLAR and acceptance ran.
+ACCEPTANCE recorded `accepted=false` (a model-generalization quality-gate
+failure, same class as start-460; see Current state above for the immutable
+design/run/acceptance IDs). This is closed evidence: no publication, release
+candidate, GitHub Release, tag, or published-release receipt exists, and tag
+`gfx1200-diagnostics-v7-production-v1` must not be created. The next
+production successor must use a separately frozen development split and 220
+entirely fresh held-out pairs; it must not reuse this `accepted=false` corpus.
 
 ### P1 — Build a fully fresh successor after the start-460 rejection
 
@@ -628,3 +684,69 @@ At this audit every command above that was run passed except
 `check_non_canonical_artifacts.py`, whose five historical v2 findings are the
 explicit expanded-store archive-boundary backlog above. Do not report the full
 handoff verification set green until that boundary is closed.
+
+### Handoff continuity for coding-agent switch
+
+This handoff is sufficient for a new agent to continue, provided the following
+bootstrap checks are re-run before any GPU work resumes:
+
+1. Confirm repository identity and local edit scope:
+
+```bash
+git rev-parse --abbrev-ref HEAD
+git rev-parse HEAD
+git status --short
+```
+
+The expected state for this transition is branch `main`, `HEAD`
+`8848d6050b4a46e08c86acaf37333f33d90c8076`, and only `HANDSOFF.md` modified.
+Any additional changed work should be staged deliberately and reconciled before
+GPU writes.
+
+2. Confirm there is no accidental lifecycle run for the active source revision:
+
+```bash
+rg -n '8848d6050b4a46e08c86acaf37333f33d90c8076' data/store/orchestrations data/store/attempts -g '*.json'
+```
+
+Expected result is empty (no current-`data/store` lifecycle acceptance/publication
+evidence yet for `p1-successor-start640-pcie5x16-r1`).
+
+3. Confirm the controlled bootstrap state from the output tree:
+
+```bash
+ls -1 data/outputs/p1-successor-start640-pcie5x16-r1
+ls -1 data/outputs/p1-successor-start640-pcie5x16-r1/corpus/cases/held_out/elementwise | head
+ls -1 data/outputs/p1-successor-start640-pcie5x16-r1/corpus-qualification-8848d60/static | head
+```
+
+These should align with the file layout already recorded above: 20 elementwise held-out
+cases completed and 0 development/held-out corpus artifacts produced.
+
+4. Before resuming, run lifecycle admission checks with the reviewed command
+contract from `docs/performance-diagnostics.md`:
+
+```bash
+uv run sol-execbench --format json diagnostics lifecycle status --run-id <RUN_ID> --store-root data/store
+uv run sol-execbench --format json diagnostics lifecycle resume --run-id <RUN_ID> --store-root data/store
+uv run sol-execbench --format json diagnostics lifecycle plan ... 
+uv run sol-execbench --format json diagnostics lifecycle run --plan PLAN.json --store-root data/store
+```
+
+`<RUN_ID>` is only used when a concrete chain exists. For this path there is none
+yet; the agent should first execute `plan` and move to `run` from a freshly
+authored transition artifact.
+
+5. Keep the `source-review-18535cf-to-8848d60.json` gate as immutable:
+
+- The reuse command family is documented as:
+  `record-exposure -> freeze-fragment -> compose-held-out` in
+  `docs/performance-diagnostics.md`.
+- Required scope is exactly one family replacement: `elementwise` (20 cases).
+- Composition output must be written to a new path; no existing held-out payload
+  may be overwritten.
+- This path admits new held-out artifacts only for the replacement families; the
+  other 200 cases in this design are admissible only by exact identity checks.
+
+Only this family-scale reuse route is intended in this phase. No overwrite of
+existing held-out evidence is permitted.
