@@ -181,7 +181,7 @@ def test_exposure_replacement_successor_has_disjoint_real_shape_neighborhoods(
         assert max(abs(sequence - anchor) for sequence in neighborhood) <= 15
 
 
-def test_full_replacement_successor_is_disjoint_and_capacity_governed(
+def test_full_replacement_successor_exposes_the_frozen_transpose_gap(
     load_script,
 ) -> None:
     corpus = load_script(
@@ -199,13 +199,27 @@ def test_full_replacement_successor_is_disjoint_and_capacity_governed(
     )
 
     corpus._validate_design_contracts(successor)
-    corpus._validate_design_working_sets(
-        corpus.FULL_REPLACEMENT_SUCCESSOR_START,
-        policy,
-    )
     assert {case.workload_uuid for case in successor}.isdisjoint(
         case.workload_uuid for case in earlier
     )
+    with pytest.raises(
+        ValueError,
+        match="held_out-transpose-14 working_set_bytes=537108992",
+    ):
+        corpus._validate_design_working_sets(
+            corpus.FULL_REPLACEMENT_SUCCESSOR_START,
+            policy,
+        )
+    out_of_range = [
+        case.case_id
+        for case in successor
+        if (
+            (working_set := corpus._capacity_governed_working_set_bytes(case))
+            is not None
+            and working_set > policy.applicability_max_bytes
+        )
+    ]
+    assert out_of_range == ["held_out-transpose-14"]
     elementwise_working_sets = {
         2 * case.axes["M"] * case.axes["N"] * 4
         for case in successor
@@ -240,6 +254,63 @@ def test_full_replacement_successor_is_disjoint_and_capacity_governed(
         assert max(abs(sequence - anchor) for sequence in neighborhood) <= 21
 
 
+def test_two_family_replacement_successor_is_disjoint_and_capacity_governed(
+    load_script,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    successor = corpus._all_cases(corpus.TWO_FAMILY_REPLACEMENT_SUCCESSOR_START)
+    earlier = [
+        case
+        for start in (100, 160, 220, 280, 340, 400, 460, 520)
+        for case in corpus._all_cases(start)
+    ]
+    policy = SimpleNamespace(
+        applicability_min_bytes=64 * 2**20,
+        applicability_max_bytes=512 * 2**20,
+    )
+
+    corpus._validate_design_contracts(successor)
+    corpus._validate_design_working_sets(
+        corpus.TWO_FAMILY_REPLACEMENT_SUCCESSOR_START,
+        policy,
+    )
+    assert {case.workload_uuid for case in successor}.isdisjoint(
+        case.workload_uuid for case in earlier
+    )
+    for family in (
+        corpus.WorkloadKind.ELEMENTWISE,
+        corpus.WorkloadKind.TRANSPOSE,
+        corpus.WorkloadKind.INDEXED_READ,
+        corpus.WorkloadKind.INDEXED_UPDATE,
+    ):
+        working_sets = {
+            corpus._capacity_governed_working_set_bytes(case)
+            for case in successor
+            if case.family is family
+        }
+        assert len(working_sets) == 60
+        assert max(working_sets) <= policy.applicability_max_bytes
+    transformer = sorted(
+        (
+            case
+            for case in successor
+            if case.family is corpus.WorkloadKind.TRANSFORMER
+        ),
+        key=lambda case: case.global_index,
+    )
+    assert tuple(case.axes["M"] for case in transformer) == (
+        corpus.TWO_FAMILY_REPLACEMENT_TRANSFORMER_SEQUENCE_LENGTHS
+    )
+    for (
+        anchor,
+        neighborhood,
+    ) in corpus._TWO_FAMILY_REPLACEMENT_TRANSFORMER_NEIGHBORHOODS:
+        assert len(neighborhood) == 4
+        assert max(abs(sequence - anchor) for sequence in neighborhood) <= 31
+
+
 def test_future_transformer_generation_requires_an_authored_realism_policy(
     load_script,
 ) -> None:
@@ -251,7 +322,7 @@ def test_future_transformer_generation_requires_an_authored_realism_policy(
         ValueError,
         match="representative schedule is not authored",
     ):
-        corpus._all_cases(580)
+        corpus._all_cases(640)
 
 
 def test_capacity_policy_rejects_out_of_range_indexed_read(
@@ -304,5 +375,32 @@ def test_capacity_policy_rejects_out_of_range_indexed_update(
     with pytest.raises(
         ValueError,
         match="held_out-indexed_update-00 working_set_bytes=567235584",
+    ):
+        corpus._validate_design_working_sets(520, policy)
+
+
+def test_capacity_policy_rejects_out_of_range_transpose(
+    load_script,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    corpus = load_script(
+        "scripts/internal/rdna4/build_rdna4_diagnostic_corpora.py",
+    )
+    case = corpus.CaseSpec(
+        phase="held_out",
+        family=corpus.WorkloadKind.TRANSPOSE,
+        index=14,
+        global_index=563,
+        axes={"M": 30_352, "N": 2_212},
+    )
+    monkeypatch.setattr(corpus, "_all_cases", lambda _start: [case])
+    policy = SimpleNamespace(
+        applicability_min_bytes=64 * 2**20,
+        applicability_max_bytes=512 * 2**20,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="held_out-transpose-14 working_set_bytes=537108992",
     ):
         corpus._validate_design_working_sets(520, policy)
