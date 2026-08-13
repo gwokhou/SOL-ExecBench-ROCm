@@ -1,7 +1,7 @@
 # Project handoff and active follow-ups
 
-Last audited: 2026-08-12 against source revision
-`8848d6050b4a46e08c86acaf37333f33d90c8076`, the live ignored evidence/store,
+Last audited: 2026-08-13 against source revision
+`cbaa382289418bda706cabe7df964b24943c927a`, the live ignored evidence/store,
 the remote P0 conformance Release metadata, both pre-verdict exposure
 boundaries, and the completed start-460 rejection described below.
 
@@ -223,6 +223,60 @@ completed investigations and one-time inventories belong in Git history.
   rule, none of this `accepted=false` held-out corpus may be reused in another
   acceptance; the next successor must use a separately frozen development
   split and 220 entirely fresh held-out pairs.
+- The start640 coverage failure was root-caused as a cross-design
+  distribution shift, not a model bug or a reusable-route defect. Offline
+  analysis of the frozen start520 development corpus against the start640
+  held-out metrics showed that `composite_graph` held-out cases fell 11/20
+  outside the reused development measured range (hard extrapolation), while
+  `indexed_read` and `reduction_norm` were in-range but systematically
+  cleaner than their reused development residuals. The elementwise family —
+  whose held-out cases stayed inside the development range — reached 100%
+  coverage, confirming the diagnosis. The conformal interval is a single
+  `solar_lower_bound_ms` linear point model scaled by `exp(q95)`; the reused
+  development `q95` (composite_graph 0.041, indexed_read 0.024) is far below
+  the held-out P90 residual (0.057 and 0.035 respectively), and a
+  leave-one-out residual over the full development corpus (scheme A) does not
+  close the gap — it was falsified offline. The fix is therefore a single
+  design whose development and held-out splits are i.i.d., not a conformal
+  code change.
+- A fully fresh successor `p1-successor-start700` was authored at commit
+  `cb35de63` (Author start700 fresh successor design shapes): capacity-bounded
+  `elementwise`/`transpose` shape functions (`M` starting at 23000 / 33000),
+  a disjoint 15-neighborhood transformer realism schedule (60 sequences all
+  bounded by 1024 and disjoint from the 313 historical sequences), and the
+  successor dispatch. Recovery preregistration reused the attested
+  `d1ee4324` VRAM policy (`dbac7df4`) via the same `d1ee4324→18535cf→8848d605`
+  chain, with a fresh `source-review-18535cf-to-cb35de63.json` (15 paths).
+  Design SHA-256 is
+  `b6401661ab53d14e41c441559df36edc4236484f60baedc9384a31bc7d4cac28`
+  and design ID is
+  `410042044bc9c67fa82e048ba49de54662fff27c27a233579658d4cc13f2d1e6`.
+- Commit `cbaa3822` (Drop rocpd output from diagnostic counter collection)
+  removes the rocprofv3 `rocpd` SQLite profiling database from counter
+  collection. The 134.5 MiB raw database per pass was never parsed — the
+  6-counter semantic model consumes only the counter CSV, marker alignment
+  uses the marker CSV, `rocpd` was only existence-checked, and publication
+  omits it. The counter job now emits `csv` only; the `counter_pass_rocpd_count`
+  check and `_compress_rocpd` path are removed. `rocpd` is not in the required
+  evidence-artifact set, so `evidence_manifest` verification is unchanged.
+  Measured effect: collect drops from ~2.5 min/case to ~2.15 min/case (~13%),
+  because rocprofv3 process start + PMC hardware initialization, not the
+  rocpd write (gzip level 1 is ~118 ms), dominates per-case time. Every new
+  case stops writing ~13 MB; historical rocpd totals ~3.0 GB (4308 `.db.gz`).
+- The start700 qualification chain was re-run at `cbaa3822` (the commit
+  changed `source_revision`, which the gates bind, so the prior `cb35de63`
+  gates drifted). All five gates verify: static
+  `6fe2bb79592b23b3`, canary development `0dc26ebcc6ee1dd6`, full development
+  `9beb78d3fa9f753b`, canary held-out `4dd61d8ce42f83e6`, and full held-out
+  `79a90b49b50c250b`. Development collection then produced 69 of 440 cases
+  before it was paused by the operator; no development corpus was frozen, no
+  SOLAR manifests were built, no inference profile was fit, no held-out
+  collection began, and no acceptance verdict exists. The RDNA4 diagnostic
+  production re-release is deliberately paused: the operator does not want to
+  spend the ~30 h of full fresh GPU collection now, and no publication,
+  release candidate, GitHub Release, tag, or published-release receipt exists.
+  The paused state is resumable — qualification is complete at `cbaa3822`, so
+  `collect --role development` can be restarted without re-qualifying.
 - Production lifecycle generation 3 is run
   `70f28d3986cd7275a7ae7c62921202da6b0b123fd7a533edfbddacdab10ab7f0`
   with plan ID
@@ -533,6 +587,21 @@ code-changing action with at least 10 held-out positives, 90% precision, and
 70% recall. Historical development quality does not substitute for held-out
 acceptance.
 
+The start640 coverage failure was root-caused as a cross-design distribution
+shift (see Current state), so a single i.i.d.-split design, not a conformal
+code change, is the fix. That fully fresh successor is `p1-successor-start700`
+(design ID `410042044bc9c67fa82e048ba49de54662fff27c27a233579658d4cc13f2d1e6`,
+authored at `cb35de63`, re-qualified at `cbaa3822`). It is **paused by the
+operator before acceptance**: qualification is complete (five gates bind
+`cbaa3822`), development collection stopped at 69/440, and no SOLAR, freeze,
+inference, held-out collection, or acceptance verdict exists. The operator
+does not currently want to spend the ~30 h of full fresh GPU collection, so
+the RDNA4 diagnostic production re-release is on hold. Resumption is
+`collect --role development` from the paused root without re-qualifying;
+whenever the operator resumes, the remaining sequence is the same Required
+sequence above (development collect → SOLAR → freeze → inference → held-out
+collect → SOLAR → freeze → acceptance once).
+
 ### P1 — Author and validate a separate MI300X capacity policy
 
 The current total-memory selection algorithm intentionally admits only
@@ -699,29 +768,31 @@ git status --short
 ```
 
 The expected state for this transition is branch `main`, `HEAD`
-`8848d6050b4a46e08c86acaf37333f33d90c8076`, and only `HANDSOFF.md` modified.
+`cbaa382289418bda706cabe7df964b24943c927a`, and only `HANDSOFF.md` modified.
 Any additional changed work should be staged deliberately and reconciled before
 GPU writes.
 
 2. Confirm there is no accidental lifecycle run for the active source revision:
 
 ```bash
-rg -n '8848d6050b4a46e08c86acaf37333f33d90c8076' data/store/orchestrations data/store/attempts -g '*.json'
+rg -n 'cbaa382289418bda706cabe7df964b24943c927a' data/store/orchestrations data/store/attempts -g '*.json'
 ```
 
 Expected result is empty (no current-`data/store` lifecycle acceptance/publication
-evidence yet for `p1-successor-start640-pcie5x16-r1`).
+evidence yet for `p1-successor-start700`).
 
 3. Confirm the controlled bootstrap state from the output tree:
 
 ```bash
-ls -1 data/outputs/p1-successor-start640-pcie5x16-r1
-ls -1 data/outputs/p1-successor-start640-pcie5x16-r1/corpus/cases/held_out/elementwise | head
-ls -1 data/outputs/p1-successor-start640-pcie5x16-r1/corpus-qualification-8848d60/static | head
+ls -1 data/outputs/p1-successor-start700
+ls -1 data/outputs/p1-successor-start700/corpus-qualification
+ls -1 data/outputs/p1-successor-start700/corpus/cases/point_fit/elementwise | head
 ```
 
-These should align with the file layout already recorded above: 20 elementwise held-out
-cases completed and 0 development/held-out corpus artifacts produced.
+These should align with the paused layout recorded above: five qualification
+gates present (`static`, `development/canary`, `development/full`,
+`held_out/canary`, `held_out/full`) and a partially collected development tree
+(69 of 440 cases, no frozen corpus, no SOLAR manifests).
 
 4. Before resuming, run lifecycle admission checks with the reviewed command
 contract from `docs/performance-diagnostics.md`:
@@ -737,16 +808,10 @@ uv run sol-execbench --format json diagnostics lifecycle run --plan PLAN.json --
 yet; the agent should first execute `plan` and move to `run` from a freshly
 authored transition artifact.
 
-5. Keep the `source-review-18535cf-to-8848d60.json` gate as immutable:
-
-- The reuse command family is documented as:
-  `record-exposure -> freeze-fragment -> compose-held-out` in
-  `docs/performance-diagnostics.md`.
-- Required scope is exactly one family replacement: `elementwise` (20 cases).
-- Composition output must be written to a new path; no existing held-out payload
-  may be overwritten.
-- This path admits new held-out artifacts only for the replacement families; the
-  other 200 cases in this design are admissible only by exact identity checks.
-
-Only this family-scale reuse route is intended in this phase. No overwrite of
-existing held-out evidence is permitted.
+5. Keep the `source-review-18535cf-to-cb35de63.json` gate as immutable
+   (the start700 recovery preregistration proof). The start700 successor is
+   fully fresh: its development and held-out splits come from one i.i.d.
+   design, so no `record-exposure -> freeze-fragment -> compose-held-out`
+   reuse route applies. No held-out payload may be composed from any prior
+   `accepted=false` corpus, and the 200-case family reuse route of start640 is
+   not part of this path.
