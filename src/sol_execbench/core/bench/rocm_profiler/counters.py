@@ -38,6 +38,13 @@ from sol_execbench.core.text_utils import normalize_ascii_alnum
 
 MAX_COUNTER_CSV_BYTES = 128 * 1024 * 1024
 ROCPROFV3_AVAIL_EXECUTABLE = "rocprofv3-avail"
+# Packaged counter manifest per gfx target. gfx942 is a spec-derived engineering
+# proposal (see gfx942_v1.yaml) pending hardware confirmation; unknown targets
+# fail closed in the collection path rather than silently reusing gfx1200.
+COUNTER_MANIFEST_BY_ARCHITECTURE: dict[str, str] = {
+    "gfx1200": "gfx1200_v3.yaml",
+    "gfx942": "gfx942_v1.yaml",
+}
 _COUNTER_TOKEN = re.compile(r"[^A-Za-z0-9]+")
 _NUMBER = re.compile(
     r"^\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)\s*([A-Za-z%]*)\s*$",
@@ -143,6 +150,11 @@ def load_counter_manifest(path: str | Path) -> CounterManifest:
     if manifest.schema_version != SchemaVersion.ROCPROFV3_COUNTER_MANIFEST:
         raise ValueError("unsupported_counter_manifest_schema")
     return manifest
+
+
+def counter_manifest_for_architecture(gfx_target: str) -> str | None:
+    """Return the packaged counter manifest for one gfx target, or ``None``."""
+    return COUNTER_MANIFEST_BY_ARCHITECTURE.get(gfx_target)
 
 
 def parse_available_counters(output: str) -> frozenset[str]:
@@ -645,6 +657,7 @@ def _optional_int(value: str | None) -> int | None:
 
 
 __all__ = [
+    "COUNTER_MANIFEST_BY_ARCHITECTURE",
     "MAX_COUNTER_CSV_BYTES",
     "ROCPROFV3_AVAIL_EXECUTABLE",
     "CounterAlternative",
@@ -653,6 +666,7 @@ __all__ = [
     "CounterPassCSV",
     "build_rocprofv3_counter_command",
     "counter_dispatch_sequence_digest",
+    "counter_manifest_for_architecture",
     "counter_names_in_csv",
     "counter_pass_index",
     "load_counter_manifest",

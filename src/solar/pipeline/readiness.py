@@ -43,6 +43,7 @@ class ConversionReadinessRequest(ConversionRequestEnvelope):
     conversion: ConversionRequest
     architecture: str | Path | Mapping[str, DynamicValue]
     output_dir: Path
+    require_verified_audit: bool = True
 
 
 @dataclass(frozen=True)
@@ -150,7 +151,9 @@ def audit_conversion(
     failure: Exception | None = None
     try:
         profile = ArchitectureProfile.load(request.architecture)
-        if isinstance(profile, ArchitectureProfile):
+        if isinstance(profile, ArchitectureProfile) and (
+            request.require_verified_audit
+        ):
             profile.require_verified_audit_evidence()
         architecture_sha256 = _profile_hash(profile)
         stage = SolarStage.GRAPH_EXTRACTION

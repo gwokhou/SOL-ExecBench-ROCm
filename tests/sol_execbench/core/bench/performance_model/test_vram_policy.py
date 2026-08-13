@@ -35,12 +35,29 @@ def test_policy_selects_supported_rdna4_capacity_class(
     assert policy.applicability_max_bytes == probe
 
 
+def test_policy_selects_cdna3_capacity_class() -> None:
+    policy = select_vram_working_set_policy(
+        gpu_architecture="gfx942",
+        gpu_id="gpu-id",
+        total_memory_bytes=192 * GIB,
+        source_revision="a" * 40,
+        created_at="2026-08-10T00:00:00+00:00",
+    )
+
+    assert policy.gpu_architecture == "gfx942"
+    assert policy.nominal_total_memory_bytes == 192 * GIB
+    assert policy.probe_working_set_bytes == 8 * GIB
+    assert policy.applicability_max_bytes == 8 * GIB
+    assert policy.selection_algorithm == "cdna3_total_memory_class.v1"
+
+
 @pytest.mark.parametrize(
     ("architecture", "capacity", "reason"),
     [
-        ("gfx942", 192 * GIB, "unsupported_vram_policy_architecture:gfx942"),
+        ("gfx942", 256 * GIB, "unsupported_total_vram_class"),
         ("gfx1200", 192 * GIB, "unsupported_total_vram_class"),
         ("gfx1200", 12 * GIB, "unsupported_total_vram_class"),
+        ("gfx1100", 8 * GIB, "unsupported_vram_policy_architecture:gfx1100"),
     ],
 )
 def test_policy_rejects_unvalidated_architecture_or_capacity(

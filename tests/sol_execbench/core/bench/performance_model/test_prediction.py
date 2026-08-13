@@ -174,6 +174,31 @@ def _semantic(
     )
 
 
+def test_wave_size_and_matrix_counter_order_are_arch_aware() -> None:
+    # gfx1200 keeps historical wave-32 / WMMA-first behavior; gfx942 resolves
+    # to wave-64 and MFMA-first; unknown targets fall back to gfx1200 defaults.
+    assert prediction._wave_size("gfx1200") == 32.0
+    assert prediction._wave_size("gfx942") == 64.0
+    assert prediction._wave_size(None) == 32.0
+    assert prediction._wave_size("gfx9999") == 32.0
+
+    assert prediction._matrix_counter_names("gfx1200") == (
+        "SQ_INSTS_WMMA",
+        "SQ_INSTS_MFMA",
+        "MFMAINSTS",
+    )
+    assert prediction._matrix_counter_names("gfx942") == (
+        "SQ_INSTS_MFMA",
+        "MFMAINSTS",
+        "SQ_INSTS_WMMA",
+    )
+    assert prediction._matrix_counter_names(None) == (
+        "SQ_INSTS_WMMA",
+        "SQ_INSTS_MFMA",
+        "MFMAINSTS",
+    )
+
+
 def test_predictions_are_deterministic_and_exclude_measured_duration() -> None:
     semantic = _semantic()
     calibration = _calibration()

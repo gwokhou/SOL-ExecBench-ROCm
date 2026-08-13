@@ -66,7 +66,9 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
     stage = SolarStage.ARCHITECTURE
     try:
         profile = ArchitectureProfile.load(request.architecture)
-        if isinstance(profile, ArchitectureProfile):
+        if isinstance(profile, ArchitectureProfile) and (
+            request.require_verified_audit
+        ):
             profile.require_verified_audit_evidence()
         architecture_sha256 = _profile_hash(profile)
         pipeline = run_pipeline(request, profile, staging)

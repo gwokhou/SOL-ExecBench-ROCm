@@ -9,6 +9,7 @@ import shutil
 from functools import partial
 from pathlib import Path
 
+from sol_execbench.core.platform.runtime import detect_rocm_device
 from sol_execbench.core.solar_bridge.formal_device import (
     FORMAL_ARCHITECTURE,
     release_formal_device_memory,
@@ -49,6 +50,20 @@ def formal_architecture_profile_hash(
     return architecture_profile_sha256(architecture)
 
 
+_ARCHITECTURE_BY_GFX_TARGET = {
+    "gfx1200": FORMAL_ARCHITECTURE,
+    "gfx942": "MI300X",
+}
+
+
+def _architecture_for_gfx_target(gfx_target: str) -> str:
+    """Return the packaged SOLAR profile name for one gfx target."""
+    architecture = _ARCHITECTURE_BY_GFX_TARGET.get(gfx_target)
+    if architecture is None:
+        raise ValueError(f"unsupported_solar_architecture:{gfx_target}")
+    return architecture
+
+
 def analyze_workload(
     *,
     problem_dir: str | Path,
@@ -69,6 +84,40 @@ def analyze_workload(
         device=device,
         orojenesis_home=orojenesis_home,
         ir_path=normalize_ir_path(ir_path),
+        device_stage_lock_path=device_stage_lock_path,
+        device_stage_lock_timeout_seconds=device_stage_lock_timeout_seconds,
+    )
+
+
+def analyze_workload_diagnostic(
+    *,
+    problem_dir: str | Path,
+    workload_uuid: str,
+    output_dir: str | Path,
+    device: str,
+    orojenesis_home: str | Path | None = None,
+    ir_path: IRPath | str = DEFAULT_IR_PATH,
+    device_stage_lock_path: str | Path | None = None,
+    device_stage_lock_timeout_seconds: float = 14_400.0,
+) -> SolarAnalysisOutcome:
+    """Adapt one workload and invoke SOLAR's non-formal diagnostic path.
+
+    Unlike :func:`analyze_workload`, this path never requires the formal
+    gfx1200 device identity, selects the per-architecture profile from the
+    detected gfx target, skips the verified-audit and Orojenesis gates, and
+    returns a roofline bound even when the result is not publication-eligible.
+    Results are engineering/inexact, never a formal SOLAR bound.
+    """
+    gfx_target = detect_rocm_device(device).gfx_target
+    context = load_solar_workload_context(problem_dir, workload_uuid, device)
+    return _invoke_solar(
+        context=context,
+        output_dir=Path(output_dir),
+        device=device,
+        orojenesis_home=orojenesis_home,
+        ir_path=normalize_ir_path(ir_path),
+        architecture=_architecture_for_gfx_target(gfx_target),
+        formal=False,
         device_stage_lock_path=device_stage_lock_path,
         device_stage_lock_timeout_seconds=device_stage_lock_timeout_seconds,
     )
@@ -109,6 +158,8 @@ def _invoke_solar(
     device: str,
     orojenesis_home: str | Path | None,
     ir_path: IRPath = DEFAULT_IR_PATH,
+    architecture: str = FORMAL_ARCHITECTURE,
+    formal: bool = True,
     device_stage_lock_path: str | Path | None = None,
     device_stage_lock_timeout_seconds: float = 14_400.0,
 ) -> SolarAnalysisOutcome:
@@ -122,10 +173,11 @@ def _invoke_solar(
     definition = context.definition
     request = AnalysisRequest(
         conversion=solar_conversion_request(context, device, ir_path),
-        architecture=FORMAL_ARCHITECTURE,
+        architecture=architecture,
         output_dir=output_dir,
         precision=formal_precision_for_definition(definition),
-        require_orojenesis=True,
+        require_orojenesis=formal,
+        require_verified_audit=formal,
         orojenesis_home=orojenesis_home,
         analysis_metadata=performance_analysis_metadata(context),
         execution_policy=AnalysisExecutionPolicy(
@@ -166,7 +218,7 @@ def _invoke_solar(
         artifacts=tuple(artifact.__dict__ for artifact in result.artifacts),
         publication_eligible=result.publication_eligible,
     )
-    if not outcome.is_formal_publication:
+    if formal and not outcome.is_formal_publication:
         shutil.rmtree(result.output_dir, ignore_errors=True)
         return SolarAnalysisOutcome(
             status=SolarAnalysisStatus.FAILED,

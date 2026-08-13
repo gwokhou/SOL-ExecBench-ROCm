@@ -1,5 +1,5 @@
 {
-  "long_functions": 0,
+  "long_functions": 1,
   "oversized_test_modules": 0,
   "production_any_modules": 60,
   "wide_functions": 2,

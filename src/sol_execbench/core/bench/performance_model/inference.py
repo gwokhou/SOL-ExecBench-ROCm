@@ -18,6 +18,7 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
 from sol_execbench.core.bench.performance_model.models import (
     PERFORMANCE_MODEL_VERSION,
     DiagnosticModelIdentity,
+    DiagnosticModelVersion,
     PerformancePrediction,
     SemanticCharacterization,
     WorkloadKind,
@@ -212,7 +213,7 @@ class DiagnosticInferenceProfile(CurrentSchemaModel):
         SchemaVersion.DIAGNOSTIC_INFERENCE_PROFILE
     )
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
-    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
+    model_version: DiagnosticModelVersion = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     calibration_profile_sha256: SHA256Digest
     calibration_audit_sha256: SHA256Digest

@@ -1,7 +1,7 @@
 # Project handoff and active follow-ups
 
 Last audited: 2026-08-13 against source revision
-`cbaa382289418bda706cabe7df964b24943c927a`, the live ignored evidence/store,
+`fd7970520e205318e2e63d8a96d5203e1d5972c3`, the live ignored evidence/store,
 the remote P0 conformance Release metadata, and the completed start-460 /
 start640 rejections described below.
 
@@ -136,6 +136,44 @@ Authoritative surfaces:
 `src/sol_execbench/data/hardware_calibration_probes/diagnostic_microarchitecture.hip`,
 `scripts/internal/rdna4/run_rdna4_diagnostic_calibration.py`.
 
+### P1 — Validate the non-formal gfx942 (CDNA3) adaptation on real hardware
+
+The code-level non-formal gfx942 path is authored and verified on gfx1200 only:
+`gfx942` now runs materialize → evaluate → `solar analyze` through the
+non-formal bridge (`analyze_workload_diagnostic`), but every gfx942-specific
+artifact is spec-derived and `inexact`. Formal publication stays gfx1200-only.
+Re-derive the following on a real gfx942 (MI300X/MI308X) host before treating
+any gfx942 claim as validated:
+
+- Confirm the `gfx942_v1.yaml` counter spellings via
+  `rocprofv3-avail -d 0 info --pmc`. The `cache_lds` group reuses RDNA
+  spellings as placeholders; CDNA3 exposes different L2/TCP counters. Update the
+  manifest and re-bind `counter_semantics_sha256` via
+  `build_diagnostic_model_identity(model_version, counter_resource="gfx942_v1.yaml")`.
+- Compile and run the CDNA3 MFMA probes and record `V_MFMA_*` ISA evidence via
+  `scripts/internal/cdna3/run_cdna3_diagnostic_calibration.py`. Author the
+  deferred fp8 (FNUZ encoding) and int8 (32x32x8 output layout) MFMA probes
+  on-device.
+- Confirm the `MI300X.yaml` roofline profile (304 CUs, 192 GiB HBM, ~5.3 TB/s,
+  FP16/BF16/INT8 MFMA peaks, L2/L3 sizes) via `rocminfo` and replace the
+  provisional values.
+- Derive the `cdna3_total_memory_class.v1` probe working set (currently a
+  provisional 8 GiB) with a wave64 `diagnostic_microarchitecture.hip` variant;
+  a capacity-ratio/simulator justification is insufficient (see the MI300X
+  capacity-policy P1 above).
+- Run `uv run pytest -m requires_cdna3 -n 0` and record the full evidence chain.
+
+Authoritative surfaces:
+`src/sol_execbench/data/rocprofv3_counters/gfx942_v1.yaml`,
+`src/solar/rocm/profiles/MI300X.yaml`,
+`src/sol_execbench/core/bench/performance_model/vram_policy.py`,
+`scripts/internal/cdna3/run_cdna3_diagnostic_calibration.py`,
+`src/sol_execbench/core/solar_bridge/analyzer.py`.
+
+Completion evidence must name the exact GPU, ROCm/PyTorch stack, test set, and
+skipped prerequisites; results remain engineering/inexact until a formal
+resource-peak calibration receipt is produced.
+
 ### P1 — Expand empirical hardware and isolation coverage
 
 - Run `test_real_multi_gpu_candidate_device_switch_is_rejected` with at least
@@ -242,7 +280,8 @@ git status --short
 ```
 
 Expected: branch `main`, `HEAD`
-`cbaa382289418bda706cabe7df964b24943c927a`, only `HANDSOFF.md` modified.
+`fd7970520e205318e2e63d8a96d5203e1d5972c3`, plus the uncommitted CDNA3
+gfx942 non-formal adaptation (see the P1 validation backlog above).
 
 2. No accidental lifecycle run for the active source revision:
 

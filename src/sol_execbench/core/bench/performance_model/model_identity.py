@@ -23,19 +23,26 @@ _POLICY_MODULES = (
     "sol_execbench.core.bench.performance_model.counter_metrics",
     "sol_execbench.core.bench.performance_model.inference",
 )
-_COUNTER_RESOURCE = "gfx1200_v3.yaml"
+_DEFAULT_COUNTER_RESOURCE = "gfx1200_v3.yaml"
 
 
 def build_diagnostic_model_identity(
     model_version: str,
+    *,
+    counter_resource: str = _DEFAULT_COUNTER_RESOURCE,
 ) -> DiagnosticModelIdentity:
-    """Hash the declared inference owners without binding orchestration code."""
+    """Hash the declared inference owners without binding orchestration code.
+
+    ``counter_resource`` binds the per-architecture counter manifest into the
+    identity digest. gfx1200 callers keep the default; gfx942 callers pass
+    ``gfx942_v1.yaml`` so ``counter_semantics_sha256`` stays per-architecture.
+    """
     policy_files = {
         module_name: sha256_file(_module_path(module_name))
         for module_name in _POLICY_MODULES
     }
     resource = files("sol_execbench.data.rocprofv3_counters").joinpath(
-        _COUNTER_RESOURCE,
+        counter_resource,
     )
     with as_file(resource) as resource_path:
         counter_hash = sha256_file(resource_path)
