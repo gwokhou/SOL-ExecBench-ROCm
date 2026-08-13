@@ -53,10 +53,29 @@ from sol_execbench.core.bench.performance_model.models import (
 from sol_execbench.core.bench.performance_model.schedule_evidence import (
     schedule_predecessor_indices,
 )
+from sol_execbench.core.platform.arch_capabilities import (
+    derive_arch_capability_budget,
+)
 
 _F16_WMMA_FLOPS = 2.0 * 16.0 * 16.0 * 16.0
-_GFX1200_WAVE_SIZE = 32.0
+_DEFAULT_WAVE_SIZE = 32.0
 _FP32_BYTES = 4.0
+
+
+def _wave_size(gpu_architecture: str | None) -> float:
+    """Return the architected wavefront size, defaulting to 32 when unknown."""
+    budget = derive_arch_capability_budget(gpu_architecture)
+    if budget is not None and budget.wavefront_size is not None:
+        return float(budget.wavefront_size)
+    return _DEFAULT_WAVE_SIZE
+
+
+def _matrix_counter_names(gpu_architecture: str | None) -> tuple[str, ...]:
+    """Return matrix-instruction counters in the preferred per-arch order."""
+    budget = derive_arch_capability_budget(gpu_architecture)
+    if budget is not None and budget.matrix_unit == "mfma":
+        return ("SQ_INSTS_MFMA", "MFMAINSTS", "SQ_INSTS_WMMA")
+    return ("SQ_INSTS_WMMA", "SQ_INSTS_MFMA", "MFMAINSTS")
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,6 +297,7 @@ def _reduction_components(
     descriptor: ReductionDescriptor,
     calibration: DiagnosticCalibrationProfile,
 ) -> list[PredictionComponent]:
+    wave_size = _wave_size(calibration.identity.gpu_architecture)
     reduction_passes = (
         2 if descriptor.operation is ReductionOperation.LAYER_NORM else 1
     )
@@ -288,7 +308,7 @@ def _reduction_components(
     )
     barrier_events = (
         descriptor.outer_rows
-        * math.ceil(descriptor.reduction_width / _GFX1200_WAVE_SIZE)
+        * math.ceil(descriptor.reduction_width / wave_size)
         * math.ceil(math.log2(descriptor.reduction_width))
     )
     return [
@@ -926,6 +946,7 @@ def _dispatch_components(
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
     counters = dispatch.counters
+    wave_size = _wave_size(calibration.identity.gpu_architecture)
     waves = _counter(counters, "SQ_WAVES_SUM", "SQ_WAVES") or 0.0
     valu = _counter(
         counters,
@@ -935,9 +956,7 @@ def _dispatch_components(
     )
     wmma = _counter(
         counters,
-        "SQ_INSTS_WMMA",
-        "SQ_INSTS_MFMA",
-        "MFMAINSTS",
+        *_matrix_counter_names(calibration.identity.gpu_architecture),
     )
     lds = _counter(counters, "LDSINSTS", "SQ_INSTS_LDS")
     if compiled is not None and waves:
@@ -982,7 +1001,7 @@ def _dispatch_components(
         result.append(
             _scaled_component(
                 "lds",
-                lds * _GFX1200_WAVE_SIZE * _FP32_BYTES,
+                lds * wave_size * _FP32_BYTES,
                 _required(
                     calibration,
                     CalibrationParameterName.LDS_BYTE_PER_MS,
@@ -1008,6 +1027,7 @@ def _append_compute_component(
     wmma: float | None,
     calibration: DiagnosticCalibrationProfile,
 ) -> None:
+    wave_size = _wave_size(calibration.identity.gpu_architecture)
     descriptor = semantic.descriptor
     if (
         wmma
@@ -1028,7 +1048,7 @@ def _append_compute_component(
     if valu and (
         component := _hardware_valu_component(
             descriptor,
-            valu * _GFX1200_WAVE_SIZE,
+            valu * wave_size,
             calibration,
             dispatch_id,
         )

@@ -210,7 +210,7 @@ def test_counter_collection_fails_closed_for_unsupported_counter(
     )
 
 
-def test_counter_collection_rejects_non_gfx1200_device(
+def test_counter_collection_rejects_unmapped_device(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -233,8 +233,40 @@ def test_counter_collection_rejects_non_gfx1200_device(
     assert result.status is Rocprofv3ProfileStatus.UNAVAILABLE
     assert (
         result.skipped_reason
-        == "required counters are unsupported: architecture:gfx1200"
+        == "required counters are unsupported: architecture:gfx1100"
     )
+
+
+def test_counter_collection_selects_gfx942_manifest(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    tool = tmp_path / "rocprofv3-avail"
+    tool.write_text("fake executable", encoding="utf-8")
+    monkeypatch.setattr(
+        counter_collection, "resolve_rocm_tool", lambda _name: tool
+    )
+
+    result = collect_rocprofv3_counters(
+        _request(tmp_path),
+        runner=lambda command, _cwd, _timeout: subprocess.CompletedProcess(
+            command,
+            0,
+            "Name:gfx942\nCounter_Name : SQ_WAVES_sum\n",
+            "",
+        ),
+    )
+
+    # gfx942 is mapped to gfx942_v1.yaml, so selection proceeds past the
+    # architecture gate and fails on that manifest's required byte counters.
+    assert result.status is Rocprofv3ProfileStatus.UNAVAILABLE
+    assert result.reason_codes == (
+        Rocprofv3ReasonCode.REQUIRED_COUNTERS_UNSUPPORTED,
+    )
+    skipped_reason = result.skipped_reason
+    assert skipped_reason is not None
+    assert "architecture" not in skipped_reason
+    assert "compute_memory_traffic:bytes_read" in skipped_reason
 
 
 def test_counter_collection_rejects_incomplete_successful_run(

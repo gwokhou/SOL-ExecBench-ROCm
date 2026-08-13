@@ -28,6 +28,7 @@ from sol_execbench.core.bench.rocm_profiler.counter_provenance import (
     Rocprofv3CounterProvenance,
 )
 from sol_execbench.core.bench.rocm_profiler.counters import (
+    COUNTER_MANIFEST_BY_ARCHITECTURE,
     ROCPROFV3_AVAIL_EXECUTABLE,
     build_rocprofv3_counter_command,
     counter_names_in_csv,
@@ -78,7 +79,7 @@ def collect_rocprofv3_counters(
     rocprofv3_available: bool = True,
     runner: ProfileRunner | None = None,
 ) -> Rocprofv3ProfileResult:
-    """Collect controlled gfx1200 counter passes and audit provenance."""
+    """Collect controlled per-architecture counter passes and audit provenance."""
     run = runner or default_profile_runner
     if not rocprofv3_available:
         return _unavailable(request, "rocprofv3 is not available")
@@ -88,12 +89,28 @@ def collect_rocprofv3_counters(
     availability = _run_availability(request, run, str(avail_path))
     if isinstance(availability, Rocprofv3ProfileResult):
         return availability
+    architectures = parse_available_architectures(availability.stdout)
+    manifest_name = next(
+        (
+            name
+            for arch, name in COUNTER_MANIFEST_BY_ARCHITECTURE.items()
+            if arch in architectures
+        ),
+        None,
+    )
+    if manifest_name is None:
+        return _unsupported(
+            request,
+            [
+                f"architecture:{','.join(sorted(architectures)) or 'unknown'}",
+            ],
+            availability,
+        )
     resource = files("sol_execbench.data.rocprofv3_counters").joinpath(
-        "gfx1200_v3.yaml",
+        manifest_name,
     )
     with as_file(resource) as manifest_path:
         manifest = load_counter_manifest(manifest_path)
-        architectures = parse_available_architectures(availability.stdout)
         if manifest.architecture not in architectures:
             return _unsupported(
                 request,

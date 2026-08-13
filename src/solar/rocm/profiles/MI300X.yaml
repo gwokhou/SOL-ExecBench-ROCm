@@ -1,0 +1,127 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOLAR ROCm Port
+# SPDX-License-Identifier: Apache-2.0
+#
+# Spec-derived gfx942 (CDNA3 / AMD Instinct MI300X) roofline profile.
+# Confidence: inexact. Peak figures and cache sizes are taken from the published
+# AMD MI300X specification and the CDNA3 ISA reference guide and MUST be
+# confirmed on real gfx942 hardware via `rocminfo` before any formal use.
+# audit_evidence status is `unavailable` (no resource-peak calibration receipt
+# exists yet): the non-formal SOLAR path skips `require_verified_audit_evidence`,
+# the formal path does not and will reject this profile.
+name: AMD_Instinct_MI300X
+vendor: AMD
+gfx_target: gfx942
+profile_revision: mi300x-amd-resource-v1
+compute_units: 304
+memory_capacity_bytes: 206158430208
+memory_bandwidth_bytes_per_second: 5300000000000
+l2_bytes: 33554432
+last_level_cache_bytes: 268435456
+memory_hierarchy:
+  - name: vgpr
+    scope: simd
+    capacity_bytes: null
+    source: rocminfo does not expose physical VGPR capacity
+  - name: lds
+    scope: compute_unit
+    capacity_bytes: 65536
+    source: AMD CDNA3 ISA reference (MI300)
+  - name: l1
+    scope: compute_unit
+    capacity_bytes: 32768
+    source: AMD CDNA3 ISA reference (MI300)
+  - name: l2
+    scope: device
+    capacity_bytes: 33554432
+    source: AMD product specification (8 XCD x 4 MiB, provisional)
+  - name: l3
+    scope: device
+    capacity_bytes: 268435456
+    source: AMD product specification (Infinity Cache, provisional)
+  - name: vram
+    scope: device
+    capacity_bytes: 206158430208
+    bandwidth_bytes_per_second: 5300000000000
+    source: AMD product specification
+# Maximum boost clock used to express per-cycle diagnostics. The formal SOL
+# calculation uses the published per-second throughput and bandwidth below.
+clock_hz: 2100000000
+peak_ops_per_second:
+  fp32: 163400000000000
+  fp16: 1307400000000000
+  bf16: 1307400000000000
+  int8: 2614900000000000
+resource_model_version: amd_resource_v3
+# MFMA rates use the published CDNA3 matrix throughput (FP16/BF16/INT8 dense
+# matrix peaks). CDNA3 has no native FP8 in this ROCm 7.2 stack (FNUZ encoding),
+# and no INT4 matrix mode, so both are intentionally absent here; the AKA
+# gfx942 execution target likewise omits FP8. VALU fp32 uses the published
+# vector peak; fp16 uses the packed V_PK_FMA_F16 ceiling; bf16 promotes to fp32
+# (no packed bf16 VALU FMA on CDNA3), so its VALU rate keeps the fp32 ceiling.
+# sfu/reduction/atomic/scan_sort/conversion keep the packed-FP16 ceiling as a
+# conservative bound pending per-resource publication. These are spec-derived
+# nominal peaks; a real resource-peak calibration receipt replaces them for
+# formal use.
+resource_limits:
+  mfma:
+    "fp32->fp32": 163400000000000
+    "fp16->fp32": 1307400000000000
+    "bf16->fp32": 1307400000000000
+    "int8->int32": 2614900000000000
+  valu:
+    "fp32": 163400000000000
+    "fp16": 326800000000000
+    "bf16": 163400000000000
+    generic: 326800000000000
+  sfu:
+    generic: 326800000000000
+  reduction:
+    generic: 326800000000000
+  atomic:
+    generic: 326800000000000
+  scan_sort:
+    generic: 326800000000000
+  conversion:
+    generic: 326800000000000
+resource_limit_sources:
+  mfma: https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf
+  valu: https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf
+  sfu: https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf
+  reduction: https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf
+  atomic: https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf
+  scan_sort: https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf
+  conversion: https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-mi300-cdna3-instruction-set-architecture.pdf
+calibration_exempt_modes:
+  valu:
+    generic: Generic VALU is a conservative cross-operation ceiling rather than one calibratable instruction mode; typed FP32, FP16, and BF16 paths are audited separately
+  atomic:
+    generic: No architecture-wide atomic throughput is published and a single contention pattern cannot calibrate a universal ceiling; the conservative packed-FP16 ceiling remains source-derived
+  scan_sort:
+    generic: Scan and sort decompose into workload-dependent multi-stage algorithms rather than one calibratable hardware instruction; the conservative ceiling remains source-derived
+  conversion:
+    generic: Conversion throughput depends on the source/destination dtype pair and no universal architecture rate is published; the conservative ceiling remains source-derived
+precision_support:
+  fp32:
+    hardware: native
+    software: pytorch_production
+    calibration: required
+    evidence: https://rocm.docs.amd.com/projects/HIP/en/latest/understand/hardware_implementation.html
+  fp16:
+    hardware: native_mfma
+    software: pytorch_production
+    calibration: required
+    evidence: https://rocm.docs.amd.com/projects/rocWMMA/en/docs-7.2.1/API_Reference_Guide.html
+  bf16:
+    hardware: native_mfma
+    software: pytorch_production
+    calibration: required
+    evidence: https://rocm.docs.amd.com/projects/rocWMMA/en/docs-7.2.1/API_Reference_Guide.html
+  int8:
+    hardware: native_mfma
+    software: pytorch_production
+    calibration: required
+    evidence: https://rocm.docs.amd.com/projects/rocWMMA/en/docs-7.2.1/API_Reference_Guide.html
+audit_evidence:
+  status: unavailable
+  reason_code: spec_derived_inexact_pending_hardware_qualification
+source: https://www.amd.com/en/products/accelerators/instinct/mi300.html

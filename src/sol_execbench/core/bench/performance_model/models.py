@@ -30,6 +30,15 @@ from sol_execbench.core.integrity.schema_versions import (
 from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v7"
+CDNA3_PERFORMANCE_MODEL_VERSION = "cdna3_diagnostic.v1"
+
+# Closed architecture/model-version sets. Never widen to a free-form ``str``:
+# an unmapped architecture must fail closed rather than silently admit.
+SupportedDiagnosticArchitecture = Literal["gfx1200", "gfx942"]
+DiagnosticModelVersion = Literal[
+    "gfx1200_diagnostic.v7",
+    "cdna3_diagnostic.v1",
+]
 
 _MODEL_CONFIG = ConfigDict(
     extra="forbid",
@@ -612,7 +621,7 @@ class CalibrationIdentity(BaseModelWithDocstrings):
 
     model_config = _MODEL_CONFIG
 
-    gpu_architecture: Literal["gfx1200"]
+    gpu_architecture: SupportedDiagnosticArchitecture
     gpu_id: str
     gpu_bdf: str
     pcie_topology: PCIeTopologyIdentity | None = None
@@ -762,7 +771,7 @@ class DiagnosticCalibrationProfile(CurrentSchemaModel):
         SchemaVersion.DIAGNOSTIC_CALIBRATION
     )
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
-    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
+    model_version: DiagnosticModelVersion = PERFORMANCE_MODEL_VERSION
     identity: CalibrationIdentity
     parameters: list[CalibrationParameter] = Field(min_length=1)
     surfaces: list[CalibrationSurface] = Field(default_factory=list)
@@ -965,7 +974,7 @@ class PerformancePrediction(BaseModelWithDocstrings):
     lower_ms: float | None = Field(default=None, ge=0.0)
     upper_ms: float | None = Field(default=None, ge=0.0)
     components: list[PredictionComponent] = Field(default_factory=list)
-    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
+    model_version: DiagnosticModelVersion = PERFORMANCE_MODEL_VERSION
     reason_codes: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
 
@@ -1081,7 +1090,7 @@ class PerformanceDiagnosticSidecar(CurrentDiagnosticSidecarAuthority):
         SchemaVersion.PERFORMANCE_DIAGNOSTIC
     )
     status: DiagnosticSidecarStatus
-    model_version: Literal["gfx1200_diagnostic.v7"] = PERFORMANCE_MODEL_VERSION
+    model_version: DiagnosticModelVersion = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
     inference_profile_sha256: SHA256Digest | None = None
     run_id: str
@@ -1125,6 +1134,7 @@ class PerformanceDiagnosticSidecar(CurrentDiagnosticSidecarAuthority):
 
 
 __all__ = [
+    "CDNA3_PERFORMANCE_MODEL_VERSION",
     "PERFORMANCE_MODEL_VERSION",
     "ApplicabilityDimension",
     "CalibrationIdentity",
@@ -1142,6 +1152,7 @@ __all__ = [
     "CrossEntropyReduction",
     "DiagnosticCalibrationProfile",
     "DiagnosticModelIdentity",
+    "DiagnosticModelVersion",
     "DiagnosticRatio",
     "DispatchEvidence",
     "DispatchScheduleEdge",
@@ -1168,6 +1179,7 @@ __all__ = [
     "SemanticDescriptor",
     "SoftmaxDescriptor",
     "SoftmaxOperation",
+    "SupportedDiagnosticArchitecture",
     "TensorDType",
     "TransposeDescriptor",
     "UnsupportedDescriptor",

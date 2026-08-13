@@ -155,6 +155,13 @@ NVFP4/MXFP4 Quant ROCm adaptation has no representative CDNA4 hardware
 evidence. CDNA3 expected skips for those problems are not CPU validation,
 dequantized benchmark validation, or performance evidence.
 
+The non-formal gfx942 path selects spec-derived engineering artifacts — the
+`MI300X` SOLAR profile, the provisional `gfx942_v1.yaml` counter manifest, and
+the provisional `cdna3_total_memory_class.v1` VRAM policy — and reports
+engineering/inexact results. These must be re-derived on real gfx942 hardware
+(HANDSOFF P1) before any formal gfx942 publication. Formal SOLAR analysis and
+official scoring remain gfx1200-only.
+
 ## Documentation
 
 Update documentation when changing:

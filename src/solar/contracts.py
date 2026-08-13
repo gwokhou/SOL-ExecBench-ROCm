@@ -193,6 +193,7 @@ class AnalysisRequest(ConversionRequestEnvelope):
     output_dir: Path
     precision: str = "fp16"
     require_orojenesis: bool = False
+    require_verified_audit: bool = True
     orojenesis_home: str | Path | None = None
     analysis_metadata: Mapping[str, DynamicValue] = field(
         default_factory=dict,

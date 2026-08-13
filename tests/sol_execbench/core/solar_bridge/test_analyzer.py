@@ -306,6 +306,58 @@ def test_invoke_solar_rejects_non_formal_result(tmp_path, monkeypatch) -> None:
     assert not result_dir.exists()
 
 
+def test_invoke_solar_non_formal_path_keeps_non_formal_bound(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    result_dir = tmp_path / "result"
+    result_dir.mkdir()
+    monkeypatch.setattr(
+        analyzer,
+        "formal_precision_for_definition",
+        lambda value: "fp16",
+    )
+
+    observed: dict[str, object] = {}
+
+    def fake_analyze(request):
+        observed["require_orojenesis"] = request.require_orojenesis
+        observed["require_verified_audit"] = request.require_verified_audit
+        return AnalysisResult(
+            status=SolarAnalysisStatus.ANALYZED,
+            analysis_id=request.analysis_id,
+            output_dir=result_dir,
+            architecture_sha256="a" * 64,
+            artifacts=_FORMAL_ARTIFACTS,
+            bound=SOLBound(0.001, "roofline_eq1_v1", "memory"),
+        )
+
+    monkeypatch.setattr("solar.api.analyze", fake_analyze)
+
+    outcome = analyzer._invoke_solar(
+        context=_context(),
+        output_dir=result_dir,
+        device="hip:0",
+        orojenesis_home=None,
+        architecture="MI300X",
+        formal=False,
+    )
+
+    assert outcome.status == "analyzed"
+    assert outcome.lower_bound_seconds == 0.001
+    assert outcome.publication_eligible is False
+    assert observed["require_orojenesis"] is False
+    assert observed["require_verified_audit"] is False
+    assert result_dir.exists()
+
+
+def test_architecture_for_gfx_target_maps_cdna3_and_rdna4() -> None:
+    assert analyzer._architecture_for_gfx_target("gfx1200") == "RX_9060_XT"
+    assert analyzer._architecture_for_gfx_target("gfx942") == "MI300X"
+    with pytest.raises(ValueError, match="unsupported_solar_architecture"):
+        analyzer._architecture_for_gfx_target("gfx1100")
+
+
 def test_select_workload_requires_exact_uuid_match() -> None:
     workload = _workload()
 
