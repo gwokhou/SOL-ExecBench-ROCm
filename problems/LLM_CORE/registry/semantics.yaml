@@ -1,0 +1,1296 @@
+schema: llm_core_semantic_registry.v1
+semantics:
+- semantic_id: llm.linear.matmul_bias.v1
+  semantic_fingerprint: aa9372d8de56d7c651a0ce4919689b99f31ad63b8b97abfd721fbedde197731e
+  operation_family: linear
+  variant: matmul_bias
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.matmul_relu.v1
+  semantic_fingerprint: b67487bf2b6094351a91182c5812e2c069cda726122f4cce255211fb8906585b
+  operation_family: linear
+  variant: matmul_relu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.matmul_gelu.v1
+  semantic_fingerprint: 9de684fdc063b79f2353379a35d0a09ec3b13f4c26cf95bf010fe21d1ca94a5d
+  operation_family: linear
+  variant: matmul_gelu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.matmul_silu.v1
+  semantic_fingerprint: 1b2a5b02ad3559370c1462c3911f1058ce6dee74aa52cb078d66982b56db8409
+  operation_family: linear
+  variant: matmul_silu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.matmul_tanh.v1
+  semantic_fingerprint: 297f047df1ffc3fc27677119114232bfc2fc628a6efb6572f900a35645624892
+  operation_family: linear
+  variant: matmul_tanh
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.matmul_softcap.v1
+  semantic_fingerprint: 657b41bc38dd8e45d1db08fdedc54a3dfb1f7df18e0a6add02a2c1d31596a495
+  operation_family: linear
+  variant: matmul_softcap
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.matmul_scaled.v1
+  semantic_fingerprint: ed2a9c829124323435dd2e7744801a315d8f71d15306fb43a70db48cf6d5ac0d
+  operation_family: linear
+  variant: matmul_scaled
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.matmul_square_relu.v1
+  semantic_fingerprint: 038555f779b71ffb3bc4352cd2d783fe40e019e1e0e1ab3e9ea5f8fd64cc5d4b
+  operation_family: linear
+  variant: matmul_square_relu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.batched_matmul.v1
+  semantic_fingerprint: 7449945a5d0c15cbfbb1d169f7e8ef60573c6b06d8ac9aec5a54fe1bda1e6693
+  operation_family: linear
+  variant: batched_matmul
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.batched_bias.v1
+  semantic_fingerprint: d1bf6d02763a40d2d5b2ef3d82e48b45b4a39f835d9a1463a6e78151f0058873
+  operation_family: linear
+  variant: batched_bias
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.grouped_matmul.v1
+  semantic_fingerprint: f532dc0715f18b9f9c104a88a005f9bed1c084a237876958ab32c4bc30a113de
+  operation_family: linear
+  variant: grouped_matmul
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.linear.grouped_silu.v1
+  semantic_fingerprint: a0bfe33729578a9b6228c406cb7f4e432b24796c4275d42b6bc0f53dc0069cd2
+  operation_family: linear
+  variant: grouped_silu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.rmsnorm.v1
+  semantic_fingerprint: 15b933f4f7d2adb9e49482d4cbca4372209dce14fe50c2da50507cc77f1d8a4d
+  operation_family: norm_activation
+  variant: rmsnorm
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.layernorm.v1
+  semantic_fingerprint: ad0c00791d122a10b43e79edb296a53de8893972e39551905a41605c56fe7e0f
+  operation_family: norm_activation
+  variant: layernorm
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.l2norm.v1
+  semantic_fingerprint: b375fcfc43d20cb71296d8bc561ab10b9909d1f92c930d73d55854aa4d855e28
+  operation_family: norm_activation
+  variant: l2norm
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.silu.v1
+  semantic_fingerprint: 16f0acae98a38509532aad4cbb79f46445f11a591976f3cb75c1e05faa991090
+  operation_family: norm_activation
+  variant: silu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.gelu.v1
+  semantic_fingerprint: f76dba6e4c2519978338542fa4569452ba97eda61d7d4c26f9f2bd91371068b7
+  operation_family: norm_activation
+  variant: gelu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.relu_squared.v1
+  semantic_fingerprint: 10326d1a059002cc2d46e014c85cb403455f75ca817513c2741bd2e81dd255e8
+  operation_family: norm_activation
+  variant: relu_squared
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.swiglu.v1
+  semantic_fingerprint: d6581cc3e3bdfe6b929aaf23e42e33b7a9eac949e9436c50befd48ab054d1f18
+  operation_family: norm_activation
+  variant: swiglu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.geglu.v1
+  semantic_fingerprint: 612f59964f4f67bc4cc25f08c6ef8bee950c20df989f13265c6a3494ea70c8b3
+  operation_family: norm_activation
+  variant: geglu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.add_rmsnorm.v1
+  semantic_fingerprint: 39295ddd687c7add224c332f4c7b8bf4b0d5ea6445e5fd87ea5ce769cde54326
+  operation_family: norm_activation
+  variant: add_rmsnorm
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.norm_activation.bias_gelu.v1
+  semantic_fingerprint: c268219ac81ac880527ceee8749f36064a8e98ca4f311a3a8a686f8bc8689c69
+  operation_family: norm_activation
+  variant: bias_gelu
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.position.rope_interleaved.v1
+  semantic_fingerprint: f9ae11e3f10a6f476cab1255c50193003c21a7a725c8f939947ce25b2acc8850
+  operation_family: position
+  variant: rope_interleaved
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.position.rope_half.v1
+  semantic_fingerprint: f22664d0fa28a1d5fb9d96b97ddf1ae031699b7ac197dc12696a943ca2260093
+  operation_family: position
+  variant: rope_half
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.position.rope_scaled.v1
+  semantic_fingerprint: a9c68347db5d4a7551cc8adc44d906524a2dc2fbc36e9ecdb9592f28ce8d667c
+  operation_family: position
+  variant: rope_scaled
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.position.rope_partial.v1
+  semantic_fingerprint: a6432cd831bbfd1281f9f320a8b0ba2383970efd3d77103e5489fcdff72db804
+  operation_family: position
+  variant: rope_partial
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.position.rope_xpos.v1
+  semantic_fingerprint: e18fc376a5ec22ecba217098fc2e7d4d891563fa9784dd36d6cf4bfec849c917
+  operation_family: position
+  variant: rope_xpos
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.position.rope_yarn.v1
+  semantic_fingerprint: 1dc45bfe98b5398ee42db404b2526025afc55976721eca8f43ec3bdd23da828e
+  operation_family: position
+  variant: rope_yarn
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.mha_causal.v1
+  semantic_fingerprint: ebc9be0099b59faf5257e2438e938d7a14368f858469e70f00f98d0c6ab04202
+  operation_family: attention
+  variant: mha_causal
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.mha_full.v1
+  semantic_fingerprint: 74d656126300ae9669f35bf2708cb9a0b55f17b95f789a0b2669df750bdd957f
+  operation_family: attention
+  variant: mha_full
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.gqa_causal.v1
+  semantic_fingerprint: 61de1e7b651d485f9488a467c2d824fbeea6506118498d80e8457a39c9920815
+  operation_family: attention
+  variant: gqa_causal
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.gqa_full.v1
+  semantic_fingerprint: 137411a3aa138e4350c677593452ffe8efd5b56c150d4b5a37ff0eb1a6b5b279
+  operation_family: attention
+  variant: gqa_full
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.mqa_decode.v1
+  semantic_fingerprint: 80c1309266195901f97f20b15af35f0c8bb53649993af7c5917e82865239156d
+  operation_family: attention
+  variant: mqa_decode
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.sliding_window.v1
+  semantic_fingerprint: be192c0bbd01e307249270288d2c38dd2b80196a48eabf3c22f2bc63bfb2f831
+  operation_family: attention
+  variant: sliding_window
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.alibi.v1
+  semantic_fingerprint: 6915fad45a9207949e9ae6fa8689c150c3da5eedd8a82fb77a9c9912de229568
+  operation_family: attention
+  variant: alibi
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.softcap.v1
+  semantic_fingerprint: 7860d0788cd8c88a52910d56cf60fbca6ac639663987ac96ff639e979bf380f0
+  operation_family: attention
+  variant: softcap
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.local_global.v1
+  semantic_fingerprint: 35faf1547ab9b792fb6a362edea8c1c7437cbef60152b0c4c35d7676e29166bb
+  operation_family: attention
+  variant: local_global
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.grouped_query_scale.v1
+  semantic_fingerprint: dcda10d896021cf773c7f38c18c6a4f6fbaf87ebe0a9d0eb231110df1c516ffb
+  operation_family: attention
+  variant: grouped_query_scale
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.masked_softmax.v1
+  semantic_fingerprint: 669f7a06884745708ebc1f6c0a546b62ba3a42c4df8574535a98a17e9cd24b00
+  operation_family: attention
+  variant: masked_softmax
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.attention.attention_sink.v1
+  semantic_fingerprint: 81a9beedd7ad3d6bacb752a4ab4d7e03034f019ef91344507c00ed950b3d3abb
+  operation_family: attention
+  variant: attention_sink
+  profiles:
+  - core
+  - long_context
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.mla_compressed.v1
+  semantic_fingerprint: 0aea9f5bb946660aaa71c4b1e9cb4fc65b82e550d30242dd3b042847430a7378
+  operation_family: advanced_attention
+  variant: mla_compressed
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.delta_attention.v1
+  semantic_fingerprint: 3c52a8079c4d9c798b2cadcf6cc207ddadcdf19899042fb9f31d92e96c659b1b
+  operation_family: advanced_attention
+  variant: delta_attention
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.linear_attention.v1
+  semantic_fingerprint: 82486214a5450a1c27273e68ad14ea680583c8129d6ced7891f2534002f2b57a
+  operation_family: advanced_attention
+  variant: linear_attention
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.indexed_sparse.v1
+  semantic_fingerprint: cdea10b15945032c116e51a58267335e81e69504e47862fc590636abc0454f8c
+  operation_family: advanced_attention
+  variant: indexed_sparse
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.block_sparse.v1
+  semantic_fingerprint: 6803deb25d9523ab5adb217efc8c1cac399b926d92b48d92b568f2f54de74cc6
+  operation_family: advanced_attention
+  variant: block_sparse
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.topk_sparse.v1
+  semantic_fingerprint: 0cdee10b87ef530fd72b54d71914b4871e916e9e5ec7d8fbf69a7d8b81fba489
+  operation_family: advanced_attention
+  variant: topk_sparse
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.recurrent_state.v1
+  semantic_fingerprint: 423eb29770f1675336f261b76f39c424b050950d1963408f721ebebd8e0df15d
+  operation_family: advanced_attention
+  variant: recurrent_state
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.gated_delta.v1
+  semantic_fingerprint: ef252f169ddd8e2cd9a57381c693631ba036a5eaa462a553ed0b669ad577ff9f
+  operation_family: advanced_attention
+  variant: gated_delta
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.index_share.v1
+  semantic_fingerprint: 6bffeacd4cce6683147fdb0b3594fcad1cacfd98d63581c29b2734a78de67000
+  operation_family: advanced_attention
+  variant: index_share
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.advanced_attention.sparse_sink.v1
+  semantic_fingerprint: cb2a601274aceed01e2a421cfa44eca0d0d16bd2079dfbf8634718e38077a5a4
+  operation_family: advanced_attention
+  variant: sparse_sink
+  profiles:
+  - architecture_specific
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - sparse_attention
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.kv_cache.cache_write.v1
+  semantic_fingerprint: 418782af17aa993a7703a92d64dec4ef8603a2eb353960ed6808a82c979e7f28
+  operation_family: kv_cache
+  variant: cache_write
+  profiles:
+  - kv_cache
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - paged_memory
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.kv_cache.paged_write.v1
+  semantic_fingerprint: e8575b55022bab94c27d062ca1392f2c0ecb60c837c1e16fbc22c64f3e4eab50
+  operation_family: kv_cache
+  variant: paged_write
+  profiles:
+  - kv_cache
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - paged_memory
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.kv_cache.cache_gather.v1
+  semantic_fingerprint: 0f1b5f4bdf8ae85a0f85f256b57e79bafd88286ed1a959e25a8c9cc3edc1d64c
+  operation_family: kv_cache
+  variant: cache_gather
+  profiles:
+  - kv_cache
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - paged_memory
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.kv_cache.cache_scatter.v1
+  semantic_fingerprint: 496595fb549c44912a650397517af0022798571dbd036d2ddc235f9a706195b8
+  operation_family: kv_cache
+  variant: cache_scatter
+  profiles:
+  - kv_cache
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - paged_memory
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.kv_cache.cache_rotate.v1
+  semantic_fingerprint: bd85d76987223102b9f958fd394e1fac1bfdaf935eecd1db19e42868fa09f0cd
+  operation_family: kv_cache
+  variant: cache_rotate
+  profiles:
+  - kv_cache
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - paged_memory
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.kv_cache.cache_scale.v1
+  semantic_fingerprint: 951afc44c296403b5fea69812923e13c45526ca94effc6ded6530096aca2a6e0
+  operation_family: kv_cache
+  variant: cache_scale
+  profiles:
+  - kv_cache
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - paged_memory
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.kv_cache.cache_compress.v1
+  semantic_fingerprint: 810a7e8b23de512bf03063fac4bdadd654c043e36b681ec0792f99daf6613f39
+  operation_family: kv_cache
+  variant: cache_compress
+  profiles:
+  - kv_cache
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - paged_memory
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.kv_cache.cache_interleave.v1
+  semantic_fingerprint: b73a5beadb06ddf137edce97c57efb4b43b5508e81cea9b0969ed6c3226c42fa
+  operation_family: kv_cache
+  variant: cache_interleave
+  profiles:
+  - kv_cache
+  - long_context
+  source_ids:
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - paged_memory
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.route_top1.v1
+  semantic_fingerprint: f4dfee3f547eef6aec7354426237864dc1b9cf9495f7c742fc4d6c0104dbd30e
+  operation_family: moe
+  variant: route_top1
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.route_top2.v1
+  semantic_fingerprint: bc91dbb4fb2c94f8eeca381e359e62d24f636bd04438b1be4ed5f60754792004
+  operation_family: moe
+  variant: route_top2
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.sigmoid_route.v1
+  semantic_fingerprint: b9c92c018febc03529a248a2483e8fc4fa5ed06aefeef911689acabd7c8b311f
+  operation_family: moe
+  variant: sigmoid_route
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.softmax_route.v1
+  semantic_fingerprint: 82bb99b4cf410e8673b3a19fe1bc55e57577a214b3dabdcebd1071227199a75f
+  operation_family: moe
+  variant: softmax_route
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.shared_expert.v1
+  semantic_fingerprint: 79d2a5290352e9204e6f2ecb2d3112a26d5fab5fc66767f0925efb09597049ec
+  operation_family: moe
+  variant: shared_expert
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.expert_bias.v1
+  semantic_fingerprint: 2e9dc80872cd2eb0866ef85640cc22d0e95278fa23b068567dbe8b169b6aee64
+  operation_family: moe
+  variant: expert_bias
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.grouped_expert.v1
+  semantic_fingerprint: 7a61be6ce4141d92a45ed784e05b5be6234edb325946583a8828a6f4918232f6
+  operation_family: moe
+  variant: grouped_expert
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.normalized_topk.v1
+  semantic_fingerprint: 5edc45d359c0779c62032fd73673255e516835800cd96dd0c384d8fb928bb18b
+  operation_family: moe
+  variant: normalized_topk
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.capacity_route.v1
+  semantic_fingerprint: 53545f1e68818302575450b845d1010ef34ab37cd44c2eba2336059e49891207
+  operation_family: moe
+  variant: capacity_route
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.expert_scale.v1
+  semantic_fingerprint: 710bc2114eadfa82c369f5f692b0f1c442a6d4b6471eead6f824e39b20148103
+  operation_family: moe
+  variant: expert_scale
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.fused_gate_up.v1
+  semantic_fingerprint: 3004a00cab844fd66a967903e483e90c2c2f735b765ffcc45a8f252f98b1cfbb
+  operation_family: moe
+  variant: fused_gate_up
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.moe.routed_residual.v1
+  semantic_fingerprint: 2b9046464ece1448bf8910c410b9b8ca7234b150eb21ec8206f3e536fb063264
+  operation_family: moe
+  variant: routed_residual
+  profiles:
+  - moe
+  - architecture_specific
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - glm_5_2
+  - minimax_m3
+  - llama_4
+  quantization: null
+  capabilities:
+  - grouped_gemm
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.quantization.fp8_per_tensor.v1
+  semantic_fingerprint: 00f25bceaa59b5c3d2105869b3f049457d668497351b71989d292c2ac8d6958f
+  operation_family: quantization
+  variant: fp8_per_tensor
+  profiles:
+  - quantized
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - minimax_m3
+  - ministral_3
+  quantization: fp8_per_tensor
+  capabilities:
+  - packed_low_precision
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.quantization.fp8_per_token.v1
+  semantic_fingerprint: 854a4731ea007da54d7d17a6d783e610924110b6815cf9da5e27f6a1306c63f4
+  operation_family: quantization
+  variant: fp8_per_token
+  profiles:
+  - quantized
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - minimax_m3
+  - ministral_3
+  quantization: fp8_per_token
+  capabilities:
+  - packed_low_precision
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.quantization.mxfp8_block.v1
+  semantic_fingerprint: a7151f79e6f2a22fb8b78c0c7fa84f7a31b896b3cf9e60ab78258f4fe8ec0f5f
+  operation_family: quantization
+  variant: mxfp8_block
+  profiles:
+  - quantized
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - minimax_m3
+  - ministral_3
+  quantization: mxfp8_block
+  capabilities:
+  - packed_low_precision
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.quantization.fp4_group.v1
+  semantic_fingerprint: 3e2a12bd96eeb972aa7600e8e89fdd0a2802f622151345af16899a060d483094
+  operation_family: quantization
+  variant: fp4_group
+  profiles:
+  - quantized
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - minimax_m3
+  - ministral_3
+  quantization: fp4_group
+  capabilities:
+  - packed_low_precision
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.quantization.mxfp4_block.v1
+  semantic_fingerprint: a2127dc1e034e61f712907614ccb435821cebef7de856908f5c7edb164b49b92
+  operation_family: quantization
+  variant: mxfp4_block
+  profiles:
+  - quantized
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - minimax_m3
+  - ministral_3
+  quantization: mxfp4_block
+  capabilities:
+  - packed_low_precision
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.quantization.int8_per_tensor.v1
+  semantic_fingerprint: 3fed714c44009adcba9b8c5cd96244cd7b849a75f6ad4963c7ebe94d5e6ec8ca
+  operation_family: quantization
+  variant: int8_per_tensor
+  profiles:
+  - quantized
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - minimax_m3
+  - ministral_3
+  quantization: int8_per_tensor
+  capabilities:
+  - packed_low_precision
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.quantization.int8_per_token.v1
+  semantic_fingerprint: 337b3f67155c3cba9acfaa06ec42400b82a1fcdd487347a1c5e8ff9bcf5b87a2
+  operation_family: quantization
+  variant: int8_per_token
+  profiles:
+  - quantized
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - minimax_m3
+  - ministral_3
+  quantization: int8_per_token
+  capabilities:
+  - packed_low_precision
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.quantization.int8_weight_only.v1
+  semantic_fingerprint: 2bfda92f8a1d346bde21d3b748b3090495f215d58ca1183fc2723e9afa9fd84f
+  operation_family: quantization
+  variant: int8_weight_only
+  profiles:
+  - quantized
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - kimi_k3
+  - minimax_m3
+  - ministral_3
+  quantization: int8_weight_only
+  capabilities:
+  - packed_low_precision
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.indexing_reduction.embedding_lookup.v1
+  semantic_fingerprint: acf69c8d8ad6c22a405c1dbfc50c2c0c060653b8887af7f8ee202d0f90cf3566
+  operation_family: indexing_reduction
+  variant: embedding_lookup
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.indexing_reduction.row_sum.v1
+  semantic_fingerprint: 229e3012f6a161b94971db23134eaeb5147ba5245bdab3a783c4b2431c8d8378
+  operation_family: indexing_reduction
+  variant: row_sum
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.indexing_reduction.row_mean.v1
+  semantic_fingerprint: 4ed0f099483b6fe083a0e6d62864f5e4072d6ed93bc925567aed357eb40a4816
+  operation_family: indexing_reduction
+  variant: row_mean
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.indexing_reduction.row_max.v1
+  semantic_fingerprint: ea23410ba2ace5d3209fff71a2102d74f8308a12970c51cea31724d10b42e6ef
+  operation_family: indexing_reduction
+  variant: row_max
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.indexing_reduction.row_l2.v1
+  semantic_fingerprint: 034d60f9077a28f21cc09bcee29ef709da5118abc96b5b4cf7fee5c31af3de1f
+  operation_family: indexing_reduction
+  variant: row_l2
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1
+- semantic_id: llm.indexing_reduction.logsumexp.v1
+  semantic_fingerprint: abc3430c94891062c6a5c940d5509d8b16293ad0b20ef9934d3c6ac9a504ecaf
+  operation_family: indexing_reduction
+  variant: logsumexp
+  profiles:
+  - core
+  source_ids:
+  - qwen3_8
+  - deepseek_v4
+  - gemma_4
+  - ministral_3
+  quantization: null
+  capabilities: []
+  status: frozen_in_llm_core_v1

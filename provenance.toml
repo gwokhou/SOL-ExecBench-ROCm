@@ -16,6 +16,7 @@ active_roots = [
   "docs",
   "examples",
   "docker",
+  "problems",
 ]
 
 [classes]
@@ -85,6 +86,25 @@ path_globs = [
 required_notices = [
   "Apache-2.0 license text or reference",
   "flashinfer-ai/flashinfer-trace attribution",
+]
+
+[[dataset_policy.sources]]
+id = "llm_core_clean_room"
+name = "LLM Core clean-room corpus"
+origin_repository = "independent reconstruction from pinned public model architecture facts"
+license = "Apache-2.0"
+provenance_class = "clean_room_model_grounded"
+redistribution_class = "publishable"
+repository_redistribution = true
+release_bundle_redistribution = true
+attribution = "Independent SOL ExecBench ROCm references; model sources and revisions are recorded as factual provenance only."
+path_globs = [
+  "problems/LLM_CORE/**",
+]
+required_notices = [
+  "Apache-2.0 project license",
+  "Pinned model-source registry",
+  "No copied model kernels, weights, or NVIDIA SOL-ExecBench dataset content",
 ]
 
 [[dataset_policy.sources]]

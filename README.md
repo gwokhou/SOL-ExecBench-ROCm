@@ -24,7 +24,27 @@ declared in `pyproject.toml`.
 
 ## Public problem corpus
 
-The reviewed selection is tracked at
+The hardware-independent, text-backbone corpus is frozen at
+`problems/LLM_CORE/releases/LLM_CORE_V1/manifest.yaml`. It contains 84
+clean-room Definitions and 1260 Workloads across dense, attention, MoE, KV
+cache, long-context, and quantization profiles. Validate it or create a purely
+static target view without probing a GPU:
+
+```bash
+uv run sol-execbench dataset corpus validate
+uv run sol-execbench dataset corpus select \
+  --target-template gfx1200 \
+  --memory-budget 8589934592 \
+  --profile core \
+  --output problems/local/LLM_CORE/gfx1200-8g
+```
+
+The bundled gfx1200 and gfx942 target files are declarations, not hardware
+qualification. They filter by profile, dtype, quantization, capability, tensor
+limits, reference IPC, and memory envelope. LLM Core scoring, profiling,
+hardware qualification, and SOLAR integration are intentionally deferred.
+
+The legacy AKA-reviewed selection remains tracked at
 `problems/AMD_AKA/manifest.yaml`. Problems are derived from AMD
 AgentKernelArena (AKA, Apache-2.0) under the SOL-ExecBench paper §3
 construction methodology: each problem's PyTorch reference is the AKA task's

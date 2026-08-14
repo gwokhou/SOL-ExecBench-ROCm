@@ -1,0 +1,83 @@
+schema: llm_core_model_registry.v1
+source_freeze_date: 2026-08-14
+sources:
+  - source_id: qwen3_8
+    model_id: Qwen/Qwen3.8-2.4T-A95B
+    url: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/blob/207bd685a7e3696cfaff12ded7c6a7ea0f88c996/config.json
+    revision: 207bd685a7e3696cfaff12ded7c6a7ea0f88c996
+    source_sha256: 4e3819548967e319ab435d044a3a331dbe3b078590ce822e9d74b79430533987
+    license: Qwen3.8 Community License
+    license_reviewed: true
+    clean_room: true
+    captured_at: 2026-08-14
+    architecture_role: high-expert MoE, GQA, and low-precision shapes
+  - source_id: deepseek_v4
+    model_id: deepseek-ai/DeepSeek-V4-Pro
+    url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/b5968e9190ef611bbf34a7229255be88a0e937c1/config.json
+    revision: b5968e9190ef611bbf34a7229255be88a0e937c1
+    source_sha256: 5fe4568daee51c208cb8a79538eaeda090ae011ade1dee2c386aa95f569c810e
+    license: MIT
+    license_reviewed: true
+    clean_room: true
+    captured_at: 2026-08-14
+    architecture_role: latent attention, fine-grained MoE, and FP8
+  - source_id: kimi_k3
+    model_id: moonshotai/Kimi-K3
+    url: https://huggingface.co/moonshotai/Kimi-K3/blob/9f62e4e9fffbd0a83ddd60e1c209d828994b3569/config.json
+    revision: 9f62e4e9fffbd0a83ddd60e1c209d828994b3569
+    source_sha256: 9710e121a58d03ac92c8d6da287a19541994319afbbe6d6202af001ffd379213
+    license: Kimi K3 Model License
+    license_reviewed: true
+    clean_room: true
+    captured_at: 2026-08-14
+    architecture_role: delta attention, attention residuals, and sparse MoE
+  - source_id: glm_5_2
+    model_id: zai-org/GLM-5.2
+    url: https://huggingface.co/zai-org/GLM-5.2/blob/b4734de4facf877f85769a911abafc5283eab3d9/config.json
+    revision: b4734de4facf877f85769a911abafc5283eab3d9
+    source_sha256: 185f93ee6d12548e16a847e279dc0c3c90b1524c970b0866b42fb545747d859a
+    license: MIT
+    license_reviewed: true
+    clean_room: true
+    captured_at: 2026-08-14
+    architecture_role: indexed sparse attention and MoE routing
+  - source_id: minimax_m3
+    model_id: MiniMaxAI/MiniMax-M3
+    url: https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/f0e1c1e04d40177e4673a22097036854f536e9c0/config.json
+    revision: f0e1c1e04d40177e4673a22097036854f536e9c0
+    source_sha256: c9c97ce1e4eece60012d5a10ea87717458bfb1f19c2c7a615a3dbff83d090c6b
+    license: MiniMax Community License
+    license_reviewed: true
+    clean_room: true
+    captured_at: 2026-08-14
+    architecture_role: million-context sparse attention and MoE
+  - source_id: gemma_4
+    model_id: google/gemma-4-12B
+    url: https://huggingface.co/google/gemma-4-12B/blob/023679ed352de9bb66cc873c9009ce3482585c08/config.json
+    revision: 023679ed352de9bb66cc873c9009ce3482585c08
+    source_sha256: 14f38c5492ffc9cbcdf808647ca0c025bb5b9b4eb737526347134d500ace6098
+    license: Apache-2.0
+    license_reviewed: true
+    clean_room: true
+    captured_at: 2026-08-14
+    architecture_role: compact dense and hybrid local-global text backbone
+  - source_id: ministral_3
+    model_id: mistralai/Ministral-3-14B-Instruct-2512
+    url: https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512/blob/29439f81c2be264d8d393273f99e7db9c0961120/config.json
+    revision: 29439f81c2be264d8d393273f99e7db9c0961120
+    source_sha256: fc51295bdc0b39c015c9c3ca5d649de183eae73a23b8cbab1a0e055be8d5fa04
+    license: Apache-2.0
+    license_reviewed: true
+    clean_room: true
+    captured_at: 2026-08-14
+    architecture_role: edge-sized dense text backbone and FP8 deployment
+  - source_id: llama_4
+    model_id: meta-llama/Llama-4-Scout-17B-16E
+    url: https://github.com/meta-llama/llama-models/blob/0e0b8c519242d5833d8c11bffc1232b77ad7f301/models/llama4/MODEL_CARD.md
+    revision: 0e0b8c519242d5833d8c11bffc1232b77ad7f301
+    source_sha256: a1739083c8a496ca0c121d90b98659a6aa7e36fcc0092581db35ef99736d104f
+    license: Llama 4 Community License
+    license_reviewed: true
+    clean_room: true
+    captured_at: 2026-08-14
+    architecture_role: long-context GQA and continuity MoE anchor
