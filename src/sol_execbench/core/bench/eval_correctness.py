@@ -22,6 +22,7 @@ from sol_execbench.core.bench.evaluation_requests import (
     WorkloadEvaluationRequest,
 )
 from sol_execbench.core.bench.output_checks import compare_output_checks
+from sol_execbench.core.bench.output_collection import call_and_collect_outputs
 from sol_execbench.core.bench.reference_protocol import (
     ReferenceCase,
     ReferenceExecutionError,
@@ -29,7 +30,6 @@ from sol_execbench.core.bench.reference_protocol import (
     ReferenceProtocolError,
 )
 from sol_execbench.core.bench.reward_hack import check_lazy_outputs
-from sol_execbench.core.bench.utils import call_and_collect_outputs
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import Correctness, EvaluationStatus
 from sol_execbench.core.data.workload import Workload

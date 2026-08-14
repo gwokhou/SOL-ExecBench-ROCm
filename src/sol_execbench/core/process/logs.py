@@ -11,7 +11,10 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+from sol_execbench.core.process.stdio import flush_stdio_streams
+
 DEFAULT_LOG_TAIL_CHARS = 4000
+MAX_EMBEDDED_LOG_BYTES = 64 * 1024
 
 _TOKEN_PATTERN = re.compile(
     r"(?ix)"
@@ -108,6 +111,25 @@ def redacted_file_tail(path: Path, limit: int = DEFAULT_LOG_TAIL_CHARS) -> str:
         return ""
 
 
+def read_bounded_log(
+    log_path: str | None,
+    *,
+    limit: int = MAX_EMBEDDED_LOG_BYTES,
+) -> str | None:
+    """Read a bounded UTF-8 log after flushing inherited stdio streams."""
+    if not log_path:
+        return None
+    flush_stdio_streams()
+    try:
+        with Path(log_path).open("rb") as handle:
+            data = handle.read(limit + 1)
+    except OSError:
+        return None
+    truncated = len(data) > limit
+    text = data[:limit].decode("utf-8", errors="replace")
+    return f"{text}\n\n[log truncated]\n" if truncated else text
+
+
 def temporary_stream_path(
     temp_dir: Path,
     name: str,
@@ -155,6 +177,8 @@ def run_command_to_files(
 
 __all__ = [
     "DEFAULT_LOG_TAIL_CHARS",
+    "MAX_EMBEDDED_LOG_BYTES",
+    "read_bounded_log",
     "redacted_file_tail",
     "redacted_text_tail",
     "run_command_to_files",
