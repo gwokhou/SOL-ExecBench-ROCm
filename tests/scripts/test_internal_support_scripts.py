@@ -13,6 +13,9 @@ import torch
 from sol_execbench.core.bench.performance_model.corpus_preflight import (
     preflight,
 )
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+)
 from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticCorpusSnapshotManifest,
     DiagnosticLifecycleStage,
@@ -20,7 +23,6 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticStageStatus,
     import_artifact_tree,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def test_aka_author_seed_helpers_and_coverage_inventory(load_script) -> None:
@@ -297,7 +299,10 @@ def test_rdna4_diagnostic_packaged_templates_prepare_full_corpus(
     corpus._prepare(tmp_path)
 
     summary = preflight(tmp_path)
-    assert summary.schema_version == SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT
+    assert (
+        summary.schema_version
+        == DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN
+    )
     assert summary.cases == 660
     assert summary.families == 11
 

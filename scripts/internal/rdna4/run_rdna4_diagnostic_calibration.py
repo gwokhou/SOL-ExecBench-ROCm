@@ -46,6 +46,10 @@ from sol_execbench.core.bench.performance_model.calibration_audit import (
     DiagnosticCalibrationAudit,
     calibration_probe_identity_payload,
 )
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticCalibrationArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.models import (
     CalibrationIdentity,
     CalibrationSurfaceName,
@@ -73,9 +77,6 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
 from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 from sol_execbench.core.platform.amd_smi import parse_gpu_identity
 from sol_execbench.core.platform.amdgpu_code_object import extract_code_object
@@ -454,7 +455,8 @@ def _audit_payload(
     environment: Sequence[RuntimeGPUTelemetry],
 ) -> dict[str, object]:
     return {
-        "schema_version": SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT,
+        "schema_version": DiagnosticArtifactSchema.DIAGNOSTIC_CALIBRATION,
+        "artifact_kind": DiagnosticCalibrationArtifactKind.AUDIT,
         "probe_identity": {
             "source_sha256": sha256_file(PROBE_SOURCE),
             "binary_sha256": sha256_file(binary),

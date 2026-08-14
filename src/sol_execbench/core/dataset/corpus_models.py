@@ -18,7 +18,8 @@ from sol_execbench.core.data.base_model import (
     NonNegativeInt,
 )
 from sol_execbench.core.data.definition_models import DType
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.dataset.schema_versions import DatasetArtifactSchema
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
 REVISION_PATTERN = r"^[0-9a-f]{40}$"
@@ -200,9 +201,9 @@ class CorpusCoveragePolicy(FrozenArtifactModel):
 class CorpusManifest(CurrentFrozenSchemaModel):
     """Generic, immutable problem-corpus manifest."""
 
-    current_schema_version = SchemaVersion.CORPUS_MANIFEST
+    current_schema_version = DatasetArtifactSchema.CORPUS_MANIFEST
 
-    schema_version: Literal[SchemaVersion.CORPUS_MANIFEST]
+    schema_version: Literal[DatasetArtifactSchema.CORPUS_MANIFEST]
     corpus_id: NonEmptyString
     release_id: NonEmptyString
     release_state: CorpusReleaseState
@@ -246,9 +247,9 @@ class CorpusManifest(CurrentFrozenSchemaModel):
 class StaticTargetDescriptor(CurrentFrozenSchemaModel):
     """User-supplied, non-probed hardware capability declaration."""
 
-    current_schema_version = SchemaVersion.STATIC_TARGET_DESCRIPTOR
+    current_schema_version = PlatformArtifactSchema.STATIC_TARGET_DESCRIPTOR
 
-    schema_version: Literal[SchemaVersion.STATIC_TARGET_DESCRIPTOR]
+    schema_version: Literal[PlatformArtifactSchema.STATIC_TARGET_DESCRIPTOR]
     target_id: NonEmptyString
     gfx_target: NonEmptyString
     qualification_status: TargetQualificationStatus
@@ -286,9 +287,9 @@ class SelectedProblem(FrozenArtifactModel):
 class CorpusSelectionManifest(CurrentFrozenSchemaModel):
     """Auditable result of static, hardware-free corpus selection."""
 
-    current_schema_version = SchemaVersion.CORPUS_SELECTION_MANIFEST
+    current_schema_version = DatasetArtifactSchema.CORPUS_SELECTION_MANIFEST
 
-    schema_version: Literal[SchemaVersion.CORPUS_SELECTION_MANIFEST]
+    schema_version: Literal[DatasetArtifactSchema.CORPUS_SELECTION_MANIFEST]
     corpus_id: NonEmptyString
     release_id: NonEmptyString
     source_manifest_sha256: str = Field(pattern=SHA256_PATTERN)

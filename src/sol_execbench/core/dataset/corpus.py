@@ -36,12 +36,12 @@ from sol_execbench.core.dataset.corpus_models import (
     StaticTargetDescriptor,
     TargetQualificationStatus,
 )
+from sol_execbench.core.dataset.schema_versions import DatasetArtifactSchema
 from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
     validate_relative_artifact_path,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 SELECTION_MANIFEST_FILENAME = "selection-manifest.yaml"
 
@@ -408,7 +408,7 @@ def _selection_manifest(
     decisions: tuple[SelectionDecision, ...],
 ) -> CorpusSelectionManifest:
     return CorpusSelectionManifest(
-        schema_version=SchemaVersion.CORPUS_SELECTION_MANIFEST,
+        schema_version=DatasetArtifactSchema.CORPUS_SELECTION_MANIFEST,
         corpus_id=manifest.corpus_id,
         release_id=manifest.release_id,
         source_manifest_sha256=sha256_file(manifest_path),

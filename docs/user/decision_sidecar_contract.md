@@ -25,10 +25,11 @@ schemas that feed it.
 The Decision sidecar consumes facts from the diagnostic data sidecars:
 
 - `EnvironmentSnapshot.capability_budgets[]` — arch ISA resource budgets
-  (`sol_execbench.environment_snapshot.v2` with packaged
+  (the `snapshot` variant of `sol_execbench.environment_evidence.v1` with packaged
   `sol_execbench.arch_capability_budget.v1` budgets).
 - `StaticKernelEvidenceSidecar.footprints[]` and `kernels[].footprint` —
-  per-kernel resource usage (`sol_execbench.static_kernel_evidence.v4`).
+  per-kernel resource usage (the `static_kernel` variant of
+  `sol_execbench.performance_evidence_component.v1`).
 
 The current Layer R builder does not consume profile-summary or Agent-feedback
 sidecars. Runtime bottleneck hints remain owned by `profile_summary.v3`, while

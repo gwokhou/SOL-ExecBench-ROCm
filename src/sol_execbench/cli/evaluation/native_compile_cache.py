@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Final
 
 import torch
 
@@ -23,7 +24,6 @@ from sol_execbench.core.data.json_utils import (
     load_json_value,
 )
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_CONTAINER_IMAGE_ID,
     ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE,
@@ -32,6 +32,7 @@ from sol_execbench.core.process.environment import (
 
 _CACHE_ARTIFACT = "benchmark_kernel.so"
 _CACHE_ENTRY = "entry.json"
+NATIVE_COMPILE_CACHE_FORMAT_VERSION: Final = 1
 _STATIC_ARTIFACT_SUFFIXES = frozenset({".co", ".hsaco", ".o"})
 _IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
 _SOURCE_REVISION = re.compile(r"[0-9a-f]{40}")
@@ -97,6 +98,9 @@ class NativeCompileCache:
             entry_dir = self.root / self.key
             if not entry_dir.exists():
                 return False
+            if not _entry_uses_current_format(entry_dir):
+                shutil.rmtree(entry_dir)
+                return False
             inventory = _verified_entry_inventory(entry_dir, self)
             for relative_path, artifact in inventory:
                 target = destination.parent / relative_path
@@ -119,8 +123,11 @@ class NativeCompileCache:
         with _locked_cache_root(self.root):
             entry_dir = self.root / self.key
             if entry_dir.exists():
-                _verified_entry_inventory(entry_dir, self)
-                return
+                if not _entry_uses_current_format(entry_dir):
+                    shutil.rmtree(entry_dir)
+                else:
+                    _verified_entry_inventory(entry_dir, self)
+                    return
             with TemporaryDirectory(
                 prefix=f".{self.key}.", dir=self.root
             ) as temporary:
@@ -138,7 +145,7 @@ class NativeCompileCache:
                         }
                     )
                 payload = {
-                    "schema_version": SchemaVersion.NATIVE_COMPILE_CACHE,
+                    "format_version": NATIVE_COMPILE_CACHE_FORMAT_VERSION,
                     "cache_key_sha256": self.key,
                     "identity": self.identity,
                     "artifacts": artifacts,
@@ -166,7 +173,7 @@ def _cache_identity(
     if _SOURCE_REVISION.fullmatch(source_revision) is None:
         raise ValueError("native compile cache requires exact source revision")
     return {
-        "schema_version": SchemaVersion.NATIVE_COMPILE_CACHE,
+        "format_version": NATIVE_COMPILE_CACHE_FORMAT_VERSION,
         "solution_sha256": sha256_file(staging_dir / "solution.json"),
         "build_script_sha256": sha256_file(staging_dir / "build_ext.py"),
         "command": list(command),
@@ -232,7 +239,7 @@ def _verified_entry_inventory(
         raise ValueError("native compile cache metadata is not a regular file")
     payload = load_json_value(entry_path)
     expected = {
-        "schema_version": SchemaVersion.NATIVE_COMPILE_CACHE,
+        "format_version": NATIVE_COMPILE_CACHE_FORMAT_VERSION,
         "cache_key_sha256": cache.key,
         "identity": cache.identity,
     }
@@ -259,6 +266,21 @@ def _verified_entry_inventory(
     if actual_paths != {*relative_paths, Path(_CACHE_ENTRY)}:
         raise ValueError("native compile cache inventory is not exact")
     return inventory
+
+
+def _entry_uses_current_format(entry_dir: Path) -> bool:
+    """Return whether a structurally readable cache entry is reusable."""
+    if entry_dir.is_symlink() or not entry_dir.is_dir():
+        raise ValueError(
+            "native compile cache entry is not a regular directory"
+        )
+    entry_path = entry_dir / _CACHE_ENTRY
+    if entry_path.is_symlink() or not entry_path.is_file():
+        raise ValueError("native compile cache metadata is not a regular file")
+    payload = load_json_value(entry_path)
+    if not isinstance(payload, dict):
+        raise ValueError("native compile cache metadata is invalid")
+    return payload.get("format_version") == NATIVE_COMPILE_CACHE_FORMAT_VERSION
 
 
 def _verified_inventory_item(

@@ -17,14 +17,14 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSourceRef,
     ExtendedDiagnosticIdentity,
 )
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.bench.rocm_profiler.models import Rocprofv3ProfileStatus
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceStatus,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
@@ -115,10 +115,10 @@ class AgentFeedbackSidecar(CurrentDiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for agent next-experiment guidance."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.AGENT_FEEDBACK
+    current_schema_version = PerformanceArtifactSchema.AGENT_FEEDBACK
 
-    schema_version: Literal[SchemaVersion.AGENT_FEEDBACK] = (
-        SchemaVersion.AGENT_FEEDBACK
+    schema_version: Literal[PerformanceArtifactSchema.AGENT_FEEDBACK] = (
+        PerformanceArtifactSchema.AGENT_FEEDBACK
     )
     status: DiagnosticSidecarStatus
     reason_code: AgentFeedbackReasonCode

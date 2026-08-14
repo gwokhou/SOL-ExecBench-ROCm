@@ -63,7 +63,7 @@ from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.data.workload_validation import (
     validate_problem_contract,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.integrity.protocol_versions import WireProtocol
 
 
 class ReferenceRequestError(ValueError):
@@ -403,7 +403,7 @@ def _validated_request(
     *,
     token: str,
 ) -> dict[str, Any]:
-    if request.get("protocol") != SchemaVersion.REFERENCE_IPC:
+    if request.get("protocol") != WireProtocol.REFERENCE_IPC:
         raise ReferenceRequestError("reference protocol version mismatch")
     if request.get("token") != token:
         raise ReferenceRequestError("reference authentication failed")
@@ -423,7 +423,7 @@ def _serve_connection(
             if request.get("operation") == "shutdown":
                 send_json(
                     writer,
-                    {"ok": True, "protocol": SchemaVersion.REFERENCE_IPC},
+                    {"ok": True, "protocol": WireProtocol.REFERENCE_IPC},
                 )
                 return
             if request.get("operation") == "timing_validation":
@@ -435,7 +435,7 @@ def _serve_connection(
                 service.validate_timing_outputs(actual.outputs)
                 send_json(
                     writer,
-                    {"ok": True, "protocol": SchemaVersion.REFERENCE_IPC},
+                    {"ok": True, "protocol": WireProtocol.REFERENCE_IPC},
                 )
                 continue
             operation, case, latency, failure = service.handle(request)

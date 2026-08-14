@@ -19,28 +19,20 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import Field, ValidationError
 
-from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
+from sol_execbench.core.data.base_model import FrozenArtifactModel
 from sol_execbench.core.platform.amd_smi import parse_gpu_count, parse_processes
 from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 
 logger = logging.getLogger(__name__)
 
 
-class GPUDeviceIsolation(CurrentFrozenSchemaModel):
-    """Current GPU isolation observation."""
+class GPUDeviceIsolation(FrozenArtifactModel):
+    """GPU isolation observation nested in a versioned calibration."""
 
-    current_schema_version = SchemaVersion.GPU_DEVICE_ISOLATION
-
-    schema_version: Literal[SchemaVersion.GPU_DEVICE_ISOLATION] = (
-        SchemaVersion.GPU_DEVICE_ISOLATION
-    )
     isolated: bool
     gpu_count: int = Field(ge=0)
     rocr_visible_devices: str | None
@@ -164,7 +156,6 @@ def validate_gpu_device_isolation(
 
     Returns:
         Dict with keys:
-        - ``schema_version``: Isolation check schema identifier
         - ``isolated``: Whether the process has adequate GPU isolation
         - ``gpu_count``: Total GPU count detected (0 if unknown)
         - ``rocr_visible_devices``: Current ``ROCR_VISIBLE_DEVICES`` value or None
@@ -198,7 +189,6 @@ def validate_gpu_device_isolation(
     isolated = gpu_count <= 1 or rocr_visible is not None
 
     result = {
-        "schema_version": SchemaVersion.GPU_DEVICE_ISOLATION,
         "isolated": isolated,
         "gpu_count": gpu_count,
         "rocr_visible_devices": rocr_visible,

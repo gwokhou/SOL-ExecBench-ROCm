@@ -12,6 +12,9 @@ from typing import Literal
 import numpy as np
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
 )
@@ -28,9 +31,6 @@ from sol_execbench.core.data.base_model import (
     StrictArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 MINIMUM_POINT_FIT_CASES = 20
 CONFORMAL_CALIBRATION_CASES = 20
@@ -207,11 +207,13 @@ class DiagnosticInferenceProfile(CurrentSchemaModel):
     """Frozen interval and action policy built before held-out acceptance."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_INFERENCE_PROFILE
-
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_INFERENCE_PROFILE] = (
-        SchemaVersion.DIAGNOSTIC_INFERENCE_PROFILE
+    current_schema_version = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_INFERENCE_PROFILE
     )
+
+    schema_version: Literal[
+        DiagnosticArtifactSchema.DIAGNOSTIC_INFERENCE_PROFILE
+    ] = DiagnosticArtifactSchema.DIAGNOSTIC_INFERENCE_PROFILE
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     model_version: DiagnosticModelVersion = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity

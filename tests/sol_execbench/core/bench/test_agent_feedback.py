@@ -18,6 +18,9 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticArtifactCitation,
     ExtendedDiagnosticIdentity,
 )
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
     Rocprofv3ProfileStatus,
@@ -34,7 +37,6 @@ from sol_execbench.core.data.trace import (
     Trace,
 )
 from sol_execbench.core.data.workload import ScalarInput, Workload
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def build_agent_feedback_sidecar(
@@ -170,7 +172,7 @@ def test_agent_feedback_sidecar_is_diagnostic_only_for_passing_trace():
     sidecar = build_agent_feedback_sidecar(traces=[_trace()])
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == SchemaVersion.AGENT_FEEDBACK
+    assert payload["schema_version"] == PerformanceArtifactSchema.AGENT_FEEDBACK
     assert payload["status"] == "available"
     assert payload["reason_code"] == "feedback_generated"
     assert payload["summary"]["status_counts"] == {"PASSED": 1}

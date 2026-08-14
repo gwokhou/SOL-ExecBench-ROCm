@@ -13,6 +13,10 @@ from sol_execbench.core.platform.dependency_matrix import (
 from sol_execbench.core.platform.docker_matrix import (
     load_docker_target_manifest,
 )
+from sol_execbench.core.platform.schema_versions import (
+    PlatformArtifactSchema,
+    PlatformPreflightArtifactKind,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
@@ -63,6 +67,10 @@ def test_module_main_emits_default_dependency_preflight_json() -> None:
     )
     payload = json.loads(completed.stdout)
 
+    assert (
+        payload["schema_version"] == PlatformArtifactSchema.PLATFORM_PREFLIGHT
+    )
+    assert payload["artifact_kind"] == PlatformPreflightArtifactKind.DEPENDENCY
     assert payload["target_id"] == "rocm-7.2.0-ubuntu-24.04-container"
     assert payload["pytorch_rocm_target"] == "rocm7.2"
     assert payload["policy_id"] == "pytorch-2.11.0-rocm7.2-project-default"

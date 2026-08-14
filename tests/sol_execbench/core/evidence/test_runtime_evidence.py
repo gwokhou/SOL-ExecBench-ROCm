@@ -13,13 +13,13 @@ from sol_execbench.core.evidence.runtime_evidence import cli
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeFailureEvidence,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
 )
 from sol_execbench.core.platform.docker_matrix import (
     load_docker_target_manifest,
 )
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
@@ -114,7 +114,7 @@ def test_runtime_evidence_io_round_trips_entry_and_aggregate(tmp_path) -> None:
 
     assert loaded == entry
     assert json.loads(entry_path.read_text())["schema_version"] == (
-        SchemaVersion.ROCM_COMPATIBILITY_MATRIX
+        PlatformArtifactSchema.ROCM_COMPATIBILITY_MATRIX
     )
     assert json.loads(report_path.read_text())["status_counts"] == {
         "not_tested": 1,

@@ -6,6 +6,9 @@ from pathlib import Path
 from sol_execbench.cli.sidecars import (
     agent_feedback as cli_agent_feedback_sidecar,
 )
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.data.solution import (
     BuildSpec,
     Solution,
@@ -20,7 +23,6 @@ from sol_execbench.core.data.trace import (
     Trace,
 )
 from sol_execbench.core.data.workload import ScalarInput, Workload
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _solution(source: str = "def run(x):\n    return x\n") -> Solution:
@@ -93,7 +95,7 @@ def test_agent_feedback_sidecar_records_bounded_metadata(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.agent-feedback.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == SchemaVersion.AGENT_FEEDBACK
+    assert payload["schema_version"] == PerformanceArtifactSchema.AGENT_FEEDBACK
     assert payload["authority"] == "diagnostic"
     assert payload["identity"]["trace_path"] == "trace.jsonl"
     assert payload["identity"]["target_id"] == "gemm"

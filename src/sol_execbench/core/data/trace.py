@@ -26,10 +26,8 @@ from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     NonEmptyString,
 )
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 
 class NumericCheckResult(BaseModelWithDocstrings):
@@ -287,9 +285,11 @@ class Trace(CurrentSchemaModel):
     without an actual benchmark execution.
     """
 
-    current_schema_version = SchemaVersion.TRACE
+    current_schema_version = BenchmarkArtifactSchema.TRACE
 
-    schema_version: Literal[SchemaVersion.TRACE] = SchemaVersion.TRACE
+    schema_version: Literal[BenchmarkArtifactSchema.TRACE] = (
+        BenchmarkArtifactSchema.TRACE
+    )
     definition: NonEmptyString
     """Name of the Definition that specifies the computational workload."""
     workload: Workload

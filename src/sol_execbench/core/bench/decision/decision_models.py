@@ -24,10 +24,10 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSourceRef,
     ExtendedDiagnosticIdentity,
 )
-from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
 )
+from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
@@ -136,9 +136,11 @@ class DecisionSidecar(CurrentDiagnosticSidecarEnvelope):
     """Strict diagnostic-only sidecar for Layer R optimization hints."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.DECISION
+    current_schema_version = PerformanceArtifactSchema.DECISION
 
-    schema_version: Literal[SchemaVersion.DECISION] = SchemaVersion.DECISION
+    schema_version: Literal[PerformanceArtifactSchema.DECISION] = (
+        PerformanceArtifactSchema.DECISION
+    )
     status: DiagnosticSidecarStatus
     reason_code: DecisionReasonCode
     identity: ExtendedDiagnosticIdentity

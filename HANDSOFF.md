@@ -236,9 +236,10 @@ Authoritative surfaces: `src/solar/graph/torchview/extraction.py`,
 - Publication evaluation remains networkless, capability-free, and private-IPC.
 - Mutable process evidence stays under ignored `data/outputs/`; immutable
   diagnostic release projections stay under ignored `data/publications/`.
-- Current `sol_execbench.*` schema identifiers are defined only in
-  `src/sol_execbench/core/integrity/schema_versions.py`; current SOLAR versions
-  are defined only in `src/solar/schema_versions.py`.
+- Current `sol_execbench.*` artifact schema identifiers are defined in their
+  owning domain registries and aggregated only for audits by
+  `src/sol_execbench/core/integrity/artifact_registry.py`; current SOLAR
+  versions are defined only in `src/solar/schema_versions.py`.
 
 ## Verification before handoff
 

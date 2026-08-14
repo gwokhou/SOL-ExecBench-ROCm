@@ -20,9 +20,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from sol_execbench.core.integrity.checksums import sha256_file
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 from sol_execbench.tools.amd_isa.errors import (
     ISADownloadError,
     ISAIntegrityError,
@@ -92,7 +90,10 @@ class ISASpecRepository:
             .joinpath("releases.json")
             .read_text(encoding="utf-8"),
         )
-        if payload.get("schema_version") != SchemaVersion.AMD_ISA_RELEASE_LOCK:
+        if (
+            payload.get("schema_version")
+            != PlatformArtifactSchema.AMD_ISA_RELEASE_LOCK
+        ):
             raise ISAIntegrityError("unsupported AMD ISA release-lock schema")
         self._releases: dict[str, dict[str, Any]] = payload["releases"]
         self._default_release = str(payload["default_release"])

@@ -11,12 +11,18 @@ from collections.abc import Iterable
 from pathlib import Path
 from types import MappingProxyType, ModuleType
 
-from sol_execbench.core.integrity import schema_versions as exec_schema_versions
-from sol_execbench.core.integrity.schema_versions import (
-    CURRENT_NUMERIC_SCHEMA_VERSIONS as EXECBENCH_NUMERIC_SCHEMA_VERSIONS,
-    CURRENT_SCHEMA_VERSIONS,
-    SCHEMA_VERSIONS,
-    SchemaVersion,
+from sol_execbench.core.dataset import (
+    schema_versions as dataset_schema_versions,
+)
+from sol_execbench.core.integrity.artifact_registry import (
+    ARTIFACT_SCHEMA_MEMBERS,
+    ARTIFACT_SCHEMA_REGISTRIES,
+    CURRENT_NUMERIC_ARTIFACT_SCHEMAS,
+    CURRENT_STRING_ARTIFACT_SCHEMAS,
+)
+from sol_execbench.core.integrity.protocol_versions import (
+    CURRENT_WIRE_PROTOCOLS,
+    WireProtocol,
 )
 from solar import schema_versions as solar_schema_versions
 from solar.schema_versions import (
@@ -28,28 +34,69 @@ from solar.schema_versions import (
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_SUFFIX_RE = re.compile(r"\.v\d+$")
 CURRENT_SCHEMA_IDENTIFIERS = (
-    CURRENT_SCHEMA_VERSIONS | CURRENT_STRING_SCHEMA_VERSIONS
+    CURRENT_STRING_ARTIFACT_SCHEMAS | CURRENT_STRING_SCHEMA_VERSIONS
+)
+CURRENT_VERSIONED_WIRE_IDENTIFIERS = (
+    CURRENT_SCHEMA_IDENTIFIERS | CURRENT_WIRE_PROTOCOLS
 )
 NON_NAMESPACED_SCHEMA_FAMILIES = frozenset(
     VERSION_SUFFIX_RE.sub("", schema_id)
     for schema_id in CURRENT_SCHEMA_IDENTIFIERS
     if not schema_id.startswith(("sol_execbench.", "solar."))
 )
-SCHEMA_ID_RE = re.compile(
-    r"(?:"
-    r"(?:sol_execbench|solar)(?:\.[a-z0-9_]+)+"
-    r"|"
-    + "|".join(map(re.escape, sorted(NON_NAMESPACED_SCHEMA_FAMILIES)))
-    + r")\.v\d+",
+VERSIONED_WIRE_PREFIXES = (
+    r"(?:sol_execbench|solar)(?:\.[a-z0-9_]+)+",
+    *map(re.escape, sorted(NON_NAMESPACED_SCHEMA_FAMILIES)),
 )
-CURRENT_NUMERIC_SCHEMA_VERSIONS = (
-    EXECBENCH_NUMERIC_SCHEMA_VERSIONS | SOLAR_NUMERIC_SCHEMA_VERSIONS
+VERSIONED_WIRE_ID_RE = re.compile(
+    rf"(?:{'|'.join(VERSIONED_WIRE_PREFIXES)})\.v\d+"
+)
+CURRENT_NUMERIC_SCHEMA_VERSIONS = MappingProxyType(
+    {
+        **CURRENT_NUMERIC_ARTIFACT_SCHEMAS,
+        **SOLAR_NUMERIC_SCHEMA_VERSIONS,
+    }
 )
 READ_ONLY_MAPPING_TYPE = type(MappingProxyType({}))
-EXECBENCH_SCHEMA_REGISTRY = Path(
-    "src/sol_execbench/core/integrity/schema_versions.py"
+EXECBENCH_SCHEMA_REGISTRIES = frozenset(
+    {
+        Path(
+            "src/sol_execbench/core/bench/performance_model/diagnostic_schema_versions.py"
+        ),
+        Path(
+            "src/sol_execbench/core/bench/performance_model/lifecycle/schema_versions.py"
+        ),
+        Path(
+            "src/sol_execbench/core/bench/performance_model/schema_versions.py"
+        ),
+        Path("src/sol_execbench/core/bench/rocm_profiler/schema_versions.py"),
+        Path("src/sol_execbench/core/control_plane_schema_versions.py"),
+        Path("src/sol_execbench/core/data/schema_versions.py"),
+        Path("src/sol_execbench/core/dataset/schema_versions.py"),
+        Path("src/sol_execbench/core/platform/schema_versions.py"),
+        Path("src/sol_execbench/core/scoring/schema_versions.py"),
+    }
+)
+ARTIFACT_AGGREGATE_REGISTRY = Path(
+    "src/sol_execbench/core/integrity/artifact_registry.py"
+)
+ARTIFACT_AGGREGATE_IMPORT = "sol_execbench.core.integrity.artifact_registry"
+ARTIFACT_AGGREGATE_IMPORT_ALLOWLIST = frozenset(
+    {
+        Path("scripts/check_non_canonical_artifacts.py"),
+        Path("scripts/check_schema_versions.py"),
+    }
 )
 SOLAR_SCHEMA_REGISTRY = Path("src/solar/schema_versions.py")
+PROTOCOL_REGISTRY = Path(
+    "src/sol_execbench/core/integrity/protocol_versions.py"
+)
+ARTIFACT_SCHEMA_CLASS_NAMES = frozenset(
+    registry.__name__ for registry in ARTIFACT_SCHEMA_REGISTRIES
+)
+ARTIFACT_SCHEMA_OWNER_BY_VALUE = {
+    member.value: type(member).__name__ for member in ARTIFACT_SCHEMA_MEMBERS
+}
 NUMERIC_SCHEMA_FIELD_RE = re.compile(
     r'(?m)^[ \t]*(?:"schema_version"|schema_version)[ \t]*:[ \t]*(\d+)\b',
 )
@@ -231,7 +278,8 @@ class _SchemaAccessPolicyVisitor(ast.NodeVisitor):
         if not (
             isinstance(value, ast.Attribute)
             and isinstance(value.value, ast.Name)
-            and value.value.id in {"SchemaVersion", "SolarSchemaVersion"}
+            and value.value.id
+            in ARTIFACT_SCHEMA_CLASS_NAMES | {"SolarSchemaVersion"}
         ):
             return
         for target in targets:
@@ -265,12 +313,40 @@ class _SchemaAccessPolicyVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+class _ArtifactAggregateImportVisitor(ast.NodeVisitor):
+    """Keep the cross-domain aggregate out of production dependencies."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.findings: list[str] = []
+
+    def _record(self, node: ast.Import | ast.ImportFrom) -> None:
+        self.findings.append(
+            f"{self.path}:{node.lineno}: artifact_registry is audit-only; "
+            "import the owning domain schema enum directly",
+        )
+
+    def visit_Import(self, node: ast.Import) -> None:
+        if any(
+            alias.name == ARTIFACT_AGGREGATE_IMPORT
+            or alias.name.startswith(f"{ARTIFACT_AGGREGATE_IMPORT}.")
+            for alias in node.names
+        ):
+            self._record(node)
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        if node.module == ARTIFACT_AGGREGATE_IMPORT:
+            self._record(node)
+        self.generic_visit(node)
+
+
 def _python_numeric_schema_findings(path: Path, content: str) -> list[str]:
     """Reject raw positive numeric schema versions outside their registries."""
     if path.suffix != ".py" or path.parts[0] not in {"src", "scripts"}:
         return []
     if path in {
-        EXECBENCH_SCHEMA_REGISTRY,
+        *EXECBENCH_SCHEMA_REGISTRIES,
         SOLAR_SCHEMA_REGISTRY,
     }:
         return []
@@ -282,15 +358,21 @@ def _python_numeric_schema_findings(path: Path, content: str) -> list[str]:
     visitor.visit(tree)
     access_visitor = _SchemaAccessPolicyVisitor(path)
     access_visitor.visit(tree)
-    return [*visitor.findings, *access_visitor.findings]
+    aggregate_import_visitor = _ArtifactAggregateImportVisitor(path)
+    if path not in ARTIFACT_AGGREGATE_IMPORT_ALLOWLIST:
+        aggregate_import_visitor.visit(tree)
+    return [
+        *visitor.findings,
+        *access_visitor.findings,
+        *aggregate_import_visitor.findings,
+    ]
 
 
 def registry_findings() -> list[str]:
     """Require immutable registries derived exactly from their enums."""
     registries = {
-        "sol_execbench SCHEMA_VERSIONS": SCHEMA_VERSIONS,
-        "sol_execbench CURRENT_NUMERIC_SCHEMA_VERSIONS": (
-            EXECBENCH_NUMERIC_SCHEMA_VERSIONS
+        "sol_execbench CURRENT_NUMERIC_ARTIFACT_SCHEMAS": (
+            CURRENT_NUMERIC_ARTIFACT_SCHEMAS
         ),
         "solar CURRENT_NUMERIC_SCHEMA_VERSIONS": SOLAR_NUMERIC_SCHEMA_VERSIONS,
     }
@@ -299,18 +381,16 @@ def registry_findings() -> list[str]:
         for name, registry in registries.items()
         if not isinstance(registry, READ_ONLY_MAPPING_TYPE)
     ]
-    expected_strings = {
-        version.name.lower(): version.value for version in SchemaVersion
-    }
-    expected_numeric = _numeric_schema_constants(exec_schema_versions)
+    expected_members = tuple(
+        member for registry in ARTIFACT_SCHEMA_REGISTRIES for member in registry
+    )
+    expected_numeric = _numeric_schema_constants(dataset_schema_versions)
     expected_solar_numeric = _numeric_schema_constants(solar_schema_versions)
-    if dict(SCHEMA_VERSIONS) != expected_strings:
+    if expected_members != ARTIFACT_SCHEMA_MEMBERS:
+        findings.append("ARTIFACT_SCHEMA_MEMBERS must derive from domain enums")
+    if dict(CURRENT_NUMERIC_ARTIFACT_SCHEMAS) != expected_numeric:
         findings.append(
-            "sol_execbench SCHEMA_VERSIONS must derive from SchemaVersion"
-        )
-    if dict(EXECBENCH_NUMERIC_SCHEMA_VERSIONS) != expected_numeric:
-        findings.append(
-            "sol_execbench CURRENT_NUMERIC_SCHEMA_VERSIONS must contain every "
+            "CURRENT_NUMERIC_ARTIFACT_SCHEMAS must contain every "
             "family constant",
         )
     if dict(SOLAR_NUMERIC_SCHEMA_VERSIONS) != expected_solar_numeric:
@@ -318,8 +398,24 @@ def registry_findings() -> list[str]:
             "solar CURRENT_NUMERIC_SCHEMA_VERSIONS must contain every family "
             "constant",
         )
-    if len(CURRENT_SCHEMA_VERSIONS) != len(SchemaVersion):
-        findings.append("SchemaVersion values must be unique")
+    expected_string_values = frozenset(
+        member.value for member in ARTIFACT_SCHEMA_MEMBERS
+    )
+    if expected_string_values != CURRENT_STRING_ARTIFACT_SCHEMAS:
+        findings.append(
+            "CURRENT_STRING_ARTIFACT_SCHEMAS must derive from domain enums"
+        )
+    if len(CURRENT_STRING_ARTIFACT_SCHEMAS) != len(ARTIFACT_SCHEMA_MEMBERS):
+        findings.append("domain artifact schema values must be unique")
+    if (
+        frozenset(protocol.value for protocol in WireProtocol)
+        != CURRENT_WIRE_PROTOCOLS
+    ):
+        findings.append("CURRENT_WIRE_PROTOCOLS must derive from WireProtocol")
+    if len(CURRENT_WIRE_PROTOCOLS) != len(WireProtocol):
+        findings.append("WireProtocol values must be unique")
+    if CURRENT_SCHEMA_IDENTIFIERS & CURRENT_WIRE_PROTOCOLS:
+        findings.append("schema and protocol registries must be disjoint")
     if (
         frozenset(version.value for version in SolarSchemaVersion)
         != CURRENT_STRING_SCHEMA_VERSIONS
@@ -377,34 +473,46 @@ def audit_text(
     path: Path,
     content: str,
 ) -> tuple[list[str], dict[str, set[str]]]:
-    """Return findings and schema IDs grouped by family for one file."""
+    """Return findings and versioned wire IDs grouped by family."""
     findings: list[str] = []
     families: dict[str, set[str]] = defaultdict(set)
     findings.extend(_numeric_schema_findings(path, content))
-    for schema_id in SCHEMA_ID_RE.findall(content):
-        family = VERSION_SUFFIX_RE.sub("", schema_id)
-        families[family].add(schema_id)
-        if schema_id not in CURRENT_SCHEMA_IDENTIFIERS:
+    for identifier in VERSIONED_WIRE_ID_RE.findall(content):
+        family = VERSION_SUFFIX_RE.sub("", identifier)
+        families[family].add(identifier)
+        if identifier not in CURRENT_VERSIONED_WIRE_IDENTIFIERS:
             findings.append(
-                f"{path}: unsupported schema identifier {schema_id}",
+                f"{path}: unsupported versioned wire identifier {identifier}",
             )
         elif (
             path.suffix == ".py"
             and path.parts[0] in {"src", "scripts"}
             and (
                 (
-                    schema_id in CURRENT_SCHEMA_VERSIONS
-                    and path != EXECBENCH_SCHEMA_REGISTRY
+                    identifier in CURRENT_STRING_ARTIFACT_SCHEMAS
+                    and path not in EXECBENCH_SCHEMA_REGISTRIES
                 )
                 or (
-                    schema_id in CURRENT_STRING_SCHEMA_VERSIONS
+                    identifier in CURRENT_STRING_SCHEMA_VERSIONS
                     and path != SOLAR_SCHEMA_REGISTRY
+                )
+                or (
+                    identifier in CURRENT_WIRE_PROTOCOLS
+                    and path != PROTOCOL_REGISTRY
                 )
             )
         ):
+            owner = (
+                "WireProtocol"
+                if identifier in CURRENT_WIRE_PROTOCOLS
+                else ARTIFACT_SCHEMA_OWNER_BY_VALUE.get(
+                    identifier,
+                    "SolarSchemaVersion",
+                )
+            )
             findings.append(
-                f"{path}: schema identifier {schema_id} must be referenced "
-                "through SchemaVersion",
+                f"{path}: versioned wire identifier {identifier} must be "
+                f"referenced through {owner}",
             )
     if (
         UPSTREAM_TOLERANCE_FIELD in content
@@ -432,8 +540,42 @@ def audit_paths(paths: Iterable[Path]) -> list[str]:
     for family, versions in sorted(families.items()):
         if len(versions) > 1:
             findings.append(
-                f"{family}: multiple schema versions: {sorted(versions)}",
+                f"{family}: multiple versioned wire identifiers: "
+                f"{sorted(versions)}",
             )
+    return findings
+
+
+def registry_usage_findings(paths: Iterable[Path]) -> list[str]:
+    """Reject canonical registry entries with no non-test owner or artifact."""
+    registry_paths = {
+        *EXECBENCH_SCHEMA_REGISTRIES,
+        ARTIFACT_AGGREGATE_REGISTRY,
+        SOLAR_SCHEMA_REGISTRY,
+        PROTOCOL_REGISTRY,
+    }
+    contents: list[str] = []
+    for path in paths:
+        if path in registry_paths or path.parts[0] == "tests":
+            continue
+        try:
+            contents.append((ROOT / path).read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            continue
+    corpus = "\n".join(contents)
+    findings = [
+        "unused artifact schema registration: "
+        f"{type(version).__name__}.{version.name}"
+        for version in ARTIFACT_SCHEMA_MEMBERS
+        if f"{type(version).__name__}.{version.name}" not in corpus
+        and version.value not in corpus
+    ]
+    findings.extend(
+        f"unused wire protocol registration: WireProtocol.{protocol.name}"
+        for protocol in WireProtocol
+        if f"WireProtocol.{protocol.name}" not in corpus
+        and protocol.value not in corpus
+    )
     return findings
 
 
@@ -474,8 +616,10 @@ def main() -> int:
         for path in sorted(RETIRED_SCHEMA_PATHS)
         if (ROOT / path).exists()
     )
+    paths = first_party_paths()
     findings.extend(registry_findings())
-    findings.extend(audit_paths(first_party_paths()))
+    findings.extend(registry_usage_findings(paths))
+    findings.extend(audit_paths(paths))
     if findings:
         print("\n".join(findings))
         return 1

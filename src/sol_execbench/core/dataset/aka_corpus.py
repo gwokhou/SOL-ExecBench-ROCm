@@ -71,14 +71,14 @@ from sol_execbench.core.dataset.aka_schemas import (
 from sol_execbench.core.dataset.aka_tolerance import (
     validate_calibration_binding,
 )
+from sol_execbench.core.dataset.schema_versions import (
+    AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
+    AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION,
+)
 from sol_execbench.core.integrity import (
     sha256_file,
     validate_relative_artifact_path,
     validate_sha256,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
-    AKA_MATERIALIZATION_MANIFEST_SCHEMA_VERSION,
 )
 from sol_execbench.core.platform.runtime import derive_cache_clear_policy
 

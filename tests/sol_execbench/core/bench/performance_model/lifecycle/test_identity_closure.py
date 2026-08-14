@@ -39,6 +39,9 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     recompute_stage_id,
     release_id,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+)
 from sol_execbench.core.platform.runtime import (
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
@@ -94,30 +97,7 @@ _GPU = GpuLifecycleIdentity(
 _SW = SoftwareLifecycleIdentity(sol_version="4.0.0", python_version="3.13")
 
 
-_SCHEMA_BY_STAGE: dict[DiagnosticLifecycleStage, str] = {
-    DiagnosticLifecycleStage.DESIGN: "sol_execbench.diagnostic_lifecycle_design.v2",
-    DiagnosticLifecycleStage.COLLECTION_RUN: (
-        "sol_execbench.diagnostic_lifecycle_collection_run.v2"
-    ),
-    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
-        "sol_execbench.diagnostic_lifecycle_corpus_snapshot.v2"
-    ),
-    DiagnosticLifecycleStage.CALIBRATION: (
-        "sol_execbench.diagnostic_lifecycle_calibration.v2"
-    ),
-    DiagnosticLifecycleStage.MODEL_BUILD: (
-        "sol_execbench.diagnostic_lifecycle_model_build.v2"
-    ),
-    DiagnosticLifecycleStage.ACCEPTANCE: (
-        "sol_execbench.diagnostic_lifecycle_acceptance.v2"
-    ),
-    DiagnosticLifecycleStage.PUBLICATION: (
-        "sol_execbench.diagnostic_lifecycle_publication.v2"
-    ),
-    DiagnosticLifecycleStage.RELEASE: (
-        "sol_execbench.diagnostic_lifecycle_release.v2"
-    ),
-}
+_LIFECYCLE_SCHEMA = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_MANIFEST
 
 
 def _manifest_data(
@@ -129,7 +109,7 @@ def _manifest_data(
     return {
         "stage": stage,
         "stage_id": stage_id,
-        "schema_version": _SCHEMA_BY_STAGE[stage],
+        "schema_version": _LIFECYCLE_SCHEMA,
         "status": DiagnosticStageStatus.VERIFIED,
         "retention_class": DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE,
         "source_revision": _SOURCE,

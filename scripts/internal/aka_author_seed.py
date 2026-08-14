@@ -30,6 +30,7 @@ import yaml
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.dataset.aka_compatibility import (
     AKA_EXECUTION_TARGET_SPECS,
@@ -67,11 +68,10 @@ from sol_execbench.core.dataset.aka_tolerance import (
     load_tolerance_calibration,
     workload_contract_sha256,
 )
-from sol_execbench.core.integrity import sha256_file
-from sol_execbench.core.integrity.schema_versions import (
+from sol_execbench.core.dataset.schema_versions import (
     AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
-    SchemaVersion,
 )
+from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.platform.runtime import resolve_tool_path
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
 
@@ -3407,7 +3407,7 @@ def _workload_records(
             for name, meta in workload["inputs"].items()
         }
         record = {
-            "schema_version": SchemaVersion.WORKLOAD,
+            "schema_version": BenchmarkArtifactSchema.WORKLOAD,
             "axes": workload["axes"],
             "inputs": inputs,
             "checks": _workload_checks(spec, workload, uuid, calibrated),
@@ -3420,7 +3420,7 @@ def _workload_records(
 
 def _definition_payload(spec: Spec) -> dict[str, Any]:
     payload = {
-        "schema_version": SchemaVersion.DEFINITION,
+        "schema_version": BenchmarkArtifactSchema.DEFINITION,
         "name": spec.name,
         "op_type": spec.op_type,
         "description": spec.description,

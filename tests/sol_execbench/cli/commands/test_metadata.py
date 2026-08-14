@@ -7,7 +7,10 @@ from click.testing import CliRunner
 
 from sol_execbench.cli.commands import metadata as cli_metadata
 from sol_execbench.cli.main import cli
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.control_plane_schema_versions import (
+    CLIArtifactKind,
+    ExecutionControlSchema,
+)
 from sol_execbench.core.platform.environment import (
     EnvironmentCheckResult,
     EnvironmentDiagnostics,
@@ -32,7 +35,8 @@ def _json(args: list[str]) -> tuple[object, dict[str, Any]]:
 
 def test_evaluator_contract_uses_response_envelope() -> None:
     _, response = _json(["contract", "evaluator"])
-    assert response["schema_version"] == SchemaVersion.CLI_RESPONSE
+    assert response["schema_version"] == ExecutionControlSchema.CLI_PROTOCOL
+    assert response["artifact_kind"] == CLIArtifactKind.RESPONSE
     assert response["data"]["schema_version"].startswith(
         "sol_execbench.evaluator_contract.",
     )
@@ -41,7 +45,8 @@ def test_evaluator_contract_uses_response_envelope() -> None:
 def test_cli_contract_matches_public_tree() -> None:
     _, response = _json(["contract", "cli"])
     contract = response["data"]
-    assert contract["schema_version"] == SchemaVersion.CLI_CONTRACT
+    assert contract["schema_version"] == ExecutionControlSchema.CLI_PROTOCOL
+    assert contract["artifact_kind"] == CLIArtifactKind.CONTRACT
     assert {item["name"] for item in contract["command_tree"]["commands"]} == {
         "evaluate",
         "baseline",

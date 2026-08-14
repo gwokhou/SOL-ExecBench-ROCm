@@ -63,6 +63,7 @@ class CurrentSchemaMixin:
     """Exact-current parsing policy shared by versioned artifact bases."""
 
     current_schema_version: ClassVar[str | int]
+    current_artifact_kind: ClassVar[str | None] = None
 
     @classmethod
     def _require_current_schema(cls, value: object) -> None:
@@ -75,6 +76,14 @@ class CurrentSchemaMixin:
             raise ValueError(
                 f"{cls.__name__} requires schema_version="
                 f"{cls.current_schema_version!r}",
+            )
+        if (
+            cls.current_artifact_kind is not None
+            and value.get("artifact_kind") != cls.current_artifact_kind
+        ):
+            raise ValueError(
+                f"{cls.__name__} requires artifact_kind="
+                f"{cls.current_artifact_kind!r}",
             )
 
     @classmethod

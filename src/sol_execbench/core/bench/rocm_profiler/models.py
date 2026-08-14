@@ -11,6 +11,10 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+    ProfilerSessionArtifactKind,
+)
 from sol_execbench.core.bench.timing_policy import (
     TimingActivityDomain,
     TimingBackend,
@@ -19,9 +23,6 @@ from sol_execbench.core.bench.timing_policy import (
 from sol_execbench.core.evidence import CANONICAL_BENCHMARK_OUTPUT
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 from sol_execbench.core.text_utils import normalize_ascii_alnum, text_tail
 
@@ -177,7 +178,11 @@ class Rocprofv3ProfileResult:
     environment_snapshots: tuple[RuntimeGPUTelemetry, ...] = ()
     schema_version: str = field(
         init=False,
-        default=SchemaVersion.ROCPROFV3_PROFILE,
+        default=ProfilerArtifactSchema.ROCPROFV3_SESSION,
+    )
+    artifact_kind: str = field(
+        init=False,
+        default=ProfilerSessionArtifactKind.PROFILE,
     )
 
     def __post_init__(self) -> None:
@@ -236,6 +241,7 @@ class Rocprofv3ProfileResult:
         """Return a JSON-serializable diagnostic sidecar payload."""
         return {
             "schema_version": self.schema_version,
+            "artifact_kind": self.artifact_kind,
             "status": self.status,
             "diagnostic_only": True,
             "score_authority": False,
@@ -318,7 +324,7 @@ class Rocprofv3TimingEvidence:
     profiler_overhead_ms: float | None = None
     schema_version: str = field(
         init=False,
-        default=SchemaVersion.ROCPROFV3_TIMING,
+        default=ProfilerArtifactSchema.ROCPROFV3_TIMING,
     )
     derived: bool = True
     canonical_output: str = CANONICAL_BENCHMARK_OUTPUT

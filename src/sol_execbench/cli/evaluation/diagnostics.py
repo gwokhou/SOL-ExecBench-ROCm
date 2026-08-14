@@ -13,12 +13,13 @@ from typing import Literal
 from pydantic import Field
 from rich.console import Console
 
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+    PerformanceDiagnosticArtifactKind,
+)
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.evidence.runtime_evidence import write_json_payload
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 _DIAGNOSTIC_TAIL_LIMIT = 8192
 
@@ -38,10 +39,14 @@ class NoTraceDiagnostics:
 class NoTraceDiagnosticsSidecar(CurrentFrozenSchemaModel):
     """Current bounded no-trace diagnostic artifact."""
 
-    current_schema_version = SchemaVersion.NO_TRACE_DIAGNOSTICS
+    current_schema_version = PerformanceArtifactSchema.PERFORMANCE_DIAGNOSTIC
+    current_artifact_kind = PerformanceDiagnosticArtifactKind.NO_TRACE
 
-    schema_version: Literal[SchemaVersion.NO_TRACE_DIAGNOSTICS] = (
-        SchemaVersion.NO_TRACE_DIAGNOSTICS
+    schema_version: Literal[
+        PerformanceArtifactSchema.PERFORMANCE_DIAGNOSTIC
+    ] = PerformanceArtifactSchema.PERFORMANCE_DIAGNOSTIC
+    artifact_kind: Literal[PerformanceDiagnosticArtifactKind.NO_TRACE] = (
+        PerformanceDiagnosticArtifactKind.NO_TRACE
     )
     diagnostic_only: Literal[True]
     canonical_trace_jsonl: Literal[False]
@@ -97,7 +102,8 @@ def _write_no_trace_diagnostics_sidecar(
     filtered_stderr = filter_benign_rocm_stderr(diagnostics.stderr)
     payload = NoTraceDiagnosticsSidecar.model_validate(
         {
-            "schema_version": SchemaVersion.NO_TRACE_DIAGNOSTICS,
+            "schema_version": PerformanceArtifactSchema.PERFORMANCE_DIAGNOSTIC,
+            "artifact_kind": PerformanceDiagnosticArtifactKind.NO_TRACE,
             "diagnostic_only": True,
             "canonical_trace_jsonl": False,
             "reason": diagnostics.reason,

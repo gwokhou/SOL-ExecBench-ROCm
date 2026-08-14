@@ -59,10 +59,10 @@ from sol_execbench.core.dataset.aka_tolerance import (
     dtype_default_tolerance,
     workload_contract_sha256,
 )
-from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import (
+from sol_execbench.core.dataset.schema_versions import (
     AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION,
 )
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.platform.runtime import (
     RocmDeviceInfo,
     detect_rocm_device,

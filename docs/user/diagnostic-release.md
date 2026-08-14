@@ -15,10 +15,10 @@ things:
   `tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --zstd`
   makes the archive byte-for-byte reproducible; no timestamps, owners, or
   directory order leak into the bytes.
-- `NAME.attestation.json` — a `sol_execbench.diagnostic_release_attestation.v2`
-  object that binds the release identity, publication digest, archive digest and
-  size, the exact sorted inventory digest, case count, source revision, and
-  producer version.
+- `NAME.attestation.json` — the `attestation` variant of the
+  `sol_execbench.diagnostic_release_package.v1` contract. It binds the release
+  identity, publication digest, archive digest and size, the exact sorted
+  inventory digest, case count, source revision, and producer version.
 - An immutable `DiagnosticReleaseLifecycleManifest` under
   `data/store/releases/<release_id>/manifest.json` when a store root is
   supplied, recording the archive and attestation digests with retention class

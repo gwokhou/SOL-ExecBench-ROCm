@@ -30,9 +30,7 @@ from sol_execbench.core.data.base_model import (
     NonEmptyString,
     NonNegativeInt,
 )
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 
 
 class RandomInput(BaseModelWithDocstrings):
@@ -299,9 +297,11 @@ class Workload(CurrentSchemaModel):
     This represents an executable configuration that can be benchmarked.
     """
 
-    current_schema_version = SchemaVersion.WORKLOAD
+    current_schema_version = BenchmarkArtifactSchema.WORKLOAD
 
-    schema_version: Literal[SchemaVersion.WORKLOAD] = SchemaVersion.WORKLOAD
+    schema_version: Literal[BenchmarkArtifactSchema.WORKLOAD] = (
+        BenchmarkArtifactSchema.WORKLOAD
+    )
     axes: dict[str, NonNegativeInt]
     """Dictionary mapping axis names to their concrete integer values. All values must be
     positive."""

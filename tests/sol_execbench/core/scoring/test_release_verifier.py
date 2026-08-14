@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 from typing import Any
@@ -46,9 +47,7 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKACorpusManifest,
 )
 from sol_execbench.core.integrity import sha256_bytes, sha256_file
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
+from sol_execbench.core.integrity.protocol_versions import WireProtocol
 from sol_execbench.core.platform.rdna4_validation import (
     RDNA4_VALIDATION_GFX_TARGET,
     RDNA4_VALIDATION_HIP_VERSION,
@@ -73,12 +72,17 @@ from sol_execbench.core.scoring.release_models import (
     ProblemRunEvidence,
     ReleaseArtifactKind,
     ReleaseBundle,
+    ReleaseRunKind,
     SolarIndexStatement,
     SolarManifestEvidence,
     release_model_payload,
 )
 from sol_execbench.core.scoring.release_solar import verify_solar_index
 from sol_execbench.core.scoring.release_verifier import verify_and_score_release
+from sol_execbench.core.scoring.schema_versions import (
+    ReleaseArtifactSchema,
+    ReleaseComponentKind,
+)
 from sol_execbench.core.solar_bridge.models import (
     FORMAL_BOUND_KIND,
     IRPath,
@@ -124,6 +128,25 @@ def test_content_addressed_release_bundle_verifies_and_scores(
     assert result.suite.score == pytest.approx(expected)
     assert result.suite.scored_workloads == 4
     assert result.candidate_id == "candidate-test"
+
+    baseline_payload = json.loads(
+        (workspace / "statements" / "baseline.json").read_text(encoding="utf-8")
+    )
+    candidate_payload = json.loads(
+        (workspace / "statements" / "candidate.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert (
+        baseline_payload["schema_version"]
+        == candidate_payload["schema_version"]
+    )
+    assert baseline_payload["role"] == "baseline"
+    assert candidate_payload["role"] == "candidate"
+
+    baseline_payload.pop("role")
+    with pytest.raises(ValidationError, match="role"):
+        BaselineStatement.model_validate(baseline_payload)
 
 
 def test_make_fx_aten_release_index_round_trips_and_verifies(
@@ -427,7 +450,7 @@ def test_release_bundle_schema_rejects_legacy_signature_fields(
     with pytest.raises(ValidationError):
         ReleaseBundle.model_validate(
             {
-                "schema_version": SchemaVersion.RELEASE_BUNDLE,
+                "schema_version": ReleaseArtifactSchema.RELEASE_BUNDLE,
                 "corpus_manifest": artifact_reference(
                     workspace,
                     workspace / "corpus" / "manifest.yaml",
@@ -591,7 +614,7 @@ def _trace(
         },
         execution_isolation="container",
         clocks_locked=True,
-        timing_protocol=SchemaVersion.ROCM_EVENT_TIMING_PAPER_COUNTS,
+        timing_protocol=WireProtocol.ROCM_EVENT_TIMING_PAPER_COUNTS,
     )
     performance = Performance(
         latency_ms=latency,
@@ -626,7 +649,8 @@ def _environment_evidence() -> dict[str, object]:
     return {
         "status": "available",
         "release_execution": {
-            "schema_version": SchemaVersion.RELEASE_ENVIRONMENT,
+            "schema_version": ReleaseArtifactSchema.RELEASE_COMPONENT,
+            "artifact_kind": ReleaseComponentKind.ENVIRONMENT,
             "source_revision": _SOURCE_REVISION,
             "source_tree_clean": True,
             "container_image_id": "sha256:" + "d" * 64,
@@ -837,8 +861,16 @@ def _run_statement(
         "problems": (evidence,),
     }
     if kind is ReleaseArtifactKind.BASELINE:
-        return BaselineStatement(**fields, baseline_id=baseline_id)
-    return CandidateStatement(**fields, candidate_id="candidate-test")
+        return BaselineStatement(
+            **fields,
+            role=ReleaseRunKind.BASELINE,
+            baseline_id=baseline_id,
+        )
+    return CandidateStatement(
+        **fields,
+        role=ReleaseRunKind.CANDIDATE,
+        candidate_id="candidate-test",
+    )
 
 
 def _solar_statement(

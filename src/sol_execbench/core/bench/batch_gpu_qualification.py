@@ -12,13 +12,16 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.control_plane_schema_versions import (
+    BatchGPUQualificationArtifactKind,
+    ExecutionControlSchema,
+)
 from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     NonEmptyString,
     StrictArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest, sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
@@ -61,10 +64,14 @@ class BatchGPUQualificationReceipt(CurrentSchemaModel):
     """Verified result for one partition within a qualification stage."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.BATCH_GPU_QUALIFICATION_RECEIPT
+    current_schema_version = ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    current_artifact_kind = BatchGPUQualificationArtifactKind.RECEIPT
 
-    schema_version: Literal[SchemaVersion.BATCH_GPU_QUALIFICATION_RECEIPT] = (
-        SchemaVersion.BATCH_GPU_QUALIFICATION_RECEIPT
+    schema_version: Literal[ExecutionControlSchema.BATCH_GPU_QUALIFICATION] = (
+        ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    )
+    artifact_kind: Literal[BatchGPUQualificationArtifactKind.RECEIPT] = (
+        BatchGPUQualificationArtifactKind.RECEIPT
     )
     stage: BatchGPUQualificationStage
     partition: NonEmptyString
@@ -86,10 +93,14 @@ class BatchGPUQualificationGate(CurrentSchemaModel):
     """Content-bound completion gate required before a large batch GPU run."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.BATCH_GPU_QUALIFICATION
+    current_schema_version = ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    current_artifact_kind = BatchGPUQualificationArtifactKind.GATE
 
-    schema_version: Literal[SchemaVersion.BATCH_GPU_QUALIFICATION] = (
-        SchemaVersion.BATCH_GPU_QUALIFICATION
+    schema_version: Literal[ExecutionControlSchema.BATCH_GPU_QUALIFICATION] = (
+        ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    )
+    artifact_kind: Literal[BatchGPUQualificationArtifactKind.GATE] = (
+        BatchGPUQualificationArtifactKind.GATE
     )
     task: LargeBatchGPUTask
     stage: BatchGPUQualificationStage

@@ -37,6 +37,10 @@ from sol_execbench.core.bench.performance_model.corpus_preflight import (
     DiagnosticCorpusDesign,
     preflight,
 )
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticCorpusDesignArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceArtifact,
     PerformanceEvidenceArtifactKind,
@@ -100,11 +104,11 @@ from sol_execbench.core.data.json_utils import (
     load_json_value,
     load_jsonl_file,
 )
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE,
     ENV_SOL_EXECBENCH_SOURCE_REVISION,
@@ -875,7 +879,8 @@ def _design_payload(
         *_cases("held_out", universe_start),
     ]
     payload: dict[str, Any] = {
-        "schema_version": SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN.value,
+        "schema_version": DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN.value,
+        "artifact_kind": DiagnosticCorpusDesignArtifactKind.DESIGN.value,
         "design": "adjacent_shape_stratified_three_way_rotation",
         "universe_start": universe_start,
         "universe_cases_per_family": UNIVERSE_CASES_PER_FAMILY,
@@ -1004,7 +1009,7 @@ def _workload(case: CaseSpec, output_name: str) -> dict[str, object]:
         inputs = {"input": {"type": "random"}}
         tolerance = 0.01 if case.family is WorkloadKind.REDUCTION else 1e-5
     return {
-        "schema_version": SchemaVersion.WORKLOAD,
+        "schema_version": BenchmarkArtifactSchema.WORKLOAD,
         "axes": case.axes,
         "inputs": inputs,
         "uuid": case.workload_uuid,

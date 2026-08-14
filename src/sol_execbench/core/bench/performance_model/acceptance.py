@@ -11,6 +11,10 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticAcceptanceArtifactKind,
+    DiagnosticArtifactSchema,
+)
 from sol_execbench.core.bench.performance_model.inference import (
     ACTION_PRECISION_GATE,
     ACTION_RECALL_GATE,
@@ -33,9 +37,6 @@ from sol_execbench.core.data.base_model import (
     StrictArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 MINIMUM_EMPIRICAL_COVERAGE = 0.90
 MAXIMUM_MEDIAN_ABSOLUTE_PERCENTAGE_ERROR = 15.0
@@ -54,6 +55,8 @@ _SUPPORTED_FAMILIES = (
     WorkloadKind.TRANSFORMER,
     WorkloadKind.CONCURRENT,
 )
+
+
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
@@ -105,11 +108,13 @@ class DiagnosticAcceptanceManifest(CurrentSchemaModel):
     """Frozen identities and evidence-derived held-out observations."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_ACCEPTANCE
+    current_schema_version = DiagnosticArtifactSchema.DIAGNOSTIC_ACCEPTANCE
+    current_artifact_kind = DiagnosticAcceptanceArtifactKind.MANIFEST
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_ACCEPTANCE] = (
-        SchemaVersion.DIAGNOSTIC_ACCEPTANCE
+    schema_version: Literal[DiagnosticArtifactSchema.DIAGNOSTIC_ACCEPTANCE] = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_ACCEPTANCE
     )
+    artifact_kind: Literal[DiagnosticAcceptanceArtifactKind.MANIFEST]
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     model_version: DiagnosticModelVersion = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
@@ -149,11 +154,13 @@ class DiagnosticAcceptanceResult(CurrentSchemaModel):
     """Content-bound aggregate acceptance verdict and Agent admission set."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_ACCEPTANCE
+    current_schema_version = DiagnosticArtifactSchema.DIAGNOSTIC_ACCEPTANCE
+    current_artifact_kind = DiagnosticAcceptanceArtifactKind.RESULT
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_ACCEPTANCE] = (
-        SchemaVersion.DIAGNOSTIC_ACCEPTANCE
+    schema_version: Literal[DiagnosticArtifactSchema.DIAGNOSTIC_ACCEPTANCE] = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_ACCEPTANCE
     )
+    artifact_kind: Literal[DiagnosticAcceptanceArtifactKind.RESULT]
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     model_version: DiagnosticModelVersion = PERFORMANCE_MODEL_VERSION
     model_identity: DiagnosticModelIdentity
@@ -262,6 +269,7 @@ def evaluate_diagnostic_acceptance(
         reasons.append("held_out_action_evidence_missing")
     accepted = not reasons
     return DiagnosticAcceptanceResult(
+        artifact_kind=DiagnosticAcceptanceArtifactKind.RESULT,
         purpose=manifest.purpose,
         model_identity=manifest.model_identity,
         manifest_sha256=stable_json_checksum(manifest.model_dump(mode="json")),
@@ -336,6 +344,7 @@ __all__ = [
     "MINIMUM_CASES_PER_FAMILY",
     "MINIMUM_EMPIRICAL_COVERAGE",
     "ActionAcceptanceMetric",
+    "DiagnosticAcceptanceArtifactKind",
     "DiagnosticAcceptanceCase",
     "DiagnosticAcceptanceManifest",
     "DiagnosticAcceptanceResult",

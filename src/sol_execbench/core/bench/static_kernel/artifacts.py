@@ -11,6 +11,10 @@ from typing import Literal
 
 from pydantic import Field
 
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+    PerformanceEvidenceComponentKind,
+)
 from sol_execbench.core.bench.static_kernel.evidence_builders import (
     build_static_kernel_evidence_sidecar,
     build_static_kernel_evidence_unavailable,
@@ -28,9 +32,6 @@ from sol_execbench.core.data.base_model import (
     StrictArtifactModel,
 )
 from sol_execbench.core.integrity.checksums import sha256_file
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 _PRIMARY_ARTIFACT_NAME = "benchmark_kernel.so"
 _COMPILER_OUTPUT_SUFFIXES = {".log", ".txt"}
@@ -50,11 +51,19 @@ class StaticArtifactManifestEntry(StrictArtifactModel):
 class StaticArtifactManifest(CurrentSchemaModel):
     """Current explicit static-artifact selection manifest."""
 
-    current_schema_version = SchemaVersion.STATIC_ARTIFACT_MANIFEST
-
-    schema_version: Literal[SchemaVersion.STATIC_ARTIFACT_MANIFEST] = (
-        SchemaVersion.STATIC_ARTIFACT_MANIFEST
+    current_schema_version = (
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
     )
+    current_artifact_kind = (
+        PerformanceEvidenceComponentKind.STATIC_ARTIFACT_MANIFEST
+    )
+
+    schema_version: Literal[
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    ] = PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    artifact_kind: Literal[
+        PerformanceEvidenceComponentKind.STATIC_ARTIFACT_MANIFEST
+    ] = PerformanceEvidenceComponentKind.STATIC_ARTIFACT_MANIFEST
     artifacts: list[str | StaticArtifactManifestEntry]
 
 

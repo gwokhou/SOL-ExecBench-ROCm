@@ -20,7 +20,13 @@ from sol_execbench.core.bench.reference_protocol import (
     send_failure,
     send_json,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.integrity.artifact_registry import (
+    CURRENT_STRING_ARTIFACT_SCHEMAS,
+)
+from sol_execbench.core.integrity.protocol_versions import (
+    CURRENT_WIRE_PROTOCOLS,
+    WireProtocol,
+)
 
 
 @contextmanager
@@ -65,10 +71,9 @@ def test_reference_failure_is_not_deserialized_as_pickle() -> None:
     assert exc.value.kind is ReferenceFailureKind.REFERENCE_EXECUTION
 
 
-def test_protocol_version_is_explicit() -> None:
-    assert reference_protocol.SchemaVersion.REFERENCE_IPC == (
-        SchemaVersion.REFERENCE_IPC
-    )
+def test_protocol_version_is_not_an_artifact_schema() -> None:
+    assert WireProtocol.REFERENCE_IPC in CURRENT_WIRE_PROTOCOLS
+    assert WireProtocol.REFERENCE_IPC not in CURRENT_STRING_ARTIFACT_SCHEMAS
 
 
 def test_invalid_failure_category_is_rejected_as_protocol_error() -> None:
@@ -91,7 +96,7 @@ def test_send_json_wraps_closed_pipe_as_protocol_error() -> None:
             ReferenceProtocolError,
             match="control channel closed",
         ):
-            send_json(sender, {"protocol": SchemaVersion.REFERENCE_IPC})
+            send_json(sender, {"protocol": WireProtocol.REFERENCE_IPC})
     finally:
         sender.close()
 
@@ -105,7 +110,7 @@ def test_receive_case_rejects_oversized_payload_before_allocation(
             sender,
             {
                 "ok": True,
-                "protocol": SchemaVersion.REFERENCE_IPC,
+                "protocol": WireProtocol.REFERENCE_IPC,
                 "inputs": [],
                 "outputs": [],
                 "payload_bytes": 5,

@@ -31,7 +31,9 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSourceRef,
     ExtendedDiagnosticIdentity,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 
 
 def test_agent_feedback_model_names_remain_reexported_from_facade() -> None:
@@ -110,7 +112,7 @@ def test_agent_feedback_sidecar_model_defaults_remain_stable() -> None:
 
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == SchemaVersion.AGENT_FEEDBACK
+    assert payload["schema_version"] == PerformanceArtifactSchema.AGENT_FEEDBACK
     assert payload["authority"] == "diagnostic"
     assert payload["items"] == []
     assert payload["limitations"] == []

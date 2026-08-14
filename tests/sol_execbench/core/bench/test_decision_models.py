@@ -20,7 +20,9 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticSidecarStatus,
     ExtendedDiagnosticIdentity,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 
 
 def _sidecar(**overrides) -> DecisionSidecar:
@@ -43,13 +45,15 @@ def _sidecar(**overrides) -> DecisionSidecar:
 
 
 def test_schema_version_is_current():
-    assert SchemaVersion.DECISION == SchemaVersion.DECISION
+    assert (
+        PerformanceArtifactSchema.DECISION == PerformanceArtifactSchema.DECISION
+    )
 
 
 def test_sidecar_authority_is_diagnostic():
     sidecar = _sidecar()
     assert sidecar.authority == "diagnostic"
-    assert sidecar.schema_version == SchemaVersion.DECISION
+    assert sidecar.schema_version == PerformanceArtifactSchema.DECISION
 
 
 def test_sidecar_round_trip():

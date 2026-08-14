@@ -20,9 +20,7 @@ from sol_execbench.core.data.base_model import (
     StrictArtifactModel,
 )
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 RDNA4_VALIDATION_GFX_TARGET = "gfx1200"
 RDNA4_VALIDATION_PCI_VENDOR_ID = "0x1002"
@@ -93,10 +91,10 @@ class Rdna4ValidationManifest(CurrentSchemaModel):
     """Current local RDNA4 validation manifest."""
 
     model_config = _VALIDATION_CONFIG
-    current_schema_version = SchemaVersion.RDNA4_VALIDATION
+    current_schema_version = PlatformArtifactSchema.RDNA4_VALIDATION
 
-    schema_version: Literal[SchemaVersion.RDNA4_VALIDATION] = (
-        SchemaVersion.RDNA4_VALIDATION
+    schema_version: Literal[PlatformArtifactSchema.RDNA4_VALIDATION] = (
+        PlatformArtifactSchema.RDNA4_VALIDATION
     )
     generated_at: str
     status: Literal["passed", "failed"]
@@ -284,7 +282,7 @@ def build_validation_manifest(
     ]
     model = Rdna4ValidationManifest.model_validate(
         {
-            "schema_version": SchemaVersion.RDNA4_VALIDATION,
+            "schema_version": PlatformArtifactSchema.RDNA4_VALIDATION,
             "generated_at": generated_at,
             "status": "passed" if passed else "failed",
             # Local evidence is useful for engineering validation but cannot
@@ -353,7 +351,10 @@ def _verify_manifest_contract(
     expected_source_revision: str | None,
     require_release_eligible: bool,
 ) -> None:
-    if manifest.get("schema_version") != SchemaVersion.RDNA4_VALIDATION:
+    if (
+        manifest.get("schema_version")
+        != PlatformArtifactSchema.RDNA4_VALIDATION
+    ):
         raise ValueError("RDNA4 validation schema mismatch")
     if manifest.get("status") != "passed":
         raise ValueError("RDNA4 validation did not pass")

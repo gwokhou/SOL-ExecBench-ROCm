@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 from pydantic import ConfigDict, Field
 
@@ -30,13 +30,14 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKACorpusEntry,
     AKACorpusManifest,
 )
+from sol_execbench.core.dataset.schema_versions import (
+    CorpusReadinessArtifactKind,
+    DatasetArtifactSchema,
+)
 from sol_execbench.core.integrity import (
     sha256_bytes,
     sha256_file,
     stable_json_checksum,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 from sol_execbench.core.process import exclusive_file_lock
 from sol_execbench.core.solar_bridge.analyzer import (
@@ -61,6 +62,7 @@ from solar.ir.contracts import DEFAULT_IR_PATH, IRPath, normalize_ir_path
 _RESULT_FILENAME = "stage-result.json"
 _MATRIX_FILENAME = "matrix.jsonl"
 _SUMMARY_FILENAME = "summary.json"
+CORPUS_TRACE_IDENTITY_FORMAT_VERSION: Final = 3
 
 
 class CorpusReadinessStatus(StrEnum):
@@ -94,15 +96,10 @@ class ReadinessStageRecord(_ReadinessModel):
     artifact: ReadinessArtifact | None = None
 
 
-class CorpusTraceIdentity(CurrentSchemaModel):
-    """Current content identity used to address a readiness trace."""
+class CorpusTraceIdentity(_ReadinessModel):
+    """Internal content identity used to address a readiness trace."""
 
-    model_config = _SCHEMA_CONFIG
-    current_schema_version = SchemaVersion.CORPUS_STAGE_TRACE_IDENTITY
-
-    schema_version: Literal[SchemaVersion.CORPUS_STAGE_TRACE_IDENTITY] = (
-        SchemaVersion.CORPUS_STAGE_TRACE_IDENTITY
-    )
+    format_version: Literal[3] = CORPUS_TRACE_IDENTITY_FORMAT_VERSION
     corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     definition_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     workload_file_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -121,10 +118,14 @@ class CorpusReadinessRecord(CurrentSchemaModel):
     """Current per-workload readiness matrix record."""
 
     model_config = _SCHEMA_CONFIG
-    current_schema_version = SchemaVersion.CORPUS_STAGE_READINESS_RECORD
+    current_schema_version = DatasetArtifactSchema.CORPUS_READINESS
+    current_artifact_kind = CorpusReadinessArtifactKind.RECORD
 
-    schema_version: Literal[SchemaVersion.CORPUS_STAGE_READINESS_RECORD] = (
-        SchemaVersion.CORPUS_STAGE_READINESS_RECORD
+    schema_version: Literal[DatasetArtifactSchema.CORPUS_READINESS] = (
+        DatasetArtifactSchema.CORPUS_READINESS
+    )
+    artifact_kind: Literal[CorpusReadinessArtifactKind.RECORD] = (
+        CorpusReadinessArtifactKind.RECORD
     )
     problem_path: str
     workload_uuid: str
@@ -160,10 +161,14 @@ class CorpusReadinessSummary(CurrentSchemaModel):
     """Current aggregate readiness summary."""
 
     model_config = _SCHEMA_CONFIG
-    current_schema_version = SchemaVersion.CORPUS_STAGE_READINESS_SUMMARY
+    current_schema_version = DatasetArtifactSchema.CORPUS_READINESS
+    current_artifact_kind = CorpusReadinessArtifactKind.SUMMARY
 
-    schema_version: Literal[SchemaVersion.CORPUS_STAGE_READINESS_SUMMARY] = (
-        SchemaVersion.CORPUS_STAGE_READINESS_SUMMARY
+    schema_version: Literal[DatasetArtifactSchema.CORPUS_READINESS] = (
+        DatasetArtifactSchema.CORPUS_READINESS
+    )
+    artifact_kind: Literal[CorpusReadinessArtifactKind.SUMMARY] = (
+        CorpusReadinessArtifactKind.SUMMARY
     )
     generated_at: str
     status: CorpusReadinessStatus
@@ -374,7 +379,7 @@ def _identity(
         "ir_kind": context.ir_path.ir_kind,
     }
     trace_contract = {
-        "schema_version": SchemaVersion.CORPUS_STAGE_TRACE_IDENTITY,
+        "format_version": CORPUS_TRACE_IDENTITY_FORMAT_VERSION,
         **{
             key: identity[key]
             for key in (
@@ -420,7 +425,8 @@ def _record(
         for stage in outcome.stages
     ]
     record = {
-        "schema_version": SchemaVersion.CORPUS_STAGE_READINESS_RECORD,
+        "schema_version": DatasetArtifactSchema.CORPUS_READINESS,
+        "artifact_kind": CorpusReadinessArtifactKind.RECORD,
         **identity,
         "status": (
             SolarReadinessStatus.READY if ready else SolarReadinessStatus.FAILED
@@ -568,7 +574,8 @@ def _summary(
         )
     ready = all(_record_ready(record) for record in records)
     summary = {
-        "schema_version": SchemaVersion.CORPUS_STAGE_READINESS_SUMMARY,
+        "schema_version": DatasetArtifactSchema.CORPUS_READINESS,
+        "artifact_kind": CorpusReadinessArtifactKind.SUMMARY,
         "generated_at": utc_timestamp(),
         "status": (
             CorpusReadinessStatus.READY

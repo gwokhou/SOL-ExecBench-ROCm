@@ -31,10 +31,8 @@ from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     NonEmptyString,
 )
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.solution_models import BuildSpec, SourceFile
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 
 class Solution(CurrentSchemaModel):
@@ -49,9 +47,11 @@ class Solution(CurrentSchemaModel):
     model_config = ConfigDict(use_attribute_docstrings=True, frozen=True)
     """Treat Solution as immutable to safely memoize derived fields."""
 
-    current_schema_version = SchemaVersion.SOLUTION
+    current_schema_version = BenchmarkArtifactSchema.SOLUTION
 
-    schema_version: Literal[SchemaVersion.SOLUTION] = SchemaVersion.SOLUTION
+    schema_version: Literal[BenchmarkArtifactSchema.SOLUTION] = (
+        BenchmarkArtifactSchema.SOLUTION
+    )
     name: NonEmptyString
     """A unique, human-readable name for this specific solution (e.g., 'rmsnorm_hip_v1_gfx1200')."""
     definition: NonEmptyString

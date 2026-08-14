@@ -14,10 +14,8 @@ from sol_execbench.core.integrity.checksums import (
     sha256_file,
     stable_json_checksum,
 )
-from sol_execbench.core.integrity.schema_versions import CURRENT_SCHEMA_VERSIONS
 
 __all__ = [
-    "CURRENT_SCHEMA_VERSIONS",
     "SHA256Digest",
     "sha256_bytes",
     "sha256_file",

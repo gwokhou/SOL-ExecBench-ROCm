@@ -18,6 +18,9 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
 from sol_execbench.core.bench.performance_model.replay_evidence import (
     PerformanceReplayEvidenceSidecar,
 )
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.data.base_model import (
     StrictArtifactModel,
 )
@@ -27,9 +30,6 @@ from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
     verify_artifact_file,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
@@ -98,11 +98,13 @@ class PerformanceEvidenceManifest(CurrentDiagnosticSidecarAuthority):
     """Root manifest binding one workload to all diagnostic evidence."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.PERFORMANCE_EVIDENCE_MANIFEST
-
-    schema_version: Literal[SchemaVersion.PERFORMANCE_EVIDENCE_MANIFEST] = (
-        SchemaVersion.PERFORMANCE_EVIDENCE_MANIFEST
+    current_schema_version = (
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_MANIFEST
     )
+
+    schema_version: Literal[
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_MANIFEST
+    ] = PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_MANIFEST
     status: DiagnosticSidecarStatus
     identity: PerformanceRunIdentity
     artifacts: list[PerformanceEvidenceArtifact] = Field(min_length=1)

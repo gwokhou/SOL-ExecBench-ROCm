@@ -53,14 +53,14 @@ from sol_execbench.core.bench.rocm_profiler.models import (
 from sol_execbench.core.bench.rocm_profiler.profile import (
     prepare_profile_output_directory,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import (
     sha256_bytes,
     sha256_file,
     stable_json_checksum,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 from sol_execbench.core.platform.runtime import (
     resolve_rocm_tool,
@@ -321,7 +321,7 @@ def _write_provenance(
     )
     payload = Rocprofv3CounterProvenance.model_validate(
         {
-            "schema_version": SchemaVersion.ROCPROFV3_COUNTER_PROVENANCE,
+            "schema_version": ProfilerArtifactSchema.ROCPROFV3_COUNTER_PROVENANCE,
             "diagnostic_only": True,
             "score_authority": False,
             "replay_phase": "evidence",

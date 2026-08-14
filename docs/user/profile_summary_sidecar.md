@@ -15,7 +15,8 @@ profile metadata sidecar remains the raw diagnostic metadata record and is cited
 from the normalized profile summary when present.
 
 When a `rocprofv3` profile result is supplied, the summary carries bounded
-artifact registration metadata from `sol_execbench.rocprofv3_profile.v1`:
+artifact registration metadata from the `profile` variant of
+`sol_execbench.rocprofv3_session.v1`:
 `summary.artifact_coverage_status`, `summary.reason_codes`,
 `summary.warnings`, `summary.artifact_count`, and `summary.artifact_kinds`.
 Return-code-zero profile runs can report partial profiler status when

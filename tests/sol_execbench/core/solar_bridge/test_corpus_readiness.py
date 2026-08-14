@@ -6,6 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from sol_execbench.core.dataset.schema_versions import (
+    CorpusReadinessArtifactKind,
+    DatasetArtifactSchema,
+)
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.solar_bridge import corpus_readiness
 from sol_execbench.core.solar_bridge.models import (
@@ -92,6 +96,11 @@ def test_corpus_audit_derives_and_addresses_the_full_scored_denominator(
         for line in result.matrix_path.read_text(encoding="utf-8").splitlines()
     ]
     assert len(records) == 163
+    assert all(
+        record["schema_version"] == DatasetArtifactSchema.CORPUS_READINESS
+        and record["artifact_kind"] == CorpusReadinessArtifactKind.RECORD
+        for record in records
+    )
     assert all(record["gfx_target"] == "gfx1200" for record in records)
     assert all(
         len(record["trace_identity_sha256"]) == 64
@@ -107,6 +116,8 @@ def test_corpus_audit_derives_and_addresses_the_full_scored_denominator(
         for record in records
     )
     summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
+    assert summary["schema_version"] == DatasetArtifactSchema.CORPUS_READINESS
+    assert summary["artifact_kind"] == CorpusReadinessArtifactKind.SUMMARY
     assert summary["matrix"]["sha256"] == sha256_file(result.matrix_path)
 
 
@@ -225,3 +236,10 @@ def test_corpus_audit_requires_every_stage_even_if_verification_passed(
     assert result.verification_passed == 163
     summary = json.loads(result.summary_path.read_text(encoding="utf-8"))
     assert summary["status"] == "incomplete"
+
+
+def test_trace_identity_uses_internal_format() -> None:
+    fields = corpus_readiness.CorpusTraceIdentity.model_fields
+
+    assert "format_version" in fields
+    assert "schema_version" not in fields

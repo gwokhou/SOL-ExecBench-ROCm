@@ -26,6 +26,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
 from sol_execbench.core.bench.performance_model.lifecycle.identity import (
     collection_run_id as derive_collection_run_id,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+    DiagnosticLifecycleStateKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
@@ -41,7 +45,6 @@ from sol_execbench.core.data.base_model import (
     FrozenArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _exclude_none(value: object) -> bool:
@@ -61,10 +64,16 @@ class DiagnosticRunStageState(FrozenArtifactModel):
 class DiagnosticStageAttempt(CurrentFrozenSchemaModel):
     """One immutable append-only execution attempt for a lifecycle stage."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_ATTEMPT
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    )
+    current_artifact_kind = DiagnosticLifecycleStateKind.ATTEMPT
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_ATTEMPT] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_ATTEMPT
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    artifact_kind: Literal[DiagnosticLifecycleStateKind.ATTEMPT] = (
+        DiagnosticLifecycleStateKind.ATTEMPT
     )
     run_id: SHA256Digest
     stage: DiagnosticLifecycleStage
@@ -88,10 +97,16 @@ class DiagnosticStageAttempt(CurrentFrozenSchemaModel):
 class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
     """One immutable, reviewable set of lifecycle execution inputs."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    )
+    current_artifact_kind = DiagnosticLifecycleStateKind.PLAN
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_PLAN
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    artifact_kind: Literal[DiagnosticLifecycleStateKind.PLAN] = (
+        DiagnosticLifecycleStateKind.PLAN
     )
     plan_id: SHA256Digest
     design: DiagnosticLifecycleParent
@@ -209,10 +224,16 @@ class DiagnosticRunManifest(CurrentFrozenSchemaModel):
     recorded entry rather than trusting file existence.
     """
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_LIFECYCLE_RUN
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    )
+    current_artifact_kind = DiagnosticLifecycleStateKind.RUN
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_LIFECYCLE_RUN] = (
-        SchemaVersion.DIAGNOSTIC_LIFECYCLE_RUN
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_LIFECYCLE_STATE
+    artifact_kind: Literal[DiagnosticLifecycleStateKind.RUN] = (
+        DiagnosticLifecycleStateKind.RUN
     )
     run_id: str = Field(min_length=1)
     collection_run_id: SHA256Digest

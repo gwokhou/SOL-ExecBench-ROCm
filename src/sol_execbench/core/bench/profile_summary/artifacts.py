@@ -11,6 +11,9 @@ from pathlib import Path
 
 from pydantic import ConfigDict, Field
 
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.bench.profile_summary.hints import (
     derive_bottleneck_hints,
 )
@@ -28,7 +31,6 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileResult,
 )
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 _PROFILE_SUMMARY_MAX_PARSE_BYTES = 1_000_000
@@ -98,7 +100,7 @@ def structured_profile_evidence(
         }:
             parse_warnings.append(
                 f"{artifact.path.name}: {artifact.kind} artifacts are "
-                f"citation-only in {SchemaVersion.PROFILE_SUMMARY}",
+                f"citation-only in {PerformanceArtifactSchema.PROFILE_SUMMARY}",
             )
         elif artifact.kind is Rocprofv3ArtifactKind.OTHER:
             parse_warnings.append(

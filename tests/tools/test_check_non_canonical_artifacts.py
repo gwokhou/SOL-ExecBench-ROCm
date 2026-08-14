@@ -8,7 +8,8 @@ from __future__ import annotations
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.integrity.protocol_versions import WireProtocol
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 from solar.schema_versions import SchemaVersion as SolarSchemaVersion
 
 SCRIPT_PATH = (
@@ -29,7 +30,16 @@ collect_findings = MODULE.collect_findings
 def test_accepts_current_schema_identifier():
     findings = audit_text(
         Path("example.json"),
-        f'{{"schema_version": "{SchemaVersion.ENVIRONMENT_SNAPSHOT.value}"}}',
+        f'{{"schema_version": "{PlatformArtifactSchema.ENVIRONMENT_EVIDENCE.value}"}}',
+    )
+
+    assert findings == []
+
+
+def test_accepts_current_protocol_identifier():
+    findings = audit_text(
+        Path("trace.json"),
+        f'{{"timing_protocol": "{WireProtocol.ROCM_EVENT_TIMING_CUSTOM}"}}',
     )
 
     assert findings == []
@@ -41,7 +51,7 @@ def test_rejects_unregistered_schema_identifier():
     findings = audit_text(Path("legacy.json"), retired)
 
     assert findings == [
-        f"legacy.json: unsupported schema identifier {retired}",
+        f"legacy.json: unsupported versioned wire identifier {retired}",
     ]
 
 
@@ -97,7 +107,7 @@ def test_unmarked_directory_fails(tmp_path: Path):
     findings = collect_findings(tmp_path)
 
     assert findings == [
-        f"plain/legacy.json: unsupported schema identifier {retired}",
+        f"plain/legacy.json: unsupported versioned wire identifier {retired}",
     ]
 
 

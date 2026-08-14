@@ -15,12 +15,14 @@ from sol_execbench.core.bench.rocm_profiler import (
     parse_rocprofv3_csv,
     select_default_timing,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.bench.timing_policy import (
     TimingBackend,
     TimingSourceType,
     select_timing_policy,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 ROCPROFV3_CSV = """Domain,Name,Start_Timestamp,End_Timestamp,Duration(ns)
 KERNEL_DISPATCH,rmsnorm_kernel,1000,5000,4000
@@ -191,7 +193,7 @@ def test_profile_collection_records_success_metadata(tmp_path):
 
     assert result.succeeded is True
     assert calls[0][-3:] == ["--", "python", "eval_driver.py"]
-    assert payload["schema_version"] == SchemaVersion.ROCPROFV3_PROFILE
+    assert payload["schema_version"] == ProfilerArtifactSchema.ROCPROFV3_SESSION
     assert payload["diagnostic_only"] is True
     assert payload["score_authority"] is False
     assert payload["status"] == "success"

@@ -38,7 +38,6 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
     verify_artifact_file,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.scoring.release_builders import artifact_reference
 from sol_execbench.core.scoring.release_models import (
     ArtifactReference,
@@ -52,6 +51,10 @@ from sol_execbench.core.scoring.release_verifier import (
     OfficialScoreResult,
     verify_and_score_release,
 )
+from sol_execbench.core.scoring.schema_versions import (
+    ReleaseArtifactSchema,
+    ReleasePackageArtifactKind,
+)
 from sol_execbench.core.solar_bridge.models import SolarRequestManifest
 
 # Fixed archive root name so the produced archive is byte-identical across hosts
@@ -63,10 +66,14 @@ _BUNDLE_FILENAME = "release-bundle.json"
 class ScoreReleaseArchive(CurrentFrozenSchemaModel):
     """One deterministic zstd archive of a verified score release."""
 
-    current_schema_version = SchemaVersion.RELEASE_ARCHIVE
+    current_schema_version = ReleaseArtifactSchema.RELEASE_PACKAGE
+    current_artifact_kind = ReleasePackageArtifactKind.ARCHIVE
 
-    schema_version: Literal[SchemaVersion.RELEASE_ARCHIVE] = (
-        SchemaVersion.RELEASE_ARCHIVE
+    schema_version: Literal[ReleaseArtifactSchema.RELEASE_PACKAGE] = (
+        ReleaseArtifactSchema.RELEASE_PACKAGE
+    )
+    artifact_kind: Literal[ReleasePackageArtifactKind.ARCHIVE] = (
+        ReleasePackageArtifactKind.ARCHIVE
     )
     name: str = Field(min_length=1)
     sha256: SHA256Digest
@@ -79,10 +86,14 @@ class ScoreReleaseArchive(CurrentFrozenSchemaModel):
 class ScoreReleaseAttestation(CurrentFrozenSchemaModel):
     """Release object binding a verified score-release bundle to its archive."""
 
-    current_schema_version = SchemaVersion.RELEASE_ATTESTATION
+    current_schema_version = ReleaseArtifactSchema.RELEASE_PACKAGE
+    current_artifact_kind = ReleasePackageArtifactKind.ATTESTATION
 
-    schema_version: Literal[SchemaVersion.RELEASE_ATTESTATION] = (
-        SchemaVersion.RELEASE_ATTESTATION
+    schema_version: Literal[ReleaseArtifactSchema.RELEASE_PACKAGE] = (
+        ReleaseArtifactSchema.RELEASE_PACKAGE
+    )
+    artifact_kind: Literal[ReleasePackageArtifactKind.ATTESTATION] = (
+        ReleasePackageArtifactKind.ATTESTATION
     )
     release_id: SHA256Digest
     bundle_sha256: SHA256Digest

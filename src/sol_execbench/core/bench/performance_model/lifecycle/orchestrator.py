@@ -1675,7 +1675,6 @@ def _import_completion_outputs(
 
 
 class _ManifestCommon(TypedDict):
-    stage: DiagnosticLifecycleStage
     purpose: DiagnosticEvidencePurpose
     stage_id: str
     status: DiagnosticStageStatus
@@ -1693,7 +1692,6 @@ def _manifest_common(
     retention: DiagnosticRetentionClass,
 ) -> _ManifestCommon:
     return {
-        "stage": receipt.stage,
         "purpose": context.purpose,
         "stage_id": receipt.stage_id,
         "status": DiagnosticStageStatus.VERIFIED,
@@ -1784,6 +1782,7 @@ def _calibration_manifest(
         **_manifest_common(
             context, receipt, DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE
         ),
+        stage=DiagnosticLifecycleStage.CALIBRATION,
         gpu_identity=gpu,
         software_identity=software,
         calibration_profile_sha256=sha256_file(profile),
@@ -1799,6 +1798,7 @@ def _collection_manifest(
         **_manifest_common(
             context, receipt, DiagnosticRetentionClass.PROCESS_EVIDENCE
         ),
+        stage=DiagnosticLifecycleStage.COLLECTION_RUN,
         gpu_identity=context.plan.gpu_identity,
         generation=context.generation,
         roles=("held_out",),
@@ -1865,6 +1865,7 @@ def _snapshot_manifests(
     return (
         DiagnosticCorpusSnapshotManifest(
             **common,
+            stage=DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
             role="held_out",
             corpus_file_sha256=artifact.sha256,
             case_count=len(corpus.cases),
@@ -1888,6 +1889,7 @@ def _model_manifest(
         **_manifest_common(
             context, receipt, DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE
         ),
+        stage=DiagnosticLifecycleStage.MODEL_BUILD,
         calibration_profile_sha256=sha256_file(calibration),
         calibration_audit_sha256=sha256_file(audit),
         inference_profile_sha256=sha256_file(inference),
@@ -1913,6 +1915,7 @@ def _acceptance_manifest(
         **_manifest_common(
             context, receipt, DiagnosticRetentionClass.FROZEN_SOURCE_EVIDENCE
         ),
+        stage=DiagnosticLifecycleStage.ACCEPTANCE,
         held_out_corpus_snapshot_id=held_out_id,
         accepted=result.accepted,
         verdict_sha256=sha256_file(result_path),
@@ -1934,6 +1937,7 @@ def _publication_manifest(
         **_manifest_common(
             context, receipt, DiagnosticRetentionClass.PUBLICATION_RELEASE
         ),
+        stage=DiagnosticLifecycleStage.PUBLICATION,
         source_corpus_sha256=projection.source_corpus_sha256,
         publication_manifest_sha256=sha256_file(manifest_path),
         uncompressed_size_bytes=projection.uncompressed_size_bytes,
