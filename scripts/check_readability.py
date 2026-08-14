@@ -35,6 +35,7 @@ class Metrics:
     long_functions: int = 0
     wide_functions: int = 0
     production_any_modules: int = 0
+    production_any_references: int = 0
     wildcard_imports: int = 0
     oversized_test_modules: int = 0
 
@@ -65,6 +66,7 @@ def collect_metrics() -> tuple[Metrics, list[str]]:
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
         has_any = False
+        any_references = 0
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 span = _line_span(node)
@@ -85,8 +87,10 @@ def collect_metrics() -> tuple[Metrics, list[str]]:
                 counts["wildcard_imports"] += 1
             elif isinstance(node, ast.Name) and node.id == "Any":
                 has_any = True
+                any_references += 1
         if path.is_relative_to(SOURCE_ROOT):
             counts["production_any_modules"] += has_any
+            counts["production_any_references"] += any_references
     for path in _python_files(TEST_ROOT):
         line_count = len(path.read_text(encoding="utf-8").splitlines())
         counts["oversized_test_modules"] += line_count > 1000

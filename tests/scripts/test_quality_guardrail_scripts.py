@@ -488,6 +488,7 @@ def test_readability_metrics_automatically_scan_scripts(
 
     assert metrics.long_functions == 1
     assert metrics.production_any_modules == 1
+    assert metrics.production_any_references == 1
     assert failures == []
 
 

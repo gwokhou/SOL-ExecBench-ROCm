@@ -6,10 +6,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
 
 from sol_execbench.core.bench.rocm_profiler.schema_versions import (
     ProfilerArtifactSchema,
@@ -128,7 +128,7 @@ class Rocprofv3ProfileArtifact:
         """Normalize boundary input and reject unknown artifact kinds."""
         object.__setattr__(self, "kind", Rocprofv3ArtifactKind(self.kind))
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable artifact payload."""
         return {
             "path": str(self.path),
@@ -237,7 +237,7 @@ class Rocprofv3ProfileResult:
         """
         return has_profiler_data_artifact(self.artifacts)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable diagnostic sidecar payload."""
         return {
             "schema_version": self.schema_version,
@@ -291,7 +291,7 @@ class Rocprofv3TimingRow:
         normalized = normalize_ascii_alnum(self.domain)
         return "kernel" in normalized
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable row payload."""
         return {
             "name": self.name,
@@ -338,7 +338,7 @@ class Rocprofv3TimingEvidence:
             if row.is_kernel_activity
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable evidence payload."""
         return {
             "schema_version": self.schema_version,
@@ -372,7 +372,7 @@ class DefaultTimingSelection:
     fallback_applied: bool
     reason: str
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable selection payload."""
         return {
             "policy": self.policy.to_dict(),
@@ -380,6 +380,23 @@ class DefaultTimingSelection:
             "fallback_applied": self.fallback_applied,
             "reason": self.reason,
         }
+
+
+class Rocprofv3ExecutionArguments(TypedDict):
+    """Typed shared arguments used to convert profiler requests."""
+
+    application_command: tuple[str, ...]
+    output_directory: Path
+    output_file: str
+    tool_version: str
+    gpu_architecture: str
+    executable: str
+    warmup_runs: int | None
+    iterations: int | None
+    min_measurement_time_seconds: float | None
+    trial_count: int | None
+    clock_locked: bool | None
+    timeout_seconds: float
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -399,11 +416,21 @@ class Rocprofv3ExecutionRequest:
     clock_locked: bool | None = None
     timeout_seconds: float = 300.0
 
-    def execution_arguments(self) -> dict[str, Any]:
+    def execution_arguments(self) -> Rocprofv3ExecutionArguments:
         """Return every shared field for lossless request conversion."""
         return {
-            item.name: getattr(self, item.name)
-            for item in fields(Rocprofv3ExecutionRequest)
+            "application_command": self.application_command,
+            "output_directory": self.output_directory,
+            "output_file": self.output_file,
+            "tool_version": self.tool_version,
+            "gpu_architecture": self.gpu_architecture,
+            "executable": self.executable,
+            "warmup_runs": self.warmup_runs,
+            "iterations": self.iterations,
+            "min_measurement_time_seconds": self.min_measurement_time_seconds,
+            "trial_count": self.trial_count,
+            "clock_locked": self.clock_locked,
+            "timeout_seconds": self.timeout_seconds,
         }
 
 
@@ -464,7 +491,7 @@ class Rocprofv3CollectionResult:
         """Whether live profiler evidence was collected and parsed."""
         return self.evidence is not None and not self.selection.fallback_applied
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return a JSON-serializable collection result payload."""
         return {
             "profiler_collected": self.profiler_collected,
