@@ -4,14 +4,13 @@
 from __future__ import annotations
 
 import builtins
-import sys
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 import torch
 from sol_execbench_type_helpers import make_definition, make_workload
 
+from sol_execbench.core.bench import safetensors_io
 from sol_execbench.core.bench.safetensors_io import (
     _resolve_blob_path,
     load_safetensors,
@@ -36,20 +35,7 @@ def _definition(**overrides):
 
 
 def _install_fake_safetensors(monkeypatch, load_file) -> None:
-    package = ModuleType("safetensors")
-    torch_module = ModuleType("safetensors.torch")
-    setattr(  # noqa: B010 -- Populate a synthetic third-party module
-        torch_module,
-        "load_file",
-        load_file,
-    )
-    setattr(  # noqa: B010 -- Populate a synthetic third-party package
-        package,
-        "torch",
-        torch_module,
-    )
-    monkeypatch.setitem(sys.modules, "safetensors", package)
-    monkeypatch.setitem(sys.modules, "safetensors.torch", torch_module)
+    monkeypatch.setattr(safetensors_io, "_load_safetensors_file", load_file)
 
 
 def test_load_safetensors_resolves_partial_root_and_caches_file(
@@ -153,7 +139,7 @@ def test_load_safetensors_reports_missing_dependency(monkeypatch) -> None:
     monkeypatch.setattr(builtins, "__import__", fail_import)
 
     with pytest.raises(RuntimeError, match="not available"):
-        load_safetensors(_definition(), _workload({"a": {"type": "random"}}))
+        safetensors_io._load_safetensors_file("unused.safetensors")
 
 
 def test_resolve_blob_path_returns_none_when_no_suffix_exists(

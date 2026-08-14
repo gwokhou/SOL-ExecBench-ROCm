@@ -85,6 +85,61 @@ jobs:
       - name: Run tools tests
         run: uv run --no-sync pytest tests/tools tests/scripts
 
+  default-parallel-tests:
+    name: Default eight-worker suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install package
+        run: uv sync --locked --all-groups
+      - name: Run the configured test command
+        run: uv run --no-sync pytest tests/
+      - name: Verify wheel resources outside the checkout
+        run: |
+          uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
+          python -m zipfile -e "$RUNNER_TEMP"/wheel/*.whl "$RUNNER_TEMP/wheel-root"
+          cd "$RUNNER_TEMP"
+          PYTHONPATH="$RUNNER_TEMP/wheel-root" "$GITHUB_WORKSPACE/.venv/bin/python" -c \
+            'from pathlib import Path; import solar; from sol_execbench.core.platform.docker_matrix import load_docker_target_manifest; assert Path(solar.__file__).is_relative_to(Path.cwd() / "wheel-root"); assert load_docker_target_manifest().default_target_id'
+
+  macos-development:
+    name: macOS development surface
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install package
+        run: uv sync --locked --all-groups
+      - name: Verify macOS-safe development paths
+        run: |
+          uv run --no-sync ty check
+          uv run --no-sync pytest -n 0 \
+            tests/sol_execbench/core/process \
+            tests/sol_execbench/core/platform/test_docker_matrix_targets.py \
+            tests/sol_execbench/core/bench/test_safetensors_io_unit.py \
+            tests/solar/test_orojenesis.py
+
   solar-tests:
     name: Solar tests and coverage
     runs-on: ubuntu-latest

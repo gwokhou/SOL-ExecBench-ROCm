@@ -125,7 +125,7 @@ dev_dri_has_accessible_node() {
 resolve_docker_target_json() {
     local cmd=(
         -m sol_execbench.core.platform.docker_matrix.cli preview
-        --manifest "${REPO_ROOT}/docker/rocm-targets.json"
+        --manifest "${REPO_ROOT}/src/sol_execbench/data/rocm_targets.json"
     )
     if [ -n "${DOCKER_TARGET}" ]; then
         cmd+=(--target "${DOCKER_TARGET}")
@@ -180,7 +180,7 @@ append_dependency_arg_from_env() {
 classify_dependency_preflight_json() {
     local cmd=(
         -m sol_execbench.core.platform.dependency_matrix.cli preflight
-        --manifest "${REPO_ROOT}/docker/rocm-targets.json"
+        --manifest "${REPO_ROOT}/src/sol_execbench/data/rocm_targets.json"
     )
     if [ -n "${DOCKER_TARGET}" ]; then
         cmd+=(--target "${DOCKER_TARGET}")
@@ -235,7 +235,7 @@ write_compatibility_sidecars() {
     entry_path="$(compatibility_entry_output_path)"
     cmd=(
         -m sol_execbench.core.evidence.runtime_evidence collect-target
-        --manifest "${REPO_ROOT}/docker/rocm-targets.json"
+        --manifest "${REPO_ROOT}/src/sol_execbench/data/rocm_targets.json"
         --output "${entry_path}"
     )
     if [ -n "${DOCKER_TARGET}" ]; then
@@ -338,7 +338,7 @@ classify_docker_preflight_json() {
 
     cmd=(
         -m sol_execbench.core.platform.docker_matrix.cli preflight
-        --manifest "${REPO_ROOT}/docker/rocm-targets.json"
+        --manifest "${REPO_ROOT}/src/sol_execbench/data/rocm_targets.json"
         --docker-context "${context_name}"
         --docker-host "${docker_host}"
         --dev-kfd-present "${dev_kfd_present}"
@@ -590,7 +590,7 @@ run_container_dependency_preflight_json() {
         --entrypoint python
         "${IMAGE}"
         -m sol_execbench.core.platform.dependency_matrix.cli preflight
-        --manifest "${CONTAINER_PROJECT}/docker/rocm-targets.json"
+        --manifest "${CONTAINER_PROJECT}/src/sol_execbench/data/rocm_targets.json"
     )
     if [ -n "${DOCKER_TARGET}" ]; then
         cmd+=(--target "${DOCKER_TARGET}")
@@ -613,7 +613,7 @@ write_container_validated_sidecars() {
         --entrypoint python
         "${IMAGE}"
         -m sol_execbench.core.evidence.runtime_evidence collect-target
-        --manifest "${CONTAINER_PROJECT}/docker/rocm-targets.json"
+        --manifest "${CONTAINER_PROJECT}/src/sol_execbench/data/rocm_targets.json"
         --output "${container_entry_path}"
         --container-validated
         --dev-kfd-present "$(bool_text "$([ -e /dev/kfd ] && echo 1 || echo 0)")"

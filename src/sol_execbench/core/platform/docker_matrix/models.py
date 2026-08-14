@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
@@ -22,11 +21,6 @@ from sol_execbench.core.platform.schema_versions import (
     PlatformArtifactSchema,
     PlatformPreflightArtifactKind,
 )
-
-DEFAULT_DOCKER_TARGET_MANIFEST = (
-    Path(__file__).resolve().parents[3] / "docker" / "rocm-targets.json"
-)
-
 
 _MODEL_CONFIG = ConfigDict(
     extra="forbid",

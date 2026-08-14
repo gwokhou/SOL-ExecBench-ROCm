@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 DOCKERFILE_PATH = REPO_ROOT / "docker" / "Dockerfile"
 ENTRYPOINT_PATH = REPO_ROOT / "docker" / "entrypoint.sh"
 RUN_DOCKER_SCRIPT = REPO_ROOT / "scripts" / "run_docker.sh"
-MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
+MANIFEST_PATH = REPO_ROOT / "src/sol_execbench/data/rocm_targets.json"
 
 
 def _dockerfile_lines() -> list[str]:

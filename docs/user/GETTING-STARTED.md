@@ -138,7 +138,7 @@ self-declared toolchain still fails closed.
 ./scripts/run_docker.sh --build
 ```
 
-The wrapper uses `docker/rocm-targets.json` and configures ROCm device
+The wrapper uses the packaged `sol_execbench/data/rocm_targets.json` and configures ROCm device
 passthrough. Run `./scripts/run_docker.sh --help` for current target options.
 
 ## Common failures

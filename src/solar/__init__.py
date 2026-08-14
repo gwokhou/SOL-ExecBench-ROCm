@@ -21,7 +21,12 @@ handling, candidate evaluation, timing, baselines, and scoring intentionally
 live in :mod:`sol_execbench`.
 """
 
-__version__ = "4.0.0"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("sol-execbench")
+except PackageNotFoundError:
+    __version__ = "0+unknown"
 
 # The supported public surface is the atomic pipeline. Stage implementations
 # remain importable for in-repository development, but are deliberately not

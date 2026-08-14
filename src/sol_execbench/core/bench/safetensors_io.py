@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from contextlib import suppress
 from pathlib import Path
 
 import torch
@@ -29,6 +30,17 @@ from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.workload import SafetensorsInput, Workload
 
 FLASHINFER_TRACE_ENV = "FLASHINFER_TRACE_DIR"
+
+
+def _load_safetensors_file(path: str) -> dict[str, torch.Tensor]:
+    """Load one file through the optional native dependency boundary."""
+    try:
+        from safetensors.torch import load_file
+    except Exception as exc:
+        raise RuntimeError(
+            "safetensors is not available in the current environment",
+        ) from exc
+    return load_file(path)
 
 
 def flashinfer_safetensors_env(
@@ -79,13 +91,6 @@ def load_safetensors(
     If none match, the path is passed as-is to safetensors (which will raise
     a FileNotFoundError with a clear message).
     """
-    try:
-        import safetensors.torch as st
-    except Exception as e:
-        raise RuntimeError(
-            "safetensors is not available in the current environment",
-        ) from e
-
     expected = definition.get_input_shapes(workload.axes)
 
     safe_tensors: dict[str, torch.Tensor] = {}
@@ -105,7 +110,7 @@ def load_safetensors(
         path = str(Path(path).resolve())
 
         if path not in loaded_files:
-            loaded_files[path] = st.load_file(path)
+            loaded_files[path] = _load_safetensors_file(path)
         tensors = loaded_files[path]
         if input_spec.tensor_key not in tensors:
             raise ValueError(
@@ -120,10 +125,10 @@ def load_safetensors(
         if t.dtype != expect_dtype:
             raise ValueError(f"'{name}' expected {expect_dtype}, got {t.dtype}")
 
-        try:
-            t = t.contiguous().pin_memory()
-        except RuntimeError:
-            t = t.contiguous()
+        t = t.contiguous()
+        if torch.cuda.is_available():
+            with suppress(RuntimeError):
+                t = t.pin_memory()
         safe_tensors[name] = t
     return safe_tensors
 

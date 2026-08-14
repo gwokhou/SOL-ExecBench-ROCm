@@ -20,7 +20,7 @@ from sol_execbench.core.platform.docker_matrix import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
+MANIFEST_PATH = REPO_ROOT / "src/sol_execbench/data/rocm_targets.json"
 
 
 def _target(target_id: str = "rocm-7.1.1-ubuntu-24.04-container"):

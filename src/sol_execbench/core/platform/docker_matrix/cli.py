@@ -8,7 +8,6 @@ from pathlib import Path
 
 from sol_execbench.core.arguments import parse_bool
 from sol_execbench.core.platform.docker_matrix.models import (
-    DEFAULT_DOCKER_TARGET_MANIFEST,
     DockerPreflightObservation,
 )
 from sol_execbench.core.platform.docker_matrix.preflight import (
@@ -28,7 +27,7 @@ def _build_parser() -> argparse.ArgumentParser:
     preview.add_argument(
         "--manifest",
         type=Path,
-        default=DEFAULT_DOCKER_TARGET_MANIFEST,
+        default=None,
     )
     preview.add_argument("--target")
     preview.add_argument("--allow-unknown-target", action="store_true")
@@ -39,7 +38,7 @@ def _build_parser() -> argparse.ArgumentParser:
     preflight.add_argument(
         "--manifest",
         type=Path,
-        default=DEFAULT_DOCKER_TARGET_MANIFEST,
+        default=None,
     )
     preflight.add_argument("--target")
     preflight.add_argument("--docker-context")

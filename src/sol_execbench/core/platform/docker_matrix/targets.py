@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +21,6 @@ from sol_execbench.core.platform.compatibility import (
     classify_matrix_entry_for_execution,
 )
 from sol_execbench.core.platform.docker_matrix.models import (
-    DEFAULT_DOCKER_TARGET_MANIFEST,
     DockerTargetManifest,
     DockerTargetManifestEntry,
     DockerTargetSelection,
@@ -28,10 +28,17 @@ from sol_execbench.core.platform.docker_matrix.models import (
 
 
 def load_docker_target_manifest(
-    path: str | Path = DEFAULT_DOCKER_TARGET_MANIFEST,
+    path: str | Path | None = None,
 ) -> DockerTargetManifest:
-    """Load and validate the checked-in Docker Target manifest."""
-    payload = json.loads(Path(path).read_text())
+    """Load and validate the packaged or explicitly supplied Target manifest."""
+    text = (
+        files("sol_execbench.data")
+        .joinpath("rocm_targets.json")
+        .read_text(encoding="utf-8")
+        if path is None
+        else Path(path).read_text(encoding="utf-8")
+    )
+    payload = json.loads(text)
     return DockerTargetManifest.model_validate(payload)
 
 
@@ -132,7 +139,7 @@ def _not_tested_selection(
 def select_docker_target(
     target_id: str | None = None,
     *,
-    manifest_path: str | Path = DEFAULT_DOCKER_TARGET_MANIFEST,
+    manifest_path: str | Path | None = None,
     allow_unknown_override: bool = False,
     override_image_repository: str | None = None,
     override_image_tag: str | None = None,
@@ -193,7 +200,7 @@ def _selection_entry_for_preview(
 def preview_docker_target_selection(
     target_id: str | None = None,
     *,
-    manifest_path: str | Path = DEFAULT_DOCKER_TARGET_MANIFEST,
+    manifest_path: str | Path | None = None,
     allow_unknown_override: bool = False,
     override_image_repository: str | None = None,
     override_image_tag: str | None = None,
