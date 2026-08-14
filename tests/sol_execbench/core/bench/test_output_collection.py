@@ -15,12 +15,12 @@
 # limitations under the License.
 
 
-"""Tests for sol_execbench.core.bench.utils."""
+"""Tests for benchmark output collection."""
 
 import torch
 from sol_execbench_type_helpers import make_definition
 
-from sol_execbench.core.bench.utils import call_and_collect_outputs
+from sol_execbench.core.bench.output_collection import call_and_collect_outputs
 
 
 def test_call_and_collect_outputs_normalizes_return_value_outputs():

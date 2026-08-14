@@ -18,7 +18,12 @@ from sol_execbench.core.integrity import (
 )
 
 _POLICY_MODULES = (
-    "sol_execbench.core.bench.performance_model.prediction",
+    "sol_execbench.core.bench.performance_model.prediction.api",
+    "sol_execbench.core.bench.performance_model.prediction.calibration",
+    "sol_execbench.core.bench.performance_model.prediction.hardware",
+    "sol_execbench.core.bench.performance_model.prediction.primitives",
+    "sol_execbench.core.bench.performance_model.prediction.schedule",
+    "sol_execbench.core.bench.performance_model.prediction.semantic",
     "sol_execbench.core.bench.performance_model.attribution",
     "sol_execbench.core.bench.performance_model.counter_metrics",
     "sol_execbench.core.bench.performance_model.inference",

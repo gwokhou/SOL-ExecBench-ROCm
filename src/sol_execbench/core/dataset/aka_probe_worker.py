@@ -15,6 +15,7 @@ from sol_execbench.core.bench.eval_output_integrity import (
     stable_reference_outputs,
 )
 from sol_execbench.core.bench.io import ShiftingMemoryPoolAllocator
+from sol_execbench.core.bench.output_collection import call_and_collect_outputs
 from sol_execbench.core.bench.reference_protocol import (
     MAX_REFERENCE_TENSOR_STORAGE_BYTES,
     ReferenceCase,
@@ -22,7 +23,6 @@ from sol_execbench.core.bench.reference_protocol import (
     reference_values_storage_bytes,
 )
 from sol_execbench.core.bench.reference_service import ReferenceService
-from sol_execbench.core.bench.utils import call_and_collect_outputs
 from sol_execbench.core.dataset.aka_compatibility import PROBE_RESULT_PREFIX
 from sol_execbench.core.dataset.aka_contract import AKAProbeStatus
 from sol_execbench.core.platform.runtime import (

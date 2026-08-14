@@ -42,6 +42,7 @@ from sol_execbench.core.bench.io import (
     load_safetensors,
 )
 from sol_execbench.core.bench.output_checks import compare_output_checks
+from sol_execbench.core.bench.output_collection import call_and_collect_outputs
 from sol_execbench.core.bench.performance_model.access_evidence import (
     summarize_integer_inputs,
 )
@@ -56,7 +57,6 @@ from sol_execbench.core.bench.reference_protocol import (
     send_failure,
     send_json,
 )
-from sol_execbench.core.bench.utils import call_and_collect_outputs
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.dtypes import dtype_str_to_torch_dtype
 from sol_execbench.core.data.workload import Workload

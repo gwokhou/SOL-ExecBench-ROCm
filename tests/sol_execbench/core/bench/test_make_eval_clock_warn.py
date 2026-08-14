@@ -24,7 +24,7 @@ The eval driver now:
 """
 
 from sol_execbench.core.bench.config.benchmark_config import BenchmarkConfig
-from sol_execbench.core.bench.utils import make_eval
+from sol_execbench.core.bench.evaluation import make_eval
 from sol_execbench.core.data.trace import EvaluationStatus
 
 _DEVICE = "cpu"

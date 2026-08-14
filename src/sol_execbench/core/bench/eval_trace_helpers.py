@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from sol_execbench.core.bench.eval_runtime import emit_trace_jsonl
-from sol_execbench.core.bench.utils import make_eval
+from sol_execbench.core.bench.evaluation import make_eval
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.trace import (
     Correctness,

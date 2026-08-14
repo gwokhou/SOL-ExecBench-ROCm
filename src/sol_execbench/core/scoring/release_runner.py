@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from sol_execbench.core.bench.utils import make_eval
+from sol_execbench.core.bench.evaluation import make_eval
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
