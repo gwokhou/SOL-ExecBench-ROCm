@@ -16,6 +16,9 @@ from sol_execbench.cli.protocol import (
     CliResult,
     artifact,
 )
+from sol_execbench.core.platform.rdna4_validation import (
+    verify_validation_receipt,
+)
 from sol_execbench.core.scoring.official_scoring import (
     official_score_availability,
 )
@@ -195,6 +198,16 @@ def assemble_bundle_cli(workspace: Path, manifest_path: Path) -> CliResult:
     type=click.Path(dir_okay=False, path_type=Path),
     required=True,
 )
+@click.option(
+    "--hardware-validation-receipt",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+)
+@click.option(
+    "--hardware-evidence-dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+)
 @click.option("--source-revision", required=True)
 @click.option(
     "--manifest",
@@ -207,17 +220,25 @@ def release_package_cli(
     bundle: Path,
     archive_output: Path,
     attestation_output: Path,
+    hardware_validation_receipt: Path,
+    hardware_evidence_dir: Path,
     source_revision: str,
     manifest_path: Path,
 ) -> CliResult:
     """Package a verified release bundle into a deterministic zstd archive."""
     try:
+        hardware_validation = verify_validation_receipt(
+            hardware_validation_receipt,
+            hardware_evidence_dir,
+            expected_source_revision=source_revision,
+        )
         attestation = package_score_release(
             bundle_path=bundle,
             corpus_manifest_path=manifest_path,
             archive_output=archive_output,
             attestation_output=attestation_output,
             source_revision=source_revision,
+            hardware_validation=hardware_validation,
         )
     except (OSError, ValueError) as exc:
         raise CliFailure(

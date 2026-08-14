@@ -6,6 +6,7 @@ from typing import Literal
 
 import pytest
 from click.testing import CliRunner
+from sol_execbench_type_helpers import make_hardware_validation_binding
 
 from sol_execbench.cli.commands import diagnostics as diagnostics_commands
 from sol_execbench.cli.main import cli
@@ -420,6 +421,7 @@ def test_inference_and_acceptance_authoring_cli_workflow(
 
 
 def _release_attestation() -> DiagnosticReleaseAttestation:
+    source_revision = "1" * 40
     return DiagnosticReleaseAttestation(
         release_id="aa" * 32,
         publication_id="ab" * 32,
@@ -428,12 +430,15 @@ def _release_attestation() -> DiagnosticReleaseAttestation:
             sha256="ac" * 32,
             size_bytes=1024,
             publication_manifest_sha256="ad" * 32,
-            source_revision="19f195a8",
+            source_revision=source_revision,
         ),
         uncompressed_size_bytes=2048,
         case_count=880,
         inventory_sha256="ae" * 32,
-        source_revision="19f195a8",
+        source_revision=source_revision,
+        hardware_validation=make_hardware_validation_binding(
+            source_revision=source_revision,
+        ),
         created_at="2026-08-07T00:00:00+00:00",
     )
 
@@ -443,18 +448,30 @@ def test_release_package_cli_command(tmp_path: Path, monkeypatch) -> None:
     manifest.write_text("{}", encoding="utf-8")
     archive_output = tmp_path / "release.tar.zst"
     attestation_output = tmp_path / "attestation.json"
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text("{}", encoding="utf-8")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    source_revision = "1" * 40
 
     def fake_package(**kwargs) -> DiagnosticReleaseAttestation:
         assert kwargs["manifest_path"] == manifest
         assert kwargs["archive_output"] == archive_output
         assert kwargs["attestation_output"] == attestation_output
-        assert kwargs["source_revision"] == "19f195a8"
+        assert kwargs["source_revision"] == source_revision
         return _release_attestation()
 
     monkeypatch.setattr(
         diagnostics_commands,
         "package_diagnostic_publication",
         fake_package,
+    )
+    monkeypatch.setattr(
+        diagnostics_commands,
+        "verify_validation_receipt",
+        lambda *args, **kwargs: make_hardware_validation_binding(
+            source_revision=source_revision,
+        ),
     )
     result = CliRunner().invoke(
         cli,
@@ -471,7 +488,11 @@ def test_release_package_cli_command(tmp_path: Path, monkeypatch) -> None:
             "--attestation-output",
             str(attestation_output),
             "--source-revision",
-            "19f195a8",
+            source_revision,
+            "--hardware-validation-receipt",
+            str(receipt),
+            "--hardware-evidence-dir",
+            str(evidence),
         ],
     )
 

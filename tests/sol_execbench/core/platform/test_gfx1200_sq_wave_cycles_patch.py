@@ -4,6 +4,10 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.requires_linux
+
 ROOT = Path(__file__).resolve().parents[4]
 PATCH_DIR = ROOT / "scripts/patches/gfx1200_sq_wave_cycles"
 WRAPPER = PATCH_DIR / "rocprofv3-gfx1200-patched"

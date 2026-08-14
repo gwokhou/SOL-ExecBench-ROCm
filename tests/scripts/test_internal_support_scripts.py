@@ -850,6 +850,21 @@ def test_rdna4_validation_helpers_and_verify_mode(
         "kind": "local_unsigned",
         "trusted_execution": False,
     }
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repository")
+    monkeypatch.setenv("GITHUB_WORKFLOW_REF", "owner/repository/workflow@main")
+    monkeypatch.setenv("GITHUB_WORKFLOW", "RDNA4 Hardware")
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "2")
+    assert validation._attestation() == {
+        "kind": "github_actions_self_hosted",
+        "trusted_execution": False,
+        "repository": "owner/repository",
+        "workflow_ref": "owner/repository/workflow@main",
+        "workflow_name": "RDNA4 Hardware",
+        "run_id": 123,
+        "run_attempt": 2,
+    }
     assert validation.main(["--verify", str(output)]) == 0
     assert capsys.readouterr().out.strip().endswith("manifest.json")
 

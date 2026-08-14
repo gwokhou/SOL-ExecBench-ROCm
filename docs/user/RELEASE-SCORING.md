@@ -69,7 +69,9 @@ A publisher cutover therefore has the following atomic contract:
    uv run sol-execbench score release-package out/release/release-bundle.json \
      --archive-output score-release.tar.zst \
      --attestation-output attestation.json \
-     --source-revision SOURCE_GIT_SHA
+     --source-revision SOURCE_GIT_SHA \
+     --hardware-validation-receipt <downloaded evidence>/receipt.json \
+     --hardware-evidence-dir <downloaded evidence>
    ```
 
    `release-package` first re-runs the fail-closed verifier, then collects the
@@ -80,11 +82,14 @@ A publisher cutover therefore has the following atomic contract:
    official score. Upload the archive and attestation as a **draft** GitHub
    Release, then trigger the `Score Release` workflow
    (`.github/workflows/score-release.yml`): it downloads the draft, verifies the
-   archive SHA-256 against the attestation, reproduces the official score with
-   `score release-verify`, requires a byte-identical deterministic rebuild, and
-   promotes the draft to published. The GitHub-hosted workflow job is the only
+   archive SHA-256 against the attestation, downloads the latest successful
+   manual RDNA4 run for the exact tag SHA, re-verifies its receipt and evidence,
+   reproduces the official score with `score release-verify`, requires a
+   content-identical deterministic rebuild, and promotes the draft to published.
+   The GitHub-hosted workflow job is the only
    component that holds release authority; the self-hosted GPU runner only
-   produces evidence.
+   produces evidence. Missing, expired, mismatched, or tampered hardware
+   evidence is a hard release failure.
 5. Verify that `sol-execbench score status` reports both policy authorization
    and the published release. Anyone can reproduce the official score from the
    distributed archive:

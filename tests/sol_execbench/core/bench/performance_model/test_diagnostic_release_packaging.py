@@ -7,6 +7,7 @@ from typing import NoReturn
 
 import pytest
 import zstandard
+from sol_execbench_type_helpers import make_hardware_validation_binding
 
 from sol_execbench.core.bench.performance_model import release as release_module
 from sol_execbench.core.bench.performance_model.lifecycle import (
@@ -90,7 +91,7 @@ def _package(
     tmp_path: Path,
     *,
     store_root: Path | None = None,
-    revision: str = "19f195a8",
+    revision: str = "a" * 40,
     index: str = "",
 ) -> tuple[Path, Path, DiagnosticReleaseAttestation]:
     archive = tmp_path / f"release{index}.tar.zst"
@@ -100,6 +101,9 @@ def _package(
         archive_output=archive,
         attestation_output=attestation,
         source_revision=revision,
+        hardware_validation=make_hardware_validation_binding(
+            source_revision=revision,
+        ),
         semantic_loader=_noop_semantic_loader,
         solar_verifier=lambda path: None,
         store_root_path=store_root,
@@ -158,14 +162,14 @@ def test_package_writes_an_immutable_release_manifest(
         publication_manifest_sha256=sha256_file(root / "publication.json"),
         uncompressed_size_bytes=projection.uncompressed_size_bytes,
         case_count=projection.case_count,
-        source_revision="19f195a8",
+        source_revision="a" * 40,
     )
     publication_manifest = DiagnosticPublicationLifecycleManifest(
         stage=DiagnosticLifecycleStage.PUBLICATION,
         stage_id=pub_id,
         status=DiagnosticStageStatus.VERIFIED,
         retention_class=DiagnosticRetentionClass.PUBLICATION_RELEASE,
-        source_revision="19f195a8",
+        source_revision="a" * 40,
         parents=(
             DiagnosticLifecycleParent(
                 stage=DiagnosticLifecycleStage.ACCEPTANCE,

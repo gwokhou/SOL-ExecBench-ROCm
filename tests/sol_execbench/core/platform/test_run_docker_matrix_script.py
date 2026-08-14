@@ -150,6 +150,7 @@ def test_entrypoint_rejects_false_host_clock_claim(tmp_path: Path) -> None:
     assert "failed container verification" in result.stdout
 
 
+@pytest.mark.requires_linux
 def test_entrypoint_releases_owned_lock_after_workload_failure(
     tmp_path: Path,
 ) -> None:
@@ -188,6 +189,7 @@ printf 'CLOCKS_LOCKED=1\nCLOCK_LOCK_ACQUIRED=1\n'
     assert cleanup_log.read_text(encoding="utf-8") == "cleanup\n"
 
 
+@pytest.mark.requires_linux
 def test_entrypoint_holds_gpu_lock_until_clock_cleanup_finishes(
     tmp_path: Path,
 ) -> None:

@@ -5,11 +5,13 @@ from pathlib import Path
 import pytest
 
 from sol_execbench.core.data.json_utils import atomic_write_json_value
-from sol_execbench.core.integrity import stable_json_checksum
+from sol_execbench.core.integrity import sha256_file, stable_json_checksum
 from sol_execbench.core.platform.rdna4_validation import (
     build_validation_manifest,
+    build_validation_receipt,
     validate_environment_payload,
     verify_validation_directory,
+    verify_validation_receipt,
 )
 
 
@@ -45,7 +47,12 @@ def _environment() -> dict:
     }
 
 
-def _write_bundle(path: Path, *, skipped: int = 0) -> dict:
+def _write_bundle(
+    path: Path,
+    *,
+    skipped: int = 0,
+    github_actions: bool = False,
+) -> dict:
     path.mkdir()
     environment_path = path / "environment-doctor.json"
     junit_path = path / "pytest-rdna4.xml"
@@ -67,6 +74,19 @@ def _write_bundle(path: Path, *, skipped: int = 0) -> dict:
         environment=validate_environment_payload(_environment()),
         pytest_returncode=0,
         artifact_paths=(environment_path, junit_path, stdout_path, stderr_path),
+        attestation=(
+            {
+                "kind": "github_actions_self_hosted",
+                "trusted_execution": False,
+                "repository": "owner/repository",
+                "workflow_ref": "owner/repository/.github/workflows/rdna4-hardware.yml@refs/heads/main",
+                "workflow_name": "RDNA4 Hardware",
+                "run_id": 123,
+                "run_attempt": 2,
+            }
+            if github_actions
+            else None
+        ),
     )
     atomic_write_json_value(path / "manifest.json", manifest)
     return manifest
@@ -96,6 +116,67 @@ def test_local_validation_bundle_cannot_become_publisher_release(
 
     with pytest.raises(ValueError, match="not release eligible"):
         verify_validation_directory(directory, require_release_eligible=True)
+
+
+def test_workflow_receipt_binds_exact_sha_and_evidence(tmp_path: Path) -> None:
+    directory = tmp_path / "bundle"
+    _write_bundle(directory, github_actions=True)
+    receipt_path = directory / "receipt.json"
+
+    receipt = build_validation_receipt(
+        directory,
+        receipt_path,
+        source_revision="a" * 40,
+        workflow_run_id=123,
+        workflow_run_attempt=2,
+        created_at="2026-08-15T00:00:00Z",
+    )
+    binding = verify_validation_receipt(
+        receipt_path,
+        directory,
+        expected_source_revision="a" * 40,
+    )
+
+    assert receipt.evidence_sha256 == sha256_file(directory / "manifest.json")
+    assert binding.receipt_sha256 == sha256_file(receipt_path)
+    assert binding.workflow_run_id == 123
+    assert binding.source_revision == "a" * 40
+
+
+def test_workflow_receipt_rejects_identity_and_evidence_tampering(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "bundle"
+    _write_bundle(directory, github_actions=True)
+    receipt_path = directory / "receipt.json"
+    with pytest.raises(ValueError, match="workflow identity"):
+        build_validation_receipt(
+            directory,
+            receipt_path,
+            source_revision="a" * 40,
+            workflow_run_id=999,
+            workflow_run_attempt=2,
+            created_at="2026-08-15T00:00:00Z",
+        )
+    build_validation_receipt(
+        directory,
+        receipt_path,
+        source_revision="a" * 40,
+        workflow_run_id=123,
+        workflow_run_attempt=2,
+        created_at="2026-08-15T00:00:00Z",
+    )
+    manifest_path = directory / "manifest.json"
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8") + " ",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="evidence checksum"):
+        verify_validation_receipt(
+            receipt_path,
+            directory,
+            expected_source_revision="a" * 40,
+        )
 
 
 def test_self_declared_release_fields_are_rejected(tmp_path: Path):

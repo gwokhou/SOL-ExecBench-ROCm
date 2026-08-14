@@ -121,6 +121,7 @@ def _design_payload() -> dict[str, object]:
                 "archive_sha256": "c1" * 32,
                 "archive_size_bytes": 1234,
                 "attestation_sha256": "d1" * 32,
+                "hardware_validation_receipt_sha256": "e1" * 32,
             },
             DiagnosticReleaseLifecycleManifest,
         ),

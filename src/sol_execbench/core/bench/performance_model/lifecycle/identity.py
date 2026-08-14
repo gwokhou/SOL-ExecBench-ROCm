@@ -295,6 +295,7 @@ def release_id(
     source_revision: str,
     producer_version: str,
     archive_size_bytes: int,
+    hardware_validation_receipt_sha256: SHA256Digest,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
     """Identity of one deterministic release archive.
@@ -310,6 +311,9 @@ def release_id(
         {
             "archive_sha256": archive_sha256,
             "archive_size_bytes": archive_size_bytes,
+            "hardware_validation_receipt_sha256": (
+                hardware_validation_receipt_sha256
+            ),
             "producer_version": producer_version,
             "publication_id": publication_id,
             "source_revision": source_revision,
@@ -464,6 +468,9 @@ def _recompute_downstream_stage_id(
             source_revision=manifest.source_revision,
             producer_version=manifest.producer_version,
             archive_size_bytes=manifest.archive_size_bytes,
+            hardware_validation_receipt_sha256=(
+                manifest.hardware_validation_receipt_sha256
+            ),
             purpose=manifest.purpose,
         )
     name = type(manifest).__name__

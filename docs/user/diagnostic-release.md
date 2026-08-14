@@ -16,9 +16,10 @@ things:
   makes the archive byte-for-byte reproducible; no timestamps, owners, or
   directory order leak into the bytes.
 - `NAME.attestation.json` — the `attestation` variant of the
-  `sol_execbench.diagnostic_release_package.v1` contract. It binds the release
+  `sol_execbench.diagnostic_release_package.v2` contract. It binds the release
   identity, publication digest, archive digest and size, the exact sorted
-  inventory digest, case count, source revision, and producer version.
+  inventory digest, case count, source revision, producer version, and the
+  exact-SHA RDNA4 workflow receipt.
 - An immutable `DiagnosticReleaseLifecycleManifest` under
   `data/store/releases/<release_id>/manifest.json` when a store root is
   supplied, recording the archive and attestation digests with retention class
@@ -34,7 +35,9 @@ sol-execbench --format json diagnostics release package \
   --manifest data/publications/microarchitecture-diagnostics-v7-cycle3/publication.json \
   --archive-output data/publications/microarchitecture-diagnostics-v7-cycle3.tar.zst \
   --attestation-output data/publications/microarchitecture-diagnostics-v7-cycle3.attestation.json \
-  --source-revision 19f195a8
+  --source-revision <40-character source revision> \
+  --hardware-validation-receipt <downloaded evidence>/receipt.json \
+  --hardware-evidence-dir <downloaded evidence>
 ```
 
 ## Blob identity
@@ -83,8 +86,10 @@ gh release create <tag> \
 A GitHub-hosted `diagnostic-release.yml` job then takes the tag via
 `workflow_dispatch`, checks out that revision, downloads the draft release
 assets, recomputes the archive SHA-256 and compares it to the attestation,
-verifies the unpacked publication, and requires a byte-identical deterministic
-rebuild. Only after all of that succeeds does it mark the draft release
+downloads the latest successful manual RDNA4 run for the exact tag SHA,
+re-verifies its receipt and evidence tree, verifies the unpacked publication,
+and requires a byte-identical deterministic rebuild. Only after all of that
+succeeds does it mark the draft release
 published. A human reviews the draft before the final `gh release edit` runs, or
 the workflow is re-dispatched later.
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from sol_execbench_type_helpers import make_hardware_validation_binding
 from test_release_verifier import (
     _PROBLEM_PATH,
     _release_fixture,
@@ -89,6 +90,7 @@ def test_package_is_deterministic_and_binds_the_verified_bundle(
         archive_output=archive_one,
         attestation_output=attestation_one,
         source_revision=_SOURCE_REVISION,
+        hardware_validation=make_hardware_validation_binding(),
     )
     second = package_score_release(
         bundle_path=bundle_path,
@@ -96,6 +98,7 @@ def test_package_is_deterministic_and_binds_the_verified_bundle(
         archive_output=archive_two,
         attestation_output=attestation_two,
         source_revision=_SOURCE_REVISION,
+        hardware_validation=make_hardware_validation_binding(),
     )
 
     assert sha256_file(archive_one) == sha256_file(archive_two)
@@ -133,6 +136,7 @@ def test_package_archive_excludes_unreferenced_files(
         archive_output=archive,
         attestation_output=tmp_path / "attestation.json",
         source_revision=_SOURCE_REVISION,
+        hardware_validation=make_hardware_validation_binding(),
     )
 
     import subprocess
@@ -159,6 +163,7 @@ def test_verify_reproduces_the_official_score(
         archive_output=archive,
         attestation_output=tmp_path / "attestation.json",
         source_revision=_SOURCE_REVISION,
+        hardware_validation=make_hardware_validation_binding(),
     )
 
     result = verify_score_release_archive(
@@ -182,6 +187,7 @@ def test_verify_rejects_a_wrong_expected_sha256(
         archive_output=archive,
         attestation_output=tmp_path / "attestation.json",
         source_revision=_SOURCE_REVISION,
+        hardware_validation=make_hardware_validation_binding(),
     )
     with pytest.raises(ValueError, match="does not match expectation"):
         verify_score_release_archive(

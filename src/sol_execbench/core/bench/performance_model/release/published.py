@@ -343,6 +343,9 @@ def _verified_downloaded_assets(
         source_revision=attestation.source_revision,
         producer_version=attestation.producer_version,
         archive_size_bytes=attestation.archive.size_bytes,
+        hardware_validation_receipt_sha256=(
+            attestation.hardware_validation.receipt_sha256
+        ),
         purpose=attestation.purpose,
     )
     if expected_release_id != attestation.release_id:

@@ -215,6 +215,7 @@ class DiagnosticReleaseLifecycleManifest(CurrentDiagnosticLifecycleManifest):
     archive_sha256: SHA256Digest
     archive_size_bytes: int = Field(ge=0)
     attestation_sha256: SHA256Digest
+    hardware_validation_receipt_sha256: SHA256Digest
     draft_release_url: str | None = None
     published: bool = False
 
