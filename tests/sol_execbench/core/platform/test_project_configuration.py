@@ -11,6 +11,11 @@ PYPROJECT = REPO_ROOT / "pyproject.toml"
 PRE_COMMIT_CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
 PYTHON_VERSION = REPO_ROOT / ".python-version"
 QUALITY_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "code-quality.yml"
+CHECKOUT_ACTION = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+SETUP_PYTHON_ACTION = (
+    "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
+)
+SETUP_UV_ACTION = "astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9"
 
 
 def _quality_workflow() -> dict[str, Any]:
@@ -39,6 +44,15 @@ def test_python_support_is_pinned_to_3_12() -> None:
 
     assert data["project"]["requires-python"] == ">=3.12,<3.13"
     assert PYTHON_VERSION.read_text().strip() == "3.12"
+    python_jobs = [
+        job
+        for job in workflow["jobs"].values()
+        if any(
+            str(step.get("uses", "")).startswith("actions/setup-python@")
+            for step in job["steps"]
+        )
+    ]
+    assert python_jobs
     assert all(
         next(
             step
@@ -46,7 +60,7 @@ def test_python_support_is_pinned_to_3_12() -> None:
             if str(step.get("uses", "")).startswith("actions/setup-python@")
         )["with"]["python-version-file"]
         == ".python-version"
-        for job in workflow["jobs"].values()
+        for job in python_jobs
     )
     assert "3.13" not in QUALITY_WORKFLOW.read_text()
 
@@ -72,15 +86,23 @@ def test_quality_workflow_splits_parallel_responsibilities() -> None:
 
     assert workflow["permissions"] == {"contents": "read"}
     assert workflow["concurrency"]["cancel-in-progress"] is True
-    assert set(jobs) == {"quality", "package-tests", "solar-tests"}
-    assert all(job["timeout-minutes"] == 15 for job in jobs.values())
+    assert set(jobs) == {
+        "dependency-review",
+        "quality",
+        "package-tests",
+        "default-parallel-tests",
+        "macos-development",
+        "solar-tests",
+    }
 
-    for job in jobs.values():
+    python_job_names = set(jobs) - {"dependency-review"}
+    for name in python_job_names:
+        job = jobs[name]
         uses = [step["uses"] for step in job["steps"] if "uses" in step]
         assert uses == [
-            "actions/checkout@v7.0.1",
-            "actions/setup-python@v7.0.0",
-            "astral-sh/setup-uv@v9.0.0",
+            CHECKOUT_ACTION,
+            SETUP_PYTHON_ACTION,
+            SETUP_UV_ACTION,
         ]
         setup_uv = job["steps"][2]
         assert setup_uv["with"]["version"] == "0.11.31"
@@ -106,14 +128,27 @@ def test_quality_workflow_splits_parallel_responsibilities() -> None:
     assert "tests/solar" not in package_commands
     assert "coverage run -m pytest -n 0 tests/solar" in solar_commands
     assert "tests/solar" not in quality_commands
+    parallel_commands = "\n".join(
+        step.get("run", "") for step in jobs["default-parallel-tests"]["steps"]
+    )
+    assert "pytest tests/" in parallel_commands
+    macos_commands = "\n".join(
+        step.get("run", "") for step in jobs["macos-development"]["steps"]
+    )
+    assert "ty check" in macos_commands
+    assert "tests/sol_execbench/core/process" in macos_commands
 
 
 def test_ci_and_docker_pin_the_same_uv_version() -> None:
     workflow = _quality_workflow()
     dockerfile = (REPO_ROOT / "docker" / "Dockerfile").read_text()
 
-    assert all(
-        job["steps"][2]["with"]["version"] == "0.11.31"
+    setup_steps = [
+        step
         for job in workflow["jobs"].values()
-    )
+        for step in job["steps"]
+        if str(step.get("uses", "")).startswith("astral-sh/setup-uv@")
+    ]
+    assert setup_steps
+    assert all(step["with"]["version"] == "0.11.31" for step in setup_steps)
     assert "ghcr.io/astral-sh/uv:0.11.31" in dockerfile

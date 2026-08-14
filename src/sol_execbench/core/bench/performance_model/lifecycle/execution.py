@@ -24,6 +24,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleParent,
 )
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.platform.rdna4_validation import (
+    HardwareValidationBinding,
+)
 
 
 @dataclass
@@ -39,6 +42,7 @@ class StageRunContext:
     plan: DiagnosticLifecyclePlan
     design_manifest_path: Path
     development_corpus_path: Path | None = None
+    hardware_validation: HardwareValidationBinding | None = None
     paths: dict[str, Path] = field(default_factory=dict)
 
     @property

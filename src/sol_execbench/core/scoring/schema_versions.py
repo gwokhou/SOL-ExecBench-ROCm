@@ -12,7 +12,7 @@ class ReleaseArtifactSchema(StrEnum):
     OFFICIAL_SCORE_AVAILABILITY = "sol_execbench.official_score_availability.v3"
     RELEASE_BUNDLE = "sol_execbench.release_bundle.v2"
     RELEASE_COMPONENT = "sol_execbench.release_component.v1"
-    RELEASE_PACKAGE = "sol_execbench.release_package.v1"
+    RELEASE_PACKAGE = "sol_execbench.release_package.v2"
 
 
 class ReleasePackageArtifactKind(StrEnum):

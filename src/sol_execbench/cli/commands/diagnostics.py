@@ -92,6 +92,9 @@ from sol_execbench.core.data.json_utils import (
 )
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
+from sol_execbench.core.platform.rdna4_validation import (
+    verify_validation_receipt,
+)
 from sol_execbench.core.platform.source_state import verify_git_source_state
 from sol_execbench.core.solar_bridge.performance import (
     load_manifest_semantic_characterization,
@@ -103,6 +106,7 @@ from sol_execbench.core.solar_bridge.publication import (
 
 console = Console(stderr=True)
 _FILE = click.Path(exists=True, dir_okay=False, path_type=Path)
+_DIRECTORY = click.Path(exists=True, file_okay=False, path_type=Path)
 _OUTPUT = click.Path(dir_okay=False, path_type=Path)
 _OUTPUT_DIRECTORY = click.Path(file_okay=False, path_type=Path)
 
@@ -292,6 +296,8 @@ def release_cli() -> None:
 @click.option("--manifest", type=_FILE, required=True)
 @click.option("--archive-output", type=_OUTPUT, required=True)
 @click.option("--attestation-output", type=_OUTPUT, required=True)
+@click.option("--hardware-validation-receipt", type=_FILE, required=True)
+@click.option("--hardware-evidence-dir", type=_DIRECTORY, required=True)
 @click.option(
     "--source-revision",
     required=True,
@@ -308,17 +314,25 @@ def release_package_cli(
     manifest: Path,
     archive_output: Path,
     attestation_output: Path,
+    hardware_validation_receipt: Path,
+    hardware_evidence_dir: Path,
     source_revision: str,
     store_root: Path | None,
     purpose: str,
 ) -> CliResult:
     """Package one verified publication into a deterministic release object."""
     try:
+        hardware_validation = verify_validation_receipt(
+            hardware_validation_receipt,
+            hardware_evidence_dir,
+            expected_source_revision=source_revision,
+        )
         attestation = package_diagnostic_publication(
             manifest_path=manifest,
             archive_output=archive_output,
             attestation_output=attestation_output,
             source_revision=source_revision,
+            hardware_validation=hardware_validation,
             semantic_loader=load_manifest_semantic_characterization,
             solar_verifier=verify_projected_solar_manifest,
             store_root_path=store_root,
@@ -435,6 +449,8 @@ def lifecycle_cli() -> None:
 @click.option("--model-version", required=True)
 @click.option("--vram-policy", type=_FILE)
 @click.option("--frozen-inference-profile", type=_FILE)
+@click.option("--hardware-validation-receipt", type=_FILE, required=True)
+@click.option("--hardware-evidence-dir", type=_DIRECTORY, required=True)
 @click.option("--max-attempts", type=int, default=3, show_default=True)
 @click.option("--store-root", type=_OUTPUT_DIRECTORY)
 @click.option("--output", type=_OUTPUT, required=True)
@@ -460,6 +476,14 @@ def lifecycle_plan_cli(**options: object) -> CliResult:
                 output_root=cast(Path, options["output_root"]),
                 model_version=cast(str, options["model_version"]),
                 max_attempts=cast(int, options["max_attempts"]),
+                hardware_validation_receipt_path=cast(
+                    Path,
+                    options["hardware_validation_receipt"],
+                ),
+                hardware_validation_evidence_dir=cast(
+                    Path,
+                    options["hardware_evidence_dir"],
+                ),
                 vram_policy_path=cast(Path | None, options["vram_policy"]),
                 frozen_inference_profile_path=cast(
                     Path | None, options["frozen_inference_profile"]

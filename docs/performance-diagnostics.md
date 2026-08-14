@@ -275,7 +275,9 @@ sol-execbench --format json diagnostics release package \
   data/publications/microarchitecture-diagnostics-v7-cycle3.tar.zst \
   --attestation-output \
   data/publications/microarchitecture-diagnostics-v7-cycle3.attestation.json \
-  --source-revision <source revision>
+  --source-revision <40-character source revision> \
+  --hardware-validation-receipt <downloaded evidence>/receipt.json \
+  --hardware-evidence-dir <downloaded evidence>
 ```
 
 After download, verify the externally published archive SHA-256 and unpack it
@@ -658,6 +660,8 @@ uv run sol-execbench --format json diagnostics lifecycle plan \
   --calibration-audit <calibration_profile.audit.json> \
   --vram-policy <frozen_vram_policy.json> \
   --frozen-inference-profile <development_only_inference.json> \
+  --hardware-validation-receipt <downloaded evidence>/receipt.json \
+  --hardware-evidence-dir <downloaded evidence> \
   --output-root <lifecycle_output_root> \
   --model-version <model_version> \
   --max-attempts 3 \
@@ -672,7 +676,8 @@ uv run sol-execbench --format json diagnostics lifecycle run \
 `PLAN.json` uses the current `sol_execbench.diagnostic_lifecycle_plan` schema
 and binds the registered design, promoted development snapshot, exact collection
 tree, held-out corpus, calibration profile and audit, output root, source
-revision, evidence purpose, model version, and bounded attempt count. The design,
+revision, exact-SHA hardware validation, evidence purpose, model version, and
+bounded attempt count. The design,
 development snapshot, and plan purposes must match. The command also verifies
 both registry identities and that the selected source revision matches the
 current `src/`, `scripts/`, `pyproject.toml`, and `uv.lock` state. Plan creation

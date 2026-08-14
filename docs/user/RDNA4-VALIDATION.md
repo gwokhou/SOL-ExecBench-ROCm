@@ -67,6 +67,14 @@ records workflow/run provenance, but that metadata is not a trusted execution
 attestation. A content checksum proves internal consistency, not who controlled
 the runner.
 
+After a successful manual workflow run, the GitHub job emits a separate
+`sol_execbench.rdna4_validation_receipt.v1` receipt. The receipt binds the
+workflow run ID and attempt, exact commit SHA, `gfx1200` target, and evidence
+manifest digest. Diagnostic and score release workflows independently download
+and re-verify the receipt and complete evidence tree; they stop unless the
+receipt SHA exactly matches the release tag commit. The local manifest remains
+non-authoritative and cannot manufacture this workflow binding.
+
 The verifier therefore cannot promote this schema into a publisher score bundle,
 including when a caller edits the booleans and recomputes the manifest
 checksum. Official scoring separately requires a clean immutable source

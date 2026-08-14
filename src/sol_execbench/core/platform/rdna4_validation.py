@@ -16,11 +16,23 @@ from xml.etree import ElementTree
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.data.base_model import (
+    CurrentFrozenSchemaModel,
     CurrentSchemaModel,
     StrictArtifactModel,
 )
-from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
+from sol_execbench.core.data.json_utils import (
+    atomic_write_json_value,
+    load_json_file,
+)
+from sol_execbench.core.integrity import (
+    SHA256Digest,
+    sha256_file,
+    stable_json_checksum,
+)
+from sol_execbench.core.platform.schema_versions import (
+    PlatformArtifactSchema,
+    RDNA4ValidationArtifactKind,
+)
 
 RDNA4_VALIDATION_GFX_TARGET = "gfx1200"
 RDNA4_VALIDATION_PCI_VENDOR_ID = "0x1002"
@@ -85,6 +97,11 @@ class Rdna4Attestation(_ValidationModel):
 
     kind: Literal["github_actions_self_hosted", "local_unsigned"]
     trusted_execution: bool
+    repository: str | None = None
+    workflow_ref: str | None = None
+    workflow_name: str | None = None
+    run_id: int | None = Field(default=None, ge=1)
+    run_attempt: int | None = Field(default=None, ge=1)
 
 
 class Rdna4ValidationManifest(CurrentSchemaModel):
@@ -109,6 +126,41 @@ class Rdna4ValidationManifest(CurrentSchemaModel):
         default=None,
         pattern=r"^[0-9a-f]{64}$",
     )
+
+
+class RDNA4ValidationReceipt(CurrentFrozenSchemaModel):
+    """GitHub Actions identity bound to one verified RDNA4 evidence tree."""
+
+    model_config = _VALIDATION_CONFIG
+    current_schema_version = PlatformArtifactSchema.RDNA4_VALIDATION_RECEIPT
+    current_artifact_kind = RDNA4ValidationArtifactKind.RECEIPT
+
+    schema_version: Literal[PlatformArtifactSchema.RDNA4_VALIDATION_RECEIPT] = (
+        PlatformArtifactSchema.RDNA4_VALIDATION_RECEIPT
+    )
+    artifact_kind: Literal[RDNA4ValidationArtifactKind.RECEIPT] = (
+        RDNA4ValidationArtifactKind.RECEIPT
+    )
+    source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    workflow_name: Literal["RDNA4 Hardware"] = "RDNA4 Hardware"
+    workflow_run_id: int = Field(ge=1)
+    workflow_run_attempt: int = Field(ge=1)
+    gpu_architecture: Literal["gfx1200"] = "gfx1200"
+    evidence_sha256: SHA256Digest
+    created_at: str = Field(min_length=1)
+
+
+class HardwareValidationBinding(_ValidationModel):
+    """Nested release binding to an independently verified receipt."""
+
+    workflow_name: Literal["RDNA4 Hardware"] = "RDNA4 Hardware"
+    workflow_run_id: int = Field(ge=1)
+    workflow_run_attempt: int = Field(ge=1)
+    source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    gpu_architecture: Literal["gfx1200"] = "gfx1200"
+    evidence_sha256: SHA256Digest
+    receipt_sha256: SHA256Digest
+    verified_at: str = Field(min_length=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -301,6 +353,7 @@ def build_validation_manifest(
     manifest["payload_sha256"] = stable_json_checksum(manifest)
     return Rdna4ValidationManifest.model_validate(manifest).model_dump(
         mode="json",
+        exclude_none=True,
     )
 
 
@@ -318,10 +371,14 @@ def verify_validation_directory(
         raise ValueError("RDNA4 validation manifest is invalid") from exc
     model = Rdna4ValidationManifest.model_validate(manifest)
     payload_sha256 = model.payload_sha256
-    unsigned = model.model_dump(mode="json", exclude={"payload_sha256"})
+    unsigned = model.model_dump(
+        mode="json",
+        exclude={"payload_sha256"},
+        exclude_none=True,
+    )
     if payload_sha256 != stable_json_checksum(unsigned):
         raise ValueError("RDNA4 validation manifest checksum mismatch")
-    manifest = model.model_dump(mode="json")
+    manifest = model.model_dump(mode="json", exclude_none=True)
     _verify_manifest_contract(
         manifest,
         expected_source_revision=expected_source_revision,
@@ -343,6 +400,75 @@ def verify_validation_directory(
     if summarize_junit(directory / "pytest-rdna4.xml") != stored_counts:
         raise ValueError("RDNA4 validation JUnit summary mismatch")
     return manifest
+
+
+def build_validation_receipt(
+    directory: Path,
+    output_path: Path,
+    *,
+    source_revision: str,
+    workflow_run_id: int,
+    workflow_run_attempt: int,
+    created_at: str,
+) -> RDNA4ValidationReceipt:
+    """Write the workflow identity receipt for one clean evidence tree."""
+    manifest = verify_validation_directory(
+        directory,
+        expected_source_revision=source_revision,
+    )
+    if manifest["source_dirty"] is not False:
+        raise ValueError("RDNA4 release validation source must be clean")
+    attestation = Rdna4Attestation.model_validate(manifest["attestation"])
+    expected_identity = (
+        "github_actions_self_hosted",
+        "RDNA4 Hardware",
+        workflow_run_id,
+        workflow_run_attempt,
+    )
+    observed_identity = (
+        attestation.kind,
+        attestation.workflow_name,
+        attestation.run_id,
+        attestation.run_attempt,
+    )
+    if observed_identity != expected_identity:
+        raise ValueError("RDNA4 workflow identity does not match its evidence")
+    receipt = RDNA4ValidationReceipt(
+        source_revision=source_revision,
+        workflow_run_id=workflow_run_id,
+        workflow_run_attempt=workflow_run_attempt,
+        evidence_sha256=sha256_file(directory / "manifest.json"),
+        created_at=created_at,
+    )
+    atomic_write_json_value(output_path, receipt.model_dump(mode="json"))
+    return receipt
+
+
+def verify_validation_receipt(
+    receipt_path: Path,
+    directory: Path,
+    *,
+    expected_source_revision: str,
+) -> HardwareValidationBinding:
+    """Verify a receipt and its complete evidence tree for release binding."""
+    receipt = load_json_file(RDNA4ValidationReceipt, receipt_path)
+    if receipt.source_revision != expected_source_revision:
+        raise ValueError("RDNA4 validation receipt source revision mismatch")
+    verify_validation_directory(
+        directory,
+        expected_source_revision=expected_source_revision,
+    )
+    evidence_sha256 = sha256_file(directory / "manifest.json")
+    if evidence_sha256 != receipt.evidence_sha256:
+        raise ValueError("RDNA4 validation receipt evidence checksum mismatch")
+    return HardwareValidationBinding(
+        workflow_run_id=receipt.workflow_run_id,
+        workflow_run_attempt=receipt.workflow_run_attempt,
+        source_revision=receipt.source_revision,
+        evidence_sha256=receipt.evidence_sha256,
+        receipt_sha256=sha256_file(receipt_path),
+        verified_at=receipt.created_at,
+    )
 
 
 def _verify_manifest_contract(

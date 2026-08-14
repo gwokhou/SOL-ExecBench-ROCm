@@ -45,6 +45,9 @@ from sol_execbench.core.data.base_model import (
     FrozenArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
+from sol_execbench.core.platform.rdna4_validation import (
+    HardwareValidationBinding,
+)
 
 
 def _exclude_none(value: object) -> bool:
@@ -182,6 +185,18 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
     frozen_inference_profile: DiagnosticLifecycleArtifact | None = Field(
         default=None, exclude_if=_exclude_none
     )
+    hardware_validation_receipt_path: str | None = Field(
+        default=None,
+        exclude_if=_exclude_none,
+    )
+    hardware_validation_evidence_dir: str | None = Field(
+        default=None,
+        exclude_if=_exclude_none,
+    )
+    hardware_validation: HardwareValidationBinding | None = Field(
+        default=None,
+        exclude_if=_exclude_none,
+    )
 
     @model_validator(mode="after")
     def _identities_are_canonical(self) -> DiagnosticLifecyclePlan:
@@ -209,6 +224,21 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
             raise ValueError(
                 "frozen inference path and artifact must be paired"
             )
+        hardware_fields = (
+            self.hardware_validation_receipt_path,
+            self.hardware_validation_evidence_dir,
+            self.hardware_validation,
+        )
+        if any(value is None for value in hardware_fields) and any(
+            value is not None for value in hardware_fields
+        ):
+            raise ValueError(
+                "hardware validation inputs must be provided together"
+            )
+        if self.hardware_validation is not None and (
+            self.hardware_validation.source_revision != self.source_revision
+        ):
+            raise ValueError("hardware validation source revision mismatch")
         if self.purpose is DiagnosticEvidencePurpose.PRODUCTION:
             require_complete_gpu_identity(
                 self.gpu_identity,
@@ -251,6 +281,9 @@ def diagnostic_lifecycle_plan_payload(
         "vram_policy",
         "frozen_inference_profile_path",
         "frozen_inference_profile",
+        "hardware_validation_receipt_path",
+        "hardware_validation_evidence_dir",
+        "hardware_validation",
     ):
         if getattr(plan, field) is None:
             payload.pop(field, None)

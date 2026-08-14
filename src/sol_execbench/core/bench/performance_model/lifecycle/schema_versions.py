@@ -19,7 +19,7 @@ class DiagnosticLifecycleSchema(StrEnum):
     DIAGNOSTIC_PUBLISHED_RELEASE = (
         "sol_execbench.diagnostic_published_release.v3"
     )
-    DIAGNOSTIC_RELEASE_PACKAGE = "sol_execbench.diagnostic_release_package.v1"
+    DIAGNOSTIC_RELEASE_PACKAGE = "sol_execbench.diagnostic_release_package.v2"
 
 
 class DiagnosticLifecycleStateKind(StrEnum):

@@ -164,7 +164,8 @@ def test_rdna4_hardware_workflow_is_exact_and_publishes_evidence():
         "scripts/internal/rdna4/run_rdna4_validation.py",
         "--output-dir out/rdna4-ci",
         '--expected-source-revision "${GITHUB_SHA}"',
-        "actions/upload-artifact@v4",
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "--receipt-output out/rdna4-ci/receipt.json",
         "if-no-files-found: error",
     ]
     for phrase in required:

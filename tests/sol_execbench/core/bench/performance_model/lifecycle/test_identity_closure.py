@@ -429,6 +429,7 @@ def test_release_identity_recomputes() -> None:
         source_revision=_SOURCE,
         producer_version="4.0.0",
         archive_size_bytes=99,
+        hardware_validation_receipt_sha256="c" * 64,
     )
     manifest = DiagnosticReleaseLifecycleManifest.model_validate(
         _manifest_data(
@@ -437,6 +438,7 @@ def test_release_identity_recomputes() -> None:
             archive_sha256=D_ARCHIVE,
             archive_size_bytes=99,
             attestation_sha256=D_ATTEST,
+            hardware_validation_receipt_sha256="c" * 64,
             producer_version="4.0.0",
             parents=(_parent(DiagnosticLifecycleStage.PUBLICATION, D_PUB),),
         ),
@@ -564,6 +566,7 @@ def test_source_revision_changes_every_stage_identity() -> None:
                     source_revision=revision,
                     producer_version="4.0.0",
                     archive_size_bytes=99,
+                    hardware_validation_receipt_sha256="c" * 64,
                 )
                 for revision in revisions
             }

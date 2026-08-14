@@ -862,11 +862,15 @@ class ReleaseHandler:
         root = _require_output_root(context)
         archive = root / "release.tar.zst"
         attestation_path = archive.with_suffix(".attestation.json")
+        hardware_validation = context.hardware_validation
+        if hardware_validation is None:
+            raise ValueError("release requires exact-SHA hardware validation")
         attestation = package_diagnostic_publication(
             manifest_path=manifest,
             archive_output=archive,
             attestation_output=attestation_path,
             source_revision=context.source_revision,
+            hardware_validation=hardware_validation,
             semantic_loader=self._semantic_loader,
             solar_verifier=self._solar_verifier,
             store_root_path=context.store_root,
@@ -1076,11 +1080,25 @@ def build_run_context(
         DiagnosticCorpusSnapshotManifest, development_path
     )
     development_corpus = BlobStore(root).get(development.corpus_file_sha256)
+    hardware_validation = None
+    if plan.hardware_validation is not None:
+        from sol_execbench.core.platform.rdna4_validation import (
+            verify_validation_receipt,
+        )
+
+        hardware_validation = verify_validation_receipt(
+            Path(plan.hardware_validation_receipt_path or ""),
+            Path(plan.hardware_validation_evidence_dir or ""),
+            expected_source_revision=plan.source_revision,
+        )
+        if hardware_validation != plan.hardware_validation:
+            raise ValueError("lifecycle plan hardware validation drifted")
     return StageRunContext(
         store_root=root,
         plan=plan,
         design_manifest_path=design_path,
         development_corpus_path=development_corpus,
+        hardware_validation=hardware_validation,
     )
 
 

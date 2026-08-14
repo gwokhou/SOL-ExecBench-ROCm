@@ -70,6 +70,9 @@ from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
 )
+from sol_execbench.core.platform.rdna4_validation import (
+    HardwareValidationBinding,
+)
 
 
 class DiagnosticReleaseArchive(CurrentFrozenSchemaModel):
@@ -91,7 +94,7 @@ class DiagnosticReleaseArchive(CurrentFrozenSchemaModel):
     size_bytes: int = Field(ge=0)
     algorithm: Literal["zstd"] = "zstd"
     publication_manifest_sha256: SHA256Digest
-    source_revision: str = Field(min_length=1)
+    source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
 
 
 class DiagnosticReleaseAttestation(CurrentFrozenSchemaModel):
@@ -115,7 +118,8 @@ class DiagnosticReleaseAttestation(CurrentFrozenSchemaModel):
     uncompressed_size_bytes: int = Field(ge=0)
     case_count: int = Field(ge=220)
     inventory_sha256: SHA256Digest
-    source_revision: str = Field(min_length=1)
+    source_revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    hardware_validation: HardwareValidationBinding
     producer_version: str = PRODUCER_VERSION
     created_at: str = Field(min_length=1)
     retention_class: Literal["publication_release"] = "publication_release"
@@ -261,6 +265,7 @@ def package_diagnostic_publication(
     archive_output: Path,
     attestation_output: Path,
     source_revision: str,
+    hardware_validation: HardwareValidationBinding,
     semantic_loader: SemanticCharacterizationLoader,
     solar_verifier: SolarManifestProjectionVerifier,
     store_root_path: Path | None = None,
@@ -271,6 +276,8 @@ def package_diagnostic_publication(
     Verification of the full publication tree precedes any archive creation;
     a release object can never be built from an unverified projection.
     """
+    if hardware_validation.source_revision != source_revision:
+        raise ValueError("hardware validation source revision mismatch")
     manifest = manifest_path.resolve()
     projection = verify_diagnostic_publication_projection(
         manifest,
@@ -297,6 +304,7 @@ def package_diagnostic_publication(
         publication_manifest_sha256=manifest_sha256,
         archive_output=archive_output,
         source_revision=source_revision,
+        hardware_validation=hardware_validation,
         purpose=purpose,
     )
     atomic_write_json_value(
@@ -368,6 +376,7 @@ def _build_attestation(
     publication_manifest_sha256: SHA256Digest,
     archive_output: Path,
     source_revision: str,
+    hardware_validation: HardwareValidationBinding,
     purpose: DiagnosticEvidencePurpose,
 ) -> DiagnosticReleaseAttestation:
     archive_sha256 = sha256_file(archive_output)
@@ -378,6 +387,7 @@ def _build_attestation(
         source_revision=source_revision,
         producer_version=PRODUCER_VERSION,
         archive_size_bytes=archive_size,
+        hardware_validation_receipt_sha256=(hardware_validation.receipt_sha256),
         purpose=purpose,
     )
     inventory_sha256 = stable_json_checksum(
@@ -405,6 +415,7 @@ def _build_attestation(
         case_count=projection.case_count,
         inventory_sha256=inventory_sha256,
         source_revision=source_revision,
+        hardware_validation=hardware_validation,
         created_at=datetime.now(UTC).isoformat(),
     )
 
@@ -497,6 +508,9 @@ def _write_release_manifest(
         archive_sha256=attestation.archive.sha256,
         archive_size_bytes=attestation.archive.size_bytes,
         attestation_sha256=attestation_sha256,
+        hardware_validation_receipt_sha256=(
+            attestation.hardware_validation.receipt_sha256
+        ),
         published=False,
     )
     atomic_write_json_value(

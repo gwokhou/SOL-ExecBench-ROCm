@@ -19,6 +19,7 @@ from sol_execbench.core.platform.environment import (
 from sol_execbench.core.platform.rdna4_validation import (
     Rdna4EnvironmentIdentity,
     build_validation_manifest,
+    build_validation_receipt,
     validate_environment_payload,
     verify_validation_directory,
 )
@@ -70,9 +71,17 @@ def _attestation() -> dict[str, object]:
         "trusted_execution": False,
         "repository": os.environ.get("GITHUB_REPOSITORY"),
         "workflow_ref": os.environ.get("GITHUB_WORKFLOW_REF"),
-        "run_id": os.environ.get("GITHUB_RUN_ID"),
-        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "workflow_name": os.environ.get("GITHUB_WORKFLOW"),
+        "run_id": _required_github_int("GITHUB_RUN_ID"),
+        "run_attempt": _required_github_int("GITHUB_RUN_ATTEMPT"),
     }
+
+
+def _required_github_int(name: str) -> int:
+    value = os.environ.get(name, "")
+    if not value.isdigit() or int(value) <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+    return int(value)
 
 
 def _run_tests(output: Path, timeout_seconds: float) -> int:
@@ -152,6 +161,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--expected-source-revision")
     parser.add_argument("--require-release-eligible", action="store_true")
+    parser.add_argument(
+        "--receipt-output",
+        type=Path,
+        help="Write a GitHub Actions release-validation receipt after verify.",
+    )
     return parser.parse_args(argv)
 
 
@@ -164,6 +178,21 @@ def main(argv: list[str] | None = None) -> int:
             expected_source_revision=args.expected_source_revision,
             require_release_eligible=args.require_release_eligible,
         )
+        if args.receipt_output is not None:
+            if args.expected_source_revision is None:
+                raise ValueError(
+                    "--receipt-output requires --expected-source-revision",
+                )
+            build_validation_receipt(
+                args.verify.resolve(),
+                args.receipt_output.resolve(),
+                source_revision=args.expected_source_revision,
+                workflow_run_id=_required_github_int("GITHUB_RUN_ID"),
+                workflow_run_attempt=_required_github_int(
+                    "GITHUB_RUN_ATTEMPT",
+                ),
+                created_at=utc_timestamp(),
+            )
         print(args.verify.resolve() / "manifest.json")
         return 0
     if args.timeout <= 0:
