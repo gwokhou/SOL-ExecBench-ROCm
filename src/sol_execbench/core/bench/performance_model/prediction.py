@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
 from functools import singledispatch
 from itertools import pairwise
 
@@ -17,6 +16,11 @@ from sol_execbench.core.bench.performance_model.access_evidence import (
 )
 from sol_execbench.core.bench.performance_model.counter_metrics import (
     counter_memory_bytes,
+)
+from sol_execbench.core.bench.performance_model.descriptor_estimates import (
+    DescriptorEstimate,
+    descriptor_output_bytes,
+    descriptor_work,
 )
 from sol_execbench.core.bench.performance_model.kernel_identity import (
     kernel_symbol_key,
@@ -76,12 +80,6 @@ def _matrix_counter_names(gpu_architecture: str | None) -> tuple[str, ...]:
     if budget is not None and budget.matrix_unit == "mfma":
         return ("SQ_INSTS_MFMA", "MFMAINSTS", "SQ_INSTS_WMMA")
     return ("SQ_INSTS_WMMA", "SQ_INSTS_MFMA", "MFMAINSTS")
-
-
-@dataclass(frozen=True, slots=True)
-class _DescriptorEstimate:
-    semantic_flops: float
-    semantic_bytes: float
 
 
 def validate_calibration_identity(
@@ -253,7 +251,7 @@ def _semantic_components(
     result.extend(
         _descriptor_components(
             semantic.descriptor,
-            _DescriptorEstimate(
+            DescriptorEstimate(
                 semantic_flops=semantic.semantic_flops,
                 semantic_bytes=semantic.semantic_bytes,
             ),
@@ -293,7 +291,7 @@ def _elementwise_components(
 
 
 def _reduction_components(
-    semantic: SemanticCharacterization | _DescriptorEstimate,
+    semantic: SemanticCharacterization | DescriptorEstimate,
     descriptor: ReductionDescriptor,
     calibration: DiagnosticCalibrationProfile,
 ) -> list[PredictionComponent]:
@@ -336,7 +334,7 @@ def _reduction_components(
 
 
 def _matmul_components(
-    semantic: SemanticCharacterization | _DescriptorEstimate,
+    semantic: SemanticCharacterization | DescriptorEstimate,
     descriptor: MatmulDescriptor,
     calibration: DiagnosticCalibrationProfile,
 ) -> list[PredictionComponent]:
@@ -395,7 +393,7 @@ def _matmul_components(
 
 
 def _softmax_components(
-    semantic: SemanticCharacterization | _DescriptorEstimate,
+    semantic: SemanticCharacterization | DescriptorEstimate,
     descriptor: SoftmaxDescriptor,
     calibration: DiagnosticCalibrationProfile,
 ) -> list[PredictionComponent]:
@@ -436,7 +434,7 @@ def _softmax_components(
 
 
 def _cross_entropy_components(
-    semantic: SemanticCharacterization | _DescriptorEstimate,
+    semantic: SemanticCharacterization | DescriptorEstimate,
     descriptor: CrossEntropyDescriptor,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
@@ -594,7 +592,7 @@ def _composite_components(
         estimate = _combine_components(
             _descriptor_components(
                 node_descriptor,
-                _descriptor_work(node_descriptor),
+                _required_descriptor_work(node_descriptor),
                 calibration,
                 access_patterns,
             )
@@ -608,7 +606,7 @@ def _composite_components(
             )
         )
     materialized_bytes = sum(
-        _descriptor_output_bytes(nodes[edge.producer].descriptor)
+        _required_descriptor_output_bytes(nodes[edge.producer].descriptor)
         for edge in descriptor.edges
         if edge.materialized
     )
@@ -626,7 +624,7 @@ def _composite_components(
 @singledispatch
 def _descriptor_components(
     descriptor: object,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -637,7 +635,7 @@ def _descriptor_components(
 @_descriptor_components.register
 def _elementwise_descriptor_components(
     descriptor: ElementwiseDescriptor,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -648,7 +646,7 @@ def _elementwise_descriptor_components(
 @_descriptor_components.register
 def _transpose_descriptor_components(
     descriptor: TransposeDescriptor,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -665,7 +663,7 @@ def _transpose_descriptor_components(
 @_descriptor_components.register
 def _reduction_descriptor_components(
     descriptor: ReductionDescriptor,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -676,7 +674,7 @@ def _reduction_descriptor_components(
 @_descriptor_components.register
 def _matmul_descriptor_components(
     descriptor: MatmulDescriptor,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -687,7 +685,7 @@ def _matmul_descriptor_components(
 @_descriptor_components.register
 def _softmax_descriptor_components(
     descriptor: SoftmaxDescriptor,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -698,7 +696,7 @@ def _softmax_descriptor_components(
 @_descriptor_components.register
 def _cross_entropy_descriptor_components(
     descriptor: CrossEntropyDescriptor,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -713,7 +711,7 @@ def _cross_entropy_descriptor_components(
 @_descriptor_components.register
 def _indexed_read_descriptor_components(
     descriptor: IndexedReadDescriptor,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -724,7 +722,7 @@ def _indexed_read_descriptor_components(
 @_descriptor_components.register
 def _indexed_update_descriptor_components(
     descriptor: IndexedUpdateDescriptor,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -735,7 +733,7 @@ def _indexed_update_descriptor_components(
 @_descriptor_components.register
 def _composite_descriptor_components(
     descriptor: CompositeGraphDescriptor,
-    work: _DescriptorEstimate,
+    work: DescriptorEstimate,
     calibration: DiagnosticCalibrationProfile,
     access_patterns: Sequence[AccessPatternSummary],
 ) -> list[PredictionComponent]:
@@ -743,158 +741,18 @@ def _composite_descriptor_components(
     return _composite_components(descriptor, calibration, access_patterns)
 
 
-@singledispatch
-def _descriptor_work(descriptor: object) -> _DescriptorEstimate:
-    del descriptor
-    raise _PredictionUnavailableError("descriptor_work_unavailable")
+def _required_descriptor_work(descriptor: object) -> DescriptorEstimate:
+    estimate = descriptor_work(descriptor)
+    if estimate is None:
+        raise _PredictionUnavailableError("descriptor_work_unavailable")
+    return estimate
 
 
-@_descriptor_work.register
-def _elementwise_work(descriptor: ElementwiseDescriptor) -> _DescriptorEstimate:
-    elements = math.prod(descriptor.shape)
-    return _DescriptorEstimate(
-        semantic_flops=sum(descriptor.operations.values()),
-        semantic_bytes=float(
-            2 * elements * _tensor_dtype_bytes(descriptor.dtype)
-        ),
-    )
-
-
-@_descriptor_work.register
-def _transpose_work(descriptor: TransposeDescriptor) -> _DescriptorEstimate:
-    elements = descriptor.rows * descriptor.columns
-    return _DescriptorEstimate(
-        0.0,
-        float(2 * elements * descriptor.element_bytes),
-    )
-
-
-@_descriptor_work.register
-def _reduction_work(descriptor: ReductionDescriptor) -> _DescriptorEstimate:
-    inputs = descriptor.outer_rows * descriptor.reduction_width
-    outputs = (
-        inputs
-        if descriptor.operation
-        in {ReductionOperation.RMS_NORM, ReductionOperation.LAYER_NORM}
-        else descriptor.outer_rows
-    )
-    return _DescriptorEstimate(
-        float(inputs),
-        float(
-            inputs * _tensor_dtype_bytes(descriptor.input_dtype)
-            + outputs * _tensor_dtype_bytes(descriptor.output_dtype)
-        ),
-    )
-
-
-@_descriptor_work.register
-def _matmul_work(descriptor: MatmulDescriptor) -> _DescriptorEstimate:
-    return _DescriptorEstimate(
-        float(
-            2 * descriptor.batch * descriptor.m * descriptor.n * descriptor.k
-        ),
-        float(
-            descriptor.batch
-            * (
-                descriptor.m * descriptor.k
-                + descriptor.k * descriptor.n
-                + descriptor.m * descriptor.n
-            )
-            * _tensor_dtype_bytes(descriptor.input_dtype)
-        ),
-    )
-
-
-@_descriptor_work.register
-def _softmax_work(descriptor: SoftmaxDescriptor) -> _DescriptorEstimate:
-    elements = descriptor.outer_rows * descriptor.reduction_width
-    return _DescriptorEstimate(
-        float(5 * elements),
-        float(
-            elements
-            * (
-                _tensor_dtype_bytes(descriptor.input_dtype)
-                + _tensor_dtype_bytes(descriptor.output_dtype)
-            )
-        ),
-    )
-
-
-@_descriptor_work.register
-def _cross_entropy_work(
-    descriptor: CrossEntropyDescriptor,
-) -> _DescriptorEstimate:
-    elements = descriptor.rows * descriptor.classes
-    return _DescriptorEstimate(
-        float(5 * elements),
-        float(
-            2 * elements * _tensor_dtype_bytes(descriptor.logits_dtype)
-            + descriptor.rows * 8
-        ),
-    )
-
-
-@_descriptor_work.register
-def _indexed_read_work(
-    descriptor: IndexedReadDescriptor,
-) -> _DescriptorEstimate:
-    count = math.prod(descriptor.index_shape)
-    return _DescriptorEstimate(
-        float(count),
-        float(count * (descriptor.element_bytes + 8)),
-    )
-
-
-@_descriptor_work.register
-def _indexed_update_work(
-    descriptor: IndexedUpdateDescriptor,
-) -> _DescriptorEstimate:
-    count = math.prod(descriptor.index_shape)
-    return _DescriptorEstimate(
-        float(count),
-        float(count * (descriptor.element_bytes + 8)),
-    )
-
-
-def _descriptor_output_bytes(descriptor: object) -> int:
-    if isinstance(descriptor, ElementwiseDescriptor):
-        return math.prod(descriptor.shape) * _tensor_dtype_bytes(
-            descriptor.dtype
-        )
-    if isinstance(descriptor, TransposeDescriptor):
-        return descriptor.rows * descriptor.columns * descriptor.element_bytes
-    if isinstance(descriptor, ReductionDescriptor):
-        elements = (
-            descriptor.outer_rows * descriptor.reduction_width
-            if descriptor.operation
-            in {ReductionOperation.RMS_NORM, ReductionOperation.LAYER_NORM}
-            else descriptor.outer_rows
-        )
-        return elements * _tensor_dtype_bytes(descriptor.output_dtype)
-    if isinstance(descriptor, MatmulDescriptor):
-        return (
-            descriptor.batch
-            * descriptor.m
-            * descriptor.n
-            * _tensor_dtype_bytes(descriptor.output_dtype)
-        )
-    if isinstance(descriptor, SoftmaxDescriptor):
-        return (
-            descriptor.outer_rows
-            * descriptor.reduction_width
-            * _tensor_dtype_bytes(descriptor.output_dtype)
-        )
-    if isinstance(descriptor, CrossEntropyDescriptor):
-        return _tensor_dtype_bytes(descriptor.logits_dtype)
-    if isinstance(descriptor, IndexedReadDescriptor):
-        return math.prod(descriptor.index_shape) * descriptor.element_bytes
-    if isinstance(descriptor, IndexedUpdateDescriptor):
-        return math.prod(descriptor.output_shape) * descriptor.element_bytes
-    raise _PredictionUnavailableError("descriptor_output_size_unavailable")
-
-
-def _tensor_dtype_bytes(dtype: TensorDType) -> int:
-    return 4 if dtype is TensorDType.FLOAT32 else 2
+def _required_descriptor_output_bytes(descriptor: object) -> int:
+    size_bytes = descriptor_output_bytes(descriptor)
+    if size_bytes is None:
+        raise _PredictionUnavailableError("descriptor_output_size_unavailable")
+    return size_bytes
 
 
 def _single_access_pattern(

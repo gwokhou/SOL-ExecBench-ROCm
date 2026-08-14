@@ -11,6 +11,35 @@ import gc
 # aka_corpus.FORMAL_ARCHITECTURE carries the manifest label "solar:RX_9060_XT";
 # the two are deliberately different views of the same target.
 FORMAL_ARCHITECTURE, FORMAL_GFX_TARGET = "RX_9060_XT", "gfx1200"
+_ARCHITECTURE_BY_GFX_TARGET = {
+    "gfx1200": FORMAL_ARCHITECTURE,
+    "gfx942": "MI300X",
+}
+
+
+def formal_producer_readiness() -> tuple[bool, str]:
+    """Report whether SOLAR can produce publication-grade formal bounds."""
+    from solar.api import formal_producer_readiness as solar_readiness
+
+    readiness = solar_readiness()
+    return readiness.ready, readiness.reason_code
+
+
+def formal_architecture_profile_hash(
+    architecture: str = FORMAL_ARCHITECTURE,
+) -> str:
+    """Return the canonical hash of a packaged SOLAR architecture profile."""
+    from solar.api import architecture_profile_sha256
+
+    return architecture_profile_sha256(architecture)
+
+
+def solar_architecture_for_gfx_target(gfx_target: str) -> str:
+    """Return the packaged SOLAR profile for one supported gfx target."""
+    architecture = _ARCHITECTURE_BY_GFX_TARGET.get(gfx_target)
+    if architecture is None:
+        raise ValueError(f"unsupported_solar_architecture:{gfx_target}")
+    return architecture
 
 
 def require_formal_device(device: str) -> None:
@@ -49,6 +78,9 @@ def release_formal_device_memory(device: str) -> None:
 __all__ = [
     "FORMAL_ARCHITECTURE",
     "FORMAL_GFX_TARGET",
+    "formal_architecture_profile_hash",
+    "formal_producer_readiness",
     "release_formal_device_memory",
     "require_formal_device",
+    "solar_architecture_for_gfx_target",
 ]

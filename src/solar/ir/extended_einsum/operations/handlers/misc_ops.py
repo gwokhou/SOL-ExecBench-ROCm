@@ -24,14 +24,13 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any
 
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class EmbeddingHandler(EinsumOpHandler):
@@ -43,7 +42,7 @@ class EmbeddingHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for embedding lookup."""
         if tensor_shapes.num_inputs < 2:
@@ -97,7 +96,7 @@ class GRUHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for GRU."""
         input_shape = (
@@ -163,7 +162,7 @@ class LSTMHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for LSTM."""
         input_shape = (
@@ -234,7 +233,7 @@ class RNNHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for basic RNN."""
         (
@@ -271,7 +270,7 @@ class CrossEntropyHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for cross-entropy loss."""
         pred = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
@@ -346,7 +345,7 @@ class PairwiseLossHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for pairwise loss."""
         pred = tensor_shapes.inputs[0] if tensor_shapes.num_inputs > 0 else None
@@ -425,7 +424,7 @@ class TopKHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Build a non-contraction representation for exact ATen replay."""
         del kwargs
@@ -474,7 +473,7 @@ class TrivialOpsHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for trivial operations."""
         if tensor_shapes.num_inputs < 1:

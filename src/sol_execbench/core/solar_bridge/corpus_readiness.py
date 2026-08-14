@@ -40,10 +40,10 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
 )
 from sol_execbench.core.process import exclusive_file_lock
-from sol_execbench.core.solar_bridge.analyzer import (
+from sol_execbench.core.solar_bridge.formal_device import (
+    FORMAL_GFX_TARGET,
     formal_architecture_profile_hash,
 )
-from sol_execbench.core.solar_bridge.formal_device import FORMAL_GFX_TARGET
 from sol_execbench.core.solar_bridge.models import (
     READINESS_STAGES,
     SolarReadinessStatus,

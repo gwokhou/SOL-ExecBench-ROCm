@@ -3,15 +3,13 @@
 
 """YAML serialization primitives for canonical SOLAR artifacts."""
 
-from typing import Any
-
 import yaml
 
 
 class NoAliasDumper(yaml.SafeDumper):
     """Disable YAML anchors so canonical artifacts remain reviewable."""
 
-    def ignore_aliases(self, data: Any) -> bool:
+    def ignore_aliases(self, data: object) -> bool:
         """Disable aliases for every serialized value."""
         del data
         return True

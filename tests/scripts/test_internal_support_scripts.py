@@ -28,21 +28,8 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
 def test_aka_author_seed_helpers_and_coverage_inventory(load_script) -> None:
     author = load_script("scripts/internal/aka_author_seed.py")
 
-    assert author._ax_var("rows") == {"type": "var", "description": "rows"}
-    assert author._ax_const(4) == {
-        "type": "const",
-        "value": 4,
-        "description": "",
-    }
-    assert author._ax_expr("M * 2", "double") == {
-        "type": "expr",
-        "expression": "M * 2",
-        "description": "double",
-    }
-    assert author._wl({"M": 4}, {"x": "random"}) == {
-        "axes": {"M": 4},
-        "inputs": {"x": "random"},
-    }
+    assert len(author.SPECS) == 45
+    assert len({spec.name for spec in author.SPECS}) == len(author.SPECS)
 
     coverage = author._coverage_axes(author.SPECS[:3])
     assert set(coverage) == {

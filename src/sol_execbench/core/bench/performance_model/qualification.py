@@ -11,6 +11,9 @@ from pydantic import ConfigDict, Field, model_validator
 
 from sol_execbench.core.bench.batch_gpu_qualification import (
     BatchGPUQualificationStage,
+    validate_qualification_coverage,
+    validate_qualification_parent,
+    validate_unique_qualification_ids,
 )
 from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
     DiagnosticArtifactSchema,
@@ -67,10 +70,16 @@ class DiagnosticQualificationReceipt(CurrentSchemaModel):
             raise ValueError("qualification case/workload counts differ")
         if self.trace_count != len(self.case_ids):
             raise ValueError("qualification trace count differs from cases")
-        if len(set(self.case_ids)) != len(self.case_ids):
-            raise ValueError("qualification receipt repeats case IDs")
-        if len(set(self.workload_uuids)) != len(self.workload_uuids):
-            raise ValueError("qualification receipt repeats workload UUIDs")
+        validate_unique_qualification_ids(
+            self.case_ids,
+            owner="qualification receipt",
+            item_name="case",
+        )
+        validate_unique_qualification_ids(
+            self.workload_uuids,
+            owner="qualification receipt",
+            item_name="workload",
+        )
         return self
 
 
@@ -107,27 +116,30 @@ class DiagnosticCorpusQualification(CurrentSchemaModel):
     @model_validator(mode="after")
     def stage_contract_is_consistent(self) -> DiagnosticCorpusQualification:
         """Require the exact parent and receipt shape for each gate."""
-        if len(set(self.case_ids)) != len(self.case_ids):
-            raise ValueError("qualification gate repeats case IDs")
+        validate_unique_qualification_ids(
+            self.case_ids,
+            owner="qualification gate",
+            item_name="case",
+        )
         if self.stage is BatchGPUQualificationStage.STATIC:
-            if self.role != "all" or self.parent_gate_sha256 is not None:
+            if self.role != "all":
                 raise ValueError(
                     "static qualification must be unparented/all-role"
                 )
+            validate_qualification_parent(self.stage, self.parent_gate_sha256)
             if self.receipts:
                 raise ValueError(
                     "static qualification cannot contain GPU receipts"
                 )
             return self
-        if self.role == "all" or self.parent_gate_sha256 is None:
-            raise ValueError("GPU qualification requires role and parent gate")
-        receipt_cases = tuple(
-            case_id for receipt in self.receipts for case_id in receipt.case_ids
+        if self.role == "all":
+            raise ValueError("GPU qualification requires a corpus role")
+        validate_qualification_parent(self.stage, self.parent_gate_sha256)
+        validate_qualification_coverage(
+            self.case_ids,
+            tuple(receipt.case_ids for receipt in self.receipts),
+            item_name="case",
         )
-        if not self.receipts or set(receipt_cases) != set(self.case_ids):
-            raise ValueError("qualification receipts do not cover gate cases")
-        if len(receipt_cases) != len(set(receipt_cases)):
-            raise ValueError("qualification receipts overlap case IDs")
         if any(
             receipt.stage is not self.stage or receipt.role != self.role
             for receipt in self.receipts

@@ -1,0 +1,6622 @@
+[
+  {
+    "name": "3267_doubled_matmul",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/3267_SimpleMatmulModule",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "gpumode",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows of a and the output."
+      },
+      "K": {
+        "type": "var",
+        "description": "Inner dimension; columns of a and rows of b."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns of b and the output."
+      }
+    },
+    "inputs": {
+      "a": {
+        "shape": [
+          "M",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Left-hand matrix (M, K)."
+      },
+      "b": {
+        "shape": [
+          "K",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Right-hand matrix (K, N), added to itself."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "a @ (b + b)."
+      }
+    },
+    "reference": "import torch\n\ndef run(a, b):\n    return torch.matmul(a, b + b)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 4,
+          "K": 4,
+          "N": 4
+        },
+        "inputs": {
+          "a": "random",
+          "b": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 16,
+          "K": 32,
+          "N": 16
+        },
+        "inputs": {
+          "a": "random",
+          "b": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 128,
+          "K": 128,
+          "N": 128
+        },
+        "inputs": {
+          "a": "random",
+          "b": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 1,
+          "K": 512,
+          "N": 256
+        },
+        "inputs": {
+          "a": "random",
+          "b": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Matrix multiply of a with (b + b): output = a @ (b + b). Derived from AKA torch2hip/gpumode/3267_SimpleMatmulModule module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n1_square_matmul",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows of A."
+      },
+      "K": {
+        "type": "var",
+        "description": "Inner dimension."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns of B."
+      }
+    },
+    "inputs": {
+      "A": {
+        "shape": [
+          "M",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Left matrix (M, K)."
+      },
+      "B": {
+        "shape": [
+          "K",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Right matrix (K, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "A @ B."
+      }
+    },
+    "reference": "import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 64,
+          "K": 64,
+          "N": 64
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 128,
+          "K": 128,
+          "N": 128
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 256,
+          "K": 256,
+          "N": 256
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 512,
+          "K": 512,
+          "N": 512
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Square matrix multiply C = A @ B. Derived from AKA torch2hip/kernelbench/level1/l1n1_Square_matrix_multiplication_ module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n2_standard_matmul",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_",
+    "op_type": "matmul",
+    "dtype": "bfloat16",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows of A."
+      },
+      "K": {
+        "type": "var",
+        "description": "Inner dimension."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns of B."
+      }
+    },
+    "inputs": {
+      "A": {
+        "shape": [
+          "M",
+          "K"
+        ],
+        "dtype": "bfloat16",
+        "description": "Left BF16 matrix (M, K)."
+      },
+      "B": {
+        "shape": [
+          "K",
+          "N"
+        ],
+        "dtype": "bfloat16",
+        "description": "Right BF16 matrix (K, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "bfloat16",
+        "description": "A @ B."
+      }
+    },
+    "reference": "import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 128,
+          "K": 256,
+          "N": 64
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 256,
+          "K": 128,
+          "N": 512
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 64,
+          "K": 512,
+          "N": 128
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "General (non-square) BF16 matrix multiply C = A @ B. Derived from AKA torch2hip/kernelbench/level1/l1n2_Standard_matrix_multiplication_.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n3_batched_matmul",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication",
+    "op_type": "matmul",
+    "dtype": "bfloat16",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "Batch": {
+        "type": "var",
+        "description": "Batch dimension."
+      },
+      "M": {
+        "type": "var",
+        "description": "Rows of A."
+      },
+      "K": {
+        "type": "var",
+        "description": "Inner dimension."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns of B."
+      }
+    },
+    "inputs": {
+      "A": {
+        "shape": [
+          "Batch",
+          "M",
+          "K"
+        ],
+        "dtype": "bfloat16",
+        "description": "Batched LHS (Batch, M, K)."
+      },
+      "B": {
+        "shape": [
+          "Batch",
+          "K",
+          "N"
+        ],
+        "dtype": "bfloat16",
+        "description": "Batched RHS (Batch, K, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "Batch",
+          "M",
+          "N"
+        ],
+        "dtype": "bfloat16",
+        "description": "torch.bmm(A, B)."
+      }
+    },
+    "reference": "import torch\n\ndef run(A, B):\n    return torch.bmm(A, B)\n",
+    "workloads": [
+      {
+        "axes": {
+          "Batch": 4,
+          "M": 64,
+          "K": 64,
+          "N": 64
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "Batch": 8,
+          "M": 128,
+          "K": 128,
+          "N": 128
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "Batch": 2,
+          "M": 256,
+          "K": 64,
+          "N": 256
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Batched BF16 matrix multiply via torch.bmm. Derived from AKA torch2hip/kernelbench/level1/l1n3_Batched_matrix_multiplication.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n4_matrix_vector",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows of A."
+      },
+      "K": {
+        "type": "var",
+        "description": "Inner dimension."
+      }
+    },
+    "inputs": {
+      "A": {
+        "shape": [
+          "M",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Matrix (M, K)."
+      },
+      "B": {
+        "shape": [
+          "K",
+          "1"
+        ],
+        "dtype": "float32",
+        "description": "Column vector (K, 1)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "1"
+        ],
+        "dtype": "float32",
+        "description": "A @ B of shape (M, 1)."
+      }
+    },
+    "reference": "import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 1024,
+          "K": 1024
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 2048,
+          "K": 512
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 512,
+          "K": 4096
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Matrix-vector product y = A @ B with B a column vector. Derived from AKA torch2hip/kernelbench/level1/l1n4_Matrix_vector_multiplication_.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n8_matmul_irregular",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_",
+    "op_type": "matmul",
+    "dtype": "float16",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows of A."
+      },
+      "K": {
+        "type": "var",
+        "description": "Inner dimension."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns of B."
+      }
+    },
+    "inputs": {
+      "A": {
+        "shape": [
+          "M",
+          "K"
+        ],
+        "dtype": "float16",
+        "description": "Left FP16 matrix (M, K)."
+      },
+      "B": {
+        "shape": [
+          "K",
+          "N"
+        ],
+        "dtype": "float16",
+        "description": "Right FP16 matrix (K, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float16",
+        "description": "A @ B."
+      }
+    },
+    "reference": "import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 1823,
+          "K": 781,
+          "N": 511
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 359,
+          "K": 127,
+          "N": 211
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 1024,
+          "K": 333,
+          "N": 717
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "FP16 matrix multiply over irregular (non power-of-two) shapes. Derived from AKA torch2hip/kernelbench/level1/l1n8_Matmul_with_irregular_shapes_.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n9_tall_skinny_matmul",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows of A (large)."
+      },
+      "K": {
+        "type": "var",
+        "description": "Inner dimension (small)."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns of B."
+      }
+    },
+    "inputs": {
+      "A": {
+        "shape": [
+          "M",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Tall matrix (M, K)."
+      },
+      "B": {
+        "shape": [
+          "K",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Right matrix (K, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "A @ B."
+      }
+    },
+    "reference": "import torch\n\ndef run(A, B):\n    return torch.matmul(A, B)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 8192,
+          "K": 64,
+          "N": 64
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 4096,
+          "K": 32,
+          "N": 128
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 16384,
+          "K": 16,
+          "N": 32
+        },
+        "inputs": {
+          "A": "random",
+          "B": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Tall-skinny matrix multiply (M >> K). Derived from AKA torch2hip/kernelbench/level1/l1n9_Tall_skinny_matrix_multiplication_.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n23_softmax",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n23_Softmax",
+    "op_type": "softmax",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns (softmax dimension)."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Input (M, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Row-wise softmax."
+      }
+    },
+    "reference": "import torch\n\ndef run(x):\n    return torch.softmax(x, dim=-1)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 128,
+          "N": 128
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 1,
+          "N": 131072
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 1823,
+          "N": 781
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 4096,
+          "N": 8192
+        },
+        "inputs": {
+          "x": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Row-wise softmax over the last dimension. Derived from AKA torch2hip/kernelbench/level1/l1n23_Softmax module_fn (dim=1).",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n26_gelu",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n26_GELU_",
+    "op_type": "elementwise",
+    "dtype": "float16",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float16",
+        "description": "Input (M, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float16",
+        "description": "F.gelu(x)."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x):\n    return F.gelu(x)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 1024,
+          "N": 1024
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 256,
+          "N": 8192
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 4096,
+          "N": 512
+        },
+        "inputs": {
+          "x": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "GELU activation. Derived from AKA torch2hip/kernelbench/level1/l1n26_GELU_ module_fn (F.gelu).",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n36_rmsnorm",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n36_RMSNorm_",
+    "op_type": "norm",
+    "dtype": "bfloat16",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch rows."
+      },
+      "F": {
+        "type": "var",
+        "description": "Feature dimension (normalized)."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "F"
+        ],
+        "dtype": "bfloat16",
+        "description": "Input (B, F)."
+      },
+      "eps": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Numerical stability epsilon."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "F"
+        ],
+        "dtype": "bfloat16",
+        "description": "x / rms(x)."
+      }
+    },
+    "reference": "import torch\n\ndef run(x, eps):\n    rms = torch.sqrt(torch.mean(x ** 2, dim=1, keepdim=True) + eps)\n    return x / rms\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 128,
+          "F": 256
+        },
+        "inputs": {
+          "x": "random",
+          "eps": {
+            "scalar": 1e-05
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 64,
+          "F": 1024
+        },
+        "inputs": {
+          "x": "random",
+          "eps": {
+            "scalar": 1e-05
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 512,
+          "F": 128
+        },
+        "inputs": {
+          "x": "random",
+          "eps": {
+            "scalar": 1e-05
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Root-mean-square normalization over the last dimension. Derived from AKA torch2hip/kernelbench/level1/l1n36_RMSNorm_ module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n40_layernorm",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n40_LayerNorm",
+    "op_type": "norm",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Feature dimension (normalized)."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, N)."
+      },
+      "weight": {
+        "shape": [
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Affine gain (N,)."
+      },
+      "bias": {
+        "shape": [
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Affine bias (N,)."
+      },
+      "eps": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Numerical stability epsilon."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "layer_norm(x)."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias, eps):\n    return F.layer_norm(x, (x.shape[-1],), weight, bias, eps)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 128,
+          "N": 256
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "eps": {
+            "scalar": 1e-05
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 64,
+          "N": 1024
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "eps": {
+            "scalar": 1e-05
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 512,
+          "N": 128
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "eps": {
+            "scalar": 1e-05
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Layer normalization over the last dimension with affine weight/bias. Derived from AKA torch2hip/kernelbench/level1/l1n40_LayerNorm.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n47_sum_reduction",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension",
+    "op_type": "elementwise",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns (reduced)."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Input (M, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "1"
+        ],
+        "dtype": "float32",
+        "description": "Row sums (M, 1)."
+      }
+    },
+    "reference": "import torch\n\ndef run(x):\n    return torch.sum(x, dim=-1, keepdim=True)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 128,
+          "N": 256
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 1024,
+          "N": 64
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 256,
+          "N": 4096
+        },
+        "inputs": {
+          "x": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Sum reduction over the last dimension with keepdim. Derived from AKA torch2hip/kernelbench/level1/l1n47_Sum_reduction_over_a_dimension.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n42_maxpool2d",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D",
+    "op_type": "elementwise",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "C": {
+        "type": "var",
+        "description": "Channels."
+      },
+      "H": {
+        "type": "var",
+        "description": "Input height (even)."
+      },
+      "W": {
+        "type": "var",
+        "description": "Input width (even)."
+      },
+      "H_out": {
+        "type": "expr",
+        "expression": "H // 2",
+        "description": "Output height."
+      },
+      "W_out": {
+        "type": "expr",
+        "expression": "W // 2",
+        "description": "Output width."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, C, H, W)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "C",
+          "H_out",
+          "W_out"
+        ],
+        "dtype": "float32",
+        "description": "Pooled output."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x):\n    return F.max_pool2d(x, kernel_size=2, stride=2)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 4,
+          "C": 16,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 8,
+          "C": 32,
+          "H": 128,
+          "W": 128
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 2,
+          "C": 64,
+          "H": 256,
+          "W": 256
+        },
+        "inputs": {
+          "x": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "2x2 stride-2 max pooling. Derived from AKA torch2hip/kernelbench/level1/l1n42_Max_Pooling_2D module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n63_conv2d",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n63_conv_standard_2D__square_input__square_kernel",
+    "op_type": "conv",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "C": {
+        "type": "var",
+        "description": "Input channels."
+      },
+      "H": {
+        "type": "var",
+        "description": "Input height."
+      },
+      "W": {
+        "type": "var",
+        "description": "Input width."
+      },
+      "O": {
+        "type": "var",
+        "description": "Output channels."
+      },
+      "K": {
+        "type": "const",
+        "value": 3,
+        "description": "Square kernel size."
+      },
+      "H_out": {
+        "type": "expr",
+        "expression": "H - K + 1",
+        "description": "Output height."
+      },
+      "W_out": {
+        "type": "expr",
+        "expression": "W - K + 1",
+        "description": "Output width."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, C, H, W)."
+      },
+      "weight": {
+        "shape": [
+          "O",
+          "C",
+          "K",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Filters (O, C, K, K)."
+      },
+      "bias": {
+        "shape": [
+          "O"
+        ],
+        "dtype": "float32",
+        "description": "Bias (O,)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "O",
+          "H_out",
+          "W_out"
+        ],
+        "dtype": "float32",
+        "description": "Convolution output."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias):\n    return F.conv2d(x, weight, bias, stride=1, padding=0, dilation=1, groups=1)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 4,
+          "C": 8,
+          "H": 32,
+          "W": 32,
+          "O": 16
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 2,
+          "C": 16,
+          "H": 64,
+          "W": 64,
+          "O": 32
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 8,
+          "C": 4,
+          "H": 48,
+          "W": 48,
+          "O": 8
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Standard 2D convolution (stride 1, no padding, 3x3 kernel). Derived from AKA torch2hip/kernelbench/level1/l1n63_conv_standard_2D.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n82_conv_depthwise",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D_square_input_square_kernel",
+    "op_type": "conv",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "C": {
+        "type": "var",
+        "description": "Channels (input = output, depthwise)."
+      },
+      "H": {
+        "type": "var",
+        "description": "Input height."
+      },
+      "W": {
+        "type": "var",
+        "description": "Input width."
+      },
+      "K": {
+        "type": "const",
+        "value": 3,
+        "description": "Square kernel size."
+      },
+      "H_out": {
+        "type": "expr",
+        "expression": "H - K + 1",
+        "description": "Output height."
+      },
+      "W_out": {
+        "type": "expr",
+        "expression": "W - K + 1",
+        "description": "Output width."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, C, H, W)."
+      },
+      "weight": {
+        "shape": [
+          "C",
+          "1",
+          "K",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Depthwise filters (C, 1, K, K)."
+      },
+      "bias": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Bias (C,)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "C",
+          "H_out",
+          "W_out"
+        ],
+        "dtype": "float32",
+        "description": "Depthwise conv output."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias):\n    return F.conv2d(x, weight, bias, stride=1, padding=0, dilation=1, groups=x.shape[1])\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 4,
+          "C": 8,
+          "H": 32,
+          "W": 32
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 2,
+          "C": 16,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 8,
+          "C": 4,
+          "H": 48,
+          "W": 48
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Depthwise 2D convolution (groups = channels, 3x3 kernel, stride 1, no padding). Derived from AKA torch2hip/kernelbench/level1/l1n82_conv_depthwise_2D.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_silu",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/16636_SiLU",
+    "op_type": "elementwise",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "gpumode",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Input (M, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "x * sigmoid(x)."
+      }
+    },
+    "reference": "import torch\n\ndef run(x):\n    return x * torch.sigmoid(x)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 1024,
+          "N": 1024
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 1,
+          "N": 65536
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 1823,
+          "N": 781
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 256,
+          "N": 8192
+        },
+        "inputs": {
+          "x": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "SiLU activation x * sigmoid(x). Derived from AKA torch2hip/gpumode/16636_SiLU module_fn (silu_fn).",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_sigmoid",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/11184_Sigmoid",
+    "op_type": "elementwise",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "gpumode",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns."
+      }
+    },
+    "inputs": {
+      "v": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Input (M, N)."
+      },
+      "a": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Input scale."
+      },
+      "max": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Output scale."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "sigmoid(a * v) * max."
+      }
+    },
+    "reference": "import torch\n\ndef run(v, a, max):  # noqa: A002 - benchmark ABI\n    return torch.sigmoid(a * v) * max\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 1024,
+          "N": 1024
+        },
+        "inputs": {
+          "v": "random",
+          "a": {
+            "scalar": 1.0
+          },
+          "max": {
+            "scalar": 10.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "M": 1,
+          "N": 65536
+        },
+        "inputs": {
+          "v": "random",
+          "a": {
+            "scalar": 2.0
+          },
+          "max": {
+            "scalar": 10.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "M": 1823,
+          "N": 781
+        },
+        "inputs": {
+          "v": "random",
+          "a": {
+            "scalar": 1.0
+          },
+          "max": {
+            "scalar": 10.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "M": 256,
+          "N": 8192
+        },
+        "inputs": {
+          "v": "random",
+          "a": {
+            "scalar": 1.0
+          },
+          "max": {
+            "scalar": 10.0
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Scaled sigmoid: sigmoid(a * x) * max. Derived from AKA torch2hip/gpumode/11184_Sigmoid module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_tanh",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/11178_TanH",
+    "op_type": "elementwise",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "gpumode",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns."
+      }
+    },
+    "inputs": {
+      "v": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Input (M, N)."
+      },
+      "a": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Input scale."
+      },
+      "max": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Output scale."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "tanh(a * v) * max."
+      }
+    },
+    "reference": "import torch\n\ndef run(v, a, max):  # noqa: A002 - benchmark ABI\n    return torch.tanh(a * v) * max\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 1024,
+          "N": 1024
+        },
+        "inputs": {
+          "v": "random",
+          "a": {
+            "scalar": 1.0
+          },
+          "max": {
+            "scalar": 10.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "M": 1,
+          "N": 65536
+        },
+        "inputs": {
+          "v": "random",
+          "a": {
+            "scalar": 2.0
+          },
+          "max": {
+            "scalar": 10.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "M": 1823,
+          "N": 781
+        },
+        "inputs": {
+          "v": "random",
+          "a": {
+            "scalar": 1.0
+          },
+          "max": {
+            "scalar": 10.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "M": 256,
+          "N": 8192
+        },
+        "inputs": {
+          "v": "random",
+          "a": {
+            "scalar": 1.0
+          },
+          "max": {
+            "scalar": 10.0
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Scaled tanh: tanh(a * x) * max. Derived from AKA torch2hip/gpumode/11178_TanH module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l2n99_matmul_gelu_softmax",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level2/l2n99_Matmul_GELU_Softmax",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch rows."
+      },
+      "IN": {
+        "type": "const",
+        "value": 8192,
+        "description": "Input features."
+      },
+      "OUT": {
+        "type": "const",
+        "value": 8192,
+        "description": "Output features."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, IN)."
+      },
+      "weight": {
+        "shape": [
+          "OUT",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Linear weight (OUT, IN)."
+      },
+      "bias": {
+        "shape": [
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "Linear bias (OUT,)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "softmax(gelu(linear(x)))."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias):\n    x = F.linear(x, weight, bias)\n    x = F.gelu(x)\n    return F.softmax(x, dim=1)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 256
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 1024
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 4096
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Fused linear -> GELU -> softmax(dim=1). Derived from AKA torch2hip/kernelbench/level2/l2n99_Matmul_GELU_Softmax module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l2n86_matmul_divide_gelu",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level2/l2n86_Matmul_Divide_GELU",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch rows."
+      },
+      "IN": {
+        "type": "const",
+        "value": 8192,
+        "description": "Input features."
+      },
+      "OUT": {
+        "type": "const",
+        "value": 8192,
+        "description": "Output features."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, IN)."
+      },
+      "weight": {
+        "shape": [
+          "OUT",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Linear weight (OUT, IN)."
+      },
+      "bias": {
+        "shape": [
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "Linear bias (OUT,)."
+      },
+      "divisor": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Divisor scalar."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "gelu(linear(x) / divisor)."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias, divisor):\n    x = F.linear(x, weight, bias)\n    x = x / divisor\n    return F.gelu(x)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 256
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "divisor": {
+            "scalar": 10.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 1024
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "divisor": {
+            "scalar": 10.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 4096
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "divisor": {
+            "scalar": 10.0
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Fused linear -> divide -> GELU. Derived from AKA torch2hip/kernelbench/level2/l2n86_Matmul_Divide_GELU module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l2n40_matmul_scaling_residual",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch rows."
+      },
+      "IN": {
+        "type": "const",
+        "value": 4096,
+        "description": "Input features."
+      },
+      "OUT": {
+        "type": "const",
+        "value": 4096,
+        "description": "Output features."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, IN)."
+      },
+      "weight": {
+        "shape": [
+          "OUT",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Linear weight (OUT, IN)."
+      },
+      "bias": {
+        "shape": [
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "Linear bias (OUT,)."
+      },
+      "scaling_factor": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Scaling factor."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "linear(x) * scaling + linear(x)."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x, weight, bias, scaling_factor):\n    x = F.linear(x, weight, bias)\n    return x * scaling_factor + x\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 2048
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "scaling_factor": {
+            "scalar": 0.5
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 4096
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "scaling_factor": {
+            "scalar": 0.5
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 16384
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "scaling_factor": {
+            "scalar": 0.5
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Fused linear -> scale -> residual add. Derived from AKA torch2hip/kernelbench/level2/l2n40_Matmul_Scaling_ResidualAdd module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l2n37_groupnorm_fused",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm",
+    "op_type": "norm",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch rows."
+      },
+      "IN": {
+        "type": "const",
+        "value": 1024,
+        "description": "Input features."
+      },
+      "OUT": {
+        "type": "const",
+        "value": 4096,
+        "description": "Output features (group_norm channels)."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, IN)."
+      },
+      "weight": {
+        "shape": [
+          "OUT",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Linear weight."
+      },
+      "bias": {
+        "shape": [
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "Linear bias."
+      },
+      "extra_bias": {
+        "shape": [
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "Additive bias."
+      },
+      "gn_weight": {
+        "shape": [
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "GroupNorm gain."
+      },
+      "gn_bias": {
+        "shape": [
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "GroupNorm bias."
+      },
+      "num_groups": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "GroupNorm group count."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "group_norm(swish(linear(x)) + extra_bias)."
+      }
+    },
+    "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, weight, bias, extra_bias, gn_weight, gn_bias, num_groups):\n    x = F.linear(x, weight, bias)\n    x = torch.sigmoid(x) * x\n    x = x + extra_bias\n    return F.group_norm(x, int(num_groups), gn_weight, gn_bias)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 4096
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "extra_bias": "random",
+          "gn_weight": "random",
+          "gn_bias": "random",
+          "num_groups": {
+            "scalar": 64
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 8192
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "extra_bias": "random",
+          "gn_weight": "random",
+          "gn_bias": "random",
+          "num_groups": {
+            "scalar": 64
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 16384
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "extra_bias": "random",
+          "gn_weight": "random",
+          "gn_bias": "random",
+          "num_groups": {
+            "scalar": 64
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Fused linear -> swish -> add -> group_norm. Derived from AKA torch2hip/kernelbench/level2/l2n37_Matmul_Swish_Sum_GroupNorm module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l2n17_instancenorm_fused",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide",
+    "op_type": "norm",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "C": {
+        "type": "const",
+        "value": 64,
+        "description": "Input channels."
+      },
+      "H": {
+        "type": "var",
+        "description": "Input height."
+      },
+      "W": {
+        "type": "var",
+        "description": "Input width."
+      },
+      "O": {
+        "type": "const",
+        "value": 128,
+        "description": "Output channels."
+      },
+      "K": {
+        "type": "const",
+        "value": 3,
+        "description": "Kernel size."
+      },
+      "HO": {
+        "type": "expr",
+        "expression": "H - K + 1",
+        "description": "Output height."
+      },
+      "WO": {
+        "type": "expr",
+        "expression": "W - K + 1",
+        "description": "Output width."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, C, H, W)."
+      },
+      "conv_weight": {
+        "shape": [
+          "O",
+          "C",
+          "K",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Conv filters."
+      },
+      "conv_bias": {
+        "shape": [
+          "O"
+        ],
+        "dtype": "float32",
+        "description": "Conv bias."
+      },
+      "divide_by": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Divisor scalar."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "O",
+          "HO",
+          "WO"
+        ],
+        "dtype": "float32",
+        "description": "instance_norm(conv2d(x)) / divide_by."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x, conv_weight, conv_bias, divide_by):\n    x = F.conv2d(x, conv_weight, conv_bias)\n    x = F.instance_norm(x)\n    return x / divide_by\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 32,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "x": "random",
+          "conv_weight": "random",
+          "conv_bias": "random",
+          "divide_by": {
+            "scalar": 2.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 64,
+          "H": 128,
+          "W": 128
+        },
+        "inputs": {
+          "x": "random",
+          "conv_weight": "random",
+          "conv_bias": "random",
+          "divide_by": {
+            "scalar": 2.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 16,
+          "H": 48,
+          "W": 48
+        },
+        "inputs": {
+          "x": "random",
+          "conv_weight": "random",
+          "conv_bias": "random",
+          "divide_by": {
+            "scalar": 2.0
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Fused conv2d -> instance_norm -> divide. Derived from AKA torch2hip/kernelbench/level2/l2n17_Conv2d_InstanceNorm_Divide module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "dot_product_attention",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/1001_NormalAttention_dot",
+    "op_type": "attention",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "gpumode",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "C": {
+        "type": "const",
+        "value": 4,
+        "description": "Channels fixed by the AKA task initializer."
+      },
+      "Q": {
+        "type": "const",
+        "value": 1,
+        "description": "Reduced query/key channels (C // 4)."
+      },
+      "H": {
+        "type": "var",
+        "description": "Spatial height."
+      },
+      "W": {
+        "type": "var",
+        "description": "Spatial width."
+      },
+      "K": {
+        "type": "const",
+        "value": 1,
+        "description": "Projection kernel size."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "Input feature map."
+      },
+      "query_weight": {
+        "shape": [
+          "Q",
+          "C",
+          "K",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Query 1x1 convolution weight."
+      },
+      "query_bias": {
+        "shape": [
+          "Q"
+        ],
+        "dtype": "float32",
+        "description": "Query convolution bias."
+      },
+      "key_weight": {
+        "shape": [
+          "Q",
+          "C",
+          "K",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Key 1x1 convolution weight."
+      },
+      "key_bias": {
+        "shape": [
+          "Q"
+        ],
+        "dtype": "float32",
+        "description": "Key convolution bias."
+      },
+      "value_weight": {
+        "shape": [
+          "C",
+          "C",
+          "K",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Value 1x1 convolution weight."
+      },
+      "value_bias": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Value convolution bias."
+      },
+      "gamma_weight": {
+        "shape": [
+          "C",
+          "C",
+          "K",
+          "K"
+        ],
+        "dtype": "float32",
+        "description": "Output 1x1 convolution weight."
+      },
+      "gamma_bias": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Output convolution bias."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "Attention output feature map."
+      }
+    },
+    "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, query_weight, query_bias, key_weight, key_bias, value_weight, value_bias, gamma_weight, gamma_bias):\n    b, c, h, w = x.shape\n    query = F.conv2d(x, query_weight, query_bias)\n    query = query.view(b, -1, h * w).permute(0, 2, 1)\n    key = F.conv2d(x, key_weight, key_bias).view(b, -1, h * w)\n    energy = torch.bmm(query, key)\n    energy = F.elu(energy) / (h * w)\n    value = F.conv2d(x, value_weight, value_bias).view(b, c, h * w)\n    out = torch.bmm(value, energy).view(b, c, h, w)\n    return F.conv2d(out, gamma_weight, gamma_bias)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 2,
+          "H": 4,
+          "W": 4
+        },
+        "inputs": {
+          "x": "random",
+          "query_weight": "random",
+          "query_bias": "random",
+          "key_weight": "random",
+          "key_bias": "random",
+          "value_weight": "random",
+          "value_bias": "random",
+          "gamma_weight": "random",
+          "gamma_bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 4,
+          "H": 8,
+          "W": 8
+        },
+        "inputs": {
+          "x": "random",
+          "query_weight": "random",
+          "query_bias": "random",
+          "key_weight": "random",
+          "key_bias": "random",
+          "value_weight": "random",
+          "value_bias": "random",
+          "gamma_weight": "random",
+          "gamma_bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 2,
+          "H": 16,
+          "W": 16
+        },
+        "inputs": {
+          "x": "random",
+          "query_weight": "random",
+          "query_bias": "random",
+          "key_weight": "random",
+          "key_bias": "random",
+          "value_weight": "random",
+          "value_bias": "random",
+          "gamma_weight": "random",
+          "gamma_bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 1,
+          "H": 32,
+          "W": 32
+        },
+        "inputs": {
+          "x": "random",
+          "query_weight": "random",
+          "query_bias": "random",
+          "key_weight": "random",
+          "key_bias": "random",
+          "value_weight": "random",
+          "value_bias": "random",
+          "gamma_weight": "random",
+          "gamma_bias": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Dot-product non-local attention with ELU-normalized query/key energy, query/key/value 1x1 projections, and an output projection. Lifted exactly from AKA torch2hip/gpumode/1001_NormalAttention_dot module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_gelu_4d",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/14539_GELU",
+    "op_type": "elementwise",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "gpumode",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "C": {
+        "type": "var",
+        "description": "Channels."
+      },
+      "H": {
+        "type": "var",
+        "description": "Height."
+      },
+      "W": {
+        "type": "var",
+        "description": "Width."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, C, H, W)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "F.gelu(x)."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x):\n    return F.gelu(x)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 8,
+          "C": 64,
+          "H": 32,
+          "W": 32
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 16,
+          "C": 128,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 4,
+          "C": 32,
+          "H": 16,
+          "W": 16
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 32,
+          "C": 64,
+          "H": 48,
+          "W": 48
+        },
+        "inputs": {
+          "x": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "GELU pinned to 4D [B, C, H, W]. Rank-split from the variable-rank (1D-4D) AKA torch2hip/gpumode/14539_GELU module_fn; the 2D case is l1n26_gelu. The schema pins rank per Definition, so each rank becomes its own problem.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "fp8_cast_sentinel",
+    "suite": "instruction2triton",
+    "task_path": "tasks/instruction2triton/rocmbench/test_chained_dot_fp8",
+    "op_type": "elementwise",
+    "dtype": "float8_e4m3fn",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "rocmbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Columns."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "FP32 input (M, N)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float8_e4m3fn",
+        "description": "x cast to float8_e4m3fn."
+      }
+    },
+    "reference": "import torch\n\ndef run(x):\n    return x.to(torch.float8_e4m3fn)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 128,
+          "N": 128
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 256,
+          "N": 512
+        },
+        "inputs": {
+          "x": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 64,
+          "N": 1024
+        },
+        "inputs": {
+          "x": "random"
+        }
+      }
+    ],
+    "role": "compatibility_sentinel",
+    "exclusion_reason_code": "",
+    "description": "FP8 compatibility sentinel: per-tensor cast to float8_e4m3fn. Probes the harness's ability to materialize, compare, and time an FP8 output tensor end-to-end. Provenance-bound to AKA instruction2triton/rocmbench/test_chained_dot_fp8 (a portable pure-torch cast stands in for the arch-coupled FP8 chained-dot reference so it executes on gfx1200). Not scored for SOL.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "rmsnorm_bwd",
+    "suite": "instruction2triton",
+    "task_path": "tasks/instruction2triton/rocmbench/rmsnorm_bwd",
+    "op_type": "norm",
+    "dtype": "float16",
+    "pass_kind": "backward",
+    "fusion_depth": "single",
+    "source_family": "rocmbench",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Feature dimension."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float16",
+        "description": "Forward input (M, N)."
+      },
+      "g": {
+        "shape": [
+          "1",
+          "N"
+        ],
+        "dtype": "float16",
+        "description": "RMSNorm gain (1, N)."
+      },
+      "grad_output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float16",
+        "description": "Upstream gradient (M, N)."
+      }
+    },
+    "outputs": {
+      "grad_x": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "float16",
+        "description": "Gradient w.r.t. x (M, N)."
+      },
+      "grad_g": {
+        "shape": [
+          "1",
+          "N"
+        ],
+        "dtype": "float16",
+        "description": "Gradient w.r.t. g (1, N)."
+      }
+    },
+    "reference": "import torch\n\ndef run(x, g, grad_output):\n    xr = x.clone().detach().requires_grad_()\n    gr = g.clone().detach().requires_grad_()\n    rms = torch.sqrt(torch.sum(xr.float() ** 2, dim=-1, keepdim=True) * (1.0 / xr.shape[-1]))\n    y = (xr.float() / rms * gr.float()).to(x.dtype)\n    y.backward(grad_output)\n    return xr.grad.to(x.dtype), gr.grad.to(x.dtype)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 256,
+          "N": 4096
+        },
+        "inputs": {
+          "x": "random",
+          "g": "random",
+          "grad_output": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 1,
+          "N": 31744
+        },
+        "inputs": {
+          "x": "random",
+          "g": "random",
+          "grad_output": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 873,
+          "N": 1245
+        },
+        "inputs": {
+          "x": "random",
+          "g": "random",
+          "grad_output": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 64,
+          "N": 1024
+        },
+        "inputs": {
+          "x": "random",
+          "g": "random",
+          "grad_output": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "RMSNorm backward (gradient w.r.t. input and weight) via autograd. Derived from and cross-checked against the PyTorch oracle in AKA instruction2triton/rocmbench/rmsnorm_bwd.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "silu_and_mul_bf16",
+    "suite": "torch2flydsl",
+    "task_path": "tasks/torch2flydsl/silu_and_mul_kernel",
+    "op_type": "elementwise",
+    "dtype": "bfloat16",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "flydsl",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "D": {
+        "type": "var",
+        "description": "Last dimension (even)."
+      },
+      "d": {
+        "type": "expr",
+        "expression": "D // 2",
+        "description": "Half of the last dimension."
+      }
+    },
+    "inputs": {
+      "input": {
+        "shape": [
+          "M",
+          "D"
+        ],
+        "dtype": "bfloat16",
+        "description": "Input (M, D), D even."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "d"
+        ],
+        "dtype": "bfloat16",
+        "description": "silu(x) * y (M, d)."
+      }
+    },
+    "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(input):  # noqa: A002 - benchmark ABI\n    d = input.shape[-1] // 2\n    x, y = input.split([d, d], dim=-1)\n    return (F.silu(x.float()) * y.float()).to(torch.bfloat16)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 512,
+          "D": 8192
+        },
+        "inputs": {
+          "input": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 1,
+          "D": 4096
+        },
+        "inputs": {
+          "input": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 2048,
+          "D": 8192
+        },
+        "inputs": {
+          "input": "random"
+        }
+      },
+      {
+        "axes": {
+          "M": 256,
+          "D": 16384
+        },
+        "inputs": {
+          "input": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Fused SiLU-and-multiply (SwIGLU): silu(x) * y over the two halves of the last dimension, computed in FP32 then cast to BF16. Derived from AKA torch2flydsl/silu_and_mul_kernel Model.forward (the suite's FlyDSL target is irrelevant here; we lift the PyTorch oracle).",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_fused_leaky_relu",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/10190_FusedLeakyReLU",
+    "op_type": "elementwise",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "gpumode",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "C": {
+        "type": "var",
+        "description": "Channels."
+      },
+      "H": {
+        "type": "var",
+        "description": "Height."
+      },
+      "W": {
+        "type": "var",
+        "description": "Width."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, C, H, W)."
+      },
+      "bias": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Channel bias (>= C, sliced to x's channels)."
+      },
+      "negative_slope": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Leaky-ReLU negative slope."
+      },
+      "scale": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Output scale."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32",
+        "description": "scale * leaky_relu(x + bias)."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x, bias, negative_slope, scale):\n    x = x + bias.reshape(1, -1, 1, 1)[:, : x.shape[1]]\n    x = F.leaky_relu(x, negative_slope=negative_slope)\n    return x * scale\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 8,
+          "C": 4,
+          "H": 32,
+          "W": 32
+        },
+        "inputs": {
+          "x": "random",
+          "bias": "random",
+          "negative_slope": {
+            "scalar": 0.2
+          },
+          "scale": {
+            "scalar": 1.4142135623730951
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 16,
+          "C": 64,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "x": "random",
+          "bias": "random",
+          "negative_slope": {
+            "scalar": 0.2
+          },
+          "scale": {
+            "scalar": 1.4142135623730951
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 8,
+          "C": 128,
+          "H": 48,
+          "W": 48
+        },
+        "inputs": {
+          "x": "random",
+          "bias": "random",
+          "negative_slope": {
+            "scalar": 0.2
+          },
+          "scale": {
+            "scalar": 1.4142135623730951
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 32,
+          "C": 16,
+          "H": 56,
+          "W": 56
+        },
+        "inputs": {
+          "x": "random",
+          "bias": "random",
+          "negative_slope": {
+            "scalar": 0.2
+          },
+          "scale": {
+            "scalar": 1.4142135623730951
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Fused bias-add -> leaky_relu -> scale. Derived from AKA torch2hip/gpumode/10190_FusedLeakyReLU module_fn (fused_leaky_relu_fn).",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_transpose",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/1067_Transpose",
+    "op_type": "elementwise",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "gpumode",
+    "axes": {
+      "A": {
+        "type": "var",
+        "description": "Dim 0 size."
+      },
+      "B": {
+        "type": "var",
+        "description": "Dim 1 size (swapped to dim 2)."
+      },
+      "C": {
+        "type": "var",
+        "description": "Dim 2 size (swapped to dim 1)."
+      },
+      "D": {
+        "type": "var",
+        "description": "Dim 3 size."
+      }
+    },
+    "inputs": {
+      "input": {
+        "shape": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "dtype": "float32",
+        "description": "Input (A, B, C, D)."
+      },
+      "dim1": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "First transpose dimension."
+      },
+      "dim2": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Second transpose dimension."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "A",
+          "C",
+          "B",
+          "D"
+        ],
+        "dtype": "float32",
+        "description": "input.transpose(dim1, dim2)."
+      }
+    },
+    "reference": "def run(input, dim1, dim2):  # noqa: A002 - benchmark ABI\n    return input.transpose(int(dim1), int(dim2)).contiguous()\n",
+    "workloads": [
+      {
+        "axes": {
+          "A": 4,
+          "B": 8,
+          "C": 16,
+          "D": 32
+        },
+        "inputs": {
+          "input": "random",
+          "dim1": {
+            "scalar": 1
+          },
+          "dim2": {
+            "scalar": 2
+          }
+        }
+      },
+      {
+        "axes": {
+          "A": 8,
+          "B": 16,
+          "C": 32,
+          "D": 64
+        },
+        "inputs": {
+          "input": "random",
+          "dim1": {
+            "scalar": 1
+          },
+          "dim2": {
+            "scalar": 2
+          }
+        }
+      },
+      {
+        "axes": {
+          "A": 2,
+          "B": 64,
+          "C": 128,
+          "D": 16
+        },
+        "inputs": {
+          "input": "random",
+          "dim1": {
+            "scalar": 1
+          },
+          "dim2": {
+            "scalar": 2
+          }
+        }
+      },
+      {
+        "axes": {
+          "A": 16,
+          "B": 32,
+          "C": 48,
+          "D": 24
+        },
+        "inputs": {
+          "input": "random",
+          "dim1": {
+            "scalar": 1
+          },
+          "dim2": {
+            "scalar": 2
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Transpose two dimensions and return a contiguous tensor. Derived from AKA torch2hip/gpumode/1067_Transpose module_fn (dims 1, 2).",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_softmax_3d",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/10082_SoftmaxModule",
+    "op_type": "softmax",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "gpumode",
+    "axes": {
+      "N": {
+        "type": "var",
+        "description": "Cube edge (all three dims equal)."
+      }
+    },
+    "inputs": {
+      "v": {
+        "shape": [
+          "N",
+          "N",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "Input cube (N, N, N)."
+      },
+      "axis": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Softmax axis."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "N",
+          "N",
+          "N"
+        ],
+        "dtype": "float32",
+        "description": "softmax(v, dim=axis)."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(v, axis):\n    return F.softmax(v, dim=int(axis))\n",
+    "workloads": [
+      {
+        "axes": {
+          "N": 16
+        },
+        "inputs": {
+          "v": "random",
+          "axis": {
+            "scalar": 2
+          }
+        }
+      },
+      {
+        "axes": {
+          "N": 64
+        },
+        "inputs": {
+          "v": "random",
+          "axis": {
+            "scalar": 2
+          }
+        }
+      },
+      {
+        "axes": {
+          "N": 128
+        },
+        "inputs": {
+          "v": "random",
+          "axis": {
+            "scalar": 2
+          }
+        }
+      },
+      {
+        "axes": {
+          "N": 91
+        },
+        "inputs": {
+          "v": "random",
+          "axis": {
+            "scalar": 2
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Softmax over the last axis of a 3D cube. Derived from AKA torch2hip/gpumode/10082_SoftmaxModule module_fn (axis=2).",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_feedforward",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/10024_Feedforward",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "gpumode",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Per-input batch (output batch is 2*B)."
+      },
+      "C": {
+        "type": "const",
+        "value": 4,
+        "description": "Input features."
+      },
+      "H": {
+        "type": "const",
+        "value": 100,
+        "description": "Hidden features."
+      },
+      "OB": {
+        "type": "expr",
+        "expression": "2 * B",
+        "description": "Output batch (vstack doubles the batch)."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "First input (B, C)."
+      },
+      "y": {
+        "shape": [
+          "B",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Second input (B, C)."
+      },
+      "fc1_weight": {
+        "shape": [
+          "H",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "First linear weight (H, C)."
+      },
+      "fc1_bias": {
+        "shape": [
+          "H"
+        ],
+        "dtype": "float32",
+        "description": "First linear bias (H,)."
+      },
+      "fc2_weight": {
+        "shape": [
+          "1",
+          "H"
+        ],
+        "dtype": "float32",
+        "description": "Second linear weight (1, H)."
+      },
+      "fc2_bias": {
+        "shape": [
+          "1"
+        ],
+        "dtype": "float32",
+        "description": "Second linear bias (1,)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "OB",
+          "1"
+        ],
+        "dtype": "float32",
+        "description": "sigmoid(linear2(relu(linear1(vstack(x,y)))))."
+      }
+    },
+    "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, y, fc1_weight, fc1_bias, fc2_weight, fc2_bias):\n    inp = torch.vstack([x, y])\n    hidden = F.linear(inp, fc1_weight, fc1_bias)\n    relu = F.relu(hidden)\n    output = F.linear(relu, fc2_weight, fc2_bias)\n    return torch.sigmoid(output)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 1
+        },
+        "inputs": {
+          "x": "random",
+          "y": "random",
+          "fc1_weight": "random",
+          "fc1_bias": "random",
+          "fc2_weight": "random",
+          "fc2_bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 4
+        },
+        "inputs": {
+          "x": "random",
+          "y": "random",
+          "fc1_weight": "random",
+          "fc1_bias": "random",
+          "fc2_weight": "random",
+          "fc2_bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 8
+        },
+        "inputs": {
+          "x": "random",
+          "y": "random",
+          "fc1_weight": "random",
+          "fc1_bias": "random",
+          "fc2_weight": "random",
+          "fc2_bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 16
+        },
+        "inputs": {
+          "x": "random",
+          "y": "random",
+          "fc1_weight": "random",
+          "fc1_bias": "random",
+          "fc2_weight": "random",
+          "fc2_bias": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Fused two-input feedforward: vstack(x,y) -> linear -> ReLU -> linear -> sigmoid. Derived from AKA torch2hip/gpumode/10024_Feedforward module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_positionwise_ffn",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/14044_PositionWiseFeedForward",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "gpumode",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "S": {
+        "type": "var",
+        "description": "Sequence length."
+      },
+      "C": {
+        "type": "const",
+        "value": 4,
+        "description": "Model dimension."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "S",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, S, C)."
+      },
+      "W_1_weight": {
+        "shape": [
+          "C",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "First linear weight."
+      },
+      "W_1_bias": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "First linear bias."
+      },
+      "W_2_weight": {
+        "shape": [
+          "C",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Second linear weight."
+      },
+      "W_2_bias": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Second linear bias."
+      },
+      "layer_norm_weight": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "LayerNorm gain."
+      },
+      "layer_norm_bias": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "LayerNorm bias."
+      },
+      "dropout_p": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Dropout probability."
+      },
+      "training": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Dropout training flag (false for determinism)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "S",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "FFN block output (B, S, C)."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(x, W_1_weight, W_1_bias, W_2_weight, W_2_bias, layer_norm_weight, layer_norm_bias, dropout_p, training):\n    out = F.linear(x, W_1_weight, W_1_bias)\n    out = F.relu(out)\n    out = F.linear(out, W_2_weight, W_2_bias)\n    out = F.dropout(out, p=dropout_p, training=bool(training))\n    out = out + x\n    return F.layer_norm(out, out.shape[-1:], layer_norm_weight, layer_norm_bias)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 4,
+          "S": 4
+        },
+        "inputs": {
+          "x": "random",
+          "W_1_weight": "random",
+          "W_1_bias": "random",
+          "W_2_weight": "random",
+          "W_2_bias": "random",
+          "layer_norm_weight": "random",
+          "layer_norm_bias": "random",
+          "dropout_p": {
+            "scalar": 0.5
+          },
+          "training": {
+            "scalar": false
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 16,
+          "S": 16
+        },
+        "inputs": {
+          "x": "random",
+          "W_1_weight": "random",
+          "W_1_bias": "random",
+          "W_2_weight": "random",
+          "W_2_bias": "random",
+          "layer_norm_weight": "random",
+          "layer_norm_bias": "random",
+          "dropout_p": {
+            "scalar": 0.5
+          },
+          "training": {
+            "scalar": false
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 64,
+          "S": 64
+        },
+        "inputs": {
+          "x": "random",
+          "W_1_weight": "random",
+          "W_1_bias": "random",
+          "W_2_weight": "random",
+          "W_2_bias": "random",
+          "layer_norm_weight": "random",
+          "layer_norm_bias": "random",
+          "dropout_p": {
+            "scalar": 0.5
+          },
+          "training": {
+            "scalar": false
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 8,
+          "S": 128
+        },
+        "inputs": {
+          "x": "random",
+          "W_1_weight": "random",
+          "W_1_bias": "random",
+          "W_2_weight": "random",
+          "W_2_bias": "random",
+          "layer_norm_weight": "random",
+          "layer_norm_bias": "random",
+          "dropout_p": {
+            "scalar": 0.5
+          },
+          "training": {
+            "scalar": false
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Position-wise feedforward block: linear -> ReLU -> linear -> dropout(eval) -> residual -> layer_norm. Derived from AKA torch2hip/gpumode/14044_PositionWiseFeedForward module_fn (eval mode, deterministic).",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "gpumode_mlp",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/1178_MLP_model",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "gpumode",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "IN4": {
+        "type": "const",
+        "value": 4,
+        "description": "Input/output size."
+      },
+      "H1": {
+        "type": "const",
+        "value": 4096,
+        "description": "Hidden 1."
+      },
+      "H2": {
+        "type": "const",
+        "value": 2048,
+        "description": "Hidden 2."
+      },
+      "H3": {
+        "type": "const",
+        "value": 512,
+        "description": "Hidden 3."
+      },
+      "H4": {
+        "type": "const",
+        "value": 128,
+        "description": "Hidden 4."
+      },
+      "H5": {
+        "type": "const",
+        "value": 64,
+        "description": "Hidden 5."
+      },
+      "H6": {
+        "type": "const",
+        "value": 32,
+        "description": "Hidden 6."
+      }
+    },
+    "inputs": {
+      "xb": {
+        "shape": [
+          "B",
+          "IN4"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, 4)."
+      },
+      "linear1_weight": {
+        "shape": [
+          "H1",
+          "IN4"
+        ],
+        "dtype": "float32"
+      },
+      "linear1_bias": {
+        "shape": [
+          "H1"
+        ],
+        "dtype": "float32"
+      },
+      "linear2_weight": {
+        "shape": [
+          "H2",
+          "H1"
+        ],
+        "dtype": "float32"
+      },
+      "linear2_bias": {
+        "shape": [
+          "H2"
+        ],
+        "dtype": "float32"
+      },
+      "linear3_weight": {
+        "shape": [
+          "H3",
+          "H2"
+        ],
+        "dtype": "float32"
+      },
+      "linear3_bias": {
+        "shape": [
+          "H3"
+        ],
+        "dtype": "float32"
+      },
+      "linear4_weight": {
+        "shape": [
+          "H4",
+          "H3"
+        ],
+        "dtype": "float32"
+      },
+      "linear4_bias": {
+        "shape": [
+          "H4"
+        ],
+        "dtype": "float32"
+      },
+      "linear5_weight": {
+        "shape": [
+          "H5",
+          "H4"
+        ],
+        "dtype": "float32"
+      },
+      "linear5_bias": {
+        "shape": [
+          "H5"
+        ],
+        "dtype": "float32"
+      },
+      "linear6_weight": {
+        "shape": [
+          "H6",
+          "H5"
+        ],
+        "dtype": "float32"
+      },
+      "linear6_bias": {
+        "shape": [
+          "H6"
+        ],
+        "dtype": "float32"
+      },
+      "linear7_weight": {
+        "shape": [
+          "IN4",
+          "H6"
+        ],
+        "dtype": "float32"
+      },
+      "linear7_bias": {
+        "shape": [
+          "IN4"
+        ],
+        "dtype": "float32"
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "IN4"
+        ],
+        "dtype": "float32",
+        "description": "MLP output (B, 4)."
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(xb, linear1_weight, linear1_bias, linear2_weight, linear2_bias, linear3_weight, linear3_bias, linear4_weight, linear4_bias, linear5_weight, linear5_bias, linear6_weight, linear6_bias, linear7_weight, linear7_bias):\n    xb = xb.view(xb.size(0), -1)\n    out = F.relu(F.linear(xb, linear1_weight, linear1_bias))\n    out = F.relu(F.linear(out, linear2_weight, linear2_bias))\n    out = F.relu(F.linear(out, linear3_weight, linear3_bias))\n    out = F.relu(F.linear(out, linear4_weight, linear4_bias))\n    out = F.relu(F.linear(out, linear5_weight, linear5_bias))\n    out = F.relu(F.linear(out, linear6_weight, linear6_bias))\n    return F.linear(out, linear7_weight, linear7_bias)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 4
+        },
+        "inputs": {
+          "xb": "random",
+          "linear1_weight": "random",
+          "linear1_bias": "random",
+          "linear2_weight": "random",
+          "linear2_bias": "random",
+          "linear3_weight": "random",
+          "linear3_bias": "random",
+          "linear4_weight": "random",
+          "linear4_bias": "random",
+          "linear5_weight": "random",
+          "linear5_bias": "random",
+          "linear6_weight": "random",
+          "linear6_bias": "random",
+          "linear7_weight": "random",
+          "linear7_bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 16
+        },
+        "inputs": {
+          "xb": "random",
+          "linear1_weight": "random",
+          "linear1_bias": "random",
+          "linear2_weight": "random",
+          "linear2_bias": "random",
+          "linear3_weight": "random",
+          "linear3_bias": "random",
+          "linear4_weight": "random",
+          "linear4_bias": "random",
+          "linear5_weight": "random",
+          "linear5_bias": "random",
+          "linear6_weight": "random",
+          "linear6_bias": "random",
+          "linear7_weight": "random",
+          "linear7_bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 64
+        },
+        "inputs": {
+          "xb": "random",
+          "linear1_weight": "random",
+          "linear1_bias": "random",
+          "linear2_weight": "random",
+          "linear2_bias": "random",
+          "linear3_weight": "random",
+          "linear3_bias": "random",
+          "linear4_weight": "random",
+          "linear4_bias": "random",
+          "linear5_weight": "random",
+          "linear5_bias": "random",
+          "linear6_weight": "random",
+          "linear6_bias": "random",
+          "linear7_weight": "random",
+          "linear7_bias": "random"
+        }
+      },
+      {
+        "axes": {
+          "B": 128
+        },
+        "inputs": {
+          "xb": "random",
+          "linear1_weight": "random",
+          "linear1_bias": "random",
+          "linear2_weight": "random",
+          "linear2_bias": "random",
+          "linear3_weight": "random",
+          "linear3_bias": "random",
+          "linear4_weight": "random",
+          "linear4_bias": "random",
+          "linear5_weight": "random",
+          "linear5_bias": "random",
+          "linear6_weight": "random",
+          "linear6_bias": "random",
+          "linear7_weight": "random",
+          "linear7_bias": "random"
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "7-layer MLP (4 -> 4096 -> 2048 -> 512 -> 128 -> 64 -> 32 -> 4) with ReLU. Derived from AKA torch2hip/gpumode/1178_MLP_model module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l2n55_matmul_maxpool_sum_scale",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "IN": {
+        "type": "const",
+        "value": 32768,
+        "description": "Input features."
+      },
+      "OUT": {
+        "type": "const",
+        "value": 32768,
+        "description": "Output features."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, IN)."
+      },
+      "weight": {
+        "shape": [
+          "OUT",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Linear weight."
+      },
+      "bias": {
+        "shape": [
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "Linear bias."
+      },
+      "kernel_size": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Max-pool kernel size."
+      },
+      "scale_factor": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Output scale."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B"
+        ],
+        "dtype": "float32",
+        "description": "Reduced output (B,)."
+      }
+    },
+    "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, weight, bias, kernel_size, scale_factor):\n    x = F.linear(x, weight, bias)\n    x = F.max_pool1d(x.unsqueeze(1), int(kernel_size)).squeeze(1)\n    x = torch.sum(x, dim=1)\n    return x * scale_factor\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 32
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "kernel_size": {
+            "scalar": 2
+          },
+          "scale_factor": {
+            "scalar": 0.5
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 64
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "kernel_size": {
+            "scalar": 2
+          },
+          "scale_factor": {
+            "scalar": 0.5
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 128
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "kernel_size": {
+            "scalar": 2
+          },
+          "scale_factor": {
+            "scalar": 0.5
+          }
+        }
+      }
+    ],
+    "role": "target_incompatible",
+    "exclusion_reason_code": "reference_ipc_payload_limit",
+    "description": "Fused linear -> max_pool1d -> sum -> scale, reducing to a 1D per-batch output. Derived from AKA torch2hip/kernelbench/level2/l2n55_Matmul_MaxPool_Sum_Scale. Retained for provenance but excluded from the gfx1200 scoring denominator because its 32768x32768 FP32 weight alone exceeds the bounded trusted-reference IPC payload.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l2n98_matmul_avgpool_gelu_scale_max",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max",
+    "op_type": "matmul",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "IN": {
+        "type": "const",
+        "value": 8192,
+        "description": "Input features."
+      },
+      "OUT": {
+        "type": "const",
+        "value": 8192,
+        "description": "Output features."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, IN)."
+      },
+      "weight": {
+        "shape": [
+          "OUT",
+          "IN"
+        ],
+        "dtype": "float32",
+        "description": "Linear weight."
+      },
+      "bias": {
+        "shape": [
+          "OUT"
+        ],
+        "dtype": "float32",
+        "description": "Linear bias."
+      },
+      "pool_kernel_size": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Avg-pool kernel size."
+      },
+      "scale_factor": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Output scale."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B"
+        ],
+        "dtype": "float32",
+        "description": "Reduced output (B,)."
+      }
+    },
+    "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, weight, bias, pool_kernel_size, scale_factor):\n    x = F.linear(x, weight, bias)\n    x = F.avg_pool1d(x.unsqueeze(1), int(pool_kernel_size)).squeeze(1)\n    x = F.gelu(x)\n    x = x * scale_factor\n    return torch.max(x, dim=1).values\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 256
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "pool_kernel_size": {
+            "scalar": 16
+          },
+          "scale_factor": {
+            "scalar": 2.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 1024
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "pool_kernel_size": {
+            "scalar": 16
+          },
+          "scale_factor": {
+            "scalar": 2.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 4096
+        },
+        "inputs": {
+          "x": "random",
+          "weight": "random",
+          "bias": "random",
+          "pool_kernel_size": {
+            "scalar": 16
+          },
+          "scale_factor": {
+            "scalar": 2.0
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Fused linear -> avg_pool1d -> GELU -> scale -> max-reduce to a 1D per-batch output. Derived from AKA torch2hip/kernelbench/level2/l2n98_Matmul_AvgPool_GELU_Scale_Max.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l3n44_mingpt_block",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level3/l3n44_MiniGPTBlock",
+    "op_type": "attention",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch."
+      },
+      "S": {
+        "type": "var",
+        "description": "Sequence length (<= 1024)."
+      },
+      "C": {
+        "type": "const",
+        "value": 768,
+        "description": "Model dimension."
+      },
+      "C3": {
+        "type": "expr",
+        "expression": "3 * C",
+        "description": "QKV projection output (3*C)."
+      },
+      "C4": {
+        "type": "expr",
+        "expression": "4 * C",
+        "description": "MLP hidden (4*C)."
+      },
+      "MT": {
+        "type": "const",
+        "value": 1024,
+        "description": "Max sequence length (causal-mask buffer edge)."
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "S",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Input (B, S, C)."
+      },
+      "ln1_w": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "LayerNorm 1 gain."
+      },
+      "ln1_b": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "LayerNorm 1 bias."
+      },
+      "attn_c_attn_w": {
+        "shape": [
+          "C3",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "QKV projection weight."
+      },
+      "attn_c_attn_b": {
+        "shape": [
+          "C3"
+        ],
+        "dtype": "float32",
+        "description": "QKV projection bias."
+      },
+      "attn_c_proj_w": {
+        "shape": [
+          "C",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Attention output projection weight."
+      },
+      "attn_c_proj_b": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Attention output projection bias."
+      },
+      "attn_bias": {
+        "shape": [
+          "1",
+          "1",
+          "MT",
+          "MT"
+        ],
+        "dtype": "float32",
+        "description": "Causal mask buffer (1, 1, MT, MT)."
+      },
+      "n_head": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Attention head count."
+      },
+      "ln2_w": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "LayerNorm 2 gain."
+      },
+      "ln2_b": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "LayerNorm 2 bias."
+      },
+      "mlp_cfc_w": {
+        "shape": [
+          "C4",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "MLP fc weight."
+      },
+      "mlp_cfc_b": {
+        "shape": [
+          "C4"
+        ],
+        "dtype": "float32",
+        "description": "MLP fc bias."
+      },
+      "mlp_cproj_w": {
+        "shape": [
+          "C",
+          "C4"
+        ],
+        "dtype": "float32",
+        "description": "MLP proj weight."
+      },
+      "mlp_cproj_b": {
+        "shape": [
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "MLP proj bias."
+      },
+      "n_embd": {
+        "shape": null,
+        "dtype": "float32",
+        "description": "Model dimension (== C)."
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "S",
+          "C"
+        ],
+        "dtype": "float32",
+        "description": "Block output (B, S, C)."
+      }
+    },
+    "reference": "import math\n\nimport torch\nimport torch.nn.functional as F\n\ndef _new_gelu(z):\n    return 0.5 * z * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (z + 0.044715 * torch.pow(z, 3.0))))\n\ndef run(x, ln1_w, ln1_b, attn_c_attn_w, attn_c_attn_b, attn_c_proj_w, attn_c_proj_b, attn_bias, n_head, ln2_w, ln2_b, mlp_cfc_w, mlp_cfc_b, mlp_cproj_w, mlp_cproj_b, n_embd):\n    a = F.layer_norm(x, (int(n_embd),), ln1_w, ln1_b)\n    B, T, C = a.size()\n    nh = int(n_head)\n    qkv = F.linear(a, attn_c_attn_w, attn_c_attn_b)\n    q, k, v = qkv.split(C, dim=2)\n    k = k.view(B, T, nh, C // nh).transpose(1, 2)\n    q = q.view(B, T, nh, C // nh).transpose(1, 2)\n    v = v.view(B, T, nh, C // nh).transpose(1, 2)\n    att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))\n    att = att.masked_fill(attn_bias[:, :, :T, :T] == 0, float('-inf'))\n    att = F.softmax(att, dim=-1)\n    y = att @ v\n    y = y.transpose(1, 2).contiguous().view(B, T, C)\n    x = x + F.linear(y, attn_c_proj_w, attn_c_proj_b)\n    m = F.layer_norm(x, (int(n_embd),), ln2_w, ln2_b)\n    h = F.linear(m, mlp_cfc_w, mlp_cfc_b)\n    h = _new_gelu(h)\n    h = F.linear(h, mlp_cproj_w, mlp_cproj_b)\n    return x + h\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 16,
+          "S": 256
+        },
+        "inputs": {
+          "x": "random",
+          "ln1_w": "random",
+          "ln1_b": "random",
+          "attn_c_attn_w": "random",
+          "attn_c_attn_b": "random",
+          "attn_c_proj_w": "random",
+          "attn_c_proj_b": "random",
+          "attn_bias": "random",
+          "n_head": {
+            "scalar": 8
+          },
+          "ln2_w": "random",
+          "ln2_b": "random",
+          "mlp_cfc_w": "random",
+          "mlp_cfc_b": "random",
+          "mlp_cproj_w": "random",
+          "mlp_cproj_b": "random",
+          "n_embd": {
+            "scalar": 768
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 32,
+          "S": 256
+        },
+        "inputs": {
+          "x": "random",
+          "ln1_w": "random",
+          "ln1_b": "random",
+          "attn_c_attn_w": "random",
+          "attn_c_attn_b": "random",
+          "attn_c_proj_w": "random",
+          "attn_c_proj_b": "random",
+          "attn_bias": "random",
+          "n_head": {
+            "scalar": 8
+          },
+          "ln2_w": "random",
+          "ln2_b": "random",
+          "mlp_cfc_w": "random",
+          "mlp_cfc_b": "random",
+          "mlp_cproj_w": "random",
+          "mlp_cproj_b": "random",
+          "n_embd": {
+            "scalar": 768
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 16,
+          "S": 512
+        },
+        "inputs": {
+          "x": "random",
+          "ln1_w": "random",
+          "ln1_b": "random",
+          "attn_c_attn_w": "random",
+          "attn_c_attn_b": "random",
+          "attn_c_proj_w": "random",
+          "attn_c_proj_b": "random",
+          "attn_bias": "random",
+          "n_head": {
+            "scalar": 8
+          },
+          "ln2_w": "random",
+          "ln2_b": "random",
+          "mlp_cfc_w": "random",
+          "mlp_cfc_b": "random",
+          "mlp_cproj_w": "random",
+          "mlp_cproj_b": "random",
+          "n_embd": {
+            "scalar": 768
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 8,
+          "S": 512
+        },
+        "inputs": {
+          "x": "random",
+          "ln1_w": "random",
+          "ln1_b": "random",
+          "attn_c_attn_w": "random",
+          "attn_c_attn_b": "random",
+          "attn_c_proj_w": "random",
+          "attn_c_proj_b": "random",
+          "attn_bias": "random",
+          "n_head": {
+            "scalar": 8
+          },
+          "ln2_w": "random",
+          "ln2_b": "random",
+          "mlp_cfc_w": "random",
+          "mlp_cfc_b": "random",
+          "mlp_cproj_w": "random",
+          "mlp_cproj_b": "random",
+          "n_embd": {
+            "scalar": 768
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Full MiniGPT transformer block: layernorm -> causal self-attention -> residual -> layernorm -> MLP(new-GELU) -> residual. Derived from AKA torch2hip/kernelbench/level3/l3n44_MiniGPTBlock module_fn.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": []
+  },
+  {
+    "name": "l1n95_cross_entropy",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level1/l1n95_CrossEntropyLoss",
+    "op_type": "loss",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch size."
+      },
+      "C": {
+        "type": "var",
+        "description": "Class count."
+      }
+    },
+    "inputs": {
+      "predictions": {
+        "shape": [
+          "B",
+          "C"
+        ],
+        "dtype": "float32"
+      },
+      "targets": {
+        "shape": [
+          "B"
+        ],
+        "dtype": "int64"
+      }
+    },
+    "outputs": {
+      "loss": {
+        "shape": [],
+        "dtype": "float32"
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(predictions, targets):\n    return F.cross_entropy(predictions, targets)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 8192,
+          "C": 1024
+        },
+        "inputs": {
+          "predictions": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "targets": {
+            "type": "generated",
+            "generator": {
+              "type": "integer",
+              "low": 0,
+              "high": "C"
+            }
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 16384,
+          "C": 2048
+        },
+        "inputs": {
+          "predictions": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "targets": {
+            "type": "generated",
+            "generator": {
+              "type": "integer",
+              "low": 0,
+              "high": "C"
+            }
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 32768,
+          "C": 4096
+        },
+        "inputs": {
+          "predictions": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "targets": {
+            "type": "generated",
+            "generator": {
+              "type": "integer",
+              "low": 0,
+              "high": "C"
+            }
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 16384,
+          "C": 8192
+        },
+        "inputs": {
+          "predictions": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "targets": {
+            "type": "generated",
+            "generator": {
+              "type": "integer",
+              "low": 0,
+              "high": "C"
+            }
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 8192,
+          "C": 16384
+        },
+        "inputs": {
+          "predictions": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "targets": {
+            "type": "generated",
+            "generator": {
+              "type": "integer",
+              "low": 0,
+              "high": "C"
+            }
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Cross entropy with class-bounded integer labels.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": [
+      "bounded_integer_input",
+      "scalar_tensor_output"
+    ]
+  },
+  {
+    "name": "l2n52_conv_activation_batchnorm",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/kernelbench/level2/l2n52_Conv2d_Activation_BatchNorm",
+    "op_type": "conv",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "kernelbench",
+    "axes": {
+      "B": {
+        "type": "var",
+        "description": "Batch size."
+      },
+      "H": {
+        "type": "var",
+        "description": "Input height."
+      },
+      "W": {
+        "type": "var",
+        "description": "Input width."
+      },
+      "IC": {
+        "type": "const",
+        "value": 64,
+        "description": ""
+      },
+      "OC": {
+        "type": "const",
+        "value": 128,
+        "description": ""
+      },
+      "K": {
+        "type": "const",
+        "value": 3,
+        "description": ""
+      },
+      "OH": {
+        "type": "expr",
+        "expression": "H - K + 1",
+        "description": ""
+      },
+      "OW": {
+        "type": "expr",
+        "expression": "W - K + 1",
+        "description": ""
+      }
+    },
+    "inputs": {
+      "x": {
+        "shape": [
+          "B",
+          "IC",
+          "H",
+          "W"
+        ],
+        "dtype": "float32"
+      },
+      "conv_weight": {
+        "shape": [
+          "OC",
+          "IC",
+          "K",
+          "K"
+        ],
+        "dtype": "float32"
+      },
+      "conv_bias": {
+        "shape": [
+          "OC"
+        ],
+        "dtype": "float32"
+      },
+      "bn_weight": {
+        "shape": [
+          "OC"
+        ],
+        "dtype": "float32"
+      },
+      "bn_bias": {
+        "shape": [
+          "OC"
+        ],
+        "dtype": "float32"
+      },
+      "bn_mean": {
+        "shape": [
+          "OC"
+        ],
+        "dtype": "float32"
+      },
+      "bn_var": {
+        "shape": [
+          "OC"
+        ],
+        "dtype": "float32"
+      },
+      "bn_eps": {
+        "shape": null,
+        "dtype": "float32"
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "B",
+          "OC",
+          "OH",
+          "OW"
+        ],
+        "dtype": "float32"
+      }
+    },
+    "reference": "import torch\nimport torch.nn.functional as F\n\ndef run(x, conv_weight, conv_bias, bn_weight, bn_bias, bn_mean, bn_var, bn_eps):\n    value = F.conv2d(x, conv_weight, conv_bias)\n    value = torch.multiply(torch.tanh(F.softplus(value)), value)\n    return F.batch_norm(value, bn_mean, bn_var, bn_weight, bn_bias, training=False, eps=bn_eps)\n",
+    "workloads": [
+      {
+        "axes": {
+          "B": 16,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "x": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "conv_weight": "random",
+          "conv_bias": "random",
+          "bn_weight": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_bias": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_mean": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_var": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_eps": {
+            "scalar": 1e-05
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 32,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "x": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "conv_weight": "random",
+          "conv_bias": "random",
+          "bn_weight": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_bias": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_mean": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_var": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_eps": {
+            "scalar": 1e-05
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 64,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "x": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "conv_weight": "random",
+          "conv_bias": "random",
+          "bn_weight": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_bias": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_mean": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_var": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_eps": {
+            "scalar": 1e-05
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 32,
+          "H": 128,
+          "W": 128
+        },
+        "inputs": {
+          "x": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "conv_weight": "random",
+          "conv_bias": "random",
+          "bn_weight": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_bias": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_mean": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_var": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_eps": {
+            "scalar": 1e-05
+          }
+        }
+      },
+      {
+        "axes": {
+          "B": 64,
+          "H": 128,
+          "W": 128
+        },
+        "inputs": {
+          "x": {
+            "type": "generated",
+            "generator": {
+              "type": "uniform",
+              "low": 0.0,
+              "high": 1.0
+            }
+          },
+          "conv_weight": "random",
+          "conv_bias": "random",
+          "bn_weight": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_bias": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_mean": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "bn_var": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 1.0
+            }
+          },
+          "bn_eps": {
+            "scalar": 1e-05
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Conv2d, Mish activation, and eval-mode BatchNorm.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": [
+      "positive_input"
+    ]
+  },
+  {
+    "name": "14007_kd_loss",
+    "suite": "torch2hip",
+    "task_path": "tasks/torch2hip/gpumode/14007_KDLoss",
+    "op_type": "loss",
+    "dtype": "float32",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "gpumode",
+    "axes": {
+      "N": {
+        "type": "var",
+        "description": "Batch size."
+      },
+      "C": {
+        "type": "var",
+        "description": "Channel count."
+      },
+      "H": {
+        "type": "var",
+        "description": "Height."
+      },
+      "W": {
+        "type": "var",
+        "description": "Width."
+      }
+    },
+    "inputs": {
+      "input": {
+        "shape": [
+          "N",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32"
+      },
+      "target": {
+        "shape": [
+          "N",
+          "C",
+          "H",
+          "W"
+        ],
+        "dtype": "float32"
+      },
+      "temperature": {
+        "shape": null,
+        "dtype": "float32"
+      }
+    },
+    "outputs": {
+      "loss": {
+        "shape": [],
+        "dtype": "float32"
+      }
+    },
+    "reference": "import torch.nn.functional as F\n\ndef run(input, target, temperature):  # noqa: A002 - benchmark ABI\n    log_p = F.log_softmax(input / temperature, dim=1)\n    return F.kl_div(log_p, target, reduction='sum') * (temperature * temperature) / input.size(0)\n",
+    "workloads": [
+      {
+        "axes": {
+          "N": 8,
+          "C": 10,
+          "H": 32,
+          "W": 32
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "target": {
+            "type": "generated",
+            "generator": {
+              "type": "simplex",
+              "axis": 1,
+              "temperature": 1.0
+            }
+          },
+          "temperature": {
+            "scalar": 4.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "N": 16,
+          "C": 10,
+          "H": 32,
+          "W": 32
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "target": {
+            "type": "generated",
+            "generator": {
+              "type": "simplex",
+              "axis": 1,
+              "temperature": 1.0
+            }
+          },
+          "temperature": {
+            "scalar": 4.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "N": 8,
+          "C": 10,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "target": {
+            "type": "generated",
+            "generator": {
+              "type": "simplex",
+              "axis": 1,
+              "temperature": 1.0
+            }
+          },
+          "temperature": {
+            "scalar": 4.0
+          }
+        }
+      },
+      {
+        "axes": {
+          "N": 16,
+          "C": 10,
+          "H": 64,
+          "W": 64
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "target": {
+            "type": "generated",
+            "generator": {
+              "type": "simplex",
+              "axis": 1,
+              "temperature": 1.0
+            }
+          },
+          "temperature": {
+            "scalar": 4.0
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Knowledge-distillation KL loss with probability targets.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": [
+      "simplex_input",
+      "scalar_tensor_output"
+    ]
+  },
+  {
+    "name": "fused_add_rmsnorm_bf16",
+    "suite": "torch2flydsl",
+    "task_path": "tasks/torch2flydsl/fused_add_rmsnorm_kernel",
+    "op_type": "norm",
+    "dtype": "bfloat16",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "flydsl",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Hidden size."
+      }
+    },
+    "inputs": {
+      "input": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "bfloat16"
+      },
+      "weight": {
+        "shape": [
+          "N"
+        ],
+        "dtype": "bfloat16"
+      },
+      "residual": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "bfloat16"
+      },
+      "eps": {
+        "shape": null,
+        "dtype": "float32"
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "bfloat16"
+      },
+      "residual_out": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "bfloat16"
+      }
+    },
+    "reference": "import torch\n\ndef run(input, weight, residual, eps):  # noqa: A002 - benchmark ABI\n    residual_out = input + residual\n    value = residual_out.float()\n    rstd = torch.rsqrt(value.pow(2).mean(-1, keepdim=True) + eps)\n    output = value * rstd * weight.float()\n    return output.to(input.dtype), residual_out.to(input.dtype)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 1,
+          "N": 4096
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "weight": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "residual": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "eps": {
+            "scalar": 1e-05
+          }
+        },
+        "checks": [
+          {
+            "type": "numeric",
+            "output": "output",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          },
+          {
+            "type": "numeric",
+            "output": "residual_out",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 8,
+          "N": 4096
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "weight": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "residual": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "eps": {
+            "scalar": 1e-05
+          }
+        },
+        "checks": [
+          {
+            "type": "numeric",
+            "output": "output",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          },
+          {
+            "type": "numeric",
+            "output": "residual_out",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 32,
+          "N": 8192
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "weight": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "residual": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "eps": {
+            "scalar": 1e-05
+          }
+        },
+        "checks": [
+          {
+            "type": "numeric",
+            "output": "output",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          },
+          {
+            "type": "numeric",
+            "output": "residual_out",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 128,
+          "N": 4096
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "weight": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "residual": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "eps": {
+            "scalar": 1e-05
+          }
+        },
+        "checks": [
+          {
+            "type": "numeric",
+            "output": "output",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          },
+          {
+            "type": "numeric",
+            "output": "residual_out",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 256,
+          "N": 8192
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "weight": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "residual": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "eps": {
+            "scalar": 1e-05
+          }
+        },
+        "checks": [
+          {
+            "type": "numeric",
+            "output": "output",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          },
+          {
+            "type": "numeric",
+            "output": "residual_out",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 64,
+          "N": 16384
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "weight": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "residual": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "eps": {
+            "scalar": 1e-05
+          }
+        },
+        "checks": [
+          {
+            "type": "numeric",
+            "output": "output",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          },
+          {
+            "type": "numeric",
+            "output": "residual_out",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.01,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "BF16 fused residual add and RMSNorm with two outputs.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": [
+      "multi_output"
+    ]
+  },
+  {
+    "name": "per_token_i8_quant",
+    "suite": "torch2flydsl",
+    "task_path": "tasks/torch2flydsl/per_token_i8_quant_kernel",
+    "op_type": "quantization",
+    "dtype": "bfloat16",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "flydsl",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "N": {
+        "type": "var",
+        "description": "Hidden size."
+      }
+    },
+    "inputs": {
+      "input": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "bfloat16"
+      }
+    },
+    "outputs": {
+      "codes": {
+        "shape": [
+          "M",
+          "N"
+        ],
+        "dtype": "int8"
+      },
+      "scale": {
+        "shape": [
+          "M",
+          "1"
+        ],
+        "dtype": "float32"
+      }
+    },
+    "reference": "import torch\n\ndef run(input):  # noqa: A002 - benchmark ABI\n    value = input.float()\n    scale = value.abs().amax(dim=-1, keepdim=True) / 127.0\n    scale = torch.where(scale == 0, torch.ones_like(scale), scale)\n    codes = torch.clamp(value / scale, -128.0, 127.0).to(torch.int8)\n    return codes, scale.float()\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 1,
+          "N": 4096
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "value",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "numeric",
+            "output": "scale",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.001,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 16,
+          "N": 8192
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "value",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "numeric",
+            "output": "scale",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.001,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 128,
+          "N": 4096
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "value",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "numeric",
+            "output": "scale",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.001,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 256,
+          "N": 8192
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "value",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "numeric",
+            "output": "scale",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.001,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 1024,
+          "N": 8192
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "value",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "numeric",
+            "output": "scale",
+            "mode": "normalized_max",
+            "max_atol": 0.0,
+            "max_rtol": 0.001,
+            "required_matched_ratio": 1.0,
+            "max_error_cap": null,
+            "allow_negative_inf": false
+          }
+        ]
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Dynamic per-token INT8 quantization with FP32 scale.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": [
+      "code_distance",
+      "mixed_output_dtype",
+      "multi_output"
+    ]
+  },
+  {
+    "name": "rope_thd_fwd_bf16",
+    "suite": "torch2flydsl",
+    "task_path": "tasks/torch2flydsl/rope_thd_fwd_kernel",
+    "op_type": "position_encoding",
+    "dtype": "bfloat16",
+    "pass_kind": "forward",
+    "fusion_depth": "single",
+    "source_family": "flydsl",
+    "axes": {
+      "T": {
+        "type": "var",
+        "description": "Packed token count."
+      },
+      "H": {
+        "type": "var",
+        "description": "Head count."
+      },
+      "D": {
+        "type": "var",
+        "description": "Head dimension."
+      },
+      "S1": {
+        "type": "var",
+        "description": "Number of sequence offsets."
+      },
+      "HALF": {
+        "type": "expr",
+        "expression": "D // 2",
+        "description": ""
+      },
+      "ONE": {
+        "type": "const",
+        "value": 1,
+        "description": ""
+      }
+    },
+    "inputs": {
+      "input": {
+        "shape": [
+          "T",
+          "H",
+          "D"
+        ],
+        "dtype": "bfloat16"
+      },
+      "cu_seqlens": {
+        "shape": [
+          "S1"
+        ],
+        "dtype": "int32"
+      },
+      "freqs": {
+        "shape": [
+          "T",
+          "ONE",
+          "ONE",
+          "HALF"
+        ],
+        "dtype": "bfloat16"
+      }
+    },
+    "outputs": {
+      "output": {
+        "shape": [
+          "T",
+          "H",
+          "D"
+        ],
+        "dtype": "bfloat16"
+      }
+    },
+    "reference": "import torch\n\ndef gen_structured_inputs(values, device):\n    cases = {(1024, 6): [0, 100, 228, 484, 712, 1024], (1024, 5): [0, 233, 456, 711, 1024], (1024, 9): [0, 100, 102, 128, 233, 456, 460, 711, 1024], (2048, 4): [0, 512, 1024, 2048]}\n    cu = torch.tensor(cases[(values['T'], values['S1'])], dtype=torch.int32, device=device)\n    half = values['D'] // 2\n    inv = 1.0 / (10000 ** (torch.arange(half, device=device).float() / half))\n    pos = torch.arange(values['T'], device=device).float()\n    freqs = torch.einsum('i,j->ij', pos, inv).view(values['T'], 1, 1, half).to(torch.bfloat16)\n    return {'cu_seqlens': cu, 'freqs': freqs}\n\ndef run(input, cu_seqlens, freqs):  # noqa: A002 - benchmark ABI\n    lengths = (cu_seqlens[1:] - cu_seqlens[:-1]).tolist()\n    outputs = []\n    for value in torch.split(input, lengths):\n        x = value.float().unsqueeze(1)\n        angles = freqs[:value.shape[0]].float().repeat(1, 1, 1, 2)\n        first, second = x.chunk(2, dim=-1)\n        rotated = torch.cat((-second, first), dim=-1)\n        outputs.append((x * angles.cos() + rotated * angles.sin()).squeeze(1))\n    return torch.cat(outputs).to(input.dtype)\n",
+    "workloads": [
+      {
+        "axes": {
+          "T": 1024,
+          "H": 8,
+          "D": 128,
+          "S1": 6
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "cu_seqlens": {
+            "type": "custom"
+          },
+          "freqs": {
+            "type": "custom"
+          }
+        }
+      },
+      {
+        "axes": {
+          "T": 1024,
+          "H": 16,
+          "D": 128,
+          "S1": 5
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "cu_seqlens": {
+            "type": "custom"
+          },
+          "freqs": {
+            "type": "custom"
+          }
+        }
+      },
+      {
+        "axes": {
+          "T": 1024,
+          "H": 8,
+          "D": 64,
+          "S1": 9
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "cu_seqlens": {
+            "type": "custom"
+          },
+          "freqs": {
+            "type": "custom"
+          }
+        }
+      },
+      {
+        "axes": {
+          "T": 2048,
+          "H": 32,
+          "D": 128,
+          "S1": 4
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 1.0
+            }
+          },
+          "cu_seqlens": {
+            "type": "custom"
+          },
+          "freqs": {
+            "type": "custom"
+          }
+        }
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Variable-length packed BF16 RoPE with int32 prefix offsets.",
+    "custom_inputs_entrypoint": "gen_structured_inputs",
+    "capabilities": [
+      "partial_custom_input",
+      "structured_offsets"
+    ]
+  },
+  {
+    "name": "dynamic_mxfp8_quant",
+    "suite": "torch2flydsl",
+    "task_path": "tasks/torch2flydsl/dynamic_mxfp8_quant_kernel",
+    "op_type": "quantization",
+    "dtype": "bfloat16",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "flydsl",
+    "axes": {
+      "M": {
+        "type": "var",
+        "description": "Rows."
+      },
+      "K": {
+        "type": "var",
+        "description": "Columns."
+      },
+      "G": {
+        "type": "expr",
+        "expression": "K // 32",
+        "description": ""
+      }
+    },
+    "inputs": {
+      "input": {
+        "shape": [
+          "M",
+          "K"
+        ],
+        "dtype": "bfloat16"
+      }
+    },
+    "outputs": {
+      "codes": {
+        "shape": [
+          "M",
+          "K"
+        ],
+        "dtype": "float8_e4m3fn"
+      },
+      "scale": {
+        "shape": [
+          "M",
+          "G"
+        ],
+        "dtype": "uint8"
+      }
+    },
+    "reference": "import torch\n\ndef run(input):  # noqa: A002 - benchmark ABI\n    value = input.float()\n    m, k = value.shape\n    blocks = value.reshape(m, k // 32, 32)\n    amax = blocks.abs().amax(dim=-1, keepdim=True)\n    bits = (amax.contiguous().view(torch.int32) + 0x200000) & -8388608\n    power = bits.view(torch.float32)\n    exponent = torch.clamp(power.log2().floor() - 8, -127, 127)\n    scale = (exponent.to(torch.int32) + 127).to(torch.uint8)\n    codes = (blocks * torch.exp2(-exponent)).reshape(m, k)\n    return codes.to(torch.float8_e4m3fn), scale.reshape(m, k // 32)\n",
+    "workloads": [
+      {
+        "axes": {
+          "M": 1,
+          "K": 32
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 4.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "raw_bits",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "exact",
+            "output": "scale"
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 8,
+          "K": 64
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 4.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "raw_bits",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "exact",
+            "output": "scale"
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 16,
+          "K": 128
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 4.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "raw_bits",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "exact",
+            "output": "scale"
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 32,
+          "K": 256
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 4.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "raw_bits",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "exact",
+            "output": "scale"
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 64,
+          "K": 512
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 4.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "raw_bits",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "exact",
+            "output": "scale"
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 128,
+          "K": 1024
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 4.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "raw_bits",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "exact",
+            "output": "scale"
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 137,
+          "K": 64
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 4.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "raw_bits",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "exact",
+            "output": "scale"
+          }
+        ]
+      },
+      {
+        "axes": {
+          "M": 256,
+          "K": 32
+        },
+        "inputs": {
+          "input": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 4.0
+            }
+          }
+        },
+        "checks": [
+          {
+            "type": "code_distance",
+            "output": "codes",
+            "mode": "raw_bits",
+            "max_distance": 1,
+            "required_matched_ratio": 1.0
+          },
+          {
+            "type": "exact",
+            "output": "scale"
+          }
+        ]
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Per-1x32 MXFP8 quantization with E8M0 byte scales.",
+    "custom_inputs_entrypoint": null,
+    "capabilities": [
+      "code_distance",
+      "fp8_output",
+      "mixed_output_dtype",
+      "multi_output",
+      "raw_code_distance",
+      "uint8_output"
+    ]
+  },
+  {
+    "name": "moe_topk_softmax",
+    "suite": "torch2flydsl",
+    "task_path": "tasks/torch2flydsl/moe_topk_softmax_kernel",
+    "op_type": "routing",
+    "dtype": "bfloat16",
+    "pass_kind": "forward",
+    "fusion_depth": "fused",
+    "source_family": "flydsl",
+    "axes": {
+      "T": {
+        "type": "var",
+        "description": "Token count."
+      },
+      "E": {
+        "type": "var",
+        "description": "Expert count."
+      },
+      "K": {
+        "type": "var",
+        "description": "Selected experts."
+      }
+    },
+    "inputs": {
+      "gating": {
+        "shape": [
+          "T",
+          "E"
+        ],
+        "dtype": "bfloat16"
+      },
+      "bias": {
+        "shape": [
+          "E"
+        ],
+        "dtype": "float32"
+      },
+      "topk": {
+        "shape": null,
+        "dtype": "int32"
+      },
+      "route_scale": {
+        "shape": null,
+        "dtype": "float32"
+      }
+    },
+    "outputs": {
+      "weights": {
+        "shape": [
+          "T",
+          "K"
+        ],
+        "dtype": "float32"
+      },
+      "ids": {
+        "shape": [
+          "T",
+          "K"
+        ],
+        "dtype": "int32"
+      }
+    },
+    "reference": "import torch\n\ndef gen_gating(values, device):\n    experts, tokens = values['E'], values['T']\n    base = torch.arange(-1, 1, 2.0 / experts, device=device)[:experts]\n    gating = base.repeat(tokens, 1).to(torch.bfloat16)\n    perm = torch.argsort(torch.rand(gating.shape, device=device), dim=-1)\n    return {'gating': torch.gather(gating, -1, perm).contiguous()}\n\ndef run(gating, bias, topk, route_scale):\n    scores = torch.softmax(gating.float(), dim=-1)\n    ids = (scores + bias.float()).topk(topk, dim=-1, sorted=False).indices\n    weights = scores.gather(1, ids) * route_scale\n    return weights.float(), ids.to(torch.int32)\n",
+    "workloads": [
+      {
+        "axes": {
+          "T": 64,
+          "E": 256,
+          "K": 8
+        },
+        "inputs": {
+          "gating": {
+            "type": "custom"
+          },
+          "bias": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 0.1
+            }
+          },
+          "topk": {
+            "scalar": 8
+          },
+          "route_scale": {
+            "scalar": 1.0
+          }
+        },
+        "checks": [
+          {
+            "type": "topk_routing",
+            "ids_output": "ids",
+            "weights_output": "weights",
+            "gating_input": "gating",
+            "bias_input": "bias",
+            "topk": 8,
+            "tie_atol": 0.0001,
+            "weight_atol": 0.01,
+            "max_mismatch_ratio": 0.0
+          }
+        ]
+      },
+      {
+        "axes": {
+          "T": 1024,
+          "E": 256,
+          "K": 8
+        },
+        "inputs": {
+          "gating": {
+            "type": "custom"
+          },
+          "bias": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 0.1
+            }
+          },
+          "topk": {
+            "scalar": 8
+          },
+          "route_scale": {
+            "scalar": 1.0
+          }
+        },
+        "checks": [
+          {
+            "type": "topk_routing",
+            "ids_output": "ids",
+            "weights_output": "weights",
+            "gating_input": "gating",
+            "bias_input": "bias",
+            "topk": 8,
+            "tie_atol": 0.0001,
+            "weight_atol": 0.01,
+            "max_mismatch_ratio": 0.0
+          }
+        ]
+      },
+      {
+        "axes": {
+          "T": 256,
+          "E": 128,
+          "K": 4
+        },
+        "inputs": {
+          "gating": {
+            "type": "custom"
+          },
+          "bias": {
+            "type": "generated",
+            "generator": {
+              "type": "normal",
+              "mean": 0.0,
+              "std": 0.1
+            }
+          },
+          "topk": {
+            "scalar": 4
+          },
+          "route_scale": {
+            "scalar": 1.0
+          }
+        },
+        "checks": [
+          {
+            "type": "topk_routing",
+            "ids_output": "ids",
+            "weights_output": "weights",
+            "gating_input": "gating",
+            "bias_input": "bias",
+            "topk": 4,
+            "tie_atol": 0.0001,
+            "weight_atol": 0.01,
+            "max_mismatch_ratio": 0.0
+          }
+        ]
+      },
+      {
+        "axes": {
+          "T": 64,
+          "E": 64,
+          "K": 2
+        },
+        "inputs": {
+          "gating": {
+            "type": "custom"
+          },
+          "bias": {
+            "type": "generated",
+            "generator": {
+              "type": "constant",
+              "value": 0.0
+            }
+          },
+          "topk": {
+            "scalar": 2
+          },
+          "route_scale": {
+            "scalar": 1.0
+          }
+        },
+        "checks": [
+          {
+            "type": "topk_routing",
+            "ids_output": "ids",
+            "weights_output": "weights",
+            "gating_input": "gating",
+            "bias_input": "bias",
+            "topk": 2,
+            "tie_atol": 0.0001,
+            "weight_atol": 0.01,
+            "max_mismatch_ratio": 0.0
+          }
+        ]
+      }
+    ],
+    "role": "scored",
+    "exclusion_reason_code": "",
+    "description": "Tie-aware softmax MoE top-k routing with IDs and weights.",
+    "custom_inputs_entrypoint": "gen_gating",
+    "capabilities": [
+      "coupled_topk",
+      "mixed_output_dtype",
+      "multi_output",
+      "partial_custom_input"
+    ]
+  }
+]

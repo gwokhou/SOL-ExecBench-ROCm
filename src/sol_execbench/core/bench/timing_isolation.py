@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-from typing import Any
+from typing import TypedDict
 
 from pydantic import Field, ValidationError
 
@@ -35,6 +35,16 @@ class GPUDeviceIsolation(FrozenArtifactModel):
 
     isolated: bool
     gpu_count: int = Field(ge=0)
+    rocr_visible_devices: str | None
+    gpu_device_set: bool
+    warnings: list[str]
+
+
+class GPUDeviceIsolationSnapshot(TypedDict):
+    """JSON-compatible public view of one isolation observation."""
+
+    isolated: bool
+    gpu_count: int
     rocr_visible_devices: str | None
     gpu_device_set: bool
     warnings: list[str]
@@ -58,7 +68,7 @@ def _run_amd_smi_json(*arguments: str) -> str:
     return result.stdout
 
 
-def detect_concurrent_gpu_processes() -> list[dict[str, Any]]:
+def detect_concurrent_gpu_processes() -> list[dict[str, int | str]]:
     """Detect concurrent GPU processes via ``amd-smi process --json``.
 
     Returns a list of process dicts with keys: ``pid``, ``device``, ``name``.
@@ -141,7 +151,7 @@ def _detect_gpu_count() -> int:
 def validate_gpu_device_isolation(
     *,
     gpu_device: int | None = None,
-) -> dict[str, Any]:
+) -> GPUDeviceIsolationSnapshot:
     """Validate GPU device isolation for timing-sensitive workloads.
 
     Checks whether the process has adequate GPU device isolation by examining
@@ -188,11 +198,17 @@ def validate_gpu_device_isolation(
 
     isolated = gpu_count <= 1 or rocr_visible is not None
 
-    result = {
-        "isolated": isolated,
-        "gpu_count": gpu_count,
-        "rocr_visible_devices": rocr_visible,
-        "gpu_device_set": gpu_device is not None,
-        "warnings": warnings,
-    }
-    return GPUDeviceIsolation.model_validate(result).model_dump(mode="json")
+    observation = GPUDeviceIsolation(
+        isolated=isolated,
+        gpu_count=gpu_count,
+        rocr_visible_devices=rocr_visible,
+        gpu_device_set=gpu_device is not None,
+        warnings=warnings,
+    )
+    return GPUDeviceIsolationSnapshot(
+        isolated=observation.isolated,
+        gpu_count=observation.gpu_count,
+        rocr_visible_devices=observation.rocr_visible_devices,
+        gpu_device_set=observation.gpu_device_set,
+        warnings=observation.warnings,
+    )

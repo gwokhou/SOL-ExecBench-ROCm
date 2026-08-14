@@ -9,13 +9,13 @@ import argparse
 from pathlib import Path
 
 from sol_execbench.core.data.json_utils import load_json_value
-from sol_execbench.core.solar_bridge.analyzer import audit_workload_stages
 from sol_execbench.core.solar_bridge.models import (
     SolarReadinessStatus,
     SolarStage,
     SolarStageAuditOutcome,
     SolarStageAuditRequest,
 )
+from sol_execbench.core.solar_bridge.stage_audit import audit_workload_stages
 from sol_execbench.core.solar_bridge.worker_io import write_worker_response
 
 

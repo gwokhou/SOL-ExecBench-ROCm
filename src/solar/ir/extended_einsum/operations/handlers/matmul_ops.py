@@ -22,14 +22,12 @@ This module provides einsum handlers for:
 - mm (2D matrix multiplication)
 """
 
-from typing import Any
-
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class MatmulHandler(EinsumOpHandler):
@@ -41,7 +39,7 @@ class MatmulHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for matrix multiplication."""
         input_shape = tensor_shapes.inputs[0]
@@ -108,7 +106,7 @@ class LinearHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for linear layer."""
         input_shape = tensor_shapes.inputs[0]
@@ -176,7 +174,7 @@ class BmmHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for batch matrix multiplication."""
         input_shape = tensor_shapes.inputs[0]

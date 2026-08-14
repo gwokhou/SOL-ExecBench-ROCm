@@ -14,12 +14,12 @@ from sol_execbench.core.solar_bridge.formal_device import (
     FORMAL_ARCHITECTURE,
     release_formal_device_memory,
     require_formal_device,
+    solar_architecture_for_gfx_target,
 )
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
     SolarStage,
-    SolarStageAuditOutcome,
     formal_precision_for_definition,
 )
 from sol_execbench.core.solar_bridge.semantic_metadata import (
@@ -31,37 +31,6 @@ from sol_execbench.core.solar_bridge.workload_context import (
     solar_conversion_request,
 )
 from solar.ir.contracts import DEFAULT_IR_PATH, IRPath, normalize_ir_path
-
-
-def formal_producer_readiness() -> tuple[bool, str]:
-    """Report whether this release can produce publication-grade SOLAR bounds."""
-    from solar.api import formal_producer_readiness as solar_readiness
-
-    readiness = solar_readiness()
-    return readiness.ready, readiness.reason_code
-
-
-def formal_architecture_profile_hash(
-    architecture: str = FORMAL_ARCHITECTURE,
-) -> str:
-    """Return the canonical hash of a packaged SOLAR architecture profile."""
-    from solar.api import architecture_profile_sha256
-
-    return architecture_profile_sha256(architecture)
-
-
-_ARCHITECTURE_BY_GFX_TARGET = {
-    "gfx1200": FORMAL_ARCHITECTURE,
-    "gfx942": "MI300X",
-}
-
-
-def _architecture_for_gfx_target(gfx_target: str) -> str:
-    """Return the packaged SOLAR profile name for one gfx target."""
-    architecture = _ARCHITECTURE_BY_GFX_TARGET.get(gfx_target)
-    if architecture is None:
-        raise ValueError(f"unsupported_solar_architecture:{gfx_target}")
-    return architecture
 
 
 def analyze_workload(
@@ -116,39 +85,11 @@ def analyze_workload_diagnostic(
         device=device,
         orojenesis_home=orojenesis_home,
         ir_path=normalize_ir_path(ir_path),
-        architecture=_architecture_for_gfx_target(gfx_target),
+        architecture=solar_architecture_for_gfx_target(gfx_target),
         formal=False,
         device_stage_lock_path=device_stage_lock_path,
         device_stage_lock_timeout_seconds=device_stage_lock_timeout_seconds,
     )
-
-
-def audit_workload_stages(
-    *,
-    problem_dir: str | Path,
-    workload_uuid: str,
-    output_dir: str | Path,
-    device: str,
-    ir_path: IRPath | str = DEFAULT_IR_PATH,
-) -> SolarStageAuditOutcome:
-    """Run the exact extraction/conversion/replay gate for one corpus workload."""
-    from solar.api import ConversionReadinessRequest, audit_conversion
-
-    require_formal_device(device)
-    selected_path = normalize_ir_path(ir_path)
-    context = load_solar_workload_context(problem_dir, workload_uuid, device)
-    result = audit_conversion(
-        ConversionReadinessRequest(
-            conversion=solar_conversion_request(
-                context,
-                device,
-                selected_path,
-            ),
-            architecture=FORMAL_ARCHITECTURE,
-            output_dir=Path(output_dir),
-        ),
-    )
-    return SolarStageAuditOutcome.from_dict(result.to_dict())
 
 
 def _invoke_solar(

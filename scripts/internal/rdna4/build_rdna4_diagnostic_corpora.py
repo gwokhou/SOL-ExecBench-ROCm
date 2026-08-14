@@ -30,6 +30,7 @@ from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.sidecars.static_evidence import _static_evidence_payload
 from sol_execbench.core.bench.batch_gpu_qualification import (
     BatchGPUQualificationStage,
+    qualification_parent_stage,
 )
 from sol_execbench.core.bench.config import BenchmarkConfig
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
@@ -1782,16 +1783,6 @@ def _cases_by_family(cases: Sequence[CaseSpec]) -> list[list[CaseSpec]]:
     ]
 
 
-def _expected_parent_stage(
-    stage: BatchGPUQualificationStage,
-) -> BatchGPUQualificationStage | None:
-    if stage is BatchGPUQualificationStage.STATIC:
-        return None
-    if stage is BatchGPUQualificationStage.CANARY:
-        return BatchGPUQualificationStage.STATIC
-    return BatchGPUQualificationStage.CANARY
-
-
 def _verify_gate_receipts(
     root: Path,
     qualification_root: Path,
@@ -1825,7 +1816,7 @@ def _verify_qualification_gate(
     stage: BatchGPUQualificationStage,
     role: Role | None = None,
 ) -> DiagnosticCorpusQualification:
-    parent_stage = _expected_parent_stage(stage)
+    parent_stage = qualification_parent_stage(stage)
     parent: DiagnosticCorpusQualification | None = None
     if parent_stage is not None:
         parent_role = (
@@ -1899,7 +1890,7 @@ def _run_qualification_stage(
     if stage is BatchGPUQualificationStage.STATIC:
         _ensure_qualification_config(qualification_root)
         _qualification_preflight(root, qualification_root)
-    parent_stage = _expected_parent_stage(stage)
+    parent_stage = qualification_parent_stage(stage)
     parent_hash: str | None = None
     if parent_stage is not None:
         parent_role = (

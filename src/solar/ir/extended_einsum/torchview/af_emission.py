@@ -71,6 +71,7 @@ From an einsum_graph.yaml on disk::
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any
 
 # Op-type classification
@@ -95,239 +96,272 @@ from solar.ir.extended_einsum.torchview.af_model import (
 )
 
 
-def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict[str, Any]:
-    einsums: list[dict[str, Any]] = []
-    weight_counter = [0]
+@dataclass
+class _EmissionCursor:
+    """Mutable positional cursor for one layer's input tensor accesses."""
 
-    def next_weight_name() -> str:
-        weight_counter[0] += 1
-        return f"W{weight_counter[0]}"
+    predecessors: list[str]
+    tensor_types: list[str]
+    input_index: int = 0
+    predecessor_index: int = 0
+    weight_index: int = 0
 
-    for layer_name, layer in ctx.layers.items():
-        operands = layer.get("operands") or {}
-        if not operands:
+    def _next_weight(self) -> str:
+        self.weight_index += 1
+        return f"W{self.weight_index}"
+
+    def _input_tensor(
+        self,
+        rename_target: dict[str, str],
+    ) -> tuple[str, str]:
+        role_type = (
+            self.tensor_types[self.input_index]
+            if self.input_index < len(self.tensor_types)
+            else None
+        )
+        self.input_index += 1
+        if role_type == "weight":
+            return self._next_weight(), "weight"
+        if self.predecessor_index < len(self.predecessors):
+            predecessor = self.predecessors[self.predecessor_index]
+            self.predecessor_index += 1
+            key = "input" if "input" not in rename_target else "weight"
+            return _sanitize(predecessor), key
+        return self._next_weight(), "weight"
+
+
+def _tensor_identity(
+    sanitized_name: str,
+    role: str,
+    role_kind: str | None,
+    cursor: _EmissionCursor,
+    rename_target: dict[str, str],
+) -> tuple[str, bool, str]:
+    """Resolve one operand role to its AF tensor identity and rename kind."""
+    if role_kind == "outputs":
+        if role in {"Output", "Output_0"}:
+            return sanitized_name, True, "output"
+        if role.startswith("Output_"):
+            suffix = role.split("_", 1)[1] if "_" in role else "0"
+            return f"{sanitized_name}_{suffix}", True, "output"
+        return sanitized_name, True, "output"
+    if role_kind == "inputs":
+        tensor_name, rename_key = cursor._input_tensor(rename_target)
+        return tensor_name, False, rename_key
+    return sanitized_name, True, "output"
+
+
+def _axis_projection(
+    ctx: BuildContext,
+    layer_name: str,
+    role: str,
+    dims: list[str],
+    atomic_iter_map: dict[str, str],
+) -> list[str] | dict[str, str]:
+    """Build and safely demote one tensor-access projection."""
+    projection: dict[str, str] = {}
+    for position in range(len(dims)):
+        key = AxisKey(layer_name, role, position)
+        if key not in ctx.axes:
             continue
-        sanitized_name = _sanitize(layer_name)
-        preds = (layer.get("connections") or {}).get("inputs") or []
-        atomic_iter_map = _build_iter_expr_for_layer(ctx, layer_name)
-        tensor_accesses: list[dict[str, Any]] = []
+        canonical = ctx.canonical_name[key]
+        projection[canonical] = _projection_for_axis(ctx, key, atomic_iter_map)
+    can_demote = all(
+        value.isidentifier() and rank == value.upper()
+        for rank, value in projection.items()
+    )
+    return list(projection.values()) if can_demote else projection
 
-        rename_target: dict[str, str] = {}
-        primary_input_set = False
-        primary_weight_set = False
 
-        # Solar annotates each input role as "input" or "weight" in
-        # tensor_types.inputs (positional, matching operands' input-role
-        # iteration order). connections.inputs only lists the non-weight
-        # producers, so we must skip "weight"-typed roles when stepping
-        # through preds — otherwise a layer like ``mul(scale, x)`` where
-        # operand 0 is a weight and operand 1 is the predecessor tensor
-        # ends up assigning the predecessor's name to the weight slot
-        # (size 1) and a synthetic W{n} to the tensor slot (full rank),
-        # producing pydantic "inconsistent ranks" errors downstream.
-        tensor_types_inputs = (layer.get("tensor_types") or {}).get(
-            "inputs"
-        ) or []
-        input_role_index = 0  # position within input-typed roles only
-        pred_index = 0
-        for role, dims in operands.items():
-            ctx_idx = ctx.role_to_shape_index.get((layer_name, role))
-            tensor_name: str
-            is_output_access = False
-            af_rename_key: str | None = None
-            role_kind = ctx_idx[0] if ctx_idx is not None else None
-            if role_kind == "outputs":
-                is_output_access = True
-                if role == "Output" or role == "Output_0":
-                    tensor_name = sanitized_name
-                elif role.startswith("Output_"):
-                    n_str = role.split("_", 1)[1] if "_" in role else "0"
-                    tensor_name = f"{sanitized_name}_{n_str}"
-                else:
-                    tensor_name = sanitized_name
-                af_rename_key = "output"
-            elif role_kind == "inputs":
-                # Honor solar's tensor_types tagging when it disagrees with
-                # the simple "any input consumes a pred" assumption.
-                role_type = (
-                    tensor_types_inputs[input_role_index]
-                    if input_role_index < len(tensor_types_inputs)
-                    else None
-                )
-                is_weight_role = role_type == "weight"
-                if is_weight_role:
-                    tensor_name = next_weight_name()
-                    af_rename_key = "weight"
-                elif pred_index < len(preds):
-                    tensor_name = _sanitize(preds[pred_index])
-                    pred_index += 1
-                    # Match OLD-pipeline convention: the FIRST consumed
-                    # pred maps to "input", subsequent preds map to "weight".
-                    af_rename_key = (
-                        "input" if not primary_input_set else "weight"
-                    )
-                else:
-                    tensor_name = next_weight_name()
-                    af_rename_key = "weight"
-                input_role_index += 1
-            else:
-                tensor_name = sanitized_name
-                is_output_access = True
-                af_rename_key = "output"
+def _register_rename(
+    rename_target: dict[str, str],
+    key: str,
+    tensor_name: str,
+) -> None:
+    """Record only the first AF tensor selected for each rename role."""
+    rename_target.setdefault(key, tensor_name)
 
-            projection: dict[str, str] = {}
-            for pos in range(len(dims)):
-                key = AxisKey(layer_name, role, pos)
-                if key not in ctx.axes:
-                    continue
-                canonical = ctx.canonical_name[key]
-                expr = _projection_for_axis(ctx, key, atomic_iter_map)
-                projection[canonical] = expr
-            can_demote = all(
-                isinstance(v, str) and v.isidentifier() and k == v.upper()
-                for k, v in projection.items()
-            )
-            access: dict[str, Any] = {
-                "name": tensor_name,
-                "projection": (
-                    list(projection.values())
-                    if can_demote
-                    else dict(projection)
-                ),
-            }
-            if is_output_access:
-                access["output"] = True
-            bits = _bits_for_role(layer, role, ctx_idx)
-            if bits is not None:
-                access["bits_per_value"] = bits
-            tensor_accesses.append(access)
 
-            if af_rename_key == "input" and not primary_input_set:
-                rename_target["input"] = tensor_name
-                primary_input_set = True
-            elif af_rename_key == "weight" and not primary_weight_set:
-                rename_target["weight"] = tensor_name
-                primary_weight_set = True
-            elif af_rename_key == "output" and "output" not in rename_target:
-                rename_target["output"] = tensor_name
-
-        # Dedup multi-read input accesses (e.g. residual ``Add(x, x)`` lists
-        # the same predecessor twice). AF requires unique tensor names in
-        # an einsum's tensor_accesses, and reading the same tensor twice
-        # with the same projection has the same memory cost as reading it
-        # once — keep one access. Output accesses are never deduped.
-        seen_in: set[tuple[Any, ...]] = set()
-        deduped: list[dict[str, Any]] = []
-        for ta in tensor_accesses:
-            if ta.get("output"):
-                deduped.append(ta)
-                continue
-            # Hash the (name, projection) pair so distinct-projection
-            # multi-reads (rare; would require an alias if encountered)
-            # still surface as a separate access.
-            proj = ta["projection"]
-            key = (
-                ta["name"],
-                tuple(proj)
-                if isinstance(proj, list)
-                else tuple(sorted(proj.items())),
-            )
-            if key in seen_in:
-                continue
-            seen_in.add(key)
-            deduped.append(ta)
-        tensor_accesses = deduped
-
-        # Entry-point pseudo-nodes ("start") have outputs but no inputs and
-        # no predecessors. Synthesize a source-input access so AF has a
-        # tensor to read from at the model boundary.
-        has_input = any(not ta.get("output") for ta in tensor_accesses)
-        has_output = any(ta.get("output") for ta in tensor_accesses)
-        is_entry_point = has_output and not has_input and not preds
-        if is_entry_point:
-            out_ta = next(ta for ta in tensor_accesses if ta.get("output"))
-            synth_name = f"{sanitized_name}_in"
-            synth: dict[str, Any] = {
-                "name": synth_name,
-                "projection": (
-                    out_ta["projection"]
-                    if isinstance(out_ta["projection"], list)
-                    else dict(out_ta["projection"])
-                ),
-            }
-            if "bits_per_value" in out_ta:
-                synth["bits_per_value"] = out_ta["bits_per_value"]
-            tensor_accesses.insert(0, synth)
-
-        if is_entry_point:
-            einsum_renames = {
-                "input": "Inputs()",
-                "output": "Outputs()",
-                "weight": "Nothing()",
-            }
-        else:
-            einsum_renames = {
-                "input": rename_target.get("input", "Nothing()"),
-                "output": rename_target.get("output", sanitized_name),
-                "weight": rename_target.get("weight", "Nothing()"),
-            }
-
-        einsum_entry: dict[str, Any] = {
-            "name": sanitized_name,
-            "tensor_accesses": tensor_accesses,
-            "renames": einsum_renames,
+def _layer_accesses(
+    ctx: BuildContext,
+    layer_name: str,
+    layer: dict[str, Any],
+    sanitized_name: str,
+    cursor: _EmissionCursor,
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Emit all raw tensor accesses and rename targets for one layer."""
+    accesses: list[dict[str, Any]] = []
+    rename_target: dict[str, str] = {}
+    atomic_iter_map = _build_iter_expr_for_layer(ctx, layer_name)
+    for role, dims in (layer.get("operands") or {}).items():
+        context_index = ctx.role_to_shape_index.get((layer_name, role))
+        role_kind = context_index[0] if context_index is not None else None
+        tensor_name, is_output, rename_key = _tensor_identity(
+            sanitized_name,
+            role,
+            role_kind,
+            cursor,
+            rename_target,
+        )
+        access: dict[str, Any] = {
+            "name": tensor_name,
+            "projection": _axis_projection(
+                ctx, layer_name, role, dims, atomic_iter_map
+            ),
         }
-        if is_entry_point:
-            einsum_entry["is_copy_operation"] = True
-        einsums.append(einsum_entry)
+        if is_output:
+            access["output"] = True
+        if (bits := _bits_for_role(layer, role, context_index)) is not None:
+            access["bits_per_value"] = bits
+        accesses.append(access)
+        _register_rename(rename_target, rename_key, tensor_name)
+    return accesses, rename_target
 
-    # Pin a canonical rank order per tensor. Union-find guarantees rank
-    # IDENTITY is consistent across multiple accesses of the same tensor,
-    # but the order in the projection may differ if Solar wrote different
-    # operand orderings. Pin the first occurrence and rewrite mismatches.
-    canonical_rank_order: dict[str, list[str]] = {}
-    for e in einsums:
-        for ta in e["tensor_accesses"]:
-            name = str(ta["name"])
-            proj = ta["projection"]
-            if isinstance(proj, list):
-                ranks = [str(value).upper() for value in proj]
-            elif isinstance(proj, dict):
-                ranks = [str(value) for value in proj]
+
+def _deduplicate_input_accesses(
+    accesses: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Deduplicate identical non-output tensor reads."""
+    seen: set[tuple[Any, ...]] = set()
+    result: list[dict[str, Any]] = []
+    for access in accesses:
+        if access.get("output"):
+            result.append(access)
+            continue
+        projection = access["projection"]
+        key = (
+            access["name"],
+            tuple(projection)
+            if isinstance(projection, list)
+            else tuple(sorted(projection.items())),
+        )
+        if key not in seen:
+            seen.add(key)
+            result.append(access)
+    return result
+
+
+def _ensure_entry_input(
+    accesses: list[dict[str, Any]],
+    sanitized_name: str,
+    predecessors: list[str],
+) -> bool:
+    """Synthesize the model-boundary input for an entry pseudo-node."""
+    has_input = any(not access.get("output") for access in accesses)
+    has_output = any(access.get("output") for access in accesses)
+    if not (has_output and not has_input and not predecessors):
+        return False
+    output = next(access for access in accesses if access.get("output"))
+    projection = output["projection"]
+    synthesized: dict[str, Any] = {
+        "name": f"{sanitized_name}_in",
+        "projection": projection
+        if isinstance(projection, list)
+        else dict(projection),
+    }
+    if "bits_per_value" in output:
+        synthesized["bits_per_value"] = output["bits_per_value"]
+    accesses.insert(0, synthesized)
+    return True
+
+
+def _emit_layer(
+    ctx: BuildContext,
+    layer_name: str,
+    layer: dict[str, Any],
+    weight_index: int,
+) -> tuple[dict[str, Any] | None, int]:
+    """Emit one layer and return the updated global weight counter."""
+    if not (layer.get("operands") or {}):
+        return None, weight_index
+    sanitized_name = _sanitize(layer_name)
+    predecessors = (layer.get("connections") or {}).get("inputs") or []
+    cursor = _EmissionCursor(
+        predecessors=list(predecessors),
+        tensor_types=(layer.get("tensor_types") or {}).get("inputs") or [],
+        weight_index=weight_index,
+    )
+    accesses, rename_target = _layer_accesses(
+        ctx, layer_name, layer, sanitized_name, cursor
+    )
+    accesses = _deduplicate_input_accesses(accesses)
+    is_entry = _ensure_entry_input(accesses, sanitized_name, predecessors)
+    renames = (
+        {"input": "Inputs()", "output": "Outputs()", "weight": "Nothing()"}
+        if is_entry
+        else {
+            "input": rename_target.get("input", "Nothing()"),
+            "output": rename_target.get("output", sanitized_name),
+            "weight": rename_target.get("weight", "Nothing()"),
+        }
+    )
+    entry: dict[str, Any] = {
+        "name": sanitized_name,
+        "tensor_accesses": accesses,
+        "renames": renames,
+    }
+    if is_entry:
+        entry["is_copy_operation"] = True
+    return entry, cursor.weight_index
+
+
+def _canonicalize_rank_order(einsums: list[dict[str, Any]]) -> None:
+    """Pin each tensor to the rank order of its first access."""
+    canonical: dict[str, list[str]] = {}
+    for einsum in einsums:
+        for access in einsum["tensor_accesses"]:
+            name = str(access["name"])
+            projection = access["projection"]
+            if isinstance(projection, list):
+                ranks = [str(value).upper() for value in projection]
+                iterator_map = dict(zip(ranks, projection, strict=False))
+            elif isinstance(projection, dict):
+                ranks = [str(value) for value in projection]
+                iterator_map = {
+                    str(rank): str(value) for rank, value in projection.items()
+                }
             else:
                 continue
-            if name not in canonical_rank_order:
-                canonical_rank_order[name] = ranks
-            else:
-                target_ranks = canonical_rank_order[name]
-                if ranks != target_ranks:
-                    iter_map: dict[str, str] = {}
-                    if isinstance(proj, list):
-                        for r, v in zip(ranks, proj, strict=False):
-                            iter_map[str(r)] = str(v)
-                    else:
-                        for r, v in proj.items():
-                            iter_map[str(r)] = str(v)
-                    if all(r in iter_map for r in target_ranks):
-                        ta["projection"] = {
-                            r: iter_map[r] for r in target_ranks
-                        }
+            target = canonical.setdefault(name, ranks)
+            if ranks != target and all(rank in iterator_map for rank in target):
+                access["projection"] = {
+                    rank: iterator_map[rank] for rank in target
+                }
 
-    all_bits = [
-        ta.get("bits_per_value")
-        for e in einsums
-        for ta in e["tensor_accesses"]
-        if ta.get("bits_per_value") is not None
+
+def _default_bits(einsums: list[dict[str, Any]]) -> int:
+    """Return the widest explicitly declared tensor bit width."""
+    widths = [
+        access.get("bits_per_value")
+        for einsum in einsums
+        for access in einsum["tensor_accesses"]
+        if access.get("bits_per_value") is not None
     ]
-    default_bits = max(all_bits) if all_bits else 32
+    return max(widths) if widths else 32
 
+
+def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict[str, Any]:
+    """Emit one canonical AccelForge workload from a prepared context."""
+    del model_name
+    einsums: list[dict[str, Any]] = []
+    weight_index = 0
+    for layer_name, layer in ctx.layers.items():
+        entry, weight_index = _emit_layer(ctx, layer_name, layer, weight_index)
+        if entry is not None:
+            einsums.append(entry)
+    _canonicalize_rank_order(einsums)
     workload = {
         "rank_sizes": dict(ctx.rank_sizes),
-        "bits_per_value": {"All": default_bits},
+        "bits_per_value": {"All": _default_bits(einsums)},
         "persistent_tensors": "weight - Intermediates",
         "einsums": einsums,
     }
-    renames = {
+    return {"workload": workload, "renames": _rename_contract()}
+
+
+def _rename_contract() -> dict[str, Any]:
+    """Return the canonical AF input/output/weight selection contract."""
+    return {
         "einsums": [
             {
                 "name": "default",
@@ -351,7 +385,6 @@ def _emit_af_workload(ctx: BuildContext, model_name: str) -> dict[str, Any]:
             }
         ]
     }
-    return {"workload": workload, "renames": renames}
 
 
 def _ghost_scalar_outputs(af: dict[str, Any]) -> None:

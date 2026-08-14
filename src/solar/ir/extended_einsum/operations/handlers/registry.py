@@ -18,14 +18,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from solar.ir.extended_einsum.operations.handlers.base import (
         EinsumOp,
         EinsumOpHandler,
     )
-    from solar.types import TensorShapes
+    from solar.types import DynamicValue, TensorShapes
 
 
 class EinsumOpRegistry:
@@ -168,7 +168,7 @@ class EinsumOpRegistry:
         self,
         op_name: str,
         shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Get an einsum operation for the given operation name.
 

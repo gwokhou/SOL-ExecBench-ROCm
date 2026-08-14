@@ -43,8 +43,9 @@ from __future__ import annotations
 
 import re
 import string
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import networkx as nx
 
@@ -54,6 +55,27 @@ from solar.ir.extended_einsum.torchview.converter_contract import (
 from solar.types import TensorShapes
 
 PathLike = str | Path
+_LinearEntry = tuple[int, str, Any, str]
+
+
+@dataclass(frozen=True)
+class _LinearSplitContext:
+    """Normalized inputs used to emit a linear matmul and bias add."""
+
+    node_id: str
+    add_node_id: str
+    output_connections: list[str]
+    output_shapes: list[list[int]]
+    matmul_output_shape: list[int]
+    activation: _LinearEntry | None
+    weight: _LinearEntry | None
+    bias: _LinearEntry | None
+    weight_shape: list[int] | None
+    bias_shape: list[int] | None
+    activation_dtype: Any
+    weight_dtype: Any
+    output_dtype: Any
+    start_node_id_map: dict[str, str]
 
 
 class ConverterNormalizationMixin(ConverterMixinContract):
@@ -223,6 +245,301 @@ class ConverterNormalizationMixin(ConverterMixinContract):
                 connections.append(start_id)
         return connections
 
+    @staticmethod
+    def _select_linear_entries(
+        typed_inputs: list[_LinearEntry],
+    ) -> tuple[_LinearEntry | None, _LinearEntry | None, _LinearEntry | None]:
+        """Select activation, weight matrix, and bias entries."""
+        activation = next(
+            (
+                entry
+                for entry in typed_inputs
+                if entry[3] != "weight" and "parameter-tensor" not in entry[1]
+            ),
+            typed_inputs[0] if typed_inputs else None,
+        )
+        weights = [
+            entry
+            for entry in typed_inputs
+            if entry[3] == "weight" or "parameter-tensor" in entry[1]
+        ]
+        bias = next(
+            (
+                entry
+                for entry in weights
+                if isinstance(entry[2], list) and len(entry[2]) == 1
+            ),
+            weights[-1] if len(weights) >= 2 else None,
+        )
+        matrix = next(
+            (
+                entry
+                for entry in weights
+                if bias is None
+                or entry[1] != bias[1]
+                and isinstance(entry[2], list)
+                and len(entry[2]) >= 2
+            ),
+            next(
+                (
+                    entry
+                    for entry in weights
+                    if bias is None or entry[1] != bias[1]
+                ),
+                None,
+            ),
+        )
+        return activation, matrix, bias
+
+    def _linear_split_context(
+        self,
+        node_id: str,
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> _LinearSplitContext:
+        """Normalize graph, dtype, and tensor-role inputs for a split."""
+        shapes = node_data.get("input_shapes") or []
+        output_shapes = node_data.get("output_shapes") or []
+        connections = self._linear_input_connections(
+            node_id, node_data, op_graph, start_nodes_info, start_node_id_map
+        )
+        outputs = list(op_graph.successors(node_id))
+        if not outputs:
+            outputs = [
+                item
+                for item in (node_data.get("connections") or {}).get(
+                    "outputs", []
+                )
+                if item in op_graph.nodes
+            ]
+        input_types = node_data.get("input_types") or []
+        input_dtypes = node_data.get("input_dtypes") or []
+        activation_dtype = input_dtypes[0] if input_dtypes else "torch.float32"
+        weight_dtype = next(
+            (
+                input_dtypes[index]
+                for index, kind in enumerate(input_types)
+                if str(kind).lower() == "weight" and index < len(input_dtypes)
+            ),
+            activation_dtype,
+        )
+        output_dtypes = node_data.get("output_dtypes") or []
+        output_dtype = output_dtypes[0] if output_dtypes else activation_dtype
+        activation, weight, bias = self._select_linear_entries(
+            self._linear_typed_inputs(connections, shapes, input_types)
+        )
+        return _LinearSplitContext(
+            node_id=node_id,
+            add_node_id=f"{node_id}.bias_add",
+            output_connections=outputs,
+            output_shapes=cast("list[list[int]]", output_shapes),
+            matmul_output_shape=(
+                cast("list[int]", output_shapes[0]) if output_shapes else []
+            ),
+            activation=activation,
+            weight=weight,
+            bias=bias,
+            weight_shape=(
+                cast("list[int]", list(weight[2]))
+                if weight and isinstance(weight[2], list)
+                else None
+            ),
+            bias_shape=(
+                cast("list[int]", list(bias[2]))
+                if bias and isinstance(bias[2], list)
+                else None
+            ),
+            activation_dtype=activation_dtype,
+            weight_dtype=weight_dtype,
+            output_dtype=output_dtype,
+            start_node_id_map=start_node_id_map,
+        )
+
+    def _linear_matmul_equation(
+        self,
+        context: _LinearSplitContext,
+    ) -> tuple[str, dict[str, list[str]]]:
+        """Return the analyzed or fallback matmul equation and operands."""
+        inputs: list[list[int]] = [
+            cast("list[int]", list(entry[2]))
+            for entry in (context.activation, context.weight)
+            if entry and isinstance(entry[2], list)
+        ]
+        tensor_shapes = TensorShapes(
+            inputs=inputs, outputs=context.output_shapes
+        )
+        try:
+            operation = self._einsum_analyzer.get_einsum_op(
+                "linear", tensor_shapes
+            )
+            return operation.equation, {
+                operand.name: list(operand.dims)
+                for operand in operation.operands
+            }
+        except Exception:  # noqa: BLE001 - optional backend fallback
+            input_shape = context.activation[2] if context.activation else []
+            batch_count = len(input_shape) - 1 if input_shape else 0
+            batch = [f"B{index}" for index in range(batch_count)]
+            input_dims = "".join([*batch, "K"])
+            output_dims = "".join([*batch, "N"])
+            tokens = lambda value: re.findall(r"[A-Z]\d*", value)  # noqa: E731
+            return (
+                f"{input_dims},NK->{output_dims}",
+                {
+                    "Input": tokens(input_dims),
+                    "Weight": ["N", "K"],
+                    "Output": tokens(output_dims),
+                },
+            )
+
+    def _linear_matmul_layer(
+        self,
+        context: _LinearSplitContext,
+        equation: str,
+        operands: dict[str, list[str]],
+    ) -> dict[str, Any]:
+        """Emit the matmul half of a split linear operation."""
+        names: list[str] = []
+        shapes: list[list[Any]] = []
+        connections: list[str] = []
+        for entry in (context.activation, context.weight):
+            if entry is None:
+                continue
+            emitted_id = self._canonical_linear_input(
+                entry, context.start_node_id_map
+            )
+            names.append(f"{emitted_id}.Output")
+            connections.append(emitted_id)
+            if isinstance(entry[2], list):
+                shapes.append(list(entry[2]))
+        layer: dict[str, Any] = {
+            "type": "linear",
+            "einsum_equation": equation,
+            "elementwise_op": "mul",
+            "reduction_op": "add",
+            "is_real_einsum": True,
+            "is_einsum_supportable": True,
+            "operands": operands,
+            "tensor_names": {
+                "inputs": names,
+                "outputs": [f"{context.node_id}.Output"],
+            },
+            "tensor_types": {
+                "inputs": [
+                    "input" if index == 0 else "weight"
+                    for index in range(len(names))
+                ],
+                "outputs": ["output"],
+            },
+            "tensor_shapes": {
+                "inputs": shapes,
+                "outputs": [list(context.matmul_output_shape)]
+                if context.matmul_output_shape
+                else [],
+            },
+            "tensor_dtypes": {
+                "inputs": [context.activation_dtype, context.weight_dtype],
+                "outputs": [context.output_dtype],
+            },
+            "connections": {
+                "inputs": connections,
+                "outputs": [context.add_node_id],
+            },
+        }
+        if context.weight_shape:
+            layer["additional_info"] = {
+                "weights": [
+                    {"name": "Weight", "shape": list(context.weight_shape)}
+                ]
+            }
+        return layer
+
+    @staticmethod
+    def _bias_add_equation(
+        output_shape: list[int],
+        bias_shape: list[int] | None,
+    ) -> tuple[str, dict[str, list[str]] | None]:
+        """Return the broadcast-add equation for the split bias."""
+        if output_shape and bias_shape and len(bias_shape) == 1:
+            labels = string.ascii_uppercase[: len(output_shape)]
+            return (
+                f"{labels},{labels[-1]}->{labels}",
+                {
+                    "Input": list(labels),
+                    "Weight": [labels[-1]],
+                    "Output": list(labels),
+                },
+            )
+        if output_shape:
+            labels = string.ascii_uppercase[: len(output_shape)]
+            return (
+                f"{labels}->{labels}",
+                {"Input": list(labels), "Output": list(labels)},
+            )
+        return "", None
+
+    def _bias_add_layer(
+        self,
+        context: _LinearSplitContext,
+    ) -> dict[str, Any]:
+        """Emit the bias-add half of a split linear operation."""
+        equation, operands = self._bias_add_equation(
+            context.matmul_output_shape, context.bias_shape
+        )
+        names = [f"{context.node_id}.Output"]
+        shapes = (
+            [list(context.matmul_output_shape)]
+            if context.matmul_output_shape
+            else []
+        )
+        connections = [context.node_id]
+        if context.bias and context.bias_shape:
+            bias_id = self._canonical_linear_input(
+                context.bias, context.start_node_id_map
+            )
+            names.append(f"{bias_id}.Output")
+            shapes.append(list(context.bias_shape))
+            connections.append(bias_id)
+        layer: dict[str, Any] = {
+            "type": "add",
+            "einsum_equation": equation,
+            "elementwise_op": "add",
+            "reduction_op": "none",
+            "is_real_einsum": False,
+            "is_einsum_supportable": True,
+            "operands": operands,
+            "tensor_names": {
+                "inputs": names,
+                "outputs": [f"{context.add_node_id}.Output"],
+            },
+            "tensor_types": {
+                "inputs": ["input"] + (["weight"] if len(names) > 1 else []),
+                "outputs": ["output"],
+            },
+            "tensor_shapes": {
+                "inputs": shapes,
+                "outputs": [list(context.output_shapes[0])]
+                if context.output_shapes
+                else [],
+            },
+            "tensor_dtypes": {
+                "inputs": [context.output_dtype, context.weight_dtype],
+                "outputs": [context.output_dtype],
+            },
+            "connections": {
+                "inputs": connections,
+                "outputs": context.output_connections,
+            },
+            "module_args": self._synthetic_tensor_call(len(names)),
+        }
+        if context.bias_shape:
+            layer["additional_info"] = {
+                "weights": [{"name": "Bias", "shape": list(context.bias_shape)}]
+            }
+        return layer
+
     def _split_linear_with_bias(
         self,
         node_id: str,
@@ -231,298 +548,85 @@ class ConverterNormalizationMixin(ConverterMixinContract):
         start_nodes_info: list[dict[str, Any]],
         start_node_id_map: dict[str, str],
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Split a linear layer with bias into matmul + add operations.
-
-        Returns:
-            Tuple of (matmul_layer_dict, add_layer_dict)
-        """
-        input_shapes = node_data.get("input_shapes") or []
-        output_shapes = node_data.get("output_shapes") or []
-
-        input_connections = self._linear_input_connections(
+        """Split a biased linear operation into matmul and add layers."""
+        context = self._linear_split_context(
             node_id,
             node_data,
             op_graph,
             start_nodes_info,
             start_node_id_map,
         )
-
-        # Use collapsed op-graph successors so tensor nodes (e.g. hidden-tensor)
-        # are not emitted in einsum connections.
-        output_connections = list(op_graph.successors(node_id))
-        if not output_connections:
-            raw_output_connections = list(
-                (node_data.get("connections") or {}).get("outputs") or []
-            )
-            output_connections = [
-                c for c in raw_output_connections if c in op_graph.nodes
-            ]
-
-        # Extract dtypes from the original node for propagation to sub-nodes.
-        input_types = node_data.get("input_types") or []
-        input_dtypes = node_data.get("input_dtypes") or []
-        output_dtypes = node_data.get("output_dtypes") or []
-        act_dtype = input_dtypes[0] if input_dtypes else "torch.float32"
-        weight_dtype = next(
-            (
-                input_dtypes[i]
-                for i, t in enumerate(input_types)
-                if str(t).lower() == "weight" and i < len(input_dtypes)
-            ),
-            act_dtype,
-        )
-        out_dtype = output_dtypes[0] if output_dtypes else act_dtype
-
-        typed_inputs = self._linear_typed_inputs(
-            input_connections,
-            input_shapes,
-            input_types,
+        equation, operands = self._linear_matmul_equation(context)
+        return (
+            self._linear_matmul_layer(context, equation, operands),
+            self._bias_add_layer(context),
         )
 
-        activation_entry: tuple[int, str, Any, str] | None = None
-        weight_entries: list[tuple[int, str, Any, str]] = []
-        for entry in typed_inputs:
-            _, conn, _, itype = entry
-            if itype == "weight" or "parameter-tensor" in conn:
-                weight_entries.append(entry)
-            elif activation_entry is None:
-                activation_entry = entry
+    def _redirect_expanded_outputs(
+        self,
+        result: dict[str, Any],
+        expanded_input_map: dict[str, dict[int, str]],
+    ) -> None:
+        """Redirect predecessors to the correct expanded subgraph entries."""
+        for original_id, input_mapping in expanded_input_map.items():
+            for layer_id, layer in result["layers"].items():
+                connections = layer.get("connections", {})
+                outputs = connections.get("outputs", [])
+                if original_id not in outputs:
+                    continue
+                connections["outputs"] = [
+                    (
+                        self._find_entry_node_for_predecessor(
+                            result,
+                            layer_id,
+                            original_id,
+                            input_mapping,
+                        )
+                        if output == original_id
+                        else output
+                    )
+                    for output in outputs
+                ]
 
-        if activation_entry is None and typed_inputs:
-            activation_entry = typed_inputs[0]
-
-        # Bias is normally rank-1 among weight inputs.
-        bias_entry: tuple[int, str, Any, str] | None = None
-        for entry in weight_entries:
-            ishape = entry[2]
-            if isinstance(ishape, list) and len(ishape) == 1:
-                bias_entry = entry
-                break
-
-        # Fallback when rank-based inference fails: last weight is bias.
-        if bias_entry is None and len(weight_entries) >= 2:
-            bias_entry = weight_entries[-1]
-
-        # Weight matrix is a non-bias weight, preferring rank-2.
-        weight_entry: tuple[int, str, Any, str] | None = None
-        for entry in weight_entries:
-            if bias_entry is not None and entry[1] == bias_entry[1]:
+    @staticmethod
+    def _remap_split_tensor_name(
+        name: str,
+        layer_id: str,
+        node_id_remap: dict[str, str],
+    ) -> str:
+        """Remap one split tensor name without creating a self-loop."""
+        for original_id, final_id in node_id_remap.items():
+            if final_id == layer_id:
                 continue
-            ishape = entry[2]
-            if isinstance(ishape, list) and len(ishape) >= 2:
-                weight_entry = entry
-                break
-        if weight_entry is None:
-            for entry in weight_entries:
-                if bias_entry is None or entry[1] != bias_entry[1]:
-                    weight_entry = entry
-                    break
+            if name == f"{original_id}.Output" or name.startswith(
+                f"{original_id}.Output_"
+            ):
+                return name.replace(f"{original_id}.", f"{final_id}.", 1)
+        return name
 
-        weight_shape = (
-            list(weight_entry[2])
-            if (weight_entry and isinstance(weight_entry[2], list))
-            else None
-        )
-        bias_shape = (
-            list(bias_entry[2])
-            if (bias_entry and isinstance(bias_entry[2], list))
-            else None
-        )
-
-        # Intermediate shape (output of matmul, input to add)
-        matmul_output_shape = output_shapes[0] if output_shapes else []
-
-        # === MATMUL LAYER ===
-        # Get einsum equation for matmul
-        matmul_input_shapes_for_equation: list[list[Any]] = []
-        if activation_entry and isinstance(activation_entry[2], list):
-            matmul_input_shapes_for_equation.append(list(activation_entry[2]))
-        if weight_entry and isinstance(weight_entry[2], list):
-            matmul_input_shapes_for_equation.append(list(weight_entry[2]))
-        matmul_ts = TensorShapes(
-            inputs=matmul_input_shapes_for_equation,
-            outputs=list(node_data.get("output_shapes") or []),
-        )
-        try:
-            einsum_op = self._einsum_analyzer.get_einsum_op("linear", matmul_ts)
-            matmul_equation = einsum_op.equation
-            matmul_operands = {o.name: list(o.dims) for o in einsum_op.operands}
-        except Exception:  # noqa: BLE001 - optional backend fallback
-            # Fallback equation
-            batch_dims = len(input_shapes[0]) - 1 if input_shapes else 0
-            batch_letters = [f"B{i}" for i in range(batch_dims)]
-            input_str = "".join(batch_letters + ["K"])
-            weight_str = "NK"
-            output_str = "".join(batch_letters + ["N"])
-            matmul_equation = f"{input_str},{weight_str}->{output_str}"
-
-            # Parse the fallback equation back into the operand structure.
-            # Tokens are an uppercase letter optionally followed by digits (e.g. B0).
-            def _toks(s: str) -> list[str]:
-                return re.findall(r"[A-Z]\d*", s)
-
-            matmul_operands = {
-                "Input": _toks(input_str),
-                "Weight": _toks(weight_str),
-                "Output": _toks(output_str),
-            }
-
-        add_node_id = f"{node_id}.bias_add"
-
-        matmul_input_names: list[str] = []
-        matmul_input_shapes_list: list[list[Any]] = []
-        matmul_connection_inputs: list[str] = []
-
-        if activation_entry:
-            activation_einsum_id = self._canonical_linear_input(
-                activation_entry,
-                start_node_id_map,
-            )
-            matmul_input_names.append(f"{activation_einsum_id}.Output")
-            if isinstance(activation_entry[2], list):
-                matmul_input_shapes_list.append(list(activation_entry[2]))
-            matmul_connection_inputs.append(activation_einsum_id)
-        if weight_entry:
-            weight_einsum_id = self._canonical_linear_input(
-                weight_entry,
-                start_node_id_map,
-            )
-            matmul_input_names.append(f"{weight_einsum_id}.Output")
-            if isinstance(weight_entry[2], list):
-                matmul_input_shapes_list.append(list(weight_entry[2]))
-            matmul_connection_inputs.append(weight_einsum_id)
-
-        matmul_tensor_names = {
-            "inputs": matmul_input_names,
-            "outputs": [f"{node_id}.Output"],
-        }
-        matmul_tensor_types = {
-            "inputs": [
-                "input" if i == 0 else "weight"
-                for i in range(len(matmul_input_names))
-            ],
-            "outputs": ["output"],
-        }
-        matmul_tensor_shapes = {
-            "inputs": matmul_input_shapes_list,
-            "outputs": [list(matmul_output_shape)]
-            if matmul_output_shape
-            else [],
-        }
-
-        matmul_layer: dict[str, Any] = {
-            # Keep type as linear so MACs are computed by LinearHandler.
-            "type": "linear",
-            "einsum_equation": matmul_equation,
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            # Operands drive the AF graph builder; without them the layer
-            # is silently skipped from the AF einsums list.
-            "operands": matmul_operands,
-            "tensor_names": matmul_tensor_names,
-            "tensor_types": matmul_tensor_types,
-            "tensor_shapes": matmul_tensor_shapes,
-            "tensor_dtypes": {
-                "inputs": [act_dtype, weight_dtype],
-                "outputs": [out_dtype],
-            },
-            "connections": {
-                "inputs": matmul_connection_inputs,
-                "outputs": [add_node_id],  # Output goes to bias_add
-            },
-        }
-
-        if weight_shape:
-            matmul_layer["additional_info"] = {
-                "weights": [{"name": "Weight", "shape": list(weight_shape)}]
-            }
-
-        # === ADD (BIAS) LAYER ===
-        # Generate einsum equation for bias add (broadcast add).
-        if (
-            matmul_output_shape
-            and bias_shape
-            and len(matmul_output_shape) >= 1
-            and len(bias_shape) == 1
-        ):
-            labels = string.ascii_uppercase[: len(matmul_output_shape)]
-            add_equation = f"{labels},{labels[-1]}->{labels}"
-            add_operands = {
-                "Input": list(labels),
-                "Weight": [labels[-1]],
-                "Output": list(labels),
-            }
-        elif matmul_output_shape:
-            labels = string.ascii_uppercase[: len(matmul_output_shape)]
-            add_equation = f"{labels}->{labels}"
-            add_operands = {
-                "Input": list(labels),
-                "Output": list(labels),
-            }
-        else:
-            add_equation = ""
-            add_operands = None
-
-        add_input_names = [f"{node_id}.Output"]
-        add_input_shapes_list = (
-            [list(matmul_output_shape)] if matmul_output_shape else []
-        )
-        add_connection_inputs = [node_id]
-
-        if bias_entry and bias_shape:
-            bias_einsum_id = self._canonical_linear_input(
-                bias_entry,
-                start_node_id_map,
-            )
-            add_input_names.append(f"{bias_einsum_id}.Output")
-            add_input_shapes_list.append(list(bias_shape))
-            add_connection_inputs.append(bias_einsum_id)
-
-        add_tensor_names = {
-            "inputs": add_input_names,
-            "outputs": [f"{add_node_id}.Output"],
-        }
-        add_tensor_types = {
-            "inputs": ["input"]
-            + (["weight"] if len(add_input_names) > 1 else []),
-            "outputs": ["output"],
-        }
-        add_tensor_shapes = {
-            "inputs": add_input_shapes_list,
-            "outputs": [list(output_shapes[0])] if output_shapes else [],
-        }
-
-        add_layer: dict[str, Any] = {
-            "type": "add",
-            "einsum_equation": add_equation,
-            "elementwise_op": "add",
-            "reduction_op": "none",
-            "is_real_einsum": False,
-            "is_einsum_supportable": True,
-            "operands": add_operands,
-            "tensor_names": add_tensor_names,
-            "tensor_types": add_tensor_types,
-            "tensor_shapes": add_tensor_shapes,
-            "tensor_dtypes": {
-                "inputs": [out_dtype, weight_dtype],
-                "outputs": [out_dtype],
-            },
-            "connections": {
-                "inputs": add_connection_inputs,
-                "outputs": output_connections,  # Original outputs
-            },
-            "module_args": self._synthetic_tensor_call(len(add_input_names)),
-        }
-
-        # Add bias info
-        if bias_shape:
-            add_layer["additional_info"] = {
-                "weights": [{"name": "Bias", "shape": list(bias_shape)}]
-            }
-
-        return matmul_layer, add_layer
+    def _redirect_split_inputs(
+        self,
+        result: dict[str, Any],
+        node_id_remap: dict[str, str],
+    ) -> None:
+        """Redirect downstream connections and tensor names to final nodes."""
+        for layer_id, layer in result["layers"].items():
+            connections = layer.get("connections", {})
+            connections["inputs"] = [
+                (
+                    node_id_remap[input_id]
+                    if input_id in node_id_remap
+                    and node_id_remap[input_id] != layer_id
+                    else input_id
+                )
+                for input_id in connections.get("inputs", [])
+            ]
+            tensor_names = layer.get("tensor_names", {})
+            if tensor_names:
+                tensor_names["inputs"] = [
+                    self._remap_split_tensor_name(name, layer_id, node_id_remap)
+                    for name in tensor_names.get("inputs", [])
+                ]
 
     def _fix_split_connections(
         self,
@@ -530,85 +634,9 @@ class ConverterNormalizationMixin(ConverterMixinContract):
         node_id_remap: dict[str, str],
         expanded_input_map: dict[str, dict[int, str]] | None = None,
     ) -> None:
-        """Fix connections for layers that reference split/expanded operations.
-
-        When an operation is split/expanded:
-        1. Downstream layers that consume the output should reference the final node
-        2. Upstream layers (predecessors) should have their outputs updated to
-           reference the correct subgraph entry node
-
-        Args:
-            result: The einsum graph dictionary being built.
-            node_id_remap: Maps original node_id -> final output node_id.
-            expanded_input_map: Maps original node_id -> {input_index -> subgraph_node_id}.
-        """
-        if expanded_input_map is None:
-            expanded_input_map = {}
-
-        if not node_id_remap and not expanded_input_map:
+        """Reconnect graph edges after split and expanded operations."""
+        expanded = expanded_input_map or {}
+        if not node_id_remap and not expanded:
             return
-
-        # First pass: Update predecessor outputs for expanded operations
-        for original_node_id, input_mapping in expanded_input_map.items():
-            # Find all layers that have the original_node_id in their outputs
-            for layer_id, layer_data in result["layers"].items():
-                connections = layer_data.get("connections", {})
-                outputs = connections.get("outputs", [])
-
-                if original_node_id in outputs:
-                    # This layer was a predecessor to the expanded node
-                    # Find which input index this layer corresponds to
-                    # by looking at the subgraph's inputs
-                    new_outputs = []
-                    for out in outputs:
-                        if out == original_node_id:
-                            # Determine which subgraph node this layer feeds into
-                            # based on which input it provides
-                            # We need to find the correct entry node
-                            target_node = self._find_entry_node_for_predecessor(
-                                result,
-                                layer_id,
-                                original_node_id,
-                                input_mapping,
-                            )
-                            new_outputs.append(target_node)
-                        else:
-                            new_outputs.append(out)
-                    connections["outputs"] = new_outputs
-
-        # Second pass: Update downstream references
-        for layer_id, layer_data in result["layers"].items():
-            connections = layer_data.get("connections", {})
-            inputs = connections.get("inputs", [])
-
-            # Update input connections to reference final output node
-            new_inputs = []
-            for inp in inputs:
-                # BUGFIX: Don't remap if the current layer is itself the target of the remapping
-                # (e.g., don't replace Model.linear -> Model.linear.bias_add in Model.linear.bias_add's own inputs)
-                # This prevents creating self-loops in split layers like bias_add
-                if inp in node_id_remap and node_id_remap[inp] != layer_id:
-                    new_inputs.append(node_id_remap[inp])
-                else:
-                    new_inputs.append(inp)
-            connections["inputs"] = new_inputs
-
-            # Update tensor_names inputs
-            tensor_names = layer_data.get("tensor_names", {})
-            if tensor_names:
-                input_names = tensor_names.get("inputs", [])
-                new_input_names = []
-                for input_name in input_names:
-                    name = input_name
-                    for old_id, new_id in node_id_remap.items():
-                        # Keep split node self-inputs stable (e.g. bias_add should
-                        # consume Model.linear.Output, not its own output).
-                        if new_id == layer_id:
-                            continue
-                        if name == f"{old_id}.Output" or name.startswith(
-                            f"{old_id}.Output_"
-                        ):
-                            name = name.replace(f"{old_id}.", f"{new_id}.", 1)
-                            break
-                    new_input_names.append(name)
-                tensor_names["inputs"] = new_input_names
+        self._redirect_expanded_outputs(result, expanded)
+        self._redirect_split_inputs(result, node_id_remap)

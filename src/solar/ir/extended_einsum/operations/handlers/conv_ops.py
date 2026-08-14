@@ -20,14 +20,12 @@ This module provides einsum handlers for:
 - convtranspose1d, convtranspose2d, convtranspose3d
 """
 
-from typing import Any
-
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class Conv1dHandler(EinsumOpHandler):
@@ -39,7 +37,7 @@ class Conv1dHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for 1D convolution."""
         input_shape = tensor_shapes.inputs[0]
@@ -135,7 +133,7 @@ class Conv2dHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for 2D convolution."""
         input_shape = tensor_shapes.inputs[0]
@@ -251,7 +249,7 @@ class Conv3dHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for 3D convolution."""
         input_shape = tensor_shapes.inputs[0]
@@ -336,7 +334,7 @@ class ConvTranspose1dHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for 1D transposed convolution."""
         input_shape = tensor_shapes.inputs[0]
@@ -395,7 +393,7 @@ class ConvTranspose2dHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for 2D transposed convolution."""
         input_shape = tensor_shapes.inputs[0]
@@ -452,7 +450,7 @@ class ConvTranspose3dHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for 3D transposed convolution."""
         input_shape = tensor_shapes.inputs[0]

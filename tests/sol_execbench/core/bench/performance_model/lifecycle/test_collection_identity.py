@@ -111,6 +111,9 @@ def test_load_collection_gpu_identity_resolves_blob_backed_corpus(
         DiagnosticSidecarStatus,
         WorkloadKind,
     )
+    from sol_execbench.core.bench.performance_model.replay_evidence import (
+        PerformanceReplayEvidenceSidecar,
+    )
     from sol_execbench.core.bench.performance_model.validation_corpus import (
         BlobArtifactReference,
         DiagnosticValidationCase,
@@ -167,7 +170,17 @@ def test_load_collection_gpu_identity_resolves_blob_backed_corpus(
             PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE,
         ):
             path = case_dir / f"{kind.value}.bin"
-            path.write_text(f"{index}-{kind.value}", encoding="utf-8")
+            if kind is PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE:
+                replay = PerformanceReplayEvidenceSidecar(
+                    status=DiagnosticSidecarStatus.AVAILABLE,
+                    run_id=f"{index:064d}",
+                    candidate_sha256=f"{index + 3:064d}",
+                    canonical_input_sha256=f"{index + 4:064d}",
+                    alignment_digest=f"{index + 5:064d}",
+                )
+                atomic_write_json_value(path, replay.to_dict())
+            else:
+                path.write_text(f"{index}-{kind.value}", encoding="utf-8")
             members.append(path)
             artifacts.append(
                 PerformanceEvidenceArtifact(

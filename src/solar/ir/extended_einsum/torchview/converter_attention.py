@@ -41,6 +41,7 @@ Example:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,209 @@ from solar.ir.extended_einsum.torchview.converter_contract import (
 )
 
 PathLike = str | Path
+
+
+@dataclass(frozen=True)
+class _AttentionCore:
+    """Normalized QK-scale-softmax-AV expansion metadata."""
+
+    node_id: str
+    query_name: str
+    key_name: str
+    value_name: str
+    query_shape: list[int]
+    key_shape: list[int]
+    value_shape: list[int]
+    scores_shape: list[int]
+    output_shape: list[int]
+    qk_equation: str
+    qk_weight_role: str
+    qk_weight_dims: list[str]
+    av_weight_role: str
+    activation_dtype: Any
+    output_dtype: Any
+    qk_connections: list[str]
+    value_connections: list[str]
+    output_connections: list[str]
+    scale_factor: str | None = None
+    softmax_dimension: int | None = None
+
+    @property
+    def qk_id(self) -> str:
+        """Return the query-key matmul node ID."""
+        return f"{self.node_id}.qk_matmul"
+
+    @property
+    def scale_id(self) -> str:
+        """Return the scale node ID."""
+        return f"{self.node_id}.scale"
+
+    @property
+    def softmax_id(self) -> str:
+        """Return the softmax node ID."""
+        return f"{self.node_id}.softmax"
+
+    @property
+    def av_id(self) -> str:
+        """Return the attention-value matmul node ID."""
+        return f"{self.node_id}.av_matmul"
+
+
+@dataclass(frozen=True)
+class _MHAContext:
+    """Projection and shared-core metadata for one MHA expansion."""
+
+    core: _AttentionCore
+    sequence: int
+    batch: int
+    dimension: int
+    activation_name: str
+    activation_dtype: Any
+    weight_dtype: Any
+    output_dtype: Any
+    input_weight_shape: list[int] | None
+    output_weight_shape: list[int] | None
+    input_connections: list[str]
+    output_connections: list[str]
+
+    @property
+    def input_projection_id(self) -> str:
+        """Return the input projection node ID."""
+        return f"{self.core.node_id}.in_proj"
+
+    @property
+    def output_projection_id(self) -> str:
+        """Return the output projection node ID."""
+        return f"{self.core.node_id}.out_proj"
+
+
+def _attention_qk_layer(context: _AttentionCore) -> dict[str, Any]:
+    """Emit the query-key contraction layer."""
+    return {
+        "type": "matmul",
+        "einsum_equation": context.qk_equation,
+        "elementwise_op": "mul",
+        "reduction_op": "add",
+        "is_real_einsum": True,
+        "is_einsum_supportable": True,
+        "tensor_names": {
+            "inputs": [context.query_name, context.key_name],
+            "outputs": [f"{context.qk_id}.Output"],
+        },
+        "tensor_types": {
+            "inputs": ["input", "input"],
+            "outputs": ["output"],
+        },
+        "tensor_shapes": {
+            "inputs": [context.query_shape, context.key_shape],
+            "outputs": [context.scores_shape],
+        },
+        "operands": {
+            "Input": ["B", "H", "Q", "D"],
+            context.qk_weight_role: context.qk_weight_dims,
+            "Output": ["B", "H", "Q", "K"],
+        },
+        "tensor_dtypes": {
+            "inputs": [context.activation_dtype, context.activation_dtype],
+            "outputs": [context.activation_dtype],
+        },
+        "connections": {
+            "inputs": context.qk_connections,
+            "outputs": [context.scale_id],
+        },
+    }
+
+
+def _attention_unary_layer(
+    context: _AttentionCore,
+    *,
+    softmax: bool,
+) -> dict[str, Any]:
+    """Emit the scale or softmax layer over attention scores."""
+    node_id = context.softmax_id if softmax else context.scale_id
+    predecessor = context.scale_id if softmax else context.qk_id
+    successor = context.av_id if softmax else context.softmax_id
+    operation = "softmax" if softmax else "mul"
+    layer: dict[str, Any] = {
+        "type": operation,
+        "einsum_equation": "BHQK->BHQK",
+        "elementwise_op": operation,
+        "reduction_op": "none",
+        "is_real_einsum": False,
+        "is_einsum_supportable": True,
+        "tensor_names": {
+            "inputs": [f"{predecessor}.Output"],
+            "outputs": [f"{node_id}.Output"],
+        },
+        "tensor_types": {"inputs": ["input"], "outputs": ["output"]},
+        "tensor_shapes": {
+            "inputs": [context.scores_shape],
+            "outputs": [context.scores_shape],
+        },
+        "operands": {
+            "Input": ["B", "H", "Q", "K"],
+            "Output": ["B", "H", "Q", "K"],
+        },
+        "tensor_dtypes": {
+            "inputs": [context.activation_dtype],
+            "outputs": [context.activation_dtype],
+        },
+        "connections": {"inputs": [predecessor], "outputs": [successor]},
+    }
+    if softmax and context.softmax_dimension is not None:
+        layer["additional_info"] = {"dim": context.softmax_dimension}
+    elif not softmax and context.scale_factor is not None:
+        layer["additional_info"] = {"scale_factor": context.scale_factor}
+    return layer
+
+
+def _attention_av_layer(context: _AttentionCore) -> dict[str, Any]:
+    """Emit the attention-value contraction layer."""
+    return {
+        "type": "matmul",
+        "einsum_equation": "BHQK,BHKV->BHQV",
+        "elementwise_op": "mul",
+        "reduction_op": "add",
+        "is_real_einsum": True,
+        "is_einsum_supportable": True,
+        "tensor_names": {
+            "inputs": [f"{context.softmax_id}.Output", context.value_name],
+            "outputs": [f"{context.av_id}.Output"],
+        },
+        "tensor_types": {
+            "inputs": ["input", "input"],
+            "outputs": ["output"],
+        },
+        "tensor_shapes": {
+            "inputs": [context.scores_shape, context.value_shape],
+            "outputs": [context.output_shape],
+        },
+        "operands": {
+            "Input": ["B", "H", "Q", "K"],
+            context.av_weight_role: ["B", "H", "K", "V"],
+            "Output": ["B", "H", "Q", "V"],
+        },
+        "tensor_dtypes": {
+            "inputs": [context.activation_dtype, context.activation_dtype],
+            "outputs": [context.output_dtype],
+        },
+        "connections": {
+            "inputs": [context.softmax_id, *context.value_connections],
+            "outputs": context.output_connections,
+        },
+    }
+
+
+def _attention_core_layers(
+    context: _AttentionCore,
+) -> dict[str, dict[str, Any]]:
+    """Emit the four shared scaled-dot-product attention layers."""
+    return {
+        context.qk_id: _attention_qk_layer(context),
+        context.scale_id: _attention_unary_layer(context, softmax=False),
+        context.softmax_id: _attention_unary_layer(context, softmax=True),
+        context.av_id: _attention_av_layer(context),
+    }
 
 
 class ConverterAttentionMixin(ConverterMixinContract):
@@ -103,6 +307,85 @@ class ConverterAttentionMixin(ConverterMixinContract):
 
         return node_type == "gru"
 
+    @staticmethod
+    def _attention_connections(
+        node_id: str,
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> tuple[list[str], list[str]]:
+        """Collect canonical attention predecessor and successor IDs."""
+        inputs = sorted(op_graph.predecessors(node_id))
+        for info in start_nodes_info:
+            if node_id not in info.get("consumers", []):
+                continue
+            start_id = start_node_id_map.get(info["original_id"])
+            if start_id and start_id not in inputs:
+                inputs.append(start_id)
+        return sorted(inputs), sorted(op_graph.successors(node_id))
+
+    def _sdpa_context(
+        self,
+        node_id: str,
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> _AttentionCore:
+        """Normalize one native scaled-dot-product attention node."""
+        input_shapes = node_data.get("input_shapes") or []
+        if len(input_shapes) < 3:
+            raise ValueError(
+                f"SDPA requires 3 inputs (Q, K, V). Got: {input_shapes}"
+            )
+        query = list(input_shapes[0])
+        key = list(input_shapes[1])
+        value = list(input_shapes[2])
+        batch, heads, query_length, dimension = query[:4]
+        key_length = key[2]
+        value_width = value[3]
+        outputs = node_data.get("output_shapes") or []
+        output_shape = (
+            list(outputs[0])
+            if outputs
+            else [batch, heads, query_length, value_width]
+        )
+        input_dtypes = node_data.get("input_dtypes") or []
+        activation_dtype = input_dtypes[0] if input_dtypes else "torch.float32"
+        output_dtypes = node_data.get("output_dtypes") or []
+        output_dtype = output_dtypes[0] if output_dtypes else activation_dtype
+        inputs, successors = self._attention_connections(
+            node_id, op_graph, start_nodes_info, start_node_id_map
+        )
+        return _AttentionCore(
+            node_id=node_id,
+            query_name=(
+                f"{inputs[0]}.Output" if inputs else f"{node_id}.Query"
+            ),
+            key_name=(
+                f"{inputs[1]}.Output" if len(inputs) > 1 else f"{node_id}.Key"
+            ),
+            value_name=(
+                f"{inputs[2]}.Output" if len(inputs) > 2 else f"{node_id}.Value"
+            ),
+            query_shape=query,
+            key_shape=key,
+            value_shape=value,
+            scores_shape=[batch, heads, query_length, key_length],
+            output_shape=output_shape,
+            qk_equation="BHQD,BHKD->BHQK",
+            qk_weight_role="Weight",
+            qk_weight_dims=["B", "H", "K", "D"],
+            av_weight_role="Weight",
+            activation_dtype=activation_dtype,
+            output_dtype=output_dtype,
+            qk_connections=inputs[:2],
+            value_connections=inputs[2:3],
+            output_connections=successors,
+            scale_factor=f"1/sqrt({dimension})",
+            softmax_dimension=-1,
+        )
+
     def _expand_sdpa(
         self,
         node_id: str,
@@ -111,251 +394,19 @@ class ConverterAttentionMixin(ConverterMixinContract):
         start_nodes_info: list[dict[str, Any]],
         start_node_id_map: dict[str, str],
     ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
-        """Expand scaled_dot_product_attention into a subgraph of operations.
-
-        Based on PyTorch's reference implementation:
-            attn_weight = query @ key.transpose(-2, -1) * scale_factor
-            attn_weight = torch.softmax(attn_weight, dim=-1)
-            return attn_weight @ value
-
-        Returns:
-            Tuple of (subgraph_layers_dict, final_node_id, input_mapping)
-            input_mapping maps input index -> subgraph node that receives it
-        """
-        input_shapes = node_data.get("input_shapes") or []
-        output_shapes = node_data.get("output_shapes") or []
-        node_data.get("module_args", {})
-        input_dtypes = node_data.get("input_dtypes") or []
-        output_dtypes = node_data.get("output_dtypes") or []
-        act_dtype = input_dtypes[0] if input_dtypes else "torch.float32"
-        out_dtype = output_dtypes[0] if output_dtypes else act_dtype
-
-        if len(input_shapes) < 3:
-            raise ValueError(
-                f"SDPA requires 3 inputs (Q, K, V). Got: {input_shapes}"
-            )
-
-        query_shape = list(input_shapes[0])  # [B, H, Q, D]
-        key_shape = list(input_shapes[1])  # [B, H, K, D]
-        value_shape = list(input_shapes[2])  # [B, H, K, V]
-        output_shape = list(output_shapes[0]) if output_shapes else None
-
-        # Infer dimensions
-        B = query_shape[0]  # noqa: N806 - matches the einsum rank label
-        H = query_shape[1]  # noqa: N806 - matches the einsum rank label
-        Q_len = query_shape[2]  # noqa: N806 - matches the einsum rank label
-        D = query_shape[3]  # noqa: N806 - matches the einsum rank label
-        K_len = key_shape[2]  # noqa: N806 - matches the einsum rank label
-        V_dim = value_shape[3]  # noqa: N806 - matches the einsum rank label
-
-        # Intermediate shapes
-        scores_shape = [B, H, Q_len, K_len]  # Q @ K^T
-        final_output_shape = (
-            output_shape if output_shape else [B, H, Q_len, V_dim]
+        """Expand native scaled-dot-product attention into four layers."""
+        context = self._sdpa_context(
+            node_id,
+            node_data,
+            op_graph,
+            start_nodes_info,
+            start_node_id_map,
         )
-
-        # Build input connections
-        input_connections = sorted(op_graph.predecessors(node_id))
-        for info in start_nodes_info:
-            if node_id in info.get("consumers", []):
-                start_id = start_node_id_map.get(info["original_id"])
-                if start_id and start_id not in input_connections:
-                    input_connections.append(start_id)
-        input_connections = sorted(input_connections)
-
-        output_connections = sorted(op_graph.successors(node_id))
-
-        subgraph: dict[str, dict[str, Any]] = {}
-
-        # Node IDs for subgraph
-        qk_node_id = f"{node_id}.qk_matmul"
-        scale_node_id = f"{node_id}.scale"
-        softmax_node_id = f"{node_id}.softmax"
-        av_node_id = f"{node_id}.av_matmul"
-
-        # Build input mapping: which predecessor input goes to which subgraph node
-        # Q (input 0) -> qk_matmul
-        # K (input 1) -> qk_matmul
-        # V (input 2) -> av_matmul
-        input_mapping: dict[int, str] = {
-            0: qk_node_id,  # Q -> qk_matmul
-            1: qk_node_id,  # K -> qk_matmul
-            2: av_node_id,  # V -> av_matmul
-        }
-
-        # 1. Q @ K^T -> attention scores
-        # Einsum: BHQD,BHKD->BHQK (D is contracted)
-        subgraph[qk_node_id] = {
-            "type": "matmul",
-            "einsum_equation": "BHQD,BHKD->BHQK",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [
-                    (
-                        f"{input_connections[0]}.Output"
-                        if input_connections
-                        else f"{node_id}.Query"
-                    ),
-                    (
-                        f"{input_connections[1]}.Output"
-                        if len(input_connections) > 1
-                        else f"{node_id}.Key"
-                    ),
-                ],
-                "outputs": [f"{qk_node_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [query_shape, key_shape],
-                "outputs": [scores_shape],
-            },
-            # Operands drive the AF graph builder; without them the
-            # layer is silently dropped (cf. commit 8162f29 for linear).
-            "operands": {
-                "Input": ["B", "H", "Q", "D"],
-                "Weight": ["B", "H", "K", "D"],
-                "Output": ["B", "H", "Q", "K"],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype, act_dtype],
-                "outputs": [act_dtype],
-            },
-            "connections": {
-                "inputs": (
-                    input_connections[:2]
-                    if len(input_connections) >= 2
-                    else input_connections
-                ),
-                "outputs": [scale_node_id],
-            },
-        }
-        # 2. Scale by 1/sqrt(d_k)
-        subgraph[scale_node_id] = {
-            "type": "mul",
-            "einsum_equation": "BHQK->BHQK",
-            "elementwise_op": "mul",
-            "reduction_op": "none",
-            "is_real_einsum": False,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [f"{qk_node_id}.Output"],
-                "outputs": [f"{scale_node_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [scores_shape],
-                "outputs": [scores_shape],
-            },
-            "operands": {
-                "Input": ["B", "H", "Q", "K"],
-                "Output": ["B", "H", "Q", "K"],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype],
-                "outputs": [act_dtype],
-            },
-            "connections": {
-                "inputs": [qk_node_id],
-                "outputs": [softmax_node_id],
-            },
-            "additional_info": {
-                "scale_factor": f"1/sqrt({D})",
-            },
-        }
-
-        # 3. Softmax over K dimension (dim=-1)
-        subgraph[softmax_node_id] = {
-            "type": "softmax",
-            "einsum_equation": "BHQK->BHQK",
-            "elementwise_op": "softmax",
-            "reduction_op": "none",
-            "is_real_einsum": False,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [f"{scale_node_id}.Output"],
-                "outputs": [f"{softmax_node_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [scores_shape],
-                "outputs": [scores_shape],
-            },
-            "operands": {
-                "Input": ["B", "H", "Q", "K"],
-                "Output": ["B", "H", "Q", "K"],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype],
-                "outputs": [act_dtype],
-            },
-            "connections": {
-                "inputs": [scale_node_id],
-                "outputs": [av_node_id],
-            },
-            "additional_info": {
-                "dim": -1,
-            },
-        }
-
-        # 4. Attention weights @ V -> output
-        # Einsum: BHQK,BHKV->BHQV (K is contracted)
-        subgraph[av_node_id] = {
-            "type": "matmul",
-            "einsum_equation": "BHQK,BHKV->BHQV",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [
-                    f"{softmax_node_id}.Output",
-                    (
-                        f"{input_connections[2]}.Output"
-                        if len(input_connections) > 2
-                        else f"{node_id}.Value"
-                    ),
-                ],
-                "outputs": [f"{av_node_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [scores_shape, value_shape],
-                "outputs": [final_output_shape],
-            },
-            "operands": {
-                "Input": ["B", "H", "Q", "K"],
-                "Weight": ["B", "H", "K", "V"],
-                "Output": ["B", "H", "Q", "V"],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype, act_dtype],
-                "outputs": [out_dtype],
-            },
-            "connections": {
-                "inputs": [softmax_node_id]
-                + (
-                    input_connections[2:3] if len(input_connections) > 2 else []
-                ),
-                "outputs": output_connections,
-            },
-        }
-
-        return subgraph, av_node_id, input_mapping
+        return (
+            _attention_core_layers(context),
+            context.av_id,
+            {0: context.qk_id, 1: context.qk_id, 2: context.av_id},
+        )
 
     @staticmethod
     def _as_list(value: Any, default: list[int]) -> list[Any]:
@@ -366,6 +417,192 @@ class ConverterAttentionMixin(ConverterMixinContract):
             return list(value)
         return [value]
 
+    @staticmethod
+    def _mha_weight_shapes(
+        input_shapes: list[Any],
+        input_types: list[str],
+        dimension: int,
+    ) -> tuple[list[int] | None, list[int] | None]:
+        """Identify the input and output projection weight matrices."""
+        input_weight = None
+        output_weight = None
+        for index, kind in enumerate(input_types):
+            if kind != "weight" or index >= len(input_shapes):
+                continue
+            shape = input_shapes[index]
+            if not isinstance(shape, list) or len(shape) != 2:
+                continue
+            if shape == [3 * dimension, dimension]:
+                input_weight = shape
+            elif shape == [dimension, dimension]:
+                output_weight = shape
+        return input_weight, output_weight
+
+    @staticmethod
+    def _mha_dtypes(
+        node_data: dict[str, Any],
+        input_types: list[str],
+    ) -> tuple[Any, Any, Any]:
+        """Return activation, weight, and output dtypes for MHA."""
+        inputs = node_data.get("input_dtypes") or []
+        activation = inputs[0] if inputs else "torch.float32"
+        weight = next(
+            (
+                inputs[index]
+                for index, kind in enumerate(input_types)
+                if kind == "weight" and index < len(inputs)
+            ),
+            activation,
+        )
+        outputs = node_data.get("output_dtypes") or []
+        return activation, weight, outputs[0] if outputs else activation
+
+    def _mha_context(
+        self,
+        node_id: str,
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> _MHAContext:
+        """Normalize one multi-head-attention node for expansion."""
+        input_shapes = node_data.get("input_shapes") or []
+        activation_shape = input_shapes[0] if input_shapes else []
+        if len(activation_shape) < 3:
+            raise ValueError(
+                f"MHA requires [S,B,D] input. Got: {activation_shape}"
+            )
+        sequence, batch, dimension = activation_shape[:3]
+        input_types = [
+            str(value).lower() for value in (node_data.get("input_types") or [])
+        ]
+        input_weight, output_weight = self._mha_weight_shapes(
+            input_shapes, input_types, dimension
+        )
+        activation_dtype, weight_dtype, output_dtype = self._mha_dtypes(
+            node_data, input_types
+        )
+        inputs, outputs = self._attention_connections(
+            node_id, op_graph, start_nodes_info, start_node_id_map
+        )
+        activation_name = (
+            f"{inputs[0]}.Output" if inputs else f"{node_id}.Input"
+        )
+        projected_name = (
+            f"{node_id}.in_proj.Output" if input_weight else activation_name
+        )
+        core = _AttentionCore(
+            node_id=node_id,
+            query_name=projected_name,
+            key_name=projected_name,
+            value_name=projected_name,
+            query_shape=[batch, 1, sequence, dimension],
+            key_shape=[batch, 1, dimension, sequence],
+            value_shape=[batch, 1, sequence, dimension],
+            scores_shape=[batch, 1, sequence, sequence],
+            output_shape=[batch, 1, sequence, dimension],
+            qk_equation="BHQD,BHDK->BHQK",
+            qk_weight_role="Input_1",
+            qk_weight_dims=["B", "H", "D", "K"],
+            av_weight_role="Input_1",
+            activation_dtype=activation_dtype,
+            output_dtype=activation_dtype,
+            qk_connections=[f"{node_id}.in_proj"]
+            if input_weight
+            else inputs[:1],
+            value_connections=[],
+            output_connections=(
+                [f"{node_id}.out_proj"] if output_weight else outputs
+            ),
+        )
+        return _MHAContext(
+            core=core,
+            sequence=sequence,
+            batch=batch,
+            dimension=dimension,
+            activation_name=activation_name,
+            activation_dtype=activation_dtype,
+            weight_dtype=weight_dtype,
+            output_dtype=output_dtype,
+            input_weight_shape=input_weight,
+            output_weight_shape=output_weight,
+            input_connections=inputs,
+            output_connections=outputs,
+        )
+
+    @staticmethod
+    def _mha_projection_layer(
+        context: _MHAContext,
+        *,
+        output: bool,
+    ) -> dict[str, Any]:
+        """Emit the input or output linear projection of MHA."""
+        node_id = (
+            context.output_projection_id
+            if output
+            else context.input_projection_id
+        )
+        weight_shape = (
+            context.output_weight_shape
+            if output
+            else context.input_weight_shape
+        )
+        output_width = context.dimension if output else 3 * context.dimension
+        input_name = (
+            f"{context.core.av_id}.Output"
+            if output
+            else context.activation_name
+        )
+        return {
+            "type": "linear",
+            "einsum_equation": "MK,NK->MN",
+            "elementwise_op": "mul",
+            "reduction_op": "add",
+            "is_real_einsum": True,
+            "is_einsum_supportable": True,
+            "operands": {
+                "Input": ["M", "K"],
+                "Weight": ["N", "K"],
+                "Output": ["M", "N"],
+            },
+            "tensor_names": {
+                "inputs": [
+                    input_name,
+                    f"{node_id}.Weight",
+                ],
+                "outputs": [f"{node_id}.Output"],
+            },
+            "tensor_types": {
+                "inputs": ["input", "weight"],
+                "outputs": ["output"],
+            },
+            "tensor_shapes": {
+                "inputs": [
+                    [context.sequence * context.batch, context.dimension],
+                    weight_shape,
+                ],
+                "outputs": [[context.sequence * context.batch, output_width]],
+            },
+            "tensor_dtypes": {
+                "inputs": [context.activation_dtype, context.weight_dtype],
+                "outputs": [
+                    context.output_dtype if output else context.activation_dtype
+                ],
+            },
+            "connections": {
+                "inputs": (
+                    [context.core.av_id]
+                    if output
+                    else context.input_connections[:1]
+                ),
+                "outputs": (
+                    context.output_connections
+                    if output
+                    else [context.core.qk_id]
+                ),
+            },
+        }
+
     def _expand_mha(
         self,
         node_id: str,
@@ -374,330 +611,29 @@ class ConverterAttentionMixin(ConverterMixinContract):
         start_nodes_info: list[dict[str, Any]],
         start_node_id_map: dict[str, str],
     ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
-        """Expand multi_head_attention_forward into a subgraph.
-
-        MHA decomposes into:
-          1. in_proj (linear): input @ in_proj_weight^T  [S*B,D] @ [D,3D] -> [S*B,3D]
-          2. qk_matmul: Q @ K^T  [B,H,S,D/H] x [B,H,D/H,S] -> [B,H,S,S]
-          3. scale: * 1/sqrt(d_k)
-          4. softmax
-          5. av_matmul: attn @ V  [B,H,S,S] x [B,H,S,D/H] -> [B,H,S,D/H]
-          6. out_proj (linear): concat @ out_proj_weight^T  [S*B,D] @ [D,D] -> [S*B,D]
-
-        The head count cancels for MACs: B*H*S*S*(D/H) = B*S*S*D.
-        We use num_heads=1 equivalent shapes so standard equations work.
-        """
-        input_shapes = node_data.get("input_shapes") or []
-        output_shapes = node_data.get("output_shapes") or []
-        input_types = [
-            str(t).lower() for t in (node_data.get("input_types") or [])
-        ]
-        input_dtypes = node_data.get("input_dtypes") or []
-        output_dtypes = node_data.get("output_dtypes") or []
-        act_dtype = input_dtypes[0] if input_dtypes else "torch.float32"
-        weight_dtype = next(
-            (
-                input_dtypes[i]
-                for i, t in enumerate(input_types)
-                if t == "weight" and i < len(input_dtypes)
-            ),
-            act_dtype,
+        """Expand MHA into optional projections and a shared SDPA core."""
+        context = self._mha_context(
+            node_id,
+            node_data,
+            op_graph,
+            start_nodes_info,
+            start_node_id_map,
         )
-        out_dtype = output_dtypes[0] if output_dtypes else act_dtype
-
-        # Parse activation shape: [S, B, D]
-        act_shape = input_shapes[0] if input_shapes else []
-        if len(act_shape) < 3:
-            raise ValueError(f"MHA requires [S,B,D] input. Got: {act_shape}")
-        S, B, D = act_shape[0], act_shape[1], act_shape[2]  # noqa: N806
-
-        # Find weight shapes by type
-        in_proj_w_shape = None  # [3D, D]
-        out_proj_w_shape = None  # [D, D]
-        for i, t in enumerate(input_types):
-            if t == "weight" and i < len(input_shapes):
-                ws = input_shapes[i]
-                if isinstance(ws, list) and len(ws) == 2:
-                    if ws[0] == 3 * D and ws[1] == D:
-                        in_proj_w_shape = ws
-                    elif ws[0] == D and ws[1] == D:
-                        out_proj_w_shape = ws
-
-        # Derived shapes for sub-nodes
-        [S, B, 3 * D]  # after in_proj
-        # Use single-head equivalent: [B, 1, S, D] so H cancels in cost
-        # Use Q/K labels for sequence dims to avoid repeated dim in equations
-        q_shape = [B, 1, S, D]
-        k_transposed_shape = [B, 1, D, S]  # K^T for matmul handler convention
-        v_shape = [B, 1, S, D]
-        scores_shape = [B, 1, S, S]  # shapes still use S,S (same value)
-        attn_out_shape = [B, 1, S, D]
-        list(output_shapes[0]) if output_shapes else [S, B, D]
-
-        # Build connections
-        input_connections = sorted(op_graph.predecessors(node_id))
-        for info in start_nodes_info:
-            if node_id in info.get("consumers", []):
-                start_id = start_node_id_map.get(info["original_id"])
-                if start_id and start_id not in input_connections:
-                    input_connections.append(start_id)
-        input_connections = sorted(input_connections)
-        output_connections = sorted(op_graph.successors(node_id))
-
         subgraph: dict[str, dict[str, Any]] = {}
-
-        in_proj_id = f"{node_id}.in_proj"
-        qk_id = f"{node_id}.qk_matmul"
-        scale_id = f"{node_id}.scale"
-        softmax_id = f"{node_id}.softmax"
-        av_id = f"{node_id}.av_matmul"
-        out_proj_id = f"{node_id}.out_proj"
-
-        input_mapping: dict[int, str] = {0: in_proj_id}
-        if len(input_connections) > 1:
-            input_mapping[1] = in_proj_id
-        if len(input_connections) > 2:
-            input_mapping[2] = in_proj_id
-
-        act_input_name = (
-            f"{input_connections[0]}.Output"
-            if input_connections
-            else f"{node_id}.Input"
-        )
-        in_proj_w_name = f"{node_id}.in_proj.Weight"
-        out_proj_w_name = f"{node_id}.out_proj.Weight"
-
-        # 1. in_proj: input @ in_proj_weight^T
-        #    Weight is [N, K] = [3D, D]. Equation MK,NK->MN matches handler convention.
-        in_proj_input_shape = [S * B, D]
-        in_proj_output_shape = [S * B, 3 * D]
-        if in_proj_w_shape:
-            subgraph[in_proj_id] = {
-                "type": "linear",
-                "einsum_equation": "MK,NK->MN",
-                "elementwise_op": "mul",
-                "reduction_op": "add",
-                "is_real_einsum": True,
-                "is_einsum_supportable": True,
-                "operands": {
-                    "Input": ["M", "K"],
-                    "Weight": ["N", "K"],
-                    "Output": ["M", "N"],
-                },
-                "tensor_names": {
-                    "inputs": [act_input_name, in_proj_w_name],
-                    "outputs": [f"{in_proj_id}.Output"],
-                },
-                "tensor_types": {
-                    "inputs": ["input", "weight"],
-                    "outputs": ["output"],
-                },
-                "tensor_shapes": {
-                    "inputs": [in_proj_input_shape, in_proj_w_shape],
-                    "outputs": [in_proj_output_shape],
-                },
-                "tensor_dtypes": {
-                    "inputs": [act_dtype, weight_dtype],
-                    "outputs": [act_dtype],
-                },
-                "connections": {
-                    "inputs": input_connections[:1],
-                    "outputs": [qk_id],
-                },
-            }
-
-        # 2. qk_matmul: Q @ K^T
-        subgraph[qk_id] = {
-            "type": "matmul",
-            "einsum_equation": "BHQD,BHDK->BHQK",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "operands": {
-                "Input": ["B", "H", "Q", "D"],
-                "Input_1": ["B", "H", "D", "K"],
-                "Output": ["B", "H", "Q", "K"],
-            },
-            "tensor_names": {
-                "inputs": [
-                    f"{in_proj_id}.Output"
-                    if in_proj_w_shape
-                    else act_input_name,
-                    f"{in_proj_id}.Output"
-                    if in_proj_w_shape
-                    else act_input_name,
-                ],
-                "outputs": [f"{qk_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [q_shape, k_transposed_shape],
-                "outputs": [scores_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype, act_dtype],
-                "outputs": [act_dtype],
-            },
-            "connections": {
-                "inputs": [in_proj_id]
-                if in_proj_w_shape
-                else input_connections[:1],
-                "outputs": [scale_id],
-            },
-        }
-
-        # 3. scale
-        subgraph[scale_id] = {
-            "type": "mul",
-            "einsum_equation": "BHQK->BHQK",
-            "elementwise_op": "mul",
-            "reduction_op": "none",
-            "is_real_einsum": False,
-            "is_einsum_supportable": True,
-            "operands": {
-                "Input": ["B", "H", "Q", "K"],
-                "Output": ["B", "H", "Q", "K"],
-            },
-            "tensor_names": {
-                "inputs": [f"{qk_id}.Output"],
-                "outputs": [f"{scale_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [scores_shape],
-                "outputs": [scores_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype],
-                "outputs": [act_dtype],
-            },
-            "connections": {
-                "inputs": [qk_id],
-                "outputs": [softmax_id],
-            },
-        }
-
-        # 4. softmax
-        subgraph[softmax_id] = {
-            "type": "softmax",
-            "einsum_equation": "BHQK->BHQK",
-            "elementwise_op": "softmax",
-            "reduction_op": "none",
-            "is_real_einsum": False,
-            "is_einsum_supportable": True,
-            "operands": {
-                "Input": ["B", "H", "Q", "K"],
-                "Output": ["B", "H", "Q", "K"],
-            },
-            "tensor_names": {
-                "inputs": [f"{scale_id}.Output"],
-                "outputs": [f"{softmax_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [scores_shape],
-                "outputs": [scores_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype],
-                "outputs": [act_dtype],
-            },
-            "connections": {
-                "inputs": [scale_id],
-                "outputs": [av_id],
-            },
-        }
-
-        # 5. av_matmul: attn @ V
-        subgraph[av_id] = {
-            "type": "matmul",
-            "einsum_equation": "BHQK,BHKV->BHQV",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "operands": {
-                "Input": ["B", "H", "Q", "K"],
-                "Input_1": ["B", "H", "K", "V"],
-                "Output": ["B", "H", "Q", "V"],
-            },
-            "tensor_names": {
-                "inputs": [
-                    f"{softmax_id}.Output",
-                    f"{in_proj_id}.Output"
-                    if in_proj_w_shape
-                    else act_input_name,
-                ],
-                "outputs": [f"{av_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [scores_shape, v_shape],
-                "outputs": [attn_out_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype, act_dtype],
-                "outputs": [act_dtype],
-            },
-            "connections": {
-                "inputs": [softmax_id],
-                "outputs": [out_proj_id]
-                if out_proj_w_shape
-                else output_connections,
-            },
-        }
-
-        # 6. out_proj: Weight is [N, K] = [D, D]. Equation MK,NK->MN.
-        final_node_id = av_id
-        if out_proj_w_shape:
-            out_proj_input_shape = [S * B, D]
-            out_proj_output_shape = [S * B, D]
-            subgraph[out_proj_id] = {
-                "type": "linear",
-                "einsum_equation": "MK,NK->MN",
-                "elementwise_op": "mul",
-                "reduction_op": "add",
-                "is_real_einsum": True,
-                "is_einsum_supportable": True,
-                "operands": {
-                    "Input": ["M", "K"],
-                    "Weight": ["N", "K"],
-                    "Output": ["M", "N"],
-                },
-                "tensor_names": {
-                    "inputs": [f"{av_id}.Output", out_proj_w_name],
-                    "outputs": [f"{out_proj_id}.Output"],
-                },
-                "tensor_types": {
-                    "inputs": ["input", "weight"],
-                    "outputs": ["output"],
-                },
-                "tensor_shapes": {
-                    "inputs": [out_proj_input_shape, out_proj_w_shape],
-                    "outputs": [out_proj_output_shape],
-                },
-                "tensor_dtypes": {
-                    "inputs": [act_dtype, weight_dtype],
-                    "outputs": [out_dtype],
-                },
-                "connections": {
-                    "inputs": [av_id],
-                    "outputs": output_connections,
-                },
-            }
-            final_node_id = out_proj_id
-
+        if context.input_weight_shape:
+            subgraph[context.input_projection_id] = self._mha_projection_layer(
+                context, output=False
+            )
+        subgraph.update(_attention_core_layers(context.core))
+        final_node_id = context.core.av_id
+        if context.output_weight_shape:
+            subgraph[context.output_projection_id] = self._mha_projection_layer(
+                context, output=True
+            )
+            final_node_id = context.output_projection_id
+        input_mapping = {0: context.input_projection_id}
+        if len(context.input_connections) > 1:
+            input_mapping[1] = context.input_projection_id
+        if len(context.input_connections) > 2:
+            input_mapping[2] = context.input_projection_id
         return subgraph, final_node_id, input_mapping

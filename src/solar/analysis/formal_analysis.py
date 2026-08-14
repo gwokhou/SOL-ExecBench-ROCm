@@ -23,8 +23,6 @@ formal-evidence contract.
 
 from __future__ import annotations
 
-from typing import Any
-
 from solar.analysis import formal_evidence
 from solar.analysis.graph_context import (
     GraphTopology,
@@ -42,6 +40,7 @@ from solar.analysis.orojenesis.runner import (
     OrojenesisRunner,
 )
 from solar.schema_versions import OROJENESIS_ANALYSIS_SCHEMA_VERSION
+from solar.types import NodeDict
 
 
 class FormalAnalysisMixin(AnalysisMixinContract):
@@ -153,7 +152,7 @@ class FormalAnalysisMixin(AnalysisMixinContract):
         seconds: float | None = None
         resource_seconds: dict[str, float] = {}
         compute_resource: str | None = None
-        components: dict[str, Any] | None = None
+        components: NodeDict | None = None
         if (
             prepared.profile is not None
             and prepared.semantic_graph

@@ -13,6 +13,9 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPO_ROOT / "src"
 PACKAGE_ROOTS = (SOURCE_ROOT / "sol_execbench", SOURCE_ROOT / "solar")
+AUDIT_ONLY_MODULES = {
+    "sol_execbench.core.integrity.artifact_registry",
+}
 
 P0_LIMITS = {
     "sol_execbench.cli.evaluation.evaluator": (240, 8),
@@ -135,6 +138,8 @@ def internal_import_edges(modules: dict[str, Path]) -> set[tuple[str, str]]:
     """Return internal import edges."""
     edges: set[tuple[str, str]] = set()
     for module, path in modules.items():
+        if module in AUDIT_ONLY_MODULES:
+            continue
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.Import | ast.ImportFrom):

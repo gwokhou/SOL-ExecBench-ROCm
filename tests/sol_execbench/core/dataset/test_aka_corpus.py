@@ -122,7 +122,7 @@ def test_aka_manifest_loads_and_pins_revision():
 
 def test_corpus_architecture_identity_matches_packaged_solar_profile():
     from sol_execbench.core.dataset.aka_corpus import FORMAL_ARCHITECTURE_SHA256
-    from sol_execbench.core.solar_bridge.analyzer import (
+    from sol_execbench.core.solar_bridge.formal_device import (
         formal_architecture_profile_hash,
     )
 

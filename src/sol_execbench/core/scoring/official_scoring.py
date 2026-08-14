@@ -21,7 +21,9 @@ from sol_execbench.core.scoring.official_scoring_models import (
     OfficialScoreAvailabilityReport,
 )
 from sol_execbench.core.scoring.schema_versions import ReleaseArtifactSchema
-from sol_execbench.core.solar_bridge.analyzer import formal_producer_readiness
+from sol_execbench.core.solar_bridge.formal_device import (
+    formal_producer_readiness,
+)
 
 OFFICIAL_CORPUS_MANIFEST_SHA256 = (
     "8f057f7890016239456e137e639e4538df22733ecf49721a919f8f6877acc857"

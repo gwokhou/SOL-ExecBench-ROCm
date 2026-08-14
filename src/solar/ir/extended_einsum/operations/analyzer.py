@@ -21,7 +21,6 @@ operation handlers to convert PyTorch operations to einsum notation.
 
 import re
 from collections.abc import Callable
-from typing import Any
 
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
@@ -31,7 +30,7 @@ from solar.ir.extended_einsum.operations.handlers.registry import (
     EinsumOpRegistry,
     get_global_registry,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 _CONVOLUTION_ALIASES = (
     (("convtranspose1d", "conv_transpose1d"), "convtranspose1d"),
@@ -246,7 +245,7 @@ class EinsumAnalyzer:
         self,
         op_name: str,
         shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> int:
         """Get compute cost for an operation.
 
@@ -292,7 +291,7 @@ class EinsumAnalyzer:
         self,
         op_name: str,
         shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Get an einsum operation for the given operation name.
 
@@ -327,7 +326,7 @@ class EinsumAnalyzer:
         op_norm: str,
         input_shape: TensorShape,
         weight_shape: TensorShape,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> TensorShape | None:
         """Infer output shape for conv ops when not provided."""
         try:

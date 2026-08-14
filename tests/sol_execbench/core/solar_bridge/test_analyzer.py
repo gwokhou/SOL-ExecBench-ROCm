@@ -8,7 +8,11 @@ import torch
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import NumericCheck, Workload
-from sol_execbench.core.solar_bridge import analyzer, workload_context
+from sol_execbench.core.solar_bridge import (
+    analyzer,
+    formal_device,
+    workload_context,
+)
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
@@ -352,10 +356,13 @@ def test_invoke_solar_non_formal_path_keeps_non_formal_bound(
 
 
 def test_architecture_for_gfx_target_maps_cdna3_and_rdna4() -> None:
-    assert analyzer._architecture_for_gfx_target("gfx1200") == "RX_9060_XT"
-    assert analyzer._architecture_for_gfx_target("gfx942") == "MI300X"
+    assert (
+        formal_device.solar_architecture_for_gfx_target("gfx1200")
+        == "RX_9060_XT"
+    )
+    assert formal_device.solar_architecture_for_gfx_target("gfx942") == "MI300X"
     with pytest.raises(ValueError, match="unsupported_solar_architecture"):
-        analyzer._architecture_for_gfx_target("gfx1100")
+        formal_device.solar_architecture_for_gfx_target("gfx1100")
 
 
 def test_select_workload_requires_exact_uuid_match() -> None:

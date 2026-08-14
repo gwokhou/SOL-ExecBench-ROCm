@@ -30,6 +30,7 @@ from sol_execbench.core.dataset.schema_versions import (
 )
 from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 from sol_execbench.core.scoring.schema_versions import ReleaseArtifactSchema
+from sol_execbench.tools.amd_isa.schema_versions import AMDISAArtifactSchema
 
 ARTIFACT_SCHEMA_REGISTRIES: Final[tuple[type[StrEnum], ...]] = (
     BenchmarkArtifactSchema,
@@ -41,6 +42,7 @@ ARTIFACT_SCHEMA_REGISTRIES: Final[tuple[type[StrEnum], ...]] = (
     DiagnosticArtifactSchema,
     DiagnosticLifecycleSchema,
     ReleaseArtifactSchema,
+    AMDISAArtifactSchema,
 )
 
 ARTIFACT_SCHEMA_MEMBERS: Final[tuple[StrEnum, ...]] = tuple(

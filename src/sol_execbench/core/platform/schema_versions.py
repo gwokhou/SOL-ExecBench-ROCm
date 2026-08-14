@@ -9,7 +9,6 @@ from enum import StrEnum
 class PlatformArtifactSchema(StrEnum):
     """Canonical platform capability and environment identifiers."""
 
-    AMD_ISA_RELEASE_LOCK = "sol_execbench.amd_isa_release_lock.v1"
     ARCH_CAPABILITY_BUDGET = "sol_execbench.arch_capability_budget.v1"
     PLATFORM_PREFLIGHT = "sol_execbench.platform_preflight.v1"
     ENVIRONMENT_EVIDENCE = "sol_execbench.environment_evidence.v1"
