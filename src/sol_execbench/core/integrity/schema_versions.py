@@ -34,6 +34,8 @@ class SchemaVersion(StrEnum):
         "sol_execbench.corpus_stage_readiness_summary.v2"
     )
     CORPUS_STAGE_TRACE_IDENTITY = "sol_execbench.corpus_stage_trace_identity.v3"
+    CORPUS_MANIFEST = "sol_execbench.corpus_manifest.v1"
+    CORPUS_SELECTION_MANIFEST = "sol_execbench.corpus_selection_manifest.v1"
     DATASET_PROVENANCE_POLICY = "sol_execbench.dataset_provenance_policy.v1"
     DATASET_REDISTRIBUTION_CHECK = (
         "sol_execbench.dataset_redistribution_check.v1"
@@ -164,6 +166,7 @@ class SchemaVersion(StrEnum):
     SOLAR_WORKER_IPC = "sol_execbench.solar_worker_ipc.v2"
     SOLUTION = "sol_execbench.solution.v1"
     STATIC_ARTIFACT_MANIFEST = "sol_execbench.static_artifact_manifest.v1"
+    STATIC_TARGET_DESCRIPTOR = "sol_execbench.static_target_descriptor.v1"
     STATIC_KERNEL_EVIDENCE = "sol_execbench.static_kernel_evidence.v4"
     TOOLCHAIN_ROUTING = "sol_execbench.toolchain_routing.v1"
     TRACE = "sol_execbench.trace.v1"

@@ -33,6 +33,13 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKA_REVISION,
     AKACorpusManifest,
 )
+from sol_execbench.core.dataset.corpus import (
+    SELECTION_MANIFEST_FILENAME,
+    load_target_descriptor,
+    select_corpus,
+    validate_corpus,
+)
+from sol_execbench.core.dataset.corpus_models import CorpusProfile
 from sol_execbench.core.platform.runtime import detect_rocm_device
 
 console = Console(stderr=True)
@@ -40,6 +47,11 @@ DEFAULT_MANIFEST = Path("problems/AMD_AKA/manifest.yaml")
 DEFAULT_OUTPUT_ROOT = Path("problems/local/AMD_AKA")
 DEFAULT_AKA_ROOT = Path("data/AgentKernelArena")
 DEFAULT_FETCH_SCRIPT = Path("scripts/fetch_aka_source.sh")
+DEFAULT_CORPUS_MANIFEST = Path(
+    "problems/LLM_CORE/releases/LLM_CORE_V1/manifest.yaml",
+)
+DEFAULT_TARGET_ROOT = Path("problems/LLM_CORE/targets")
+TARGET_TEMPLATES = ("gfx1200", "gfx942")
 
 
 @click.group(
@@ -47,7 +59,128 @@ DEFAULT_FETCH_SCRIPT = Path("scripts/fetch_aka_source.sh")
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 def dataset_cli() -> None:
-    """Materialize and audit the AKA-derived problem corpus."""
+    """Validate and select problem corpora; preserve AKA compatibility."""
+
+
+@dataset_cli.group("corpus")
+def corpus_cli() -> None:
+    """Validate or statically select a hardware-independent corpus."""
+
+
+@corpus_cli.command("validate")
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=DEFAULT_CORPUS_MANIFEST,
+    show_default=True,
+)
+def validate_corpus_cli(manifest_path: Path) -> CliResult:
+    """Validate the manifest, artifacts, provenance, and coverage floors."""
+    try:
+        report = validate_corpus(manifest_path)
+    except (OSError, ValueError) as exc:
+        raise CliFailure(str(exc), code="invalid_corpus_manifest") from exc
+    console.print(
+        f"[green]Valid {report['release_id']}: {report['definitions']} definitions, "
+        f"{report['workloads']} workloads[/green]",
+    )
+    return CliResult(data={"manifest": str(manifest_path), **report})
+
+
+@corpus_cli.command("select")
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=DEFAULT_CORPUS_MANIFEST,
+    show_default=True,
+)
+@click.option(
+    "--target-template",
+    type=click.Choice(TARGET_TEMPLATES),
+    help="Bundled declared target template.",
+)
+@click.option(
+    "--target-descriptor",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="External static target descriptor in JSON or YAML.",
+)
+@click.option(
+    "--memory-budget",
+    type=click.IntRange(min=1),
+    help="Usable bytes; required when the descriptor does not declare a budget.",
+)
+@click.option(
+    "--profile",
+    "profile_values",
+    type=click.Choice(tuple(profile.value for profile in CorpusProfile)),
+    multiple=True,
+    default=(CorpusProfile.CORE.value,),
+    show_default=True,
+)
+@click.option(
+    "--output",
+    type=click.Path(file_okay=False, path_type=Path),
+    required=True,
+)
+@click.option(
+    "--require-complete-profile",
+    is_flag=True,
+    help="Fail when the selected target falls below a requested profile floor.",
+)
+def select_corpus_cli(
+    manifest_path: Path,
+    target_template: str | None,
+    target_descriptor: Path | None,
+    memory_budget: int | None,
+    profile_values: tuple[str, ...],
+    output: Path,
+    require_complete_profile: bool,
+) -> CliResult:
+    """Create a deterministic target view without probing a GPU."""
+    if (target_template is None) == (target_descriptor is None):
+        raise CliFailure(
+            "provide exactly one of --target-template or --target-descriptor",
+            code="invalid_static_target",
+        )
+    target_path = (
+        target_descriptor or DEFAULT_TARGET_ROOT / f"{target_template}.yaml"
+    )
+    try:
+        target = load_target_descriptor(target_path)
+        if memory_budget is not None:
+            target = target.model_copy(
+                update={"memory_budget_bytes": memory_budget},
+            )
+        if target.memory_budget_bytes is None:
+            raise ValueError(
+                "--memory-budget is required for this target descriptor"
+            )
+        result = select_corpus(
+            manifest_path,
+            output,
+            target=target,
+            profiles=tuple(CorpusProfile(value) for value in profile_values),
+            require_complete_profile=require_complete_profile,
+        )
+    except FileExistsError as exc:
+        raise CliFailure(
+            str(exc), code="corpus_selection_output_exists"
+        ) from exc
+    except (OSError, ValueError) as exc:
+        raise CliFailure(str(exc), code="corpus_selection_invalid") from exc
+    record = result / SELECTION_MANIFEST_FILENAME
+    console.print(f"[green]Static corpus selection written to {result}[/green]")
+    return CliResult(
+        data={
+            "output": str(result),
+            "target_id": target.target_id,
+            "profiles": list(profile_values),
+            "qualification_status": target.qualification_status.value,
+        },
+        artifacts=(artifact(record, "yaml_file"),),
+    )
 
 
 @dataset_cli.command("materialize")

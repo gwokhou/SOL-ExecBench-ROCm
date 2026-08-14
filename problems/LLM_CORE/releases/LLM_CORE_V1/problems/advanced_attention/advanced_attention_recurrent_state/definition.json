@@ -1,0 +1,79 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "advanced_attention_recurrent_state",
+  "op_type": "advanced_attention",
+  "axes": {
+    "B": {
+      "type": "var",
+      "description": "B"
+    },
+    "HQ": {
+      "type": "var",
+      "description": "HQ"
+    },
+    "HK": {
+      "type": "var",
+      "description": "HK"
+    },
+    "S": {
+      "type": "var",
+      "description": "S"
+    },
+    "T": {
+      "type": "var",
+      "description": "T"
+    },
+    "D": {
+      "type": "var",
+      "description": "D"
+    }
+  },
+  "custom_inputs_entrypoint": null,
+  "inputs": {
+    "q": {
+      "shape": [
+        "B",
+        "HQ",
+        "S",
+        "D"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    },
+    "k": {
+      "shape": [
+        "B",
+        "HK",
+        "T",
+        "D"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    },
+    "v": {
+      "shape": [
+        "B",
+        "HK",
+        "T",
+        "D"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "B",
+        "HQ",
+        "S",
+        "D"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    }
+  },
+  "reference": "import math\nimport torch\n\ndef run(q, k, v):\n    q = q.float()\n    repeat = q.shape[1] // k.shape[1]\n    k = k.float().repeat_interleave(repeat, dim=1)\n    v = v.float().repeat_interleave(repeat, dim=1)\n    scores = torch.matmul(q, k.transpose(-1, -2)) / math.sqrt(q.shape[-1])\n    scores = scores + torch.cumsum(scores, dim=-1) * 0.01\n    scores = scores\n    probs = torch.softmax(scores, dim=-1)\n    return torch.matmul(probs, v).to(torch.bfloat16)\n",
+  "description": "Clean-room LLM Core V1 semantic: llm.advanced_attention.recurrent_state.v1.",
+  "hf_id": null
+}

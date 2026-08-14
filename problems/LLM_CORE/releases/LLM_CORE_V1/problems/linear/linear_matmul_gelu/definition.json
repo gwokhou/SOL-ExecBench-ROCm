@@ -1,0 +1,58 @@
+{
+  "schema_version": "sol_execbench.definition.v1",
+  "name": "linear_matmul_gelu",
+  "op_type": "linear",
+  "axes": {
+    "M": {
+      "type": "var",
+      "description": "M"
+    },
+    "K": {
+      "type": "var",
+      "description": "K"
+    },
+    "N": {
+      "type": "var",
+      "description": "N"
+    }
+  },
+  "custom_inputs_entrypoint": null,
+  "inputs": {
+    "x": {
+      "shape": [
+        "M",
+        "K"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    },
+    "weight": {
+      "shape": [
+        "K",
+        "N"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    },
+    "bias": {
+      "shape": [
+        "N"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    }
+  },
+  "outputs": {
+    "output": {
+      "shape": [
+        "M",
+        "N"
+      ],
+      "dtype": "bfloat16",
+      "description": null
+    }
+  },
+  "reference": "import torch\n\ndef run(x, weight, bias):\n    y = x.float() @ weight.float()\n    return (torch.nn.functional.gelu(y + bias.float(), approximate='tanh')).to(torch.bfloat16)\n",
+  "description": "Clean-room LLM Core V1 semantic: llm.linear.matmul_gelu.v1.",
+  "hf_id": null
+}
