@@ -75,6 +75,7 @@ EXECBENCH_SCHEMA_REGISTRIES = frozenset(
         Path("src/sol_execbench/core/dataset/schema_versions.py"),
         Path("src/sol_execbench/core/platform/schema_versions.py"),
         Path("src/sol_execbench/core/scoring/schema_versions.py"),
+        Path("src/sol_execbench/tools/amd_isa/schema_versions.py"),
     }
 )
 ARTIFACT_AGGREGATE_REGISTRY = Path(

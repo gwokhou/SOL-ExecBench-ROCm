@@ -41,6 +41,7 @@ Example:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -53,8 +54,303 @@ from solar.ir.extended_einsum.torchview.converter_contract import (
 PathLike = str | Path
 
 
+@dataclass(frozen=True)
+class _RecurrentContext:
+    """Normalized graph and tensor metadata for one recurrent expansion."""
+
+    node_id: str
+    sequence: int
+    batch: int
+    input_width: int
+    hidden_width: int
+    gate_width: int
+    activation_shape: list[int]
+    input_weight_shape: list[int]
+    hidden_weight_shape: list[int]
+    final_shape: list[int]
+    activation_dtype: Any
+    weight_dtype: Any
+    output_dtype: Any
+    input_connections: list[str]
+    output_connections: list[str]
+    input_name: str
+    hidden_name: str
+
+    @property
+    def input_linear_id(self) -> str:
+        """Return the input-projection node ID."""
+        return f"{self.node_id}.ih_linear"
+
+    @property
+    def hidden_linear_id(self) -> str:
+        """Return the hidden-projection node ID."""
+        return f"{self.node_id}.hh_linear"
+
+    @property
+    def gates_id(self) -> str:
+        """Return the final gate-combination node ID."""
+        return f"{self.node_id}.gates"
+
+
 class ConverterRecurrentMixin(ConverterMixinContract):
     """Expand recurrent neural-network operations."""
+
+    @staticmethod
+    def _recurrent_weight_shapes(
+        input_shapes: list[Any],
+        input_types: list[str],
+        input_width: int,
+    ) -> tuple[list[int] | None, list[int] | None]:
+        """Identify input and hidden weight matrices by their inner width."""
+        input_weight = None
+        hidden_weight = None
+        for index, kind in enumerate(input_types):
+            if kind != "weight" or index >= len(input_shapes):
+                continue
+            shape = input_shapes[index]
+            if not isinstance(shape, list) or len(shape) != 2:
+                continue
+            if shape[1] == input_width and input_weight is None:
+                input_weight = shape
+            elif hidden_weight is None:
+                hidden_weight = shape
+        return input_weight, hidden_weight
+
+    @staticmethod
+    def _recurrent_connections(
+        node_id: str,
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> tuple[list[str], list[str]]:
+        """Collect canonical recurrent predecessor and successor IDs."""
+        inputs = sorted(op_graph.predecessors(node_id))
+        for info in start_nodes_info:
+            if node_id not in info.get("consumers", []):
+                continue
+            start_id = start_node_id_map.get(info["original_id"])
+            if start_id and start_id not in inputs:
+                inputs.append(start_id)
+        return sorted(inputs), sorted(op_graph.successors(node_id))
+
+    def _recurrent_context(
+        self,
+        operation: str,
+        gate_count: int,
+        node_id: str,
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> _RecurrentContext:
+        """Normalize one GRU/LSTM node into shared expansion metadata."""
+        input_shapes = node_data.get("input_shapes") or []
+        activation_shape = input_shapes[0] if input_shapes else []
+        if len(activation_shape) < 3:
+            raise ValueError(
+                f"{operation} requires [S,B,I] input. Got: {activation_shape}"
+            )
+        sequence, batch, input_width = activation_shape[:3]
+        input_types = [
+            str(value).lower() for value in (node_data.get("input_types") or [])
+        ]
+        input_weight, hidden_weight = self._recurrent_weight_shapes(
+            input_shapes, input_types, input_width
+        )
+        hidden_width = (
+            hidden_weight[1]
+            if hidden_weight
+            else input_weight[0] // gate_count
+            if input_weight
+            else input_width
+        )
+        input_dtypes = node_data.get("input_dtypes") or []
+        activation_dtype = input_dtypes[0] if input_dtypes else "torch.float32"
+        weight_dtype = next(
+            (
+                input_dtypes[index]
+                for index, kind in enumerate(input_types)
+                if kind == "weight" and index < len(input_dtypes)
+            ),
+            activation_dtype,
+        )
+        outputs = node_data.get("output_shapes") or []
+        output_dtypes = node_data.get("output_dtypes") or []
+        output_dtype = output_dtypes[0] if output_dtypes else activation_dtype
+        inputs, successors = self._recurrent_connections(
+            node_id, op_graph, start_nodes_info, start_node_id_map
+        )
+        gate_width = gate_count * hidden_width
+        return _RecurrentContext(
+            node_id=node_id,
+            sequence=sequence,
+            batch=batch,
+            input_width=input_width,
+            hidden_width=hidden_width,
+            gate_width=gate_width,
+            activation_shape=list(activation_shape),
+            input_weight_shape=input_weight or [gate_width, input_width],
+            hidden_weight_shape=hidden_weight or [gate_width, hidden_width],
+            final_shape=(
+                list(outputs[0]) if outputs else [sequence, batch, hidden_width]
+            ),
+            activation_dtype=activation_dtype,
+            weight_dtype=weight_dtype,
+            output_dtype=output_dtype,
+            input_connections=inputs,
+            output_connections=successors,
+            input_name=(
+                f"{inputs[0]}.Output" if inputs else f"{node_id}.Input"
+            ),
+            hidden_name=(
+                f"{inputs[1]}.Output"
+                if len(inputs) > 1
+                else f"{node_id}.Hidden"
+            ),
+        )
+
+    @staticmethod
+    def _recurrent_linear_layer(
+        context: _RecurrentContext,
+        *,
+        hidden: bool,
+    ) -> dict[str, Any]:
+        """Emit one input-to-hidden or hidden-to-hidden projection."""
+        node_id = (
+            context.hidden_linear_id if hidden else context.input_linear_id
+        )
+        input_rank = "H" if hidden else "I"
+        input_shape = (
+            [context.sequence, context.batch, context.hidden_width]
+            if hidden
+            else context.activation_shape
+        )
+        weight_shape = (
+            context.hidden_weight_shape
+            if hidden
+            else context.input_weight_shape
+        )
+        input_name = context.hidden_name if hidden else context.input_name
+        connection = (
+            context.input_connections[1:2]
+            if hidden
+            else context.input_connections[:1]
+        )
+        return {
+            "type": "linear",
+            "einsum_equation": f"SB{input_rank},G{input_rank}->SBG",
+            "elementwise_op": "mul",
+            "reduction_op": "add",
+            "is_real_einsum": True,
+            "is_einsum_supportable": True,
+            "tensor_names": {
+                "inputs": [
+                    input_name,
+                    f"{context.node_id}.Weight_{'hh' if hidden else 'ih'}",
+                ],
+                "outputs": [f"{node_id}.Output"],
+            },
+            "tensor_types": {
+                "inputs": ["input", "weight"],
+                "outputs": ["output"],
+            },
+            "tensor_shapes": {
+                "inputs": [input_shape, weight_shape],
+                "outputs": [
+                    [context.sequence, context.batch, context.gate_width]
+                ],
+            },
+            "tensor_dtypes": {
+                "inputs": [context.activation_dtype, context.weight_dtype],
+                "outputs": [context.output_dtype],
+            },
+            "operands": {
+                "Input": ["S", "B", input_rank],
+                "Weight": ["G", input_rank],
+                "Output": ["S", "B", "G"],
+            },
+            "connections": {
+                "inputs": connection,
+                "outputs": [context.gates_id],
+            },
+        }
+
+    @staticmethod
+    def _recurrent_gate_layer(context: _RecurrentContext) -> dict[str, Any]:
+        """Emit the final elementwise gate-combination layer."""
+        gate_shape = [context.sequence, context.batch, context.gate_width]
+        return {
+            "type": "sigmoid",
+            "einsum_equation": "SBH->SBH",
+            "elementwise_op": "sigmoid",
+            "reduction_op": "none",
+            "is_real_einsum": False,
+            "is_einsum_supportable": True,
+            "tensor_names": {
+                "inputs": [
+                    f"{context.input_linear_id}.Output",
+                    f"{context.hidden_linear_id}.Output",
+                ],
+                "outputs": [f"{context.gates_id}.Output"],
+            },
+            "tensor_types": {
+                "inputs": ["input", "input"],
+                "outputs": ["output"],
+            },
+            "tensor_shapes": {
+                "inputs": [gate_shape, gate_shape],
+                "outputs": [context.final_shape],
+            },
+            "tensor_dtypes": {
+                "inputs": [context.output_dtype, context.output_dtype],
+                "outputs": [context.output_dtype],
+            },
+            "operands": {
+                "Input": ["S", "B", "H"],
+                "Output": ["S", "B", "H"],
+            },
+            "connections": {
+                "inputs": [
+                    context.input_linear_id,
+                    context.hidden_linear_id,
+                ],
+                "outputs": context.output_connections,
+            },
+        }
+
+    def _expand_recurrent(
+        self,
+        operation: str,
+        gate_count: int,
+        node_id: str,
+        node_data: dict[str, Any],
+        op_graph: nx.DiGraph,
+        start_nodes_info: list[dict[str, Any]],
+        start_node_id_map: dict[str, str],
+    ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
+        """Expand one recurrent node using the shared GRU/LSTM structure."""
+        context = self._recurrent_context(
+            operation,
+            gate_count,
+            node_id,
+            node_data,
+            op_graph,
+            start_nodes_info,
+            start_node_id_map,
+        )
+        subgraph = {
+            context.input_linear_id: self._recurrent_linear_layer(
+                context, hidden=False
+            ),
+            context.hidden_linear_id: self._recurrent_linear_layer(
+                context, hidden=True
+            ),
+            context.gates_id: self._recurrent_gate_layer(context),
+        }
+        input_mapping = {0: context.input_linear_id}
+        if len(context.input_connections) > 1:
+            input_mapping[1] = context.hidden_linear_id
+        return subgraph, context.gates_id, input_mapping
 
     def _expand_lstm(
         self,
@@ -64,205 +360,16 @@ class ConverterRecurrentMixin(ConverterMixinContract):
         start_nodes_info: list[dict[str, Any]],
         start_node_id_map: dict[str, str],
     ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
-        """Expand LSTM into a subgraph of linear operations.
-
-        LSTM decomposes into (per timestep, summed over S steps):
-          1. ih_linear: input @ W_ih^T   [S*B, I] @ [4H, I] -> [S*B, 4H]
-          2. hh_linear: hidden @ W_hh^T  [S*B, H] @ [4H, H] -> [S*B, 4H]
-          3. gate ops (sigmoid, tanh) — elementwise, not real einsums
-        """
-        input_shapes = node_data.get("input_shapes") or []
-        output_shapes = node_data.get("output_shapes") or []
-        input_types = [
-            str(t).lower() for t in (node_data.get("input_types") or [])
-        ]
-        input_dtypes = node_data.get("input_dtypes") or []
-        output_dtypes = node_data.get("output_dtypes") or []
-        act_dtype = input_dtypes[0] if input_dtypes else "torch.float32"
-        weight_dtype = next(
-            (
-                input_dtypes[i]
-                for i, t in enumerate(input_types)
-                if t == "weight" and i < len(input_dtypes)
-            ),
-            act_dtype,
+        """Expand an LSTM into two projections and one gate layer."""
+        return self._expand_recurrent(
+            "LSTM",
+            4,
+            node_id,
+            node_data,
+            op_graph,
+            start_nodes_info,
+            start_node_id_map,
         )
-        out_dtype = output_dtypes[0] if output_dtypes else act_dtype
-
-        act_shape = input_shapes[0] if input_shapes else []
-        if len(act_shape) < 3:
-            raise ValueError(f"LSTM requires [S,B,I] input. Got: {act_shape}")
-        S, B, input_width = act_shape[:3]  # noqa: N806
-
-        # Find weight shapes
-        w_ih_shape = None  # [4H, I]
-        w_hh_shape = None  # [4H, H]
-        for i, t in enumerate(input_types):
-            if t == "weight" and i < len(input_shapes):
-                ws = input_shapes[i]
-                if isinstance(ws, list) and len(ws) == 2:
-                    if ws[1] == input_width and w_ih_shape is None:
-                        w_ih_shape = ws
-                    elif w_hh_shape is None:
-                        w_hh_shape = ws
-
-        H = (  # noqa: N806 - matches the einsum rank label
-            w_hh_shape[1]
-            if w_hh_shape
-            else (w_ih_shape[0] // 4 if w_ih_shape else input_width)
-        )
-
-        input_connections = sorted(op_graph.predecessors(node_id))
-        for info in start_nodes_info:
-            if node_id in info.get("consumers", []):
-                start_id = start_node_id_map.get(info["original_id"])
-                if start_id and start_id not in input_connections:
-                    input_connections.append(start_id)
-        input_connections = sorted(input_connections)
-        output_connections = sorted(op_graph.successors(node_id))
-
-        subgraph: dict[str, dict[str, Any]] = {}
-
-        ih_id = f"{node_id}.ih_linear"
-        hh_id = f"{node_id}.hh_linear"
-        gates_id = f"{node_id}.gates"
-
-        input_mapping: dict[int, str] = {0: ih_id}
-        if len(input_connections) > 1:
-            input_mapping[1] = hh_id
-
-        act_input_name = (
-            f"{input_connections[0]}.Output"
-            if input_connections
-            else f"{node_id}.Input"
-        )
-        hidden_input_name = (
-            f"{input_connections[1]}.Output"
-            if len(input_connections) > 1
-            else f"{node_id}.Hidden"
-        )
-
-        # Hidden state shape — h0 is [num_layers*num_directions, B, H].
-        # Use the shape from input_shapes[1] if available.
-        input_shapes[1] if len(input_shapes) > 1 else [1, B, H]
-
-        G = 4 * H  # noqa: N806 - matches the einsum rank label
-
-        # 1. ih_linear: input @ W_ih^T — [S, B, I] @ [G, I] -> [S, B, G]
-        ih_output_shape = [S, B, G]
-        subgraph[ih_id] = {
-            "type": "linear",
-            "einsum_equation": "SBI,GI->SBG",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [act_input_name, f"{node_id}.Weight_ih"],
-                "outputs": [f"{ih_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "weight"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [list(act_shape), w_ih_shape or [G, input_width]],
-                "outputs": [ih_output_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype, weight_dtype],
-                "outputs": [out_dtype],
-            },
-            "operands": {
-                "Input": ["S", "B", "I"],
-                "Weight": ["G", "I"],
-                "Output": ["S", "B", "G"],
-            },
-            "connections": {
-                "inputs": input_connections[:1],
-                "outputs": [gates_id],
-            },
-        }
-
-        # 2. hh_linear: hidden @ W_hh^T
-        # The hidden projection runs once per timestep but we represent the
-        # total work as [S, B, H] @ [G, H] -> [S, B, G] so MACs reflect
-        # S steps of B×H×G multiplies.
-        hh_input_shape = [S, B, H]
-        hh_output_shape = [S, B, G]
-        subgraph[hh_id] = {
-            "type": "linear",
-            "einsum_equation": "SBH,GH->SBG",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [hidden_input_name, f"{node_id}.Weight_hh"],
-                "outputs": [f"{hh_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "weight"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [hh_input_shape, w_hh_shape or [G, H]],
-                "outputs": [hh_output_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype, weight_dtype],
-                "outputs": [out_dtype],
-            },
-            "operands": {
-                "Input": ["S", "B", "H"],
-                "Weight": ["G", "H"],
-                "Output": ["S", "B", "G"],
-            },
-            "connections": {
-                "inputs": input_connections[1:2]
-                if len(input_connections) > 1
-                else [],
-                "outputs": [gates_id],
-            },
-        }
-
-        # 3. Gate ops (sigmoid/tanh) — elementwise, combines ih + hh results
-        final_shape = list(output_shapes[0]) if output_shapes else [S, B, H]
-        subgraph[gates_id] = {
-            "type": "sigmoid",
-            "einsum_equation": "SBH->SBH",
-            "elementwise_op": "sigmoid",
-            "reduction_op": "none",
-            "is_real_einsum": False,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [f"{ih_id}.Output", f"{hh_id}.Output"],
-                "outputs": [f"{gates_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [ih_output_shape, hh_output_shape],
-                "outputs": [final_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [out_dtype, out_dtype],
-                "outputs": [out_dtype],
-            },
-            "operands": {
-                "Input": ["S", "B", "H"],
-                "Output": ["S", "B", "H"],
-            },
-            "connections": {
-                "inputs": [ih_id, hh_id],
-                "outputs": output_connections,
-            },
-        }
-
-        final_node_id = gates_id
-        return subgraph, final_node_id, input_mapping
 
     def _expand_gru(
         self,
@@ -272,199 +379,13 @@ class ConverterRecurrentMixin(ConverterMixinContract):
         start_nodes_info: list[dict[str, Any]],
         start_node_id_map: dict[str, str],
     ) -> tuple[dict[str, dict[str, Any]], str, dict[int, str]]:
-        """Expand GRU into a subgraph of linear operations.
-
-        GRU decomposes into (per timestep, summed over S steps):
-          1. ih_linear: input @ W_ih^T   [S*B, I] @ [3H, I] -> [S*B, 3H]
-          2. hh_linear: hidden @ W_hh^T  [S*B, H] @ [3H, H] -> [S*B, 3H]
-          3. gate ops (sigmoid, tanh) — elementwise, not real einsums
-        """
-        input_shapes = node_data.get("input_shapes") or []
-        output_shapes = node_data.get("output_shapes") or []
-        input_types = [
-            str(t).lower() for t in (node_data.get("input_types") or [])
-        ]
-        input_dtypes = node_data.get("input_dtypes") or []
-        output_dtypes = node_data.get("output_dtypes") or []
-        act_dtype = input_dtypes[0] if input_dtypes else "torch.float32"
-        weight_dtype = next(
-            (
-                input_dtypes[i]
-                for i, t in enumerate(input_types)
-                if t == "weight" and i < len(input_dtypes)
-            ),
-            act_dtype,
+        """Expand a GRU into two projections and one gate layer."""
+        return self._expand_recurrent(
+            "GRU",
+            3,
+            node_id,
+            node_data,
+            op_graph,
+            start_nodes_info,
+            start_node_id_map,
         )
-        out_dtype = output_dtypes[0] if output_dtypes else act_dtype
-
-        act_shape = input_shapes[0] if input_shapes else []
-        if len(act_shape) < 3:
-            raise ValueError(f"GRU requires [S,B,I] input. Got: {act_shape}")
-        S, B, input_width = act_shape[:3]  # noqa: N806
-
-        w_ih_shape = None  # [3H, I]
-        w_hh_shape = None  # [3H, H]
-        for i, t in enumerate(input_types):
-            if t == "weight" and i < len(input_shapes):
-                ws = input_shapes[i]
-                if isinstance(ws, list) and len(ws) == 2:
-                    if ws[1] == input_width and w_ih_shape is None:
-                        w_ih_shape = ws
-                    elif w_hh_shape is None:
-                        w_hh_shape = ws
-
-        H = (  # noqa: N806 - matches the einsum rank label
-            w_hh_shape[1]
-            if w_hh_shape
-            else (w_ih_shape[0] // 3 if w_ih_shape else input_width)
-        )
-
-        input_connections = sorted(op_graph.predecessors(node_id))
-        for info in start_nodes_info:
-            if node_id in info.get("consumers", []):
-                start_id = start_node_id_map.get(info["original_id"])
-                if start_id and start_id not in input_connections:
-                    input_connections.append(start_id)
-        input_connections = sorted(input_connections)
-        output_connections = sorted(op_graph.successors(node_id))
-
-        subgraph: dict[str, dict[str, Any]] = {}
-
-        ih_id = f"{node_id}.ih_linear"
-        hh_id = f"{node_id}.hh_linear"
-        gates_id = f"{node_id}.gates"
-
-        input_mapping: dict[int, str] = {0: ih_id}
-        if len(input_connections) > 1:
-            input_mapping[1] = hh_id
-
-        act_input_name = (
-            f"{input_connections[0]}.Output"
-            if input_connections
-            else f"{node_id}.Input"
-        )
-        hidden_input_name = (
-            f"{input_connections[1]}.Output"
-            if len(input_connections) > 1
-            else f"{node_id}.Hidden"
-        )
-
-        input_shapes[1] if len(input_shapes) > 1 else [1, B, H]
-
-        G = 3 * H  # noqa: N806 - matches the einsum rank label
-
-        # 1. ih_linear: input @ W_ih^T — [S, B, I] @ [G, I] -> [S, B, G]
-        ih_output_shape = [S, B, G]
-        subgraph[ih_id] = {
-            "type": "linear",
-            "einsum_equation": "SBI,GI->SBG",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [act_input_name, f"{node_id}.Weight_ih"],
-                "outputs": [f"{ih_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "weight"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [list(act_shape), w_ih_shape or [G, input_width]],
-                "outputs": [ih_output_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype, weight_dtype],
-                "outputs": [out_dtype],
-            },
-            "operands": {
-                "Input": ["S", "B", "I"],
-                "Weight": ["G", "I"],
-                "Output": ["S", "B", "G"],
-            },
-            "connections": {
-                "inputs": input_connections[:1],
-                "outputs": [gates_id],
-            },
-        }
-
-        # 2. hh_linear: hidden @ W_hh^T
-        # The hidden projection runs once per timestep but we represent the
-        # total work as [S, B, H] @ [G, H] -> [S, B, G] so MACs reflect
-        # S steps of B×H×G multiplies.
-        hh_input_shape = [S, B, H]
-        hh_output_shape = [S, B, G]
-        subgraph[hh_id] = {
-            "type": "linear",
-            "einsum_equation": "SBH,GH->SBG",
-            "elementwise_op": "mul",
-            "reduction_op": "add",
-            "is_real_einsum": True,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [hidden_input_name, f"{node_id}.Weight_hh"],
-                "outputs": [f"{hh_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "weight"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [hh_input_shape, w_hh_shape or [G, H]],
-                "outputs": [hh_output_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [act_dtype, weight_dtype],
-                "outputs": [out_dtype],
-            },
-            "operands": {
-                "Input": ["S", "B", "H"],
-                "Weight": ["G", "H"],
-                "Output": ["S", "B", "G"],
-            },
-            "connections": {
-                "inputs": input_connections[1:2]
-                if len(input_connections) > 1
-                else [],
-                "outputs": [gates_id],
-            },
-        }
-
-        # 3. Gate ops (sigmoid/tanh) — elementwise, combines ih + hh results
-        final_shape = list(output_shapes[0]) if output_shapes else [S, B, H]
-        subgraph[gates_id] = {
-            "type": "sigmoid",
-            "einsum_equation": "SBH->SBH",
-            "elementwise_op": "sigmoid",
-            "reduction_op": "none",
-            "is_real_einsum": False,
-            "is_einsum_supportable": True,
-            "tensor_names": {
-                "inputs": [f"{ih_id}.Output", f"{hh_id}.Output"],
-                "outputs": [f"{gates_id}.Output"],
-            },
-            "tensor_types": {
-                "inputs": ["input", "input"],
-                "outputs": ["output"],
-            },
-            "tensor_shapes": {
-                "inputs": [ih_output_shape, hh_output_shape],
-                "outputs": [final_shape],
-            },
-            "tensor_dtypes": {
-                "inputs": [out_dtype, out_dtype],
-                "outputs": [out_dtype],
-            },
-            "operands": {
-                "Input": ["S", "B", "H"],
-                "Output": ["S", "B", "H"],
-            },
-            "connections": {
-                "inputs": [ih_id, hh_id],
-                "outputs": output_connections,
-            },
-        }
-
-        final_node_id = gates_id
-        return subgraph, final_node_id, input_mapping

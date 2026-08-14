@@ -34,14 +34,14 @@ from sol_execbench.core.scoring.release_builders import load_execution_plan
 from sol_execbench.core.scoring.release_environment import (
     verify_release_source_state,
 )
-from sol_execbench.core.solar_bridge.analyzer import (
-    formal_architecture_profile_hash,
-)
 from sol_execbench.core.solar_bridge.corpus_readiness import (
     CorpusReadinessRecord,
     CorpusReadinessStatus,
     CorpusReadinessSummary,
     audit_corpus_stage_readiness,
+)
+from sol_execbench.core.solar_bridge.formal_device import (
+    formal_architecture_profile_hash,
 )
 from sol_execbench.core.solar_bridge.models import (
     DEFAULT_IR_PATH,

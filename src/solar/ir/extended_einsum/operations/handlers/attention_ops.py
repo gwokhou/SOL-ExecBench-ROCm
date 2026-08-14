@@ -24,14 +24,12 @@ Based on PyTorch's scaled_dot_product_attention:
 https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
 """
 
-from typing import Any
-
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class ScaledDotProductAttentionHandler(EinsumOpHandler):
@@ -60,7 +58,7 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for scaled dot-product attention.
 
@@ -138,7 +136,7 @@ class FlexAttentionHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for flex_attention."""
         if tensor_shapes.num_inputs < 3:
@@ -187,7 +185,7 @@ class MultiHeadAttentionHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for multi-head attention."""
         if tensor_shapes.num_inputs < 1:

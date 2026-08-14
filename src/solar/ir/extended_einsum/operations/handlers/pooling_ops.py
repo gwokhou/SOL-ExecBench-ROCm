@@ -23,14 +23,13 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any
 
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 class PoolingHandler(EinsumOpHandler):
@@ -55,7 +54,7 @@ class PoolingHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for pooling operation."""
         if tensor_shapes.num_inputs < 1:

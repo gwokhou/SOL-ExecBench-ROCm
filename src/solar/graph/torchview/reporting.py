@@ -35,12 +35,12 @@ The output format matches the original process_torchview_graph.py output:
 """
 
 from pathlib import Path
-from typing import Any
 
 import yaml
 
 from solar.graph.torchview.models import NodeInfo
 from solar.graph.torchview.processor_contract import TorchviewProcessorContract
+from solar.types import NodeDict
 
 
 class TorchviewReportingMixin(TorchviewProcessorContract):
@@ -76,13 +76,14 @@ class TorchviewReportingMixin(TorchviewProcessorContract):
             filename: Output YAML path.
             model_name: Human-readable model name.
         """
-        graph_dict: dict[str, Any] = {
+        layers: dict[str, NodeDict] = {}
+        graph_dict: NodeDict = {
             "model_name": model_name,
-            "layers": {},
+            "layers": layers,
         }
 
         for node in layer_nodes:
-            graph_dict["layers"][node.node_id] = node.to_dict()
+            layers[node.node_id] = node.to_dict()
 
         with open(filename, "w") as f:
             from solar.artifacts.yaml import NoAliasDumper

@@ -23,12 +23,12 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar, Optional
+from typing import ClassVar, Optional
 
 from solar.ir.extended_einsum.equations import (
     validate_einsum_ranks_match_shapes,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +191,7 @@ class EinsumOpHandler(ABC):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate an einsum operation for the given operation.
 

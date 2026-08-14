@@ -60,6 +60,48 @@ class DiagnosticRunStageState(FrozenArtifactModel):
     receipt_path: str = ""
     outputs: tuple[DiagnosticLifecycleArtifact, ...] = ()
 
+    @classmethod
+    def running(
+        cls,
+        stage: DiagnosticLifecycleStage,
+        attempts: int,
+    ) -> DiagnosticRunStageState:
+        """Build the canonical transient state for an active attempt."""
+        return cls(
+            stage=stage,
+            status=DiagnosticStageStatus.RUNNING,
+            attempts=attempts,
+        )
+
+    @classmethod
+    def verified(
+        cls,
+        stage: DiagnosticLifecycleStage,
+        attempts: int,
+        outputs: tuple[DiagnosticLifecycleArtifact, ...],
+    ) -> DiagnosticRunStageState:
+        """Build the canonical verified state for a completed stage."""
+        return cls(
+            stage=stage,
+            status=DiagnosticStageStatus.VERIFIED,
+            attempts=attempts,
+            receipt_path=f"{stage.value}.json",
+            outputs=outputs,
+        )
+
+    @classmethod
+    def failed(
+        cls,
+        stage: DiagnosticLifecycleStage,
+        attempts: int,
+    ) -> DiagnosticRunStageState:
+        """Build the canonical failed state without stale output claims."""
+        return cls(
+            stage=stage,
+            status=DiagnosticStageStatus.FAILED,
+            attempts=attempts,
+        )
+
 
 class DiagnosticStageAttempt(CurrentFrozenSchemaModel):
     """One immutable append-only execution attempt for a lifecycle stage."""

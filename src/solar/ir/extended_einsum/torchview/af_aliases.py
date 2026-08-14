@@ -162,279 +162,303 @@ def _derive_pos_mapping(
     )
 
 
+@dataclass(frozen=True)
+class _ShapeOpCandidate:
+    """Validated positional metadata for one elide-able shape operation."""
+
+    name: str
+    predecessor: str
+    output_tensor: str
+    input_dims: list[str]
+    input_shape: list[int]
+    output_to_input: list[int | None]
+    input_to_output: list[list[int]]
+
+
+def _shape_product(shape: list[int]) -> int | None:
+    """Return an integer shape product, or ``None`` for malformed metadata."""
+    product = 1
+    try:
+        for size in shape:
+            product *= int(size)
+    except (TypeError, ValueError):
+        return None
+    return product
+
+
+def _shape_op_candidate(
+    name: str,
+    layer: dict[str, Any],
+    diagnostics: list[str],
+) -> _ShapeOpCandidate | None:
+    """Validate and normalize one potential shape-op alias."""
+    if layer.get("is_real_einsum", True):
+        return None
+    operation = str(layer.get("type", ""))
+    if operation not in _SHAPE_OP_TYPES:
+        return None
+    operands = layer.get("operands") or {}
+    inputs = [
+        role
+        for role in operands
+        if _is_input_role(role)
+        or (not _is_output_role(role) and role != "start")
+    ]
+    outputs = [role for role in operands if _is_output_role(role)]
+    predecessors = (layer.get("connections") or {}).get("inputs") or []
+    if len(inputs) != 1 or len(outputs) != 1 or len(predecessors) != 1:
+        return None
+    shapes = layer.get("tensor_shapes") or {}
+    input_shapes = shapes.get("inputs") or []
+    output_shapes = shapes.get("outputs") or []
+    output_names = (layer.get("tensor_names") or {}).get("outputs") or []
+    if not input_shapes or not output_shapes or not output_names:
+        return None
+    input_shape = list(input_shapes[0])
+    output_shape = list(output_shapes[0])
+    if operation != "expand":
+        input_product = _shape_product(input_shape)
+        output_product = _shape_product(output_shape)
+        if input_product is None or output_product is None:
+            diagnostics.append(
+                f"layer {name!r}: non-integer shape; emit normally"
+            )
+            return None
+        if input_product != output_product:
+            diagnostics.append(
+                f"layer {name!r}: shape product mismatch "
+                f"(in={input_shape}, out={output_shape}); emit normally"
+            )
+            return None
+    input_dims = list(operands.get(inputs[0]) or [])
+    output_dims = list(operands.get(outputs[0]) or [])
+    mapping = _derive_pos_mapping(
+        name, layer, input_dims, input_shape, output_dims, output_shape
+    )
+    if mapping is None:
+        diagnostics.append(
+            f"layer {name!r} ({operation}): could not derive a safe "
+            f"projection rewrite (in={input_dims}/{input_shape}, "
+            f"out={output_dims}/{output_shape}); emit normally"
+        )
+        return None
+    output_to_input, input_to_output = mapping
+    return _ShapeOpCandidate(
+        name=name,
+        predecessor=str(predecessors[0]),
+        output_tensor=str(output_names[0]),
+        input_dims=input_dims,
+        input_shape=input_shape,
+        output_to_input=output_to_input,
+        input_to_output=input_to_output,
+    )
+
+
+def _primary_output(
+    name: str,
+    layer: dict[str, Any],
+) -> tuple[str, str, list[str], list[int]] | None:
+    """Return the primary producer output role, tensor, dims, and shape."""
+    operands = layer.get("operands") or {}
+    role = next((item for item in operands if _is_output_role(item)), None)
+    if role is None and operands:
+        role = next(iter(operands))
+    names = (layer.get("tensor_names") or {}).get("outputs") or []
+    shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
+    if role is None or not names or not shapes:
+        return None
+    return role, str(names[0]), list(operands.get(role) or []), list(shapes[0])
+
+
+def _compose_shape_alias(
+    upstream: _Alias,
+    candidate: _ShapeOpCandidate,
+) -> _Alias:
+    """Compose one candidate mapping with its already-elided predecessor."""
+    output_to_input = [
+        (
+            upstream.out_to_in[index]
+            if index is not None and index < len(upstream.out_to_in)
+            else None
+        )
+        for index in candidate.output_to_input
+    ]
+    input_to_output: list[list[int]] = [
+        [] for _ in range(len(upstream.root_dims))
+    ]
+    for output_index, input_index in enumerate(output_to_input):
+        if input_index is not None and 0 <= input_index < len(input_to_output):
+            input_to_output[input_index].append(output_index)
+    return _Alias(
+        root_tensor=upstream.root_tensor,
+        root_layer=upstream.root_layer,
+        root_role=upstream.root_role,
+        root_dims=list(upstream.root_dims),
+        root_shape=list(upstream.root_shape),
+        in_to_out=input_to_output,
+        out_to_in=output_to_input,
+    )
+
+
+def _candidate_alias(
+    candidate: _ShapeOpCandidate,
+    layers: dict[str, dict[str, Any]],
+    aliases: dict[str, _Alias],
+) -> _Alias | None:
+    """Resolve one candidate to its surviving root producer."""
+    producer = layers.get(candidate.predecessor)
+    if producer is None:
+        return None
+    primary = _primary_output(candidate.predecessor, producer)
+    if primary is None:
+        return None
+    role, tensor, dims, shape = primary
+    if tensor in aliases:
+        return _compose_shape_alias(aliases[tensor], candidate)
+    return _Alias(
+        root_tensor=tensor,
+        root_layer=candidate.predecessor,
+        root_role=role,
+        root_dims=dims,
+        root_shape=shape,
+        in_to_out=candidate.input_to_output,
+        out_to_in=candidate.output_to_input,
+    )
+
+
 def _build_shape_op_aliases(
     layers: dict[str, dict[str, Any]],
 ) -> tuple[dict[str, _Alias], set[str], list[str]]:
-    """Return (alias_table, elided_set, diagnostics).
-
-    Walks layers in topological order and records, for each elide-able
-    pure-shape-op layer, an Alias entry keyed by the layer's primary
-    output tensor name. Chained shape ops compose via the table — when
-    an op's predecessor is itself elided, we look up the predecessor's
-    alias and propagate the root forward.
-    """
+    """Build aliases for safe shape ops in topological layer order."""
     aliases: dict[str, _Alias] = {}
     elided: set[str] = set()
     diagnostics: list[str] = []
-
     for name, layer in layers.items():
-        if layer.get("is_real_einsum", True):
+        candidate = _shape_op_candidate(name, layer, diagnostics)
+        if candidate is None:
             continue
-        op_type = layer.get("type")
-        if op_type not in _SHAPE_OP_TYPES:
+        alias = _candidate_alias(candidate, layers, aliases)
+        if alias is None:
             continue
-
-        operands = layer.get("operands") or {}
-        in_roles = [
-            r
-            for r in operands
-            if _is_input_role(r) or (not _is_output_role(r) and r != "start")
-        ]
-        out_roles = [r for r in operands if _is_output_role(r)]
-        # Skip multi-input or no-output shape ops.
-        if len(in_roles) != 1 or len(out_roles) != 1:
-            continue
-        preds = (layer.get("connections") or {}).get("inputs") or []
-        if len(preds) != 1:
-            continue
-
-        in_role = in_roles[0]
-        out_role = out_roles[0]
-        in_dims = list(operands.get(in_role) or [])
-        out_dims = list(operands.get(out_role) or [])
-        shapes = layer.get("tensor_shapes", {}) or {}
-        in_shape_list = shapes.get("inputs") or []
-        out_shape_list = shapes.get("outputs") or []
-        if not in_shape_list or not out_shape_list:
-            continue
-        in_shape = list(in_shape_list[0])
-        out_shape = list(out_shape_list[0])
-
-        # Defensive: total size must be preserved (expand explicitly excepted).
-        if op_type != "expand":
-            try:
-                pi = 1
-                for s in in_shape:
-                    pi *= int(s)
-                po = 1
-                for s in out_shape:
-                    po *= int(s)
-            except Exception:  # noqa: BLE001 - malformed optional metadata
-                diagnostics.append(
-                    f"layer {name!r}: non-integer shape; emit normally"
-                )
-                continue
-            if pi != po:
-                diagnostics.append(
-                    f"layer {name!r}: shape product mismatch "
-                    f"(in={in_shape}, out={out_shape}); emit normally"
-                )
-                continue
-
-        # Detect partial __getitem__ (slice with stride/length != full
-        # range). For now, only elide when shapes equate or are a pure
-        # permutation (handled inside _derive_pos_mapping).
-        # Compute the rewrite.
-        derived = _derive_pos_mapping(
-            name, layer, in_dims, in_shape, out_dims, out_shape
-        )
-        if derived is None:
-            diagnostics.append(
-                f"layer {name!r} ({op_type}): could not derive a safe "
-                f"projection rewrite (in={in_dims}/{in_shape}, "
-                f"out={out_dims}/{out_shape}); emit normally"
-            )
-            continue
-        out_to_in, in_to_out = derived
-
-        # Resolve predecessor's primary output tensor + role.
-        pred_name = preds[0]
-        pred_layer = layers.get(pred_name)
-        if pred_layer is None:
-            continue
-        pred_operands = pred_layer.get("operands") or {}
-        pred_out_role: str | None = None
-        for cand in pred_operands:
-            if _is_output_role(cand):
-                pred_out_role = cand
-                break
-        if pred_out_role is None and pred_operands:
-            # pseudo-node (e.g. "start") — fall back to its first operand.
-            pred_out_role = next(iter(pred_operands))
-        if pred_out_role is None:
-            continue
-
-        pred_output_tensor_name = (
-            (pred_layer.get("tensor_names") or {}).get("outputs") or [None]
-        )[0]
-        if pred_output_tensor_name is None:
-            continue
-        pred_output_tensor_name = str(pred_output_tensor_name)
-        pred_out_shape_list = (pred_layer.get("tensor_shapes") or {}).get(
-            "outputs"
-        ) or []
-        if not pred_out_shape_list:
-            continue
-        pred_out_shape = list(pred_out_shape_list[0])
-        pred_out_dims = list(pred_operands.get(pred_out_role) or [])
-
-        my_output_tensor_name = (
-            (layer.get("tensor_names") or {}).get("outputs") or [None]
-        )[0]
-        if my_output_tensor_name is None:
-            continue
-
-        # If the predecessor is itself elided, follow the chain.
-        if pred_output_tensor_name in aliases:
-            up = aliases[pred_output_tensor_name]
-            # Compose: out_to_in points at our input positions; those map
-            # via the predecessor's alias.out_to_in to the chain root.
-            composed: list[int | None] = []
-            for j in range(len(out_to_in)):
-                k = out_to_in[j]
-                if k is None:
-                    composed.append(None)
-                else:
-                    if k < len(up.out_to_in):
-                        composed.append(up.out_to_in[k])
-                    else:
-                        composed.append(None)
-            composed_i2o: list[list[int]] = [
-                [] for _ in range(len(up.root_dims))
-            ]
-            for j, i in enumerate(composed):
-                if i is not None and 0 <= i < len(composed_i2o):
-                    composed_i2o[i].append(j)
-            aliases[my_output_tensor_name] = _Alias(
-                root_tensor=up.root_tensor,
-                root_layer=up.root_layer,
-                root_role=up.root_role,
-                root_dims=list(up.root_dims),
-                root_shape=list(up.root_shape),
-                in_to_out=composed_i2o,
-                out_to_in=composed,
-            )
-        else:
-            aliases[my_output_tensor_name] = _Alias(
-                root_tensor=pred_output_tensor_name,
-                root_layer=pred_name,
-                root_role=pred_out_role,
-                root_dims=pred_out_dims,
-                root_shape=pred_out_shape,
-                in_to_out=in_to_out,
-                out_to_in=out_to_in,
-            )
+        aliases[candidate.output_tensor] = alias
         elided.add(name)
-
     return aliases, elided, diagnostics
+
+
+def _rewrite_alias_inputs(
+    name: str,
+    layer: dict[str, Any],
+    aliases: dict[str, _Alias],
+    diagnostics: list[str],
+    rewrite_sequence: int,
+) -> int:
+    """Rewrite one surviving layer's inputs to their shape-op roots."""
+    predecessors = list((layer.get("connections") or {}).get("inputs") or [])
+    operands = layer.get("operands") or {}
+    names = (layer.get("tensor_names") or {}).get("inputs") or []
+    shapes = (layer.get("tensor_shapes") or {}).get("inputs") or []
+    input_roles = [role for role in operands if not _is_output_role(role)]
+    for slot in range(len(predecessors)):
+        tensor_name = names[slot] if slot < len(names) else None
+        if tensor_name is None or tensor_name not in aliases:
+            continue
+        alias = aliases[tensor_name]
+        predecessors[slot] = alias.root_layer
+        if slot < len(names):
+            names[slot] = alias.root_tensor
+        if slot < len(shapes):
+            shapes[slot] = list(alias.root_shape)
+        if slot >= len(input_roles):
+            continue
+        role = input_roles[slot]
+        current_dims = list(operands.get(role) or [])
+        if len(current_dims) != len(alias.out_to_in):
+            diagnostics.append(
+                f"layer {name!r}: alias-rewrite skipped for role {role!r} "
+                f"— operand width {len(current_dims)} != alias width "
+                f"{len(alias.out_to_in)}."
+            )
+            continue
+        new_dims: list[str | None] = [None] * len(alias.root_dims)
+        for output_index, input_index in enumerate(alias.out_to_in):
+            if input_index is None or not 0 <= input_index < len(new_dims):
+                continue
+            if new_dims[input_index] is None:
+                new_dims[input_index] = current_dims[output_index]
+        for index, label in enumerate(new_dims):
+            if label is None:
+                new_dims[index] = f"squeeze_{name}_{rewrite_sequence}_{index}"
+                rewrite_sequence += 1
+        operands[role] = [str(value) for value in new_dims]
+    layer["operands"] = operands
+    _store_rewritten_inputs(layer, predecessors, names, shapes)
+    return rewrite_sequence
+
+
+def _store_rewritten_inputs(
+    layer: dict[str, Any],
+    predecessors: list[str],
+    names: list[str],
+    shapes: list[list[int]],
+) -> None:
+    """Write rewritten positional input metadata back when present."""
+    if (layer.get("connections") or {}).get("inputs") is not None:
+        layer["connections"]["inputs"] = predecessors
+    if (layer.get("tensor_names") or {}).get("inputs") is not None:
+        layer["tensor_names"]["inputs"] = names
+    if (layer.get("tensor_shapes") or {}).get("inputs") is not None:
+        layer["tensor_shapes"]["inputs"] = shapes
+
+
+def _rewrite_elided_layer(
+    name: str,
+    layer: dict[str, Any],
+    aliases: dict[str, _Alias],
+    elided: set[str],
+    diagnostics: list[str],
+    rewrite_sequence: int,
+) -> tuple[dict[str, Any], int]:
+    """Return one surviving layer with all elided aliases bypassed."""
+    rewritten = copy.deepcopy(layer)
+    rewrite_sequence = _rewrite_alias_inputs(
+        name,
+        rewritten,
+        aliases,
+        diagnostics,
+        rewrite_sequence,
+    )
+    connections = rewritten.get("connections") or {}
+    outputs = [
+        output
+        for output in list(connections.get("outputs") or [])
+        if output not in elided
+    ]
+    if connections.get("outputs") is not None:
+        connections["outputs"] = outputs
+    return rewritten, rewrite_sequence
 
 
 def _apply_shape_op_elision(
     layers: dict[str, dict[str, Any]],
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
-    """Return a rewritten layers dict with shape ops elided.
-
-    For each elide-able layer S:
-      - drop S from the output dict
-      - for every consumer C whose ``connections.inputs`` lists S, replace
-        the entry with the chain root
-      - for the consumer operand reading from S, rewrite its dim list to
-        align positionally with the root producer's output dims (insert a
-        synthetic label for unsqueeze-introduced output dims that the
-        consumer carried; drop labels for squeeze-dropped axes; reorder
-        for transposes/permutations)
-    """
-    aliases, elided, diags = _build_shape_op_aliases(layers)
+    """Elide safe shape ops and reconnect consumers to root producers."""
+    aliases, elided, diagnostics = _build_shape_op_aliases(layers)
     if not elided:
-        return layers, diags
-
-    new_layers: dict[str, dict[str, Any]] = {}
-    rewrite_seq = 0
-
+        return layers, diagnostics
+    rewritten: dict[str, dict[str, Any]] = {}
+    rewrite_sequence = 0
     for name, layer in layers.items():
         if name in elided:
             continue
-        new_layer = copy.deepcopy(layer)
-        preds = list((new_layer.get("connections") or {}).get("inputs") or [])
-        operands = new_layer.get("operands") or {}
-        tensor_names = (new_layer.get("tensor_names") or {}).get("inputs") or []
-        tensor_shapes = (new_layer.get("tensor_shapes") or {}).get(
-            "inputs"
-        ) or []
-        tensor_dtypes_in = (new_layer.get("tensor_dtypes") or {}).get(
-            "inputs"
-        ) or []
-
-        # Every role that isn't an explicit output role is an input-like slot
-        # (covers Input, Input_1, Weight, Target, Hidden_in, etc.).
-        input_roles = [r for r in operands if not _is_output_role(r)]
-        # Walk input slot k (1:1 with preds[k] / tensor_names[k] / shapes[k]).
-        for k in range(len(preds)):
-            preds[k]
-            # Walk the alias chain: if pred itself produces an elided
-            # tensor we substitute its root.
-            in_tensor_name = tensor_names[k] if k < len(tensor_names) else None
-            if in_tensor_name is None or in_tensor_name not in aliases:
-                continue
-            alias = aliases[in_tensor_name]
-            preds[k] = alias.root_layer
-            if k < len(tensor_names):
-                tensor_names[k] = alias.root_tensor
-            if k < len(tensor_shapes):
-                tensor_shapes[k] = list(alias.root_shape)
-            # Rewrite operand labels for this input slot.
-            if k < len(input_roles):
-                role = input_roles[k]
-                cur_dims = list(operands.get(role) or [])
-                if len(cur_dims) != len(alias.out_to_in):
-                    # Defensive: skip this rewrite (shouldn't happen given
-                    # solar's positional convention).
-                    diags.append(
-                        f"layer {name!r}: alias-rewrite skipped for role "
-                        f"{role!r} — operand width {len(cur_dims)} != alias "
-                        f"width {len(alias.out_to_in)}."
-                    )
-                    continue
-                new_dims: list[str | None] = [None] * len(alias.root_dims)
-                for j, i in enumerate(alias.out_to_in):
-                    if i is None or i < 0 or i >= len(new_dims):
-                        continue
-                    # When multiple output positions map to the same input
-                    # (broadcast) — pick the first; the iter at the root
-                    # axis is the same dim across the broadcast.
-                    if new_dims[i] is None:
-                        new_dims[i] = cur_dims[j]
-                # Slot in synthetic labels for root positions that the
-                # consumer doesn't iterate (because the shape-op squeezed
-                # them out / they're size-1).
-                for i, label in enumerate(new_dims):
-                    if label is None:
-                        new_dims[i] = f"squeeze_{name}_{rewrite_seq}_{i}"
-                        rewrite_seq += 1
-                operands[role] = [str(x) for x in new_dims]
-
-        new_layer["operands"] = operands
-        # Write rewritten connections / tensor_names / shapes / dtypes back.
-        if (new_layer.get("connections") or {}).get("inputs") is not None:
-            new_layer["connections"]["inputs"] = preds
-        if (new_layer.get("tensor_names") or {}).get("inputs") is not None:
-            new_layer["tensor_names"]["inputs"] = tensor_names
-        if (new_layer.get("tensor_shapes") or {}).get("inputs") is not None:
-            new_layer["tensor_shapes"]["inputs"] = tensor_shapes
-
-        # Rewrite outgoing-connection lists: each elided layer's name in a
-        # successor's connections.outputs should be replaced by the
-        # surviving successor or the root layer's successors. We only
-        # touch `connections.outputs` for symmetry; AF doesn't read it.
-        outs = list((new_layer.get("connections") or {}).get("outputs") or [])
-        outs = [o for o in outs if o not in elided]
-        if (new_layer.get("connections") or {}).get("outputs") is not None:
-            new_layer["connections"]["outputs"] = outs
-
-        _ = tensor_dtypes_in  # currently no dtype rewrite needed; root retains
-        new_layers[name] = new_layer
-
-    return new_layers, diags
+        rewritten[name], rewrite_sequence = _rewrite_elided_layer(
+            name,
+            layer,
+            aliases,
+            elided,
+            diagnostics,
+            rewrite_sequence,
+        )
+    return rewritten, diagnostics
 
 
 # ---------------------------------------------------------------------------
@@ -442,151 +466,164 @@ def _apply_shape_op_elision(
 # ---------------------------------------------------------------------------
 
 
-def _normalize_operands(layers: dict[str, dict[str, Any]]) -> list[str]:
-    """Make ``operands`` reflect the true tensor slot count per layer.
+def _operand_roles(
+    operands: dict[str, Any],
+    input_slots: int,
+    output_slots: int,
+) -> tuple[list[str], list[str]]:
+    """Classify existing operand roles using the AF positional convention."""
+    inputs: list[str] = []
+    outputs: list[str] = []
+    for role in operands:
+        if _is_output_role(role):
+            outputs.append(role)
+        elif _is_input_role(role) or len(inputs) < input_slots:
+            inputs.append(role)
+        elif len(outputs) < output_slots:
+            outputs.append(role)
+        else:
+            inputs.append(role)
+    return inputs, outputs
 
-    Solar's shape-handlers sometimes emit a single ``Input`` operand role
-    for ops that actually consume N tensors (cat, concat, stack). Every
-    downstream pass — context indexing, axis collection, cross-layer
-    union, AF emit — iterates ``operands`` and would silently drop the
-    extra preds. We fix that here, once, by making operands the canonical
-    projection-shape map: one role per real input/output tensor slot.
 
-    Source of truth (per AF builder contract):
-      - ``tensor_shapes.inputs[k]``, ``tensor_types.inputs[k]`` — slot k's
-        shape and role (``"input"`` vs ``"weight"``)
-      - ``tensor_shapes.outputs[k]`` — output slot k's shape
+def _synthesize_operand(
+    operands: dict[str, Any],
+    diagnostics: list[str],
+    *,
+    layer_name: str,
+    slot: int,
+    role_name: str,
+    slot_shape: list[int],
+    template_dims: list[str],
+    template_shape: list[int],
+    suffix: str,
+) -> None:
+    """Add one missing positional operand role when shape data is complete."""
+    while role_name in operands:
+        role_name += "_x"
+    if (
+        template_dims
+        and template_shape
+        and slot_shape
+        and len(template_dims) == len(slot_shape) == len(template_shape)
+    ):
+        labels = list(template_dims)
+        for dimension, (actual, template) in enumerate(
+            zip(slot_shape, template_shape, strict=True)
+        ):
+            if int(actual) != int(template):
+                labels[dimension] = f"{labels[dimension]}_{suffix}{slot}"
+    elif slot_shape:
+        labels = [f"{role_name}_d{index}" for index in range(len(slot_shape))]
+    else:
+        diagnostics.append(
+            f"layer {layer_name!r}: cannot synthesize role {role_name!r} "
+            f"— no shape info available for slot {slot}."
+        )
+        return
+    operands[role_name] = labels
+    diagnostics.append(
+        f"layer {layer_name!r}: synthesized {role_name}={labels} "
+        f"for missing slot {slot} (shape={slot_shape})."
+    )
 
-    For each layer:
-      - If existing input-role count < slot count, synthesize ``Input_k``
-        (or ``Weight_k`` per tensor_types) for the missing slots.
-      - Same for output roles.
 
-    Synthesized labels are derived from the first existing same-kind role
-    as a template, with a per-slot suffix on dims whose size differs from
-    the template's size at the same position. Equal-sized dims keep the
-    template's label so the union-find correctly merges them (e.g.
-    add(x,x) has all dims unified; cat's cat-axis is split). Without a
-    template, fresh labels are minted per-dim.
-
-    Mutates ``layers`` in place. Returns diagnostic strings for the
-    synthesized roles.
-    """
-    diags: list[str] = []
-
-    for name, layer in layers.items():
-        operands = layer.get("operands")
-        if not operands:
+def _normalize_input_operands(
+    name: str,
+    operands: dict[str, Any],
+    roles: list[str],
+    shapes: list[list[int]],
+    types: list[str],
+    diagnostics: list[str],
+) -> None:
+    """Synthesize undeclared non-weight input slots."""
+    template_dims = list(operands.get(roles[0]) or []) if roles else []
+    template_shape = list(shapes[0]) if shapes else []
+    slot_count = len(types) if types else len(shapes)
+    for slot in range(len(roles), slot_count):
+        if slot < len(types) and types[slot] == "weight":
             continue
-        in_shapes = (layer.get("tensor_shapes") or {}).get("inputs") or []
-        in_types = (layer.get("tensor_types") or {}).get("inputs") or []
-        out_shapes = (layer.get("tensor_shapes") or {}).get("outputs") or []
-
-        # Classify each existing role by the same rule
-        # ``_build_role_to_shape_index`` uses, so unconventionally-named
-        # roles like the entry-point ``start`` (which functions as an
-        # output) are recognized and don't trigger spurious synthesis.
-        in_roles_existing: list[str] = []
-        out_roles_existing: list[str] = []
-        n_in_max = max(len(in_shapes), len(in_types))
-        for role in operands:
-            if _is_output_role(role):
-                out_roles_existing.append(role)
-            elif _is_input_role(role):
-                in_roles_existing.append(role)
-            else:
-                # Default: fill remaining input slots first, then outputs.
-                if len(in_roles_existing) < n_in_max:
-                    in_roles_existing.append(role)
-                elif len(out_roles_existing) < len(out_shapes):
-                    out_roles_existing.append(role)
-                else:
-                    in_roles_existing.append(role)
-
-        def _synthesize(
-            slot: int,
-            role_name: str,
-            slot_shape: list[int],
-            tmpl_dims: list[str],
-            tmpl_shape: list[int],
-            suffix: str,
-            layer_operands: dict[str, Any],
-            layer_name: str,
-        ) -> None:
-            while role_name in layer_operands:
-                role_name += "_x"
-            if (
-                tmpl_dims
-                and tmpl_shape
-                and slot_shape
-                and len(tmpl_dims) == len(slot_shape)
-                and len(tmpl_shape) == len(slot_shape)
-            ):
-                labels = list(tmpl_dims)
-                for d in range(len(labels)):
-                    if int(slot_shape[d]) != int(tmpl_shape[d]):
-                        labels[d] = f"{labels[d]}_{suffix}{slot}"
-            elif slot_shape:
-                labels = [f"{role_name}_d{d}" for d in range(len(slot_shape))]
-            else:
-                diags.append(
-                    f"layer {layer_name!r}: cannot synthesize role {role_name!r} "
-                    f"— no shape info available for slot {slot}."
-                )
-                return
-            layer_operands[role_name] = labels
-            diags.append(
-                f"layer {layer_name!r}: synthesized {role_name}={labels} "
-                f"for missing slot {slot} (shape={slot_shape})."
-            )
-
-        # Input slots — only synthesize NON-WEIGHT slots. Weight slots not
-        # declared in operands are still correctly emitted as ``W{n}`` by
-        # ``_emit_af_workload`` (it inspects tensor_types positionally);
-        # adding phantom Weight_k roles for tensors that don't participate
-        # in the current einsum's compute inflates the AF mapper's
-        # pmapping space and causes OOMs (L2/13: ConvTranspose3d with
-        # bias). Real multi-input ops (cat/concat/stack) only need
-        # additional non-weight roles.
-        tmpl_in_dims = (
-            list(operands.get(in_roles_existing[0]) or [])
-            if in_roles_existing
-            else []
+        slot_shape = list(shapes[slot]) if slot < len(shapes) else []
+        _synthesize_operand(
+            operands,
+            diagnostics,
+            layer_name=name,
+            slot=slot,
+            role_name=f"Input_{slot}",
+            slot_shape=slot_shape,
+            template_dims=template_dims,
+            template_shape=template_shape,
+            suffix="s",
         )
-        tmpl_in_shape = list(in_shapes[0]) if in_shapes else []
-        for slot in range(len(in_roles_existing), len(in_types) or n_in_max):
-            if slot < len(in_types) and in_types[slot] == "weight":
-                continue
-            slot_shape = list(in_shapes[slot]) if slot < len(in_shapes) else []
-            _synthesize(
-                slot,
-                f"Input_{slot}",
-                slot_shape,
-                tmpl_in_dims,
-                tmpl_in_shape,
-                suffix="s",
-                layer_operands=operands,
-                layer_name=name,
-            )
 
-        # Output slots.
-        tmpl_out_dims = (
-            list(operands.get(out_roles_existing[0]) or [])
-            if out_roles_existing
-            else []
+
+def _normalize_output_operands(
+    name: str,
+    operands: dict[str, Any],
+    roles: list[str],
+    shapes: list[list[int]],
+    diagnostics: list[str],
+) -> None:
+    """Synthesize undeclared output slots."""
+    template_dims = list(operands.get(roles[0]) or []) if roles else []
+    template_shape = list(shapes[0]) if shapes else []
+    for slot in range(len(roles), len(shapes)):
+        _synthesize_operand(
+            operands,
+            diagnostics,
+            layer_name=name,
+            slot=slot,
+            role_name=f"Output_{slot}",
+            slot_shape=list(shapes[slot]),
+            template_dims=template_dims,
+            template_shape=template_shape,
+            suffix="o",
         )
-        tmpl_out_shape = list(out_shapes[0]) if out_shapes else []
-        for slot in range(len(out_roles_existing), len(out_shapes)):
-            slot_shape = list(out_shapes[slot])
-            _synthesize(
-                slot,
-                f"Output_{slot}",
-                slot_shape,
-                tmpl_out_dims,
-                tmpl_out_shape,
-                suffix="o",
-                layer_operands=operands,
-                layer_name=name,
-            )
 
-    return diags
+
+def _normalize_layer_operands(
+    name: str,
+    layer: dict[str, Any],
+    diagnostics: list[str],
+) -> None:
+    """Normalize the positional operand roles for one layer in place."""
+    operands = layer.get("operands")
+    if not operands:
+        return
+    shapes = layer.get("tensor_shapes") or {}
+    input_shapes = shapes.get("inputs") or []
+    output_shapes = shapes.get("outputs") or []
+    input_types = (layer.get("tensor_types") or {}).get("inputs") or []
+    input_roles, output_roles = _operand_roles(
+        operands,
+        max(len(input_shapes), len(input_types)),
+        len(output_shapes),
+    )
+    _normalize_input_operands(
+        name,
+        operands,
+        input_roles,
+        input_shapes,
+        input_types,
+        diagnostics,
+    )
+    _normalize_output_operands(
+        name,
+        operands,
+        output_roles,
+        output_shapes,
+        diagnostics,
+    )
+
+
+def _normalized_operands(layers: dict[str, dict[str, Any]]) -> list[str]:
+    """Normalize every layer and return all synthesis diagnostics."""
+    diagnostics: list[str] = []
+    for name, layer in layers.items():
+        _normalize_layer_operands(name, layer, diagnostics)
+    return diagnostics
+
+
+def _normalize_operands(layers: dict[str, dict[str, Any]]) -> list[str]:
+    """Normalize operand roles in place and return synthesis diagnostics."""
+    return _normalized_operands(layers)

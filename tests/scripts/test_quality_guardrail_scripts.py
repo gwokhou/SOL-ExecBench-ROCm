@@ -229,6 +229,31 @@ def test_coupling_rejects_domain_cycles_without_module_cycles(
     ]
 
 
+def test_coupling_excludes_audit_only_aggregate_edges(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    coupling = load_script("scripts/check_coupling.py")
+    audit_module = "sol_execbench.core.integrity.artifact_registry"
+    platform_module = "sol_execbench.core.platform.schema_versions"
+    audit_path = tmp_path / "artifact_registry.py"
+    platform_path = tmp_path / "schema_versions.py"
+    audit_path.write_text(
+        "from sol_execbench.core.platform.schema_versions import Schema\n",
+        encoding="utf-8",
+    )
+    platform_path.write_text("class Schema: pass\n", encoding="utf-8")
+
+    edges = coupling.internal_import_edges(
+        {
+            audit_module: audit_path,
+            platform_module: platform_path,
+        },
+    )
+
+    assert edges == set()
+
+
 def test_coupling_limit_failures_include_lines_fanout_and_exact_imports(
     load_script,
 ) -> None:

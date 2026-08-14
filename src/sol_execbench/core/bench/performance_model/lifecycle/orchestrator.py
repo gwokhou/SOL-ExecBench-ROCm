@@ -15,10 +15,9 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, TypedDict, runtime_checkable
+from typing import TYPE_CHECKING, TypedDict
 
 from pydantic import TypeAdapter
 
@@ -64,6 +63,13 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticLifecycleStage,
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.execution import (
+    DiagnosticStageHandler,
+    StageCompletion,
+    StageRunContext,
+    artifact_for_path,
+    verify_artifacts,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.identity import (
     acceptance_id,
@@ -165,103 +171,6 @@ DEPENDENCIES: dict[
 _CHAIN_INDEX = {stage: index for index, stage in enumerate(CHAIN)}
 
 _RECEIPT_ADAPTER = TypeAdapter(DiagnosticStageReceipt)
-
-
-@dataclass
-class StageRunContext:
-    """Mutable carrier of the fixed run inputs and produced output paths."""
-
-    store_root: Path
-    plan: DiagnosticLifecyclePlan
-    design_manifest_path: Path
-    collection_run_id: str
-    generation: int
-    purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
-    corpus_root: Path | None = None
-    calibration_profile_path: Path | None = None
-    calibration_audit_path: Path | None = None
-    vram_policy_path: Path | None = None
-    frozen_inference_profile_path: Path | None = None
-    development_corpus_path: Path | None = None
-    held_out_corpus_path: Path | None = None
-    output_root: Path | None = None
-    source_revision: str = "unknown"
-    model_version: str = "gfx1200_diagnostic.v7"
-    paths: dict[str, Path] = field(default_factory=dict)
-
-    def output(self, stage: DiagnosticLifecycleStage) -> Path | None:
-        """Return the recorded primary output path for one stage."""
-        return self.paths.get(stage.value)
-
-    def set_output(self, stage: DiagnosticLifecycleStage, path: Path) -> None:
-        """Record the primary output path for one completed stage."""
-        self.paths[stage.value] = Path(path)
-
-
-@dataclass(frozen=True)
-class StageCompletion:
-    """One completed stage's produced identity and exact output inventory."""
-
-    stage_id: str
-    outputs: tuple[DiagnosticLifecycleArtifact, ...]
-    output_paths: tuple[Path, ...] = ()
-
-
-@runtime_checkable
-class DiagnosticStageHandler(Protocol):
-    """One lifecycle stage adapter: perform, prepare, and re-verify."""
-
-    stage: DiagnosticLifecycleStage
-
-    def run(self, context: StageRunContext) -> StageCompletion:
-        """Execute the stage and return its produced identity and outputs."""
-        ...
-
-    def prepare(
-        self,
-        context: StageRunContext,
-        run_state: DiagnosticRunManifest,
-    ) -> tuple[DiagnosticLifecycleParent, ...]:
-        """Return the immutable input identities the stage consumes."""
-        ...
-
-    def verify(
-        self,
-        context: StageRunContext,
-        receipt: DiagnosticStageReceipt,
-    ) -> bool:
-        """Re-verify the completed stage; returns whether it still holds."""
-        ...
-
-
-def _artifact(path: Path) -> DiagnosticLifecycleArtifact:
-    return DiagnosticLifecycleArtifact(
-        relative_path=path.name,
-        sha256=sha256_file(path),
-        size_bytes=path.stat().st_size,
-    )
-
-
-def _verify_artifacts(
-    artifacts: Sequence[DiagnosticLifecycleArtifact],
-    base: Path,
-) -> bool:
-    """Re-check that every recorded artifact still verifies under *base*."""
-    resolved_base = base.resolve()
-    for item in artifacts:
-        if item.relative_path == "":
-            continue
-        candidate = resolved_base / item.relative_path
-        if candidate.is_symlink():
-            return False
-        path = candidate.resolve()
-        if not path.is_relative_to(resolved_base) or not path.is_file():
-            return False
-        if path.stat().st_size != item.size_bytes:
-            return False
-        if sha256_file(path) != item.sha256:
-            return False
-    return True
 
 
 class DesignHandler:
@@ -436,7 +345,10 @@ class CalibrationHandler:
         )
         return StageCompletion(
             stage_id=stage_id,
-            outputs=(_artifact(profile_path), _artifact(audit_path)),
+            outputs=(
+                artifact_for_path(profile_path),
+                artifact_for_path(audit_path),
+            ),
             output_paths=(profile_path, audit_path),
         )
 
@@ -458,7 +370,7 @@ class CalibrationHandler:
         audit = context.calibration_audit_path
         if profile is None or audit is None or profile.parent != audit.parent:
             return False
-        return _verify_artifacts(receipt.output_inventory, profile.parent)
+        return verify_artifacts(receipt.output_inventory, profile.parent)
 
 
 class CorpusSnapshotHandler:
@@ -510,7 +422,7 @@ class CorpusSnapshotHandler:
         """Re-verify the frozen corpus files against the receipt."""
         if context.corpus_root is None:
             return False
-        return _verify_artifacts(
+        return verify_artifacts(
             receipt.output_inventory,
             context.corpus_root,
         )
@@ -590,7 +502,7 @@ class ModelBuildHandler:
         )
         return StageCompletion(
             stage_id=stage_id,
-            outputs=(_artifact(output),),
+            outputs=(artifact_for_path(output),),
             output_paths=(output,),
         )
 
@@ -611,7 +523,7 @@ class ModelBuildHandler:
         output = context.output(self.stage)
         if output is None:
             return False
-        return _verify_artifacts(
+        return verify_artifacts(
             receipt.output_inventory,
             output.parent,
         )
@@ -659,7 +571,10 @@ class AcceptanceHandler:
         )
         atomic_write_json_value(result_output, result.model_dump(mode="json"))
         context.set_output(self.stage, manifest_output)
-        outputs = (_artifact(manifest_output), _artifact(result_output))
+        outputs = (
+            artifact_for_path(manifest_output),
+            artifact_for_path(result_output),
+        )
         held_out_snapshot_id = corpus_snapshot_id(
             collection_run_id=context.collection_run_id,
             role="held_out",
@@ -778,7 +693,7 @@ class AcceptanceHandler:
         output = context.output(self.stage)
         if output is None:
             return False
-        return _verify_artifacts(
+        return verify_artifacts(
             receipt.output_inventory,
             output.parent,
         )
@@ -876,7 +791,7 @@ class PublicationHandler:
         )
         return StageCompletion(
             stage_id=stage_id,
-            outputs=(_artifact(manifest_path),),
+            outputs=(artifact_for_path(manifest_path),),
             output_paths=(manifest_path,),
         )
 
@@ -960,7 +875,10 @@ class ReleaseHandler:
         context.set_output(self.stage, archive)
         return StageCompletion(
             stage_id=attestation.release_id,
-            outputs=(_artifact(archive), _artifact(attestation_path)),
+            outputs=(
+                artifact_for_path(archive),
+                artifact_for_path(attestation_path),
+            ),
             output_paths=(archive, attestation_path),
         )
 
@@ -1162,27 +1080,7 @@ def build_run_context(
         store_root=root,
         plan=plan,
         design_manifest_path=design_path,
-        collection_run_id=plan.collection_run_id,
-        generation=plan.generation,
-        purpose=plan.purpose,
-        corpus_root=Path(plan.collection_root),
-        calibration_profile_path=Path(plan.calibration_profile_path),
-        calibration_audit_path=Path(plan.calibration_audit_path),
-        vram_policy_path=(
-            Path(plan.vram_policy_path)
-            if plan.vram_policy_path is not None
-            else None
-        ),
-        frozen_inference_profile_path=(
-            Path(plan.frozen_inference_profile_path)
-            if plan.frozen_inference_profile_path is not None
-            else None
-        ),
         development_corpus_path=development_corpus,
-        held_out_corpus_path=Path(plan.held_out_corpus_path),
-        output_root=Path(plan.output_root),
-        source_revision=plan.source_revision,
-        model_version=plan.model_version,
     )
 
 
@@ -1471,12 +1369,7 @@ def _execute_stage(
         attempts += 1
         running = _replace_stage(
             current,
-            DiagnosticRunStageState(
-                stage=stage,
-                status=DiagnosticStageStatus.RUNNING,
-                attempts=attempts,
-                receipt_path="",
-            ),
+            DiagnosticRunStageState.running(stage, attempts),
         )
         _write_run_state(context, running)
         started = clock()
@@ -1506,12 +1399,10 @@ def _execute_stage(
             continue
         current = _replace_stage(
             running,
-            DiagnosticRunStageState(
-                stage=stage,
-                status=DiagnosticStageStatus.VERIFIED,
-                attempts=attempts,
-                receipt_path=_receipt_name(stage),
-                outputs=completion.outputs,
+            DiagnosticRunStageState.verified(
+                stage,
+                attempts,
+                completion.outputs,
             ),
         )
         _write_attempt(
@@ -1649,12 +1540,7 @@ def _failed_stage(
 ) -> DiagnosticRunManifest:
     return _replace_stage(
         run_state,
-        DiagnosticRunStageState(
-            stage=stage,
-            status=DiagnosticStageStatus.FAILED,
-            attempts=attempts,
-            receipt_path="",
-        ),
+        DiagnosticRunStageState.failed(stage, attempts),
     )
 
 
@@ -2023,10 +1909,6 @@ def _write_attempt(
     BlobStore(context.store_root).put_file(path)
 
 
-def _receipt_name(stage: DiagnosticLifecycleStage) -> str:
-    return f"{stage.value}.json"
-
-
 def _build_receipt(
     stage: DiagnosticLifecycleStage,
     completion: StageCompletion,
@@ -2068,11 +1950,7 @@ def _reverify_past_stages(
         if any(dependency in invalid for dependency in DEPENDENCIES[stage]):
             invalid.add(stage)
             current = current.set_stage(
-                DiagnosticRunStageState(
-                    stage=state.stage,
-                    status=DiagnosticStageStatus.FAILED,
-                    attempts=state.attempts,
-                )
+                DiagnosticRunStageState.failed(state.stage, state.attempts)
             )
             continue
         receipt = _load_receipt(
@@ -2097,13 +1975,7 @@ def _reverify_past_stages(
         if not verified:
             invalid.add(stage)
             current = current.set_stage(
-                DiagnosticRunStageState(
-                    stage=state.stage,
-                    status=DiagnosticStageStatus.FAILED,
-                    attempts=state.attempts,
-                    receipt_path="",
-                    outputs=(),
-                ),
+                DiagnosticRunStageState.failed(state.stage, state.attempts),
             )
     return current
 
@@ -2216,12 +2088,9 @@ __all__ = [
     "CollectionRunHandler",
     "CorpusSnapshotHandler",
     "DesignHandler",
-    "DiagnosticStageHandler",
     "ModelBuildHandler",
     "PublicationHandler",
     "ReleaseHandler",
-    "StageCompletion",
-    "StageRunContext",
     "build_run_context",
     "build_stage_handlers",
     "diagnostic_lifecycle_status",

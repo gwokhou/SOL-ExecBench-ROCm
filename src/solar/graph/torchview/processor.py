@@ -35,7 +35,6 @@ The output format matches the original process_torchview_graph.py output:
 """
 
 from pathlib import Path
-from typing import Any
 
 from torch import nn
 
@@ -44,6 +43,7 @@ from solar.graph.torchview.models import NodeInfo
 from solar.graph.torchview.parameters import TorchviewParametersMixin
 from solar.graph.torchview.reporting import TorchviewReportingMixin
 from solar.graph.torchview.topology import TorchviewTopologyMixin
+from solar.types import DynamicValue
 
 
 class TorchviewProcessor(
@@ -73,7 +73,7 @@ class TorchviewProcessor(
 
     def process_graph(
         self,
-        computation_graph: Any,
+        computation_graph: DynamicValue,
         output_dir: str,
         kernel_name: str,
         original_model: nn.Module | None = None,

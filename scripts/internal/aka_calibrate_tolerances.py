@@ -7,8 +7,7 @@
 from __future__ import annotations
 
 import argparse
-import runpy
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -38,6 +37,7 @@ from sol_execbench.core.data.workload import (
     NumericCheckMode,
     Workload,
 )
+from sol_execbench.core.dataset.aka_authoring import load_aka_seed_specs
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import (
     AKA_REVISION,
@@ -72,7 +72,8 @@ from sol_execbench.core.timestamps import utc_timestamp
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PROBLEMS_ROOT = REPO_ROOT / "problems" / "AMD_AKA"
 DEFAULT_OUTPUT = DEFAULT_PROBLEMS_ROOT / "tolerance-calibration.json"
-AUTHOR_SCRIPT = REPO_ROOT / "scripts/internal/aka_author_seed.py"
+AKA_SEED_SPECS_PATH = REPO_ROOT / "scripts/internal/aka_seed_specs.json"
+AKA_SEED_SPECS = load_aka_seed_specs(AKA_SEED_SPECS_PATH)
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,7 +129,7 @@ def _output_snapshot(
 def _variation(
     anchor: tuple[torch.Tensor, ...],
     observed: tuple[torch.Tensor, ...],
-    output_dtypes: list[str],
+    output_dtypes: Sequence[str],
 ) -> list[tuple[float, float]]:
     metrics: list[tuple[float, float]] = []
     for expected, actual, dtype in zip(
@@ -227,11 +228,9 @@ def _calibrate_workload(
 
 
 def _records(args: argparse.Namespace) -> list[dict[str, Any]]:
-    author = runpy.run_path(str(AUTHOR_SCRIPT))
-    specs = author["SPECS"]
     records: list[dict[str, Any]] = []
     device = torch.device(args.device)
-    for spec in specs:
+    for spec in AKA_SEED_SPECS:
         problem_path = f"{spec.suite}/{spec.name}"
         definition, workloads = load_problem(args.problems_root / problem_path)
         run, custom_inputs_fn = execute_reference_entrypoints(definition)
@@ -271,9 +270,8 @@ def _qualification_items(
     *,
     executable_only: bool,
 ) -> tuple[_QualificationItem, ...]:
-    specs = runpy.run_path(str(AUTHOR_SCRIPT))["SPECS"]
     items: list[_QualificationItem] = []
-    for spec in specs:
+    for spec in AKA_SEED_SPECS:
         if executable_only and spec.role is AKACorpusRole.TARGET_INCOMPATIBLE:
             continue
         problem_path = f"{spec.suite}/{spec.name}"
@@ -345,7 +343,7 @@ def _qualification_subject(args: argparse.Namespace) -> str:
     return stable_json_checksum(
         {
             "aka_revision": AKA_REVISION,
-            "author_script_sha256": sha256_file(AUTHOR_SCRIPT),
+            "seed_specs_sha256": sha256_file(AKA_SEED_SPECS_PATH),
             "problems": artifacts,
         }
     )
@@ -473,10 +471,12 @@ def _run_qualification(
                 f"qualification requires {FORMAL_GFX_TARGET}, "
                 f"got {device_info.gfx_target}"
             )
-    receipts = (
-        (_static_receipt(args, items),)
-        if stage is BatchGPUQualificationStage.STATIC
-        else tuple(
+    if stage is BatchGPUQualificationStage.STATIC:
+        receipts = (_static_receipt(args, items),)
+    else:
+        if device_info is None:
+            raise RuntimeError("GPU qualification requires device identity")
+        receipts = tuple(
             _gpu_receipt(
                 args,
                 stage,
@@ -486,7 +486,6 @@ def _run_qualification(
             )
             for partition in _partition_items(items)
         )
-    )
     gate = BatchGPUQualificationGate(
         task=LargeBatchGPUTask.AKA_TOLERANCE_CALIBRATION,
         stage=stage,

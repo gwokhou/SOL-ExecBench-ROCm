@@ -24,14 +24,14 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
     EinsumOperand,
     EinsumOpHandler,
 )
-from solar.types import TensorShape, TensorShapes
+from solar.types import DynamicValue, TensorShape, TensorShapes
 
 
 def generate_dim_labels(num_dims: int, prefix: str = "") -> list[str]:
@@ -111,7 +111,7 @@ class TensorManipulationHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for tensor manipulation operation."""
         if tensor_shapes.num_inputs < 1:
@@ -149,7 +149,7 @@ class TensorManipulationHandler(EinsumOpHandler):
         input_shape: TensorShape,
         output_shape: TensorShape,
         operation_name: str,
-        module_args: dict[str, Any] | None = None,
+        module_args: dict[str, DynamicValue] | None = None,
     ) -> EinsumOp:
         """Generate einsum for transpose/permute operations.
 
@@ -223,7 +223,7 @@ class TensorManipulationHandler(EinsumOpHandler):
     def _apply_permutation_from_args(
         self,
         in_labels: list[str],
-        module_args: dict[str, Any] | None = None,
+        module_args: dict[str, DynamicValue] | None = None,
     ) -> list[str] | None:
         """Apply explicit permutation from module_args if available.
 
@@ -406,7 +406,7 @@ class TensorManipulationHandler(EinsumOpHandler):
         input_shape: TensorShape,
         output_shape: TensorShape,
         operation_name: str,
-        module_args: dict[str, Any] | None = None,
+        module_args: dict[str, DynamicValue] | None = None,
     ) -> EinsumOp:
         """Generate einsum for reshape/view operations.
 
@@ -463,7 +463,7 @@ class MatrixStructureHandler(EinsumOpHandler):
         self,
         op_name: str,
         tensor_shapes: TensorShapes,
-        **kwargs: Any,
+        **kwargs: DynamicValue,
     ) -> EinsumOp:
         """Generate einsum for matrix structure operation."""
         if tensor_shapes.num_inputs < 1:

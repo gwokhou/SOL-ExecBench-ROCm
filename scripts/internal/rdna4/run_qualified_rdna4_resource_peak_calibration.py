@@ -6,12 +6,10 @@
 from __future__ import annotations
 
 import argparse
-import runpy
 import tempfile
-from collections.abc import Mapping
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 from sol_execbench.core.bench.batch_gpu_qualification import (
     BatchGPUQualificationGate,
@@ -23,6 +21,12 @@ from sol_execbench.core.bench.batch_gpu_qualification import (
     qualification_parent_stage,
     require_isolated_qualification_root,
     verify_qualification_artifact,
+)
+from sol_execbench.core.bench.frozen_resource_peak_producer import (
+    FrozenResourcePeakProducer,
+    ResourcePeakProbe,
+    ResourcePeakTuning,
+    load_frozen_resource_peak_producer,
 )
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
@@ -46,9 +50,9 @@ _CANARY_PROBES = (
 
 
 @cache
-def _legacy() -> dict[str, Any]:
-    """Load the byte-frozen producer without modifying its evidence identity."""
-    return runpy.run_path(str(LEGACY_PRODUCER))
+def _producer() -> FrozenResourcePeakProducer:
+    """Return the typed adapter for the byte-frozen historical producer."""
+    return load_frozen_resource_peak_producer(LEGACY_PRODUCER)
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -89,8 +93,8 @@ def _root(arguments: argparse.Namespace) -> Path:
     )
 
 
-def _probes() -> tuple[Mapping[str, Any], ...]:
-    return tuple(_legacy()["PROBES"])
+def _probes() -> tuple[ResourcePeakProbe, ...]:
+    return _producer().probes
 
 
 def _probe_names(stage: BatchGPUQualificationStage) -> tuple[str, ...]:
@@ -101,14 +105,14 @@ def _probe_names(stage: BatchGPUQualificationStage) -> tuple[str, ...]:
 
 def _selected_probes(
     stage: BatchGPUQualificationStage,
-) -> tuple[Mapping[str, Any], ...]:
+) -> tuple[ResourcePeakProbe, ...]:
     selected = set(_probe_names(stage))
     return tuple(probe for probe in _probes() if probe["source"] in selected)
 
 
 def _subject(hipcc: str) -> str:
-    legacy = _legacy()
-    probe_root = Path(legacy["PROBE_DIR"])
+    producer = _producer()
+    probe_root = producer.probe_dir
     return stable_json_checksum(
         {
             "legacy_producer_sha256": sha256_file(LEGACY_PRODUCER),
@@ -136,10 +140,11 @@ def _configuration(arguments: argparse.Namespace) -> str:
     )
 
 
-def _compiler_defines(probe: Mapping[str, Any]) -> dict[str, int]:
+def _compiler_defines(probe: ResourcePeakProbe) -> dict[str, int]:
     tuning = probe.get("tuning")
     if tuning is None:
         return {}
+    tuning = cast(ResourcePeakTuning, tuning)
     return {tuning.compiler_macro: tuning.candidates[0]}
 
 
@@ -147,11 +152,11 @@ def _static_receipt(
     arguments: argparse.Namespace,
     hipcc: str,
 ) -> BatchGPUQualificationReceipt:
-    legacy = _legacy()
+    producer = _producer()
     root = _root(arguments)
     binaries = tuple(
-        legacy["_compile_probe"](
-            Path(legacy["PROBE_DIR"]) / str(probe["source"]),
+        producer.compile_probe(
+            producer.probe_dir / str(probe["source"]),
             root / "static",
             hipcc,
             arguments.gfx,
@@ -180,8 +185,8 @@ def _static_receipt(
     )
 
 
-def _binary(arguments: argparse.Namespace, probe: Mapping[str, Any]) -> Path:
-    source = Path(_legacy()["PROBE_DIR"]) / str(probe["source"])
+def _binary(arguments: argparse.Namespace, probe: ResourcePeakProbe) -> Path:
+    source = _producer().probe_dir / str(probe["source"])
     definitions = _compiler_defines(probe)
     label = "-".join(
         f"{name.lower()}-{value}" for name, value in sorted(definitions.items())
@@ -197,9 +202,9 @@ def _binary(arguments: argparse.Namespace, probe: Mapping[str, Any]) -> Path:
 def _gpu_receipt(
     arguments: argparse.Namespace,
     stage: BatchGPUQualificationStage,
-    probe: Mapping[str, Any],
+    probe: ResourcePeakProbe,
     hipcc: str,
-    device: dict[str, Any],
+    device: dict[str, object],
 ) -> BatchGPUQualificationReceipt:
     root = _root(arguments)
     name = str(probe["source"])
@@ -210,9 +215,7 @@ def _gpu_receipt(
     if path.is_file():
         payload = load_json_value(path)
     else:
-        batch = _legacy()["_run_sample_batch"](
-            _binary(arguments, probe), 0, amdsmi=None
-        )
+        batch = _producer().run_sample_batch(_binary(arguments, probe), 0)
         payload = {
             "stage": stage,
             "probe": name,
@@ -238,7 +241,7 @@ def _gpu_receipt(
 
 
 def _require_clock(arguments: argparse.Namespace) -> None:
-    clock = _legacy()["_clock_state"]()
+    clock = _producer().clock_state()
     if not clock.get("clock_locked_verified") and not arguments.allow_unlocked:
         raise RuntimeError("resource qualification requires locked clocks")
 
@@ -251,8 +254,8 @@ def _run_qualification(
     gate_path = qualification_gate_path(root, stage)
     if gate_path.is_file():
         return _verify_qualification(arguments, stage)
-    legacy = _legacy()
-    hipcc = legacy["_required_rocm_tool"]("hipcc")
+    producer = _producer()
+    hipcc = producer.required_rocm_tool("hipcc")
     parent = qualification_parent_stage(stage)
     parent_hash = None
     if parent is not None:
@@ -262,7 +265,7 @@ def _run_qualification(
         receipts = (_static_receipt(arguments, hipcc),)
     else:
         _require_clock(arguments)
-        device = legacy["_device_identity"]()
+        device = producer.device_identity()
         if device["gfx_target"] != arguments.gfx:
             raise RuntimeError(
                 f"visible GPU is {device['gfx_target']}, expected {arguments.gfx}"
@@ -278,7 +281,7 @@ def _run_qualification(
         subject_sha256=_subject(hipcc),
         runner_sha256=sha256_file(Path(__file__)),
         configuration_sha256=_configuration(arguments),
-        source_revision=legacy["_git_revision"](),
+        source_revision=producer.git_revision(),
         parent_gate_sha256=parent_hash,
         item_ids=tuple(
             item for receipt in receipts for item in receipt.item_ids
@@ -295,8 +298,8 @@ def _verify_qualification(
     stage: BatchGPUQualificationStage,
 ) -> BatchGPUQualificationGate:
     root = _root(arguments)
-    legacy = _legacy()
-    hipcc = legacy["_required_rocm_tool"]("hipcc")
+    producer = _producer()
+    hipcc = producer.required_rocm_tool("hipcc")
     parent = qualification_parent_stage(stage)
     parent_hash = None
     if parent is not None:
@@ -313,7 +316,7 @@ def _verify_qualification(
         and gate.subject_sha256 == _subject(hipcc)
         and gate.runner_sha256 == sha256_file(Path(__file__))
         and gate.configuration_sha256 == _configuration(arguments)
-        and gate.source_revision == legacy["_git_revision"]()
+        and gate.source_revision == producer.git_revision()
         and gate.parent_gate_sha256 == parent_hash
         and gate.item_ids == _probe_names(stage)
     ):
@@ -323,7 +326,7 @@ def _verify_qualification(
             verify_qualification_artifact(root, artifact)
     if stage is not BatchGPUQualificationStage.STATIC:
         _require_clock(arguments)
-        device = legacy["_device_identity"]()
+        device = producer.device_identity()
         for receipt in gate.receipts:
             payload = load_json_value(root / receipt.artifacts[0].path)
             if payload.get("device") != device:
@@ -333,13 +336,13 @@ def _verify_qualification(
 
 def _run_calibration(arguments: argparse.Namespace) -> int:
     _verify_qualification(arguments, BatchGPUQualificationStage.FULL)
-    calibrate = _legacy()["_calibrate"]
+    producer = _producer()
     if arguments.workdir is not None:
-        return int(calibrate(arguments, arguments.workdir))
+        return producer.calibrate(arguments, arguments.workdir)
     with tempfile.TemporaryDirectory(
         prefix="solar-resource-peak-calibration-"
     ) as temporary:
-        return int(calibrate(arguments, Path(temporary)))
+        return producer.calibrate(arguments, Path(temporary))
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -72,7 +72,7 @@ def test_diagnostic_calibration_blocks_before_run(
     assert ran is False
 
 
-def test_resource_peak_successor_blocks_before_legacy_producer(
+def test_resource_peak_successor_blocks_before_frozen_producer(
     load_script: Any,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -83,14 +83,14 @@ def test_resource_peak_successor_blocks_before_legacy_producer(
     ran = False
     arguments = SimpleNamespace(stage="run")
 
-    def legacy():
+    def producer():
         nonlocal ran
         ran = True
-        return {}
+        return object()
 
     monkeypatch.setattr(script, "_parse_args", lambda _argv=None: arguments)
     monkeypatch.setattr(script, "_verify_qualification", _reject)
-    monkeypatch.setattr(script, "_legacy", legacy)
+    monkeypatch.setattr(script, "_producer", producer)
 
     with pytest.raises(ValueError, match="gate missing"):
         script.main([])

@@ -26,6 +26,11 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.execution import (
+    DiagnosticStageHandler,
+    StageCompletion,
+    StageRunContext,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.gc import (
     GCEntry,
     GCPlan,
@@ -72,12 +77,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.orchestrator import (
     CollectionRunHandler,
     CorpusSnapshotHandler,
     DesignHandler,
-    DiagnosticStageHandler,
     ModelBuildHandler,
     PublicationHandler,
     ReleaseHandler,
-    StageCompletion,
-    StageRunContext,
     build_run_context,
     build_stage_handlers,
     diagnostic_lifecycle_status,
