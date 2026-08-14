@@ -1,6 +1,6 @@
 """Real handlers derive their stage_id from the identity family.
 
-``test_orchestrator`` drives the chain with fake handlers, so the real
+``test_engine`` drives the chain with fake handlers, so the real
 ``CorpusSnapshotHandler`` and ``AcceptanceHandler`` stage_id derivation is
 not exercised there. These tests pin the runtime contract that every real
 handler routes its stage_id through the identity functions rather than
@@ -29,15 +29,18 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticRunManifest,
     acceptance_id,
     corpus_snapshot_id,
-    orchestrator as lifecycle_orchestrator,
+    model_stages as lifecycle_model_stages,
+    records as lifecycle_records,
+)
+from sol_execbench.core.bench.performance_model.lifecycle.collection_stages import (
+    CollectionRunHandler,
+    CorpusSnapshotHandler,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.execution import (
     StageRunContext,
 )
-from sol_execbench.core.bench.performance_model.lifecycle.orchestrator import (
+from sol_execbench.core.bench.performance_model.lifecycle.model_stages import (
     AcceptanceHandler,
-    CollectionRunHandler,
-    CorpusSnapshotHandler,
     PublicationHandler,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.receipts import (
@@ -143,7 +146,7 @@ def test_collection_generation_counts_failed_precollection_run(
         design_manifest_path=tmp_path / "design.json",
     )
 
-    assert lifecycle_orchestrator._latest_collection_run(context) is None
+    assert lifecycle_records._latest_collection_run(context) is None
 
 
 def test_corpus_snapshot_handler_derives_identity(tmp_path: Path) -> None:
@@ -373,7 +376,7 @@ def test_publication_handler_uses_promoted_development_identity(
         _build,
     )
     monkeypatch.setattr(
-        lifecycle_orchestrator,
+        lifecycle_model_stages,
         "load_json_file",
         lambda model, path: (
             SimpleNamespace(accepted=True)
@@ -386,7 +389,7 @@ def test_publication_handler_uses_promoted_development_identity(
         ),
     )
     monkeypatch.setattr(
-        lifecycle_orchestrator, "publication_id", _publication_id
+        lifecycle_model_stages, "publication_id", _publication_id
     )
     context = StageRunContext(
         store_root=tmp_path,

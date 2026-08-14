@@ -25,7 +25,8 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     StageRunContext,
     collection_run_id,
     diagnostic_lifecycle_status,
-    orchestrator as lifecycle_orchestrator,
+    engine as lifecycle_engine,
+    records as lifecycle_records,
     resume_diagnostic_lifecycle,
     run_diagnostic_lifecycle,
     run_state_path,
@@ -350,7 +351,7 @@ def test_stage_manifest_preparation_runs_outside_registry_lock(
     plan = DiagnosticLifecyclePlan.model_validate_json(
         plan_path.read_text(encoding="utf-8")
     )
-    context = lifecycle_orchestrator.build_run_context(
+    context = lifecycle_engine.build_run_context(
         plan=plan, store_root_path=tmp_path
     )
     output = tmp_path / "output.json"
@@ -380,9 +381,9 @@ def test_stage_manifest_preparation_runs_outside_registry_lock(
         BlobStore(tmp_path).put_bytes(b"nested CAS preparation")
         return ()
 
-    monkeypatch.setattr(lifecycle_orchestrator, "_stage_manifests", _prepare)
+    monkeypatch.setattr(lifecycle_records, "_stage_manifests", _prepare)
 
-    lifecycle_orchestrator._commit_stage_manifests(context, completion, receipt)
+    lifecycle_records._commit_stage_manifests(context, completion, receipt)
 
 
 def test_run_illegal_transition_rejected(tmp_path: Path) -> None:
@@ -515,6 +516,46 @@ def test_resume_reruns_stage_with_missing_receipt(tmp_path: Path) -> None:
     release = resumed.stage_state(DiagnosticLifecycleStage.RELEASE)
     assert release is not None
     assert release.status is DiagnosticStageStatus.VERIFIED
+
+
+def test_resume_reruns_stage_with_corrupt_receipt(tmp_path: Path) -> None:
+    design_path = _design(tmp_path)
+    run_state = _run(design_path, tmp_path, _handlers([]))
+    receipt_path = stage_receipt_path(
+        run_state.collection_run_id,
+        DiagnosticLifecycleStage.MODEL_BUILD,
+        tmp_path,
+    )
+    receipt_path.write_text("{not-json", encoding="utf-8")
+    resumed_order: list[DiagnosticLifecycleStage] = []
+
+    resumed = resume_diagnostic_lifecycle(
+        run_state_path=run_state_path(run_state.collection_run_id, tmp_path),
+        handlers=_handlers(resumed_order),
+        now_fn=lambda: _NOW,
+    )
+
+    assert DiagnosticLifecycleStage.MODEL_BUILD in resumed_order
+    state = resumed.stage_state(DiagnosticLifecycleStage.MODEL_BUILD)
+    assert state is not None
+    assert state.status is DiagnosticStageStatus.VERIFIED
+
+
+def test_status_rejects_run_state_schema_version_mismatch(
+    tmp_path: Path,
+) -> None:
+    design_path = _design(tmp_path)
+    run_state = _run(design_path, tmp_path, _handlers([]))
+    state_path = run_state_path(run_state.collection_run_id, tmp_path)
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    payload["schema_version"] = f"{payload['schema_version']}-obsolete"
+    atomic_write_json_value(state_path, payload)
+
+    with pytest.raises(ValueError, match="schema_version"):
+        diagnostic_lifecycle_status(
+            run_state_path=state_path,
+            handlers=_handlers([]),
+        )
 
 
 def test_resume_reruns_drifted_stage(tmp_path: Path) -> None:
