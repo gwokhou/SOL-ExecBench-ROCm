@@ -33,7 +33,7 @@ from sol_execbench.core.dataset.corpus_models import (
     StaticTargetDescriptor,
     TargetQualificationStatus,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 ROOT = Path(__file__).resolve().parents[4]
 MANIFEST = ROOT / "problems/LLM_CORE/releases/LLM_CORE_V1/manifest.yaml"
@@ -116,7 +116,7 @@ def test_every_definition_has_cpu_micro_reference(
 
 def _target(**updates: object) -> StaticTargetDescriptor:
     payload = {
-        "schema_version": SchemaVersion.STATIC_TARGET_DESCRIPTOR,
+        "schema_version": PlatformArtifactSchema.STATIC_TARGET_DESCRIPTOR,
         "target_id": "synthetic",
         "gfx_target": "gfx-test",
         "qualification_status": TargetQualificationStatus.DECLARED,

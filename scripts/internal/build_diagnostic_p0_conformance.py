@@ -15,6 +15,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticCalibrationArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle import (
     BlobStore,
     DiagnosticCollectionRunManifest,
@@ -45,7 +49,6 @@ from sol_execbench.core.bench.performance_model.validation_corpus import (
 )
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.solar_bridge.publication import (
     verified_solar_artifact_paths,
 )
@@ -64,10 +67,16 @@ def _load_object(path: Path) -> dict[str, Any]:
 
 
 def _write_currentized(
-    path: Path, *, schema: SchemaVersion, purpose: DiagnosticEvidencePurpose
+    path: Path,
+    *,
+    schema: DiagnosticArtifactSchema,
+    artifact_kind: DiagnosticCalibrationArtifactKind | None = None,
+    purpose: DiagnosticEvidencePurpose,
 ) -> None:
     value = _load_object(path)
     value["schema_version"] = schema.value
+    if artifact_kind is not None:
+        value["artifact_kind"] = artifact_kind.value
     value["purpose"] = purpose.value
     atomic_write_json_value(path, value)
 
@@ -130,7 +139,7 @@ def _write_corpus(path: Path, role: str, cases: list[dict[str, Any]]) -> None:
     atomic_write_json_value(
         path,
         {
-            "schema_version": SchemaVersion.DIAGNOSTIC_VALIDATION_CORPUS.value,
+            "schema_version": DiagnosticArtifactSchema.DIAGNOSTIC_VALIDATION_CORPUS.value,
             "purpose": _PURPOSE.value,
             "role": role,
             "cases": cases,
@@ -157,12 +166,14 @@ def _prepare_inputs(source: Path, root: Path) -> None:
     shutil.copytree(source / "calibration", root / "calibration")
     _write_currentized(
         root / "calibration/profile.json",
-        schema=SchemaVersion.DIAGNOSTIC_CALIBRATION,
+        schema=DiagnosticArtifactSchema.DIAGNOSTIC_CALIBRATION,
+        artifact_kind=DiagnosticCalibrationArtifactKind.PROFILE,
         purpose=_PURPOSE,
     )
     _write_currentized(
         root / "calibration/profile.audit.json",
-        schema=SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT,
+        schema=DiagnosticArtifactSchema.DIAGNOSTIC_CALIBRATION,
+        artifact_kind=DiagnosticCalibrationArtifactKind.AUDIT,
         purpose=_PURPOSE,
     )
     _rebind_calibration_audit_hashes(root / "calibration")

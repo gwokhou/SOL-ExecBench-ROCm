@@ -42,7 +42,8 @@ excluded = "Must not be committed, checked in as fixtures, or redistributed by t
 release_bundle_blocked = "Must not be copied into prerelease or release artifact bundles."
 
 [dataset_policy]
-schema_version = "sol_execbench.dataset_provenance_policy.v1"
+schema_version = "sol_execbench.dataset_governance.v1"
+artifact_kind = "policy"
 policy_doc = "docs/user/provenance.md#dataset-license-and-redistribution-boundaries"
 guardrail = "scripts/check_dataset_redistribution.py"
 default_boundary = "Dataset source and migrated payloads are local inputs unless this manifest explicitly classifies them as publishable."

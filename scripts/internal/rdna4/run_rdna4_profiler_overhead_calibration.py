@@ -30,13 +30,15 @@ from sol_execbench.core.bench.pid_lock import acquire_pid_lock
 from sol_execbench.core.bench.rocm_profiler.calibration import (
     Rocprofv3OverheadCalibration,
 )
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 from sol_execbench.core.bench.timing_isolation import (
     detect_concurrent_gpu_processes,
     validate_gpu_device_isolation,
     verify_clock_state_with_warning,
 )
 from sol_execbench.core.integrity import sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.runtime import (
     RocmDeviceInfo,
     detect_rocm_device,
@@ -295,7 +297,7 @@ def _calibration_payload(
     overhead_ms = profiler_median - baseline_median
     payload = Rocprofv3OverheadCalibration.model_validate(
         {
-            "schema_version": SchemaVersion.ROCPROFV3_OVERHEAD_CALIBRATION,
+            "schema_version": ProfilerArtifactSchema.ROCPROFV3_OVERHEAD_CALIBRATION,
             "generated_at": _utc_timestamp(),
             "baseline_median_ms": round(baseline_median, 6),
             "profiler_median_ms": round(profiler_median, 6),

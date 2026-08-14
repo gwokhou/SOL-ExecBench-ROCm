@@ -4,8 +4,8 @@ import json
 import subprocess
 from pathlib import Path
 
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
+from sol_execbench.core.control_plane_schema_versions import (
+    ExecutionControlSchema,
 )
 from sol_execbench.core.solar_bridge import runner
 from sol_execbench.core.solar_bridge.models import SolarWorkerRequest
@@ -13,7 +13,7 @@ from sol_execbench.core.solar_bridge.models import SolarWorkerRequest
 
 def _formal_payload() -> dict:
     return {
-        "schema_version": SchemaVersion.SOLAR_WORKER_IPC,
+        "schema_version": ExecutionControlSchema.SOLAR_WORKER_IPC,
         "status": "analyzed",
         "analysis_id": "workload-1",
         "output_dir": "/tmp/formal-output",

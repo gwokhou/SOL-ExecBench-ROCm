@@ -351,10 +351,12 @@ counter-pass misalignment, missing queue identity, or unverified overlap scope p
 `partial`/`unavailable` reason codes. No representative shape, achieved-rate,
 profiler-duration, or measured-runtime fallback is permitted.
 
-The output contract is `sol_execbench.performance_diagnostic.v7` using model
+The output contract is `sol_execbench.performance_diagnostic.v9` using model
 `gfx1200_diagnostic.v7`. It contains `T_pred(IR)`, `T_pred(HW)`, the canonical
 measured confidence interval, optional trusted frontier, uncertainty-aware
-`L/C/R`, bounded attribution, and stable action codes.
+`L/C/R`, bounded attribution, and stable action codes. Dispatch schedule data
+is a nested value object governed by this envelope rather than an independently
+versioned artifact.
 
 ## Govern Agent feedback
 

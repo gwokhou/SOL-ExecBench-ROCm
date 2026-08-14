@@ -25,6 +25,7 @@ from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     atomic_write_jsonl_values,
 )
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.data.workload_validation import (
     validate_problem_contract,
@@ -45,8 +46,8 @@ from sol_execbench.core.dataset.corpus_models import (
     StaticCapability,
     StaticRequirements,
 )
+from sol_execbench.core.dataset.schema_versions import DatasetArtifactSchema
 from sol_execbench.core.integrity import sha256_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 CORPUS_ROOT = REPOSITORY_ROOT / "problems" / "LLM_CORE"
@@ -309,7 +310,7 @@ def _definition(spec: ProblemSpec) -> Definition:
     payload = builders[spec.family](spec)
     return Definition.model_validate(
         {
-            "schema_version": SchemaVersion.DEFINITION,
+            "schema_version": BenchmarkArtifactSchema.DEFINITION,
             "name": spec.problem_name,
             "op_type": spec.family.value,
             "description": f"Clean-room LLM Core V1 semantic: {spec.semantic_id}.",
@@ -885,7 +886,7 @@ def _workloads(
     for index, (tier, axes) in enumerate(_shape_rows(spec)):
         workload = Workload.model_validate(
             {
-                "schema_version": SchemaVersion.WORKLOAD,
+                "schema_version": BenchmarkArtifactSchema.WORKLOAD,
                 "axes": axes,
                 "inputs": _workload_inputs(spec, definition),
                 "uuid": str(
@@ -1087,7 +1088,7 @@ def build(destination: Path, metadata_root: Path) -> CorpusManifest:
         entries.append(entry)
         semantic_records.append(_semantic_record(spec, fingerprint))
     manifest = CorpusManifest(
-        schema_version=SchemaVersion.CORPUS_MANIFEST,
+        schema_version=DatasetArtifactSchema.CORPUS_MANIFEST,
         corpus_id="LLM_CORE",
         release_id="LLM_CORE_V1",
         release_state=CorpusReleaseState.FROZEN,

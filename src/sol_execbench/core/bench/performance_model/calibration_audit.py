@@ -9,6 +9,10 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticCalibrationArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
 )
@@ -20,9 +24,6 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
@@ -107,10 +108,14 @@ class DiagnosticCalibrationAudit(CurrentSchemaModel):
     """Current diagnostic calibration audit artifact."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT
+    current_schema_version = DiagnosticArtifactSchema.DIAGNOSTIC_CALIBRATION
+    current_artifact_kind = DiagnosticCalibrationArtifactKind.AUDIT
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT] = (
-        SchemaVersion.DIAGNOSTIC_CALIBRATION_AUDIT
+    schema_version: Literal[DiagnosticArtifactSchema.DIAGNOSTIC_CALIBRATION] = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_CALIBRATION
+    )
+    artifact_kind: Literal[DiagnosticCalibrationArtifactKind.AUDIT] = (
+        DiagnosticCalibrationArtifactKind.AUDIT
     )
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     probe_identity: CalibrationProbeIdentity

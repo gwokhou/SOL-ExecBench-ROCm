@@ -17,6 +17,9 @@ from sol_execbench.cli.sidecars.decision import (
     _write_decision_sidecar,
 )
 from sol_execbench.cli.sidecars.mode import SidecarMode
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
@@ -31,7 +34,6 @@ from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceStatus,
     StaticResourceFootprint,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 from sol_execbench.core.platform.arch_capabilities import (
     load_packaged_arch_capability_budget,
 )
@@ -56,7 +58,7 @@ def _environment_sidecar(path: Path, archs: list[str]) -> None:
 
 def _static_evidence(detected: list[str]) -> StaticKernelEvidenceSidecar:
     return StaticKernelEvidenceSidecar(
-        schema_version=SchemaVersion.STATIC_KERNEL_EVIDENCE,
+        schema_version=PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT,
         status=StaticKernelEvidenceStatus.COLLECTED,
         reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
         classification=StaticKernelEvidenceClassification(
@@ -94,7 +96,7 @@ def test_decision_auto_writes_sidecar_with_matched_budget(
     assert path is not None
     assert path == tmp_path / "trace.jsonl.decision.json"
     decision = json.loads(path.read_text(encoding="utf-8"))
-    assert decision["schema_version"] == SchemaVersion.DECISION
+    assert decision["schema_version"] == PerformanceArtifactSchema.DECISION
     assert decision["summary"]["architecture"] == "gfx942"  # matched target
     assert decision["authority"] == "diagnostic"
     assert any(
@@ -123,7 +125,7 @@ def test_decision_auto_without_footprints_writes_nothing(
     output = tmp_path / "trace.jsonl"
     output.write_text("{}\n")
     empty = StaticKernelEvidenceSidecar(
-        schema_version=SchemaVersion.STATIC_KERNEL_EVIDENCE,
+        schema_version=PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT,
         status=StaticKernelEvidenceStatus.COLLECTED,
         reason_code=StaticKernelEvidenceReasonCode.STATIC_EVIDENCE_COLLECTED,
     )

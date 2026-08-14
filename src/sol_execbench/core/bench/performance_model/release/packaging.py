@@ -43,6 +43,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DiagnosticPublicationLifecycleManifest,
     DiagnosticReleaseLifecycleManifest,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
+    DiagnosticLifecycleSchema,
+    DiagnosticReleasePackageArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
@@ -66,16 +70,21 @@ from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 class DiagnosticReleaseArchive(CurrentFrozenSchemaModel):
     """One deterministic zstd archive of a verified publication."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_RELEASE_ARCHIVE
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_RELEASE_PACKAGE
+    )
+    current_artifact_kind = DiagnosticReleasePackageArtifactKind.ARCHIVE
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_RELEASE_ARCHIVE] = (
-        SchemaVersion.DIAGNOSTIC_RELEASE_ARCHIVE
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_RELEASE_PACKAGE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_RELEASE_PACKAGE
+    artifact_kind: Literal[DiagnosticReleasePackageArtifactKind.ARCHIVE] = (
+        DiagnosticReleasePackageArtifactKind.ARCHIVE
     )
     name: str = Field(min_length=1)
     sha256: SHA256Digest
@@ -88,10 +97,16 @@ class DiagnosticReleaseArchive(CurrentFrozenSchemaModel):
 class DiagnosticReleaseAttestation(CurrentFrozenSchemaModel):
     """Release object binding a verified publication to its archive."""
 
-    current_schema_version = SchemaVersion.DIAGNOSTIC_RELEASE_ATTESTATION
+    current_schema_version = (
+        DiagnosticLifecycleSchema.DIAGNOSTIC_RELEASE_PACKAGE
+    )
+    current_artifact_kind = DiagnosticReleasePackageArtifactKind.ATTESTATION
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_RELEASE_ATTESTATION] = (
-        SchemaVersion.DIAGNOSTIC_RELEASE_ATTESTATION
+    schema_version: Literal[
+        DiagnosticLifecycleSchema.DIAGNOSTIC_RELEASE_PACKAGE
+    ] = DiagnosticLifecycleSchema.DIAGNOSTIC_RELEASE_PACKAGE
+    artifact_kind: Literal[DiagnosticReleasePackageArtifactKind.ATTESTATION] = (
+        DiagnosticReleasePackageArtifactKind.ATTESTATION
     )
     release_id: SHA256Digest
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION

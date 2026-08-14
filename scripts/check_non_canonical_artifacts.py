@@ -5,7 +5,8 @@
 deliberately excludes ``data/``, ``out/``, and ``dist/`` from traversal. This
 companion gate closes that blind spot: it walks the *curated* top-level
 children of ``data/`` (skipping generated and vendored roots) and fails on any
-unsupported schema identifier unless the file lives under a ``NON_CANONICAL.md``
+unsupported versioned wire identifier unless the file lives under a
+``NON_CANONICAL.md``
 marker directory.
 
 Rule: mark it or fix it. A directory that contains ``NON_CANONICAL.md`` exempts
@@ -20,8 +21,11 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
-from sol_execbench.core.integrity.schema_versions import (
-    CURRENT_SCHEMA_VERSIONS,
+from sol_execbench.core.integrity.artifact_registry import (
+    CURRENT_STRING_ARTIFACT_SCHEMAS,
+)
+from sol_execbench.core.integrity.protocol_versions import (
+    CURRENT_WIRE_PROTOCOLS,
 )
 from solar.schema_versions import CURRENT_STRING_SCHEMA_VERSIONS
 
@@ -47,7 +51,7 @@ EXEMPT_DATA_ROOTS = frozenset(
     }
 )
 MARKER = "NON_CANONICAL.md"
-SCHEMA_ID_RE = re.compile(
+VERSIONED_WIRE_ID_RE = re.compile(
     r"(?:sol_execbench|solar)(?:\.[a-z0-9_]+)+\.v\d+",
 )
 # Content-based, not line-anchored: curated data files may be inline JSON
@@ -55,8 +59,10 @@ SCHEMA_ID_RE = re.compile(
 NUMERIC_SCHEMA_FIELD_RE = re.compile(
     r'(?:"schema_version"|schema_version)[ \t]*:[ \t]*(\d+)\b',
 )
-CURRENT_SCHEMA_IDENTIFIERS = (
-    CURRENT_SCHEMA_VERSIONS | CURRENT_STRING_SCHEMA_VERSIONS
+CURRENT_VERSIONED_WIRE_IDENTIFIERS = (
+    CURRENT_STRING_ARTIFACT_SCHEMAS
+    | CURRENT_STRING_SCHEMA_VERSIONS
+    | CURRENT_WIRE_PROTOCOLS
 )
 TEXT_SUFFIXES = frozenset(
     {
@@ -111,12 +117,12 @@ def is_marked(rel_path: Path, scan_root: Path) -> bool:
 
 
 def audit_text(path: Path, content: str) -> list[str]:
-    """Return findings for one in-scope file's schema contracts."""
+    """Return findings for one in-scope file's versioned wire contracts."""
     findings: list[str] = []
-    for schema_id in SCHEMA_ID_RE.findall(content):
-        if schema_id not in CURRENT_SCHEMA_IDENTIFIERS:
+    for identifier in VERSIONED_WIRE_ID_RE.findall(content):
+        if identifier not in CURRENT_VERSIONED_WIRE_IDENTIFIERS:
             findings.append(
-                f"{path}: unsupported schema identifier {schema_id}",
+                f"{path}: unsupported versioned wire identifier {identifier}",
             )
     for version in NUMERIC_SCHEMA_FIELD_RE.findall(content):
         findings.append(

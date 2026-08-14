@@ -72,16 +72,20 @@ focused test snippets may remain inline.
 
 ## Schemas and Public Contracts
 
-- Each schema family has one current canonical-registry version. Every reader,
-  including diagnostics and tests, requires an exact match before business
-  fields. Update producers, artifacts, tests, and docs atomically; delete all
-  superseded models, readers, migrations, aliases, fixtures, and prose.
-- Audit string IDs, numeric versions, versioned resources/prose, and
-  multi-version acceptance. Raw numeric versions belong only in canonical
-  registries and registered artifacts.
-- Breaking public changes update CLI contracts, docs, examples, and tests
-  together and remove old paths. Errors need stable codes, actionable hints,
-  and no credential leakage.
+- Register only independently serialized contracts, not public classes,
+  in-memory DTOs, or nested values owned by an envelope.
+- Each artifact family belongs to its domain schema registry. Import that
+  registry directly; `core/integrity/artifact_registry.py` is audit-only and
+  must not become a production dependency or compatibility re-export.
+- Variants that evolve together share one family and a validated discriminator
+  such as `artifact_kind`, `role`, or `stage`.
+- Readers require the exact current version before business fields. Breaking
+  changes update producers, readers, artifacts, tests, docs, and CLI contracts
+  atomically, then remove superseded models, migrations, aliases, and fixtures.
+- Caches and checksum preimages use local format versions; protocol selectors
+  use their domain protocol registry. None are artifact schema families.
+- Keep raw versions in owning registries and registered artifacts. Enforce the
+  boundary with `scripts/check_schema_versions.py`.
 
 ## Quality and Process Safety
 

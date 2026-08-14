@@ -9,6 +9,9 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticGovernanceGuardrail,
     DiagnosticIdentity,
 )
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.bench.profile_summary import (
     ProfileSummarySidecar,
     build_profile_summary_sidecar,
@@ -24,7 +27,6 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileStatus,
     Rocprofv3ReasonCode,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _profile_result(
@@ -119,7 +121,9 @@ def test_profile_summary_sidecar_is_diagnostic_only(tmp_path: Path):
     )
     payload = sidecar.model_dump(mode="json")
 
-    assert payload["schema_version"] == SchemaVersion.PROFILE_SUMMARY
+    assert (
+        payload["schema_version"] == PerformanceArtifactSchema.PROFILE_SUMMARY
+    )
     assert payload["status"] == "available"
     assert payload["reason_code"] == "profile_summary_generated"
     assert payload["identity"]["trace_path"] == "trace.jsonl"

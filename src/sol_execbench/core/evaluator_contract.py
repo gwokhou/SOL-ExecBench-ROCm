@@ -10,10 +10,8 @@ from typing import Any, Literal
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.data.base_model import CurrentSchemaModel
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.trace import EvaluationStatus
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 SOL_EXECBENCH_CONTRACT_VERSION = "4.0"
 SOL_EXECBENCH_RELEASE = "unreleased-v4"
@@ -23,10 +21,10 @@ class EvaluatorContract(CurrentSchemaModel):
     """Current evaluator, corpus, SOLAR, and scoring ownership contract."""
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
-    current_schema_version = SchemaVersion.EVALUATOR_CONTRACT
+    current_schema_version = BenchmarkArtifactSchema.EVALUATOR_CONTRACT
 
-    schema_version: Literal[SchemaVersion.EVALUATOR_CONTRACT] = (
-        SchemaVersion.EVALUATOR_CONTRACT
+    schema_version: Literal[BenchmarkArtifactSchema.EVALUATOR_CONTRACT] = (
+        BenchmarkArtifactSchema.EVALUATOR_CONTRACT
     )
     contract_version: Literal["4.0"] = SOL_EXECBENCH_CONTRACT_VERSION
     release: Literal["unreleased-v4"] = SOL_EXECBENCH_RELEASE
@@ -44,7 +42,7 @@ class EvaluatorContract(CurrentSchemaModel):
 def build_evaluator_contract() -> EvaluatorContract:
     """Build the single current public contract."""
     return EvaluatorContract(
-        schema_version=SchemaVersion.EVALUATOR_CONTRACT,
+        schema_version=BenchmarkArtifactSchema.EVALUATOR_CONTRACT,
         contract_version=SOL_EXECBENCH_CONTRACT_VERSION,
         release=SOL_EXECBENCH_RELEASE,
         capabilities=_capabilities(),

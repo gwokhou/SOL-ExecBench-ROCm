@@ -334,6 +334,8 @@ def test_dataset_redistribution_loads_policy_and_emits_json(
     provenance.write_text(
         """
 [dataset_policy]
+schema_version = "sol_execbench.dataset_governance.v1"
+artifact_kind = "policy"
 [[dataset_policy.sources]]
 id = "restricted"
 name = "Restricted corpus"
@@ -379,6 +381,25 @@ def test_dataset_redistribution_rejects_invalid_policy(
     path.write_text(content, encoding="utf-8")
 
     with pytest.raises(ValueError, match=r"\[dataset_policy\]"):
+        redistribution.load_dataset_policy(path)
+
+
+def test_dataset_redistribution_requires_current_policy_schema(
+    load_script,
+    tmp_path: Path,
+) -> None:
+    redistribution = load_script("scripts/check_dataset_redistribution.py")
+    path = tmp_path / "provenance.toml"
+    path.write_text(
+        """
+[dataset_policy]
+schema_version = "future.v999"
+sources = []
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="requires schema_version"):
         redistribution.load_dataset_policy(path)
 
 

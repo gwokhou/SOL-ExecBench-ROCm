@@ -52,7 +52,8 @@ requires its applicable notice.
 ## Dataset redistribution boundaries
 
 `provenance.toml` contains the authoritative
-`sol_execbench.dataset_provenance_policy.v1` source table used by automated
+the `policy` variant of the `sol_execbench.dataset_governance.v1` contract,
+used by automated
 guards. The current table declares four source classes.
 
 ### AMD AgentKernelArena

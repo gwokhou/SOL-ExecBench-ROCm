@@ -37,7 +37,7 @@ from sol_execbench.core.dataset.aka_corpus import (
     SEED_SET_MIN_PROBLEMS,
     AKACorpusManifest,
 )
-from sol_execbench.core.integrity.schema_versions import (
+from sol_execbench.core.dataset.schema_versions import (
     AKA_CORPUS_MANIFEST_SCHEMA_VERSION,
 )
 from sol_execbench.core.platform.runtime import RocmDeviceInfo

@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 
 from sol_execbench.cli.sidecars import profile as cli_profile_sidecars
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ArtifactKind,
@@ -12,7 +15,9 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileStatus,
     Rocprofv3ReasonCode,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.bench.rocm_profiler.schema_versions import (
+    ProfilerArtifactSchema,
+)
 
 
 def test_profile_sidecar_is_disabled_when_no_profile_result(tmp_path: Path):
@@ -40,7 +45,7 @@ def test_profile_sidecar_records_diagnostic_metadata(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.profile.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == SchemaVersion.ROCPROFV3_PROFILE
+    assert payload["schema_version"] == ProfilerArtifactSchema.ROCPROFV3_SESSION
     assert payload["status"] == "unavailable"
     assert payload["diagnostic_only"] is True
     assert payload["score_authority"] is False
@@ -61,7 +66,7 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     output.write_text('{"definition":"toy"}\n')
     profile_metadata = tmp_path / "trace.jsonl.profile.json"
     profile_metadata.write_text(
-        '{"schema_version":SchemaVersion.ROCPROFV3_PROFILE}\n',
+        '{"schema_version":ProfilerArtifactSchema.ROCPROFV3_SESSION}\n',
     )
     profile_artifact_dir = tmp_path / "trace.jsonl.rocprofv3" / "trace"
     profile_artifact_dir.mkdir(parents=True)
@@ -109,7 +114,9 @@ def test_profile_summary_sidecar_records_bounded_metadata(tmp_path: Path):
     assert written == tmp_path / "trace.jsonl.profile-summary.json"
     assert written is not None
     payload = json.loads(written.read_text())
-    assert payload["schema_version"] == SchemaVersion.PROFILE_SUMMARY
+    assert (
+        payload["schema_version"] == PerformanceArtifactSchema.PROFILE_SUMMARY
+    )
     assert payload["status"] == "available"
     assert payload["authority"] == "diagnostic"
     assert payload["identity"]["trace_path"] == "trace.jsonl"

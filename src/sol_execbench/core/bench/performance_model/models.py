@@ -15,8 +15,16 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     DiagnosticConfidence,
     DiagnosticSidecarStatus,
 )
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticCalibrationArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
+)
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+    PerformanceDiagnosticArtifactKind,
 )
 from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
@@ -24,9 +32,6 @@ from sol_execbench.core.data.base_model import (
 )
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
 PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v7"
@@ -573,15 +578,10 @@ class DispatchScheduleEdge(BaseModelWithDocstrings):
     reason: Literal["same_lane", "happens_before"]
 
 
-class PerformanceScheduleEvidence(CurrentSchemaModel):
-    """Controlled-replay dispatch topology used by the overlap model."""
+class PerformanceScheduleEvidence(BaseModelWithDocstrings):
+    """Nested controlled-replay topology owned by the diagnostic envelope."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.PERFORMANCE_SCHEDULE_EVIDENCE
-
-    schema_version: Literal[SchemaVersion.PERFORMANCE_SCHEDULE_EVIDENCE] = (
-        SchemaVersion.PERFORMANCE_SCHEDULE_EVIDENCE
-    )
     status: DiagnosticSidecarStatus
     workload_uuid: str = Field(min_length=1)
     candidate_sha256: SHA256Digest
@@ -765,10 +765,14 @@ class DiagnosticCalibrationProfile(CurrentSchemaModel):
     """Content-addressed gfx1200 diagnostic calibration."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_CALIBRATION
+    current_schema_version = DiagnosticArtifactSchema.DIAGNOSTIC_CALIBRATION
+    current_artifact_kind = DiagnosticCalibrationArtifactKind.PROFILE
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_CALIBRATION] = (
-        SchemaVersion.DIAGNOSTIC_CALIBRATION
+    schema_version: Literal[DiagnosticArtifactSchema.DIAGNOSTIC_CALIBRATION] = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_CALIBRATION
+    )
+    artifact_kind: Literal[DiagnosticCalibrationArtifactKind.PROFILE] = (
+        DiagnosticCalibrationArtifactKind.PROFILE
     )
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION
     model_version: DiagnosticModelVersion = PERFORMANCE_MODEL_VERSION
@@ -1084,10 +1088,14 @@ class PerformanceDiagnosticSidecar(CurrentDiagnosticSidecarAuthority):
     """Diagnostic-only microarchitecture sidecar."""
 
     model_config = _MODEL_CONFIG
-    current_schema_version = SchemaVersion.PERFORMANCE_DIAGNOSTIC
+    current_schema_version = PerformanceArtifactSchema.PERFORMANCE_DIAGNOSTIC
+    current_artifact_kind = PerformanceDiagnosticArtifactKind.TRACE
 
-    schema_version: Literal[SchemaVersion.PERFORMANCE_DIAGNOSTIC] = (
-        SchemaVersion.PERFORMANCE_DIAGNOSTIC
+    schema_version: Literal[
+        PerformanceArtifactSchema.PERFORMANCE_DIAGNOSTIC
+    ] = PerformanceArtifactSchema.PERFORMANCE_DIAGNOSTIC
+    artifact_kind: Literal[PerformanceDiagnosticArtifactKind.TRACE] = (
+        PerformanceDiagnosticArtifactKind.TRACE
     )
     status: DiagnosticSidecarStatus
     model_version: DiagnosticModelVersion = PERFORMANCE_MODEL_VERSION

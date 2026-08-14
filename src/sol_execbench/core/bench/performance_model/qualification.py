@@ -12,13 +12,16 @@ from pydantic import ConfigDict, Field, model_validator
 from sol_execbench.core.bench.batch_gpu_qualification import (
     BatchGPUQualificationStage,
 )
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticQualificationArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.models import WorkloadKind
 from sol_execbench.core.data.base_model import (
     CurrentSchemaModel,
     NonEmptyString,
 )
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
@@ -28,12 +31,16 @@ class DiagnosticQualificationReceipt(CurrentSchemaModel):
 
     model_config = _CONFIG
     current_schema_version = (
-        SchemaVersion.DIAGNOSTIC_CORPUS_QUALIFICATION_RECEIPT
+        DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_QUALIFICATION
     )
+    current_artifact_kind = DiagnosticQualificationArtifactKind.RECEIPT
 
     schema_version: Literal[
-        SchemaVersion.DIAGNOSTIC_CORPUS_QUALIFICATION_RECEIPT
-    ] = SchemaVersion.DIAGNOSTIC_CORPUS_QUALIFICATION_RECEIPT
+        DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_QUALIFICATION
+    ] = DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_QUALIFICATION
+    artifact_kind: Literal[DiagnosticQualificationArtifactKind.RECEIPT] = (
+        DiagnosticQualificationArtifactKind.RECEIPT
+    )
     stage: Literal[
         BatchGPUQualificationStage.CANARY,
         BatchGPUQualificationStage.FULL,
@@ -71,10 +78,16 @@ class DiagnosticCorpusQualification(CurrentSchemaModel):
     """Content-bound completion gate for one qualification stage."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.DIAGNOSTIC_CORPUS_QUALIFICATION
+    current_schema_version = (
+        DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_QUALIFICATION
+    )
+    current_artifact_kind = DiagnosticQualificationArtifactKind.GATE
 
-    schema_version: Literal[SchemaVersion.DIAGNOSTIC_CORPUS_QUALIFICATION] = (
-        SchemaVersion.DIAGNOSTIC_CORPUS_QUALIFICATION
+    schema_version: Literal[
+        DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_QUALIFICATION
+    ] = DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_QUALIFICATION
+    artifact_kind: Literal[DiagnosticQualificationArtifactKind.GATE] = (
+        DiagnosticQualificationArtifactKind.GATE
     )
     stage: BatchGPUQualificationStage
     role: Literal["all", "development", "held_out"]

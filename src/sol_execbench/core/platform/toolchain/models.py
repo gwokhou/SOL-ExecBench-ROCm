@@ -14,9 +14,7 @@ from sol_execbench.core.data.base_model import (
     BaseModelWithDocstrings,
     CurrentSchemaModel,
 )
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
+from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 DEFAULT_TOOLCHAIN_PROBE_TIMEOUT_SECONDS = 3.0
 
@@ -162,10 +160,10 @@ class ToolchainRoutingDecision(BaseModelWithDocstrings):
 class ToolchainRoutingReport(CurrentSchemaModel):
     """Toolchain routing report for one request."""
 
-    current_schema_version = SchemaVersion.TOOLCHAIN_ROUTING
+    current_schema_version = PlatformArtifactSchema.TOOLCHAIN_ROUTING
 
-    schema_version: Literal[SchemaVersion.TOOLCHAIN_ROUTING] = (
-        SchemaVersion.TOOLCHAIN_ROUTING
+    schema_version: Literal[PlatformArtifactSchema.TOOLCHAIN_ROUTING] = (
+        PlatformArtifactSchema.TOOLCHAIN_ROUTING
     )
     """Routing schema version."""
     generated_at: str

@@ -12,15 +12,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 from sol_execbench.core.platform.source_state import (
     GitSourceState,
     verify_git_source_state,
 )
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_CONTAINER_IMAGE_ID,
+)
+from sol_execbench.core.scoring.schema_versions import (
+    ReleaseArtifactSchema,
+    ReleaseComponentKind,
 )
 
 CONTAINER_IMAGE_ID_ENV = ENV_SOL_EXECBENCH_CONTAINER_IMAGE_ID
@@ -45,7 +46,8 @@ class ReleaseExecutionIdentity:
     def to_dict(self) -> dict[str, object]:
         """Return the strict nested environment payload."""
         return {
-            "schema_version": SchemaVersion.RELEASE_ENVIRONMENT,
+            "schema_version": ReleaseArtifactSchema.RELEASE_COMPONENT,
+            "artifact_kind": ReleaseComponentKind.ENVIRONMENT,
             "source_revision": self.source_revision,
             "source_tree_clean": True,
             "container_image_id": self.container_image_id,
@@ -89,7 +91,8 @@ def release_execution_identity_from_payload(
     if not isinstance(raw, Mapping):
         raise ValueError("release environment lacks execution identity")
     if (
-        raw.get("schema_version") != SchemaVersion.RELEASE_ENVIRONMENT
+        raw.get("schema_version") != ReleaseArtifactSchema.RELEASE_COMPONENT
+        or raw.get("artifact_kind") != ReleaseComponentKind.ENVIRONMENT
         or raw.get("source_tree_clean") is not True
     ):
         raise ValueError("release execution environment contract mismatch")

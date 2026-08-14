@@ -53,9 +53,7 @@ from sol_execbench.core.data.definition_reference import (
     validate_reference_inputs_match,
     verify_custom_inputs_entrypoint,
 )
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 
 if TYPE_CHECKING:
     import torch
@@ -73,9 +71,11 @@ __all__ = [
 class Definition(CurrentSchemaModel):
     """Complete definition of a computational workload."""
 
-    current_schema_version = SchemaVersion.DEFINITION
+    current_schema_version = BenchmarkArtifactSchema.DEFINITION
 
-    schema_version: Literal[SchemaVersion.DEFINITION] = SchemaVersion.DEFINITION
+    schema_version: Literal[BenchmarkArtifactSchema.DEFINITION] = (
+        BenchmarkArtifactSchema.DEFINITION
+    )
     name: NonEmptyString
     """A unique, human-readable name for the kernel definition."""
     op_type: NonEmptyString

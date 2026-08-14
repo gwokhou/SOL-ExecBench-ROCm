@@ -14,6 +14,10 @@ from sol_execbench.core.bench.diagnostic_sidecar import (
     CurrentDiagnosticSidecarAuthority,
     DiagnosticSidecarStatus,
 )
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+    PerformanceEvidenceComponentKind,
+)
 from sol_execbench.core.data.base_model import StrictArtifactModel
 from sol_execbench.core.data.json_utils import load_json_file, load_jsonl_file
 from sol_execbench.core.data.trace import CacheClearEvidence
@@ -24,9 +28,6 @@ from sol_execbench.core.integrity import (
     SHA256Digest,
     sha256_file,
     stable_json_checksum,
-)
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
 )
 from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
 
@@ -100,10 +101,16 @@ class PerformanceReplayEvidenceSidecar(CurrentDiagnosticSidecarAuthority):
     """Fail-closed replay identity and alignment evidence."""
 
     model_config = _CONFIG
-    current_schema_version = SchemaVersion.PERFORMANCE_REPLAY_EVIDENCE
+    current_schema_version = (
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    )
+    current_artifact_kind = PerformanceEvidenceComponentKind.REPLAY
 
-    schema_version: Literal[SchemaVersion.PERFORMANCE_REPLAY_EVIDENCE] = (
-        SchemaVersion.PERFORMANCE_REPLAY_EVIDENCE
+    schema_version: Literal[
+        PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    ] = PerformanceArtifactSchema.PERFORMANCE_EVIDENCE_COMPONENT
+    artifact_kind: Literal[PerformanceEvidenceComponentKind.REPLAY] = (
+        PerformanceEvidenceComponentKind.REPLAY
     )
     status: DiagnosticSidecarStatus
     run_id: SHA256Digest

@@ -7,12 +7,13 @@ from typing import Any, Literal
 from pydantic import ConfigDict
 
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 from sol_execbench.core.platform.compatibility import (
     MatrixEntry,
     MatrixExecutionDecision,
+)
+from sol_execbench.core.platform.schema_versions import (
+    PlatformArtifactSchema,
+    PlatformPreflightArtifactKind,
 )
 
 _MODEL_CONFIG = ConfigDict(
@@ -109,7 +110,8 @@ class DependencyPreflightResult(BaseModelWithDocstrings):
         policy_payload = entry_payload["observed"]["dependency_policy"]
         claim_payload = entry_payload["claim_boundary"]
         return {
-            "schema_version": SchemaVersion.DEPENDENCY_PREFLIGHT,
+            "schema_version": PlatformArtifactSchema.PLATFORM_PREFLIGHT,
+            "artifact_kind": PlatformPreflightArtifactKind.DEPENDENCY,
             "target_id": target_payload["target_id"],
             "pytorch_rocm_target": target_payload["pytorch_rocm_target"],
             "policy_id": policy_payload["policy_id"],

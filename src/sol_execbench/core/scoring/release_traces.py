@@ -21,7 +21,7 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKACorpusManifest,
 )
 from sol_execbench.core.integrity import sha256_file, verify_artifact_file
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.integrity.protocol_versions import WireProtocol
 from sol_execbench.core.platform.rdna4_validation import (
     RDNA4_VALIDATION_GFX_TARGET,
     RDNA4_VALIDATION_HIP_VERSION,
@@ -360,7 +360,7 @@ def _verify_trace_environment(
     if require_timing and (
         environment.clocks_locked is not True
         or environment.timing_protocol
-        != SchemaVersion.ROCM_EVENT_TIMING_PAPER_COUNTS
+        != WireProtocol.ROCM_EVENT_TIMING_PAPER_COUNTS
     ):
         raise ValueError(
             "passing release trace lacks publication timing controls",

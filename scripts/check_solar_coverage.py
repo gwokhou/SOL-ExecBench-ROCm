@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sol_execbench.core.integrity.schema_versions import (
+from sol_execbench.core.dataset.schema_versions import (
     COVERAGE_POLICY_SCHEMA_VERSION,
 )
 

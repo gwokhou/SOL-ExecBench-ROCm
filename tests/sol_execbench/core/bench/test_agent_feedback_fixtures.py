@@ -8,7 +8,9 @@ import pytest
 from sol_execbench.core.bench.agent_feedback import (
     AgentFeedbackSidecar,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.bench.performance_model.schema_versions import (
+    PerformanceArtifactSchema,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_DIR = REPO_ROOT / "tests/sol_execbench/fixtures/agent_feedback"
@@ -103,7 +105,7 @@ def test_agent_feedback_docs_explain_hip_mapping_and_fixture_semantics():
         "solution content hash",
         "compile_failure",
         "profile_summary.sidecar",
-        SchemaVersion.PROFILE_SUMMARY,
+        PerformanceArtifactSchema.PROFILE_SUMMARY,
         "SOL does not duplicate those hints into",
         "unknown values must be downgraded",
         "valid.agent-feedback.json",

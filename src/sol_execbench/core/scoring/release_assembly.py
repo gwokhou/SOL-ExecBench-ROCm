@@ -214,6 +214,7 @@ def _run_statement(
     generated_at = utc_timestamp()
     if plan.role is ReleaseRunKind.BASELINE:
         return BaselineStatement(
+            role=ReleaseRunKind.BASELINE,
             generated_at=generated_at,
             source_revision=plan.source_revision,
             corpus_manifest=corpus_manifest,
@@ -223,6 +224,7 @@ def _run_statement(
         )
     if plan.role is ReleaseRunKind.CANDIDATE:
         return CandidateStatement(
+            role=ReleaseRunKind.CANDIDATE,
             generated_at=generated_at,
             source_revision=plan.source_revision,
             corpus_manifest=corpus_manifest,

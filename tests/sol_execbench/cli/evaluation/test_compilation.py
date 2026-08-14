@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
 from sol_execbench.cli.evaluation import compilation
+from sol_execbench.cli.evaluation.native_compile_cache import (
+    NATIVE_COMPILE_CACHE_FORMAT_VERSION,
+    NativeCompileCache,
+)
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_CONTAINER_IMAGE_ID,
     ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE,
@@ -210,3 +215,49 @@ def test_run_compile_phase_reuses_content_addressed_native_artifact(
     assert second.artifact_path is not None
     assert second.artifact_path.read_bytes() == b"compiled artifact"
     assert (second_dir / "kernel.hip.o").read_bytes() == b"static object"
+    entry_path = next(cache_root.glob("*/entry.json"))
+    entry = json.loads(entry_path.read_text(encoding="utf-8"))
+    assert entry["format_version"] == NATIVE_COMPILE_CACHE_FORMAT_VERSION
+    assert "schema_version" not in entry
+
+
+def test_native_compile_cache_refreshes_incompatible_local_format(
+    tmp_path: Path,
+) -> None:
+    staging_dir = tmp_path / "staging"
+    staging_dir.mkdir()
+    (staging_dir / "solution.json").write_text("{}", encoding="utf-8")
+    (staging_dir / "build_ext.py").write_text("# build\n", encoding="utf-8")
+    artifact = staging_dir / "benchmark_kernel.so"
+    artifact.write_bytes(b"compiled artifact")
+    cache = NativeCompileCache.from_environment(
+        staging_dir=staging_dir,
+        command=("hipcc",),
+        compile_environment={},
+        compiler_path="/opt/rocm/bin/hipcc",
+        compiler_sha256="c" * 64,
+        compiler_version="HIP 7.2",
+        environ={
+            ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE: str(tmp_path / "cache"),
+            ENV_SOL_EXECBENCH_CONTAINER_IMAGE_ID: f"sha256:{'a' * 64}",
+            ENV_SOL_EXECBENCH_SOURCE_REVISION: "b" * 40,
+        },
+    )
+    assert cache is not None
+    cache.store(artifact)
+    entry_dir = cache.root / cache.key
+    entry_path = entry_dir / "entry.json"
+    payload = json.loads(entry_path.read_text(encoding="utf-8"))
+    payload["format_version"] = 0
+    entry_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    restored = cache.restore(tmp_path / "restored" / "benchmark_kernel.so")
+
+    assert restored is False
+    assert not entry_dir.exists()
+
+    cache.store(artifact)
+    destination = tmp_path / "refreshed" / "benchmark_kernel.so"
+
+    assert cache.restore(destination) is True
+    assert destination.read_bytes() == b"compiled artifact"

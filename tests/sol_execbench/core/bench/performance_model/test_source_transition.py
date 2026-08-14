@@ -5,6 +5,10 @@ from collections.abc import Mapping
 import pytest
 from pydantic import ValidationError
 
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticSourceTransitionArtifactKind,
+)
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
 )
@@ -20,7 +24,6 @@ from sol_execbench.core.bench.performance_model.source_transition import (
     SourceTransitionDisposition,
     SourceTransitionStage,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
 
 def _digest(value: int) -> str:
@@ -117,7 +120,8 @@ def _validate_attestation(
 ) -> DiagnosticSourceTransitionAttestation:
     return DiagnosticSourceTransitionAttestation.model_validate(
         {
-            "schema_version": SchemaVersion.DIAGNOSTIC_SOURCE_TRANSITION,
+            "schema_version": DiagnosticArtifactSchema.DIAGNOSTIC_SOURCE_TRANSITION,
+            "artifact_kind": DiagnosticSourceTransitionArtifactKind.ATTESTATION,
             **payload,
         }
     )

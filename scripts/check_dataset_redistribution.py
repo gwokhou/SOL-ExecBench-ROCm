@@ -13,9 +13,11 @@ import tomllib
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
+from sol_execbench.core.dataset.schema_versions import (
+    DatasetArtifactSchema,
+    DatasetGovernanceArtifactKind,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -57,7 +59,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         import json
 
         payload = {
-            "schema_version": SchemaVersion.DATASET_REDISTRIBUTION_CHECK,
+            "schema_version": DatasetArtifactSchema.DATASET_GOVERNANCE,
+            "artifact_kind": DatasetGovernanceArtifactKind.REDISTRIBUTION_CHECK,
             "overall_status": "blocking" if findings else "passed",
             "findings": [finding.__dict__ for finding in findings],
         }
@@ -113,6 +116,17 @@ def load_dataset_policy(path: Path = PROVENANCE_PATH) -> dict[str, object]:
     policy = provenance.get("dataset_policy")
     if not isinstance(policy, dict):
         raise ValueError("provenance.toml must define [dataset_policy]")
+    expected_schema = DatasetArtifactSchema.DATASET_GOVERNANCE
+    if policy.get("schema_version") != expected_schema:
+        raise ValueError(
+            "provenance.toml [dataset_policy] requires "
+            f"schema_version={expected_schema!r}"
+        )
+    if policy.get("artifact_kind") != DatasetGovernanceArtifactKind.POLICY:
+        raise ValueError(
+            "provenance.toml [dataset_policy] requires "
+            f"artifact_kind={DatasetGovernanceArtifactKind.POLICY!r}"
+        )
     sources = policy.get("sources")
     if not isinstance(sources, list):
         raise ValueError("provenance.toml [dataset_policy] must define sources")
@@ -169,7 +183,14 @@ def check_paths(
 
 
 def _sources(policy: dict[str, object]) -> list[dict[str, object]]:
-    return [source for source in policy["sources"] if isinstance(source, dict)]
+    sources = policy.get("sources")
+    if not isinstance(sources, list):
+        return []
+    return [
+        cast(dict[str, object], source)
+        for source in sources
+        if isinstance(source, dict)
+    ]
 
 
 def _matches_source(path: str, source: dict[str, object]) -> bool:

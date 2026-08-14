@@ -14,6 +14,10 @@ from sol_execbench.core.bench.batch_gpu_qualification import (
     require_isolated_qualification_root,
     select_risk_first_axis_extrema,
 )
+from sol_execbench.core.control_plane_schema_versions import (
+    BatchGPUQualificationArtifactKind,
+    ExecutionControlSchema,
+)
 
 _DIGEST = "a" * 64
 
@@ -68,6 +72,27 @@ def test_gate_rejects_incomplete_receipt_coverage() -> None:
             receipts=(_receipt(BatchGPUQualificationStage.FULL, ("one",)),),
             created_at="2026-08-09T00:00:00Z",
         )
+
+
+def test_gate_and_receipt_share_one_discriminated_contract() -> None:
+    receipt = _receipt(BatchGPUQualificationStage.STATIC, ("item",))
+    gate = BatchGPUQualificationGate(
+        task=LargeBatchGPUTask.RELEASE_EVALUATION,
+        stage=BatchGPUQualificationStage.STATIC,
+        scope_id="release",
+        subject_sha256=_DIGEST,
+        runner_sha256=_DIGEST,
+        configuration_sha256=_DIGEST,
+        source_revision="revision",
+        item_ids=("item",),
+        receipts=(receipt,),
+        created_at="2026-08-09T00:00:00Z",
+    )
+
+    assert gate.schema_version == ExecutionControlSchema.BATCH_GPU_QUALIFICATION
+    assert gate.artifact_kind == BatchGPUQualificationArtifactKind.GATE
+    assert receipt.schema_version == gate.schema_version
+    assert receipt.artifact_kind == BatchGPUQualificationArtifactKind.RECEIPT
 
 
 def test_qualification_root_must_be_isolated(tmp_path) -> None:

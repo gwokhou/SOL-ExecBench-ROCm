@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sol_execbench.core.bench.performance_model.acceptance import (
+    DiagnosticAcceptanceArtifactKind,
     DiagnosticAcceptanceCase,
     DiagnosticAcceptanceManifest,
     DiagnosticAcceptanceResult,
@@ -157,6 +158,7 @@ def build_diagnostic_acceptance(
             raise
         cases.append(built)
     manifest = DiagnosticAcceptanceManifest(
+        artifact_kind=DiagnosticAcceptanceArtifactKind.MANIFEST,
         purpose=development.purpose,
         model_identity=profile.model_identity,
         calibration_profile_sha256=sha256_file(calibration_profile_path),

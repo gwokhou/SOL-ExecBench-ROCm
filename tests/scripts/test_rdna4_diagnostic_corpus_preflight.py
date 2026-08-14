@@ -21,7 +21,10 @@ from sol_execbench.core.bench.performance_model.corpus_preflight import (
     validate_design,
     validate_status_log,
 )
-from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.bench.performance_model.diagnostic_schema_versions import (
+    DiagnosticArtifactSchema,
+    DiagnosticCorpusDesignArtifactKind,
+)
 
 
 def _design() -> dict[str, Any]:
@@ -41,7 +44,8 @@ def _design() -> dict[str, Any]:
                     }
                 )
     return {
-        "schema_version": SchemaVersion.RDNA4_DIAGNOSTIC_CORPUS_DESIGN.value,
+        "schema_version": DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN.value,
+        "artifact_kind": DiagnosticCorpusDesignArtifactKind.DESIGN.value,
         "design": "adjacent_shape_stratified_three_way_rotation",
         "cases_per_family": {
             "point_fit": 20,
@@ -176,5 +180,6 @@ def test_main_writes_versioned_preflight_artifact(
 
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert (
-        payload["schema_version"] == SchemaVersion.DIAGNOSTIC_CORPUS_PREFLIGHT
+        payload["schema_version"]
+        == DiagnosticArtifactSchema.DIAGNOSTIC_CORPUS_DESIGN
     )

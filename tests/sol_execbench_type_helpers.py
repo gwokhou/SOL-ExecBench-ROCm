@@ -3,12 +3,10 @@ from __future__ import annotations
 from typing import Any, cast
 
 from sol_execbench.core.data.definition import Definition
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 from sol_execbench.core.data.solution import BuildSpec, Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.data.workload import Workload
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
 
 JSONDict = dict[str, Any]
 
@@ -23,12 +21,12 @@ def typed[T](value: object, typ: type[T]) -> T:
 
 
 def make_definition(**kwargs: Any) -> Definition:
-    kwargs.setdefault("schema_version", SchemaVersion.DEFINITION)
+    kwargs.setdefault("schema_version", BenchmarkArtifactSchema.DEFINITION)
     return Definition.model_validate(kwargs)
 
 
 def make_workload(**kwargs: Any) -> Workload:
-    kwargs.setdefault("schema_version", SchemaVersion.WORKLOAD)
+    kwargs.setdefault("schema_version", BenchmarkArtifactSchema.WORKLOAD)
     kwargs.setdefault(
         "checks",
         [{"type": "numeric", "output": "output"}],
@@ -37,7 +35,7 @@ def make_workload(**kwargs: Any) -> Workload:
 
 
 def make_solution(**kwargs: Any) -> Solution:
-    kwargs.setdefault("schema_version", SchemaVersion.SOLUTION)
+    kwargs.setdefault("schema_version", BenchmarkArtifactSchema.SOLUTION)
     return Solution.model_validate(kwargs)
 
 
@@ -46,5 +44,5 @@ def make_build_spec(**kwargs: Any) -> BuildSpec:
 
 
 def make_trace(**kwargs: Any) -> Trace:
-    kwargs.setdefault("schema_version", SchemaVersion.TRACE)
+    kwargs.setdefault("schema_version", BenchmarkArtifactSchema.TRACE)
     return Trace.model_validate(kwargs)

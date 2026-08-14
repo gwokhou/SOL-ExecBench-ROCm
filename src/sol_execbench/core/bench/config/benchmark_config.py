@@ -11,18 +11,17 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from sol_execbench.core.data.base_model import CurrentSchemaModel
-from sol_execbench.core.integrity.schema_versions import (
-    SchemaVersion,
-)
+from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
+from sol_execbench.core.integrity.protocol_versions import WireProtocol
 
 
 class BenchmarkConfig(CurrentSchemaModel):
     """Configuration for benchmark runs."""
 
-    current_schema_version = SchemaVersion.BENCHMARK_CONFIG
+    current_schema_version = BenchmarkArtifactSchema.BENCHMARK_CONFIG
 
-    schema_version: Literal[SchemaVersion.BENCHMARK_CONFIG] = (
-        SchemaVersion.BENCHMARK_CONFIG
+    schema_version: Literal[BenchmarkArtifactSchema.BENCHMARK_CONFIG] = (
+        BenchmarkArtifactSchema.BENCHMARK_CONFIG
     )
     warmup_runs: int = Field(default=10, ge=0)
     iterations: int = Field(default=50, gt=0)
@@ -49,7 +48,7 @@ class BenchmarkConfig(CurrentSchemaModel):
         return self
 
     @property
-    def timing_protocol(self) -> str:
+    def timing_protocol(self) -> WireProtocol:
         """Return the declared protocol, distinguishing custom diagnostic runs."""
         if (
             self.warmup_runs == 10
@@ -58,5 +57,5 @@ class BenchmarkConfig(CurrentSchemaModel):
             and self.min_measurement_time_seconds is None
             and self.lock_clocks
         ):
-            return SchemaVersion.ROCM_EVENT_TIMING_PAPER_COUNTS
-        return SchemaVersion.ROCM_EVENT_TIMING_CUSTOM
+            return WireProtocol.ROCM_EVENT_TIMING_PAPER_COUNTS
+        return WireProtocol.ROCM_EVENT_TIMING_CUSTOM
