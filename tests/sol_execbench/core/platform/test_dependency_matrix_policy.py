@@ -20,7 +20,7 @@ from sol_execbench.core.platform.docker_matrix import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
+MANIFEST_PATH = REPO_ROOT / "src/sol_execbench/data/rocm_targets.json"
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
 UV_LOCK_PATH = REPO_ROOT / "uv.lock"
 

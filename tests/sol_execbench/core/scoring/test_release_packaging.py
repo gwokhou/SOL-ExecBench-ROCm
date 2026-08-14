@@ -24,6 +24,7 @@ from sol_execbench.core.scoring.release_packaging import (
 )
 
 _SOURCE_REVISION = "a" * 40
+pytestmark = pytest.mark.requires_linux
 
 
 def _verified_bundle(

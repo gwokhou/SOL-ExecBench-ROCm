@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -119,6 +120,10 @@ class TarRunner(Protocol):
 
 
 def _system_tar(argv: list[str], *, cwd: Path | None = None) -> None:
+    if sys.platform != "linux":
+        raise RuntimeError(
+            "official score release packaging requires Linux and GNU tar",
+        )
     completed = subprocess.run(
         argv,
         cwd=cwd,

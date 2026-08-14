@@ -18,6 +18,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Protocol
 
+from sol_execbench.core.process.process_observation import (
+    process_group_has_live_members as _process_group_has_live_members,
+    wait_for_exit_without_reaping as _wait_for_exit_without_reaping,
+)
+
 _MAX_CAPTURE_BYTES = 5 * 1024 * 1024
 _OUTPUT_DRAIN_GRACE_SECONDS = 5.0
 _PROCESS_GROUP_GRACE_SECONDS = 1.0
@@ -331,23 +336,6 @@ def _stop_capture_threads(workers: tuple[_CaptureWorker, ...]) -> None:
     _join_capture_threads(workers, _PROCESS_GROUP_GRACE_SECONDS)
 
 
-def _wait_for_exit_without_reaping(
-    process: subprocess.Popen[bytes] | subprocess.Popen[str],
-    timeout: float | None,
-) -> None:
-    """Observe leader exit while retaining its PID/session identity for cleanup."""
-    if timeout is None:
-        os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOWAIT)
-        return
-    deadline = time.monotonic() + timeout
-    flags = os.WEXITED | os.WNOWAIT | os.WNOHANG
-    while os.waitid(os.P_PID, process.pid, flags) is None:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise subprocess.TimeoutExpired(process.args, timeout)
-        time.sleep(min(_WAIT_POLL_SECONDS, remaining))
-
-
 def _signal_unreaped_process_group(
     process: subprocess.Popen[bytes] | subprocess.Popen[str],
     signal_number: int,
@@ -408,29 +396,6 @@ def _wait_for_process_group_members(
             return False
         time.sleep(min(_WAIT_POLL_SECONDS, remaining))
     return True
-
-
-def _process_group_has_live_members(process_group_id: int) -> bool:
-    for entry in Path("/proc").iterdir():
-        if not entry.name.isdigit() or int(entry.name) == process_group_id:
-            continue
-        try:
-            raw = (entry / "stat").read_text()
-            fields = raw[raw.rfind(")") + 2 :].split()
-            state, process_group, session = (
-                fields[0],
-                int(fields[2]),
-                int(fields[3]),
-            )
-        except (OSError, IndexError, ValueError):
-            continue
-        if (
-            state != "Z"
-            and process_group == process_group_id
-            and session == process_group_id
-        ):
-            return True
-    return False
 
 
 def _terminate_process_group(

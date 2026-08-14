@@ -189,6 +189,6 @@ user configuration.
 ## Docker
 
 Use `./scripts/run_docker.sh --build` or select a target declared in
-`docker/rocm-targets.json` with `--target`. The wrapper owns its image, device
+the packaged `sol_execbench/data/rocm_targets.json` with `--target`. The wrapper owns its image, device
 and dependency variables; inspect `./scripts/run_docker.sh --help` for the
 current surface.

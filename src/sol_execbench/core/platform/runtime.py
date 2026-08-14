@@ -12,6 +12,7 @@ import re
 import shutil
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -430,8 +431,7 @@ def env_snapshot(
 
     libs: dict[str, str] = {"torch": torch.__version__}
     try:
-        import triton
-
+        triton = import_module("triton")
         libs["triton"] = getattr(triton, "__version__", "unknown")
     except ImportError:
         pass

@@ -19,7 +19,7 @@ from sol_execbench.core.platform.schema_versions import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
+MANIFEST_PATH = REPO_ROOT / "src/sol_execbench/data/rocm_targets.json"
 
 
 def _base_command(*extra: str) -> list[str]:
