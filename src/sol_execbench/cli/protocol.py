@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import click
 from pydantic import Field
@@ -34,8 +34,8 @@ class CliExitCode(IntEnum):
 class CliResult:
     """Structured command result before text or JSON rendering."""
 
-    data: Any = field(default_factory=dict)
-    artifacts: tuple[dict[str, Any], ...] = ()
+    data: object = field(default_factory=dict)
+    artifacts: tuple[dict[str, object], ...] = ()
     warnings: tuple[str, ...] = ()
     exit_code: CliExitCode = CliExitCode.SUCCESS
 
@@ -49,7 +49,7 @@ class CliFailure(click.ClickException):
         *,
         code: str = "input_error",
         exit_code: CliExitCode = CliExitCode.INPUT,
-        details: Any = None,
+        details: object = None,
         hint: str | None = None,
     ) -> None:
         """Initialize a classified user-facing CLI failure."""
@@ -72,7 +72,7 @@ class CliError(FrozenArtifactModel):
 
     code: str = Field(min_length=1)
     message: str
-    details: Any
+    details: object
     hint: str | None
 
 
@@ -88,7 +88,7 @@ class CliSuccessResponse(CurrentFrozenSchemaModel):
     artifact_kind: Literal[CLIArtifactKind.RESPONSE] = CLIArtifactKind.RESPONSE
     ok: Literal[True]
     command: str = Field(min_length=1)
-    data: Any
+    data: object
     artifacts: list[CliArtifact]
     warnings: list[str]
 
@@ -108,14 +108,16 @@ class CliFailureResponse(CurrentFrozenSchemaModel):
     error: CliError
 
 
-def artifact(path: Path, artifact_type: str) -> dict[str, Any]:
+def artifact(path: Path, artifact_type: str) -> dict[str, object]:
     """Return a serialized CLI artifact reference."""
     return CliArtifact(type=artifact_type, path=str(path)).model_dump(
         mode="json",
     )
 
 
-def response_success(command: str, result: CliResult | None) -> dict[str, Any]:
+def response_success(
+    command: str, result: CliResult | None
+) -> dict[str, object]:
     """Build a successful machine-readable CLI response."""
     result = result or CliResult()
     response = {
@@ -130,7 +132,7 @@ def response_success(command: str, result: CliResult | None) -> dict[str, Any]:
     return CliSuccessResponse.model_validate(response).model_dump(mode="json")
 
 
-def response_failure(command: str, error: BaseException) -> dict[str, Any]:
+def response_failure(command: str, error: BaseException) -> dict[str, object]:
     """Build a failed machine-readable CLI response."""
     if isinstance(error, CliFailure):
         code = error.code

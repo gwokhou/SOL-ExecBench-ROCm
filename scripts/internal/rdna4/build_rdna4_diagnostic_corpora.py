@@ -725,59 +725,61 @@ def _transformer_shape(global_index: int) -> dict[str, int]:
     return {"M": sequence, "N": TRANSFORMER_CHANNELS}
 
 
+def _elementwise_shape(global_index: int) -> dict[str, int]:
+    for start, factory in (
+        (FRESH_SUCCESSOR_START, _fresh_elementwise_shape),
+        (REPLAY_RECOVERY_SUCCESSOR_START, _replay_recovery_elementwise_shape),
+        (
+            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START,
+            _two_family_replacement_elementwise_shape,
+        ),
+        (FULL_REPLACEMENT_SUCCESSOR_START, _full_replacement_elementwise_shape),
+    ):
+        if start <= global_index < start + UNIVERSE_CASES_PER_FAMILY:
+            return factory(global_index)
+    return {
+        "M": 512 + 64 * global_index,
+        "N": 768 + 32 * ((17 * global_index) % 40),
+    }
+
+
+def _transpose_shape(global_index: int) -> dict[str, int]:
+    for start, factory in (
+        (FRESH_SUCCESSOR_START, _fresh_transpose_shape),
+        (REPLAY_RECOVERY_SUCCESSOR_START, _replay_recovery_transpose_shape),
+        (
+            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START,
+            _two_family_replacement_transpose_shape,
+        ),
+    ):
+        if start <= global_index < start + UNIVERSE_CASES_PER_FAMILY:
+            return factory(global_index)
+    return {
+        "M": 513 + 53 * global_index,
+        "N": 769 + 37 * ((13 * global_index) % 40),
+    }
+
+
+def _matmul_shape(global_index: int) -> dict[str, int]:
+    if global_index >= PAIR_DISJOINT_SUCCESSOR_START:
+        rows = SUCCESSOR_MATMUL_ROWS_START + (
+            SUCCESSOR_MATMUL_ROWS_STRIDE
+            * (global_index - PAIR_DISJOINT_SUCCESSOR_START)
+        )
+    else:
+        rows = 64 + 16 * (global_index % 10)
+    return {
+        "M": rows,
+        "N": 80 + 16 * ((7 * global_index) % 10),
+        "K": 64 + 16 * ((3 * global_index) % 13),
+    }
+
+
 def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
     if family is WorkloadKind.ELEMENTWISE:
-        if (
-            FRESH_SUCCESSOR_START
-            <= global_index
-            < FRESH_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _fresh_elementwise_shape(global_index)
-        if (
-            REPLAY_RECOVERY_SUCCESSOR_START
-            <= global_index
-            < REPLAY_RECOVERY_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _replay_recovery_elementwise_shape(global_index)
-        if (
-            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
-            <= global_index
-            < TWO_FAMILY_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _two_family_replacement_elementwise_shape(global_index)
-        if (
-            FULL_REPLACEMENT_SUCCESSOR_START
-            <= global_index
-            < FULL_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _full_replacement_elementwise_shape(global_index)
-        return {
-            "M": 512 + 64 * global_index,
-            "N": 768 + 32 * ((17 * global_index) % 40),
-        }
+        return _elementwise_shape(global_index)
     if family is WorkloadKind.TRANSPOSE:
-        if (
-            FRESH_SUCCESSOR_START
-            <= global_index
-            < FRESH_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _fresh_transpose_shape(global_index)
-        if (
-            REPLAY_RECOVERY_SUCCESSOR_START
-            <= global_index
-            < REPLAY_RECOVERY_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _replay_recovery_transpose_shape(global_index)
-        if (
-            TWO_FAMILY_REPLACEMENT_SUCCESSOR_START
-            <= global_index
-            < TWO_FAMILY_REPLACEMENT_SUCCESSOR_START + UNIVERSE_CASES_PER_FAMILY
-        ):
-            return _two_family_replacement_transpose_shape(global_index)
-        return {
-            "M": 513 + 53 * global_index,
-            "N": 769 + 37 * ((13 * global_index) % 40),
-        }
+        return _transpose_shape(global_index)
     if family is WorkloadKind.REDUCTION:
         calibrated_widths = (32, 64, 128, 256, 512, 1024)
         return {
@@ -801,22 +803,7 @@ def _shape(family: WorkloadKind, global_index: int) -> dict[str, int]:
             "M": 32 + 8 * (global_index - HISTORICAL_UNIVERSE_START),
             "N": 768,
         }
-    if (
-        family is WorkloadKind.MATMUL
-        and global_index >= PAIR_DISJOINT_SUCCESSOR_START
-    ):
-        return {
-            "M": SUCCESSOR_MATMUL_ROWS_START
-            + SUCCESSOR_MATMUL_ROWS_STRIDE
-            * (global_index - PAIR_DISJOINT_SUCCESSOR_START),
-            "N": 80 + 16 * ((7 * global_index) % 10),
-            "K": 64 + 16 * ((3 * global_index) % 13),
-        }
-    return {
-        "M": 64 + 16 * (global_index % 10),
-        "N": 80 + 16 * ((7 * global_index) % 10),
-        "K": 64 + 16 * ((3 * global_index) % 13),
-    }
+    return _matmul_shape(global_index)
 
 
 def _representative_transformer_sequence(global_index: int) -> int:

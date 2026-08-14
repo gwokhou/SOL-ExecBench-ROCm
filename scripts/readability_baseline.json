@@ -1,7 +1,8 @@
 {
-  "long_functions": 1,
+  "long_functions": 0,
   "oversized_test_modules": 0,
-  "production_any_modules": 60,
+  "production_any_modules": 58,
+  "production_any_references": 332,
   "wide_functions": 2,
   "wildcard_imports": 0
 }

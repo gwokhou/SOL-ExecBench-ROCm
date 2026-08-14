@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Sequence
+from typing import Any, cast
 
 import pytest
 
@@ -64,7 +65,7 @@ def test_source_collection_selects_triton_rocprofv3_and_records_run_config(
     assert calls
     assert result.profiler_collected is True
     assert result.evidence is not None
-    payload = result.evidence.to_dict()
+    payload = cast(Any, result.evidence.to_dict())
     assert payload["backend"] == "rocprofv3"
     assert payload["gpu_architecture"] == "gfx942"
     assert payload["warmup_runs"] == 5
@@ -186,7 +187,7 @@ def test_profile_collection_timeout_keeps_partial_artifacts_and_reasons(
     )
 
     result = collect_rocprofv3_profile(request, runner=runner)
-    payload = result.to_dict()
+    payload = cast(Any, result.to_dict())
 
     assert result.status == "failed"
     assert "rocprof_command_timeout" in payload["reason_codes"]
