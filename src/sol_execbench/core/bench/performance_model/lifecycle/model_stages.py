@@ -70,31 +70,6 @@ from sol_execbench.core.data.json_utils import (
 )
 from sol_execbench.core.integrity import sha256_file
 
-DEPENDENCIES: dict[
-    DiagnosticLifecycleStage, tuple[DiagnosticLifecycleStage, ...]
-] = {
-    DiagnosticLifecycleStage.DESIGN: (),
-    DiagnosticLifecycleStage.CALIBRATION: (),
-    DiagnosticLifecycleStage.COLLECTION_RUN: (DiagnosticLifecycleStage.DESIGN,),
-    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
-        DiagnosticLifecycleStage.COLLECTION_RUN,
-    ),
-    DiagnosticLifecycleStage.MODEL_BUILD: (
-        DiagnosticLifecycleStage.CALIBRATION,
-    ),
-    DiagnosticLifecycleStage.ACCEPTANCE: (
-        DiagnosticLifecycleStage.MODEL_BUILD,
-        DiagnosticLifecycleStage.CALIBRATION,
-        DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
-    ),
-    DiagnosticLifecycleStage.PUBLICATION: (
-        DiagnosticLifecycleStage.ACCEPTANCE,
-        DiagnosticLifecycleStage.CALIBRATION,
-        DiagnosticLifecycleStage.MODEL_BUILD,
-    ),
-    DiagnosticLifecycleStage.RELEASE: (DiagnosticLifecycleStage.PUBLICATION,),
-}
-
 
 class ModelBuildHandler:
     """Fit the frozen inference model build from development evidence."""

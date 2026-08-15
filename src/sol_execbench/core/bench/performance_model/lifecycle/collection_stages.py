@@ -48,31 +48,6 @@ from sol_execbench.core.bench.performance_model.lifecycle.stage_support import (
 )
 from sol_execbench.core.integrity import sha256_file
 
-DEPENDENCIES: dict[
-    DiagnosticLifecycleStage, tuple[DiagnosticLifecycleStage, ...]
-] = {
-    DiagnosticLifecycleStage.DESIGN: (),
-    DiagnosticLifecycleStage.CALIBRATION: (),
-    DiagnosticLifecycleStage.COLLECTION_RUN: (DiagnosticLifecycleStage.DESIGN,),
-    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
-        DiagnosticLifecycleStage.COLLECTION_RUN,
-    ),
-    DiagnosticLifecycleStage.MODEL_BUILD: (
-        DiagnosticLifecycleStage.CALIBRATION,
-    ),
-    DiagnosticLifecycleStage.ACCEPTANCE: (
-        DiagnosticLifecycleStage.MODEL_BUILD,
-        DiagnosticLifecycleStage.CALIBRATION,
-        DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
-    ),
-    DiagnosticLifecycleStage.PUBLICATION: (
-        DiagnosticLifecycleStage.ACCEPTANCE,
-        DiagnosticLifecycleStage.CALIBRATION,
-        DiagnosticLifecycleStage.MODEL_BUILD,
-    ),
-    DiagnosticLifecycleStage.RELEASE: (DiagnosticLifecycleStage.PUBLICATION,),
-}
-
 
 class DesignHandler:
     """Verify the preregistered design that roots a lifecycle run."""
