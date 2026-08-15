@@ -79,9 +79,9 @@ def test_topology_stages_preserve_recorded_input_order_and_weight_type() -> (
         "operation": "add",
     }
     by_id = {
-        "weight": NodeInfo("weight", "parameter-tensor"),
-        "input": NodeInfo("input", "input-tensor"),
-        "add": NodeInfo("add", "add"),
+        "weight": NodeInfo(node_id="weight", type="parameter-tensor"),
+        "input": NodeInfo(node_id="input", type="input-tensor"),
+        "add": NodeInfo(node_id="add", type="add"),
     }
     edges = [(parameter, operation), (activation, operation)]
 

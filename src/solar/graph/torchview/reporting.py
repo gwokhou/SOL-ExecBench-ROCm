@@ -38,12 +38,12 @@ from pathlib import Path
 
 import yaml
 
+from solar.composition import BoundComponent
 from solar.graph.torchview.models import NodeInfo
-from solar.graph.torchview.processor_contract import TorchviewProcessorContract
 from solar.types import NodeDict
 
 
-class TorchviewReportingMixin(TorchviewProcessorContract):
+class GraphReporter(BoundComponent):
     """Persist and summarize processed Torchview graphs."""
 
     def _save_pytorch_graph_yaml(

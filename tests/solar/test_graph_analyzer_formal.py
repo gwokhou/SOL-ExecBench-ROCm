@@ -7,6 +7,7 @@ from typing import cast
 
 import pytest
 
+from solar.analysis.formal_analysis import FormalBoundAnalyzer
 from solar.analysis.graph_analyzer import IRGraphAnalyzer
 from solar.analysis.graph_context import GraphTopology, PreparedAnalysis
 from solar.analysis.graph_models import (
@@ -15,6 +16,7 @@ from solar.analysis.graph_models import (
     FusionPlan,
 )
 from solar.analysis.orojenesis import OrojenesisRunner
+from solar.analysis.orojenesis_evidence import OrojenesisEvidenceEvaluator
 from solar.rocm.architecture import ArchitectureProfile, MemoryLevel
 from solar.schema_versions import (
     OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION,
@@ -196,9 +198,9 @@ def test_runner_evidence_and_audit_cover_chain_region_and_single(
     plan, all_layers = _formal_plan()
     profile = SimpleNamespace(
         memory_hierarchy=(
-            MemoryLevel("l1", "cu", 32),
-            MemoryLevel("l2", "device", 128),
-            MemoryLevel("vram", "device", 4096),
+            MemoryLevel(name="l1", scope="cu", capacity_bytes=32),
+            MemoryLevel(name="l2", scope="device", capacity_bytes=128),
+            MemoryLevel(name="vram", scope="device", capacity_bytes=4096),
         ),
     )
     prepared = SimpleNamespace(
@@ -258,7 +260,7 @@ def test_evidence_selection_handles_no_cache_and_strict_capacity_failure():
         "curve": [{"buffer_bytes": 64, "dram_bytes": 10}],
         "evidence_files": {},
     }
-    IRGraphAnalyzer._select_capacity_and_rewrite_evidence(
+    OrojenesisEvidenceEvaluator._select_capacity_and_rewrite_evidence(
         result,
         None,
         False,
@@ -267,21 +269,30 @@ def test_evidence_selection_handles_no_cache_and_strict_capacity_failure():
     )
     assert "selected_capacity" not in result
     with pytest.raises(ValueError, match="missing"):
-        IRGraphAnalyzer._select_capacity_and_rewrite_evidence(
+        OrojenesisEvidenceEvaluator._select_capacity_and_rewrite_evidence(
             result,
-            MemoryLevel("tiny", "cu", 1),
+            MemoryLevel(name="tiny", scope="cu", capacity_bytes=1),
             True,
             "missing",
             Path("root"),
         )
-    assert IRGraphAnalyzer._last_cache(None) is None
+    assert OrojenesisEvidenceEvaluator._last_cache(None) is None
     empty = SimpleNamespace(
-        memory_hierarchy=(MemoryLevel("vram", "device", 100),),
+        memory_hierarchy=(
+            MemoryLevel(name="vram", scope="device", capacity_bytes=100),
+        ),
     )
-    assert IRGraphAnalyzer._last_cache(cast(ArchitectureProfile, empty)) is None
-    assert IRGraphAnalyzer._word_bits([], 4.0) == 32
     assert (
-        IRGraphAnalyzer._word_bits(["torch.float16", "torch.float32"], 4.0)
+        OrojenesisEvidenceEvaluator._last_cache(
+            cast(ArchitectureProfile, empty)
+        )
+        is None
+    )
+    assert OrojenesisEvidenceEvaluator._word_bits([], 4.0) == 32
+    assert (
+        OrojenesisEvidenceEvaluator._word_bits(
+            ["torch.float16", "torch.float32"], 4.0
+        )
         == 16
     )
 
@@ -319,7 +330,7 @@ def test_evidence_audits_fail_closed_on_mismatch():
         "selected_capacity": {"point": None},
     }
     assert (
-        IRGraphAnalyzer._audit_layer_evidence(
+        OrojenesisEvidenceEvaluator._audit_layer_evidence(
             plan,
             evidence,
             region_by_layer,
@@ -339,7 +350,7 @@ def test_evidence_audits_fail_closed_on_mismatch():
         },
     }
     assert (
-        IRGraphAnalyzer._audit_chain_evidence(
+        OrojenesisEvidenceEvaluator._audit_chain_evidence(
             plan,
             evidence,
             region_by_layer,
@@ -358,7 +369,7 @@ def test_evidence_audits_fail_closed_on_mismatch():
         },
     }
     assert (
-        IRGraphAnalyzer._audit_region_evidence(
+        OrojenesisEvidenceEvaluator._audit_region_evidence(
             plan,
             evidence,
             region_by_layer,
@@ -654,8 +665,14 @@ def test_lower_bound_combines_compute_and_prefetched_memory():
         semantic_complete=True,
     )
     accumulator = SimpleNamespace(resource_work={"valu": {"fp32": 2}})
-    formal = FormalAnalysis(None, {}, 50.0, 300.0, True)
-    lower = IRGraphAnalyzer._lower_bound(
+    formal = FormalAnalysis(
+        fusion=None,
+        orojenesis={},
+        audited_fused_bytes=50.0,
+        audited_prefetched_bytes=300.0,
+        tile_aware_bound=True,
+    )
+    lower = FormalBoundAnalyzer._lower_bound(
         cast(PreparedAnalysis, prepared),
         cast(AnalysisAccumulator, accumulator),
         formal,
@@ -666,9 +683,15 @@ def test_lower_bound_combines_compute_and_prefetched_memory():
     assert lower.components is not None
     assert lower.components["fused_memory_seconds"] == 0.5
 
-    incomplete = FormalAnalysis(None, {}, 50.0, 50.0, False)
+    incomplete = FormalAnalysis(
+        fusion=None,
+        orojenesis={},
+        audited_fused_bytes=50.0,
+        audited_prefetched_bytes=50.0,
+        tile_aware_bound=False,
+    )
     with pytest.raises(ValueError, match="complete tile-aware"):
-        IRGraphAnalyzer._lower_bound(
+        FormalBoundAnalyzer._lower_bound(
             cast(
                 PreparedAnalysis,
                 SimpleNamespace(
