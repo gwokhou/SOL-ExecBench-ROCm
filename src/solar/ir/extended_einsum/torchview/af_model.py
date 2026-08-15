@@ -151,7 +151,7 @@ def _bits_from_dtype(dtype_str: str) -> int | None:
 # Data model
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AxisKey:
     """Unique identifier for one dim of one operand in one layer."""
 
@@ -160,7 +160,7 @@ class AxisKey:
     pos: int
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class Axis:
     """Describe one graph axis and its concrete extent."""
 
@@ -217,7 +217,7 @@ class UnionFind:
 # Builder
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class BuildContext:
     """Mutable state shared by AF graph construction phases."""
 
@@ -359,7 +359,7 @@ def _collect_axes(ctx: BuildContext) -> None:
                 )
             n = min(len(dims), len(shape))
             for pos in range(n):
-                key = AxisKey(layer_name, role, pos)
+                key = AxisKey(layer=layer_name, role=role, pos=pos)
                 ctx.axes[key] = Axis(
                     key=key, label=dims[pos], size=int(shape[pos])
                 )
@@ -484,8 +484,8 @@ def _cross_layer_union(ctx: BuildContext) -> None:
             cur_dims = operands.get(role, [])
             n = min(len(pred_dims), len(cur_dims))
             for pos in range(n):
-                a = AxisKey(pred, pred_output_role, pos)
-                b = AxisKey(layer_name, role, pos)
+                a = AxisKey(layer=pred, role=pred_output_role, pos=pos)
+                b = AxisKey(layer=layer_name, role=role, pos=pos)
                 if a not in ctx.axes or b not in ctx.axes:
                     continue
                 if ctx.axes[a].size == ctx.axes[b].size:
@@ -500,7 +500,7 @@ def _assign_canonical_names(ctx: BuildContext) -> None:
         operands = layer.get("operands") or {}
         for role, dims in operands.items():
             for pos in range(len(dims)):
-                key = AxisKey(layer_name, role, pos)
+                key = AxisKey(layer=layer_name, role=role, pos=pos)
                 if key not in ctx.axes:
                     continue
                 root = ctx.uf.find(key)
@@ -537,7 +537,7 @@ def _build_iter_expr_for_layer(
             atoms = _parse_atoms(label)
             if len(atoms) == 1:
                 atom = atoms[0]
-                key = AxisKey(layer_name, role, pos)
+                key = AxisKey(layer=layer_name, role=role, pos=pos)
                 canonical = ctx.canonical_name.get(key)
                 if canonical is not None and atom not in atomic_to_iter:
                     atomic_to_iter[atom] = canonical.lower()

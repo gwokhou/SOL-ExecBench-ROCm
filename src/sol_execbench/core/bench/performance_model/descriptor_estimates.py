@@ -21,7 +21,7 @@ from sol_execbench.core.bench.performance_model.models import (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DescriptorEstimate:
     """Descriptor-derived semantic floating-point work and memory traffic."""
 
@@ -51,8 +51,8 @@ def _elementwise_work(descriptor: ElementwiseDescriptor) -> DescriptorEstimate:
 def _transpose_work(descriptor: TransposeDescriptor) -> DescriptorEstimate:
     elements = descriptor.rows * descriptor.columns
     return DescriptorEstimate(
-        0.0,
-        float(2 * elements * descriptor.element_bytes),
+        semantic_flops=0.0,
+        semantic_bytes=float(2 * elements * descriptor.element_bytes),
     )
 
 
@@ -66,8 +66,8 @@ def _reduction_work(descriptor: ReductionDescriptor) -> DescriptorEstimate:
         else descriptor.outer_rows
     )
     return DescriptorEstimate(
-        float(inputs),
-        float(
+        semantic_flops=float(inputs),
+        semantic_bytes=float(
             inputs * tensor_dtype_bytes(descriptor.input_dtype)
             + outputs * tensor_dtype_bytes(descriptor.output_dtype)
         ),
@@ -77,10 +77,10 @@ def _reduction_work(descriptor: ReductionDescriptor) -> DescriptorEstimate:
 @descriptor_work.register
 def _matmul_work(descriptor: MatmulDescriptor) -> DescriptorEstimate:
     return DescriptorEstimate(
-        float(
+        semantic_flops=float(
             2 * descriptor.batch * descriptor.m * descriptor.n * descriptor.k
         ),
-        float(
+        semantic_bytes=float(
             descriptor.batch
             * (
                 descriptor.m * descriptor.k
@@ -96,8 +96,8 @@ def _matmul_work(descriptor: MatmulDescriptor) -> DescriptorEstimate:
 def _softmax_work(descriptor: SoftmaxDescriptor) -> DescriptorEstimate:
     elements = descriptor.outer_rows * descriptor.reduction_width
     return DescriptorEstimate(
-        float(5 * elements),
-        float(
+        semantic_flops=float(5 * elements),
+        semantic_bytes=float(
             elements
             * (
                 tensor_dtype_bytes(descriptor.input_dtype)
@@ -113,8 +113,8 @@ def _cross_entropy_work(
 ) -> DescriptorEstimate:
     elements = descriptor.rows * descriptor.classes
     return DescriptorEstimate(
-        float(5 * elements),
-        float(
+        semantic_flops=float(5 * elements),
+        semantic_bytes=float(
             2 * elements * tensor_dtype_bytes(descriptor.logits_dtype)
             + descriptor.rows * 8
         ),
@@ -127,8 +127,8 @@ def _indexed_read_work(
 ) -> DescriptorEstimate:
     count = math.prod(descriptor.index_shape)
     return DescriptorEstimate(
-        float(count),
-        float(count * (descriptor.element_bytes + 8)),
+        semantic_flops=float(count),
+        semantic_bytes=float(count * (descriptor.element_bytes + 8)),
     )
 
 
@@ -138,8 +138,8 @@ def _indexed_update_work(
 ) -> DescriptorEstimate:
     count = math.prod(descriptor.index_shape)
     return DescriptorEstimate(
-        float(count),
-        float(count * (descriptor.element_bytes + 8)),
+        semantic_flops=float(count),
+        semantic_bytes=float(count * (descriptor.element_bytes + 8)),
     )
 
 

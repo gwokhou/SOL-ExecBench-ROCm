@@ -115,7 +115,7 @@ class CounterManifest(CurrentSchemaModel):
         return self
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CounterPassCSV:
     """One pass-indexed counter CSV artifact."""
 
@@ -123,7 +123,7 @@ class CounterPassCSV:
     path: Path
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class _MutableDispatch:
     workload_uuid: str
     candidate_sha256: str
@@ -326,7 +326,7 @@ def counter_pass_index(path: str | Path) -> int | None:
 def counter_dispatch_sequence_digest(path: str | Path) -> str:
     """Hash per-queue dispatch order without nondeterministic queue interleaving."""
     parsed = _parse_counter_pass(
-        CounterPassCSV(1, Path(path)),
+        CounterPassCSV(pass_index=1, path=Path(path)),
         workload_uuid="digest",
         candidate_sha256="0" * 64,
     )

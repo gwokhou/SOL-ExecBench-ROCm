@@ -16,7 +16,7 @@ from solar.errors import (
 from solar.types import DynamicValue
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class NativeEffects:
     """Dialect-independent default effects of a public operation."""
 
@@ -26,7 +26,7 @@ class NativeEffects:
     opaque_library_call: bool = False
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class NativeOpSpec:
     """Complete capability contract for one canonical native operation."""
 

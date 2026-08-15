@@ -111,8 +111,8 @@ class UnaryElementwiseHandler(EinsumOpHandler):
         labels = string.ascii_uppercase[:dims]
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Output", list(labels), is_output=True),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
+            EinsumOperand(name="Output", dims=list(labels), is_output=True),
         ]
 
         equation = f"{labels}->{labels}"
@@ -275,9 +275,9 @@ class BinaryElementwiseHandler(EinsumOpHandler):
         equation = f"{''.join(input_labels)},{''.join(input_1_labels)}->{''.join(output_labels)}"
 
         operands = [
-            EinsumOperand("Input", input_labels, is_output=False),
-            EinsumOperand("Input_1", input_1_labels, is_output=False),
-            EinsumOperand("Output", output_labels, is_output=True),
+            EinsumOperand(name="Input", dims=input_labels, is_output=False),
+            EinsumOperand(name="Input_1", dims=input_1_labels, is_output=False),
+            EinsumOperand(name="Output", dims=output_labels, is_output=True),
         ]
 
         return EinsumOp(
@@ -299,8 +299,8 @@ class BinaryElementwiseHandler(EinsumOpHandler):
         labels = string.ascii_uppercase[:dims]
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Output", list(labels), is_output=True),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
+            EinsumOperand(name="Output", dims=list(labels), is_output=True),
         ]
 
         equation = f"{labels}->{labels}"

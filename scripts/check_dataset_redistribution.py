@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PROVENANCE_PATH = REPO_ROOT / "provenance.toml"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DatasetRedistributionFinding:
     """One path that violates the dataset redistribution policy."""
 
@@ -34,6 +34,17 @@ class DatasetRedistributionFinding:
     redistribution_class: str
     mode: str
     message: str
+
+    def to_dict(self) -> dict[str, str]:
+        """Return the canonical JSON representation."""
+        return {
+            "path": self.path,
+            "source_id": self.source_id,
+            "source_name": self.source_name,
+            "redistribution_class": self.redistribution_class,
+            "mode": self.mode,
+            "message": self.message,
+        }
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -62,7 +73,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "schema_version": DatasetArtifactSchema.DATASET_GOVERNANCE,
             "artifact_kind": DatasetGovernanceArtifactKind.REDISTRIBUTION_CHECK,
             "overall_status": "blocking" if findings else "passed",
-            "findings": [finding.__dict__ for finding in findings],
+            "findings": [finding.to_dict() for finding in findings],
         }
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:

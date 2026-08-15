@@ -124,7 +124,7 @@ _QUALIFICATION_CANARY_MODES = (
 _CAPACITY_GOVERNED_MODES = frozenset({"memory", "indexed_read"})
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _CalibrationContext:
     output: Path
     hipcc: Path

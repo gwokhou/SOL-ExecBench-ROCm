@@ -56,7 +56,7 @@ _QUALIFICATION_CONFIG = BenchmarkConfig(
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReleaseQualificationRequest:
     """One problem partition selected for minimal evaluator execution."""
 
@@ -77,7 +77,7 @@ class ReleaseQualificationEvaluator(Protocol):
         ...
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _ReleaseQualificationContext:
     plan_path: Path
     workspace: Path
@@ -88,7 +88,7 @@ class _ReleaseQualificationContext:
     device: str
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _ProblemPartition:
     problem: ExecutionPlanProblem
     definition: Definition
@@ -168,13 +168,13 @@ def _context(
     verify_release_plan_contract(plan, workspace, corpus)
     root = require_isolated_qualification_root(qualification_root, workspace)
     return _ReleaseQualificationContext(
-        plan_file,
-        workspace,
-        plan,
-        corpus,
-        root,
-        timeout_seconds,
-        device,
+        plan_path=plan_file,
+        workspace=workspace,
+        plan=plan,
+        corpus=corpus,
+        root=root,
+        timeout_seconds=timeout_seconds,
+        device=device,
     )
 
 
@@ -192,7 +192,12 @@ def _partitions(
             (_workload_risk(definition, item) for item in workloads), default=0
         )
         partitions.append(
-            _ProblemPartition(problem, definition, workloads, risk)
+            _ProblemPartition(
+                problem=problem,
+                definition=definition,
+                workloads=workloads,
+                risk=risk,
+            )
         )
     return tuple(partitions)
 
@@ -239,10 +244,10 @@ def _selected_partitions(
     if stage is BatchGPUQualificationStage.CANARY:
         selected = tuple(
             _ProblemPartition(
-                item.problem,
-                item.definition,
-                _canary_workloads(item),
-                item.risk,
+                problem=item.problem,
+                definition=item.definition,
+                workloads=_canary_workloads(item),
+                risk=item.risk,
             )
             for item in partitions
         )
@@ -343,13 +348,14 @@ def _run_gpu_partition(
     )
     exit_code = evaluator(
         ReleaseQualificationRequest(
-            context.corpus.authored_root / partition.problem.problem_path,
-            solution_path,
-            workload_path,
-            config_path,
-            trace_path,
-            context.timeout_seconds,
-            context.device,
+            problem_dir=context.corpus.authored_root
+            / partition.problem.problem_path,
+            solution_path=solution_path,
+            workload_path=workload_path,
+            config_path=config_path,
+            trace_path=trace_path,
+            timeout_seconds=context.timeout_seconds,
+            device=context.device,
         )
     )
     _verify_trace(trace_path, partition, exit_code)

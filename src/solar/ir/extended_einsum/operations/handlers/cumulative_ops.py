@@ -129,8 +129,8 @@ class CumulativeHandler(EinsumOpHandler):
         output_labels = labels.copy()
 
         operands = [
-            EinsumOperand("Input", input_labels, is_output=False),
-            EinsumOperand("Output", output_labels, is_output=True),
+            EinsumOperand(name="Input", dims=input_labels, is_output=False),
+            EinsumOperand(name="Output", dims=output_labels, is_output=True),
         ]
 
         equation = f"{''.join(input_labels)}->{''.join(output_labels)}"

@@ -38,7 +38,7 @@ from solar.ir.contracts import (
 from solar.schema_versions import OROJENESIS_MULTI_EINSUM_REGION_SCHEMA_VERSION
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _ViewMetadata:
     target: str
     semantic: Mapping[str, Any]
@@ -198,7 +198,7 @@ def _region_axis_map(
     return axis_map if mapped_shape == consumer_shape else None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _RegionDiscovery:
     layers: dict[str, Mapping[str, Any]]
     producers: dict[str, str]

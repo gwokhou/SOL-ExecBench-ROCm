@@ -28,7 +28,7 @@ REFACTORED_MODULES = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Metrics:
     """Repository readability metrics collected from Python ASTs."""
 

@@ -47,7 +47,7 @@ from sol_execbench.driver import ProblemPackager
 _EXECUTION_ENV_LOCK = threading.RLock()
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationPhaseContext:
     """Shared resources and output paths for evaluation phases."""
 
@@ -57,7 +57,7 @@ class EvaluationPhaseContext:
     console: Console
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationPhasesResult:
     """Successful outputs from the compile and runtime evaluation stages."""
 

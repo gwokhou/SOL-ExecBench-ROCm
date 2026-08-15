@@ -28,7 +28,7 @@ from typing import Any
 from solar.artifacts import sha256_bytes, sha256_file
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class NodeTypeHandler:
     """Handler for a specific node type.
 

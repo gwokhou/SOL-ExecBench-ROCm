@@ -67,7 +67,7 @@ def validate_declared_outputs(
             )
         metadata.update(
             {
-                str(name): TensorSignature(tuple(shape), str(dtype))
+                str(name): TensorSignature(shape=tuple(shape), dtype=str(dtype))
                 for name, shape, dtype in zip(
                     names, shapes, dtypes, strict=True
                 )

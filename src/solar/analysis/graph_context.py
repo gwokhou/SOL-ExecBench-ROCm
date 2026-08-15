@@ -28,7 +28,7 @@ def product(shape: list[DynamicValue]) -> int:
     return int(result)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AnalysisJob:
     """Inputs controlling one graph-analysis run."""
 
@@ -42,7 +42,7 @@ class AnalysisJob:
     require_orojenesis: bool
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PreparedAnalysis:
     """Validated graph inputs and resolved analysis configuration."""
 
@@ -60,7 +60,7 @@ class PreparedAnalysis:
     profile: ArchitectureProfile | None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class GraphTopology:
     """Producer, consumer, and layer classifications for an IR graph."""
 

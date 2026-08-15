@@ -38,7 +38,7 @@ class CompilePackager(Protocol):
         ...
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CompilePhaseResult:
     """Compilation outcome and optional terminal CLI result."""
 

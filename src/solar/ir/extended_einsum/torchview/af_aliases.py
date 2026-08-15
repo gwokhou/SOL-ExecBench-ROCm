@@ -111,7 +111,7 @@ _SHAPE_OP_TYPES: set[str] = {
 }
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class _Alias:
     root_tensor: str
     """Tensor name in the surviving (root) producer's output."""
@@ -162,7 +162,7 @@ def _derive_pos_mapping(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _ShapeOpCandidate:
     """Validated positional metadata for one elide-able shape operation."""
 

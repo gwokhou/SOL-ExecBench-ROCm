@@ -55,7 +55,7 @@ FORBIDDEN_DEPENDENCIES = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ModuleStats:
     """Coupling stats for one module."""
 

@@ -165,7 +165,7 @@ def _shape_product(shape: Sequence[int]) -> int:
     return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _RegionTensorMetadata:
     input_names: list[str]
     output_name: str

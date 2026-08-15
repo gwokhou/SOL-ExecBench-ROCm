@@ -29,7 +29,7 @@ from sol_execbench.core.platform.rdna4_validation import (
 )
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class StageRunContext:
     """Resolved run resources plus mutable paths produced during execution.
 
@@ -116,7 +116,7 @@ class StageRunContext:
         self.paths[stage.value] = Path(path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class StageCompletion:
     """One completed stage's produced identity and exact output inventory."""
 

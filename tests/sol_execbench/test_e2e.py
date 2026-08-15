@@ -64,7 +64,7 @@ _SAMPLES_DIR = Path(__file__).parent / "samples"
 # ---------------------------------------------------------------------------
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class Sample:
     """Parameters for one SOL ExecBench e2e test case."""
 
@@ -75,7 +75,7 @@ class Sample:
     extra_markers: list[str] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class EvilCase:
     """Parameters for one reward-hack e2e test case."""
 
@@ -114,9 +114,21 @@ _EVIL_WORKLOAD_DICTS = [
 ]
 
 _EVIL_CASES = [
-    EvilCase("evil_monkey_patch", "evil_monkey_patch", "monkey-patched"),
-    EvilCase("evil_thread_inject", "evil_thread_inject", "thread"),
-    EvilCase("evil_lazy_output", "evil_lazy_output", "_FakeTensor"),
+    EvilCase(
+        test_id="evil_monkey_patch",
+        sample="evil_monkey_patch",
+        expected_log_fragment="monkey-patched",
+    ),
+    EvilCase(
+        test_id="evil_thread_inject",
+        sample="evil_thread_inject",
+        expected_log_fragment="thread",
+    ),
+    EvilCase(
+        test_id="evil_lazy_output",
+        sample="evil_lazy_output",
+        expected_log_fragment="_FakeTensor",
+    ),
 ]
 
 _CASES = [

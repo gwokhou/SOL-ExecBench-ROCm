@@ -32,7 +32,7 @@ _MAX_EXTRACTED_BYTES = 128 * 1024 * 1024
 _LOCK_NAME = ".lock"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ISASpecDescriptor:
     """Integrity-bound identity for one resolved ISA specification."""
 

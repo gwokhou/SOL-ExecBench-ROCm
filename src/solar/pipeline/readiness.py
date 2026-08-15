@@ -36,7 +36,7 @@ READINESS_STAGES = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ConversionReadinessRequest(ConversionRequestEnvelope):
     """Inputs for the graph extraction, conversion, and replay readiness gate."""
 
@@ -46,7 +46,7 @@ class ConversionReadinessRequest(ConversionRequestEnvelope):
     require_verified_audit: bool = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReadinessArtifact:
     """One content-addressed stage artifact relative to the workload output."""
 
@@ -58,7 +58,7 @@ class ReadinessArtifact:
         return asdict(self)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReadinessStage:
     """Stable status and optional evidence for one ordered readiness stage."""
 
@@ -83,7 +83,7 @@ class ReadinessStage:
         return value
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ConversionReadinessResult:
     """Complete fail-closed result for one executable-conversion audit."""
 
@@ -188,7 +188,7 @@ def _passed_stage(stage: SolarStage, path: Path) -> ReadinessStage:
     return ReadinessStage(
         stage=stage,
         status=SolarStageStatus.PASSED,
-        artifact=ReadinessArtifact(path.name, sha256_file(path)),
+        artifact=ReadinessArtifact(path=path.name, sha256=sha256_file(path)),
     )
 
 
@@ -218,7 +218,7 @@ def _result(
     )
     completed_names = {item.stage for item in passed}
     remaining = tuple(
-        ReadinessStage(candidate, SolarStageStatus.NOT_RUN)
+        ReadinessStage(stage=candidate, status=SolarStageStatus.NOT_RUN)
         for candidate in READINESS_STAGES
         if candidate not in completed_names and candidate != stage
     )

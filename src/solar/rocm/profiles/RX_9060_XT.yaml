@@ -140,7 +140,7 @@ precision_support:
 audit_evidence:
   status: verified
   path: rocm/audits/rx9060xt_resource_peaks_v3.json
-  sha256: d7428fbdf5db2826b9be9113ef3442ad5c7bb1ea5a03494e080555e113afc1da
+  sha256: 7845b8c596b589fbc14a63d11a10e201c8d7396e5893e04f61df3bcf5a298597
   required_schema_version: solar.resource_peak_calibration.v4
   required_timing_profile: official
   required_clocks_locked: true

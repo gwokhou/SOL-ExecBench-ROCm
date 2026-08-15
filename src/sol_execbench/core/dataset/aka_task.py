@@ -14,7 +14,7 @@ from typing import Any
 import yaml
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKATask:
     """A resolved handle to an AKA task on disk."""
 
@@ -47,7 +47,7 @@ def read_task(aka_root: str | Path, task_path: str) -> AKATask:
     if not config_path.is_file():
         raise FileNotFoundError(f"AKA task config not found: {config_path}")
     config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    return AKATask(root, task_path, config)
+    return AKATask(aka_root=root, task_path=task_path, config=config)
 
 
 def functional_reference_path(task: AKATask) -> Path:

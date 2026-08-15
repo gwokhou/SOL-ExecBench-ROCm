@@ -33,7 +33,7 @@ class PathComparisonStatus(StrEnum):
     INCOMPLETE = "incomplete"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ComparisonSection:
     """One independently reviewed comparison dimension."""
 
@@ -43,7 +43,7 @@ class ComparisonSection:
     values: dict[str, object]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class WorkloadPathComparison:
     """Separated accounting dimensions for one dual-ready workload."""
 
@@ -95,7 +95,7 @@ class WorkloadPathComparison:
         return payload
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CrossPathComparisonResult:
     """Corpus-level result without favorable-path selection semantics."""
 

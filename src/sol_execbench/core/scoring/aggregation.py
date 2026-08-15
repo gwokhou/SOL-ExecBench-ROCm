@@ -15,7 +15,7 @@ OFFICIAL_AGGREGATION_POLICY = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class WorkloadScore:
     """One scored workload or a non-scoring compatibility sentinel."""
 
@@ -29,7 +29,7 @@ class WorkloadScore:
         object.__setattr__(self, "role", AKACorpusRole(self.role))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SuiteScore:
     """Equal-weight mean of per-problem workload means."""
 

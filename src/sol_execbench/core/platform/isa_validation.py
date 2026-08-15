@@ -13,7 +13,7 @@ from typing import cast
 from sol_execbench.tools.amd_isa import AMDIsa, ISADecodeError, open_isa
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ISAInstructionRequirement:
     """One exact instruction required by a declared calibration path."""
 
@@ -21,7 +21,7 @@ class ISAInstructionRequirement:
     functional_subgroup: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ISASpecProvenance:
     """Integrity and version identity for a loaded ISA specification."""
 
@@ -37,7 +37,7 @@ class ISASpecProvenance:
         return asdict(self)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ISACapabilityReport:
     """Exact requirements confirmed by one architecture specification."""
 
@@ -60,7 +60,7 @@ class ISACapabilityReport:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ISADisassemblyAnalysis:
     """Bounded structured facts decoded from an AMDGPU disassembly."""
 

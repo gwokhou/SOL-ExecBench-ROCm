@@ -96,7 +96,7 @@ from solar.ir.extended_einsum.torchview.af_model import (
 )
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class _EmissionCursor:
     """Mutable positional cursor for one layer's input tensor accesses."""
 
@@ -161,7 +161,7 @@ def _axis_projection(
     """Build and safely demote one tensor-access projection."""
     projection: dict[str, str] = {}
     for position in range(len(dims)):
-        key = AxisKey(layer_name, role, position)
+        key = AxisKey(layer=layer_name, role=role, pos=position)
         if key not in ctx.axes:
             continue
         canonical = ctx.canonical_name[key]

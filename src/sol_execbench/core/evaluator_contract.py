@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import ConfigDict, Field
 
@@ -30,11 +30,11 @@ class EvaluatorContract(CurrentSchemaModel):
     release: Literal["unreleased-v4"] = SOL_EXECBENCH_RELEASE
     capabilities: dict[str, str] = Field(default_factory=dict)
     evaluation_statuses: list[str]
-    corpus: dict[str, Any]
-    scoring: dict[str, Any]
-    boundaries: list[dict[str, Any]]
+    corpus: dict[str, object]
+    scoring: dict[str, object]
+    boundaries: list[dict[str, object]]
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
         """Return the JSON-compatible contract payload."""
         return self.model_dump(mode="json")
 
@@ -80,7 +80,7 @@ def _capabilities() -> dict[str, str]:
     }
 
 
-def _corpus_contract() -> dict[str, Any]:
+def _corpus_contract() -> dict[str, object]:
     """Return corpus identity and coverage facts in the public contract."""
     return {
         "manifest": "problems/AMD_AKA/manifest.yaml",
@@ -94,7 +94,7 @@ def _corpus_contract() -> dict[str, Any]:
     }
 
 
-def _scoring_contract() -> dict[str, Any]:
+def _scoring_contract() -> dict[str, object]:
     """Return the formula, prerequisites, and prohibited scoring behavior."""
     return {
         "formula": "1 / (1 + (T_k - T_SOL) / (T_b - T_SOL))",
@@ -120,7 +120,7 @@ def _scoring_contract() -> dict[str, Any]:
     }
 
 
-def _ownership_boundaries() -> list[dict[str, Any]]:
+def _ownership_boundaries() -> list[dict[str, object]]:
     """Return the explicit SOLAR and evaluator responsibility boundary."""
     return [
         {

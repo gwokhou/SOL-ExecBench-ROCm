@@ -204,16 +204,16 @@ def test_iteration_provider_fetches_unique_reference_per_invocation() -> None:
     cases = iter(
         [
             ReferenceTimingCase(
-                [torch.tensor([1.0])],
-                [],
-                0.0,
-                "a" * 64,
+                inputs=[torch.tensor([1.0])],
+                outputs=[],
+                reference_latency_ms=0.0,
+                input_sha256="a" * 64,
             ),
             ReferenceTimingCase(
-                [torch.tensor([3.0])],
-                [],
-                0.0,
-                "b" * 64,
+                inputs=[torch.tensor([3.0])],
+                outputs=[],
+                reference_latency_ms=0.0,
+                input_sha256="b" * 64,
             ),
         ],
     )
@@ -244,10 +244,10 @@ def test_iteration_provider_fetches_unique_reference_per_invocation() -> None:
 def test_iteration_provider_rejects_repeated_input_content() -> None:
     request, _ = _request()
     case = ReferenceTimingCase(
-        [torch.tensor([1.0])],
-        [],
-        0.0,
-        "a" * 64,
+        inputs=[torch.tensor([1.0])],
+        outputs=[],
+        reference_latency_ms=0.0,
+        input_sha256="a" * 64,
     )
     request.dependencies.reference_client = SimpleNamespace(
         timing_iteration_case=lambda **_kwargs: case,

@@ -26,7 +26,7 @@ _DIAGNOSTIC_TAIL_LIMIT = 8192
 console = Console(stderr=True)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class NoTraceDiagnostics:
     """Bounded subprocess diagnostics for one execution without traces."""
 

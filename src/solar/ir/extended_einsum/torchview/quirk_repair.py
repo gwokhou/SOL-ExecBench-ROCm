@@ -17,7 +17,7 @@ type OrphanKey = tuple[Shape, str]
 type HiddenCandidate = tuple[str, str, str]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class _RepairState:
     """Mutable evidence shared by the ordered repair passes."""
 

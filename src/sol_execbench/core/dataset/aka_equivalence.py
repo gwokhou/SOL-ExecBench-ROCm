@@ -57,7 +57,7 @@ def _positional_oracle(
     return oracle
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKAEquivalenceReport:
     """Result for one authored problem."""
 
@@ -507,12 +507,12 @@ def check_problem_equivalence(
     definition, workloads = load_problem(problem_dir)
     if entry.role is AKACorpusRole.TARGET_INCOMPATIBLE:
         return AKAEquivalenceReport(
-            entry.problem_name,
-            True,
-            CrosscheckStatus.NOT_APPLICABLE,
-            0,
-            0,
-            "execution excluded by the manifest's target-incompatible role",
+            problem_name=entry.problem_name,
+            passed=True,
+            crosscheck=CrosscheckStatus.NOT_APPLICABLE,
+            workloads_checked=0,
+            outputs_checked=0,
+            detail="execution excluded by the manifest's target-incompatible role",
         )
     selected = workloads if max_workloads is None else workloads[:max_workloads]
     if not selected:
@@ -528,12 +528,12 @@ def check_problem_equivalence(
         )
     except Exception as exc:  # noqa: BLE001 -- convert to a complete corpus report
         return AKAEquivalenceReport(
-            entry.problem_name,
-            False,
-            CrosscheckStatus.FAILED,
-            0,
-            0,
-            str(exc),
+            problem_name=entry.problem_name,
+            passed=False,
+            crosscheck=CrosscheckStatus.FAILED,
+            workloads_checked=0,
+            outputs_checked=0,
+            detail=str(exc),
         )
 
 
@@ -584,12 +584,12 @@ def _check_executable_problem(
         else CrosscheckStatus.NOT_APPLICABLE
     )
     return AKAEquivalenceReport(
-        entry.problem_name,
-        True,
-        crosscheck,
-        len(workloads),
-        output_count,
-        "all declared workloads and outputs satisfy the authored/AKA contract",
+        problem_name=entry.problem_name,
+        passed=True,
+        crosscheck=crosscheck,
+        workloads_checked=len(workloads),
+        outputs_checked=output_count,
+        detail="all declared workloads and outputs satisfy the authored/AKA contract",
     )
 
 

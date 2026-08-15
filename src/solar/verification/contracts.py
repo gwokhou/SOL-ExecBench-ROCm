@@ -23,7 +23,7 @@ LayerExecutor = Callable[
 ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class IRVerificationBackend:
     """Verification runtime paired with its representation backend."""
 
@@ -31,7 +31,7 @@ class IRVerificationBackend:
     execute: LayerExecutor
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TolerancePolicy:
     """Numerical acceptance policy for graph verification."""
 
@@ -54,7 +54,7 @@ class TolerancePolicy:
             raise ValueError("required_matched_ratio cannot exceed one")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class VerificationPolicy(TolerancePolicy):
     """Case generation and execution policy for graph verification."""
 
@@ -69,7 +69,7 @@ class VerificationPolicy(TolerancePolicy):
 
     def __post_init__(self) -> None:
         """Validate tolerances and structured-input protection indices."""
-        super().__post_init__()
+        TolerancePolicy.__post_init__(self)
         indices = tuple(int(index) for index in self.preserved_input_indices)
         if any(index < 0 for index in indices) or len(indices) != len(
             set(indices)

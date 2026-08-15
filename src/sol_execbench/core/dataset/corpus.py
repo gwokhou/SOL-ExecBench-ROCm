@@ -57,7 +57,7 @@ from sol_execbench.core.platform.memory_quota import GPUMemoryQuotaEvidence
 TARGET_VIEW_MANIFEST_FILENAME = "target-view-manifest.yaml"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _GenerationContext:
     capacity_bytes: int
     capacity_id: str | None
@@ -66,7 +66,7 @@ class _GenerationContext:
     cohort_id: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _GenerationState:
     results: dict[str, GeneratedRuleResult]
     decisions: tuple[GenerationDecision, ...]
@@ -74,7 +74,7 @@ class _GenerationState:
     complete: bool
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _ViewRequest:
     manifest_path: Path
     manifest: CorpusManifest

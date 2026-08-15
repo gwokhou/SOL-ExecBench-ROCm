@@ -10,7 +10,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from functools import cached_property
+from functools import cache
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -68,24 +69,38 @@ CONTRACTION_KIND = "einsum"
 OPERATION_KIND = "operation"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class IRGraphArtifact:
     """One validated IR graph produced from a traced operator artifact."""
 
     path: Path
     kind: IRKind = DEFAULT_IR_KIND
 
-    @cached_property
+    @property
     def document(self) -> ArtifactDocument:
         """Load, cache, and verify the typed IR graph document."""
-        document = load_yaml_artifact(self.path)
-        observed = normalize_ir_kind(document.require_str("ir_kind"))
-        if observed is not self.kind:
-            raise ValueError(
-                f"IR artifact kind {observed.value!r} does not match "
-                f"{self.kind.value!r}",
-            )
-        return document
+        return _load_ir_document(
+            self.path,
+            self.kind,
+            sha256(self.path.read_bytes()).digest(),
+        )
+
+
+@cache
+def _load_ir_document(
+    path: Path,
+    kind: IRKind,
+    _content_sha256: bytes,
+) -> ArtifactDocument:
+    """Load one immutable IR document using every behavior input as a key."""
+    document = load_yaml_artifact(path)
+    observed = normalize_ir_kind(document.require_str("ir_kind"))
+    if observed is not kind:
+        raise ValueError(
+            f"IR artifact kind {observed.value!r} does not match "
+            f"{kind.value!r}",
+        )
+    return document
 
 
 class IRConversionRequest(Protocol):
@@ -122,7 +137,7 @@ class IRConversionRequest(Protocol):
     def trace_seed(self) -> int: ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class IRBackend:
     """Representation and conversion interface for one SOLAR IR dialect."""
 
@@ -192,7 +207,7 @@ def operation_attributes(
     return value if isinstance(value, Mapping) else {}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LayerContractionAnalysis:
     """Contraction analysis facts carried consistently by every IR layer.
 

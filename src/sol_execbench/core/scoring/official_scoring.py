@@ -26,7 +26,7 @@ from sol_execbench.core.solar_bridge.formal_device import (
 )
 
 OFFICIAL_CORPUS_MANIFEST_SHA256 = (
-    "8f057f7890016239456e137e639e4538df22733ecf49721a919f8f6877acc857"
+    "65589033720555a29b25d42a0e4ca3069dad6cf6db5f910578bd0c8aa87ce38e"
 )
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 _PUBLISHED_RELEASE_BUNDLE = _REPOSITORY_ROOT / "RELEASE" / "release-bundle.json"

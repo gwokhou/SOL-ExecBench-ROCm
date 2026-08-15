@@ -51,7 +51,7 @@ _COMPILE_ENVIRONMENT_NAMES = (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class NativeCompileCache:
     """One exact cache lookup bound to immutable build inputs."""
 

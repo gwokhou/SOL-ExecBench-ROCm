@@ -101,7 +101,7 @@ def readiness_stage_artifacts(
 READINESS_STAGES = tuple(readiness_stage_artifacts(DEFAULT_IR_PATH))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _SolarWorkerRequestBase:
     """Common process-boundary contract for isolated SOLAR requests."""
 
@@ -140,7 +140,7 @@ class _SolarWorkerRequestBase:
         return asdict(self)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarWorkerRequest(_SolarWorkerRequestBase):
     """Serializable request for one isolated SOLAR analysis."""
 
@@ -154,7 +154,7 @@ class SolarWorkerRequest(_SolarWorkerRequestBase):
 
     def __post_init__(self) -> None:
         """Validate the analysis-specific execution controls."""
-        super().__post_init__()
+        _SolarWorkerRequestBase.__post_init__(self)
         if self.device_stage_lock_timeout_seconds <= 0:
             raise ValueError("device stage lock timeout must be positive")
 
@@ -179,7 +179,7 @@ class SolarWorkerRequest(_SolarWorkerRequestBase):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarStageAuditRequest(_SolarWorkerRequestBase):
     """One corpus workload request for the isolated three-stage audit."""
 
@@ -194,7 +194,7 @@ class SolarStageAuditRequest(_SolarWorkerRequestBase):
         return cls(**cls._common_arguments(value))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarAnalysisOutcome:
     """Serializable success or failure from an isolated SOLAR analysis."""
 
@@ -276,7 +276,7 @@ class SolarAnalysisOutcome:
         return valid_formal_artifact_paths(paths, self.ir_path)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarStageAuditOutcome:
     """Outer-package copy of one benchmark-agnostic readiness result."""
 

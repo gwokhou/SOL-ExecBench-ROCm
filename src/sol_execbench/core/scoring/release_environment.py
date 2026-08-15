@@ -36,7 +36,7 @@ _RELEASE_SOURCE_PATHS = (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReleaseExecutionIdentity:
     """Committed source and immutable container used by one release run."""
 
@@ -115,7 +115,9 @@ def _validated_identity(
         raise ValueError(
             f"{CONTAINER_IMAGE_ID_ENV} must be an immutable sha256 image ID",
         )
-    return ReleaseExecutionIdentity(source_revision, container_image_id)
+    return ReleaseExecutionIdentity(
+        source_revision=source_revision, container_image_id=container_image_id
+    )
 
 
 __all__ = [

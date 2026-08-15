@@ -26,7 +26,7 @@ from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.platform.runtime import CacheClearPolicy
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReferenceTimingResult:
     """Result of timing the reference implementation for one workload."""
 
@@ -34,7 +34,7 @@ class ReferenceTimingResult:
     failure: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TimingResult:
     """Result of timing a callable for one workload."""
 

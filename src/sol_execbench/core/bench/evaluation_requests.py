@@ -17,7 +17,7 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import Workload
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationDependencies:
     """Injected functions and process state used by the evaluation loop."""
 
@@ -30,7 +30,7 @@ class EvaluationDependencies:
     timing_recorder: Callable[[dict[str, object]], None] | None = None
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class WorkloadEvaluationRequest:
     """Data configuration for evaluating a homogeneous workload collection."""
 

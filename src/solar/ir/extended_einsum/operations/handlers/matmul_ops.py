@@ -81,9 +81,9 @@ class MatmulHandler(EinsumOpHandler):
             *(["N"] if other_rank > 1 else []),
         ]
         operands = [
-            EinsumOperand("Input", input_dims, is_output=False),
-            EinsumOperand("Weight", other_dims, is_output=False),
-            EinsumOperand("Output", output_dims, is_output=True),
+            EinsumOperand(name="Input", dims=input_dims, is_output=False),
+            EinsumOperand(name="Weight", dims=other_dims, is_output=False),
+            EinsumOperand(name="Output", dims=output_dims, is_output=True),
         ]
         return EinsumOp(
             operands=operands,
@@ -146,9 +146,9 @@ class LinearHandler(EinsumOpHandler):
         output_dims = batch_letters + ["N"]
 
         operands = [
-            EinsumOperand("Input", input_dims, is_output=False),
-            EinsumOperand("Weight", weight_dims, is_output=False),
-            EinsumOperand("Output", output_dims, is_output=True),
+            EinsumOperand(name="Input", dims=input_dims, is_output=False),
+            EinsumOperand(name="Weight", dims=weight_dims, is_output=False),
+            EinsumOperand(name="Output", dims=output_dims, is_output=True),
         ]
 
         input_str = "".join(input_dims)
@@ -197,9 +197,9 @@ class BmmHandler(EinsumOpHandler):
         bmm: [B, M, K] x [B, K, N] -> [B, M, N]
         """
         operands = [
-            EinsumOperand("Input", ["B", "M", "K"], is_output=False),
-            EinsumOperand("Weight", ["B", "K", "N"], is_output=False),
-            EinsumOperand("Output", ["B", "M", "N"], is_output=True),
+            EinsumOperand(name="Input", dims=["B", "M", "K"], is_output=False),
+            EinsumOperand(name="Weight", dims=["B", "K", "N"], is_output=False),
+            EinsumOperand(name="Output", dims=["B", "M", "N"], is_output=True),
         ]
 
         equation = "BMK,BKN->BMN"

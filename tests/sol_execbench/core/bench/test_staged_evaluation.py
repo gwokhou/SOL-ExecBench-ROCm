@@ -164,7 +164,9 @@ def test_correctness_rounds_classify_protocol_failure() -> None:
 def test_correctness_rounds_classify_user_exception(monkeypatch) -> None:
     tensor = torch.ones(2)
     request = _request(
-        ReferenceClientStub(correctness=ReferenceCase([tensor], [tensor])),
+        ReferenceClientStub(
+            correctness=ReferenceCase(inputs=[tensor], outputs=[tensor])
+        ),
     )
     recording, emitter = _emitter()
 
@@ -200,7 +202,7 @@ def test_correctness_rounds_reject_bad_candidate_outputs(
     reference = torch.zeros(2)
     request = _request(
         ReferenceClientStub(
-            correctness=ReferenceCase([reference], [reference]),
+            correctness=ReferenceCase(inputs=[reference], outputs=[reference]),
         ),
     )
     recording, emitter = _emitter()
@@ -223,7 +225,9 @@ def test_correctness_rounds_reject_bad_candidate_outputs(
 
 def test_correctness_rounds_execute_all_ten_cases(monkeypatch) -> None:
     tensor = torch.ones(2)
-    client = ReferenceClientStub(correctness=ReferenceCase([tensor], [tensor]))
+    client = ReferenceClientStub(
+        correctness=ReferenceCase(inputs=[tensor], outputs=[tensor])
+    )
     request = _request(client)
     recording, emitter = _emitter()
     monkeypatch.setattr(
@@ -248,7 +252,9 @@ def test_framework_thread_warmup_precedes_first_candidate_call(
     monkeypatch,
 ) -> None:
     tensor = torch.ones(2)
-    client = ReferenceClientStub(correctness=ReferenceCase([tensor], [tensor]))
+    client = ReferenceClientStub(
+        correctness=ReferenceCase(inputs=[tensor], outputs=[tensor])
+    )
     request = _request(client)
     _recording, emitter = _emitter()
     candidate_calls = 0
@@ -358,7 +364,12 @@ def test_measure_and_emit_classifies_timing_errors(
         request.workloads[0],
         0,
         {},
-        ReferenceTimingCase([tensor], [tensor], 2.0, "a" * 64),
+        ReferenceTimingCase(
+            inputs=[tensor],
+            outputs=[tensor],
+            reference_latency_ms=2.0,
+            input_sha256="a" * 64,
+        ),
         Correctness(),
     )
 
@@ -373,10 +384,10 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
         eval_workload_execution,
         "measure_solution_latency",
         lambda **kwargs: SolutionTimingResult(
-            1.25,
-            (4,),
-            ((1.25, 1.25, 1.25, 1.25),),
-            CacheClearPolicy(
+            latency_ms=1.25,
+            timed_iterations_per_trial=(4,),
+            trial_samples_ms=((1.25, 1.25, 1.25, 1.25),),
+            cache_clear_policy=CacheClearPolicy(
                 detected_l2_bytes=4 * 1024**2,
                 clear_buffer_bytes=8 * 1024**2,
                 source="torch_device_properties",
@@ -401,11 +412,11 @@ def test_measure_and_emit_records_validated_timing(monkeypatch) -> None:
         0,
         {},
         ReferenceTimingCase(
-            [tensor],
-            [tensor],
-            2.0,
-            "a" * 64,
-            "reference diagnostic",
+            inputs=[tensor],
+            outputs=[tensor],
+            reference_latency_ms=2.0,
+            input_sha256="a" * 64,
+            timing_failure="reference diagnostic",
         ),
         Correctness(),
     )

@@ -9,7 +9,7 @@ from solar.ir.extended_einsum.operations.analyzer import EinsumAnalyzer
 from solar.types import TensorShapes
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class OperationCase:
     name: str
     inputs: list[list[int]]
@@ -19,107 +19,132 @@ class OperationCase:
 
 
 MATMUL_CASES = (
-    OperationCase("matmul", [[8], [8]], "K,K->"),
-    OperationCase("matmul", [[8], [8, 4]], "K,KN->N"),
-    OperationCase("matmul", [[3, 8], [8]], "MK,K->M"),
-    OperationCase("matmul", [[8], [2, 3, 8, 4]], "K,B0B1KN->B0B1N"),
-    OperationCase("matmul", [[3, 8], [8, 4]], "MK,KN->MN"),
-    OperationCase("matmul", [[2, 3, 8], [8, 4]], "B0MK,KN->B0MN"),
-    OperationCase("matmul", [[3, 8], [2, 8, 4]], "MK,B0KN->B0MN"),
+    OperationCase(name="matmul", inputs=[[8], [8]], equation="K,K->"),
+    OperationCase(name="matmul", inputs=[[8], [8, 4]], equation="K,KN->N"),
+    OperationCase(name="matmul", inputs=[[3, 8], [8]], equation="MK,K->M"),
     OperationCase(
-        "matmul",
-        [[5, 3, 8], [2, 5, 8, 4]],
-        "B1MK,B0B1KN->B0B1MN",
+        name="matmul", inputs=[[8], [2, 3, 8, 4]], equation="K,B0B1KN->B0B1N"
     ),
-    OperationCase("linear", [[2, 3, 8]], "B0B1K,NK->B0B1N"),
-    OperationCase("bmm", [[2, 3, 8], [2, 8, 4]], "BMK,BKN->BMN"),
+    OperationCase(name="matmul", inputs=[[3, 8], [8, 4]], equation="MK,KN->MN"),
+    OperationCase(
+        name="matmul", inputs=[[2, 3, 8], [8, 4]], equation="B0MK,KN->B0MN"
+    ),
+    OperationCase(
+        name="matmul", inputs=[[3, 8], [2, 8, 4]], equation="MK,B0KN->B0MN"
+    ),
+    OperationCase(
+        name="matmul",
+        inputs=[[5, 3, 8], [2, 5, 8, 4]],
+        equation="B1MK,B0B1KN->B0B1MN",
+    ),
+    OperationCase(
+        name="linear", inputs=[[2, 3, 8]], equation="B0B1K,NK->B0B1N"
+    ),
+    OperationCase(
+        name="bmm", inputs=[[2, 3, 8], [2, 8, 4]], equation="BMK,BKN->BMN"
+    ),
 )
 
 
 CONV_CASES = (
-    OperationCase("conv1d", [[2, 4, 16], [8, 4, 3]], "BC(P+R),OCR->BOP"),
     OperationCase(
-        "conv1d",
-        [[2, 4, 16], [4, 1, 3]],
-        "BO(P+R),OCR->BOP",
+        name="conv1d",
+        inputs=[[2, 4, 16], [8, 4, 3]],
+        equation="BC(P+R),OCR->BOP",
+    ),
+    OperationCase(
+        name="conv1d",
+        inputs=[[2, 4, 16], [4, 1, 3]],
+        equation="BO(P+R),OCR->BOP",
         kwargs={
             "module_args": {"groups": 4, "in_channels": 4, "out_channels": 4},
         },
     ),
     OperationCase(
-        "conv1d",
-        [[2, 4, 16], [8, 2, 3]],
-        "BGI(P+R),GOIR->BGOP",
+        name="conv1d",
+        inputs=[[2, 4, 16], [8, 2, 3]],
+        equation="BGI(P+R),GOIR->BGOP",
         kwargs={
             "module_args": {"groups": 2, "in_channels": 4, "out_channels": 8},
         },
     ),
     OperationCase(
-        "conv2d",
-        [[2, 4, 16, 16], [4, 1, 3, 3]],
-        "BO(P+R)(Q+S),OCRS->BOPQ",
+        name="conv2d",
+        inputs=[[2, 4, 16, 16], [4, 1, 3, 3]],
+        equation="BO(P+R)(Q+S),OCRS->BOPQ",
         kwargs={
             "module_args": {"groups": 4, "in_channels": 4, "out_channels": 4},
         },
     ),
     OperationCase(
-        "conv2d",
-        [[2, 4, 16, 16], [8, 2, 3, 3]],
-        "BGI(P+R)(Q+S),GOIRS->BGOPQ",
+        name="conv2d",
+        inputs=[[2, 4, 16, 16], [8, 2, 3, 3]],
+        equation="BGI(P+R)(Q+S),GOIRS->BGOPQ",
         kwargs={
             "module_args": {"groups": 2, "in_channels": 4, "out_channels": 8},
         },
     ),
     OperationCase(
-        "conv3d",
-        [[2, 4, 8, 10, 12], [6, 4, 3, 3, 3]],
-        "BC(P+T)(Q+R)(U+S),OCTRS->BOPQU",
+        name="conv3d",
+        inputs=[[2, 4, 8, 10, 12], [6, 4, 3, 3, 3]],
+        equation="BC(P+T)(Q+R)(U+S),OCTRS->BOPQU",
         kwargs={"stride": (2, 1, 1), "padding": (1, 0, 0)},
     ),
-    OperationCase("convtranspose1d", [[2, 4, 8]], "BCP,CKR->BK(P+R)"),
     OperationCase(
-        "convtranspose2d",
-        [[2, 4, 8, 8], [4, 6, 3, 3]],
-        "BCPQ,CKRS->BK(P+R)(Q+S)",
+        name="convtranspose1d", inputs=[[2, 4, 8]], equation="BCP,CKR->BK(P+R)"
     ),
     OperationCase(
-        "convtranspose3d",
-        [[2, 4, 5, 6, 7]],
-        "BCPQU,CKTRS->BK(P+T)(Q+R)(U+S)",
+        name="convtranspose2d",
+        inputs=[[2, 4, 8, 8], [4, 6, 3, 3]],
+        equation="BCPQ,CKRS->BK(P+R)(Q+S)",
+    ),
+    OperationCase(
+        name="convtranspose3d",
+        inputs=[[2, 4, 5, 6, 7]],
+        equation="BCPQU,CKTRS->BK(P+T)(Q+R)(U+S)",
     ),
 )
 
 
 MISC_CASES = (
-    OperationCase("embedding", [[2, 3, 4], [100, 16]], "ABC,VD->ABCD"),
-    OperationCase("gru", [], "SBI,GI,GH,BH->SBH"),
     OperationCase(
-        "gru",
-        [[5, 2, 8], [1, 2, 4], [12, 8], [12, 4]],
-        "SBI,GI,GH,BH->SBH",
+        name="embedding", inputs=[[2, 3, 4], [100, 16]], equation="ABC,VD->ABCD"
     ),
-    OperationCase("lstm", [[5, 2, 8]], "SBI,GI,GH,BH,BH->SBH"),
+    OperationCase(name="gru", inputs=[], equation="SBI,GI,GH,BH->SBH"),
     OperationCase(
-        "lstm",
-        [[5, 2, 8], [1, 2, 4], [1, 2, 4], [16, 8], [16, 4]],
-        "SBI,GI,GH,BH,BH->SBH",
+        name="gru",
+        inputs=[[5, 2, 8], [1, 2, 4], [12, 8], [12, 4]],
+        equation="SBI,GI,GH,BH->SBH",
     ),
-    OperationCase("rnn", [], "SBI,HI,HH,BH->SBH"),
-    OperationCase("cross_entropy", [[4, 10]], "AB,A->"),
     OperationCase(
-        "cross_entropy",
-        [[4, 10], [4]],
-        "AB,A->A",
+        name="lstm", inputs=[[5, 2, 8]], equation="SBI,GI,GH,BH,BH->SBH"
+    ),
+    OperationCase(
+        name="lstm",
+        inputs=[[5, 2, 8], [1, 2, 4], [1, 2, 4], [16, 8], [16, 4]],
+        equation="SBI,GI,GH,BH,BH->SBH",
+    ),
+    OperationCase(name="rnn", inputs=[], equation="SBI,HI,HH,BH->SBH"),
+    OperationCase(name="cross_entropy", inputs=[[4, 10]], equation="AB,A->"),
+    OperationCase(
+        name="cross_entropy",
+        inputs=[[4, 10], [4]],
+        equation="AB,A->A",
         kwargs={"reduction": "none"},
     ),
-    OperationCase("mse_loss", [[2, 3], [2, 3]], "AB,AB->", outputs=[[]]),
     OperationCase(
-        "smooth_l1_loss",
-        [[2, 3], [2, 3]],
-        "AB,AB->AB",
+        name="mse_loss",
+        inputs=[[2, 3], [2, 3]],
+        equation="AB,AB->",
+        outputs=[[]],
+    ),
+    OperationCase(
+        name="smooth_l1_loss",
+        inputs=[[2, 3], [2, 3]],
+        equation="AB,AB->AB",
         outputs=[[2, 3]],
     ),
-    OperationCase("clone", [[2, 3, 4]], "ABC->ABC"),
+    OperationCase(name="clone", inputs=[[2, 3, 4]], equation="ABC->ABC"),
 )
 
 

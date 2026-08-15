@@ -129,13 +129,18 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         root = Path(output_dir)
         operator = root / "operator_graph.yaml"
         operator.write_text("layers: {}\n")
-        return OperatorGraphArtifact(operator, (), (), ())
+        return OperatorGraphArtifact(
+            path=operator,
+            source_inputs=(),
+            used_source_indices=(),
+            reference_outputs=(),
+        )
 
     def convert(operator, *, output_dir, ir_kind=None):
         del operator, ir_kind
         einsum = Path(output_dir) / "einsum_graph.yaml"
         einsum.write_text("layers: {}\n")
-        return IRGraphArtifact(einsum, IRKind.ATEN)
+        return IRGraphArtifact(path=einsum, kind=IRKind.ATEN)
 
     def verify(**kwargs):
         Path(kwargs["output_path"]).write_text("predicate: passed\n")
@@ -276,7 +281,12 @@ def test_conversion_failure_has_its_own_stable_stage(tmp_path, monkeypatch):
         del reference, inputs, device, name, extraction_kind
         operator = Path(output_dir) / "operator_graph.yaml"
         operator.write_text("layers: {}\n")
-        return OperatorGraphArtifact(operator, (), (), ())
+        return OperatorGraphArtifact(
+            path=operator,
+            source_inputs=(),
+            used_source_indices=(),
+            reference_outputs=(),
+        )
 
     monkeypatch.setattr(
         analysis_pipeline,
@@ -648,7 +658,7 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
         _request(tmp_path / "result"),
         cast(Any, _Profile()),
         tmp_path,
-        IRGraphArtifact(graph_path, IRKind.ATEN),
+        IRGraphArtifact(path=graph_path, kind=IRKind.ATEN),
     )
 
     assert result == {"schema_version": 4}

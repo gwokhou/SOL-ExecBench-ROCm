@@ -128,8 +128,10 @@ def formal_producer_readiness() -> FormalProducerReadiness:
     from solar.analysis.orojenesis import OROJENESIS_TRUSTED_MAPPER_SHA256
 
     if not OROJENESIS_TRUSTED_MAPPER_SHA256:
-        return FormalProducerReadiness(False, "formal_mapper_not_allowlisted")
-    return FormalProducerReadiness(True, "ready")
+        return FormalProducerReadiness(
+            ready=False, reason_code="formal_mapper_not_allowlisted"
+        )
+    return FormalProducerReadiness(ready=True, reason_code="ready")
 
 
 def architecture_profile_sha256(
@@ -163,7 +165,11 @@ def _extract_bound(
     elif kind not in SOL_BOUND_KINDS:
         raise ValueError(f"analysis returned unsupported bound kind {kind!r}")
     resource = total.get("compute_resource")
-    return SOLBound(float(seconds), kind, str(resource) if resource else None)
+    return SOLBound(
+        seconds=float(seconds),
+        kind=kind,
+        limiting_resource=str(resource) if resource else None,
+    )
 
 
 def _finish_artifacts(
@@ -191,7 +197,9 @@ def _finish_artifacts(
     if missing:
         raise ValueError(f"analysis is missing required artifacts: {missing}")
     return tuple(
-        ArtifactRef(path.relative_to(staging).as_posix(), sha256_file(path))
+        ArtifactRef(
+            path=path.relative_to(staging).as_posix(), sha256=sha256_file(path)
+        )
         for path in paths
     )
 

@@ -69,7 +69,7 @@ def _tensor_signature(value: DynamicValue) -> TensorSignature:
         raise RuntimeError(
             "SOLAR operator graphs require tensor reference inputs and outputs"
         )
-    return TensorSignature(tuple(value.shape), str(value.dtype))
+    return TensorSignature(shape=tuple(value.shape), dtype=str(value.dtype))
 
 
 def _record_source_input_indices(

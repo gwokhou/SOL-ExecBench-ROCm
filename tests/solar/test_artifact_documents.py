@@ -26,7 +26,12 @@ def test_operator_artifact_loads_once_and_exposes_typed_provenance(
         ),
         encoding="utf-8",
     )
-    artifact = OperatorGraphArtifact(path, (), (), ())
+    artifact = OperatorGraphArtifact(
+        path=path,
+        source_inputs=(),
+        used_source_indices=(),
+        reference_outputs=(),
+    )
 
     assert artifact.extraction_kind is ExtractionKind.MAKE_FX_REFERENCE
     assert artifact.document is artifact.document
@@ -37,7 +42,7 @@ def test_ir_artifact_rejects_a_mismatched_discriminator(
 ) -> None:
     path = tmp_path / "graph.yaml"
     path.write_text("ir_kind: aten\n", encoding="utf-8")
-    artifact = IRGraphArtifact(path, IRKind.EXTENDED_EINSUM)
+    artifact = IRGraphArtifact(path=path, kind=IRKind.EXTENDED_EINSUM)
 
     with pytest.raises(ValueError, match="does not match"):
         _ = artifact.document

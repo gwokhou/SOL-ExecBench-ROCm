@@ -116,7 +116,7 @@ PROFILE_OUTPUT_DIR_NAMES = {
 }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3ProfileArtifact:
     """One profiler artifact registered from a `rocprofv3` output directory."""
 
@@ -151,7 +151,7 @@ class Rocprofv3ProfileRequest:
     timeout_seconds: int | None = None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3ProfileResult:
     """Result metadata for optional `rocprofv3` artifact collection."""
 
@@ -271,7 +271,7 @@ class Rocprofv3ProfileResult:
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3TimingRow:
     """One normalized timing row parsed from `rocprofv3` CSV output."""
 
@@ -303,7 +303,7 @@ class Rocprofv3TimingRow:
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3TimingEvidence:
     """Derived profiler timing evidence for one profiled command."""
 
@@ -363,7 +363,7 @@ class Rocprofv3TimingEvidence:
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DefaultTimingSelection:
     """Policy-aware decision for profiler-backed timing or fallback."""
 
@@ -460,7 +460,7 @@ class SourceTimingRequest(Rocprofv3ExecutionRequest):
         )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rocprofv3CollectionResult:
     """Result of live profiler collection or explicit fallback routing."""
 

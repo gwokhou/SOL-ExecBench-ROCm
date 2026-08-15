@@ -11,7 +11,7 @@
   },
   "corpus_manifest": {
     "path": "corpus/manifest.yaml",
-    "sha256": "8f057f7890016239456e137e639e4538df22733ecf49721a919f8f6877acc857",
+    "sha256": "65589033720555a29b25d42a0e4ca3069dad6cf6db5f910578bd0c8aa87ce38e",
     "size_bytes": 60729
   },
   "schema_version": "sol_execbench.release_bundle.v2",

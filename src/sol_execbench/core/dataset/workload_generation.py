@@ -46,7 +46,7 @@ MAX_COMMON_SCALE = 1 << 20
 WORKLOAD_NAMESPACE = uuid.UUID("d8218ae1-b9c5-54bc-9e4b-7d10a7ac0b4d")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class GeneratedRuleResult:
     """Concrete workloads generated atomically from one distribution rule."""
 

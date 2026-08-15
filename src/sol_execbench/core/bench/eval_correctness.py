@@ -35,7 +35,7 @@ from sol_execbench.core.data.trace import Correctness, EvaluationStatus
 from sol_execbench.core.data.workload import Workload
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class CorrectnessRoundsResult:
     """Outcome and retained inputs from correctness rounds."""
 
@@ -50,7 +50,7 @@ def set_evaluation_seed(seed: int) -> None:
 
 
 def _prepare_framework_thread_baseline(
-    user_fn: Callable[..., Any],
+    user_fn: Callable[..., object],
     device: str,
 ) -> None:
     """Prime trusted compiler state before sampling candidate threads."""
@@ -67,7 +67,7 @@ def emit_reward_hack_if_detected(
     *,
     emitter: WorkloadTraceEmitter,
     workload: Workload,
-    check_fn: Callable[..., Any],
+    check_fn: Callable[..., object],
     args: tuple[Any, ...] = (),
     suppress_errors: bool = False,
 ) -> bool:
@@ -111,27 +111,21 @@ def run_correctness_rounds(
             emitter,
         )
         if case is None:
-            return CorrectnessRoundsResult(True, inputs, correctness)
-        inputs = case.inputs
-        ref_outputs = case.outputs
-        try:
-            user_outputs = call_and_collect_outputs(
-                dependencies.user_fn,
-                inputs,
-                destination_passing_style=request.destination_passing_style,
-                definition=definition,
-                resolved_axes=resolved_axes,
-                device=request.device,
-                output_names=request.output_names,
-                output_dtypes=request.output_dtypes_torch,
+            return CorrectnessRoundsResult(
+                failed=True, inputs=inputs, correctness=correctness
             )
-        except Exception as exc:  # noqa: BLE001 -- candidate execution boundary
-            emitter.emit_status(
-                workload,
-                EvaluationStatus.RUNTIME_ERROR,
-                extra_msg=_candidate_failure_message(exc),
+        inputs, ref_outputs = case.inputs, case.outputs
+        user_outputs = _candidate_outputs(
+            request=request,
+            workload=workload,
+            emitter=emitter,
+            inputs=inputs,
+            resolved_axes=resolved_axes,
+        )
+        if user_outputs is None:
+            return CorrectnessRoundsResult(
+                failed=True, inputs=inputs, correctness=correctness
             )
-            return CorrectnessRoundsResult(True, inputs, correctness)
         if emit_reward_hack_if_detected(
             emitter=emitter,
             workload=workload,
@@ -141,15 +135,18 @@ def run_correctness_rounds(
                 dependencies.driver_globals,
             ),
         ):
-            return CorrectnessRoundsResult(True, inputs, correctness)
-
+            return CorrectnessRoundsResult(
+                failed=True, inputs=inputs, correctness=correctness
+            )
         if round_index == 0 and _first_round_failed(
             emitter,
             workload,
             ref_outputs,
             user_outputs,
         ):
-            return CorrectnessRoundsResult(True, inputs, correctness)
+            return CorrectnessRoundsResult(
+                failed=True, inputs=inputs, correctness=correctness
+            )
         correctness, numerically_wrong = _compare_outputs(
             definition,
             inputs,
@@ -165,9 +162,41 @@ def run_correctness_rounds(
                 EvaluationStatus.INCORRECT_NUMERICAL,
                 correctness=correctness,
             )
-            return CorrectnessRoundsResult(True, inputs, correctness)
+            return CorrectnessRoundsResult(
+                failed=True, inputs=inputs, correctness=correctness
+            )
+    return CorrectnessRoundsResult(
+        failed=False, inputs=inputs, correctness=correctness
+    )
 
-    return CorrectnessRoundsResult(False, inputs, correctness)
+
+def _candidate_outputs(
+    *,
+    request: WorkloadEvaluationRequest,
+    workload: Workload,
+    emitter: WorkloadTraceEmitter,
+    inputs: list[Any],
+    resolved_axes: dict[str, int],
+) -> list[Any] | None:
+    """Execute one untrusted candidate call and emit bounded failure details."""
+    try:
+        return call_and_collect_outputs(
+            request.dependencies.user_fn,
+            inputs,
+            destination_passing_style=request.destination_passing_style,
+            definition=request.definition,
+            resolved_axes=resolved_axes,
+            device=request.device,
+            output_names=request.output_names,
+            output_dtypes=request.output_dtypes_torch,
+        )
+    except Exception as exc:  # noqa: BLE001 -- candidate execution boundary
+        emitter.emit_status(
+            workload,
+            EvaluationStatus.RUNTIME_ERROR,
+            extra_msg=_candidate_failure_message(exc),
+        )
+        return None
 
 
 def _candidate_failure_message(exc: Exception) -> str:

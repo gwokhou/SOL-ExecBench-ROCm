@@ -57,7 +57,9 @@ def _open(*_: object, **__: object) -> _Isa:
 
 
 def test_requirement_inspection_records_integrity_provenance() -> None:
-    requirement = ISAInstructionRequirement("V_WMMA_F32_16X16X16_BF16", "WMMA")
+    requirement = ISAInstructionRequirement(
+        instruction="V_WMMA_F32_16X16X16_BF16", functional_subgroup="WMMA"
+    )
 
     report = inspect_isa_requirements("gfx1200", [requirement], opener=_open)
 

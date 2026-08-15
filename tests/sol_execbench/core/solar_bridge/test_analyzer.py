@@ -30,7 +30,7 @@ from solar.api import AnalysisFailure, AnalysisResult, ArtifactRef, SOLBound
 from solar.ir.contracts import IRPath
 
 _FORMAL_ARTIFACTS = tuple(
-    ArtifactRef(path, "b" * 64)
+    ArtifactRef(path=path, sha256="b" * 64)
     for path in (
         "operator_graph.yaml",
         "einsum_graph.yaml",
@@ -74,10 +74,10 @@ def _workload() -> Workload:
 
 def _context() -> SolarWorkloadContext:
     return SolarWorkloadContext(
-        _definition(),
-        _workload(),
-        lambda value: value,
-        lambda seed: (seed,),
+        definition=_definition(),
+        workload=_workload(),
+        reference=lambda value: value,
+        input_factory=lambda seed: (seed,),
     )
 
 
@@ -106,10 +106,10 @@ def test_analyze_workload_adapts_outer_models_to_solar(
 
     monkeypatch.setattr(analyzer, "require_formal_device", lambda device: None)
     context = SolarWorkloadContext(
-        definition,
-        workload,
-        reference,
-        input_factory,
+        definition=definition,
+        workload=workload,
+        reference=reference,
+        input_factory=input_factory,
     )
     monkeypatch.setattr(
         analyzer,
@@ -195,9 +195,9 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
             architecture_sha256="a" * 64,
             artifacts=_FORMAL_ARTIFACTS,
             bound=SOLBound(
-                0.001,
-                "capacity_constrained_tile_aware_v1",
-                "memory",
+                seconds=0.001,
+                kind="capacity_constrained_tile_aware_v1",
+                limiting_resource="memory",
             ),
         )
 
@@ -227,10 +227,10 @@ def test_performance_metadata_marks_controlled_concurrent_graph() -> None:
         SimpleNamespace(op_type="concurrent_graph"),
     )
     context = SolarWorkloadContext(
-        definition,
-        _workload(),
-        lambda value: value,
-        lambda seed: (seed,),
+        definition=definition,
+        workload=_workload(),
+        reference=lambda value: value,
+        input_factory=lambda seed: (seed,),
     )
 
     assert performance_analysis_metadata(context) == {
@@ -260,10 +260,10 @@ def test_performance_metadata_requires_exact_minigpt_contract() -> None:
         SimpleNamespace(axes={"S": 128}),
     )
     context = SolarWorkloadContext(
-        definition,
-        workload,
-        lambda value: value,
-        lambda seed: (seed,),
+        definition=definition,
+        workload=workload,
+        reference=lambda value: value,
+        input_factory=lambda seed: (seed,),
     )
 
     assert performance_analysis_metadata(context) == {
@@ -293,7 +293,9 @@ def test_invoke_solar_rejects_non_formal_result(tmp_path, monkeypatch) -> None:
             output_dir=result_dir,
             architecture_sha256="a" * 64,
             artifacts=_FORMAL_ARTIFACTS,
-            bound=SOLBound(0.001, "diagnostic", "memory"),
+            bound=SOLBound(
+                seconds=0.001, kind="diagnostic", limiting_resource="memory"
+            ),
         ),
     )
 
@@ -333,7 +335,11 @@ def test_invoke_solar_non_formal_path_keeps_non_formal_bound(
             output_dir=result_dir,
             architecture_sha256="a" * 64,
             artifacts=_FORMAL_ARTIFACTS,
-            bound=SOLBound(0.001, "roofline_eq1_v1", "memory"),
+            bound=SOLBound(
+                seconds=0.001,
+                kind="roofline_eq1_v1",
+                limiting_resource="memory",
+            ),
         )
 
     monkeypatch.setattr("solar.api.analyze", fake_analyze)

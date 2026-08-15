@@ -151,7 +151,7 @@ def convert_operator_graph(
     validate_aten_graph(converted)
     path = Path(output_dir) / "aten_graph.yaml"
     path.write_text(yaml.safe_dump(converted, sort_keys=False))
-    return IRGraphArtifact(path, IRKind.ATEN)
+    return IRGraphArtifact(path=path, kind=IRKind.ATEN)
 
 
 def validate_aten_graph(graph: Mapping[str, Any]) -> None:

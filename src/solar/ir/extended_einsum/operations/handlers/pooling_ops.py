@@ -88,8 +88,10 @@ class PoolingHandler(EinsumOpHandler):
 
         # Pooling preserves batch and channel dims, reduces spatial
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Output", list(labels), is_output=True),  # Simplified
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
+            EinsumOperand(
+                name="Output", dims=list(labels), is_output=True
+            ),  # Simplified
         ]
 
         equation = f"{labels}->{labels}"

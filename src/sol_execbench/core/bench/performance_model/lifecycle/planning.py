@@ -71,7 +71,7 @@ from sol_execbench.core.platform.source_state import (
 _SOURCE_PATHS = ("src", "scripts", "pyproject.toml", "uv.lock")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LifecyclePlanInputs:
     """Operator-selected inputs for one immutable lifecycle plan."""
 

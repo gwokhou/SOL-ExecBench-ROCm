@@ -74,8 +74,8 @@ def test_registries_compose_representation_and_execution(
         extractions=frozenset(ExtractionKind),
         validate=stub_validate,
         convert=lambda _operator, output_dir: IRGraphArtifact(
-            Path(output_dir),
-            IRKind.EXTENDED_EINSUM,
+            path=Path(output_dir),
+            kind=IRKind.EXTENDED_EINSUM,
         ),
     )
     monkeypatch.setitem(
@@ -108,7 +108,7 @@ def test_pipeline_owns_verification_and_analysis_composition(
     graph = _stub_graph()
     graph_path = tmp_path / "graph.yaml"
     graph_path.write_text(yaml.safe_dump(graph), encoding="utf-8")
-    artifact = IRGraphArtifact(graph_path, IRKind.EXTENDED_EINSUM)
+    artifact = IRGraphArtifact(path=graph_path, kind=IRKind.EXTENDED_EINSUM)
 
     def record_verification(**kwargs: Any) -> None:
         seen["verification"] = kwargs["backend"]

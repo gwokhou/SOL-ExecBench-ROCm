@@ -229,11 +229,11 @@ def test_memory_level_and_profile_load_normalize_all_fields(tmp_path: Path):
     assert profile.name == "test_amd"
     assert profile.clock_hz == 2_000_000_000
     assert profile.memory_hierarchy[0] == MemoryLevel(
-        "l1",
-        "cu",
-        32,
-        50.0,
-        "spec",
+        name="l1",
+        scope="cu",
+        capacity_bytes=32,
+        bandwidth_bytes_per_second=50.0,
+        source="spec",
     )
     assert profile.to_dict()["memory_hierarchy"][0]["name"] == "l1"
 

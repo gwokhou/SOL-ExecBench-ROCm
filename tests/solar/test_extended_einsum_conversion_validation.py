@@ -39,7 +39,7 @@ def test_validate_rejects_a_different_ir_kind() -> None:
 
 
 def test_input_binding_rejects_arity_and_incomplete_metadata() -> None:
-    signature = TensorSignature((2, 3), "torch.float32")
+    signature = TensorSignature(shape=(2, 3), dtype="torch.float32")
     operator = _operator(inputs=((0, signature),))
 
     with pytest.raises(RuntimeError, match="observed=.*starts=0"):
@@ -55,7 +55,7 @@ def test_input_binding_rejects_arity_and_incomplete_metadata() -> None:
 
 
 def test_input_binding_rejects_missing_exact_source_indices() -> None:
-    signature = TensorSignature((2, 3), "torch.float32")
+    signature = TensorSignature(shape=(2, 3), dtype="torch.float32")
     operator = _operator(inputs=((0, signature), (1, signature)))
     graph = {
         "layers": {
@@ -69,7 +69,7 @@ def test_input_binding_rejects_missing_exact_source_indices() -> None:
 
 
 def test_input_binding_uses_source_indices_for_identical_signatures() -> None:
-    signature = TensorSignature((2, 3), "torch.float32")
+    signature = TensorSignature(shape=(2, 3), dtype="torch.float32")
     operator = _operator(inputs=((0, signature), (1, signature)))
     graph = {
         "layers": {
@@ -82,7 +82,7 @@ def test_input_binding_uses_source_indices_for_identical_signatures() -> None:
 
 
 def test_output_binding_rejects_arity_and_signature_mismatches() -> None:
-    expected = (TensorSignature((2, 3), "torch.float32"),)
+    expected = (TensorSignature(shape=(2, 3), dtype="torch.float32"),)
 
     with pytest.raises(RuntimeError, match="output arity"):
         conversion._bind_outputs({"layers": {}}, {"layers": {}}, expected)

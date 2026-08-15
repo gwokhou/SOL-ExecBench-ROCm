@@ -483,7 +483,7 @@ _QUALIFICATION_FAMILY_ORDER = (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CaseSpec:
     """One workload in the preregistered three-way stratified split."""
 
