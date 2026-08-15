@@ -12,9 +12,12 @@ from typing import cast
 import click
 from rich.console import Console
 
+from sol_execbench.cli.error_translation import (
+    CliErrorRule,
+    translate_cli_errors,
+)
 from sol_execbench.cli.protocol import (
     CliExitCode,
-    CliFailure,
     CliResult,
     artifact,
 )
@@ -104,6 +107,140 @@ from sol_execbench.core.solar_bridge.publication import (
     verify_projected_solar_manifest,
 )
 
+_PERFORMANCE_DIAGNOSTIC_INPUT_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="performance_diagnostic_input_invalid",
+        hint="Verify the performance/SOLAR manifests, hashes, candidate, "
+        "GPU identity, timing evidence, and calibration compatibility.",
+    ),
+)
+
+_PERFORMANCE_INFERENCE_INPUT_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="performance_inference_input_invalid",
+        hint="Verify development corpus hashes and calibration identity.",
+    ),
+)
+
+_DIAGNOSTIC_PUBLICATION_INPUT_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_publication_input_invalid",
+        hint="Verify the frozen corpus, calibration audit, source "
+        "inference, and every cited evidence artifact.",
+    ),
+)
+
+_DIAGNOSTIC_PUBLICATION_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_publication_invalid",
+        hint="Restore the exact content-addressed publication tree.",
+    ),
+)
+
+_DIAGNOSTIC_RELEASE_INPUT_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_release_input_invalid",
+        hint="Verify the publication tree, its exact inventory, and that "
+        "the archive output does not already exist.",
+    ),
+)
+
+_DIAGNOSTIC_RELEASE_ARCHIVE_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_release_archive_invalid",
+        hint="Restore the exact archive or supply the correct SHA-256.",
+    ),
+)
+
+_DIAGNOSTIC_PUBLISHED_RELEASE_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, RuntimeError, ValueError),
+        code="diagnostic_published_release_invalid",
+        hint="Verify the fixed tag, exact two assets, and public release state.",
+    ),
+)
+
+_DIAGNOSTIC_LIFECYCLE_PLAN_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, RuntimeError, ValueError),
+        code="diagnostic_lifecycle_plan_invalid",
+        hint="Verify registry identities, clean source, and exact inputs.",
+    ),
+)
+
+_DIAGNOSTIC_LIFECYCLE_RUN_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_lifecycle_run_invalid",
+        hint="Verify the design manifest, the selected chain stages, and "
+        "that every earlier stage is verified.",
+    ),
+)
+
+_DIAGNOSTIC_LIFECYCLE_RESUME_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_lifecycle_run_invalid",
+        hint="Verify the run-state object and any drifted stage inputs.",
+    ),
+)
+
+_DIAGNOSTIC_LIFECYCLE_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_lifecycle_invalid",
+        hint="Verify the run-state object path and store layout.",
+    ),
+)
+
+_DIAGNOSTIC_GC_REFUSED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_gc_refused",
+        hint="A blob became reachable since planning; re-run and inspect "
+        "the dry-run plan before deleting.",
+    ),
+)
+
+_DIAGNOSTIC_GC_APPLY_REFUSED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_gc_refused",
+        hint="Create and review a fresh GC plan before applying it.",
+    ),
+)
+
+_DIAGNOSTIC_RETIREMENT_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="diagnostic_retirement_invalid",
+        hint="Re-run after resolving the lifecycle store and target roots.",
+    ),
+)
+
+_PERFORMANCE_ACCEPTANCE_INPUT_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="performance_acceptance_input_invalid",
+        hint="Verify disjoint corpora and all cited artifact hashes.",
+    ),
+)
+
+_PERFORMANCE_AGENT_FEEDBACK_INPUT_INVALID_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="performance_agent_feedback_input_invalid",
+        hint="Use a current diagnostic, its exact evidence manifest, and "
+        "the complete frozen source bundle for an accepted report.",
+    ),
+)
+
 console = Console(stderr=True)
 _FILE = click.Path(exists=True, dir_okay=False, path_type=Path)
 _DIRECTORY = click.Path(exists=True, file_okay=False, path_type=Path)
@@ -145,7 +282,7 @@ def performance_diagnostics_cli(
     output: Path,
 ) -> CliResult:
     """Build T_pred(IR/HW), L/C/R, and structured performance advice."""
-    try:
+    with translate_cli_errors(*_PERFORMANCE_DIAGNOSTIC_INPUT_INVALID_ERRORS):
         sidecar = build_performance_diagnostic(
             PerformanceDiagnosticBuildRequest(
                 evidence_manifest_path=evidence_manifest,
@@ -158,15 +295,6 @@ def performance_diagnostics_cli(
             semantic_loader=load_manifest_semantic_characterization,
         )
         atomic_write_json_value(output, sidecar.to_dict())
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="performance_diagnostic_input_invalid",
-            hint=(
-                "Verify the performance/SOLAR manifests, hashes, candidate, "
-                "GPU identity, timing evidence, and calibration compatibility."
-            ),
-        ) from error
     console.print(f"[green]Saved performance diagnostic to {output}[/green]")
     return CliResult(
         data={
@@ -188,7 +316,7 @@ def fit_performance_inference_cli(
     output: Path,
 ) -> CliResult:
     """Freeze conformal intervals and action thresholds from development data."""
-    try:
+    with translate_cli_errors(*_PERFORMANCE_INFERENCE_INPUT_INVALID_ERRORS):
         profile = fit_diagnostic_inference_profile(
             development_corpus_path=development_corpus,
             calibration_profile_path=calibration_profile,
@@ -196,12 +324,6 @@ def fit_performance_inference_cli(
             blob_resolver=_blob_resolver(),
         )
         atomic_write_json_value(output, profile.model_dump(mode="json"))
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="performance_inference_input_invalid",
-            hint="Verify development corpus hashes and calibration identity.",
-        ) from error
     return CliResult(
         data={
             "families": len(profile.conformal),
@@ -223,7 +345,7 @@ def build_publication_projection_cli(
     output: Path,
 ) -> CliResult:
     """Publish the compact, reproducible inputs of a frozen diagnostic."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_PUBLICATION_INPUT_INVALID_ERRORS):
         manifest_path = build_diagnostic_publication_projection(
             development_corpus_path=development_corpus,
             calibration_profile_path=calibration_profile,
@@ -237,15 +359,6 @@ def build_publication_projection_cli(
         projection = load_json_file(
             DiagnosticPublicationProjection, manifest_path
         )
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_publication_input_invalid",
-            hint=(
-                "Verify the frozen corpus, calibration audit, source "
-                "inference, and every cited evidence artifact."
-            ),
-        ) from error
     return CliResult(
         data={
             "cases": projection.case_count,
@@ -260,19 +373,13 @@ def build_publication_projection_cli(
 @click.option("--manifest", type=_FILE, required=True)
 def verify_publication_projection_cli(manifest: Path) -> CliResult:
     """Verify a distributed compact diagnostic publication tree."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_PUBLICATION_INVALID_ERRORS):
         projection = verify_diagnostic_publication_projection(
             manifest,
             semantic_loader=load_manifest_semantic_characterization,
             solar_verifier=verify_projected_solar_manifest,
             blob_resolver=_blob_resolver(),
         )
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_publication_invalid",
-            hint="Restore the exact content-addressed publication tree.",
-        ) from error
     return CliResult(
         data={
             "cases": projection.case_count,
@@ -321,7 +428,7 @@ def release_package_cli(
     purpose: str,
 ) -> CliResult:
     """Package one verified publication into a deterministic release object."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_RELEASE_INPUT_INVALID_ERRORS):
         hardware_validation = verify_validation_receipt(
             hardware_validation_receipt,
             hardware_evidence_dir,
@@ -338,15 +445,6 @@ def release_package_cli(
             store_root_path=store_root,
             purpose=DiagnosticEvidencePurpose(purpose),
         )
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_release_input_invalid",
-            hint=(
-                "Verify the publication tree, its exact inventory, and that "
-                "the archive output does not already exist."
-            ),
-        ) from error
     return CliResult(
         data={
             "release_id": attestation.release_id,
@@ -374,7 +472,7 @@ def release_verify_cli(
     unpack_root: Path | None,
 ) -> CliResult:
     """Verify a downloaded release archive against its publication contract."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_RELEASE_ARCHIVE_INVALID_ERRORS):
         projection = verify_diagnostic_release_archive(
             archive_path=archive,
             semantic_loader=load_manifest_semantic_characterization,
@@ -382,12 +480,6 @@ def release_verify_cli(
             expected_sha256=expected_sha256,
             unpack_root=unpack_root,
         )
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_release_archive_invalid",
-            hint="Restore the exact archive or supply the correct SHA-256.",
-        ) from error
     return CliResult(
         data={
             "cases": projection.case_count,
@@ -414,19 +506,13 @@ def release_ingest_published_cli(
     store_root: Path,
 ) -> CliResult:
     """Download and persist one verified published release receipt."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_PUBLISHED_RELEASE_INVALID_ERRORS):
         receipt = ingest_github_published_release(
             repository=repository,
             tag=tag,
             purpose=DiagnosticEvidencePurpose(purpose),
             store_root_path=store_root,
         )
-    except (OSError, RuntimeError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_published_release_invalid",
-            hint="Verify the fixed tag, exact two assets, and public release state.",
-        ) from error
     return CliResult(data=receipt.model_dump(mode="json"))
 
 
@@ -458,7 +544,7 @@ def lifecycle_plan_cli(**options: object) -> CliResult:
     """Author one complete production plan from verified immutable inputs."""
     store_root_path = cast(Path | None, options["store_root"])
     output = cast(Path, options["output"])
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_LIFECYCLE_PLAN_INVALID_ERRORS):
         plan = author_lifecycle_plan(
             repository_root=repo_root(),
             store_root=(store_root_path or _store_root_path()),
@@ -491,12 +577,6 @@ def lifecycle_plan_cli(**options: object) -> CliResult:
             ),
         )
         atomic_write_json_value(output, plan.model_dump(mode="json"))
-    except (OSError, RuntimeError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_lifecycle_plan_invalid",
-            hint="Verify registry identities, clean source, and exact inputs.",
-        ) from error
     return CliResult(data=plan.model_dump(mode="json"))
 
 
@@ -508,7 +588,7 @@ def lifecycle_run_cli(
     store_root: Path | None,
 ) -> CliResult:
     """Execute one reviewed lifecycle plan and persist its run-state."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_LIFECYCLE_RUN_INVALID_ERRORS):
         plan = load_json_file(DiagnosticLifecyclePlan, plan_path)
         verify_git_source_state(
             repo_root(),
@@ -527,15 +607,6 @@ def lifecycle_run_cli(
             ),
         )
         _require_lifecycle_success(run_state)
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_lifecycle_run_invalid",
-            hint=(
-                "Verify the design manifest, the selected chain stages, and "
-                "that every earlier stage is verified."
-            ),
-        ) from error
     return CliResult(
         data={
             "run_id": run_state.run_id,
@@ -559,7 +630,7 @@ def lifecycle_run_cli(
 @click.option("--store-root", type=_OUTPUT_DIRECTORY)
 def lifecycle_status_cli(run_id: str, store_root: Path | None) -> CliResult:
     """Re-verify the recorded run and report the current chain state."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_LIFECYCLE_INVALID_ERRORS):
         status = diagnostic_lifecycle_status(
             run_state_path=run_state_path(run_id, store_root),
             handlers=build_stage_handlers(
@@ -569,12 +640,6 @@ def lifecycle_status_cli(run_id: str, store_root: Path | None) -> CliResult:
                 blob_resolver=_blob_resolver(store_root),
             ),
         )
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_lifecycle_invalid",
-            hint="Verify the run-state object path and store layout.",
-        ) from error
     return CliResult(data=status)
 
 
@@ -583,7 +648,7 @@ def lifecycle_status_cli(run_id: str, store_root: Path | None) -> CliResult:
 @click.option("--store-root", type=_OUTPUT_DIRECTORY)
 def lifecycle_resume_cli(run_id: str, store_root: Path | None) -> CliResult:
     """Re-verify and continue a previously interrupted lifecycle run."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_LIFECYCLE_RESUME_INVALID_ERRORS):
         run_state = resume_diagnostic_lifecycle(
             run_state_path=run_state_path(run_id, store_root),
             handlers=build_stage_handlers(
@@ -594,12 +659,6 @@ def lifecycle_resume_cli(run_id: str, store_root: Path | None) -> CliResult:
             ),
         )
         _require_lifecycle_success(run_state)
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_lifecycle_run_invalid",
-            hint="Verify the run-state object and any drifted stage inputs.",
-        ) from error
     return CliResult(
         data={
             "run_id": run_state.run_id,
@@ -644,18 +703,9 @@ def lifecycle_gc_plan_cli(
     output: Path,
 ) -> CliResult:
     """Write a 24-hour registry-bound GC plan without deleting data."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_GC_REFUSED_ERRORS):
         plan = run_gc(store_root_path=store_root, delete=False)
         atomic_write_json_value(output, plan.model_dump(mode="json"))
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_gc_refused",
-            hint=(
-                "A blob became reachable since planning; re-run and inspect "
-                "the dry-run plan before deleting."
-            ),
-        ) from error
     return CliResult(data=plan.model_dump(mode="json"))
 
 
@@ -663,15 +713,9 @@ def lifecycle_gc_plan_cli(
 @click.option("--plan", "plan_path", type=_FILE, required=True)
 def lifecycle_gc_apply_cli(plan_path: Path) -> CliResult:
     """Apply exactly one reviewed, unexpired GC plan."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_GC_APPLY_REFUSED_ERRORS):
         plan = load_json_file(GCPlan, plan_path)
         applied = apply_gc_plan(plan)
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_gc_refused",
-            hint="Create and review a fresh GC plan before applying it.",
-        ) from error
     return CliResult(data=applied.model_dump(mode="json"))
 
 
@@ -681,7 +725,7 @@ def lifecycle_retirement_plan_cli(
     store_root: Path | None,
 ) -> CliResult:
     """Print the audit-only dry-run plan for the resolved retirement targets."""
-    try:
+    with translate_cli_errors(*_DIAGNOSTIC_RETIREMENT_INVALID_ERRORS):
         plan = plan_retirement(
             store_root_path=(
                 store_root.resolve() if store_root else _store_root_path()
@@ -689,12 +733,6 @@ def lifecycle_retirement_plan_cli(
             targets=resolved_retirement_targets(repo_root()),
             repo_root=repo_root(),
         )
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="diagnostic_retirement_invalid",
-            hint="Re-run after resolving the lifecycle store and target roots.",
-        ) from error
     return CliResult(data=plan.model_dump(mode="json"))
 
 
@@ -714,7 +752,7 @@ def accept_performance_model_cli(
     output: Path,
 ) -> CliResult:
     """Run held-out acceptance using only content-addressed case evidence."""
-    try:
+    with translate_cli_errors(*_PERFORMANCE_ACCEPTANCE_INPUT_INVALID_ERRORS):
         manifest, result = build_diagnostic_acceptance(
             development_corpus_path=development_corpus,
             held_out_corpus_path=held_out_corpus,
@@ -728,12 +766,6 @@ def accept_performance_model_cli(
             manifest.model_dump(mode="json"),
         )
         atomic_write_json_value(output, result.model_dump(mode="json"))
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="performance_acceptance_input_invalid",
-            hint="Verify disjoint corpora and all cited artifact hashes.",
-        ) from error
     return CliResult(
         data={
             "accepted": result.accepted,
@@ -781,7 +813,9 @@ def performance_agent_feedback_cli(
     output: Path,
 ) -> CliResult:
     """Build Agent actions from a governed and accepted performance model."""
-    try:
+    with translate_cli_errors(
+        *_PERFORMANCE_AGENT_FEEDBACK_INPUT_INVALID_ERRORS
+    ):
         feedback = _build_performance_agent_feedback(
             performance_diagnostic,
             acceptance,
@@ -793,15 +827,6 @@ def performance_agent_feedback_cli(
             evidence_manifest,
         )
         atomic_write_json_value(output, feedback.to_dict())
-    except (OSError, ValueError) as error:
-        raise CliFailure(
-            str(error),
-            code="performance_agent_feedback_input_invalid",
-            hint=(
-                "Use a current diagnostic, its exact evidence manifest, and "
-                "the complete frozen source bundle for an accepted report."
-            ),
-        ) from error
     console.print(
         f"[green]Saved performance Agent feedback to {output}[/green]"
     )
@@ -873,7 +898,7 @@ def _build_performance_agent_feedback(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _AcceptanceSources:
     """All frozen inputs needed to reconstruct an acceptance verdict."""
 

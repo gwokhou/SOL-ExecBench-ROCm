@@ -11,6 +11,10 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from sol_execbench.cli.error_translation import (
+    CliErrorRule,
+    translate_cli_errors,
+)
 from sol_execbench.cli.evaluation.evaluator import run_evaluation_cli
 from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
@@ -40,6 +44,37 @@ from sol_execbench.core.scoring.release_runner import (
 )
 
 console = Console(stderr=True)
+
+_RELEASE_BASELINE_BUILD_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="release_baseline_build_failed",
+        hint="Use an absent output directory and a clean 40-hex source revision.",
+    ),
+)
+_RELEASE_CANDIDATE_BUILD_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="release_candidate_build_failed",
+        hint="Provide one valid solution.json under every scored problem path.",
+    ),
+)
+_RELEASE_PLAN_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, RuntimeError, ValueError),
+        code="release_plan_execution_failed",
+        exit_code=CliExitCode.EXECUTION,
+        hint="Run the plan inside the hardened container on the pinned GPU.",
+    ),
+)
+_RELEASE_QUALIFICATION_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, RuntimeError, ValueError),
+        code="release_qualification_failed",
+        exit_code=CliExitCode.EXECUTION,
+        hint="Complete static, canary, and full qualification in order.",
+    ),
+)
 
 
 @click.group(
@@ -71,19 +106,13 @@ def release_build_cli(
     source_revision: str,
 ) -> CliResult:
     """Materialize the release-defined trusted-reference baseline."""
-    try:
+    with translate_cli_errors(*_RELEASE_BASELINE_BUILD_ERRORS):
         workspace = materialize_release_baseline(
             manifest_path,
             output,
             baseline_id=baseline_id,
             source_revision=source_revision,
         )
-    except (OSError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="release_baseline_build_failed",
-            hint="Use an absent output directory and a clean 40-hex source revision.",
-        ) from exc
     console.print(f"[green]Release baseline workspace: {workspace}[/green]")
     return CliResult(
         data={"workspace": str(workspace), "baseline_id": baseline_id},
@@ -117,7 +146,7 @@ def candidate_build_cli(
     source_revision: str,
 ) -> CliResult:
     """Ingest an exact full-corpus candidate set into a release workspace."""
-    try:
+    with translate_cli_errors(*_RELEASE_CANDIDATE_BUILD_ERRORS):
         plan = materialize_release_candidate(
             manifest_path,
             workspace,
@@ -125,12 +154,6 @@ def candidate_build_cli(
             candidate_id=candidate_id,
             source_revision=source_revision,
         )
-    except (OSError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="release_candidate_build_failed",
-            hint="Provide one valid solution.json under every scored problem path.",
-        ) from exc
     console.print(f"[green]Release candidate plan: {plan}[/green]")
     return CliResult(
         data={"plan": str(plan), "candidate_id": candidate_id},
@@ -173,7 +196,7 @@ def release_run_cli(
     qualification_root: Path,
 ) -> CliResult:
     """Execute a baseline or candidate plan in the hardened container."""
-    try:
+    with translate_cli_errors(*_RELEASE_PLAN_ERRORS):
         result = execute_release_plan(
             plan,
             corpus_manifest_path=manifest_path,
@@ -183,13 +206,6 @@ def release_run_cli(
             resume=resume,
             device=device,
         )
-    except (OSError, RuntimeError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="release_plan_execution_failed",
-            exit_code=CliExitCode.EXECUTION,
-            hint="Run the plan inside the hardened container on the pinned GPU.",
-        ) from exc
     report = {
         "role": result.role,
         "run_id": result.run_id,
@@ -239,7 +255,7 @@ def _run_qualification_cli(
     device: str,
     qualification_root: Path,
 ) -> CliResult:
-    try:
+    with translate_cli_errors(*_RELEASE_QUALIFICATION_ERRORS):
         gate = run_release_qualification(
             plan,
             corpus_manifest_path=manifest_path,
@@ -249,13 +265,6 @@ def _run_qualification_cli(
             timeout_seconds=timeout_seconds,
             device=device,
         )
-    except (OSError, RuntimeError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="release_qualification_failed",
-            exit_code=CliExitCode.EXECUTION,
-            hint="Complete static, canary, and full qualification in order.",
-        ) from exc
     gate_path = qualification_root.resolve() / stage.value / "gate.json"
     return CliResult(
         data={
