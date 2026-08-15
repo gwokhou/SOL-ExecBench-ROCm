@@ -1,12 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 contributors to SOL ExecBench ROCm Port
 # SPDX-License-Identifier: Apache-2.0
 
-"""AKA-derived problem-corpus commands.
+"""Dataset corpus commands.
 
-Materialize and audit the problem set derived from AMD AgentKernelArena (AKA).
-The benchmark problems are authored artifacts committed under
-``problems/AMD_AKA/<suite>/<name>/``. ``materialize`` selects workloads for an
-observed GPU and ``audit`` verifies the target-specific result.
+The ``corpus`` group validates and derives measured target views for LLM Core.
+The remaining commands materialize and audit the problem set derived from AMD
+AgentKernelArena (AKA).
 """
 
 from __future__ import annotations
@@ -34,12 +33,16 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKACorpusManifest,
 )
 from sol_execbench.core.dataset.corpus import (
-    SELECTION_MANIFEST_FILENAME,
+    TARGET_VIEW_MANIFEST_FILENAME,
+    generate_corpus,
     load_target_descriptor,
-    select_corpus,
     validate_corpus,
 )
 from sol_execbench.core.dataset.corpus_models import CorpusProfile
+from sol_execbench.core.platform.memory_quota import (
+    DEFAULT_PROBE_TIMEOUT_SECONDS as DEFAULT_CAPACITY_PROBE_TIMEOUT_SECONDS,
+    collect_gpu_memory_quota_isolated,
+)
 from sol_execbench.core.platform.runtime import detect_rocm_device
 
 console = Console(stderr=True)
@@ -48,7 +51,7 @@ DEFAULT_OUTPUT_ROOT = Path("problems/local/AMD_AKA")
 DEFAULT_AKA_ROOT = Path("data/AgentKernelArena")
 DEFAULT_FETCH_SCRIPT = Path("scripts/fetch_aka_source.sh")
 DEFAULT_CORPUS_MANIFEST = Path(
-    "problems/LLM_CORE/releases/LLM_CORE_V1/manifest.yaml",
+    "problems/LLM_CORE/releases/LLM_CORE_V2/manifest.yaml",
 )
 DEFAULT_TARGET_ROOT = Path("problems/LLM_CORE/targets")
 TARGET_TEMPLATES = ("gfx1200", "gfx942")
@@ -59,12 +62,12 @@ TARGET_TEMPLATES = ("gfx1200", "gfx942")
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 def dataset_cli() -> None:
-    """Validate and select problem corpora; preserve AKA compatibility."""
+    """Validate and generate problem corpora; preserve AKA compatibility."""
 
 
 @dataset_cli.group("corpus")
 def corpus_cli() -> None:
-    """Validate or statically select a hardware-independent corpus."""
+    """Validate rules or generate a measured target view."""
 
 
 @corpus_cli.command("validate")
@@ -83,12 +86,12 @@ def validate_corpus_cli(manifest_path: Path) -> CliResult:
         raise CliFailure(str(exc), code="invalid_corpus_manifest") from exc
     console.print(
         f"[green]Valid {report['release_id']}: {report['definitions']} definitions, "
-        f"{report['workloads']} workloads[/green]",
+        f"{report['generation_rules']} generation rules[/green]",
     )
     return CliResult(data={"manifest": str(manifest_path), **report})
 
 
-@corpus_cli.command("select")
+@corpus_cli.command("generate")
 @click.option(
     "--manifest",
     "manifest_path",
@@ -107,9 +110,21 @@ def validate_corpus_cli(manifest_path: Path) -> CliResult:
     help="External static target descriptor in JSON or YAML.",
 )
 @click.option(
-    "--memory-budget",
+    "--device",
+    default="cuda:0",
+    show_default=True,
+    help="Visible ROCm device used by the isolated capacity probe.",
+)
+@click.option(
+    "--environment-quota",
     type=click.IntRange(min=1),
-    help="Usable bytes; required when the descriptor does not declare a budget.",
+    help="Optional container or scheduler quota; measured limits still apply.",
+)
+@click.option(
+    "--capacity-probe-timeout",
+    type=click.FloatRange(min=1.0),
+    default=DEFAULT_CAPACITY_PROBE_TIMEOUT_SECONDS,
+    show_default=True,
 )
 @click.option(
     "--profile",
@@ -127,18 +142,20 @@ def validate_corpus_cli(manifest_path: Path) -> CliResult:
 @click.option(
     "--require-complete-profile",
     is_flag=True,
-    help="Fail when the selected target falls below a requested profile floor.",
+    help="Fail when generated Definitions fall below a profile floor.",
 )
-def select_corpus_cli(
+def generate_corpus_cli(
     manifest_path: Path,
     target_template: str | None,
     target_descriptor: Path | None,
-    memory_budget: int | None,
+    device: str,
+    environment_quota: int | None,
+    capacity_probe_timeout: float,
     profile_values: tuple[str, ...],
     output: Path,
     require_complete_profile: bool,
 ) -> CliResult:
-    """Create a deterministic target view without probing a GPU."""
+    """Generate a concrete target view from rules and measured memory."""
     if (target_template is None) == (target_descriptor is None):
         raise CliFailure(
             "provide exactly one of --target-template or --target-descriptor",
@@ -149,35 +166,44 @@ def select_corpus_cli(
     )
     try:
         target = load_target_descriptor(target_path)
-        if memory_budget is not None:
-            target = target.model_copy(
-                update={"memory_budget_bytes": memory_budget},
-            )
-        if target.memory_budget_bytes is None:
-            raise ValueError(
-                "--memory-budget is required for this target descriptor"
-            )
-        result = select_corpus(
+        capacity = collect_gpu_memory_quota_isolated(
+            device,
+            environment_quota_bytes=environment_quota,
+            timeout_seconds=capacity_probe_timeout,
+        )
+        result = generate_corpus(
             manifest_path,
             output,
             target=target,
             profiles=tuple(CorpusProfile(value) for value in profile_values),
             require_complete_profile=require_complete_profile,
+            capacity_evidence=capacity,
         )
     except FileExistsError as exc:
         raise CliFailure(
-            str(exc), code="corpus_selection_output_exists"
+            str(exc), code="corpus_generation_output_exists"
+        ) from exc
+    except RuntimeError as exc:
+        raise CliFailure(
+            str(exc),
+            code="corpus_capacity_probe_unavailable",
+            exit_code=CliExitCode.UNAVAILABLE,
+            hint="Use a visible ROCm device or adjust the probe quota and timeout.",
         ) from exc
     except (OSError, ValueError) as exc:
-        raise CliFailure(str(exc), code="corpus_selection_invalid") from exc
-    record = result / SELECTION_MANIFEST_FILENAME
-    console.print(f"[green]Static corpus selection written to {result}[/green]")
+        raise CliFailure(str(exc), code="corpus_generation_invalid") from exc
+    record = result / TARGET_VIEW_MANIFEST_FILENAME
+    console.print(
+        f"[green]Generated corpus target view written to {result}[/green]"
+    )
     return CliResult(
         data={
             "output": str(result),
             "target_id": target.target_id,
             "profiles": list(profile_values),
-            "qualification_status": target.qualification_status.value,
+            "qualification_status": "hardware_qualified",
+            "usable_budget_bytes": capacity.usable_budget_bytes,
+            "capacity_probe_digest": capacity.capacity_probe_digest,
         },
         artifacts=(artifact(record, "yaml_file"),),
     )

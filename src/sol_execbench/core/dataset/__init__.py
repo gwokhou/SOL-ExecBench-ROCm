@@ -8,15 +8,15 @@ from sol_execbench.core.dataset.aka_corpus import (
     AKACorpusManifest,
 )
 from sol_execbench.core.dataset.corpus import (
+    generate_corpus,
     load_corpus_manifest,
-    select_corpus,
-    static_selection_reason,
     validate_corpus,
 )
 from sol_execbench.core.dataset.corpus_models import (
     CorpusEntry,
     CorpusManifest,
     CorpusProfile,
+    CorpusTargetViewManifest,
     StaticTargetDescriptor,
 )
 
@@ -26,9 +26,9 @@ __all__ = [
     "CorpusEntry",
     "CorpusManifest",
     "CorpusProfile",
+    "CorpusTargetViewManifest",
     "StaticTargetDescriptor",
+    "generate_corpus",
     "load_corpus_manifest",
-    "select_corpus",
-    "static_selection_reason",
     "validate_corpus",
 ]

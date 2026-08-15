@@ -1,4 +1,4 @@
-schema_version: sol_execbench.static_target_descriptor.v1
+schema_version: sol_execbench.static_target_descriptor.v2
 target_id: amd-gfx1200-declared
 gfx_target: gfx1200
 qualification_status: declared
