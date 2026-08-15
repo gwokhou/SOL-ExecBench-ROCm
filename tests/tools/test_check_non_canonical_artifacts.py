@@ -20,7 +20,8 @@ SPEC = spec_from_file_location(
     "check_non_canonical_artifacts",
     SCRIPT_PATH,
 )
-assert SPEC is not None and SPEC.loader is not None
+assert SPEC is not None
+assert SPEC.loader is not None
 MODULE = module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 audit_text = MODULE.audit_text

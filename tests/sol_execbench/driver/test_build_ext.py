@@ -315,7 +315,7 @@ class TestSoRename:
         (tmp_path / "k.hip").write_text("")
         with pytest.raises(
             FileNotFoundError,
-            match="benchmark_kernel.so not produced",
+            match=r"benchmark_kernel\.so not produced",
         ):
             _exec_build_ext(tmp_path)
 

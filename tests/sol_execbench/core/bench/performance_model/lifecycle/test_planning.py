@@ -268,7 +268,8 @@ def test_capacity_governed_plan_binds_prefrozen_policy_and_inference(
 
     policy, inference = planning._pre_frozen_inputs(design, governed_inputs)
 
-    assert policy is not None and policy.sha256 == policy_digest
+    assert policy is not None
+    assert policy.sha256 == policy_digest
     assert inference is not None
     assert inference.sha256 == sha256_file(inference_path)
 

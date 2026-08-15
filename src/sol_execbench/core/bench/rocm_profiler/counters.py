@@ -613,7 +613,7 @@ def _dimensions(
         values = [int(value) for value in re.findall(r"\d+", combined)]
         if not values:
             raise ValueError(f"invalid_{combined_name}")
-        padded = values + [1, 1]
+        padded = [*values, 1, 1]
         return padded[0], padded[1], padded[2]
     values = [
         _optional_int(_field(row, f"{prefix}size{axis}", f"{prefix}{axis}"))

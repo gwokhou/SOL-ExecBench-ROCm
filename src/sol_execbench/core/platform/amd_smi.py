@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, RootModel
 
 type MetricJSON = (
-    str | int | float | bool | None | list[MetricJSON] | dict[str, MetricJSON]
+    str | int | float | bool | list[MetricJSON] | dict[str, MetricJSON] | None
 )
 
 

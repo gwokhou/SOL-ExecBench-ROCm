@@ -78,7 +78,8 @@ class TestCheckThreadInjection:
         with pytest.raises(RewardHackError) as exc:
             check_thread_injection(2, 7)
         msg = str(exc.value)
-        assert "7" in msg and "2" in msg
+        assert "7" in msg
+        assert "2" in msg
 
 
 # ── ThreadInjectionMonitor (concurrent thread-count sampling) ──────────────
@@ -235,7 +236,8 @@ class TestEvalIntegrity:
     def test_snapshot_captures_present_names(self):
         ns = {"foo": lambda: None, "bar": 42}
         snap = snapshot_critical_functions(ns, ["foo", "bar", "missing"])
-        assert "foo" in snap and "bar" in snap
+        assert "foo" in snap
+        assert "bar" in snap
         assert "missing" not in snap
 
     def test_passes_when_namespace_unchanged(self):
@@ -258,7 +260,7 @@ class TestEvalIntegrity:
         ns["time_runnable"] = lambda *a, **kw: 0.001  # attacker replaces it
         with pytest.raises(
             RewardHackError,
-            match="time_runnable.*monkey-patched",
+            match=r"time_runnable.*monkey-patched",
         ):
             check_eval_integrity(snap, ns)
 

@@ -150,7 +150,7 @@ def parse_probe_output(output: str) -> dict[str, Any]:
         parsed["gfx_targets"] = gfx_targets
     marketing_names = []
     for line in output.splitlines():
-        if "Marketing Name" in line or "GPU" in line and "Name" in line:
+        if "Marketing Name" in line or ("GPU" in line and "Name" in line):
             _, _, value = line.partition(":")
             value = value.strip()
             if value:

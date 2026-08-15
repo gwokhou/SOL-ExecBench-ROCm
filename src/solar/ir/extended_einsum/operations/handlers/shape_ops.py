@@ -24,7 +24,7 @@ This module provides einsum handlers for:
 """
 
 import string
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from solar.ir.extended_einsum.operations.handlers.base import (
     EinsumOp,
@@ -399,7 +399,7 @@ class TensorManipulationHandler(EinsumOpHandler):
                         break
                 out_labels[i] = new_label
 
-        return out_labels  # type: ignore
+        return cast(list[str], out_labels)
 
     def _generate_reshape_einsum(
         self,

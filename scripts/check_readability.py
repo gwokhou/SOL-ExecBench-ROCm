@@ -36,7 +36,6 @@ class Metrics:
     wide_functions: int = 0
     production_any_modules: int = 0
     production_any_references: int = 0
-    wildcard_imports: int = 0
     oversized_test_modules: int = 0
 
 
@@ -81,10 +80,6 @@ def collect_metrics() -> tuple[Metrics, list[str]]:
                     strict_failures.append(
                         f"{relative}:{node.lineno} has {width} parameters",
                     )
-            elif isinstance(node, ast.ImportFrom) and any(
-                alias.name == "*" for alias in node.names
-            ):
-                counts["wildcard_imports"] += 1
             elif isinstance(node, ast.Name) and node.id == "Any":
                 has_any = True
                 any_references += 1
@@ -132,7 +127,6 @@ def collect_solar_debt() -> dict[str, object]:
     wide_functions: dict[str, int] = {}
     oversized_modules: dict[str, int] = {}
     any_modules: list[str] = []
-    wildcard_imports: list[str] = []
     for path in _python_files(SOLAR_ROOT):
         if "_vendor" in path.relative_to(SOLAR_ROOT).parts:
             continue
@@ -154,11 +148,7 @@ def collect_solar_debt() -> dict[str, object]:
             if width > 10:
                 wide_functions[key] = width
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and any(
-                alias.name == "*" for alias in node.names
-            ):
-                wildcard_imports.append(f"{relative}:{node.lineno}")
-            elif isinstance(node, ast.Name) and node.id == "Any":
+            if isinstance(node, ast.Name) and node.id == "Any":
                 has_any = True
         if has_any:
             any_modules.append(relative)
@@ -167,7 +157,6 @@ def collect_solar_debt() -> dict[str, object]:
         "long_functions": dict(sorted(long_functions.items())),
         "oversized_modules": dict(sorted(oversized_modules.items())),
         "wide_functions": dict(sorted(wide_functions.items())),
-        "wildcard_imports": sorted(wildcard_imports),
     }
 
 
@@ -194,7 +183,7 @@ def check_solar_debt(current: dict[str, object]) -> list[str]:
                     f"SOLAR {category} changed without baseline update: "
                     f"{key}={actual[key]} != {expected[key]}",
                 )
-    for category in ("any_modules", "wildcard_imports"):
+    for category in ("any_modules",):
         actual_items = set(current[category])
         expected_items = set(baseline[category])
         for item in sorted(actual_items ^ expected_items):

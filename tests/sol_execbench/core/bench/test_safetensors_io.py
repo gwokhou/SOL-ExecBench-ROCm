@@ -84,7 +84,7 @@ def test_missing_file_raises(tmp_path):
         },
     )
 
-    with pytest.raises(FileNotFoundError, match="missing.safetensors"):
+    with pytest.raises(FileNotFoundError, match=r"missing\.safetensors"):
         load_safetensors(_definition(), workload, blob_roots=[tmp_path])
 
 

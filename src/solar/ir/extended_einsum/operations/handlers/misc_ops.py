@@ -75,7 +75,7 @@ class EmbeddingHandler(EinsumOpHandler):
             ),
             EinsumOperand(name="Weight", dims=["V", "D"], is_output=False),
             EinsumOperand(
-                name="Output", dims=list(batch_labels) + ["D"], is_output=True
+                name="Output", dims=[*batch_labels, "D"], is_output=True
             ),
         ]
 

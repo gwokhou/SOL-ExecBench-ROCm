@@ -503,7 +503,6 @@ def test_readability_solar_debt_detects_added_removed_and_changed_items(
         "wide_functions": {},
         "oversized_modules": {},
         "any_modules": ["removed.py"],
-        "wildcard_imports": [],
     }
     baseline_path = tmp_path / "solar-debt.json"
     baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
@@ -513,7 +512,6 @@ def test_readability_solar_debt_detects_added_removed_and_changed_items(
         "wide_functions": {},
         "oversized_modules": {},
         "any_modules": ["added.py"],
-        "wildcard_imports": [],
     }
 
     failures = readability.check_solar_debt(current)

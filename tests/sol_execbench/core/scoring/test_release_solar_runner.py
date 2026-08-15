@@ -238,7 +238,7 @@ def test_parallel_release_stops_submitting_after_failure(
     monkeypatch.setattr(release_solar_runner, "run_solar_worker", worker)
     workspace = tmp_path / "release"
 
-    with pytest.raises(RuntimeError, match="p0/w0.*formal_failed"):
+    with pytest.raises(RuntimeError, match=r"p0/w0.*formal_failed"):
         release_solar_runner.build_release_solar_manifests(
             workspace,
             corpus_manifest_path=corpus.path,
@@ -413,7 +413,7 @@ def test_jobs_limit_reports_nondivisible_cpu_remainder(
 
     with pytest.raises(
         ValueError,
-        match="safe limit 2.*leaving 16 logical CPUs",
+        match=r"safe limit 2.*leaving 16 logical CPUs",
     ):
         release_solar_runner._validate_release_jobs(3)
 

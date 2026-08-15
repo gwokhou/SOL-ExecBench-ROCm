@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,105 @@ def test_ruff_preserves_excludes_for_explicit_hook_paths() -> None:
     data = tomllib.loads(PYPROJECT.read_text())
 
     assert data["tool"]["ruff"]["force-exclude"] is True
+
+
+def test_ruff_migration_scope_matches_previous_guardrails() -> None:
+    data = tomllib.loads(PYPROJECT.read_text())
+    lint = data["tool"]["ruff"]["lint"]
+    banned_api = lint["flake8-tidy-imports"]["banned-api"]
+    message = banned_api["sol_execbench.core.integrity.artifact_registry"][
+        "msg"
+    ]
+
+    assert message == (
+        "artifact_registry is audit-only; import the owning domain schema "
+        "enum directly"
+    )
+    ignores = lint["per-file-ignores"]
+    assert {"F403", "TID251"} <= set(ignores["problems/**/reference.py"])
+    assert "F403" in ignores["tests/**/*.py"]
+    assert "TID251" in ignores["tests/**/*.py"]
+    assert ignores["scripts/check_non_canonical_artifacts.py"] == ["TID251"]
+    assert ignores["scripts/check_schema_versions.py"] == ["TID251"]
+
+
+def test_ruff_owns_migrated_ast_checks() -> None:
+    ruff = shutil.which("ruff")
+    assert ruff is not None
+    artifact_registry_import = (
+        "from sol_execbench.core.integrity.artifact_registry "
+        "import CURRENT_STRING_ARTIFACT_SCHEMAS\n"
+    )
+    samples = (
+        ("from math import *\n", "F403"),
+        (artifact_registry_import, "TID251"),
+    )
+
+    for source, code in samples:
+        result = subprocess.run(
+            [
+                ruff,
+                "check",
+                "--config",
+                str(PYPROJECT),
+                "--stdin-filename",
+                "src/example.py",
+                "-",
+            ],
+            input=source,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        assert result.returncode == 1
+        assert code in result.stdout
+
+
+def test_ruff_enables_recommended_stable_rules() -> None:
+    data = tomllib.loads(PYPROJECT.read_text())
+    enabled = set(data["tool"]["ruff"]["lint"]["extend-select"])
+
+    assert {
+        "ASYNC110",
+        "ASYNC212",
+        "ASYNC250",
+        "EXE003",
+        "NPY",
+        "PGH",
+        "PLE0237",
+        "PLE0241",
+        "PLE0302",
+        "PLW0603",
+        "PLW1641",
+        "PT018",
+        "RET",
+        "RUF005",
+        "RUF006",
+        "RUF021",
+        "RUF036",
+        "RUF043",
+        "RUF061",
+        "RUF064",
+        "RUF102",
+        "RUF103",
+        "RUF104",
+        "S113",
+        "S323",
+        "S501",
+        "S502",
+        "S503",
+        "S504",
+        "S505",
+        "S506",
+        "S602",
+        "S604",
+        "S605",
+        "S609",
+        "SLOT",
+        "UP",
+    } <= enabled
 
 
 def test_pre_commit_hooks_use_locked_uv_runs() -> None:

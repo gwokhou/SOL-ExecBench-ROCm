@@ -298,13 +298,11 @@ def cross_package_violations(
     violations: list[tuple[str, str]] = []
     for source, target in edges:
         if (
-            source.startswith("solar")
-            and target.startswith("sol_execbench")
-            or (
-                source.startswith("sol_execbench")
-                and target.startswith("solar")
-                and not is_under(source, "sol_execbench.core.solar_bridge")
-            )
+            source.startswith("solar") and target.startswith("sol_execbench")
+        ) or (
+            source.startswith("sol_execbench")
+            and target.startswith("solar")
+            and not is_under(source, "sol_execbench.core.solar_bridge")
         ):
             violations.append((source, target))
     return sorted(violations)
