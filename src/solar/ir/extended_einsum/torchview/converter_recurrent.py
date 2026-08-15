@@ -47,14 +47,12 @@ from typing import Any
 
 import networkx as nx
 
-from solar.ir.extended_einsum.torchview.converter_contract import (
-    ConverterMixinContract,
-)
+from solar.composition import BoundComponent
 
 PathLike = str | Path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _RecurrentContext:
     """Normalized graph and tensor metadata for one recurrent expansion."""
 
@@ -92,7 +90,7 @@ class _RecurrentContext:
         return f"{self.node_id}.gates"
 
 
-class ConverterRecurrentMixin(ConverterMixinContract):
+class RecurrentOperationConverter(BoundComponent):
     """Expand recurrent neural-network operations."""
 
     @staticmethod

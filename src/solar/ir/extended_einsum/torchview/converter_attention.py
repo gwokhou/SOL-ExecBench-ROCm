@@ -47,14 +47,12 @@ from typing import Any
 
 import networkx as nx
 
-from solar.ir.extended_einsum.torchview.converter_contract import (
-    ConverterMixinContract,
-)
+from solar.composition import BoundComponent
 
 PathLike = str | Path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _AttentionCore:
     """Normalized QK-scale-softmax-AV expansion metadata."""
 
@@ -100,7 +98,7 @@ class _AttentionCore:
         return f"{self.node_id}.av_matmul"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _MHAContext:
     """Projection and shared-core metadata for one MHA expansion."""
 
@@ -257,7 +255,7 @@ def _attention_core_layers(
     }
 
 
-class ConverterAttentionMixin(ConverterMixinContract):
+class AttentionOperationConverter(BoundComponent):
     """Expand attention and groupwise-convolution operations."""
 
     def _should_expand_mha(self, node_data: dict[str, Any]) -> bool:
