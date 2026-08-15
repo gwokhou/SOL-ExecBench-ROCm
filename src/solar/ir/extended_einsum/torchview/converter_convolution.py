@@ -47,15 +47,13 @@ from typing import Any
 
 import networkx as nx
 
-from solar.ir.extended_einsum.torchview.converter_contract import (
-    ConverterMixinContract,
-)
+from solar.composition import BoundComponent
 from solar.types import TensorShapes
 
 PathLike = str | Path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _GroupwiseGeometry:
     node_type: str
     is_2d: bool
@@ -73,21 +71,21 @@ class _GroupwiseGeometry:
     fallback_conv_equation: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _GroupwiseConnections:
     activation: str | None
     weight: str | None
     outputs: list[str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _GroupwiseLayerIds:
     reshape_input: str
     convolution: str
     reshape_output: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _GroupwiseDTypes:
     activation: str
     weight: str
@@ -327,7 +325,7 @@ def _make_groupwise_view_layer(
     }
 
 
-class ConverterConvolutionMixin(ConverterMixinContract):
+class ConvolutionOperationConverter(BoundComponent):
     """Expand reviewed groupwise-convolution operations."""
 
     def _should_expand_groupwise_conv(self, node_data: dict[str, Any]) -> bool:
@@ -467,7 +465,9 @@ class ConverterConvolutionMixin(ConverterMixinContract):
             )
             outputs = [item for item in raw_outputs if item in op_graph.nodes]
         activation, weight = _select_data_connections(node_data, inputs)
-        return _GroupwiseConnections(activation, weight, outputs)
+        return _GroupwiseConnections(
+            activation=activation, weight=weight, outputs=outputs
+        )
 
     def _groupwise_conv_spec(
         self, geometry: _GroupwiseGeometry

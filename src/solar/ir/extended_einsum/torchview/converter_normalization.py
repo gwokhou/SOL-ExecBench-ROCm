@@ -49,16 +49,14 @@ from typing import Any, cast
 
 import networkx as nx
 
-from solar.ir.extended_einsum.torchview.converter_contract import (
-    ConverterMixinContract,
-)
+from solar.composition import BoundComponent
 from solar.types import TensorShapes
 
 PathLike = str | Path
 _LinearEntry = tuple[int, str, Any, str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _LinearSplitContext:
     """Normalized inputs used to emit a linear matmul and bias add."""
 
@@ -78,7 +76,7 @@ class _LinearSplitContext:
     start_node_id_map: dict[str, str]
 
 
-class ConverterNormalizationMixin(ConverterMixinContract):
+class GraphNormalizer(BoundComponent):
     """Normalize split, linear, and entry-node graph structure."""
 
     def _should_split_linear_with_bias(self, node_data: dict[str, Any]) -> bool:

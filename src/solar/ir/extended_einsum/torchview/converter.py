@@ -41,41 +41,44 @@ Example:
 
 from __future__ import annotations
 
+from threading import RLock
 from typing import ClassVar
 
+from solar.composition import BoundComponent, component_attribute
 from solar.ir.extended_einsum.operations.analyzer import EinsumAnalyzer
 from solar.ir.extended_einsum.torchview.converter_attention import (
-    ConverterAttentionMixin,
+    AttentionOperationConverter,
 )
 from solar.ir.extended_einsum.torchview.converter_convolution import (
-    ConverterConvolutionMixin,
+    ConvolutionOperationConverter,
+)
+from solar.ir.extended_einsum.torchview.converter_expansion import (
+    OperationExpansionEngine,
 )
 from solar.ir.extended_einsum.torchview.converter_layers import (
-    ConverterLayersMixin,
+    GeneralOperationConverter,
+)
+from solar.ir.extended_einsum.torchview.converter_models import (
+    ConversionConfig,
+    ConversionState,
+    PathLike,
 )
 from solar.ir.extended_einsum.torchview.converter_normalization import (
-    ConverterNormalizationMixin,
+    GraphNormalizer,
 )
 from solar.ir.extended_einsum.torchview.converter_parsing import (
-    ConverterParsingMixin,
+    TorchviewGraphParser,
 )
 from solar.ir.extended_einsum.torchview.converter_pipeline import (
-    ConverterPipelineMixin,
+    GraphEmitter,
 )
 from solar.ir.extended_einsum.torchview.converter_recurrent import (
-    ConverterRecurrentMixin,
+    RecurrentOperationConverter,
 )
+from solar.types import DynamicValue
 
 
-class PyTorchToEinsum(
-    ConverterParsingMixin,
-    ConverterPipelineMixin,
-    ConverterAttentionMixin,
-    ConverterConvolutionMixin,
-    ConverterRecurrentMixin,
-    ConverterNormalizationMixin,
-    ConverterLayersMixin,
-):
+class PyTorchToEinsum:
     """Convert PyTorch computation graphs to einsum representation.
 
     This converter transforms pytorch_graph.yaml files into einsum_graph.yaml
@@ -105,12 +108,76 @@ class PyTorchToEinsum(
             cache_dir: Directory for caching generated handlers.
             strict: Reject unsupported operations instead of passing through.
         """
-        self._debug = debug
-        self._enable_agent = enable_agent
-        self._api_key = api_key
-        self._cache_dir = cache_dir
-        self._strict = strict
+        self._config = ConversionConfig(
+            debug=debug,
+            enable_agent=enable_agent,
+            api_key=api_key,
+            cache_dir=cache_dir,
+            strict=strict,
+        )
+        self._debug = self._config.debug
+        self._enable_agent = self._config.enable_agent
+        self._api_key = self._config.api_key
+        self._cache_dir = self._config.cache_dir
+        self._strict = self._config.strict
+        self._state = ConversionState()
+        self._conversion_lock = RLock()
         self._einsum_analyzer = EinsumAnalyzer(debug=debug)
+        self._components: tuple[BoundComponent, ...] = (
+            TorchviewGraphParser(self),
+            GraphEmitter(self),
+            OperationExpansionEngine(self),
+            AttentionOperationConverter(self),
+            ConvolutionOperationConverter(self),
+            RecurrentOperationConverter(self),
+            GraphNormalizer(self),
+            GeneralOperationConverter(self),
+        )
+
+    def __getattr__(self, name: str) -> DynamicValue:
+        """Resolve private conversion behavior from composed components."""
+        return component_attribute(self._components, name)
+
+    @property
+    def _tensor_to_producer_op(self) -> dict[str, str]:
+        return self._state.tensor_to_producer
+
+    @_tensor_to_producer_op.setter
+    def _tensor_to_producer_op(self, value: dict[str, str]) -> None:
+        self._state.tensor_to_producer = value
+
+    @property
+    def _tensor_to_producer_slot(self) -> dict[str, int]:
+        return self._state.tensor_to_producer_slot
+
+    @_tensor_to_producer_slot.setter
+    def _tensor_to_producer_slot(self, value: dict[str, int]) -> None:
+        self._state.tensor_to_producer_slot = value
+
+    def convert(
+        self,
+        pytorch_graph_path: PathLike,
+        output_dir: PathLike,
+        *,
+        copy_graph: bool = True,
+        expand_complex_ops: bool = True,
+        enable_rename: bool = False,
+    ) -> dict[str, DynamicValue] | None:
+        """Serialize reuse of this façade and run the composed pipeline."""
+        with self._conversion_lock:
+            self._state = ConversionState()
+            emitter = next(
+                component
+                for component in self._components
+                if isinstance(component, GraphEmitter)
+            )
+            return emitter.convert(
+                pytorch_graph_path,
+                output_dir,
+                copy_graph=copy_graph,
+                expand_complex_ops=expand_complex_ops,
+                enable_rename=enable_rename,
+            )
 
     @property
     def debug(self) -> bool:
