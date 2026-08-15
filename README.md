@@ -4,7 +4,7 @@ SOL ExecBench ROCm evaluates GPU kernel candidates and derives formal
 Speed-of-Light bounds for the AMD Radeon RX 9060 XT. The distribution contains
 two sibling packages with a deliberately narrow boundary:
 
-- `sol_execbench` owns problem/workload contracts, imported-corpus selection,
+- `sol_execbench` owns problem/workload contracts, corpus generation,
   input generation, candidate correctness and timing, local score formulae,
   aggregation policy, security, and the CLI.
 - `solar` owns only the three stages described in SOL-ExecBench §4.2: operator
@@ -25,24 +25,27 @@ declared in `pyproject.toml`.
 ## Public problem corpus
 
 The hardware-independent, text-backbone corpus is frozen at
-`problems/LLM_CORE/releases/LLM_CORE_V1/manifest.yaml`. It contains 84
-clean-room Definitions and 1260 Workloads across dense, attention, MoE, KV
-cache, long-context, and quantization profiles. Validate it or create a purely
-static target view without probing a GPU:
+`problems/LLM_CORE/releases/LLM_CORE_V2/manifest.yaml`. It contains 36
+production-derived Definitions and 36 frozen workload-generation rules across
+dense, attention, MoE, KV cache, long-context, and quantization profiles. It
+does not freeze concrete Workloads. Validate it or generate a target view from
+an isolated measurement of currently allocatable GPU memory:
 
 ```bash
 uv run sol-execbench dataset corpus validate
-uv run sol-execbench dataset corpus select \
+uv run sol-execbench dataset corpus generate \
   --target-template gfx1200 \
-  --memory-budget 8589934592 \
+  --device cuda:0 \
   --profile core \
-  --output problems/local/LLM_CORE/gfx1200-8g
+  --output problems/local/LLM_CORE/gfx1200-measured
 ```
 
-The bundled gfx1200 and gfx942 target files are declarations, not hardware
-qualification. They filter by profile, dtype, quantization, capability, tensor
-limits, reference IPC, and memory envelope. LLM Core scoring, profiling,
-hardware qualification, and SOLAR integration are intentionally deferred.
+The bundled gfx1200 and gfx942 files declare capability, dtype, quantization,
+tensor, and IPC limits. A bounded allocation probe measures usable quota, which
+is floored to a frozen capacity class. Each Definition then generates exactly
+nine slots at one common scale or is skipped atomically. Exact free bytes and
+other audit-only hardware fields cannot change workloads inside one cohort.
+Leaderboard submission, ranking, and hosted scoring remain out of scope.
 
 The legacy AKA-reviewed selection remains tracked at
 `problems/AMD_AKA/manifest.yaml`. Problems are derived from AMD

@@ -1,0 +1,85 @@
+schema_version: sol_execbench.workload_generation_rule.v1
+semantic_id: llm.quantization.mxfp8_block.v2
+algorithm_version: llm_core_common_scale.v1
+operation_family: quantization
+variant: mxfp8_block
+source_ids:
+- deepseek_v4
+eligible_gfx_targets:
+- gfx942
+quantization: mxfp8_block
+capabilities:
+- packed_low_precision
+slots:
+- slot_id: smoke
+  role: smoke
+  regime: latency
+  serving_phase: not_applicable
+  binding: boundary
+  scale_numerator: 1
+  scale_denominator: 64
+  irregular: false
+- slot_id: latency-low
+  role: development
+  regime: latency
+  serving_phase: decode
+  binding: model
+  scale_numerator: 1
+  scale_denominator: 8
+  irregular: false
+- slot_id: latency-high
+  role: development
+  regime: latency
+  serving_phase: decode
+  binding: model
+  scale_numerator: 1
+  scale_denominator: 6
+  irregular: false
+- slot_id: throughput-low
+  role: development
+  regime: throughput
+  serving_phase: prefill
+  binding: model
+  scale_numerator: 1
+  scale_denominator: 3
+  irregular: false
+- slot_id: throughput-high
+  role: development
+  regime: throughput
+  serving_phase: prefill
+  binding: model
+  scale_numerator: 1
+  scale_denominator: 2
+  irregular: false
+- slot_id: irregular-low
+  role: development
+  regime: irregular
+  serving_phase: not_applicable
+  binding: boundary
+  scale_numerator: 1
+  scale_denominator: 4
+  irregular: true
+- slot_id: irregular-high
+  role: development
+  regime: irregular
+  serving_phase: not_applicable
+  binding: boundary
+  scale_numerator: 3
+  scale_denominator: 8
+  irregular: true
+- slot_id: capacity-low
+  role: development
+  regime: capacity
+  serving_phase: prefill
+  binding: model
+  scale_numerator: 3
+  scale_denominator: 4
+  irregular: false
+- slot_id: capacity-high
+  role: development
+  regime: capacity
+  serving_phase: prefill
+  binding: model
+  scale_numerator: 1
+  scale_denominator: 1
+  irregular: false

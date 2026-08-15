@@ -1,0 +1,730 @@
+schema_version: sol_execbench.corpus_manifest.v2
+corpus_id: LLM_CORE
+release_id: LLM_CORE_V2
+release_state: frozen
+license: Apache-2.0
+source_freeze_date: '2026-08-14'
+profiles:
+- core
+- moe
+- kv_cache
+- long_context
+- quantized
+- architecture_specific
+sources:
+- source_id: qwen3_8
+  model_id: Qwen/Qwen3.8-2.4T-A95B
+  url: https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B/blob/207bd685a7e3696cfaff12ded7c6a7ea0f88c996/config.json
+  revision: 207bd685a7e3696cfaff12ded7c6a7ea0f88c996
+  source_sha256: 4e3819548967e319ab435d044a3a331dbe3b078590ce822e9d74b79430533987
+  license: Qwen3.8 Community License
+  license_reviewed: true
+  clean_room: true
+  captured_at: '2026-08-14'
+  architecture_role: high-expert MoE, GQA, and low-precision shapes
+  architecture_facts:
+    hidden_size: 8192
+    intermediate_size: null
+    query_heads: 64
+    kv_heads: 4
+    head_dimension: 256
+    expert_count: 512
+    experts_per_token: 10
+    page_size: null
+    maximum_context: 262144
+    tensor_parallel: null
+    expert_parallel: null
+    quantization_block_size: null
+- source_id: deepseek_v4
+  model_id: deepseek-ai/DeepSeek-V4-Pro
+  url: https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/b5968e9190ef611bbf34a7229255be88a0e937c1/config.json
+  revision: b5968e9190ef611bbf34a7229255be88a0e937c1
+  source_sha256: 5fe4568daee51c208cb8a79538eaeda090ae011ade1dee2c386aa95f569c810e
+  license: MIT
+  license_reviewed: true
+  clean_room: true
+  captured_at: '2026-08-14'
+  architecture_role: latent attention, fine-grained MoE, and FP8
+  architecture_facts:
+    hidden_size: 7168
+    intermediate_size: null
+    query_heads: 128
+    kv_heads: 1
+    head_dimension: 512
+    expert_count: 384
+    experts_per_token: 6
+    page_size: null
+    maximum_context: 1048576
+    tensor_parallel: null
+    expert_parallel: null
+    quantization_block_size: 128
+- source_id: kimi_k3
+  model_id: moonshotai/Kimi-K3
+  url: https://huggingface.co/moonshotai/Kimi-K3/blob/9f62e4e9fffbd0a83ddd60e1c209d828994b3569/config.json
+  revision: 9f62e4e9fffbd0a83ddd60e1c209d828994b3569
+  source_sha256: 9710e121a58d03ac92c8d6da287a19541994319afbbe6d6202af001ffd379213
+  license: Kimi K3 Model License
+  license_reviewed: true
+  clean_room: true
+  captured_at: '2026-08-14'
+  architecture_role: delta attention, attention residuals, and sparse MoE
+  architecture_facts:
+    hidden_size: 7168
+    intermediate_size: 33792
+    query_heads: 96
+    kv_heads: 96
+    head_dimension: 128
+    expert_count: 896
+    experts_per_token: 16
+    page_size: null
+    maximum_context: 1048576
+    tensor_parallel: null
+    expert_parallel: null
+    quantization_block_size: 32
+- source_id: glm_5_2
+  model_id: zai-org/GLM-5.2
+  url: https://huggingface.co/zai-org/GLM-5.2/blob/b4734de4facf877f85769a911abafc5283eab3d9/config.json
+  revision: b4734de4facf877f85769a911abafc5283eab3d9
+  source_sha256: 185f93ee6d12548e16a847e279dc0c3c90b1524c970b0866b42fb545747d859a
+  license: MIT
+  license_reviewed: true
+  clean_room: true
+  captured_at: '2026-08-14'
+  architecture_role: indexed sparse attention and MoE routing
+  architecture_facts:
+    hidden_size: 6144
+    intermediate_size: 12288
+    query_heads: 64
+    kv_heads: 64
+    head_dimension: 192
+    expert_count: 256
+    experts_per_token: 8
+    page_size: null
+    maximum_context: 1048576
+    tensor_parallel: null
+    expert_parallel: null
+    quantization_block_size: null
+- source_id: minimax_m3
+  model_id: MiniMaxAI/MiniMax-M3
+  url: https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/f0e1c1e04d40177e4673a22097036854f536e9c0/config.json
+  revision: f0e1c1e04d40177e4673a22097036854f536e9c0
+  source_sha256: c9c97ce1e4eece60012d5a10ea87717458bfb1f19c2c7a615a3dbff83d090c6b
+  license: MiniMax Community License
+  license_reviewed: true
+  clean_room: true
+  captured_at: '2026-08-14'
+  architecture_role: million-context sparse attention and MoE
+  architecture_facts:
+    hidden_size: 6144
+    intermediate_size: 12288
+    query_heads: 64
+    kv_heads: 4
+    head_dimension: 128
+    expert_count: 128
+    experts_per_token: 4
+    page_size: null
+    maximum_context: 1048576
+    tensor_parallel: null
+    expert_parallel: null
+    quantization_block_size: null
+- source_id: gemma_4
+  model_id: google/gemma-4-12B
+  url: https://huggingface.co/google/gemma-4-12B/blob/023679ed352de9bb66cc873c9009ce3482585c08/config.json
+  revision: 023679ed352de9bb66cc873c9009ce3482585c08
+  source_sha256: 14f38c5492ffc9cbcdf808647ca0c025bb5b9b4eb737526347134d500ace6098
+  license: Apache-2.0
+  license_reviewed: true
+  clean_room: true
+  captured_at: '2026-08-14'
+  architecture_role: compact dense and hybrid local-global text backbone
+  architecture_facts:
+    hidden_size: 3840
+    intermediate_size: 15360
+    query_heads: 16
+    kv_heads: 8
+    head_dimension: 256
+    expert_count: null
+    experts_per_token: null
+    page_size: null
+    maximum_context: 262144
+    tensor_parallel: null
+    expert_parallel: null
+    quantization_block_size: null
+- source_id: ministral_3
+  model_id: mistralai/Ministral-3-14B-Instruct-2512
+  url: https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512/blob/29439f81c2be264d8d393273f99e7db9c0961120/config.json
+  revision: 29439f81c2be264d8d393273f99e7db9c0961120
+  source_sha256: fc51295bdc0b39c015c9c3ca5d649de183eae73a23b8cbab1a0e055be8d5fa04
+  license: Apache-2.0
+  license_reviewed: true
+  clean_room: true
+  captured_at: '2026-08-14'
+  architecture_role: edge-sized dense text backbone and FP8 deployment
+  architecture_facts:
+    hidden_size: 5120
+    intermediate_size: 16384
+    query_heads: 32
+    kv_heads: 8
+    head_dimension: 128
+    expert_count: null
+    experts_per_token: null
+    page_size: null
+    maximum_context: 262144
+    tensor_parallel: null
+    expert_parallel: null
+    quantization_block_size: null
+- source_id: llama_4
+  model_id: meta-llama/Llama-4-Scout-17B-16E
+  url: https://github.com/meta-llama/llama-models/blob/0e0b8c519242d5833d8c11bffc1232b77ad7f301/models/llama4/MODEL_CARD.md
+  revision: 0e0b8c519242d5833d8c11bffc1232b77ad7f301
+  source_sha256: a1739083c8a496ca0c121d90b98659a6aa7e36fcc0092581db35ef99736d104f
+  license: Llama 4 Community License
+  license_reviewed: true
+  clean_room: true
+  captured_at: '2026-08-14'
+  architecture_role: long-context GQA and continuity MoE anchor
+  architecture_facts:
+    hidden_size: null
+    intermediate_size: null
+    query_heads: null
+    kv_heads: null
+    head_dimension: null
+    expert_count: 16
+    experts_per_token: null
+    page_size: null
+    maximum_context: 10000000
+    tensor_parallel: null
+    expert_parallel: null
+    quantization_block_size: null
+generation_policy:
+  algorithm_version: llm_core_common_scale.v1
+  capacity_classes_gib:
+  - 1
+  - 2
+  - 4
+  - 6
+  - 8
+  - 12
+  - 16
+  - 24
+  - 32
+  - 48
+  - 64
+  - 80
+  - 96
+  - 128
+  - 160
+  - 192
+  - 256
+  - 384
+  maximum_capacity_numerator: 1
+  maximum_capacity_denominator: 2
+coverage_policy:
+  definition_count: 36
+  operation_definition_counts:
+    linear: 8
+    norm_activation: 4
+    position: 2
+    attention: 6
+    advanced_attention: 2
+    kv_cache: 4
+    moe: 6
+    quantization: 4
+    indexing_reduction: 0
+  workloads_per_generated_definition: 9
+  profile_minimum_generated_definitions:
+    core: 20
+    moe: 6
+    kv_cache: 4
+    long_context: 14
+    quantized: 3
+    architecture_specific: 8
+entries:
+- semantic_id: llm.linear.matmul_bias.v2
+  semantic_fingerprint: aa9372d8de56d7c651a0ce4919689b99f31ad63b8b97abfd721fbedde197731e
+  problem_name: linear_matmul_bias
+  operation_family: linear
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/linear/linear_matmul_bias/definition.json
+  generation_rule_path: problems/linear/linear_matmul_bias/generation-rule.yaml
+  definition_sha256: 363d4cba2b74005a142bb637586eaa7cae324b564ba10ac814ba6ec74e4f60ec
+  generation_rule_sha256: d26e0537c4308ef29ae97da4802b604cf2ac97939e98449973db68c425868152
+- semantic_id: llm.linear.matmul_relu.v2
+  semantic_fingerprint: b67487bf2b6094351a91182c5812e2c069cda726122f4cce255211fb8906585b
+  problem_name: linear_matmul_relu
+  operation_family: linear
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/linear/linear_matmul_relu/definition.json
+  generation_rule_path: problems/linear/linear_matmul_relu/generation-rule.yaml
+  definition_sha256: 107dfdd7669c14df2adc2858a6c4a0181c7fe1ead8d88ec6e4b1801f0953fa59
+  generation_rule_sha256: 9ae55663ee4b00bd8b62c986d9c7ad487729d2bdcdd3465c20025b83988dd564
+- semantic_id: llm.linear.matmul_gelu.v2
+  semantic_fingerprint: 9de684fdc063b79f2353379a35d0a09ec3b13f4c26cf95bf010fe21d1ca94a5d
+  problem_name: linear_matmul_gelu
+  operation_family: linear
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/linear/linear_matmul_gelu/definition.json
+  generation_rule_path: problems/linear/linear_matmul_gelu/generation-rule.yaml
+  definition_sha256: f0461e79301391d552b8e34334a2008d8bfffde7fc0a7ee8d8b7a33691f8478f
+  generation_rule_sha256: c493bb0c441a1ac575e278f3fe09affbf376b62ab0319feb038fe125cdaa6b12
+- semantic_id: llm.linear.matmul_silu.v2
+  semantic_fingerprint: 1b2a5b02ad3559370c1462c3911f1058ce6dee74aa52cb078d66982b56db8409
+  problem_name: linear_matmul_silu
+  operation_family: linear
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/linear/linear_matmul_silu/definition.json
+  generation_rule_path: problems/linear/linear_matmul_silu/generation-rule.yaml
+  definition_sha256: 762a08eb975754a4a6086d783019a463f37296dafd84c9ec293221f99957e309
+  generation_rule_sha256: f1d2fbf28e5573ab875c4fb93c218a0975b27587ebd3acd20647be84dd70a478
+- semantic_id: llm.linear.batched_matmul.v2
+  semantic_fingerprint: 7449945a5d0c15cbfbb1d169f7e8ef60573c6b06d8ac9aec5a54fe1bda1e6693
+  problem_name: linear_batched_matmul
+  operation_family: linear
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/linear/linear_batched_matmul/definition.json
+  generation_rule_path: problems/linear/linear_batched_matmul/generation-rule.yaml
+  definition_sha256: c561ac98106835ffee6b3e0d3158db55ff2989ade4c25304d94a568cd73d4279
+  generation_rule_sha256: f8e6bf3e148a984847d5ba66adae278a25d66af2cfd9cb160fb3ba4b4f2ae5e8
+- semantic_id: llm.linear.batched_bias.v2
+  semantic_fingerprint: d1bf6d02763a40d2d5b2ef3d82e48b45b4a39f835d9a1463a6e78151f0058873
+  problem_name: linear_batched_bias
+  operation_family: linear
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/linear/linear_batched_bias/definition.json
+  generation_rule_path: problems/linear/linear_batched_bias/generation-rule.yaml
+  definition_sha256: af22ac054c4500f273a9b5bed252ea8621c01abf61cd16b8c1aa9fe5dbc75c20
+  generation_rule_sha256: 663c180e93d2523646f2b61323c6e31e3b40626d882250698ca66f4e12f9f2c0
+- semantic_id: llm.linear.grouped_matmul.v2
+  semantic_fingerprint: f532dc0715f18b9f9c104a88a005f9bed1c084a237876958ab32c4bc30a113de
+  problem_name: linear_grouped_matmul
+  operation_family: linear
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/linear/linear_grouped_matmul/definition.json
+  generation_rule_path: problems/linear/linear_grouped_matmul/generation-rule.yaml
+  definition_sha256: 928e1cb91ecfff063eb792c2bcf68e7d6006f7d439c5960e7519bb955f7bd049
+  generation_rule_sha256: 721151b4f0c7e7e4fdb0d69446579987a4335695bcef56354134b87d02b0b2dc
+- semantic_id: llm.linear.grouped_silu.v2
+  semantic_fingerprint: a0bfe33729578a9b6228c406cb7f4e432b24796c4275d42b6bc0f53dc0069cd2
+  problem_name: linear_grouped_silu
+  operation_family: linear
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/linear/linear_grouped_silu/definition.json
+  generation_rule_path: problems/linear/linear_grouped_silu/generation-rule.yaml
+  definition_sha256: 2a8fbdc8e23906af1a3fedb9a08527a3d6ee8b0d04b024459255abaea859ee34
+  generation_rule_sha256: fce9359a1942ea668f4f3cc49edc6e6813e030621d1f23bf29b7b7942192875d
+- semantic_id: llm.norm_activation.rmsnorm.v2
+  semantic_fingerprint: 15b933f4f7d2adb9e49482d4cbca4372209dce14fe50c2da50507cc77f1d8a4d
+  problem_name: norm_activation_rmsnorm
+  operation_family: norm_activation
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - qwen3_8
+  definition_path: problems/norm_activation/norm_activation_rmsnorm/definition.json
+  generation_rule_path: problems/norm_activation/norm_activation_rmsnorm/generation-rule.yaml
+  definition_sha256: 3b266d3a78ab7e7411574177b468b747b0f2fc08701f16cfb3cf6de63cd7e82b
+  generation_rule_sha256: cdc83864918d9bfdd3a134c13ff999d3d5c7f868eb7901f2a12a1fb43288b080
+- semantic_id: llm.norm_activation.swiglu.v2
+  semantic_fingerprint: d6581cc3e3bdfe6b929aaf23e42e33b7a9eac949e9436c50befd48ab054d1f18
+  problem_name: norm_activation_swiglu
+  operation_family: norm_activation
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - qwen3_8
+  definition_path: problems/norm_activation/norm_activation_swiglu/definition.json
+  generation_rule_path: problems/norm_activation/norm_activation_swiglu/generation-rule.yaml
+  definition_sha256: 314cba9cec3627fd4748bb87708a53f87593ab180a2419c55171e26b6d87fa23
+  generation_rule_sha256: 4858c118fc1b0e05e0e913fbf38e6d70c1dbec0b6de4d723025f638c24fb07f1
+- semantic_id: llm.norm_activation.add_rmsnorm.v2
+  semantic_fingerprint: 39295ddd687c7add224c332f4c7b8bf4b0d5ea6445e5fd87ea5ce769cde54326
+  problem_name: norm_activation_add_rmsnorm
+  operation_family: norm_activation
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - qwen3_8
+  definition_path: problems/norm_activation/norm_activation_add_rmsnorm/definition.json
+  generation_rule_path: problems/norm_activation/norm_activation_add_rmsnorm/generation-rule.yaml
+  definition_sha256: eec1136311282f1872f7d100e99f3464990354400b8efa6e2595799f2dda8cc2
+  generation_rule_sha256: d07c55cf9a0b5703f094a0f194af1193b5efeba647ebccf2c046159e5659a8bd
+- semantic_id: llm.norm_activation.bias_gelu.v2
+  semantic_fingerprint: c268219ac81ac880527ceee8749f36064a8e98ca4f311a3a8a686f8bc8689c69
+  problem_name: norm_activation_bias_gelu
+  operation_family: norm_activation
+  profiles:
+  - core
+  pass_kind: forward
+  source_ids:
+  - qwen3_8
+  definition_path: problems/norm_activation/norm_activation_bias_gelu/definition.json
+  generation_rule_path: problems/norm_activation/norm_activation_bias_gelu/generation-rule.yaml
+  definition_sha256: 9102a5b66d4a01a7c3de475dec5f1e379e55626cde3c3868c0b5408fdebc9cad
+  generation_rule_sha256: 5d013641d199fd8a7135338a59e2e7d1a341d5b6912e96d6f3eb5b93ef5b9c8f
+- semantic_id: llm.position.rope_interleaved.v2
+  semantic_fingerprint: f9ae11e3f10a6f476cab1255c50193003c21a7a725c8f939947ce25b2acc8850
+  problem_name: position_rope_interleaved
+  operation_family: position
+  profiles:
+  - core
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - gemma_4
+  definition_path: problems/position/position_rope_interleaved/definition.json
+  generation_rule_path: problems/position/position_rope_interleaved/generation-rule.yaml
+  definition_sha256: 2e7343877773ffade6109bce94e2da8fb23300797577ed8758e16ef500429f72
+  generation_rule_sha256: 3114d945e893604679849b7651d8bcfbb75c5eb048e4527efe19e419fb682fc8
+- semantic_id: llm.position.rope_yarn.v2
+  semantic_fingerprint: 1dc45bfe98b5398ee42db404b2526025afc55976721eca8f43ec3bdd23da828e
+  problem_name: position_rope_yarn
+  operation_family: position
+  profiles:
+  - core
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/position/position_rope_yarn/definition.json
+  generation_rule_path: problems/position/position_rope_yarn/generation-rule.yaml
+  definition_sha256: 58a7bedd167f8c54841327f2c5165f61071f5e8ebb3eb9c9d82a0e298a53eaf4
+  generation_rule_sha256: 38b1ff81deb9249b5329c8a2864a09bba1f935ecac94b3390e5db9df441f966f
+- semantic_id: llm.attention.gqa_causal.v2
+  semantic_fingerprint: 61de1e7b651d485f9488a467c2d824fbeea6506118498d80e8457a39c9920815
+  problem_name: attention_gqa_causal
+  operation_family: attention
+  profiles:
+  - core
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - qwen3_8
+  definition_path: problems/attention/attention_gqa_causal/definition.json
+  generation_rule_path: problems/attention/attention_gqa_causal/generation-rule.yaml
+  definition_sha256: 28d209cc743ea41195f7f350e24de03753c743dc1a05d78b06a5c8da8550493f
+  generation_rule_sha256: cea9cf296adead7efa5b62b8fc44cb213b9b3d2420841642df3af398d349ccdf
+- semantic_id: llm.attention.mqa_decode.v2
+  semantic_fingerprint: 80c1309266195901f97f20b15af35f0c8bb53649993af7c5917e82865239156d
+  problem_name: attention_mqa_decode
+  operation_family: attention
+  profiles:
+  - core
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - deepseek_v4
+  definition_path: problems/attention/attention_mqa_decode/definition.json
+  generation_rule_path: problems/attention/attention_mqa_decode/generation-rule.yaml
+  definition_sha256: 8cc071a548c3821565599d446a04f9713c094f3a80ba58effc84cf4063b4f57a
+  generation_rule_sha256: e785ea5db72c69bf898b947d53104f5c476e7177a08f36bb51e20b6f41eee351
+- semantic_id: llm.attention.sliding_window.v2
+  semantic_fingerprint: be192c0bbd01e307249270288d2c38dd2b80196a48eabf3c22f2bc63bfb2f831
+  problem_name: attention_sliding_window
+  operation_family: attention
+  profiles:
+  - core
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - gemma_4
+  definition_path: problems/attention/attention_sliding_window/definition.json
+  generation_rule_path: problems/attention/attention_sliding_window/generation-rule.yaml
+  definition_sha256: d5fcfe8de753fb7e44b8f52f4cd813db565e5e2ab7a90532c5bc21d04d717c94
+  generation_rule_sha256: 76b25ddc61bcf9aed980292069adaaaf25e7cdbe73c53bc64d7def19c7a8210e
+- semantic_id: llm.attention.local_global.v2
+  semantic_fingerprint: 35faf1547ab9b792fb6a362edea8c1c7437cbef60152b0c4c35d7676e29166bb
+  problem_name: attention_local_global
+  operation_family: attention
+  profiles:
+  - core
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - gemma_4
+  definition_path: problems/attention/attention_local_global/definition.json
+  generation_rule_path: problems/attention/attention_local_global/generation-rule.yaml
+  definition_sha256: 6a2fb6937641bfffee4e22fdf76464a7bf062e5bfcd9bf40f162e84c02725e62
+  generation_rule_sha256: ce094d70c905c5b76eac7faeb1ffaeb4a0b467171587761bfec0c289c79e524d
+- semantic_id: llm.attention.masked_softmax.v2
+  semantic_fingerprint: 669f7a06884745708ebc1f6c0a546b62ba3a42c4df8574535a98a17e9cd24b00
+  problem_name: attention_masked_softmax
+  operation_family: attention
+  profiles:
+  - core
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - minimax_m3
+  definition_path: problems/attention/attention_masked_softmax/definition.json
+  generation_rule_path: problems/attention/attention_masked_softmax/generation-rule.yaml
+  definition_sha256: fbeaab4486610e842d213bc1063ecd6fd3bbd4c7d31c32f6e04020b76cbe55b1
+  generation_rule_sha256: cc0170467f8a4c21c1d00a3d0fba3231cd0094a3f6087ed2198788d81b582e3d
+- semantic_id: llm.attention.attention_sink.v2
+  semantic_fingerprint: 81a9beedd7ad3d6bacb752a4ab4d7e03034f019ef91344507c00ed950b3d3abb
+  problem_name: attention_attention_sink
+  operation_family: attention
+  profiles:
+  - core
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - deepseek_v4
+  definition_path: problems/attention/attention_attention_sink/definition.json
+  generation_rule_path: problems/attention/attention_attention_sink/generation-rule.yaml
+  definition_sha256: 9834a57e628ea3d298226ea63dc8aea4a939ceeb88b641c77fdeffa5bbc7e6a3
+  generation_rule_sha256: 4cf9883b14206b73574adac6dfcd380db7d3eb644ad80210c4c9a57453183007
+- semantic_id: llm.advanced_attention.mla_compressed.v2
+  semantic_fingerprint: 0aea9f5bb946660aaa71c4b1e9cb4fc65b82e550d30242dd3b042847430a7378
+  problem_name: advanced_attention_mla_compressed
+  operation_family: advanced_attention
+  profiles:
+  - architecture_specific
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - deepseek_v4
+  definition_path: problems/advanced_attention/advanced_attention_mla_compressed/definition.json
+  generation_rule_path: problems/advanced_attention/advanced_attention_mla_compressed/generation-rule.yaml
+  definition_sha256: 902fe3d647b70fa37f3f820e4fdda05413782cbf32ca2a2ffbed2f594a69a540
+  generation_rule_sha256: 4928f8c8f3f581f5082d292527fda8d3e3e4cf3ea8e378b68c6d5286e2370395
+- semantic_id: llm.advanced_attention.indexed_sparse.v2
+  semantic_fingerprint: cdea10b15945032c116e51a58267335e81e69504e47862fc590636abc0454f8c
+  problem_name: advanced_attention_indexed_sparse
+  operation_family: advanced_attention
+  profiles:
+  - architecture_specific
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - glm_5_2
+  definition_path: problems/advanced_attention/advanced_attention_indexed_sparse/definition.json
+  generation_rule_path: problems/advanced_attention/advanced_attention_indexed_sparse/generation-rule.yaml
+  definition_sha256: ee2f32c3960c16a4df5102be8a9960ff016327d4f973b9358d2987df1b9a3e5c
+  generation_rule_sha256: c94ac029d1effd2f5230644dab49a1c5df46e24d9576893ed82ac92cf1f764b7
+- semantic_id: llm.kv_cache.paged_write.v2
+  semantic_fingerprint: e8575b55022bab94c27d062ca1392f2c0ecb60c837c1e16fbc22c64f3e4eab50
+  problem_name: kv_cache_paged_write
+  operation_family: kv_cache
+  profiles:
+  - kv_cache
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - llama_4
+  definition_path: problems/kv_cache/kv_cache_paged_write/definition.json
+  generation_rule_path: problems/kv_cache/kv_cache_paged_write/generation-rule.yaml
+  definition_sha256: 0abd5aefa9dbc381af8930c4abf1236eed7b0807a0f8e17a6d04d94a82665647
+  generation_rule_sha256: 930c5e26a7ad1e9fd92614f1e32498ccbd4a803e51598c0d94a94825d1885036
+- semantic_id: llm.kv_cache.cache_gather.v2
+  semantic_fingerprint: 0f1b5f4bdf8ae85a0f85f256b57e79bafd88286ed1a959e25a8c9cc3edc1d64c
+  problem_name: kv_cache_cache_gather
+  operation_family: kv_cache
+  profiles:
+  - kv_cache
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - qwen3_8
+  definition_path: problems/kv_cache/kv_cache_cache_gather/definition.json
+  generation_rule_path: problems/kv_cache/kv_cache_cache_gather/generation-rule.yaml
+  definition_sha256: 87a803a4df4e4f231f75f40c46049bc1911b4c1f7e3c4a2090f0c0843977531b
+  generation_rule_sha256: 53f4f6d6a3ea440990beb1327ca0b9ad7eff09c328737129f21d138a2c3dc919
+- semantic_id: llm.kv_cache.cache_scatter.v2
+  semantic_fingerprint: 496595fb549c44912a650397517af0022798571dbd036d2ddc235f9a706195b8
+  problem_name: kv_cache_cache_scatter
+  operation_family: kv_cache
+  profiles:
+  - kv_cache
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - minimax_m3
+  definition_path: problems/kv_cache/kv_cache_cache_scatter/definition.json
+  generation_rule_path: problems/kv_cache/kv_cache_cache_scatter/generation-rule.yaml
+  definition_sha256: 12fce593feb749de7a39ddc0d9f0df387c790d4028b817118ad3c417f44969fd
+  generation_rule_sha256: 3b6f3d0d3d87371652b45fa4088defb59015f3bea4d961e7a722b2d8afad27f3
+- semantic_id: llm.kv_cache.cache_compress.v2
+  semantic_fingerprint: 810a7e8b23de512bf03063fac4bdadd654c043e36b681ec0792f99daf6613f39
+  problem_name: kv_cache_cache_compress
+  operation_family: kv_cache
+  profiles:
+  - kv_cache
+  - long_context
+  pass_kind: forward
+  source_ids:
+  - deepseek_v4
+  definition_path: problems/kv_cache/kv_cache_cache_compress/definition.json
+  generation_rule_path: problems/kv_cache/kv_cache_cache_compress/generation-rule.yaml
+  definition_sha256: 8eb638cea60423cb302f1a1ae47091c88b783b618509aab737e1a2b0b7784cd6
+  generation_rule_sha256: 62bb1927ddfad61254d42360c8455fcd4e14cd74e0ce4c1138c7f40914b5a71d
+- semantic_id: llm.moe.route_top2.v2
+  semantic_fingerprint: bc91dbb4fb2c94f8eeca381e359e62d24f636bd04438b1be4ed5f60754792004
+  problem_name: moe_route_top2
+  operation_family: moe
+  profiles:
+  - moe
+  - architecture_specific
+  pass_kind: forward
+  source_ids:
+  - minimax_m3
+  definition_path: problems/moe/moe_route_top2/definition.json
+  generation_rule_path: problems/moe/moe_route_top2/generation-rule.yaml
+  definition_sha256: ca9569113532433c564b3b8b5f9ad10d245acb4cdf62f9349efd1d2eb7c45219
+  generation_rule_sha256: 15b809b51303b767a7aa94705db8715c0e504c296837dbf2f4c2c7b3bcf8cc7c
+- semantic_id: llm.moe.shared_expert.v2
+  semantic_fingerprint: 79d2a5290352e9204e6f2ecb2d3112a26d5fab5fc66767f0925efb09597049ec
+  problem_name: moe_shared_expert
+  operation_family: moe
+  profiles:
+  - moe
+  - architecture_specific
+  pass_kind: forward
+  source_ids:
+  - deepseek_v4
+  definition_path: problems/moe/moe_shared_expert/definition.json
+  generation_rule_path: problems/moe/moe_shared_expert/generation-rule.yaml
+  definition_sha256: 4723c55efdde1bc2aa40a30830ba9f09633b6f4c6dc42a885505c495fcafb4d3
+  generation_rule_sha256: 30280663d7eed8381fbbd14fbe0f1261160573cdb70ec71eb0e9f9c21098883c
+- semantic_id: llm.moe.grouped_expert.v2
+  semantic_fingerprint: 7a61be6ce4141d92a45ed784e05b5be6234edb325946583a8828a6f4918232f6
+  problem_name: moe_grouped_expert
+  operation_family: moe
+  profiles:
+  - moe
+  - architecture_specific
+  pass_kind: forward
+  source_ids:
+  - qwen3_8
+  definition_path: problems/moe/moe_grouped_expert/definition.json
+  generation_rule_path: problems/moe/moe_grouped_expert/generation-rule.yaml
+  definition_sha256: 45b8d52710b624e1eca55c2de398afe24a444d3fe7e7f544df471ff23b8339b2
+  generation_rule_sha256: d6e9d504b5a199ab621583ed53319090f30b6747c16f1faebfeff228bd01c8b6
+- semantic_id: llm.moe.normalized_topk.v2
+  semantic_fingerprint: 5edc45d359c0779c62032fd73673255e516835800cd96dd0c384d8fb928bb18b
+  problem_name: moe_normalized_topk
+  operation_family: moe
+  profiles:
+  - moe
+  - architecture_specific
+  pass_kind: forward
+  source_ids:
+  - glm_5_2
+  definition_path: problems/moe/moe_normalized_topk/definition.json
+  generation_rule_path: problems/moe/moe_normalized_topk/generation-rule.yaml
+  definition_sha256: 86dafa76d31a1a58fd2ccb8b8917b4639e342187517e93c68a6d9bf4026ddf53
+  generation_rule_sha256: 4919e11b21f1f657f8836023951028216c1240877bf2d1b943b2c777f47d33fc
+- semantic_id: llm.moe.fused_gate_up.v2
+  semantic_fingerprint: 3004a00cab844fd66a967903e483e90c2c2f735b765ffcc45a8f252f98b1cfbb
+  problem_name: moe_fused_gate_up
+  operation_family: moe
+  profiles:
+  - moe
+  - architecture_specific
+  pass_kind: forward
+  source_ids:
+  - kimi_k3
+  definition_path: problems/moe/moe_fused_gate_up/definition.json
+  generation_rule_path: problems/moe/moe_fused_gate_up/generation-rule.yaml
+  definition_sha256: 52fab56c84a8f9188f97f5e162a7fa298624d8054184e7d40bf345fe4939b5b2
+  generation_rule_sha256: a309faab0c5859e9057d8c87d441c279cb566c3714a0f6acd9bbfdda21ce0a67
+- semantic_id: llm.moe.routed_residual.v2
+  semantic_fingerprint: 2b9046464ece1448bf8910c410b9b8ca7234b150eb21ec8206f3e536fb063264
+  problem_name: moe_routed_residual
+  operation_family: moe
+  profiles:
+  - moe
+  - architecture_specific
+  pass_kind: forward
+  source_ids:
+  - llama_4
+  definition_path: problems/moe/moe_routed_residual/definition.json
+  generation_rule_path: problems/moe/moe_routed_residual/generation-rule.yaml
+  definition_sha256: 55a6205dd00a9966cbc4482291f8dd2d0c52bb4677370be5317e696ac8b91b36
+  generation_rule_sha256: b439d20aeb3f35e30895f61a1ef2c5a2c53f385e2e4694693a6e92d88a376f58
+- semantic_id: llm.quantization.fp8_per_token.v2
+  semantic_fingerprint: 854a4731ea007da54d7d17a6d783e610924110b6815cf9da5e27f6a1306c63f4
+  problem_name: quantization_fp8_per_token
+  operation_family: quantization
+  profiles:
+  - quantized
+  pass_kind: forward
+  source_ids:
+  - ministral_3
+  definition_path: problems/quantization/quantization_fp8_per_token/definition.json
+  generation_rule_path: problems/quantization/quantization_fp8_per_token/generation-rule.yaml
+  definition_sha256: 2bc3bef51f112ecd75c650268a0346729d1d30a42a8ac988832638ffb8515229
+  generation_rule_sha256: fcb7ab7aaabea2d657e146f4bab0231210401aabe277f43e11f8aede554e9a55
+- semantic_id: llm.quantization.mxfp8_block.v2
+  semantic_fingerprint: a7151f79e6f2a22fb8b78c0c7fa84f7a31b896b3cf9e60ab78258f4fe8ec0f5f
+  problem_name: quantization_mxfp8_block
+  operation_family: quantization
+  profiles:
+  - quantized
+  pass_kind: forward
+  source_ids:
+  - deepseek_v4
+  definition_path: problems/quantization/quantization_mxfp8_block/definition.json
+  generation_rule_path: problems/quantization/quantization_mxfp8_block/generation-rule.yaml
+  definition_sha256: d237c2d04e5072f442604c0e659500983f6decfba11fe3be3670f391031cd5a5
+  generation_rule_sha256: b6ad9018b63335fe68dde82b066e93bd67b98c773358512bf16d57ab74f4942b
+- semantic_id: llm.quantization.mxfp4_block.v2
+  semantic_fingerprint: a2127dc1e034e61f712907614ccb435821cebef7de856908f5c7edb164b49b92
+  problem_name: quantization_mxfp4_block
+  operation_family: quantization
+  profiles:
+  - quantized
+  pass_kind: forward
+  source_ids:
+  - kimi_k3
+  definition_path: problems/quantization/quantization_mxfp4_block/definition.json
+  generation_rule_path: problems/quantization/quantization_mxfp4_block/generation-rule.yaml
+  definition_sha256: cc6cf8bff561a75688512f52af5efbac39d03bea1fcdbd3c68f4f9ebcf0ee4de
+  generation_rule_sha256: 17c0a77facc6bb2355b2eb414220ec28ac8da5f0fee2718fdf61d0cca02db159
+- semantic_id: llm.quantization.int8_weight_only.v2
+  semantic_fingerprint: 2bfda92f8a1d346bde21d3b748b3090495f215d58ca1183fc2723e9afa9fd84f
+  problem_name: quantization_int8_weight_only
+  operation_family: quantization
+  profiles:
+  - quantized
+  pass_kind: forward
+  source_ids:
+  - llama_4
+  definition_path: problems/quantization/quantization_int8_weight_only/definition.json
+  generation_rule_path: problems/quantization/quantization_int8_weight_only/generation-rule.yaml
+  definition_sha256: cb6dfcedab7f010a9e85a55f4ee65b70b2a98b5a0fff19b75644f83d55bda3dc
+  generation_rule_sha256: a1a90ac03e32ba7a25e0dad6ec3d202d1ca63dfde2f4ff20ec1596728e7a5be8
