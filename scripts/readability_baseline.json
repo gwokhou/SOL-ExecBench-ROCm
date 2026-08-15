@@ -3,6 +3,5 @@
   "oversized_test_modules": 0,
   "production_any_modules": 58,
   "production_any_references": 332,
-  "wide_functions": 2,
-  "wildcard_imports": 0
+  "wide_functions": 2
 }

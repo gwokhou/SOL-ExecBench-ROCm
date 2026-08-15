@@ -274,9 +274,11 @@ class GraphNormalizer(BoundComponent):
                 entry
                 for entry in weights
                 if bias is None
-                or entry[1] != bias[1]
-                and isinstance(entry[2], list)
-                and len(entry[2]) >= 2
+                or (
+                    entry[1] != bias[1]
+                    and isinstance(entry[2], list)
+                    and len(entry[2]) >= 2
+                )
             ),
             next(
                 (

@@ -42,7 +42,7 @@ def test_input_binding_rejects_arity_and_incomplete_metadata() -> None:
     signature = TensorSignature(shape=(2, 3), dtype="torch.float32")
     operator = _operator(inputs=((0, signature),))
 
-    with pytest.raises(RuntimeError, match="observed=.*starts=0"):
+    with pytest.raises(RuntimeError, match=r"observed=.*starts=0"):
         conversion._bind_inputs({"layers": {}}, operator)
 
     with pytest.raises(

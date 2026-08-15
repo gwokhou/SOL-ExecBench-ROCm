@@ -45,6 +45,5 @@
   ],
   "long_functions": {},
   "oversized_modules": {},
-  "wide_functions": {},
-  "wildcard_imports": []
+  "wide_functions": {}
 }

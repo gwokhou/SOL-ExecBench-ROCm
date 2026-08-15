@@ -138,19 +138,23 @@ class TestEntryPointSuffixValidation:
 
     @pytest.mark.parametrize("lang", PYTHON_LANGUAGES)
     def test_python_language_rejects_hip_entry(self, lang):
-        with pytest.raises(ValidationError, match="require a .py entry point"):
+        with pytest.raises(
+            ValidationError, match=r"require a \.py entry point"
+        ):
             _make_spec(languages=[lang], entry_point="kernel.hip::run")
 
     @pytest.mark.parametrize("lang", PYTHON_LANGUAGES)
     def test_python_language_rejects_cpp_entry(self, lang):
-        with pytest.raises(ValidationError, match="require a .py entry point"):
+        with pytest.raises(
+            ValidationError, match=r"require a \.py entry point"
+        ):
             _make_spec(languages=[lang], entry_point="kernel.cpp::run")
 
     @pytest.mark.parametrize("lang", NATIVE_LANGUAGES)
     def test_native_language_rejects_py_entry(self, lang):
         with pytest.raises(
             ValidationError,
-            match="require a .hip or C/C\\+\\+ entry point",
+            match=r"require a \.hip or C/C\+\+ entry point",
         ):
             _make_spec(languages=[lang], entry_point="kernel.py::run")
 

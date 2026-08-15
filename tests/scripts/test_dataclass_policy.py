@@ -7,7 +7,8 @@ from pathlib import Path
 
 SCRIPT = Path(__file__).parents[2] / "scripts" / "check_dataclass_policy.py"
 SPEC = importlib.util.spec_from_file_location("check_dataclass_policy", SCRIPT)
-assert SPEC and SPEC.loader
+assert SPEC
+assert SPEC.loader
 policy = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(policy)
 

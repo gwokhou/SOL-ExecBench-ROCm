@@ -141,9 +141,9 @@ class LinearHandler(EinsumOpHandler):
         batch_dims = len(input_shape) - 1
         batch_letters = [f"B{i}" for i in range(batch_dims)]
 
-        input_dims = batch_letters + ["K"]
+        input_dims = [*batch_letters, "K"]
         weight_dims = ["N", "K"]  # Weight is [out_features, in_features]
-        output_dims = batch_letters + ["N"]
+        output_dims = [*batch_letters, "N"]
 
         operands = [
             EinsumOperand(name="Input", dims=input_dims, is_output=False),

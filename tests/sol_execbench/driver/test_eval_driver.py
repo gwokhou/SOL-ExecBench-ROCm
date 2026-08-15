@@ -936,10 +936,16 @@ def test_nan_correctness_fields_are_finite_with_flags(tmp_path):
     # Error values must be finite (not NaN/Inf)
     max_abs = correctness.get("max_absolute_error", 0.0)
     max_rel = correctness.get("max_relative_error", 0.0)
-    assert isinstance(max_abs, (int, float)) and math.isfinite(max_abs), (
+    assert isinstance(max_abs, (int, float)), (
         f"max_absolute_error should be finite, got {max_abs!r}"
     )
-    assert isinstance(max_rel, (int, float)) and math.isfinite(max_rel), (
+    assert math.isfinite(max_abs), (
+        f"max_absolute_error should be finite, got {max_abs!r}"
+    )
+    assert isinstance(max_rel, (int, float)), (
+        f"max_relative_error should be finite, got {max_rel!r}"
+    )
+    assert math.isfinite(max_rel), (
         f"max_relative_error should be finite, got {max_rel!r}"
     )
 
@@ -963,9 +969,15 @@ def test_passing_trace_correctness_unchanged(tmp_path):
     max_rel = correctness.get("max_relative_error")
 
     # For a correct kernel, error values must be finite numbers (not null)
-    assert isinstance(max_abs, (int, float)) and math.isfinite(max_abs), (
+    assert isinstance(max_abs, (int, float)), (
         f"Expected finite max_absolute_error for PASSED trace, got {max_abs!r}"
     )
-    assert isinstance(max_rel, (int, float)) and math.isfinite(max_rel), (
+    assert math.isfinite(max_abs), (
+        f"Expected finite max_absolute_error for PASSED trace, got {max_abs!r}"
+    )
+    assert isinstance(max_rel, (int, float)), (
+        f"Expected finite max_relative_error for PASSED trace, got {max_rel!r}"
+    )
+    assert math.isfinite(max_rel), (
         f"Expected finite max_relative_error for PASSED trace, got {max_rel!r}"
     )

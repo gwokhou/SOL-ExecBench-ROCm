@@ -52,7 +52,8 @@ def load_script() -> Iterator[ScriptLoader]:
             module_name,
             repository_root / relative_path,
         )
-        assert spec is not None and spec.loader is not None
+        assert spec is not None
+        assert spec.loader is not None
         module = module_from_spec(spec)
         sys.modules[module_name] = module
         try:

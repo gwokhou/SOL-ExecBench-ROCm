@@ -152,7 +152,7 @@ def read_overhead_calibration(
     *,
     expected_gpu_architecture: str | None = None,
     expected_profiler_executable: str | None = None,
-    expected_clock_locked: bool | None | object = _UNSET_CLOCK,
+    expected_clock_locked: bool | object | None = _UNSET_CLOCK,
 ) -> float | None:
     """Read profiler overhead calibration value from a JSON sidecar.
 
@@ -193,7 +193,7 @@ def _calibration_identity_mismatch(
     *,
     expected_gpu_architecture: str | None,
     expected_profiler_executable: str | None,
-    expected_clock_locked: bool | None | object,
+    expected_clock_locked: bool | object | None,
 ) -> str | None:
     if expected_gpu_architecture is not None:
         expected_arch = expected_gpu_architecture.split(":", maxsplit=1)[

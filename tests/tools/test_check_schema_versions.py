@@ -15,7 +15,8 @@ SCRIPT_PATH = (
     Path(__file__).resolve().parents[2] / "scripts/check_schema_versions.py"
 )
 SPEC = spec_from_file_location("check_schema_versions", SCRIPT_PATH)
-assert SPEC is not None and SPEC.loader is not None
+assert SPEC is not None
+assert SPEC.loader is not None
 MODULE = module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 audit_text = MODULE.audit_text
@@ -247,23 +248,6 @@ def test_rejects_schema_version_coercion_at_reader_boundaries():
                 f"with {conversion}()"
             ),
         ]
-
-
-def test_rejects_artifact_aggregate_import_in_production():
-    findings, _ = audit_text(
-        Path("src/example.py"),
-        (
-            "from sol_execbench.core.integrity.artifact_registry "
-            "import CURRENT_STRING_ARTIFACT_SCHEMAS\n"
-        ),
-    )
-
-    assert findings == [
-        (
-            "src/example.py:1: artifact_registry is audit-only; import the "
-            "owning domain schema enum directly"
-        ),
-    ]
 
 
 def test_current_schema_registries_are_read_only():

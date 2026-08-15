@@ -7,7 +7,8 @@ SCRIPT_PATH = (
     Path(__file__).resolve().parents[2] / "scripts/check_solar_coverage.py"
 )
 SPEC = spec_from_file_location("check_coverage_policy", SCRIPT_PATH)
-assert SPEC is not None and SPEC.loader is not None
+assert SPEC is not None
+assert SPEC.loader is not None
 coverage_policy = module_from_spec(SPEC)
 SPEC.loader.exec_module(coverage_policy)
 

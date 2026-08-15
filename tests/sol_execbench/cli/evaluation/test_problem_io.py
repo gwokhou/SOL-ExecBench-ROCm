@@ -186,7 +186,7 @@ def test_resolve_problem_inputs_allows_explicit_workload_when_problem_dir_defaul
 def test_resolve_problem_inputs_rejects_missing_solution() -> None:
     with pytest.raises(
         click.ClickException,
-        match="Provide PROBLEM_DIR with solution.json or --solution",
+        match=r"Provide PROBLEM_DIR with solution\.json or --solution",
     ):
         problem_io.resolve_problem_inputs(
             problem_dir=None,

@@ -750,15 +750,21 @@ def _validated_recorded_tolerance(
         or recorded.rtol > required.rtol
         or recorded.required_matched_ratio < required.required_matched_ratio
         or cap_is_weaker
-        or recorded.allow_negative_inf
-        and not required.allow_negative_inf
-        or isinstance(required, VerificationPolicy)
-        and recorded.preserved_input_indices
-        != tuple(required.preserved_input_indices)
-        or isinstance(required, VerificationPolicy)
-        and recorded.verify_gradients != required.verify_gradients
-        or isinstance(required, VerificationPolicy)
-        and recorded.gradient_input_indices != required.gradient_input_indices
+        or (recorded.allow_negative_inf and not required.allow_negative_inf)
+        or (
+            isinstance(required, VerificationPolicy)
+            and recorded.preserved_input_indices
+            != tuple(required.preserved_input_indices)
+        )
+        or (
+            isinstance(required, VerificationPolicy)
+            and recorded.verify_gradients != required.verify_gradients
+        )
+        or (
+            isinstance(required, VerificationPolicy)
+            and recorded.gradient_input_indices
+            != required.gradient_input_indices
+        )
     ):
         raise VerificationError(
             "verification tolerance is weaker than benchmark tolerance",

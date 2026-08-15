@@ -360,7 +360,7 @@ def test_analysis_request_rejects_invalid_contract_fields(tmp_path, changes):
         conversion_values.update(changes)
     with pytest.raises(
         ValueError,
-        match="non-empty|SHA-256|tolerances|cannot exceed",
+        match=r"non-empty|SHA-256|tolerances|cannot exceed",
     ):
         AnalysisRequest(
             conversion=ConversionRequest(

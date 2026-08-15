@@ -423,7 +423,7 @@ class TopologyBuilder(BoundComponent):
                 parent_hierarchy = self._get_module_hierarchy_with_ids(
                     parent, visited
                 )
-                return parent_hierarchy + [(parent_name, parent_obj_id)]
+                return [*parent_hierarchy, (parent_name, parent_obj_id)]
 
         # No direct ModuleNode parent - trace through TensorNode parents only
         # (TensorNodes are part of module containment, FunctionNodes are data flow)

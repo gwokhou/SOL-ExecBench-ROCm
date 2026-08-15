@@ -264,7 +264,8 @@ class TestCalibrationScriptArgs:
             "run_rdna4_profiler_overhead_calibration",
             SCRIPT_PATH,
         )
-        assert spec is not None and spec.loader is not None
+        assert spec is not None
+        assert spec.loader is not None
         mod = module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod
@@ -333,7 +334,8 @@ class TestCalibrationJSONSchema:
             "run_rdna4_profiler_overhead_calibration_schema",
             SCRIPT_PATH,
         )
-        assert spec is not None and spec.loader is not None
+        assert spec is not None
+        assert spec.loader is not None
         mod = module_from_spec(spec)
         spec.loader.exec_module(mod)
         assert (
@@ -357,7 +359,8 @@ class TestCalibrationClockSetup:
             "run_rdna4_profiler_overhead_calibration_clock_setup",
             SCRIPT_PATH,
         )
-        assert spec is not None and spec.loader is not None
+        assert spec is not None
+        assert spec.loader is not None
         mod = module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod

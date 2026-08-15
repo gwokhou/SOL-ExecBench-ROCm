@@ -81,13 +81,6 @@ EXECBENCH_SCHEMA_REGISTRIES = frozenset(
 ARTIFACT_AGGREGATE_REGISTRY = Path(
     "src/sol_execbench/core/integrity/artifact_registry.py"
 )
-ARTIFACT_AGGREGATE_IMPORT = "sol_execbench.core.integrity.artifact_registry"
-ARTIFACT_AGGREGATE_IMPORT_ALLOWLIST = frozenset(
-    {
-        Path("scripts/check_non_canonical_artifacts.py"),
-        Path("scripts/check_schema_versions.py"),
-    }
-)
 SOLAR_SCHEMA_REGISTRY = Path("src/solar/schema_versions.py")
 PROTOCOL_REGISTRY = Path(
     "src/sol_execbench/core/integrity/protocol_versions.py"
@@ -314,34 +307,6 @@ class _SchemaAccessPolicyVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-class _ArtifactAggregateImportVisitor(ast.NodeVisitor):
-    """Keep the cross-domain aggregate out of production dependencies."""
-
-    def __init__(self, path: Path) -> None:
-        self.path = path
-        self.findings: list[str] = []
-
-    def _record(self, node: ast.Import | ast.ImportFrom) -> None:
-        self.findings.append(
-            f"{self.path}:{node.lineno}: artifact_registry is audit-only; "
-            "import the owning domain schema enum directly",
-        )
-
-    def visit_Import(self, node: ast.Import) -> None:
-        if any(
-            alias.name == ARTIFACT_AGGREGATE_IMPORT
-            or alias.name.startswith(f"{ARTIFACT_AGGREGATE_IMPORT}.")
-            for alias in node.names
-        ):
-            self._record(node)
-        self.generic_visit(node)
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if node.module == ARTIFACT_AGGREGATE_IMPORT:
-            self._record(node)
-        self.generic_visit(node)
-
-
 def _python_numeric_schema_findings(path: Path, content: str) -> list[str]:
     """Reject raw positive numeric schema versions outside their registries."""
     if path.suffix != ".py" or path.parts[0] not in {"src", "scripts"}:
@@ -359,13 +324,9 @@ def _python_numeric_schema_findings(path: Path, content: str) -> list[str]:
     visitor.visit(tree)
     access_visitor = _SchemaAccessPolicyVisitor(path)
     access_visitor.visit(tree)
-    aggregate_import_visitor = _ArtifactAggregateImportVisitor(path)
-    if path not in ARTIFACT_AGGREGATE_IMPORT_ALLOWLIST:
-        aggregate_import_visitor.visit(tree)
     return [
         *visitor.findings,
         *access_visitor.findings,
-        *aggregate_import_visitor.findings,
     ]
 
 

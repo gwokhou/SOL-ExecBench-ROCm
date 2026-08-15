@@ -139,7 +139,7 @@ def test_performance_projection_verifies_then_omits_rocpd_and_private_paths(
     assert static.artifacts[0].persisted_path is None
 
     (source_root / "rocpd.artifact").write_text("tampered", encoding="utf-8")
-    with pytest.raises(ValueError, match="(size|SHA-256) mismatch"):
+    with pytest.raises(ValueError, match=r"(size|SHA-256) mismatch"):
         publication._project_performance_manifest(
             source, tmp_path / "other-publication" / "performance"
         )

@@ -223,7 +223,7 @@ def _result(
         if candidate not in completed_names and candidate != stage
     )
     stages = tuple(passed) + (
-        ((failed,) + remaining) if stage in READINESS_STAGES else remaining
+        ((failed, *remaining)) if stage in READINESS_STAGES else remaining
     )
     return ConversionReadinessResult(
         status=SolarReadinessStatus.FAILED,
