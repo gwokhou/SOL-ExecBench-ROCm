@@ -26,17 +26,19 @@ from solar.ir.extended_einsum.operations.handlers.base import (
 )
 from solar.ir.extended_einsum.operations.handlers.registry import (
     EinsumOpRegistry,
+    EinsumOpRegistryBuilder,
+    ReadonlyEinsumOpRegistry,
     build_builtin_registry,
-    get_global_registry,
-    register_einsum_op,
+    builtin_einsum_registry,
 )
 
 __all__ = [
     "EinsumOp",
     "EinsumOpHandler",
     "EinsumOpRegistry",
+    "EinsumOpRegistryBuilder",
     "EinsumOperand",
+    "ReadonlyEinsumOpRegistry",
     "build_builtin_registry",
-    "get_global_registry",
-    "register_einsum_op",
+    "builtin_einsum_registry",
 ]

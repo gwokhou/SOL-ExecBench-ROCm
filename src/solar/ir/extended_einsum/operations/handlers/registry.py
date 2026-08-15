@@ -17,8 +17,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from collections.abc import Mapping
+from functools import cache
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from solar.ir.extended_einsum.operations.handlers.base import (
@@ -28,35 +30,61 @@ if TYPE_CHECKING:
     from solar.types import DynamicValue, TensorShapes
 
 
+class ReadonlyEinsumOpRegistry(Protocol):
+    """Minimal immutable lookup boundary consumed by analyzers."""
+
+    def has_handler(self, op_name: str) -> bool:
+        """Return whether a handler exists for an operation."""
+        ...
+
+    def get_einsum_op(
+        self,
+        op_name: str,
+        shapes: TensorShapes,
+        **kwargs: DynamicValue,
+    ) -> EinsumOp:
+        """Generate a normalized operation through a registered handler."""
+        ...
+
+
 class EinsumOpRegistry:
-    """Registry for einsum operation handlers.
+    """Immutable operation-handler lookup used during analysis."""
 
-    This class manages a collection of EinsumOpHandler instances and provides
-    methods for registration and lookup.
+    def __init__(self, handlers: Mapping[str, EinsumOpHandler]) -> None:
+        """Freeze a normalized handler mapping."""
+        self._op_to_handler = MappingProxyType(dict(handlers))
 
-    Usage:
-        registry = EinsumOpRegistry()
+    @property
+    def handlers(self) -> Mapping[str, EinsumOpHandler]:
+        """Return the immutable normalized handler inventory."""
+        return self._op_to_handler
 
-        # Register a handler class
-        registry.register_handler(MatmulHandler)
+    def get_handler(self, op_name: str) -> EinsumOpHandler | None:
+        """Return the registered handler for one normalized operation."""
+        return self._op_to_handler.get(op_name.lower())
 
-        # Or use the decorator
-        @registry.register
-        class MyHandler(EinsumOpHandler):
-            supported_ops = ["my_op"]
-            ...
+    def has_handler(self, op_name: str) -> bool:
+        """Return whether a handler exists for the operation."""
+        return op_name.lower() in self._op_to_handler
 
-        # Get einsum for an operation
-        einsum_op = registry.get_einsum_op("matmul", shapes)
-    """
+    def get_einsum_op(
+        self,
+        op_name: str,
+        shapes: TensorShapes,
+        **kwargs: DynamicValue,
+    ) -> EinsumOp:
+        """Generate an einsum operation through the registered handler."""
+        handler = self.get_handler(op_name)
+        if handler is None:
+            raise ValueError(f"No handler registered for operation: {op_name}")
+        return handler.generate_einsum(op_name, shapes, **kwargs)
 
-    def __init__(self, debug: bool = False) -> None:
-        """Initialize the registry.
 
-        Args:
-            debug: Print handler registration diagnostics.
+class EinsumOpRegistryBuilder:
+    """Mutable construction boundary for an immutable handler registry."""
 
-        """
+    def __init__(self, *, debug: bool = False) -> None:
+        """Initialize an empty builder."""
         self.debug = debug
         self._op_to_handler: dict[str, EinsumOpHandler] = {}
 
@@ -65,15 +93,8 @@ class EinsumOpRegistry:
         handler_class: type[EinsumOpHandler],
         *,
         replace_ops: frozenset[str] = frozenset(),
-    ) -> None:
-        """Register a handler class.
-
-        Args:
-            handler_class: Handler class to register.
-            replace_ops: Existing operation mappings this class intentionally
-                replaces.
-
-        """
+    ) -> EinsumOpRegistryBuilder:
+        """Register a handler class and return this builder."""
         op_keys = tuple(
             op_name.lower() for op_name in handler_class.supported_ops
         )
@@ -125,84 +146,14 @@ class EinsumOpRegistry:
                 print(
                     f"Registered handler for '{op_key}': {handler_class.__name__}",
                 )
+        return self
 
-    def register(
-        self,
-        handler_class: type[EinsumOpHandler],
-    ) -> type[EinsumOpHandler]:
-        """Decorator to register a handler class.
-
-        Usage:
-            @registry.register
-            class MyHandler(EinsumOpHandler):
-                ...
-        """
-        self.register_handler(handler_class)
-        return handler_class
-
-    def get_handler(self, op_name: str) -> EinsumOpHandler | None:
-        """Get the handler for an operation.
-
-        Args:
-            op_name: Operation name.
-
-        Returns:
-            Handler if registered, None otherwise.
-
-        """
-        return self._op_to_handler.get(op_name.lower())
-
-    def has_handler(self, op_name: str) -> bool:
-        """Check if a handler is registered for an operation.
-
-        Args:
-            op_name: Operation name.
-
-        Returns:
-            True if a handler exists.
-
-        """
-        return op_name.lower() in self._op_to_handler
-
-    def get_einsum_op(
-        self,
-        op_name: str,
-        shapes: TensorShapes,
-        **kwargs: DynamicValue,
-    ) -> EinsumOp:
-        """Get an einsum operation for the given operation name.
-
-        Args:
-            op_name: Operation name.
-            shapes: Positional input/output tensor shapes.
-            **kwargs: Additional operation-specific parameters.
-
-        Returns:
-            EinsumOp for the operation.
-
-        Raises:
-            ValueError: If no handler is registered for the operation.
-
-        """
-        handler = self.get_handler(op_name)
-        if handler is None:
-            raise ValueError(f"No handler registered for operation: {op_name}")
-
-        return handler.generate_einsum(op_name, shapes, **kwargs)
+    def build(self) -> EinsumOpRegistry:
+        """Freeze the current inventory as an independent registry."""
+        return EinsumOpRegistry(self._op_to_handler)
 
 
-@dataclass(slots=True)
-class _RegistryState:
-    """Hold the optional process-wide registry behind the public accessor."""
-
-    registry: EinsumOpRegistry | None = None
-    handlers_loaded: bool = False
-
-
-_REGISTRY_STATE = _RegistryState()
-
-
-def _register_builtin_handlers(registry: EinsumOpRegistry) -> None:
+def _register_builtin_handlers(builder: EinsumOpRegistryBuilder) -> None:
     """Register the explicit built-in inventory in precedence order."""
     from solar.ir.extended_einsum.operations.handlers.builtin_handlers import (
         BUILTIN_HANDLER_CLASSES,
@@ -210,7 +161,7 @@ def _register_builtin_handlers(registry: EinsumOpRegistry) -> None:
     )
 
     for handler_class in BUILTIN_HANDLER_CLASSES:
-        registry.register_handler(
+        builder.register_handler(
             handler_class,
             replace_ops=BUILTIN_HANDLER_OVERRIDE_OPS.get(
                 handler_class,
@@ -220,41 +171,22 @@ def _register_builtin_handlers(registry: EinsumOpRegistry) -> None:
 
 
 def build_builtin_registry(*, debug: bool = False) -> EinsumOpRegistry:
-    """Build an independent registry containing every built-in handler."""
-    registry = EinsumOpRegistry(debug=debug)
-    _register_builtin_handlers(registry)
-    return registry
+    """Build an independent immutable registry of built-in handlers."""
+    builder = EinsumOpRegistryBuilder(debug=debug)
+    _register_builtin_handlers(builder)
+    return builder.build()
 
 
-def get_global_registry(load_handlers: bool = True) -> EinsumOpRegistry:
-    """Return the compatibility process-wide registry."""
-    if _REGISTRY_STATE.registry is None:
-        _REGISTRY_STATE.registry = EinsumOpRegistry()
-
-    if load_handlers and not _REGISTRY_STATE.handlers_loaded:
-        _register_builtin_handlers(_REGISTRY_STATE.registry)
-        _REGISTRY_STATE.handlers_loaded = True
-    return _REGISTRY_STATE.registry
-
-
-def register_einsum_op(
-    handler_class: type[EinsumOpHandler],
-) -> type[EinsumOpHandler]:
-    """Decorator to register a handler with the global registry.
-
-    Usage:
-        @register_einsum_op
-        class MyHandler(EinsumOpHandler):
-            supported_ops = ["my_op"]
-            ...
-    """
-    get_global_registry(load_handlers=False).register_handler(handler_class)
-    return handler_class
+@cache
+def builtin_einsum_registry() -> EinsumOpRegistry:
+    """Return the process-wide immutable built-in registry."""
+    return build_builtin_registry()
 
 
 __all__ = [
     "EinsumOpRegistry",
+    "EinsumOpRegistryBuilder",
+    "ReadonlyEinsumOpRegistry",
     "build_builtin_registry",
-    "get_global_registry",
-    "register_einsum_op",
+    "builtin_einsum_registry",
 ]
