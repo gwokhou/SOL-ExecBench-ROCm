@@ -39,11 +39,11 @@ from typing import Any
 
 from torch import nn
 
+from solar.composition import BoundComponent
 from solar.graph.torchview.models import NodeInfo
-from solar.graph.torchview.processor_contract import TorchviewProcessorContract
 
 
-class TorchviewTopologyMixin(TorchviewProcessorContract):
+class TopologyBuilder(BoundComponent):
     """Recover graph edges, hierarchy, and stable node identities."""
 
     def _extract_from_edge_list(

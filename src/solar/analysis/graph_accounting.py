@@ -43,11 +43,11 @@ from solar.analysis.graph_models import (
     OutputIo,
     ResourceAccounting,
 )
-from solar.analysis.mixin_contract import AnalysisMixinContract
 from solar.analysis.resources import (
     classify_layer_resources,
     merge_resource_work,
 )
+from solar.composition import BoundComponent
 from solar.ir.contracts import layer_operation
 from solar.precision import (
     BYTES_PER_ELEMENT,
@@ -100,7 +100,7 @@ def _serialized_tensor_metadata(
     }
 
 
-class GraphAccountingMixin(AnalysisMixinContract):
+class LayerAccountant(BoundComponent):
     """Account graph compute, memory, and external I/O."""
 
     def _account_layer_resources(
@@ -148,7 +148,9 @@ class GraphAccountingMixin(AnalysisMixinContract):
             cast(Mapping[str, Mapping[str, Any]], layer_work),
         )
         accumulator.resource_coverage[str(resources["classification"])] += 1
-        return ResourceAccounting(compute_precision, resources)
+        return ResourceAccounting(
+            compute_precision=compute_precision, resources=resources
+        )
 
     @staticmethod
     def _resource_precision(
@@ -248,10 +250,10 @@ class GraphAccountingMixin(AnalysisMixinContract):
                     byte_counts.input_bytes[index],
                 )
         return InputIo(
-            intermediate_elems,
-            model_elems,
-            intermediate_bytes,
-            model_bytes,
+            intermediate_elems=intermediate_elems,
+            model_elems=model_elems,
+            intermediate_bytes=intermediate_bytes,
+            model_bytes=model_bytes,
         )
 
     @staticmethod
@@ -326,11 +328,11 @@ class GraphAccountingMixin(AnalysisMixinContract):
                 bytes_,
             )
         return OutputIo(
-            intermediate_elems,
-            model_elems,
-            intermediate_bytes,
-            model_bytes,
-            any(intermediate_flags),
+            intermediate_elems=intermediate_elems,
+            model_elems=model_elems,
+            intermediate_bytes=intermediate_bytes,
+            model_bytes=model_bytes,
+            is_intermediate=any(intermediate_flags),
         )
 
     def _classify_layer_io(

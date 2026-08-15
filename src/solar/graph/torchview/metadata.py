@@ -40,6 +40,7 @@ from typing import Any
 import torch
 from torch import nn
 
+from solar.composition import BoundComponent
 from solar.graph.torchview.attribute_parsing import (
     parse_operation_attributes,
 )
@@ -49,11 +50,10 @@ from solar.graph.torchview.constants import (
     MODULE_ATTR_NAMES,
 )
 from solar.graph.torchview.models import NodeInfo
-from solar.graph.torchview.processor_contract import TorchviewProcessorContract
 from solar.types import TensorShape
 
 
-class TorchviewMetadataMixin(TorchviewProcessorContract):
+class MetadataExtractor(BoundComponent):
     """Extract node, tensor, module, and function metadata."""
 
     def _extract_layer_nodes(

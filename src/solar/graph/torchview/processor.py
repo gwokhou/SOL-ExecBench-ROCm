@@ -35,23 +35,21 @@ The output format matches the original process_torchview_graph.py output:
 """
 
 from pathlib import Path
+from threading import RLock
+from typing import ClassVar
 
 from torch import nn
 
-from solar.graph.torchview.metadata import TorchviewMetadataMixin
-from solar.graph.torchview.models import NodeInfo
-from solar.graph.torchview.parameters import TorchviewParametersMixin
-from solar.graph.torchview.reporting import TorchviewReportingMixin
-from solar.graph.torchview.topology import TorchviewTopologyMixin
+from solar.composition import BoundComponent, component_attribute
+from solar.graph.torchview.metadata import MetadataExtractor
+from solar.graph.torchview.models import NodeInfo, TorchviewProcessorState
+from solar.graph.torchview.parameters import ParameterBinder
+from solar.graph.torchview.reporting import GraphReporter
+from solar.graph.torchview.topology import TopologyBuilder
 from solar.types import DynamicValue
 
 
-class TorchviewProcessor(
-    TorchviewMetadataMixin,
-    TorchviewTopologyMixin,
-    TorchviewParametersMixin,
-    TorchviewReportingMixin,
-):
+class TorchviewProcessor:
     """Processes torchview computation graphs to extract layer information.
 
     This class provides methods to extract detailed information from torchview
@@ -66,10 +64,28 @@ class TorchviewProcessor(
             debug: Enable debug output for troubleshooting.
         """
         self.debug = debug
-        self._processed_nodes: set[str] = set()
-        self._matched_modules: set[str] = set()
-        self._node_counter: dict[str, int] = {}
-        self._original_to_clean_id: dict[str, str] = {}
+        self._state = TorchviewProcessorState()
+        self._processing_lock = RLock()
+        self._components: tuple[BoundComponent, ...] = (
+            MetadataExtractor(self),
+            TopologyBuilder(self),
+            ParameterBinder(self),
+            GraphReporter(self),
+        )
+
+    def __getattr__(self, name: str) -> DynamicValue:
+        """Resolve private processing behavior from composed components."""
+        if name in self._STATE_ATTRIBUTES:
+            return getattr(self._state, name.removeprefix("_"))
+        return component_attribute(self._components, name)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        """Route known per-call fields into the active state object."""
+        state = self.__dict__.get("_state")
+        if state is not None and name in self._STATE_ATTRIBUTES:
+            setattr(state, name.removeprefix("_"), value)
+            return
+        object.__setattr__(self, name, value)
 
     def process_graph(
         self,
@@ -89,39 +105,35 @@ class TorchviewProcessor(
         Returns:
             List of NodeInfo objects containing extracted layer information.
         """
-        if self.debug:
-            print(f"Processing torchview graph for {kernel_name}...")
+        with self._processing_lock:
+            if self.debug:
+                print(f"Processing torchview graph for {kernel_name}...")
 
-        self._reset_state()
+            self._reset_state()
 
-        layer_nodes = self._extract_layer_nodes(
-            computation_graph, original_model
-        )
+            layer_nodes = self._extract_layer_nodes(
+                computation_graph, original_model
+            )
 
-        # Save canonical YAML graph (and remove any legacy JSON artifacts).
-        output_path = Path(output_dir)
-        Path(output_path).mkdir(parents=True, exist_ok=True)
-        yaml_filename = output_path / "pytorch_graph.yaml"
+            # Save canonical YAML graph (and remove legacy JSON artifacts).
+            output_path = Path(output_dir)
+            Path(output_path).mkdir(parents=True, exist_ok=True)
+            yaml_filename = output_path / "pytorch_graph.yaml"
 
-        self._save_pytorch_graph_yaml(
-            layer_nodes, yaml_filename, model_name=kernel_name
-        )
+            self._save_pytorch_graph_yaml(
+                layer_nodes, yaml_filename, model_name=kernel_name
+            )
 
-        if self.debug:
-            self._print_layer_summary(layer_nodes)
+            if self.debug:
+                self._print_layer_summary(layer_nodes)
 
-        return layer_nodes
+            return layer_nodes
 
     def _reset_state(self) -> None:
         """Reset internal state for processing a new graph."""
-        self._processed_nodes.clear()
-        self._matched_modules.clear()
-        self._node_counter.clear()
-        self._original_to_clean_id.clear()
-        self._module_index_tracker: dict[tuple[str, str], dict[int, int]] = {}
-        self._module_has_duplicates: set[tuple[str, str]] = set()
-        self._names_repeated_in_any_path: set[str] = set()
-        self._hierarchical_counter: dict[str, int] = {}
-        self._original_to_hierarchical: dict[str, str] = {}
+        self._state = TorchviewProcessorState()
 
     _VALID_NODE_TYPES = ("TensorNode", "ModuleNode", "FunctionNode")
+    _STATE_ATTRIBUTES: ClassVar[frozenset[str]] = frozenset(
+        f"_{name}" for name in TorchviewProcessorState.__dataclass_fields__
+    )

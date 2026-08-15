@@ -50,12 +50,12 @@ from solar.analysis.graph_rules import (
 from solar.analysis.graph_validation import (
     validate_graph_semantics,
 )
-from solar.analysis.mixin_contract import AnalysisMixinContract
 from solar.analysis.resources import (
     ResourceClassificationError,
     is_mfma_operation,
     mandatory_mfma_macs,
 )
+from solar.composition import BoundComponent
 from solar.ir.contracts import (
     OPERATION_KIND,
     layer_contraction_analysis,
@@ -70,7 +70,7 @@ from solar.rocm.architecture import ArchitectureProfile
 from solar.types import TensorShapes
 
 
-class GraphLoadingMixin(AnalysisMixinContract):
+class GraphLoader(BoundComponent):
     """Load, validate, and normalize analysis graph inputs."""
 
     def _resolve_analysis_paths(
@@ -381,7 +381,7 @@ class GraphLoadingMixin(AnalysisMixinContract):
             writes = [0] * len(data.output_sizes)
             other_ops = 0
         elif data.op_type in SCATTER_OPS:
-            slice_elements = GraphLoadingMixin._scatter_write_elements(data)
+            slice_elements = GraphLoader._scatter_write_elements(data)
             reads = [0] * len(data.input_sizes)
             writes = [slice_elements] if data.output_sizes else []
             writes += [0] * max(0, len(data.output_sizes) - 1)
@@ -401,7 +401,9 @@ class GraphLoadingMixin(AnalysisMixinContract):
             reads = [0] * len(data.input_sizes)
             writes = [0] * len(data.output_sizes)
             other_ops = 0
-        return MemoryElements(reads, writes, other_ops, orphaned)
+        return MemoryElements(
+            reads=reads, writes=writes, other_ops=other_ops, orphaned=orphaned
+        )
 
     @staticmethod
     def _memory_bytes(
