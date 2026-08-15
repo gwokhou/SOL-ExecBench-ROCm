@@ -39,7 +39,7 @@ from sol_execbench.core.solar_bridge.resource_policy import (
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarReleaseResult:
     """Summary of an exact formal-manifest release build."""
 
@@ -51,7 +51,7 @@ class SolarReleaseResult:
     ir_path: IRPath = DEFAULT_IR_PATH
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _SolarReleaseWorkItem:
     """One deterministically ordered release workload invocation."""
 

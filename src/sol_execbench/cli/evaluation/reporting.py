@@ -16,7 +16,7 @@ from sol_execbench.core.data.trace import EvaluationStatus, Trace
 console = Console()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _TraceRow:
     values: tuple[str, str, str, str, str, str, str]
     passed: bool
@@ -64,8 +64,8 @@ def _trace_row(index: int, trace: Trace) -> _TraceRow:
     evaluation = trace.evaluation
     if evaluation is None:
         return _TraceRow(
-            (str(index), "[dim]no evaluation[/dim]", "", "", "", "", ""),
-            False,
+            values=(str(index), "[dim]no evaluation[/dim]", "", "", "", "", ""),
+            passed=False,
         )
 
     status = evaluation.status
@@ -92,7 +92,7 @@ def _trace_row(index: int, trace: Trace) -> _TraceRow:
             absolute_error = f"{evaluation.correctness.max_absolute_error:.2e}"
             relative_error = f"{evaluation.correctness.max_relative_error:.2e}"
     return _TraceRow(
-        (
+        values=(
             str(index),
             status_text,
             latency,
@@ -101,7 +101,7 @@ def _trace_row(index: int, trace: Trace) -> _TraceRow:
             absolute_error,
             relative_error,
         ),
-        status == EvaluationStatus.PASSED,
+        passed=status == EvaluationStatus.PASSED,
     )
 
 

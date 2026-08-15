@@ -29,7 +29,7 @@ from solar.rocm.architecture import ArchitectureProfile
 from solar.types import DynamicValue
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PipelineResult:
     """Graph, IR, verification, and analysis output."""
 
@@ -106,7 +106,7 @@ def run_pipeline(
                 cleanup()
         stage = SolarStage.FORMAL_ANALYSIS
         analysis = analyze_request_graph(request, profile, staging, ir_graph)
-        return PipelineResult(ir_graph, analysis)
+        return PipelineResult(ir_graph=ir_graph, analysis=analysis)
     except Exception as exc:
         raise PipelineStageError(stage, exc) from exc
 

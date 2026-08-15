@@ -30,7 +30,7 @@ class CliExitCode(IntEnum):
     EXECUTION = 4
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CliResult:
     """Structured command result before text or JSON rendering."""
 

@@ -46,7 +46,7 @@ class TextSubprocessRunner(Protocol):
         ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ProbeCompletedProcess:
     """Small subprocess result shape used by injectable probe runners."""
 
@@ -290,7 +290,7 @@ class _TailCapture:
         return value
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _CaptureWorker:
     thread: threading.Thread
     stop: threading.Event

@@ -71,7 +71,7 @@ class SolarStage(StrEnum):
     FORMAL_ACCEPTANCE = "formal_acceptance"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ConversionRequest:
     """Shared graph extraction, conversion, and verification request."""
 
@@ -170,7 +170,7 @@ class ConversionRequestEnvelope:
         return self.conversion.verification
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AnalysisExecutionPolicy:
     """Non-semantic controls for one analysis execution."""
 
@@ -184,7 +184,7 @@ class AnalysisExecutionPolicy:
             raise ValueError("device stage lock timeout must be positive")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AnalysisRequest(ConversionRequestEnvelope):
     """Formal-analysis inputs composed around one conversion request."""
 
@@ -203,15 +203,19 @@ class AnalysisRequest(ConversionRequestEnvelope):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ArtifactRef:
     """A content-addressed file relative to the result directory."""
 
     path: str
     sha256: str
 
+    def to_dict(self) -> dict[str, str]:
+        """Return the stable serialized artifact reference."""
+        return {"path": self.path, "sha256": self.sha256}
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SOLBound:
     """The formal lower bound emitted by SOLAR, never a benchmark score."""
 
@@ -220,7 +224,7 @@ class SOLBound:
     limiting_resource: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AnalysisResult:
     """Successful immutable result of the SOLAR pipeline."""
 
@@ -248,7 +252,7 @@ class AnalysisResult:
         return self.bound.kind in SOL_BOUND_KINDS
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AnalysisFailure:
     """Fail-closed result; a failed run publishes no partial directory."""
 
@@ -266,7 +270,7 @@ class AnalysisFailure:
         object.__setattr__(self, "stage", SolarStage(self.stage))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FormalProducerReadiness:
     """Whether the pinned formal-analysis producer is available."""
 

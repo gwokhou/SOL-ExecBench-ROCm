@@ -93,7 +93,7 @@ AKA_PROVENANCE_CLASS = "ecosystem_grounded"
 FORMAL_ARCHITECTURE = "solar:RX_9060_XT"
 FORMAL_GFX_TARGET = "gfx1200"
 FORMAL_ARCHITECTURE_SHA256 = (
-    "25ad977df7a7206bd9d8caf60d2cd85d4f5c5fdc47368a22efb881c0250d0877"
+    "09bff1a265b43a981c8c2e6d479f0de99b356cb0976a2bf511953f3026adf3b1"
 )
 
 # Corpus-size bounds. The initial seed landed at 15 problems; the current
@@ -104,7 +104,7 @@ SEED_SET_MIN_PROBLEMS = 15
 SEED_SET_MAX_PROBLEMS = 48
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKAArtifactBinding:
     """One content-addressed file within an AKA task."""
 
@@ -113,7 +113,7 @@ class AKAArtifactBinding:
     sha256: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKACorpusEntry:
     """One AKA-derived problem selected into the seed set."""
 
@@ -140,7 +140,7 @@ class AKACorpusEntry:
         return Path(self.suite) / self.problem_name
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKACorpusManifest:
     """Validated AKA-derived corpus manifest."""
 
@@ -199,15 +199,17 @@ class AKACorpusManifest:
             ),
         )
         return cls(
-            manifest_path,
-            dict(data.get("source") or {}),
-            load_execution_targets(data.get("execution_targets") or {}),
-            dict(data.get("formal_analysis") or {}),
-            entries,
-            materialized_problem_sha256,
-            coverage,
-            dict(data.get("official_scoring") or {}),
-            calibration,
+            path=manifest_path,
+            source=dict(data.get("source") or {}),
+            execution_targets=load_execution_targets(
+                data.get("execution_targets") or {}
+            ),
+            formal_analysis=dict(data.get("formal_analysis") or {}),
+            entries=entries,
+            materialized_problem_sha256=materialized_problem_sha256,
+            formal_coverage_requirements=coverage,
+            official_scoring=dict(data.get("official_scoring") or {}),
+            tolerance_calibration=calibration,
         )
 
     def materialize(

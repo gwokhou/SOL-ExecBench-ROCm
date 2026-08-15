@@ -52,7 +52,7 @@ RELEASE_ROOT = CORPUS_ROOT / "releases" / "LLM_CORE_V2"
 PUBLIC_GFX_TARGETS = ("gfx1200", "gfx942")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ProblemSpec:
     """Declarative semantic specification consumed by family generators."""
 
@@ -649,99 +649,101 @@ def _coverage_policy() -> CorpusCoveragePolicy:
     )
 
 
+_GENERATION_SLOT_ROWS = (
+    (
+        "smoke",
+        WorkloadRole.SMOKE,
+        WorkloadRegime.LATENCY,
+        ServingPhase.NOT_APPLICABLE,
+        ShapeBinding.BOUNDARY,
+        1,
+        64,
+        False,
+    ),
+    (
+        "latency-low",
+        WorkloadRole.DEVELOPMENT,
+        WorkloadRegime.LATENCY,
+        ServingPhase.DECODE,
+        ShapeBinding.MODEL,
+        1,
+        8,
+        False,
+    ),
+    (
+        "latency-high",
+        WorkloadRole.DEVELOPMENT,
+        WorkloadRegime.LATENCY,
+        ServingPhase.DECODE,
+        ShapeBinding.MODEL,
+        1,
+        6,
+        False,
+    ),
+    (
+        "throughput-low",
+        WorkloadRole.DEVELOPMENT,
+        WorkloadRegime.THROUGHPUT,
+        ServingPhase.PREFILL,
+        ShapeBinding.MODEL,
+        1,
+        3,
+        False,
+    ),
+    (
+        "throughput-high",
+        WorkloadRole.DEVELOPMENT,
+        WorkloadRegime.THROUGHPUT,
+        ServingPhase.PREFILL,
+        ShapeBinding.MODEL,
+        1,
+        2,
+        False,
+    ),
+    (
+        "irregular-low",
+        WorkloadRole.DEVELOPMENT,
+        WorkloadRegime.IRREGULAR,
+        ServingPhase.NOT_APPLICABLE,
+        ShapeBinding.BOUNDARY,
+        1,
+        4,
+        True,
+    ),
+    (
+        "irregular-high",
+        WorkloadRole.DEVELOPMENT,
+        WorkloadRegime.IRREGULAR,
+        ServingPhase.NOT_APPLICABLE,
+        ShapeBinding.BOUNDARY,
+        3,
+        8,
+        True,
+    ),
+    (
+        "capacity-low",
+        WorkloadRole.DEVELOPMENT,
+        WorkloadRegime.CAPACITY,
+        ServingPhase.PREFILL,
+        ShapeBinding.MODEL,
+        3,
+        4,
+        False,
+    ),
+    (
+        "capacity-high",
+        WorkloadRole.DEVELOPMENT,
+        WorkloadRegime.CAPACITY,
+        ServingPhase.PREFILL,
+        ShapeBinding.MODEL,
+        1,
+        1,
+        False,
+    ),
+)
+
+
 def _generation_slots() -> tuple[GenerationSlotRule, ...]:
-    rows = (
-        (
-            "smoke",
-            WorkloadRole.SMOKE,
-            WorkloadRegime.LATENCY,
-            ServingPhase.NOT_APPLICABLE,
-            ShapeBinding.BOUNDARY,
-            1,
-            64,
-            False,
-        ),
-        (
-            "latency-low",
-            WorkloadRole.DEVELOPMENT,
-            WorkloadRegime.LATENCY,
-            ServingPhase.DECODE,
-            ShapeBinding.MODEL,
-            1,
-            8,
-            False,
-        ),
-        (
-            "latency-high",
-            WorkloadRole.DEVELOPMENT,
-            WorkloadRegime.LATENCY,
-            ServingPhase.DECODE,
-            ShapeBinding.MODEL,
-            1,
-            6,
-            False,
-        ),
-        (
-            "throughput-low",
-            WorkloadRole.DEVELOPMENT,
-            WorkloadRegime.THROUGHPUT,
-            ServingPhase.PREFILL,
-            ShapeBinding.MODEL,
-            1,
-            3,
-            False,
-        ),
-        (
-            "throughput-high",
-            WorkloadRole.DEVELOPMENT,
-            WorkloadRegime.THROUGHPUT,
-            ServingPhase.PREFILL,
-            ShapeBinding.MODEL,
-            1,
-            2,
-            False,
-        ),
-        (
-            "irregular-low",
-            WorkloadRole.DEVELOPMENT,
-            WorkloadRegime.IRREGULAR,
-            ServingPhase.NOT_APPLICABLE,
-            ShapeBinding.BOUNDARY,
-            1,
-            4,
-            True,
-        ),
-        (
-            "irregular-high",
-            WorkloadRole.DEVELOPMENT,
-            WorkloadRegime.IRREGULAR,
-            ServingPhase.NOT_APPLICABLE,
-            ShapeBinding.BOUNDARY,
-            3,
-            8,
-            True,
-        ),
-        (
-            "capacity-low",
-            WorkloadRole.DEVELOPMENT,
-            WorkloadRegime.CAPACITY,
-            ServingPhase.PREFILL,
-            ShapeBinding.MODEL,
-            3,
-            4,
-            False,
-        ),
-        (
-            "capacity-high",
-            WorkloadRole.DEVELOPMENT,
-            WorkloadRegime.CAPACITY,
-            ServingPhase.PREFILL,
-            ShapeBinding.MODEL,
-            1,
-            1,
-            False,
-        ),
-    )
     return tuple(
         GenerationSlotRule(
             slot_id=slot_id,
@@ -753,7 +755,7 @@ def _generation_slots() -> tuple[GenerationSlotRule, ...]:
             scale_denominator=denominator,
             irregular=irregular,
         )
-        for slot_id, role, regime, phase, binding, numerator, denominator, irregular in rows
+        for slot_id, role, regime, phase, binding, numerator, denominator, irregular in _GENERATION_SLOT_ROWS
     )
 
 

@@ -82,8 +82,8 @@ class NormalizationHandler(EinsumOpHandler):
         labels = string.ascii_uppercase[:dims]
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Output", list(labels), is_output=True),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
+            EinsumOperand(name="Output", dims=list(labels), is_output=True),
         ]
 
         equation = f"{labels}->{labels}"

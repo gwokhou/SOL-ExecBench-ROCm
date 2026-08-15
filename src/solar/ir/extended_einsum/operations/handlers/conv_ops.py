@@ -95,23 +95,41 @@ class Conv1dHandler(EinsumOpHandler):
         """
         if groups == 1:
             operands = [
-                EinsumOperand("Input", ["B", "C", "P+R"], is_output=False),
-                EinsumOperand("Weight", ["O", "C", "R"], is_output=False),
-                EinsumOperand("Output", ["B", "O", "P"], is_output=True),
+                EinsumOperand(
+                    name="Input", dims=["B", "C", "P+R"], is_output=False
+                ),
+                EinsumOperand(
+                    name="Weight", dims=["O", "C", "R"], is_output=False
+                ),
+                EinsumOperand(
+                    name="Output", dims=["B", "O", "P"], is_output=True
+                ),
             ]
             equation = "BC(P+R),OCR->BOP"
         elif groups == in_channels and groups == out_channels:
             operands = [
-                EinsumOperand("Input", ["B", "O", "P+R"], is_output=False),
-                EinsumOperand("Weight", ["O", "C", "R"], is_output=False),
-                EinsumOperand("Output", ["B", "O", "P"], is_output=True),
+                EinsumOperand(
+                    name="Input", dims=["B", "O", "P+R"], is_output=False
+                ),
+                EinsumOperand(
+                    name="Weight", dims=["O", "C", "R"], is_output=False
+                ),
+                EinsumOperand(
+                    name="Output", dims=["B", "O", "P"], is_output=True
+                ),
             ]
             equation = "BO(P+R),OCR->BOP"
         else:
             operands = [
-                EinsumOperand("Input", ["B", "G", "I", "P+R"], is_output=False),
-                EinsumOperand("Weight", ["G", "O", "I", "R"], is_output=False),
-                EinsumOperand("Output", ["B", "G", "O", "P"], is_output=True),
+                EinsumOperand(
+                    name="Input", dims=["B", "G", "I", "P+R"], is_output=False
+                ),
+                EinsumOperand(
+                    name="Weight", dims=["G", "O", "I", "R"], is_output=False
+                ),
+                EinsumOperand(
+                    name="Output", dims=["B", "G", "O", "P"], is_output=True
+                ),
             ]
             equation = "BGI(P+R),GOIR->BGOP"
 
@@ -192,40 +210,48 @@ class Conv2dHandler(EinsumOpHandler):
         if groups == 1:
             operands = [
                 EinsumOperand(
-                    "Input",
-                    ["B", "C", "P+R", "Q+S"],
+                    name="Input",
+                    dims=["B", "C", "P+R", "Q+S"],
                     is_output=False,
                 ),
-                EinsumOperand("Weight", ["O", "C", "R", "S"], is_output=False),
-                EinsumOperand("Output", ["B", "O", "P", "Q"], is_output=True),
+                EinsumOperand(
+                    name="Weight", dims=["O", "C", "R", "S"], is_output=False
+                ),
+                EinsumOperand(
+                    name="Output", dims=["B", "O", "P", "Q"], is_output=True
+                ),
             ]
             equation = "BC(P+R)(Q+S),OCRS->BOPQ"
         elif groups == in_channels and groups == out_channels:
             operands = [
                 EinsumOperand(
-                    "Input",
-                    ["B", "O", "P+R", "Q+S"],
+                    name="Input",
+                    dims=["B", "O", "P+R", "Q+S"],
                     is_output=False,
                 ),
-                EinsumOperand("Weight", ["O", "C", "R", "S"], is_output=False),
-                EinsumOperand("Output", ["B", "O", "P", "Q"], is_output=True),
+                EinsumOperand(
+                    name="Weight", dims=["O", "C", "R", "S"], is_output=False
+                ),
+                EinsumOperand(
+                    name="Output", dims=["B", "O", "P", "Q"], is_output=True
+                ),
             ]
             equation = "BO(P+R)(Q+S),OCRS->BOPQ"
         else:
             operands = [
                 EinsumOperand(
-                    "Input",
-                    ["B", "G", "I", "P+R", "Q+S"],
+                    name="Input",
+                    dims=["B", "G", "I", "P+R", "Q+S"],
                     is_output=False,
                 ),
                 EinsumOperand(
-                    "Weight",
-                    ["G", "O", "I", "R", "S"],
+                    name="Weight",
+                    dims=["G", "O", "I", "R", "S"],
                     is_output=False,
                 ),
                 EinsumOperand(
-                    "Output",
-                    ["B", "G", "O", "P", "Q"],
+                    name="Output",
+                    dims=["B", "G", "O", "P", "Q"],
                     is_output=True,
                 ),
             ]
@@ -305,12 +331,16 @@ class Conv3dHandler(EinsumOpHandler):
         # P,Q,U are output positions, T,R,S are kernel positions
         operands = [
             EinsumOperand(
-                "Input",
-                ["B", "C", "P+T", "Q+R", "U+S"],
+                name="Input",
+                dims=["B", "C", "P+T", "Q+R", "U+S"],
                 is_output=False,
             ),
-            EinsumOperand("Weight", ["O", "C", "T", "R", "S"], is_output=False),
-            EinsumOperand("Output", ["B", "O", "P", "Q", "U"], is_output=True),
+            EinsumOperand(
+                name="Weight", dims=["O", "C", "T", "R", "S"], is_output=False
+            ),
+            EinsumOperand(
+                name="Output", dims=["B", "O", "P", "Q", "U"], is_output=True
+            ),
         ]
 
         # Sliding window einsum: BC(P+T)(Q+R)(U+S),OCTRS->BOPQU
@@ -368,9 +398,11 @@ class ConvTranspose1dHandler(EinsumOpHandler):
         distinction by giving them separate canonical ranks.
         """
         operands = [
-            EinsumOperand("Input", ["B", "C", "P"], is_output=False),
-            EinsumOperand("Weight", ["C", "K", "R"], is_output=False),
-            EinsumOperand("Output", ["B", "K", "P+R"], is_output=True),
+            EinsumOperand(name="Input", dims=["B", "C", "P"], is_output=False),
+            EinsumOperand(name="Weight", dims=["C", "K", "R"], is_output=False),
+            EinsumOperand(
+                name="Output", dims=["B", "K", "P+R"], is_output=True
+            ),
         ]
 
         equation = "BCP,CKR->BK(P+R)"
@@ -425,9 +457,15 @@ class ConvTranspose2dHandler(EinsumOpHandler):
         union-find canonicalization.
         """
         operands = [
-            EinsumOperand("Input", ["B", "C", "P", "Q"], is_output=False),
-            EinsumOperand("Weight", ["C", "K", "R", "S"], is_output=False),
-            EinsumOperand("Output", ["B", "K", "P+R", "Q+S"], is_output=True),
+            EinsumOperand(
+                name="Input", dims=["B", "C", "P", "Q"], is_output=False
+            ),
+            EinsumOperand(
+                name="Weight", dims=["C", "K", "R", "S"], is_output=False
+            ),
+            EinsumOperand(
+                name="Output", dims=["B", "K", "P+R", "Q+S"], is_output=True
+            ),
         ]
 
         equation = "BCPQ,CKRS->BK(P+R)(Q+S)"
@@ -482,11 +520,15 @@ class ConvTranspose3dHandler(EinsumOpHandler):
         union-find canonicalization.
         """
         operands = [
-            EinsumOperand("Input", ["B", "C", "P", "Q", "U"], is_output=False),
-            EinsumOperand("Weight", ["C", "K", "T", "R", "S"], is_output=False),
             EinsumOperand(
-                "Output",
-                ["B", "K", "P+T", "Q+R", "U+S"],
+                name="Input", dims=["B", "C", "P", "Q", "U"], is_output=False
+            ),
+            EinsumOperand(
+                name="Weight", dims=["C", "K", "T", "R", "S"], is_output=False
+            ),
+            EinsumOperand(
+                name="Output",
+                dims=["B", "K", "P+T", "Q+R", "U+S"],
                 is_output=True,
             ),
         ]

@@ -33,7 +33,7 @@ from solar.types import DynamicValue, TensorShape, TensorShapes
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class EinsumOperand:
     """Represents an operand in an einsum operation."""
 
@@ -44,7 +44,7 @@ class EinsumOperand:
     dilation: dict[str, int] | None = None
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class EinsumOp:
     """Represents an einsum operation.
 
@@ -274,39 +274,13 @@ class EinsumOpHandler(ABC):
         input_labels = string.ascii_uppercase[:input_rank]
         output_labels = string.ascii_uppercase[:output_rank]
 
-        # For binary ops, handle second input
-        if input_1_shape is not None:
-            input_1_rank = len(input_1_shape)
-
-            # Handle broadcasting: use output labels for the larger tensor
-            if input_1_rank < input_rank:
-                # A smaller second input uses the output-label suffix.
-                input_1_labels = (
-                    output_labels[-input_1_rank:] if input_1_rank > 0 else ""
-                )
-            elif input_1_rank > input_rank:
-                # First input is smaller, use suffix of output labels
-                input_labels = (
-                    output_labels[-input_rank:] if input_rank > 0 else ""
-                )
-                input_1_labels = output_labels
-            else:
-                input_1_labels = input_labels
-
-            new_equation = f"{input_labels},{input_1_labels}->{output_labels}"
-
-            # Update operands
-            new_operands = [
-                EinsumOperand("Input", list(input_labels), is_output=False),
-                EinsumOperand("Input_1", list(input_1_labels), is_output=False),
-                EinsumOperand("Output", list(output_labels), is_output=True),
-            ]
-        else:
-            new_equation = f"{input_labels}->{output_labels}"
-            new_operands = [
-                EinsumOperand("Input", list(input_labels), is_output=False),
-                EinsumOperand("Output", list(output_labels), is_output=True),
-            ]
+        new_equation, new_operands = _rank_repair_operands(
+            input_labels=input_labels,
+            output_labels=output_labels,
+            second_input_rank=(
+                len(input_1_shape) if input_1_shape is not None else None
+            ),
+        )
 
         logger.info(
             "Fixed einsum equation: %s -> %s",
@@ -323,6 +297,44 @@ class EinsumOpHandler(ABC):
             reduction_op=einsum_op.reduction_op,
             is_einsum_supportable=einsum_op.is_einsum_supportable,
         )
+
+
+def _rank_repair_operands(
+    *,
+    input_labels: str,
+    output_labels: str,
+    second_input_rank: int | None,
+) -> tuple[str, list[EinsumOperand]]:
+    """Build rank-aligned operands for one unary or binary operation."""
+    if second_input_rank is None:
+        equation = f"{input_labels}->{output_labels}"
+        return equation, [
+            EinsumOperand(
+                name="Input", dims=list(input_labels), is_output=False
+            ),
+            EinsumOperand(
+                name="Output", dims=list(output_labels), is_output=True
+            ),
+        ]
+
+    input_rank = len(input_labels)
+    if second_input_rank < input_rank:
+        second_labels = (
+            output_labels[-second_input_rank:] if second_input_rank > 0 else ""
+        )
+    elif second_input_rank > input_rank:
+        input_labels = output_labels[-input_rank:] if input_rank > 0 else ""
+        second_labels = output_labels
+    else:
+        second_labels = input_labels
+    equation = f"{input_labels},{second_labels}->{output_labels}"
+    return equation, [
+        EinsumOperand(name="Input", dims=list(input_labels), is_output=False),
+        EinsumOperand(
+            name="Input_1", dims=list(second_labels), is_output=False
+        ),
+        EinsumOperand(name="Output", dims=list(output_labels), is_output=True),
+    ]
 
 
 __all__ = [

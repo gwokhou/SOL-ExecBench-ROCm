@@ -23,7 +23,7 @@ def _operator(path: Path, *indices: int) -> OperatorGraphArtifact:
     return OperatorGraphArtifact(
         path=path,
         source_inputs=tuple(
-            (index, TensorSignature((2, 3), "torch.float32"))
+            (index, TensorSignature(shape=(2, 3), dtype="torch.float32"))
             for index in indices
         ),
         used_source_indices=indices,

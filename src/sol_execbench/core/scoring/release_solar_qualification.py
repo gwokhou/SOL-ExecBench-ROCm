@@ -51,7 +51,7 @@ from sol_execbench.core.solar_bridge.models import (
 from sol_execbench.core.timestamps import utc_timestamp
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _SolarQualificationContext:
     workspace: Path
     corpus: AKACorpusManifest
@@ -156,16 +156,16 @@ def _context(
         qualification_root, root
     )
     return _SolarQualificationContext(
-        root,
-        corpus,
-        plan.source_revision,
-        qualification,
-        orojenesis_home.resolve(),
-        device,
-        selected_path,
-        timeout_seconds,
-        f"{plan.run_id}:{selected_path.value}",
-        jobs,
+        workspace=root,
+        corpus=corpus,
+        source_revision=plan.source_revision,
+        root=qualification,
+        orojenesis_home=orojenesis_home.resolve(),
+        device=device,
+        ir_path=selected_path,
+        timeout_seconds=timeout_seconds,
+        scope_id=f"{plan.run_id}:{selected_path.value}",
+        jobs=jobs,
     )
 
 

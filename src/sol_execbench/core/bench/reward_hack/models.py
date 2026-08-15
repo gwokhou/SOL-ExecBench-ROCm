@@ -42,7 +42,7 @@ class SourceReviewSeverity(StrEnum):
     BLOCK = "block"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SourceReviewIssue:
     """One static source review finding."""
 
@@ -63,7 +63,7 @@ class SourceReviewIssue:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SourceReview:
     """Static review result for a submitted solution."""
 
@@ -99,7 +99,7 @@ class SourceReview:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _SourceRule:
     rule: str
     severity: SourceReviewSeverity
@@ -113,42 +113,42 @@ class _SourceRule:
 
 _STATIC_RULES = (
     _SourceRule(
-        "hidden_async_stream",
-        SourceReviewSeverity.BLOCK,
-        re.compile(
+        rule="hidden_async_stream",
+        severity=SourceReviewSeverity.BLOCK,
+        pattern=re.compile(
             r"\b(torch\.cuda\.Stream|torch\.cuda\.stream|wait_stream|hipStreamCreate|"
             r"cudaStreamCreate|hipStreamSynchronize|cudaStreamSynchronize|"
             r"torch\.cuda\.CUDAGraph|torch\.cuda\.graph|make_graphed_callables|"
             r"capture_begin|capture_end|replay|hipGraph[A-Za-z0-9_]*|"
             r"cudaGraph[A-Za-z0-9_]*)\b",
         ),
-        "non-default streams or graph capture can hide work from event timing",
+        message="non-default streams or graph capture can hide work from event timing",
     ),
     _SourceRule(
-        "semantic_output_cache",
-        SourceReviewSeverity.BLOCK,
-        re.compile(
+        rule="semantic_output_cache",
+        severity=SourceReviewSeverity.BLOCK,
+        pattern=re.compile(
             r"(\bdata_ptr\s*\(|\blru_cache\b|\bfunctools\.cache\b|\bcached_property\b|"
             r"\bglobal\s+[_A-Za-z0-9]*cache\b|"
             r"[_A-Za-z0-9]*cache\s*=\s*\{|\btobytes\s*\(|\bhashlib\b)",
         ),
-        "data-pointer or content-keyed caching can reuse outputs across phases",
+        message="data-pointer or content-keyed caching can reuse outputs across phases",
         suffixes=(".py",),
     ),
     _SourceRule(
-        "parallel_execution",
-        SourceReviewSeverity.BLOCK,
-        re.compile(
+        rule="parallel_execution",
+        severity=SourceReviewSeverity.BLOCK,
+        pattern=re.compile(
             r"\b(threading|_thread|multiprocessing|concurrent\.futures|"
             r"pthread_create|std::thread|hipLaunchHostFunc|"
             r"torch\.jit\.fork|jit\.fork)\b",
         ),
-        "submission-created workers can escape timed execution and cleanup",
+        message="submission-created workers can escape timed execution and cleanup",
     ),
     _SourceRule(
-        "unauthorized_file_or_loader",
-        SourceReviewSeverity.BLOCK,
-        re.compile(
+        rule="unauthorized_file_or_loader",
+        severity=SourceReviewSeverity.BLOCK,
+        pattern=re.compile(
             r"(\bopen\s*\(|\bPath\s*\(|\bread_text\s*\(|\bwrite_text\s*\(|"
             r"\bbase64\b|\bmarshal\.loads\b|\bpickle\.loads\b|\bctypes\.CDLL\b|"
             r"\bctypes\.cdll\b|\bdlopen\b|\btorch\.ops\.load_library\b|"
@@ -165,20 +165,20 @@ _STATIC_RULES = (
             r"\b(system|popen|fork)\s*\(|"
             r"\bpty\.spawn\s*\(|\bsocket\b|\burllib\b|\brequests\b)",
         ),
-        "file I/O, embedded payload decoding, dynamic native loading, or process/network access is not allowed in submitted sources",
+        message="file I/O, embedded payload decoding, dynamic native loading, or process/network access is not allowed in submitted sources",
     ),
 )
 
 
 _PRECISION_DOWNGRADE_RULE = _SourceRule(
-    "precision_downgrade",
-    SourceReviewSeverity.FLAG,
-    re.compile(
+    rule="precision_downgrade",
+    severity=SourceReviewSeverity.FLAG,
+    pattern=re.compile(
         r"(\.half\s*\(|\.bfloat16\s*\(|\.to\s*\(\s*torch\.(float16|bfloat16)|"
         r"\btorch\.(float16|bfloat16)\b|\btl\.(float16|bfloat16)\b|"
         r"\.to\s*\(\s*tl\.(float16|bfloat16))",
     ),
-    "precision downgrade is not allowed for float32 output contracts without explicit benchmark approval",
+    message="precision downgrade is not allowed for float32 output contracts without explicit benchmark approval",
 )
 
 

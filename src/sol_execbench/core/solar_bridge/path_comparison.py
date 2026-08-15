@@ -34,7 +34,7 @@ from solar.schema_versions import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _WorkloadArtifacts:
     relative: Path
     directory: Path

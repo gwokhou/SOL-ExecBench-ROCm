@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from solar.api import ConversionRequest
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SolarWorkloadContext:
     """Resolved reference and deterministic input factory for one workload."""
 
@@ -64,11 +64,11 @@ def load_solar_workload_context(
     )
     preserved = structured_input_indices(definition, workload)
     return SolarWorkloadContext(
-        definition,
-        workload,
-        reference,
-        factory,
-        preserved,
+        definition=definition,
+        workload=workload,
+        reference=reference,
+        input_factory=factory,
+        preserved_input_indices=preserved,
     )
 
 

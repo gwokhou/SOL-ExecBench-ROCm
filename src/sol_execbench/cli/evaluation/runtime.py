@@ -44,7 +44,7 @@ class EvaluationRuntimeFailureReason(StrEnum):
     EVALUATION_INCOMPLETE = "evaluation_incomplete"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationRuntimeSuccess:
     """Successful runtime execution with parsed traces and diagnostics."""
 
@@ -57,7 +57,7 @@ class EvaluationRuntimeSuccess:
     profile_fallback_reason: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationRuntimeNoTraceFailure:
     """Common diagnostics for a classified execution failure."""
 
@@ -71,7 +71,7 @@ class EvaluationRuntimeNoTraceFailure:
     profile_fallback_reason: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationRuntimeTimeout(EvaluationRuntimeNoTraceFailure):
     """Execution that exceeded its timeout without producing traces."""
 
@@ -80,7 +80,7 @@ class EvaluationRuntimeTimeout(EvaluationRuntimeNoTraceFailure):
     )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationRuntimeFailedNoStdout(EvaluationRuntimeNoTraceFailure):
     """Failed execution that produced no standard output."""
 
@@ -89,7 +89,7 @@ class EvaluationRuntimeFailedNoStdout(EvaluationRuntimeNoTraceFailure):
     )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationRuntimeNoParseableTraces(EvaluationRuntimeNoTraceFailure):
     """Execution whose output contained no parseable traces."""
 
@@ -98,7 +98,7 @@ class EvaluationRuntimeNoParseableTraces(EvaluationRuntimeNoTraceFailure):
     )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class EvaluationRuntimeIncomplete(EvaluationRuntimeNoTraceFailure):
     """Execution whose trace count or exit code cannot be trusted.
 

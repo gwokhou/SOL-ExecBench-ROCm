@@ -9,7 +9,7 @@ from dataclasses import dataclass
 type AxisMapping = tuple[list[int | None], list[list[int]]]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AxisMappingRequest:
     """Normalized shape-operation facts consumed by mapping rules."""
 

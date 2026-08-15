@@ -21,7 +21,7 @@ type ArtifactMap = dict[str, ArtifactValue]
 MAX_ARTIFACT_BYTES = 64 * 1024 * 1024
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ArtifactDocument(Mapping[str, ArtifactValue]):
     """One validated mapping-shaped YAML artifact and its source path."""
 
@@ -77,7 +77,7 @@ def load_yaml_artifact(
     if not isinstance(loaded, Mapping):
         raise ValueError(f"artifact {artifact_path.name!r} is not a mapping")
     data = _artifact_mapping(loaded, location="$")
-    return ArtifactDocument(artifact_path, data)
+    return ArtifactDocument(path=artifact_path, data=data)
 
 
 def _artifact_mapping(

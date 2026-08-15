@@ -46,7 +46,7 @@ from sol_execbench.core.scoring.release_models import (
 _MAX_TRACE_BYTES = 16 * 1024 * 1024
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class VerifiedWorkloadRun:
     """One verified workload outcome and optional candidate runtime."""
 
@@ -56,7 +56,7 @@ class VerifiedWorkloadRun:
     passed: bool
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReleaseRunEnvironmentIdentity:
     """Exact hardware, runtime, source, and container identity of one run."""
 
@@ -64,7 +64,7 @@ class ReleaseRunEnvironmentIdentity:
     execution: ReleaseExecutionIdentity
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class VerifiedRun:
     """Every scored workload derived from a release run statement."""
 
@@ -107,10 +107,10 @@ def verify_release_run(
             ),
         )
     return VerifiedRun(
-        statement.source_revision,
-        environment,
-        workloads,
-        implementations,
+        source_revision=statement.source_revision,
+        environment=environment,
+        workloads=workloads,
+        implementation_sha256=implementations,
     )
 
 
@@ -328,10 +328,10 @@ def _verify_trace(
         raise ValueError("baseline traces must pass every workload")
     latency = _verified_latency(trace) if passed else None
     return VerifiedWorkloadRun(
-        problem_path,
-        trace.workload.uuid,
-        latency,
-        passed,
+        problem_path=problem_path,
+        workload_uuid=trace.workload.uuid,
+        latency_ms=latency,
+        passed=passed,
     )
 
 

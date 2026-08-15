@@ -47,7 +47,7 @@ AMD_SMI_FAILURE_MARKERS = (
 )
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class ClockLockLease:
     """Owned STABLE_PEAK lease with idempotent, exception-aware release."""
 

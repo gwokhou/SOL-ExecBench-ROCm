@@ -69,7 +69,7 @@ class AgentFeedbackWriteRequest:
     artifact_paths: AgentFeedbackArtifactPaths = AgentFeedbackArtifactPaths()
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ResolvedAgentFeedbackIdentity:
     """Fully derived freshness identity used by the core builder."""
 

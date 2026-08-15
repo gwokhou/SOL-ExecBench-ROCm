@@ -65,7 +65,7 @@ class _RunSampleBatch(Protocol):
         ...
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FrozenResourcePeakProducer:
     """Public typed view of the evidence-bound historical producer."""
 

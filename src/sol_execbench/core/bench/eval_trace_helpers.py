@@ -21,7 +21,7 @@ from sol_execbench.core.data.trace import (
 from sol_execbench.core.data.workload import Workload
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class WorkloadTraceEmitter:
     """Construct and emit canonical workload evaluation traces."""
 

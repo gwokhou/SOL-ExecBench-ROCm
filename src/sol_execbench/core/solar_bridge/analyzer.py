@@ -156,7 +156,7 @@ def _invoke_solar(
         lower_bound_seconds=result.bound.seconds,
         bound_kind=result.bound.kind,
         limiting_resource=result.bound.limiting_resource,
-        artifacts=tuple(artifact.__dict__ for artifact in result.artifacts),
+        artifacts=tuple(artifact.to_dict() for artifact in result.artifacts),
         publication_eligible=result.publication_eligible,
     )
     if formal and not outcome.is_formal_publication:

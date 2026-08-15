@@ -76,7 +76,7 @@ AKA_SEED_SPECS_PATH = REPO_ROOT / "scripts/internal/aka_seed_specs.json"
 AKA_SEED_SPECS = load_aka_seed_specs(AKA_SEED_SPECS_PATH)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _QualificationItem:
     problem_path: str
     definition: Definition
@@ -281,10 +281,10 @@ def _qualification_items(
             _, custom_inputs_fn = execute_reference_entrypoints(definition)
         items.extend(
             _QualificationItem(
-                problem_path,
-                definition,
-                workload,
-                custom_inputs_fn,
+                problem_path=problem_path,
+                definition=definition,
+                workload=workload,
+                custom_inputs_fn=custom_inputs_fn,
             )
             for workload in workloads
         )

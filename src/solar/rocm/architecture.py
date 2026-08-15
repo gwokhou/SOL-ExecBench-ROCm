@@ -428,7 +428,7 @@ def _validate_audit_evidence_config(evidence: Mapping[str, Any]) -> None:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class MemoryLevel:
     """One explicitly sourced AMD memory level; unknown values stay unknown."""
 
@@ -468,7 +468,7 @@ def _load_profile_data(
     return yaml.safe_load(resource.read_text()) or {}, str(resource)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ArchitectureProfile:
     """Normalized AMD hardware limits used by SOL roofline calculations."""
 

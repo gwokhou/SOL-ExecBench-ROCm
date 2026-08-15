@@ -16,7 +16,7 @@ _GIT_TIMEOUT_SECONDS = 10.0
 _MAX_GIT_OUTPUT_BYTES = 64 * 1024
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class GitSourceState:
     """Observed Git revision and cleanliness for release-relevant paths."""
 

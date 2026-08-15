@@ -20,7 +20,7 @@ _ARCHITECTURE = re.compile(r"gfx[0-9a-z]+")
 _ELF_MACHINE_AMDGPU = 224
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ExtractedCodeObject:
     """One extracted AMDGPU code object and its bounded disassembly."""
 

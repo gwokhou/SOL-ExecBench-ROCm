@@ -70,9 +70,13 @@ class EmbeddingHandler(EinsumOpHandler):
         batch_labels = string.ascii_uppercase[:batch_dims]
 
         operands = [
-            EinsumOperand("Input", list(batch_labels), is_output=False),
-            EinsumOperand("Weight", ["V", "D"], is_output=False),
-            EinsumOperand("Output", list(batch_labels) + ["D"], is_output=True),
+            EinsumOperand(
+                name="Input", dims=list(batch_labels), is_output=False
+            ),
+            EinsumOperand(name="Weight", dims=["V", "D"], is_output=False),
+            EinsumOperand(
+                name="Output", dims=list(batch_labels) + ["D"], is_output=True
+            ),
         ]
 
         equation = f"{batch_labels},VD->{batch_labels}D"
@@ -135,11 +139,11 @@ class GRUHandler(EinsumOpHandler):
         GRU has 3 gates (reset, update, new) each with ih and hh weights.
         """
         operands = [
-            EinsumOperand("Input", ["S", "B", "I"], is_output=False),
-            EinsumOperand("Weight_ih", ["G", "I"], is_output=False),
-            EinsumOperand("Weight_hh", ["G", "H"], is_output=False),
-            EinsumOperand("Hidden", ["B", "H"], is_output=False),
-            EinsumOperand("Output", ["S", "B", "H"], is_output=True),
+            EinsumOperand(name="Input", dims=["S", "B", "I"], is_output=False),
+            EinsumOperand(name="Weight_ih", dims=["G", "I"], is_output=False),
+            EinsumOperand(name="Weight_hh", dims=["G", "H"], is_output=False),
+            EinsumOperand(name="Hidden", dims=["B", "H"], is_output=False),
+            EinsumOperand(name="Output", dims=["S", "B", "H"], is_output=True),
         ]
 
         equation = "SBI,GI,GH,BH->SBH"
@@ -205,12 +209,12 @@ class LSTMHandler(EinsumOpHandler):
         LSTM has 4 gates (input, forget, cell, output) each with ih and hh weights.
         """
         operands = [
-            EinsumOperand("Input", ["S", "B", "I"], is_output=False),
-            EinsumOperand("Weight_ih", ["G", "I"], is_output=False),
-            EinsumOperand("Weight_hh", ["G", "H"], is_output=False),
-            EinsumOperand("Hidden", ["B", "H"], is_output=False),
-            EinsumOperand("Cell", ["B", "H"], is_output=False),
-            EinsumOperand("Output", ["S", "B", "H"], is_output=True),
+            EinsumOperand(name="Input", dims=["S", "B", "I"], is_output=False),
+            EinsumOperand(name="Weight_ih", dims=["G", "I"], is_output=False),
+            EinsumOperand(name="Weight_hh", dims=["G", "H"], is_output=False),
+            EinsumOperand(name="Hidden", dims=["B", "H"], is_output=False),
+            EinsumOperand(name="Cell", dims=["B", "H"], is_output=False),
+            EinsumOperand(name="Output", dims=["S", "B", "H"], is_output=True),
         ]
 
         equation = "SBI,GI,GH,BH,BH->SBH"
@@ -243,11 +247,11 @@ class RNNHandler(EinsumOpHandler):
         )
 
         operands = [
-            EinsumOperand("Input", ["S", "B", "I"], is_output=False),
-            EinsumOperand("Weight_ih", ["H", "I"], is_output=False),
-            EinsumOperand("Weight_hh", ["H", "H"], is_output=False),
-            EinsumOperand("Hidden", ["B", "H"], is_output=False),
-            EinsumOperand("Output", ["S", "B", "H"], is_output=True),
+            EinsumOperand(name="Input", dims=["S", "B", "I"], is_output=False),
+            EinsumOperand(name="Weight_ih", dims=["H", "I"], is_output=False),
+            EinsumOperand(name="Weight_hh", dims=["H", "H"], is_output=False),
+            EinsumOperand(name="Hidden", dims=["B", "H"], is_output=False),
+            EinsumOperand(name="Output", dims=["S", "B", "H"], is_output=True),
         ]
 
         equation = "SBI,HI,HH,BH->SBH"
@@ -302,11 +306,11 @@ class CrossEntropyHandler(EinsumOpHandler):
         out_labels = labels[0] if reduction == "none" else ""
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Target", [labels[0]], is_output=False),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
+            EinsumOperand(name="Target", dims=[labels[0]], is_output=False),
             EinsumOperand(
-                "Output",
-                list(out_labels) if out_labels else [],
+                name="Output",
+                dims=list(out_labels) if out_labels else [],
                 is_output=True,
             ),
         ]
@@ -390,11 +394,13 @@ class PairwiseLossHandler(EinsumOpHandler):
         out_labels = labels if reduction == "none" else ""
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Target", list(target_labels), is_output=False),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
             EinsumOperand(
-                "Output",
-                list(out_labels) if out_labels else [],
+                name="Target", dims=list(target_labels), is_output=False
+            ),
+            EinsumOperand(
+                name="Output",
+                dims=list(out_labels) if out_labels else [],
                 is_output=True,
             ),
         ]
@@ -438,8 +444,10 @@ class TopKHandler(EinsumOpHandler):
         )
         return EinsumOp(
             operands=[
-                EinsumOperand("Input", input_labels, is_output=False),
-                EinsumOperand("Output", output_labels, is_output=True),
+                EinsumOperand(name="Input", dims=input_labels, is_output=False),
+                EinsumOperand(
+                    name="Output", dims=output_labels, is_output=True
+                ),
             ],
             equation=(f"{''.join(input_labels)}->{''.join(output_labels)}"),
             name=op_name,
@@ -493,8 +501,8 @@ class TrivialOpsHandler(EinsumOpHandler):
         labels = string.ascii_uppercase[:dims]
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Output", list(labels), is_output=True),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
+            EinsumOperand(name="Output", dims=list(labels), is_output=True),
         ]
 
         equation = f"{labels}->{labels}"

@@ -70,7 +70,7 @@ class ReferenceExecutionError(RuntimeError):
         self.kind = kind
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReferenceCase:
     """Inputs and expected outputs produced outside the candidate process."""
 
@@ -78,7 +78,7 @@ class ReferenceCase:
     outputs: list[torch.Tensor]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReferenceTimingCase(ReferenceCase):
     """A fresh timing case with independently measured reference latency."""
 

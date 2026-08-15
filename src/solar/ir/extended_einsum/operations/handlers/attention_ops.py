@@ -109,10 +109,18 @@ class ScaledDotProductAttentionHandler(EinsumOpHandler):
             V = value embedding dimension (Ev)
         """
         operands = [
-            EinsumOperand("Query", ["B", "H", "Q", "D"], is_output=False),
-            EinsumOperand("Key", ["B", "H", "K", "D"], is_output=False),
-            EinsumOperand("Value", ["B", "H", "K", "V"], is_output=False),
-            EinsumOperand("Output", ["B", "H", "Q", "V"], is_output=True),
+            EinsumOperand(
+                name="Query", dims=["B", "H", "Q", "D"], is_output=False
+            ),
+            EinsumOperand(
+                name="Key", dims=["B", "H", "K", "D"], is_output=False
+            ),
+            EinsumOperand(
+                name="Value", dims=["B", "H", "K", "V"], is_output=False
+            ),
+            EinsumOperand(
+                name="Output", dims=["B", "H", "Q", "V"], is_output=True
+            ),
         ]
 
         # Fused equation: combines Q@K^T and result@V
@@ -159,10 +167,18 @@ class FlexAttentionHandler(EinsumOpHandler):
     ) -> EinsumOp:
         """Generate einsum for flex_attention."""
         operands = [
-            EinsumOperand("Query", ["B", "H", "Q", "D"], is_output=False),
-            EinsumOperand("Key", ["B", "H", "K", "D"], is_output=False),
-            EinsumOperand("Value", ["B", "H", "K", "V"], is_output=False),
-            EinsumOperand("Output", ["B", "H", "Q", "V"], is_output=True),
+            EinsumOperand(
+                name="Query", dims=["B", "H", "Q", "D"], is_output=False
+            ),
+            EinsumOperand(
+                name="Key", dims=["B", "H", "K", "D"], is_output=False
+            ),
+            EinsumOperand(
+                name="Value", dims=["B", "H", "K", "V"], is_output=False
+            ),
+            EinsumOperand(
+                name="Output", dims=["B", "H", "Q", "V"], is_output=True
+            ),
         ]
 
         equation = "BHQD,BHKD,BHKV->BHQV"
@@ -201,8 +217,8 @@ class MultiHeadAttentionHandler(EinsumOpHandler):
         We represent it as a single attention-like operation.
         """
         operands = [
-            EinsumOperand("Input", ["B", "S", "D"], is_output=False),
-            EinsumOperand("Output", ["B", "S", "D"], is_output=True),
+            EinsumOperand(name="Input", dims=["B", "S", "D"], is_output=False),
+            EinsumOperand(name="Output", dims=["B", "S", "D"], is_output=True),
         ]
 
         equation = "BSD->BSD"

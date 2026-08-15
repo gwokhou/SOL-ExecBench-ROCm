@@ -46,7 +46,7 @@ from sol_execbench.core.scoring.release_qualification import (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReleaseRunResult:
     """Summary of one completed full-corpus release execution."""
 
@@ -57,7 +57,7 @@ class ReleaseRunResult:
     passed: int
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReleaseEvaluationRequest:
     """Inputs required from an evaluation application adapter."""
 
@@ -68,7 +68,7 @@ class ReleaseEvaluationRequest:
     device: str
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ReleaseEvaluationResult:
     """Minimal evaluator outcome consumed by release execution."""
 
@@ -138,11 +138,11 @@ def execute_release_plan(
     if plan.role is ReleaseRunKind.BASELINE and passed != workloads:
         raise ValueError("release baseline did not pass every workload")
     return ReleaseRunResult(
-        plan.role,
-        plan.run_id,
-        len(plan.problems),
-        workloads,
-        passed,
+        role=plan.role,
+        run_id=plan.run_id,
+        problems=len(plan.problems),
+        workloads=workloads,
+        passed=passed,
     )
 
 

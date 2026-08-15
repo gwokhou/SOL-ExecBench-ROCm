@@ -44,7 +44,7 @@ execution_targets:
 formal_analysis:
   architecture_profile: solar:RX_9060_XT
   formal_gfx_target: gfx1200
-  architecture_profile_sha256: 25ad977df7a7206bd9d8caf60d2cd85d4f5c5fdc47368a22efb881c0250d0877
+  architecture_profile_sha256: 09bff1a265b43a981c8c2e6d479f0de99b356cb0976a2bf511953f3026adf3b1
 tolerance_calibration:
   path: tolerance-calibration.json
   sha256: 3144fac284adbdf789ea88811d69ec5e888e489da562286e6dcf150e5e51c5d2

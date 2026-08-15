@@ -95,7 +95,7 @@ class AKAProbeInfrastructureError(RuntimeError):
     """The compatibility probe could not produce workload-level evidence."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKAExecutionTarget:
     """Manifest-declared execution policy for one exact gfx target."""
 
@@ -117,7 +117,7 @@ class AKAExecutionTarget:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKAMaterializationTarget:
     """Observed target device used to select a materialized corpus."""
 
@@ -144,7 +144,7 @@ class AKAMaterializationTarget:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKAWorkloadDecision:
     """Compatibility decision for one canonical workload."""
 
@@ -174,7 +174,7 @@ class AKAWorkloadDecision:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKAProblemSelection:
     """Selected workloads for one corpus problem."""
 
@@ -182,7 +182,7 @@ class AKAProblemSelection:
     workloads: tuple[Workload, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AKACorpusSelection:
     """Complete target-specific partition of the canonical corpus."""
 
@@ -197,7 +197,7 @@ class AKACorpusSelection:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class StaticReferenceStorage:
     """Minimum contiguous storage required by one reference IPC case."""
 
@@ -408,7 +408,9 @@ def select_corpus_for_target(
             problems.append(
                 AKAProblemSelection(entry=entry, workloads=tuple(selected)),
             )
-    return AKACorpusSelection(tuple(problems), tuple(decisions))
+    return AKACorpusSelection(
+        problems=tuple(problems), decisions=tuple(decisions)
+    )
 
 
 def _probe_command(

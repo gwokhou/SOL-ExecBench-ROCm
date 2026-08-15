@@ -142,7 +142,7 @@ class _BuildEvidence:
     dispatch_reasons: list[str]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _BuildArtifactPaths:
     trace: Path
     timing: Path
@@ -490,7 +490,7 @@ def _manifest_dispatch_evidence(
         pass_index = counter_pass_index(path)
         if pass_index is None:
             raise ValueError(f"counter_csv_pass_identity_missing:{path.name}")
-        passes.append(CounterPassCSV(pass_index, path))
+        passes.append(CounterPassCSV(pass_index=pass_index, path=path))
     dispatches = parse_and_align_counter_passes(
         passes,
         workload_uuid=trace.workload.uuid,

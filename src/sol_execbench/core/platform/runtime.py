@@ -107,7 +107,7 @@ class PCIeTopologyIdentity(StrictArtifactModel):
         return self
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class RocmDeviceInfo:
     """Runtime properties for one visible PyTorch ROCm device."""
 
@@ -121,7 +121,7 @@ class RocmDeviceInfo:
     hip_version: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CacheClearPolicy:
     """Resolved L2 eviction-buffer policy for one benchmark device."""
 

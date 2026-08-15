@@ -76,7 +76,7 @@ _PreparedCase = tuple[
 ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _CallableInputFactory:
     factory: Callable[[int], Sequence[Any]]
 
@@ -554,7 +554,7 @@ def verify_callable_conversion(
     cases = _verification_cases({}, policy)
     results = _run_cases(
         reference,
-        _CallableInputFactory(input_factory),
+        _CallableInputFactory(factory=input_factory),
         graph,
         backend,
         cases,

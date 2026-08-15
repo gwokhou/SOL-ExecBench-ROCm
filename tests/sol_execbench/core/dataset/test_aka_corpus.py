@@ -305,7 +305,9 @@ def test_target_incompatible_role_requires_every_workload_to_exceed_limit(
     monkeypatch.setattr(
         aka_corpus,
         "static_reference_storage",
-        lambda _definition, _workload: StaticReferenceStorage(0, next(sizes)),
+        lambda _definition, _workload: StaticReferenceStorage(
+            input_storage_bytes=0, reference_case_bytes=next(sizes)
+        ),
     )
 
     with pytest.raises(

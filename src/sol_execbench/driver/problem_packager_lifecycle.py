@@ -18,7 +18,7 @@ from sol_execbench.core.bench.clock_lock import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True)
 class ProblemPackagerLifecycle:
     """Own clock and staging cleanup independently from packaging logic."""
 

@@ -87,7 +87,7 @@ def _run_probe(args: argparse.Namespace) -> None:
         )
         outputs = stable_reference_outputs(outputs, inputs)
         case_bytes = reference_case_storage_bytes(
-            ReferenceCase(inputs, outputs),
+            ReferenceCase(inputs=inputs, outputs=outputs),
         )
         if case_bytes > MAX_REFERENCE_TENSOR_STORAGE_BYTES:
             _emit(

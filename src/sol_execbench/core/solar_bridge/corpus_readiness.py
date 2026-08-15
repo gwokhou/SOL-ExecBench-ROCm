@@ -183,7 +183,7 @@ class CorpusReadinessSummary(CurrentSchemaModel):
     matrix: ReadinessMatrixReference
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CorpusStageAuditResult:
     """Paths and denominator counts for one complete corpus audit attempt."""
 
@@ -216,7 +216,7 @@ class CorpusStageAuditResult:
         return value
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _CorpusAuditContext:
     """Immutable inputs shared by every workload in one corpus audit."""
 

@@ -102,12 +102,14 @@ def test_yaml_dumper_does_not_emit_aliases() -> None:
 
 
 def test_einsum_operand_operation_and_cost_contracts() -> None:
-    input_operand = EinsumOperand("Input", ["M", "K"])
-    output_operand = EinsumOperand("Output", ["M", "N"], is_output=True)
+    input_operand = EinsumOperand(name="Input", dims=["M", "K"])
+    output_operand = EinsumOperand(
+        name="Output", dims=["M", "N"], is_output=True
+    )
     operation = EinsumOp(
         operands=[
             input_operand,
-            EinsumOperand("Weight", ["K", "N"]),
+            EinsumOperand(name="Weight", dims=["K", "N"]),
             output_operand,
         ],
         equation="MK,KN->MN",
@@ -140,21 +142,24 @@ def test_compute_cost_supports_compound_ranks_and_malformed_equations() -> None:
 def test_handler_validation_fixes_unary_and_binary_rank_mismatches() -> None:
     handler = MatmulHandler()
     unary = EinsumOp(
-        [EinsumOperand("Input", ["A"]), EinsumOperand("Output", ["A"], True)],
-        "A->A",
-        "copy",
+        operands=[
+            EinsumOperand(name="Input", dims=["A"]),
+            EinsumOperand(name="Output", dims=["A"], is_output=True),
+        ],
+        equation="A->A",
+        name="copy",
         is_real_einsum=False,
         elementwise_op="copy",
         reduction_op="none",
     )
     binary = EinsumOp(
-        [
-            EinsumOperand("Input", ["A"]),
-            EinsumOperand("Input_1", ["A"]),
-            EinsumOperand("Output", ["A"], True),
+        operands=[
+            EinsumOperand(name="Input", dims=["A"]),
+            EinsumOperand(name="Input_1", dims=["A"]),
+            EinsumOperand(name="Output", dims=["A"], is_output=True),
         ],
-        "A,A->A",
-        "add",
+        equation="A,A->A",
+        name="add",
         is_real_einsum=False,
         elementwise_op="add",
         reduction_op="none",
@@ -188,13 +193,13 @@ def test_handler_validation_covers_larger_second_input_and_missing_shapes() -> (
 ):
     handler = MatmulHandler()
     operation = EinsumOp(
-        [
-            EinsumOperand("Input", ["A"]),
-            EinsumOperand("Input_1", ["A"]),
-            EinsumOperand("Output", ["A"], True),
+        operands=[
+            EinsumOperand(name="Input", dims=["A"]),
+            EinsumOperand(name="Input_1", dims=["A"]),
+            EinsumOperand(name="Output", dims=["A"], is_output=True),
         ],
-        "A,A->A",
-        "add",
+        equation="A,A->A",
+        name="add",
     )
 
     corrected = handler._try_fix_einsum_ranks(

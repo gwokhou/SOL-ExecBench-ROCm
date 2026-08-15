@@ -35,14 +35,14 @@ def test_sol_score_treats_precondition_violations_as_audit_errors(
 def test_suite_aggregation_weights_problems_equally_and_excludes_sentinel():
     result = aggregate_suite_scores(
         [
-            WorkloadScore("problem-a", "a1", 1.0),
-            WorkloadScore("problem-a", "a2", 0.0),
-            WorkloadScore("problem-b", "b1", 1.0),
+            WorkloadScore(problem="problem-a", workload_uuid="a1", score=1.0),
+            WorkloadScore(problem="problem-a", workload_uuid="a2", score=0.0),
+            WorkloadScore(problem="problem-b", workload_uuid="b1", score=1.0),
             WorkloadScore(
-                "sentinel",
-                "s1",
-                0.0,
-                AKACorpusRole.COMPATIBILITY_SENTINEL,
+                problem="sentinel",
+                workload_uuid="s1",
+                score=0.0,
+                role=AKACorpusRole.COMPATIBILITY_SENTINEL,
             ),
         ],
     )

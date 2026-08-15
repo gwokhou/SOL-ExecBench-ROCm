@@ -205,8 +205,8 @@ class TensorManipulationHandler(EinsumOpHandler):
         out_labels = "".join(out_label_list)
 
         operands = [
-            EinsumOperand("Input", in_label_list, is_output=False),
-            EinsumOperand("Output", out_label_list, is_output=True),
+            EinsumOperand(name="Input", dims=in_label_list, is_output=False),
+            EinsumOperand(name="Output", dims=out_label_list, is_output=True),
         ]
 
         equation = f"{in_labels}->{out_labels}"
@@ -438,8 +438,8 @@ class TensorManipulationHandler(EinsumOpHandler):
         out_labels = "".join(out_label_list)
 
         operands = [
-            EinsumOperand("Input", in_label_list, is_output=False),
-            EinsumOperand("Output", out_label_list, is_output=True),
+            EinsumOperand(name="Input", dims=in_label_list, is_output=False),
+            EinsumOperand(name="Output", dims=out_label_list, is_output=True),
         ]
 
         equation = f"{in_labels}->{out_labels}"
@@ -499,8 +499,10 @@ class MatrixStructureHandler(EinsumOpHandler):
             output_labels = labels
 
         operands = [
-            EinsumOperand("Input", list(labels), is_output=False),
-            EinsumOperand("Output", list(output_labels), is_output=True),
+            EinsumOperand(name="Input", dims=list(labels), is_output=False),
+            EinsumOperand(
+                name="Output", dims=list(output_labels), is_output=True
+            ),
         ]
 
         equation = f"{labels}->{output_labels}"

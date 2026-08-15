@@ -163,7 +163,7 @@ class HardwareValidationBinding(_ValidationModel):
     verified_at: str = Field(min_length=1)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Rdna4EnvironmentIdentity:
     """Exact hardware and user-space identity accepted by the local gate."""
 
