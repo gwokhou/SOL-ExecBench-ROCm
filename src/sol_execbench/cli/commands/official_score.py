@@ -10,9 +10,12 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from sol_execbench.cli.error_translation import (
+    CliErrorRule,
+    translate_cli_errors,
+)
 from sol_execbench.cli.protocol import (
     CliExitCode,
-    CliFailure,
     CliResult,
     artifact,
 )
@@ -33,6 +36,50 @@ from sol_execbench.core.scoring.release_packaging import (
     verify_score_release_archive,
 )
 from sol_execbench.core.scoring.release_verifier import verify_and_score_release
+
+_RELEASE_STATEMENT_BUILD_FAILED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="release_statement_build_failed",
+        hint="Verify the full plan, environment, implementations, and traces.",
+    ),
+)
+
+_OFFICIAL_RELEASE_VERIFICATION_FAILED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, RuntimeError, ValueError),
+        code="official_release_verification_failed",
+        exit_code=CliExitCode.RESULT_FAILED,
+        hint="Verify every content-addressed artifact and the pinned corpus.",
+    ),
+)
+
+_RELEASE_BUNDLE_ASSEMBLY_FAILED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="release_bundle_assembly_failed",
+        hint="Build baseline, candidate, and SOLAR statements in the workspace.",
+    ),
+)
+
+_SCORE_RELEASE_PACKAGING_FAILED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="score_release_packaging_failed",
+        exit_code=CliExitCode.RESULT_FAILED,
+        hint="Verify the bundle with 'score official', then choose archive "
+        "and attestation output paths that do not already exist.",
+    ),
+)
+
+_SCORE_RELEASE_VERIFICATION_FAILED_ERRORS = (
+    CliErrorRule(
+        exception_type=(OSError, ValueError),
+        code="score_release_verification_failed",
+        exit_code=CliExitCode.RESULT_FAILED,
+        hint="Restore the exact content-addressed score release archive.",
+    ),
+)
 
 console = Console(stderr=True)
 
@@ -89,18 +136,11 @@ def official_score_status_cli(manifest_path: Path) -> CliResult:
 )
 def official_score_cli(bundle: Path, manifest_path: Path) -> CliResult:
     """Verify a publisher release bundle and emit its official score."""
-    try:
+    with translate_cli_errors(*_OFFICIAL_RELEASE_VERIFICATION_FAILED_ERRORS):
         result = verify_and_score_release(
             bundle,
             corpus_manifest_path=manifest_path,
         )
-    except Exception as exc:
-        raise CliFailure(
-            str(exc),
-            code="official_release_verification_failed",
-            exit_code=CliExitCode.RESULT_FAILED,
-            hint="Verify every content-addressed artifact and the pinned corpus.",
-        ) from exc
     report = result.to_dict()
     console.print(
         f"[green]Official SOL score: {result.suite.score:.9g}[/green]",
@@ -125,18 +165,12 @@ def build_statement_cli(plan: Path, manifest_path: Path) -> CliResult:
     loaded = load_execution_plan(plan)
     workspace = plan.resolve().parents[1]
     output = workspace / "statements" / f"{loaded.role}.json"
-    try:
+    with translate_cli_errors(*_RELEASE_STATEMENT_BUILD_FAILED_ERRORS):
         path = build_run_statement(
             plan,
             corpus_manifest_path=manifest_path,
             output_path=output,
         )
-    except (OSError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="release_statement_build_failed",
-            hint="Verify the full plan, environment, implementations, and traces.",
-        ) from exc
     console.print(f"[green]{loaded.role.title()} statement: {path}[/green]")
     return CliResult(
         data={"role": loaded.role, "statement": str(path)},
@@ -163,19 +197,13 @@ def assemble_bundle_cli(workspace: Path, manifest_path: Path) -> CliResult:
         kind: root / "statements" / f"{kind}.json"
         for kind in ReleaseArtifactKind
     }
-    try:
+    with translate_cli_errors(*_RELEASE_BUNDLE_ASSEMBLY_FAILED_ERRORS):
         path = assemble_release_bundle(
             root,
             corpus_manifest_path=manifest_path,
             statement_paths=statements,
             output_path=root / "release-bundle.json",
         )
-    except (OSError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="release_bundle_assembly_failed",
-            hint="Build baseline, candidate, and SOLAR statements in the workspace.",
-        ) from exc
     console.print(f"[green]Content-addressed release bundle: {path}[/green]")
     return CliResult(
         data={"bundle": str(path)},
@@ -226,7 +254,7 @@ def release_package_cli(
     manifest_path: Path,
 ) -> CliResult:
     """Package a verified release bundle into a deterministic zstd archive."""
-    try:
+    with translate_cli_errors(*_SCORE_RELEASE_PACKAGING_FAILED_ERRORS):
         hardware_validation = verify_validation_receipt(
             hardware_validation_receipt,
             hardware_evidence_dir,
@@ -240,16 +268,6 @@ def release_package_cli(
             source_revision=source_revision,
             hardware_validation=hardware_validation,
         )
-    except (OSError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="score_release_packaging_failed",
-            exit_code=CliExitCode.RESULT_FAILED,
-            hint=(
-                "Verify the bundle with 'score official', then choose archive "
-                "and attestation output paths that do not already exist."
-            ),
-        ) from exc
     console.print(
         f"[green]Score release archive: {archive_output} "
         f"(official score {attestation.official_score:.9g}).[/green]",
@@ -296,20 +314,13 @@ def release_verify_cli(
     manifest_path: Path,
 ) -> CliResult:
     """Extract a release archive and reproduce its official score."""
-    try:
+    with translate_cli_errors(*_SCORE_RELEASE_VERIFICATION_FAILED_ERRORS):
         result = verify_score_release_archive(
             archive_path=archive,
             corpus_manifest_path=manifest_path,
             expected_sha256=expected_sha256,
             unpack_root=unpack_root,
         )
-    except (OSError, ValueError) as exc:
-        raise CliFailure(
-            str(exc),
-            code="score_release_verification_failed",
-            exit_code=CliExitCode.RESULT_FAILED,
-            hint="Restore the exact content-addressed score release archive.",
-        ) from exc
     console.print(
         f"[green]Official SOL score: {result.suite.score:.9g}[/green]",
     )
