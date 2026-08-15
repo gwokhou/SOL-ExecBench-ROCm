@@ -6,7 +6,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal, cast
+from dataclasses import dataclass
+from typing import Literal, Protocol, cast
 
 from sol_execbench.core.bench.performance_model.models import (
     CompositeGraphDescriptor,
@@ -61,84 +62,192 @@ _IGNORED_TYPES = frozenset(
 _MAX_COMPOSITE_NODES = 32
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DescriptorClassification:
+    """One successful semantic descriptor classification."""
+
+    descriptor: object
+    workload_kind: WorkloadKind
+    reason_codes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _DescriptorRequest:
+    layers: Mapping[str, object]
+    metadata: Mapping[str, object]
+    operation_layers: list[tuple[Mapping[str, object], str]]
+    operation_types: tuple[str, ...]
+
+
+class DescriptorRule(Protocol):
+    """Ordered classifier rule for one descriptor family."""
+
+    def __call__(
+        self, request: _DescriptorRequest
+    ) -> DescriptorClassification | None: ...
+
+
 def semantic_descriptor(
     layers: Mapping[str, object],
     metadata: Mapping[str, object],
 ) -> tuple[object, WorkloadKind, list[str]]:
     """Classify validated SOLAR layers into one typed descriptor family."""
     operation_layers = _operation_layers(layers)
-    operation_types = [item[1] for item in operation_layers]
-    special = _special_graph_descriptor(layers, operation_layers, metadata)
-    if special is not None:
-        return special
-    if operation_types and set(operation_types) <= ELEMENTWISE_TYPES:
-        descriptor = elementwise_descriptor(operation_layers)
-        if descriptor is not None:
-            return descriptor, WorkloadKind.ELEMENTWISE, []
-    if len(operation_layers) == 1 and operation_types[0] in TRANSPOSE_TYPES:
-        descriptor = transpose_descriptor(operation_layers[0][0])
-        if descriptor is not None:
-            return descriptor, WorkloadKind.TRANSPOSE, []
-    if len(operation_layers) == 1 and operation_types[0] in REDUCTION_TYPES:
-        descriptor = reduction_descriptor(
-            operation_layers[0][0],
-            REDUCTION_TYPES[operation_types[0]],
-        )
-        if descriptor is not None:
-            return descriptor, WorkloadKind.REDUCTION, []
-    if len(operation_layers) == 1 and operation_types[0] in MATMUL_TYPES:
-        descriptor = matmul_descriptor(
-            operation_layers[0][0],
-            batched=operation_types[0] == "bmm",
-        )
-        if descriptor is not None:
-            return descriptor, WorkloadKind.MATMUL, []
-    if len(operation_layers) == 1 and operation_types[0] in SOFTMAX_TYPES:
-        descriptor = softmax_descriptor(
-            operation_layers[0][0],
-            SOFTMAX_TYPES[operation_types[0]],
-        )
-        if descriptor is not None:
-            return descriptor, WorkloadKind.SOFTMAX, []
-    decomposed_cross_entropy = decomposed_cross_entropy_descriptor(
-        operation_layers
+    request = _DescriptorRequest(
+        layers=layers,
+        metadata=metadata,
+        operation_layers=operation_layers,
+        operation_types=tuple(item[1] for item in operation_layers),
     )
-    if decomposed_cross_entropy is not None:
-        return decomposed_cross_entropy, WorkloadKind.CROSS_ENTROPY, []
-    if len(operation_layers) == 1 and operation_types[0] == "cross_entropy":
-        descriptor = cross_entropy_descriptor(operation_layers[0][0])
-        if descriptor is not None:
-            return descriptor, WorkloadKind.CROSS_ENTROPY, []
-    if len(operation_layers) == 1 and operation_types[0] in INDEXED_READ_TYPES:
-        descriptor = indexed_read_descriptor(
-            operation_layers[0][0],
-            INDEXED_READ_TYPES[operation_types[0]],
-        )
-        if descriptor is not None:
-            return descriptor, WorkloadKind.INDEXED_READ, []
-    if (
-        len(operation_layers) == 1
-        and operation_types[0] in INDEXED_UPDATE_TYPES
-    ):
-        descriptor = indexed_update_descriptor(
-            operation_layers[0][0],
-            INDEXED_UPDATE_TYPES[operation_types[0]],
-        )
-        if descriptor is not None:
-            return descriptor, WorkloadKind.INDEXED_UPDATE, []
-    composite = _composite_descriptor(layers, operation_layers, metadata)
-    if composite is not None:
-        kind = {
-            "transformer_block": WorkloadKind.TRANSFORMER,
-            "concurrent_graph": WorkloadKind.CONCURRENT,
-        }.get(composite.graph_class, WorkloadKind.COMPOSITE)
-        return composite, kind, []
-    reasons = ["unsupported_workload_descriptor"]
+    classification = next(
+        (result for rule in _DESCRIPTOR_RULES if (result := rule(request))),
+        _unsupported_rule(request),
+    )
     return (
-        UnsupportedDescriptor(reason_codes=reasons),
-        WorkloadKind.UNSUPPORTED,
-        reasons,
+        classification.descriptor,
+        classification.workload_kind,
+        list(classification.reason_codes),
     )
+
+
+def _classification(
+    descriptor: object | None,
+    kind: WorkloadKind,
+) -> DescriptorClassification | None:
+    if descriptor is None:
+        return None
+    return DescriptorClassification(descriptor=descriptor, workload_kind=kind)
+
+
+def _special_rule(
+    request: _DescriptorRequest,
+) -> DescriptorClassification | None:
+    special = _special_graph_descriptor(
+        request.layers, request.operation_layers, request.metadata
+    )
+    if special is None:
+        return None
+    descriptor, kind, _reasons = special
+    return _classification(descriptor, kind)
+
+
+def _elementwise_rule(
+    request: _DescriptorRequest,
+) -> DescriptorClassification | None:
+    if not request.operation_types or not (
+        set(request.operation_types) <= ELEMENTWISE_TYPES
+    ):
+        return None
+    return _classification(
+        elementwise_descriptor(request.operation_layers),
+        WorkloadKind.ELEMENTWISE,
+    )
+
+
+def _single_operation_rule(
+    request: _DescriptorRequest,
+) -> DescriptorClassification | None:
+    if len(request.operation_layers) != 1:
+        return None
+    layer = request.operation_layers[0][0]
+    operation = request.operation_types[0]
+    if operation in TRANSPOSE_TYPES:
+        return _classification(
+            transpose_descriptor(layer), WorkloadKind.TRANSPOSE
+        )
+    if operation in REDUCTION_TYPES:
+        return _classification(
+            reduction_descriptor(layer, REDUCTION_TYPES[operation]),
+            WorkloadKind.REDUCTION,
+        )
+    if operation in MATMUL_TYPES:
+        return _classification(
+            matmul_descriptor(layer, batched=operation == "bmm"),
+            WorkloadKind.MATMUL,
+        )
+    if operation in SOFTMAX_TYPES:
+        return _classification(
+            softmax_descriptor(layer, SOFTMAX_TYPES[operation]),
+            WorkloadKind.SOFTMAX,
+        )
+    return None
+
+
+def _decomposed_cross_entropy_rule(
+    request: _DescriptorRequest,
+) -> DescriptorClassification | None:
+    decomposed_cross_entropy = decomposed_cross_entropy_descriptor(
+        request.operation_layers
+    )
+    return _classification(decomposed_cross_entropy, WorkloadKind.CROSS_ENTROPY)
+
+
+def _native_cross_entropy_rule(
+    request: _DescriptorRequest,
+) -> DescriptorClassification | None:
+    if len(request.operation_layers) != 1 or request.operation_types != (
+        "cross_entropy",
+    ):
+        return None
+    return _classification(
+        cross_entropy_descriptor(request.operation_layers[0][0]),
+        WorkloadKind.CROSS_ENTROPY,
+    )
+
+
+def _indexed_rule(
+    request: _DescriptorRequest,
+) -> DescriptorClassification | None:
+    if len(request.operation_layers) != 1:
+        return None
+    layer = request.operation_layers[0][0]
+    operation = request.operation_types[0]
+    if operation in INDEXED_READ_TYPES:
+        return _classification(
+            indexed_read_descriptor(layer, INDEXED_READ_TYPES[operation]),
+            WorkloadKind.INDEXED_READ,
+        )
+    if operation in INDEXED_UPDATE_TYPES:
+        return _classification(
+            indexed_update_descriptor(layer, INDEXED_UPDATE_TYPES[operation]),
+            WorkloadKind.INDEXED_UPDATE,
+        )
+    return None
+
+
+def _composite_rule(
+    request: _DescriptorRequest,
+) -> DescriptorClassification | None:
+    composite = _composite_descriptor(
+        request.layers, request.operation_layers, request.metadata
+    )
+    if composite is None:
+        return None
+    kind = {
+        "transformer_block": WorkloadKind.TRANSFORMER,
+        "concurrent_graph": WorkloadKind.CONCURRENT,
+    }.get(composite.graph_class, WorkloadKind.COMPOSITE)
+    return _classification(composite, kind)
+
+
+def _unsupported_rule(_request: _DescriptorRequest) -> DescriptorClassification:
+    reasons = ("unsupported_workload_descriptor",)
+    return DescriptorClassification(
+        descriptor=UnsupportedDescriptor(reason_codes=list(reasons)),
+        workload_kind=WorkloadKind.UNSUPPORTED,
+        reason_codes=reasons,
+    )
+
+
+_DESCRIPTOR_RULES: tuple[DescriptorRule, ...] = (
+    _special_rule,
+    _elementwise_rule,
+    _single_operation_rule,
+    _decomposed_cross_entropy_rule,
+    _native_cross_entropy_rule,
+    _indexed_rule,
+    _composite_rule,
+)
 
 
 def _special_graph_descriptor(
