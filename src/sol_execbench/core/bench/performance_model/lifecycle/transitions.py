@@ -5,36 +5,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Final
-
 from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticLifecycleStage,
 )
-
-LEGAL_TRANSITIONS: Final[
-    Mapping[DiagnosticLifecycleStage, frozenset[DiagnosticLifecycleStage]]
-] = {
-    DiagnosticLifecycleStage.DESIGN: frozenset(
-        {DiagnosticLifecycleStage.COLLECTION_RUN}
-    ),
-    DiagnosticLifecycleStage.COLLECTION_RUN: frozenset(
-        {DiagnosticLifecycleStage.CORPUS_SNAPSHOT}
-    ),
-    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: frozenset(
-        {DiagnosticLifecycleStage.MODEL_BUILD}
-    ),
-    DiagnosticLifecycleStage.MODEL_BUILD: frozenset(
-        {DiagnosticLifecycleStage.ACCEPTANCE}
-    ),
-    DiagnosticLifecycleStage.ACCEPTANCE: frozenset(
-        {DiagnosticLifecycleStage.PUBLICATION}
-    ),
-    DiagnosticLifecycleStage.PUBLICATION: frozenset(
-        {DiagnosticLifecycleStage.RELEASE}
-    ),
-    DiagnosticLifecycleStage.RELEASE: frozenset(),
-}
+from sol_execbench.core.bench.performance_model.lifecycle.stage_specs import (
+    LEGAL_TRANSITIONS,
+)
 
 
 def require_legal_transition(

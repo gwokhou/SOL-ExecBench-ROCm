@@ -26,61 +26,13 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleParent,
 )
+from sol_execbench.core.bench.performance_model.lifecycle.stage_specs import (
+    DEPENDENCIES,
+)
 from sol_execbench.core.data.json_utils import (
     load_json_file,
 )
 from sol_execbench.core.integrity import sha256_file
-
-DEPENDENCIES: dict[
-    DiagnosticLifecycleStage, tuple[DiagnosticLifecycleStage, ...]
-] = {
-    DiagnosticLifecycleStage.DESIGN: (),
-    DiagnosticLifecycleStage.CALIBRATION: (),
-    DiagnosticLifecycleStage.COLLECTION_RUN: (DiagnosticLifecycleStage.DESIGN,),
-    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
-        DiagnosticLifecycleStage.COLLECTION_RUN,
-    ),
-    DiagnosticLifecycleStage.MODEL_BUILD: (
-        DiagnosticLifecycleStage.CALIBRATION,
-    ),
-    DiagnosticLifecycleStage.ACCEPTANCE: (
-        DiagnosticLifecycleStage.MODEL_BUILD,
-        DiagnosticLifecycleStage.CALIBRATION,
-        DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
-    ),
-    DiagnosticLifecycleStage.PUBLICATION: (
-        DiagnosticLifecycleStage.ACCEPTANCE,
-        DiagnosticLifecycleStage.CALIBRATION,
-        DiagnosticLifecycleStage.MODEL_BUILD,
-    ),
-    DiagnosticLifecycleStage.RELEASE: (DiagnosticLifecycleStage.PUBLICATION,),
-}
-
-
-DEPENDENCIES: dict[
-    DiagnosticLifecycleStage, tuple[DiagnosticLifecycleStage, ...]
-] = {
-    DiagnosticLifecycleStage.DESIGN: (),
-    DiagnosticLifecycleStage.CALIBRATION: (),
-    DiagnosticLifecycleStage.COLLECTION_RUN: (DiagnosticLifecycleStage.DESIGN,),
-    DiagnosticLifecycleStage.CORPUS_SNAPSHOT: (
-        DiagnosticLifecycleStage.COLLECTION_RUN,
-    ),
-    DiagnosticLifecycleStage.MODEL_BUILD: (
-        DiagnosticLifecycleStage.CALIBRATION,
-    ),
-    DiagnosticLifecycleStage.ACCEPTANCE: (
-        DiagnosticLifecycleStage.MODEL_BUILD,
-        DiagnosticLifecycleStage.CALIBRATION,
-        DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
-    ),
-    DiagnosticLifecycleStage.PUBLICATION: (
-        DiagnosticLifecycleStage.ACCEPTANCE,
-        DiagnosticLifecycleStage.CALIBRATION,
-        DiagnosticLifecycleStage.MODEL_BUILD,
-    ),
-    DiagnosticLifecycleStage.RELEASE: (DiagnosticLifecycleStage.PUBLICATION,),
-}
 
 
 def _require_output_root(context: StageRunContext) -> Path:

@@ -78,7 +78,9 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
     DiagnosticStageAttempt,
     lifecycle_plan_path,
 )
-from sol_execbench.core.bench.performance_model.lifecycle.stage_support import (
+from sol_execbench.core.bench.performance_model.lifecycle.stage_specs import (
+    CHAIN,
+    CHAIN_INDEX,
     DEPENDENCIES,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
@@ -89,19 +91,6 @@ from sol_execbench.core.data.json_utils import (
 )
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.process import redacted_text_tail
-
-CHAIN: tuple[DiagnosticLifecycleStage, ...] = (
-    DiagnosticLifecycleStage.DESIGN,
-    DiagnosticLifecycleStage.CALIBRATION,
-    DiagnosticLifecycleStage.COLLECTION_RUN,
-    DiagnosticLifecycleStage.CORPUS_SNAPSHOT,
-    DiagnosticLifecycleStage.MODEL_BUILD,
-    DiagnosticLifecycleStage.ACCEPTANCE,
-    DiagnosticLifecycleStage.PUBLICATION,
-    DiagnosticLifecycleStage.RELEASE,
-)
-
-_CHAIN_INDEX = {stage: index for index, stage in enumerate(CHAIN)}
 
 
 def build_stage_handlers(
@@ -332,9 +321,9 @@ def _ordered_stages(
 ) -> tuple[DiagnosticLifecycleStage, ...]:
     if len(set(requested)) != len(requested):
         raise ValueError("lifecycle stage list repeats a stage")
-    if any(stage not in _CHAIN_INDEX for stage in requested):
+    if any(stage not in CHAIN_INDEX for stage in requested):
         raise ValueError("lifecycle stage list contains an unknown stage")
-    return tuple(sorted(requested, key=lambda stage: _CHAIN_INDEX[stage]))
+    return tuple(sorted(requested, key=lambda stage: CHAIN_INDEX[stage]))
 
 
 def _validate_predecessor(
@@ -618,7 +607,7 @@ def _stage_status(
 def _immediate_predecessor(
     stage: DiagnosticLifecycleStage,
 ) -> DiagnosticLifecycleStage | None:
-    index = _CHAIN_INDEX[stage]
+    index = CHAIN_INDEX[stage]
     return CHAIN[index - 1] if index > 0 else None
 
 
