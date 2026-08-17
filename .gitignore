@@ -42,6 +42,7 @@ pytest*
 /problems/local/
 
 # other
+**/.DS_Store
 /out/
 /tmp/
 /.rocprofv3/

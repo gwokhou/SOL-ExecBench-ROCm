@@ -3,8 +3,9 @@
 `LLM_CORE_V2` is a frozen, forward-only text-model corpus built independently
 from pinned public architecture facts. It contains 36 semantic Definitions and
 36 workload-generation rules across six selectable profiles, with no concrete
-Workloads frozen in the release. Every rule defines one smoke slot and eight
-balanced development slots. It does not include model weights, multimodal
+Workloads frozen in the release. Every rule defines one smoke slot, four
+balanced development slots, and four corresponding holdout slots. It does not
+include model weights, multimodal
 encoders, NVIDIA SOL-ExecBench dataset content, scores, or real-hardware
 qualification.
 
@@ -41,10 +42,19 @@ embeds the raw capacity evidence for audit, but only semantic generation inputs
 participate in the workload-view digest. Bundled target templates remain
 declarations; the measurement qualifies only the derived view.
 
-The frozen slot distribution is hardware-independent. Different capacity
+The frozen latent slot structure is hardware-independent. Different capacity
 classes may choose different common scales, while slot IDs, roles, regimes,
 serving phases, bindings, coefficients, input profiles, and correctness
 profiles remain identical. If all nine aligned workloads cannot be distinct and
 feasible together, the entire Definition is marked `insufficient_capacity`.
 Runtime OOM evidence never triggers an in-place scale downgrade or partial
 workload deletion.
+
+The four `*-low` slots form the agent-visible development view. The four
+`*-high` slots are evaluator-held workloads: their concrete axes, UUIDs, and
+resource envelopes are withheld while a solution is produced, then disclosed
+with the completed evaluation evidence. This is an exposure boundary rather
+than a cryptographic secrecy claim because the generation rules are public.
+
+See [Cross-hardware Agent evaluation](../../../docs/user/HARDWARE-GENERALIZATION.md)
+for the benchmark-owned study protocol and distributed CLI workflow.
