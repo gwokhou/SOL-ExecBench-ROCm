@@ -25,8 +25,8 @@ from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
 REVISION_PATTERN = r"^[0-9a-f]{40}$"
-WORKLOAD_GENERATOR_VERSION = "llm_core_common_scale.v1"
-WORKLOAD_GENERATION_PROTOCOL_MAJOR = 1
+WORKLOAD_GENERATOR_VERSION = "llm_core_common_scale.v2"
+WORKLOAD_GENERATION_PROTOCOL_MAJOR = 2
 MINIMUM_CAPACITY_CLASS_GIB = 1
 SATURATED_CAPACITY_CLASS_GIB = 384
 
@@ -256,7 +256,7 @@ class WorkloadGenerationRule(CurrentFrozenSchemaModel):
 
     schema_version: Literal[DatasetArtifactSchema.WORKLOAD_GENERATION_RULE]
     semantic_id: NonEmptyString
-    algorithm_version: Literal["llm_core_common_scale.v1"]
+    algorithm_version: Literal["llm_core_common_scale.v2"]
     operation_family: CorpusOperationFamily
     variant: NonEmptyString
     source_ids: tuple[NonEmptyString, ...] = Field(min_length=1)
@@ -286,13 +286,20 @@ class WorkloadGenerationRule(CurrentFrozenSchemaModel):
         development = tuple(
             slot for slot in self.slots if slot.role is WorkloadRole.DEVELOPMENT
         )
-        if len(development) != 8:
+        holdout = tuple(
+            slot for slot in self.slots if slot.role is WorkloadRole.HOLDOUT
+        )
+        if len(development) != 4:
             raise ValueError(
-                "generation rule must contain eight development slots"
+                "generation rule must contain four development slots"
             )
+        if len(holdout) != 4:
+            raise ValueError("generation rule must contain four holdout slots")
         for regime in WorkloadRegime:
-            if sum(slot.regime is regime for slot in development) != 2:
-                raise ValueError(f"generation rule must balance {regime}")
+            if sum(slot.regime is regime for slot in development) != 1:
+                raise ValueError(f"development slots must balance {regime}")
+            if sum(slot.regime is regime for slot in holdout) != 1:
+                raise ValueError(f"holdout slots must balance {regime}")
         return self
 
 
@@ -324,7 +331,7 @@ class CorpusCoveragePolicy(FrozenArtifactModel):
 class CorpusGenerationPolicy(FrozenArtifactModel):
     """Frozen capacity normalization and executor policy."""
 
-    algorithm_version: Literal["llm_core_common_scale.v1"]
+    algorithm_version: Literal["llm_core_common_scale.v2"]
     capacity_classes_gib: tuple[int, ...] = Field(min_length=1)
     maximum_capacity_numerator: Literal[1] = 1
     maximum_capacity_denominator: Literal[2] = 2
@@ -464,7 +471,7 @@ class CorpusTargetViewManifest(CurrentFrozenSchemaModel):
     capacity_class_bytes: NonNegativeInt
     distribution_id: str = Field(pattern=SHA256_PATTERN)
     generation_cohort_id: str = Field(pattern=SHA256_PATTERN)
-    generator_version: Literal["llm_core_common_scale.v1"]
+    generator_version: Literal["llm_core_common_scale.v2"]
     workload_view_digest: str = Field(pattern=SHA256_PATTERN)
     requested_profiles: tuple[CorpusProfile, ...] = Field(min_length=1)
     require_complete_profile: bool

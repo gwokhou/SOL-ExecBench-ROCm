@@ -672,7 +672,7 @@ _GENERATION_SLOT_ROWS = (
     ),
     (
         "latency-high",
-        WorkloadRole.DEVELOPMENT,
+        WorkloadRole.HOLDOUT,
         WorkloadRegime.LATENCY,
         ServingPhase.DECODE,
         ShapeBinding.MODEL,
@@ -692,7 +692,7 @@ _GENERATION_SLOT_ROWS = (
     ),
     (
         "throughput-high",
-        WorkloadRole.DEVELOPMENT,
+        WorkloadRole.HOLDOUT,
         WorkloadRegime.THROUGHPUT,
         ServingPhase.PREFILL,
         ShapeBinding.MODEL,
@@ -712,7 +712,7 @@ _GENERATION_SLOT_ROWS = (
     ),
     (
         "irregular-high",
-        WorkloadRole.DEVELOPMENT,
+        WorkloadRole.HOLDOUT,
         WorkloadRegime.IRREGULAR,
         ServingPhase.NOT_APPLICABLE,
         ShapeBinding.BOUNDARY,
@@ -732,7 +732,7 @@ _GENERATION_SLOT_ROWS = (
     ),
     (
         "capacity-high",
-        WorkloadRole.DEVELOPMENT,
+        WorkloadRole.HOLDOUT,
         WorkloadRegime.CAPACITY,
         ServingPhase.PREFILL,
         ShapeBinding.MODEL,

@@ -56,6 +56,10 @@ class LazyGroup(click.Group):
                 "sol_execbench.cli.commands.dataset",
                 "dataset_cli",
             ),
+            "generalization": (
+                "sol_execbench.cli.commands.generalization",
+                "generalization_cli",
+            ),
             "diagnostics": (
                 "sol_execbench.cli.commands.diagnostics",
                 "diagnostics_cli",
@@ -247,6 +251,7 @@ def _command_name(args: list[str]) -> str:
         "contract": 2,
         "toolchain": 2,
         "dataset": 3,
+        "generalization": 2,
         "diagnostics": 2,
         "solar": 2,
         "score": 2,

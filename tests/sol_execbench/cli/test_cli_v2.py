@@ -26,6 +26,7 @@ def test_root_help_and_version_are_stable() -> None:
         "contract",
         "toolchain",
         "dataset",
+        "generalization",
         "solar",
         "score",
     }.issubset(set(no_args.output.split()))

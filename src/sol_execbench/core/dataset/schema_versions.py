@@ -12,9 +12,11 @@ from typing import Final
 class DatasetArtifactSchema(StrEnum):
     """Canonical dataset governance and corpus identifiers."""
 
-    CORPUS_MANIFEST = "sol_execbench.corpus_manifest.v2"
-    CORPUS_TARGET_VIEW = "sol_execbench.corpus_target_view.v2"
-    WORKLOAD_GENERATION_RULE = "sol_execbench.workload_generation_rule.v1"
+    CORPUS_MANIFEST = "sol_execbench.corpus_manifest.v3"
+    CORPUS_TARGET_VIEW = "sol_execbench.corpus_target_view.v3"
+    WORKLOAD_GENERATION_RULE = "sol_execbench.workload_generation_rule.v2"
+    CORPUS_AGENT_VIEW = "sol_execbench.corpus_agent_view.v1"
+    HARDWARE_GENERALIZATION = "sol_execbench.hardware_generalization.v1"
     CORPUS_READINESS = "sol_execbench.corpus_readiness.v1"
     DATASET_GOVERNANCE = "sol_execbench.dataset_governance.v1"
 

@@ -1,6 +1,6 @@
-schema_version: sol_execbench.workload_generation_rule.v1
+schema_version: sol_execbench.workload_generation_rule.v2
 semantic_id: llm.moe.shared_expert.v2
-algorithm_version: llm_core_common_scale.v1
+algorithm_version: llm_core_common_scale.v2
 operation_family: moe
 variant: shared_expert
 source_ids:
@@ -29,7 +29,7 @@ slots:
   scale_denominator: 8
   irregular: false
 - slot_id: latency-high
-  role: development
+  role: holdout
   regime: latency
   serving_phase: decode
   binding: model
@@ -45,7 +45,7 @@ slots:
   scale_denominator: 3
   irregular: false
 - slot_id: throughput-high
-  role: development
+  role: holdout
   regime: throughput
   serving_phase: prefill
   binding: model
@@ -61,7 +61,7 @@ slots:
   scale_denominator: 4
   irregular: true
 - slot_id: irregular-high
-  role: development
+  role: holdout
   regime: irregular
   serving_phase: not_applicable
   binding: boundary
@@ -77,7 +77,7 @@ slots:
   scale_denominator: 4
   irregular: false
 - slot_id: capacity-high
-  role: development
+  role: holdout
   regime: capacity
   serving_phase: prefill
   binding: model

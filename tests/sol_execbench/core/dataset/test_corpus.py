@@ -23,6 +23,7 @@ from sol_execbench.core.dataset.corpus import (
     validate_corpus,
 )
 from sol_execbench.core.dataset.corpus_models import (
+    WORKLOAD_GENERATION_PROTOCOL_MAJOR,
     CorpusManifest,
     CorpusOperationFamily,
     CorpusProfile,
@@ -362,7 +363,7 @@ def test_distribution_identity_binds_model_facts_and_protocol(
         definition=definition,
         rule=rule,
         facts=facts,
-        protocol_major=2,
+        protocol_major=WORKLOAD_GENERATION_PROTOCOL_MAJOR + 1,
     )
     changed_slot = rule.slots[0].model_copy(update={"scale_numerator": 2})
     rule_changed = workload_generation.distribution_id(
