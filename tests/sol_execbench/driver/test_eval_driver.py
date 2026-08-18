@@ -44,6 +44,8 @@ from sol_execbench.core.bench.reference_protocol import TRUSTED_DEFINITION_FILE
 from sol_execbench.core.data.schema_versions import BenchmarkArtifactSchema
 
 _TEMPLATES_DIR = Path(driver.__file__).parent / "templates"
+_EVAL_DRIVER_TIMEOUT_SECONDS = 60
+_TORCH_COMPILE_TIMEOUT_SECONDS = 180
 
 
 def _stage_evaluation_templates(tmp_path: Path) -> None:
@@ -143,6 +145,8 @@ def _run_eval_driver(
     extra_env: dict | None = None,
     definition: dict | None = None,
     workload: dict | None = None,
+    *,
+    timeout_seconds: int = _EVAL_DRIVER_TIMEOUT_SECONDS,
 ) -> list[dict]:
     """Write all staging files and run eval_driver.py in a subprocess.
 
@@ -155,6 +159,7 @@ def _run_eval_driver(
         extra_env: Additional environment variables for the subprocess.
         definition: Problem definition dict. Defaults to ``_MINIMAL_DEFINITION``.
         workload: Workload dict. Defaults to ``_MINIMAL_WORKLOAD``.
+        timeout_seconds: Bounded subprocess timeout for this scenario.
 
     Returns:
         List of Trace dicts parsed from the driver's stdout.
@@ -167,6 +172,7 @@ def _run_eval_driver(
         extra_env=extra_env,
         definition=definition,
         workload=workload,
+        timeout_seconds=timeout_seconds,
     )
     return parse_eval_result(result.stdout, result.stderr)
 
@@ -178,6 +184,8 @@ def _run_eval_driver_process(
     extra_env: dict | None = None,
     definition: dict | None = None,
     workload: dict | None = None,
+    *,
+    timeout_seconds: int = _EVAL_DRIVER_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess[str]:
     """Run the isolated reference/candidate workflow and return its result."""
     _stage_evaluation_templates(tmp_path)
@@ -233,7 +241,7 @@ def _run_eval_driver_process(
         capture_output=True,
         check=False,
         text=True,
-        timeout=60,
+        timeout=timeout_seconds,
     )
 
 
@@ -658,6 +666,7 @@ def test_thread_injection_detected(tmp_path):
     )
 
 
+@pytest.mark.xdist_group("serial")
 def test_torch_compile_no_reward_hack(tmp_path):
     """@torch.compile must not trigger thread injection false positive.
 
@@ -673,7 +682,11 @@ def test_torch_compile_no_reward_hack(tmp_path):
         "def run(x, y):\n"
         "    return x + y\n"
     )
-    traces = _run_eval_driver(tmp_path, kernel)
+    traces = _run_eval_driver(
+        tmp_path,
+        kernel,
+        timeout_seconds=_TORCH_COMPILE_TIMEOUT_SECONDS,
+    )
 
     assert len(traces) == 1
     ev = traces[0]["evaluation"]
