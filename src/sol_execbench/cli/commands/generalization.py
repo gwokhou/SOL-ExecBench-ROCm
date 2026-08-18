@@ -237,11 +237,7 @@ def run_cell_cli(
                 _load_model(Solution, path) for path in solution_paths
             ),
             traces=tuple(_load_traces(trace_paths)),
-            observed_gfx_target=capacity.gfx_target,
-            observed_hardware_configuration_id=(
-                observed_context.hardware_configuration_id
-            ),
-            observed_capacity_class_bytes=observed_capacity_class,
+            observed_hardware=observed_context,
             used_holdout_feedback=used_holdout_feedback,
         )
         _write_model(output, cell)

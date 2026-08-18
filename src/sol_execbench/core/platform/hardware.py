@@ -8,7 +8,6 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
@@ -231,7 +230,7 @@ class HardwareConfiguration(FrozenArtifactModel):
             raise ValueError("PCIe topology does not terminate at gpu_bdf")
         return self
 
-    def identity_payload(self) -> dict[str, Any]:
+    def identity_payload(self) -> dict[str, object]:
         """Return configuration semantics without audit-only target labels."""
         payload = self.model_dump(mode="json", exclude={"target_id"})
         payload["device_model"] = (
@@ -497,7 +496,7 @@ def build_resolved_hardware_context(
 ) -> ResolvedHardwareContext:
     """Resolve and bind one hardware context without changing workload identity."""
     resolved = resolve_hardware_configuration(configuration, observation)
-    payload: dict[str, Any] = {
+    payload: dict[str, object] = {
         "configuration": resolved,
         "observation": observation,
         "hardware_configuration_id": resolved.configuration_id,
@@ -511,7 +510,10 @@ def build_resolved_hardware_context(
         "resolution_policy": HARDWARE_RESOLUTION_POLICY,
         "context_digest": "0" * 64,
     }
-    provisional = ResolvedHardwareContext.model_construct(**payload)
+    provisional = ResolvedHardwareContext.model_construct(
+        _fields_set=None,
+        **payload,
+    )
     payload["context_digest"] = resolved_hardware_context_digest(provisional)
     return ResolvedHardwareContext.model_validate(payload)
 

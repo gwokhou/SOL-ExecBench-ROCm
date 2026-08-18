@@ -164,14 +164,8 @@ def _cells(
             manifest_digest=sha256_file(MANIFEST),
             solutions=(),
             traces=(),
-            observed_gfx_target=(
-                target_views[cell.study_target_id].target.gfx_target
-            ),
-            observed_hardware_configuration_id=(
-                target_views[cell.study_target_id].hardware_configuration_id
-            ),
-            observed_capacity_class_bytes=(
-                target_views[cell.study_target_id].capacity_class_bytes
+            observed_hardware=(
+                target_views[cell.study_target_id].hardware_context
             ),
         )
         for cell in planned.plan.cells
@@ -604,13 +598,7 @@ def test_runtime_sealing_never_calls_workload_generator(
         manifest_digest=sha256_file(MANIFEST),
         solutions=(),
         traces=(),
-        observed_gfx_target="gfx1200",
-        observed_hardware_configuration_id=(
-            target_views[cell.study_target_id].hardware_configuration_id
-        ),
-        observed_capacity_class_bytes=(
-            target_views[cell.study_target_id].capacity_class_bytes
-        ),
+        observed_hardware=target_views[cell.study_target_id].hardware_context,
     )
     expected = sum(
         item.role is not WorkloadRole.SMOKE
@@ -636,11 +624,7 @@ def test_seal_rejects_manifest_and_runtime_capacity_drift(
             manifest_digest="f" * 64,
             solutions=(),
             traces=(),
-            observed_gfx_target=target.target.gfx_target,
-            observed_hardware_configuration_id=(
-                target.hardware_configuration_id
-            ),
-            observed_capacity_class_bytes=target.capacity_class_bytes,
+            observed_hardware=target.hardware_context,
         )
     with pytest.raises(ValueError, match="observed capacity class differs"):
         seal_cell(
@@ -651,11 +635,9 @@ def test_seal_rejects_manifest_and_runtime_capacity_drift(
             manifest_digest=sha256_file(MANIFEST),
             solutions=(),
             traces=(),
-            observed_gfx_target=target.target.gfx_target,
-            observed_hardware_configuration_id=(
-                target.hardware_configuration_id
+            observed_hardware=target.hardware_context.model_copy(
+                update={"capacity_class_bytes": target.capacity_class_bytes * 2}
             ),
-            observed_capacity_class_bytes=target.capacity_class_bytes * 2,
         )
 
 
@@ -743,11 +725,7 @@ def test_seal_rejects_trace_identity_drift(
             manifest_digest=sha256_file(MANIFEST),
             solutions=(solution,),
             traces=(trace,),
-            observed_gfx_target=target.target.gfx_target,
-            observed_hardware_configuration_id=(
-                target.hardware_configuration_id
-            ),
-            observed_capacity_class_bytes=target.capacity_class_bytes,
+            observed_hardware=target.hardware_context,
         )
 
 
