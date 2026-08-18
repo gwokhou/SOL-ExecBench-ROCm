@@ -89,6 +89,57 @@ completed investigations and one-time inventories belong in Git history.
 
 ## Active backlog
 
+### P1 — Close the hardware-generalization study design
+
+The v2 implementation provides an immutable target/capacity matrix, separate
+target-conditioned and solution-portability tracks, development/holdout roles,
+Definition-equal metrics, common-support comparisons, and workload-drift
+reporting. The following are study-design decisions, not implementation defects,
+and must be settled before results are described as evidence of GPU Kernel Agent
+cross-hardware generalization:
+
+- Define an externally verifiable Agent-run identity and provenance contract.
+  The current training-exposure declaration is self-declared by default, and a
+  solution name in a Trace does not cryptographically bind the evaluated source
+  bundle. The protocol needs to prove which Agent/model/checkpoint/prompt/tool
+  policy produced each candidate and whether the required identity is shared
+  across cells.
+- Decide whether holdout workloads are genuinely private evaluation material or
+  public high-difficulty evaluation slots. The public deterministic generator,
+  generation-rule identity, hardware facts, and withheld slot IDs can make the
+  present holdout reconstructible; documentation must not imply secrecy unless
+  generation happens behind an evaluator boundary that withholds its rule inputs.
+- Freeze the primary generalization endpoint. In particular, decide whether the
+  confirmatory result is holdout-only while development results remain
+  diagnostic, or whether the current combined development-plus-holdout estimate
+  is intentional and justified.
+- Freeze the solution-portability intervention. Specify whether one candidate is
+  generated once against a designated control target and replayed unchanged on
+  every target, or whether the Agent may generate one target-agnostic candidate
+  with multi-target facts. The current digest equality check enforces unchanged
+  payloads but does not define how that payload was produced.
+- Add an explicit primary-control identity if a study may contain more than one
+  seen-hardware/seen-capacity target. The current implementation fails closed on
+  ambiguous controls rather than silently choosing one, but the research design
+  must define the intended comparison baseline.
+- Define conclusion eligibility independently of artifact completeness. A full
+  matrix of zero submitted candidates is mechanically complete but is not, by
+  itself, a valid claim about Agent generalization. Set minimum candidate
+  coverage, required holdout evidence, exposure-verification, and invalid-run
+  thresholds before enabling a confirmatory conclusion.
+- Define repeated-run and stochasticity policy: generation seeds, number of
+  independent Agent attempts, within-Agent aggregation, and whether uncertainty
+  must include run-to-run variance in addition to the current
+  Definition-cluster bootstrap.
+- If SOL-normalized evidence is required, define a content-bound SOL artifact
+  input and its eligibility rules. The v2 Trace-backed report intentionally omits
+  placeholder SOL fields because ordinary evaluator Traces do not contain that
+  evidence.
+
+Completion requires a reviewed protocol decision for every item, matching model
+and CLI contracts, adversarial contract tests, and user documentation that
+states the evidence boundary without claiming proven distribution preservation.
+
 ### P1 — start-640 PCIe5.0x16 successor path (closed terminal)
 
 `p1-successor-start640-pcie5x16-r1` completed at `8848d605` and is **closed

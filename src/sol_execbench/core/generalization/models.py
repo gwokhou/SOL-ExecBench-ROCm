@@ -242,7 +242,6 @@ class CellWorkloadResult(FrozenArtifactModel):
     compiled: bool
     correct: bool
     speedup: float | None = Field(default=None, gt=0.0)
-    sol_score: float | None = None
 
 
 class HardwareGeneralizationCell(CurrentFrozenSchemaModel):
@@ -256,6 +255,7 @@ class HardwareGeneralizationCell(CurrentFrozenSchemaModel):
     plan_digest: str = Field(pattern=SHA256_PATTERN)
     cell_id: NonEmptyString
     observed_gfx_target: NonEmptyString
+    observed_capacity_class_bytes: NonNegativeInt
     candidates: tuple[CandidateDeclaration, ...]
     results: tuple[CellWorkloadResult, ...]
     evaluator_failures: tuple[NonEmptyString, ...] = ()
@@ -279,8 +279,6 @@ class StratumMetrics(FrozenArtifactModel):
     correctness_rate: MetricEstimate
     fast_p: dict[str, MetricEstimate]
     conditional_geomean_speedup: MetricEstimate
-    sol_score: MetricEstimate
-    sol_coverage: MetricEstimate
 
 
 class WorkloadDrift(FrozenArtifactModel):
