@@ -60,6 +60,7 @@ from sol_execbench.core.generalization.views import (
     hardware_facts,
 )
 from sol_execbench.core.integrity import stable_json_checksum
+from sol_execbench.core.platform.hardware import ResolvedHardwareContext
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -131,22 +132,14 @@ def seal_cell(
     manifest_digest: str,
     solutions: tuple[Solution, ...],
     traces: tuple[Trace, ...],
-    observed_gfx_target: str,
-    observed_hardware_configuration_id: str,
-    observed_capacity_class_bytes: int,
+    observed_hardware: ResolvedHardwareContext,
     used_holdout_feedback: bool = False,
 ) -> HardwareGeneralizationCell:
     """Seal traces from the existing evaluator; never regenerate workloads."""
     _validate_plan_digest(plan)
     _validate_manifest_digest(plan, manifest_digest)
     planned = _find_planned_cell(plan, cell_id)
-    _validate_cell_target(
-        planned,
-        target_view,
-        observed_gfx_target,
-        observed_hardware_configuration_id,
-        observed_capacity_class_bytes,
-    )
+    _validate_cell_target(planned, target_view, observed_hardware)
     if planned.zero_shot and used_holdout_feedback:
         raise ValueError("zero-shot cell cannot use target holdout feedback")
     solution_map = _solutions_by_semantic_id(manifest, solutions)
@@ -155,7 +148,10 @@ def seal_cell(
         solution_map,
         used_holdout_feedback,
     )
-    traces_by_uuid = _trace_index(traces, observed_gfx_target)
+    traces_by_uuid = _trace_index(
+        traces,
+        observed_hardware.observation.gfx_target,
+    )
     entries = {item.semantic_id: item for item in manifest.entries}
     expected_trace_uuids = {
         item.uuid
@@ -186,11 +182,13 @@ def seal_cell(
         "artifact_kind": GeneralizationArtifactKind.CELL,
         "plan_digest": plan.plan_digest,
         "cell_id": cell_id,
-        "observed_gfx_target": observed_gfx_target.strip().lower(),
-        "observed_hardware_configuration_id": (
-            observed_hardware_configuration_id
+        "observed_gfx_target": (
+            observed_hardware.observation.gfx_target.strip().lower()
         ),
-        "observed_capacity_class_bytes": observed_capacity_class_bytes,
+        "observed_hardware_configuration_id": (
+            observed_hardware.hardware_configuration_id
+        ),
+        "observed_capacity_class_bytes": observed_hardware.capacity_class_bytes,
         "candidates": candidates,
         "results": tuple(results),
         "evaluator_failures": tuple(sorted(failures)),
@@ -330,21 +328,22 @@ def _find_planned_cell(
 def _validate_cell_target(
     planned: PlannedCell,
     target: CorpusTargetViewManifest,
-    observed_gfx: str,
-    observed_hardware_configuration_id: str,
-    observed_capacity_class_bytes: int,
+    observed: ResolvedHardwareContext,
 ) -> None:
     if target.workload_view_digest != planned.target_view_digest:
         raise ValueError("target view differs from immutable plan")
     if target.generation_cohort_id != planned.generation_cohort_id:
         raise ValueError("generation cohort differs from immutable plan")
-    if target.target.gfx_target.lower() != observed_gfx.strip().lower():
+    if (
+        target.target.gfx_target.lower()
+        != observed.observation.gfx_target.strip().lower()
+    ):
         raise ValueError("observed gfx target differs from planned target")
-    if observed_capacity_class_bytes != target.capacity_class_bytes:
+    if observed.capacity_class_bytes != target.capacity_class_bytes:
         raise ValueError("observed capacity class differs from planned target")
     if (
-        observed_hardware_configuration_id != planned.hardware_configuration_id
-        or observed_hardware_configuration_id
+        observed.hardware_configuration_id != planned.hardware_configuration_id
+        or observed.hardware_configuration_id
         != target.hardware_configuration_id
     ):
         raise ValueError(
