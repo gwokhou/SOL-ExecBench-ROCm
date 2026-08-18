@@ -9,6 +9,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 from pydantic import BaseModel
+from sol_execbench_type_helpers import make_solution, make_trace, make_workload
 
 from sol_execbench.cli.main import cli
 from sol_execbench.core.data.json_utils import atomic_write_json_value
@@ -149,14 +150,67 @@ def _cells(
             cell_id=cell.cell_id,
             target_view=target_views[cell.study_target_id],
             manifest=corpus,
+            manifest_digest=sha256_file(MANIFEST),
             solutions=(),
             traces=(),
             observed_gfx_target=(
                 target_views[cell.study_target_id].target.gfx_target
             ),
+            observed_capacity_class_bytes=(
+                target_views[cell.study_target_id].capacity_class_bytes
+            ),
         )
         for cell in planned.plan.cells
     )
+
+
+def _solution_and_trace(
+    corpus: CorpusManifest,
+    target_view: CorpusTargetViewManifest,
+    *,
+    trace_solution: str = "candidate",
+    axes: dict[str, int] | None = None,
+    workload_uuid: str | None = None,
+):
+    workload = next(
+        item
+        for item in target_view.workloads
+        if item.role is not WorkloadRole.SMOKE
+    )
+    entry = next(
+        item
+        for item in corpus.entries
+        if item.semantic_id == workload.semantic_id
+    )
+    solution = make_solution(
+        name="candidate",
+        definition=entry.problem_name,
+        author="test-agent",
+        spec={
+            "languages": ["pytorch"],
+            "target_hardware": ["LOCAL"],
+            "entry_point": "kernel.py::run",
+        },
+        sources=[{"path": "kernel.py", "content": "def run(*args): pass\n"}],
+    )
+    trace = make_trace(
+        definition=entry.problem_name,
+        solution=trace_solution,
+        workload=make_workload(
+            uuid=workload_uuid or workload.uuid,
+            axes=axes if axes is not None else workload.axes,
+            inputs={"x": {"type": "random"}},
+        ),
+        evaluation={
+            "status": "COMPILE_ERROR",
+            "environment": {
+                "hardware": target_view.target.gfx_target,
+                "libs": {},
+            },
+            "timestamp": "2026-08-17T00:00:00Z",
+        },
+    )
+    return solution, trace
 
 
 def test_roles_and_agent_visibility_are_exact(
@@ -280,12 +334,14 @@ def test_aggregate_is_deterministic_and_uses_common_support(
     first = aggregate_study(
         plan=planned.plan,
         manifest=corpus,
+        manifest_digest=sha256_file(MANIFEST),
         target_views=target_views,
         cells=cells,
     )
     second = aggregate_study(
         plan=planned.plan,
         manifest=corpus,
+        manifest_digest=sha256_file(MANIFEST),
         target_views=target_views,
         cells=cells,
     )
@@ -343,6 +399,7 @@ def test_capability_missingness_changes_only_target_full_denominator(
     report = aggregate_study(
         plan=study.plan,
         manifest=corpus,
+        manifest_digest=sha256_file(MANIFEST),
         target_views=views,
         cells=_cells(study, corpus, views),
     )
@@ -376,6 +433,7 @@ def test_missing_cell_produces_no_generalization_conclusion(
     report = aggregate_study(
         plan=planned.plan,
         manifest=corpus,
+        manifest_digest=sha256_file(MANIFEST),
         target_views=target_views,
         cells=cells,
     )
@@ -396,7 +454,14 @@ def test_portability_payload_change_is_rejected(
         for index, cell in enumerate(planned.plan.cells)
         if cell.track.value == "solution_portability"
     ]
-    semantic_id = corpus.entries[0].semantic_id
+    first_two_views = [
+        target_views[planned.plan.cells[index].study_target_id]
+        for index in portable[:2]
+    ]
+    semantic_id = min(
+        {item.semantic_id for item in first_two_views[0].workloads}
+        & {item.semantic_id for item in first_two_views[1].workloads}
+    )
     for offset, index in enumerate(portable[:2]):
         planned_cell = planned.plan.cells[index]
         candidate = CandidateDeclaration(
@@ -408,6 +473,12 @@ def test_portability_payload_change_is_rejected(
         )
         payload = cells[index].model_dump(mode="json")
         payload["candidates"] = [candidate.model_dump(mode="json")]
+        missing = []
+        for result in payload["results"]:
+            if result["semantic_id"] == semantic_id:
+                result["status"] = "evaluator_failure"
+                missing.append(f"missing_trace:{result['workload_uuid']}")
+        payload["evaluator_failures"] = missing
         payload.pop("cell_digest")
         payload["cell_digest"] = stable_json_checksum(payload)
         cells[index] = type(cells[index]).model_validate(payload)
@@ -416,6 +487,7 @@ def test_portability_payload_change_is_rejected(
         aggregate_study(
             plan=planned.plan,
             manifest=corpus,
+            manifest_digest=sha256_file(MANIFEST),
             target_views=target_views,
             cells=tuple(cells),
         )
@@ -440,15 +512,201 @@ def test_runtime_sealing_never_calls_workload_generator(
         cell_id=cell.cell_id,
         target_view=target_views[cell.study_target_id],
         manifest=corpus,
+        manifest_digest=sha256_file(MANIFEST),
         solutions=(),
         traces=(),
         observed_gfx_target="gfx1200",
+        observed_capacity_class_bytes=(
+            target_views[cell.study_target_id].capacity_class_bytes
+        ),
     )
     expected = sum(
         item.role is not WorkloadRole.SMOKE
         for item in target_views[cell.study_target_id].workloads
     )
     assert len(sealed.results) == expected
+
+
+def test_seal_rejects_manifest_and_runtime_capacity_drift(
+    planned: PlannedStudy,
+    corpus: CorpusManifest,
+    target_views: dict[str, CorpusTargetViewManifest],
+) -> None:
+    cell = planned.plan.cells[0]
+    target = target_views[cell.study_target_id]
+
+    with pytest.raises(ValueError, match="corpus manifest differs"):
+        seal_cell(
+            plan=planned.plan,
+            cell_id=cell.cell_id,
+            target_view=target,
+            manifest=corpus,
+            manifest_digest="f" * 64,
+            solutions=(),
+            traces=(),
+            observed_gfx_target=target.target.gfx_target,
+            observed_capacity_class_bytes=target.capacity_class_bytes,
+        )
+    with pytest.raises(ValueError, match="observed capacity class differs"):
+        seal_cell(
+            plan=planned.plan,
+            cell_id=cell.cell_id,
+            target_view=target,
+            manifest=corpus,
+            manifest_digest=sha256_file(MANIFEST),
+            solutions=(),
+            traces=(),
+            observed_gfx_target=target.target.gfx_target,
+            observed_capacity_class_bytes=target.capacity_class_bytes * 2,
+        )
+
+
+def test_run_cell_cli_reprobes_runtime_capacity_class(
+    tmp_path: Path,
+    monkeypatch,
+    planned: PlannedStudy,
+    target_views: dict[str, CorpusTargetViewManifest],
+) -> None:
+    cell = next(
+        item
+        for item in planned.plan.cells
+        if item.study_target_id == "gfx1200-8"
+    )
+    plan_path = tmp_path / "plan.json"
+    target_path = tmp_path / "target.json"
+    output = tmp_path / "cell.json"
+    atomic_write_json_value(plan_path, planned.plan.model_dump(mode="json"))
+    atomic_write_json_value(
+        target_path,
+        target_views["gfx1200-8"].model_dump(mode="json"),
+    )
+    monkeypatch.setattr(
+        "sol_execbench.cli.commands.generalization."
+        "collect_gpu_memory_quota_isolated",
+        lambda *_args, **_kwargs: _capacity(16, "gfx1200"),
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--format",
+            "json",
+            "generalization",
+            "run-cell",
+            "--plan",
+            str(plan_path),
+            "--manifest",
+            str(MANIFEST),
+            "--target-view",
+            str(target_path),
+            "--cell-id",
+            cell.cell_id,
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    response = json.loads(result.output)
+    assert response["error"]["code"] == "generalization_protocol_invalid"
+    assert "observed capacity class differs" in response["error"]["message"]
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    ("trace_overrides", "message"),
+    (
+        ({"trace_solution": "other"}, "trace Solution differs"),
+        ({"axes": {"tampered": 1}}, "trace workload axes differ"),
+        ({"workload_uuid": "unplanned"}, "unplanned workload traces"),
+    ),
+)
+def test_seal_rejects_trace_identity_drift(
+    trace_overrides: dict[str, Any],
+    message: str,
+    planned: PlannedStudy,
+    corpus: CorpusManifest,
+    target_views: dict[str, CorpusTargetViewManifest],
+) -> None:
+    cell = planned.plan.cells[0]
+    target = target_views[cell.study_target_id]
+    solution, trace = _solution_and_trace(
+        corpus,
+        target,
+        **trace_overrides,
+    )
+
+    with pytest.raises(ValueError, match=message):
+        seal_cell(
+            plan=planned.plan,
+            cell_id=cell.cell_id,
+            target_view=target,
+            manifest=corpus,
+            manifest_digest=sha256_file(MANIFEST),
+            solutions=(solution,),
+            traces=(trace,),
+            observed_gfx_target=target.target.gfx_target,
+            observed_capacity_class_bytes=target.capacity_class_bytes,
+        )
+
+
+def test_aggregate_revalidates_cell_results_against_target_view(
+    planned: PlannedStudy,
+    corpus: CorpusManifest,
+    target_views: dict[str, CorpusTargetViewManifest],
+) -> None:
+    cells = list(_cells(planned, corpus, target_views))
+    payload = cells[0].model_dump(mode="json")
+    payload["results"][0]["slot_id"] = "tampered-slot"
+    payload.pop("cell_digest")
+    payload["cell_digest"] = stable_json_checksum(payload)
+    cells[0] = HardwareGeneralizationCell.model_validate(payload)
+
+    with pytest.raises(ValueError, match="result metadata differs"):
+        aggregate_study(
+            plan=planned.plan,
+            manifest=corpus,
+            manifest_digest=sha256_file(MANIFEST),
+            target_views=target_views,
+            cells=tuple(cells),
+        )
+
+
+def test_aggregate_rejects_ambiguous_seen_control(
+    corpus: CorpusManifest,
+    target_views: dict[str, CorpusTargetViewManifest],
+) -> None:
+    control = target_views["gfx1200-8"]
+    views = {
+        "control-a": control,
+        "control-b": control,
+        "gfx942": target_views["gfx942"],
+    }
+    exposure = TrainingExposureDeclaration(
+        hardware=(
+            TrainingHardwareExposure(
+                gfx_target="gfx1200",
+                capacity_class_bytes=8 * GIB,
+                distribution_id=control.distribution_id,
+            ),
+        )
+    )
+    study = build_study_plan(
+        study_id="ambiguous-control",
+        manifest=corpus,
+        manifest_digest=sha256_file(MANIFEST),
+        exposure=exposure,
+        targets=tuple(views.items()),
+    )
+
+    with pytest.raises(ValueError, match="comparison control is ambiguous"):
+        aggregate_study(
+            plan=study.plan,
+            manifest=corpus,
+            manifest_digest=sha256_file(MANIFEST),
+            target_views=views,
+            cells=_cells(study, corpus, views),
+        )
 
 
 def test_plan_cli_emits_machine_readable_contract(

@@ -128,26 +128,43 @@ def seal_cell(
     cell_id: str,
     target_view: CorpusTargetViewManifest,
     manifest: CorpusManifest,
+    manifest_digest: str,
     solutions: tuple[Solution, ...],
     traces: tuple[Trace, ...],
     observed_gfx_target: str,
+    observed_capacity_class_bytes: int,
     used_holdout_feedback: bool = False,
 ) -> HardwareGeneralizationCell:
     """Seal traces from the existing evaluator; never regenerate workloads."""
     _validate_plan_digest(plan)
+    _validate_manifest_digest(plan, manifest_digest)
     planned = _find_planned_cell(plan, cell_id)
-    _validate_cell_target(planned, target_view, observed_gfx_target)
+    _validate_cell_target(
+        planned,
+        target_view,
+        observed_gfx_target,
+        observed_capacity_class_bytes,
+    )
     if planned.zero_shot and used_holdout_feedback:
         raise ValueError("zero-shot cell cannot use target holdout feedback")
+    solution_map = _solutions_by_semantic_id(manifest, solutions)
     candidates = _candidate_declarations(
         planned,
-        manifest,
-        solutions,
+        solution_map,
         used_holdout_feedback,
     )
-    candidate_ids = {item.semantic_id for item in candidates}
     traces_by_uuid = _trace_index(traces, observed_gfx_target)
     entries = {item.semantic_id: item for item in manifest.entries}
+    expected_trace_uuids = {
+        item.uuid
+        for item in target_view.workloads
+        if item.role is not WorkloadRole.SMOKE
+    }
+    unexpected = sorted(traces_by_uuid.keys() - expected_trace_uuids)
+    if unexpected:
+        raise ValueError(
+            f"cell contains unplanned workload traces: {', '.join(unexpected)}"
+        )
     results: list[CellWorkloadResult] = []
     failures: list[str] = []
     for workload in target_view.workloads:
@@ -156,7 +173,7 @@ def seal_cell(
         result, failure = _workload_result(
             workload,
             entries[workload.semantic_id],
-            workload.semantic_id in candidate_ids,
+            solution_map.get(workload.semantic_id),
             traces_by_uuid.get(workload.uuid),
         )
         results.append(result)
@@ -168,6 +185,7 @@ def seal_cell(
         "plan_digest": plan.plan_digest,
         "cell_id": cell_id,
         "observed_gfx_target": observed_gfx_target.strip().lower(),
+        "observed_capacity_class_bytes": observed_capacity_class_bytes,
         "candidates": candidates,
         "results": tuple(results),
         "evaluator_failures": tuple(sorted(failures)),
@@ -180,13 +198,15 @@ def aggregate_study(
     *,
     plan: HardwareGeneralizationPlan,
     manifest: CorpusManifest,
+    manifest_digest: str,
     target_views: dict[str, CorpusTargetViewManifest],
     cells: tuple[HardwareGeneralizationCell, ...],
 ) -> HardwareGeneralizationReport:
     """Aggregate valid cells; incomplete evidence cannot yield conclusions."""
     _validate_plan_digest(plan)
+    _validate_manifest_digest(plan, manifest_digest)
     _validate_target_views(plan, target_views)
-    cell_map = _validate_cells(plan, cells)
+    cell_map = _validate_cells(plan, manifest, target_views, cells)
     invalid = {key for key, cell in cell_map.items() if cell.evaluator_failures}
     planned_ids = {item.cell_id for item in plan.cells}
     missing = tuple(sorted((planned_ids - cell_map.keys()) | invalid))
@@ -305,6 +325,7 @@ def _validate_cell_target(
     planned: PlannedCell,
     target: CorpusTargetViewManifest,
     observed_gfx: str,
+    observed_capacity_class_bytes: int,
 ) -> None:
     if target.workload_view_digest != planned.target_view_digest:
         raise ValueError("target view differs from immutable plan")
@@ -312,20 +333,20 @@ def _validate_cell_target(
         raise ValueError("generation cohort differs from immutable plan")
     if target.target.gfx_target.lower() != observed_gfx.strip().lower():
         raise ValueError("observed gfx target differs from planned target")
+    if observed_capacity_class_bytes != target.capacity_class_bytes:
+        raise ValueError("observed capacity class differs from planned target")
 
 
-def _candidate_declarations(
-    planned: PlannedCell,
+def _solutions_by_semantic_id(
     manifest: CorpusManifest,
     solutions: tuple[Solution, ...],
-    used_holdout_feedback: bool,
-) -> tuple[CandidateDeclaration, ...]:
+) -> dict[str, Solution]:
     semantic_ids = {
         entry.problem_name: entry.semantic_id for entry in manifest.entries
     }
     if len({solution.definition for solution in solutions}) != len(solutions):
         raise ValueError("solutions must be unique by Definition")
-    declarations = []
+    result: dict[str, Solution] = {}
     for solution in solutions:
         try:
             semantic_id = semantic_ids[solution.definition]
@@ -333,6 +354,17 @@ def _candidate_declarations(
             raise ValueError(
                 "solution Definition is absent from corpus"
             ) from exc
+        result[semantic_id] = solution
+    return result
+
+
+def _candidate_declarations(
+    planned: PlannedCell,
+    solutions: dict[str, Solution],
+    used_holdout_feedback: bool,
+) -> tuple[CandidateDeclaration, ...]:
+    declarations = []
+    for semantic_id, solution in solutions.items():
         declarations.append(
             CandidateDeclaration(
                 semantic_id=semantic_id,
@@ -365,10 +397,12 @@ def _trace_index(
 def _workload_result(
     workload: GeneratedWorkloadRecord,
     entry: CorpusEntry,
-    has_solution: bool,
+    solution: Solution | None,
     trace: Trace | None,
 ) -> tuple[CellWorkloadResult, str | None]:
-    if not has_solution:
+    if solution is None:
+        if trace is not None:
+            raise ValueError("Trace supplied without a candidate Solution")
         outcome = (CellResultStatus.MISSING_SOLUTION, False, False, None)
         failure = None
     elif trace is None:
@@ -377,6 +411,10 @@ def _workload_result(
     else:
         if trace.definition != entry.problem_name:
             raise ValueError("trace Definition differs from workload record")
+        if trace.solution != solution.name:
+            raise ValueError("trace Solution differs from supplied candidate")
+        if trace.workload.axes != workload.axes:
+            raise ValueError("trace workload axes differ from planned workload")
         outcome = _trace_outcome(trace)
         failure = (
             f"invalid_reference:{workload.uuid}"
@@ -436,10 +474,13 @@ def _trace_outcome(
 
 def _validate_cells(
     plan: HardwareGeneralizationPlan,
+    manifest: CorpusManifest,
+    target_views: dict[str, CorpusTargetViewManifest],
     cells: tuple[HardwareGeneralizationCell, ...],
 ) -> dict[str, HardwareGeneralizationCell]:
     result: dict[str, HardwareGeneralizationCell] = {}
-    planned = {item.cell_id for item in plan.cells}
+    planned = {item.cell_id: item for item in plan.cells}
+    entries = {item.semantic_id: item for item in manifest.entries}
     for cell in cells:
         if cell.plan_digest != plan.plan_digest or cell.cell_id not in planned:
             raise ValueError("cell does not belong to supplied plan")
@@ -449,9 +490,77 @@ def _validate_cells(
             raise ValueError("cell digest does not match semantic content")
         if cell.cell_id in result:
             raise ValueError("duplicate cell artifact")
+        planned_cell = planned[cell.cell_id]
+        _validate_cell_evidence(
+            planned_cell,
+            cell,
+            target_views[planned_cell.study_target_id],
+            entries,
+        )
         result[cell.cell_id] = cell
     _validate_portability(plan, result)
     return result
+
+
+def _validate_cell_evidence(
+    planned: PlannedCell,
+    cell: HardwareGeneralizationCell,
+    target: CorpusTargetViewManifest,
+    entries: dict[str, CorpusEntry],
+) -> None:
+    if cell.observed_gfx_target.lower() != target.target.gfx_target.lower():
+        raise ValueError("cell observed gfx target differs from target view")
+    if cell.observed_capacity_class_bytes != target.capacity_class_bytes:
+        raise ValueError(
+            "cell observed capacity class differs from target view"
+        )
+    expected = {
+        workload.uuid: workload
+        for workload in target.workloads
+        if workload.role is not WorkloadRole.SMOKE
+    }
+    observed = {row.workload_uuid: row for row in cell.results}
+    if len(observed) != len(cell.results) or observed.keys() != expected.keys():
+        raise ValueError("cell results differ from planned workloads")
+    candidate_ids = {item.semantic_id for item in cell.candidates}
+    if len(candidate_ids) != len(cell.candidates):
+        raise ValueError("cell candidates contain duplicate Definitions")
+    expected_semantic_ids = {item.semantic_id for item in expected.values()}
+    if not candidate_ids <= expected_semantic_ids:
+        raise ValueError("cell candidate is absent from target view")
+    for candidate in cell.candidates:
+        if (
+            candidate.agent_view_digest != planned.agent_view_digest
+            or candidate.hardware_context_digest
+            != planned.hardware_context_digest
+        ):
+            raise ValueError("cell candidate context differs from plan")
+        if planned.zero_shot and candidate.used_holdout_feedback:
+            raise ValueError("zero-shot cell used target holdout feedback")
+    for uuid, workload in expected.items():
+        row = observed[uuid]
+        entry = entries[workload.semantic_id]
+        expected_identity = (
+            workload.semantic_id,
+            workload.slot_id,
+            workload.role,
+            workload.regime,
+            entry.operation_family,
+            entry.profiles,
+        )
+        observed_identity = (
+            row.semantic_id,
+            row.slot_id,
+            row.role,
+            row.regime,
+            row.operation_family,
+            row.profiles,
+        )
+        if observed_identity != expected_identity:
+            raise ValueError("cell result metadata differs from target view")
+        missing = row.status is CellResultStatus.MISSING_SOLUTION
+        if missing != (row.semantic_id not in candidate_ids):
+            raise ValueError("cell result disagrees with candidate declaration")
 
 
 def _validate_plan_digest(plan: HardwareGeneralizationPlan) -> None:
@@ -459,6 +568,14 @@ def _validate_plan_digest(plan: HardwareGeneralizationPlan) -> None:
     observed_digest = payload.pop("plan_digest")
     if stable_json_checksum(payload) != observed_digest:
         raise ValueError("plan digest does not match semantic content")
+
+
+def _validate_manifest_digest(
+    plan: HardwareGeneralizationPlan,
+    manifest_digest: str,
+) -> None:
+    if manifest_digest != plan.corpus_manifest_digest:
+        raise ValueError("corpus manifest differs from immutable plan")
 
 
 def _validate_target_views(
@@ -595,6 +712,10 @@ def _matching_control(
         and item.context_view is target.context_view
     ]
     candidates.sort(key=lambda cell: cell.cell_id)
+    if len(candidates) > 1:
+        raise ValueError(
+            f"comparison control is ambiguous for {target.cell_id}"
+        )
     return candidates[0] if candidates else None
 
 
@@ -656,6 +777,8 @@ def _drifts(
     )
     if not controls:
         return ()
+    if len(controls) > 1:
+        raise ValueError("workload drift control is ambiguous")
     control_id = controls[0]
     source = target_views[control_id]
     return tuple(

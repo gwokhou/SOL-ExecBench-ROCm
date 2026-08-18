@@ -66,18 +66,6 @@ def summarize_results(
             seed_digest=seed_digest,
             replicates=replicates,
         ),
-        sol_score=_estimate(
-            grouped,
-            _conditional_sol,
-            seed_digest=seed_digest,
-            replicates=replicates,
-        ),
-        sol_coverage=_estimate(
-            grouped,
-            _sol_coverage,
-            seed_digest=seed_digest,
-            replicates=replicates,
-        ),
     )
 
 
@@ -198,21 +186,6 @@ def _conditional_speedup(rows: list[CellWorkloadResult]) -> float | None:
     if not values:
         return None
     return math.exp(fmean(math.log(value) for value in values))
-
-
-def _conditional_sol(rows: list[CellWorkloadResult]) -> float | None:
-    values = [
-        row.sol_score
-        for row in rows
-        if row.correct and row.sol_score is not None
-    ]
-    return fmean(values) if values else None
-
-
-def _sol_coverage(rows: list[CellWorkloadResult]) -> float:
-    return fmean(
-        float(row.correct and row.sol_score is not None) for row in rows
-    )
 
 
 def _estimate(

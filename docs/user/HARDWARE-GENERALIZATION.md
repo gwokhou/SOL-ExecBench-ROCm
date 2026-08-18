@@ -88,8 +88,9 @@ least one seen control and one hardware or capacity shift target.
 The report has no composite score. It records target-full and common-support
 results, plus role, profile, operation-family, and regime strata. Workloads are
 averaged within each Definition before Definitions receive equal weight.
-Correctness, compilation, `fast_p`, correct-only geometric mean speedup, and
-available SOL evidence use deterministic Definition-cluster bootstrap intervals.
+Correctness, compilation, `fast_p`, and correct-only geometric mean speedup use
+deterministic Definition-cluster bootstrap intervals. SOL evidence is not part
+of this Trace-backed protocol until a content-bound SOL input is specified.
 
 Representativeness drift is reported separately through Definition support and
 skip reasons, latent slot signatures, categorical Jensen-Shannon divergence,

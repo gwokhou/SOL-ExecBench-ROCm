@@ -23,6 +23,7 @@ from sol_execbench.core.data.solution_instance import Solution
 from sol_execbench.core.data.trace import Trace
 from sol_execbench.core.dataset.corpus import load_corpus_manifest
 from sol_execbench.core.dataset.corpus_models import CorpusTargetViewManifest
+from sol_execbench.core.dataset.workload_generation import capacity_class_bytes
 from sol_execbench.core.generalization.models import (
     HardwareGeneralizationCell,
     HardwareGeneralizationPlan,
@@ -36,7 +37,10 @@ from sol_execbench.core.generalization.workflow import (
     seal_cell,
 )
 from sol_execbench.core.integrity import sha256_file
-from sol_execbench.core.platform.runtime import detect_rocm_device
+from sol_execbench.core.platform.memory_quota import (
+    DEFAULT_PROBE_TIMEOUT_SECONDS as DEFAULT_CAPACITY_PROBE_TIMEOUT_SECONDS,
+    collect_gpu_memory_quota_isolated,
+)
 
 console = Console(stderr=True)
 _GENERALIZATION_ERRORS = (
@@ -169,6 +173,12 @@ def plan_cli(
     multiple=True,
 )
 @click.option("--device", default="cuda:0", show_default=True)
+@click.option(
+    "--capacity-probe-timeout",
+    type=click.FloatRange(min=0.1),
+    default=DEFAULT_CAPACITY_PROBE_TIMEOUT_SECONDS,
+    show_default=True,
+)
 @click.option("--used-holdout-feedback", is_flag=True)
 @click.option(
     "--output",
@@ -183,22 +193,39 @@ def run_cell_cli(
     solution_paths: tuple[Path, ...],
     trace_paths: tuple[Path, ...],
     device: str,
+    capacity_probe_timeout: float,
     used_holdout_feedback: bool,
     output: Path,
 ) -> CliResult:
     """Verify the physical target and seal existing evaluator Traces."""
     with translate_cli_errors(*_GENERALIZATION_ERRORS):
-        runtime = detect_rocm_device(device)
+        plan = _load_model(HardwareGeneralizationPlan, plan_path)
+        manifest = load_corpus_manifest(manifest_path)
+        target = _load_model(CorpusTargetViewManifest, target_view)
+        capacity = collect_gpu_memory_quota_isolated(
+            device,
+            environment_quota_bytes=(
+                target.capacity_evidence.environment_quota_bytes
+            ),
+            safety_percent=target.capacity_evidence.safety_percent,
+            timeout_seconds=capacity_probe_timeout,
+        )
+        observed_capacity_class = capacity_class_bytes(
+            capacity.usable_budget_bytes,
+            manifest.generation_policy.capacity_classes_gib,
+        )
         cell = seal_cell(
-            plan=_load_model(HardwareGeneralizationPlan, plan_path),
+            plan=plan,
             cell_id=cell_id,
-            target_view=_load_model(CorpusTargetViewManifest, target_view),
-            manifest=load_corpus_manifest(manifest_path),
+            target_view=target,
+            manifest=manifest,
+            manifest_digest=sha256_file(manifest_path),
             solutions=tuple(
                 _load_model(Solution, path) for path in solution_paths
             ),
             traces=tuple(_load_traces(trace_paths)),
-            observed_gfx_target=runtime.gfx_target,
+            observed_gfx_target=capacity.gfx_target,
+            observed_capacity_class_bytes=observed_capacity_class,
             used_holdout_feedback=used_holdout_feedback,
         )
         _write_model(output, cell)
@@ -261,6 +288,7 @@ def aggregate_cli(
         report = aggregate_study(
             plan=plan,
             manifest=load_corpus_manifest(manifest_path),
+            manifest_digest=sha256_file(manifest_path),
             target_views=views,
             cells=tuple(
                 _load_model(HardwareGeneralizationCell, path)
