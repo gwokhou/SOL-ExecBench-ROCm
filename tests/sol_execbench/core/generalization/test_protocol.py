@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -59,12 +60,51 @@ GIB = 1024**3
 
 
 @pytest.fixture(scope="module")
-def corpus() -> CorpusManifest:
-    return load_corpus_manifest(MANIFEST)
+def corpus_path(tmp_path_factory) -> Path:
+    """Build the smallest real-rule corpus needed by protocol tests."""
+    root = tmp_path_factory.mktemp("generalization-corpus")
+    production = load_corpus_manifest(MANIFEST)
+    entry = production.entries[0]
+    for relative_path in (entry.definition_path, entry.generation_rule_path):
+        destination = root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(RELEASE / relative_path, destination)
+
+    payload = production.model_dump(mode="json")
+    payload["entries"] = [entry.model_dump(mode="json")]
+    coverage = payload["coverage_policy"]
+    coverage["definition_count"] = 1
+    coverage["operation_definition_counts"] = {
+        family: int(family == entry.operation_family.value)
+        for family in coverage["operation_definition_counts"]
+    }
+    coverage["profile_minimum_generated_definitions"] = {
+        profile: int(profile == CorpusProfile.CORE.value)
+        for profile in coverage["profile_minimum_generated_definitions"]
+    }
+    manifest_path = root / "manifest.yaml"
+    manifest_path.write_text(
+        yaml.safe_dump(payload, sort_keys=False),
+        encoding="utf-8",
+    )
+    return manifest_path
 
 
 @pytest.fixture(scope="module")
-def target_views(tmp_path_factory) -> dict[str, CorpusTargetViewManifest]:
+def corpus(corpus_path: Path) -> CorpusManifest:
+    return load_corpus_manifest(corpus_path)
+
+
+@pytest.fixture(scope="module")
+def corpus_digest(corpus_path: Path) -> str:
+    return sha256_file(corpus_path)
+
+
+@pytest.fixture(scope="module")
+def target_views(
+    tmp_path_factory,
+    corpus_path: Path,
+) -> dict[str, CorpusTargetViewManifest]:
     root = tmp_path_factory.mktemp("generalization-views")
     scenarios = (
         ("gfx1200-8", "gfx1200", 8),
@@ -75,7 +115,7 @@ def target_views(tmp_path_factory) -> dict[str, CorpusTargetViewManifest]:
     for target_id, gfx_target, usable_gib in scenarios:
         output = root / target_id
         generate_corpus(
-            MANIFEST,
+            corpus_path,
             output,
             target=load_target_descriptor(
                 TARGETS / "isa" / f"{gfx_target}.yaml"
@@ -90,6 +130,7 @@ def target_views(tmp_path_factory) -> dict[str, CorpusTargetViewManifest]:
 @pytest.fixture(scope="module")
 def planned(
     corpus: CorpusManifest,
+    corpus_digest: str,
     target_views: dict[str, CorpusTargetViewManifest],
 ) -> PlannedStudy:
     exposure = TrainingExposureDeclaration(
@@ -107,7 +148,7 @@ def planned(
     return build_study_plan(
         study_id="mock-three-targets",
         manifest=corpus,
-        manifest_digest=sha256_file(MANIFEST),
+        manifest_digest=corpus_digest,
         exposure=exposure,
         targets=tuple(target_views.items()),
     )
@@ -161,7 +202,7 @@ def _cells(
             cell_id=cell.cell_id,
             target_view=target_views[cell.study_target_id],
             manifest=corpus,
-            manifest_digest=sha256_file(MANIFEST),
+            manifest_digest=planned.plan.corpus_manifest_digest,
             solutions=(),
             traces=(),
             observed_hardware=(
@@ -319,12 +360,13 @@ def test_unseen_isa_distribution_mismatch_is_not_a_hardware_shift(
 
 def test_same_gfx_and_capacity_with_new_device_model_is_new_configuration(
     tmp_path: Path,
+    corpus_path: Path,
 ) -> None:
     views = []
     for model in ("AMD Instinct MI300X", "AMD Instinct MI308X"):
         output = tmp_path / model.split()[-1].lower()
         generate_corpus(
-            MANIFEST,
+            corpus_path,
             output,
             target=load_target_descriptor(TARGETS / "isa/gfx942.yaml"),
             profiles=(CorpusProfile.CORE,),
@@ -365,7 +407,7 @@ def test_core_matrix_is_small_and_anonymous_is_optional(
     expanded = build_study_plan(
         study_id="anonymous-ablation",
         manifest=corpus,
-        manifest_digest=sha256_file(MANIFEST),
+        manifest_digest=planned.plan.corpus_manifest_digest,
         exposure=planned.plan.exposure,
         targets=tuple(target_views.items()),
         include_anonymous=True,
@@ -416,14 +458,14 @@ def test_aggregate_is_deterministic_and_uses_common_support(
     first = aggregate_study(
         plan=planned.plan,
         manifest=corpus,
-        manifest_digest=sha256_file(MANIFEST),
+        manifest_digest=planned.plan.corpus_manifest_digest,
         target_views=target_views,
         cells=cells,
     )
     second = aggregate_study(
         plan=planned.plan,
         manifest=corpus,
-        manifest_digest=sha256_file(MANIFEST),
+        manifest_digest=planned.plan.corpus_manifest_digest,
         target_views=target_views,
         cells=cells,
     )
@@ -445,7 +487,9 @@ def test_aggregate_is_deterministic_and_uses_common_support(
 
 def test_capability_missingness_changes_only_target_full_denominator(
     tmp_path: Path,
+    corpus_path: Path,
     corpus: CorpusManifest,
+    corpus_digest: str,
     target_views: dict[str, CorpusTargetViewManifest],
 ) -> None:
     limited_target = load_target_descriptor(
@@ -453,7 +497,7 @@ def test_capability_missingness_changes_only_target_full_denominator(
     ).model_copy(update={"capabilities": ()})
     output = tmp_path / "limited-gfx942"
     generate_corpus(
-        MANIFEST,
+        corpus_path,
         output,
         target=limited_target,
         profiles=(CorpusProfile.CORE,),
@@ -475,14 +519,14 @@ def test_capability_missingness_changes_only_target_full_denominator(
     study = build_study_plan(
         study_id="capability-missingness",
         manifest=corpus,
-        manifest_digest=sha256_file(MANIFEST),
+        manifest_digest=corpus_digest,
         exposure=exposure,
         targets=tuple(views.items()),
     )
     report = aggregate_study(
         plan=study.plan,
         manifest=corpus,
-        manifest_digest=sha256_file(MANIFEST),
+        manifest_digest=study.plan.corpus_manifest_digest,
         target_views=views,
         cells=_cells(study, corpus, views),
     )
@@ -516,7 +560,7 @@ def test_missing_cell_produces_no_generalization_conclusion(
     report = aggregate_study(
         plan=planned.plan,
         manifest=corpus,
-        manifest_digest=sha256_file(MANIFEST),
+        manifest_digest=planned.plan.corpus_manifest_digest,
         target_views=target_views,
         cells=cells,
     )
@@ -570,7 +614,7 @@ def test_portability_payload_change_is_rejected(
         aggregate_study(
             plan=planned.plan,
             manifest=corpus,
-            manifest_digest=sha256_file(MANIFEST),
+            manifest_digest=planned.plan.corpus_manifest_digest,
             target_views=target_views,
             cells=tuple(cells),
         )
@@ -595,7 +639,7 @@ def test_runtime_sealing_never_calls_workload_generator(
         cell_id=cell.cell_id,
         target_view=target_views[cell.study_target_id],
         manifest=corpus,
-        manifest_digest=sha256_file(MANIFEST),
+        manifest_digest=planned.plan.corpus_manifest_digest,
         solutions=(),
         traces=(),
         observed_hardware=target_views[cell.study_target_id].hardware_context,
@@ -632,7 +676,7 @@ def test_seal_rejects_manifest_and_runtime_capacity_drift(
             cell_id=cell.cell_id,
             target_view=target,
             manifest=corpus,
-            manifest_digest=sha256_file(MANIFEST),
+            manifest_digest=planned.plan.corpus_manifest_digest,
             solutions=(),
             traces=(),
             observed_hardware=target.hardware_context.model_copy(
@@ -644,6 +688,7 @@ def test_seal_rejects_manifest_and_runtime_capacity_drift(
 def test_run_cell_cli_reprobes_runtime_capacity_class(
     tmp_path: Path,
     monkeypatch,
+    corpus_path: Path,
     planned: PlannedStudy,
     target_views: dict[str, CorpusTargetViewManifest],
 ) -> None:
@@ -676,7 +721,7 @@ def test_run_cell_cli_reprobes_runtime_capacity_class(
             "--plan",
             str(plan_path),
             "--manifest",
-            str(MANIFEST),
+            str(corpus_path),
             "--target-view",
             str(target_path),
             "--cell-id",
@@ -722,7 +767,7 @@ def test_seal_rejects_trace_identity_drift(
             cell_id=cell.cell_id,
             target_view=target,
             manifest=corpus,
-            manifest_digest=sha256_file(MANIFEST),
+            manifest_digest=planned.plan.corpus_manifest_digest,
             solutions=(solution,),
             traces=(trace,),
             observed_hardware=target.hardware_context,
@@ -745,7 +790,7 @@ def test_aggregate_revalidates_cell_results_against_target_view(
         aggregate_study(
             plan=planned.plan,
             manifest=corpus,
-            manifest_digest=sha256_file(MANIFEST),
+            manifest_digest=planned.plan.corpus_manifest_digest,
             target_views=target_views,
             cells=tuple(cells),
         )
@@ -753,6 +798,7 @@ def test_aggregate_revalidates_cell_results_against_target_view(
 
 def test_aggregate_rejects_ambiguous_seen_control(
     corpus: CorpusManifest,
+    corpus_digest: str,
     target_views: dict[str, CorpusTargetViewManifest],
 ) -> None:
     control = target_views["gfx1200-8"]
@@ -774,7 +820,7 @@ def test_aggregate_rejects_ambiguous_seen_control(
     study = build_study_plan(
         study_id="ambiguous-control",
         manifest=corpus,
-        manifest_digest=sha256_file(MANIFEST),
+        manifest_digest=corpus_digest,
         exposure=exposure,
         targets=tuple(views.items()),
     )
@@ -783,7 +829,7 @@ def test_aggregate_rejects_ambiguous_seen_control(
         aggregate_study(
             plan=study.plan,
             manifest=corpus,
-            manifest_digest=sha256_file(MANIFEST),
+            manifest_digest=study.plan.corpus_manifest_digest,
             target_views=views,
             cells=_cells(study, corpus, views),
         )
@@ -791,6 +837,7 @@ def test_aggregate_rejects_ambiguous_seen_control(
 
 def test_plan_cli_emits_machine_readable_contract(
     tmp_path: Path,
+    corpus_path: Path,
     target_views: dict[str, CorpusTargetViewManifest],
 ) -> None:
     target_paths = []
@@ -818,7 +865,7 @@ def test_plan_cli_emits_machine_readable_contract(
             "--seen-hardware",
             seen,
             "--manifest",
-            str(MANIFEST),
+            str(corpus_path),
             *target_paths,
             "--output",
             str(output),
