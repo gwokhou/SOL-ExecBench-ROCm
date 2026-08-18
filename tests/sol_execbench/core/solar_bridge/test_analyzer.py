@@ -8,6 +8,10 @@ import torch
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import NumericCheck, Workload
+from sol_execbench.core.platform.hardware import (
+    HardwareConfiguration,
+    HardwareConfigurationKind,
+)
 from sol_execbench.core.solar_bridge import (
     analyzer,
     formal_device,
@@ -361,14 +365,78 @@ def test_invoke_solar_non_formal_path_keeps_non_formal_bound(
     assert result_dir.exists()
 
 
-def test_architecture_for_gfx_target_maps_cdna3_and_rdna4() -> None:
+def test_architecture_selection_distinguishes_models_sharing_gfx942() -> None:
+    mi300x = HardwareConfiguration(
+        target_id="mi300x",
+        vendor="AMD",
+        device_model="AMD Instinct MI300X",
+        gfx_target="gfx942",
+        kind=HardwareConfigurationKind.PHYSICAL_DEVICE,
+        visible_memory_bytes=192 * 1024**3,
+    )
+    mi308x = mi300x.model_copy(
+        update={"target_id": "mi308x", "device_model": "AMD Instinct MI308X"}
+    )
+
     assert (
-        formal_device.solar_architecture_for_gfx_target("gfx1200")
+        formal_device.solar_architecture_for_configuration(mi300x) == "MI300X"
+    )
+    with pytest.raises(ValueError, match="unsupported_solar_hardware:gfx942"):
+        formal_device.solar_architecture_for_configuration(mi308x)
+
+    contradictory_gfx = mi300x.model_copy(update={"gfx_target": "gfx1200"})
+    with pytest.raises(
+        ValueError,
+        match="unsupported_solar_hardware_configuration",
+    ):
+        formal_device.solar_architecture_for_configuration(contradictory_gfx)
+
+
+def test_solar_profile_selection_rejects_gfx1200_sku_or_capacity_drift() -> (
+    None
+):
+    standard = HardwareConfiguration(
+        target_id="standard",
+        vendor="AMD",
+        device_model="AMD Radeon RX 9060 XT",
+        product_sku="rx9060xt-standard",
+        gfx_target="gfx1200",
+        kind=HardwareConfigurationKind.PHYSICAL_DEVICE,
+        visible_memory_bytes=16 * 1024**3,
+    )
+    low_profile = standard.model_copy(
+        update={"target_id": "lp", "product_sku": "rx9060xt-lp"}
+    )
+    eight_gib = standard.model_copy(
+        update={"target_id": "8gb", "visible_memory_bytes": 8 * 1024**3}
+    )
+    unresolved_product = standard.model_copy(
+        update={
+            "target_id": "product",
+            "kind": HardwareConfigurationKind.PRODUCT_TEMPLATE,
+            "visible_memory_bytes": None,
+        }
+    )
+
+    assert (
+        formal_device.solar_architecture_for_configuration(standard)
         == "RX_9060_XT"
     )
-    assert formal_device.solar_architecture_for_gfx_target("gfx942") == "MI300X"
-    with pytest.raises(ValueError, match="unsupported_solar_architecture"):
-        formal_device.solar_architecture_for_gfx_target("gfx1100")
+    for unsupported in (low_profile, eight_gib, unresolved_product):
+        with pytest.raises(
+            ValueError,
+            match="unsupported_solar_hardware_configuration",
+        ):
+            formal_device.solar_architecture_for_configuration(unsupported)
+
+
+def test_solar_profile_projects_to_canonical_nominal_hardware() -> None:
+    profile = formal_device.nominal_hardware_profile("MI300X")
+
+    assert profile.device_model == "AMD Instinct MI300X"
+    assert profile.gfx_target == "gfx942"
+    assert profile.compute_units == 304
+    assert profile.profile_digest
 
 
 def test_select_workload_requires_exact_uuid_match() -> None:

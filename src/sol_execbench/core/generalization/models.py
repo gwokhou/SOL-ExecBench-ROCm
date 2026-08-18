@@ -47,8 +47,9 @@ class HardwareContextView(StrEnum):
 class HardwareShift(StrEnum):
     """Target class derived from the minimal training exposure declaration."""
 
-    SEEN_HARDWARE_SEEN_CAPACITY = "seen_hardware_seen_capacity"
-    SEEN_ARCHITECTURE_NEW_CAPACITY = "seen_architecture_new_capacity"
+    SEEN_CONFIGURATION = "seen_configuration"
+    SAME_ISA_NEW_CAPACITY = "same_isa_new_capacity"
+    SAME_ISA_NEW_CONFIGURATION = "same_isa_new_configuration"
     UNSEEN_ARCHITECTURE = "unseen_architecture"
 
 
@@ -86,6 +87,7 @@ class TrainingHardwareExposure(FrozenArtifactModel):
     """One target tuple declared as visible during training."""
 
     gfx_target: NonEmptyString
+    hardware_configuration_id: str = Field(pattern=SHA256_PATTERN)
     capacity_class_bytes: NonNegativeInt
     distribution_id: str = Field(pattern=SHA256_PATTERN)
 
@@ -101,6 +103,7 @@ class TrainingExposureDeclaration(FrozenArtifactModel):
         identities = {
             (
                 item.gfx_target.strip().lower(),
+                item.hardware_configuration_id,
                 item.capacity_class_bytes,
                 item.distribution_id,
             )
@@ -119,6 +122,18 @@ class NormalizedHardwareFacts(FrozenArtifactModel):
     context_digest: str = Field(pattern=SHA256_PATTERN)
     gfx_target: NonEmptyString | None
     target_id: NonEmptyString | None
+    hardware_configuration_id: str | None = Field(
+        default=None,
+        pattern=SHA256_PATTERN,
+    )
+    device_model: NonEmptyString | None = None
+    product_sku: NonEmptyString | None = None
+    configuration_kind: NonEmptyString | None = None
+    visible_compute_units: int | None = Field(default=None, gt=0)
+    visible_memory_bytes: int | None = Field(default=None, gt=0)
+    partition: NonEmptyString | None = None
+    virtualization: NonEmptyString | None = None
+    isolation: NonEmptyString | None = None
     capacity_class_bytes: NonNegativeInt
     supported_dtypes: tuple[NonEmptyString, ...]
     supported_quantization: tuple[NonEmptyString, ...]
@@ -128,13 +143,28 @@ class NormalizedHardwareFacts(FrozenArtifactModel):
 
     @model_validator(mode="after")
     def _identity_boundary(self) -> NormalizedHardwareFacts:
-        identities = (self.gfx_target, self.target_id)
+        required_identities = (
+            self.gfx_target,
+            self.target_id,
+            self.hardware_configuration_id,
+            self.configuration_kind,
+        )
+        all_identities = (
+            *required_identities,
+            self.device_model,
+            self.product_sku,
+            self.visible_compute_units,
+            self.visible_memory_bytes,
+            self.partition,
+            self.virtualization,
+            self.isolation,
+        )
         if self.context_view is HardwareContextView.FULL_FACTS and any(
-            item is None for item in identities
+            item is None for item in required_identities
         ):
             raise ValueError("full facts require target identity")
         if self.context_view is HardwareContextView.ANONYMIZED_FACTS and any(
-            item is not None for item in identities
+            item is not None for item in all_identities
         ):
             raise ValueError("anonymous facts leak target identity")
         return self
@@ -206,6 +236,7 @@ class PlannedCell(FrozenArtifactModel):
     shift: HardwareShift
     target_view_digest: str = Field(pattern=SHA256_PATTERN)
     generation_cohort_id: str = Field(pattern=SHA256_PATTERN)
+    hardware_configuration_id: str = Field(pattern=SHA256_PATTERN)
     hardware_context_digest: str = Field(pattern=SHA256_PATTERN)
     agent_view_digest: str = Field(pattern=SHA256_PATTERN)
     zero_shot: bool = True
@@ -255,6 +286,7 @@ class HardwareGeneralizationCell(CurrentFrozenSchemaModel):
     plan_digest: str = Field(pattern=SHA256_PATTERN)
     cell_id: NonEmptyString
     observed_gfx_target: NonEmptyString
+    observed_hardware_configuration_id: str = Field(pattern=SHA256_PATTERN)
     observed_capacity_class_bytes: NonNegativeInt
     candidates: tuple[CandidateDeclaration, ...]
     results: tuple[CellWorkloadResult, ...]

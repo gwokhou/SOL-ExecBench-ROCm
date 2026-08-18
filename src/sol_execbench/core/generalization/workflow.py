@@ -132,6 +132,7 @@ def seal_cell(
     solutions: tuple[Solution, ...],
     traces: tuple[Trace, ...],
     observed_gfx_target: str,
+    observed_hardware_configuration_id: str,
     observed_capacity_class_bytes: int,
     used_holdout_feedback: bool = False,
 ) -> HardwareGeneralizationCell:
@@ -143,6 +144,7 @@ def seal_cell(
         planned,
         target_view,
         observed_gfx_target,
+        observed_hardware_configuration_id,
         observed_capacity_class_bytes,
     )
     if planned.zero_shot and used_holdout_feedback:
@@ -185,6 +187,9 @@ def seal_cell(
         "plan_digest": plan.plan_digest,
         "cell_id": cell_id,
         "observed_gfx_target": observed_gfx_target.strip().lower(),
+        "observed_hardware_configuration_id": (
+            observed_hardware_configuration_id
+        ),
         "observed_capacity_class_bytes": observed_capacity_class_bytes,
         "candidates": candidates,
         "results": tuple(results),
@@ -270,6 +275,7 @@ def _planned_cell(
         shift=shift,
         target_view_digest=target.workload_view_digest,
         generation_cohort_id=target.generation_cohort_id,
+        hardware_configuration_id=target.hardware_configuration_id,
         hardware_context_digest=facts.context_digest,
         agent_view_digest=agent_view.agent_view_digest,
     )
@@ -325,6 +331,7 @@ def _validate_cell_target(
     planned: PlannedCell,
     target: CorpusTargetViewManifest,
     observed_gfx: str,
+    observed_hardware_configuration_id: str,
     observed_capacity_class_bytes: int,
 ) -> None:
     if target.workload_view_digest != planned.target_view_digest:
@@ -335,6 +342,14 @@ def _validate_cell_target(
         raise ValueError("observed gfx target differs from planned target")
     if observed_capacity_class_bytes != target.capacity_class_bytes:
         raise ValueError("observed capacity class differs from planned target")
+    if (
+        observed_hardware_configuration_id != planned.hardware_configuration_id
+        or observed_hardware_configuration_id
+        != target.hardware_configuration_id
+    ):
+        raise ValueError(
+            "observed hardware configuration differs from planned target"
+        )
 
 
 def _solutions_by_semantic_id(
@@ -510,6 +525,12 @@ def _validate_cell_evidence(
 ) -> None:
     if cell.observed_gfx_target.lower() != target.target.gfx_target.lower():
         raise ValueError("cell observed gfx target differs from target view")
+    if cell.observed_hardware_configuration_id != (
+        target.hardware_configuration_id
+    ):
+        raise ValueError(
+            "cell observed hardware configuration differs from target view"
+        )
     if cell.observed_capacity_class_bytes != target.capacity_class_bytes:
         raise ValueError(
             "cell observed capacity class differs from target view"
@@ -686,7 +707,7 @@ def _comparisons(
     comparisons = []
     for cell_id, target in sorted(cells.items()):
         target_plan = planned[cell_id]
-        if target_plan.shift is HardwareShift.SEEN_HARDWARE_SEEN_CAPACITY:
+        if target_plan.shift is HardwareShift.SEEN_CONFIGURATION:
             continue
         control = _matching_control(target_plan, planned, cells)
         if control is not None:
@@ -707,7 +728,7 @@ def _matching_control(
         cells[item.cell_id]
         for item in planned.values()
         if item.cell_id in cells
-        and item.shift is HardwareShift.SEEN_HARDWARE_SEEN_CAPACITY
+        and item.shift is HardwareShift.SEEN_CONFIGURATION
         and item.track is target.track
         and item.context_view is target.context_view
     ]
@@ -772,7 +793,7 @@ def _drifts(
         {
             item.study_target_id
             for item in plan.cells
-            if item.shift is HardwareShift.SEEN_HARDWARE_SEEN_CAPACITY
+            if item.shift is HardwareShift.SEEN_CONFIGURATION
         }
     )
     if not controls:
@@ -803,7 +824,7 @@ def _report_status(
         return GeneralizationReportStatus.INCOMPLETE, False
     planned = {item.cell_id: item for item in plan.cells}
     shifts = {planned[cell_id].shift for cell_id in cells}
-    seen = HardwareShift.SEEN_HARDWARE_SEEN_CAPACITY
+    seen = HardwareShift.SEEN_CONFIGURATION
     eligible = seen in shifts and any(shift is not seen for shift in shifts)
     status = (
         GeneralizationReportStatus.COMPLETE

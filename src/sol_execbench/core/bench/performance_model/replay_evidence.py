@@ -29,7 +29,7 @@ from sol_execbench.core.integrity import (
     sha256_file,
     stable_json_checksum,
 )
-from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
+from sol_execbench.core.platform.hardware import PCIeTopologyIdentity
 
 REPLAY_PROTOCOL_VERSION = "gfx1200_counter_replay.v1"
 REPLAY_WARMUP_RUNS = 10

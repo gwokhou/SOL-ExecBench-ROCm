@@ -24,7 +24,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
+from sol_execbench.core.platform.hardware import PCIeTopologyIdentity
 
 _CONFIG = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 

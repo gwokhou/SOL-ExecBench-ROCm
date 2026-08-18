@@ -31,7 +31,7 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
     verify_artifact_file,
 )
-from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
+from sol_execbench.core.platform.hardware import PCIeTopologyIdentity
 
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 

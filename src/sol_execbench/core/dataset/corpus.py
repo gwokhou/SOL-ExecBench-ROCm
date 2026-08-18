@@ -52,6 +52,10 @@ from sol_execbench.core.integrity import (
     stable_json_checksum,
     validate_relative_artifact_path,
 )
+from sol_execbench.core.platform.hardware import (
+    ResolvedHardwareContext,
+    build_resolved_hardware_context,
+)
 from sol_execbench.core.platform.memory_quota import GPUMemoryQuotaEvidence
 
 TARGET_VIEW_MANIFEST_FILENAME = "target-view-manifest.yaml"
@@ -64,6 +68,7 @@ class _GenerationContext:
     entry_distributions: dict[str, str]
     distribution_id: str
     cohort_id: str
+    hardware: ResolvedHardwareContext
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -302,6 +307,16 @@ def _generation_context(
         ),
         executor_version=WORKLOAD_GENERATOR_VERSION,
     )
+    hardware = build_resolved_hardware_context(
+        configuration=target.hardware,
+        observation=capacity.hardware_observation(),
+        capacity_class_bytes=capacity_bytes,
+        supported_dtypes=tuple(map(str, target.supported_dtypes)),
+        supported_quantization=tuple(map(str, target.supported_quantization)),
+        capabilities=tuple(map(str, target.capabilities)),
+        max_tensor_bytes=target.max_tensor_bytes,
+        reference_ipc_limit_bytes=target.reference_ipc_limit_bytes,
+    )
     return _GenerationContext(
         capacity_bytes=capacity_bytes,
         capacity_id=(
@@ -310,6 +325,7 @@ def _generation_context(
         entry_distributions=entry_distributions,
         distribution_id=overall_distribution,
         cohort_id=cohort,
+        hardware=hardware,
     )
 
 
@@ -647,6 +663,10 @@ def _target_view(
         ),
         target=request.target,
         capacity_evidence=request.capacity,
+        hardware_context=request.context.hardware,
+        hardware_configuration_id=(
+            request.context.hardware.hardware_configuration_id
+        ),
         capacity_class_id=request.context.capacity_id,
         capacity_class_bytes=request.context.capacity_bytes,
         distribution_id=request.context.distribution_id,

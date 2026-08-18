@@ -20,6 +20,13 @@ from sol_execbench.core.data.base_model import (
 )
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.dataset.schema_versions import DatasetArtifactSchema
+from sol_execbench.core.integrity import stable_json_checksum
+from sol_execbench.core.platform.hardware import (
+    HardwareConfiguration,
+    HardwareConfigurationKind,
+    ResolvedHardwareContext,
+    build_resolved_hardware_context,
+)
 from sol_execbench.core.platform.memory_quota import GPUMemoryQuotaEvidence
 from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
@@ -29,6 +36,13 @@ WORKLOAD_GENERATOR_VERSION = "llm_core_common_scale.v2"
 WORKLOAD_GENERATION_PROTOCOL_MAJOR = 2
 MINIMUM_CAPACITY_CLASS_GIB = 1
 SATURATED_CAPACITY_CLASS_GIB = 384
+_STATIC_TARGET_KINDS = frozenset(
+    {
+        HardwareConfigurationKind.ISA_TEMPLATE,
+        HardwareConfigurationKind.PRODUCT_TEMPLATE,
+        HardwareConfigurationKind.CONFIGURATION_TEMPLATE,
+    }
+)
 
 
 class CorpusProfile(StrEnum):
@@ -398,8 +412,7 @@ class StaticTargetDescriptor(CurrentFrozenSchemaModel):
     current_schema_version = PlatformArtifactSchema.STATIC_TARGET_DESCRIPTOR
 
     schema_version: Literal[PlatformArtifactSchema.STATIC_TARGET_DESCRIPTOR]
-    target_id: NonEmptyString
-    gfx_target: NonEmptyString
+    hardware: HardwareConfiguration
     qualification_status: TargetQualificationStatus
     declaration_source: NonEmptyString
     max_tensor_bytes: int = Field(gt=0)
@@ -407,6 +420,24 @@ class StaticTargetDescriptor(CurrentFrozenSchemaModel):
     supported_dtypes: tuple[DType, ...] = Field(min_length=1)
     supported_quantization: tuple[QuantizationScheme, ...] = ()
     capabilities: tuple[StaticCapability, ...] = ()
+
+    @model_validator(mode="after")
+    def _requires_declared_template(self) -> StaticTargetDescriptor:
+        if self.hardware.kind not in _STATIC_TARGET_KINDS:
+            raise ValueError(
+                "static target descriptor requires a declared template kind"
+            )
+        return self
+
+    @property
+    def target_id(self) -> str:
+        """Return the audit label owned by the hardware configuration."""
+        return self.hardware.target_id
+
+    @property
+    def gfx_target(self) -> str:
+        """Return the normalized base ISA owned by the configuration."""
+        return self.hardware.gfx_target
 
 
 class GeneratedWorkloadRecord(FrozenArtifactModel):
@@ -467,6 +498,8 @@ class CorpusTargetViewManifest(CurrentFrozenSchemaModel):
     target_descriptor_sha256: str = Field(pattern=SHA256_PATTERN)
     target: StaticTargetDescriptor
     capacity_evidence: GPUMemoryQuotaEvidence
+    hardware_context: ResolvedHardwareContext
+    hardware_configuration_id: str = Field(pattern=SHA256_PATTERN)
     capacity_class_id: NonEmptyString | None
     capacity_class_bytes: NonNegativeInt
     distribution_id: str = Field(pattern=SHA256_PATTERN)
@@ -483,8 +516,49 @@ class CorpusTargetViewManifest(CurrentFrozenSchemaModel):
 
     @model_validator(mode="after")
     def _validate_target_identity(self) -> CorpusTargetViewManifest:
-        if self.target.gfx_target != self.capacity_evidence.gfx_target:
+        expected_descriptor_digest = stable_json_checksum(
+            self.target.model_dump(mode="json")
+        )
+        if self.target_descriptor_sha256 != expected_descriptor_digest:
+            raise ValueError("target descriptor digest does not match")
+        if (
+            self.target.gfx_target
+            != self.capacity_evidence.gfx_target.strip().lower()
+        ):
             raise ValueError("capacity evidence does not match target gfx")
+        if self.hardware_configuration_id != (
+            self.hardware_context.hardware_configuration_id
+        ):
+            raise ValueError(
+                "target view hardware configuration does not match"
+            )
+        if (
+            self.capacity_class_bytes
+            != self.hardware_context.capacity_class_bytes
+        ):
+            raise ValueError(
+                "target view hardware capacity class does not match"
+            )
+        if self.hardware_context.observation != (
+            self.capacity_evidence.hardware_observation()
+        ):
+            raise ValueError("target view hardware observation does not match")
+        expected_context = build_resolved_hardware_context(
+            configuration=self.target.hardware,
+            observation=self.capacity_evidence.hardware_observation(),
+            capacity_class_bytes=self.capacity_class_bytes,
+            supported_dtypes=tuple(map(str, self.target.supported_dtypes)),
+            supported_quantization=tuple(
+                map(str, self.target.supported_quantization)
+            ),
+            capabilities=tuple(map(str, self.target.capabilities)),
+            max_tensor_bytes=self.target.max_tensor_bytes,
+            reference_ipc_limit_bytes=self.target.reference_ipc_limit_bytes,
+        )
+        if self.hardware_context != expected_context:
+            raise ValueError(
+                "target view hardware context was not resolved from target"
+            )
         generated_ids = {
             uuid for problem in self.problems for uuid in problem.workload_uuids
         }

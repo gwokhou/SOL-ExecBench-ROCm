@@ -43,7 +43,6 @@ from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
-    GpuLifecycleIdentity,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     designs_dir,
@@ -59,6 +58,7 @@ from sol_execbench.core.bench.performance_model.vram_policy import (
 )
 from sol_execbench.core.data.json_utils import load_json_file
 from sol_execbench.core.integrity import sha256_file, stable_json_checksum
+from sol_execbench.core.platform.hardware import HardwareExecutionIdentity
 from sol_execbench.core.platform.rdna4_validation import (
     HardwareValidationBinding,
     verify_validation_receipt,
@@ -197,7 +197,7 @@ def _plan_gpu_identity(
     inputs: LifecyclePlanInputs,
     design: DiagnosticDesignManifest,
     collection: Path,
-) -> GpuLifecycleIdentity:
+) -> HardwareExecutionIdentity:
     gpu_identity = load_calibration_gpu_identity(
         inputs.calibration_profile_path,
         inputs.calibration_audit_path,

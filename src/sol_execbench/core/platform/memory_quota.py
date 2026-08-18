@@ -20,6 +20,7 @@ from sol_execbench.core.data.base_model import (
     NonNegativeInt,
 )
 from sol_execbench.core.integrity import stable_json_checksum
+from sol_execbench.core.platform.hardware import HardwareObservation
 from sol_execbench.core.platform.runtime import detect_rocm_device
 from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
@@ -55,7 +56,13 @@ class GPUMemoryQuotaEvidence(CurrentFrozenSchemaModel):
     device: NonEmptyString
     device_index: NonNegativeInt
     gpu_name: NonEmptyString
+    product_sku: str | None = Field(
+        default=None,
+        pattern=r"^[a-z0-9][a-z0-9._-]*$",
+    )
     gfx_target: NonEmptyString
+    visible_compute_units: int | None = Field(default=None, gt=0)
+    l2_cache_bytes: int | None = Field(default=None, gt=0)
     torch_version: NonEmptyString
     hip_version: NonEmptyString
     collected_at: datetime
@@ -89,6 +96,27 @@ class GPUMemoryQuotaEvidence(CurrentFrozenSchemaModel):
             raise ValueError("capacity probe digest does not match evidence")
         return self
 
+    def hardware_observation(self) -> HardwareObservation:
+        """Project the canonical runtime observation used by target resolution."""
+        return HardwareObservation(
+            probe_method=self.probe_method,
+            probe_version=CAPACITY_PROBE_ALGORITHM,
+            device=self.device,
+            device_index=self.device_index,
+            gpu_name=self.gpu_name,
+            product_sku=self.product_sku,
+            gfx_target=self.gfx_target,
+            collected_at=self.collected_at,
+            torch_version=self.torch_version,
+            hip_version=self.hip_version,
+            visible_compute_units=self.visible_compute_units,
+            runtime_total_bytes=self.runtime_total_bytes,
+            runtime_free_bytes=self.runtime_free_bytes,
+            stable_allocatable_bytes=self.stable_allocatable_bytes,
+            usable_quota_bytes=self.usable_budget_bytes,
+            l2_cache_bytes=self.l2_cache_bytes,
+        )
+
 
 def derive_usable_budget(
     *,
@@ -115,7 +143,10 @@ def _digest_payload(evidence: GPUMemoryQuotaEvidence) -> dict[str, object]:
         "device": evidence.device,
         "device_index": evidence.device_index,
         "gpu_name": evidence.gpu_name,
+        "product_sku": evidence.product_sku,
         "gfx_target": evidence.gfx_target,
+        "visible_compute_units": evidence.visible_compute_units,
+        "l2_cache_bytes": evidence.l2_cache_bytes,
         "torch_version": evidence.torch_version,
         "hip_version": evidence.hip_version,
         "runtime_free_bytes": evidence.runtime_free_bytes,
@@ -219,6 +250,8 @@ def collect_gpu_memory_quota(
         "device_index": info.index,
         "gpu_name": info.name,
         "gfx_target": info.gfx_target,
+        "visible_compute_units": info.visible_compute_units,
+        "l2_cache_bytes": info.l2_cache_bytes,
         "torch_version": info.torch_version,
         "hip_version": info.hip_version,
         "collected_at": now or datetime.now(UTC),

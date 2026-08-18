@@ -32,7 +32,7 @@ from sol_execbench.core.data.base_model import (
 )
 from sol_execbench.core.data.definition_models import DType
 from sol_execbench.core.integrity import SHA256Digest
-from sol_execbench.core.platform.runtime import PCIeTopologyIdentity
+from sol_execbench.core.platform.hardware import PCIeTopologyIdentity
 
 PERFORMANCE_MODEL_VERSION = "gfx1200_diagnostic.v7"
 CDNA3_PERFORMANCE_MODEL_VERSION = "cdna3_diagnostic.v1"

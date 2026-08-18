@@ -86,6 +86,12 @@ completed investigations and one-time inventories belong in Git history.
 - Real-device evidence is strongest on one RX 9060 XT/gfx1200 host; multi-GPU
   and CDNA coverage is narrower. Static AMDGPU metadata extraction does not
   parse the CCOB manifest.
+- Hardware identity is now normalized into nominal, configured, observed, and
+  resolved layers. Generic `gfx1200`/`gfx942` target descriptors are ISA
+  templates; RX 9060 XT, MI300X, and MI308X have distinct product templates,
+  and generalization cells bind a configuration ID in addition to gfx and
+  capacity. This is code- and mock-validated only: real MI300X/MI308X
+  configuration and partition evidence remains part of the hardware backlog.
 
 ## Active backlog
 
@@ -189,10 +195,12 @@ Authoritative surfaces:
 
 ### P1 — Validate the non-formal gfx942 (CDNA3) adaptation on real hardware
 
-The code-level non-formal gfx942 path is authored and verified on gfx1200 only:
-`gfx942` now runs materialize → evaluate → `solar analyze` through the
-non-formal bridge (`analyze_workload_diagnostic`), but every gfx942-specific
-artifact is spec-derived and `inexact`. Formal publication stays gfx1200-only.
+The code-level non-formal MI300X/gfx942 path is authored and verified on
+gfx1200 only: MI300X runs materialize → evaluate → `solar analyze` through the
+non-formal bridge (`analyze_workload_diagnostic`), but every MI300X-specific
+artifact is spec-derived and `inexact`. MI308X is no longer silently mapped to
+the MI300X SOLAR profile; it fails closed until a distinct nominal profile is
+authored and qualified. Formal publication stays gfx1200-only.
 Re-derive the following on a real gfx942 (MI300X/MI308X) host before treating
 any gfx942 claim as validated:
 

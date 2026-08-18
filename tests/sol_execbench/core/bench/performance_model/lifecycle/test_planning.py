@@ -23,11 +23,11 @@ from sol_execbench.core.bench.performance_model.lifecycle.planning import (
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleParent,
-    GpuLifecycleIdentity,
 )
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file
-from sol_execbench.core.platform.runtime import (
+from sol_execbench.core.platform.hardware import (
+    HardwareExecutionIdentity,
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
 )
@@ -56,8 +56,8 @@ def _topology(width: int = 8) -> PCIeTopologyIdentity:
     )
 
 
-def _gpu(width: int = 8) -> GpuLifecycleIdentity:
-    return GpuLifecycleIdentity(
+def _gpu(width: int = 8) -> HardwareExecutionIdentity:
+    return HardwareExecutionIdentity(
         gpu_architecture="gfx1200",
         gpu_id="a3ff7590-0000-1000-800f-a29c1cca1511",
         gpu_bdf="0000:03:00.0",

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from types import MappingProxyType
 
 import click
 from rich.console import Console
@@ -42,7 +43,11 @@ from sol_execbench.core.dataset.corpus import (
     load_target_descriptor,
     validate_corpus,
 )
-from sol_execbench.core.dataset.corpus_models import CorpusProfile
+from sol_execbench.core.dataset.corpus_models import (
+    CorpusProfile,
+    StaticTargetDescriptor,
+)
+from sol_execbench.core.platform.hardware import HardwareConfigurationKind
 from sol_execbench.core.platform.memory_quota import (
     DEFAULT_PROBE_TIMEOUT_SECONDS as DEFAULT_CAPACITY_PROBE_TIMEOUT_SECONDS,
     collect_gpu_memory_quota_isolated,
@@ -123,7 +128,36 @@ DEFAULT_CORPUS_MANIFEST = Path(
     "problems/LLM_CORE/releases/LLM_CORE_V2/manifest.yaml",
 )
 DEFAULT_TARGET_ROOT = Path("problems/LLM_CORE/targets")
-TARGET_TEMPLATES = ("gfx1200", "gfx942")
+BUNDLED_TARGET_TEMPLATE_KINDS = MappingProxyType(
+    {
+        "isa/gfx1200": HardwareConfigurationKind.ISA_TEMPLATE,
+        "isa/gfx942": HardwareConfigurationKind.ISA_TEMPLATE,
+        "products/mi300x": HardwareConfigurationKind.PRODUCT_TEMPLATE,
+        "products/mi308x": HardwareConfigurationKind.PRODUCT_TEMPLATE,
+        "products/rx9060xt": HardwareConfigurationKind.PRODUCT_TEMPLATE,
+        "configurations/mi300x/spx-192gb": (
+            HardwareConfigurationKind.CONFIGURATION_TEMPLATE
+        ),
+        "configurations/rx9060xt/standard-16gb": (
+            HardwareConfigurationKind.CONFIGURATION_TEMPLATE
+        ),
+    }
+)
+TARGET_TEMPLATES = tuple(BUNDLED_TARGET_TEMPLATE_KINDS)
+
+
+def _load_bundled_target_template(
+    template_id: str,
+) -> StaticTargetDescriptor:
+    target = load_target_descriptor(DEFAULT_TARGET_ROOT / f"{template_id}.yaml")
+    expected_kind = BUNDLED_TARGET_TEMPLATE_KINDS[template_id]
+    if target.hardware.kind is not expected_kind:
+        raise ValueError(
+            "bundled target template tier mismatch: "
+            f"{template_id} declares {target.hardware.kind.value}, "
+            f"expected {expected_kind.value}"
+        )
+    return target
 
 
 @click.group(
@@ -228,11 +262,13 @@ def generate_corpus_cli(
             "provide exactly one of --target-template or --target-descriptor",
             code="invalid_static_target",
         )
-    target_path = (
-        target_descriptor or DEFAULT_TARGET_ROOT / f"{target_template}.yaml"
-    )
     with translate_cli_errors(*_CORPUS_GENERATION_OUTPUT_EXISTS_ERRORS):
-        target = load_target_descriptor(target_path)
+        if target_descriptor is not None:
+            target = load_target_descriptor(target_descriptor)
+        else:
+            if target_template is None:
+                raise ValueError("bundled target template is required")
+            target = _load_bundled_target_template(target_template)
         capacity = collect_gpu_memory_quota_isolated(
             device,
             environment_quota_bytes=environment_quota,

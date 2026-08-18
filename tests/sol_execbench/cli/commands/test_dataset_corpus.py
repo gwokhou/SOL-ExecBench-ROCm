@@ -5,11 +5,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 from click.testing import CliRunner
 
 from sol_execbench.cli.commands import dataset as cli_dataset
 from sol_execbench.cli.main import cli
+from sol_execbench.core.platform.hardware import HardwareConfigurationKind
 from sol_execbench.core.platform.memory_quota import (
     GPUMemoryQuotaEvidence,
     capacity_probe_digest,
@@ -19,7 +21,7 @@ from sol_execbench.core.platform.schema_versions import PlatformArtifactSchema
 
 ROOT = Path(__file__).resolve().parents[4]
 MANIFEST = ROOT / "problems/LLM_CORE/releases/LLM_CORE_V2/manifest.yaml"
-TARGET = ROOT / "problems/LLM_CORE/targets/gfx1200.yaml"
+TARGET = ROOT / "problems/LLM_CORE/targets/isa/gfx1200.yaml"
 GIB = 1024**3
 
 
@@ -143,6 +145,50 @@ def test_corpus_generate_cli_requires_one_target_source(tmp_path: Path) -> None:
     assert result.exit_code == 2
     response = json.loads(result.output)
     assert response["error"]["code"] == "invalid_static_target"
+
+
+def test_bundled_target_templates_are_tiered_and_loadable() -> None:
+    expected = {
+        "isa/gfx1200",
+        "isa/gfx942",
+        "products/mi300x",
+        "products/mi308x",
+        "products/rx9060xt",
+        "configurations/mi300x/spx-192gb",
+        "configurations/rx9060xt/standard-16gb",
+    }
+
+    assert set(cli_dataset.TARGET_TEMPLATES) == expected
+    assert set(cli_dataset.BUNDLED_TARGET_TEMPLATE_KINDS) == expected
+    assert not tuple(cli_dataset.DEFAULT_TARGET_ROOT.glob("*.yaml"))
+    for template in expected:
+        descriptor = cli_dataset._load_bundled_target_template(template)
+        assert descriptor.target_id
+        assert (
+            descriptor.hardware.kind
+            is cli_dataset.BUNDLED_TARGET_TEMPLATE_KINDS[template]
+        )
+
+
+def test_bundled_target_template_rejects_directory_kind_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    descriptor = cli_dataset._load_bundled_target_template("isa/gfx1200")
+    mismatched = descriptor.model_copy(
+        update={
+            "hardware": descriptor.hardware.model_copy(
+                update={"kind": HardwareConfigurationKind.PRODUCT_TEMPLATE}
+            )
+        }
+    )
+    monkeypatch.setattr(
+        cli_dataset,
+        "load_target_descriptor",
+        lambda _path: mismatched,
+    )
+
+    with pytest.raises(ValueError, match="tier mismatch"):
+        cli_dataset._load_bundled_target_template("isa/gfx1200")
 
 
 def test_corpus_generate_cli_reports_capacity_probe_failure(

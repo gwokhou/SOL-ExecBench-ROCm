@@ -129,7 +129,6 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
-    GpuLifecycleIdentity,
     SoftwareLifecycleIdentity,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.source_review import (
@@ -204,7 +203,6 @@ __all__ = [
     "GCEntry",
     "GCPlan",
     "GCRefusedError",
-    "GpuLifecycleIdentity",
     "LifecyclePlanInputs",
     "ModelBuildHandler",
     "PublicationHandler",
