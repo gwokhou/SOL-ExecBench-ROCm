@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import tempfile
 from collections.abc import Iterator
-from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -319,7 +319,7 @@ def _run_parallel_items(
         for _ in range(min(jobs, len(items))):
             _submit_next(executor, active, iterator, timeout_seconds)
         while active:
-            done, _ = wait(active, return_when=FIRST_COMPLETED)
+            done, _ = wait(active)
             completed = sorted(
                 ((active.pop(future), future) for future in done),
                 key=lambda pair: pair[0].ordinal,
