@@ -14,7 +14,7 @@ from sol_execbench.core.solar_bridge.formal_device import (
     FORMAL_ARCHITECTURE,
     release_formal_device_memory,
     require_formal_device,
-    solar_architecture_for_gfx_target,
+    solar_architecture_for_configuration,
 )
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
@@ -77,7 +77,7 @@ def analyze_workload_diagnostic(
     returns a roofline bound even when the result is not publication-eligible.
     Results are engineering/inexact, never a formal SOLAR bound.
     """
-    gfx_target = detect_rocm_device(device).gfx_target
+    hardware = detect_rocm_device(device).hardware_configuration
     context = load_solar_workload_context(problem_dir, workload_uuid, device)
     return _invoke_solar(
         context=context,
@@ -85,7 +85,7 @@ def analyze_workload_diagnostic(
         device=device,
         orojenesis_home=orojenesis_home,
         ir_path=normalize_ir_path(ir_path),
-        architecture=solar_architecture_for_gfx_target(gfx_target),
+        architecture=solar_architecture_for_configuration(hardware),
         formal=False,
         device_stage_lock_path=device_stage_lock_path,
         device_stage_lock_timeout_seconds=device_stage_lock_timeout_seconds,

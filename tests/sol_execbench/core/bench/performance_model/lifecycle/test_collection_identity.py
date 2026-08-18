@@ -10,7 +10,7 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
 from sol_execbench.core.bench.performance_model.lifecycle.collection_identity import (
     require_consistent_collection_gpu_identity,
 )
-from sol_execbench.core.platform.runtime import (
+from sol_execbench.core.platform.hardware import (
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
 )

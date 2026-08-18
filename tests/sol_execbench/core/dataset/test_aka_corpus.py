@@ -53,6 +53,7 @@ TEST_TARGET = materialization_target(
         index=0,
         name="test gfx1200",
         gfx_target="gfx1200",
+        visible_compute_units=32,
         total_memory_bytes=16 * 1024**3,
         l2_cache_bytes=4 * 1024**2,
         torch_version="test",

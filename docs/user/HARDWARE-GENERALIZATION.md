@@ -15,7 +15,28 @@ The benchmark owns four responsibilities:
 Training, prompting, tool use, solution generation, and adaptation experiments
 remain outside this repository. The study plan consumes only a minimal exposure
 declaration: previously seen gfx targets, capacity classes, distribution IDs,
-and whether that declaration was independently verified.
+hardware-configuration IDs, and whether that declaration was independently
+verified. A gfx target identifies an ISA family, not a complete device
+configuration: MI300X and MI308X both use `gfx942` but remain distinct hardware.
+Likewise, `gfx1200` does not collapse RX 9060 XT 8/16 GiB, RX 9060 XT
+low-profile, and RX 9060 configurations: model, optional SKU, and visible
+resources are independent configuration inputs. An unobservable SKU remains
+unknown rather than being inferred from the ISA or memory size.
+
+Hardware facts use four separate layers: published nominal profiles, declared
+or provisioned configurations, runtime observations, and a resolved evaluation
+context. Workload feasibility consumes the resolved visible resources. Study
+classification consumes the stable configuration ID. Collection time, device
+index, current free memory, and target labels remain audit facts rather than
+configuration identity.
+
+Bundled declarations mirror their schema kinds in the filesystem:
+`targets/isa/` contains `isa_template`, `targets/products/` contains
+`product_template`, and `targets/configurations/` contains
+`configuration_template`. These are declarations, not observed devices. Only
+runtime resolution may produce `observed_device`, `physical_device`,
+`virtual_device`, or `partition`; the resolver derives that kind from measured
+visibility plus the declared virtualization and partition boundary.
 
 ## Protocol stages
 
@@ -26,7 +47,7 @@ study plan:
 ```bash
 uv run sol-execbench generalization plan \
   --study-id example-study \
-  --seen-hardware gfx1200:8589934592:<distribution-sha256> \
+  --seen-hardware gfx1200:<configuration-sha256>:8589934592:<distribution-sha256> \
   --manifest problems/LLM_CORE/releases/LLM_CORE_V2/manifest.yaml \
   --target-id gfx1200-8 --target-view artifacts/gfx1200-8.yaml \
   --target-id gfx1200-16 --target-view artifacts/gfx1200-16.yaml \
@@ -55,8 +76,9 @@ uv run sol-execbench generalization run-cell \
   --output cells/gfx1200-8-target-conditioned.json
 ```
 
-`run-cell` verifies the physical gfx target, plan and cohort identities, but it
-does not regenerate workloads. A missing solution is an Agent failure. Missing
+`run-cell` verifies the resolved hardware configuration, physical gfx target,
+capacity class, plan, and cohort identities, but it does not regenerate
+workloads. A missing solution is an Agent failure. Missing
 Trace evidence for a supplied solution or an invalid reference is evaluator
 failure evidence and invalidates that cell. Candidate compile failures,
 incorrect results, timeouts, runtime failures, and OOM remain Agent outcomes.
@@ -82,6 +104,13 @@ uv run sol-execbench generalization aggregate \
 The command may emit an `incomplete` report, but such a report explicitly
 forbids a generalization conclusion. A complete conclusion also requires at
 least one seen control and one hardware or capacity shift target.
+
+Shift labels distinguish an exact seen configuration, the same ISA at a new
+capacity, the same ISA and capacity on a new configuration, and an unseen ISA.
+This prevents two devices from being treated as identical merely because their
+ISA flag matches. A same-ISA training exposure with a different distribution
+ID is rejected during planning instead of being mislabeled as a hardware or
+capacity shift; workload-distribution transfer requires a separate protocol.
 
 ## Reporting boundary
 

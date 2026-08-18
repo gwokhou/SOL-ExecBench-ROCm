@@ -6,7 +6,7 @@ from sol_execbench.cli.sidecars.performance import _gpu_identity
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
-from sol_execbench.core.platform.runtime import (
+from sol_execbench.core.platform.hardware import (
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
 )

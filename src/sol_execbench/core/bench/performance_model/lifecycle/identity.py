@@ -37,10 +37,10 @@ from sol_execbench.core.bench.performance_model.lifecycle.models import (
     DiagnosticReleaseLifecycleManifest,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
-    GpuLifecycleIdentity,
     SoftwareLifecycleIdentity,
 )
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
+from sol_execbench.core.platform.hardware import HardwareExecutionIdentity
 
 
 def diagnostic_lifecycle_id(
@@ -52,11 +52,14 @@ def diagnostic_lifecycle_id(
 
 
 def _dump(
-    value: GpuLifecycleIdentity | SoftwareLifecycleIdentity,
+    value: HardwareExecutionIdentity | SoftwareLifecycleIdentity,
 ) -> object:
     """Return a stable JSON-serializable form for nested identity models."""
     payload = value.model_dump(mode="json")
-    if isinstance(value, GpuLifecycleIdentity) and value.pcie_topology is None:
+    if (
+        isinstance(value, HardwareExecutionIdentity)
+        and value.pcie_topology is None
+    ):
         payload.pop("pcie_topology", None)
     return payload
 
@@ -87,7 +90,7 @@ def collection_run_id(
     generation: int,
     roles: tuple[str, ...] = ("development", "held_out"),
     frozen_held_out_sha256: SHA256Digest | None = None,
-    gpu_identity: GpuLifecycleIdentity | None = None,
+    gpu_identity: HardwareExecutionIdentity | None = None,
     source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,
 ) -> SHA256Digest:
@@ -167,7 +170,7 @@ def calibration_id(
     *,
     calibration_profile_sha256: SHA256Digest,
     calibration_audit_sha256: SHA256Digest,
-    gpu_identity: GpuLifecycleIdentity,
+    gpu_identity: HardwareExecutionIdentity,
     software_identity: SoftwareLifecycleIdentity,
     source_revision: str,
     purpose: DiagnosticEvidencePurpose = DiagnosticEvidencePurpose.PRODUCTION,

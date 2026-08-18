@@ -20,7 +20,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
 from sol_execbench.core.platform.dependency_matrix import (
     PytorchDependencyObservation,
 )
-from sol_execbench.core.platform.runtime import (
+from sol_execbench.core.platform.hardware import (
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
 )

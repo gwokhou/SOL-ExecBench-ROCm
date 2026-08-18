@@ -36,15 +36,17 @@ from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
-    GpuLifecycleIdentity,
     SoftwareLifecycleIdentity,
-    require_complete_gpu_identity,
 )
 from sol_execbench.core.data.base_model import (
     CurrentSchemaMixin,
     StrictArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest
+from sol_execbench.core.platform.hardware import (
+    HardwareExecutionIdentity,
+    require_complete_execution_identity,
+)
 
 PRODUCER_VERSION = "4.0.0"
 
@@ -63,7 +65,7 @@ class DiagnosticLifecycleManifestBase(StrictArtifactModel):
     producer_version: str = PRODUCER_VERSION
     parents: tuple[DiagnosticLifecycleParent, ...] = ()
     policy_hashes: dict[str, str] = Field(default_factory=dict)
-    gpu_identity: GpuLifecycleIdentity | None = None
+    gpu_identity: HardwareExecutionIdentity | None = None
     software_identity: SoftwareLifecycleIdentity | None = None
     exact_inventory: tuple[DiagnosticLifecycleArtifact, ...] = ()
     receipt: DiagnosticStageReceipt | None = None
@@ -80,7 +82,10 @@ class DiagnosticLifecycleManifestBase(StrictArtifactModel):
         so it can participate in the stage identity. ``unknown`` or a
         missing field is not an authoritative production identity.
         """
-        require_complete_gpu_identity(self.gpu_identity, stage=self.stage)
+        require_complete_execution_identity(
+            self.gpu_identity,
+            context=self.stage.value,
+        )
         return self
 
     @model_validator(mode="after")
@@ -171,7 +176,10 @@ class DiagnosticCalibrationLifecycleManifest(
             raise ValueError("calibration requires a complete gpu_identity")
         if self.software_identity is None:
             raise ValueError("calibration requires a software_identity")
-        require_complete_gpu_identity(self.gpu_identity, stage=self.stage)
+        require_complete_execution_identity(
+            self.gpu_identity,
+            context=self.stage.value,
+        )
         return self
 
 

@@ -14,7 +14,12 @@ The directory layers are:
 - `registry/`: pinned model sources and normalized semantic identities;
 - `releases/LLM_CORE_V2/`: immutable Definition, generation-rule, and manifest
   files;
-- `targets/`: declared capability templates without fixed memory budgets.
+- `targets/isa/`: ISA capability templates without product assumptions;
+- `targets/products/`: product-family templates with unknown SKU and visible
+  resources;
+- `targets/configurations/`: exact declared SKU, capacity, partition, and
+  isolation configurations. Runtime evidence must still confirm their fixed
+  facts.
 
 Rebuild or verify the committed release deterministically:
 
@@ -28,12 +33,25 @@ Validate the corpus or derive a target view using measured ROCm capacity:
 ```bash
 uv run sol-execbench dataset corpus validate
 uv run sol-execbench dataset corpus generate \
-  --target-template gfx942 \
+  --target-template isa/gfx942 \
   --device cuda:0 \
   --profile core \
   --profile moe \
   --output problems/local/LLM_CORE/gfx942-measured
 ```
+
+Use `--target-template configurations/mi300x/spx-192gb` when a full, dedicated
+MI300X SPX configuration must be enforced. `products/mi308x` binds the product
+identity but leaves visible CU, memory, and partition facts to runtime evidence
+because the same `gfx942` ISA does not determine those configuration facts.
+
+The same distinction applies to `gfx1200`: the generic template does not imply
+an RX 9060-series SKU. `products/rx9060xt` binds only the product family, while
+`configurations/rx9060xt/standard-16gb` demonstrates an exact standard 16 GiB
+configuration.
+The canonical configuration identity binds model, optional SKU, and visible
+memory separately, so 8/16 GiB and standard/low-profile variants can remain
+distinct without requiring an exhaustive committed product catalog.
 
 Generation reason codes are recorded per Definition. Hardware measurements are
 normalized into integer-byte capacity classes, then one maximum feasible common

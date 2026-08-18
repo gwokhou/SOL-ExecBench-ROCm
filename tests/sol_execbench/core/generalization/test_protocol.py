@@ -37,6 +37,7 @@ from sol_execbench.core.generalization.models import (
     TrainingExposureDeclaration,
     TrainingHardwareExposure,
 )
+from sol_execbench.core.generalization.views import classify_hardware_shift
 from sol_execbench.core.generalization.workflow import (
     PlannedStudy,
     aggregate_study,
@@ -76,7 +77,9 @@ def target_views(tmp_path_factory) -> dict[str, CorpusTargetViewManifest]:
         generate_corpus(
             MANIFEST,
             output,
-            target=load_target_descriptor(TARGETS / f"{gfx_target}.yaml"),
+            target=load_target_descriptor(
+                TARGETS / "isa" / f"{gfx_target}.yaml"
+            ),
             profiles=(CorpusProfile.CORE,),
             capacity_evidence=_capacity(usable_gib, gfx_target),
         )
@@ -93,6 +96,9 @@ def planned(
         hardware=(
             TrainingHardwareExposure(
                 gfx_target="gfx1200",
+                hardware_configuration_id=(
+                    target_views["gfx1200-8"].hardware_configuration_id
+                ),
                 capacity_class_bytes=8 * GIB,
                 distribution_id=target_views["gfx1200-8"].distribution_id,
             ),
@@ -107,13 +113,18 @@ def planned(
     )
 
 
-def _capacity(usable_gib: int, gfx_target: str) -> GPUMemoryQuotaEvidence:
+def _capacity(
+    usable_gib: int,
+    gfx_target: str,
+    *,
+    gpu_name: str | None = None,
+) -> GPUMemoryQuotaEvidence:
     raw = usable_gib * GIB * 5 // 4
     payload: dict[str, Any] = {
         "schema_version": PlatformArtifactSchema.GPU_MEMORY_QUOTA_EVIDENCE,
         "device": "cuda:0",
         "device_index": 0,
-        "gpu_name": f"mock {gfx_target}",
+        "gpu_name": gpu_name or f"mock {gfx_target}",
         "gfx_target": gfx_target,
         "torch_version": "test",
         "hip_version": "test",
@@ -155,6 +166,9 @@ def _cells(
             traces=(),
             observed_gfx_target=(
                 target_views[cell.study_target_id].target.gfx_target
+            ),
+            observed_hardware_configuration_id=(
+                target_views[cell.study_target_id].hardware_configuration_id
             ),
             observed_capacity_class_bytes=(
                 target_views[cell.study_target_id].capacity_class_bytes
@@ -265,9 +279,83 @@ def test_mock_targets_are_classified_from_exposure(
     planned: PlannedStudy,
 ) -> None:
     shifts = {cell.study_target_id: cell.shift for cell in planned.plan.cells}
-    assert shifts["gfx1200-8"] is HardwareShift.SEEN_HARDWARE_SEEN_CAPACITY
-    assert shifts["gfx1200-16"] is HardwareShift.SEEN_ARCHITECTURE_NEW_CAPACITY
+    assert shifts["gfx1200-8"] is HardwareShift.SEEN_CONFIGURATION
+    assert shifts["gfx1200-16"] is HardwareShift.SAME_ISA_NEW_CAPACITY
     assert shifts["gfx942"] is HardwareShift.UNSEEN_ARCHITECTURE
+
+
+def test_same_isa_distribution_mismatch_is_not_a_hardware_shift(
+    target_views: dict[str, CorpusTargetViewManifest],
+) -> None:
+    target = target_views["gfx1200-8"]
+    exposure = TrainingExposureDeclaration(
+        hardware=(
+            TrainingHardwareExposure(
+                gfx_target=target.target.gfx_target,
+                hardware_configuration_id=target.hardware_configuration_id,
+                capacity_class_bytes=target.capacity_class_bytes,
+                distribution_id="f" * 64,
+            ),
+        )
+    )
+
+    with pytest.raises(ValueError, match="different workload distribution"):
+        classify_hardware_shift(exposure, target)
+
+
+def test_unseen_isa_distribution_mismatch_is_not_a_hardware_shift(
+    target_views: dict[str, CorpusTargetViewManifest],
+) -> None:
+    source = target_views["gfx1200-8"]
+    target = target_views["gfx942"]
+    exposure = TrainingExposureDeclaration(
+        hardware=(
+            TrainingHardwareExposure(
+                gfx_target=source.target.gfx_target,
+                hardware_configuration_id=source.hardware_configuration_id,
+                capacity_class_bytes=source.capacity_class_bytes,
+                distribution_id="f" * 64,
+            ),
+        )
+    )
+
+    with pytest.raises(ValueError, match="different workload distribution"):
+        classify_hardware_shift(exposure, target)
+
+
+def test_same_gfx_and_capacity_with_new_device_model_is_new_configuration(
+    tmp_path: Path,
+) -> None:
+    views = []
+    for model in ("AMD Instinct MI300X", "AMD Instinct MI308X"):
+        output = tmp_path / model.split()[-1].lower()
+        generate_corpus(
+            MANIFEST,
+            output,
+            target=load_target_descriptor(TARGETS / "isa/gfx942.yaml"),
+            profiles=(CorpusProfile.CORE,),
+            capacity_evidence=_capacity(192, "gfx942", gpu_name=model),
+        )
+        views.append(_view(output))
+    source, target = views
+    exposure = TrainingExposureDeclaration(
+        hardware=(
+            TrainingHardwareExposure(
+                gfx_target="gfx942",
+                hardware_configuration_id=source.hardware_configuration_id,
+                capacity_class_bytes=source.capacity_class_bytes,
+                distribution_id=source.distribution_id,
+            ),
+        )
+    )
+
+    assert source.distribution_id == target.distribution_id
+    assert source.capacity_class_bytes == target.capacity_class_bytes
+    assert source.hardware_configuration_id != target.hardware_configuration_id
+    assert (
+        classify_hardware_shift(exposure, target)
+        is HardwareShift.SAME_ISA_NEW_CONFIGURATION
+    )
 
 
 def test_core_matrix_is_small_and_anonymous_is_optional(
@@ -366,9 +454,9 @@ def test_capability_missingness_changes_only_target_full_denominator(
     corpus: CorpusManifest,
     target_views: dict[str, CorpusTargetViewManifest],
 ) -> None:
-    limited_target = load_target_descriptor(TARGETS / "gfx942.yaml").model_copy(
-        update={"capabilities": ()}
-    )
+    limited_target = load_target_descriptor(
+        TARGETS / "isa/gfx942.yaml"
+    ).model_copy(update={"capabilities": ()})
     output = tmp_path / "limited-gfx942"
     generate_corpus(
         MANIFEST,
@@ -383,6 +471,7 @@ def test_capability_missingness_changes_only_target_full_denominator(
         hardware=(
             TrainingHardwareExposure(
                 gfx_target="gfx1200",
+                hardware_configuration_id=control.hardware_configuration_id,
                 capacity_class_bytes=8 * GIB,
                 distribution_id=control.distribution_id,
             ),
@@ -516,6 +605,9 @@ def test_runtime_sealing_never_calls_workload_generator(
         solutions=(),
         traces=(),
         observed_gfx_target="gfx1200",
+        observed_hardware_configuration_id=(
+            target_views[cell.study_target_id].hardware_configuration_id
+        ),
         observed_capacity_class_bytes=(
             target_views[cell.study_target_id].capacity_class_bytes
         ),
@@ -545,6 +637,9 @@ def test_seal_rejects_manifest_and_runtime_capacity_drift(
             solutions=(),
             traces=(),
             observed_gfx_target=target.target.gfx_target,
+            observed_hardware_configuration_id=(
+                target.hardware_configuration_id
+            ),
             observed_capacity_class_bytes=target.capacity_class_bytes,
         )
     with pytest.raises(ValueError, match="observed capacity class differs"):
@@ -557,6 +652,9 @@ def test_seal_rejects_manifest_and_runtime_capacity_drift(
             solutions=(),
             traces=(),
             observed_gfx_target=target.target.gfx_target,
+            observed_hardware_configuration_id=(
+                target.hardware_configuration_id
+            ),
             observed_capacity_class_bytes=target.capacity_class_bytes * 2,
         )
 
@@ -646,6 +744,9 @@ def test_seal_rejects_trace_identity_drift(
             solutions=(solution,),
             traces=(trace,),
             observed_gfx_target=target.target.gfx_target,
+            observed_hardware_configuration_id=(
+                target.hardware_configuration_id
+            ),
             observed_capacity_class_bytes=target.capacity_class_bytes,
         )
 
@@ -686,6 +787,7 @@ def test_aggregate_rejects_ambiguous_seen_control(
         hardware=(
             TrainingHardwareExposure(
                 gfx_target="gfx1200",
+                hardware_configuration_id=control.hardware_configuration_id,
                 capacity_class_bytes=8 * GIB,
                 distribution_id=control.distribution_id,
             ),
@@ -721,7 +823,10 @@ def test_plan_cli_emits_machine_readable_contract(
             ("--target-id", target_id, "--target-view", str(path))
         )
     control = target_views["gfx1200-8"]
-    seen = f"gfx1200:{8 * GIB}:{control.distribution_id}"
+    seen = (
+        f"gfx1200:{control.hardware_configuration_id}:"
+        f"{8 * GIB}:{control.distribution_id}"
+    )
     output = tmp_path / "study"
     result = CliRunner().invoke(
         cli,

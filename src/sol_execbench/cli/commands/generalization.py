@@ -37,6 +37,7 @@ from sol_execbench.core.generalization.workflow import (
     seal_cell,
 )
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.platform.hardware import build_resolved_hardware_context
 from sol_execbench.core.platform.memory_quota import (
     DEFAULT_PROBE_TIMEOUT_SECONDS as DEFAULT_CAPACITY_PROBE_TIMEOUT_SECONDS,
     collect_gpu_memory_quota_isolated,
@@ -71,7 +72,7 @@ def generalization_cli() -> None:
 @click.option(
     "--seen-hardware",
     multiple=True,
-    metavar="GFX:CAPACITY_BYTES:DISTRIBUTION_SHA256",
+    metavar="GFX:CONFIG_SHA256:CAPACITY_BYTES:DISTRIBUTION_SHA256",
 )
 @click.option(
     "--manifest",
@@ -214,6 +215,18 @@ def run_cell_cli(
             capacity.usable_budget_bytes,
             manifest.generation_policy.capacity_classes_gib,
         )
+        observed_context = build_resolved_hardware_context(
+            configuration=target.target.hardware,
+            observation=capacity.hardware_observation(),
+            capacity_class_bytes=observed_capacity_class,
+            supported_dtypes=tuple(map(str, target.target.supported_dtypes)),
+            supported_quantization=tuple(
+                map(str, target.target.supported_quantization)
+            ),
+            capabilities=tuple(map(str, target.target.capabilities)),
+            max_tensor_bytes=target.target.max_tensor_bytes,
+            reference_ipc_limit_bytes=(target.target.reference_ipc_limit_bytes),
+        )
         cell = seal_cell(
             plan=plan,
             cell_id=cell_id,
@@ -225,6 +238,9 @@ def run_cell_cli(
             ),
             traces=tuple(_load_traces(trace_paths)),
             observed_gfx_target=capacity.gfx_target,
+            observed_hardware_configuration_id=(
+                observed_context.hardware_configuration_id
+            ),
             observed_capacity_class_bytes=observed_capacity_class,
             used_holdout_feedback=used_holdout_feedback,
         )
@@ -311,11 +327,15 @@ def aggregate_cli(
 
 def _parse_seen_hardware(value: str) -> TrainingHardwareExposure:
     parts = value.split(":")
-    if len(parts) != 3:
-        raise ValueError("seen hardware must be GFX:CAPACITY_BYTES:DIGEST")
-    gfx_target, capacity, distribution = parts
+    if len(parts) != 4:
+        raise ValueError(
+            "seen hardware must be "
+            "GFX:CONFIG_SHA256:CAPACITY_BYTES:DISTRIBUTION_SHA256"
+        )
+    gfx_target, configuration, capacity, distribution = parts
     return TrainingHardwareExposure(
         gfx_target=gfx_target,
+        hardware_configuration_id=configuration,
         capacity_class_bytes=int(capacity),
         distribution_id=distribution,
     )

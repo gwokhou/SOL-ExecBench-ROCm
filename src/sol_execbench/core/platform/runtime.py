@@ -16,9 +16,12 @@ from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import ConfigDict, Field, field_validator, model_validator
-
-from sol_execbench.core.data.base_model import StrictArtifactModel
+from sol_execbench.core.platform.hardware import (
+    HardwareConfiguration,
+    HardwareConfigurationKind,
+    PCIeLinkIdentity,
+    PCIeTopologyIdentity,
+)
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_SANDBOXED,
     ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION,
@@ -36,75 +39,6 @@ SYS_DEVICES_ROOT = Path("/sys/devices")
 _PCI_BDF_PATTERN = r"[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]"
 _PCI_BDF_RE = re.compile(f"^{_PCI_BDF_PATTERN}$")
 _PCIE_SPEED_RE = re.compile(r"^([0-9]+(?:\.[0-9]+)?)\s+GT/s(?:\s+PCIe)?$")
-_PCIE_CONFIG = ConfigDict(
-    extra="forbid",
-    frozen=True,
-    strict=True,
-    allow_inf_nan=False,
-)
-
-
-class PCIeLinkIdentity(StrictArtifactModel):
-    """Negotiated and maximum identity of one PCIe link endpoint."""
-
-    model_config = _PCIE_CONFIG
-
-    bdf: str = Field(pattern=f"^{_PCI_BDF_PATTERN}$")
-    current_speed_gtps: float = Field(gt=0)
-    max_speed_gtps: float = Field(gt=0)
-    current_width: int = Field(gt=0)
-    max_width: int = Field(gt=0)
-
-    @model_validator(mode="after")
-    def _negotiated_values_fit_capability(self) -> PCIeLinkIdentity:
-        if self.current_speed_gtps > self.max_speed_gtps:
-            raise ValueError("PCIe current speed exceeds maximum speed")
-        if self.current_width > self.max_width:
-            raise ValueError("PCIe current width exceeds maximum width")
-        return self
-
-
-class PCIeTopologyIdentity(StrictArtifactModel):
-    """Ordered CPU-root-to-GPU PCIe path and its effective bottleneck."""
-
-    model_config = _PCIE_CONFIG
-
-    links: tuple[PCIeLinkIdentity, ...] = Field(min_length=1)
-    bottleneck_bdf: str = Field(pattern=f"^{_PCI_BDF_PATTERN}$")
-    effective_speed_gtps: float = Field(gt=0)
-    effective_width: int = Field(gt=0)
-
-    @property
-    def endpoint_bdf(self) -> str:
-        """Return the final device BDF in the ordered path."""
-        return self.links[-1].bdf
-
-    @field_validator("links", mode="before")
-    @classmethod
-    def _json_links_are_immutable(
-        cls,
-        value: object,
-    ) -> object:
-        if isinstance(value, list):
-            return tuple(value)
-        return value
-
-    @model_validator(mode="after")
-    def _effective_link_is_derived(self) -> PCIeTopologyIdentity:
-        bdfs = [link.bdf for link in self.links]
-        if len(bdfs) != len(set(bdfs)):
-            raise ValueError("PCIe topology repeats a BDF")
-        bottleneck = min(
-            self.links,
-            key=lambda link: link.current_speed_gtps * link.current_width,
-        )
-        if (
-            self.bottleneck_bdf != bottleneck.bdf
-            or self.effective_speed_gtps != bottleneck.current_speed_gtps
-            or self.effective_width != bottleneck.current_width
-        ):
-            raise ValueError("PCIe effective link is not canonically derived")
-        return self
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -115,10 +49,25 @@ class RocmDeviceInfo:
     index: int
     name: str
     gfx_target: str
+    visible_compute_units: int | None
     total_memory_bytes: int
     l2_cache_bytes: int | None
     torch_version: str
     hip_version: str
+
+    @property
+    def hardware_configuration(self) -> HardwareConfiguration:
+        """Project detected stable facts into the canonical hardware model."""
+        return HardwareConfiguration(
+            target_id=f"runtime:{self.device}:{self.index}",
+            vendor="AMD",
+            device_model=self.name,
+            gfx_target=self.gfx_target,
+            kind=HardwareConfigurationKind.OBSERVED_DEVICE,
+            visible_compute_units=self.visible_compute_units,
+            visible_memory_bytes=self.total_memory_bytes,
+            l2_cache_bytes=self.l2_cache_bytes,
+        )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -254,6 +203,11 @@ def detect_rocm_device(
         index=index,
         name=str(properties.name),
         gfx_target=gfx_target,
+        visible_compute_units=(
+            int(properties.multi_processor_count)
+            if getattr(properties, "multi_processor_count", 0)
+            else None
+        ),
         total_memory_bytes=int(properties.total_memory),
         l2_cache_bytes=l2_cache_bytes,
         torch_version=str(getattr(torch_module, "__version__", "")),

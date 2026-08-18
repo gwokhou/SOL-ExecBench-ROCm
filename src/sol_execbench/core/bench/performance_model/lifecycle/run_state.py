@@ -33,8 +33,6 @@ from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
-    GpuLifecycleIdentity,
-    require_complete_gpu_identity,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
     attempts_dir,
@@ -45,6 +43,10 @@ from sol_execbench.core.data.base_model import (
     FrozenArtifactModel,
 )
 from sol_execbench.core.integrity import SHA256Digest, stable_json_checksum
+from sol_execbench.core.platform.hardware import (
+    HardwareExecutionIdentity,
+    require_complete_execution_identity,
+)
 from sol_execbench.core.platform.rdna4_validation import (
     HardwareValidationBinding,
 )
@@ -161,7 +163,7 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
         min_length=1
     )
     collection_run_id: SHA256Digest
-    gpu_identity: GpuLifecycleIdentity | None = None
+    gpu_identity: HardwareExecutionIdentity | None = None
     generation: int = Field(ge=1)
     roles: tuple[Literal["held_out"], ...] = ("held_out",)
     calibration_profile_path: str = Field(min_length=1)
@@ -240,9 +242,9 @@ class DiagnosticLifecyclePlan(CurrentFrozenSchemaModel):
         ):
             raise ValueError("hardware validation source revision mismatch")
         if self.purpose is DiagnosticEvidencePurpose.PRODUCTION:
-            require_complete_gpu_identity(
+            require_complete_execution_identity(
                 self.gpu_identity,
-                stage=DiagnosticLifecycleStage.COLLECTION_RUN,
+                context=DiagnosticLifecycleStage.COLLECTION_RUN.value,
                 require_pcie_topology=True,
             )
         paths = tuple(item.relative_path for item in self.collection_inventory)

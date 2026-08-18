@@ -36,21 +36,42 @@ def classify_hardware_shift(
 ) -> HardwareShift:
     """Derive the shift label from declared training exposure."""
     gfx = target_view.target.gfx_target.strip().lower()
-    same_arch = tuple(
+    same_distribution = tuple(
         item
         for item in exposure.hardware
+        if item.distribution_id == target_view.distribution_id
+    )
+    if exposure.hardware and not same_distribution:
+        raise ValueError(
+            "training exposure uses a different workload distribution"
+        )
+    same_arch = tuple(
+        item
+        for item in same_distribution
         if item.gfx_target.strip().lower() == gfx
     )
+    if not same_arch and any(
+        item.gfx_target.strip().lower() == gfx for item in exposure.hardware
+    ):
+        raise ValueError(
+            "same-ISA training exposure uses a different workload distribution"
+        )
     if not same_arch:
         return HardwareShift.UNSEEN_ARCHITECTURE
     exact = any(
-        item.capacity_class_bytes == target_view.capacity_class_bytes
-        and item.distribution_id == target_view.distribution_id
+        item.hardware_configuration_id == target_view.hardware_configuration_id
+        and item.capacity_class_bytes == target_view.capacity_class_bytes
         for item in same_arch
     )
     if exact:
-        return HardwareShift.SEEN_HARDWARE_SEEN_CAPACITY
-    return HardwareShift.SEEN_ARCHITECTURE_NEW_CAPACITY
+        return HardwareShift.SEEN_CONFIGURATION
+    same_capacity = any(
+        item.capacity_class_bytes == target_view.capacity_class_bytes
+        for item in same_arch
+    )
+    if same_capacity:
+        return HardwareShift.SAME_ISA_NEW_CONFIGURATION
+    return HardwareShift.SAME_ISA_NEW_CAPACITY
 
 
 def hardware_facts(
@@ -61,6 +82,8 @@ def hardware_facts(
 ) -> NormalizedHardwareFacts:
     """Project only facts already used by workload generation."""
     target = target_view.target
+    configuration = target_view.hardware_context.configuration
+    expose_identity = not anonymous
     payload: dict[str, object] = {
         "study_target_id": study_target_id,
         "context_view": (
@@ -68,8 +91,27 @@ def hardware_facts(
             if anonymous
             else HardwareContextView.FULL_FACTS
         ),
-        "gfx_target": None if anonymous else target.gfx_target.strip().lower(),
-        "target_id": None if anonymous else target.target_id,
+        "gfx_target": (
+            target.gfx_target.strip().lower() if expose_identity else None
+        ),
+        "target_id": target.target_id if expose_identity else None,
+        "hardware_configuration_id": (
+            target_view.hardware_configuration_id if expose_identity else None
+        ),
+        "device_model": configuration.device_model if expose_identity else None,
+        "product_sku": configuration.product_sku if expose_identity else None,
+        "configuration_kind": (configuration.kind if expose_identity else None),
+        "visible_compute_units": (
+            configuration.visible_compute_units if expose_identity else None
+        ),
+        "visible_memory_bytes": (
+            configuration.visible_memory_bytes if expose_identity else None
+        ),
+        "partition": configuration.partition if expose_identity else None,
+        "virtualization": (
+            configuration.virtualization if expose_identity else None
+        ),
+        "isolation": configuration.isolation if expose_identity else None,
         "capacity_class_bytes": target_view.capacity_class_bytes,
         "supported_dtypes": sorted(set(map(str, target.supported_dtypes))),
         "supported_quantization": sorted(
@@ -138,6 +180,14 @@ def _validate_facts(
         and facts.gfx_target != target_view.target.gfx_target.strip().lower()
     ):
         raise ValueError("Agent hardware identity differs from target view")
+    if (
+        facts.hardware_configuration_id is not None
+        and facts.hardware_configuration_id
+        != target_view.hardware_configuration_id
+    ):
+        raise ValueError(
+            "Agent hardware configuration differs from target view"
+        )
 
 
 def _definition_view(

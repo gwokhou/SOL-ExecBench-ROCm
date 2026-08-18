@@ -62,7 +62,6 @@ from sol_execbench.core.bench.performance_model.lifecycle.run_state import (
 from sol_execbench.core.bench.performance_model.lifecycle.shared import (
     DiagnosticLifecycleArtifact,
     DiagnosticLifecycleParent,
-    GpuLifecycleIdentity,
     SoftwareLifecycleIdentity,
 )
 from sol_execbench.core.bench.performance_model.lifecycle.store import (
@@ -81,6 +80,7 @@ from sol_execbench.core.data.json_utils import (
     load_json_file,
 )
 from sol_execbench.core.integrity import sha256_file
+from sol_execbench.core.platform.hardware import HardwareExecutionIdentity
 from sol_execbench.core.process import exclusive_file_lock
 
 _RECEIPT_ADAPTER = TypeAdapter(DiagnosticStageReceipt)
@@ -497,7 +497,7 @@ def _calibration_identities(
     audit_path: Path,
     *,
     purpose: DiagnosticEvidencePurpose,
-) -> tuple[GpuLifecycleIdentity, SoftwareLifecycleIdentity]:
+) -> tuple[HardwareExecutionIdentity, SoftwareLifecycleIdentity]:
     gpu = load_calibration_gpu_identity(
         profile_path,
         audit_path,

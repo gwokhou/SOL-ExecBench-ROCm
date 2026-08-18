@@ -32,6 +32,8 @@ from sol_execbench.core.dataset.corpus_models import (
     StaticTargetDescriptor,
     WorkloadGenerationRule,
 )
+from sol_execbench.core.integrity import stable_json_checksum
+from sol_execbench.core.platform.hardware import HardwareConfigurationKind
 from sol_execbench.core.platform.memory_quota import (
     GPUMemoryQuotaEvidence,
     capacity_probe_digest,
@@ -122,7 +124,7 @@ def _usable_capacity(
 
 
 def _target(name: str = "gfx1200", **updates: Any) -> StaticTargetDescriptor:
-    target = load_target_descriptor(TARGETS / f"{name}.yaml")
+    target = load_target_descriptor(TARGETS / "isa" / f"{name}.yaml")
     return target.model_copy(update=updates)
 
 
@@ -205,7 +207,13 @@ def test_same_cohort_ignores_all_target_view_audit_fields(
     tmp_path: Path,
 ) -> None:
     target = _target()
-    renamed_target = target.model_copy(update={"target_id": "audit-only-id"})
+    renamed_target = target.model_copy(
+        update={
+            "hardware": target.hardware.model_copy(
+                update={"target_id": "audit-only-id"}
+            )
+        }
+    )
     first = tmp_path / "first"
     second = tmp_path / "second"
     generate_corpus(
@@ -292,7 +300,9 @@ def test_normalized_gfx_spelling_does_not_change_generation(
 ) -> None:
     outputs = (tmp_path / "lower", tmp_path / "upper")
     lower = _target()
-    upper = lower.model_copy(update={"gfx_target": " GFX1200 "})
+    upper_payload = lower.model_dump(mode="python")
+    upper_payload["hardware"]["gfx_target"] = " GFX1200 "
+    upper = StaticTargetDescriptor.model_validate(upper_payload)
     capacities = (
         _capacity(10),
         _capacity(10, gfx_target=" GFX1200 "),
@@ -315,6 +325,44 @@ def test_normalized_gfx_spelling_does_not_change_generation(
     assert [(item.axes, item.uuid) for item in left.workloads] == [
         (item.axes, item.uuid) for item in right.workloads
     ]
+
+
+def test_static_target_descriptor_rejects_resolved_device_kind() -> None:
+    payload = _target().model_dump(mode="python")
+    payload["hardware"]["kind"] = HardwareConfigurationKind.PHYSICAL_DEVICE
+
+    with pytest.raises(ValueError, match="declared template kind"):
+        StaticTargetDescriptor.model_validate(payload)
+
+
+def test_target_view_binds_descriptor_digest_and_resolved_context(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "view"
+    generate_corpus(
+        MANIFEST,
+        output,
+        target=_target(),
+        profiles=(CorpusProfile.CORE,),
+        capacity_evidence=_capacity(10),
+    )
+    view = _view(output)
+
+    bad_digest = view.model_dump(mode="python")
+    bad_digest["target_descriptor_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="descriptor digest"):
+        CorpusTargetViewManifest.model_validate(bad_digest)
+
+    mismatched_target = load_target_descriptor(
+        TARGETS / "products/rx9060xt.yaml"
+    )
+    mismatched_context = view.model_dump(mode="python")
+    mismatched_context["target"] = mismatched_target
+    mismatched_context["target_descriptor_sha256"] = stable_json_checksum(
+        mismatched_target.model_dump(mode="json")
+    )
+    with pytest.raises(ValueError, match="device model"):
+        CorpusTargetViewManifest.model_validate(mismatched_context)
 
 
 def test_executor_major_version_changes_cohort() -> None:

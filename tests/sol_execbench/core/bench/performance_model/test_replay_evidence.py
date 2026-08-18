@@ -20,7 +20,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity import stable_json_checksum
-from sol_execbench.core.platform.runtime import (
+from sol_execbench.core.platform.hardware import (
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
 )

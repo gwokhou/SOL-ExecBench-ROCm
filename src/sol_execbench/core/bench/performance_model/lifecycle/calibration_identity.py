@@ -14,14 +14,14 @@ from sol_execbench.core.bench.performance_model.lifecycle.enums import (
     DiagnosticEvidencePurpose,
     DiagnosticLifecycleStage,
 )
-from sol_execbench.core.bench.performance_model.lifecycle.shared import (
-    GpuLifecycleIdentity,
-    require_complete_gpu_identity,
-)
 from sol_execbench.core.bench.performance_model.models import (
     DiagnosticCalibrationProfile,
 )
 from sol_execbench.core.data.json_utils import load_json_file
+from sol_execbench.core.platform.hardware import (
+    HardwareExecutionIdentity,
+    require_complete_execution_identity,
+)
 
 
 def load_calibration_gpu_identity(
@@ -30,7 +30,7 @@ def load_calibration_gpu_identity(
     *,
     expected_purpose: DiagnosticEvidencePurpose,
     require_pcie_topology: bool,
-) -> GpuLifecycleIdentity:
+) -> HardwareExecutionIdentity:
     """Load matching calibration artifacts and return their GPU identity."""
     profile = load_json_file(DiagnosticCalibrationProfile, profile_path)
     audit = load_json_file(DiagnosticCalibrationAudit, audit_path)
@@ -58,10 +58,10 @@ def load_calibration_gpu_identity(
     )
     if observed != expected:
         raise ValueError("calibration profile/audit GPU identity mismatch")
-    gpu = GpuLifecycleIdentity(**identity.model_dump(mode="python"))
-    require_complete_gpu_identity(
+    gpu = HardwareExecutionIdentity(**identity.model_dump(mode="python"))
+    require_complete_execution_identity(
         gpu,
-        stage=DiagnosticLifecycleStage.CALIBRATION,
+        context=DiagnosticLifecycleStage.CALIBRATION.value,
         require_pcie_topology=require_pcie_topology,
     )
     return gpu

@@ -26,7 +26,6 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
     DiagnosticReleaseLifecycleManifest,
     DiagnosticRetentionClass,
     DiagnosticStageStatus,
-    GpuLifecycleIdentity,
     SoftwareLifecycleIdentity,
     acceptance_id,
     calibration_id,
@@ -42,7 +41,8 @@ from sol_execbench.core.bench.performance_model.lifecycle import (
 from sol_execbench.core.bench.performance_model.lifecycle.schema_versions import (
     DiagnosticLifecycleSchema,
 )
-from sol_execbench.core.platform.runtime import (
+from sol_execbench.core.platform.hardware import (
+    HardwareExecutionIdentity,
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
 )
@@ -84,7 +84,7 @@ _TOPOLOGY = PCIeTopologyIdentity(
     effective_width=_LINK.current_width,
 )
 
-_GPU = GpuLifecycleIdentity(
+_GPU = HardwareExecutionIdentity(
     gpu_architecture="gfx1200",
     gpu_id="a3ff7590-0000-1000-800f-a29c1cca1511",
     gpu_bdf="0000:03:00.0",
@@ -314,7 +314,7 @@ def test_calibration_identity_recomputes_and_binds_hardware() -> None:
 
 
 def test_calibration_rejects_partial_gpu_identity() -> None:
-    partial_gpu = GpuLifecycleIdentity(gpu_architecture="gfx1200")
+    partial_gpu = HardwareExecutionIdentity(gpu_architecture="gfx1200")
     with pytest.raises(ValidationError, match="gpu_identity is missing"):
         DiagnosticCalibrationLifecycleManifest.model_validate(
             _manifest_data(

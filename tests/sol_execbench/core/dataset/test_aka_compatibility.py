@@ -34,6 +34,7 @@ def _device(gfx_target: str) -> RocmDeviceInfo:
         index=0,
         name=f"test {gfx_target}",
         gfx_target=gfx_target,
+        visible_compute_units=32,
         total_memory_bytes=16 * 1024**3,
         l2_cache_bytes=4 * 1024**2,
         torch_version="test",
