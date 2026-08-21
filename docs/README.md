@@ -54,11 +54,15 @@ grant official-score authority.
 - [AKA task-source research](internal/aka-sol-task-source-research.md),
   [corpus friendliness policy](internal/aka-expansion-friendliness.md), and
   [decision-modeling research](internal/decision-modeling-research.md)
+- [Potential research workstreams](internal/potential-research-workstreams.md)
+  separates proposed research claims, proof obligations, and publication
+  dependencies from current implementation capability.
 
 Internal research documents record the design basis for policies still
-referenced by the implementation. They are not current readiness reports or
-release-status claims.
+referenced by the implementation or explicitly label prospective research.
+They are not current readiness reports or release-status claims.
 
-This tree documents only the current implementation. Superseded contracts,
-completed readiness snapshots, and engineering history are available from Git
-history rather than checked-in archive files.
+Except for explicitly labeled prospective research, this tree documents only
+the current implementation. Superseded contracts, completed readiness
+snapshots, and engineering history are available from Git history rather than
+checked-in archive files.
