@@ -51,12 +51,12 @@ grant official-score authority.
 - [Development](user/DEVELOPMENT.md)
 - [Architecture navigation](internal/architecture_navigation.md) and
   [coupling governance](internal/coupling_governance.md)
-- [AKA task-source research](internal/aka-sol-task-source-research.md),
+- [AKA task-source case study](internal/aka-sol-task-source-case-study.md),
   [corpus friendliness policy](internal/aka-expansion-friendliness.md), and
   [decision-modeling research](internal/decision-modeling-research.md)
-- [Potential research workstreams](internal/potential-research-workstreams.md)
-  separates proposed research claims, proof obligations, and publication
-  dependencies from current implementation capability.
+- The cross-vendor [CrossSOL-Eval research agenda](https://github.com/gwokhou/CrossSOL-Eval/blob/main/docs/research-agenda.md)
+  owns proposed cross-hardware claims, proof obligations, and publication
+  dependencies. This repository retains AMD/ROCm implementation evidence.
 
 Internal research documents record the design basis for policies still
 referenced by the implementation or explicitly label prospective research.

@@ -1,10 +1,15 @@
-# AKA and SOL-ExecBench Task-Source Research
+# AKA and SOL-ExecBench Task-Source Case Study
 
 > Internal research note comparing only the **origin, construction, and
 > modeling assumptions of benchmark tasks** in AMD AgentKernelArena (AKA) and
 > NVIDIA SOL-ExecBench. Evaluation metrics, agent implementations, and hardware
 > performance are out of scope except where they determine which source tasks
 > can enter a benchmark. Research snapshot: 2026-07-20.
+
+The vendor-neutral principles extracted from this AMD/NVIDIA case study are
+maintained by CrossSOL-Eval in its
+[Corpus Source and Admission Policy](https://github.com/gwokhou/CrossSOL-Eval/blob/main/docs/corpus-source-and-admission.md).
+This file remains the source-specific rationale for the ROCm AKA corpus.
 
 ## 1. Executive Summary
 
@@ -347,4 +352,3 @@ provenance_class    # model_grounded | ecosystem_grounded
    stratified corpus construction.
 5. Converting AKA into a SOL-like source is primarily a **semantic modeling and
    provenance problem**, not a kernel-language translation problem.
-
