@@ -5,7 +5,7 @@
 
 Replaces the NVIDIA-parquet corpus engine. Benchmark problems are authored
 artifacts derived from AMD AgentKernelArena (AKA) tasks under the methodology in
-``docs/internal/aka-sol-task-source-research.md`` §8 and the SOL-ExecBench paper
+``docs/internal/aka-sol-task-source-case-study.md`` §8 and the SOL-ExecBench paper
 (arXiv 2603.19173) §3. Each problem is committed under
 ``problems/AMD_AKA/<suite>/<name>/`` as ``definition.json`` + ``workload.jsonl``
 (+ optional ``reference.py``), in the current schema consumed by
