@@ -142,7 +142,7 @@ def _detect_gpu_count() -> int:
         return 0
     try:
         return parse_gpu_count(raw)
-    except (ValidationError, ValueError):
+    except ValidationError, ValueError:
         return 0
 
 

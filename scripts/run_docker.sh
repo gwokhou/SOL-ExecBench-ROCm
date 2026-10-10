@@ -7,13 +7,13 @@
 # Examples:
 #   ./scripts/run_docker.sh                             # interactive shell
 #   ./scripts/run_docker.sh --build                     # build image, then shell
-#   ./scripts/run_docker.sh --target rocm-7.1.1         # select a declared ROCm Docker Target
+#   ./scripts/run_docker.sh --target rocm-10.1.0-ubuntu-26.04-container         # select a declared ROCm Docker Target
 #   ./scripts/run_docker.sh -- sol-execbench evaluate tests/sol_execbench/samples/rmsnorm --solution tests/sol_execbench/samples/rmsnorm/solution_python.json
 #   ./scripts/run_docker.sh --device=/dev/kfd --device=/dev/dri -- bash
 #
 # Environment variables:
 #   IMAGE_NAME          Docker image name    (default: sol-execbench)
-#   IMAGE_TAG           Docker image tag     (default: rocm-<selected ROCm Docker tag>)
+#   IMAGE_TAG           Docker image tag     (default: rocm-<selected ROCm version>)
 #   ROCM_DOCKER_IMAGE   Unsafe unknown-target override repository
 #   ROCM_DOCKER_TAG     Unsafe unknown-target override tag
 #   SOL_EXECBENCH_ALLOW_MIXED_VERSION_DEPENDENCIES=1  Allow dependency probe/smoke diagnostics for mixed-version stacks
@@ -28,8 +28,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if [ "$(uname -s)" != "Linux" ]; then
-    echo "ERROR: scripts/run_docker.sh is supported only on Linux ROCm hosts." >&2
+if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
+    echo "ERROR: scripts/run_docker.sh is supported only on Linux x86-64 ROCm hosts." >&2
     exit 2
 fi
 
@@ -133,7 +133,7 @@ resolve_docker_target_json() {
     if $ALLOW_UNKNOWN_TARGET; then
         cmd+=(
             --allow-unknown-target
-            --override-image-repository "${ROCM_DOCKER_IMAGE:-rocm/dev-ubuntu-24.04}"
+            --override-image-repository "${ROCM_DOCKER_IMAGE:-rocm/pytorch}"
             --override-image-tag "${ROCM_DOCKER_TAG:-${DOCKER_TARGET}}"
         )
     fi
@@ -434,7 +434,7 @@ ROCM_DOCKER_IMAGE_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.ROC
 ROCM_DOCKER_TAG_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.ROCM_DOCKER_TAG")"
 SELECTED_TARGET_ID="$(matrix_json_value "${TARGET_JSON}" "target_id")"
 if [ -z "${IMAGE_TAG}" ]; then
-    IMAGE_TAG="rocm-${ROCM_DOCKER_TAG_SELECTED}"
+    IMAGE_TAG="${SELECTED_TARGET_ID%%-ubuntu-*}"
 fi
 IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
 
@@ -502,10 +502,8 @@ fi
 if $BUILD; then
     PYTORCH_TORCH_VERSION_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.PYTORCH_TORCH_VERSION")"
     PYTORCH_TORCHVISION_VERSION_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.PYTORCH_TORCHVISION_VERSION")"
-    PYTORCH_ROCM_INDEX_URL_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.PYTORCH_ROCM_INDEX_URL")"
     TRITON_ROCM_VERSION_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.TRITON_ROCM_VERSION")"
-    TRITON_ROCM_INDEX_URL_SELECTED="$(matrix_json_value "${TARGET_JSON}" "build_args.TRITON_ROCM_INDEX_URL")"
-    echo "+ docker build -t ${IMAGE} --build-arg ROCM_DOCKER_IMAGE=\"${ROCM_DOCKER_IMAGE_SELECTED}\" --build-arg ROCM_DOCKER_TAG=\"${ROCM_DOCKER_TAG_SELECTED}\" --build-arg PYTORCH_TORCH_VERSION=\"${PYTORCH_TORCH_VERSION_SELECTED}\" --build-arg PYTORCH_TORCHVISION_VERSION=\"${PYTORCH_TORCHVISION_VERSION_SELECTED}\" --build-arg PYTORCH_ROCM_INDEX_URL=\"${PYTORCH_ROCM_INDEX_URL_SELECTED}\" --build-arg TRITON_ROCM_VERSION=\"${TRITON_ROCM_VERSION_SELECTED}\" --build-arg TRITON_ROCM_INDEX_URL=\"${TRITON_ROCM_INDEX_URL_SELECTED}\" -f ${REPO_ROOT}/docker/Dockerfile ${REPO_ROOT}"
+    echo "+ docker build -t ${IMAGE} --build-arg ROCM_DOCKER_IMAGE=\"${ROCM_DOCKER_IMAGE_SELECTED}\" --build-arg ROCM_DOCKER_TAG=\"${ROCM_DOCKER_TAG_SELECTED}\" --build-arg PYTORCH_TORCH_VERSION=\"${PYTORCH_TORCH_VERSION_SELECTED}\" --build-arg PYTORCH_TORCHVISION_VERSION=\"${PYTORCH_TORCHVISION_VERSION_SELECTED}\" --build-arg TRITON_ROCM_VERSION=\"${TRITON_ROCM_VERSION_SELECTED}\" -f ${REPO_ROOT}/docker/Dockerfile ${REPO_ROOT}"
     if [ "${DRY_RUN}" != "1" ]; then
         docker build \
             -t "${IMAGE}" \
@@ -513,9 +511,7 @@ if $BUILD; then
             --build-arg "ROCM_DOCKER_TAG=${ROCM_DOCKER_TAG_SELECTED}" \
             --build-arg "PYTORCH_TORCH_VERSION=${PYTORCH_TORCH_VERSION_SELECTED}" \
             --build-arg "PYTORCH_TORCHVISION_VERSION=${PYTORCH_TORCHVISION_VERSION_SELECTED}" \
-            --build-arg "PYTORCH_ROCM_INDEX_URL=${PYTORCH_ROCM_INDEX_URL_SELECTED}" \
             --build-arg "TRITON_ROCM_VERSION=${TRITON_ROCM_VERSION_SELECTED}" \
-            --build-arg "TRITON_ROCM_INDEX_URL=${TRITON_ROCM_INDEX_URL_SELECTED}" \
             --build-arg HOST_UID="$(id -u)" \
             --build-arg HOST_GID="$(id -g)" \
             --build-arg HOST_USER="$(whoami)" \

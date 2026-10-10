@@ -23,7 +23,7 @@ from sol_execbench.core.platform.docker_matrix import (
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
-TARGET_ID = "rocm-7.2.0-ubuntu-24.04-container"
+TARGET_ID = "rocm-10.1.0-ubuntu-26.04-container"
 
 
 def _target():
@@ -32,18 +32,18 @@ def _target():
 
 def _matching_observation() -> PytorchDependencyObservation:
     return PytorchDependencyObservation(
-        torch_distribution_version="2.11.0+rocm7.2",
-        torch_version="2.11.0+rocm7.2",
-        torch_local_version="rocm7.2",
-        torch_rocm_target="rocm7.2",
-        torch_hip_version="7.2.0",
+        torch_distribution_version="2.14.0+rocm10.1.0",
+        torch_version="2.14.0+rocm10.1.0",
+        torch_local_version="rocm10.1.0",
+        torch_rocm_target="rocm10.1.0",
+        torch_hip_version="7.16.0",
         torch_device_available=True,
-        torchvision_distribution_version="0.26.0+rocm7.2",
-        triton_rocm_distribution_version="3.6.0",
+        torchvision_distribution_version="0.29.0a0+rocm10.1.0",
+        triton_rocm_distribution_version="3.8.0+git669b31ac.rocm10.1.0",
         triton_rocm_status="installed",
-        container_rocm_user_space_version="7.2.0",
-        hipcc_version="HIP version: 7.2.0",
-        toolchain_rocm_version="7.2.0",
+        container_rocm_user_space_version="10.1.0",
+        hipcc_version="HIP version: 10.1.0",
+        toolchain_rocm_version="10.1.0",
     )
 
 
@@ -52,7 +52,7 @@ def test_runtime_entry_keeps_scopes_and_failure_artifacts_separate() -> None:
         target=_target(),
         dependency_observation=_matching_observation(),
         host=runtime_evidence.build_host_evidence(
-            rocm_version="7.2.0",
+            rocm_version="10.1.0",
             driver_version="6.14.0",
             dev_kfd_present=True,
             dev_kfd_accessible=True,
@@ -143,7 +143,7 @@ def test_collectors_use_injected_values_without_hardware_probe() -> None:
 def test_dependency_collector_preserves_explicit_toolchain_overrides(
     monkeypatch,
 ) -> None:
-    observed = PytorchDependencyObservation(torch_version="2.11.0+rocm7.2")
+    observed = PytorchDependencyObservation(torch_version="2.14.0+rocm10.1.0")
     collector_calls = 0
 
     def collect() -> PytorchDependencyObservation:
@@ -158,15 +158,15 @@ def test_dependency_collector_preserves_explicit_toolchain_overrides(
     )
     result = runtime_evidence.build_dependency_observation(
         PytorchDependencyObservation(
-            container_rocm_user_space_version="7.2.0",
-            hipcc_version="HIP 7.2.0",
+            container_rocm_user_space_version="10.1.0",
+            hipcc_version="HIP 10.1.0",
         ),
     )
 
     assert collector_calls == 1
     assert result.torch_version == observed.torch_version
-    assert result.container_rocm_user_space_version == "7.2.0"
-    assert result.hipcc_version == "HIP 7.2.0"
+    assert result.container_rocm_user_space_version == "10.1.0"
+    assert result.hipcc_version == "HIP 10.1.0"
 
 
 def test_visible_environment_arguments_merge_and_validate(monkeypatch) -> None:
@@ -192,29 +192,29 @@ def test_runtime_evidence_cli_collects_and_aggregates(tmp_path, capsys) -> None:
         "--output",
         str(entry_path),
         "--torch-distribution-version",
-        "2.11.0+rocm7.2",
+        "2.14.0+rocm10.1.0",
         "--torch-version",
-        "2.11.0+rocm7.2",
+        "2.14.0+rocm10.1.0",
         "--torch-local-version",
-        "rocm7.2",
+        "rocm10.1.0",
         "--torch-rocm-target",
-        "rocm7.2",
+        "rocm10.1.0",
         "--torch-hip-version",
-        "7.2.0",
+        "7.16.0",
         "--torch-device-available",
         "true",
         "--torchvision-distribution-version",
-        "0.26.0+rocm7.2",
+        "0.29.0a0+rocm10.1.0",
         "--triton-rocm-distribution-version",
-        "3.6.0",
+        "3.8.0+git669b31ac.rocm10.1.0",
         "--triton-rocm-status",
         "installed",
         "--container-rocm-user-space-version",
-        "7.2.0",
+        "10.1.0",
         "--hipcc-version",
-        "HIP version: 7.2.0",
+        "HIP version: 10.1.0",
         "--toolchain-rocm-version",
-        "7.2.0",
+        "10.1.0",
         "--container-validated",
         "--device-count",
         "1",

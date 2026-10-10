@@ -1,11 +1,11 @@
 # ROCm Setup
 
-This port targets ROCm 7.0 or newer. The current dependency lock uses PyTorch
-ROCm 7.2 wheels.
+This port supports Linux x86-64 with Python 3.14. The current dependency lock
+uses ROCm 10.1.0 and AMD's PyTorch 2.14.0 wheels.
 
 ## Host Requirements
 
-- Linux host with AMD ROCm drivers and runtime installed.
+- Linux x86-64 host with compatible AMD ROCm drivers installed.
 - `/dev/kfd` and `/dev/dri` present and accessible.
 - `rocminfo` can see at least one AMD GPU agent.
 - `amd-smi` is available for hardware inspection and clock-state management.
@@ -33,11 +33,16 @@ find /opt/rocm/include -maxdepth 3 \
 Install dependencies with:
 
 ```bash
-uv sync --all-groups
+uv sync --locked --all-groups
+uv run rocm-sdk init
+export ROCM_PATH="$(uv run rocm-sdk path --root)"
+export HIP_PATH="${ROCM_PATH}"
+export PATH="${ROCM_PATH}/bin:${ROCM_PATH}/llvm/bin:${PATH}"
 ```
 
-The Linux dependency source is the PyTorch ROCm index configured in
-`pyproject.toml`. Verify that CUDA wheels were not installed:
+The dependency source is AMD's ROCm 10.1 wheel index configured in
+`pyproject.toml`. The exported paths select the wheel SDK for native tools.
+Verify the runtime:
 
 ```bash
 uv run python - <<'PY'
@@ -129,15 +134,20 @@ requires the native Linux Docker daemon. It runs containers with:
 - private IPC with an 8 GiB shared-memory allocation
 - a 512-process/container PID ceiling
 
-The default declared target is based on
-`rocm/dev-ubuntu-24.04:7.2-complete` and builds the local image as
-`sol-execbench:rocm-7.2-complete`. The image installs the project into
-`/venv`. Non-default declared targets keep the same wrapper flow but pass
-target-specific Docker build arguments for the PyTorch ROCm wheel stack, such
-as `torch==2.10.0+rocm7.0` for ROCm 7.0 and `torch==2.11.0+rocm7.2` for ROCm
-7.2. Targets that are still classified as `not_tested` are blocked by default;
-use `--allow-untested-target-smoke` only for smoke/E2E diagnostics that should
-not be treated as validated Matrix evidence.
+The only declared build target is Linux x86-64 with Python 3.14, based on
+`rocm/pytorch:rocm10.1.0_ubuntu26.04_py3.14_pytorch_release_2.14.0`.
+The Dockerfile pins the official manifest digest and builds the local image as
+`sol-execbench:rocm-10.1.0`. The project lives in `/venv`, which inherits the
+base image's PyTorch, torchvision, Triton, and ROCm SDK through system
+site-packages. Additional project dependencies are installed from `uv.lock`;
+the GPU stack is checked against the declared target and is never reinstalled.
+The wheel SDK development root is exposed at `/opt/rocm` for native tools.
+PyTorch-bound HIP/C++ extensions require C++20; packaged templates and native
+samples use `-std=c++20`.
+Other operating systems, architectures, and former ROCm 7.x build targets are
+unsupported. Targets classified as `not_tested` are blocked by default; use
+`--allow-untested-target-smoke` only for smoke/E2E diagnostics that should not
+be treated as validated Matrix evidence.
 
 ## ROCm Library Dependencies
 
@@ -151,8 +161,13 @@ to HIP itself:
 | Composable Kernel | `ck/ck.hpp` | Header-driven | Focused solution metadata is checked in under `tests/sol_execbench/samples/rdna4_vecadd/`. |
 | rocWMMA | `rocwmma/rocwmma.hpp` | Header-driven | A focused RDNA4 sample is checked in under `tests/sol_execbench/samples/rdna4_rocwmma/`. |
 
-Run `uv run pytest tests/docker/dependencies/test_rocm_libraries.py` inside the
-ROCm container before evaluating a solution that uses these libraries.
+The pinned official ROCm 10.1 image does not provide Composable Kernel headers.
+CK samples require a separate compatible header installation; their tests use
+`requires_ck` and skip only when those headers are absent.
+
+Run `uv run pytest tests/docker/dependencies/test_rocm_libraries.py -m
+docker_dependency -n 0` inside the ROCm container before evaluating a solution
+that uses these libraries.
 
 ## Clock Locking
 

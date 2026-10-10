@@ -472,7 +472,7 @@ def _serve_connection(
             )
         except ReferenceProtocolError:
             return
-        except (BrokenPipeError, EOFError):
+        except BrokenPipeError, EOFError:
             return
         except Exception as exc:  # noqa: BLE001 -- trusted request isolation
             try:
@@ -480,7 +480,7 @@ def _serve_connection(
                     writer,
                     f"trusted reference execution failed: {exc}",
                 )
-            except (BrokenPipeError, EOFError):
+            except BrokenPipeError, EOFError:
                 return
 
 

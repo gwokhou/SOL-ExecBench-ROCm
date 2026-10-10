@@ -33,12 +33,19 @@ def test_pre_commit_hooks_use_locked_uv_runs() -> None:
     assert "entry: uv run ty check" not in config
 
 
-def test_python_support_is_pinned_to_3_12() -> None:
+def test_python_support_is_pinned_to_3_14() -> None:
     data = tomllib.loads(PYPROJECT.read_text())
     workflow = _quality_workflow()
 
-    assert data["project"]["requires-python"] == ">=3.12,<3.13"
-    assert PYTHON_VERSION.read_text().strip() == "3.12"
+    assert data["project"]["requires-python"] == ">=3.14,<3.15,!=3.14.1"
+    assert PYTHON_VERSION.read_text().strip() == "3.14"
+    assert data["tool"]["ruff"]["target-version"] == "py314"
+    assert data["tool"]["uv"]["environments"] == [
+        "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    ]
+    assert data["tool"]["uv"]["required-environments"] == [
+        "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    ]
     assert all(
         next(
             step

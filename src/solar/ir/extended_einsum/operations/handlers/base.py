@@ -23,7 +23,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 
 from solar.ir.extended_einsum.equations import (
     validate_einsum_ranks_match_shapes,
@@ -207,9 +207,9 @@ class EinsumOpHandler(ABC):
 
     def _validate_einsum(
         self,
-        einsum_op: "EinsumOp",
+        einsum_op: EinsumOp,
         tensor_shapes: dict[str, list[list[int]]],
-    ) -> "EinsumOp":
+    ) -> EinsumOp:
         """Validate that einsum ranks match tensor shapes.
 
         If validation fails, logs a warning and attempts to fix the equation
@@ -247,9 +247,9 @@ class EinsumOpHandler(ABC):
 
     def _try_fix_einsum_ranks(
         self,
-        einsum_op: "EinsumOp",
+        einsum_op: EinsumOp,
         tensor_shapes: dict[str, list[list[int]]],
-    ) -> Optional["EinsumOp"]:
+    ) -> EinsumOp | None:
         """Best-effort regenerate an equation from observed tensor ranks."""
         import string
 

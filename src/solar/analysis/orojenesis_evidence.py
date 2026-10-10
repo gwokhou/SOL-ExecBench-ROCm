@@ -90,7 +90,7 @@ def _is_zero_excess_compulsory_witness(
             int(certificate["compulsory_accesses_words"]) * word_bytes
         )
         solver_bytes = float((point or {})["dram_bytes"])
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return False
     return bool(
         certificate.get("kind") == "selected_capacity_compulsory_witness_v1"

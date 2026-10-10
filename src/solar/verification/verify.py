@@ -341,7 +341,7 @@ def _einsum_roundoff_equivalent(
             normalized_equation,
             *(value.abs() for value in precise),
         )
-    except (RuntimeError, IRExecutionError):
+    except RuntimeError, IRExecutionError:
         return False
     gamma = (
         reduction_size * unit_roundoff / (1.0 - reduction_size * unit_roundoff)

@@ -114,7 +114,7 @@ class MatrixPythonDependencyEvidence(BaseModelWithDocstrings):
     torchvision_distribution_version: str | None = None
     """Observed installed torchvision distribution version."""
     triton_rocm_distribution_version: str | None = None
-    """Observed installed triton-rocm distribution version."""
+    """Observed installed ROCm Triton distribution version."""
     triton_rocm_status: str | None = None
     """Observed Triton ROCm package or availability status."""
 
@@ -137,11 +137,11 @@ class MatrixDependencyPolicyEvidence(BaseModelWithDocstrings):
     suggested_uv_command: str
     """Auditable uv command or workflow users can run for this policy."""
     triton_rocm_version: str
-    """Expected triton-rocm distribution version."""
+    """Expected ROCm Triton distribution version."""
     triton_rocm_index_name: str
-    """uv index name expected to provide triton-rocm."""
+    """uv index name expected to provide ROCm Triton."""
     triton_rocm_index_url: str
-    """uv index URL expected to provide triton-rocm."""
+    """uv index URL expected to provide ROCm Triton."""
 
 
 class MatrixToolchainEvidence(BaseModelWithDocstrings):

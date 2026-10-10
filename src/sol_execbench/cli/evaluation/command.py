@@ -281,7 +281,7 @@ def _replay_snapshot(
             phase=phase,
             device_index=_replay_device_index(),
         )
-    except (OSError, TypeError, ValueError):
+    except OSError, TypeError, ValueError:
         logger.warning("Unable to collect %s replay GPU telemetry", phase)
         return None
 

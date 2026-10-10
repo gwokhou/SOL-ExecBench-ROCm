@@ -21,32 +21,19 @@ def test_rocm_dependency_sources():
     data = tomllib.loads(PYPROJECT.read_text())
 
     dependencies = data["project"]["dependencies"]
-    assert (
-        "torch==2.10.0; sys_platform != 'linux' or platform_machine != 'x86_64'"
-        in dependencies
-    )
-    assert (
-        "torch==2.11.0+rocm7.2; sys_platform == 'linux' and platform_machine == 'x86_64'"
-        in dependencies
-    )
-    assert (
-        "torchvision==0.25.0; sys_platform != 'linux' or platform_machine != 'x86_64'"
-        in dependencies
-    )
-    assert (
-        "torchvision==0.26.0+rocm7.2; sys_platform == 'linux' and platform_machine == 'x86_64'"
-        in dependencies
-    )
+    assert "torch[device-gfx1200]==2.14.0+rocm10.1.0" in dependencies
+    assert "torchvision[device-gfx1200]==0.29.0a0+rocm10.1.0" in dependencies
+    assert "triton==3.8.0+git669b31ac.rocm10.1.0" in dependencies
+    assert "rocm[devel,device-gfx1200]==10.1.0" in dependencies
+    assert all("sys_platform != 'linux'" not in dep for dep in dependencies)
     for forbidden in FORBIDDEN:
         assert all(forbidden not in dep for dep in dependencies), forbidden
 
     indexes = data["tool"]["uv"]["index"]
-    assert any(idx["name"] == "pytorch-rocm72" for idx in indexes)
-    rocm_index = next(idx for idx in indexes if idx["name"] == "pytorch-rocm72")
-    assert rocm_index["url"] == "https://download.pytorch.org/whl/rocm7.2"
-    assert rocm_index["explicit"] is True
+    rocm_index = next(idx for idx in indexes if idx["name"] == "amd-rocm1010")
+    assert rocm_index["url"] == "https://stable.repo.amd.com/rocm/whl-next/"
 
     sources = data["tool"]["uv"]["sources"]
-    for package in ("torch", "torchvision"):
+    for package in ("torch", "torchvision", "triton", "rocm"):
         assert package in sources
-        assert any(src["index"] == "pytorch-rocm72" for src in sources[package])
+        assert sources[package]["index"] == "amd-rocm1010"

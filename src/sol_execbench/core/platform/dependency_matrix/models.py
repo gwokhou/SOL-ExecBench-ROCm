@@ -47,11 +47,11 @@ class PytorchDependencyPolicy(BaseModelWithDocstrings):
     suggested_uv_command: str
     """Auditable uv command or workflow users can run for this policy."""
     triton_rocm_version: str
-    """Expected triton-rocm distribution version."""
+    """Expected ROCm Triton distribution version (the current package is triton)."""
     triton_rocm_index_name: str
-    """uv index name expected to provide triton-rocm."""
+    """uv index name expected to provide ROCm Triton."""
     triton_rocm_index_url: str
-    """uv index URL expected to provide triton-rocm."""
+    """uv index URL expected to provide ROCm Triton."""
 
 
 class PytorchDependencyObservation(BaseModelWithDocstrings):
@@ -78,9 +78,9 @@ class PytorchDependencyObservation(BaseModelWithDocstrings):
     torchvision_distribution_version: str | None = None
     """Installed torchvision distribution version."""
     triton_rocm_distribution_version: str | None = None
-    """Installed triton-rocm distribution version."""
+    """Installed ROCm Triton distribution version (the current package is triton)."""
     triton_rocm_status: str | None = None
-    """Observed triton-rocm status, such as installed or missing."""
+    """Observed ROCm Triton status, such as installed or missing."""
     container_rocm_user_space_version: str | None = None
     """Observed container ROCm user-space version."""
     hipcc_version: str | None = None

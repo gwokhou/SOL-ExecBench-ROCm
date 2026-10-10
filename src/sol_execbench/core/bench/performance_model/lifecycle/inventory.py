@@ -61,7 +61,7 @@ def verify_regular_tree_inventory(
     """Return whether *root* still has exactly the expected file inventory."""
     try:
         return inventory_regular_tree(root) == expected
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
 
 

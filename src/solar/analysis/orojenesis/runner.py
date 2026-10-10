@@ -493,7 +493,7 @@ class OrojenesisRunner:
                         raise OrojenesisError(
                             "operational intensity must be finite and nonnegative",
                         )
-                except (ValueError, OrojenesisError):
+                except ValueError, OrojenesisError:
                     continue
                 point = {
                     "buffer_bytes": buffer_bytes,
@@ -520,7 +520,7 @@ class OrojenesisRunner:
                                 strict=True,
                             ),
                         )
-                    except (ValueError, OrojenesisError):
+                    except ValueError, OrojenesisError:
                         continue
                 previous = best.get(buffer_bytes)
                 if (

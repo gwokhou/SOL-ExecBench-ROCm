@@ -215,7 +215,7 @@ def build_orojenesis_proof_layer(
             TensorShapes(inputs=input_shapes, outputs=output_shapes),
             **operation_kwargs,
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if (
         not operation_proof.is_real_einsum

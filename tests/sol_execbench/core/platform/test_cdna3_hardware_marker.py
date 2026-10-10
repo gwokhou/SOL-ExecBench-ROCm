@@ -224,7 +224,7 @@ def test_dependency_markers_skip_missing_python_modules(
     )
 
     assert _skip_reasons(triton_item) == [
-        "triton-rocm Python package unavailable",
+        "ROCm Triton Python package unavailable",
     ]
     assert _skip_reasons(safetensors_item) == [
         "safetensors.torch support unavailable",

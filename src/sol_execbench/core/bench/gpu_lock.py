@@ -104,7 +104,7 @@ def _reuse_inherited_lock(lock_path: Path) -> bool:
         file_descriptor = int(value)
         inherited = os.fstat(file_descriptor)
         expected = lock_path.stat()
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
     if (inherited.st_dev, inherited.st_ino) != (
         expected.st_dev,
@@ -113,7 +113,7 @@ def _reuse_inherited_lock(lock_path: Path) -> bool:
         return False
     try:
         fcntl.flock(file_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except (BlockingIOError, OSError):
+    except BlockingIOError, OSError:
         return False
     return True
 

@@ -4,6 +4,7 @@
 """ROCm profiler timing parsing and live timing collection."""
 
 import csv
+import math
 from pathlib import Path
 
 from sol_execbench.core.bench.rocm_profiler.models import Rocprofv3TimingRow
@@ -26,7 +27,7 @@ def parse_rocprofv3_csv(content: str) -> tuple[Rocprofv3TimingRow, ...]:
             "operation",
         )
         domain = _first_value(normalized, "domain", "kind", "type", "category")
-        duration_ns = _duration_ns(normalized)
+        duration_ns = rocprofv3_duration_ns(normalized)
         if name is None or domain is None or duration_ns is None:
             continue
         rows.append(
@@ -62,7 +63,7 @@ def summarize_rocprofv3_csv(path: Path) -> tuple[int, float]:
                 "type",
                 "category",
             )
-            row_duration_ns = _duration_ns(normalized)
+            row_duration_ns = rocprofv3_duration_ns(normalized)
             if domain is None or row_duration_ns is None:
                 continue
             if "kernel" not in normalize_ascii_alnum(domain):
@@ -80,21 +81,23 @@ def _first_value(row: dict[str, str], *keys: str) -> str | None:
     return None
 
 
-def _duration_ns(row: dict[str, str]) -> float | None:
+def rocprofv3_duration_ns(row: dict[str, str]) -> float | None:
+    """Read finite duration or timestamp differences from normalized CSV keys."""
     for key in (
         "durationns",
         "durationnsec",
         "durationnanoseconds",
         "duration",
     ):
-        value = row.get(key)
-        if value:
-            return float(value)
+        value = _first_numeric(row, key)
+        if value is not None and value >= 0:
+            return value
 
     start = _first_numeric(row, "starttimestamp", "startns", "begin")
     end = _first_numeric(row, "endtimestamp", "endns", "end")
     if start is not None and end is not None and end >= start:
-        return end - start
+        duration = end - start
+        return duration if math.isfinite(duration) else None
     return None
 
 
@@ -102,5 +105,10 @@ def _first_numeric(row: dict[str, str], *keys: str) -> float | None:
     for key in keys:
         value = row.get(key)
         if value:
-            return float(value)
+            try:
+                number = float(value)
+            except ValueError:
+                continue
+            if math.isfinite(number):
+                return number
     return None

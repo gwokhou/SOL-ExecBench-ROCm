@@ -16,7 +16,7 @@
       "hip_cflags": [
         "--offload-arch=gfx1200",
         "-O3",
-        "-std=c++17"
+        "-std=c++20"
       ],
       "ld_flags": []
     },

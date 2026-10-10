@@ -105,7 +105,7 @@ def collect_gpu_evidence(
                             ":",
                             maxsplit=1,
                         )[0]
-            except (AttributeError, RuntimeError):
+            except AttributeError, RuntimeError:
                 pass
 
     return MatrixGPUEvidence(
@@ -193,7 +193,7 @@ def collect_runtime_gpu_telemetry(
             if identity.bdf is not None
             else None
         )
-    except (OSError, ValueError):
+    except OSError, ValueError:
         topology = None
     return RuntimeGPUTelemetry(
         phase=phase,

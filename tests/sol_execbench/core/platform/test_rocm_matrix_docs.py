@@ -89,9 +89,9 @@ def test_testing_docs_document_marker_gated_live_validation() -> None:
     )
     assert "not full MI300X hardware-validation evidence" in text
     assert "not a `gfx94*` validation target" in text
-    assert "configured default container target is ROCm 7.2.x" in text
+    assert "configured default container target is ROCm 10.1.0" in text
     assert re.search(
-        r"ROCm 7\.0\.x, 7\.1\.x, or\s+7\.2\.x native-host validation requires a matching host",
+        r"Native-host validation requires a matching host",
         text,
     )
 
@@ -101,20 +101,15 @@ def test_testing_docs_include_configured_target_catalog() -> None:
 
     assert "Configured container target catalog" in text
     assert "Target id | Local image tag | Requested ROCm user-space" in text
-    assert "rocm-7.0.2-ubuntu-24.04-container" in text
-    assert "rocm-7.1.1-ubuntu-24.04-container" in text
-    assert "rocm-7.2.0-ubuntu-24.04-container" in text
+    assert "rocm-10.1.0-ubuntu-26.04-container" in text
     assert "--record-container-validation" in text
     assert "--allow-untested-target-smoke" in text
     assert "--allow-mixed-version-dependencies" in text
     assert "benchmark_allowed=false" in text
     assert "status=mixed_version" in text
-    assert re.search(r"target-specific\s+PyTorch ROCm pins", text)
-    assert "torch==2.10.0+rocm7.0" in text
-    assert "torch==2.10.0+rocm7.1" in text
-    assert "torch==2.11.0+rocm7.2" in text
-    assert "sol-execbench:rocm-7.0.2-complete" in text
-    assert "sol-execbench:rocm-7.2-complete" in text
+    assert re.search(r"Target-specific\s+PyTorch ROCm pins", text)
+    assert "torch==2.14.0+rocm10.1.0" in text
+    assert "sol-execbench:rocm-10.1.0" in text
     assert "artifact, rather than this catalog" in text
 
 

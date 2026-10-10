@@ -12,6 +12,9 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
     PerformanceEvidenceManifest,
     PerformanceRunIdentity,
 )
+from sol_execbench.core.bench.performance_model.replay_evidence import (
+    PerformanceReplayEvidenceSidecar,
+)
 from sol_execbench.core.bench.static_kernel.evidence_models import (
     StaticKernelEvidenceArtifact,
     StaticKernelEvidenceReasonCode,
@@ -71,6 +74,17 @@ def _performance_manifest(root: Path) -> Path:
         path = root / f"{kind.value}.artifact"
         if kind is PerformanceEvidenceArtifactKind.STATIC_EVIDENCE:
             _static_evidence(path)
+        elif kind is PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE:
+            atomic_write_json_value(
+                path,
+                PerformanceReplayEvidenceSidecar(
+                    status=DiagnosticSidecarStatus.AVAILABLE,
+                    run_id="b" * 64,
+                    candidate_sha256="f" * 64,
+                    canonical_input_sha256="a" * 64,
+                    alignment_digest="a" * 64,
+                ).to_dict(),
+            )
         else:
             path.write_text(kind.value, encoding="utf-8")
         artifacts.append(

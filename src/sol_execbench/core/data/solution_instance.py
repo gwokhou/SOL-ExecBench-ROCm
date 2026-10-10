@@ -66,7 +66,7 @@ class Solution(CurrentSchemaModel):
     """Optional human-readable description of the solution's technique or approach."""
 
     @model_validator(mode="after")
-    def _validate_source_path_entry_point(self) -> "Solution":
+    def _validate_source_path_entry_point(self) -> Solution:
         """Validate source file paths for uniqueness and entry file existence.
 
         Raises:

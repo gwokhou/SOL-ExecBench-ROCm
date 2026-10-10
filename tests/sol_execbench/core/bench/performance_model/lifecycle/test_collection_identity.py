@@ -10,6 +10,9 @@ from sol_execbench.core.bench.performance_model.evidence_manifest import (
 from sol_execbench.core.bench.performance_model.lifecycle.collection_identity import (
     require_consistent_collection_gpu_identity,
 )
+from sol_execbench.core.bench.performance_model.replay_evidence import (
+    PerformanceReplayEvidenceSidecar,
+)
 from sol_execbench.core.platform.runtime import (
     PCIeLinkIdentity,
     PCIeTopologyIdentity,
@@ -167,7 +170,19 @@ def test_load_collection_gpu_identity_resolves_blob_backed_corpus(
             PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE,
         ):
             path = case_dir / f"{kind.value}.bin"
-            path.write_text(f"{index}-{kind.value}", encoding="utf-8")
+            if kind is PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE:
+                atomic_write_json_value(
+                    path,
+                    PerformanceReplayEvidenceSidecar(
+                        status=DiagnosticSidecarStatus.AVAILABLE,
+                        run_id=f"{index:064d}",
+                        candidate_sha256=f"{index + 3:064d}",
+                        canonical_input_sha256="a" * 64,
+                        alignment_digest="a" * 64,
+                    ).to_dict(),
+                )
+            else:
+                path.write_text(f"{index}-{kind.value}", encoding="utf-8")
             members.append(path)
             artifacts.append(
                 PerformanceEvidenceArtifact(

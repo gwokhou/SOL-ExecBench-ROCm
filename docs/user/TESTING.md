@@ -166,24 +166,26 @@ device and toolchain. The CDNA3 marker contract lives at
 `tests/sol_execbench/core/platform/test_cdna3_hardware_marker.py`; passing it is
 not full MI300X hardware-validation evidence, and RDNA4 is not a `gfx94*` validation target.
 
-The configured default container target is ROCm 7.2.x. ROCm 7.0.x, 7.1.x, or
-7.2.x native-host validation requires a matching host. Container records are
-ROCm user-space evidence on their observed host driver/devices, not native-host
-authority.
+The configured default container target is ROCm 10.1.0 on Linux x86-64 with
+Python 3.14. Native-host validation requires a matching host. Container records
+are ROCm user-space evidence on their observed host driver/devices, not
+native-host authority. Existing ROCm 7.2 engineering records retain their
+original scope; this dependency upgrade does not requalify them.
 
 ### Configured container target catalog
 
 | Target id | Local image tag | Requested ROCm user-space | PyTorch ROCm dependency |
 | --- | --- | --- | --- |
-| `rocm-7.0.2-ubuntu-24.04-container` | `sol-execbench:rocm-7.0.2-complete` | 7.0.2 | `torch==2.10.0+rocm7.0` |
-| `rocm-7.1.1-ubuntu-24.04-container` | `sol-execbench:rocm-7.1.1-complete` | 7.1.1 | `torch==2.10.0+rocm7.1` |
-| `rocm-7.2.0-ubuntu-24.04-container` | `sol-execbench:rocm-7.2-complete` | 7.2.0 | `torch==2.11.0+rocm7.2` (default) |
+| `rocm-10.1.0-ubuntu-26.04-container` | `sol-execbench:rocm-10.1.0` | 10.1.0 | `torch==2.14.0+rocm10.1.0` (default) |
+
+The only supported base is the digest-pinned official AMD PyTorch image.
+Former ROCm 7.x targets are rejected; other OS/CPU build combinations are
+unsupported. Target-specific PyTorch ROCm pins are checked against the
+inherited official framework stack.
 
 Smoke runs selected by `--allow-untested-target-smoke` or
 `--allow-mixed-version-dependencies` are diagnostic. A mixed stack reports
-`benchmark_allowed=false` and `status=mixed_version`. The target-specific
-PyTorch ROCm pins include `torch==2.10.0+rocm7.0` and
-`torch==2.11.0+rocm7.2`.
+`benchmark_allowed=false` and `status=mixed_version`.
 
 Use `--record-container-validation` to create evidence for a concrete run. The
 resulting artifact, rather than this catalog, owns observed versions, clock

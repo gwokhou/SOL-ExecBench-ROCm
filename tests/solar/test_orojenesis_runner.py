@@ -729,6 +729,6 @@ def test_default_mapper_runner_bounds_output_while_running(tmp_path):
 def _process_is_running(pid: int) -> bool:
     try:
         state = Path(f"/proc/{pid}/stat").read_text().split()[2]
-    except (FileNotFoundError, ProcessLookupError):
+    except FileNotFoundError, ProcessLookupError:
         return False
     return state != "Z"

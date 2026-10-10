@@ -97,7 +97,7 @@ def _resolve_elapsed_time() -> Any:
         import torch.cuda
 
         return torch.cuda.Event.elapsed_time
-    except (AttributeError, RuntimeError):
+    except AttributeError, RuntimeError:
         return None
 
 
