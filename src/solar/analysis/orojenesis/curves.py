@@ -516,7 +516,7 @@ def _serialized_curve_point(
         }
         if include_row_tile:
             point["row_tile"] = int(row[4])
-    except (TypeError, ValueError, json.JSONDecodeError):
+    except TypeError, ValueError, json.JSONDecodeError:
         return None
     invalid = (
         point["buffer_bytes"] <= 0

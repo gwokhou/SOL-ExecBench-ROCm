@@ -7,19 +7,18 @@ name = "sol-execbench"
 version = "4.0.0"
 description = "SOL ExecBench with paper-aligned SOLAR analysis for AMD ROCm"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.14,<3.15,!=3.14.1"
 dependencies = [
-    "torch==2.10.0; sys_platform != 'linux' or platform_machine != 'x86_64'",
-    "torch==2.11.0+rocm7.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "torchvision==0.25.0; sys_platform != 'linux' or platform_machine != 'x86_64'",
-    "torchvision==0.26.0+rocm7.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torch[device-gfx1200]==2.14.0+rocm10.1.0",
+    "torchvision[device-gfx1200]==0.29.0a0+rocm10.1.0",
     "ninja>=1.13.0",
     "pydantic>=2.12.5",
     "safetensors>=0.7.0",
     "click>=8.0",
     "graphviz>=0.21",
     "rich>=13.0",
-    "triton-rocm==3.6.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "triton==3.8.0+git669b31ac.rocm10.1.0",
+    "rocm[devel,device-gfx1200]==10.1.0",
     "networkx>=3.0",
     "numpy>=2.0",
     "pyyaml>=6.0",
@@ -81,7 +80,7 @@ markers = [
     "requires_rocm: test requires a ROCm GPU visible through PyTorch",
     "requires_rocm_gpu: test requires a ROCm GPU visible through PyTorch",
     "requires_rocm_dev: test requires ROCm native extension development headers",
-    "requires_triton_rocm: test requires the triton-rocm Python package",
+    "requires_triton_rocm: test requires the ROCm Triton Python package",
     "requires_safetensors_torch: test requires safetensors.torch support",
     "requires_ck: test requires Composable Kernel headers",
     "requires_rocwmma: test requires rocWMMA headers",
@@ -115,7 +114,7 @@ skip_covered = false
 force-exclude = true
 line-length = 80
 required-version = ">=0.16.0,<0.17.0"
-target-version = "py312"
+target-version = "py314"
 exclude = [
     ".git",
     ".venv",
@@ -226,22 +225,15 @@ url = "https://pypi.org/simple"
 default = true
 
 [[tool.uv.index]]
-name = "pytorch-rocm72"
-url = "https://download.pytorch.org/whl/rocm7.2"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-rocm-root"
-url = "https://download.pytorch.org/whl/"
-explicit = true
+name = "amd-rocm1010"
+url = "https://stable.repo.amd.com/rocm/whl-next/"
 
 [tool.uv.sources]
-torch = [
-  { index = "pytorch-rocm72", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
-]
-torchvision = [
-  { index = "pytorch-rocm72", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
-]
-triton-rocm = [
-  { index = "pytorch-rocm-root", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
-]
+torch = { index = "amd-rocm1010" }
+torchvision = { index = "amd-rocm1010" }
+triton = { index = "amd-rocm1010" }
+rocm = { index = "amd-rocm1010" }
+
+[tool.uv]
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+required-environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]

@@ -18,7 +18,7 @@ def collect_pytorch_dependency_observation() -> PytorchDependencyObservation:
     """Collect lightweight dependency observations without requiring ROCm hardware."""
     torch_distribution_version = _distribution_version("torch")
     torchvision_distribution_version = _distribution_version("torchvision")
-    triton_rocm_distribution_version = _distribution_version("triton-rocm")
+    triton_rocm_distribution_version = _distribution_version("triton")
     triton_rocm_status = (
         "installed"
         if triton_rocm_distribution_version is not None
@@ -43,7 +43,7 @@ def collect_pytorch_dependency_observation() -> PytorchDependencyObservation:
     cuda_version = getattr(version, "cuda", None)
     try:
         device_available = bool(torch.cuda.is_available())
-    except (RuntimeError, AttributeError):
+    except RuntimeError, AttributeError:
         device_available = False
     local_version = _local_version(torch_version or torch_distribution_version)
     rocm_version = detect_rocm_version()

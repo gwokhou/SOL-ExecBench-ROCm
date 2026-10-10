@@ -28,6 +28,8 @@ from sol_execbench.core.platform.docker_matrix import (
     to_matrix_target,
 )
 
+ROCM_HIP_VERSION_PREFIXES = {"rocm10.1.0": "7.16"}
+
 
 def classify_dependency_preflight(
     *,
@@ -175,7 +177,11 @@ def _torch_mismatch_reason(
             f"torch ROCm target {observation.torch_rocm_target!r} does not match "
             f"requested {expected_rocm_target!r}."
         )
-    expected_hip_prefix = _rocm_major_minor(policy.expected_local_version)
+    # Core SDK and HIP use separate release numbers in the ROCm 10 series.
+    expected_hip_prefix = ROCM_HIP_VERSION_PREFIXES.get(
+        policy.expected_local_version,
+        _rocm_major_minor(policy.expected_local_version),
+    )
     if (
         expected_hip_prefix is not None
         and observation.torch_hip_version is not None
@@ -203,7 +209,7 @@ def _triton_mismatch_reason(
 ) -> str | None:
     if observation.triton_rocm_status != "installed":
         return (
-            f"triton-rocm status {observation.triton_rocm_status!r} does not match "
+            f"ROCm Triton status {observation.triton_rocm_status!r} does not match "
             "required installed policy."
         )
     if (
@@ -211,7 +217,7 @@ def _triton_mismatch_reason(
         != policy.triton_rocm_version
     ):
         return (
-            "triton-rocm distribution "
+            "ROCm Triton distribution "
             f"{observation.triton_rocm_distribution_version!r} does not match policy "
             f"{policy.triton_rocm_version!r}."
         )

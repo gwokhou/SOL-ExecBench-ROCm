@@ -15,6 +15,8 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ProfileStatus,
     Rocprofv3ReasonCode,
     classify_profile_artifact,
+    parse_rocprofv3_csv,
+    summarize_rocprofv3_csv,
 )
 
 _ARTIFACT_KIND_CASES = (
@@ -65,6 +67,61 @@ def _profile_result(
         artifact_coverage_status=Rocprofv3ArtifactCoverageStatus.COMPLETE,
         reason_codes=(Rocprofv3ReasonCode.ARTIFACTS_REGISTERED,),
     )
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "expected_ns"),
+    [
+        pytest.param("1000", "4000", 3000, id="timestamp-duration"),
+        pytest.param("1000", "1000", 0, id="zero-duration"),
+        pytest.param("4000", "1000", None, id="reversed-timestamps"),
+        pytest.param("1000", "", None, id="missing-end"),
+        pytest.param("invalid", "4000", None, id="invalid-start"),
+        pytest.param("nan", "4000", None, id="nan-start"),
+        pytest.param("1000", "inf", None, id="infinite-end"),
+        pytest.param("-1e308", "1e308", None, id="duration-overflow"),
+    ],
+)
+def test_timestamp_csv_has_consistent_summary_and_timing_metrics(
+    tmp_path: Path, start: str, end: str, expected_ns: int | None
+) -> None:
+    """ROCm 10.1 kernel CSVs omit the standalone duration column."""
+    content = (
+        '"Kind","Kernel_Name","Start_Timestamp","End_Timestamp"\n'
+        f'"KERNEL_DISPATCH","_vecadd","{start}","{end}"\n'
+        '"HIP_RUNTIME_API","hipLaunchKernel","1000","5000"\n'
+    )
+    path = tmp_path / "profile_kernel_trace.csv"
+    path.write_text(content, encoding="utf-8")
+    profile = _profile_result(
+        tmp_path,
+        (
+            Rocprofv3ProfileArtifact(
+                path=path,
+                kind=Rocprofv3ArtifactKind.TRACE_CSV,
+                size_bytes=path.stat().st_size,
+            ),
+        ),
+    )
+
+    evidence = structured_profile_evidence(profile)
+    timing_rows = [
+        row for row in parse_rocprofv3_csv(content) if row.is_kernel_activity
+    ]
+    count, duration_ns = summarize_rocprofv3_csv(path)
+
+    assert evidence.parse_warnings == []
+    assert count == len(timing_rows) == len(evidence.kernel_metrics)
+    if expected_ns is None:
+        assert count == 0
+        assert duration_ns == 0
+    else:
+        assert count == 1
+        assert duration_ns == expected_ns == timing_rows[0].duration_ns
+        metric = evidence.kernel_metrics[0]
+        assert metric.kernel_name == "_vecadd"
+        assert metric.unit == "ms"
+        assert metric.value == pytest.approx(expected_ns / 1_000_000)
 
 
 def test_structured_profile_evidence_parses_trace_counter_and_metadata(

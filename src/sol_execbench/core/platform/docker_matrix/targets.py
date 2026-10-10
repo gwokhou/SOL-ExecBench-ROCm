@@ -65,12 +65,7 @@ def docker_build_args_for_target(
                     "torchvision_version",
                     "",
                 ),
-                "PYTORCH_ROCM_INDEX_URL": policy.get("uv_index_url", ""),
                 "TRITON_ROCM_VERSION": policy.get("triton_rocm_version", ""),
-                "TRITON_ROCM_INDEX_URL": policy.get(
-                    "triton_rocm_index_url",
-                    "",
-                ),
             },
         )
     return args

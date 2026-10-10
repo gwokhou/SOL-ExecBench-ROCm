@@ -188,7 +188,7 @@ class IRGraphAnalyzer(
                 try:
                     with open(candidate) as f:
                         meta = yaml.safe_load(f) or {}
-                except (OSError, UnicodeError, yaml.YAMLError):
+                except OSError, UnicodeError, yaml.YAMLError:
                     return None
 
                 best = None

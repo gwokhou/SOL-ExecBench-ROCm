@@ -9,7 +9,7 @@
     "entry_point": "kernel.hip::run",
     "dependencies": ["hipBLAS"],
     "compile_options": {
-      "hip_cflags": ["-O3", "-std=c++17"],
+      "hip_cflags": ["-O3", "-std=c++20"],
       "ld_flags": ["-L/opt/rocm/lib", "-lhipblas"]
     },
     "destination_passing_style": false,

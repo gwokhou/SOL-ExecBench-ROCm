@@ -208,7 +208,7 @@ def _scan_amdgpu_notes(data: bytes) -> Iterator[dict[object, object]]:
             continue
         try:
             meta, _ = _unpack_msgpack(desc)
-        except (ValueError, IndexError, struct.error):
+        except ValueError, IndexError, struct.error:
             continue
         if isinstance(meta, dict):
             yield cast(dict[object, object], meta)

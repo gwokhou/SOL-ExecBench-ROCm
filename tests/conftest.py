@@ -184,7 +184,7 @@ def pytest_collection_modifyitems(
         reason="ROCm HIP development headers unavailable",
     )
     skip_no_triton_rocm = pytest.mark.skip(
-        reason="triton-rocm Python package unavailable",
+        reason="ROCm Triton Python package unavailable",
     )
     skip_no_safetensors_torch = pytest.mark.skip(
         reason="safetensors.torch support unavailable",

@@ -44,8 +44,8 @@ Downloaded/generated data belongs under uncommitted `data/`.
 
 ## Naming and Resources
 
-Target Python 3.12/Ruff and keep changes local. Import canonical definitions
-directly; alias only for collisions, clear roles, or conventions such as
+Target Python 3.14/Ruff on Linux x86_64 and keep changes local. Import canonical
+definitions directly; alias only for collisions, clear roles, or conventions such as
 `numpy as np`. Update callers when symbols move; do not add private/self aliases
 or incidental compatibility re-exports.
 

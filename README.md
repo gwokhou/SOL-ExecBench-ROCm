@@ -19,8 +19,11 @@ The paper is the source of truth when imported implementations disagree:
 uv sync --all-groups
 ```
 
-Only Python 3.12 is supported. Linux x86-64 resolves the ROCm 7.2 PyTorch stack
-declared in `pyproject.toml`.
+Only Linux x86-64 with Python 3.14 is supported. The locked stack is ROCm
+10.1.0, PyTorch 2.14.0, torchvision 0.29.0a0, and ROCm Triton 3.8.0. Python
+3.14.1 is excluded by the official torchvision wheel. Native installations
+select `gfx1200` device wheels; Docker inherits the official GPU packages
+without reinstalling them.
 
 ## Public problem corpus
 

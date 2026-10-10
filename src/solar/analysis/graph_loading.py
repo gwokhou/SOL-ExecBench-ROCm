@@ -113,7 +113,7 @@ class GraphLoadingMixin(AnalysisMixinContract):
             destination = output_dir / source.name
             if source.resolve() != destination.resolve():
                 destination.write_text(source.read_text())
-        except (OSError, UnicodeError):
+        except OSError, UnicodeError:
             if self.debug:
                 print(f"Debug: failed to copy {source.name}")
 

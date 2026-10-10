@@ -45,16 +45,18 @@ def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
     manifest = load_docker_target_manifest(MANIFEST_PATH)
     policy_ids: set[str] = set()
 
-    assert manifest.default_target_id == "rocm-7.2.0-ubuntu-24.04-container"
+    assert manifest.default_target_id == "rocm-10.1.0-ubuntu-26.04-container"
     assert (
         manifest.targets_by_id[
             manifest.default_target_id
         ].docker_image_repository
-        == "rocm/dev-ubuntu-24.04"
+        == "rocm/pytorch"
     )
     assert manifest.targets_by_id[
         manifest.default_target_id
-    ].docker_image_tag == ("7.2-complete")
+    ].docker_image_tag == (
+        "rocm10.1.0_ubuntu26.04_py3.14_pytorch_release_2.14.0"
+    )
     for target in manifest.targets:
         policy = load_docker_target_dependency_policy(target)
         assert set(policy.model_dump(mode="json")) == EXPECTED_POLICY_FIELDS
@@ -64,71 +66,60 @@ def test_manifest_records_dependency_policy_for_every_declared_target() -> None:
         assert target.pytorch_rocm_target == policy.expected_local_version
         assert target.pytorch_rocm_target is not None
         assert (
-            target.pytorch_rocm_target.replace(".", "") in policy.uv_index_name
+            target.pytorch_rocm_target.replace("rocm", "").replace(".", "")
+            in policy.uv_index_name
         )
-        assert policy.expected_local_version in policy.uv_index_url
         assert policy.suggested_uv_command
         assert policy.uv_index_url.startswith(
-            "https://download.pytorch.org/whl/",
+            "https://stable.repo.amd.com/rocm/whl-next/",
         )
         assert (
-            policy.triton_rocm_index_url == "https://download.pytorch.org/whl/"
+            policy.triton_rocm_index_url
+            == "https://stable.repo.amd.com/rocm/whl-next/"
         )
 
 
-def test_default_target_policy_matches_rocm_7_2_project_default() -> None:
+def test_default_target_policy_matches_rocm_10_1_project_default() -> None:
     selection = select_docker_target(None, manifest_path=MANIFEST_PATH)
     policy = load_docker_target_dependency_policy(selection.target)
 
-    assert selection.target_id == "rocm-7.2.0-ubuntu-24.04-container"
-    assert selection.target.docker_image_repository == "rocm/dev-ubuntu-24.04"
-    assert selection.target.docker_image_tag == "7.2-complete"
-    assert policy.torch_version == "2.11.0+rocm7.2"
-    assert policy.torchvision_version == "0.26.0+rocm7.2"
-    assert policy.expected_local_version == "rocm7.2"
-    assert policy.uv_index_name == "pytorch-rocm72"
-    assert policy.uv_index_url == "https://download.pytorch.org/whl/rocm7.2"
+    assert selection.target_id == "rocm-10.1.0-ubuntu-26.04-container"
+    assert selection.target.docker_image_repository == "rocm/pytorch"
+    assert (
+        selection.target.docker_image_tag
+        == "rocm10.1.0_ubuntu26.04_py3.14_pytorch_release_2.14.0"
+    )
+    assert policy.torch_version == "2.14.0+rocm10.1.0"
+    assert policy.torchvision_version == "0.29.0a0+rocm10.1.0"
+    assert policy.expected_local_version == "rocm10.1.0"
+    assert policy.uv_index_name == "amd-rocm1010"
+    assert policy.uv_index_url == "https://stable.repo.amd.com/rocm/whl-next/"
     assert policy.lock_strategy == "project_default"
-    assert policy.triton_rocm_version == "3.6.0"
-    assert policy.triton_rocm_index_name == "pytorch-rocm-root"
-    assert policy.triton_rocm_index_url == "https://download.pytorch.org/whl/"
+    assert policy.triton_rocm_version == "3.8.0+git669b31ac.rocm10.1.0"
+    assert policy.triton_rocm_index_name == "amd-rocm1010"
+    assert (
+        policy.triton_rocm_index_url
+        == "https://stable.repo.amd.com/rocm/whl-next/"
+    )
 
 
-def test_non_default_target_policies_record_explicit_workflows() -> None:
+def test_manifest_has_one_supported_official_target() -> None:
     manifest = load_docker_target_manifest(MANIFEST_PATH)
-    rocm_70 = load_docker_target_dependency_policy(
-        manifest.targets_by_id["rocm-7.0.2-ubuntu-24.04-container"],
-    )
-    rocm_72 = load_docker_target_dependency_policy(
-        manifest.targets_by_id["rocm-7.2.0-ubuntu-24.04-container"],
-    )
 
-    assert rocm_70.torch_version == "2.10.0+rocm7.0"
-    assert rocm_70.torchvision_version == "0.25.0+rocm7.0"
-    assert rocm_70.expected_local_version == "rocm7.0"
-    assert rocm_70.uv_index_name == "pytorch-rocm70"
-    assert rocm_70.uv_index_url == "https://download.pytorch.org/whl/rocm7.0"
-
-    assert rocm_72.torch_version == "2.11.0+rocm7.2"
-    assert rocm_72.torchvision_version == "0.26.0+rocm7.2"
-    assert rocm_72.expected_local_version == "rocm7.2"
-    assert rocm_72.uv_index_name == "pytorch-rocm72"
-    assert rocm_72.uv_index_url == "https://download.pytorch.org/whl/rocm7.2"
+    assert len(manifest.targets) == 1
+    assert manifest.targets[0].target_id == manifest.default_target_id
 
 
-def test_default_project_dependency_path_matches_rocm_7_2() -> None:
+def test_default_project_dependency_path_matches_rocm_10_1() -> None:
     pyproject = PYPROJECT_PATH.read_text()
     uv_lock = UV_LOCK_PATH.read_text()
 
-    assert "torch==2.11.0+rocm7.2" in pyproject
-    assert "torchvision==0.26.0+rocm7.2" in pyproject
-    assert "triton-rocm==3.6.0" in pyproject
-    assert "https://download.pytorch.org/whl/rocm7.2" in pyproject
-    assert "https://download.pytorch.org/whl/" in pyproject
-    assert "pytorch-rocm72" in pyproject
-    assert "pytorch-rocm-root" in pyproject
-    assert "https://download.pytorch.org/whl/rocm7.2" in uv_lock
-    assert "https://download.pytorch.org/whl/" in uv_lock
+    assert "torch[device-gfx1200]==2.14.0+rocm10.1.0" in pyproject
+    assert "torchvision[device-gfx1200]==0.29.0a0+rocm10.1.0" in pyproject
+    assert "triton==3.8.0+git669b31ac.rocm10.1.0" in pyproject
+    assert "https://stable.repo.amd.com/rocm/whl-next/" in pyproject
+    assert "amd-rocm1010" in pyproject
+    assert "https://stable.repo.amd.com/rocm/whl-next/" in uv_lock
 
 
 def test_default_docker_policy_matches_project_dependency_files() -> None:
@@ -139,9 +130,9 @@ def test_default_docker_policy_matches_project_dependency_files() -> None:
 
     assert policy.lock_strategy == "project_default"
     for expected in (
-        f"torch=={policy.torch_version}",
-        f"torchvision=={policy.torchvision_version}",
-        f"triton-rocm=={policy.triton_rocm_version}",
+        f"torch[device-gfx1200]=={policy.torch_version}",
+        f"torchvision[device-gfx1200]=={policy.torchvision_version}",
+        f"triton=={policy.triton_rocm_version}",
         policy.uv_index_name,
         policy.uv_index_url,
         policy.triton_rocm_index_name,
@@ -177,12 +168,12 @@ def test_matrix_entry_payload_records_dependency_policy() -> None:
 
     assert payload["observed"]["dependency_policy"] == {
         "policy_id": policy.policy_id,
-        "expected_local_version": "rocm7.2",
-        "uv_index_name": "pytorch-rocm72",
-        "uv_index_url": "https://download.pytorch.org/whl/rocm7.2",
+        "expected_local_version": "rocm10.1.0",
+        "uv_index_name": "amd-rocm1010",
+        "uv_index_url": "https://stable.repo.amd.com/rocm/whl-next/",
         "lock_strategy": "project_default",
         "suggested_uv_command": policy.suggested_uv_command,
-        "triton_rocm_version": "3.6.0",
-        "triton_rocm_index_name": "pytorch-rocm-root",
-        "triton_rocm_index_url": "https://download.pytorch.org/whl/",
+        "triton_rocm_version": "3.8.0+git669b31ac.rocm10.1.0",
+        "triton_rocm_index_name": "amd-rocm1010",
+        "triton_rocm_index_url": "https://stable.repo.amd.com/rocm/whl-next/",
     }

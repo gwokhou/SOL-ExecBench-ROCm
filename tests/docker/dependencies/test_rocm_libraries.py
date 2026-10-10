@@ -54,7 +54,7 @@ def test_selected_rocm_libraries_available():
     (
         "hipblas/hipblas.h",
         "miopen/miopen.h",
-        "ck/ck.hpp",
+        pytest.param("ck/ck.hpp", marks=pytest.mark.requires_ck),
         "rocwmma/rocwmma.hpp",
     ),
 )

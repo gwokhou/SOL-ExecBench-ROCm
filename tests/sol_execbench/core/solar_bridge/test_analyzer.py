@@ -8,7 +8,11 @@ import torch
 
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import NumericCheck, Workload
-from sol_execbench.core.solar_bridge import analyzer, workload_context
+from sol_execbench.core.solar_bridge import (
+    analyzer,
+    invocation,
+    workload_context,
+)
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
     SolarAnalysisStatus,
@@ -117,7 +121,7 @@ def test_analyze_workload_adapts_outer_models_to_solar(
         observed.update(kwargs)
         return expected
 
-    monkeypatch.setattr(analyzer, "_invoke_solar", fake_invoke)
+    monkeypatch.setattr(analyzer, "invoke_solar", fake_invoke)
 
     outcome = analyzer.analyze_workload(
         problem_dir=problem,
@@ -136,7 +140,7 @@ def test_invoke_solar_maps_failure_without_claiming_bound(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        analyzer,
+        invocation,
         "formal_precision_for_definition",
         lambda value: "fp16",
     )
@@ -151,7 +155,7 @@ def test_invoke_solar_maps_failure_without_claiming_bound(
         ),
     )
 
-    outcome = analyzer._invoke_solar(
+    outcome = invocation.invoke_solar(
         context=_context(),
         output_dir=tmp_path,
         device="hip:0",
@@ -170,12 +174,12 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
     result_dir = tmp_path / "result"
     cleanup_devices: list[str] = []
     monkeypatch.setattr(
-        analyzer,
+        invocation,
         "formal_precision_for_definition",
         lambda value: "fp16",
     )
     monkeypatch.setattr(
-        analyzer,
+        invocation,
         "release_formal_device_memory",
         cleanup_devices.append,
     )
@@ -199,7 +203,7 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
 
     monkeypatch.setattr("solar.api.analyze", fake_analyze)
 
-    outcome = analyzer._invoke_solar(
+    outcome = invocation.invoke_solar(
         context=_context(),
         output_dir=result_dir,
         device="hip:0",
@@ -277,7 +281,7 @@ def test_invoke_solar_rejects_non_formal_result(tmp_path, monkeypatch) -> None:
     result_dir = tmp_path / "result"
     result_dir.mkdir()
     monkeypatch.setattr(
-        analyzer,
+        invocation,
         "formal_precision_for_definition",
         lambda value: "fp16",
     )
@@ -293,7 +297,7 @@ def test_invoke_solar_rejects_non_formal_result(tmp_path, monkeypatch) -> None:
         ),
     )
 
-    outcome = analyzer._invoke_solar(
+    outcome = invocation.invoke_solar(
         context=_context(),
         output_dir=result_dir,
         device="hip:0",
@@ -313,7 +317,7 @@ def test_invoke_solar_non_formal_path_keeps_non_formal_bound(
     result_dir = tmp_path / "result"
     result_dir.mkdir()
     monkeypatch.setattr(
-        analyzer,
+        invocation,
         "formal_precision_for_definition",
         lambda value: "fp16",
     )
@@ -334,7 +338,7 @@ def test_invoke_solar_non_formal_path_keeps_non_formal_bound(
 
     monkeypatch.setattr("solar.api.analyze", fake_analyze)
 
-    outcome = analyzer._invoke_solar(
+    outcome = invocation.invoke_solar(
         context=_context(),
         output_dir=result_dir,
         device="hip:0",

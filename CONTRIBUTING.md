@@ -56,8 +56,8 @@ and [Testing](docs/user/TESTING.md) for more detail.
 
 ## Coding Standards
 
-- Use Python `>=3.12,<3.13`; `.python-version` pins local development to
-  Python 3.12.
+- Use Python `>=3.14,<3.15,!=3.14.1` on Linux x86-64; `.python-version` pins local development to
+  Python 3.14.
 - Follow Ruff formatting and linting from `pyproject.toml`.
 - Run Ty type checks over `src` and `tests`.
 - Use `snake_case` for modules, functions, and variables.
@@ -81,7 +81,7 @@ uv run ty check
 ```
 
 The `Python Quality` GitHub Actions workflow runs three parallel jobs on Python
-3.12: static quality, CPU-safe package tests, and Solar tests with branch
+3.14: static quality, CPU-safe package tests, and Solar tests with branch
 coverage.
 
 Default pre-commit setup installs Ruff hooks, the commit-message DCO check,
@@ -221,7 +221,7 @@ PRs should include:
 No repository PR template is currently present under `.github/`, so include
 these details directly in the pull request description.
 
-The `Python Quality` GitHub Actions workflow runs three parallel Python 3.12
+The `Python Quality` GitHub Actions workflow runs three parallel Python 3.14
 jobs for static quality, CPU-safe package tests, and Solar branch coverage.
 Every job uses `uv sync --locked --all-groups`, the shared uv cache, and bounded
 job timeouts.

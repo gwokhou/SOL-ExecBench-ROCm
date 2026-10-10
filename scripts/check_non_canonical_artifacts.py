@@ -137,7 +137,7 @@ def collect_findings(
             continue
         try:
             content = (scan_root / rel_path).read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             continue
         findings.extend(audit_text(rel_path, content))
     return findings

@@ -1,0 +1,14 @@
+.git
+.venv
+.agents
+.codex
+.claude
+.pytest_cache
+.ruff_cache
+.uv-cache
+**/__pycache__
+data
+out
+tmp
+dist
+build

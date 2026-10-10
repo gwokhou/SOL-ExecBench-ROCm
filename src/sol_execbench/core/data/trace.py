@@ -232,7 +232,7 @@ class Evaluation(BaseModelWithDocstrings):
     """Performance metrics (present only for PASSED status)."""
 
     @model_validator(mode="after")
-    def _validate_status_correctness_performance(self) -> "Evaluation":
+    def _validate_status_correctness_performance(self) -> Evaluation:
         """Validate correctness and performance fields based on status.
 
         Ensures that correctness and performance metrics are present or absent

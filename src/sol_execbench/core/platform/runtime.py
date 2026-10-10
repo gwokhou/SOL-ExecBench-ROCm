@@ -32,6 +32,12 @@ Which = Callable[[str], str | None]
 FALLBACK_CACHE_CLEAR_BYTES = 256 * 1024 * 1024
 PCI_DEVICES_ROOT = Path("/sys/bus/pci/devices")
 SYS_DEVICES_ROOT = Path("/sys/devices")
+ROCM_VERSION_RELATIVE_PATHS = (
+    ".info/version",
+    ".info/version-dev",
+    "core/.info/version",
+    "core/.info/version-dev",
+)
 _PCI_BDF_PATTERN = r"[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]"
 _PCI_BDF_RE = re.compile(f"^{_PCI_BDF_PATTERN}$")
 _PCIE_SPEED_RE = re.compile(r"^([0-9]+(?:\.[0-9]+)?)\s+GT/s(?:\s+PCIe)?$")
@@ -337,7 +343,8 @@ def detect_rocm_version(
     )
     if rocm_root is None:
         return None
-    for path in (rocm_root / ".info/version", rocm_root / ".info/version-dev"):
+    for relative_path in ROCM_VERSION_RELATIVE_PATHS:
+        path = rocm_root / relative_path
         try:
             version = path.read_text(encoding="utf-8").strip()
         except OSError:
@@ -476,7 +483,7 @@ def hardware_from_device(device: str) -> str:
                 for line in handle:
                     if line.startswith("model name"):
                         return line.split(":", 1)[1].strip()
-        except (OSError, UnicodeError):
+        except OSError, UnicodeError:
             pass
         return platform.processor() or platform.machine() or "CPU"
     if parsed_device.type == "mps":

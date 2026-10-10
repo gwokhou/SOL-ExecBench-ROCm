@@ -32,38 +32,48 @@ def test_dockerfile_declares_rocm_base_args_before_first_from() -> None:
     )
     pre_from_lines = lines[:first_from_index]
 
-    assert "ARG ROCM_DOCKER_IMAGE=rocm/dev-ubuntu-24.04" in pre_from_lines
-    assert "ARG ROCM_DOCKER_TAG=7.2-complete" in pre_from_lines
-    assert "ARG PYTORCH_TORCH_VERSION=2.11.0+rocm7.2" in pre_from_lines
-    assert "ARG PYTORCH_TORCHVISION_VERSION=0.26.0+rocm7.2" in pre_from_lines
+    assert "ARG ROCM_DOCKER_IMAGE=rocm/pytorch" in pre_from_lines
     assert (
-        "ARG PYTORCH_ROCM_INDEX_URL=https://download.pytorch.org/whl/rocm7.2"
+        "ARG ROCM_DOCKER_TAG=rocm10.1.0_ubuntu26.04_py3.14_pytorch_release_2.14.0"
         in pre_from_lines
     )
+    assert "ARG PYTORCH_TORCH_VERSION=2.14.0+rocm10.1.0" in pre_from_lines
+    assert (
+        "ARG PYTORCH_TORCHVISION_VERSION=0.29.0a0+rocm10.1.0" in pre_from_lines
+    )
+    assert any(
+        "ARG ROCM_DOCKER_DIGEST=sha256:" in line for line in pre_from_lines
+    )
     assert lines[first_from_index] == (
-        "FROM ${ROCM_DOCKER_IMAGE}:${ROCM_DOCKER_TAG} AS base"
+        "FROM ${ROCM_DOCKER_IMAGE}:${ROCM_DOCKER_TAG}@${ROCM_DOCKER_DIGEST} AS base"
     )
 
 
-def test_dockerfile_keeps_existing_runtime_setup() -> None:
+def test_dockerfile_preserves_official_gpu_stack_and_runtime_setup() -> None:
     dockerfile = DOCKERFILE_PATH.read_text()
 
     assert "ENV ROCM_PATH=/opt/rocm" in dockerfile
+    assert "$(rocm-sdk path --root)" in dockerfile
     assert "HIP_PLATFORM=amd" in dockerfile
     assert "ARG HOST_UID=1000" in dockerfile
     assert "ARG HOST_GID=1000" in dockerfile
     assert "ARG HOST_USER=sol-execbench" in dockerfile
     assert "util-linux" in dockerfile
-    assert "uv sync --frozen --no-install-project --no-dev" in dockerfile
-    assert "uv sync --frozen --no-editable --no-dev" in dockerfile
     assert (
-        "uv sync --frozen --no-install-project --all-groups" not in dockerfile
+        "uv venv --python python3.14 --system-site-packages /venv" in dockerfile
     )
-    assert "uv sync --frozen --no-editable --all-groups" not in dockerfile
-    assert "uv pip install --python /venv/bin/python" in dockerfile
-    assert '"torch==${PYTORCH_TORCH_VERSION}"' in dockerfile
-    assert '"torchvision==${PYTORCH_TORCHVISION_VERSION}"' in dockerfile
-    assert '"triton-rocm==${TRITON_ROCM_VERSION}"' in dockerfile
+    assert (
+        "uv export --locked --no-dev --no-emit-project --no-hashes"
+        in dockerfile
+    )
+    assert "uv pip install --python /venv/bin/python --no-deps" in dockerfile
+    assert "uv sync" not in dockerfile
+    assert (
+        '"${PYTORCH_TORCH_VERSION}" "${PYTORCH_TORCHVISION_VERSION}"'
+        in dockerfile
+    )
+    assert '"${TRITON_ROCM_VERSION}"' in dockerfile
+    assert "/venv/bin/python -m pip check" in dockerfile
     assert (
         "COPY --from=ghcr.io/astral-sh/uv:0.11.31 /uv /usr/local/bin/uv"
         in dockerfile
@@ -314,6 +324,37 @@ def test_run_docker_host_helpers_use_uv_managed_python() -> None:
     assert not re.search(r"^\s*python\s+-c\b", script, re.MULTILINE)
 
 
+@pytest.mark.parametrize(
+    ("system", "machine"),
+    [("Darwin", "x86_64"), ("Linux", "aarch64"), ("Linux", "i686")],
+    ids=["macos", "linux-arm", "linux-32bit"],
+)
+def test_run_docker_rejects_unsupported_build_platforms(
+    tmp_path: Path, system: str, machine: str
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    uname = bin_dir / "uname"
+    uname.write_text(
+        "#!/bin/bash\n"
+        f'case "$1" in -s) echo {system};; -m) echo {machine};; esac\n',
+        encoding="utf-8",
+    )
+    uname.chmod(0o755)
+    completed = subprocess.run(
+        [str(RUN_DOCKER_SCRIPT), "--build"],
+        env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert completed.returncode == 2
+    assert "only on Linux x86-64" in completed.stderr
+    assert "docker build" not in completed.stdout
+
+
 def test_run_docker_holds_host_clock_guard_around_container() -> None:
     script = RUN_DOCKER_SCRIPT.read_text()
 
@@ -327,28 +368,28 @@ def test_run_docker_holds_host_clock_guard_around_container() -> None:
 
 @pytest.mark.requires_linux
 @pytest.mark.subprocess_uv
-def test_run_docker_default_build_preview_uses_rocm_7_2_build_args() -> None:
+def test_run_docker_default_build_preview_uses_rocm_10_1_build_args() -> None:
     completed = _run_docker_preview("--build")
 
     assert completed.returncode == 0, completed.stderr
-    assert "docker build -t sol-execbench:rocm-7.2-complete" in completed.stdout
+    assert "docker build -t sol-execbench:rocm-10.1.0" in completed.stdout
+    assert '--build-arg ROCM_DOCKER_IMAGE="rocm/pytorch"' in completed.stdout
     assert (
-        '--build-arg ROCM_DOCKER_IMAGE="rocm/dev-ubuntu-24.04"'
-        in completed.stdout
-    )
-    assert '--build-arg ROCM_DOCKER_TAG="7.2-complete"' in completed.stdout
-    assert (
-        '--build-arg PYTORCH_TORCH_VERSION="2.11.0+rocm7.2"' in completed.stdout
-    )
-    assert (
-        '--build-arg PYTORCH_TORCHVISION_VERSION="0.26.0+rocm7.2"'
+        '--build-arg ROCM_DOCKER_TAG="rocm10.1.0_ubuntu26.04_py3.14_pytorch_release_2.14.0"'
         in completed.stdout
     )
     assert (
-        '--build-arg PYTORCH_ROCM_INDEX_URL="https://download.pytorch.org/whl/rocm7.2"'
+        '--build-arg PYTORCH_TORCH_VERSION="2.14.0+rocm10.1.0"'
         in completed.stdout
     )
-    assert '--build-arg TRITON_ROCM_VERSION="3.6.0"' in completed.stdout
+    assert (
+        '--build-arg PYTORCH_TORCHVISION_VERSION="0.29.0a0+rocm10.1.0"'
+        in completed.stdout
+    )
+    assert (
+        '--build-arg TRITON_ROCM_VERSION="3.8.0+git669b31ac.rocm10.1.0"'
+        in completed.stdout
+    )
     assert "--device=/dev/kfd" in completed.stdout
     assert "--device=/dev/dri" in completed.stdout
     assert "--group-add video" in completed.stdout
@@ -366,45 +407,33 @@ def test_run_docker_declared_target_build_preview_uses_manifest_build_args() -> 
     None
 ):
     manifest = load_docker_target_manifest(MANIFEST_PATH)
-    non_default = next(
-        target
-        for target in manifest.targets
-        if target.target_id != manifest.default_target_id
-    )
+    selected = manifest.targets_by_id[manifest.default_target_id]
 
     completed = _run_docker_preview(
         "--build",
         "--target",
-        non_default.target_id,
+        selected.target_id,
     )
 
     assert completed.returncode == 0, completed.stderr
+    assert "docker build -t sol-execbench:rocm-10.1.0" in completed.stdout
     assert (
-        f"docker build -t sol-execbench:rocm-{non_default.docker_image_tag}"
+        f'--build-arg ROCM_DOCKER_IMAGE="{selected.docker_image_repository}"'
         in completed.stdout
     )
     assert (
-        f'--build-arg ROCM_DOCKER_IMAGE="{non_default.docker_image_repository}"'
+        f'--build-arg ROCM_DOCKER_TAG="{selected.docker_image_tag}"'
         in completed.stdout
     )
-    assert (
-        f'--build-arg ROCM_DOCKER_TAG="{non_default.docker_image_tag}"'
-        in completed.stdout
-    )
-    assert non_default.pytorch_dependency_policy is not None
+    assert selected.pytorch_dependency_policy is not None
     assert (
         '--build-arg PYTORCH_TORCH_VERSION="'
-        f'{non_default.pytorch_dependency_policy["torch_version"]}"'
+        f'{selected.pytorch_dependency_policy["torch_version"]}"'
         in completed.stdout
     )
     assert (
         '--build-arg PYTORCH_TORCHVISION_VERSION="'
-        f'{non_default.pytorch_dependency_policy["torchvision_version"]}"'
-        in completed.stdout
-    )
-    assert (
-        '--build-arg PYTORCH_ROCM_INDEX_URL="'
-        f'{non_default.pytorch_dependency_policy["uv_index_url"]}"'
+        f'{selected.pytorch_dependency_policy["torchvision_version"]}"'
         in completed.stdout
     )
 
@@ -434,7 +463,7 @@ def test_run_docker_target_flag_is_not_forwarded_to_docker_args_or_command() -> 
     )
     assert "--name matrix-test" in run_line
     assert "echo inside-container" in run_line
-    assert "sol-execbench:rocm-7.2-complete" in run_line
+    assert "sol-execbench:rocm-10.1.0" in run_line
     assert "--target" not in run_line
 
 
@@ -483,12 +512,18 @@ def test_run_docker_preflight_only_emits_runtime_unavailable_diagnostics() -> (
     assert payload["status"] == "runtime_unavailable"
     assert payload["reason_code"] == "rocm_runtime_unavailable"
     assert payload["target_id"]
-    assert payload["image_repository"] == "rocm/dev-ubuntu-24.04"
-    assert payload["image_tag"] == "7.2-complete"
+    assert payload["image_repository"] == "rocm/pytorch"
+    assert (
+        payload["image_tag"]
+        == "rocm10.1.0_ubuntu26.04_py3.14_pytorch_release_2.14.0"
+    )
     assert "image_digest" in payload
     assert payload["image_digest"] is None
-    assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/dev-ubuntu-24.04"
-    assert payload["build_args"]["ROCM_DOCKER_TAG"] == "7.2-complete"
+    assert payload["build_args"]["ROCM_DOCKER_IMAGE"] == "rocm/pytorch"
+    assert (
+        payload["build_args"]["ROCM_DOCKER_TAG"]
+        == "rocm10.1.0_ubuntu26.04_py3.14_pytorch_release_2.14.0"
+    )
     assert payload["benchmark_allowed"] is False
     assert payload["score_authority"] is False
     assert payload["paper_parity_authority"] is False

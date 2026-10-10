@@ -116,7 +116,7 @@ def test_timeout_cleans_descendant_processes(tmp_path, monkeypatch):
         while time.monotonic() < deadline:
             try:
                 int(child_pid_path.read_text())
-            except (FileNotFoundError, ValueError):
+            except FileNotFoundError, ValueError:
                 time.sleep(0.01)
             else:
                 return process
@@ -298,7 +298,7 @@ def _wait_for_process_exit(pid: int) -> bool:
     for _ in range(20):
         try:
             state = Path(f"/proc/{pid}/stat").read_text().split()[2]
-        except (FileNotFoundError, ProcessLookupError):
+        except FileNotFoundError, ProcessLookupError:
             return True
         if state == "Z":
             return True

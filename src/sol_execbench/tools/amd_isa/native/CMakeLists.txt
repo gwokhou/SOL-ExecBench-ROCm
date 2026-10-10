@@ -31,6 +31,12 @@ add_library(isa_explorer STATIC
 target_include_directories(isa_explorer PRIVATE "${COMMON_ROOT}" "${TINYXML_ROOT}")
 target_include_directories(isa_explorer PUBLIC "${VENDOR_ROOT}/include")
 
+# Upstream v1.2.0 uses integer types without including cstdint. GCC 15 no
+# longer provides those definitions through the other standard headers.
+foreach(ISA_TARGET IN ITEMS isa_decoder isa_explorer)
+    target_compile_options(${ISA_TARGET} PUBLIC -include cstdint)
+endforeach()
+
 add_executable(sol-execbench-amd-isa-helper bridge.cpp)
 target_include_directories(sol-execbench-amd-isa-helper PRIVATE
     "${VENDOR_ROOT}/include"

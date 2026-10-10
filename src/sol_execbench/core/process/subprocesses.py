@@ -359,7 +359,7 @@ def _signal_unreaped_process_group(
         if os.getsid(process.pid) != process.pid:
             return False
         os.killpg(process.pid, signal_number)
-    except (PermissionError, ProcessLookupError):
+    except PermissionError, ProcessLookupError:
         return False
     return True
 
@@ -422,7 +422,7 @@ def _process_group_has_live_members(process_group_id: int) -> bool:
                 int(fields[2]),
                 int(fields[3]),
             )
-        except (OSError, IndexError, ValueError):
+        except OSError, IndexError, ValueError:
             continue
         if (
             state != "Z"

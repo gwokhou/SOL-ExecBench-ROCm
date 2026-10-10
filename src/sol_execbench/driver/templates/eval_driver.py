@@ -228,7 +228,7 @@ try:
     _real_stdout.flush()
     sys.stderr.flush()
     sys.stdout.flush()
-except (OSError, ValueError):
+except OSError, ValueError:
     pass
 if os.environ.get("SOL_EXECBENCH_GRACEFUL_EXIT") == "1":
     sys.exit(0)

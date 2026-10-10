@@ -457,7 +457,7 @@ def _counter_artifact_reasons(
                     csv_artifacts[0].path,
                     marker_artifacts[0].path,
                 )
-            except (OSError, ValueError):
+            except OSError, ValueError:
                 reasons.append(
                     f"counter_pass_marker_window_invalid:{pass_index}"
                 )
@@ -525,7 +525,7 @@ def _compact_candidate_replay_artifacts(
                 compacted.append(
                     _filter_counter_csv_to_marker_ranges(artifact, marker)
                 )
-            except (OSError, ValueError):
+            except OSError, ValueError:
                 compacted.append(artifact)
         else:
             compacted.append(artifact)
@@ -710,7 +710,7 @@ def _counter_csv_reasons(
 ) -> list[str]:
     try:
         observed = counter_names_in_csv(path)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return [f"counter_pass_csv_invalid:{pass_index}"]
     expected = {normalize_counter_name(name) for name in requested}
     if expected <= observed:

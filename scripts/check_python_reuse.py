@@ -290,7 +290,7 @@ def audit_paths(paths: Iterable[Path]) -> list[str]:
     for path in paths:
         try:
             content = (ROOT / path).read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             continue
         findings.extend(audit_source(path, content))
     return findings

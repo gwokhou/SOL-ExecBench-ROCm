@@ -190,7 +190,7 @@ class SourceFile(BaseModelWithDocstrings):
     """The complete text content of the source file."""
 
     @model_validator(mode="after")
-    def _validate_source_path(self) -> "SourceFile":
+    def _validate_source_path(self) -> SourceFile:
         """Validate source path for security.
 
         Raises:
@@ -265,7 +265,7 @@ class BuildSpec(BaseModelWithDocstrings):
     """Optional compiler and linker flags. Only used for HIP/C++ solutions with torch binding."""
 
     @model_validator(mode="after")
-    def _validate_entry_point(self) -> "BuildSpec":
+    def _validate_entry_point(self) -> BuildSpec:
         """Validate entry_point format.
 
         Raises:
@@ -282,7 +282,7 @@ class BuildSpec(BaseModelWithDocstrings):
         return self
 
     @model_validator(mode="after")
-    def _validate_languages(self) -> "BuildSpec":
+    def _validate_languages(self) -> BuildSpec:
         """Validate languages support matrix.
 
         Raises:

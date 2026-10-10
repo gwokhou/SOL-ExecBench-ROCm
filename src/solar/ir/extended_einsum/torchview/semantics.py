@@ -257,7 +257,7 @@ def annotate_semantics(
                 layer, layer["semantic_op"], dynamic_index
             ):
                 dynamic_index += 1
-        except (SemanticGraphError, SolarError):
+        except SemanticGraphError, SolarError:
             if strict:
                 raise
             layer["semantic_op"] = {

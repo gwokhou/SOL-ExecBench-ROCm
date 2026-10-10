@@ -77,6 +77,6 @@ def orojenesis_mapper_thread_count(
 def _process_cpu_ids() -> frozenset[int]:
     try:
         return frozenset(os.sched_getaffinity(0))
-    except (AttributeError, OSError):
+    except AttributeError, OSError:
         logical_cpus = os.cpu_count()
         return frozenset(range(logical_cpus)) if logical_cpus else frozenset()

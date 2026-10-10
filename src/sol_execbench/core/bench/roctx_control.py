@@ -98,7 +98,7 @@ def roctx_library_available() -> bool:
     """Return whether the required ROCTx control API can be loaded."""
     try:
         ROCTxReplayController()
-    except (AttributeError, OSError, ROCTxUnavailableError):
+    except AttributeError, OSError, ROCTxUnavailableError:
         return False
     return True
 

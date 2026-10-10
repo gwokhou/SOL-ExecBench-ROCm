@@ -368,7 +368,7 @@ def _collection_gpu_identity_matches_plan(context: StageRunContext) -> bool:
             context.held_out_corpus_path,
             corpus_root=context.corpus_root,
         )
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
     return observed == context.plan.gpu_identity
 
@@ -379,7 +379,7 @@ def _case_reuse_bundle_is_valid(context: StageRunContext) -> bool:
         return False
     try:
         load_and_verify_case_reuse_bundle(path)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
     return True
 
@@ -912,7 +912,7 @@ class PublicationHandler:
                 solar_verifier=self._solar_verifier,
                 blob_resolver=self._blob_resolver,
             )
-        except (OSError, ValueError):
+        except OSError, ValueError:
             return False
         return True
 
@@ -992,7 +992,7 @@ class ReleaseHandler:
                 semantic_loader=self._semantic_loader,
                 solar_verifier=self._solar_verifier,
             )
-        except (OSError, ValueError):
+        except OSError, ValueError:
             return False
         return True
 
@@ -1392,7 +1392,7 @@ def _load_design_or_none(
 ) -> DiagnosticDesignManifest | None:
     try:
         return _load_design(context)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
 
 
@@ -2078,7 +2078,7 @@ def _reverify_past_stages(
         )
         try:
             prepared = handlers[state.stage].prepare(context, current)
-        except (OSError, ValueError):
+        except OSError, ValueError:
             prepared = ()
             inputs_match = False
         else:
@@ -2116,7 +2116,7 @@ def _load_receipt(
         return _RECEIPT_ADAPTER.validate_json(
             path.read_text(encoding="utf-8"),
         )
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
 
 

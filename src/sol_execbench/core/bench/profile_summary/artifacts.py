@@ -27,6 +27,9 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ArtifactKind,
     Rocprofv3ProfileResult,
 )
+from sol_execbench.core.bench.rocm_profiler.timing_parsing import (
+    rocprofv3_duration_ns,
+)
 from sol_execbench.core.data.base_model import BaseModelWithDocstrings
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
 
@@ -124,7 +127,7 @@ def _metadata_workload_id(profile_result: Rocprofv3ProfileResult) -> str | None:
             if artifact.path.stat().st_size > _PROFILE_SUMMARY_MAX_PARSE_BYTES:
                 continue
             payload = json.loads(artifact.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        except OSError, json.JSONDecodeError, UnicodeDecodeError:
             continue
         if isinstance(payload, dict):
             value = payload.get("workload_id") or payload.get("workload")
@@ -145,13 +148,7 @@ def _parse_trace_csv_artifact(
         domain = _first_text(normalized, "domain", "kind", "type", "category")
         if domain is None or "kernel" not in normalize_metric_key(domain):
             continue
-        duration_ns = _first_number(
-            normalized,
-            "durationns",
-            "durationnsec",
-            "durationnanoseconds",
-            "duration",
-        )
+        duration_ns = rocprofv3_duration_ns(normalized)
         if duration_ns is None:
             continue
         kernel_name = _first_text(

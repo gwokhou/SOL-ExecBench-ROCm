@@ -52,7 +52,7 @@ def _load_budget_from_environment(
         payload = json.loads(
             environment_sidecar_path.read_text(encoding="utf-8"),
         )
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return None
     candidates = [
         entry
@@ -68,7 +68,7 @@ def _load_budget_from_environment(
     for entry in candidates:
         try:
             return arch_capability_budget_from_dict(entry["budget"])
-        except (ValueError, TypeError, KeyError):
+        except ValueError, TypeError, KeyError:
             # Skip a malformed budget and try the next candidate rather than
             # aborting the whole loop (a later valid budget may be usable).
             continue
