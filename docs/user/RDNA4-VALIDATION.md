@@ -27,10 +27,21 @@ fixtures compile for the observed `gfx1200` target and execute correctness
 checks; a schema value or successful compilation alone is not treated as
 hardware validation.
 
-The packaged RX 9060 XT resource audit has a narrower authority. Its current
-AMD-SMI telemetry reports `THROTTLED`, so the artifact is accepted only as
+The packaged RX 9060 XT SOLAR resource audit was separately refreshed on
+2026-10-11 for ROCm 10.1.0, Python 3.14.4, PyTorch 2.14.0+rocm10.1.0 and HIP
+7.16.26385. This does not replace the historical engineering gate identity in
+the table above. Its 10 HIP probes cover all nine required resource modes and
+five precisions, with seven independent held-out process batches per probe.
+All seven ISA/compiler/runtime instruction checks passed. The profile is
+`rx9060xt-amd-resource-v6`; its nominal peaks and bandwidth are unchanged.
+
+This resource audit has a narrower authority. Its AMD-SMI telemetry contains
+both `THROTTLED` and `UNTHROTTLED`, so the artifact is accepted only as
 instruction/runtime corroboration. It is not unthrottled resource-peak
-evidence. Canonical benchmark latency remains HIP device-event timing.
+evidence or qualification of PyTorch private matrix APIs. The FP8 runtime probe
+checks OCP E4M3; E5M2 remains ISA-derived, and INT4 remains exempt without a
+qualified runtime probe. See the [P0 evidence report](../internal/solar-p0-rocm101-completion-2026-10-11.md).
+Canonical benchmark latency remains HIP device-event timing.
 `rocprofv3` timing is derived diagnostic evidence, and its optional overhead
 calibration is accepted only when the v2 artifact matches the GPU architecture,
 current profiler binary SHA-256, and clock-lock state.
