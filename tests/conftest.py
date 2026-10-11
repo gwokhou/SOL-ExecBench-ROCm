@@ -349,3 +349,13 @@ def tmp_cache_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     cache_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("SOLEXECBENCH_CACHE_PATH", str(cache_dir))
     return cache_dir
+
+
+@pytest.fixture
+def frozen_tensor_writer() -> Callable:
+    """Use tiny bytes in upgrade control-plane tests, never GPU evidence."""
+
+    def write(definition: dict, workload: dict, path: Path) -> None:
+        path.write_bytes(b"control-plane-test-placeholder")
+
+    return write

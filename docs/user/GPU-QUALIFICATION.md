@@ -32,6 +32,7 @@ gate.
 | SOLAR cross-path focus | `run_cross_path_focus.py qualify-*` | `run` |
 | RDNA4 diagnostic calibration | `run_rdna4_diagnostic_calibration.py qualify-*` | `run` |
 | RDNA4 resource-peak calibration | `run_qualified_rdna4_resource_peak_calibration.py qualify-*` | `run` |
+| Public stack-upgrade screening | `python -m scripts.internal.upgrade.qualification qualify-*` | `python -m scripts.internal.upgrade.acquire` |
 
 The resource-peak v3 evidence pins the complete SHA-256 of
 `run_rdna4_resource_peak_calibration.py`. That historical producer is retained
