@@ -35,6 +35,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     command -v rocprofv3 && \
     command -v amd-smi
 
+# The official Python SDK image omits CK headers. Install a fixed upstream
+# revision with generated configuration, limited to this repository's gfx1200.
+COPY docker/install_ck_headers.sh /tmp/install_ck_headers.sh
+RUN timeout 900 bash /tmp/install_ck_headers.sh && rm /tmp/install_ck_headers.sh
+
 ARG HOST_UID=1000
 ARG HOST_GID=1000
 ARG HOST_USER=sol-execbench
