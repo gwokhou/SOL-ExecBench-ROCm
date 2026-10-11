@@ -455,10 +455,9 @@ def test_hardware_prediction_rejects_unverified_concurrency(
     assert prediction.reason_codes == [reason]
 
 
-def test_hardware_prediction_rejects_timestamp_only_cross_queue_schedule() -> (
-    None
-):
-    first = DispatchEvidence(
+@pytest.fixture
+def timed_dispatch():
+    return DispatchEvidence(
         workload_uuid="workload-1",
         candidate_sha256="c" * 64,
         dispatch_id="1",
@@ -471,13 +470,27 @@ def test_hardware_prediction_rejects_timestamp_only_cross_queue_schedule() -> (
         start_timestamp_ns=0,
         end_timestamp_ns=10,
     )
+
+
+@pytest.mark.parametrize("lane_field", ["queue_id", "stream_id"])
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [(10, 20), (5, 15), (0, 10), (None, None)],
+    ids=["sequential", "overlap", "equal", "missing"],
+)
+def test_hardware_prediction_rejects_timestamp_only_cross_lane_schedule(
+    timed_dispatch, lane_field, start, end
+):
+    first = timed_dispatch.model_copy(
+        update={"queue_id": None, lane_field: "0"}
+    )
     second = first.model_copy(
         update={
             "dispatch_id": "2",
-            "queue_id": "1",
+            lane_field: "1",
             "iteration_ordinal": 1,
-            "start_timestamp_ns": 10,
-            "end_timestamp_ns": 20,
+            "start_timestamp_ns": start,
+            "end_timestamp_ns": end,
         }
     )
 
@@ -489,6 +502,77 @@ def test_hardware_prediction_rejects_timestamp_only_cross_queue_schedule() -> (
     )
 
     assert prediction.status is DiagnosticSidecarStatus.UNAVAILABLE
-    assert prediction.reason_codes == [
-        "cross_lane_event_dependencies_unverified"
-    ]
+    assert prediction.predicted_time_ms is None
+    expected = (
+        "dispatch_schedule_topology_unverified"
+        if start is None
+        else "cross_lane_event_dependencies_unverified"
+    )
+    assert prediction.reason_codes == [expected]
+
+
+@pytest.mark.parametrize(
+    ("updates", "reason"),
+    [
+        (
+            {
+                "queue_id": "1",
+                "valid": False,
+                "reason_codes": ["dispatch_static_kernel_identity_mismatch"],
+            },
+            "cross_lane_event_dependencies_unverified",
+        ),
+        ({"workload_uuid": "other"}, "dispatch_workload_identity_conflict"),
+        ({"candidate_sha256": "d" * 64}, "dispatch_workload_identity_conflict"),
+        (
+            {
+                "queue_id": None,
+                "valid": False,
+                "reason_codes": ["dispatch_static_kernel_identity_mismatch"],
+            },
+            "dispatch_queue_identity_unverified",
+        ),
+    ],
+    ids=[
+        "filtered-cross-lane-helper",
+        "mixed-workload",
+        "mixed-candidate",
+        "filtered-unknown-lane",
+    ],
+)
+def test_hardware_prediction_checks_scope_before_filtering(
+    timed_dispatch, updates, reason
+):
+    first = timed_dispatch
+    second = first.model_copy(
+        update={
+            "dispatch_id": "2",
+            "start_timestamp_ns": 10,
+            "end_timestamp_ns": 20,
+            **updates,
+        }
+    )
+    result = predict_hw(_semantic(), [], [first, second], _calibration())
+    assert result.status is DiagnosticSidecarStatus.UNAVAILABLE
+    assert result.predicted_time_ms is None
+    assert reason in result.reason_codes
+
+
+def test_single_lane_prediction_does_not_use_timestamp_distances(
+    timed_dispatch,
+):
+    original = predict_hw(_semantic(), [], [timed_dispatch], _calibration())
+    changed = timed_dispatch.model_copy(
+        update={
+            "dispatch_id": "2",
+            "start_timestamp_ns": 10_000,
+            "end_timestamp_ns": 1_000_000,
+        }
+    )
+    result = predict_hw(
+        _semantic(), [], [changed, timed_dispatch], _calibration()
+    )
+    assert original.predicted_time_ms is not None
+    assert result.predicted_time_ms == pytest.approx(
+        2 * original.predicted_time_ms
+    )

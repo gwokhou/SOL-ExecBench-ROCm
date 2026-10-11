@@ -56,6 +56,14 @@ not establish a dependency. Multi-lane predictions return
 scope are verified; receiving HIP event observations alone does not remove that
 restriction.
 
+Schedule identity and lane checks include every observed dispatch, even a helper
+whose counters are excluded from the hardware estimate. Filtering such a helper
+must not turn a multi-stream capture into an apparently serial workload. Mixed
+workload or candidate identities cannot be combined into one prediction. Same-lane
+overlap, tied starts or incomplete ordering timestamps do not produce precedence
+edges. A single-lane estimate can still sum calibrated dispatch costs without
+using timestamp distances as durations.
+
 The sidecar is not correctness authority, timing authority, performance
 authority, score authority, evidence-tier authority, confirmed-improvement
 authority, release-gate authority, cutover authority, paper-parity authority,

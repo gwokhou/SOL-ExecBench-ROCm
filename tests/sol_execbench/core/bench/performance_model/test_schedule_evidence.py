@@ -3,10 +3,15 @@
 
 """Causal schedule evidence is narrower than observed completion order."""
 
+from itertools import permutations
+
+import pytest
+
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
 from sol_execbench.core.bench.performance_model.models import DispatchEvidence
 from sol_execbench.core.bench.performance_model.schedule_evidence import (
     build_schedule_evidence,
+    schedule_predecessor_indices,
 )
 
 
@@ -52,3 +57,67 @@ def test_unknown_scope_cannot_emit_dependencies():
     assert evidence is not None
     assert evidence.status is DiagnosticSidecarStatus.PARTIAL
     assert evidence.edges == []
+
+
+@pytest.mark.parametrize(
+    ("first_end", "updates", "reason"),
+    [
+        (1, {"start_timestamp_ns": 0}, "same_lane_dispatch_overlap"),
+        (
+            0,
+            {"start_timestamp_ns": 0, "end_timestamp_ns": 0},
+            "dispatch_lane_order_unverified",
+        ),
+        (1, {"start_timestamp_ns": None}, "dispatch_lane_order_unverified"),
+        (1, {"end_timestamp_ns": None}, "dispatch_lane_order_unverified"),
+        (1, {"workload_uuid": "other"}, "dispatch_workload_identity_conflict"),
+    ],
+    ids=[
+        "overlap",
+        "tied-start",
+        "missing-start",
+        "missing-end",
+        "mixed-workload",
+    ],
+)
+def test_ambiguous_lane_cannot_publish_precedence(first_end, updates, reason):
+    first = dispatch("z", "0", 0).model_copy(
+        update={"end_timestamp_ns": first_end}
+    )
+    second = dispatch("a", "0", 5).model_copy(update=updates)
+    evidence = build_schedule_evidence([first, second], scope_verified=True)
+    assert evidence is not None
+    assert evidence.status is DiagnosticSidecarStatus.PARTIAL
+    assert evidence.edges == []
+    assert reason in evidence.reason_codes
+    assert schedule_predecessor_indices([first, second]) == {0: set(), 1: set()}
+
+
+@pytest.mark.parametrize("lane_field", ["queue_id", "stream_id"])
+def test_multilane_order_keeps_only_verified_local_edges(lane_field):
+    records = [
+        dispatch("a", None, 0).model_copy(update={lane_field: "0"}),
+        dispatch("b", None, 3).model_copy(update={lane_field: "1"}),
+        dispatch("c", None, 6).model_copy(update={lane_field: "0"}),
+    ]
+    for order in permutations(records):
+        evidence = build_schedule_evidence(order, scope_verified=True)
+        assert evidence is not None
+        assert evidence.status is DiagnosticSidecarStatus.PARTIAL
+        assert {
+            (edge.predecessor_dispatch_id, edge.successor_dispatch_id)
+            for edge in evidence.edges
+        } == {("a", "c")}
+        assert evidence.reason_codes == [
+            "cross_lane_event_dependencies_unverified"
+        ]
+
+
+def test_unknown_lane_cannot_publish_a_dependency():
+    records = [dispatch("a", None, 0), dispatch("b", None, 5)]
+    evidence = build_schedule_evidence(records, scope_verified=True)
+    assert evidence is not None
+    assert evidence.status is DiagnosticSidecarStatus.PARTIAL
+    assert evidence.edges == []
+    assert "dispatch_lane_identity_unverified" in evidence.reason_codes
+    assert schedule_predecessor_indices(records) == {0: set(), 1: set()}

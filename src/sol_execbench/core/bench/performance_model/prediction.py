@@ -51,6 +51,9 @@ from sol_execbench.core.bench.performance_model.models import (
     UnsupportedDescriptor,
 )
 from sol_execbench.core.bench.performance_model.schedule_evidence import (
+    dispatch_identity_reason,
+    dispatch_intervals_overlap,
+    dispatch_lane,
     schedule_predecessor_indices,
 )
 from sol_execbench.core.platform.arch_capabilities import (
@@ -175,7 +178,7 @@ def predict_hw(
     valid = [dispatch for dispatch in dispatches if dispatch.valid]
     if not valid:
         return _unavailable(PredictionKind.HW, ["no_valid_dispatch_evidence"])
-    if concurrency_reason := _concurrency_reason(valid):
+    if concurrency_reason := _concurrency_reason(dispatches):
         return _unavailable(PredictionKind.HW, [concurrency_reason])
     static_by_symbol = {
         key: item
@@ -1481,7 +1484,7 @@ def _combine_components(
 
 def _has_overlap(dispatches: Sequence[DispatchEvidence]) -> bool:
     return any(
-        _overlaps(left, right)
+        dispatch_intervals_overlap(left, right)
         for index, left in enumerate(dispatches)
         for right in dispatches[index + 1 :]
     )
@@ -1490,14 +1493,17 @@ def _has_overlap(dispatches: Sequence[DispatchEvidence]) -> bool:
 def _concurrency_reason(
     dispatches: Sequence[DispatchEvidence],
 ) -> str | None:
+    if identity_reason := dispatch_identity_reason(dispatches):
+        return identity_reason
     if any(
         dispatch.queue_id is None and dispatch.stream_id is None
         for dispatch in dispatches
     ):
         return "dispatch_queue_identity_unverified"
-    identities = {_dispatch_lane(dispatch) for dispatch in dispatches}
+    identities = {dispatch_lane(dispatch) for dispatch in dispatches}
     if any(
-        _dispatch_lane(left) == _dispatch_lane(right) and _overlaps(left, right)
+        dispatch_lane(left) == dispatch_lane(right)
+        and dispatch_intervals_overlap(left, right)
         for index, left in enumerate(dispatches)
         for right in dispatches[index + 1 :]
     ):
@@ -1521,7 +1527,7 @@ def _schedule_estimate(
     estimates = [_combine_components(group) for group in groups]
     if (
         not _has_overlap(dispatches)
-        and len({_dispatch_lane(dispatch) for dispatch in dispatches}) == 1
+        and len({dispatch_lane(dispatch) for dispatch in dispatches}) == 1
     ):
         return tuple(sum(values) for values in zip(*estimates, strict=True))
     ordered = sorted(
@@ -1575,7 +1581,7 @@ def _overlap_adjusted_estimate(
     concurrent = sum(
         1
         for other, _dispatch in enumerate(dispatches)
-        if _overlaps(dispatches[index], dispatches[other])
+        if dispatch_intervals_overlap(dispatches[index], dispatches[other])
     )
     if concurrent <= 1:
         return estimate
@@ -1670,35 +1676,6 @@ def _surface_coordinate_contains(
 
 def _linear_interpolation(left: float, right: float, weight: float) -> float:
     return left + weight * (right - left)
-
-
-def _dispatch_lane(
-    dispatch: DispatchEvidence,
-) -> tuple[str | None, str | None]:
-    return dispatch.queue_id, dispatch.stream_id
-
-
-def _overlaps(left: DispatchEvidence, right: DispatchEvidence) -> bool:
-    values = (
-        left.start_timestamp_ns,
-        left.end_timestamp_ns,
-        right.start_timestamp_ns,
-        right.end_timestamp_ns,
-    )
-    if any(value is None for value in values):
-        return False
-    left_start = left.start_timestamp_ns
-    left_end = left.end_timestamp_ns
-    right_start = right.start_timestamp_ns
-    right_end = right.end_timestamp_ns
-    if (
-        left_start is None
-        or left_end is None
-        or right_start is None
-        or right_end is None
-    ):
-        return False
-    return left_start < right_end and right_start < left_end
 
 
 def _hardware_reason_codes(
