@@ -46,6 +46,7 @@ class LargeBatchGPUTask(StrEnum):
     RELEASE_EVALUATION = "release_evaluation"
     SOLAR_CROSS_PATH_FOCUS = "solar_cross_path_focus"
     SOLAR_RELEASE_BUILD = "solar_release_build"
+    STACK_UPGRADE_SCREENING = "stack_upgrade_screening"
 
 
 class QualificationArtifact(StrictArtifactModel):

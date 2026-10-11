@@ -5,6 +5,9 @@ primary user-facing entry points.
 
 Subdirectories:
 
+- `upgrade/`: bounded stack-upgrade probes and strict paired benefit analysis;
+  engineering-only checkpoint and prerequisites are documented in its README.
+
 - `rdna4/`: bounded clock behavior checks, rocprofv3 overhead calibration, and
   exact RX 9060 XT/gfx1200 content-addressed validation. Local and manual
   self-hosted bundles are engineering evidence and never release authority.
