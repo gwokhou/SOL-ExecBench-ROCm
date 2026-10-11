@@ -6,7 +6,10 @@ from pathlib import Path
 from typing import Literal, Self
 
 from sol_execbench.cli import evaluation as cli_evaluation
-from sol_execbench.cli.evaluation.command import ProfileLifecycle
+from sol_execbench.cli.evaluation.command import (
+    ProfileLifecycle,
+    _replay_snapshot,
+)
 from sol_execbench.core.bench.clock_lock import ClockLockLease
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
@@ -209,7 +212,7 @@ def test_replay_snapshot_collects_selected_device(monkeypatch) -> None:
         collect,
     )
 
-    snapshot = cli_evaluation.command._replay_snapshot("pre")
+    snapshot = _replay_snapshot("pre")
 
     assert snapshot is not None
     assert calls == [("pre", 2)]

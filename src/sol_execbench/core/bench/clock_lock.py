@@ -26,16 +26,22 @@ import logging
 import os
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol, Self
 
 from pydantic import ValidationError
 
 from sol_execbench.core.platform.amd_smi import parse_performance_levels
-from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
+from sol_execbench.core.platform.clock_commands import (
+    ClockLevel,
+    clock_command,
+    clock_executable,
+)
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_CLOCKS_LOCKED,
 )
+from sol_execbench.core.process.termination import defer_termination
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +59,8 @@ class ClockLockLease:
 
     locked: bool
     acquired: bool
+    restore: Callable[[], bool] | None = field(default=None, repr=False)
+    release_blocker: str | None = None
     _released: bool = field(
         default=False,
         init=False,
@@ -100,8 +108,12 @@ class ClockLockLease:
         if self._released or not self.acquired:
             self._released = True
             return True
-        if not unlock_clocks():
+        if self.release_blocker is not None:
             return False
+        reset = self.restore or unlock_clocks
+        with defer_termination():
+            if not reset():
+                return False
         self._released = True
         return True
 
@@ -160,7 +172,7 @@ class ClockLockLease:
         """Release the lease while preserving an active body exception."""
         if self.release():
             return
-        message = "failed to reset and verify every GPU at AUTO"
+        message = "failed to reset and verify owned GPU policy at AUTO"
         if exc_value is not None:
             exc_value.add_note(message)
             return
@@ -176,7 +188,7 @@ class ClockLockAcquirer(Protocol):
 
 
 def _amd_smi_executable() -> str:
-    return resolve_rocm_tool_command("amd-smi")
+    return clock_executable()
 
 
 def _has_command_failure(
@@ -298,10 +310,7 @@ def acquire_clock_lock() -> ClockLockLease:
             [
                 "sudo",
                 "-n",
-                _amd_smi_executable(),
-                "set",
-                "-l",
-                "STABLE_PEAK",
+                *clock_command(_amd_smi_executable(), ClockLevel.PEAK),
             ],
         )
         logger.info("GPU clock locked to STABLE_PEAK")
@@ -352,7 +361,11 @@ def unlock_clocks() -> bool:
     """
     try:
         _run_checked_amd_smi(
-            ["sudo", "-n", _amd_smi_executable(), "set", "-l", "AUTO"],
+            [
+                "sudo",
+                "-n",
+                *clock_command(_amd_smi_executable(), ClockLevel.AUTO),
+            ],
         )
     except Exception as e:  # noqa: BLE001 -- Cleanup must never mask callers
         logger.warning("Failed to unlock clocks: %s", e)

@@ -160,6 +160,8 @@ class SchemaVersion(StrEnum):
         "sol_execbench.rocprofv3_overhead_calibration.v2"
     )
     ROCPROFV3_PROFILE = "sol_execbench.rocprofv3_profile.v1"
+    PMC_CLOCK_WINDOW = "sol_execbench.pmc_clock_window.v2"
+    CLOCK_OWNER = "sol_execbench.clock_owner.v1"
     ROCPROFV3_TIMING = "sol_execbench.rocprofv3_timing.v1"
     SOLAR_WORKER_IPC = "sol_execbench.solar_worker_ipc.v2"
     SOLUTION = "sol_execbench.solution.v1"

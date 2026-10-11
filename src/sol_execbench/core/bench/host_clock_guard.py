@@ -12,10 +12,25 @@ import subprocess
 from collections.abc import Callable, Mapping, Sequence
 
 from sol_execbench.core.bench.clock_lock import acquire_clock_lock
-from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
-from sol_execbench.core.process import run_attached_process_group
+from sol_execbench.core.bench.clock_ownership import (
+    ENV_CLOCK_OWNER,
+    clock_owner_path,
+    published_clock_owner,
+)
+from sol_execbench.core.bench.gpu_lock import (
+    acquire_gpu_lock,
+    gpu_lock_directory,
+)
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_CLOCKS_LOCKED,
+)
+from sol_execbench.core.process.termination import cleanup_on_termination
+from sol_execbench.tools.docker_process import (
+    CONTAINER_CLEANUP_BLOCKER_PREFIX,
+    CONTAINER_ID_SUFFIX,
+    ContainerCleanupError,
+    is_docker_run,
+    run_owned_docker_process,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,7 +52,15 @@ def _default_runner(
     command: Sequence[str],
     env: Mapping[str, str],
 ) -> subprocess.CompletedProcess[str]:
-    return run_attached_process_group(command, env=env)
+    owner = env.get(ENV_CLOCK_OWNER)
+    cidfile = (
+        clock_owner_path(gpu_lock_directory(), owner).with_suffix(
+            CONTAINER_ID_SUFFIX
+        )
+        if owner is not None
+        else None
+    )
+    return run_owned_docker_process(command, env, cidfile=cidfile)
 
 
 def _lock_timeout_seconds(environment: Mapping[str, str]) -> float:
@@ -65,23 +88,37 @@ def run_with_host_clock_guard(
 
     try:
         with (
+            cleanup_on_termination(),
             acquire_gpu_lock(timeout_seconds=timeout_seconds),
-            acquire_clock_lock() as clock_lease,
         ):
-            child_environment = {
-                **base_environment,
-                **_HOST_MANAGED_ENV,
-                ENV_SOL_EXECBENCH_CLOCKS_LOCKED: "1"
-                if clock_lease.locked
-                else "0",
-            }
-            if not clock_lease.locked:
-                logger.warning(
-                    "Host clock locking unavailable; child will run with "
-                    "SOL_EXECBENCH_CLOCKS_LOCKED=0",
-                )
-            completed = runner(command, child_environment)
-            return completed.returncode
+            clock_lease = acquire_clock_lock()
+            with published_clock_owner(
+                clock_lease,
+                gpu_lock_directory(),
+                container_supervised=is_docker_run(command),
+            ) as owner:
+                child_environment: dict[str, str] = {
+                    **base_environment,
+                    **_HOST_MANAGED_ENV,
+                    ENV_SOL_EXECBENCH_CLOCKS_LOCKED: "1"
+                    if clock_lease.locked
+                    else "0",
+                }
+                child_environment.pop(ENV_CLOCK_OWNER, None)
+                if owner is not None:
+                    child_environment[ENV_CLOCK_OWNER] = owner
+                if not clock_lease.locked:
+                    logger.warning(
+                        "Host clock locking unavailable; child will run with "
+                        "SOL_EXECBENCH_CLOCKS_LOCKED=0",
+                    )
+                try:
+                    completed = runner(command, child_environment)
+                except ContainerCleanupError as error:
+                    # Never change clocks under a possibly live container.
+                    clock_lease.release_blocker = f"{CONTAINER_CLEANUP_BLOCKER_PREFIX}{error.container_id or 'unknown'}"
+                    raise
+                return completed.returncode
     except TimeoutError as exc:
         logger.error("%s", exc)
         return _GPU_BUSY_EXIT_CODE
