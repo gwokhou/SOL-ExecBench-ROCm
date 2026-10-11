@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import statistics
+import tomllib
 from copy import deepcopy
 from pathlib import Path
 
@@ -243,7 +244,7 @@ def test_memory_level_and_profile_load_normalize_all_fields(tmp_path: Path):
     assert from_file.source == str(path)
     packaged = ArchitectureProfile.load("RX_9060_XT")
     assert packaged.vendor == "AMD"
-    assert packaged.profile_revision == "rx9060xt-amd-resource-v5"
+    assert packaged.profile_revision == "rx9060xt-amd-resource-v6"
     assert packaged.resource_rate_for("valu", "fp16") == 25_600_000_000_000.0
     assert packaged.resource_rate_for("valu", "generic") == 51_281_920_000_000.0
     assert "valu/generic" not in packaged.required_calibration_resource_modes()
@@ -266,6 +267,19 @@ def test_packaged_rx9060xt_audit_pins_corrected_probe_semantics():
     audit_path = solar_root / str(profile.audit_evidence["path"])
     payload = json.loads(audit_path.read_text(encoding="utf-8"))
     measurements = {item["probe"]: item for item in payload["measurements"]}
+    dependencies = tomllib.loads(
+        (repository_root / "pyproject.toml").read_text(encoding="utf-8"),
+    )["project"]["dependencies"]
+    expected_torch = next(
+        dependency.split("==", maxsplit=1)[1]
+        for dependency in dependencies
+        if dependency.startswith("torch[")
+    )
+    assert payload["device"]["torch_version"] == expected_torch
+    assert payload["device"]["hipcc_version"][0].startswith(
+        f"HIP version: {payload['device']['hip_version']}-",
+    )
+    assert len(payload["source_revision"]) == 40
 
     assert (
         measurements["vector_fp16_fp16.hip"]["nominal_ops_per_second"]
@@ -295,16 +309,11 @@ def test_packaged_rx9060xt_audit_pins_corrected_probe_semantics():
     for probe in (
         "matrix_fp16_fp16_wmma.hip",
         "matrix_bf16_bf16_wmma.hip",
-    ):
-        assert measurements[probe]["selected_configuration"] == {
-            "waves_per_reported_wgp": 128,
-        }
-    for probe in (
         "matrix_fp8_fp8_wmma.hip",
         "matrix_int8_int8_wmma.hip",
     ):
         assert measurements[probe]["selected_configuration"] == {
-            "waves_per_reported_wgp": 32,
+            "waves_per_reported_wgp": 128,
         }
     assert (
         "valu/generic"

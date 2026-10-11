@@ -4,7 +4,7 @@
 name: Radeon_RX_9060_XT
 vendor: AMD
 gfx_target: gfx1200
-profile_revision: rx9060xt-amd-resource-v5
+profile_revision: rx9060xt-amd-resource-v6
 compute_units: 32
 memory_capacity_bytes: 17179869184
 memory_bandwidth_bytes_per_second: 320000000000
@@ -95,7 +95,7 @@ resource_limit_sources:
 calibration_exempt_modes:
   mfma:
     "fp32->fp32": RDNA4 exposes no native FP32-input WMMA instruction; this conservative mode shares the published FP32 vector ceiling
-    "int4->int32": RDNA4 ISA defines IU4 WMMA, but ROCm 7.2 rocWMMA lists no INT4 type and PyTorch 2.11 exposes no validated gfx1200 INT4 matrix API; published peak remains source-only
+    "int4->int32": RDNA4 ISA defines IU4 WMMA, but this profile has no qualified INT4 runtime probe on the audited stack; published peak remains source-only
   valu:
     generic: Generic VALU is a conservative cross-operation ceiling rather than one calibratable instruction mode; typed FP32, FP16, and BF16 paths are audited separately
   atomic:
@@ -104,47 +104,50 @@ calibration_exempt_modes:
     generic: Scan and sort decompose into workload-dependent multi-stage algorithms rather than one calibratable hardware instruction; the conservative ceiling remains source-derived
   conversion:
     generic: Conversion throughput depends on the source/destination dtype pair and no universal architecture rate is published; the conservative ceiling remains source-derived
+# Software support below is limited to the hash-bound HIP probes on ROCm 10.1.
+# PyTorch 2.14 identifies the environment, not a private-API qualification.
 precision_support:
   fp32:
     hardware: native
-    software: pytorch_production
+    software: hip_probe_runtime_validated
     calibration: required
-    evidence: https://rocm.docs.amd.com/projects/radeon-ryzen/en/docs-7.2/docs/compatibility/compatibilityrad/native_linux/native_linux_compatibility.html
+    evidence: rocm/audits/rx9060xt_resource_peaks_v3.json
   fp16:
     hardware: native_wmma
-    software: pytorch_production
+    software: hip_probe_runtime_validated
     calibration: required
-    evidence: https://rocm.docs.amd.com/projects/radeon-ryzen/en/docs-7.2/docs/compatibility/compatibilityrad/native_linux/native_linux_compatibility.html
+    evidence: rocm/audits/rx9060xt_resource_peaks_v3.json
   bf16:
     hardware: native_wmma
-    software: rocwmma_supported_pytorch_empirical
+    software: hip_probe_runtime_validated
     calibration: required
-    evidence: https://rocm.docs.amd.com/projects/rocWMMA/en/docs-7.2.1/API_Reference_Guide.html
+    evidence: rocm/audits/rx9060xt_resource_peaks_v3.json
   fp8:
     hardware: native_wmma_input_only
-    software: rocwmma_supported_pytorch_private_api_validated
+    software: hip_probe_runtime_validated
     calibration: required
-    evidence: https://rocm.docs.amd.com/projects/rocWMMA/en/docs-7.2.1/API_Reference_Guide.html
+    evidence: rocm/audits/rx9060xt_resource_peaks_v3.json
     formats: [float8_e4m3fn, float8_e5m2]
+    limitation: The runtime probe validates OCP E4M3 input; E5M2 remains ISA-derived. This audit does not qualify PyTorch private matrix APIs.
   int8:
     hardware: native_wmma
-    software: pytorch_production_dtype_private_probe
+    software: hip_probe_runtime_validated
     calibration: required
-    evidence: https://rocm.docs.amd.com/projects/radeon-ryzen/en/docs-7.2/docs/compatibility/compatibilityrad/native_linux/native_linux_compatibility.html
+    evidence: rocm/audits/rx9060xt_resource_peaks_v3.json
   int4:
     hardware: native_wmma
-    software: isa_only_no_validated_rocm_matrix_api
+    software: isa_only_no_qualified_runtime_probe
     calibration: exempt
     evidence: https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/rdna4-instruction-set-architecture.pdf
-    limitation: ROCm 7.2 rocWMMA exposes no INT4 type and PyTorch 2.11 has no validated gfx1200 INT4 matrix API; the published peak is source-only.
+    limitation: No INT4 runtime probe is qualified by this profile; the published peak is source-only, regardless of library API availability.
 audit_evidence:
   status: verified
   path: rocm/audits/rx9060xt_resource_peaks_v3.json
-  sha256: d7428fbdf5db2826b9be9113ef3442ad5c7bb1ea5a03494e080555e113afc1da
+  sha256: f822fcc4f0019c12da9e46dbfb42f2b4f5f56b65cf2813c9ab7c0582c3083e48
   required_schema_version: solar.resource_peak_calibration.v4
   required_timing_profile: official
   required_clocks_locked: true
-  # ROCm 7.2 reports THROTTLED on this Navi48 board even while idle in AUTO.
+  # ROCm 10.1 samples contain both THROTTLED and UNTHROTTLED telemetry.
   # This audit therefore corroborates ISA emission and real-device execution;
   # it is not evidence that an unthrottled theoretical peak was attained.
   required_unthrottled: false
