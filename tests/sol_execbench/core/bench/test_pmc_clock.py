@@ -311,7 +311,6 @@ def test_host_guard_owns_pmc_borrow_and_final_auto(
     tmp_path, control, monkeypatch
 ):
     from sol_execbench.core.bench import clock_ownership, host_clock_guard
-    from sol_execbench.core.bench.clock_lock import ClockLockLease
 
     restores = []
 
@@ -320,13 +319,18 @@ def test_host_guard_owns_pmc_borrow_and_final_auto(
         control["level"] = "AUTO"
         return True
 
-    def acquire():
+    def activate():
         control["level"] = "STABLE_PEAK"
-        return ClockLockLease(locked=True, acquired=True, restore=restore)
 
-    monkeypatch.setattr(host_clock_guard, "acquire_clock_lock", acquire)
+    monkeypatch.setattr(host_clock_guard, "set_peak_clocks", activate)
+    monkeypatch.setattr(host_clock_guard, "unlock_clocks", restore)
     monkeypatch.setattr(
-        clock_ownership,
+        host_clock_guard,
+        "observe_clock_levels",
+        lambda: (f"AMDSMI_DEV_PERF_LEVEL_{control['level']}",),
+    )
+    monkeypatch.setattr(
+        host_clock_guard,
         "observe_clock_devices",
         lambda: (
             clock_ownership.ClockDevice(

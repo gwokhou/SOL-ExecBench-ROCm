@@ -20,13 +20,16 @@ from uuid import uuid4
 
 from pydantic import Field
 
-from sol_execbench.core.bench.clock_lock import ClockLockLease
+from sol_execbench.core.bench.clock_lock import (
+    ClockLockLease,
+    ClockRestoreError,
+)
 from sol_execbench.core.bench.clock_ownership import (
     ENV_CLOCK_OWNER,
     ClockDevice,
     ClockOwnership,
     ClockOwnershipError,
-    published_clock_owner,
+    owned_clock_window,
     verify_clock_owner,
 )
 from sol_execbench.core.bench.gpu_lock import gpu_lock_directory
@@ -230,6 +233,17 @@ class PMCClockControl:
         """Attempt AUTO and readback independently, including failed writes."""
         return self._restore_auto()
 
+    def activate(self) -> None:
+        """Bind the published owner before setting and verifying STABLE_PEAK."""
+        self.receipt = self.receipt.model_copy(
+            update={"owner_lease_id": os.environ[ENV_CLOCK_OWNER]}
+        )
+        self.save()
+        self.set_level(ClockLevel.PEAK)
+        self.verify(ClockLevel.PEAK)
+        self.receipt = self.receipt.model_copy(update={"peak_verified": True})
+        self.save()
+
     def _restore_auto(self) -> bool:
         """Require readback even when a set command reports an error."""
         with suppress(Exception):
@@ -270,27 +284,15 @@ def _lease_window(control: PMCClockControl) -> Iterator[ClockLockLease]:
             control.verify(ClockLevel.PEAK)
         return
     control.verify(ClockLevel.AUTO)
-    lease = ClockLockLease(locked=False, acquired=True, restore=control.restore)
     control.receipt = control.receipt.model_copy(
         update={"ownership": ClockOwnership.OWNED}
     )
-    with published_clock_owner(
-        lease, gpu_lock_directory(), control.devices
-    ) as owner:
-        control.receipt = control.receipt.model_copy(
-            update={
-                "ownership": ClockOwnership.OWNED,
-                "owner_lease_id": owner,
-            }
-        )
-        control.save()
-        control.set_level(ClockLevel.PEAK)
-        control.verify(ClockLevel.PEAK)
-        lease.locked = True
-        control.receipt = control.receipt.model_copy(
-            update={"peak_verified": True}
-        )
-        control.save()
+    with owned_clock_window(
+        gpu_lock_directory(),
+        control.devices,
+        activate=control.activate,
+        restore=control.restore,
+    ) as lease:
         yield lease
 
 
@@ -315,7 +317,7 @@ def pmc_clock_window(
             with ExitStack() as leases:
                 try:
                     lease = leases.enter_context(_lease_window(control))
-                except ClockOwnershipError:
+                except ClockOwnershipError, ClockRestoreError:
                     raise
                 except Exception:
                     owned = control.receipt.ownership == ClockOwnership.OWNED

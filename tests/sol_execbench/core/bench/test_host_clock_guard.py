@@ -10,7 +10,6 @@ from collections.abc import Iterator
 import pytest
 
 from sol_execbench.core.bench import clock_ownership, host_clock_guard
-from sol_execbench.core.bench.clock_lock import ClockLockLease
 
 
 @pytest.fixture(autouse=True)
@@ -18,12 +17,19 @@ def owner_directory(monkeypatch, tmp_path):
     monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
     monkeypatch.delenv(clock_ownership.ENV_CLOCK_OWNER, raising=False)
     monkeypatch.setattr(
-        clock_ownership,
+        host_clock_guard,
         "observe_clock_devices",
         lambda: (
             clock_ownership.ClockDevice(bdf="0000:05:00.0", uuid="test-uuid"),
         ),
     )
+    monkeypatch.setattr(
+        host_clock_guard,
+        "observe_clock_levels",
+        lambda: ("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+    )
+    monkeypatch.setattr(host_clock_guard, "set_peak_clocks", lambda: None)
+    monkeypatch.setattr(host_clock_guard, "unlock_clocks", lambda: True)
 
 
 @contextlib.contextmanager
@@ -34,21 +40,20 @@ def _gpu_lock() -> Iterator[None]:
 def test_guard_publishes_verified_host_state_and_releases_lease(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    lease = ClockLockLease(locked=True, acquired=True)
     release_calls: list[bool] = []
     monkeypatch.setattr(
         host_clock_guard,
         "acquire_gpu_lock",
         lambda **kwargs: _gpu_lock(),
     )
-    monkeypatch.setattr(host_clock_guard, "acquire_clock_lock", lambda: lease)
 
     def unlock() -> bool:
         release_calls.append(True)
         return True
 
     monkeypatch.setattr(
-        "sol_execbench.core.bench.clock_lock.unlock_clocks",
+        host_clock_guard,
+        "unlock_clocks",
         unlock,
     )
     observed: dict[str, str] = {}
@@ -81,8 +86,8 @@ def test_guard_runs_unlocked_without_false_clock_claim(
     )
     monkeypatch.setattr(
         host_clock_guard,
-        "acquire_clock_lock",
-        lambda: ClockLockLease(locked=False, acquired=False),
+        "observe_clock_levels",
+        lambda: None,
     )
     observed: dict[str, str] = {}
 
@@ -132,12 +137,11 @@ def test_container_cleanup_failure_keeps_clock_policy_and_recovery_gate(
     monkeypatch, tmp_path
 ):
     restores = []
-    lease = ClockLockLease(
-        locked=True,
-        acquired=True,
-        restore=lambda: restores.append(True) or True,
+    monkeypatch.setattr(
+        host_clock_guard,
+        "unlock_clocks",
+        lambda: restores.append(True) or True,
     )
-    monkeypatch.setattr(host_clock_guard, "acquire_clock_lock", lambda: lease)
 
     def runner(_command, _environment):
         raise host_clock_guard.ContainerCleanupError("container remains")
@@ -153,4 +157,3 @@ def test_container_cleanup_failure_keeps_clock_policy_and_recovery_gate(
         clock_ownership.ClockOwnershipError, match="clock_recovery_required"
     ):
         clock_ownership.require_no_clock_recovery(tmp_path)
-    lease.detach()
