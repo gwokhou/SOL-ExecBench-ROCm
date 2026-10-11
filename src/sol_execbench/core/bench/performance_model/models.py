@@ -564,13 +564,13 @@ class DispatchEvidence(BaseModelWithDocstrings):
 
 
 class DispatchScheduleEdge(BaseModelWithDocstrings):
-    """One timestamp-established precedence edge without measured duration."""
+    """One verified lane precedence edge without measured duration."""
 
     model_config = _MODEL_CONFIG
 
     predecessor_dispatch_id: str = Field(min_length=1)
     successor_dispatch_id: str = Field(min_length=1)
-    reason: Literal["same_lane", "happens_before"]
+    reason: Literal["same_lane"]
 
 
 class PerformanceScheduleEvidence(CurrentSchemaModel):

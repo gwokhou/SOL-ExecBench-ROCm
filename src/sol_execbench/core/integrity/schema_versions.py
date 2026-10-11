@@ -130,7 +130,7 @@ class SchemaVersion(StrEnum):
     )
     PERFORMANCE_REPLAY_EVIDENCE = "sol_execbench.performance_replay_evidence.v4"
     PERFORMANCE_SCHEDULE_EVIDENCE = (
-        "sol_execbench.performance_schedule_evidence.v1"
+        "sol_execbench.performance_schedule_evidence.v2"
     )
     PERFORMANCE_TIMING_EVIDENCE = "sol_execbench.performance_timing_evidence.v3"
     PROFILE_SUMMARY = "sol_execbench.profile_summary.v4"
