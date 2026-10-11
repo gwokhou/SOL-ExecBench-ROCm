@@ -53,6 +53,14 @@ AMD_SMI_FAILURE_MARKERS = (
 )
 
 
+class ClockSetupError(RuntimeError):
+    """STABLE_PEAK setup failed; continuation requires verified rollback."""
+
+
+class ClockRestoreError(RuntimeError):
+    """AUTO restoration is unverified; never continue as an unlocked run."""
+
+
 @dataclass
 class ClockLockLease:
     """Owned STABLE_PEAK lease with idempotent, exception-aware release."""
@@ -232,10 +240,13 @@ def _run_checked_amd_smi(
     return result
 
 
-def _query_performance_levels() -> tuple[str, ...]:
-    """Return the performance level reported for every visible AMD GPU."""
+def _query_performance_levels(gpu_uuid: str | None = None) -> tuple[str, ...]:
+    """Return policies for the selected UUID, or all visible AMD GPUs."""
+    command = [_amd_smi_executable(), "metric", "-l", "--json"]
+    if gpu_uuid is not None:
+        command.extend(("--gpu", gpu_uuid))
     result = subprocess.run(
-        [_amd_smi_executable(), "metric", "-l", "--json"],
+        command,
         capture_output=True,
         check=True,
         text=True,
@@ -244,9 +255,14 @@ def _query_performance_levels() -> tuple[str, ...]:
     return parse_performance_levels(result.stdout)
 
 
-def _observed_performance_levels() -> tuple[str, ...] | None:
+def observe_clock_levels(gpu_uuid: str | None = None) -> tuple[str, ...] | None:
+    """Read the selected GPU policies without changing device state."""
     try:
-        return _query_performance_levels()
+        return (
+            _query_performance_levels()
+            if gpu_uuid is None
+            else _query_performance_levels(gpu_uuid)
+        )
     except (
         FileNotFoundError,
         subprocess.CalledProcessError,
@@ -260,18 +276,52 @@ def _observed_performance_levels() -> tuple[str, ...] | None:
 
 def _levels_are(levels: tuple[str, ...], level: str) -> bool:
     expected = f"AMDSMI_DEV_PERF_LEVEL_{level.upper()}"
-    return all(current == expected for current in levels)
+    return bool(levels) and all(current == expected for current in levels)
 
 
-def _all_gpus_at_level(level: str) -> bool:
-    levels = _observed_performance_levels()
-    return levels is not None and _levels_are(levels, level)
+def _all_gpus_at_level(level: str, gpu_uuid: str | None = None) -> bool:
+    levels = (
+        observe_clock_levels()
+        if gpu_uuid is None
+        else observe_clock_levels(gpu_uuid)
+    )
+    return (
+        levels is not None
+        and (gpu_uuid is None or len(levels) == 1)
+        and _levels_are(levels, level)
+    )
 
 
 def _reset_after_failed_lock() -> None:
-    """Best-effort reset after a lock command may have changed GPU policy."""
+    """Refuse continuation when a possibly changed policy cannot be restored."""
     if not unlock_clocks():
-        logger.error("Failed to restore GPU clocks to AUTO after lock failure")
+        raise ClockRestoreError("clock_restore_unverified: AUTO reset failed")
+
+
+def set_peak_clocks(gpu_uuid: str | None = None) -> None:
+    """Set and verify STABLE_PEAK; the caller must already own restoration."""
+    try:
+        _run_checked_amd_smi(
+            [
+                "sudo",
+                "-n",
+                *clock_command(
+                    _amd_smi_executable(), ClockLevel.PEAK, gpu_uuid
+                ),
+            ]
+        )
+        time.sleep(VERIFY_DELAY_S)
+    except (
+        subprocess.CalledProcessError,
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+    ) as error:
+        raise ClockSetupError(
+            "clock_setup_failed: STABLE_PEAK command failed"
+        ) from error
+    verified = verify_clocks() if gpu_uuid is None else verify_clocks(gpu_uuid)
+    if not verified:
+        raise ClockSetupError("clock_setup_failed: STABLE_PEAK readback failed")
 
 
 def acquire_clock_lock() -> ClockLockLease:
@@ -288,7 +338,7 @@ def acquire_clock_lock() -> ClockLockLease:
       - Clock and power gating disabled
 
     """
-    initial_levels = _observed_performance_levels()
+    initial_levels = observe_clock_levels()
     if initial_levels is None:
         return ClockLockLease(locked=False, acquired=False)
     if _levels_are(initial_levels, "STABLE_PEAK"):
@@ -303,35 +353,14 @@ def acquire_clock_lock() -> ClockLockLease:
         )
         return ClockLockLease(locked=False, acquired=False)
 
-    command_started = False
     try:
-        command_started = True
-        _run_checked_amd_smi(
-            [
-                "sudo",
-                "-n",
-                *clock_command(_amd_smi_executable(), ClockLevel.PEAK),
-            ],
-        )
-        logger.info("GPU clock locked to STABLE_PEAK")
-        logger.info("Waiting %ss for clocks to stabilize...", VERIFY_DELAY_S)
-        time.sleep(VERIFY_DELAY_S)
-        if not verify_clocks():
-            logger.warning("STABLE_PEAK verification failed; unlocking")
-            _reset_after_failed_lock()
-            return ClockLockLease(locked=False, acquired=False)
-    except (
-        subprocess.CalledProcessError,
-        FileNotFoundError,
-        subprocess.TimeoutExpired,
-    ) as exc:
+        set_peak_clocks()
+    except ClockSetupError as exc:
         logger.warning("Failed to lock clocks (STABLE_PEAK): %s", exc)
-        if command_started:
-            _reset_after_failed_lock()
+        _reset_after_failed_lock()
         return ClockLockLease(locked=False, acquired=False)
     except BaseException:
-        if command_started:
-            _reset_after_failed_lock()
+        _reset_after_failed_lock()
         raise
 
     return ClockLockLease(locked=True, acquired=True)
@@ -345,32 +374,34 @@ def lock_clocks() -> bool:
     return lease.locked
 
 
-def verify_clocks() -> bool:
-    """Return whether every visible AMD GPU is in STABLE_PEAK mode."""
-    locked = _all_gpus_at_level("STABLE_PEAK")
+def verify_clocks(gpu_uuid: str | None = None) -> bool:
+    """Return whether all selected AMD GPUs are in STABLE_PEAK mode."""
+    locked = _all_gpus_at_level("STABLE_PEAK", gpu_uuid)
     if not locked:
-        logger.warning("Not all visible GPUs are in STABLE_PEAK mode")
+        logger.warning("Not all selected GPUs are in STABLE_PEAK mode")
     return locked
 
 
-def unlock_clocks() -> bool:
+def unlock_clocks(gpu_uuid: str | None = None) -> bool:
     """Reset GPU clocks to auto via ``amd-smi set -l AUTO``.
 
-    Best-effort; errors are logged but not raised. Returns whether every visible
-    GPU was verified back in AUTO mode.
+    Errors are logged but not raised. Returns whether every selected GPU was
+    verified back in AUTO mode. None retains legacy all-device scope.
     """
     try:
         _run_checked_amd_smi(
             [
                 "sudo",
                 "-n",
-                *clock_command(_amd_smi_executable(), ClockLevel.AUTO),
+                *clock_command(
+                    _amd_smi_executable(), ClockLevel.AUTO, gpu_uuid
+                ),
             ],
         )
     except Exception as e:  # noqa: BLE001 -- Cleanup must never mask callers
         logger.warning("Failed to unlock clocks: %s", e)
         return False
-    if not _all_gpus_at_level("AUTO"):
+    if not _all_gpus_at_level("AUTO", gpu_uuid):
         logger.warning("GPU clock reset could not be verified at AUTO")
         return False
     return True

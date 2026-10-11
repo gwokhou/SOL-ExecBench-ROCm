@@ -57,20 +57,30 @@ ROCPY
 
 verify_host_managed_clocks() {
     if [ "${HOST_CLOCKS_DECLARED}" != "1" ]; then
+        if [ -n "${SOL_EXECBENCH_HOST_CLOCK_GPU_UUID:-}" ]; then
+            echo "ERROR: UUID-targeted host clock guard did not verify STABLE_PEAK" >&2
+            return 1
+        fi
         echo "WARNING: Host clock guard did not acquire STABLE_PEAK — continuing unlocked"
         export SOL_EXECBENCH_CLOCKS_LOCKED=0
         return
     fi
     if python - <<'ROCPY'
+import os
 from sol_execbench.core.bench.clock_lock import verify_clocks
+from sol_execbench.core.platform.clock_commands import ENV_HOST_CLOCK_GPU_UUID
 
-if not verify_clocks():
+if not verify_clocks(os.environ.get(ENV_HOST_CLOCK_GPU_UUID)):
     raise SystemExit(1)
 ROCPY
     then
         echo "CLOCKS_LOCKED=1"
         export SOL_EXECBENCH_CLOCKS_LOCKED=1
         return
+    fi
+    if [ -n "${SOL_EXECBENCH_HOST_CLOCK_GPU_UUID:-}" ]; then
+        echo "ERROR: UUID-targeted host STABLE_PEAK failed container verification" >&2
+        return 1
     fi
     echo "WARNING: Host-declared STABLE_PEAK state failed container verification"
     echo "CLOCKS_LOCKED=0"

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -10,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from sol_execbench.core.platform.clock_commands import ENV_HOST_CLOCK_GPU_UUID
 from sol_execbench.core.platform.docker_matrix import (
     load_docker_target_manifest,
 )
@@ -158,6 +160,54 @@ def test_entrypoint_rejects_false_host_clock_claim(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert "failed container verification" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("declared", "level", "expected"),
+    [("1", "STABLE_PEAK", 0), ("1", "AUTO", 1), ("0", "STABLE_PEAK", 1)],
+    ids=["target-verified", "target-readback-failed", "target-not-declared"],
+)
+def test_entrypoint_verifies_only_host_uuid_or_refuses_workload(
+    tmp_path: Path, declared: str, level: str, expected: int
+) -> None:
+    gpu_uuid = "a3007590-0000-1000-800f-a29c1cca1511"
+    tool = tmp_path / "amd-smi"
+    payload = {
+        "gpu_data": [{"gpu": 0, "perf_level": f"AMDSMI_DEV_PERF_LEVEL_{level}"}]
+    }
+    tool.write_text(
+        f"#!{sys.executable}\nimport sys\n"
+        f"assert sys.argv[1:] == ['metric', '-l', '--json', '--gpu', {gpu_uuid!r}]\n"
+        f"print({json.dumps(payload)!r})\n",
+        encoding="utf-8",
+    )
+    tool.chmod(0o755)
+    python = tmp_path / "python"
+    python.write_text(
+        f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n',
+        encoding="utf-8",
+    )
+    python.chmod(0o755)
+    marker = tmp_path / "workload-started"
+    env = {
+        **os.environ,
+        "PATH": f"{tmp_path}:{os.environ['PATH']}",
+        "FLASHINFER_TRACE_DIR": str(tmp_path),
+        "SOL_EXECBENCH_CLOCKS_LOCKED": declared,
+        "SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST": "1",
+        "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST": "1",
+        ENV_HOST_CLOCK_GPU_UUID: gpu_uuid,
+    }
+    result = subprocess.run(
+        [str(ENTRYPOINT_PATH), "touch", str(marker)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=15,
+    )
+    assert result.returncode == expected, result.stderr
+    assert marker.exists() == (expected == 0)
 
 
 def test_entrypoint_releases_owned_lock_after_workload_failure(
@@ -362,6 +412,7 @@ def test_run_docker_holds_host_clock_guard_around_container() -> None:
     assert "-e SOL_EXECBENCH_CLOCKS_LOCKED" in script
     assert "-e SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST" in script
     assert "-e SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST" in script
+    assert f"-e {ENV_HOST_CLOCK_GPU_UUID}" in script
     assert "docker image inspect --format '{{.Id}}'" in script
     assert "SOL_EXECBENCH_CONTAINER_IMAGE_ID" in script
 

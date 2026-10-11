@@ -35,7 +35,7 @@ class TestLockClocks:
     def _patch_verify_and_sleep(self):
         return (
             patch(
-                f"{_MODULE}._observed_performance_levels",
+                f"{_MODULE}.observe_clock_levels",
                 return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
             ),
             patch(f"{_MODULE}.verify_clocks", return_value=True),
@@ -75,7 +75,7 @@ class TestLockClocks:
 
         with (
             patch(
-                f"{_MODULE}._observed_performance_levels",
+                f"{_MODULE}.observe_clock_levels",
                 return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
             ),
             patch(f"{_MODULE}.subprocess.run", return_value=failed) as mock_run,
@@ -98,7 +98,7 @@ class TestLockClocks:
 
         with (
             patch(
-                f"{_MODULE}._observed_performance_levels",
+                f"{_MODULE}.observe_clock_levels",
                 return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
             ),
             patch(
@@ -118,7 +118,7 @@ class TestLockClocks:
         p_verify = patch(f"{_MODULE}.verify_clocks", return_value=False)
         p_unlock = patch(f"{_MODULE}.unlock_clocks", return_value=True)
         p_levels = patch(
-            f"{_MODULE}._observed_performance_levels",
+            f"{_MODULE}.observe_clock_levels",
             return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
         )
         with (
@@ -147,7 +147,7 @@ class TestLockClocks:
         p_verify = patch(f"{_MODULE}.verify_clocks", return_value=True)
         p_sleep = patch(f"{_MODULE}.time.sleep")
         p_levels = patch(
-            f"{_MODULE}._observed_performance_levels",
+            f"{_MODULE}.observe_clock_levels",
             return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
         )
         with (
@@ -163,7 +163,7 @@ class TestLockClocks:
     def test_preserves_existing_stable_peak_without_taking_ownership(self):
         with (
             patch(
-                f"{_MODULE}._observed_performance_levels",
+                f"{_MODULE}.observe_clock_levels",
                 return_value=("AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK",),
             ),
             patch(f"{_MODULE}.subprocess.run") as run,
@@ -176,7 +176,7 @@ class TestLockClocks:
     def test_refuses_to_replace_manual_policy(self):
         with (
             patch(
-                f"{_MODULE}._observed_performance_levels",
+                f"{_MODULE}.observe_clock_levels",
                 return_value=("AMDSMI_DEV_PERF_LEVEL_MANUAL",),
             ),
             patch(f"{_MODULE}.subprocess.run") as run,
@@ -189,7 +189,7 @@ class TestLockClocks:
     def test_keyboard_interrupt_during_stabilization_attempts_reset(self):
         with (
             patch(
-                f"{_MODULE}._observed_performance_levels",
+                f"{_MODULE}.observe_clock_levels",
                 return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
             ),
             patch(f"{_MODULE}.subprocess.run"),
@@ -204,7 +204,7 @@ class TestLockClocks:
     def test_unexpected_lock_exception_attempts_reset_before_reraising(self):
         with (
             patch(
-                f"{_MODULE}._observed_performance_levels",
+                f"{_MODULE}.observe_clock_levels",
                 return_value=("AMDSMI_DEV_PERF_LEVEL_AUTO",),
             ),
             patch(

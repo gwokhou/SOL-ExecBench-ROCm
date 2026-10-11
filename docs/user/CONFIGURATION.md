@@ -99,6 +99,43 @@ An environment flag or a GPU that happens to be at STABLE_PEAK is insufficient.
 Unknown external policies are not overwritten. Ownership proof failures remain
 fatal even in best-effort mode.
 
+Host-owned and independently owned PMC windows share the same acquisition order:
+verify identity and initial AUTO, publish the active owner record and live lock,
+then set and verify STABLE_PEAK. The active record represents a restoration
+obligation, not successful setup. Failure to publish it prevents all policy
+writes. A legacy all-device host setup failure may continue unlocked only after AUTO rollback is
+verified; failed rollback raises `clock_restore_unverified`, keeps the recovery
+gate, and prevents workload startup. Interruption during setup follows the same
+teardown as interruption during execution. If setup is forcibly killed, the
+already-published active record blocks the next GPU-lock acquisition.
+
+Container supervision is recorded only after clock activation succeeds and
+before the workload may start. An interrupted or failed activation therefore
+does not require a container ID that could not yet have been created.
+
+To control only the qualified GPU with the existing UUID-scoped sudoers rules,
+set the host selector before launching the wrapper:
+
+```bash
+export SOL_EXECBENCH_HOST_CLOCK_GPU_UUID=a3007590-0000-1000-800f-a29c1cca1511
+export ROCR_VISIBLE_DEVICES=GPU-a30fa29c1cca1511
+./scripts/run_docker.sh <command>
+```
+
+The direct host-guard CLI also accepts `--gpu-uuid AMD_SMI_UUID` before `--`;
+that argument overrides `SOL_EXECBENCH_HOST_CLOCK_GPU_UUID`. The selector is an
+AMD-SMI UUID, not a ROCR UUID or GPU index. The host resolves it against the live
+device inventory and records only that device in the owner receipt. Both set
+and restore use the verified UUID with `set -l LEVEL -g UUID`; policy readbacks
+must contain exactly one device. Initial state must be AUTO. Missing identity,
+unknown policy or failed activation prevents workload startup, even if rollback
+succeeds. Other GPU policies are left alone. This selector controls clocks;
+select the workload GPU separately with `ROCR_VISIBLE_DEVICES` as above.
+
+Omitting both host selectors preserves legacy all-device behavior. Both modes
+still use the shared GPU-0 exclusion; UUID targeting does not provide independent
+multi-GPU concurrency. PMC selectors do not change the host's clock scope.
+
 Exceptions, timeouts, SIGINT and SIGTERM unwind the existing clock lease. The
 order is child/process-group cleanup, owned Docker container removal, clock
 restore and readback, final owner receipt, then GPU-lock release. If container
@@ -118,12 +155,15 @@ records on a trusted shared directory, not authentication against a process with
 write access to that directory. The owner token is not forwarded to untrusted
 kernel subprocesses.
 
-`run_docker.sh` forwards the owner token and PMC options through the existing
+`run_docker.sh` forwards the owner token, host UUID and PMC options through the existing
 shared lock-directory mount. Thus an unprivileged container can borrow a verified
 host policy without sudo or broader container permissions. The host remains
 responsible for restoration after the container is confirmed stopped. The wrapper
 owns `--cidfile`; do not supply another one. Host and container must both use the
-updated code. No benchmark clock policy or canonical timing protocol is changed;
+updated code. The container entrypoint verifies the selected host UUID and refuses
+startup if that readback fails. Use the host UID/GID in custom images, matching the
+Dockerfile build arguments, so the container can read the owner's private receipt.
+No benchmark clock policy or canonical timing protocol is changed;
 PMC replay still cannot replace canonical timing samples.
 
 An independently owned PMC window needs permission for the exact

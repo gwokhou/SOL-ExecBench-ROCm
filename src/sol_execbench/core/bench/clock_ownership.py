@@ -12,7 +12,7 @@ from __future__ import annotations
 import fcntl
 import os
 import re
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from enum import StrEnum
 from pathlib import Path
@@ -21,7 +21,10 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sol_execbench.core.bench.clock_lock import ClockLockLease
+from sol_execbench.core.bench.clock_lock import (
+    ClockLockLease,
+    ClockRestoreError,
+)
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
@@ -171,7 +174,7 @@ def published_clock_owner(
             lease_id=uuid4().hex,
             devices=devices or observe_clock_devices(),
             owner_pid=os.getpid(),
-            container_supervised=container_supervised,
+            container_supervised=container_supervised and lease.locked,
         )
         path = clock_owner_path(directory, record.lease_id)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -203,8 +206,60 @@ def published_clock_owner(
                     else ClockOwnerState.RESTORE_FAILED,
                     "ended_at": utc_timestamp(),
                     "release_blocker": lease.release_blocker,
+                    "container_supervised": container_supervised
+                    and lease.locked,
                 }
             )
             atomic_write_json_value(path, record.model_dump(mode="json"))
         finally:
             os.close(descriptor)
+
+
+def _record_container_supervision(directory: Path, token: str) -> None:
+    """Persist possible container ownership before allowing workload startup."""
+    path = clock_owner_path(directory, token)
+    record = ClockOwnerRecord.model_validate_json(path.read_text())
+    record = record.model_copy(update={"container_supervised": True})
+    atomic_write_json_value(path, record.model_dump(mode="json"))
+
+
+@contextmanager
+def owned_clock_window(
+    directory: Path,
+    devices: tuple[ClockDevice, ...],
+    *,
+    activate: Callable[[], None],
+    restore: Callable[[], bool],
+    container_supervised: bool = False,
+) -> Iterator[ClockLockLease]:
+    """Publish responsibility before activation, then require verified rollback.
+
+    Callers hold GPU exclusion and verify identity/initial AUTO first. Hardware
+    callbacks are the test seam shared by host setup and target-scoped PMC setup.
+    A failure to publish ownership must not invoke either mutating callback.
+    """
+    activation_started = False
+
+    def rollback() -> bool:
+        return not activation_started or restore()
+
+    lease = ClockLockLease(locked=False, acquired=True, restore=rollback)
+    try:
+        with published_clock_owner(
+            lease, directory, devices, container_supervised=container_supervised
+        ) as token:
+            activation_started = True
+            activate()
+            lease.locked = True
+            if container_supervised:
+                if token is None:
+                    raise ClockOwnershipError("clock_owner_missing")
+                _record_container_supervision(directory, token)
+            yield lease
+    except BaseException as error:
+        if not lease.released and lease.release_blocker is None:
+            raise ClockRestoreError(
+                "clock_restore_unverified: failed to reset and verify owned "
+                "GPU policy at AUTO; inspect the clock owner record"
+            ) from error
+        raise
