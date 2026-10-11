@@ -20,34 +20,38 @@ def build_schedule_evidence(
     *,
     scope_verified: bool,
 ) -> PerformanceScheduleEvidence | None:
-    """Build precedence edges using timestamps only as ordering evidence."""
+    """Build lane dependencies; cross-lane timestamps are observations only."""
     if not dispatches:
         return None
     reasons: list[str] = []
     if not scope_verified:
         reasons.append("controlled_replay_scope_unverified")
+    if (
+        len(
+            {(item.workload_uuid, item.candidate_sha256) for item in dispatches}
+        )
+        != 1
+    ):
+        reasons.append("dispatch_workload_identity_conflict")
+        scope_verified = False
     if any(
         dispatch.queue_id is None and dispatch.stream_id is None
         for dispatch in dispatches
     ):
         reasons.append("dispatch_lane_identity_unverified")
     concurrent = len({_dispatch_lane(item) for item in dispatches}) > 1
-    if concurrent and any(
-        item.start_timestamp_ns is None or item.end_timestamp_ns is None
-        for item in dispatches
+    if concurrent:
+        reasons.append("cross_lane_event_dependencies_unverified")
+    if len(dispatches) > 1 and any(
+        item.start_timestamp_ns is None for item in dispatches
     ):
-        reasons.append("dispatch_schedule_topology_unverified")
+        reasons.append("dispatch_lane_order_unverified")
     predecessors = schedule_predecessor_indices(dispatches)
     edges = [
         DispatchScheduleEdge(
             predecessor_dispatch_id=dispatches[predecessor].dispatch_id,
             successor_dispatch_id=dispatches[successor].dispatch_id,
-            reason=(
-                "same_lane"
-                if _dispatch_lane(dispatches[predecessor])
-                == _dispatch_lane(dispatches[successor])
-                else "happens_before"
-            ),
+            reason="same_lane",
         )
         for successor, parents in predecessors.items()
         for predecessor in sorted(parents)
@@ -65,7 +69,9 @@ def build_schedule_evidence(
         same_gpu=scope_verified,
         marker_contained=scope_verified,
         dispatch_ids=[item.dispatch_id for item in dispatches],
-        edges=edges,
+        edges=edges
+        if scope_verified and "dispatch_lane_order_unverified" not in reasons
+        else [],
         reason_codes=reasons,
     )
 
@@ -85,19 +91,14 @@ def schedule_predecessor_indices(
     )
     predecessors = {index: set() for index in range(len(dispatches))}
     last_by_lane: dict[tuple[str | None, str | None], int] = {}
-    for position, index in enumerate(ordered):
+    for index in ordered:
         dispatch = dispatches[index]
         lane = _dispatch_lane(dispatch)
+        if lane == (None, None):
+            continue
         if lane in last_by_lane:
             predecessors[index].add(last_by_lane[lane])
         last_by_lane[lane] = index
-        start = dispatch.start_timestamp_ns
-        if start is None:
-            continue
-        for previous in ordered[:position]:
-            end = dispatches[previous].end_timestamp_ns
-            if end is not None and end <= start:
-                predecessors[index].add(previous)
     return predecessors
 
 

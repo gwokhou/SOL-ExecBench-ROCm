@@ -49,6 +49,13 @@ unresolved waits produce parse warnings. JSON and rocpd copies remain separately
 scoped captures; consumers must not add their event counts together. A barrier's
 duration is not a measurement of avoidable synchronization overhead.
 
+The performance model's `sol_execbench.performance_schedule_evidence.v2`
+retains only verified same-lane precedence. Timestamp order across lanes does
+not establish a dependency. Multi-lane predictions return
+`cross_lane_event_dependencies_unverified` until event generations and dispatch
+scope are verified; receiving HIP event observations alone does not remove that
+restriction.
+
 The sidecar is not correctness authority, timing authority, performance
 authority, score authority, evidence-tier authority, confirmed-improvement
 authority, release-gate authority, cutover authority, paper-parity authority,

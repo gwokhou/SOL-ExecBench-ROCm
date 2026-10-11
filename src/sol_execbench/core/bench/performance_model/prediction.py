@@ -1508,6 +1508,8 @@ def _concurrency_reason(
         for dispatch in dispatches
     ):
         return "dispatch_schedule_topology_unverified"
+    if len(identities) != 1:
+        return "cross_lane_event_dependencies_unverified"
     return None
 
 

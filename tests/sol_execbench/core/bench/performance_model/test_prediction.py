@@ -455,7 +455,9 @@ def test_hardware_prediction_rejects_unverified_concurrency(
     assert prediction.reason_codes == [reason]
 
 
-def test_hardware_prediction_accepts_ordered_cross_queue_schedule() -> None:
+def test_hardware_prediction_rejects_timestamp_only_cross_queue_schedule() -> (
+    None
+):
     first = DispatchEvidence(
         workload_uuid="workload-1",
         candidate_sha256="c" * 64,
@@ -486,4 +488,7 @@ def test_hardware_prediction_accepts_ordered_cross_queue_schedule() -> None:
         _calibration(),
     )
 
-    assert prediction.status is not DiagnosticSidecarStatus.UNAVAILABLE
+    assert prediction.status is DiagnosticSidecarStatus.UNAVAILABLE
+    assert prediction.reason_codes == [
+        "cross_lane_event_dependencies_unverified"
+    ]
