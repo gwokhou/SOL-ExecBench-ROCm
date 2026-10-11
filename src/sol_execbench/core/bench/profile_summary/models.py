@@ -11,6 +11,7 @@ from typing import Literal
 from pydantic import ConfigDict, Field
 
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticConfidence
+from sol_execbench.core.bench.rocm_profiler.hip_events import HIPEventRecord
 from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ArtifactCoverageStatus,
     Rocprofv3ProfileStatus,
@@ -163,3 +164,5 @@ class ProfileSummaryContent(BaseModelWithDocstrings):
     """Conservative diagnostic bottleneck hints."""
     parse_warnings: list[str] = Field(default_factory=list)
     """Bounded artifact parse warnings."""
+    hip_events: list[HIPEventRecord] = Field(default_factory=list)
+    """Observed GPU barriers; missing wait generations are not causal edges."""

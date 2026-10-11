@@ -27,6 +27,10 @@ from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3ArtifactKind,
     Rocprofv3ProfileResult,
 )
+from sol_execbench.core.bench.rocm_profiler.hip_event_artifacts import (
+    read_hip_events,
+)
+from sol_execbench.core.bench.rocm_profiler.hip_events import HIPEventRecord
 from sol_execbench.core.bench.rocm_profiler.timing_parsing import (
     rocprofv3_duration_ns,
 )
@@ -53,6 +57,7 @@ class StructuredProfileEvidence(BaseModelWithDocstrings):
         default_factory=list,
     )
     parse_warnings: list[str] = Field(default_factory=list)
+    hip_events: list[HIPEventRecord] = Field(default_factory=list)
 
 
 def structured_profile_evidence(
@@ -71,8 +76,16 @@ def structured_profile_evidence(
     ]
     kernel_metrics: list[ProfileSummaryKernelMetric] = []
     parse_warnings: list[str] = []
+    hip_events: list[HIPEventRecord] = []
 
     for artifact in profile_result.artifacts:
+        if artifact.kind in {
+            Rocprofv3ArtifactKind.METADATA_JSON,
+            Rocprofv3ArtifactKind.ROCPD,
+        }:
+            events, warnings = read_hip_events(artifact.path)
+            hip_events.extend(events)
+            parse_warnings.extend(warnings)
         if artifact.kind is Rocprofv3ArtifactKind.TRACE_CSV:
             parsed_metrics, warnings = _parse_trace_csv_artifact(artifact.path)
             kernel_metrics.extend(parsed_metrics)
@@ -95,7 +108,6 @@ def structured_profile_evidence(
             parse_warnings.extend(warnings)
         elif artifact.kind in {
             Rocprofv3ArtifactKind.DIAGNOSTIC_JSON,
-            Rocprofv3ArtifactKind.ROCPD,
             Rocprofv3ArtifactKind.PERFETTO_TRACE,
             Rocprofv3ArtifactKind.OTF2_TRACE,
         }:
@@ -113,6 +125,7 @@ def structured_profile_evidence(
         kernel_metrics=kernel_metrics,
         bottleneck_hints=derive_bottleneck_hints(kernel_metrics),
         parse_warnings=parse_warnings,
+        hip_events=hip_events,
     )
 
 

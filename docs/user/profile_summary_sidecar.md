@@ -1,6 +1,6 @@
 # Profile Summary Sidecar
 
-`sol_execbench.profile_summary.v3` is an optional diagnostic sidecar written
+`sol_execbench.profile_summary.v4` is an optional diagnostic sidecar written
 next to canonical Trace JSONL using the profile-summary JSON suffix. It normalizes
 bounded `rocprofv3` profile metadata for downstream adapters while preserving
 Trace JSONL as the only authority for correctness, timing, scoring, and
@@ -8,7 +8,7 @@ evaluation status.
 
 The evaluator contract advertises this artifact through the optional
 `profile_summary.sidecar` capability key. The concrete artifact schema remains
-`sol_execbench.profile_summary.v3`.
+`sol_execbench.profile_summary.v4`.
 
 The summary sidecar does not replace the raw profile JSON sidecar. The existing
 profile metadata sidecar remains the raw diagnostic metadata record and is cited
@@ -34,9 +34,20 @@ The summary may also include structured diagnostic evidence:
 - `summary.parse_warnings[]`: bounded parse warnings for malformed,
   unsupported, too-large, or citation-only artifacts.
 
-The parser reads only registered CSV and JSON text artifacts. `.rocpd`,
-database, Perfetto/PFTrace, and OTF2 artifacts remain citation-only evidence
-pointers in the current schema.
+`summary.hip_events[]` contains bounded GPU barrier observations from registered
+ROCProfiler JSON or rocpd 3.0.4 databases. Each record retains capture, process,
+agent, queue, optional stream, event handle, source queue, operation, timestamps,
+and an optional observed record generation. The readers limit JSON to 16 MB,
+databases to 128 MB, and events to 10,000 per artifact; SQLite is read-only and
+has a query instruction budget. Other database contents, Perfetto/PFTrace and
+OTF2 remain citation-only.
+
+Generations are ordinals within the observed capture, not proven event lifetimes.
+Wait generations remain unknown because GPU completion timestamps cannot identify
+the host record call consumed by a wait. Reused handles, duplicate records and
+unresolved waits produce parse warnings. JSON and rocpd copies remain separately
+scoped captures; consumers must not add their event counts together. A barrier's
+duration is not a measurement of avoidable synchronization overhead.
 
 The sidecar is not correctness authority, timing authority, performance
 authority, score authority, evidence-tier authority, confirmed-improvement
@@ -85,10 +96,13 @@ conclusions. When counters are missing or insufficient, SOL emits
 `insufficient_counters` or `unknown` instead of speculating.
 
 Profiler-derived bottleneck hints remain in the
-`sol_execbench.profile_summary.v3` sidecar; SOL does not surface them as
+`sol_execbench.profile_summary.v4` sidecar; SOL does not surface them as
 `agent_feedback.items[]`. HIP adapters that want one prompt-facing hint list
 should merge profile-summary hints with agent-feedback items only after each
-source sidecar passes strict freshness and authority checks.
+source sidecar passes strict freshness and authority checks. The separate
+`hip_event_observations` agent-feedback item is informational and cites its
+captures. It does not classify a bottleneck, supersede static Decision hints,
+or admit a code-changing action.
 
 HIP runtime prompts should never include raw trace rows, raw profiler dumps,
 full kernel source, prompt text, or absolute temporary paths from SOL profile

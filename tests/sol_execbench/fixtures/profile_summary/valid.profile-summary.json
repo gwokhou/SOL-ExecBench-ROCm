@@ -62,7 +62,7 @@
     "Raw rocprofv3 metadata remains in the separate profile sidecar when present."
   ],
   "reason_code": "profile_summary_generated",
-  "schema_version": "sol_execbench.profile_summary.v3",
+  "schema_version": "sol_execbench.profile_summary.v4",
   "status": "available",
   "summary": {
     "artifact_count": 4,
@@ -173,7 +173,7 @@
     ],
     "output_file": "trace",
     "parse_warnings": [
-      "trace.rocpd: rocpd artifacts are citation-only in sol_execbench.profile_summary.v3"
+      "trace.rocpd: hip_event_artifact_invalid_or_unsupported"
     ],
     "profiler_available": true,
     "profiler_status": "success",

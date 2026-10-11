@@ -23,7 +23,7 @@
     "rocprofv3 profile status is failed."
   ],
   "reason_code": "profile_partial",
-  "schema_version": "sol_execbench.profile_summary.v3",
+  "schema_version": "sol_execbench.profile_summary.v4",
   "status": "partial",
   "summary": {
     "artifact_count": 0,

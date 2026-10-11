@@ -9,6 +9,9 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from sol_execbench.core.bench.agent_feedback.hip_events import (
+    hip_event_feedback,
+)
 from sol_execbench.core.bench.agent_feedback.items import trace_feedback_items
 from sol_execbench.core.bench.agent_feedback.models import (
     AgentFeedbackBottleneck,
@@ -156,6 +159,7 @@ def build_agent_feedback_sidecar(
         summary=_feedback_summary(request, status_counter, len(evaluated)),
         items=[
             *trace_feedback_items(status_counter),
+            *hip_event_feedback(profile_result),
             *_performance_feedback_items(request),
         ],
         limitations=_limitations(
