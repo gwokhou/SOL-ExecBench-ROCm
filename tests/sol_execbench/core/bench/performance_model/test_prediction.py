@@ -474,12 +474,16 @@ def timed_dispatch():
 
 @pytest.mark.parametrize("lane_field", ["queue_id", "stream_id"])
 @pytest.mark.parametrize(
+    "helper_valid", [True, False], ids=["valid", "filtered"]
+)
+@pytest.mark.parametrize("reverse", [False, True], ids=["forward", "reverse"])
+@pytest.mark.parametrize(
     ("start", "end"),
     [(10, 20), (5, 15), (0, 10), (None, None)],
     ids=["sequential", "overlap", "equal", "missing"],
 )
 def test_hardware_prediction_rejects_timestamp_only_cross_lane_schedule(
-    timed_dispatch, lane_field, start, end
+    timed_dispatch, lane_field, helper_valid, reverse, start, end
 ):
     first = timed_dispatch.model_copy(
         update={"queue_id": None, lane_field: "0"}
@@ -491,13 +495,19 @@ def test_hardware_prediction_rejects_timestamp_only_cross_lane_schedule(
             "iteration_ordinal": 1,
             "start_timestamp_ns": start,
             "end_timestamp_ns": end,
+            "valid": helper_valid,
+            "reason_codes": (
+                []
+                if helper_valid
+                else ["dispatch_static_kernel_identity_mismatch"]
+            ),
         }
     )
 
     prediction = predict_hw(
         _semantic(),
         [],
-        [first, second],
+        [second, first] if reverse else [first, second],
         _calibration(),
     )
 
@@ -525,6 +535,14 @@ def test_hardware_prediction_rejects_timestamp_only_cross_lane_schedule(
         ({"workload_uuid": "other"}, "dispatch_workload_identity_conflict"),
         ({"candidate_sha256": "d" * 64}, "dispatch_workload_identity_conflict"),
         (
+            {"workload_uuid": "other", "valid": False},
+            "dispatch_workload_identity_conflict",
+        ),
+        (
+            {"candidate_sha256": "d" * 64, "valid": False},
+            "dispatch_workload_identity_conflict",
+        ),
+        (
             {
                 "queue_id": None,
                 "valid": False,
@@ -537,6 +555,8 @@ def test_hardware_prediction_rejects_timestamp_only_cross_lane_schedule(
         "filtered-cross-lane-helper",
         "mixed-workload",
         "mixed-candidate",
+        "filtered-mixed-workload",
+        "filtered-mixed-candidate",
         "filtered-unknown-lane",
     ],
 )
@@ -576,3 +596,78 @@ def test_single_lane_prediction_does_not_use_timestamp_distances(
     assert result.predicted_time_ms == pytest.approx(
         2 * original.predicted_time_ms
     )
+
+
+@pytest.mark.parametrize("lane_field", ["queue_id", "stream_id"])
+@pytest.mark.parametrize(
+    "count", [2, 4], ids=["two-dispatches", "four-dispatches"]
+)
+@pytest.mark.parametrize(
+    "with_helper", [False, True], ids=["kernel-only", "helper"]
+)
+@pytest.mark.parametrize(
+    ("spacing", "duration"),
+    [(None, None), (10, None), (10, 5), (100_000, 5_000), (0, 0)],
+    ids=["missing", "start-only", "ordered", "long-gap", "tied-zero-width"],
+)
+def test_single_lane_prediction_preserves_calibrated_sum(
+    timed_dispatch, lane_field, count, with_helper, spacing, duration
+):
+    first = timed_dispatch.model_copy(
+        update={"queue_id": None, lane_field: "0"}
+    )
+    original = predict_hw(_semantic(), [], [first], _calibration())
+    records = [
+        first.model_copy(
+            update={
+                "dispatch_id": str(index),
+                "iteration_ordinal": index,
+                "start_timestamp_ns": index * 10,
+                "end_timestamp_ns": index * 10 + 5,
+            }
+        )
+        for index in range(count + int(with_helper))
+    ]
+    if with_helper:
+        records[-1] = records[-1].model_copy(
+            update={
+                "kernel_symbol": "__amd_rocclr_copyBuffer",
+                "valid": False,
+                "reason_codes": ["dispatch_static_kernel_identity_mismatch"],
+            }
+        )
+    expected = predict_hw(_semantic(), [], records, _calibration())
+    assert original.predicted_time_ms is not None
+    assert original.lower_ms is not None
+    assert original.upper_ms is not None
+    assert expected.predicted_time_ms == pytest.approx(
+        count * original.predicted_time_ms
+    )
+    assert expected.lower_ms == pytest.approx(count * original.lower_ms)
+    assert expected.upper_ms == pytest.approx(count * original.upper_ms)
+    changed = [
+        item.model_copy(
+            update={
+                "start_timestamp_ns": None
+                if spacing is None
+                else index * spacing,
+                "end_timestamp_ns": (
+                    None
+                    if spacing is None or duration is None
+                    else index * spacing + duration
+                ),
+            }
+        )
+        for index, item in enumerate(records)
+    ]
+    for ordered, baseline in (
+        (changed, records),
+        (list(reversed(changed)), list(reversed(records))),
+    ):
+        result = predict_hw(_semantic(), [], ordered, _calibration())
+        reference = predict_hw(_semantic(), [], baseline, _calibration())
+        # Per-dispatch component details follow the supplied record order.
+        assert result.model_dump() == reference.model_dump()
+        assert result.model_dump(exclude={"components"}) == expected.model_dump(
+            exclude={"components"}
+        )

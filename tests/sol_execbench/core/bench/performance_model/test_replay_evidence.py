@@ -2,20 +2,36 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from sol_execbench.core.bench.diagnostic_sidecar import DiagnosticSidecarStatus
+from sol_execbench.core.bench.performance_model import builder
+from sol_execbench.core.bench.performance_model.evidence_manifest import (
+    PerformanceEvidenceArtifactKind,
+    PerformanceEvidenceManifest,
+    PerformanceRunIdentity,
+    artifact_reference,
+)
 from sol_execbench.core.bench.performance_model.replay_evidence import (
     REPLAY_EVIDENCE_ITERATIONS,
     RawPerformanceReplayRecord,
     build_performance_replay_evidence,
+    load_json_file_from_timing,
 )
 from sol_execbench.core.bench.performance_model.timing_evidence import (
     PerformanceTimingEvidenceSidecar,
     WorkloadTimingEvidence,
 )
+from sol_execbench.core.bench.rocm_profiler.counters import (
+    CounterPassCSV,
+    parse_and_align_counter_passes,
+)
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     atomic_write_jsonl_values,
 )
+from sol_execbench.core.data.trace import Trace
+from sol_execbench.core.data.workload import Workload
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
@@ -232,3 +248,138 @@ def test_replay_evidence_parses_only_registered_counter_csvs(
 
     assert replay.status is DiagnosticSidecarStatus.AVAILABLE
     assert marker_path.name in replay.artifact_sha256
+
+
+@pytest.fixture
+def lane_replay_passes(tmp_path):
+    timing_path = tmp_path / "timing.json"
+    _write_timing(timing_path)
+    paths = []
+    for pass_index in (1, 2):
+        pass_dir = tmp_path / f"pass_{pass_index}"
+        pass_dir.mkdir()
+        paths.append(pass_dir / "counter.csv")
+        record = RawPerformanceReplayRecord(
+            pid=100 + pass_index,
+            parent_pid=10,
+            process_executable_sha256="d" * 64,
+            pass_index=pass_index,
+            workload_uuid="w0",
+            input_sha256="c" * 64,
+            cache_identity_sha256=_EMPTY_CACHE_SHA256,
+            marker_ranges=[
+                f"sol_execbench/w0/iteration/{index}"
+                for index in range(REPLAY_EVIDENCE_ITERATIONS)
+            ],
+        )
+        atomic_write_jsonl_values(
+            tmp_path / f"performance-replay-raw-{pass_index}.jsonl",
+            [record.model_dump(mode="json")],
+        )
+    return timing_path, paths
+
+
+@pytest.mark.parametrize("lane_column", ["Queue_Id", "Stream_Id"])
+@pytest.mark.parametrize(
+    "second_helper_lane", ["0", "1", ""], ids=["stable", "changed", "missing"]
+)
+def test_replay_rejects_cross_pass_helper_lane_drift(
+    tmp_path, lane_replay_passes, lane_column, second_helper_lane
+):
+    timing_path, paths = lane_replay_passes
+    for path, counter, helper_lane in zip(
+        paths,
+        ("SQ_WAVES", "SQ_INSTS_VALU"),
+        ("0", second_helper_lane),
+        strict=True,
+    ):
+        path.write_text(
+            f"{lane_column},"
+            + _HEADER
+            + f"0,1,kernel,32,32,{counter},1\n"
+            + f"{helper_lane},2,__amd_rocclr_copyBuffer,32,32,{counter},1\n",
+            encoding="utf-8",
+        )
+    aligned = parse_and_align_counter_passes(
+        [CounterPassCSV(index, path) for index, path in enumerate(paths, 1)],
+        workload_uuid="w0",
+        candidate_sha256="f" * 64,
+    )
+    kernel = next(item for item in aligned if item.kernel_symbol == "kernel")
+    helper = next(item for item in aligned if item.kernel_symbol != "kernel")
+    assert kernel.valid
+    drifted = second_helper_lane != "0"
+    assert helper.valid is (not drifted)
+    if drifted:
+        assert "cross_pass_execution_identity_conflict" in helper.reason_codes
+    # Alignment retains the first pass lane. The replay gate must catch the
+    # discarded lane before a caller can filter this invalid helper out.
+    lane_field = "queue_id" if lane_column == "Queue_Id" else "stream_id"
+    assert getattr(helper, lane_field) == "0"
+    replay = build_performance_replay_evidence(
+        staging_dir=tmp_path,
+        run_id="a" * 64,
+        candidate_sha256="f" * 64,
+        canonical_timing_path=timing_path,
+        artifact_paths=paths,
+        expected_gpu_id="gpu-0",
+        expected_gpu_bdf="0000:03:00.0",
+        environment=_environment(),
+    )
+    assert len(replay.processes) == 2
+    digests = {process.dispatch_sequence_digest for process in replay.processes}
+    assert len(digests) == (2 if drifted else 1)
+    if drifted:
+        assert replay.status is DiagnosticSidecarStatus.PARTIAL
+        assert replay.alignment_digest is None
+        assert replay.reason_codes == ["replay_dispatch_sequence_mismatch"]
+        manifest = _manifest_for_replay(tmp_path, replay)
+        dispatches, reasons = builder._manifest_dispatch_evidence(
+            manifest,
+            tmp_path / "manifest.json",
+            Trace(
+                definition="toy",
+                workload=Workload(
+                    uuid="w0",
+                    axes={},
+                    inputs={},
+                    checks=[{"type": "numeric", "output": "output"}],
+                ),
+            ),
+            load_json_file_from_timing(timing_path).workloads[0],
+            [],
+        )
+        assert dispatches == []
+        assert reasons == ["replay_dispatch_sequence_mismatch"]
+    else:
+        assert replay.status is DiagnosticSidecarStatus.AVAILABLE
+        assert replay.alignment_digest is not None
+        assert replay.reason_codes == []
+
+
+def _manifest_for_replay(root, replay):
+    replay_path = root / "replay.json"
+    atomic_write_json_value(replay_path, replay.to_dict())
+    return PerformanceEvidenceManifest(
+        status=replay.status,
+        identity=PerformanceRunIdentity(
+            run_id=replay.run_id,
+            definition="toy",
+            definition_sha256="b" * 64,
+            workload_uuid="w0",
+            workload_sha256="c" * 64,
+            solution_sha256="d" * 64,
+            candidate_sha256=replay.candidate_sha256,
+            gpu_architecture="gfx1200",
+            clock_mode="locked",
+            timing_protocol="device_event_v1",
+        ),
+        artifacts=[
+            artifact_reference(
+                kind=PerformanceEvidenceArtifactKind.REPLAY_EVIDENCE,
+                path=replay_path,
+                root=root,
+            )
+        ],
+        reason_codes=replay.reason_codes,
+    )
