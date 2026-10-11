@@ -142,6 +142,7 @@ def _profile_summary_content(
         kernel_metrics=structured.kernel_metrics,
         bottleneck_hints=structured.bottleneck_hints,
         parse_warnings=structured.parse_warnings,
+        hip_events=structured.hip_events,
     )
 
 

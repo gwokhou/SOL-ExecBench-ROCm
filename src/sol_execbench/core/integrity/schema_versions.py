@@ -133,7 +133,7 @@ class SchemaVersion(StrEnum):
         "sol_execbench.performance_schedule_evidence.v1"
     )
     PERFORMANCE_TIMING_EVIDENCE = "sol_execbench.performance_timing_evidence.v3"
-    PROFILE_SUMMARY = "sol_execbench.profile_summary.v3"
+    PROFILE_SUMMARY = "sol_execbench.profile_summary.v4"
     RDNA4_DIAGNOSTIC_CORPUS_DESIGN = "rdna4_diagnostic_corpus_design.v1"
     RDNA4_VALIDATION = "sol_execbench.rdna4_validation.v2"
     REFERENCE_IPC = "sol_execbench.reference_ipc.v2"
