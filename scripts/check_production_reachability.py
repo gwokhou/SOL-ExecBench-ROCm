@@ -14,6 +14,7 @@ PACKAGE_ROOTS = ("sol_execbench", "solar")
 ENTRY_MODULES = {
     "sol_execbench",
     "sol_execbench.cli.main",
+    "sol_execbench.core.bench.clock_recovery",
     "solar",
     "solar.api",
 }

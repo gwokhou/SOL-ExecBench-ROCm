@@ -61,11 +61,90 @@ uv run sol-execbench evaluate \
 | `--lock-clocks` | off | force the clock-lock requirement |
 | `--unsafe-local-execution` | off | allow diagnostic host execution |
 | `--keep-staging` | off | preserve staged process assets |
-| `--profile` | `none` | `none` or `rocprofv3` |
+| `--profile` | `none` | `none`, `rocprofv3` or `rocprofv3-counters` |
 | `--static-evidence` | `none` | `none` or `auto` |
 | `--decision` | `none` | `none` or `auto` |
 | `--feedback-*` | none | optional derived-sidecar identities |
 | `--verbose` | off | print bounded subprocess details |
+
+### PMC clock window
+
+`rocprofv3-counters` collects replay evidence **after canonical timing**. Its
+clock policy is independent of benchmark `lock_clocks` and trace-only profiling.
+The existing evaluation GPU lock and owned `ClockLockLease` teardown are reused.
+
+| Environment option | Default | Meaning |
+| --- | --- | --- |
+| `SOL_EXECBENCH_PMC_CLOCK_TARGET` | `0000:05:00.0` when `ROCR_VISIBLE_DEVICES=GPU-a30fa29c1cca1511`; otherwise no automatic window | AMD-SMI BDF, UUID, index, or explicit `all` |
+| `SOL_EXECBENCH_PMC_CLOCK_MODE` | `required` | `required` refuses replay if setup fails; `best-effort` permits unlocked diagnostic replay after verified rollback |
+
+Prefer a BDF or UUID over a mutable enumeration index. `all` deliberately changes
+every AMD GPU, and is never selected implicitly. The qualified local BDF is
+also checked against its known AMD-SMI UUID before any write.
+
+For the qualified gfx1200 target, set these in the **process running evaluate**:
+
+```bash
+export ROCR_VISIBLE_DEVICES=GPU-a30fa29c1cca1511
+export SOL_EXECBENCH_PMC_CLOCK_TARGET=0000:05:00.0
+export SOL_EXECBENCH_PMC_CLOCK_MODE=required
+```
+
+Without an outer owner, the PMC window verifies initial AUTO, sets and verifies
+STABLE_PEAK, then restores and verifies AUTO. With a verified outer host guard or
+nested PMC owner, it **borrows** that policy and never resets clocks on inner exit.
+Borrowing requires a unique owner token, a current owner record covering the same
+physical GPU identities, a live owner file lock, and a fresh STABLE_PEAK readback.
+An environment flag or a GPU that happens to be at STABLE_PEAK is insufficient.
+Unknown external policies are not overwritten. Ownership proof failures remain
+fatal even in best-effort mode.
+
+Exceptions, timeouts, SIGINT and SIGTERM unwind the existing clock lease. The
+order is child/process-group cleanup, owned Docker container removal, clock
+restore and readback, final owner receipt, then GPU-lock release. If container
+removal cannot be confirmed, the host leaves clocks alone and records a recovery
+blocker. Release is idempotent; failed restoration does not mark the lease released.
+SIGKILL and host failure cannot run teardown. A stale active owner or failed
+restore blocks the next GPU-lock acquisition instead of silently resuming work.
+
+PMC receipts are stored independently in
+`<profiler-output-directory>.pmc-clock/`. They distinguish `owned`, `borrowed` and
+`none`, retain the owner lease ID, and record `borrow_ended` separately from
+`auto_verified`. A borrowed receipt never claims AUTO restoration. The owner's
+record in `$SOL_EXECBENCH_GPU_LOCK_DIR/clock-leases/<lease-id>.json` records the
+final restoration outcome; its sibling lock proves live ownership and its
+container-ID file survives host crashes. These are cooperative orchestration
+records on a trusted shared directory, not authentication against a process with
+write access to that directory. The owner token is not forwarded to untrusted
+kernel subprocesses.
+
+`run_docker.sh` forwards the owner token and PMC options through the existing
+shared lock-directory mount. Thus an unprivileged container can borrow a verified
+host policy without sudo or broader container permissions. The host remains
+responsible for restoration after the container is confirmed stopped. The wrapper
+owns `--cidfile`; do not supply another one. Host and container must both use the
+updated code. No benchmark clock policy or canonical timing protocol is changed;
+PMC replay still cannot replace canonical timing samples.
+
+An independently owned PMC window needs permission for the exact
+`sudo -n amd-smi set -l STABLE_PEAK -g VERIFIED_UUID` and corresponding
+`AUTO` command. BDF/index selectors are resolved to verified AMD-SMI UUIDs before
+mutation; explicit `all` applies the same command separately to each verified UUID. This feature does not install permissions or elevate Python.
+
+After a crash or restoration failure, inspect the owner record, stop its abandoned
+workload/container, and restore only its recorded GPU devices with AMD-SMI. Then
+run the verification-only recovery command on the host, using the same lock directory:
+
+```bash
+uv run python -m sol_execbench.core.bench.clock_recovery LEASE_ID
+```
+
+Recovery does not change clocks or kill processes. It acquires GPU/owner exclusion,
+checks container absence where applicable, physical identities, GPU idleness and
+AUTO, preserves the original record in `clock-leases/recovery-history/`, then
+records the successful recovery. Missing container identity, unreadable state,
+a live owner or failed verification leaves the gate blocked. Do not delete pending
+records to bypass those checks.
 
 JSON response mode requires a trace path:
 
@@ -192,3 +271,15 @@ Use `./scripts/run_docker.sh --build` or select a target declared in
 `docker/rocm-targets.json` with `--target`. The wrapper owns its image, device
 and dependency variables; inspect `./scripts/run_docker.sh --help` for the
 current surface.
+
+Clock command authorization and execution share
+`core/platform/clock_commands.py`: the executable resolver, policy values, and
+exact argument ordering are common to the legacy all-device clock lease, the
+UUID-scoped PMC controller, and `scripts/setup_rocm_clock_sudoers.py`.
+Use the generator option `--gpu-uuid VERIFIED_UUID` for device-scoped rules;
+omitting it retains the legacy all-device scope. Generation does not install
+permissions automatically. Its read-only `check` mode reports
+`allowed_authentication_unverified` when sudo permits a command: successful
+`sudo -l` alone does not prove passwordless execution, so this result is not
+reported as verified coverage. Actual controlled lease execution remains the
+verification of noninteractive acquisition and AUTO restoration.

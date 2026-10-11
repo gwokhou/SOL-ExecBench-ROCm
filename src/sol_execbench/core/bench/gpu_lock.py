@@ -12,7 +12,10 @@ import time
 from collections.abc import Iterator
 from pathlib import Path
 
+from sol_execbench.core.bench.clock_ownership import require_no_clock_recovery
+
 _HOST_MANAGED_ENV = "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST"
+GPU_LOCK_FILENAME = "gpu-{device_index}.lock"
 
 
 class GPULockVerificationError(RuntimeError):
@@ -37,7 +40,9 @@ def acquire_gpu_lock(
     """Serialize access to one GPU across evaluator processes and containers."""
     if timeout_seconds <= 0:
         raise ValueError("GPU lock timeout must be positive")
-    lock_path = gpu_lock_directory() / f"gpu-{device_index}.lock"
+    lock_path = gpu_lock_directory() / GPU_LOCK_FILENAME.format(
+        device_index=device_index
+    )
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     if _reuse_inherited_lock(lock_path):
         yield
@@ -55,6 +60,7 @@ def acquire_gpu_lock(
                         f"{timeout_seconds:g} seconds",
                     ) from None
                 time.sleep(0.1)
+        require_no_clock_recovery(lock_path.parent)
         handle.seek(0)
         handle.truncate()
         handle.write(f"pid={os.getpid()}\n")
@@ -84,7 +90,9 @@ def acquire_evaluation_gpu_lock(
 
 
 def _external_gpu_lock_is_held(device_index: int) -> bool:
-    lock_path = gpu_lock_directory() / f"gpu-{device_index}.lock"
+    lock_path = gpu_lock_directory() / GPU_LOCK_FILENAME.format(
+        device_index=device_index
+    )
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+", encoding="utf-8") as handle:
         try:

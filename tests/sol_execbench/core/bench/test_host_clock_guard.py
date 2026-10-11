@@ -9,8 +9,21 @@ from collections.abc import Iterator
 
 import pytest
 
-from sol_execbench.core.bench import host_clock_guard
+from sol_execbench.core.bench import clock_ownership, host_clock_guard
 from sol_execbench.core.bench.clock_lock import ClockLockLease
+
+
+@pytest.fixture(autouse=True)
+def owner_directory(monkeypatch, tmp_path):
+    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.delenv(clock_ownership.ENV_CLOCK_OWNER, raising=False)
+    monkeypatch.setattr(
+        clock_ownership,
+        "observe_clock_devices",
+        lambda: (
+            clock_ownership.ClockDevice(bdf="0000:05:00.0", uuid="test-uuid"),
+        ),
+    )
 
 
 @contextlib.contextmanager
@@ -113,3 +126,31 @@ def test_guard_rejects_invalid_timeout() -> None:
             ("true",),
             environment={"SOL_EXECBENCH_GPU_LOCK_TIMEOUT_SECONDS": "0"},
         )
+
+
+def test_container_cleanup_failure_keeps_clock_policy_and_recovery_gate(
+    monkeypatch, tmp_path
+):
+    restores = []
+    lease = ClockLockLease(
+        locked=True,
+        acquired=True,
+        restore=lambda: restores.append(True) or True,
+    )
+    monkeypatch.setattr(host_clock_guard, "acquire_clock_lock", lambda: lease)
+
+    def runner(_command, _environment):
+        raise host_clock_guard.ContainerCleanupError("container remains")
+
+    with pytest.raises(
+        host_clock_guard.ContainerCleanupError, match="container remains"
+    ):
+        host_clock_guard.run_with_host_clock_guard(
+            ("docker", "run"), runner=runner
+        )
+    assert restores == []
+    with pytest.raises(
+        clock_ownership.ClockOwnershipError, match="clock_recovery_required"
+    ):
+        clock_ownership.require_no_clock_recovery(tmp_path)
+    lease.detach()

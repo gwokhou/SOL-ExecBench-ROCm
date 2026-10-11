@@ -10,6 +10,7 @@ import logging
 import os
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, Protocol
@@ -26,6 +27,7 @@ from sol_execbench.cli.evaluation.diagnostics import (
 from sol_execbench.cli.sidecars.profile import _profile_output_directory
 from sol_execbench.core.bench.clock_lock import (
     ClockLockAcquirer,
+    ClockLockLease,
     acquire_clock_lock,
 )
 from sol_execbench.core.bench.io import flashinfer_safetensors_env
@@ -37,6 +39,7 @@ from sol_execbench.core.bench.rocm_profiler import (
     collect_rocprofv3_counters,
     collect_rocprofv3_profile,
 )
+from sol_execbench.core.bench.rocm_profiler.pmc_clock import pmc_clock_window
 from sol_execbench.core.evidence.runtime_evidence.collectors import (
     collect_runtime_gpu_telemetry,
 )
@@ -209,13 +212,8 @@ def _run_profiled_evaluation(
 ) -> tuple[subprocess.CompletedProcess[str] | None, Rocprofv3ProfileResult]:
     """Run evaluation under `rocprofv3`, returning normal execution on failure.
 
-    The rocprofv3 collection is wrapped in a best-effort STABLE_PEAK clock lock.
-
-    The lock comes from :func:`acquire_clock_lock`: idempotent (an outer
-    STABLE_PEAK is preserved, never released by this inner acquire) and
-    best-effort -- if the lock is unsupported or unavailable, profiling still
-    runs unlocked and a warning records that the environment is not suitable
-    for formal counter evidence.
+    Counter replay uses a target-scoped strict PMC window after canonical
+    timing. Trace-only profiling retains its existing best-effort clock lease.
     """
     output_directory = _profile_output_directory(output_file, staging_dir)
     request = Rocprofv3ProfileRequest(
@@ -230,10 +228,15 @@ def _run_profiled_evaluation(
             resolve_rocm_tool(ROCPROFV3_EXECUTABLE) is not None
         )
 
-    # Hold STABLE_PEAK across collection so replay passes share one audited
-    # clock policy. Idempotent vs an outer lock; best-effort skip below.
-    with lifecycle.clock_locker() as clock_lease:
-        if not clock_lease.locked:
+    clock_window = (
+        pmc_clock_window(output_directory)
+        if counter_mode
+        else lifecycle.clock_locker()
+    )
+    if counter_mode and not rocprofv3_available:
+        clock_window = nullcontext(ClockLockLease(locked=False, acquired=False))
+    with clock_window as clock_lease:
+        if clock_lease is not None and not clock_lease.locked:
             logger.warning(
                 "rocprofv3 profiling is running without a STABLE_PEAK clock "
                 "lock; this run cannot be formal gfx1200 counter evidence.",
@@ -252,6 +255,14 @@ def _run_profiled_evaluation(
                 lifecycle.prepare_profiled_application,
             ),
         )
+        if counter_mode and not clock_lease.locked:
+            profile_result = replace(
+                profile_result,
+                warnings=(
+                    *profile_result.warnings,
+                    "PMC clock policy unverified; diagnostic-only counters",
+                ),
+            )
         post_snapshot = _replay_snapshot("post") if counter_mode else None
         if counter_mode:
             profile_result = replace(
@@ -262,15 +273,21 @@ def _run_profiled_evaluation(
                     if snapshot is not None
                 ),
             )
-    if profile_result.succeeded:
-        profiled_proc = subprocess.CompletedProcess(
-            args=list(profile_result.command),
-            returncode=profile_result.returncode or 0,
-            stdout=profile_result.stdout,
-            stderr=profile_result.stderr,
-        )
-        return profiled_proc, profile_result
-    return None, profile_result
+    return _profiled_process(profile_result), profile_result
+
+
+def _profiled_process(
+    result: Rocprofv3ProfileResult,
+) -> subprocess.CompletedProcess[str] | None:
+    """Expose application output only for a successful profiler collection."""
+    if not result.succeeded:
+        return None
+    return subprocess.CompletedProcess(
+        args=list(result.command),
+        returncode=result.returncode or 0,
+        stdout=result.stdout,
+        stderr=result.stderr,
+    )
 
 
 def _replay_snapshot(

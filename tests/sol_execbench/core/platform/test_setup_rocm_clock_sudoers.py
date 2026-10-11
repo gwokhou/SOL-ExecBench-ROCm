@@ -73,7 +73,9 @@ def test_check_passwordless_coverage_is_read_only():
     with patch.object(sudoers.subprocess, "run", return_value=ok) as run:
         checks = sudoers.check_passwordless_coverage("/opt/rocm/bin/amd-smi")
 
-    assert {check.status for check in checks} == {"covered"}
+    assert {check.status for check in checks} == {
+        "allowed_authentication_unverified"
+    }
     assert [call.args[0] for call in run.call_args_list] == [
         ["sudo", "-n", "-l", "--", "/opt/rocm/bin/amd-smi", "version"],
         [
@@ -207,3 +209,33 @@ def test_help_explains_check_and_live_side_effects(capsys):
 
 def stat_mode(path: Path) -> int:
     return path.stat().st_mode & 0o777
+
+
+@pytest.mark.parametrize(
+    "executable", ["/opt/rocm/bin/amd-smi", "/opt/rocm/core-10.0/bin/amd-smi"]
+)
+@pytest.mark.parametrize(
+    "gpu_uuid", [None, "a3007590-0000-1000-800f-a29c1cca1511"]
+)
+def test_runtime_and_sudoers_share_exact_clock_contract(executable, gpu_uuid):
+    from sol_execbench.core.platform.clock_commands import (
+        ClockLevel,
+        clock_command,
+    )
+
+    content = sudoers.render_sudoers(
+        user="runner", amd_smi=executable, gpu_uuid=gpu_uuid
+    )
+    commands = sudoers.protected_commands(executable, gpu_uuid)
+    for level in ClockLevel:
+        command = clock_command(executable, level, gpu_uuid)
+        assert command in commands
+        assert " ".join(command) in content
+
+
+@pytest.mark.parametrize("gpu_uuid", ["all", "0", "*", "bad\nALL", "-g other"])
+def test_uuid_rule_rejects_unverified_selectors(gpu_uuid):
+    with pytest.raises(ValueError, match="UUID"):
+        sudoers.render_sudoers(
+            user="runner", amd_smi="/opt/rocm/bin/amd-smi", gpu_uuid=gpu_uuid
+        )

@@ -26,8 +26,8 @@ _MODULE = "sol_execbench.core.bench.clock_lock"
 def _mock_tool_paths(monkeypatch):
     monkeypatch.setattr(
         clock_lock_module,
-        "resolve_rocm_tool_command",
-        lambda _tool: "amd-smi",
+        "clock_executable",
+        lambda: "amd-smi",
     )
 
 
@@ -280,7 +280,7 @@ class TestClockLockLease:
             raise ValueError("body failed")
 
         assert caught.value.__notes__ == [
-            "failed to reset and verify every GPU at AUTO",
+            "failed to reset and verify owned GPU policy at AUTO",
         ]
         lease.detach()
 
