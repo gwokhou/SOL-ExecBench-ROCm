@@ -194,6 +194,36 @@ def test_replayed_dispatches_preserve_concurrent_lanes() -> None:
     ]
 
 
+@pytest.mark.parametrize("lane_field", ["queue_id", "stream_id"])
+def test_replay_collapse_preserves_filtered_helper_lane(lane_field):
+    compiled = CompiledCharacterization(
+        candidate_sha256="c" * 64,
+        code_object_sha256="d" * 64,
+        gpu_architecture="gfx1200",
+        kernel_symbol="kernel",
+        footprint=ResourceFootprint(scratch_bytes=0),
+        source=_source(),
+    )
+    dispatches = [
+        _dispatch(kernel, iteration=index).model_copy(update={lane_field: lane})
+        for index in range(2)
+        for kernel, lane in (("kernel", "0"), ("__amd_rocclr_copyBuffer", "1"))
+    ]
+    classified = builder._record_static_runtime_conflicts(
+        dispatches, [compiled]
+    )
+    result = builder._collapse_replayed_dispatches(classified)
+
+    assert sum(item.valid for item in result) == 1
+    helpers = [item for item in result if not item.valid]
+    assert len(helpers) == 2
+    assert all(getattr(item, lane_field) == "1" for item in helpers)
+    assert all(
+        item.reason_codes == ["dispatch_static_kernel_identity_mismatch"]
+        for item in helpers
+    )
+
+
 def test_counter_artifacts_require_cited_relative_path_and_hash(
     tmp_path: Path,
 ) -> None:
