@@ -89,6 +89,58 @@ completed investigations and one-time inventories belong in Git history.
 
 ## Active backlog
 
+<a id="solar-evolution"></a>
+
+### P1/P2 — SOLAR: BASE-01 retained; stages 1–5 saved separately
+
+Scope: BASE-01 CPU support and baseline only. The stages 1–5 implementation is
+saved on local branch `codex/solar-stages1-5-saved`; its foundation is on
+`codex/solar-base01-foundation`. The stage commit is separate from the snapshot
+of existing unrelated work and BASE-01. Neither branch has been pushed.
+
+The original [BASE-01 report](docs/internal/solar-base01-cpu-2026-10-23.md),
+[2026-10-26 recollection](docs/internal/solar-base01-cpu-2026-10-26.md),
+[stage 0](docs/internal/solar-evolution-stage0.md),
+[acceptance specification](docs/internal/solar-evolution-acceptance.md), and
+[task specifications](docs/internal/solar-evolution-tasks.md) remain available.
+Their observations are tied to their recorded source revisions. In particular,
+the recollection's F08 improvement and 821 passing / 1 failing tests describe
+that intermediate snapshot, not the restored production source.
+
+The original baseline records 32 F attempts, 30 semantic/counting completions,
+two torchview triangular conversion refusals, eight mathematical discrepancies,
+and 736 passing tests. The later BASE-01 support review passed 84 tests. Neither
+historical result substitutes for validation of the split candidate.
+
+The split restores the pre-stage production and regression files at fixed
+commit `e35d046ee9c64c310ff3be41fe0a78b00bb993b3`, while retaining all 12
+BASE-01 files and the 86 unrelated working-tree changes. The existing planning
+specifications are not authorization to resume stage implementation. Restoration
+of old counting behavior intentionally retains the F04/F08 baseline discrepancies.
+
+Backup manifests, the independent source bundle, isolated CPU validation,
+round-trip verification and final switch receipt are recorded under ignored
+`data/outputs/solar-safe-split-20261026/`. The independent backup also lives in
+the managed `solar-safe-split` worktree. Original BASE-01 and stage evidence
+stays immutable at its original location; old document seals describe their
+historical snapshots. No generated benchmark output is committed.
+
+GPU experiments, real mapper, R workloads and paused production qualification
+remain outside this split. Other backlog entries below are unchanged.
+
+The standalone BASE-01 commit is prepared on `codex/solar-base01-only`, directly
+from `e35d046ee9c64c310ff3be41fe0a78b00bb993b3`: 12 support/report files and
+five shared documents. The 86 unrelated changes remain uncommitted in this
+worktree; the original `main` checkout and both archive branches are unchanged.
+Split validation passed 1042 CPU tests on the retained working-tree snapshot.
+A separate export containing only the original base and these 17 files passed
+all 84 BASE-01 support tests, Ruff, format, ty, coupling, readability, schema and
+documentation checks in the same locked CPU image. This checks independence
+from the 86 changes; it does not recollect the F baseline. Commit preparation
+receipts are under ignored `data/outputs/solar-base01-commit-20261026/` in the
+managed worktree. No GPU, real mapper or R workload was run, and nothing was
+pushed.
+
 ### P1 — start-640 PCIe5.0x16 successor path (closed terminal)
 
 `p1-successor-start640-pcie5x16-r1` completed at `8848d605` and is **closed

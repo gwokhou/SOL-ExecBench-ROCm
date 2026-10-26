@@ -59,6 +59,21 @@ Internal research documents record the design basis for policies still
 referenced by the implementation. They are not current readiness reports or
 release-status claims.
 
-This tree documents only the current implementation. Superseded contracts,
+## SOLAR evolution
+
+- [Stage 0: capabilities, assumptions, and baseline](internal/solar-evolution-stage0.md)
+- [Acceptance sample specifications](internal/solar-evolution-acceptance.md)
+- [Stage 1–3 task specifications](internal/solar-evolution-tasks.md)
+- [BASE-01 original CPU baseline, 2026-10-23](internal/solar-base01-cpu-2026-10-23.md)
+- [BASE-01 pre-integration CPU snapshot, 2026-10-26](internal/solar-base01-cpu-2026-10-26.md)
+
+The current working tree retains BASE-01 support. The stage 1–5 implementation,
+contracts and reports are saved separately on local branch
+`codex/solar-stages1-5-saved`. The stage 0 and task specifications remain plans;
+BASE-01 reports retain their source-bound historical results. Current scope,
+backup locations and split validation are recorded in the
+[SOLAR evolution backlog entry](../HANDSOFF.md#solar-evolution).
+
+Public contracts in this tree describe the current implementation. Superseded contracts,
 completed readiness snapshots, and engineering history are available from Git
 history rather than checked-in archive files.
