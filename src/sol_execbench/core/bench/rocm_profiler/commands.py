@@ -59,7 +59,11 @@ def build_rocprofv3_profile_command(
         executable,
         "--kernel-trace",
         "--output-format",
-        output_format,
+        *(
+            [output_format, "json"]
+            if output_format == "rocpd" and include_hip_runtime
+            else [output_format]
+        ),
         "--output-directory",
         output_directory,
         "--output-file",

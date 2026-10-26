@@ -11,6 +11,7 @@ from pathlib import Path
 from rich.console import Console
 
 from sol_execbench.cli.evaluation import reporting as cli_reporting
+from sol_execbench.cli.protocol import CliExitCode, CliResult, artifact
 from sol_execbench.core.data.trace import EvaluationStatus, Trace
 from sol_execbench.core.integrity.checksums import sha256_file
 
@@ -53,4 +54,52 @@ def all_traces_passed(traces: list[Trace]) -> bool:
     return all(
         trace.evaluation and trace.evaluation.status == EvaluationStatus.PASSED
         for trace in traces
+    )
+
+
+def evaluation_artifacts(
+    output: Path | None, scope_archive: Path | None
+) -> tuple[dict[str, str], ...]:
+    """Expose the canonical trace and the independently archived scope verdict."""
+    result = (
+        (artifact(output, "canonical_trace_jsonl"),)
+        if output is not None
+        else ()
+    )
+    if scope_archive is not None:
+        result = (
+            *result,
+            artifact(scope_archive / "index.json", "hip_scope_qualification"),
+        )
+    return result
+
+
+def build_evaluation_result(
+    definition_name: str,
+    solution_name: str,
+    traces: list[Trace],
+    *,
+    output_file: Path | None,
+    scope_archive: Path | None,
+    scope_qualified: bool | None,
+) -> CliResult:
+    """Keep correctness status distinct while failing a rejected qualification."""
+    all_passed = all_traces_passed(traces)
+    return CliResult(
+        data={
+            "problem": definition_name,
+            "solution": solution_name,
+            "workloads": len(traces),
+            "passed": sum(1 for trace in traces if trace.is_successful()),
+            "all_passed": all_passed,
+            **(
+                {"scope_qualified": scope_qualified}
+                if scope_qualified is not None
+                else {}
+            ),
+        },
+        artifacts=evaluation_artifacts(output_file, scope_archive),
+        exit_code=CliExitCode.SUCCESS
+        if all_passed and scope_qualified is not False
+        else CliExitCode.RESULT_FAILED,
     )

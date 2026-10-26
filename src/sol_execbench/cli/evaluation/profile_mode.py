@@ -13,6 +13,7 @@ class ProfileMode(StrEnum):
 
     NONE = "none"
     ROCPROFV3 = "rocprofv3"
+    ROCPROFV3_SCOPE = "rocprofv3-scope"
     ROCPROFV3_COUNTERS = "rocprofv3-counters"
 
 

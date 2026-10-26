@@ -10,6 +10,7 @@ import pytest
 
 from sol_execbench.cli.evaluation import phases
 from sol_execbench.cli.evaluation.phases import require_execution_isolation
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import CliFailure
 
@@ -54,6 +55,7 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
             unsafe_local_execution=True,
             timeout=5,
             device="cuda:1",
+            profile=ProfileMode.NONE,
         ),
     )
     first_inside = threading.Event()

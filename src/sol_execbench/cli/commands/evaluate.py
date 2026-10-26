@@ -82,6 +82,7 @@ from sol_execbench.cli.sidecars.mode import (
 @click.option(
     "--profile",
     type=click.Choice(PROFILE_MODE_CHOICES),
+    help="rocprofv3-scope runs independent, identity-bound scope qualification after evaluation; requires --trace-output and STABLE_PEAK.",
     default=str(ProfileMode.NONE),
     show_default=True,
 )

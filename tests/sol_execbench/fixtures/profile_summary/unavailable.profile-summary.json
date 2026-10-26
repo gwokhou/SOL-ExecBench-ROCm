@@ -14,7 +14,7 @@
     "No rocprofv3 profile result was supplied."
   ],
   "reason_code": "no_profile_result",
-  "schema_version": "sol_execbench.profile_summary.v4",
+  "schema_version": "sol_execbench.profile_summary.v5",
   "status": "unavailable",
   "summary": {
     "artifact_count": 0,
