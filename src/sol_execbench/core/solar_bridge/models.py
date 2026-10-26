@@ -14,6 +14,10 @@ from typing import Any, Literal
 from sol_execbench.core.integrity.schema_versions import (
     SchemaVersion,
 )
+from solar.artifacts.names import (
+    ANALYSIS_FILENAME,
+    CONVERSION_ATTESTATION_FILENAME,
+)
 from solar.contracts import (
     FORMAL_BOUND_KIND,
     SolarAnalysisStatus,
@@ -23,6 +27,7 @@ from solar.contracts import (
     SolarStage,
     SolarStageStatus,
 )
+from solar.graph.contracts import OPERATOR_GRAPH_FILENAME
 from solar.ir.contracts import (
     DEFAULT_IR_PATH,
     IRPath,
@@ -49,12 +54,15 @@ def _normalize_worker_outcome(value: Any) -> None:
 
 def formal_artifact_paths(ir_path: IRPath) -> frozenset[str]:
     """Return the required top-level artifacts for one fixed IR path."""
+    from solar.ir.access_artifact import ACCESS_FILENAME
+
     return frozenset(
         {
-            "operator_graph.yaml",
+            ACCESS_FILENAME,
+            OPERATOR_GRAPH_FILENAME,
             ir_path.graph_filename,
-            "conversion-attestation.yaml",
-            "solar-analysis.yaml",
+            CONVERSION_ATTESTATION_FILENAME,
+            ANALYSIS_FILENAME,
         },
     )
 
@@ -92,9 +100,9 @@ def readiness_stage_artifacts(
 ) -> dict[SolarStage, str]:
     """Return the exact readiness artifact names for one fixed IR path."""
     return {
-        SolarStage.GRAPH_EXTRACTION: "operator_graph.yaml",
+        SolarStage.GRAPH_EXTRACTION: OPERATOR_GRAPH_FILENAME,
         SolarStage.IR_CONVERSION: ir_path.graph_filename,
-        SolarStage.CONVERSION_VERIFICATION: "conversion-attestation.yaml",
+        SolarStage.CONVERSION_VERIFICATION: CONVERSION_ATTESTATION_FILENAME,
     }
 
 

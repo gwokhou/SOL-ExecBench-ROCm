@@ -222,6 +222,8 @@ def _pooling_resampling_specs() -> list[NativeOpSpec]:
 
 def _indexing_specs() -> list[NativeOpSpec]:
     return [
+        _spec("tril", inputs=(1, 1), attributes=("diagonal",)),
+        _spec("triu", inputs=(1, 1), attributes=("diagonal",)),
         _spec("gather", inputs=(2, 2), attributes=("dim", "sparse_grad")),
         _spec(
             "scatter",

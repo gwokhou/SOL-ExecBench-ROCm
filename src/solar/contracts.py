@@ -16,6 +16,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from solar.artifacts.names import MANIFEST_FILENAME
 from solar.graph.contracts import (
     ExtractionKind,
     normalize_extraction_kind,
@@ -405,7 +406,7 @@ def write_request_manifest(
             },
         },
     )
-    (staging / "manifest.yaml").write_text(
+    (staging / MANIFEST_FILENAME).write_text(
         yaml.safe_dump(manifest.model_dump(mode="json"), sort_keys=False),
     )
 

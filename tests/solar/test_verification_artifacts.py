@@ -11,6 +11,10 @@ import yaml
 from solar.ir.contracts import IRKind
 from solar.schema_versions import ATEN_IR_SCHEMA_VERSION
 from solar.verification import numerics, verify as verification
+from solar.verification.execution import (
+    execution_identity,
+    semantic_runtime_identity,
+)
 from solar.verification.registry import verification_backend
 from solar.verification.verify import VerificationError
 
@@ -580,11 +584,12 @@ def test_replay_rejects_subject_digest_mismatches(source_artifact) -> None:
 
 
 def test_execution_identity_and_operation_resolution(monkeypatch) -> None:
-    assert verification._execution_identity("cpu") == {
+    assert execution_identity("cpu") == {
+        **semantic_runtime_identity(),
         "device_type": "cpu",
         "backend": "cpu",
         "device": "cpu",
     }
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     with pytest.raises(VerificationError, match="device is unavailable"):
-        verification._execution_identity("cu" + "da:0")
+        execution_identity("cu" + "da:0")

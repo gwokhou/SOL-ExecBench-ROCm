@@ -91,42 +91,100 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
-### P1/P2 — SOLAR: BASE-01 retained; stages 1–5 saved separately
+### P1/P2 — SOLAR: BASE-01 closeout; retained stages 1–5 work
 
-Scope: BASE-01 CPU support and baseline only. The stages 1–5 implementation is
-saved on local branch `codex/solar-stages1-5-saved`; its foundation is on
-`codex/solar-base01-foundation`. The stage commit is separate from the snapshot
-of existing unrelated work and BASE-01. Neither branch has been pushed.
+Scope clarification received 2026-10-26: the user's answer to the pending scope
+question is **BASE-01 closeout only**. BASE-01 CPU collection and reporting are
+complete. Its original 627 artifact bindings, later recollection's 664 bindings,
+and rules review's 20 bindings were rechecked unchanged. No fresh baseline or
+test run is implied by this integrity check. The source-bound results remain
+736 passing tests for the original baseline, 821 passing / 1 failing for the
+recollection, and 84 passing support tests for the rules review.
 
-The original [BASE-01 report](docs/internal/solar-base01-cpu-2026-10-23.md),
-[2026-10-26 recollection](docs/internal/solar-base01-cpu-2026-10-26.md),
-[stage 0](docs/internal/solar-evolution-stage0.md),
-[acceptance specification](docs/internal/solar-evolution-acceptance.md), and
-[task specifications](docs/internal/solar-evolution-tasks.md) remain available.
-Their observations are tied to their recorded source revisions. In particular,
-the recollection's F08 improvement and 821 passing / 1 failing tests describe
-that intermediate snapshot, not the restored production source.
+Earlier execution followed the stages 1–5 goal record before this answer arrived.
+Those code changes and execution receipts remain in the working tree; they have
+not been rolled back and are separate from the authorized BASE-01 deliverable.
+The stage records below describe completed CPU/fixture work, not authorization
+to continue it. This clarification changes documentation only; production code,
+GPU experiments, real mapper and R workloads are outside the closeout. The
+correction and before/after document identities are retained under
+`data/outputs/solar-base01-scope-closeout-20261026/`; earlier seals are preserved
+as historical snapshots rather than rewritten to match these documentation edits.
 
-The original baseline records 32 F attempts, 30 semantic/counting completions,
-two torchview triangular conversion refusals, eight mathematical discrepancies,
-and 736 passing tests. The later BASE-01 support review passed 84 tests. Neither
-historical result substitutes for validation of the split candidate.
+Retained stage implementation record: the updated AGENTS rules were applied to trust
+boundaries, owned validated contracts, explicit unsupported/invariant outcomes,
+and pre-computation work/output budgets. No quality baseline was raised.
+This entry does not re-audit the other state recorded in this file.
 
-The split restores the pre-stage production and regression files at fixed
-commit `e35d046ee9c64c310ff3be41fe0a78b00bb993b3`, while retaining all 12
-BASE-01 files and the 86 unrelated working-tree changes. The existing planning
-specifications are not authorization to resume stage implementation. Restoration
-of old counting behavior intentionally retains the F04/F08 baseline discrepancies.
+The [implementation and acceptance map](docs/internal/solar-stages1-5-implementation.md)
+preserves the complete requirements. Stage 0's
+[capabilities and assumptions](docs/internal/solar-evolution-stage0.md),
+[frozen acceptance samples](docs/internal/solar-evolution-acceptance.md), and
+[task specifications](docs/internal/solar-evolution-tasks.md) remain the planning
+baseline. Earlier stage checkpoint statements about downstream work describe
+those source revisions; this entry is the current status authority.
 
-Backup manifests, the independent source bundle, isolated CPU validation,
-round-trip verification and final switch receipt are recorded under ignored
-`data/outputs/solar-safe-split-20261026/`. The independent backup also lives in
-the managed `solar-safe-split` worktree. Original BASE-01 and stage evidence
-stays immutable at its original location; old document seals describe their
-historical snapshots. No generated benchmark output is committed.
+| Stage | Delivered CPU/fixture scope | Acceptance evidence |
+| --- | --- | --- |
+| S1 | Structured access/effects, base-coordinate unions, input-storage checks, accounting and sealed access artifacts | [S1 requirement/G01–G10 map](docs/internal/solar-stage1-cpu-acceptance.md); 946 related tests plus 59 final affected tests |
+| S2 | Intrinsic counts, resource/rate separation, exact verified-bundle reuse, unfused/ideal-fused/cache-aware views, API/CLI/bridge | [S2 contract](docs/internal/solar-stage2-cpu-checkpoint.md), [32-slot report](docs/internal/solar-stage2-cpu-2026-10-26.md); 1027 related tests and final focused checks |
+| S3 | Necessary resource constraints, bounded serial scans, sensitivity, complete point states and identity-bound recovery | [S3 contract](docs/internal/solar-stage3-cpu-checkpoint.md), [32-slot report](docs/internal/solar-stage3-cpu-2026-10-26.md); 1223 related tests plus 316 final affected tests |
+| S4 | Explicit finite-domain structural-zero scenarios, bounded demand propagation, separate dense/restricted outputs | [S4 contract](docs/internal/solar-stage4-cpu-checkpoint.md), [32-slot report](docs/internal/solar-stage4-cpu-2026-10-26.md); 1364 related tests plus 67 final affected tests |
+| S5 | Budgeted ordered matrix-chain reassociation, unchanged original callable oracle, per-candidate verification/pricing, API/CLI and pinned recovery | [S5 contract](docs/internal/solar-stage5-cpu-checkpoint.md), [32-slot and strict-numerical report](docs/internal/solar-stage5-cpu-2026-10-26.md); final 1445 related tests |
 
-GPU experiments, real mapper, R workloads and paused production qualification
-remain outside this split. Other backlog entries below are unchanged.
+The original [BASE-01 report](docs/internal/solar-base01-cpu-2026-10-23.md) remains
+unchanged: 32 F attempts, 30 semantic/counting completions, 2 conversion refusals,
+8 mathematical discrepancies, and 736 passing tests. The
+[pre-integration snapshot](docs/internal/solar-base01-cpu-2026-10-26.md) is also
+historical; its extraction-identity test issue was fixed during storage-contract
+integration. Neither snapshot is relabeled as validation of later production code.
+All 627 original BASE-01 bindings and 417 protected unrelated source files were
+rechecked unchanged at final collection.
+
+S1 corrects F04 to 392/648 B (96/160 unique fp32 input elements plus two scalar
+outputs) and F08 to 8/12 VALU operations. S1's 32-slot collection changed only
+F04/F08 numerical totals; source reference, trace inputs and verification policy
+were preserved. Unknown/effect/copy accesses remain unavailable. S2's collection
+retained 20 eligible equal full/reuse results and 12 visible ineligible slots;
+reuse never executes the reference or extractor. Missing capacity coverage does
+not create a cache-aware result or change the existing formal-bound field.
+
+S3 retained 80 new parameter points, 20 inverse queries and 80 resumed points,
+matching independent forward formulas. Nested mapper cleanup handles worker
+SIGTERM and owned groups whose leader exits normally; SIGKILL and deliberately
+detached tools remain outside that guarantee. Cleanup has separate source-bound
+checks rather than a falsely relabeled earlier collection.
+
+S4 retained 24 eligible public analyses, 8 ineligible F07/F08 slots, 20 available
+restricted ideal-fused views and 24 declined default IEEE scenarios. Both F06
+paths now retain dense 48/70 MAC and explicitly report restricted 30/30 MAC;
+torchview triangular conversion is verified rather than routed to the other path.
+Eight new/resumed scan points and four inverse queries pass independent formulas.
+Four F02 collector errors were recovered separately; all 36 attempts remain.
+S4 is sealed in `data/outputs/solar-stages1-5-20261026/demand/closeout.json`.
+
+S5's final `order/check-06` passes 1445 related CPU tests and schema, Ruff, format,
+ty, coupling, readability and documentation checks. Source identity
+`a225aaa60853091b985fdc5f4db8f7ca17de2b7d603cc483874ac7f963ffb0cc` is identical
+across full regression, main collection and recovery. Of 32 F slots, 24 sources
+are eligible: 8 matrix-chain search slots and 16 explicit domain refusals;
+8 F07/F08 sources remain ineligible. Twelve F search scenarios and two strict
+numerical scenarios yield 24 candidates and 24 resumed candidates, including
+two retained numerical refusals. F03 independent MACs are 84/70 (D) and 165/224
+(Q); model-minimum selection and stable ties are verified separately. A real
+four-matrix test covers all five trees. Four F03 collector-only pricing-assertion
+errors were recovered without production changes; 36 F worker attempts and all
+40 actually generated new candidate artifacts remain available.
+
+All execution evidence stays under ignored
+`data/outputs/solar-stages1-5-20261026/`; stage seals retain failed checks and
+recovered attempts. S5 is sealed in `order/closeout.json`; its 15 stopped CPU containers were
+removed after preserving configuration and exit status. The final S5 report
+identifies limitations and evidence locations. No generated benchmark output is
+added to tracked files.
+R references (16 slots), real mapper and GPU experiments remain `not_run`.
+Hypothetical/restricted/search projections confer no performance or publication
+authority. Stage 6 was not started; paused production qualification remains paused.
 
 ### P1 — start-640 PCIe5.0x16 successor path (closed terminal)
 

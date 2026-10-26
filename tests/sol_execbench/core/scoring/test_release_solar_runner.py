@@ -15,6 +15,7 @@ from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisStatus,
     SolarStage,
     SolarWorkerRequest,
+    formal_artifact_paths,
 )
 
 
@@ -57,12 +58,7 @@ def _formal_outcome(request: SolarWorkerRequest) -> SolarAnalysisOutcome:
         bound_kind="capacity_constrained_tile_aware_v1",
         artifacts=tuple(
             {"path": path, "sha256": "b" * 64}
-            for path in (
-                "operator_graph.yaml",
-                request.ir_path.graph_filename,
-                "conversion-attestation.yaml",
-                "solar-analysis.yaml",
-            )
+            for path in sorted(formal_artifact_paths(request.ir_path))
         ),
         publication_eligible=True,
     )

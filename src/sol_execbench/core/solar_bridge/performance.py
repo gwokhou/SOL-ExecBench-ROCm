@@ -44,6 +44,7 @@ from sol_execbench.core.solar_bridge.models import (
     SolarRequestManifest,
 )
 from solar.artifacts import load_yaml_artifact
+from solar.artifacts.names import ANALYSIS_FILENAME
 from solar.schema_versions import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
 )
@@ -128,9 +129,7 @@ def _manifest_analysis(
     manifest: SolarRequestManifest,
 ) -> tuple[Path, str]:
     matches = [
-        item
-        for item in manifest.artifacts
-        if item.path == "solar-analysis.yaml"
+        item for item in manifest.artifacts if item.path == ANALYSIS_FILENAME
     ]
     if len(matches) != 1:
         raise ValueError("solar_manifest_analysis_reference_missing")
@@ -164,7 +163,15 @@ def load_semantic_characterization(
     layers = _mapping(data.get("layers"), "layers")
     total = _mapping(data.get("total"), "total")
     metadata = _mapping(data.get("metadata"), "metadata")
+    from solar.analysis.access_contract import read_external_report
+    from solar.analysis.views import read_analysis_views
+    from solar.ir.access import AccessQuality
+
+    reads = read_external_report(metadata)
+    read_analysis_views(metadata.get("views"))
     descriptor, kind, reasons = _semantic_descriptor(layers, metadata)
+    if reads.quality is AccessQuality.UNAVAILABLE:
+        reasons.append("external_reads_unproved")
     regions = _fusion_regions(metadata.get("fusion"))
     if not regions:
         reasons.append("fusion_regions_missing")

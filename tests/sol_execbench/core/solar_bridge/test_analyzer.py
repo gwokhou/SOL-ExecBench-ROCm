@@ -27,6 +27,7 @@ from sol_execbench.core.solar_bridge.workload_context import (
     SolarWorkloadContext,
 )
 from solar.api import AnalysisFailure, AnalysisResult, ArtifactRef, SOLBound
+from solar.ir.access_artifact import ACCESS_FILENAME
 from solar.ir.contracts import IRPath
 
 _FORMAL_ARTIFACTS = tuple(
@@ -35,6 +36,7 @@ _FORMAL_ARTIFACTS = tuple(
         "operator_graph.yaml",
         "einsum_graph.yaml",
         "conversion-attestation.yaml",
+        ACCESS_FILENAME,
         "solar-analysis.yaml",
     )
 )

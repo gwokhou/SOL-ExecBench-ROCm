@@ -13,6 +13,7 @@ from typing import Any
 import yaml
 
 from solar.graph.contracts import OperatorGraphArtifact
+from solar.ir.access_artifact import write_access_document
 from solar.ir.bindings import bind_graph
 from solar.ir.contracts import IRGraphArtifact, IRKind
 from solar.schema_versions import ATEN_IR_SCHEMA_VERSION
@@ -151,7 +152,9 @@ def convert_operator_graph(
     validate_aten_graph(converted)
     path = Path(output_dir) / "aten_graph.yaml"
     path.write_text(yaml.safe_dump(converted, sort_keys=False))
-    return IRGraphArtifact(path, IRKind.ATEN)
+    artifact = IRGraphArtifact(path, IRKind.ATEN)
+    write_access_document(artifact, operator)
+    return artifact
 
 
 def validate_aten_graph(graph: Mapping[str, Any]) -> None:

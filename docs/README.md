@@ -66,12 +66,20 @@ release-status claims.
 - [Stage 1–3 task specifications](internal/solar-evolution-tasks.md)
 - [BASE-01 original CPU baseline, 2026-10-23](internal/solar-base01-cpu-2026-10-23.md)
 - [BASE-01 pre-integration CPU snapshot, 2026-10-26](internal/solar-base01-cpu-2026-10-26.md)
+- [Stages 1–5 implementation and acceptance map](internal/solar-stages1-5-implementation.md)
+- [S1 access/accounting CPU acceptance](internal/solar-stage1-cpu-acceptance.md)
+- [S2 verified reuse and three-view contract](internal/solar-stage2-cpu-checkpoint.md)
+- [S3 inverse queries and bounded scans](internal/solar-stage3-cpu-checkpoint.md)
+- [S4 restricted computation and demand propagation](internal/solar-stage4-cpu-checkpoint.md)
+- [S5 contraction-order search](internal/solar-stage5-cpu-checkpoint.md)
+- [S5 per-slot CPU search evidence](internal/solar-stage5-cpu-2026-10-26.md)
 
-The current working tree retains BASE-01 support. The stage 1–5 implementation,
-contracts and reports are saved separately on local branch
-`codex/solar-stages1-5-saved`. The stage 0 and task specifications remain plans;
-BASE-01 reports retain their source-bound historical results. Current scope,
-backup locations and split validation are recorded in the
+The stage 0 and task specifications preserve the original planning baseline;
+BASE-01 reports are historical, source-bound observations. Implementation
+checkpoints describe delivered domains and their CPU/fixture evidence at their
+source revisions; their earlier downstream-stage status is historical. They do
+not establish real mapper, GPU performance or release qualification. Track the
+current completion state in the
 [SOLAR evolution backlog entry](../HANDSOFF.md#solar-evolution).
 
 Public contracts in this tree describe the current implementation. Superseded contracts,

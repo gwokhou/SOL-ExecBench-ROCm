@@ -56,6 +56,8 @@ def _cases() -> list[tuple[str, Callable[..., Any], tuple[torch.Tensor, ...]]]:
         ("int", lambda x: x.int(), (matrix,)),
         ("long", lambda x: x.long(), (matrix,)),
         ("ones_like", torch.ones_like, (matrix,)),
+        ("tril", lambda x: torch.tril(x, diagonal=-1), (matrix,)),
+        ("triu", lambda x: torch.triu(x, diagonal=1), (matrix,)),
         ("eq", lambda x: x == 2, (matrix,)),
         ("reshape", lambda x: x.reshape(2, 2, 3), (matrix,)),
         (

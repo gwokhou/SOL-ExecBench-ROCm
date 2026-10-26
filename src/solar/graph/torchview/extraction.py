@@ -11,6 +11,7 @@ from pathlib import Path
 import yaml
 
 from solar.graph.contracts import (
+    OPERATOR_GRAPH_FILENAME,
     ExtractionKind,
     GraphBackend,
     OperatorGraphArtifact,
@@ -36,7 +37,7 @@ def extract_operator_graph(
         reference, tuple(inputs), device=device, output=output, name=name
     )
     traced_path = output / "pytorch_graph.yaml"
-    operator_path = output / "operator_graph.yaml"
+    operator_path = output / OPERATOR_GRAPH_FILENAME
     traced_path.replace(operator_path)
     graph = yaml.safe_load(operator_path.read_text()) or {}
     graph["schema_version"] = OPERATOR_GRAPH_SCHEMA_VERSION

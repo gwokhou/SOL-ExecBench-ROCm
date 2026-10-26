@@ -18,6 +18,7 @@ from sol_execbench.core.solar_bridge.models import (
     SolarStageAuditOutcome,
     SolarWorkerRequest,
 )
+from solar.ir.access_artifact import ACCESS_FILENAME
 
 
 def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
@@ -34,6 +35,7 @@ def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
                 "operator_graph.yaml",
                 "einsum_graph.yaml",
                 "conversion-attestation.yaml",
+                ACCESS_FILENAME,
                 "solar-analysis.yaml",
             )
         ),

@@ -12,6 +12,7 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from solar.artifacts.names import CONVERSION_ATTESTATION_FILENAME
 from solar.contracts import (
     AnalysisExecutionPolicy,
     AnalysisRequest,
@@ -99,7 +100,7 @@ def run_pipeline(
             verify_request_graph(
                 request,
                 ir_graph,
-                staging / "conversion-attestation.yaml",
+                staging / CONVERSION_ATTESTATION_FILENAME,
             )
             cleanup = request.execution_policy.device_stage_cleanup
             if cleanup is not None:

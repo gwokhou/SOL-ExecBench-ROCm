@@ -264,16 +264,26 @@ def test_graph_extraction_dispatches_through_registry(
         lambda: stub,
     )
 
+    inputs = _inputs(9)
     result = extract_operator_graph(
         _matmul,
-        _inputs(9),
+        inputs,
         device="cpu",
         output_dir=tmp_path,
         name="registry-dispatch",
         extraction_kind=ExtractionKind.MAKE_FX_REFERENCE,
     )
 
-    assert result is expected
+    assert result.path == expected.path
+    assert result.source_inputs == expected.source_inputs
+    assert result.used_source_indices == expected.used_source_indices
+    assert result.reference_outputs == expected.reference_outputs
+    assert expected.source_storage is None
+    assert result.source_storage is not None
+    result.source_storage.require_independent((0, 1))
+    assert [item.shape for item in result.source_storage.inputs] == [
+        tuple(value.shape) for value in inputs
+    ]
     assert seen["reference"] is _matmul
     assert seen["options"] == {
         "device": "cpu",

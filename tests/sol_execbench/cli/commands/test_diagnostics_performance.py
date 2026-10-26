@@ -70,6 +70,7 @@ from solar.schema_versions import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
     SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
 )
+from tests.solar.access_fixtures import exact_reads, unavailable_views
 
 
 def _trace(tmp_path: Path) -> tuple[Path, Trace]:
@@ -126,6 +127,8 @@ def _solar(path: Path) -> None:
             "lower_bound_seconds": 1.0e-6,
         },
         "metadata": {
+            "views": unavailable_views(),
+            "external_reads": exact_reads(128),
             "fusion": {"regions": [{"id": "region-0", "layers": ["add"]}]},
         },
     }

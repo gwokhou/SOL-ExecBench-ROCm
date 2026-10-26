@@ -8,9 +8,20 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 
 from solar.ir.contracts import IRBackend
 from solar.types import DynamicValue
+
+IN_TOTO_STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
+
+
+class VerificationPredicate(StrEnum):
+    """The two source-bound statements emitted by the verifier."""
+
+    CALLABLE = "https://solar-rocm.dev/attestations/callable-to-einsum/v1"
+    FILE = "https://solar-rocm.dev/attestations/source-to-einsum/v2"
+
 
 LayerExecutor = Callable[
     [

@@ -10,14 +10,19 @@ import re
 import signal
 import subprocess
 import threading
+import time
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
+from math import isfinite
 from pathlib import Path
 from typing import IO
 
 MAPPER_LOG_MAX_BYTES = 5 * 1024 * 1024
 _CAPTURE_OVERLAP_BYTES = 64 * 1024
 _READ_BYTES = 64 * 1024
+_PROCESS_WAIT_SECONDS = 5.0
+_PROCESS_POLL_SECONDS = 0.01
 _MAPPER_ENV_NAMES = frozenset(
     {
         "LANG",
@@ -107,6 +112,8 @@ def run_mapper_process(
 ) -> subprocess.CompletedProcess[str]:
     """Run one mapper process group with bounded file-backed output."""
     del capture_output, text, check
+    if not isfinite(timeout) or timeout <= 0:
+        raise ValueError("mapper timeout must be finite and positive")
     stdout_path = cwd / "stdout.log"
     stderr_path = cwd / "stderr.log"
     process_env = mapper_subprocess_environment(
@@ -116,7 +123,6 @@ def run_mapper_process(
     )
     stdout_tail = _ByteTail(MAPPER_LOG_MAX_BYTES + _CAPTURE_OVERLAP_BYTES)
     stderr_tail = _ByteTail(MAPPER_LOG_MAX_BYTES + _CAPTURE_OVERLAP_BYTES)
-    timeout_error: subprocess.TimeoutExpired | None = None
     capture_errors: list[BaseException] = []
     process = subprocess.Popen(
         list(command),
@@ -126,30 +132,31 @@ def run_mapper_process(
         stderr=subprocess.PIPE,
         start_new_session=True,
     )
-    if process.stdout is None or process.stderr is None:
-        raise RuntimeError("mapper process streams were not captured")
-    readers = (
-        _capture_thread(process.stdout, stdout_tail, capture_errors.append),
-        _capture_thread(process.stderr, stderr_tail, capture_errors.append),
-    )
+    readers: tuple[threading.Thread, ...] = ()
     try:
-        returncode = process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired as exc:
+        if process.stdout is None or process.stderr is None:
+            raise RuntimeError("mapper process streams were not captured")
+        readers = (
+            _capture_thread(process.stdout, stdout_tail, capture_errors.append),
+            _capture_thread(process.stderr, stderr_tail, capture_errors.append),
+        )
+        _wait_unreaped(process, timeout)
+    finally:
+        # Keep the leader unreaped until the entire owned session is signaled.
+        # This also runs for caller interruption and normal leader exit with
+        # surviving children; a recycled PID cannot become our cleanup target.
         _terminate_process_group(process)
-        timeout_error = exc
-        returncode = process.wait(timeout=5)
-    for reader in readers:
-        reader.join(timeout=5)
-        if reader.is_alive():
-            raise RuntimeError("mapper output pipe did not close")
+        for reader in readers:
+            reader.join(timeout=_PROCESS_WAIT_SECONDS)
+        _write_redacted_tail(stdout_path, stdout_tail.value())
+        _write_redacted_tail(stderr_path, stderr_tail.value())
+    if any(reader.is_alive() for reader in readers):
+        raise RuntimeError("mapper output pipe did not close")
     if capture_errors:
         raise RuntimeError(
             "failed to capture mapper output"
         ) from capture_errors[0]
-    _write_redacted_tail(stdout_path, stdout_tail.value())
-    _write_redacted_tail(stderr_path, stderr_tail.value())
-    if timeout_error is not None:
-        raise subprocess.TimeoutExpired(command, timeout) from timeout_error
+    returncode = process.returncode
     if returncode is None:
         raise RuntimeError("mapper process ended without a return code")
     return subprocess.CompletedProcess(list(command), returncode, None, None)
@@ -194,22 +201,26 @@ def invoke_mapper_process(
 
 
 def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
-    for process_signal in (signal.SIGTERM, signal.SIGKILL):
-        try:
-            os.killpg(process.pid, process_signal)
-        except ProcessLookupError:
-            break
-        try:
-            process.wait(timeout=1)
-            return
-        except subprocess.TimeoutExpired:
-            continue
+    # Immediate cleanup fits inside the outer worker's termination grace.
+    # SIGTERM-only cleanup can leave descendants that ignore termination.
+    with suppress(ProcessLookupError):
+        os.killpg(process.pid, signal.SIGKILL)
     try:
-        process.wait(timeout=5)
+        process.wait(timeout=_PROCESS_WAIT_SECONDS)
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(
             "mapper process group survived SIGKILL",
         ) from exc
+
+
+def _wait_unreaped(process: subprocess.Popen[bytes], timeout: float) -> None:
+    deadline = time.monotonic() + timeout
+    flags = os.WEXITED | os.WNOWAIT | os.WNOHANG
+    while os.waitid(os.P_PID, process.pid, flags) is None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(process.args, timeout)
+        time.sleep(min(_PROCESS_POLL_SECONDS, remaining))
 
 
 def _capture_thread(
