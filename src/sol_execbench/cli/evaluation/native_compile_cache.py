@@ -98,13 +98,15 @@ class NativeCompileCache:
             if not entry_dir.exists():
                 return False
             inventory = _verified_entry_inventory(entry_dir, self)
-            for relative_path, artifact in inventory:
+            for relative_path, _artifact in inventory:
                 target = destination.parent / relative_path
-                target.parent.mkdir(parents=True, exist_ok=True)
                 if target.is_symlink() or target.exists():
                     raise ValueError(
                         "native compile cache restore target already exists"
                     )
+            for relative_path, artifact in inventory:
+                target = destination.parent / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(artifact, target)
                 if sha256_file(target) != sha256_file(artifact):
                     target.unlink(missing_ok=True)

@@ -14,6 +14,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Mapping, Sequence
+from concurrent.futures import CancelledError
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Protocol
@@ -212,10 +213,13 @@ def run_in_process_group_bounded(
     env: Mapping[str, str] | None = None,
     timeout: float | None = None,
     max_capture_bytes: int = _MAX_CAPTURE_BYTES,
+    cancel_event: threading.Event | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a process group while retaining only a bounded tail of each stream."""
     if max_capture_bytes <= 0:
         raise ValueError("max_capture_bytes must be positive")
+    if cancel_event is not None and cancel_event.is_set():
+        raise CancelledError("subprocess batch cancelled")
     process = subprocess.Popen(
         list(command),
         cwd=cwd,
@@ -234,7 +238,15 @@ def run_in_process_group_bounded(
         _start_capture_thread(process.stderr, stderr_capture),
     )
     try:
-        _wait_for_exit_without_reaping(process, timeout)
+        _wait_for_exit_without_reaping(
+            process,
+            timeout,
+            **(
+                {"cancel_event": cancel_event}
+                if cancel_event is not None
+                else {}
+            ),
+        )
         _join_capture_threads(workers, _OUTPUT_DRAIN_GRACE_SECONDS)
         _cleanup_unreaped_process_group(process, workers)
         return_code = process.wait()
@@ -334,17 +346,23 @@ def _stop_capture_threads(workers: tuple[_CaptureWorker, ...]) -> None:
 def _wait_for_exit_without_reaping(
     process: subprocess.Popen[bytes] | subprocess.Popen[str],
     timeout: float | None,
+    *,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     """Observe leader exit while retaining its PID/session identity for cleanup."""
-    if timeout is None:
+    if timeout is None and cancel_event is None:
         os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOWAIT)
         return
-    deadline = time.monotonic() + timeout
+    deadline = (
+        time.monotonic() + timeout if timeout is not None else float("inf")
+    )
     flags = os.WEXITED | os.WNOWAIT | os.WNOHANG
     while os.waitid(os.P_PID, process.pid, flags) is None:
+        if cancel_event is not None and cancel_event.is_set():
+            raise CancelledError("subprocess batch cancelled")
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise subprocess.TimeoutExpired(process.args, timeout)
+            raise subprocess.TimeoutExpired(process.args, timeout or 0)
         time.sleep(min(_WAIT_POLL_SECONDS, remaining))
 
 

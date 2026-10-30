@@ -56,6 +56,7 @@ def test_only_two_lock_files_are_mounted_and_private_history_is_readonly(
     assert f"type=bind,src={history},dst={history},readonly" in result.stdout
     assert "--entrypoint /sol-execbench/docker/entrypoint.sh" in result.stdout
     assert "PYTHONPATH=/sol-execbench/src" in result.stdout
+    assert "-e MAX_JOBS" in result.stdout
 
 
 def test_missing_execution_bind_is_rejected_without_creation(tmp_path):

@@ -38,6 +38,28 @@ def hardware(monkeypatch, native_gpu_cpu_observation):
     return writes
 
 
+def _stub_calibration_preparation(module, entry, monkeypatch, payload):
+    if entry == "resource":
+        monkeypatch.setattr(module, "_prepare_calibration", lambda *_: object())
+        monkeypatch.setattr(module, "_calibrate", payload)
+    else:
+        monkeypatch.setattr(
+            module, "_verify_qualification", lambda *_, **__: None
+        )
+        monkeypatch.setattr(module, "_check_device", lambda *_: None)
+        monkeypatch.setattr(
+            module, "_prepare_qualified_calibration", lambda *_: object()
+        )
+        monkeypatch.setattr(
+            module,
+            "_legacy",
+            lambda: {
+                "_prepare_calibration": lambda *_: object(),
+                "_calibrate": payload,
+            },
+        )
+
+
 @pytest.mark.parametrize("entry", ["resource", "qualified"])
 @pytest.mark.parametrize("allow_unlocked", [False, True])
 def test_calibration_uses_requested_clock_ownership(
@@ -50,7 +72,10 @@ def test_calibration_uses_requested_clock_ownership(
     )
     module = load_script(SCRIPTS + "rdna4/" + name)
     args = SimpleNamespace(
-        workdir=tmp_path, stage="run", allow_unlocked=allow_unlocked
+        workdir=tmp_path,
+        stage="run",
+        allow_unlocked=allow_unlocked,
+        check_only=False,
     )
     monkeypatch.setattr(module, "_parse_args", lambda *_: args)
 
@@ -59,10 +84,6 @@ def test_calibration_uses_requested_clock_ownership(
         assert hardware == ([] if allow_unlocked else ["PEAK"])
         return 0
 
-    monkeypatch.setattr(
-        module,
-        "_calibrate" if entry == "resource" else "_run_calibration",
-        payload,
-    )
+    _stub_calibration_preparation(module, entry, monkeypatch, payload)
     assert module.main() == 0
     assert hardware == ([] if allow_unlocked else ["PEAK", "AUTO"])

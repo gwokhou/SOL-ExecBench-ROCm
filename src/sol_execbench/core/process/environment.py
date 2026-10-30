@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
+ENV_MAX_JOBS = "MAX_JOBS"
 ENV_HIP_VISIBLE_DEVICES = "HIP_VISIBLE_DEVICES"
 ENV_ROCR_VISIBLE_DEVICES = "ROCR_VISIBLE_DEVICES"
 ENV_ROCPROF_TMPDIR = "ROCPROF_TMPDIR"
@@ -83,6 +84,7 @@ def sanitized_subprocess_env(
 
 __all__ = [
     "ENV_HIP_VISIBLE_DEVICES",
+    "ENV_MAX_JOBS",
     "ENV_ROCPROF_TMPDIR",
     "ENV_ROCR_VISIBLE_DEVICES",
     "ENV_SOL_EXECBENCH_CLOCKS_LOCKED",

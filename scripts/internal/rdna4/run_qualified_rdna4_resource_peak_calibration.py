@@ -6,9 +6,13 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import runpy
 import tempfile
 from collections.abc import Mapping
+from contextlib import nullcontext
+from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -25,12 +29,20 @@ from sol_execbench.core.bench.batch_gpu_qualification import (
     verify_qualification_artifact,
 )
 from sol_execbench.core.bench.gpu_execution import native_gpu_execution
+from sol_execbench.core.bench.resource_calibration_timing import (
+    CalibrationPhase,
+    CalibrationTimings,
+)
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
-    load_json_file,
     load_json_value,
 )
-from sol_execbench.core.integrity import sha256_file, stable_json_checksum
+from sol_execbench.core.integrity import (
+    sha256_bytes,
+    sha256_file,
+    stable_json_checksum,
+)
+from sol_execbench.core.process.locks import exclusive_file_lock
 from sol_execbench.core.timestamps import utc_timestamp
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -72,10 +84,18 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=7,
     )
+    parser.add_argument("--compile-jobs", type=int, default=1)
     parser.add_argument("--workdir", type=Path)
     parser.add_argument("--allow-unlocked", action="store_true")
     parser.add_argument("--qualification-root", type=Path, required=True)
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Verify the existing artifact chain on CPU; no device validation or execution",
+    )
     arguments = parser.parse_args(argv)
+    if arguments.compile_jobs <= 0:
+        parser.error("--compile-jobs must be positive")
     if arguments.tuning_batches <= 0:
         parser.error("--tuning-batches must be positive")
     if arguments.measurement_batches < 5:
@@ -114,6 +134,7 @@ def _subject(hipcc: str) -> str:
         {
             "legacy_producer_sha256": sha256_file(LEGACY_PRODUCER),
             "compiler_sha256": sha256_file(Path(hipcc)),
+            "toolchain": _toolchain_identity(hipcc),
             "probes": [
                 (
                     probe["source"],
@@ -123,6 +144,39 @@ def _subject(hipcc: str) -> str:
             ],
         }
     )
+
+
+def _toolchain_identity(hipcc: str) -> dict[str, object]:
+    legacy = _legacy()
+    configured = os.environ.get("HIP_CLANG_PATH")
+    clang = (
+        (Path(configured) / "clang++")
+        if configured
+        else Path(legacy["_required_rocm_tool"]("clang++"))
+    )
+    return {
+        "hipcc_version": legacy["_run"]([hipcc, "--version"]).stdout,
+        "clang_path": str(clang),
+        "clang_sha256": sha256_file(clang),
+        "environment": {
+            key: os.environ[key]
+            for key in (
+                "CPATH",
+                "CPLUS_INCLUDE_PATH",
+                "LIBRARY_PATH",
+                "PATH",
+                "LD_LIBRARY_PATH",
+                "HIP_PLATFORM",
+                "DEVICE_LIB_PATH",
+                "HIP_CLANG_PATH",
+                "HIP_PATH",
+                "ROCM_PATH",
+                "HIPCC_COMPILE_FLAGS_APPEND",
+                "HIPCC_LINK_FLAGS_APPEND",
+            )
+            if key in os.environ
+        },
+    }
 
 
 def _configuration(arguments: argparse.Namespace) -> str:
@@ -150,15 +204,14 @@ def _static_receipt(
 ) -> BatchGPUQualificationReceipt:
     legacy = _legacy()
     root = _root(arguments)
+    compiled = legacy["_compile_calibration_binaries"](
+        arguments.gfx,
+        root / "static",
+        hipcc,
+        compile_jobs=getattr(arguments, "compile_jobs", 1),
+    )
     binaries = tuple(
-        legacy["_compile_probe"](
-            Path(legacy["PROBE_DIR"]) / str(probe["source"]),
-            root / "static",
-            hipcc,
-            arguments.gfx,
-            compiler_defines=_compiler_defines(probe),
-        )
-        for probe in _probes()
+        path for group in compiled.values() for path in group.values()
     )
     path = root / "static" / "preflight.json"
     item_ids = _probe_names(BatchGPUQualificationStage.STATIC)
@@ -199,14 +252,14 @@ def _gpu_receipt(
     arguments: argparse.Namespace,
     stage: BatchGPUQualificationStage,
     probe: Mapping[str, Any],
-    hipcc: str,
+    subject_sha256: str,
     device: dict[str, Any],
 ) -> BatchGPUQualificationReceipt:
     root = _root(arguments)
     name = str(probe["source"])
     path = root / stage.value / name / "evidence.json"
     input_sha256 = stable_json_checksum(
-        {"subject_sha256": _subject(hipcc), "probe": name, "device": device}
+        {"subject_sha256": subject_sha256, "probe": name, "device": device}
     )
     if path.is_file():
         payload = load_json_value(path)
@@ -244,42 +297,136 @@ def _require_clock(arguments: argparse.Namespace) -> None:
         raise RuntimeError("resource qualification requires locked clocks")
 
 
+@dataclass(frozen=True)
+class QualificationIdentity:
+    """Invocation-local CPU identity, recomputed on every CLI call."""
+
+    hipcc: str
+    subject: str
+    runner: str
+    configuration: str
+    revision: str
+
+
+def _identity(arguments: argparse.Namespace) -> QualificationIdentity:
+    hipcc = _legacy()["_required_rocm_tool"]("hipcc")
+    return QualificationIdentity(
+        hipcc,
+        _subject(hipcc),
+        sha256_file(Path(__file__)),
+        _configuration(arguments),
+        _legacy()["_git_revision"](),
+    )
+
+
+def _check_device(
+    arguments: argparse.Namespace, gates: list[BatchGPUQualificationGate]
+) -> dict[str, Any]:
+    _require_clock(arguments)
+    device = _legacy()["_device_identity"]()
+    if device["gfx_target"] != arguments.gfx:
+        raise RuntimeError(
+            f"visible GPU is {device['gfx_target']}, expected {arguments.gfx}"
+        )
+    root = _root(arguments)
+    for gate in gates:
+        if gate.stage is BatchGPUQualificationStage.STATIC:
+            continue
+        for receipt in gate.receipts:
+            payload = load_json_value(root / receipt.artifacts[0].path)
+            if payload.get("device") != device:
+                raise ValueError("resource qualification device identity drift")
+    return device
+
+
 def _run_qualification(
     arguments: argparse.Namespace,
     stage: BatchGPUQualificationStage,
 ) -> BatchGPUQualificationGate:
-    root = _root(arguments)
-    gate_path = qualification_gate_path(root, stage)
-    if gate_path.is_file():
-        return _verify_qualification(arguments, stage)
-    legacy = _legacy()
-    hipcc = legacy["_required_rocm_tool"]("hipcc")
-    parent = qualification_parent_stage(stage)
-    parent_hash = None
-    if parent is not None:
-        _verify_qualification(arguments, parent)
-        parent_hash = sha256_file(qualification_gate_path(root, parent))
-    if stage is BatchGPUQualificationStage.STATIC:
-        receipts = (_static_receipt(arguments, hipcc),)
-    else:
-        _require_clock(arguments)
-        device = legacy["_device_identity"]()
-        if device["gfx_target"] != arguments.gfx:
-            raise RuntimeError(
-                f"visible GPU is {device['gfx_target']}, expected {arguments.gfx}"
+    # Competing static publishers fail before touching binaries; no GPU lock.
+    lock = (
+        exclusive_file_lock(_root(arguments) / ".static-compile.lock")
+        if stage is BatchGPUQualificationStage.STATIC
+        else nullcontext()
+    )
+    with lock:
+        return _run_qualification_locked(arguments, stage)
+
+
+def _run_qualification_locked(
+    arguments: argparse.Namespace,
+    stage: BatchGPUQualificationStage,
+) -> BatchGPUQualificationGate:
+    timings = CalibrationTimings()
+    try:
+        with timings.measure(CalibrationPhase.PREPARE):
+            identity = _identity(arguments)
+            root = _root(arguments)
+            gate_path = qualification_gate_path(root, stage)
+            gates: list[BatchGPUQualificationGate] = []
+            gate_hashes: dict[BatchGPUQualificationStage, str] = {}
+            existing = gate_path.is_file()
+            receipts: tuple[BatchGPUQualificationReceipt, ...] = ()
+            parent_hash = None
+            predecessor = (
+                stage if existing else qualification_parent_stage(stage)
             )
-        receipts = tuple(
-            _gpu_receipt(arguments, stage, probe, hipcc, device)
-            for probe in _selected_probes(stage)
+            if predecessor is not None:
+                _verify_qualification(
+                    arguments, predecessor, identity, gates, gate_hashes
+                )
+                parent_hash = gate_hashes[predecessor]
+            if stage is BatchGPUQualificationStage.STATIC and not existing:
+                receipts = (_static_receipt(arguments, identity.hipcc),)
+        if stage is not BatchGPUQualificationStage.STATIC:
+            with (
+                timings.measure(CalibrationPhase.GPU_LIFECYCLE),
+                native_gpu_execution(
+                    manage_clocks=not arguments.allow_unlocked
+                ),
+            ):
+                device = _check_device(arguments, gates)
+                if not existing:
+                    receipts = tuple(
+                        _gpu_receipt(
+                            arguments, stage, probe, identity.subject, device
+                        )
+                        for probe in _selected_probes(stage)
+                    )
+        with timings.measure(CalibrationPhase.FINALIZE):
+            if existing:
+                return gates[-1]
+            return _write_gate(
+                arguments, stage, identity, receipts, parent_hash
+            )
+    finally:
+        timings.report()
+
+
+def _write_gate(
+    arguments: argparse.Namespace,
+    stage: BatchGPUQualificationStage,
+    identity: QualificationIdentity,
+    receipts: tuple[BatchGPUQualificationReceipt, ...],
+    parent_hash: str | None,
+) -> BatchGPUQualificationGate:
+    root = _root(arguments)
+    parent = qualification_parent_stage(stage)
+    if (
+        parent is not None
+        and sha256_file(qualification_gate_path(root, parent)) != parent_hash
+    ):
+        raise ValueError(
+            "resource qualification parent changed during execution"
         )
     gate = BatchGPUQualificationGate(
         task=LargeBatchGPUTask.RDNA4_RESOURCE_PEAK_CALIBRATION,
         stage=stage,
         scope_id=f"{arguments.profile}:{arguments.gfx}",
-        subject_sha256=_subject(hipcc),
-        runner_sha256=sha256_file(Path(__file__)),
-        configuration_sha256=_configuration(arguments),
-        source_revision=legacy["_git_revision"](),
+        subject_sha256=identity.subject,
+        runner_sha256=identity.runner,
+        configuration_sha256=identity.configuration,
+        source_revision=identity.revision,
         parent_gate_sha256=parent_hash,
         item_ids=tuple(
             item for receipt in receipts for item in receipt.item_ids
@@ -287,34 +434,38 @@ def _run_qualification(
         receipts=receipts,
         created_at=utc_timestamp(),
     )
-    atomic_write_json_value(gate_path, gate.model_dump(mode="json"))
-    return _verify_qualification(arguments, stage)
+    atomic_write_json_value(
+        qualification_gate_path(root, stage), gate.model_dump(mode="json")
+    )
+    return gate
 
 
 def _verify_qualification(
     arguments: argparse.Namespace,
     stage: BatchGPUQualificationStage,
+    identity: QualificationIdentity | None = None,
+    gates: list[BatchGPUQualificationGate] | None = None,
+    gate_hashes: dict[BatchGPUQualificationStage, str] | None = None,
 ) -> BatchGPUQualificationGate:
     root = _root(arguments)
-    legacy = _legacy()
-    hipcc = legacy["_required_rocm_tool"]("hipcc")
+    identity = identity or _identity(arguments)
+    gate_hashes = {} if gate_hashes is None else gate_hashes
     parent = qualification_parent_stage(stage)
     parent_hash = None
     if parent is not None:
-        _verify_qualification(arguments, parent)
-        parent_hash = sha256_file(qualification_gate_path(root, parent))
-    gate = load_json_file(
-        BatchGPUQualificationGate,
-        qualification_gate_path(root, stage),
-    )
+        _verify_qualification(arguments, parent, identity, gates, gate_hashes)
+        parent_hash = gate_hashes[parent]
+    raw = qualification_gate_path(root, stage).read_bytes()
+    gate = BatchGPUQualificationGate.model_validate_json(raw)
+    gate_hashes[stage] = sha256_bytes(raw)
     if not (
         gate.task is LargeBatchGPUTask.RDNA4_RESOURCE_PEAK_CALIBRATION
         and gate.stage is stage
         and gate.scope_id == f"{arguments.profile}:{arguments.gfx}"
-        and gate.subject_sha256 == _subject(hipcc)
-        and gate.runner_sha256 == sha256_file(Path(__file__))
-        and gate.configuration_sha256 == _configuration(arguments)
-        and gate.source_revision == legacy["_git_revision"]()
+        and gate.subject_sha256 == identity.subject
+        and gate.runner_sha256 == identity.runner
+        and gate.configuration_sha256 == identity.configuration
+        and gate.source_revision == identity.revision
         and gate.parent_gate_sha256 == parent_hash
         and gate.item_ids == _probe_names(stage)
     ):
@@ -322,43 +473,99 @@ def _verify_qualification(
     for receipt in gate.receipts:
         for artifact in receipt.artifacts:
             verify_qualification_artifact(root, artifact)
-    if stage is not BatchGPUQualificationStage.STATIC:
-        _require_clock(arguments)
-        device = legacy["_device_identity"]()
-        for receipt in gate.receipts:
-            payload = load_json_value(root / receipt.artifacts[0].path)
-            if payload.get("device") != device:
-                raise ValueError("resource qualification device identity drift")
+    if gates is not None:
+        gates.append(gate)
     return gate
 
 
 def _run_calibration(arguments: argparse.Namespace) -> int:
-    _verify_qualification(arguments, BatchGPUQualificationStage.FULL)
-    calibrate = _legacy()["_calibrate"]
     if arguments.workdir is not None:
-        return int(calibrate(arguments, arguments.workdir))
+        return _run_prepared_calibration(arguments, arguments.workdir)
     with tempfile.TemporaryDirectory(
         prefix="solar-resource-peak-calibration-"
     ) as temporary:
-        return int(calibrate(arguments, Path(temporary)))
+        return _run_prepared_calibration(arguments, Path(temporary))
+
+
+def _prepare_qualified_calibration(
+    arguments: argparse.Namespace,
+    gates: list[BatchGPUQualificationGate],
+    legacy: dict[str, Any],
+) -> Any:
+    """Consume static binaries; never compile inside a host-managed GPU job."""
+    root = _root(arguments)
+    static = gates[0]
+    expected = {
+        (root / artifact.path).resolve(): artifact.sha256
+        for receipt in static.receipts
+        for artifact in receipt.artifacts
+    }
+    binaries = legacy["_calibration_binary_paths"](root / "static")
+    paths = [path for group in binaries.values() for path in group.values()]
+    if any(path.resolve() not in expected for path in paths):
+        raise ValueError("static qualification is missing a calibration binary")
+    prepared = legacy["CalibrationPreparation"](
+        legacy["_required_rocm_tool"]("hipcc"),
+        binaries,
+        {path: expected[path.resolve()] for path in paths},
+        legacy["_isa_spec_evidence"](arguments.gfx),
+    )
+    prepared.verify()
+    return prepared
+
+
+def _run_prepared_calibration(
+    arguments: argparse.Namespace, workdir: Path
+) -> int:
+    timings = CalibrationTimings()
+    try:
+        with timings.measure(CalibrationPhase.PREPARE):
+            gates: list[BatchGPUQualificationGate] = []
+            _verify_qualification(
+                arguments, BatchGPUQualificationStage.FULL, gates=gates
+            )
+            legacy = _legacy()
+            preparation = _prepare_qualified_calibration(
+                arguments, gates, legacy
+            )
+        with (
+            timings.measure(CalibrationPhase.GPU_LIFECYCLE),
+            native_gpu_execution(manage_clocks=not arguments.allow_unlocked),
+        ):
+            _check_device(arguments, gates)
+            return int(legacy["_calibrate"](arguments, workdir, preparation))
+    finally:
+        timings.report()
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run one uniform qualification stage or the gated calibration."""
+    """Validate CPU inputs before acquiring the native GPU lifecycle."""
     arguments = _parse_args(argv)
-    with native_gpu_execution(
-        "cpu" if arguments.stage == "qualify-static" else "cuda:0",
-        manage_clocks=arguments.stage != "qualify-static"
-        and not arguments.allow_unlocked,
-    ):
-        if arguments.stage == "run":
-            return _run_calibration(arguments)
-        stage = BatchGPUQualificationStage(
+    stage = (
+        BatchGPUQualificationStage.FULL
+        if arguments.stage == "run"
+        else BatchGPUQualificationStage(
             arguments.stage.removeprefix("qualify-")
         )
-        gate = _run_qualification(arguments, stage)
-        print(gate.model_dump_json())
+    )
+    if arguments.check_only:
+        gate = _verify_qualification(arguments, stage)
+        print(
+            json.dumps(
+                {
+                    "stage": stage.value,
+                    "artifact_chain_verified": True,
+                    "device_readback_performed": False,
+                    "items": len(gate.item_ids),
+                }
+            )
+        )
         return 0
+    if arguments.stage == "run":
+        return _run_calibration(arguments)
+    gate = _run_qualification(arguments, stage)
+    print(gate.model_dump_json())
+    return 0
 
 
 if __name__ == "__main__":

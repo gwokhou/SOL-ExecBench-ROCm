@@ -79,22 +79,38 @@ def _execute_autograd_public(
     layer_id: str,
     output_shapes: Sequence[tuple[int, ...]],
 ) -> DynamicValue:
-    del kwargs, semantic, layer_id
+    del semantic, layer_id
     if target != "_embedding_bag_forward_only":
         return _UNHANDLED
     import torch
+    from torch.fx.operator_schemas import normalize_function
     from torch.nn import functional
 
-    weight, indices, offsets = arguments[:3]
-    mode = {0: "sum", 1: "mean", 2: "max"}[int(arguments[4])]
+    normalized = normalize_function(
+        torch.ops.aten._embedding_bag_forward_only.default,
+        tuple(arguments),
+        kwargs,
+        normalize_to_only_use_kwargs=True,
+    )
+    if normalized is None:
+        raise IRExecutionError(
+            "embedding_bag arguments do not match its schema"
+        )
+    values = normalized.kwargs
+    indices = values["indices"]
+    mode = {0: "sum", 1: "mean", 2: "max"}[int(values["mode"])]
     output = functional.embedding_bag(
         indices,
-        weight,
-        offsets,
-        scale_grad_by_freq=bool(arguments[3]),
+        values["weight"],
+        values["offsets"],
+        scale_grad_by_freq=bool(values["scale_grad_by_freq"]),
         mode=mode,
-        sparse=bool(arguments[5]),
-        per_sample_weights=arguments[6],
+        sparse=bool(values["sparse"]),
+        per_sample_weights=values["per_sample_weights"],
+        include_last_offset=bool(values["include_last_offset"]),
+        padding_idx=(
+            None if values["padding_idx"] == -1 else values["padding_idx"]
+        ),
     )
     auxiliaries = tuple(
         torch.empty(
