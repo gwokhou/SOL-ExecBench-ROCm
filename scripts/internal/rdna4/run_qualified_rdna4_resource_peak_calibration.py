@@ -347,7 +347,9 @@ def main(argv: list[str] | None = None) -> int:
     """Run one uniform qualification stage or the gated calibration."""
     arguments = _parse_args(argv)
     with native_gpu_execution(
-        "cpu" if arguments.stage == "qualify-static" else "cuda:0"
+        "cpu" if arguments.stage == "qualify-static" else "cuda:0",
+        manage_clocks=arguments.stage != "qualify-static"
+        and not arguments.allow_unlocked,
     ):
         if arguments.stage == "run":
             return _run_calibration(arguments)

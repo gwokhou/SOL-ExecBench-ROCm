@@ -113,6 +113,8 @@ def _view_axis_map(metadata: _ViewMetadata) -> list[int] | None:
     target = metadata.target
     input_shape = metadata.input_shape
     output_shape = metadata.output_shape
+    if not input_shape or not output_shape:
+        return None
     if target in {"view", "squeeze", "unsqueeze"}:
         input_flat = [_shape_product(input_shape[:-1]), input_shape[-1]]
         output_flat = [

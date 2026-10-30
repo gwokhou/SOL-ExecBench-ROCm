@@ -261,6 +261,8 @@ def run_evaluation_runtime(
         timeout=timeout,
         profile=profile,
     )
+    if profiled_proc is None and profile_result is not None:
+        packager.restage_trusted_reference()
     proc_or_timeout = _run_eval_subprocess(
         eval_cmd,
         staging_dir=staging_dir,

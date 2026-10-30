@@ -10,11 +10,17 @@ from solar.contracts import (
     AnalysisRequest,
     ConversionRequest,
 )
+from solar.pipeline.readiness import ConversionReadinessRequest
 from solar.verification.contracts import VerificationPolicy
 
 
+@pytest.mark.parametrize(
+    "request_type", [AnalysisRequest, ConversionReadinessRequest]
+)
 @pytest.mark.parametrize("device", ["cpu", "cuda:0", "hip:0"])
-def test_gpu_request_requires_context_not_only_private_lock(tmp_path, device):
+def test_gpu_request_requires_context_not_only_private_lock(
+    tmp_path, device, request_type
+):
     conversion = ConversionRequest(
         analysis_id="cpu-policy-fixture",
         reference=lambda x: x,
@@ -24,7 +30,7 @@ def test_gpu_request_requires_context_not_only_private_lock(tmp_path, device):
         verification=VerificationPolicy(device=device, atol=1e-5, rtol=1e-5),
     )
     make_request = partial(
-        AnalysisRequest,
+        request_type,
         conversion=conversion,
         architecture="RX_9060_XT",
         output_dir=tmp_path,

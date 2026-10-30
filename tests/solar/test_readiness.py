@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import contextmanager, nullcontext
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -11,7 +13,7 @@ from solar.api import (
     VerificationPolicy,
     audit_conversion,
 )
-from solar.contracts import SolarStage
+from solar.contracts import AnalysisExecutionPolicy, SolarStage
 from solar.errors import (
     IRReplayError,
     NumericalEquivalenceError,
@@ -82,6 +84,9 @@ def test_readiness_request_reuses_one_verification_policy(
             reference_sha256="d" * 64,
             verification=policy,
         ),
+        execution_policy=AnalysisExecutionPolicy(
+            device_stage_context=nullcontext
+        ),
         architecture={},
         output_dir=tmp_path / "composed",
     )
@@ -136,3 +141,59 @@ def test_audit_conversion_retains_passed_artifacts_on_failure(
     assert result.stages[0].artifact is not None
     assert (tmp_path / "failed" / "operator_graph.yaml").is_file()
     assert result.stages[-1].status == "not_run"
+
+
+@pytest.mark.parametrize("stage", ["extract", "convert", "verify"])
+@pytest.mark.parametrize("error", [RuntimeError, KeyboardInterrupt, SystemExit])
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+def test_readiness_cleanup_is_within_owner(
+    tmp_path, monkeypatch, stage, error, cleanup_fails
+):
+    from solar.pipeline import readiness
+
+    events = []
+
+    @contextmanager
+    def owner():
+        events.append("enter")
+        try:
+            yield
+        finally:
+            events.append("exit")
+
+    def cleanup():
+        assert "exit" not in events
+        events.append("cleanup")
+        if cleanup_fails:
+            raise RuntimeError("cleanup failure")
+
+    def operation(name):
+        def execute(*args):
+            assert events == ["enter"]
+            if name == stage:
+                raise error("stage failure")
+            path = tmp_path / name
+            path.write_text("fixture")
+            return type("Artifact", (), {"path": path})()
+
+        return execute
+
+    for name in ("extract", "convert", "verify"):
+        monkeypatch.setattr(readiness, f"{name}_request_graph", operation(name))
+    request = replace(
+        _request(tmp_path / "out", lambda x: x),
+        execution_policy=AnalysisExecutionPolicy(
+            device_stage_context=owner,
+            device_stage_cleanup=cleanup,
+        ),
+    )
+    if issubclass(error, Exception) or cleanup_fails:
+        result = audit_conversion(request)
+        assert not result.ready
+        assert result.message == (
+            "cleanup failure" if cleanup_fails else "stage failure"
+        )
+    else:
+        with pytest.raises(error):
+            audit_conversion(request)
+    assert events == ["enter", "cleanup", "exit"]

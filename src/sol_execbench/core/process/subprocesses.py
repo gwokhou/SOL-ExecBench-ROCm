@@ -141,18 +141,18 @@ def run_in_process_group_to_files(
         )
         try:
             _wait_for_exit_without_reaping(process, timeout)
+            _wait_for_process_group_members(
+                process.pid,
+                _PROCESS_GROUP_GRACE_SECONDS,
+            )
+            _cleanup_unreaped_process_group(process, ())
+            return_code = process.wait()
         except subprocess.TimeoutExpired as exc:
             _terminate_unreaped_process_group(process)
             raise subprocess.TimeoutExpired(command, timeout or 0) from exc
         except BaseException:
             _terminate_unreaped_process_group(process)
             raise
-        _wait_for_process_group_members(
-            process.pid,
-            _PROCESS_GROUP_GRACE_SECONDS,
-        )
-        _cleanup_unreaped_process_group(process, ())
-        return_code = process.wait()
     return subprocess.CompletedProcess(list(command), return_code, None, None)
 
 
@@ -235,6 +235,9 @@ def run_in_process_group_bounded(
     )
     try:
         _wait_for_exit_without_reaping(process, timeout)
+        _join_capture_threads(workers, _OUTPUT_DRAIN_GRACE_SECONDS)
+        _cleanup_unreaped_process_group(process, workers)
+        return_code = process.wait()
     except subprocess.TimeoutExpired as exc:
         _terminate_unreaped_process_group(process, workers)
         raise subprocess.TimeoutExpired(
@@ -246,9 +249,6 @@ def run_in_process_group_bounded(
     except BaseException:
         _terminate_unreaped_process_group(process, workers)
         raise
-    _join_capture_threads(workers, _OUTPUT_DRAIN_GRACE_SECONDS)
-    _cleanup_unreaped_process_group(process, workers)
-    return_code = process.wait()
     return subprocess.CompletedProcess(
         list(command),
         return_code,

@@ -15,6 +15,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from solar.analysis.resource_dtypes import resource_compute_dtype
+from solar.analysis.resource_geometry import transposed_convolution_macs
 from solar.analysis.resource_targets import (
     _ATOMIC_OPS,
     _COMPOSITE_SFU_OPS,
@@ -67,12 +69,12 @@ def mandatory_mfma_macs(
         activation = input_shapes[0]
         return output_n * int(activation[-1]) if activation else 0
     if target.startswith("conv_transpose") and len(input_shapes) >= 2:
-        activation, weight = input_shapes[:2]
-        if len(activation) < 2 or len(weight) < 3:
-            return 0
-        groups = int(_unwrap(operation_attributes(semantic).get("groups", 1)))
-        kernel = math.prod(int(item) for item in weight[2:])
-        return output_n * int(activation[1]) * kernel // max(1, groups)
+        try:
+            return transposed_convolution_macs(
+                input_shapes, output_shapes, semantic
+            )
+        except ValueError as exc:
+            raise ResourceClassificationError(str(exc)) from exc
     if target.startswith("conv") and len(input_shapes) >= 2:
         weight = input_shapes[1]
         if len(weight) < 3:
@@ -218,11 +220,18 @@ class _ResourceContext:
         dtypes = layer.get("tensor_dtypes") or {}
         input_dtypes = list(dtypes.get("inputs") or [])
         output_dtypes = list(dtypes.get("outputs") or [])
-        dtype = compute_precision or (
-            input_dtypes[0]
-            if input_dtypes
-            else (output_dtypes[0] if output_dtypes else fallback_precision)
-        )
+        try:
+            dtype = resource_compute_dtype(
+                semantic,
+                target,
+                input_shapes,
+                input_dtypes,
+                output_dtypes,
+                compute_precision,
+                fallback_precision,
+            )
+        except ValueError as exc:
+            raise ResourceClassificationError(str(exc)) from exc
         return cls(
             semantic=semantic,
             target=target,

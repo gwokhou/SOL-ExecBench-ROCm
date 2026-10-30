@@ -384,7 +384,21 @@ def test_current_calibration_only_wraps_the_audited_producer():
                             id="native_gpu_execution", ctx=ast.Load()
                         ),
                         args=[],
-                        keywords=[],
+                        keywords=[
+                            ast.keyword(
+                                arg="manage_clocks",
+                                value=ast.UnaryOp(
+                                    op=ast.Not(),
+                                    operand=ast.Attribute(
+                                        value=ast.Name(
+                                            id="args", ctx=ast.Load()
+                                        ),
+                                        attr="allow_unlocked",
+                                        ctx=ast.Load(),
+                                    ),
+                                ),
+                            )
+                        ],
                     ),
                     optional_vars=None,
                 ),

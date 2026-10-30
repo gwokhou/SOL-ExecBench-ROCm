@@ -562,6 +562,8 @@ class OrojenesisRunner:
                 word_bits=word_bits,
             )
             if selected_capacity_bytes is not None
+            and selected_capacity_bytes > 0
+            and selected_capacity_bytes % 1024 == 0
             else None
         )
         witness_capacity = (

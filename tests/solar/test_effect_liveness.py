@@ -154,3 +154,57 @@ def test_verified_mutation_cost_matches_independent_base01_oracle(
         layers[name] = layer
     maps = resolve_graph_accesses(layers)
     assert len(maps.effect_bases) == 1
+
+
+@pytest.mark.parametrize("write_before_read", [True, False])
+def test_local_write_is_live_only_before_a_live_read(write_before_read):
+    layers = {
+        "copy": _layer("copy", "input"),
+        "alias": _layer("alias", "copy", alias=True),
+    }
+    write = _layer("write", "copy", mutates=True)
+    read = _layer("result", "alias")
+    layers.update(
+        {"write": write, "result": read}
+        if write_before_read
+        else {"result": read, "write": write}
+    )
+    expected = {"copy", "alias", "result"}
+    if write_before_read:
+        expected.add("write")
+    assert build_graph_topology(layers, {"result"}).live_layer_ids == expected
+
+
+def test_effect_read_can_make_an_earlier_local_effect_live():
+    layers = {
+        "copy": _layer("copy", "input"),
+        "alias": _layer("alias", "copy", alias=True),
+        "write": _layer("write", "copy", mutates=True),
+        "external_write": _layer("external_write", "input", mutates=True),
+        "result": _layer("result", "input", alias=True),
+    }
+    layers["external_write"]["tensor_names"]["inputs"].append("alias")
+    layers["external_write"]["connections"]["inputs"].append("alias")
+    assert build_graph_topology(layers, {"result"}).live_layer_ids == set(
+        layers
+    )
+
+
+@pytest.mark.parametrize(
+    "order",
+    [
+        ("copy", "alias", "write", "result"),
+        ("result", "alias", "copy", "write"),
+    ],
+)
+def test_local_effect_follows_replay_order_not_mapping_order(order):
+    layers = {
+        "copy": _layer("copy", "input"),
+        "alias": _layer("alias", "copy", alias=True),
+        "write": _layer("write", "copy", mutates=True),
+        "result": _layer("result", "alias"),
+    }
+    ordered = {name: layers[name] for name in order}
+    assert build_graph_topology(ordered, {"result"}).live_layer_ids == set(
+        layers
+    )

@@ -23,6 +23,19 @@ ENV ROCM_PATH=/opt/rocm \
     PATH=/opt/rocm/bin:/opt/rocm/llvm/bin:${PATH} \
     LD_LIBRARY_PATH=/opt/rocm/lib
 
+# Native UUID readback uses this stable path in both host and container code.
+# The SDK script also resolves CLI modules relative to its invocation path.
+# Link both paths to this image's SDK, never a host-mounted tool or modules.
+RUN AMD_SMI="$(readlink -f "${ROCM_PATH}/bin/amd-smi")" && \
+    test -x "${AMD_SMI}" && \
+    ln -s "${AMD_SMI}" /usr/bin/amd-smi && \
+    test "$(readlink -f /usr/bin/amd-smi)" = "${AMD_SMI}" && \
+    AMD_SMI_CLI="$(readlink -f "${ROCM_PATH}/libexec/amdsmi_cli")" && \
+    test -f "${AMD_SMI_CLI}/amdsmi_init.py" && \
+    mkdir -p /usr/libexec && \
+    ln -s "${AMD_SMI_CLI}" /usr/libexec/amdsmi_cli && \
+    test "$(readlink -f /usr/libexec/amdsmi_cli)" = "${AMD_SMI_CLI}"
+
 # System packages (changes infrequently - cache this layer well)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \

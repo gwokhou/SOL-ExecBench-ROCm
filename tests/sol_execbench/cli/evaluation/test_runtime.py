@@ -527,3 +527,37 @@ def test_counter_profile_restages_reference_before_each_application(
 
     assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
     assert packager.restage_calls == 2
+
+
+def test_profile_failure_restages_consumed_reference_before_fallback(
+    tmp_path, monkeypatch
+):
+    packager = _FakePackager(traces=[_trace()])
+    failed_profile = Rocprofv3ProfileResult(
+        status=Rocprofv3ProfileStatus.FAILED,
+        command=("fixture",),
+        output_directory=tmp_path,
+        output_file="out.json",
+        failed_reason="profile failed after reference READY",
+    )
+    monkeypatch.setattr(
+        evaluation_runtime,
+        "_run_profiled_or_none",
+        lambda *_, **kw: (None, failed_profile),
+    )
+
+    def run(command, **_kwargs):
+        assert packager.restage_calls == 1
+        return subprocess.CompletedProcess(command, 0, '{"trace": 1}\n', "")
+
+    monkeypatch.setattr(cli_evaluation, "_run_evaluation_command", run)
+    result = evaluation_runtime.run_evaluation_runtime(
+        packager,
+        eval_cmd=["python", "fixture.py"],
+        staging_dir=tmp_path,
+        output_file=None,
+        timeout=7,
+        profile=ProfileMode.ROCPROFV3,
+    )
+    assert isinstance(result, evaluation_runtime.EvaluationRuntimeSuccess)
+    assert result.profile_fallback_reason == failed_profile.failed_reason

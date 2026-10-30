@@ -42,6 +42,7 @@ from solar.analysis.graph_models import (
     MemoryElements,
 )
 from solar.analysis.graph_rules import (
+    METADATA_INPUT_TARGETS,
     SCATTER_OPS,
     SLICE_VIEW_OPS,
     ZERO_COMPUTE_OPS,
@@ -365,6 +366,8 @@ class GraphLoadingMixin(AnalysisMixinContract):
         topology: GraphTopology,
     ) -> MemoryElements:
         reads = list(data.input_sizes)
+        if layer_operation(data.layer).get("target") in METADATA_INPUT_TARGETS:
+            reads = [0] * len(reads)
         writes = list(data.output_sizes)
         other_ops = compute.other_ops
         if data.op_type in {"embedding", "embedding_bag"}:

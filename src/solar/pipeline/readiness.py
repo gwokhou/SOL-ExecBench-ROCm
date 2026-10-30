@@ -8,12 +8,13 @@ from __future__ import annotations
 import shutil
 import tempfile
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from solar.artifacts import sha256_file, stable_json_checksum
 from solar.artifacts.names import CONVERSION_ATTESTATION_FILENAME
 from solar.contracts import (
+    AnalysisExecutionPolicy,
     ConversionRequest,
     ConversionRequestEnvelope,
     SolarReadinessStatus,
@@ -22,6 +23,7 @@ from solar.contracts import (
 )
 from solar.errors import SolarError
 from solar.ir.contracts import IRPath, normalize_ir_path
+from solar.pipeline.analysis import device_stage_guard
 from solar.pipeline.stages import (
     convert_request_graph,
     extract_request_graph,
@@ -45,6 +47,19 @@ class ConversionReadinessRequest(ConversionRequestEnvelope):
     architecture: str | Path | Mapping[str, DynamicValue]
     output_dir: Path
     require_verified_audit: bool = True
+    execution_policy: AnalysisExecutionPolicy = field(
+        default_factory=AnalysisExecutionPolicy,
+    )
+
+    def __post_init__(self) -> None:
+        """Require a caller-owned native lifecycle for GPU readiness."""
+        if (
+            self.device.split(":", 1)[0] in {"cuda", "hip"}
+            and self.execution_policy.device_stage_context is None
+        ):
+            raise ValueError(
+                "GPU readiness requires a native device_stage_context"
+            )
 
 
 @dataclass(frozen=True)
@@ -158,17 +173,21 @@ def audit_conversion(
             profile.require_verified_audit_evidence()
         architecture_sha256 = _profile_hash(profile)
         stage = SolarStage.GRAPH_EXTRACTION
-        operator = extract_request_graph(request, staging)
-        passed.append(_passed_stage(stage, operator.path))
-        stage = SolarStage.IR_CONVERSION
-        ir_graph = convert_request_graph(request, operator, staging)
-        passed.append(_passed_stage(stage, ir_graph.path))
-        stage = SolarStage.CONVERSION_VERIFICATION
-        attestation = staging / CONVERSION_ATTESTATION_FILENAME
-        verify_request_graph(request, ir_graph, attestation)
-        passed.append(_passed_stage(stage, attestation))
+        with device_stage_guard(request.execution_policy):
+            operator = extract_request_graph(request, staging)
+            passed.append(_passed_stage(stage, operator.path))
+            stage = SolarStage.IR_CONVERSION
+            ir_graph = convert_request_graph(request, operator, staging)
+            passed.append(_passed_stage(stage, ir_graph.path))
+            stage = SolarStage.CONVERSION_VERIFICATION
+            attestation = staging / CONVERSION_ATTESTATION_FILENAME
+            verify_request_graph(request, ir_graph, attestation)
+            passed.append(_passed_stage(stage, attestation))
     except Exception as exc:  # noqa: BLE001 -- retain staged failure evidence
         failure = exc
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
     try:
         result = _result(
             request,

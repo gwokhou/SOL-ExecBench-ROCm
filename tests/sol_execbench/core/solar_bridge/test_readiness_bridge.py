@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -72,3 +73,60 @@ def test_readiness_bridge_preserves_native_failure(
     assert outcome.message == result.message
     assert outcome.ir_path is ir_path
     assert SolarStageAuditOutcome.from_dict(outcome.to_dict()) == outcome
+
+
+@pytest.mark.parametrize(
+    "failure", [None, ValueError, KeyboardInterrupt, SystemExit]
+)
+def test_readiness_owns_gpu_before_query_and_releases_on_failure(
+    tmp_path, monkeypatch, failure
+):
+    events = []
+
+    @contextmanager
+    def native(device):
+        assert device == "cpu"  # real extraction below stays CPU-only
+        events.append("enter")
+        try:
+            yield
+        finally:
+            events.append("exit")
+
+    def require(_device):
+        assert events == ["enter"]
+        events.append("query")
+        if failure:
+            raise failure("query cancelled")
+
+    monkeypatch.setattr(analyzer, "native_gpu_execution", native)
+    monkeypatch.setattr(analyzer, "require_formal_device", require)
+
+    def run():
+        return analyzer.audit_workload_stages(
+            problem_dir=_PROBLEM,
+            workload_uuid=_WORKLOAD,
+            output_dir=tmp_path / "ready",
+            device="cpu",
+        )
+
+    if failure:
+        with pytest.raises(failure):
+            run()
+    else:
+        assert run().ready
+    assert events == ["enter", "query", "exit"]
+
+
+@pytest.mark.parametrize("device", ["cpu", "meta", "mps"])
+def test_formal_bridge_rejects_non_rocm_before_probe(device, monkeypatch):
+    import torch
+
+    from sol_execbench.core.solar_bridge.formal_device import (
+        require_formal_device,
+    )
+
+    monkeypatch.setattr(
+        torch.cuda, "is_available", lambda: pytest.fail("GPU was probed")
+    )
+    with pytest.raises(ValueError, match="ROCm GPU"):
+        require_formal_device(device)

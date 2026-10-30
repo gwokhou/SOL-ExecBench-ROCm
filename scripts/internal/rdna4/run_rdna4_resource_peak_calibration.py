@@ -1354,7 +1354,7 @@ def _calibrate(args: argparse.Namespace, workdir: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Run resource-peak calibration and persist audited evidence."""
     args = _parse_args(argv)
-    with native_gpu_execution():
+    with native_gpu_execution(manage_clocks=not args.allow_unlocked):
         if args.workdir is not None:
             return _calibrate(args, args.workdir)
         with tempfile.TemporaryDirectory(

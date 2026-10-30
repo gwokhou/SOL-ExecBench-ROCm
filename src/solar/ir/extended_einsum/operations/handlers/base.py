@@ -163,15 +163,21 @@ def compute_cost_from_equation(
                 atoms = _parse_dim_atoms(token)
                 if len(atoms) == 1 and dim_offset < len(shape):
                     atom = atoms[0]
-                    if all_ranks.get(atom) is None:
-                        all_ranks[atom] = int(shape[dim_offset])
+                    previous = all_ranks.get(atom)
+                    current = int(shape[dim_offset])
+                    if previous is None or previous == 1:
+                        all_ranks[atom] = current
+                    elif current not in (1, previous):
+                        raise ValueError(
+                            f"incompatible broadcast rank {atom}: {previous} and {current}"
+                        )
 
     _resolve(input_tokens, tensor_shapes.inputs)
     _resolve([output_tokens], tensor_shapes.outputs)
 
     total_ops = 1
     for value in all_ranks.values():
-        if value is not None and value > 0:
+        if value is not None:
             total_ops *= value
     return int(total_ops)
 
