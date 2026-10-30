@@ -20,6 +20,7 @@ from solar.graph.contracts import (
     OperatorGraphArtifact,
     TensorSignature,
 )
+from solar.ir.access_artifact import write_access_document
 from solar.ir.contracts import IRGraphArtifact, IRKind
 from solar.ir.extended_einsum.semantics import validate_semantic_graph
 from solar.ir.extended_einsum.torchview.converter import PyTorchToEinsum
@@ -45,7 +46,9 @@ def convert_operator_graph(
     validate_extended_einsum_graph(converted)
     einsum_path = output / "einsum_graph.yaml"
     einsum_path.write_text(yaml.safe_dump(converted, sort_keys=False))
-    return IRGraphArtifact(einsum_path, IRKind.EXTENDED_EINSUM)
+    artifact = IRGraphArtifact(einsum_path, IRKind.EXTENDED_EINSUM)
+    write_access_document(artifact, operator)
+    return artifact
 
 
 def _convert_torchview_graph(

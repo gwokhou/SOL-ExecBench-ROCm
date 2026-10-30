@@ -10,7 +10,7 @@ import os
 import secrets
 import threading
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn
@@ -28,9 +28,12 @@ from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import CliExitCode, CliFailure
 from sol_execbench.cli.sidecars import static_evidence as cli_static_evidence
 from sol_execbench.cli.sidecars.mode import SidecarMode
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.bench.gpu_lock import (
     GPULockVerificationError,
-    acquire_evaluation_gpu_lock,
+)
+from sol_execbench.core.bench.rocm_profiler.pmc_clock import (
+    configured_pmc_clock_options,
 )
 from sol_execbench.core.bench.static_kernel.evidence import (
     StaticKernelEvidenceSidecar,
@@ -42,6 +45,7 @@ from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION,
     EVALUATION_INPUT_NONCE_BYTES,
 )
+from sol_execbench.core.process.termination import cleanup_on_termination
 from sol_execbench.driver import ProblemPackager
 
 _EXECUTION_ENV_LOCK = threading.RLock()
@@ -84,15 +88,26 @@ def require_execution_isolation(request: EvaluationRequest) -> None:
 
 
 @contextmanager
-def evaluation_execution_boundary(request: EvaluationRequest) -> Iterator[None]:
+def evaluation_execution_boundary(
+    request: EvaluationRequest,
+) -> Iterator[None]:
     """Mark unsafe runs and serialize access to the selected GPU."""
     unsafe_name = ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION
     device_name = ENV_SOL_EXECBENCH_DEVICE
     nonce_name = ENV_SOL_EXECBENCH_INPUT_NONCE
     try:
         with (
-            acquire_evaluation_gpu_lock(
+            cleanup_on_termination()
+            if threading.current_thread() is threading.main_thread()
+            else nullcontext(),
+            native_gpu_execution(
+                request.device,
                 timeout_seconds=min(float(request.timeout), 60.0),
+                manage_clocks=request.lock_clocks
+                or (
+                    request.profile == ProfileMode.ROCPROFV3_COUNTERS
+                    and configured_pmc_clock_options() is not None
+                ),
             ),
             _EXECUTION_ENV_LOCK,
         ):

@@ -32,11 +32,13 @@ from typing import Protocol, Self
 
 from pydantic import ValidationError
 
+from sol_execbench.core.bench.clock_diagnostics import log_clock_command
 from sol_execbench.core.platform.amd_smi import parse_performance_levels
 from sol_execbench.core.platform.clock_commands import (
     ClockLevel,
     clock_command,
     clock_executable,
+    host_clock_executable,
 )
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_CLOCKS_LOCKED,
@@ -195,8 +197,10 @@ class ClockLockAcquirer(Protocol):
         ...
 
 
-def _amd_smi_executable() -> str:
-    return clock_executable()
+def _amd_smi_executable(gpu_uuid: str | None = None) -> str:
+    return (
+        host_clock_executable() if gpu_uuid is not None else clock_executable()
+    )
 
 
 def _has_command_failure(
@@ -222,14 +226,36 @@ def _has_command_failure(
 def _run_checked_amd_smi(
     command: list[str],
 ) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(
-        command,
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    try:
+        result = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        log_clock_command(
+            command,
+            error.returncode
+            if isinstance(error, subprocess.CalledProcessError)
+            else None,
+            error.output,
+            error.stderr,
+            error=type(error).__name__,
+        )
+        raise
+    except OSError as error:
+        log_clock_command(command, None, None, None, error=type(error).__name__)
+        raise
     failure = _has_command_failure(result, AMD_SMI_FAILURE_MARKERS)
+    log_clock_command(
+        command,
+        result.returncode,
+        result.stdout,
+        result.stderr,
+        error="output_failure_marker" if failure else None,
+    )
     if failure:
         raise subprocess.CalledProcessError(
             result.returncode,
@@ -242,7 +268,7 @@ def _run_checked_amd_smi(
 
 def _query_performance_levels(gpu_uuid: str | None = None) -> tuple[str, ...]:
     """Return policies for the selected UUID, or all visible AMD GPUs."""
-    command = [_amd_smi_executable(), "metric", "-l", "--json"]
+    command = [_amd_smi_executable(gpu_uuid), "metric", "-l", "--json"]
     if gpu_uuid is not None:
         command.extend(("--gpu", gpu_uuid))
     result = subprocess.run(
@@ -306,7 +332,7 @@ def set_peak_clocks(gpu_uuid: str | None = None) -> None:
                 "sudo",
                 "-n",
                 *clock_command(
-                    _amd_smi_executable(), ClockLevel.PEAK, gpu_uuid
+                    _amd_smi_executable(gpu_uuid), ClockLevel.PEAK, gpu_uuid
                 ),
             ]
         )
@@ -322,56 +348,6 @@ def set_peak_clocks(gpu_uuid: str | None = None) -> None:
     verified = verify_clocks() if gpu_uuid is None else verify_clocks(gpu_uuid)
     if not verified:
         raise ClockSetupError("clock_setup_failed: STABLE_PEAK readback failed")
-
-
-def acquire_clock_lock() -> ClockLockLease:
-    """Request STABLE_PEAK and report whether this process changed the policy.
-
-    Uses ``sudo amd-smi set -l STABLE_PEAK`` which sets the GPU to a
-    stable near-maximum performance level with clock gating disabled. Any
-    unsuccessful exit after the mutating command starts attempts to restore
-    AUTO, including interruption during stabilization or verification.
-
-    On RDNA4 ``gfx1200``, STABLE_PEAK provides:
-      - SCLK at ~2709-2754Mhz (within 1-2% of maximum 2780Mhz)
-      - MCLK locked at 1124Mhz (zero fluctuation)
-      - Clock and power gating disabled
-
-    """
-    initial_levels = observe_clock_levels()
-    if initial_levels is None:
-        return ClockLockLease(locked=False, acquired=False)
-    if _levels_are(initial_levels, "STABLE_PEAK"):
-        logger.info(
-            "GPU clocks are already at STABLE_PEAK; preserving external lock",
-        )
-        return ClockLockLease(locked=True, acquired=False)
-    if not _levels_are(initial_levels, "AUTO"):
-        logger.warning(
-            "Refusing to replace non-AUTO GPU performance levels: %s",
-            initial_levels,
-        )
-        return ClockLockLease(locked=False, acquired=False)
-
-    try:
-        set_peak_clocks()
-    except ClockSetupError as exc:
-        logger.warning("Failed to lock clocks (STABLE_PEAK): %s", exc)
-        _reset_after_failed_lock()
-        return ClockLockLease(locked=False, acquired=False)
-    except BaseException:
-        _reset_after_failed_lock()
-        raise
-
-    return ClockLockLease(locked=True, acquired=True)
-
-
-def lock_clocks() -> bool:
-    """Compatibility wrapper returning whether GPUs are at STABLE_PEAK."""
-    lease = acquire_clock_lock()
-    if lease.acquired:
-        lease.detach()
-    return lease.locked
 
 
 def verify_clocks(gpu_uuid: str | None = None) -> bool:
@@ -394,7 +370,7 @@ def unlock_clocks(gpu_uuid: str | None = None) -> bool:
                 "sudo",
                 "-n",
                 *clock_command(
-                    _amd_smi_executable(), ClockLevel.AUTO, gpu_uuid
+                    _amd_smi_executable(gpu_uuid), ClockLevel.AUTO, gpu_uuid
                 ),
             ],
         )

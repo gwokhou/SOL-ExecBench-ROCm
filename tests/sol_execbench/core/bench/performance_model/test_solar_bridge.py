@@ -22,6 +22,11 @@ from sol_execbench.core.solar_bridge.performance import (
     load_semantic_characterization,
 )
 from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
+from tests.solar.access_fixtures import (
+    exact_reads,
+    unavailable_reads,
+    unavailable_views,
+)
 
 
 def _analysis() -> dict[str, object]:
@@ -47,6 +52,8 @@ def _analysis() -> dict[str, object]:
             "lower_bound_seconds": 2.0e-6,
         },
         "metadata": {
+            "views": unavailable_views(),
+            "external_reads": exact_reads(32),
             "fusion": {
                 "regions": [{"id": "fused_0", "layers": ["sigmoid"]}],
             },
@@ -128,6 +135,8 @@ def test_bridge_treats_clone_as_transpose_materialization(
         },
     }
     payload["metadata"] = {
+        "views": unavailable_views(),
+        "external_reads": unavailable_reads(),
         "fusion": {
             "regions": [
                 {"id": "region_0", "layers": ["transpose"]},
@@ -145,7 +154,7 @@ def test_bridge_treats_clone_as_transpose_materialization(
 
     assert result.workload_kind is WorkloadKind.TRANSPOSE
     assert isinstance(result.descriptor, TransposeDescriptor)
-    assert result.reason_codes == []
+    assert result.reason_codes == ["external_reads_unproved"]
 
 
 def test_bridge_recognizes_canonical_aten_cross_entropy_lowering(
@@ -195,6 +204,8 @@ def test_bridge_recognizes_canonical_aten_cross_entropy_lowering(
         },
     }
     payload["metadata"] = {
+        "views": unavailable_views(),
+        "external_reads": unavailable_reads(),
         "fusion": {
             "regions": [
                 {"id": "region_0", "layers": ["log_softmax"]},
@@ -214,7 +225,7 @@ def test_bridge_recognizes_canonical_aten_cross_entropy_lowering(
     assert isinstance(result.descriptor, CrossEntropyDescriptor)
     assert result.descriptor.rows == 256
     assert result.descriptor.classes == 128
-    assert result.reason_codes == []
+    assert result.reason_codes == ["external_reads_unproved"]
 
 
 def test_bridge_accepts_fp16_matmul_output_with_fp32_accumulation(
@@ -235,6 +246,8 @@ def test_bridge_accepts_fp16_matmul_output_with_fp32_accumulation(
         },
     }
     payload["metadata"] = {
+        "views": unavailable_views(),
+        "external_reads": unavailable_reads(),
         "fusion": {"regions": [{"id": "region_0", "layers": ["mm"]}]},
     }
     path = tmp_path / "solar-analysis.yaml"
@@ -300,7 +313,9 @@ def test_bridge_extracts_v4_semantics(
         }
     payload["layers"] = {operation: layer}
     payload["metadata"] = {
-        "fusion": {"regions": [{"id": "region_0", "layers": [operation]}]}
+        "views": unavailable_views(),
+        "external_reads": unavailable_reads(),
+        "fusion": {"regions": [{"id": "region_0", "layers": [operation]}]},
     }
     path = tmp_path / f"{operation}.yaml"
     path.write_text(yaml.safe_dump(payload), encoding="utf-8")
@@ -342,7 +357,9 @@ def test_bridge_recovers_index_axis_from_content_bound_semantic_operation(
         }
     }
     payload["metadata"] = {
-        "fusion": {"regions": [{"id": "region_0", "layers": ["index_select"]}]}
+        "views": unavailable_views(),
+        "external_reads": unavailable_reads(),
+        "fusion": {"regions": [{"id": "region_0", "layers": ["index_select"]}]},
     }
     path = tmp_path / "index-select.yaml"
     path.write_text(yaml.safe_dump(payload), encoding="utf-8")
@@ -398,12 +415,14 @@ def test_bridge_builds_exact_bounded_composite_dag(tmp_path: Path) -> None:
         },
     }
     payload["metadata"] = {
+        "views": unavailable_views(),
+        "external_reads": unavailable_reads(),
         "fusion": {
             "regions": [
                 {"id": "fused", "layers": ["sigmoid", "relu"]},
                 {"id": "materialized", "layers": ["sum"]},
             ]
-        }
+        },
     }
     path = tmp_path / "composite.yaml"
     path.write_text(yaml.safe_dump(payload), encoding="utf-8")
@@ -465,12 +484,14 @@ def test_bridge_resolves_composite_edges_through_transparent_views(
         },
     }
     payload["metadata"] = {
+        "views": unavailable_views(),
+        "external_reads": unavailable_reads(),
         "fusion": {
             "regions": [
                 {"id": "region_0", "layers": ["sigmoid", "view"]},
                 {"id": "region_1", "layers": ["sum"]},
             ]
-        }
+        },
     }
     path = tmp_path / "transparent-composite.yaml"
     path.write_text(yaml.safe_dump(payload), encoding="utf-8")
@@ -521,6 +542,8 @@ def test_bridge_honors_content_bound_concurrent_graph_semantics(
         },
     }
     payload["metadata"] = {
+        "views": unavailable_views(),
+        "external_reads": unavailable_reads(),
         "performance_semantics": {"graph_class": "concurrent_graph"},
         "fusion": {
             "regions": [

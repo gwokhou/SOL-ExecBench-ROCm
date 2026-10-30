@@ -24,6 +24,7 @@ from sol_execbench.core.bench.batch_gpu_qualification import (
     require_isolated_qualification_root,
     verify_qualification_artifact,
 )
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
     load_json_file,
@@ -345,12 +346,17 @@ def _run_calibration(arguments: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Run one uniform qualification stage or the gated calibration."""
     arguments = _parse_args(argv)
-    if arguments.stage == "run":
-        return _run_calibration(arguments)
-    stage = BatchGPUQualificationStage(arguments.stage.removeprefix("qualify-"))
-    gate = _run_qualification(arguments, stage)
-    print(gate.model_dump_json())
-    return 0
+    with native_gpu_execution(
+        "cpu" if arguments.stage == "qualify-static" else "cuda:0"
+    ):
+        if arguments.stage == "run":
+            return _run_calibration(arguments)
+        stage = BatchGPUQualificationStage(
+            arguments.stage.removeprefix("qualify-")
+        )
+        gate = _run_qualification(arguments, stage)
+        print(gate.model_dump_json())
+        return 0
 
 
 if __name__ == "__main__":

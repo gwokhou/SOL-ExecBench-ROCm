@@ -28,9 +28,16 @@ from sol_execbench.core.solar_bridge.path_comparison_models import (
     WorkloadPathComparison,
 )
 from solar.artifacts import load_yaml_artifact
+from solar.artifacts.names import (
+    ANALYSIS_FILENAME,
+    CONVERSION_ATTESTATION_FILENAME,
+    MANIFEST_FILENAME,
+)
+from solar.ir.access_artifact import ACCESS_FILENAME
 from solar.schema_versions import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
     SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+    SchemaVersion as SolarSchemaVersion,
 )
 
 
@@ -98,7 +105,7 @@ def _load_root(
     if not root.is_dir():
         raise ValueError(f"analysis root is not a directory: {root}")
     workloads: dict[Path, _WorkloadArtifacts] = {}
-    for manifest_path in sorted(root.rglob("manifest.yaml")):
+    for manifest_path in sorted(root.rglob(MANIFEST_FILENAME)):
         relative = manifest_path.parent.relative_to(root)
         if relative in workloads:
             raise ValueError(f"duplicate workload directory: {relative}")
@@ -119,7 +126,7 @@ def _load_workload(
     directory: Path,
     expected_path: IRPath,
 ) -> _WorkloadArtifacts:
-    manifest = _load_mapping(directory / "manifest.yaml")
+    manifest = _load_mapping(directory / MANIFEST_FILENAME)
     if manifest.get("schema_version") != SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION:
         raise ValueError(f"{relative}: unsupported request manifest schema")
     contract = _mapping(manifest.get("analysis_contract"), "analysis_contract")
@@ -130,11 +137,17 @@ def _load_workload(
             f"found {observed_path.value}",
         )
     artifacts = _verify_manifest_artifacts(directory, manifest, expected_path)
-    analysis = _load_mapping(artifacts["solar-analysis.yaml"])
+    analysis = _load_mapping(artifacts[ANALYSIS_FILENAME])
     if analysis.get("schema_version") != SOLAR_ANALYSIS_SCHEMA_VERSION:
         raise ValueError(f"{relative}: unsupported SOLAR analysis schema")
+    from solar.analysis.access_contract import read_external_report
+    from solar.analysis.views import read_analysis_views
+
+    metadata = _mapping(analysis.get("metadata"), "metadata")
+    read_external_report(metadata)
+    read_analysis_views(metadata.get("views"))
     attestation = _load_mapping(
-        artifacts["conversion-attestation.yaml"],
+        artifacts[CONVERSION_ATTESTATION_FILENAME],
     )
     _validate_attestation_identity(
         manifest,
@@ -182,6 +195,9 @@ def _validate_attestation_identity(
     attestation: Mapping[str, object],
     ir_path: IRPath,
 ) -> None:
+    predicate = _mapping(attestation.get("predicate"), "predicate")
+    if predicate.get("verifier") != SolarSchemaVersion.IR_VERIFICATION:
+        raise ValueError("conversion attestation verifier is not current")
     records = _list(manifest.get("artifacts"), "manifest artifacts")
     artifact_digests = {
         str(record.get("path")): str(record.get("sha256"))
@@ -202,9 +218,11 @@ def _validate_attestation_identity(
         for raw in subjects
         for subject in (_mapping(raw, "attestation subject"),)
     }
+    if ACCESS_FILENAME not in artifact_digests:
+        raise ValueError("conversion attestation access artifact is missing")
+    expected[ACCESS_FILENAME] = artifact_digests[ACCESS_FILENAME]
     if any(observed.get(name) != digest for name, digest in expected.items()):
         raise ValueError("conversion attestation subject identity mismatch")
-    predicate = _mapping(attestation.get("predicate"), "predicate")
     if predicate.get("status") != "passed":
         raise ValueError("conversion attestation did not pass")
 
@@ -261,7 +279,25 @@ def _compare_workload(
         mandatory_resource_work=resources,
         fusion_intermediate_accounting=fusion,
         formal_bound=bound,
+        analysis_views=_section(
+            _analysis_views(left),
+            _analysis_views(right),
+            path_names,
+            DifferenceCategory.ANALYSIS_VIEW_DIFFERENCE,
+        ),
     )
+
+
+def _analysis_views(artifacts: _WorkloadArtifacts) -> dict[str, object]:
+    """Compare each model's quantities without equating dialect operator IDs."""
+    from solar.analysis.views import read_analysis_views
+
+    metadata = _mapping(artifacts.analysis.get("metadata"), "analysis metadata")
+    views = read_analysis_views(metadata.get("views"))
+    return {
+        name.value: view.model_dump(mode="json", exclude={"operator_seconds"})
+        for name, view in views.items()
+    }
 
 
 def _section(

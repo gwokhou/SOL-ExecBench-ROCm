@@ -11,6 +11,12 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from sol_execbench.cli.commands.solar_exploration import (
+    requirements_cli,
+    scan_cli,
+    search_orders_cli,
+)
+from sol_execbench.cli.commands.solar_reuse import reprice_cli
 from sol_execbench.cli.protocol import (
     CliExitCode,
     CliFailure,
@@ -41,6 +47,7 @@ from sol_execbench.core.solar_bridge.path_comparison_models import (
     PathComparisonStatus,
 )
 from sol_execbench.core.solar_bridge.runner import run_solar_worker
+from sol_execbench.core.solar_bridge.views import load_outcome_views
 
 console = Console(stderr=True)
 _BACKEND_CHOICE = click.Choice(
@@ -52,6 +59,12 @@ _BACKEND_CHOICE = click.Choice(
 @click.group("solar", context_settings={"help_option_names": ["-h", "--help"]})
 def solar_cli() -> None:
     """Build formal SOLAR artifacts; never time or score candidates."""
+
+
+solar_cli.add_command(reprice_cli)
+solar_cli.add_command(requirements_cli)
+solar_cli.add_command(scan_cli)
+solar_cli.add_command(search_orders_cli)
 
 
 @solar_cli.command("compare-paths")
@@ -137,7 +150,7 @@ def compare_paths_cli(
 @click.option(
     "--device-stage-lock",
     type=click.Path(dir_okay=False, path_type=Path),
-    help="Serialize the GPU-dependent stage across parallel SOLAR workers.",
+    help="Optional additional stage lock; the native shared GPU lock is always used.",
 )
 @click.option(
     "--device-stage-lock-timeout",
@@ -204,6 +217,20 @@ def analyze_cli(
             f"[red]SOLAR failed at {outcome.stage}: {outcome.message}[/red]",
         )
         return CliResult(data=data, exit_code=CliExitCode.RESULT_FAILED)
+    return _analyzed_result(outcome, output)
+
+
+def _analyzed_result(outcome: SolarAnalysisOutcome, output: Path) -> CliResult:
+    data = outcome.to_dict()
+    try:
+        data["views"] = load_outcome_views(outcome)
+    except (OSError, ValueError) as exc:
+        raise CliFailure(
+            str(exc),
+            code="solar_analysis_views_invalid",
+            exit_code=CliExitCode.RESULT_FAILED,
+            hint="Keep the complete accepted analysis artifact unchanged.",
+        ) from exc
     console.print(
         f"[green]Formal SOL bound: {outcome.lower_bound_seconds:.9g} s[/green]",
     )

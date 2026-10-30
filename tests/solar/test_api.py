@@ -20,13 +20,20 @@ from solar.api import (
 )
 from solar.contracts import SolarStage
 from solar.graph.extraction import OperatorGraphArtifact
+from solar.ir.access_artifact import ACCESS_FILENAME
 from solar.ir.contracts import IRKind, IRPath
 from solar.ir.conversion import IRGraphArtifact
 from solar.pipeline import (
     analysis as analysis_pipeline,
     stages as pipeline_stages,
 )
+from solar.pipeline.publication import extract_bound
+from solar.schema_versions import (
+    SOLAR_ANALYSIS_SCHEMA_VERSION,
+    SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
+)
 from solar.verification import VerificationError
+from tests.solar.access_fixtures import exact_reads, unavailable_views
 
 
 class _Profile:
@@ -133,6 +140,7 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
 
     def convert(operator, *, output_dir, ir_kind=None):
         del operator, ir_kind
+        (Path(output_dir) / ACCESS_FILENAME).write_text("{}\n")
         einsum = Path(output_dir) / "einsum_graph.yaml"
         einsum.write_text("layers: {}\n")
         return IRGraphArtifact(einsum, IRKind.ATEN)
@@ -141,9 +149,13 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         Path(kwargs["output_path"]).write_text("predicate: passed\n")
 
     analysis = {
-        "schema_version": 4,
+        "schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION,
         "total": {"lower_bound_seconds": 0.001, "compute_resource": "mfma"},
-        "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
+        "metadata": {
+            "views": unavailable_views(),
+            "external_reads": exact_reads(),
+            "bound_kind": "capacity_constrained_tile_aware_v1",
+        },
     }
     monkeypatch.setattr(
         analysis_pipeline,
@@ -185,11 +197,12 @@ def test_analyze_publishes_only_complete_atomic_artifact_set(
         "operator_graph.yaml",
         "einsum_graph.yaml",
         "conversion-attestation.yaml",
+        ACCESS_FILENAME,
         "solar-analysis.yaml",
         "manifest.yaml",
     }
     manifest = yaml.safe_load((output / "manifest.yaml").read_text())
-    assert manifest["schema_version"] == 6
+    assert manifest["schema_version"] == SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
     assert "candidate_runtime" not in manifest
     assert "score" not in manifest
     assert manifest["analysis_contract"]["precision"] == "fp16"
@@ -224,7 +237,9 @@ def test_attach_analysis_metadata_preserves_formal_metadata() -> None:
 
 
 def test_attach_analysis_metadata_rejects_reserved_collision() -> None:
-    analysis = {"metadata": {"bound_kind": "formal"}}
+    analysis = {
+        "metadata": {"external_reads": exact_reads(), "bound_kind": "formal"}
+    }
 
     with pytest.raises(ValueError, match="reserved"):
         api._attach_analysis_metadata(
@@ -372,25 +387,33 @@ def test_analyze_refuses_to_overwrite_existing_output(tmp_path):
 
 
 def test_bound_and_reason_code_helpers_fail_closed():
-    valid = api._extract_bound(
+    valid = extract_bound(
         {
-            "schema_version": 4,
+            "schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION,
             "total": {"lower_bound_seconds": 0, "compute_resource": None},
-            "metadata": {"bound_kind": "capacity_constrained_tile_aware_v1"},
+            "metadata": {
+                "views": unavailable_views(),
+                "external_reads": exact_reads(),
+                "bound_kind": "capacity_constrained_tile_aware_v1",
+            },
         },
     )
     assert valid.seconds == 0
     assert valid.limiting_resource is None
     with pytest.raises(ValueError, match="non-tile-aware"):
-        api._extract_bound(
+        extract_bound(
             {
-                "schema_version": 4,
+                "schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION,
                 "total": {"lower_bound_seconds": 1},
-                "metadata": {"bound_kind": "roofline"},
+                "metadata": {
+                    "views": unavailable_views(),
+                    "external_reads": exact_reads(),
+                    "bound_kind": "roofline",
+                },
             },
         )
     with pytest.raises(ValueError, match="unsupported schema"):
-        api._extract_bound({"schema_version": 0})
+        extract_bound({"schema_version": 0})
     assert pipeline.pipeline_reason_code(
         SolarStage.FORMAL_ANALYSIS,
         OrojenesisError("missing"),
@@ -417,11 +440,13 @@ def test_bound_and_reason_code_helpers_fail_closed():
 )
 def test_extract_bound_rejects_non_finite_or_negative_seconds(seconds) -> None:
     with pytest.raises(ValueError, match="finite lower bound"):
-        api._extract_bound(
+        extract_bound(
             {
-                "schema_version": 4,
+                "schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION,
                 "total": {"lower_bound_seconds": seconds},
                 "metadata": {
+                    "views": unavailable_views(),
+                    "external_reads": exact_reads(),
                     "bound_kind": "capacity_constrained_tile_aware_v1",
                 },
             },
@@ -572,23 +597,16 @@ def test_incomplete_optional_orojenesis_evidence_falls_back_to_eq1(
     )
 
 
-def test_default_api_keeps_unmodeled_contraction_on_paper_roofline(tmp_path):
+def test_default_api_refuses_unproved_convolution_read_footprint(tmp_path):
     result = api.analyze(
         _conv_request(tmp_path / "result", require_orojenesis=False),
     )
 
-    assert isinstance(result, AnalysisResult)
-    assert result.bound.kind == "roofline_eq1_v1"
-    assert result.sol_score_eligible is True
-    analysis = yaml.safe_load(
-        (result.output_dir / "solar-analysis.yaml").read_text(),
-    )
-    evidence = analysis["metadata"]["orojenesis"]
-    assert evidence["status"] == "not_requested"
-    assert evidence["formal_coverage"] == {
-        "applicable_layers": 0,
-        "total_layers": 1,
-    }
+    assert isinstance(result, AnalysisFailure)
+    assert result.stage == SolarStage.FORMAL_ANALYSIS
+    assert "external reads are unproved" in result.message
+    assert "read_semantics_unproved" in result.message
+    assert not (tmp_path / "result").exists()
 
 
 def test_strict_api_rejects_contraction_without_exact_orojenesis_proof(
@@ -627,7 +645,7 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
 
         def analyze_graph(self, *args, **kwargs):
             observed.update(kwargs)
-            return {"schema_version": 4}
+            return {"schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION}
 
     monkeypatch.setattr(
         graph_analyzer,
@@ -651,17 +669,21 @@ def test_diagnostic_analysis_does_not_construct_orojenesis_runner(
         IRGraphArtifact(graph_path, IRKind.ATEN),
     )
 
-    assert result == {"schema_version": 4}
+    assert result == {"schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION}
     assert observed["orojenesis_runner"] is None
     assert observed["require_orojenesis"] is False
 
 
 def test_extract_bound_accepts_paper_roofline_when_orojenesis_not_required():
-    bound = api._extract_bound(
+    bound = extract_bound(
         {
-            "schema_version": 4,
+            "schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION,
             "total": {"lower_bound_seconds": 1.5, "compute_resource": "mfma"},
-            "metadata": {"bound_kind": "roofline_eq1_v1"},
+            "metadata": {
+                "views": unavailable_views(),
+                "external_reads": exact_reads(),
+                "bound_kind": "roofline_eq1_v1",
+            },
         },
         require_orojenesis=False,
     )
@@ -672,11 +694,15 @@ def test_extract_bound_accepts_paper_roofline_when_orojenesis_not_required():
 
 def test_extract_bound_rejects_roofline_when_tile_evidence_is_required():
     with pytest.raises(ValueError, match="non-tile-aware"):
-        api._extract_bound(
+        extract_bound(
             {
-                "schema_version": 4,
+                "schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION,
                 "total": {"lower_bound_seconds": 1.5},
-                "metadata": {"bound_kind": "roofline_eq1_v1"},
+                "metadata": {
+                    "views": unavailable_views(),
+                    "external_reads": exact_reads(),
+                    "bound_kind": "roofline_eq1_v1",
+                },
             },
             require_orojenesis=True,
         )
@@ -684,11 +710,15 @@ def test_extract_bound_rejects_roofline_when_tile_evidence_is_required():
 
 def test_extract_bound_rejects_unknown_kind_even_when_orojenesis_not_required():
     with pytest.raises(ValueError, match="unsupported bound kind"):
-        api._extract_bound(
+        extract_bound(
             {
-                "schema_version": 4,
+                "schema_version": SOLAR_ANALYSIS_SCHEMA_VERSION,
                 "total": {"lower_bound_seconds": 1.5},
-                "metadata": {"bound_kind": "roofline"},
+                "metadata": {
+                    "views": unavailable_views(),
+                    "external_reads": exact_reads(),
+                    "bound_kind": "roofline",
+                },
             },
             require_orojenesis=False,
         )

@@ -25,6 +25,18 @@ from sol_execbench.core.bench.clock_lock import (
     ClockLockLease,
     ClockRestoreError,
 )
+from sol_execbench.core.bench.gpu_admission import (
+    AdmissionDevice,
+    AdmissionError,
+    clock_state_directory,
+    configured_admission,
+    durable_json_write,
+    ensure_durable_directory,
+)
+from sol_execbench.core.bench.gpu_lock_paths import (
+    LEGACY_CLOCK_STATE_DIRECTORY,
+    normalize_gpu_uuid,
+)
 from sol_execbench.core.data.base_model import CurrentFrozenSchemaModel
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
@@ -35,6 +47,7 @@ from sol_execbench.core.timestamps import utc_timestamp
 
 ENV_CLOCK_OWNER = "SOL_EXECBENCH_CLOCK_OWNER"
 LEASE_DIRECTORY = "clock-leases"
+EXECUTION_CLEANUP_BLOCKER = "execution_cleanup_unverified"
 OWNER_TOKEN_PATTERN = re.compile(r"[0-9a-f]{32}")
 IDENTITY_TIMEOUT_SECONDS = 10
 IDENTITY_OUTPUT_BYTES = 16384
@@ -109,7 +122,26 @@ def clock_owner_path(directory: Path, token: str) -> Path:
     """Resolve only a canonical token under the shared ownership directory."""
     if OWNER_TOKEN_PATTERN.fullmatch(token) is None:
         raise ClockOwnershipError("clock_owner_token_invalid")
-    return directory / LEASE_DIRECTORY / f"{token}.json"
+    return clock_state_directory(directory) / LEASE_DIRECTORY / f"{token}.json"
+
+
+def write_clock_record(path: Path, record: ClockOwnerRecord) -> None:
+    """Persist native responsibility before any admitted device side effect."""
+    value = record.model_dump(mode="json")
+    if configured_admission() is None:
+        atomic_write_json_value(path, value)
+    else:
+        durable_json_write(path, value)
+
+
+def admission_device(record: ClockOwnerRecord) -> AdmissionDevice:
+    """Require one explicit canonical device in the admitted native owner."""
+    if len(record.devices) != 1:
+        raise AdmissionError("gpu_admission_requires_single_device")
+    device = record.devices[0]
+    return AdmissionDevice(
+        pci_bdf=device.bdf.lower(), smi_uuid=device.uuid.lower()
+    )
 
 
 def verify_clock_owner(
@@ -140,16 +172,30 @@ def verify_clock_owner(
     return record
 
 
-def require_no_clock_recovery(directory: Path) -> None:
-    """Fail closed after a crashed owner or failed restore, once GPU lock is held."""
-    for path in sorted((directory / LEASE_DIRECTORY).glob("*.json")):
+def require_no_clock_recovery(directory: Path, *, gpu_uuid: str) -> None:
+    """Require no unresolved lease covering the held canonical GPU UUID."""
+    directories = {
+        clock_state_directory(directory),
+        LEGACY_CLOCK_STATE_DIRECTORY,
+    }
+    paths = {
+        path
+        for root in directories
+        for path in (root / LEASE_DIRECTORY).glob("*.json")
+    }
+    for path in sorted(paths):
         try:
             record = ClockOwnerRecord.model_validate_json(path.read_text())
+            if record.state is ClockOwnerState.RESTORED:
+                continue
+            devices = {
+                normalize_gpu_uuid(device.uuid) for device in record.devices
+            }
         except (OSError, ValueError) as error:
             raise ClockOwnershipError(
                 f"clock_recovery_record_invalid: {path}"
             ) from error
-        if record.state != ClockOwnerState.RESTORED:
+        if gpu_uuid in devices:
             raise ClockOwnershipError(
                 f"clock_recovery_required: inspect {path}"
             )
@@ -169,6 +215,7 @@ def published_clock_owner(
             yield None
         return
     descriptor: int | None = None
+    admission = configured_admission()
     try:
         record = ClockOwnerRecord(
             lease_id=uuid4().hex,
@@ -177,12 +224,16 @@ def published_clock_owner(
             container_supervised=container_supervised and lease.locked,
         )
         path = clock_owner_path(directory, record.lease_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
+        if admission is not None:
+            admission.hold(admission_device(record), record.lease_id, path)
+            ensure_durable_directory(path.parent)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
         descriptor = os.open(
             path.with_suffix(".lock"), os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o644
         )
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        atomic_write_json_value(path, record.model_dump(mode="json"))
+        write_clock_record(path, record)
     except BaseException:
         if descriptor is not None:
             os.close(descriptor)
@@ -199,6 +250,10 @@ def published_clock_owner(
         else:
             os.environ[ENV_CLOCK_OWNER] = previous
         try:
+            # Activation may have persisted container supervision even when
+            # natural clocks require no setter. Preserve that recovery duty.
+            if container_supervised:
+                record = ClockOwnerRecord.model_validate_json(path.read_text())
             record = record.model_copy(
                 update={
                     "state": ClockOwnerState.RESTORED
@@ -206,11 +261,16 @@ def published_clock_owner(
                     else ClockOwnerState.RESTORE_FAILED,
                     "ended_at": utc_timestamp(),
                     "release_blocker": lease.release_blocker,
-                    "container_supervised": container_supervised
-                    and lease.locked,
                 }
             )
-            atomic_write_json_value(path, record.model_dump(mode="json"))
+            write_clock_record(path, record)
+            if (
+                admission is not None
+                and record.state == ClockOwnerState.RESTORED
+            ):
+                admission.release(
+                    admission_device(record), record.lease_id, path
+                )
         finally:
             os.close(descriptor)
 
@@ -220,7 +280,7 @@ def _record_container_supervision(directory: Path, token: str) -> None:
     path = clock_owner_path(directory, token)
     record = ClockOwnerRecord.model_validate_json(path.read_text())
     record = record.model_copy(update={"container_supervised": True})
-    atomic_write_json_value(path, record.model_dump(mode="json"))
+    write_clock_record(path, record)
 
 
 @contextmanager
@@ -228,7 +288,7 @@ def owned_clock_window(
     directory: Path,
     devices: tuple[ClockDevice, ...],
     *,
-    activate: Callable[[], None],
+    activate: Callable[[], None] | None,
     restore: Callable[[], bool],
     container_supervised: bool = False,
 ) -> Iterator[ClockLockLease]:
@@ -249,8 +309,9 @@ def owned_clock_window(
             lease, directory, devices, container_supervised=container_supervised
         ) as token:
             activation_started = True
-            activate()
-            lease.locked = True
+            if activate is not None:
+                activate()
+                lease.locked = True
             if container_supervised:
                 if token is None:
                     raise ClockOwnershipError("clock_owner_missing")

@@ -6,6 +6,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from solar.analysis.external_reads import ExternalReads
 from solar.types import GraphValue, NodeDict
 
 
@@ -63,6 +64,16 @@ class MemoryBytes:
     output_bytes: list[float]
     unfused_bytes: float
     used_dtype_fallback: bool
+
+
+@dataclass(frozen=True, slots=True)
+class IntrinsicLayer:
+    """Profile-independent work and memory for one validated graph layer."""
+
+    data: LayerData
+    compute: LayerCompute
+    memory: MemoryElements
+    byte_counts: MemoryBytes
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +156,7 @@ class AnalysisAccumulator:
     unique_external_output_bytes: dict[str, float] = field(default_factory=dict)
     orphaned_layers: set[str] = field(default_factory=set)
     used_dtype_fallback: bool = False
+    external_reads: ExternalReads | None = None
 
     def record(self, layer_id: str, analyzed: AnalyzedLayer) -> None:
         """Add one analyzed layer to the aggregate totals."""

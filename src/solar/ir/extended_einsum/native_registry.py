@@ -222,6 +222,8 @@ def _pooling_resampling_specs() -> list[NativeOpSpec]:
 
 def _indexing_specs() -> list[NativeOpSpec]:
     return [
+        _spec("tril", inputs=(1, 1), attributes=("diagonal",)),
+        _spec("triu", inputs=(1, 1), attributes=("diagonal",)),
         _spec("gather", inputs=(2, 2), attributes=("dim", "sparse_grad")),
         _spec(
             "scatter",
@@ -466,7 +468,7 @@ def _compatibility_functional_specs() -> list[NativeOpSpec]:
             target,
             attributes=functional_attributes.get(target, ()),
             executor="functional",
-            effects=_LIBRARY,
+            effects=_NO_EFFECTS if target in {"relu", "elu"} else _LIBRARY,
         )
         for target in sorted(functional)
     ]
@@ -504,7 +506,7 @@ def _compatibility_shape_specs() -> list[NativeOpSpec]:
     ]
     specs.extend(
         _spec(target, effects=_ATOMIC)
-        for target in sorted({"index_copy", "index_put", "where"})
+        for target in sorted({"index_copy", "index_put"})
     )
     return specs
 
@@ -524,6 +526,7 @@ def _compatibility_library_specs() -> list[NativeOpSpec]:
             for target in ("bfloat16", "float", "half", "int", "long")
         ),
         _spec("ones_like"),
+        _spec("where"),
         _spec("to", executor="method"),
         _spec("type_as", inputs=(2, 2), executor="method"),
         _spec("cumsum"),
@@ -535,7 +538,12 @@ def _compatibility_library_specs() -> list[NativeOpSpec]:
         ),
     ]
     specs.extend(
-        _spec(target, inputs=(2, 3), executor="functional", effects=_LIBRARY)
+        _spec(
+            target,
+            inputs=(2, 3),
+            executor="functional",
+            effects=_NO_EFFECTS if target == "conv2d" else _LIBRARY,
+        )
         for target in ("conv1d", "conv2d", "conv3d")
     )
     specs.extend(

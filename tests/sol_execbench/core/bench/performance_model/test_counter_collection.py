@@ -7,6 +7,11 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from sol_execbench.core.bench.gpu_lock import (
+    GPULockVerificationError,
+    require_evaluation_gpu_lock,
+    require_supervised_gpu_execution,
+)
 from sol_execbench.core.bench.rocm_profiler import counter_collection
 from sol_execbench.core.bench.rocm_profiler.counter_collection import (
     collect_rocprofv3_counters,
@@ -21,6 +26,8 @@ from sol_execbench.core.bench.rocm_profiler.models import (
     Rocprofv3ReasonCode,
 )
 from sol_execbench.core.data.json_utils import load_json_file
+
+pytestmark = pytest.mark.usefixtures("native_gpu_cpu_observation")
 
 _REQUIRED_COUNTERS = """
 Name:gfx1200
@@ -57,6 +64,7 @@ def test_counter_collection_discovers_availability_and_hashes_inputs(
     request = _request(tmp_path)
 
     def runner(command, _cwd, _timeout):
+        require_supervised_gpu_execution()
         if "info" in command:
             assert command[-4:] == ["-d", "0", "info", "--pmc"]
             return subprocess.CompletedProcess(
@@ -113,6 +121,8 @@ def test_counter_collection_discovers_availability_and_hashes_inputs(
         request.output_directory / "profile.counter-metadata.json",
     )
     assert provenance.pmc_check_sha256 == result.provenance["pmc_check_sha256"]
+    with pytest.raises(GPULockVerificationError):
+        require_evaluation_gpu_lock()
 
 
 def test_counter_collection_selects_only_roctx_marked_candidate_process(

@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Canonical AMD-SMI clock command contract shared by execution and sudoers."""
 
+import os
 import re
 from enum import StrEnum
 
 ENV_HOST_CLOCK_GPU_UUID = "SOL_EXECBENCH_HOST_CLOCK_GPU_UUID"
+ENV_HOST_AMD_SMI = "SOL_EXECBENCH_HOST_AMD_SMI"
+DEFAULT_HOST_AMD_SMI = "/usr/bin/amd-smi"
 
 _UUID_PATTERN = re.compile(
     r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
@@ -19,12 +22,24 @@ class ClockLevel(StrEnum):
 
 
 def clock_executable(explicit: str | None = None) -> str:
-    """Resolve the same executable spelling for authorization and execution."""
+    """Preserve legacy/container discovery or an explicit invocation path."""
     if explicit is not None:
         return explicit
     from sol_execbench.core.platform.runtime import resolve_rocm_tool_command
 
     return resolve_rocm_tool_command("amd-smi")
+
+
+def host_clock_executable(explicit: str | None = None) -> str:
+    """Select an explicit host path or stable default, never a PATH lookup."""
+    selected = (
+        explicit
+        if explicit is not None
+        else os.environ.get(ENV_HOST_AMD_SMI, DEFAULT_HOST_AMD_SMI)
+    )
+    if not os.path.isabs(selected) or "\0" in selected:
+        raise ValueError("host AMD-SMI must be a nonempty absolute path")
+    return selected
 
 
 def clock_arguments(

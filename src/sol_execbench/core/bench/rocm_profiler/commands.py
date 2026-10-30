@@ -7,14 +7,21 @@ from __future__ import annotations
 
 import os
 import subprocess
+import threading
 from collections.abc import Callable, Sequence
+from contextlib import nullcontext
 from pathlib import Path
 
+from sol_execbench.core.bench.gpu_lock import (
+    require_evaluation_gpu_lock,
+    require_supervised_gpu_execution,
+)
 from sol_execbench.core.bench.rocm_profiler.models import ROCPROFV3_EXECUTABLE
 from sol_execbench.core.process.environment import (
     ENV_SOL_EXECBENCH_GRACEFUL_EXIT,
 )
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+from sol_execbench.core.process.termination import cleanup_on_termination
 
 ProfilerRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 ProfileRunner = Callable[
@@ -76,12 +83,19 @@ def default_runner(
     timeout_seconds: float = 300.0,
 ) -> subprocess.CompletedProcess[str]:
     """Run a profiler command with bounded output and process cleanup."""
+    require_evaluation_gpu_lock()
+    require_supervised_gpu_execution()
     env = {**os.environ, ENV_SOL_EXECBENCH_GRACEFUL_EXIT: "1"}
-    return run_in_process_group_bounded(
-        command,
-        timeout=timeout_seconds,
-        env=env,
-    )
+    with (
+        cleanup_on_termination()
+        if threading.current_thread() is threading.main_thread()
+        else nullcontext()
+    ):
+        return run_in_process_group_bounded(
+            command,
+            timeout=timeout_seconds,
+            env=env,
+        )
 
 
 def default_profile_runner(
@@ -90,10 +104,17 @@ def default_profile_runner(
     timeout_seconds: int | None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a profiler command from an optional working directory."""
+    require_evaluation_gpu_lock()
+    require_supervised_gpu_execution()
     env = {**os.environ, ENV_SOL_EXECBENCH_GRACEFUL_EXIT: "1"}
-    return run_in_process_group_bounded(
-        command,
-        cwd=working_directory,
-        timeout=timeout_seconds,
-        env=env,
-    )
+    with (
+        cleanup_on_termination()
+        if threading.current_thread() is threading.main_thread()
+        else nullcontext()
+    ):
+        return run_in_process_group_bounded(
+            command,
+            cwd=working_directory,
+            timeout=timeout_seconds,
+            env=env,
+        )

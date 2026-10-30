@@ -31,14 +31,18 @@ class TargetHardware(TypedDict):
 
 @pytest.fixture
 def hardware(monkeypatch, tmp_path):
-    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("GPU_LOCK_UUID", TARGET_UUID)
+    monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("SOL_EXECBENCH_CLOCK_STATE_DIR", str(tmp_path))
     monkeypatch.delenv(clock_ownership.ENV_CLOCK_OWNER, raising=False)
     monkeypatch.delenv(ENV_HOST_CLOCK_GPU_UUID, raising=False)
     monkeypatch.setattr(
         host_clock_guard, "observe_clock_devices", lambda: (TARGET, OTHER)
     )
     monkeypatch.setattr(
-        clock_lock, "_amd_smi_executable", lambda: "/opt/rocm/bin/amd-smi"
+        clock_lock,
+        "_amd_smi_executable",
+        lambda _gpu_uuid=None: "/opt/rocm/bin/amd-smi",
     )
     monkeypatch.setattr(clock_lock.time, "sleep", lambda _: None)
     state: TargetHardware = {
@@ -261,14 +265,60 @@ def test_uuid_from_environment_reaches_production_window(hardware, explicit):
     ]
 
 
-def test_cli_forwards_uuid(monkeypatch):
+@pytest.mark.parametrize(
+    "natural_clocks", [False, True], ids=["managed", "natural"]
+)
+def test_cli_forwards_uuid(monkeypatch, natural_clocks):
     # Exercise parser forwarding without launching an external process.
     observed = {}
 
-    def invoke(command, *, gpu_uuid):
-        observed.update(command=command, gpu_uuid=gpu_uuid)
+    def invoke(command, *, gpu_uuid, natural_clocks):
+        observed.update(
+            command=command, gpu_uuid=gpu_uuid, natural_clocks=natural_clocks
+        )
         return 0
 
     monkeypatch.setattr(host_clock_guard, "run_with_host_clock_guard", invoke)
-    assert host_clock_guard.main(["--gpu-uuid", TARGET_UUID, "--", "true"]) == 0
-    assert observed == {"command": ["true"], "gpu_uuid": TARGET_UUID}
+    arguments = ["--gpu-uuid", TARGET_UUID]
+    if natural_clocks:
+        arguments.append("--natural-clocks")
+    assert host_clock_guard.main([*arguments, "--", "true"]) == 0
+    assert observed == {
+        "command": ["true"],
+        "gpu_uuid": TARGET_UUID,
+        "natural_clocks": natural_clocks,
+    }
+
+
+@pytest.mark.parametrize(
+    "readback_ok", [True, False], ids=["auto", "readback-failure"]
+)
+def test_natural_container_retains_supervision_in_final_receipt(
+    hardware, tmp_path, readback_ok
+):
+    def runner(command, environment):
+        assert environment["SOL_EXECBENCH_CLOCKS_LOCKED"] == "0"
+        assert owner_record(tmp_path).container_supervised
+        if not readback_ok:
+            hardware["levels"][TARGET_UUID] = "MANUAL"
+        return subprocess.CompletedProcess(command, 0)
+
+    def invoke():
+        return host_clock_guard.run_with_host_clock_guard(
+            ["docker", "run"], runner=runner, natural_clocks=True
+        )
+
+    if readback_ok:
+        assert invoke() == 0
+    else:
+        with pytest.raises(clock_lock.ClockRestoreError):
+            invoke()
+    record = owner_record(tmp_path)
+    assert record.container_supervised
+    expected = (
+        clock_ownership.ClockOwnerState.RESTORED
+        if readback_ok
+        else clock_ownership.ClockOwnerState.RESTORE_FAILED
+    )
+    assert record.state == expected
+    assert all("set" not in command for command in hardware["commands"])

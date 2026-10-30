@@ -9,6 +9,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from importlib import resources
+from math import isfinite
 from pathlib import Path
 from typing import Any, cast
 
@@ -450,7 +451,7 @@ class MemoryLevel:
             bandwidth_bytes_per_second=(
                 float(bandwidth) if bandwidth is not None else None
             ),
-            source=str(data.get("source", "")) or None,
+            source=str(data.get("source") or "") or None,
         )
 
 
@@ -576,10 +577,14 @@ class ArchitectureProfile:
             raise ValueError(
                 "SOLAR-ROCm accepts AMD architecture profiles only",
             )
-        if self.memory_bandwidth_bytes_per_second <= 0:
+        if (
+            not isfinite(self.memory_bandwidth_bytes_per_second)
+            or self.memory_bandwidth_bytes_per_second <= 0
+        ):
             raise ValueError("memory bandwidth must be positive")
         if not self.peak_ops_per_second or any(
-            value <= 0 for value in self.peak_ops_per_second.values()
+            not isfinite(value) or value <= 0
+            for value in self.peak_ops_per_second.values()
         ):
             raise ValueError(
                 "at least one positive peak throughput is required",
@@ -614,7 +619,9 @@ class ArchitectureProfile:
                 f"missing={missing}, extra={extra}",
             )
         for resource_name, modes in self.resource_limits.items():
-            if not modes or any(value <= 0 for value in modes.values()):
+            if not modes or any(
+                not isfinite(value) or value <= 0 for value in modes.values()
+            ):
                 raise ValueError(
                     f"resource limit rates for {resource_name} must be positive",
                 )
@@ -694,9 +701,9 @@ class ArchitectureProfile:
                 )
             if level.capacity_bytes is not None and level.capacity_bytes <= 0:
                 raise ValueError("memory hierarchy capacities must be positive")
-            if (
-                level.bandwidth_bytes_per_second is not None
-                and level.bandwidth_bytes_per_second <= 0
+            if level.bandwidth_bytes_per_second is not None and (
+                not isfinite(level.bandwidth_bytes_per_second)
+                or level.bandwidth_bytes_per_second <= 0
             ):
                 raise ValueError("memory hierarchy bandwidths must be positive")
 
@@ -825,6 +832,20 @@ class ArchitectureProfile:
             )
             for resource, modes in resource_work.items()
         }
+
+    def qualification_sha256(self) -> str:
+        """Bind parameters and audit policy, excluding only source descriptions.
+
+        Keep the complete ``to_dict()`` digest for artifact provenance. New
+        fields enter qualification by default; exemptions, support claims,
+        revisions and audit references remain bound even when textual.
+        """
+        data = self.to_dict()
+        data.pop("source")
+        data.pop("resource_limit_sources")
+        for level in data["memory_hierarchy"]:
+            level.pop("source")
+        return stable_json_checksum(data)
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible architecture profile."""

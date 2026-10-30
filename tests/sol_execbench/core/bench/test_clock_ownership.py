@@ -21,12 +21,15 @@ from sol_execbench.core.bench.clock_ownership import (
 from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
 from sol_execbench.core.process.termination import cleanup_on_termination
 
-DEVICE = ClockDevice(bdf="0000:05:00.0", uuid="test-uuid")
+DEVICE = ClockDevice(
+    bdf="0000:05:00.0", uuid="11111111-2222-3333-4444-555555555555"
+)
 
 
 @pytest.fixture(autouse=True)
 def isolation(monkeypatch, tmp_path):
-    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("SOL_EXECBENCH_CLOCK_STATE_DIR", str(tmp_path))
     monkeypatch.delenv(ENV_CLOCK_OWNER, raising=False)
 
 

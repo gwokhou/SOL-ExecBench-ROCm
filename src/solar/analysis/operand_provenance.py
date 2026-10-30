@@ -12,6 +12,7 @@ from typing import Any
 from solar.analysis.graph_rules import (
     LOW_PRECISION_DEQUANT_DTYPES,
     RECOMPUTABLE_OPERAND_TARGETS,
+    TILE_LOCAL_BINARY_POSTPROCESS_TARGETS,
     TILE_LOCAL_SCALAR_POSTPROCESS_TARGETS,
     TILE_RECOMPUTABLE_OPERAND_TARGETS,
 )
@@ -44,13 +45,21 @@ class _RegionOutputTracer:
             for layer_id, layer in layers.items()
             if layer_id in region_layers
         }
+        self._external_inputs = {
+            str(item) for item in region.get("external_inputs") or []
+        }
+        self._produced = {
+            str(name)
+            for layer in self._layers.values()
+            for name in (layer.get("tensor_names") or {}).get("outputs") or []
+        }
         self._consumers: dict[str, list[NodeDict]] = {}
         for layer in self._layers.values():
             for name in (layer.get("tensor_names") or {}).get("inputs") or []:
                 self._consumers.setdefault(str(name), []).append(layer)
 
-    @staticmethod
     def _safe_pointwise_step(
+        self,
         layer: NodeDict,
         input_name: str,
         shape: list[Any],
@@ -71,16 +80,64 @@ class _RegionOutputTracer:
         dtypes = layer.get("tensor_dtypes") or {}
         inputs = [str(item) for item in names.get("inputs") or []]
         outputs = [str(item) for item in names.get("outputs") or []]
-        if inputs != [input_name] or len(outputs) != 1:
+        if len(outputs) != 1:
             return None
-        if (
-            list(shapes.get("inputs") or []) != [shape]
-            or list(shapes.get("outputs") or []) != [shape]
-            or [str(item) for item in dtypes.get("inputs") or []] != [dtype]
-            or [str(item) for item in dtypes.get("outputs") or []] != [dtype]
-        ):
+        if inputs != [input_name]:
+            if not self._safe_binary_inputs(layer, input_name, shape, dtype):
+                return None
+        elif list(shapes.get("inputs") or []) != [shape] or [
+            str(item) for item in dtypes.get("inputs") or []
+        ] != [dtype]:
+            return None
+        if list(shapes.get("outputs") or []) != [shape] or [
+            str(item) for item in dtypes.get("outputs") or []
+        ] != [dtype]:
             return None
         return outputs[0]
+
+    def _safe_binary_inputs(
+        self, layer: NodeDict, input_name: str, shape: list[Any], dtype: str
+    ) -> bool:
+        """Preserve the output tile with a statically indexed external operand.
+
+        This proves a contraction relaxation, not a fused-kernel schedule.
+        Side-input bytes remain in the independently audited compulsory reads;
+        they are not removed or charged as contraction traffic here.
+        """
+        if (
+            layer_operation(layer).get("target")
+            not in TILE_LOCAL_BINARY_POSTPROCESS_TARGETS
+        ):
+            return False
+        inputs = list((layer.get("tensor_names") or {}).get("inputs") or [])
+        shapes = list((layer.get("tensor_shapes") or {}).get("inputs") or [])
+        dtypes = list((layer.get("tensor_dtypes") or {}).get("inputs") or [])
+        if (
+            len(inputs) != 2
+            or inputs.count(input_name) != 1
+            or len(shapes) != 2
+        ):
+            return False
+        tracked = inputs.index(input_name)
+        side = 1 - tracked
+        if (
+            inputs[side] not in self._external_inputs
+            or inputs[side] in self._produced
+            or shapes[tracked] != shape
+            or dtypes != [dtype, dtype]
+        ):
+            return False
+        side_shape = shapes[side]
+        if not isinstance(side_shape, (list, tuple)):
+            return False
+        if any(type(n) is not int or n <= 0 for n in [*shape, *side_shape]):
+            return False
+        return len(side_shape) <= len(shape) and all(
+            n in (1, m)
+            for n, m in zip(
+                side_shape, shape[len(shape) - len(side_shape) :], strict=True
+            )
+        )
 
     def trace(self, output_name: str, shape: list[Any], dtype: str) -> bool:
         visited: set[str] = set()

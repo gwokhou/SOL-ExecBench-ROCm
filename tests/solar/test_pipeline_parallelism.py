@@ -160,3 +160,58 @@ def test_device_cleanup_runs_before_cpu_analysis(
 def test_execution_policy_requires_positive_lock_timeout() -> None:
     with pytest.raises(ValueError, match="timeout must be positive"):
         AnalysisExecutionPolicy(device_stage_lock_timeout_seconds=0)
+
+
+@pytest.mark.parametrize("failure_stage", ["extract", "convert", "verify"])
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+def test_failed_device_stage_cleans_up_under_lock(
+    tmp_path,
+    monkeypatch,
+    failure_stage,
+    cleanup_fails,
+) -> None:
+    lock_path = tmp_path / "device.lock"
+    cleaned = []
+
+    def stage(name):
+        def execute(*_args):
+            if name == failure_stage:
+                raise ValueError("device stage failed")
+            return object()
+
+        return execute
+
+    def cleanup():
+        with lock_path.open("a+") as handle, pytest.raises(BlockingIOError):
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        cleaned.append(True)
+        if cleanup_fails:
+            raise RuntimeError("device cleanup failed")
+
+    monkeypatch.setattr(pipeline, "extract_request_graph", stage("extract"))
+    monkeypatch.setattr(pipeline, "convert_request_graph", stage("convert"))
+    monkeypatch.setattr(pipeline, "verify_request_graph", stage("verify"))
+    monkeypatch.setattr(
+        pipeline,
+        "analyze_request_graph",
+        lambda *_: pytest.fail("CPU analysis ran"),
+    )
+    request = cast(
+        AnalysisRequest,
+        SimpleNamespace(
+            execution_policy=AnalysisExecutionPolicy(
+                device_stage_lock_path=lock_path,
+                device_stage_cleanup=cleanup,
+            )
+        ),
+    )
+    with pytest.raises(pipeline.PipelineStageError) as captured:
+        pipeline.run_pipeline(
+            request, cast(ArchitectureProfile, None), tmp_path
+        )
+    assert cleaned == [True]
+    assert str(captured.value.error) == (
+        "device cleanup failed" if cleanup_fails else "device stage failed"
+    )
+    with lock_path.open("a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)

@@ -1,4 +1,4 @@
-"""Typed decoding for serialized IR semantic values."""
+"""Shared IR value decoding for replay and static semantic analysis."""
 
 from __future__ import annotations
 

@@ -17,6 +17,7 @@ from typing import Final
 class SchemaVersion(StrEnum):
     """Current string-valued first-party wire-schema identifiers."""
 
+    GPU_ADMISSION = "gpu-admission.v1"
     AGENT_FEEDBACK = "sol_execbench.agent_feedback.v7"
     AMD_ISA_RELEASE_LOCK = "sol_execbench.amd_isa_release_lock.v1"
     ARCH_CAPABILITY_BUDGET = "sol_execbench.arch_capability_budget.v1"

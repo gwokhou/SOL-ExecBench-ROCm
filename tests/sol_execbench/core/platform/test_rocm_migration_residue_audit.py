@@ -8,6 +8,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
 ACTIVE_ROOTS = (
@@ -60,6 +62,17 @@ def _active_files() -> list[Path]:
 
 
 def _classification(relative_path: str, line: str) -> str | None:
+    if (
+        relative_path == "scripts/internal/upgrade/torch_scope_workload.py"
+        and line.strip() == "a, b = a_cpu.cuda(), b_cpu.cuda()"
+    ):
+        return "PyTorch ROCm tensor transfer in the guarded scope executor"
+    if (
+        relative_path == "tests/sol_execbench/core/process/test_environment.py"
+        and line.strip()
+        == '"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",'
+    ):
+        return "fixture proves inherited legacy allocator options are removed"
     if line.startswith("# SPDX-FileCopyrightText:") and "NVIDIA" in line:
         return "retained upstream SPDX copyright notice"
     if (
@@ -98,13 +111,21 @@ def _classification(relative_path: str, line: str) -> str | None:
         return "PyTorch extension API keyword used for HIP compiler flags"
     if "#include <ATen/cuda/CUDAContext.h>" in line:
         return "PyTorch ROCm compatibility header for current stream access"
-    if (
-        "torch.version.cuda" in line
-        or '"cuda"' in line
-        or '"cuda:' in line
-        or 'device="cuda"' in line
+    if "torch.version.cuda" in line or re.search(
+        r"(?P<quote>['\"])cuda(?::\d+)?(?P=quote)", line
     ):
         return "PyTorch ROCm compatibility device/version namespace"
+    if (
+        relative_path == "scripts/internal/solar/base01_records.py"
+        and line.strip() == 'nodes.extend(Path("/dev").glob("nvidia*"))'
+    ):
+        return "CPU isolation rejects visible GPU device nodes"
+    if (
+        relative_path == "scripts/internal/upgrade/README.md"
+        and line.strip()
+        == "Selecting PyTorch's `cublas` preference alone did not isolate hipBLASLt: the"
+    ):
+        return "ROCm investigation records the PyTorch BLAS preference label"
     if "cuda_cflags" in line or "cuda_cpp" in line:
         return "legacy schema rejection or migration guidance"
     if relative_path.startswith(("docs/", "README.md")):
@@ -454,6 +475,84 @@ def _classification(relative_path: str, line: str) -> str | None:
     ) and ("caching allocator" in line or "CuTe DSL" in line):
         return "legacy explanatory comment for benchmark behavior"
     return None
+
+
+@pytest.mark.parametrize(
+    ("path", "line", "accepted"),
+    [
+        pytest.param(
+            "scripts/internal/upgrade/torch_scope_workload.py",
+            "a, b = a_cpu.cuda(), b_cpu.cuda()",
+            True,
+            id="guarded-scope-tensor-transfer",
+        ),
+        pytest.param(
+            "scripts/internal/upgrade/torch_scope_workload.py",
+            'subprocess.run(["nvidia-smi"])',
+            False,
+            id="scope-transfer-does-not-allow-tool-execution",
+        ),
+        pytest.param(
+            "tests/sol_execbench/core/process/test_environment.py",
+            '"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",',
+            True,
+            id="legacy-allocator-removal-fixture",
+        ),
+        pytest.param(
+            "tests/sol_execbench/core/process/test_environment.py",
+            'os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"',
+            False,
+            id="removal-fixture-does-not-allow-enabling-legacy-option",
+        ),
+        pytest.param(
+            "scripts/internal/solar/base01_records.py",
+            'nodes.extend(Path("/dev").glob("nvidia*"))',
+            True,
+            id="cpu-isolation-device-refusal",
+        ),
+        pytest.param(
+            "scripts/internal/solar/base01_records.py",
+            'subprocess.run(["nvidia-smi"])',
+            False,
+            id="node-refusal-does-not-allow-tool-execution",
+        ),
+        pytest.param(
+            "scripts/internal/upgrade/README.md",
+            "Selecting PyTorch's `cublas` preference alone did not isolate hipBLASLt: the",
+            True,
+            id="documented-rocm-backend-label",
+        ),
+        pytest.param(
+            "scripts/internal/upgrade/README.md",
+            "Run the NVIDIA backend",
+            False,
+            id="other-backend-guidance-not-allowlisted",
+        ),
+        pytest.param(
+            "tests/new_entry.py",
+            "device='cuda:0'",
+            True,
+            id="single-quoted-device",
+        ),
+        pytest.param(
+            "tests/new_entry.py",
+            'device="cuda:0"',
+            True,
+            id="double-quoted-device",
+        ),
+        pytest.param(
+            "tests/new_entry.py",
+            "backend='cuda_backend'",
+            False,
+            id="not-device-literal",
+        ),
+    ],
+)
+def test_residue_classification_keeps_narrow_compatibility_scope(
+    path, line, accepted
+):
+    assert RESIDUE_PATTERN.search(line)
+    assert (_classification(path, line) is not None) is accepted
 
 
 def test_active_cuda_nvidia_residue_is_classified():

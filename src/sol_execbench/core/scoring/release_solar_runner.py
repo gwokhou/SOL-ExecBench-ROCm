@@ -5,12 +5,14 @@
 
 from __future__ import annotations
 
-import tempfile
 from collections.abc import Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from sol_execbench.core.bench.gpu_lock import (
+    gpu_lock_path,
+)
 from sol_execbench.core.dataset.aka_contract import AKACorpusRole
 from sol_execbench.core.dataset.aka_corpus import AKACorpusManifest
 from sol_execbench.core.process import exclusive_file_lock
@@ -261,28 +263,32 @@ def _run_parallel_release(
     jobs: int,
 ) -> tuple[int, int]:
     pending, resumed = _parallel_pending_items(items, resume=resume)
-    with (
-        tempfile.TemporaryDirectory(
-            prefix="sol-execbench-solar-release-",
-        ) as lock_root,
-    ):
-        stage_lock = Path(lock_root) / "device-stage.lock"
-        scheduled = tuple(
-            replace(
-                item,
-                request=replace(
-                    item.request,
-                    device_stage_lock_path=str(stage_lock),
-                    device_stage_lock_timeout_seconds=timeout_seconds,
-                ),
-            )
+    stage_lock = (
+        gpu_lock_path()
+        if any(
+            item.request.device.split(":", 1)[0] in {"cuda", "hip"}
             for item in pending
         )
-        generated = _run_parallel_items(
-            scheduled,
-            timeout_seconds=timeout_seconds,
-            jobs=jobs,
+        else None
+    )
+    scheduled = tuple(
+        replace(
+            item,
+            request=replace(
+                item.request,
+                device_stage_lock_path=str(stage_lock)
+                if stage_lock is not None
+                else None,
+                device_stage_lock_timeout_seconds=timeout_seconds,
+            ),
         )
+        for item in pending
+    )
+    generated = _run_parallel_items(
+        scheduled,
+        timeout_seconds=timeout_seconds,
+        jobs=jobs,
+    )
     return generated, resumed
 
 

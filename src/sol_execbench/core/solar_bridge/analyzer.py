@@ -139,4 +139,15 @@ def audit_workload_stages(
             output_dir=Path(output_dir),
         ),
     )
-    return SolarStageAuditOutcome.from_dict(result.to_dict())
+    return SolarStageAuditOutcome(
+        status=result.status,
+        analysis_id=result.analysis_id,
+        ir_path=result.ir_path,
+        output_dir=result.output_dir,
+        architecture_sha256=result.architecture_sha256,
+        stages=tuple(stage.to_dict() for stage in result.stages),
+        artifacts=tuple(artifact.to_dict() for artifact in result.artifacts),
+        failure_stage=result.failure_stage,
+        reason_code=result.reason_code,
+        message=result.message,
+    )

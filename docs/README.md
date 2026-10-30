@@ -67,12 +67,13 @@ release-status claims.
 - [BASE-01 original CPU baseline, 2026-10-23](internal/solar-base01-cpu-2026-10-23.md)
 - [BASE-01 pre-integration CPU snapshot, 2026-10-26](internal/solar-base01-cpu-2026-10-26.md)
 
-The current working tree retains BASE-01 support. The stage 1–5 implementation,
-contracts and reports are saved separately on local branch
-`codex/solar-stages1-5-saved`. The stage 0 and task specifications remain plans;
-BASE-01 reports retain their source-bound historical results. Current scope,
-backup locations and split validation are recorded in the
-[SOLAR evolution backlog entry](../HANDSOFF.md#solar-evolution).
+- [Stages 1–5 isolated CPU implementation and current evidence](internal/solar-resume-2026-10-26.md)
+- [Real mapper small-sample follow-up and proposed GPU validation](internal/solar-mapper-followup-2026-10-26.md)
+
+This isolated branch continues stages 1–5 under the user's renewed authorization.
+The original BASE-01 and archived stage reports remain historical snapshots.
+Current CPU completion and the separate real-mapper/R/GPU gates are recorded in
+[HANDSOFF](../HANDSOFF.md#solar-evolution) and the current report above.
 
 Public contracts in this tree describe the current implementation. Superseded contracts,
 completed readiness snapshots, and engineering history are available from Git

@@ -3,6 +3,8 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Sequence
 
+import pytest
+
 from sol_execbench.core.bench.rocm_profiler import (
     Rocprofv3CollectionRequest,
     Rocprofv3ProfileRequest,
@@ -816,3 +818,6 @@ def test_live_collection_labels_missing_csv_as_fallback(tmp_path):
     assert result.evidence is None
     assert result.selection.fallback_applied is True
     assert "did not produce a CSV" in result.selection.reason
+
+
+pytestmark = pytest.mark.usefixtures("native_gpu_cpu_observation")

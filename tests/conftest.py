@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import contextlib
-import fcntl
 import sys
 from collections.abc import Callable, Iterator
 from importlib.util import find_spec, module_from_spec, spec_from_file_location
@@ -33,7 +32,6 @@ _REAL_GPU_MARKERS = frozenset(
     {"requires_rocm", "requires_rocm_gpu", "requires_rdna4", "requires_cdna3"},
 )
 _REAL_GPU_XDIST_GROUP = "real_rocm_gpu"
-_REAL_GPU_LOCK_PATH = Path("/tmp/sol-execbench-real-gpu.lock")
 
 
 @pytest.fixture
@@ -101,9 +99,10 @@ def _rocm_gpu_info(
 
         if getattr(torch.version, "hip", None) is None:
             return False, "", "PyTorch is not a ROCm build"
-        if not torch.cuda.is_available():
-            return False, "", "ROCm GPU unavailable through PyTorch"
-        props = torch.cuda.get_device_properties(0)
+        with _real_gpu_execution_lock():
+            if not torch.cuda.is_available():
+                return False, "", "ROCm GPU unavailable through PyTorch"
+            props = torch.cuda.get_device_properties(0)
         arch = getattr(props, "gcnArchName", "") or getattr(
             props,
             "gfx_arch_name",
@@ -157,7 +156,11 @@ def pytest_collection_modifyitems(
 
     Also skips serial-only native/timing tests unless explicitly selected with -m.
     """
-    rocm_available, gfx_arch, rocm_skip_reason = _rocm_gpu_info()
+    rocm_available, gfx_arch, rocm_skip_reason = (
+        _rocm_gpu_info()
+        if any(_has_real_gpu_marker(item) for item in items)
+        else (False, "", "No hardware tests selected")
+    )
     rocm_dev_available = _has_rocm_dev_headers()
     ck_available = _has_ck_headers()
     rocwmma_available = _has_rocwmma_headers()
@@ -319,13 +322,11 @@ def _has_real_gpu_marker(item: pytest.Item) -> bool:
 
 @contextlib.contextmanager
 def _real_gpu_execution_lock() -> Iterator[None]:
-    """Serialize real-GPU tests even if xdist group scheduling changes."""
-    with _REAL_GPU_LOCK_PATH.open("a+") as lock_file:
-        fcntl.flock(lock_file, fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
+    """Use the same native GPU exclusion as CLI and SOLAR device stages."""
+    from sol_execbench.core.bench.gpu_execution import native_gpu_execution
+
+    with native_gpu_execution():
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -359,3 +360,43 @@ def frozen_tensor_writer() -> Callable:
         path.write_bytes(b"control-plane-test-placeholder")
 
     return write
+
+
+@pytest.fixture(autouse=True)
+def _cpu_gpu_lock_fixture_configuration(request, tmp_path_factory, monkeypatch):
+    """Use temporary explicit UUID records for CPU tests, never host state."""
+    if _has_real_gpu_marker(request.node):
+        return
+    from sol_execbench.core.bench import clock_ownership
+
+    tmp_path = tmp_path_factory.mktemp("gpu-control")
+    monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path / "gpu-locks"))
+    monkeypatch.setenv("GPU_LOCK_UUID", "11111111-2222-3333-4444-555555555555")
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_CLOCK_STATE_DIR", str(tmp_path / "gpu-private")
+    )
+    monkeypatch.setattr(
+        clock_ownership,
+        "LEGACY_CLOCK_STATE_DIRECTORY",
+        tmp_path / "legacy-clock-state",
+    )
+
+
+@pytest.fixture
+def native_gpu_cpu_observation(monkeypatch):
+    """Stub hardware observations explicitly for native-boundary CPU tests."""
+    from sol_execbench.core.bench import gpu_execution
+    from sol_execbench.core.bench.clock_ownership import ClockDevice
+
+    monkeypatch.setattr(
+        gpu_execution,
+        "resolve_gpu_device",
+        lambda: ClockDevice(
+            bdf="0000:05:00.0", uuid="11111111-2222-3333-4444-555555555555"
+        ),
+    )
+    monkeypatch.setattr(
+        gpu_execution,
+        "observe_clock_levels",
+        lambda _: ("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+    )

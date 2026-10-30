@@ -15,6 +15,7 @@ from sol_execbench.core.bench.clock_ownership import (
     ClockOwnerRecord,
     ClockOwnership,
     ClockOwnerState,
+    clock_owner_path,
 )
 from sol_execbench.core.bench.rocm_profiler import pmc_clock
 
@@ -28,7 +29,11 @@ class ControlState(TypedDict):
 
 @pytest.fixture
 def control(monkeypatch, tmp_path):
-    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setenv("GPU_LOCK_UUID", pmc_clock.TARGET_SMI_UUID)
+    monkeypatch.setenv(
+        "SOL_EXECBENCH_CLOCK_STATE_DIR", str(tmp_path / "private")
+    )
     monkeypatch.delenv("SOL_EXECBENCH_CLOCK_OWNER", raising=False)
     state: ControlState = {
         "level": "AUTO",
@@ -284,9 +289,9 @@ def test_nested_pmc_borrows_without_resetting_owner(tmp_path, control, fails):
         assert borrowed.ownership == ClockOwnership.BORROWED
         assert borrowed.borrow_ended and not borrowed.auto_verified
     assert control["level"] == "AUTO"
-    owner_path = (
-        tmp_path / "locks" / LEASE_DIRECTORY / f"{borrowed.owner_lease_id}.json"
-    )
+    assert borrowed.owner_lease_id is not None
+    owner_path = clock_owner_path(tmp_path / "locks", borrowed.owner_lease_id)
+    assert owner_path.parent == tmp_path / "private" / LEASE_DIRECTORY
     assert (
         ClockOwnerRecord.model_validate_json(owner_path.read_text()).state
         == ClockOwnerState.RESTORED
@@ -314,12 +319,14 @@ def test_host_guard_owns_pmc_borrow_and_final_auto(
 
     restores = []
 
-    def restore():
+    def restore(gpu_uuid):
+        assert gpu_uuid == pmc_clock.TARGET_SMI_UUID
         restores.append("host")
         control["level"] = "AUTO"
         return True
 
-    def activate():
+    def activate(gpu_uuid):
+        assert gpu_uuid == pmc_clock.TARGET_SMI_UUID
         control["level"] = "STABLE_PEAK"
 
     monkeypatch.setattr(host_clock_guard, "set_peak_clocks", activate)
@@ -327,7 +334,7 @@ def test_host_guard_owns_pmc_borrow_and_final_auto(
     monkeypatch.setattr(
         host_clock_guard,
         "observe_clock_levels",
-        lambda: (f"AMDSMI_DEV_PERF_LEVEL_{control['level']}",),
+        lambda _gpu_uuid: (f"AMDSMI_DEV_PERF_LEVEL_{control['level']}",),
     )
     monkeypatch.setattr(
         host_clock_guard,

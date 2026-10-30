@@ -10,6 +10,7 @@ import string
 from collections.abc import Iterable
 
 from solar.errors import NumericalEquivalenceError
+from solar.storage import same_tensor_storage
 from solar.types import DynamicValue
 from solar.verification.errors import IRExecutionError
 
@@ -67,22 +68,6 @@ def _tensor_leaves(value: DynamicValue) -> list[DynamicValue]:
     return []
 
 
-def _same_storage(left: DynamicValue, right: DynamicValue) -> bool:
-    import torch
-
-    if not isinstance(left, torch.Tensor) or not isinstance(
-        right,
-        torch.Tensor,
-    ):
-        return False
-    if left is right:
-        return True
-    try:
-        return left.untyped_storage()._cdata == right.untyped_storage()._cdata
-    except RuntimeError:
-        return False
-
-
 def alias_relation(
     outputs: DynamicValue,
     inputs: DynamicValue,
@@ -90,7 +75,8 @@ def alias_relation(
     """Return the complete input/output tensor-storage alias relation."""
     leaves = [*_tensor_leaves(inputs), *_tensor_leaves(outputs)]
     return tuple(
-        tuple(_same_storage(left, right) for right in leaves) for left in leaves
+        tuple(same_tensor_storage(left, right) for right in leaves)
+        for left in leaves
     )
 
 

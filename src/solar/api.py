@@ -5,16 +5,13 @@
 
 from __future__ import annotations
 
-import math
 import shutil
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
-import yaml
-
-from solar.artifacts import sha256_file, stable_json_checksum
+from solar.artifacts import stable_json_checksum
 from solar.contracts import (
     FORMAL_BOUND_KIND,
     ROOFLINE_BOUND_KIND,
@@ -45,8 +42,12 @@ from solar.pipeline import (
     pipeline_reason_code,
     run_pipeline,
 )
+from solar.pipeline.publication import (
+    extract_bound,
+    finish_artifacts,
+    verify_publication_tree,
+)
 from solar.rocm.architecture import ArchitectureProfile
-from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
 
 
 def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
@@ -73,9 +74,10 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
         architecture_sha256 = _profile_hash(profile)
         pipeline = run_pipeline(request, profile, staging)
         ir_graph, analysis = pipeline.ir_graph, pipeline.analysis
+        stage = SolarStage.FORMAL_ANALYSIS
         _attach_analysis_metadata(analysis, request.analysis_metadata)
-        bound = _extract_bound(analysis, request.require_orojenesis)
-        artifacts = _finish_artifacts(staging, analysis, ir_graph.path.name)
+        bound = extract_bound(analysis, request.require_orojenesis)
+        artifacts = finish_artifacts(staging, analysis, ir_graph.path.name)
         write_request_manifest(
             request,
             staging,
@@ -84,7 +86,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResult | AnalysisFailure:
             bound,
             formal_bound_kind=FORMAL_BOUND_KIND,
         )
-        _verify_publication_tree(staging, artifacts)
+        verify_publication_tree(staging, artifacts)
         staging.replace(output)
         return AnalysisResult(
             status=SolarAnalysisStatus.ANALYZED,
@@ -137,104 +139,6 @@ def architecture_profile_sha256(
 ) -> str:
     """Return the canonical identity of a packaged architecture profile."""
     return _profile_hash(ArchitectureProfile.load(architecture))
-
-
-def _extract_bound(
-    analysis: Mapping[str, Any],
-    require_orojenesis: bool = True,
-) -> SOLBound:
-    if analysis.get("schema_version") != SOLAR_ANALYSIS_SCHEMA_VERSION:
-        raise ValueError("formal analysis uses an unsupported schema")
-    total = analysis.get("total") or {}
-    metadata = analysis.get("metadata") or {}
-    seconds = total.get("lower_bound_seconds")
-    kind = str(metadata.get("bound_kind", ""))
-    if (
-        seconds is None
-        or not math.isfinite(float(seconds))
-        or float(seconds) < 0
-    ):
-        raise ValueError("formal analysis lacks a finite lower bound")
-    if require_orojenesis:
-        if kind != FORMAL_BOUND_KIND:
-            raise ValueError(
-                f"strict analysis returned non-tile-aware bound kind {kind!r}",
-            )
-    elif kind not in SOL_BOUND_KINDS:
-        raise ValueError(f"analysis returned unsupported bound kind {kind!r}")
-    resource = total.get("compute_resource")
-    return SOLBound(float(seconds), kind, str(resource) if resource else None)
-
-
-def _finish_artifacts(
-    staging: Path,
-    analysis: dict[str, Any],
-    graph_name: str,
-) -> tuple[ArtifactRef, ...]:
-    metadata = analysis.get("metadata") or {}
-    metadata["source_graph"] = graph_name
-    analysis["metadata"] = metadata
-    old_path = staging / "analysis.yaml"
-    analysis_path = staging / "solar-analysis.yaml"
-    old_path.unlink(missing_ok=True)
-    analysis_path.write_text(yaml.safe_dump(analysis, sort_keys=False))
-    required = {
-        "operator_graph.yaml",
-        graph_name,
-        "conversion-attestation.yaml",
-        "solar-analysis.yaml",
-    }
-    paths = _publication_files(staging)
-    missing = sorted(
-        required - {path.relative_to(staging).as_posix() for path in paths}
-    )
-    if missing:
-        raise ValueError(f"analysis is missing required artifacts: {missing}")
-    return tuple(
-        ArtifactRef(path.relative_to(staging).as_posix(), sha256_file(path))
-        for path in paths
-    )
-
-
-def _publication_files(staging: Path) -> tuple[Path, ...]:
-    entries = tuple(staging.rglob("*"))
-    symlinks = sorted(
-        path.relative_to(staging).as_posix()
-        for path in entries
-        if path.is_symlink()
-    )
-    if symlinks:
-        raise ValueError(
-            f"analysis staging tree contains symbolic links: {symlinks}",
-        )
-    return tuple(
-        sorted(
-            (
-                path
-                for path in entries
-                if path.is_file() and path.name != "manifest.yaml"
-            ),
-            key=lambda path: path.relative_to(staging).as_posix(),
-        ),
-    )
-
-
-def _verify_publication_tree(
-    staging: Path,
-    artifacts: tuple[ArtifactRef, ...],
-) -> None:
-    manifest_path = staging / "manifest.yaml"
-    if not manifest_path.is_file() or manifest_path.is_symlink():
-        raise ValueError("analysis staging tree lacks a regular manifest")
-    expected = {artifact.path for artifact in artifacts} | {"manifest.yaml"}
-    actual = {
-        path.relative_to(staging).as_posix()
-        for path in _publication_files(staging)
-    } | {"manifest.yaml"}
-    if actual != expected:
-        raise ValueError(
-            "analysis staging tree changed after artifact hashing",
-        )
 
 
 def _profile_hash(profile: ArchitectureProfile) -> str:

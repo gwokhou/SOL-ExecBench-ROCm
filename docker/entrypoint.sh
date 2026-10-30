@@ -1,110 +1,41 @@
 #!/bin/bash
 set -e
 
-# ---------------------------------------------------------------------------
-# Thin wrapper that locks GPU/DRAM clocks before the Python server starts
-# and guarantees unlock on exit (even SIGTERM/crash).  All real logic lives
-# in sol_execbench.core.bench.clock_lock.
-# ---------------------------------------------------------------------------
-
-acquire_gpu_lock() {
-    local lock_dir="${SOL_EXECBENCH_GPU_LOCK_DIR:-/tmp/sol-execbench-locks}"
-    local lock_path="${lock_dir}/gpu-0.lock"
-    local timeout="${SOL_EXECBENCH_GPU_LOCK_TIMEOUT_SECONDS:-60}"
-    mkdir -p "${lock_dir}"
-    exec 9>>"${lock_path}"
-    if ! flock -w "${timeout}" 9; then
-        echo "ERROR: GPU 0 is busy; lock wait exceeded ${timeout} seconds" >&2
-        return 75
-    fi
-    printf 'entrypoint_pid=%s\n' "$$" >"${lock_path}"
-    export SOL_EXECBENCH_GPU_LOCK_FD=9
-}
-
-lock_clocks() {
-    local status
-    status="$(python - <<'ROCPY'
-import logging
-
-logging.basicConfig(level=logging.INFO, format='%(message)s')
-from sol_execbench.core.bench.clock_lock import acquire_clock_lock
-
-clock_lock = acquire_clock_lock()
-if not clock_lock.locked:
-    print('WARNING: Clock locking unavailable — continuing unlocked')
-    print('CLOCKS_LOCKED=0')
-    print('CLOCK_LOCK_ACQUIRED=0')
-    raise SystemExit(0)
-
-print('CLOCKS_LOCKED=1')
-print(f'CLOCK_LOCK_ACQUIRED={int(clock_lock.acquired)}', flush=True)
-if clock_lock.acquired:
-    clock_lock.detach()
-ROCPY
-)"
-    if echo "$status" | grep -q 'CLOCKS_LOCKED=1'; then
-        export SOL_EXECBENCH_CLOCKS_LOCKED=1
-    else
-        export SOL_EXECBENCH_CLOCKS_LOCKED=0
-    fi
-    if echo "$status" | grep -q 'CLOCK_LOCK_ACQUIRED=1'; then
-        export SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED=1
-    else
-        export SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED=0
-    fi
-    printf '%s\n' "$status"
-}
-
+# Consume the host's native UUID owner. The host retains cleanup/restoration;
+# this entrypoint only checks its declared performance policy before exec.
 verify_host_managed_clocks() {
-    if [ "${HOST_CLOCKS_DECLARED}" != "1" ]; then
-        if [ -n "${SOL_EXECBENCH_HOST_CLOCK_GPU_UUID:-}" ]; then
-            echo "ERROR: UUID-targeted host clock guard did not verify STABLE_PEAK" >&2
-            return 1
-        fi
-        echo "WARNING: Host clock guard did not acquire STABLE_PEAK — continuing unlocked"
-        export SOL_EXECBENCH_CLOCKS_LOCKED=0
-        return
-    fi
-    if python - <<'ROCPY'
-import os
-from sol_execbench.core.bench.clock_lock import verify_clocks
-from sol_execbench.core.platform.clock_commands import ENV_HOST_CLOCK_GPU_UUID
+    if python - "${HOST_CLOCKS_DECLARED}" <<'ROCPY'
+import sys
+from sol_execbench.core.bench.clock_lock import observe_clock_levels
+from sol_execbench.core.bench.gpu_lock_paths import configured_gpu_locks
 
-if not verify_clocks(os.environ.get(ENV_HOST_CLOCK_GPU_UUID)):
+expected = {"0": "AMDSMI_DEV_PERF_LEVEL_AUTO", "1": "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK"}.get(sys.argv[1])
+if expected is None or observe_clock_levels(configured_gpu_locks().uuid) != (expected,):
     raise SystemExit(1)
 ROCPY
     then
-        echo "CLOCKS_LOCKED=1"
-        export SOL_EXECBENCH_CLOCKS_LOCKED=1
+        export SOL_EXECBENCH_CLOCKS_LOCKED="${HOST_CLOCKS_DECLARED}"
+        echo "CLOCKS_LOCKED=${SOL_EXECBENCH_CLOCKS_LOCKED}"
         return
     fi
-    if [ -n "${SOL_EXECBENCH_HOST_CLOCK_GPU_UUID:-}" ]; then
-        echo "ERROR: UUID-targeted host STABLE_PEAK failed container verification" >&2
-        return 1
-    fi
-    echo "WARNING: Host-declared STABLE_PEAK state failed container verification"
-    echo "CLOCKS_LOCKED=0"
-    export SOL_EXECBENCH_CLOCKS_LOCKED=0
-}
-
-cleanup() {
-    if [ "${SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED}" = "1" ]; then
-        python -c '
-from sol_execbench.core.bench.clock_lock import unlock_clocks
-print("Unlocking clocks...")
-if not unlock_clocks():
-    raise SystemExit("Clock reset to AUTO failed or could not be verified")
-print("Clocks unlocked")
-'
-    fi
+    echo "ERROR: native host clock policy failed container verification" >&2
+    return 1
 }
 
 HOST_CLOCKS_DECLARED="${SOL_EXECBENCH_CLOCKS_LOCKED:-0}"
 export SOL_EXECBENCH_CLOCKS_LOCKED=0
-export SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED=0
 export SOL_EXECBENCH_SANDBOXED=1
-trap 'cleanup' EXIT
-trap 'exit' TERM INT
+# This container consumes the existing native host owner; it never creates a
+# private lock inode or performs an all-device clock write.
+python - <<'ROCPY'
+from sol_execbench.core.bench.gpu_lock import verify_host_gpu_owner
+from sol_execbench.core.bench.gpu_lock_paths import configured_gpu_locks, prepare_gpu_locks
+paths = configured_gpu_locks()
+if not paths.host_managed:
+    raise SystemExit("Use scripts/run_docker.sh with a native host GPU owner")
+prepare_gpu_locks(paths)
+verify_host_gpu_owner(paths)
+ROCPY
 
 # check if flashinfer-trace directory is mounted
 if [ ! -d "${FLASHINFER_TRACE_DIR}" ]; then
@@ -112,13 +43,9 @@ if [ ! -d "${FLASHINFER_TRACE_DIR}" ]; then
     echo "         Continuing without flashinfer-trace; dependency smoke tests are still allowed."
 fi
 
-if [ "${SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST:-0}" != "1" ]; then
-    acquire_gpu_lock
+if [ "${SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST:-0}" != "1" ]; then
+    echo "ERROR: native host clock ownership is required" >&2
+    exit 1
 fi
-if [ "${SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST:-0}" = "1" ]; then
-    verify_host_managed_clocks
-else
-    lock_clocks
-fi
-
-"$@"
+verify_host_managed_clocks
+exec "$@"

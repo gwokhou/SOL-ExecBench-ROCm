@@ -732,3 +732,57 @@ def _process_is_running(pid: int) -> bool:
     except FileNotFoundError, ProcessLookupError:
         return False
     return state != "Z"
+
+
+@pytest.mark.requires_linux
+def test_mapper_normal_leader_exit_cleans_surviving_child(tmp_path):
+    completed = orojenesis_runner._default_mapper_runner(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import subprocess,sys; "
+                "child=subprocess.Popen([sys.executable,'-c',"
+                "'import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(30)']); "
+                "print(child.pid,flush=True)"
+            ),
+        ],
+        cwd=tmp_path,
+        timeout=2,
+    )
+    assert completed.returncode == 0
+    child_pid = int((tmp_path / "stdout.log").read_text().strip())
+    assert not _process_is_running(child_pid)
+
+
+@pytest.mark.parametrize("timeout", [0, -1, float("inf"), float("nan")])
+def test_mapper_rejects_invalid_timeout_before_launch(
+    tmp_path, monkeypatch, timeout
+):
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid timeout must not start a process")
+
+    monkeypatch.setattr(orojenesis_process.subprocess, "Popen", forbidden)
+    with pytest.raises(ValueError, match="finite and positive"):
+        orojenesis_process.run_mapper_process(
+            ["unused"], cwd=tmp_path, timeout=timeout
+        )
+
+
+@pytest.mark.requires_linux
+def test_scan_deadline_unwinds_mapper_and_its_child(tmp_path):
+    from solar.analysis.interrupts import AnalysisDeadline, analysis_deadline
+
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import subprocess,sys,time; "
+            "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']); "
+            "print(child.pid,flush=True);time.sleep(30)"
+        ),
+    ]
+    with pytest.raises(AnalysisDeadline), analysis_deadline(0.2):
+        orojenesis_process.run_mapper_process(command, cwd=tmp_path, timeout=30)
+    child_pid = int((tmp_path / "stdout.log").read_text().strip())
+    assert not _process_is_running(child_pid)

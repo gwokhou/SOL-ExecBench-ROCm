@@ -6,11 +6,16 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from solar.analysis.access_regions import DEFAULT_ACCESS_BUDGET, AccessBudget
+from solar.analysis.effects import observable_effect_layers
+from solar.analysis.external_reads import ExternalReads
+from solar.analysis.graph_models import IntrinsicLayer
 from solar.analysis.graph_rules import (
     BOOL_DTYPES,
     QUANTIZED_PAYLOAD_PASSTHROUGH,
     TRANSPARENT_OPS,
 )
+from solar.ir.access_artifact import AccessDocument
 from solar.ir.contracts import layer_operation
 from solar.rocm.architecture import ArchitectureProfile
 from solar.types import DynamicValue
@@ -40,6 +45,7 @@ class AnalysisJob:
     architecture: str | Path | ArchitectureProfile | None
     orojenesis_runner: DynamicValue | None
     require_orojenesis: bool
+    access_budget: AccessBudget = DEFAULT_ACCESS_BUDGET
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +53,7 @@ class PreparedAnalysis:
     """Validated graph inputs and resolved analysis configuration."""
 
     source: Path
+    source_sha256: str
     output_dir: Path
     graph: dict[str, DynamicValue]
     all_layers: dict[str, DynamicValue]
@@ -58,6 +65,17 @@ class PreparedAnalysis:
     fallback_precision: str
     element_size: float
     profile: ArchitectureProfile | None
+    access: AccessDocument | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class IntrinsicGraph:
+    """Owned analysis facts reused before any architecture resource attribution."""
+
+    prepared: PreparedAnalysis
+    topology: GraphTopology
+    layers: tuple[IntrinsicLayer, ...]
+    external_reads: ExternalReads
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +93,7 @@ class GraphTopology:
     bool_layers: set[str]
     dead_end_layers: set[str]
     live_layer_ids: set[str]
+    has_access_contract: bool = False
 
     def trace_source_through_views(self, layer_id: str) -> str:
         """Trace backward through transparent view layers to the real source."""
@@ -185,6 +204,7 @@ class GraphTopology:
 def build_graph_topology(
     all_layers: dict[str, DynamicValue],
     declared_graph_outputs: set[str] | None = None,
+    access: AccessDocument | None = None,
 ) -> GraphTopology:
     """Build immutable producer and consumer indices for graph layers."""
     layers, start_ids, bool_start_ids = _partition_graph_layers(all_layers)
@@ -194,6 +214,8 @@ def build_graph_topology(
         for layer_id, layer in layers.items()
         if str(layer.get("type", "")).lower() in TRANSPARENT_OPS
     }
+    if access is not None:
+        transparent_ids = set(access.transparent_layers)
     producers, consumers = _build_tensor_indices(layers)
     live_layer_ids = _live_layers(
         layers,
@@ -214,6 +236,7 @@ def build_graph_topology(
         bool_layers=_propagate_bool_layers(layers, bool_start_ids),
         dead_end_layers=set(),
         live_layer_ids=live_layer_ids,
+        has_access_contract=access is not None,
     )
     return replace(
         topology,
@@ -230,7 +253,7 @@ def _live_layers(
     producers: dict[str, str],
     declared_outputs: set[str],
 ) -> set[str]:
-    """Return layers that contribute to a declared graph output."""
+    """Retain returned values and writes observable through external storage."""
     if not declared_outputs:
         return set(layers)
     roots = {
@@ -238,6 +261,7 @@ def _live_layers(
         for output in declared_outputs
         if (producer := producers.get(output)) is not None
     }
+    roots.update(observable_effect_layers(layers, declared_outputs))
     missing = sorted(declared_outputs - producers.keys())
     if missing:
         raise ValueError(

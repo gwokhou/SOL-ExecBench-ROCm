@@ -217,3 +217,6 @@ def test_collection_result_requires_evidence_for_profiler_selection() -> None:
 
     with pytest.raises(ValueError, match="requires timing evidence"):
         Rocprofv3CollectionResult(evidence=None, selection=selection)
+
+
+pytestmark = pytest.mark.usefixtures("native_gpu_cpu_observation")

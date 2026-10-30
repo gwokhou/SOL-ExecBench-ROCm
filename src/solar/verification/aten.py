@@ -7,15 +7,15 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 
-from solar.types import DynamicValue
-from solar.verification.errors import IRExecutionError
-from solar.verification.numerics import torch_equation
-from solar.verification.semantic_values import (
+from solar.ir.semantic_values import (
     ATEN_VALUE_POLICY,
     SemanticValueDecodeError,
     SemanticValueErrorKind,
     decode_semantic_value,
 )
+from solar.types import DynamicValue
+from solar.verification.errors import IRExecutionError
+from solar.verification.numerics import torch_equation
 
 _UNHANDLED = object()
 

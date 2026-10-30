@@ -298,3 +298,14 @@ def test_record_container_validation_still_blocks_mixed_dry_run() -> None:
     payload = json.loads(completed.stdout)
     assert payload["status"] == "mixed_version"
     assert "docker run" not in completed.stdout
+
+
+@pytest.fixture(autouse=True)
+def preview_lock_files(monkeypatch, tmp_path):
+    from sol_execbench.core.bench.gpu_lock_paths import (
+        configured_gpu_locks,
+        prepare_gpu_locks,
+    )
+
+    prepare_gpu_locks(configured_gpu_locks())
+    monkeypatch.setenv("SOL_EXECBENCH_OUTPUT_DIR", str(tmp_path / "outputs"))

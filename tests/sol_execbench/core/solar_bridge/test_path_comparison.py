@@ -16,6 +16,7 @@ from sol_execbench.core.solar_bridge.path_comparison_models import (
     DifferenceCategory,
     PathComparisonStatus,
 )
+from solar.ir.access_artifact import ACCESS_FILENAME
 from solar.ir.contracts import IRPath
 from solar.schema_versions import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
@@ -23,6 +24,7 @@ from solar.schema_versions import (
     ResourceModelVersion as SolarResourceModelVersion,
     SchemaVersion as SolarSchemaVersion,
 )
+from tests.solar.access_fixtures import exact_reads, unavailable_views
 
 
 def _write_yaml(path: Path, value: object) -> None:
@@ -107,6 +109,8 @@ def _analysis(
             "lower_bound_seconds": 1.0e-9,
         },
         "metadata": {
+            "views": unavailable_views(),
+            "external_reads": exact_reads(8, "fp16"),
             "bound_kind": "roofline_eq1_v1",
             "resource_model": {
                 "version": SolarResourceModelVersion.AMD.value,
@@ -117,7 +121,9 @@ def _analysis(
     }
 
 
-def _attestation(graph_name: str, graph_sha256: str) -> dict:
+def _attestation(
+    graph_name: str, graph_sha256: str, access_sha256: str
+) -> dict:
     return {
         "subject": [
             {
@@ -128,6 +134,7 @@ def _attestation(graph_name: str, graph_sha256: str) -> dict:
                 "name": graph_name,
                 "digest": {"sha256": graph_sha256},
             },
+            {"name": ACCESS_FILENAME, "digest": {"sha256": access_sha256}},
         ],
         "predicate": {
             "status": "passed",
@@ -150,6 +157,7 @@ def _write_workload(
     directory = root / relative
     graph_name = ir_path.graph_filename
     artifacts = {
+        ACCESS_FILENAME: {},
         "operator_graph.yaml": {"model_name": relative},
         graph_name: _graph(ir_path.value),
         "solar-analysis.yaml": _analysis(
@@ -163,7 +171,11 @@ def _write_workload(
     attestation_name = "conversion-attestation.yaml"
     _write_yaml(
         directory / attestation_name,
-        _attestation(graph_name, sha256_file(directory / graph_name)),
+        _attestation(
+            graph_name,
+            sha256_file(directory / graph_name),
+            sha256_file(directory / ACCESS_FILENAME),
+        ),
     )
     artifacts[attestation_name] = {}
     manifest = {
@@ -231,6 +243,7 @@ def test_comparison_classifies_internal_dialect_differences(
     assert comparison.model_io_accounting.match is True
     assert comparison.mandatory_resource_work.match is True
     assert comparison.formal_bound.match is True
+    assert comparison.analysis_views.match is True
     assert comparison.categories == (
         DifferenceCategory.DIALECT_DECOMPOSITION_DIFFERENCE,
     )

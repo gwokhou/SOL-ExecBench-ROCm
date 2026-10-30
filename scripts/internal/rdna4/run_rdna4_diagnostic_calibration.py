@@ -31,7 +31,14 @@ from sol_execbench.core.bench.batch_gpu_qualification import (
     require_isolated_qualification_root,
     verify_qualification_artifact,
 )
-from sol_execbench.core.bench.clock_lock import acquire_clock_lock
+from sol_execbench.core.bench.gpu_execution import (
+    acquire_clock_lock,
+    native_gpu_execution,
+)
+from sol_execbench.core.bench.gpu_lock_paths import (
+    configured_gpu_locks,
+    normalize_gpu_uuid,
+)
 from sol_execbench.core.bench.performance_model.calibration import (
     BOOTSTRAP_REPLICATES,
     BOOTSTRAP_SEED,
@@ -272,43 +279,48 @@ def run_calibration(
     vram_policy_path: Path,
 ) -> Path:
     """Compile, tune, freeze, and collect parameter-estimation evidence."""
+    if normalize_gpu_uuid(gpu_id) != configured_gpu_locks().uuid:
+        raise ValueError("--gpu-id conflicts with GPU_LOCK_UUID")
     hipcc = resolve_rocm_tool("hipcc")
     if hipcc is None:
         raise RuntimeError("hipcc is unavailable")
     amd_smi = resolve_rocm_tool("amd-smi")
     if amd_smi is None:
         raise RuntimeError("amd-smi is unavailable")
-    device = detect_rocm_device()
-    if device.gfx_target != "gfx1200":
-        raise RuntimeError(
-            f"diagnostic calibration requires gfx1200, got {device.gfx_target}"
+    with native_gpu_execution(manage_clocks=True):
+        device = detect_rocm_device()
+        if device.gfx_target != "gfx1200":
+            raise RuntimeError(
+                f"diagnostic calibration requires gfx1200, got {device.gfx_target}"
+            )
+        observed_gpu_id, gpu_bdf = _gpu_identity(amd_smi, device.index)
+        if gpu_id != observed_gpu_id:
+            raise RuntimeError(
+                f"--gpu-id does not match device {device.index} UUID",
+            )
+        policy = load_json_file(
+            DiagnosticVRAMWorkingSetPolicy, vram_policy_path
         )
-    observed_gpu_id, gpu_bdf = _gpu_identity(amd_smi, device.index)
-    if gpu_id != observed_gpu_id:
-        raise RuntimeError(
-            f"--gpu-id does not match device {device.index} UUID",
+        _verify_vram_policy(policy, device, observed_gpu_id)
+        compiler_version = _compiler_version(hipcc)
+        rocm_version = detect_rocm_version()
+        if rocm_version is None:
+            raise RuntimeError("ROCm user-space version is unavailable")
+        return _run_calibration_workspace(
+            _CalibrationContext(
+                output=output,
+                hipcc=hipcc,
+                device=device,
+                gpu_id=observed_gpu_id,
+                gpu_bdf=gpu_bdf,
+                rocm_version=rocm_version,
+                compiler_version=compiler_version,
+                tuning_batches=tuning_batches,
+                estimation_batches=estimation_batches,
+                vram_policy=policy,
+                vram_policy_path=vram_policy_path.resolve(),
+            ),
         )
-    policy = load_json_file(DiagnosticVRAMWorkingSetPolicy, vram_policy_path)
-    _verify_vram_policy(policy, device, observed_gpu_id)
-    compiler_version = _compiler_version(hipcc)
-    rocm_version = detect_rocm_version()
-    if rocm_version is None:
-        raise RuntimeError("ROCm user-space version is unavailable")
-    return _run_calibration_workspace(
-        _CalibrationContext(
-            output=output,
-            hipcc=hipcc,
-            device=device,
-            gpu_id=observed_gpu_id,
-            gpu_bdf=gpu_bdf,
-            rocm_version=rocm_version,
-            compiler_version=compiler_version,
-            tuning_batches=tuning_batches,
-            estimation_batches=estimation_batches,
-            vram_policy=policy,
-            vram_policy_path=vram_policy_path.resolve(),
-        ),
-    )
 
 
 def _run_calibration_workspace(context: _CalibrationContext) -> Path:
@@ -740,23 +752,26 @@ def _run_qualification(
     if stage is BatchGPUQualificationStage.STATIC:
         receipts = (_static_qualification_receipt(arguments, hipcc),)
     else:
-        device, gpu_id, gpu_bdf = _qualification_hardware(arguments)
-        binary = root / "static" / "diagnostic_microarchitecture"
-        with acquire_clock_lock() as lease:
-            if not lease.locked:
-                raise RuntimeError("STABLE_PEAK clock lock is required")
-            receipts = tuple(
-                _gpu_qualification_receipt(
-                    arguments,
-                    stage,
-                    mode,
-                    binary,
-                    device,
-                    gpu_id,
-                    gpu_bdf,
+        if normalize_gpu_uuid(arguments.gpu_id) != configured_gpu_locks().uuid:
+            raise ValueError("--gpu-id conflicts with GPU_LOCK_UUID")
+        with native_gpu_execution(manage_clocks=True):
+            device, gpu_id, gpu_bdf = _qualification_hardware(arguments)
+            binary = root / "static" / "diagnostic_microarchitecture"
+            with acquire_clock_lock() as lease:
+                if not lease.locked:
+                    raise RuntimeError("STABLE_PEAK clock lock is required")
+                receipts = tuple(
+                    _gpu_qualification_receipt(
+                        arguments,
+                        stage,
+                        mode,
+                        binary,
+                        device,
+                        gpu_id,
+                        gpu_bdf,
+                    )
+                    for mode in _qualification_modes(stage)
                 )
-                for mode in _qualification_modes(stage)
-            )
     gate = BatchGPUQualificationGate(
         task=LargeBatchGPUTask.RDNA4_DIAGNOSTIC_CALIBRATION,
         stage=stage,
@@ -850,7 +865,8 @@ def main() -> int:
     """Run the command-line calibration workflow."""
     arguments = _parse_args()
     if arguments.stage == "freeze-policy":
-        path = _freeze_vram_policy(arguments)
+        with native_gpu_execution():
+            path = _freeze_vram_policy(arguments)
         print(path)
         return 0
     if arguments.stage != "run":

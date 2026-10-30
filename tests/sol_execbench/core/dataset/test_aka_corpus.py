@@ -127,6 +127,30 @@ def test_corpus_architecture_identity_matches_packaged_solar_profile():
     )
 
     assert formal_architecture_profile_hash() == FORMAL_ARCHITECTURE_SHA256
+    manifest = AKACorpusManifest.load(MANIFEST)
+    assert (
+        manifest.formal_analysis["architecture_profile_sha256"]
+        == formal_architecture_profile_hash()
+    )
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        pytest.param(
+            "25ad977df7a7206bd9d8caf60d2cd85d4f5c5fdc47368a22efb881c0250d0877",
+            id="superseded-rocm-audit",
+        ),
+        pytest.param("0" * 64, id="unknown-profile"),
+    ],
+)
+def test_corpus_rejects_unreviewed_architecture_identity(identity):
+    data = yaml.safe_load(MANIFEST.read_text())
+    data["formal_analysis"]["architecture_profile_sha256"] = identity
+    with pytest.raises(
+        ValueError, match="formal architecture profile identity"
+    ):
+        aka_corpus._validate_manifest_header(data)
 
 
 def test_every_entry_references_aka_task_path():
