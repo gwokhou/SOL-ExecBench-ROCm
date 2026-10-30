@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,12 +40,14 @@ def bundled_architectures(
     timeout_seconds: float = 30.0,
 ) -> tuple[str, ...]:
     """Return AMDGPU targets embedded in a HIP host binary."""
-    fatbin = _dump_fatbin(binary, workspace, timeout_seconds)
-    bundler = _required_tool("clang-offload-bundler")
-    result = _run(
-        [str(bundler), "--list", "--type=o", f"--input={fatbin}"],
-        timeout_seconds,
-    )
+    workspace.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".targets-", dir=workspace) as tmp:
+        fatbin = _dump_fatbin(binary, Path(tmp), timeout_seconds)
+        bundler = _required_tool("clang-offload-bundler")
+        result = _run(
+            [str(bundler), "--list", "--type=o", f"--input={fatbin}"],
+            timeout_seconds,
+        )
     architectures = {
         match.group(1)
         for line in result.stdout.splitlines()
@@ -64,67 +68,93 @@ def extract_code_object(
     architecture = architecture.lower().split(":", maxsplit=1)[0].strip()
     if _ARCHITECTURE.fullmatch(architecture) is None:
         raise ValueError(f"invalid AMDGPU architecture: {architecture}")
-    if binary.suffix in {".hsaco", ".co"} or _is_amdgpu_elf(binary):
+    owned_workspace: Path | None = None
+    try:
         code_object = binary
-    else:
-        fatbin = _dump_fatbin(binary, workspace, timeout_seconds)
-        bundler = _required_tool("clang-offload-bundler")
-        listing = _run(
-            [str(bundler), "--list", "--type=o", f"--input={fatbin}"],
+        if binary.suffix not in {".hsaco", ".co"} and not _is_amdgpu_elf(
+            binary
+        ):
+            owned_workspace = Path(
+                tempfile.mkdtemp(prefix=".extract-", dir=workspace)
+            )
+            code_object = _unbundle(
+                binary, architecture, owned_workspace, timeout_seconds
+            )
+        objdump = _required_tool("llvm-objdump")
+        disassembly = _run(
+            [str(objdump), "--disassemble", str(code_object)],
             timeout_seconds,
-        ).stdout.splitlines()
-        target = next(
-            (
-                line.strip()
-                for line in listing
-                if line.strip().startswith("hip")
-                and (match := _TARGET_ARCH.search(line.strip())) is not None
-                and match.group(1) == architecture
-            ),
-            None,
+        ).stdout
+        if len(disassembly.encode("utf-8")) > MAX_DISASSEMBLY_BYTES:
+            raise ValueError("ISA disassembly exceeds output limit")
+        return ExtractedCodeObject(
+            architecture=architecture,
+            path=code_object,
+            sha256=sha256_file(code_object),
+            disassembly=disassembly,
+            disassembly_sha256=sha256_bytes(disassembly.encode("utf-8")),
         )
-        if target is None:
-            raise ValueError(f"ISA architecture mismatch: {architecture}")
-        code_object = workspace / f"{binary.stem}-{architecture}.hsaco"
-        _run(
-            [
-                str(bundler),
-                "--unbundle",
-                "--type=o",
-                f"--input={fatbin}",
-                f"--targets={target}",
-                f"--output={code_object}",
-            ],
-            timeout_seconds,
-        )
-    objdump = _required_tool("llvm-objdump")
-    disassembly = _run(
-        [str(objdump), "--disassemble", str(code_object)],
-        timeout_seconds,
-    ).stdout
-    if len(disassembly.encode("utf-8")) > MAX_DISASSEMBLY_BYTES:
-        raise ValueError("ISA disassembly exceeds output limit")
-    return ExtractedCodeObject(
-        architecture=architecture,
-        path=code_object,
-        sha256=sha256_file(code_object),
-        disassembly=disassembly,
-        disassembly_sha256=sha256_bytes(disassembly.encode("utf-8")),
+    except BaseException:
+        if owned_workspace is not None:
+            shutil.rmtree(owned_workspace)
+        raise
+
+
+def _unbundle(
+    binary: Path, architecture: str, workspace: Path, timeout: float
+) -> Path:
+    fatbin = _dump_fatbin(binary, workspace, timeout)
+    bundler = _required_tool("clang-offload-bundler")
+    listing = _run(
+        [str(bundler), "--list", "--type=o", f"--input={fatbin}"],
+        timeout,
+    ).stdout.splitlines()
+    target = next(
+        (
+            line.strip()
+            for line in listing
+            if line.strip().startswith("hip")
+            and (match := _TARGET_ARCH.search(line.strip())) is not None
+            and match.group(1) == architecture
+        ),
+        None,
     )
+    if target is None:
+        raise ValueError(f"ISA architecture mismatch: {architecture}")
+    output = workspace / f"{binary.stem}-{architecture}.hsaco"
+    _run(
+        [
+            str(bundler),
+            "--unbundle",
+            "--type=o",
+            f"--input={fatbin}",
+            f"--targets={target}",
+            f"--output={output}",
+        ],
+        timeout,
+    )
+    return output
 
 
 def _dump_fatbin(binary: Path, workspace: Path, timeout_seconds: float) -> Path:
     workspace.mkdir(parents=True, exist_ok=True)
     fatbin = workspace / f"{binary.stem}.hip-fatbin"
     objcopy = _required_tool("llvm-objcopy")
-    _run(
-        [
-            str(objcopy),
-            f"--dump-section=.hip_fatbin={fatbin}",
-            str(binary),
-        ],
-        timeout_seconds,
-    )
+    # Omitting output makes llvm-objcopy rewrite the measured input ELF.
+    with tempfile.TemporaryDirectory(prefix=".objcopy-", dir=workspace) as tmp:
+        try:
+            _run(
+                [
+                    str(objcopy),
+                    f"--dump-section=.hip_fatbin={fatbin}",
+                    str(binary),
+                    str(Path(tmp) / "output.elf"),
+                ],
+                timeout_seconds,
+            )
+        except BaseException:
+            fatbin.unlink(missing_ok=True)
+            raise
     if not fatbin.is_file():
         raise ValueError("HIP fatbin extraction produced no artifact")
     return fatbin

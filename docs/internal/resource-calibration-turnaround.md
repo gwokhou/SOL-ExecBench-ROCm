@@ -102,3 +102,23 @@ restore preflights all existing destination paths before copying any artifact.
 Worker count alone does not change the native cache key. This change does not
 make all native compilation cached by default, nor prove cold-start latency from
 a warm run. No writable shared Triton/MIOpen cache or new mount is introduced.
+
+## Raw throttle evidence and immutable ISA extraction
+
+New calibration snapshots retain `throttle_status_cli` and `throttle_evidence`
+(raw uint32/uint64 values, Python types, binding conversion, metrics header,
+API/CLI versions and binding identity). The derived status is THROTTLED,
+UNTHROTTLED, or UNKNOWN. Unsigned maximum values, malformed/missing evidence,
+and conflicting observations cannot certify unthrottled operation. The producer
+uses bounded management-only child queries inside the existing native lease.
+
+The v4 envelope remains readable. Historical snapshots without raw evidence
+remain usable only for their existing limited corroboration scope; they cannot
+prove a new strict unthrottled qualification. No historical record is rewritten.
+Raw flags are observations, not proof of physical overheating or performance loss.
+
+ISA inspection supplies an explicit output ELF to llvm-objcopy and uses separate
+per-call extraction directories. The measured input bytes and mode are preserved;
+failed calls remove their own partial files, while successful extracted code
+objects remain in the caller's workspace. Consumers use the returned path rather
+than assuming a fixed basename directly beneath that workspace.

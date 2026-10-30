@@ -31,8 +31,30 @@ def _telemetry() -> dict:
         "socket_power_w": 100.0,
         "deep_sleep": "DISABLED",
         "throttle_status": "UNTHROTTLED",
+        "throttle_status_cli": "UNTHROTTLED",
+        "throttle_evidence": {
+            "raw": {
+                "throttle_status": {"value": 0, "type": "int"},
+                "indep_throttle_status": {"value": 0, "type": "int"},
+            },
+            "metrics_header": {
+                "format_revision": 1,
+                "content_revision": 3,
+                "structure_size": 120,
+            },
+            "api_version": {"major": 27, "minor": 1},
+            "cli_version": "AMDSMI Tool: 27.1.0",
+        },
         "performance_level": "STABLE_PEAK",
     }
+
+
+def _set_throttled(snapshot: dict) -> None:
+    snapshot["throttle_status"] = "THROTTLED"
+    snapshot["throttle_status_cli"] = "THROTTLED"
+    raw = snapshot["throttle_evidence"]["raw"]
+    raw["throttle_status"]["value"] = 2
+    raw["indep_throttle_status"]["value"] = 1 << 36
 
 
 def _telemetry_summary(raw_batches: list[dict]) -> dict:
@@ -338,8 +360,8 @@ def test_limited_scope_accepts_explicitly_reported_throttling(tmp_path: Path):
     payload = _payload()
     measurement = payload["measurements"][0]
     for batch in measurement["raw_process_batches"]:
-        batch["telemetry_before"]["throttle_status"] = "THROTTLED"
-        batch["telemetry_after"]["throttle_status"] = "THROTTLED"
+        _set_throttled(batch["telemetry_before"])
+        _set_throttled(batch["telemetry_after"])
     measurement["telemetry_summary"]["throttle_statuses"] = ["THROTTLED"]
     digest = _write(path, payload)
 
@@ -454,9 +476,11 @@ def test_verifies_tuning_selection_is_separate_and_recomputable(tmp_path: Path):
             "telemetry state is incomplete",
         ),
         (
-            lambda item: item["measurements"][0]["raw_process_batches"][0][
-                "telemetry_before"
-            ].update(throttle_status="THROTTLED"),
+            lambda item: _set_throttled(
+                item["measurements"][0]["raw_process_batches"][0][
+                    "telemetry_before"
+                ]
+            ),
             "telemetry reports throttling",
         ),
         (

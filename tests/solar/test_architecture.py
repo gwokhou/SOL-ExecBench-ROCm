@@ -45,6 +45,20 @@ def _audit_telemetry() -> dict:
         "socket_power_w": 100.0,
         "deep_sleep": "DISABLED",
         "throttle_status": "UNTHROTTLED",
+        "throttle_status_cli": "UNTHROTTLED",
+        "throttle_evidence": {
+            "raw": {
+                "throttle_status": {"value": 0, "type": "int"},
+                "indep_throttle_status": {"value": 0, "type": "int"},
+            },
+            "metrics_header": {
+                "format_revision": 1,
+                "content_revision": 3,
+                "structure_size": 120,
+            },
+            "api_version": {"major": 27, "minor": 1},
+            "cli_version": "AMDSMI Tool: 27.1.0",
+        },
         "performance_level": "STABLE_PEAK",
     }
 
@@ -392,6 +406,41 @@ def _without_compile_controls(node: ast.FunctionDef) -> ast.FunctionDef:
     return node
 
 
+def _without_raw_throttle_capture(node: ast.FunctionDef) -> ast.FunctionDef:
+    node = deepcopy(node)
+    node.body = [
+        item
+        for item in node.body
+        if not (
+            isinstance(item, ast.Assign)
+            and isinstance(item.targets[0], ast.Name)
+            and item.targets[0].id in {"raw_result", "raw_evidence"}
+        )
+    ]
+    for item in ast.walk(node):
+        if isinstance(item, ast.Return) and isinstance(item.value, ast.Dict):
+            pairs = [
+                (key, value)
+                for key, value in zip(
+                    item.value.keys, item.value.values, strict=True
+                )
+                if not isinstance(key, ast.Constant)
+                or key.value not in {"throttle_status_cli", "throttle_evidence"}
+            ]
+            item.value.keys = [key for key, _ in pairs]
+            item.value.values = [
+                ast.parse(
+                    '_nested_value(gpu, "power", "throttle_status")',
+                    mode="eval",
+                ).body
+                if isinstance(key, ast.Constant)
+                and key.value == "throttle_status"
+                else value
+                for key, value in pairs
+            ]
+    return node
+
+
 def _measurement_ast(tree: ast.Module) -> dict[str, str]:
     """Extract audited math and ordering, excluding explicitly changed CPU plumbing."""
     runtime = {"main", "_compile_probe", "_isa_spec_evidence"}
@@ -407,6 +456,10 @@ def _measurement_ast(tree: ast.Module) -> dict[str, str]:
         if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
             if isinstance(node, ast.FunctionDef):
                 node = _without_compile_controls(node)
+                if node.name == "_telemetry_snapshot":
+                    # Only new raw-evidence capture is normalized; all prior
+                    # clock, thermal, power fields and measurement math remain compared.
+                    node = _without_raw_throttle_capture(node)
             if node.name in runtime:
                 continue
             if node.name not in split:

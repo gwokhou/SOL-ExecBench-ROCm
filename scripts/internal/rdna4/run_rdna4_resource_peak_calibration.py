@@ -75,6 +75,7 @@ from solar.rocm.architecture import (
     RESOURCE_PEAK_TIMING_PROFILE,
     resource_peak_payload_sha256,
 )
+from solar.rocm.throttle import snapshot_throttle_status
 from solar.schema_versions import SchemaVersion as SolarSchemaVersion
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -578,6 +579,18 @@ def _telemetry_snapshot(amdsmi: str) -> dict[str, Any]:
         gpu = payload["gpu_data"][0]
     except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
         raise RuntimeError("amd-smi returned invalid telemetry JSON") from exc
+    raw_result = _run(
+        [
+            sys.executable,
+            "-m",
+            "sol_execbench.core.platform.amdsmi_telemetry",
+            "--amdsmi",
+            amdsmi,
+            "--gpu",
+            "0",
+        ]
+    )
+    raw_evidence = json.loads(raw_result.stdout)
     return {
         "captured_at": datetime.now(UTC).isoformat(),
         "gfx_clock_mhz": _metric_value(gpu, "clock", "gfx_0", "clk"),
@@ -588,7 +601,11 @@ def _telemetry_snapshot(amdsmi: str) -> dict[str, Any]:
         "memory_temperature_c": _metric_value(gpu, "temperature", "mem"),
         "socket_power_w": _metric_value(gpu, "power", "socket_power"),
         "deep_sleep": _nested_value(gpu, "clock", "gfx_0", "deep_sleep"),
-        "throttle_status": _nested_value(gpu, "power", "throttle_status"),
+        "throttle_status": snapshot_throttle_status(
+            raw_evidence, _nested_value(gpu, "power", "throttle_status")
+        ),
+        "throttle_status_cli": _nested_value(gpu, "power", "throttle_status"),
+        "throttle_evidence": raw_evidence,
         "performance_level": gpu.get("perf_level"),
     }
 

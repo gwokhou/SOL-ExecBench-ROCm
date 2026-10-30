@@ -111,7 +111,8 @@ def test_extract_host_binary_selects_exact_target(
 
     result = code_object.extract_code_object(binary, "gfx1200", workspace)
 
-    assert result.path == workspace / "kernel-gfx1200.hsaco"
+    assert result.path.name == "kernel-gfx1200.hsaco"
+    assert result.path.parent.parent == workspace
     assert result.path.read_bytes() == b"selected"
     unbundle = next(command for command in commands if "--unbundle" in command)
     assert "--targets=hip-amdgcn-amd-amdhsa--gfx1200" in unbundle
