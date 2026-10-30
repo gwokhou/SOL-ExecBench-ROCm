@@ -33,12 +33,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import signal
 import statistics
 import subprocess
 import sys
 import tempfile
-from collections.abc import Mapping
+import threading
+from collections.abc import Iterator, Mapping
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -47,6 +52,10 @@ from typing import Any, cast
 import numpy as np
 
 from sol_execbench.core.bench.gpu_execution import native_gpu_execution
+from sol_execbench.core.bench.resource_calibration_timing import (
+    CalibrationPhase,
+    CalibrationTimings,
+)
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.platform.amdgpu_code_object import extract_code_object
@@ -57,8 +66,11 @@ from sol_execbench.core.platform.isa_validation import (
     inspect_isa_requirements,
 )
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
+from sol_execbench.core.process.compile_budget import compile_job_limit
 from sol_execbench.core.process.logs import redacted_text_tail
 from sol_execbench.core.process.subprocesses import run_in_process_group_bounded
+from sol_execbench.core.process.termination import TERMINATION_SIGNALS
+from sol_execbench.tools.amd_isa.helper import helper_path
 from solar.rocm.architecture import (
     RESOURCE_PEAK_TIMING_PROFILE,
     resource_peak_payload_sha256,
@@ -302,11 +314,13 @@ def _run(
     cmd: list[str],
     *,
     timeout_seconds: float = COMMAND_TIMEOUT_SECONDS,
+    cancel_event: threading.Event | None = None,
 ) -> subprocess.CompletedProcess[str]:
     completed = run_in_process_group_bounded(
         cmd,
         timeout=timeout_seconds,
         max_capture_bytes=MAX_CAPTURE_BYTES,
+        **({"cancel_event": cancel_event} if cancel_event is not None else {}),
     )
     if completed.returncode != 0:
         detail = redacted_text_tail(completed.stderr or completed.stdout or "")
@@ -388,6 +402,126 @@ def _clock_state() -> dict[str, Any]:
     return state
 
 
+def _probe_binary_path(
+    source: Path,
+    workdir: Path,
+    compiler_defines: Mapping[str, int] | None = None,
+) -> Path:
+    label = "-".join(
+        f"{name.lower()}-{value}"
+        for name, value in sorted((compiler_defines or {}).items())
+    )
+    return (
+        workdir
+        / "binaries"
+        / source.stem
+        / f"{source.stem}-{label or 'default'}.bin"
+    )
+
+
+def _probe_configurations(
+    probe: Mapping[str, Any],
+) -> dict[int | None, dict[str, int]]:
+    tuning = probe.get("tuning")
+    if isinstance(tuning, TuningSpec):
+        return {
+            value: {tuning.compiler_macro: value} for value in tuning.candidates
+        }
+    return {None: {}}
+
+
+def _calibration_binary_paths(
+    workdir: Path,
+) -> dict[str, dict[int | None, Path]]:
+    return {
+        str(probe["source"]): {
+            value: _probe_binary_path(
+                PROBE_DIR / str(probe["source"]), workdir, defines
+            )
+            for value, defines in _probe_configurations(probe).items()
+        }
+        for probe in PROBES
+    }
+
+
+@contextmanager
+def _compile_pool(
+    jobs: int, cancel: threading.Event
+) -> Iterator[ThreadPoolExecutor]:
+    """Defer signal unwinding until the executor has registered/joined workers.
+
+    Raising during Thread.start can leave a running thread outside the pool's
+    inventory. Set cancellation in the handler; subprocess polling then stops
+    compilers and descendants before we propagate the original signal status.
+    """
+    previous = {sig: signal.getsignal(sig) for sig in TERMINATION_SIGNALS}
+    received: list[int] = []
+
+    def terminate(number: int, _frame: object) -> None:
+        if not received:
+            received.append(number)
+        cancel.set()
+
+    try:
+        for sig in previous:
+            signal.signal(sig, terminate)
+        with ThreadPoolExecutor(max_workers=jobs) as executor:
+            try:
+                yield executor
+            finally:
+                cancel.set()
+    except BaseException:
+        if received:
+            raise SystemExit(128 + received[0]) from None
+        raise
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+    if received:
+        raise SystemExit(128 + received[0])
+
+
+def _compile_calibration_binaries(
+    architecture: str, workdir: Path, hipcc: str, *, compile_jobs: int = 1
+) -> dict[str, dict[int | None, Path]]:
+    jobs = compile_job_limit(compile_jobs)
+    tasks = [
+        (str(probe["source"]), value, defines)
+        for probe in PROBES
+        for value, defines in _probe_configurations(probe).items()
+    ]
+    results: dict[tuple[str, int | None], Path] = {}
+    cancel = threading.Event()
+    with _compile_pool(jobs, cancel) as executor:
+        pending: dict[Future[Path], tuple[str, int | None]] = {}
+        try:
+            for source, value, defines in tasks:
+                future = executor.submit(
+                    _compile_probe,
+                    PROBE_DIR / source,
+                    workdir,
+                    hipcc,
+                    architecture,
+                    compiler_defines=defines,
+                    cancel_event=cancel,
+                )
+                pending[future] = (source, value)
+            for future in as_completed(pending):
+                results[pending[future]] = future.result()
+        except BaseException:
+            cancel.set()
+            for future in pending:
+                future.cancel()
+            raise
+    return {
+        str(probe["source"]): {
+            value: results[str(probe["source"]), value]
+            for value in _probe_configurations(probe)
+        }
+        for probe in PROBES
+    }
+
+
 def _compile_probe(
     source: Path,
     workdir: Path,
@@ -395,25 +529,32 @@ def _compile_probe(
     architecture: str,
     *,
     compiler_defines: Mapping[str, int] | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> Path:
+    binary = _probe_binary_path(source, workdir, compiler_defines)
+    binary.parent.mkdir(parents=True, exist_ok=True)
     definition_items = sorted((compiler_defines or {}).items())
-    label = "-".join(
-        f"{name.lower()}-{value}" for name, value in definition_items
-    )
-    binary_directory = workdir / "binaries" / source.stem
-    binary_directory.mkdir(parents=True, exist_ok=True)
-    binary = binary_directory / f"{source.stem}-{label or 'default'}.bin"
-    _run(
-        [
-            hipcc,
-            f"--offload-arch={architecture}",
-            "-O3",
-            *(f"-D{name}={value}" for name, value in definition_items),
-            "-o",
-            str(binary),
-            str(source),
-        ],
-    )
+    with tempfile.TemporaryDirectory(
+        prefix=".compile-", dir=binary.parent
+    ) as tmp:
+        staged = Path(tmp) / binary.name
+        _run(
+            [
+                hipcc,
+                f"--offload-arch={architecture}",
+                "-O3",
+                *(f"-D{name}={value}" for name, value in definition_items),
+                "-o",
+                str(staged),
+                str(source),
+            ],
+            **(
+                {"cancel_event": cancel_event}
+                if cancel_event is not None
+                else {}
+            ),
+        )
+        os.replace(staged, binary)
     return binary
 
 
@@ -648,7 +789,14 @@ CALIBRATION_INSTRUCTION_NAMES: tuple[str, ...] = tuple(
 
 def _isa_spec_evidence(architecture: str) -> dict[str, Any]:
     """Validate candidate instructions against the machine-readable ISA."""
-    report = inspect_isa_requirements(architecture, CALIBRATION_ISA_CHECKS)
+    helper = helper_path()
+    if not helper.is_file() or not os.access(helper, os.X_OK):
+        raise FileNotFoundError(
+            "prebuilt AMD ISA helper required before calibration"
+        )
+    report = inspect_isa_requirements(
+        architecture, CALIBRATION_ISA_CHECKS, allow_download=False
+    )
     supported = set(report.supported_instructions)
     return {
         **report.to_dict(),
@@ -862,22 +1010,10 @@ def _tuning_candidate_entry(
 def _tune_probe(
     probe: Mapping[str, Any],
     source: Path,
-    workdir: Path,
-    hipcc: str,
-    architecture: str,
+    binaries: Mapping[int | None, Path],
     tuning_batches: int,
 ) -> PreparedProbe:
     tuning = cast(TuningSpec, probe["tuning"])
-    binaries = {
-        candidate: _compile_probe(
-            source,
-            workdir,
-            hipcc,
-            architecture,
-            compiler_defines={tuning.compiler_macro: candidate},
-        )
-        for candidate in tuning.candidates
-    }
     observed: dict[int, list[SampleBatch]] = {
         candidate: [] for candidate in tuning.candidates
     }
@@ -943,9 +1079,7 @@ def _tune_probe(
 
 def _prepare_probe(
     probe: Mapping[str, Any],
-    workdir: Path,
-    hipcc: str,
-    architecture: str,
+    binaries: Mapping[int | None, Path],
     tuning_batches: int,
 ) -> PreparedProbe:
     source = PROBE_DIR / str(probe["source"])
@@ -953,9 +1087,7 @@ def _prepare_probe(
         prepared = _tune_probe(
             probe,
             source,
-            workdir,
-            hipcc,
-            architecture,
+            binaries,
             tuning_batches,
         )
         selected = prepared.selected_configuration
@@ -964,7 +1096,7 @@ def _prepare_probe(
             file=sys.stderr,
         )
         return prepared
-    binary = _compile_probe(source, workdir, hipcc, architecture)
+    binary = binaries[None]
     return PreparedProbe(
         specification=probe,
         source=source,
@@ -1048,6 +1180,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=7,
         help="fresh held-out processes per frozen probe (minimum: 5)",
     )
+    parser.add_argument("--compile-jobs", type=int, default=1)
     parser.add_argument("--workdir", type=Path, default=None)
     parser.add_argument(
         "--allow-unlocked",
@@ -1134,14 +1267,12 @@ def _probe_entry(
 def _collect_measurements(
     args: argparse.Namespace,
     workdir: Path,
-    hipcc: str,
+    binaries: Mapping[str, Mapping[int | None, Path]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     prepared = tuple(
         _prepare_probe(
             probe,
-            workdir,
-            hipcc,
-            args.gfx,
+            binaries[str(probe["source"])],
             args.tuning_batches,
         )
         for probe in PROBES
@@ -1312,9 +1443,47 @@ def _write_artifact(args: argparse.Namespace, artifact: dict[str, Any]) -> None:
     )
 
 
-def _calibrate(args: argparse.Namespace, workdir: Path) -> int:
+@dataclass(frozen=True)
+class CalibrationPreparation:
+    """CPU-built binaries and ISA inputs for one invocation; never a disk cache."""
+
+    hipcc: str
+    binaries: Mapping[str, Mapping[int | None, Path]]
+    binary_hashes: Mapping[Path, str]
+    spec_evidence: dict[str, Any]
+
+    def verify(self) -> None:
+        """Reject changed prepared executables before any GPU measurement."""
+        for path, digest in self.binary_hashes.items():
+            if sha256_file(path) != digest:
+                raise ValueError(f"prepared calibration binary drift: {path}")
+
+
+def _prepare_calibration(
+    args: argparse.Namespace, workdir: Path
+) -> CalibrationPreparation:
     hipcc = _required_rocm_tool("hipcc")
-    workdir.mkdir(parents=True, exist_ok=True)
+    spec_evidence = _isa_spec_evidence(args.gfx)
+    binaries = _compile_calibration_binaries(
+        args.gfx, workdir, hipcc, compile_jobs=getattr(args, "compile_jobs", 1)
+    )
+    return CalibrationPreparation(
+        hipcc,
+        binaries,
+        {
+            path: sha256_file(path)
+            for group in binaries.values()
+            for path in group.values()
+        },
+        spec_evidence,
+    )
+
+
+def _calibrate(
+    args: argparse.Namespace, workdir: Path, preparation: CalibrationPreparation
+) -> int:
+    preparation.verify()
+    hipcc = preparation.hipcc
     args.out.parent.mkdir(parents=True, exist_ok=True)
 
     print("[calibrate] verifying clock state...", file=sys.stderr)
@@ -1332,11 +1501,11 @@ def _calibrate(args: argparse.Namespace, workdir: Path) -> int:
         raise RuntimeError(
             f"visible GPU is {device['gfx_target']}, expected {args.gfx}",
         )
-    spec_evidence = _isa_spec_evidence(args.gfx)
+    spec_evidence = preparation.spec_evidence
     measurements, held_out_execution_order = _collect_measurements(
         args,
         workdir,
-        hipcc,
+        preparation.binaries,
     )
     artifact = _build_artifact(
         args,
@@ -1351,16 +1520,29 @@ def _calibrate(args: argparse.Namespace, workdir: Path) -> int:
     return 0
 
 
+def _run_prepared(args: argparse.Namespace, workdir: Path) -> int:
+    timings = CalibrationTimings()
+    try:
+        with timings.measure(CalibrationPhase.PREPARE):
+            preparation = _prepare_calibration(args, workdir)
+        with (
+            timings.measure(CalibrationPhase.GPU_LIFECYCLE),
+            native_gpu_execution(manage_clocks=not args.allow_unlocked),
+        ):
+            return _calibrate(args, workdir, preparation)
+    finally:
+        timings.report()
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run resource-peak calibration and persist audited evidence."""
+    """Compile before ownership; retain tuning, measurement and cleanup inside it."""
     args = _parse_args(argv)
-    with native_gpu_execution(manage_clocks=not args.allow_unlocked):
-        if args.workdir is not None:
-            return _calibrate(args, args.workdir)
-        with tempfile.TemporaryDirectory(
-            prefix="solar-resource-peak-calibration-",
-        ) as temporary:
-            return _calibrate(args, Path(temporary))
+    if args.workdir is not None:
+        return _run_prepared(args, args.workdir)
+    with tempfile.TemporaryDirectory(
+        prefix="solar-resource-peak-calibration-"
+    ) as temporary:
+        return _run_prepared(args, Path(temporary))
 
 
 if __name__ == "__main__":

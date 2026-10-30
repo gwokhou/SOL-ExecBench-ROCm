@@ -94,13 +94,16 @@ def test_diagnostic_calibration_blocks_before_run(
 def test_resource_peak_successor_blocks_before_legacy_producer(
     load_script: Any,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     script = load_script(
         "scripts/internal/rdna4/"
         "run_qualified_rdna4_resource_peak_calibration.py"
     )
     ran = False
-    arguments = SimpleNamespace(stage="run", allow_unlocked=False)
+    arguments = SimpleNamespace(
+        stage="run", allow_unlocked=False, check_only=False, workdir=tmp_path
+    )
     writes = []
     device = ClockDevice(
         bdf="0000:05:00.0", uuid="11111111-2222-3333-4444-555555555555"
@@ -128,15 +131,13 @@ def test_resource_peak_successor_blocks_before_legacy_producer(
         return {}
 
     monkeypatch.setattr(script, "_parse_args", lambda _argv=None: arguments)
-    monkeypatch.setattr(
-        script, "_verify_qualification", _reject_with_native_lease
-    )
+    monkeypatch.setattr(script, "_verify_qualification", _reject)
     monkeypatch.setattr(script, "_legacy", legacy)
 
     with pytest.raises(ValueError, match="gate missing"):
         script.main([])
     assert ran is False
-    assert writes == ["PEAK", "AUTO"]
+    assert writes == []  # A missing CPU gate must not acquire or set clocks.
     with pytest.raises(GPULockVerificationError):
         require_evaluation_gpu_lock()
 

@@ -25,6 +25,7 @@ def trace_make_fx_reference(
     import torch
     from torch.fx.experimental.proxy_tensor import make_fx
 
+    from solar.graph.grad_capture import GradientBoundaryCapture
     from solar.graph.reference_serializer import ReferenceGraphSerializer
 
     tensor_inputs = {
@@ -34,16 +35,20 @@ def trace_make_fx_reference(
     }
     tensor_indices = list(tensor_inputs)
 
+    boundaries = GradientBoundaryCapture()
+
     def tensor_reference(*tensor_values: Any) -> Any:
         replacements = iter(tensor_values)
         arguments = tuple(
             next(replacements) if isinstance(value, torch.Tensor) else value
             for value in inputs
         )
-        return reference(*arguments)
+        with boundaries:
+            return reference(*arguments)
 
     try:
         graph_module = make_fx(tensor_reference)(*tensor_inputs.values())
+        boundaries.materialize(graph_module)
         graph_module.graph.eliminate_dead_code()
         graph_module.recompile()
         placeholders = [

@@ -348,69 +348,170 @@ def test_packaged_rx9060xt_audit_pins_corrected_probe_semantics():
     )
 
 
-def test_current_calibration_only_wraps_the_audited_producer():
-    """Keep all audited calculations; the sole change is native entry ownership.
+def _without_compile_controls(node: ast.FunctionDef) -> ast.FunctionDef:
+    """Normalize only the new CPU concurrency argument and cancellation token."""
+    node = deepcopy(node)
+    if node.name == "_parse_args":
+        node.body = [
+            item
+            for item in node.body
+            if not (
+                isinstance(item, ast.Expr)
+                and isinstance(item.value, ast.Call)
+                and item.value.args
+                and isinstance(item.value.args[0], ast.Constant)
+                and item.value.args[0].value == "--compile-jobs"
+            )
+        ]
+    if node.name == "_run":
+        paired = [
+            (arg, default)
+            for arg, default in zip(
+                node.args.kwonlyargs, node.args.kw_defaults, strict=True
+            )
+            if arg.arg != "cancel_event"
+        ]
+        node.args.kwonlyargs = [arg for arg, _ in paired]
+        node.args.kw_defaults = [default for _, default in paired]
+        for call in ast.walk(node):
+            if isinstance(call, ast.Call):
+                call.keywords = [
+                    kw
+                    for kw in call.keywords
+                    if not (
+                        kw.arg is None
+                        and isinstance(kw.value, ast.IfExp)
+                        and isinstance(kw.value.body, ast.Dict)
+                        and any(
+                            isinstance(key, ast.Constant)
+                            and key.value == "cancel_event"
+                            for key in kw.value.body.keys
+                        )
+                    )
+                ]
+    return node
 
-    This is a source relationship check, not new hardware qualification.
-    """
+
+def _measurement_ast(tree: ast.Module) -> dict[str, str]:
+    """Extract audited math and ordering, excluding explicitly changed CPU plumbing."""
+    runtime = {"main", "_compile_probe", "_isa_spec_evidence"}
+    split = {
+        "_tune_probe",
+        "_prepare_probe",
+        "_collect_measurements",
+        "_calibrate",
+    }
+    result = {}
+    for original_node in tree.body:
+        node = original_node
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            if isinstance(node, ast.FunctionDef):
+                node = _without_compile_controls(node)
+            if node.name in runtime:
+                continue
+            if node.name not in split:
+                result[node.name] = ast.dump(node)
+            elif node.name == "_tune_probe":
+                # The compiler map moved out; all observations, counterbalancing,
+                # winner selection/tie-breaking and returned evidence stay exact.
+                start = next(
+                    i
+                    for i, item in enumerate(node.body)
+                    if isinstance(item, ast.AnnAssign)
+                    and isinstance(item.target, ast.Name)
+                    and item.target.id == "observed"
+                )
+                result[node.name] = ast.dump(
+                    ast.Module(body=node.body[start:], type_ignores=[])
+                )
+            elif node.name == "_calibrate":
+                # Ignore preparation placement only. Clock/device rejection,
+                # measurement dispatch and the final artifact remain exact.
+                body = deepcopy(node.body)
+                start = next(
+                    i
+                    for i, item in enumerate(body)
+                    if isinstance(item, ast.Assign)
+                    and isinstance(item.targets[0], ast.Name)
+                    and item.targets[0].id == "clock"
+                )
+                body = body[start:]
+                for item in body:
+                    if not isinstance(item, ast.Assign):
+                        continue
+                    if (
+                        isinstance(item.targets[0], ast.Name)
+                        and item.targets[0].id == "spec_evidence"
+                    ):
+                        item.value = ast.Name(id="prepared_isa", ctx=ast.Load())
+                    if (
+                        isinstance(item.value, ast.Call)
+                        and isinstance(item.value.func, ast.Name)
+                        and item.value.func.id == "_collect_measurements"
+                    ):
+                        item.value.args[-1] = ast.Name(
+                            id="prepared_binaries", ctx=ast.Load()
+                        )
+                result[node.name] = ast.dump(
+                    ast.Module(body=body, type_ignores=[])
+                )
+            elif node.name == "_collect_measurements":
+                # Only the initial prepared-binary input changed.
+                result[node.name] = ast.dump(
+                    ast.Module(body=node.body[1:], type_ignores=[])
+                )
+            else:
+                # Preserve the no-tuning evidence contract; tuning itself is
+                # compared above and exercised by counterbalanced CPU replay.
+                result[node.name] = ast.dump(node.body[-1])
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            result[
+                ast.unparse(
+                    node.targets[0]
+                    if isinstance(node, ast.Assign)
+                    else node.target
+                )
+            ] = ast.dump(node)
+    return result
+
+
+def test_current_calibration_preserves_audited_measurement_math():
+    """Keep historical evidence immutable; compare scientific code, not new qualification."""
     fixture = (
         Path(__file__).parent
         / "fixtures/resource_peak_calibration_52cf050d.py.txt"
     )
-    expected = ast.parse(fixture.read_text())
-    native_import = ast.parse(
-        "from sol_execbench.core.bench.gpu_execution "
-        "import native_gpu_execution"
-    ).body[0]
-    insertion = next(
-        index
-        for index, node in enumerate(expected.body)
-        if isinstance(node, ast.ImportFrom)
-        and node.module == "sol_execbench.core.data.json_utils"
-    )
-    expected.body.insert(insertion, native_import)
-    main = next(
-        node
-        for node in expected.body
-        if isinstance(node, ast.FunctionDef) and node.name == "main"
-    )
-    # Preserve the docstring and argument parsing before the native boundary.
-    main.body[2:] = [
-        ast.With(
-            items=[
-                ast.withitem(
-                    context_expr=ast.Call(
-                        func=ast.Name(
-                            id="native_gpu_execution", ctx=ast.Load()
-                        ),
-                        args=[],
-                        keywords=[
-                            ast.keyword(
-                                arg="manage_clocks",
-                                value=ast.UnaryOp(
-                                    op=ast.Not(),
-                                    operand=ast.Attribute(
-                                        value=ast.Name(
-                                            id="args", ctx=ast.Load()
-                                        ),
-                                        attr="allow_unlocked",
-                                        ctx=ast.Load(),
-                                    ),
-                                ),
-                            )
-                        ],
-                    ),
-                    optional_vars=None,
-                ),
-            ],
-            body=main.body[2:],
-        ),
-    ]
     current = (
         Path(__file__).resolve().parents[2]
         / "scripts/internal/rdna4/run_rdna4_resource_peak_calibration.py"
     )
-    assert ast.dump(ast.parse(current.read_text())) == ast.dump(expected)
+    expected = _measurement_ast(ast.parse(fixture.read_text()))
+    observed = _measurement_ast(ast.parse(current.read_text()))
+    assert {name: observed[name] for name in expected} == expected
+
+
+def test_audited_measurement_check_detects_selection_change():
+    fixture = (
+        Path(__file__).parent
+        / "fixtures/resource_peak_calibration_52cf050d.py.txt"
+    )
+    original = ast.parse(fixture.read_text())
+    changed = deepcopy(original)
+    tune = next(
+        node
+        for node in changed.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_tune_probe"
+    )
+    select = next(
+        node
+        for node in tune.body
+        if isinstance(node, ast.Assign)
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "selected"
+    )
+    assert isinstance(select.value, ast.Call)
+    select.value.func = ast.Name(id="min", ctx=ast.Load())
+    assert _measurement_ast(original) != _measurement_ast(changed)
 
 
 def test_precision_and_resource_methods():

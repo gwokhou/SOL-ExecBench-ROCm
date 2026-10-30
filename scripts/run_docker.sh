@@ -581,6 +581,7 @@ DOCKER_COMMON_ARGS=(
     --workdir "${CONTAINER_PROJECT}"
     --entrypoint "${CONTAINER_PROJECT}/docker/entrypoint.sh"
     -e "PYTHONPATH=${CONTAINER_PROJECT}/src"
+    -e MAX_JOBS
     -v "${REPO_ROOT}:${CONTAINER_PROJECT}:ro"
     -v "${OUTPUT_DIR}:/outputs:rw"
     --mount "type=bind,src=${GPU_LOCK_DIR}/gpu-${GPU_LOCK_UUID}.L1-ownership.lock,dst=/run/lock/gpu-${GPU_LOCK_UUID}.L1-ownership.lock"

@@ -17,7 +17,9 @@ from sol_execbench.core.bench.io import flashinfer_safetensors_env
 from sol_execbench.core.bench.stderr import filter_benign_rocm_stderr
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.platform.runtime import resolve_rocm_tool
+from sol_execbench.core.process.compile_budget import compile_job_limit
 from sol_execbench.core.process.environment import (
+    ENV_MAX_JOBS,
     ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE,
     sanitized_subprocess_env,
 )
@@ -80,8 +82,7 @@ def run_compile_phase(
     cmd, artifact_path_text = packager.compile()
     artifact_path = Path(artifact_path_text)
     (staging_dir / ".tmp").mkdir(exist_ok=True)
-    base = sanitized_subprocess_env(os.environ, staging_dir=staging_dir)
-    env = sanitized_subprocess_env(env_builder(base), staging_dir=staging_dir)
+    env = _compilation_environment(staging_dir, env_builder)
     cache_requested = os.environ.get(ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE)
     compiler = (
         _compiler_provenance()
@@ -133,6 +134,19 @@ def run_compile_phase(
         compiler_sha256=compiler[1],
         compiler_version=compiler[2],
     )
+
+
+def _compilation_environment(
+    staging_dir: Path,
+    env_builder: Callable[[Mapping[str, str]], dict[str, str]],
+) -> dict[str, str]:
+    """Expose quota-bounded Ninja jobs only to the compilation subprocess."""
+    base = sanitized_subprocess_env(os.environ, staging_dir=staging_dir)
+    env = sanitized_subprocess_env(env_builder(base), staging_dir=staging_dir)
+    env[ENV_MAX_JOBS] = str(
+        compile_job_limit(int(os.environ.get(ENV_MAX_JOBS, "1")))
+    )
+    return env
 
 
 def _compile_cache(
