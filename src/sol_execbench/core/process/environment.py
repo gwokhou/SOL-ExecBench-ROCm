@@ -11,6 +11,7 @@ from pathlib import Path
 ENV_MAX_JOBS = "MAX_JOBS"
 ENV_HIP_VISIBLE_DEVICES = "HIP_VISIBLE_DEVICES"
 ENV_ROCR_VISIBLE_DEVICES = "ROCR_VISIBLE_DEVICES"
+ENV_PYTORCH_ALLOC_CONF = "PYTORCH_ALLOC_CONF"
 ENV_ROCPROF_TMPDIR = "ROCPROF_TMPDIR"
 ENV_SOL_EXECBENCH_CLOCKS_LOCKED = "SOL_EXECBENCH_CLOCKS_LOCKED"
 ENV_SOL_EXECBENCH_CONTAINER_IMAGE_ID = "SOL_EXECBENCH_CONTAINER_IMAGE_ID"
@@ -26,6 +27,9 @@ ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION = (
     "SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION"
 )
 EVALUATION_INPUT_NONCE_BYTES = 32
+# HIP VMM remapping corrupts live data on the tested gfx1200 stack.
+# Keep both workers on ordinary allocations until VMM is qualified separately.
+EVALUATION_ALLOCATOR_CONFIG = "expandable_segments:False"
 
 _PASSTHROUGH_NAMES = frozenset(
     {
@@ -76,7 +80,7 @@ def sanitized_subprocess_env(
             "HOME": str(staging_dir),
             "TMPDIR": str(staging_dir / ".tmp"),
             ENV_ROCPROF_TMPDIR: str(staging_dir / ".tmp"),
-            "PYTORCH_ALLOC_CONF": "expandable_segments:True",
+            ENV_PYTORCH_ALLOC_CONF: EVALUATION_ALLOCATOR_CONFIG,
         },
     )
     return result
@@ -85,6 +89,7 @@ def sanitized_subprocess_env(
 __all__ = [
     "ENV_HIP_VISIBLE_DEVICES",
     "ENV_MAX_JOBS",
+    "ENV_PYTORCH_ALLOC_CONF",
     "ENV_ROCPROF_TMPDIR",
     "ENV_ROCR_VISIBLE_DEVICES",
     "ENV_SOL_EXECBENCH_CLOCKS_LOCKED",
@@ -96,6 +101,7 @@ __all__ = [
     "ENV_SOL_EXECBENCH_SANDBOXED",
     "ENV_SOL_EXECBENCH_SOURCE_REVISION",
     "ENV_SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION",
+    "EVALUATION_ALLOCATOR_CONFIG",
     "EVALUATION_INPUT_NONCE_BYTES",
     "sanitized_subprocess_env",
 ]

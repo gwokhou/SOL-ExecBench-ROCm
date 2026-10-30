@@ -5,6 +5,7 @@ from pathlib import Path
 
 from sol_execbench.cli.evaluation import compilation
 from sol_execbench.core.process.environment import (
+    ENV_PYTORCH_ALLOC_CONF,
     ENV_SOL_EXECBENCH_CONTAINER_IMAGE_ID,
     ENV_SOL_EXECBENCH_NATIVE_COMPILE_CACHE,
     ENV_SOL_EXECBENCH_SOURCE_REVISION,
@@ -108,7 +109,7 @@ def test_run_compile_phase_executes_compile_command_for_cpp_solution(
     assert kwargs["capture_output"] is True
     assert kwargs["text"] is True
     assert kwargs["timeout"] == 11
-    assert kwargs["env"]["PYTORCH_ALLOC_CONF"] == "expandable_segments:True"
+    assert kwargs["env"][ENV_PYTORCH_ALLOC_CONF] == "expandable_segments:False"
     assert packager.compile_output_path == tmp_path / "benchmark_kernel.so"
     assert result == compilation.CompilePhaseResult(
         attempted=True,
