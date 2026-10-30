@@ -24,6 +24,7 @@ from sol_execbench.core.solar_bridge.models import (
 from sol_execbench.core.solar_bridge.performance import (
     load_manifest_semantic_characterization,
 )
+from solar.artifacts.names import MANIFEST_FILENAME
 from solar.contracts import SolarRequestArtifact, SolarRequestManifest
 from solar.ir.contracts import normalize_ir_path
 
@@ -55,7 +56,7 @@ def project_solar_manifest(
     destination.mkdir(parents=True, exist_ok=False)
     for artifact in selected:
         _copy_regular_file(verified[artifact.path], destination / artifact.path)
-    output = destination / "manifest.yaml"
+    output = destination / MANIFEST_FILENAME
     projected = manifest.model_copy(update={"artifacts": selected})
     _write_yaml(output, projected.model_dump(mode="json"))
     load_manifest_semantic_characterization(

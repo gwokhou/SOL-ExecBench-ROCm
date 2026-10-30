@@ -16,6 +16,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from sol_execbench.cli.evaluation import command as cli_evaluation
@@ -45,9 +46,34 @@ def _stage_pytorch_problem(tmp_path: Path) -> Path:
     return problem_dir
 
 
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
     problem_dir = _stage_pytorch_problem(tmp_path)
     trace_path = tmp_path / "linear_backward.trace.jsonl"
+
+    from sol_execbench.core.bench import gpu_execution, host_clock_guard
+
+    physical = gpu_execution.resolve_gpu_device()
+    policies = []
+    monkeypatch.setattr(
+        host_clock_guard, "observe_clock_devices", lambda: (physical,)
+    )
+    monkeypatch.setattr(
+        host_clock_guard,
+        "observe_clock_levels",
+        lambda _uuid: ("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+    )
+    monkeypatch.setattr(
+        host_clock_guard,
+        "set_peak_clocks",
+        lambda _uuid: policies.append("STABLE_PEAK"),
+    )
+    monkeypatch.setattr(
+        host_clock_guard,
+        "unlock_clocks",
+        lambda _uuid: policies.append("AUTO") or True,
+    )
+    monkeypatch.setattr(gpu_execution, "verify_clocks", lambda _uuid: True)
 
     def _raise_timeout(eval_cmd, *, staging_dir, timeout):
         raise subprocess.TimeoutExpired(cmd=eval_cmd, timeout=timeout)
@@ -60,7 +86,7 @@ def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
     # The CLI execution boundary acquires the host GPU lock before running; point
     # it at an isolated lock dir so this test never contends with live GPU runs.
     monkeypatch.setenv(
-        "SOL_EXECBENCH_GPU_LOCK_DIR",
+        "GPU_LOCK_DIR",
         str(tmp_path / "gpu-locks"),
     )
 
@@ -90,3 +116,4 @@ def test_cli_eval_timeout_writes_no_trace_sidecar(tmp_path: Path, monkeypatch):
     assert payload["reason"] == "evaluation_timeout"
     assert payload["returncode"] == 124
     assert payload["diagnostic_only"] is True
+    assert policies == ["STABLE_PEAK", "AUTO"]

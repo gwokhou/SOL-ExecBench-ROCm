@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import statistics
@@ -332,17 +333,70 @@ def test_packaged_rx9060xt_audit_pins_corrected_probe_semantics():
             measurement["source_sha256"]
             == hashlib.sha256((probe_root / probe).read_bytes()).hexdigest()
         )
-    script_path = (
-        repository_root
-        / "scripts"
-        / "internal"
-        / "rdna4"
-        / "run_rdna4_resource_peak_calibration.py"
+    # The audit binds the producer at its recorded revision, not later entry
+    # wrappers. This immutable source fixture is parsed as data, never executed.
+    assert (
+        payload["source_revision"] == "52cf050d10c53ce9fb3904122d86af525cd38cb5"
+    )
+    source_snapshot = (
+        Path(__file__).parent
+        / "fixtures/resource_peak_calibration_52cf050d.py.txt"
     )
     assert (
         payload["calibration_script_sha256"]
-        == hashlib.sha256(script_path.read_bytes()).hexdigest()
+        == hashlib.sha256(source_snapshot.read_bytes()).hexdigest()
     )
+
+
+def test_current_calibration_only_wraps_the_audited_producer():
+    """Keep all audited calculations; the sole change is native entry ownership.
+
+    This is a source relationship check, not new hardware qualification.
+    """
+    fixture = (
+        Path(__file__).parent
+        / "fixtures/resource_peak_calibration_52cf050d.py.txt"
+    )
+    expected = ast.parse(fixture.read_text())
+    native_import = ast.parse(
+        "from sol_execbench.core.bench.gpu_execution "
+        "import native_gpu_execution"
+    ).body[0]
+    insertion = next(
+        index
+        for index, node in enumerate(expected.body)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "sol_execbench.core.data.json_utils"
+    )
+    expected.body.insert(insertion, native_import)
+    main = next(
+        node
+        for node in expected.body
+        if isinstance(node, ast.FunctionDef) and node.name == "main"
+    )
+    # Preserve the docstring and argument parsing before the native boundary.
+    main.body[2:] = [
+        ast.With(
+            items=[
+                ast.withitem(
+                    context_expr=ast.Call(
+                        func=ast.Name(
+                            id="native_gpu_execution", ctx=ast.Load()
+                        ),
+                        args=[],
+                        keywords=[],
+                    ),
+                    optional_vars=None,
+                ),
+            ],
+            body=main.body[2:],
+        ),
+    ]
+    current = (
+        Path(__file__).resolve().parents[2]
+        / "scripts/internal/rdna4/run_rdna4_resource_peak_calibration.py"
+    )
+    assert ast.dump(ast.parse(current.read_text())) == ast.dump(expected)
 
 
 def test_precision_and_resource_methods():

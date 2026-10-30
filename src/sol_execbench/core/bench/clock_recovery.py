@@ -12,17 +12,21 @@ import argparse
 from pathlib import Path
 
 from sol_execbench.core.bench.clock_ownership import (
+    EXECUTION_CLEANUP_BLOCKER,
     ClockOwnerRecord,
     ClockOwnershipError,
     ClockOwnerState,
+    admission_device,
     clock_owner_path,
     observe_clock_devices,
+    write_clock_record,
 )
+from sol_execbench.core.bench.gpu_admission import configured_admission
 from sol_execbench.core.bench.gpu_lock import (
-    GPU_LOCK_FILENAME,
+    acquire_gpu_recovery_lock,
     gpu_lock_directory,
 )
-from sol_execbench.core.data.json_utils import atomic_write_json_value
+from sol_execbench.core.bench.gpu_lock_paths import configured_gpu_locks
 from sol_execbench.core.platform.amd_smi import (
     AMDSMIProcessPayload,
     parse_performance_levels,
@@ -64,30 +68,36 @@ def confirm_clock_recovery(directory: Path, token: str) -> None:
     """Confirm recovery under GPU/owner exclusion, preserving the old receipt."""
     path = clock_owner_path(directory, token)
     with (
-        exclusive_file_lock(
-            directory / GPU_LOCK_FILENAME.format(device_index=0)
-        ),
+        acquire_gpu_recovery_lock(),
         exclusive_file_lock(path.with_suffix(".lock")),
     ):
         record = ClockOwnerRecord.model_validate_json(path.read_text())
         if record.lease_id != token:
             raise ClockOwnershipError("clock_recovery_identity_mismatch")
+        if admission_device(record).smi_uuid != configured_gpu_locks().uuid:
+            raise ClockOwnershipError("clock_recovery_device_mismatch")
+        admission = configured_admission()
+        if admission is not None:
+            admission.require_owner(admission_device(record), token, path)
         if record.container_supervised:
             confirm_container_absent(
                 "docker",
                 path.with_suffix(CONTAINER_ID_SUFFIX).read_text().strip(),
             )
         if record.release_blocker is not None:
-            if not record.release_blocker.startswith(
+            if record.release_blocker == EXECUTION_CLEANUP_BLOCKER:
+                pass  # The original owner still needs the live process/AUTO checks below.
+            elif not record.release_blocker.startswith(
                 CONTAINER_CLEANUP_BLOCKER_PREFIX
             ):
                 raise ClockOwnershipError("clock_recovery_blocker_unresolved")
-            confirm_container_absent(
-                "docker",
-                record.release_blocker.removeprefix(
-                    CONTAINER_CLEANUP_BLOCKER_PREFIX
-                ),
-            )
+            else:
+                confirm_container_absent(
+                    "docker",
+                    record.release_blocker.removeprefix(
+                        CONTAINER_CLEANUP_BLOCKER_PREFIX
+                    ),
+                )
         if not set(record.devices).issubset(observe_clock_devices()):
             raise ClockOwnershipError("clock_recovery_device_mismatch")
         observations = []
@@ -113,8 +123,10 @@ def confirm_clock_recovery(directory: Path, token: str) -> None:
         # Keep the failed/crashed receipt as evidence; never delete the gate blindly.
         original = path.parent / "recovery-history" / path.name
         if not original.exists():
-            atomic_write_json_value(original, record.model_dump(mode="json"))
-        atomic_write_json_value(path, recovered.model_dump(mode="json"))
+            write_clock_record(original, record)
+        write_clock_record(path, recovered)
+        if admission is not None:
+            admission.release(admission_device(recovered), token, path)
 
 
 def main() -> None:

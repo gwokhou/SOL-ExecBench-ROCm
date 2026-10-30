@@ -10,10 +10,12 @@ from sol_execbench.core.solar_bridge.publication import (
     verify_projected_solar_manifest,
 )
 from solar.contracts import SolarRequestManifest
+from solar.ir.access_artifact import ACCESS_FILENAME
 from solar.schema_versions import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
     SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION,
 )
+from tests.solar.access_fixtures import exact_reads, unavailable_views
 
 
 def _solar_analysis(path: Path) -> None:
@@ -41,9 +43,11 @@ def _solar_analysis(path: Path) -> None:
                     "lower_bound_seconds": 1e-6,
                 },
                 "metadata": {
+                    "views": unavailable_views(),
+                    "external_reads": exact_reads(128),
                     "fusion": {
                         "regions": [{"id": "region-0", "layers": ["add"]}]
-                    }
+                    },
                 },
             }
         ),
@@ -56,6 +60,7 @@ def _solar_manifest(root: Path) -> Path:
         "operator_graph.yaml",
         "aten_graph.yaml",
         "conversion-attestation.yaml",
+        ACCESS_FILENAME,
         "solar-analysis.yaml",
         "orojenesis/raw-search.json",
     )
@@ -124,6 +129,7 @@ def test_solar_projection_omits_verified_nested_orojenesis(
         "operator_graph.yaml",
         "aten_graph.yaml",
         "conversion-attestation.yaml",
+        ACCESS_FILENAME,
         "solar-analysis.yaml",
     }
     assert not (output.parent / "orojenesis").exists()

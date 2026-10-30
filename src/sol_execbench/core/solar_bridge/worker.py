@@ -28,14 +28,17 @@ def _prefer_worker_as_oom_victim(
     """Protect the release parent by making this worker the OOM victim."""
     try:
         current = int(path.read_text(encoding="utf-8").strip())
-        target = max(current, _SOLAR_WORKER_OOM_SCORE_ADJUSTMENT)
-        path.write_text(f"{target}\n", encoding="utf-8")
+        if current >= _SOLAR_WORKER_OOM_SCORE_ADJUSTMENT:
+            return
+        path.write_text(
+            f"{_SOLAR_WORKER_OOM_SCORE_ADJUSTMENT}\n", encoding="utf-8"
+        )
         observed = int(path.read_text(encoding="utf-8").strip())
     except (OSError, UnicodeError, ValueError) as exc:
         raise RuntimeError(
             "SOLAR parallel worker could not configure OOM isolation",
         ) from exc
-    if observed < target:
+    if observed < _SOLAR_WORKER_OOM_SCORE_ADJUSTMENT:
         raise RuntimeError(
             "SOLAR parallel worker OOM isolation was not applied",
         )

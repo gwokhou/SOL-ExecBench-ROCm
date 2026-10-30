@@ -6,7 +6,6 @@ import re
 import shlex
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -21,6 +20,14 @@ DOCKERFILE_PATH = REPO_ROOT / "docker" / "Dockerfile"
 ENTRYPOINT_PATH = REPO_ROOT / "docker" / "entrypoint.sh"
 RUN_DOCKER_SCRIPT = REPO_ROOT / "scripts" / "run_docker.sh"
 MANIFEST_PATH = REPO_ROOT / "docker" / "rocm-targets.json"
+
+
+def _shell_test_environment() -> dict[str, str]:
+    """Keep fixture PATH intact instead of sourcing image shell startup hooks."""
+    environment = dict(os.environ)
+    environment.pop("BASH_ENV", None)
+    environment.pop("ENV", None)
+    return environment
 
 
 def _dockerfile_lines() -> list[str]:
@@ -98,21 +105,14 @@ def test_dockerfile_installs_exact_validated_amd_smi_sudoers_rule() -> None:
     assert "${AMD_SMI} set -l *" not in dockerfile
 
 
-def test_entrypoint_registers_owned_lock_cleanup_before_locking() -> None:
-    entrypoint = ENTRYPOINT_PATH.read_text(encoding="utf-8")
-
-    cleanup_index = entrypoint.index("trap 'cleanup' EXIT")
-    gpu_lock_index = entrypoint.index(
-        '\nif [ "${SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST:-0}" != "1" ]',
-    )
-    clock_lock_index = entrypoint.index(
-        '\nif [ "${SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST:-0}" = "1" ]',
-    )
-    assert cleanup_index < gpu_lock_index < clock_lock_index
-    assert "SOL_EXECBENCH_GPU_LOCK_FD=9" in entrypoint
-    assert "CLOCK_LOCK_ACQUIRED={int(clock_lock.acquired)}" in entrypoint
-    assert "clock_lock.detach()" in entrypoint
-    assert 'if [ "${SOL_EXECBENCH_CLOCK_LOCK_ACQUIRED}" = "1" ]' in entrypoint
+def test_entrypoint_requires_native_host_owner_without_container_setters():
+    entrypoint = ENTRYPOINT_PATH.read_text()
+    assert "prepare_gpu_locks(paths)" in entrypoint
+    assert "verify_host_gpu_owner(paths)" in entrypoint
+    assert 'exec "$@"' in entrypoint
+    assert "GPU_LOCK_FD=9" not in entrypoint
+    assert "unlock_clocks" not in entrypoint
+    assert "acquire_clock_lock" not in entrypoint
 
 
 def test_entrypoint_verifies_host_managed_clock_state_without_container_sudo() -> (
@@ -121,13 +121,17 @@ def test_entrypoint_verifies_host_managed_clock_state_without_container_sudo() -
     entrypoint = ENTRYPOINT_PATH.read_text(encoding="utf-8")
 
     assert "SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST" in entrypoint
-    assert "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST" in entrypoint
+    assert "paths.host_managed" in entrypoint
     assert "verify_host_managed_clocks" in entrypoint
     assert (
-        "from sol_execbench.core.bench.clock_lock import verify_clocks"
+        "from sol_execbench.core.bench.clock_lock import observe_clock_levels"
         in entrypoint
     )
     assert "HOST_CLOCKS_DECLARED" in entrypoint
+    assert "observe_clock_levels(configured_gpu_locks().uuid)" in entrypoint
+    assert "AMDSMI_DEV_PERF_LEVEL_AUTO" in entrypoint
+    assert "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK" in entrypoint
+    assert "sudo" not in entrypoint
 
 
 def test_entrypoint_rejects_false_host_clock_claim(tmp_path: Path) -> None:
@@ -142,7 +146,7 @@ def test_entrypoint_rejects_false_host_clock_claim(tmp_path: Path) -> None:
         "FLASHINFER_TRACE_DIR": str(tmp_path),
         "SOL_EXECBENCH_CLOCKS_LOCKED": "1",
         "SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST": "1",
-        "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST": "1",
+        "GPU_LOCK_HELD_BY_HOST": "1",
     }
 
     result = subprocess.run(
@@ -158,25 +162,40 @@ def test_entrypoint_rejects_false_host_clock_claim(tmp_path: Path) -> None:
         text=True,
     )
 
-    assert result.returncode == 0
-    assert "failed container verification" in result.stdout
+    assert result.returncode != 0
+    assert "failed container verification" not in result.stdout
 
 
 @pytest.mark.parametrize(
     ("declared", "level", "expected"),
-    [("1", "STABLE_PEAK", 0), ("1", "AUTO", 1), ("0", "STABLE_PEAK", 1)],
-    ids=["target-verified", "target-readback-failed", "target-not-declared"],
+    [
+        ("1", "STABLE_PEAK", 0),
+        ("1", "AUTO", 1),
+        ("0", "STABLE_PEAK", 1),
+        ("0", "AUTO", 0),
+        ("0", "MANUAL", 1),
+    ],
+    ids=[
+        "target-verified",
+        "target-readback-failed",
+        "target-not-declared",
+        "natural-auto",
+        "natural-readback-failed",
+    ],
 )
 def test_entrypoint_verifies_only_host_uuid_or_refuses_workload(
     tmp_path: Path, declared: str, level: str, expected: int
 ) -> None:
     gpu_uuid = "a3007590-0000-1000-800f-a29c1cca1511"
     tool = tmp_path / "amd-smi"
+    tool_calls = tmp_path / "amd-smi-argv.json"
+    python_calls = tmp_path / "python-calls.txt"
     payload = {
         "gpu_data": [{"gpu": 0, "perf_level": f"AMDSMI_DEV_PERF_LEVEL_{level}"}]
     }
     tool.write_text(
-        f"#!{sys.executable}\nimport sys\n"
+        f"#!{sys.executable}\nimport json, sys\nfrom pathlib import Path\n"
+        f"Path({str(tool_calls)!r}).write_text(json.dumps(sys.argv[1:]))\n"
         f"assert sys.argv[1:] == ['metric', '-l', '--json', '--gpu', {gpu_uuid!r}]\n"
         f"print({json.dumps(payload)!r})\n",
         encoding="utf-8",
@@ -184,125 +203,96 @@ def test_entrypoint_verifies_only_host_uuid_or_refuses_workload(
     tool.chmod(0o755)
     python = tmp_path / "python"
     python.write_text(
-        f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n',
+        "#!/bin/sh\n"
+        f"printf 'invoked\\n' >> {shlex.quote(str(python_calls))}\n"
+        f'exec {shlex.quote(sys.executable)} "$@"\n',
         encoding="utf-8",
     )
     python.chmod(0o755)
     marker = tmp_path / "workload-started"
     env = {
-        **os.environ,
+        **_shell_test_environment(),
         "PATH": f"{tmp_path}:{os.environ['PATH']}",
         "FLASHINFER_TRACE_DIR": str(tmp_path),
         "SOL_EXECBENCH_CLOCKS_LOCKED": declared,
         "SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST": "1",
-        "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST": "1",
+        "GPU_LOCK_HELD_BY_HOST": "1",
         ENV_HOST_CLOCK_GPU_UUID: gpu_uuid,
+    }
+    from sol_execbench.core.bench.clock_lock import ClockLockLease
+    from sol_execbench.core.bench.clock_ownership import (
+        ClockDevice,
+        published_clock_owner,
+    )
+    from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setenv("GPU_LOCK_UUID", gpu_uuid)
+        with (
+            acquire_gpu_lock(),
+            published_clock_owner(
+                ClockLockLease(
+                    locked=declared == "1", acquired=True, restore=lambda: True
+                ),
+                Path(os.environ["GPU_LOCK_DIR"]),
+                (ClockDevice(bdf="0000:05:00.0", uuid=gpu_uuid),),
+            ) as token,
+        ):
+            assert token is not None
+            env.update(
+                GPU_LOCK_UUID=gpu_uuid,
+                SOL_EXECBENCH_CLOCK_OWNER=token,
+                SOL_EXECBENCH_HOST_AMD_SMI=str(tool),
+            )
+            result = subprocess.run(
+                [str(ENTRYPOINT_PATH), "touch", str(marker)],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=15,
+            )
+    assert result.returncode == expected, result.stderr
+    assert marker.exists() == (expected == 0)
+    assert python_calls.read_text().splitlines() == ["invoked", "invoked"]
+    assert json.loads(tool_calls.read_text()) == [
+        "metric",
+        "-l",
+        "--json",
+        "--gpu",
+        gpu_uuid,
+    ]
+
+
+def test_entrypoint_missing_uuid_mount_stops_before_workload(tmp_path):
+    marker = tmp_path / "started"
+    env = {
+        **os.environ,
+        "GPU_LOCK_DIR": str(tmp_path / "missing"),
+        "GPU_LOCK_HELD_BY_HOST": "1",
     }
     result = subprocess.run(
         [str(ENTRYPOINT_PATH), "touch", str(marker)],
         env=env,
         capture_output=True,
         text=True,
+        timeout=10,
         check=False,
-        timeout=15,
     )
-    assert result.returncode == expected, result.stderr
-    assert marker.exists() == (expected == 0)
+    assert result.returncode != 0
+    assert not marker.exists()
+    assert not (tmp_path / "missing").exists()
 
 
-def test_entrypoint_releases_owned_lock_after_workload_failure(
-    tmp_path: Path,
-) -> None:
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    cleanup_log = tmp_path / "cleanup.log"
-    fake_python = bin_dir / "python"
-    fake_python.write_text(
-        """#!/bin/bash
-if [[ ${1:-} == -c ]]; then
-  printf 'cleanup\n' >>"${CLEANUP_LOG}"
-  exit 0
-fi
-printf 'CLOCKS_LOCKED=1\nCLOCK_LOCK_ACQUIRED=1\n'
-""",
-        encoding="utf-8",
-    )
-    fake_python.chmod(0o755)
-    env = {
-        **os.environ,
-        "PATH": f"{bin_dir}:{os.environ['PATH']}",
-        "CLEANUP_LOG": str(cleanup_log),
-        "FLASHINFER_TRACE_DIR": str(tmp_path),
-        "SOL_EXECBENCH_GPU_LOCK_DIR": str(tmp_path / "locks"),
-    }
-
-    result = subprocess.run(
-        [ENTRYPOINT_PATH, "bash", "-c", "exit 23"],
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
+@pytest.fixture(autouse=True)
+def preview_lock_files(monkeypatch, tmp_path):
+    from sol_execbench.core.bench.gpu_lock_paths import (
+        configured_gpu_locks,
+        prepare_gpu_locks,
     )
 
-    assert result.returncode == 23
-    assert cleanup_log.read_text(encoding="utf-8") == "cleanup\n"
-
-
-def test_entrypoint_holds_gpu_lock_until_clock_cleanup_finishes(
-    tmp_path: Path,
-) -> None:
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    fake_python = bin_dir / "python"
-    fake_python.write_text(
-        """#!/bin/bash
-if [[ ${1:-} == -c ]]; then
-  touch "${CLEANUP_STARTED}"
-  while [[ ! -e "${CLEANUP_RELEASE}" ]]; do sleep 0.01; done
-  exit 0
-fi
-printf 'CLOCKS_LOCKED=1\nCLOCK_LOCK_ACQUIRED=1\n'
-""",
-        encoding="utf-8",
-    )
-    fake_python.chmod(0o755)
-    cleanup_started = tmp_path / "cleanup.started"
-    cleanup_release = tmp_path / "cleanup.release"
-    env = {
-        **os.environ,
-        "PATH": f"{bin_dir}:{os.environ['PATH']}",
-        "CLEANUP_STARTED": str(cleanup_started),
-        "CLEANUP_RELEASE": str(cleanup_release),
-        "FLASHINFER_TRACE_DIR": str(tmp_path),
-        "SOL_EXECBENCH_GPU_LOCK_DIR": str(tmp_path / "locks"),
-    }
-    first = subprocess.Popen(
-        [ENTRYPOINT_PATH, "true"],
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    try:
-        deadline = time.monotonic() + 5
-        while not cleanup_started.exists() and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert cleanup_started.exists()
-
-        second = subprocess.run(
-            [ENTRYPOINT_PATH, "true"],
-            env={**env, "SOL_EXECBENCH_GPU_LOCK_TIMEOUT_SECONDS": "0.05"},
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        assert second.returncode == 75
-        assert "GPU 0 is busy" in second.stderr
-    finally:
-        cleanup_release.touch()
-        first.communicate(timeout=5)
-    assert first.returncode == 0
+    prepare_gpu_locks(configured_gpu_locks())
+    monkeypatch.setenv("SOL_EXECBENCH_OUTPUT_DIR", str(tmp_path / "outputs"))
 
 
 def test_container_validation_sidecar_uses_writable_output_transport() -> None:
@@ -385,15 +375,20 @@ def test_run_docker_rejects_unsupported_build_platforms(
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     uname = bin_dir / "uname"
+    calls = tmp_path / "uname-calls.txt"
     uname.write_text(
         "#!/bin/bash\n"
+        f'printf "%s\\n" "$1" >> {shlex.quote(str(calls))}\n'
         f'case "$1" in -s) echo {system};; -m) echo {machine};; esac\n',
         encoding="utf-8",
     )
     uname.chmod(0o755)
     completed = subprocess.run(
         [str(RUN_DOCKER_SCRIPT), "--build"],
-        env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        env={
+            **_shell_test_environment(),
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        },
         capture_output=True,
         text=True,
         timeout=10,
@@ -403,6 +398,9 @@ def test_run_docker_rejects_unsupported_build_platforms(
     assert completed.returncode == 2
     assert "only on Linux x86-64" in completed.stderr
     assert "docker build" not in completed.stdout
+    assert calls.read_text().splitlines() == (
+        ["-s"] if system != "Linux" else ["-s", "-m"]
+    )
 
 
 def test_run_docker_holds_host_clock_guard_around_container() -> None:
@@ -411,7 +409,7 @@ def test_run_docker_holds_host_clock_guard_around_container() -> None:
     assert "sol_execbench.core.bench.host_clock_guard" in script
     assert "-e SOL_EXECBENCH_CLOCKS_LOCKED" in script
     assert "-e SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST" in script
-    assert "-e SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST" in script
+    assert "-e GPU_LOCK_HELD_BY_HOST" in script
     assert f"-e {ENV_HOST_CLOCK_GPU_UUID}" in script
     assert "docker image inspect --format '{{.Id}}'" in script
     assert "SOL_EXECBENCH_CONTAINER_IMAGE_ID" in script

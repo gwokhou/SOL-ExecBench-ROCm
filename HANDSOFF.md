@@ -91,55 +91,68 @@ completed investigations and one-time inventories belong in Git history.
 
 <a id="solar-evolution"></a>
 
-### P1/P2 — SOLAR: BASE-01 retained; stages 1–5 saved separately
+### SOLAR integration preparation — 2026-10-29
 
-Scope: BASE-01 CPU support and baseline only. The stages 1–5 implementation is
-saved on local branch `codex/solar-stages1-5-saved`; its foundation is on
-`codex/solar-base01-foundation`. The stage commit is separate from the snapshot
-of existing unrelated work and BASE-01. Neither branch has been pushed.
+The current scientific snapshot is `9e8cc0e615716fced80ca5998bfe7da17b028aa9943ebb9d76a845afa68f7876`.
+The fixed R set retains 16 slots: 14 readiness receipts, 12 priceable and 12
+complete cache-aware model results. R06 remains two ready but unpriced dynamic
+read cases; R08 retains the extraction and gradient-verification boundary
+rejections. All final counts and required mapper evidence were recalculated
+with this analysis implementation. Semantic runtime identity `005d6c03…82d1d`
+is unchanged, permitting strict reuse of the original 5d37 GPU receipts;
+this does not relabel their source or replay the GPU.
 
-The original [BASE-01 report](docs/internal/solar-base01-cpu-2026-10-23.md),
-[2026-10-26 recollection](docs/internal/solar-base01-cpu-2026-10-26.md),
-[stage 0](docs/internal/solar-evolution-stage0.md),
-[acceptance specification](docs/internal/solar-evolution-acceptance.md), and
-[task specifications](docs/internal/solar-evolution-tasks.md) remain available.
-Their observations are tied to their recorded source revisions. In particular,
-the recollection's F08 improvement and 821 passing / 1 failing tests describe
-that intermediate snapshot, not the restored production source.
+The 32 MiB point is nominal profile/model capacity, not measured performance
+or whole-project formal qualification. Stages 4–5 remain bounded research
+interfaces with their explicit domain and numerical policies. No speedup,
+complete-corpus qualification, deployment, or start700 restart is claimed.
 
-The original baseline records 32 F attempts, 30 semantic/counting completions,
-two torchview triangular conversion refusals, eight mathematical discrepancies,
-and 736 passing tests. The later BASE-01 support review passed 84 tests. Neither
-historical result substitutes for validation of the split candidate.
+The integration rehearsal starts from all current Git-visible main bytes,
+including its uncommitted work, and preserves the newer HIP scope,
+profile-summary v5 and allocator VMM workaround. It reconciles 176 paths;
+main and the research worktree remain untouched during preparation. The
+rehearsal CPU suite passed 3821 tests (2 skipped, 74 environment/hardware
+exclusions; 229.68 seconds). Exact file preconditions, rollback, same-source
+ledger, canonical bundles and final validation are in the local handoff
+`/home/guohao/Documents/Codex/2026-10-26/task/solar-integration-prep-20261029/`.
+Apply only after rechecking that handoff's main preimage; integration is not
+performed by this document. Preserve all original run evidence.
 
-The split restores the pre-stage production and regression files at fixed
-commit `e35d046ee9c64c310ff3be41fe0a78b00bb993b3`, while retaining all 12
-BASE-01 files and the 86 unrelated working-tree changes. The existing planning
-specifications are not authorization to resume stage implementation. Restoration
-of old counting behavior intentionally retains the F04/F08 baseline discrepancies.
+The following 2026-10-26 entries are historical snapshots, not current results.
 
-Backup manifests, the independent source bundle, isolated CPU validation,
-round-trip verification and final switch receipt are recorded under ignored
-`data/outputs/solar-safe-split-20261026/`. The independent backup also lives in
-the managed `solar-safe-split` worktree. Original BASE-01 and stage evidence
-stays immutable at its original location; old document seals describe their
-historical snapshots. No generated benchmark output is committed.
+### Historical P1/P2 — SOLAR: stages 1–5 CPU implementation on an isolated branch
 
-GPU experiments, real mapper, R workloads and paused production qualification
-remain outside this split. Other backlog entries below are unchanged.
+The user explicitly renewed authorization to continue stages 1–5 after the
+BASE-01-only safe split. This branch, `codex/solar-stages1-5-resume`, starts at
+`edc9ad211857f208e73efdd631ec2e472c11a581` and adapts reviewed modules from the
+saved stage commit `c9c0e5b6`; it does not merge the foundation's 86 unrelated
+changes. Main and both archive branches remain unchanged. No push or main merge
+was performed. The original split was a scope decision, not a claim that all
+archived code was defective.
 
-The standalone BASE-01 commit is prepared on `codex/solar-base01-only`, directly
-from `e35d046ee9c64c310ff3be41fe0a78b00bb993b3`: 12 support/report files and
-five shared documents. The 86 unrelated changes remain uncommitted in this
-worktree; the original `main` checkout and both archive branches are unchanged.
-Split validation passed 1042 CPU tests on the retained working-tree snapshot.
-A separate export containing only the original base and these 17 files passed
-all 84 BASE-01 support tests, Ruff, format, ty, coupling, readability, schema and
-documentation checks in the same locked CPU image. This checks independence
-from the 86 changes; it does not recollect the F baseline. Commit preparation
-receipts are under ignored `data/outputs/solar-base01-commit-20261026/` in the
-managed worktree. No GPU, real mapper or R workload was run, and nothing was
-pushed.
+Stages 1–5 CPU checks passed respectively 919, 1140, 1233, 1364 and 1445 tests.
+The final stage suite also passed Ruff, format, ty, coupling, readability and
+schema checks, with identical before/after source identity
+`ec176be36d93db331f71a18a27426a08c82691f28f39ad56a8f2114603263277`.
+Each phase retains its own source archive, command logs, JUnit and earlier
+failed attempts under ignored `data/outputs/solar-resume-20261026/`.
+Final F32 collection and documentation closure are recorded in the
+[current implementation report](docs/internal/solar-resume-2026-10-26.md).
+
+The fixed installed image uses CPU only, four CPU quota, 8 GiB memory, one test
+worker and no network. No software was installed. The primary worktree's 86
+existing edits are checked against a content/mode/status protection manifest.
+The prior BASE-01 and safe-split reports describe their historical source
+snapshots; their counts are not substituted for these runs.
+
+A subsequent same-source F03-D real-mapper check passed both IR paths at
+64/4096 B capacity (420/196 B traffic). See the
+[mapper follow-up and proposed GPU validation](docs/internal/solar-mapper-followup-2026-10-26.md).
+Broader real-mapper coverage, all 16 real-workload R slots, GPU validation
+and formal publication qualification remain open. CPU fixtures and model-only
+contraction search do not establish device speedups. The operator-paused
+`p1-successor-start700` batch remains paused and outside this work. Next bounded
+validation steps and approval/resource requirements are in the current report.
 
 ### P1 — start-640 PCIe5.0x16 successor path (closed terminal)
 
@@ -369,3 +382,7 @@ uv run sol-execbench --format json diagnostics lifecycle run --plan PLAN.json --
 recovery preregistration proof). start700 is fully fresh — no
 `record-exposure -> freeze-fragment -> compose-held-out` reuse route applies,
 and no held-out payload may be composed from any prior `accepted=false` corpus.
+
+Historical local continuation (2026-10-26 05:28 UTC): real GPU canary exposed an internal readiness-to-IPC bridge defect, now repaired with focused CPU regression passing. Full final-source CPU rerun and GPU canary/R16 remain pending; all owned GPU resources are released. See [safe continuation checkpoint](data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/CHECKPOINT-0528.md). Old source-bound CPU/F32/mapper receipts remain historical.
+
+Historical local checkpoint (2026-10-26 05:53 UTC): final source 455e281d passes 1449 CPU tests and F32 32/32; GPU canary passes both paths. R16 retains 12 ready, two R08 boundary rejections and two R04 cache-write blockers (Triton EROFS). All owned GPU resources and the shared lock are released. See [current execution checkpoint](data/outputs/solar-resume-20261026/mapper-followup/gpu-proposal/CHECKPOINT-0553.md); do not treat readiness as full accounting or formal qualification.

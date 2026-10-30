@@ -24,7 +24,10 @@ from typing import Any, NamedTuple
 
 from sol_execbench.core.bench.clock_lock import (
     ClockLockLease,
+)
+from sol_execbench.core.bench.gpu_execution import (
     acquire_clock_lock,
+    native_gpu_execution,
 )
 from sol_execbench.core.bench.pid_lock import acquire_pid_lock
 from sol_execbench.core.bench.rocm_profiler.calibration import (
@@ -94,6 +97,10 @@ class CalibrationClockState(NamedTuple):
 
 
 def _validate_request(request: CalibrationRequest) -> None:
+    if request.gpu_device not in (None, 0):
+        raise ValueError(
+            "--gpu-device must be visible index 0; select the physical GPU with GPU_LOCK_UUID and ROCR_VISIBLE_DEVICES"
+        )
     if request.iterations <= 0:
         raise ValueError("iterations must be positive")
     if request.warmup_runs < 0:
@@ -120,7 +127,7 @@ def _prepare_environment(
     )
     profiler_executable_path = Path(resolved_profiler).resolve(strict=True)
     gpu_isolation = validate_gpu_device_isolation(
-        gpu_device=request.gpu_device,
+        gpu_device=None,
     )
     if request.strict_isolation and not gpu_isolation["isolated"]:
         logger.error(
@@ -141,26 +148,27 @@ def run_calibration(request: CalibrationRequest) -> int:
     environment = _prepare_environment(request)
     if environment is None:
         return 1
-    clock_state = _setup_calibration_clocks(
-        manage_clocks=request.manage_clocks,
-        strict_isolation=request.strict_isolation,
-    )
-    if request.strict_isolation and not clock_state.clock_locked:
-        return 1
+    with native_gpu_execution(manage_clocks=request.manage_clocks):
+        clock_state = _setup_calibration_clocks(
+            manage_clocks=request.manage_clocks,
+            strict_isolation=request.strict_isolation,
+        )
+        if request.strict_isolation and not clock_state.clock_locked:
+            return 1
 
-    try:
-        return _execute_calibration(request, environment, clock_state)
-    finally:
-        active_exception = sys.exception()
         try:
-            _teardown_calibration_clocks(
-                clock_state,
-                reset_clocks=request.reset_clocks,
-            )
-        except Exception as cleanup_error:
-            if active_exception is None:
-                raise
-            active_exception.add_note(str(cleanup_error))
+            return _execute_calibration(request, environment, clock_state)
+        finally:
+            active_exception = sys.exception()
+            try:
+                _teardown_calibration_clocks(
+                    clock_state,
+                    reset_clocks=request.reset_clocks,
+                )
+            except Exception as cleanup_error:
+                if active_exception is None:
+                    raise
+                active_exception.add_note(str(cleanup_error))
 
 
 def _detect_device(

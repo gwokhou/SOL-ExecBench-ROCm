@@ -46,6 +46,7 @@ from typing import Any, cast
 
 import numpy as np
 
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.data.json_utils import atomic_write_json_value
 from sol_execbench.core.integrity import sha256_file
 from sol_execbench.core.platform.amdgpu_code_object import extract_code_object
@@ -1353,12 +1354,13 @@ def _calibrate(args: argparse.Namespace, workdir: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Run resource-peak calibration and persist audited evidence."""
     args = _parse_args(argv)
-    if args.workdir is not None:
-        return _calibrate(args, args.workdir)
-    with tempfile.TemporaryDirectory(
-        prefix="solar-resource-peak-calibration-",
-    ) as temporary:
-        return _calibrate(args, Path(temporary))
+    with native_gpu_execution():
+        if args.workdir is not None:
+            return _calibrate(args, args.workdir)
+        with tempfile.TemporaryDirectory(
+            prefix="solar-resource-peak-calibration-",
+        ) as temporary:
+            return _calibrate(args, Path(temporary))
 
 
 if __name__ == "__main__":

@@ -92,8 +92,10 @@ AKA_PROVENANCE_CLASS = "ecosystem_grounded"
 # in solar_bridge.formal_device.FORMAL_ARCHITECTURE.
 FORMAL_ARCHITECTURE = "solar:RX_9060_XT"
 FORMAL_GFX_TARGET = "gfx1200"
+# Reviewed rx9060xt-amd-resource-v6: ROCm 10.1 audit/support evidence changed;
+# nominal rates did not. Keep this pin explicit so evidence drift is rejected.
 FORMAL_ARCHITECTURE_SHA256 = (
-    "25ad977df7a7206bd9d8caf60d2cd85d4f5c5fdc47368a22efb881c0250d0877"
+    "f77f2f1301a7a08cc8679d91fde4b216e83faf348888829a52a2bae60c78a604"
 )
 
 # Corpus-size bounds. The initial seed landed at 15 problems; the current

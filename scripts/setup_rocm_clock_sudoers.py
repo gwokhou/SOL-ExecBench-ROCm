@@ -22,7 +22,7 @@ from pathlib import Path
 from sol_execbench.core.platform.clock_commands import (
     ClockLevel,
     clock_command,
-    clock_executable,
+    host_clock_executable,
 )
 
 SUDOERS_PATH = Path("/etc/sudoers.d/sol-execbench-amd-smi")
@@ -41,19 +41,21 @@ Modes:
   print        Print the validated sudoers entry without installing it.
   install      Atomically install a visudo-validated 0440 sudoers file as root.
 
-The rule covers every visible AMD GPU because `amd-smi set -l` has all-GPU
-scope when no `-g` argument is supplied. Use --gpu-uuid to generate a
-device-scoped rule with the same contract as the PMC clock controller.
+The rule requires --gpu-uuid and covers only two exact device-scoped setters.
+The default invocation is the stable /usr/bin/amd-smi link, independent of
+PATH order. SOL_EXECBENCH_HOST_AMD_SMI explicitly selects another absolute
+host path for both UUID clock control and this tool. --amd-smi overrides it
+for this invocation only. Link resolution validates safety, not rule rendering.
 
 Typical workflow (run from the repository root):
   python scripts/setup_rocm_clock_sudoers.py --mode print \\
-    --user "$USER" --amd-smi /opt/rocm/bin/amd-smi
+    --user guohao --gpu-uuid a3007590-0000-1000-800f-a29c1cca1511
   sudo .venv/bin/python scripts/setup_rocm_clock_sudoers.py --mode install \\
-    --user "$USER" --amd-smi /opt/rocm/bin/amd-smi
+    --user guohao --gpu-uuid a3007590-0000-1000-800f-a29c1cca1511
   .venv/bin/python scripts/setup_rocm_clock_sudoers.py --mode check --json \\
-    --amd-smi /opt/rocm/bin/amd-smi
+    --gpu-uuid a3007590-0000-1000-800f-a29c1cca1511
 
-Use `verify-live` only when briefly changing every GPU to STABLE_PEAK is safe.
+Use `verify-live` only with explicit approval to change the selected GPU.
 It always attempts AUTO cleanup, including when the lock command fails. The
 installer refuses unsafe usernames, labels, executable paths, symlink targets,
 non-root-controlled executables, and destinations outside /etc/sudoers.d.
@@ -88,8 +90,8 @@ class SudoCommandCheck:
 
 
 def resolve_amd_smi(explicit_path: str | None = None) -> str:
-    """Return the exact amd-smi path used in both sudoers and runtime calls."""
-    return clock_executable(explicit_path)
+    """Preserve the stable invocation spelling, regardless of installer PATH."""
+    return host_clock_executable(explicit_path)
 
 
 def default_target_user() -> str:
@@ -162,7 +164,7 @@ def render_sudoers(
     patterns = ", \\\n    ".join(amd_smi_command_patterns(amd_smi, gpu_uuid))
     lines = [
         f"# Managed by SOL ExecBench ROCm: {label}",
-        "# Allows only amd-smi clock probe, lock, and reset commands.",
+        "# Allows only device-scoped STABLE_PEAK and AUTO setters.",
         f"{user} ALL=(root) NOPASSWD: {patterns}",
     ]
     return "\n".join(lines) + "\n"
@@ -172,8 +174,11 @@ def protected_commands(
     amd_smi: str, gpu_uuid: str | None = None
 ) -> list[list[str]]:
     """Return the clock commands protected by the sudoers rule."""
+    if gpu_uuid is None:
+        raise ValueError(
+            "gpu_uuid is required; all-device rules are not generated"
+        )
     return [
-        [amd_smi, "version"],
         clock_command(amd_smi, ClockLevel.PEAK, gpu_uuid),
         clock_command(amd_smi, ClockLevel.AUTO, gpu_uuid),
     ]
@@ -236,20 +241,8 @@ def verify_passwordless_coverage_live(
     amd_smi: str, gpu_uuid: str | None = None
 ) -> list[SudoCommandCheck]:
     """Exercise the clock lifecycle and always attempt to restore AUTO."""
-    version, stable_peak, auto = protected_commands(amd_smi, gpu_uuid)
-    results = [_run_check(["sudo", "-n", *version])]
-    if results[0].status != "covered":
-        skipped = SudoCommandCheck(
-            stable_peak,
-            "skipped",
-            None,
-            "version check failed",
-        )
-        return [
-            *results,
-            skipped,
-            SudoCommandCheck(auto, "skipped", None, "version check failed"),
-        ]
+    stable_peak, auto = protected_commands(amd_smi, gpu_uuid)
+    results = []
     try:
         results.append(_run_check(["sudo", "-n", *stable_peak]))
     finally:
@@ -373,7 +366,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--gpu-uuid",
-        help="Verified AMD-SMI UUID; omit for legacy all-device scope",
+        required=True,
+        help="Verified AMD-SMI UUID; required to avoid all-device scope",
     )
     return parser.parse_args(argv)
 
@@ -400,8 +394,8 @@ def _print_checks(
 def main(argv: list[str] | None = None) -> int:
     """Validate, render, install, or check the clock sudoers rule."""
     args = parse_args(argv)
-    amd_smi = resolve_amd_smi(args.amd_smi)
     try:
+        amd_smi = resolve_amd_smi(args.amd_smi)
         validate_render_inputs(
             user=args.user,
             amd_smi=amd_smi,

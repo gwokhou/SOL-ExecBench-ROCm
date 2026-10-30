@@ -22,6 +22,7 @@ class DifferenceCategory(StrEnum):
     )
     RESOURCE_MODEL_BUG = "resource_model_bug"
     FORMAL_BOUND_POLICY_DIFFERENCE = "formal_bound_policy_difference"
+    ANALYSIS_VIEW_DIFFERENCE = "analysis_view_difference"
 
 
 class PathComparisonStatus(StrEnum):
@@ -53,6 +54,7 @@ class WorkloadPathComparison:
     mandatory_resource_work: ComparisonSection
     fusion_intermediate_accounting: ComparisonSection
     formal_bound: ComparisonSection
+    analysis_views: ComparisonSection
 
     @property
     def status(self) -> PathComparisonStatus:
@@ -65,7 +67,10 @@ class WorkloadPathComparison:
         )
         if any(not section.match for section in authoritative):
             return PathComparisonStatus.DIFFERENT
-        if not self.fusion_intermediate_accounting.match:
+        if (
+            not self.fusion_intermediate_accounting.match
+            or not self.analysis_views.match
+        ):
             return PathComparisonStatus.MATCHED_WITH_DIALECT_DIFFERENCES
         return PathComparisonStatus.EXACT_MATCH
 
@@ -78,6 +83,7 @@ class WorkloadPathComparison:
             self.mandatory_resource_work,
             self.fusion_intermediate_accounting,
             self.formal_bound,
+            self.analysis_views,
         )
         return tuple(
             dict.fromkeys(

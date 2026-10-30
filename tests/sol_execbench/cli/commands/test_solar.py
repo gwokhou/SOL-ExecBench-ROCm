@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 
 from click.testing import CliRunner
@@ -25,6 +26,8 @@ def _formal_outcome(
     output_dir: str,
     ir_path: IRPath = IRPath.TORCHVIEW_EXTENDED_EINSUM,
 ) -> SolarAnalysisOutcome:
+    root = Path(output_dir)
+    root.mkdir(parents=True, exist_ok=True)
     return SolarAnalysisOutcome(
         status=SolarAnalysisStatus.ANALYZED,
         analysis_id=analysis_id,
@@ -36,6 +39,7 @@ def _formal_outcome(
         artifacts=tuple(
             {"path": path, "sha256": "b" * 64}
             for path in (
+                "access.json",
                 "operator_graph.yaml",
                 ir_path.graph_filename,
                 "conversion-attestation.yaml",
@@ -53,6 +57,9 @@ def test_solar_analyze_cli_returns_bound_and_artifacts(
     problem = tmp_path / "problem"
     problem.mkdir()
     output = tmp_path / "analysis"
+    monkeypatch.setattr(
+        solar_commands, "load_outcome_views", lambda outcome: {}
+    )
     monkeypatch.setattr(
         solar_commands,
         "run_solar_worker",
@@ -85,6 +92,7 @@ def test_solar_analyze_cli_returns_bound_and_artifacts(
     assert {item["path"] for item in payload["artifacts"]} == {
         str(output / path)
         for path in (
+            "access.json",
             "operator_graph.yaml",
             "einsum_graph.yaml",
             "conversion-attestation.yaml",
@@ -107,6 +115,9 @@ def test_solar_analyze_cli_forwards_device_stage_lock(
         observed.append(request)
         return _formal_outcome(request.workload_uuid, request.output_dir)
 
+    monkeypatch.setattr(
+        solar_commands, "load_outcome_views", lambda outcome: {}
+    )
     monkeypatch.setattr(solar_commands, "run_solar_worker", analyze)
     result = CliRunner().invoke(
         cli,
@@ -148,6 +159,9 @@ def test_solar_analyze_cli_selects_one_fixed_make_fx_aten_path(
             request.ir_path,
         )
 
+    monkeypatch.setattr(
+        solar_commands, "load_outcome_views", lambda outcome: {}
+    )
     monkeypatch.setattr(solar_commands, "run_solar_worker", analyze)
     result = CliRunner().invoke(
         cli,
@@ -173,6 +187,7 @@ def test_solar_analyze_cli_selects_one_fixed_make_fx_aten_path(
     } == {
         str(output / path)
         for path in (
+            "access.json",
             "operator_graph.yaml",
             "aten_graph.yaml",
             "conversion-attestation.yaml",
@@ -213,6 +228,9 @@ def test_solar_analyze_cli_rejects_non_formal_success(
     invalid = _formal_outcome("workload-1", str(output))
     object.__setattr__(invalid, "publication_eligible", False)
     monkeypatch.setattr(
+        solar_commands, "load_outcome_views", lambda outcome: {}
+    )
+    monkeypatch.setattr(
         solar_commands,
         "run_solar_worker",
         lambda request, **kwargs: invalid,
@@ -244,6 +262,9 @@ def test_solar_analyze_cli_preserves_failed_stage(
 ) -> None:
     problem = tmp_path / "problem"
     problem.mkdir()
+    monkeypatch.setattr(
+        solar_commands, "load_outcome_views", lambda outcome: {}
+    )
     monkeypatch.setattr(
         solar_commands,
         "run_solar_worker",

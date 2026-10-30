@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -16,6 +17,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from solar.artifacts.names import MANIFEST_FILENAME
 from solar.graph.contracts import (
     ExtractionKind,
     normalize_extraction_kind,
@@ -177,6 +179,9 @@ class AnalysisExecutionPolicy:
     device_stage_lock_path: Path | None = None
     device_stage_lock_timeout_seconds: float = 14_400.0
     device_stage_cleanup: Callable[[], None] | None = None
+    device_stage_context: Callable[[], AbstractContextManager[None]] | None = (
+        None
+    )
 
     def __post_init__(self) -> None:
         """Reject execution controls that cannot provide a bounded wait."""
@@ -201,6 +206,16 @@ class AnalysisRequest(ConversionRequestEnvelope):
     execution_policy: AnalysisExecutionPolicy = field(
         default_factory=AnalysisExecutionPolicy,
     )
+
+    def __post_init__(self) -> None:
+        """GPU callers must provide their native lifecycle, not only a local lock."""
+        if (
+            self.device.split(":", 1)[0] in {"cuda", "hip"}
+            and self.execution_policy.device_stage_context is None
+        ):
+            raise ValueError(
+                "GPU analysis requires a native device_stage_context"
+            )
 
 
 @dataclass(frozen=True)
@@ -405,7 +420,7 @@ def write_request_manifest(
             },
         },
     )
-    (staging / "manifest.yaml").write_text(
+    (staging / MANIFEST_FILENAME).write_text(
         yaml.safe_dump(manifest.model_dump(mode="json"), sort_keys=False),
     )
 

@@ -9,6 +9,7 @@ from sol_execbench.core.integrity.schema_versions import (
 )
 from sol_execbench.core.solar_bridge import runner
 from sol_execbench.core.solar_bridge.models import SolarWorkerRequest
+from solar.ir.access_artifact import ACCESS_FILENAME
 
 
 def _formal_payload() -> dict:
@@ -27,6 +28,7 @@ def _formal_payload() -> dict:
                 "operator_graph.yaml",
                 "einsum_graph.yaml",
                 "conversion-attestation.yaml",
+                ACCESS_FILENAME,
                 "solar-analysis.yaml",
             )
         ],

@@ -82,6 +82,7 @@ from sol_execbench.core.scoring.release_verifier import verify_and_score_release
 from sol_execbench.core.solar_bridge.models import (
     FORMAL_BOUND_KIND,
     IRPath,
+    formal_artifact_paths,
 )
 from solar.schema_versions import SOLAR_REQUEST_MANIFEST_SCHEMA_VERSION
 
@@ -673,12 +674,7 @@ def _write_solar_artifacts(
         root = workspace / "solar" / "manifests" / _PROBLEM_PATH / workload.uuid
         root.mkdir(parents=True, exist_ok=True)
         artifacts = []
-        for name in (
-            "operator_graph.yaml",
-            ir_path.graph_filename,
-            "conversion-attestation.yaml",
-            "solar-analysis.yaml",
-        ):
+        for name in sorted(formal_artifact_paths(ir_path)):
             path = root / name
             path.write_text(f"artifact: {name}\n", encoding="utf-8")
             artifacts.append({"path": name, "sha256": sha256_file(path)})

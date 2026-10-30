@@ -38,7 +38,12 @@ IMAGE_TAG="${IMAGE_TAG:-}"
 
 # Container-side paths (must match Dockerfile / entrypoint expectations)
 CONTAINER_PROJECT="/sol-execbench"
-GPU_LOCK_DIR="${SOL_EXECBENCH_GPU_LOCK_DIR:-/tmp/sol-execbench-locks}"
+# UUID lock configuration is mandatory for GPU execution; no legacy defaults.
+GPU_LOCK_DIR="${GPU_LOCK_DIR:-}"
+# Keep the existing native history when no explicit private state was selected.
+# The host owner creates/validates this path under L1 before Docker starts.
+SOL_EXECBENCH_CLOCK_STATE_DIR="${SOL_EXECBENCH_CLOCK_STATE_DIR:-/tmp/sol-execbench-locks}"
+export SOL_EXECBENCH_CLOCK_STATE_DIR
 OUTPUT_DIR="${SOL_EXECBENCH_OUTPUT_DIR:-${REPO_ROOT}/data/outputs}"
 DOCKER_TARGET=""
 ALLOW_UNKNOWN_TARGET=false
@@ -548,7 +553,16 @@ if [ -t 0 ] && [ -t 1 ]; then
     TTY_ARGS=(-it)
 fi
 
-mkdir -p "${GPU_LOCK_DIR}"
+# Validate existing bind sources; deployment/host owner creates them beforehand.
+GPU_LOCK_UUID="$(run_host_python -c 'from sol_execbench.core.bench.gpu_lock_paths import configured_gpu_locks; print(configured_gpu_locks().uuid)')"
+export GPU_LOCK_UUID
+for layer in L1-ownership L2-execution; do
+    lock_file="${GPU_LOCK_DIR}/gpu-${GPU_LOCK_UUID}.${layer}.lock"
+    if [ ! -f "${lock_file}" ] || [ -L "${lock_file}" ]; then
+        echo "ERROR: missing regular UUID lock bind source: ${lock_file}" >&2
+        exit 1
+    fi
+done
 mkdir -p "${OUTPUT_DIR}"
 
 DOCKER_COMMON_ARGS=(
@@ -565,17 +579,21 @@ DOCKER_COMMON_ARGS=(
     --ulimit memlock=-1
     --ulimit stack=67108864
     --workdir "${CONTAINER_PROJECT}"
+    --entrypoint "${CONTAINER_PROJECT}/docker/entrypoint.sh"
+    -e "PYTHONPATH=${CONTAINER_PROJECT}/src"
     -v "${REPO_ROOT}:${CONTAINER_PROJECT}:ro"
     -v "${OUTPUT_DIR}:/outputs:rw"
-    -v "${GPU_LOCK_DIR}:/run/lock/sol-execbench"
-    -e "SOL_EXECBENCH_GPU_LOCK_DIR=/run/lock/sol-execbench"
+    --mount "type=bind,src=${GPU_LOCK_DIR}/gpu-${GPU_LOCK_UUID}.L1-ownership.lock,dst=/run/lock/gpu-${GPU_LOCK_UUID}.L1-ownership.lock"
+    --mount "type=bind,src=${GPU_LOCK_DIR}/gpu-${GPU_LOCK_UUID}.L2-execution.lock,dst=/run/lock/gpu-${GPU_LOCK_UUID}.L2-execution.lock"
+    -e "GPU_LOCK_DIR=/run/lock"
+    -e "GPU_LOCK_UUID=${GPU_LOCK_UUID}"
     -e "ROCPROF_TMPDIR=/tmp"
     -e "SOLAR_OROJENESIS_HOME=${SOLAR_OROJENESIS_HOME:-}"
     -e "SOL_EXECBENCH_GPU_CLK_MHZ=${SOL_EXECBENCH_GPU_CLK_MHZ:-}"
     -e "SOL_EXECBENCH_DRAM_CLK_MHZ=${SOL_EXECBENCH_DRAM_CLK_MHZ:-}"
     -e SOL_EXECBENCH_CLOCKS_LOCKED
     -e SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST
-    -e SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST
+    -e GPU_LOCK_HELD_BY_HOST
     -e SOL_EXECBENCH_CLOCK_OWNER
     -e SOL_EXECBENCH_HOST_CLOCK_GPU_UUID
     -e SOL_EXECBENCH_PMC_CLOCK_TARGET
@@ -584,6 +602,14 @@ DOCKER_COMMON_ARGS=(
     -e "SOL_EXECBENCH_CONTAINER_IMAGE_ID=${CONTAINER_IMAGE_ID}"
     "${DOCKER_ARGS[@]}"
 )
+
+# Native receipts remain project-private; the neutral record stays host-only.
+if [ -n "${SOL_EXECBENCH_CLOCK_STATE_DIR:-}" ]; then
+    DOCKER_COMMON_ARGS+=(
+        --mount "type=bind,src=${SOL_EXECBENCH_CLOCK_STATE_DIR},dst=${SOL_EXECBENCH_CLOCK_STATE_DIR},readonly"
+        -e SOL_EXECBENCH_CLOCK_STATE_DIR
+    )
+fi
 
 run_container_dependency_preflight_json() {
     local cmd=(
@@ -596,7 +622,7 @@ run_container_dependency_preflight_json() {
     if [ -n "${DOCKER_TARGET}" ]; then
         cmd+=(--target "${DOCKER_TARGET}")
     fi
-    "${cmd[@]}"
+    run_host_python -m sol_execbench.core.bench.host_clock_guard --natural-clocks -- "${cmd[@]}"
 }
 
 write_container_validated_sidecars() {
@@ -625,7 +651,7 @@ write_container_validated_sidecars() {
     if [ -n "${DOCKER_TARGET}" ]; then
         cmd+=(--target "${DOCKER_TARGET}")
     fi
-    if ! "${cmd[@]}" >/dev/null; then
+    if ! run_host_python -m sol_execbench.core.bench.host_clock_guard --natural-clocks -- "${cmd[@]}" >/dev/null; then
         rm -f "${transport_path}"
         return 1
     fi

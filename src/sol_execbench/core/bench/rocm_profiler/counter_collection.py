@@ -15,6 +15,7 @@ from dataclasses import replace
 from importlib.resources import as_file, files
 from pathlib import Path
 
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.bench.rocm_profiler.artifacts import (
     discover_rocprofv3_artifacts,
     profile_artifact_coverage_metadata,
@@ -86,59 +87,60 @@ def collect_rocprofv3_counters(
     avail_path = resolve_rocm_tool(ROCPROFV3_AVAIL_EXECUTABLE)
     if avail_path is None:
         return _unavailable(request, "rocprofv3-avail is not available")
-    availability = _run_availability(request, run, str(avail_path))
-    if isinstance(availability, Rocprofv3ProfileResult):
-        return availability
-    architectures = parse_available_architectures(availability.stdout)
-    manifest_name = next(
-        (
-            name
-            for arch, name in COUNTER_MANIFEST_BY_ARCHITECTURE.items()
-            if arch in architectures
-        ),
-        None,
-    )
-    if manifest_name is None:
-        return _unsupported(
-            request,
-            [
-                f"architecture:{','.join(sorted(architectures)) or 'unknown'}",
-            ],
-            availability,
+    with native_gpu_execution():
+        availability = _run_availability(request, run, str(avail_path))
+        if isinstance(availability, Rocprofv3ProfileResult):
+            return availability
+        architectures = parse_available_architectures(availability.stdout)
+        manifest_name = next(
+            (
+                name
+                for arch, name in COUNTER_MANIFEST_BY_ARCHITECTURE.items()
+                if arch in architectures
+            ),
+            None,
         )
-    resource = files("sol_execbench.data.rocprofv3_counters").joinpath(
-        manifest_name,
-    )
-    with as_file(resource) as manifest_path:
-        manifest = load_counter_manifest(manifest_path)
-        if manifest.architecture not in architectures:
+        if manifest_name is None:
             return _unsupported(
                 request,
-                [f"architecture:{manifest.architecture}"],
+                [
+                    f"architecture:{','.join(sorted(architectures)) or 'unknown'}",
+                ],
                 availability,
             )
-        groups, missing = select_counter_groups(
-            manifest,
-            parse_available_counters(availability.stdout),
+        resource = files("sol_execbench.data.rocprofv3_counters").joinpath(
+            manifest_name,
         )
-        if missing:
-            return _unsupported(request, missing, availability)
-        pmc_checks = _run_pmc_checks(
-            request,
-            run,
-            str(avail_path),
-            groups,
-        )
-        if isinstance(pmc_checks, Rocprofv3ProfileResult):
-            return pmc_checks
-        return _collect_selected(
-            request,
-            groups=groups,
-            manifest_path=manifest_path,
-            availability=availability,
-            pmc_checks=pmc_checks,
-            runner=run,
-        )
+        with as_file(resource) as manifest_path:
+            manifest = load_counter_manifest(manifest_path)
+            if manifest.architecture not in architectures:
+                return _unsupported(
+                    request,
+                    [f"architecture:{manifest.architecture}"],
+                    availability,
+                )
+            groups, missing = select_counter_groups(
+                manifest,
+                parse_available_counters(availability.stdout),
+            )
+            if missing:
+                return _unsupported(request, missing, availability)
+            pmc_checks = _run_pmc_checks(
+                request,
+                run,
+                str(avail_path),
+                groups,
+            )
+            if isinstance(pmc_checks, Rocprofv3ProfileResult):
+                return pmc_checks
+            return _collect_selected(
+                request,
+                groups=groups,
+                manifest_path=manifest_path,
+                availability=availability,
+                pmc_checks=pmc_checks,
+                runner=run,
+            )
 
 
 def _run_availability(

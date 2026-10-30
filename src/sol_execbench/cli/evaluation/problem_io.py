@@ -118,6 +118,11 @@ def require_materialized_target_match(
             f"invalid target-specific materialization record: {record_path}",
             code="invalid_materialization_record",
         ) from exc
+    if device.split(":", 1)[0] == "cpu":
+        raise CliFailure(
+            "GPU materialization cannot run on CPU",
+            code="evaluation_target_mismatch",
+        )
     try:
         observed = detect_rocm_device(device).gfx_target
     except (RuntimeError, ValueError) as exc:

@@ -23,17 +23,22 @@ formal-evidence contract.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
 import yaml
 
+from solar.analysis.access_regions import DEFAULT_ACCESS_BUDGET, AccessBudget
+from solar.analysis.external_reads import external_reads
 from solar.analysis.formal_analysis import FormalAnalysisMixin
 from solar.analysis.graph_accounting import GraphAccountingMixin
 from solar.analysis.graph_context import (
     AnalysisJob,
+    IntrinsicGraph,
     PathLike,
+    PreparedAnalysis,
 )
 from solar.analysis.graph_loading import GraphLoadingMixin
 from solar.analysis.graph_models import (
@@ -48,6 +53,7 @@ from solar.analysis.orojenesis.runner import (
 )
 from solar.analysis.orojenesis_evidence import OrojenesisEvidenceMixin
 from solar.analysis.reporting import build_analysis_result, write_analysis
+from solar.ir.access import AccessQuality
 from solar.ir.extended_einsum.operations.analyzer import EinsumAnalyzer
 from solar.precision import (
     BYTES_PER_ELEMENT,
@@ -119,35 +125,96 @@ class IRGraphAnalyzer(
 
     def _analyze_job(self, job: AnalysisJob) -> dict[str, Any] | None:
         """Run validated graph analysis through explicit accounting stages."""
+        intrinsic = self.prepare_intrinsic(job)
+        if intrinsic is None:
+            return None
+        return self.project_intrinsic(
+            intrinsic,
+            output_dir=job.output_dir,
+            architecture=self._resolve_architecture_profile(job.architecture),
+            orojenesis_runner=job.orojenesis_runner,
+            require_orojenesis=job.require_orojenesis,
+        )
+
+    def prepare_intrinsic(self, job: AnalysisJob) -> IntrinsicGraph | None:
+        """Load and count a graph once without hardware rates or precision modes."""
         prepared = self._prepare_analysis(job)
         if prepared is None:
             return None
+        return self.count_prepared(prepared, access_budget=job.access_budget)
+
+    def count_prepared(
+        self,
+        prepared: PreparedAnalysis,
+        *,
+        access_budget: AccessBudget = DEFAULT_ACCESS_BUDGET,
+    ) -> IntrinsicGraph:
+        """Count owned, validated inputs without reopening or revalidating IR."""
+        if prepared.strict:
+            self._validate_strict_layers(prepared.all_layers)
         topology = self._build_graph_topology(
             prepared.all_layers,
             prepared.declared_graph_outputs,
+            prepared.access,
         )
-        accumulator = AnalysisAccumulator()
-        for layer_id, layer in topology.layers.items():
-            self._analyze_layer(
-                layer_id,
-                layer,
-                topology,
-                prepared,
-                accumulator,
+        layers = tuple(
+            self._intrinsic_layer(layer_id, layer, topology, prepared)
+            for layer_id, layer in topology.layers.items()
+        )
+        reads = external_reads(
+            topology.layers,
+            topology.live_layer_ids,
+            prepared.declared_graph_outputs,
+            prepared.access,
+            budget=access_budget,
+        )
+        return IntrinsicGraph(prepared, topology, layers, reads)
+
+    def project_intrinsic(
+        self,
+        intrinsic: IntrinsicGraph,
+        *,
+        output_dir: PathLike,
+        architecture: ArchitectureProfile | None,
+        orojenesis_runner: OrojenesisRunner | None = None,
+        require_orojenesis: bool = False,
+        write_output: bool = True,
+    ) -> dict[str, Any]:
+        """Recompute resource attribution and capacity evidence from owned facts."""
+        prepared = replace(
+            intrinsic.prepared,
+            output_dir=Path(output_dir),
+            profile=architecture,
+        )
+        prepared.output_dir.mkdir(parents=True, exist_ok=True)
+        topology = intrinsic.topology
+        if prepared.strict and architecture is not None:
+            self._validate_profile_dtypes(
+                prepared.all_layers, architecture, prepared.requested_precision
             )
+        accumulator = AnalysisAccumulator()
+        for layer in intrinsic.layers:
+            self._account_intrinsic_layer(
+                layer, topology, prepared, accumulator
+            )
+        reads = intrinsic.external_reads
+        accumulator.external_reads = reads
+        if reads.quality is not AccessQuality.UNAVAILABLE:
+            accumulator.unique_external_inputs = dict(reads.elements)
+            accumulator.unique_external_input_bytes = dict(reads.bytes)
         io_totals = self._graph_io_totals(accumulator)
         formal = self._run_formal_analysis(
             prepared,
             topology,
             io_totals,
-            job.orojenesis_runner,
-            require_orojenesis=job.require_orojenesis,
+            orojenesis_runner,
+            require_orojenesis=require_orojenesis,
         )
         lower_bound = self._lower_bound(
             prepared,
             accumulator,
             formal,
-            require_orojenesis=job.require_orojenesis,
+            require_orojenesis=require_orojenesis,
         )
         analysis = build_analysis_result(
             prepared,
@@ -158,9 +225,10 @@ class IRGraphAnalyzer(
             start_node_count=len(topology.start_node_ids),
             intermediate_tensor_count=len(topology.intermediate_tensors),
         )
-        output_path = write_analysis(prepared.output_dir, analysis)
-        if self.debug:
-            print(f"✅ Wrote analysis: {output_path}")
+        if write_output:
+            output_path = write_analysis(prepared.output_dir, analysis)
+            if self.debug:
+                print(f"✅ Wrote analysis: {output_path}")
         return analysis
 
     _QUANT_DTYPE_MAP = MappingProxyType(

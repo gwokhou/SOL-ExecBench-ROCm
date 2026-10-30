@@ -24,7 +24,9 @@ from sol_execbench.core.bench.clock_ownership import (
 )
 from sol_execbench.core.bench.gpu_lock import acquire_gpu_lock
 
-DEVICE = ClockDevice(bdf="0000:05:00.0", uuid="test-uuid")
+DEVICE = ClockDevice(
+    bdf="0000:05:00.0", uuid="11111111-2222-3333-4444-555555555555"
+)
 
 
 class HardwareState(TypedDict):
@@ -41,7 +43,8 @@ def hardware(monkeypatch, tmp_path):
 
 
 def mock_hardware(monkeypatch, tmp_path):
-    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("SOL_EXECBENCH_CLOCK_STATE_DIR", str(tmp_path))
     monkeypatch.delenv(ENV_CLOCK_OWNER, raising=False)
     state: HardwareState = {
         "level": "AUTO",
@@ -51,11 +54,11 @@ def mock_hardware(monkeypatch, tmp_path):
         "restore": True,
     }
 
-    def levels():
+    def levels(*_):
         return (f"AMDSMI_DEV_PERF_LEVEL_{state['level']}",)
 
     def write(command):
-        level = command[-1]
+        level = command[command.index("-l") + 1]
         # The durable record and live owner lock must predate even the first write.
         token = os.environ[ENV_CLOCK_OWNER]
         assert (
@@ -115,11 +118,14 @@ def test_partial_setup_failure_can_continue_only_after_verified_rollback(
     if failure == "command":
         hardware["fault"] = subprocess.CalledProcessError(1, "amd-smi")
     else:
-        monkeypatch.setattr(clock_lock, "verify_clocks", lambda: False)
+        monkeypatch.setattr(clock_lock, "verify_clocks", lambda *_: False)
     hardware["restore"] = restore
     if restore:
-        assert run_guard(hardware, container=True) == 0
-        assert hardware["runner"] == ["0"]
+        with pytest.raises(
+            clock_lock.ClockSetupError, match="clock_setup_failed"
+        ):
+            run_guard(hardware, container=True)
+        assert hardware["runner"] == []
         assert owner_record(tmp_path).state == ClockOwnerState.RESTORED
         with acquire_gpu_lock(timeout_seconds=0.01):
             pass
@@ -209,7 +215,8 @@ def crash_during_stabilization(directory):
 def test_sigkill_during_stabilization_leaves_recovery_gate(
     monkeypatch, tmp_path
 ):
-    monkeypatch.setenv("SOL_EXECBENCH_GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.setenv("SOL_EXECBENCH_CLOCK_STATE_DIR", str(tmp_path))
     child = get_context("spawn").Process(
         target=crash_during_stabilization, args=(tmp_path,)
     )
@@ -233,19 +240,12 @@ def test_sigkill_during_stabilization_leaves_recovery_gate(
         pytest.fail("crashed acquisition must block subsequent work")
 
 
-def test_legacy_acquirer_also_rejects_failed_rollback(monkeypatch):
+def test_direct_clock_acquirer_requires_native_execution(monkeypatch):
+    from sol_execbench.core.bench.gpu_execution import acquire_clock_lock
+    from sol_execbench.core.bench.gpu_lock import GPULockVerificationError
+
     monkeypatch.setattr(
-        clock_lock,
-        "observe_clock_levels",
-        lambda: ("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+        clock_lock, "set_peak_clocks", lambda *_: pytest.fail("unowned setter")
     )
-    monkeypatch.setattr(clock_lock, "unlock_clocks", lambda: False)
-
-    def fail():
-        raise clock_lock.ClockSetupError("setup failed")
-
-    monkeypatch.setattr(clock_lock, "set_peak_clocks", fail)
-    with pytest.raises(
-        clock_lock.ClockRestoreError, match="clock_restore_unverified"
-    ):
-        clock_lock.acquire_clock_lock()
+    with pytest.raises((GPULockVerificationError, FileNotFoundError)):
+        acquire_clock_lock()

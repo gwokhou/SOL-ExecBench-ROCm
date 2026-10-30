@@ -23,14 +23,26 @@ from typing import Any
 import yaml
 
 from solar.artifacts import sha256_file, stable_json_checksum
+from solar.graph.storage import capture_source_storage
+from solar.ir.access_artifact import (
+    ACCESS_FILENAME,
+    AccessDocument,
+    load_access_document,
+)
 from solar.ir.contracts import layer_operation
 from solar.schema_versions import SchemaVersion as SolarSchemaVersion
 from solar.verification.contracts import (
+    IN_TOTO_STATEMENT_TYPE,
     IRVerificationBackend,
     TolerancePolicy,
     VerificationPolicy,
+    VerificationPredicate,
 )
 from solar.verification.errors import IRExecutionError, VerificationError
+from solar.verification.execution import (
+    execution_identity,
+    require_current_semantic_runtime,
+)
 from solar.verification.executor import (
     IRGraphExecutor,
 )
@@ -45,6 +57,10 @@ from solar.verification.numerics import (
     clone,
     pattern_inputs,
     torch_equation,
+)
+from solar.verification.policy import (
+    verification_cases,
+    verification_policy_record,
 )
 
 
@@ -89,15 +105,39 @@ class _CallableInputFactory:
         return self.factory(int(parameters["seed"]))
 
 
+def _source_tensor_indices(
+    inputs: Sequence[Any], graph: Mapping[str, Any]
+) -> tuple[int, ...]:
+    """Validate source bindings before any operation can erase input layout."""
+    import torch
+
+    indices = graph.get("source_input_indices")
+    if indices is None:
+        return tuple(
+            index
+            for index, value in enumerate(inputs)
+            if isinstance(value, torch.Tensor)
+        )
+    if not isinstance(indices, (list, tuple)) or any(
+        type(index) is not int or not 0 <= index < len(inputs)
+        for index in indices
+    ):
+        raise VerificationError("graph has invalid source_input_indices")
+    if not all(isinstance(inputs[index], torch.Tensor) for index in indices):
+        raise VerificationError(
+            "graph source_input_indices must select tensor arguments"
+        )
+    return tuple(indices)
+
+
 def _prepare_case(
     input_factory: Callable[..., Any],
     graph: Mapping[str, Any],
     case: Mapping[str, Any],
     device: str,
     preserved_input_indices: Sequence[int],
+    access: AccessDocument | None = None,
 ) -> _PreparedCase:
-    import torch
-
     parameters = dict(case.get("parameters") or {})
     seed, pattern = int(case["seed"]), str(case["pattern"])
     generated = input_factory({**parameters, "seed": seed}, device)
@@ -106,6 +146,12 @@ def _prepare_case(
         if isinstance(generated, (tuple, list))
         else (generated,)
     )
+    source_indices = _source_tensor_indices(inputs, graph)
+    storage = capture_source_storage(inputs)
+    if access is None:
+        storage.require_independent(source_indices)
+    else:
+        access.require_inputs(storage)
     if any(index >= len(inputs) for index in preserved_input_indices):
         raise VerificationError(
             "preserved_input_indices select unavailable reference arguments",
@@ -117,28 +163,9 @@ def _prepare_case(
             preserved_input_indices=preserved_input_indices,
         ),
     )
-    source_indices = graph.get("source_input_indices")
-    if source_indices is None:
-        reference_tensor_inputs = tuple(
-            value
-            for value in reference_inputs
-            if isinstance(value, torch.Tensor)
-        )
-    else:
-        try:
-            reference_tensor_inputs = tuple(
-                reference_inputs[int(index)] for index in source_indices
-            )
-        except (IndexError, TypeError, ValueError) as exc:
-            raise VerificationError(
-                "graph has invalid source_input_indices",
-            ) from exc
-        if not all(
-            isinstance(value, torch.Tensor) for value in reference_tensor_inputs
-        ):
-            raise VerificationError(
-                "graph source_input_indices must select tensor arguments",
-            )
+    reference_tensor_inputs = tuple(
+        reference_inputs[index] for index in source_indices
+    )
     return (
         parameters,
         seed,
@@ -261,6 +288,7 @@ def _run_cases(
     tolerance: TolerancePolicy,
     device: str,
     check_shapes: bool,
+    access: AccessDocument | None = None,
 ) -> list[dict[str, Any]]:
     executor = IRGraphExecutor(
         graph,
@@ -275,6 +303,7 @@ def _run_cases(
             case,
             device,
             tuple(getattr(tolerance, "preserved_input_indices", ())),
+            access,
         )
         parameters, seed, pattern, *_ = prepared
         stats = _verify_case(reference, executor, graph, prepared, tolerance)
@@ -385,56 +414,6 @@ def _einsum_reduction_size(
     return math.prod(dimensions[token] for token in reduced)
 
 
-def _verification_cases(
-    parameters: Mapping[str, Any],
-    policy: VerificationPolicy,
-) -> list[dict[str, Any]]:
-    if len({int(seed) for seed in policy.seeds}) < 3:
-        raise VerificationError(
-            "trusted verification requires at least three seeds",
-        )
-    if not {"random", "zeros", "boundary"}.issubset(policy.patterns):
-        raise VerificationError(
-            "trusted verification requires random, zeros, and boundary patterns",
-        )
-    return [
-        {
-            "parameters": dict(parameters),
-            "seed": int(seed),
-            "pattern": str(pattern),
-        }
-        for seed in policy.seeds
-        for pattern in policy.patterns
-    ]
-
-
-def _tolerance_record(policy: TolerancePolicy) -> dict[str, Any]:
-    return {
-        "atol": float(policy.atol),
-        "rtol": float(policy.rtol),
-        "required_matched_ratio": float(policy.required_matched_ratio),
-        "max_error_cap": policy.max_error_cap,
-        "allow_negative_inf": bool(policy.allow_negative_inf),
-    }
-
-
-def _verification_policy_record(
-    policy: VerificationPolicy,
-) -> dict[str, Any]:
-    return {
-        **_tolerance_record(policy),
-        "preserved_input_indices": list(policy.preserved_input_indices),
-        "verify_gradients": policy.verify_gradients,
-        "gradient_input_indices": (
-            list(policy.gradient_input_indices)
-            if policy.gradient_input_indices is not None
-            else None
-        ),
-        "gradient_atol": policy.gradient_atol,
-        "gradient_rtol": policy.gradient_rtol,
-    }
-
-
 def create_verification_artifact(
     *,
     reference_path: str | Path,
@@ -454,8 +433,9 @@ def create_verification_artifact(
     reference = getattr(module, reference_entry_point)
     input_factory = getattr(module, input_factory_name)
     graph = yaml.safe_load(graph_path.read_text()) or {}
-    cases = _verification_cases(workload_parameters, policy)
-    execution = _execution_identity(policy.device)
+    access = _bound_access(graph_path, graph)
+    cases = verification_cases(workload_parameters, policy)
+    execution = execution_identity(policy.device)
     results = _run_cases(
         reference,
         input_factory,
@@ -465,6 +445,7 @@ def create_verification_artifact(
         tolerance=policy,
         device=policy.device,
         check_shapes=True,
+        access=access,
     )
     artifact = _file_attestation(
         reference_path=reference_path,
@@ -473,7 +454,7 @@ def create_verification_artifact(
         graph_path=graph_path,
         workload_name=workload_name,
         workload_parameters=workload_parameters,
-        tolerance=_verification_policy_record(policy),
+        tolerance=verification_policy_record(policy),
         execution=execution,
         cases=cases,
         results=results,
@@ -496,7 +477,7 @@ def _file_attestation(
     results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     return {
-        "_type": "https://in-toto.io/Statement/v1",
+        "_type": IN_TOTO_STATEMENT_TYPE,
         "subject": [
             {
                 "name": reference_path.name,
@@ -506,10 +487,9 @@ def _file_attestation(
                 "name": graph_path.name,
                 "digest": {"sha256": sha256_file(graph_path)},
             },
+            *_access_subjects(graph_path),
         ],
-        "predicateType": (
-            "https://solar-rocm.dev/attestations/source-to-einsum/v2"
-        ),
+        "predicateType": (VerificationPredicate.FILE.value),
         "predicate": {
             "status": "passed",
             "verifier": SolarSchemaVersion.IR_VERIFICATION.value,
@@ -551,7 +531,8 @@ def verify_callable_conversion(
     graph_path = Path(graph_path).resolve()
     if graph is None:
         graph = yaml.safe_load(graph_path.read_text()) or {}
-    cases = _verification_cases({}, policy)
+    access = _bound_access(graph_path, graph)
+    cases = verification_cases({}, policy)
     results = _run_cases(
         reference,
         _CallableInputFactory(input_factory),
@@ -561,18 +542,40 @@ def verify_callable_conversion(
         tolerance=policy,
         device=policy.device,
         check_shapes=True,
+        access=access,
     )
     artifact = _callable_attestation(
         reference_name=reference_name,
         reference_sha256=reference_sha256,
         graph_path=graph_path,
-        tolerance=_verification_policy_record(policy),
-        execution=_execution_identity(policy.device),
+        tolerance=verification_policy_record(policy),
+        execution=execution_identity(policy.device),
         cases=cases,
         results=results,
     )
     Path(output_path).write_text(yaml.safe_dump(artifact, sort_keys=False))
     return artifact
+
+
+def _bound_access(
+    graph_path: Path, graph: Mapping[str, Any]
+) -> AccessDocument | None:
+    """Validate available access evidence before it joins a replay claim."""
+    if not graph_path.with_name(ACCESS_FILENAME).exists():
+        return None
+    result = load_access_document(graph_path)
+    result.require_graph(graph)
+    return result
+
+
+def _access_subjects(graph_path: Path) -> list[dict[str, Any]]:
+    """Bind present access proof bytes without fabricating missing evidence."""
+    path = graph_path.with_name(ACCESS_FILENAME)
+    return (
+        [{"name": ACCESS_FILENAME, "digest": {"sha256": sha256_file(path)}}]
+        if path.exists()
+        else []
+    )
 
 
 def _callable_attestation(
@@ -586,15 +589,16 @@ def _callable_attestation(
     results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     return {
-        "_type": "https://in-toto.io/Statement/v1",
+        "_type": IN_TOTO_STATEMENT_TYPE,
         "subject": [
             {"name": reference_name, "digest": {"sha256": reference_sha256}},
             {
                 "name": graph_path.name,
                 "digest": {"sha256": sha256_file(graph_path)},
             },
+            *_access_subjects(graph_path),
         ],
-        "predicateType": "https://solar-rocm.dev/attestations/callable-to-einsum/v1",
+        "predicateType": VerificationPredicate.CALLABLE.value,
         "predicate": {
             "status": "passed",
             "verifier": SolarSchemaVersion.IR_VERIFICATION.value,
@@ -642,6 +646,7 @@ def replay_verification_artifact(
     reference_data = predicate.get("reference") or {}
     module = _load_module(reference_path)
     graph = yaml.safe_load(graph_path.read_text()) or {}
+    access = _bound_access(graph_path, graph)
     replay = _run_cases(
         getattr(module, str(reference_data["entry_point"])),
         getattr(module, str(reference_data["input_factory"])),
@@ -651,6 +656,7 @@ def replay_verification_artifact(
         tolerance=recorded_tolerance,
         device=replay_device,
         check_shapes=True,
+        access=access,
     )
     identity = ("seed", "pattern", "parameters_sha256")
     for expected, actual in zip(results, replay, strict=True):
@@ -665,13 +671,11 @@ def _validated_replay_predicate(
     workload_name: str,
     workload_parameters: Mapping[str, Any],
 ) -> Mapping[str, Any]:
-    if artifact.get("_type") != "https://in-toto.io/Statement/v1":
+    if artifact.get("_type") != IN_TOTO_STATEMENT_TYPE:
         raise VerificationError(
             "verification artifact must be an in-toto Statement v1",
         )
-    if artifact.get("predicateType") != (
-        "https://solar-rocm.dev/attestations/source-to-einsum/v2"
-    ):
+    if artifact.get("predicateType") != (VerificationPredicate.FILE.value):
         raise VerificationError("unsupported verification predicate type")
     predicate = artifact.get("predicate") or {}
     if (
@@ -689,6 +693,16 @@ def _validated_replay_predicate(
         raise VerificationError("verification reference SHA-256 mismatch")
     if digests.get(graph_path.name) != sha256_file(graph_path):
         raise VerificationError("verification graph SHA-256 mismatch")
+    access_path = graph_path.with_name(ACCESS_FILENAME)
+    recorded_access = digests.get(ACCESS_FILENAME)
+    if (recorded_access is not None) != access_path.exists():
+        raise VerificationError(
+            "verification access artifact presence mismatch"
+        )
+    if recorded_access is not None and recorded_access != sha256_file(
+        access_path
+    ):
+        raise VerificationError("verification access SHA-256 mismatch")
     workload_data = predicate.get("workload") or {}
     if workload_data.get("name") != workload_name:
         raise VerificationError("verification workload name mismatch")
@@ -805,7 +819,7 @@ def _validated_replay_device(
         )
     replay_device = requested_device or recorded_device
     expected_backend = str(execution.get("backend", ""))
-    actual_execution = _execution_identity(replay_device)
+    actual_execution = execution_identity(replay_device)
     if expected_backend not in {"cpu", "cuda", "rocm"}:
         raise VerificationError(
             "verification artifact has no execution backend identity",
@@ -820,48 +834,5 @@ def _validated_replay_device(
                 raise VerificationError(
                     f"verification replay {field} differs from recorded ROCm device",
                 )
+    require_current_semantic_runtime(execution)
     return replay_device
-
-
-def _execution_identity(device: str) -> dict[str, Any]:
-    """Identify the actual PyTorch backend selected by a device string."""
-    import torch
-
-    if not str(device).startswith("cuda"):
-        return {"device_type": "cpu", "backend": "cpu", "device": str(device)}
-    if not torch.cuda.is_available():
-        raise VerificationError(
-            f"requested CUDA/HIP device is unavailable: {device}",
-        )
-    selected = torch.device(device)
-    index = (
-        selected.index
-        if selected.index is not None
-        else torch.cuda.current_device()
-    )
-    if index < 0 or index >= torch.cuda.device_count():
-        raise VerificationError(
-            f"requested CUDA/HIP device index is invalid: {device}",
-        )
-    properties = torch.cuda.get_device_properties(index)
-    hip_version = getattr(torch.version, "hip", None)
-    if hip_version:
-        gfx_target = getattr(properties, "gcnArchName", "").split(":", 1)[0]
-        if not gfx_target.startswith("gfx"):
-            raise VerificationError(
-                "HIP runtime selected a device without an AMD gfx target",
-            )
-        return {
-            "device_type": "cuda",
-            "backend": "rocm",
-            "device": f"cuda:{index}",
-            "hip_version": str(hip_version),
-            "device_name": str(properties.name),
-            "gfx_target": gfx_target,
-        }
-    return {
-        "device_type": "cuda",
-        "backend": "cuda",
-        "device": f"cuda:{index}",
-        "device_name": str(properties.name),
-    }

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from solar.verification.semantic_values import (
+from solar.ir.semantic_values import (
     ATEN_VALUE_POLICY,
     EXTENDED_VALUE_POLICY,
     SemanticValueDecodeError,

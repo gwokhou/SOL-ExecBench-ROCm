@@ -29,8 +29,8 @@ with a timeout, process-group cleanup, and file-backed redacted logs. The
 boundary test also scans `tests/sol_execbench/` so test code reaches `solar`
 only through the bridge, with one documented exception: the bridge's own
 contract tests under `tests/sol_execbench/core/solar_bridge/` may reference
-public `solar.api` types (`AnalysisResult`, `AnalysisFailure`, `ArtifactRef`,
-`SOLBound`) to verify the outcome-mapping logic.
+SOLAR public contracts and workflows to verify the adapter, outcome mapping
+and isolated worker behavior.
 
 Formal conversion is offline and fail-closed. Graph extraction is a declared
 `ExtractionKind`: `torchview_v1` uses the reviewed Torchview extractor and
@@ -56,6 +56,127 @@ snapshots.
 auditing. That conversion request owns one `VerificationPolicy`, so the extractor,
 IR, replay device, seeds, input patterns, and numerical tolerances cannot drift
 between the readiness and formal-analysis entry points.
+
+Current conversion artifacts include `access.json` (access schema v1), binding
+graph digests, logical base/view maps, unknown access reasons, and source storage
+layouts. The current IR verifier (`solar.verification.ir.v8`) checks used-input
+independence and trace/replay layout agreement before cloning inputs, and binds
+the access artifact as an attestation subject. Request manifest schema v7
+requires this artifact in publication and comparison inventories.
+The verification execution record binds Python implementation/version, Torch
+version and the semantic interpreter source digest. Missing or changed runtime
+identity requires fresh verification; an old passing flag alone cannot be reused.
+
+Analysis schema v6 requires `metadata.external_reads`: `exact`, `lower_bound`
+with union-budget reasons, or `unavailable` with absent numeric totals. Proven
+base unions replace external input reads using each base's dtype width. Proven
+views have no independent memory traffic; output materialization, initialization,
+effects and capacity traffic remain separate obligations. This proof describes
+complete operand reads in the fixed operator graph, before algebraic rewriting
+or demand propagation. Dynamic indexing, effects, copies, output aliases and
+unreviewed read semantics retain diagnostic counts without an eligible bound.
+Convolution footprints are not yet proven by the static-view union model;
+conversion success does not establish this separate accounting obligation.
+
+The same current analysis schema also requires `metadata.views`, containing
+`unfused`, `ideal_fused` and `cache_aware`. Each records availability, reason,
+assumptions, read-proof quality, time and traffic. Unfused time sums the per-layer
+maximum of compute and memory; ideal fused time takes the global maximum after
+summing modes sharing a resource. Cache-aware uses the existing audited traffic
+composition and is unavailable when its supported capacity domain is incomplete.
+Unavailable views have no numeric time or traffic; partial evidence remains in
+`metadata.orojenesis`. These views do not replace the existing formal bound field
+or confer publication eligibility.
+
+Internal analysis now separates an owned intrinsic-count snapshot from resource
+attribution, capacity evidence and pricing. Reprojection does not reload or
+recount the graph; profile-dependent attribution and capacity auditing run again.
+The snapshot retains the digest of the exact loaded bytes. Graph selection is
+explicit: a neighboring `*_reordered.yaml` is never substituted. The public `solar.reuse.ReuseSession` now connects this seam to a pinned,
+complete source bundle. Its request types live in `solar.reuse_contracts`:
+`VerifiedProgramRequest`, `ProjectionRequest` and the versioned `ReuseJob`.
+Loading checks the entire inventory, current schemas, source/path/policy/runtime
+identity and independent access maps before counting. It does not execute the
+reference, retrace or load pickle. Each session computes intrinsic work once;
+rate, resource-mode and capacity scenarios recompute attribution, capacity
+evidence and pricing. Installed analysis-rule fingerprints and all intrinsic,
+mapper and output budgets enter derived identities. Rule drift requires a new
+session; the implementation conservatively invalidates all intrinsic work when
+any analysis implementation changes.
+
+`sol-execbench solar reprice job.json --timeout 900` runs a `ReuseJob` through an
+isolated CPU-capable worker with bounded output and process-group cleanup. It
+writes a new directory containing `solar-analysis.yaml`, all emitted capacity
+evidence, and the current reuse schema v1 `reuse.json`. Results bind their parent
+manifest and complete derived inventory; partial output, extra files or digest
+drift are rejected by the pinned result loader. Repricing is an analysis command;
+it does not execute a candidate or change release acceptance. All three views
+and unavailable reasons are displayed by both `solar analyze` and `solar reprice`.
+Path-comparison schema v2 also reports the three views separately from the
+existing authoritative formal-bound comparison, without selecting a better path.
+
+A changed profile parameter or qualification input (including a rate-only change),
+or an explicitly hypothetical request, discards inherited audit fields and has no
+score/publication eligibility. Changes only to `source`, `resource_limit_sources`
+or a memory level's `source` description preserve the source scenario. Complete
+profile digests still record those edits in the manifest and derived result;
+audit references, exemptions, support claims and revisions remain qualification
+inputs. The source profile is read from the hash-checked analysis bundle.
+Even an identical profile must pass a freshly requested resource-audit check to
+retain publication eligibility; it cannot gain eligibility from its parent.
+The ordinary reuse default leaves audit qualification false and allows model
+exploration. The original formal `solar analyze` gate is unchanged. Synthetic
+capacity fixtures remain test evidence, not trusted mapper or device receipts.
+
+The public `solar.explore` entry points add fixed-instance necessary resource
+queries and bounded profile scans. Exploration schema v1 pins complete derived
+results, exact model/view identity, budgets and resume inputs. `solar requirements`
+solves only ideal-fused or complete cache-aware constraints at fixed capacity;
+unfused inversion is explicitly unsupported. Constraints are necessary conditions,
+not device performance guarantees. `solar scan` runs a serial isolated worker,
+counts the source once per attempt, and recomputes attribution/capacity/pricing
+for every grid point. Every point is hypothetical, including the baseline-rate
+point, and has no score or publication eligibility. All planned statuses and
+three views remain visible; resumed complete points are revalidated and retain
+references to prior immutable directories. Runtime, mapper-thread, rule, profile,
+grid or budget drift invalidates reuse. See the [CPU checkpoint](internal/solar-resume-2026-10-26.md)
+for supported axes, units, limits and the current acceptance status.
+
+Restricted computation is opt-in through `ProjectionRequest.restricted`.
+The original `solar-analysis.yaml` remains dense; a separately bound
+`restricted-computation.json` reports structural-zero and backward-demand
+counts, traffic, resources, assumptions and availability. Its default IEEE
+domain is not applicable to zero elimination. The caller must explicitly assert
+`finite_no_overflow_ignore_signed_zero`; sample verification does not prove
+that domain. Static triangular masks, reviewed views, pointwise operations and
+binary contractions have bounded coordinate rules; unknown operations, copies,
+effects and dynamic indices retain full demand. Returned internal views share
+their producer's output-storage union; external output aliases remain unproved.
+Transformed cache-aware estimates require new applicable capacity evidence.
+`solar requirements` and `solar scan` select this model only with
+`computation="restricted"`, and scan requests also need the explicit projection
+constraints. Selection, constraints and rule/budget identities bind recovery.
+Unavailable restricted estimates never fall back to dense. Restricted results
+have no score, publication or measured-performance authority. See the
+[restricted computation contract](internal/solar-resume-2026-10-26.md).
+
+Contraction-order exploration is exposed by `solar.order.search_contractions`
+and `solar search-orders REQUEST.json`. It currently supports ordered, pure,
+fixed-shape two-dimensional matrix chains. Every association is extracted on
+the same IR path and verified against the explicitly supplied original callable,
+using its unchanged seeds, patterns, tolerances and gradient policy. The source
+IR is not a numerical oracle. Original baseline and candidate projections use
+the same model/profile; they remain hypothetical and carry no score, publication
+or measured-performance authority. The selected computation scenario retains
+all stage 4 constraints and unavailable states.
+
+The search retains the full Catalan denominator, failed numerical candidates,
+unavailable views, candidate/time/work budget stops and stable original-first
+ties. Pinned recovery validates complete candidate inventories, original-source
+verification, association identity and projections; it cannot mix paths,
+profiles, policies or rules. The CLI executes a hash-pinned local reference
+module in a bounded CPU worker. See the
+[search contract and CPU evidence](internal/solar-resume-2026-10-26.md).
 
 The `--backend` IR identity is one of two fixed paths:
 `torchview_extended_einsum` or `make_fx_aten`. The default remains

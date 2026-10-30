@@ -10,8 +10,10 @@ import pytest
 
 from sol_execbench.cli.evaluation import phases
 from sol_execbench.cli.evaluation.phases import require_execution_isolation
+from sol_execbench.cli.evaluation.profile_mode import ProfileMode
 from sol_execbench.cli.evaluation.requests import EvaluationRequest
 from sol_execbench.cli.protocol import CliFailure
+from sol_execbench.core.bench.gpu_lock import require_supervised_gpu_execution
 
 
 def test_untrusted_evaluation_requires_container(monkeypatch):
@@ -45,6 +47,7 @@ def test_container_marker_allows_evaluation(monkeypatch):
     require_execution_isolation(request)
 
 
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
     monkeypatch.delenv("SOL_EXECBENCH_SANDBOXED", raising=False)
     monkeypatch.delenv("SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION", raising=False)
@@ -53,7 +56,9 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
         SimpleNamespace(
             unsafe_local_execution=True,
             timeout=5,
-            device="cuda:1",
+            device="cuda:0",
+            lock_clocks=False,
+            profile=ProfileMode.NONE,
         ),
     )
     first_inside = threading.Event()
@@ -61,14 +66,17 @@ def test_unsafe_local_marker_is_serialized_with_gpu_boundary(monkeypatch):
     observed: list[str | None] = []
     observed_nonces: list[str] = []
 
+    native_boundary = phases.native_gpu_execution
+
     @contextmanager
-    def fake_gpu_lock(**kwargs):
-        del kwargs
+    def observed_gpu_boundary(device, **kwargs):
         if threading.current_thread().name == "second":
             second_attempted.set()
-        yield
+        with native_boundary(device, **kwargs):
+            require_supervised_gpu_execution()
+            yield
 
-    monkeypatch.setattr(phases, "acquire_evaluation_gpu_lock", fake_gpu_lock)
+    monkeypatch.setattr(phases, "native_gpu_execution", observed_gpu_boundary)
 
     def evaluate_first():
         with phases.evaluation_execution_boundary(request):

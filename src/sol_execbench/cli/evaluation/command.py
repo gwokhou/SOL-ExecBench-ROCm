@@ -28,8 +28,8 @@ from sol_execbench.cli.sidecars.profile import _profile_output_directory
 from sol_execbench.core.bench.clock_lock import (
     ClockLockAcquirer,
     ClockLockLease,
-    acquire_clock_lock,
 )
+from sol_execbench.core.bench.gpu_execution import acquire_clock_lock
 from sol_execbench.core.bench.io import flashinfer_safetensors_env
 from sol_execbench.core.bench.rocm_profiler import (
     ROCPROFV3_EXECUTABLE,

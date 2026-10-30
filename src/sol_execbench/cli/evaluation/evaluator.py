@@ -39,10 +39,6 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
     """Evaluate a SOL-ExecBench solution on GPU."""
     cli_phases.require_execution_isolation(request)
     require_counter_evidence_outputs(request)
-    cli_problem_io.require_materialized_target_match(
-        request.problem_dir,
-        request.device,
-    )
 
     resolved_inputs = cli_problem_io.resolve_problem_inputs(
         problem_dir=request.problem_dir,
@@ -81,7 +77,13 @@ def run_evaluation_cli(*, request: EvaluationRequest) -> CliResult:
         if not request.keep_staging:
             resources.callback(shutil.rmtree, staging_dir, ignore_errors=True)
         resources.enter_context(
-            cli_phases.evaluation_execution_boundary(request),
+            cli_phases.evaluation_execution_boundary(
+                dataclasses.replace(request, lock_clocks=config.lock_clocks)
+            ),
+        )
+        cli_problem_io.require_materialized_target_match(
+            request.problem_dir,
+            request.device,
         )
         packager = resources.enter_context(
             ProblemPackager(

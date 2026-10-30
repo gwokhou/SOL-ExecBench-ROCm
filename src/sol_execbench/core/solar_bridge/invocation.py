@@ -6,13 +6,12 @@
 from __future__ import annotations
 
 import shutil
-from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sol_execbench.core.solar_bridge.formal_device import (
     FORMAL_ARCHITECTURE,
-    release_formal_device_memory,
+    device_execution_policy,
 )
 from sol_execbench.core.solar_bridge.models import (
     SolarAnalysisOutcome,
@@ -46,7 +45,7 @@ def invoke_solar(
     device_stage_lock_timeout_seconds: float = 14_400.0,
 ) -> SolarAnalysisOutcome:
     """Build a SOLAR request and adapt its accepted result to ExecBench."""
-    from solar.api import AnalysisExecutionPolicy, AnalysisRequest, analyze
+    from solar.api import AnalysisRequest, analyze
 
     definition = context.definition
     request = AnalysisRequest(
@@ -58,20 +57,10 @@ def invoke_solar(
         require_verified_audit=formal,
         orojenesis_home=orojenesis_home,
         analysis_metadata=performance_analysis_metadata(context),
-        execution_policy=AnalysisExecutionPolicy(
-            device_stage_lock_path=(
-                Path(device_stage_lock_path)
-                if device_stage_lock_path is not None
-                else None
-            ),
-            device_stage_lock_timeout_seconds=(
-                device_stage_lock_timeout_seconds
-            ),
-            device_stage_cleanup=(
-                partial(release_formal_device_memory, device)
-                if device_stage_lock_path is not None
-                else None
-            ),
+        execution_policy=device_execution_policy(
+            device,
+            device_stage_lock_path,
+            device_stage_lock_timeout_seconds,
         ),
     )
     return _analysis_outcome(

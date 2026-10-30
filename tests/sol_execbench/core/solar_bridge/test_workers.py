@@ -18,6 +18,7 @@ from sol_execbench.core.solar_bridge.models import (
     SolarStageAuditOutcome,
     SolarWorkerRequest,
 )
+from solar.ir.access_artifact import ACCESS_FILENAME
 
 
 def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
@@ -34,6 +35,7 @@ def _formal_outcome(analysis_id: str, output_dir: str) -> SolarAnalysisOutcome:
                 "operator_graph.yaml",
                 "einsum_graph.yaml",
                 "conversion-attestation.yaml",
+                ACCESS_FILENAME,
                 "solar-analysis.yaml",
             )
         ),
@@ -190,6 +192,41 @@ def test_parallel_worker_prefers_itself_as_oom_victim(
 def test_parallel_worker_requires_oom_isolation(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="configure OOM isolation"):
         worker._prefer_worker_as_oom_victim(tmp_path / "missing" / "score")
+
+
+@pytest.mark.parametrize("initial", [500, 800], ids=["threshold", "higher"])
+def test_satisfied_oom_isolation_needs_no_write(tmp_path, monkeypatch, initial):
+    score = tmp_path / "oom_score_adj"
+    score.write_text(f"{initial}\n")
+
+    def deny_write(self, *_args, **_kwargs):
+        assert self == score
+        pytest.fail("an already satisfied OOM policy must not be rewritten")
+
+    monkeypatch.setattr(Path, "write_text", deny_write)
+    worker._prefer_worker_as_oom_victim(score)
+    assert int(score.read_text()) == initial
+
+
+@pytest.mark.parametrize(
+    "failure, message",
+    [("denied", "configure OOM isolation"), ("ignored", "was not applied")],
+)
+def test_unsatisfied_oom_isolation_still_requires_effective_write(
+    tmp_path, monkeypatch, failure, message
+):
+    score = tmp_path / "oom_score_adj"
+    score.write_text("0\n")
+
+    def failed_write(self, text, **_kwargs):
+        assert self == score and text == "500\n"
+        if failure == "denied":
+            raise PermissionError("read-only policy")
+        return len(text)
+
+    monkeypatch.setattr(Path, "write_text", failed_write)
+    with pytest.raises(RuntimeError, match=message):
+        worker._prefer_worker_as_oom_victim(score)
 
 
 def test_stage_worker_serializes_success(tmp_path, monkeypatch) -> None:

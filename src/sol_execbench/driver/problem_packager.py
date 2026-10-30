@@ -26,8 +26,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import Self
 
-from sol_execbench.core.bench.clock_lock import acquire_clock_lock
 from sol_execbench.core.bench.config import BenchmarkConfig
+from sol_execbench.core.bench.gpu_execution import acquire_clock_lock
 from sol_execbench.core.data.solution import NATIVE_ROCM_LANGUAGES
 from sol_execbench.driver.build_config import (
     first_gfx_target as _first_gfx_target_core,

@@ -71,6 +71,13 @@ TILE_LOCAL_SCALAR_POSTPROCESS_TARGETS = frozenset(
     },
 )
 
+# Binary tensor postprocessing needs a separate static broadcasting proof:
+# one unchanged contraction output plus one materialized external operand.
+# These targets are elementwise; min/max are excluded because they can reduce.
+TILE_LOCAL_BINARY_POSTPROCESS_TARGETS = frozenset(
+    {"add", "sub", "mul", "div", "maximum", "minimum"}
+)
+
 LOW_PRECISION_DEQUANT_DTYPES = frozenset(
     {
         "float8_e4m3fn",

@@ -8,6 +8,11 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import Annotated
+
+from pydantic import Field
+
+type SHA256 = Annotated[str, Field(strict=True, pattern=r"^[0-9a-f]{64}$")]
 
 
 def sha256_bytes(data: bytes) -> str:

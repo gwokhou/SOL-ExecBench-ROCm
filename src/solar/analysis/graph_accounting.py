@@ -35,6 +35,7 @@ from solar.analysis.graph_models import (
     AnalyzedLayer,
     GraphIoTotals,
     InputIo,
+    IntrinsicLayer,
     LayerCompute,
     LayerData,
     LayerIo,
@@ -420,24 +421,34 @@ class GraphAccountingMixin(AnalysisMixinContract):
             intermediate_bytes=io.intermediate_bytes,
         )
 
-    def _analyze_layer(
+    def _intrinsic_layer(
         self,
         layer_id: str,
         layer: dict[str, Any],
         topology: GraphTopology,
         prepared: PreparedAnalysis,
-        accumulator: AnalysisAccumulator,
-    ) -> None:
+    ) -> IntrinsicLayer:
         data = self._parse_layer(layer_id, layer)
         compute = self._compute_layer(data, strict=prepared.strict)
         memory = self._memory_elements(data, compute, topology)
-        if memory.orphaned:
-            accumulator.orphaned_layers.add(layer_id)
         byte_counts = self._memory_bytes(
             data,
             memory,
             prepared.fallback_precision,
         )
+        return IntrinsicLayer(data, compute, memory, byte_counts)
+
+    def _account_intrinsic_layer(
+        self,
+        intrinsic: IntrinsicLayer,
+        topology: GraphTopology,
+        prepared: PreparedAnalysis,
+        accumulator: AnalysisAccumulator,
+    ) -> None:
+        data, compute = intrinsic.data, intrinsic.compute
+        memory, byte_counts = intrinsic.memory, intrinsic.byte_counts
+        if memory.orphaned:
+            accumulator.orphaned_layers.add(data.layer_id)
         accumulator.used_dtype_fallback |= byte_counts.used_dtype_fallback
         resources = self._account_layer_resources(
             data,
@@ -456,7 +467,7 @@ class GraphAccountingMixin(AnalysisMixinContract):
             accumulator,
         )
         accumulator.record(
-            layer_id,
+            data.layer_id,
             self._serialize_analyzed_layer(
                 data,
                 compute,

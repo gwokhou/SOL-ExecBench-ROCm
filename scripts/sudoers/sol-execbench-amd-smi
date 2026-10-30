@@ -1,0 +1,4 @@
+# Managed by SOL ExecBench ROCm: sol-execbench-amd-smi
+# Allows only device-scoped STABLE_PEAK and AUTO setters.
+guohao ALL=(root) NOPASSWD: /usr/bin/amd-smi set -l STABLE_PEAK -g a3007590-0000-1000-800f-a29c1cca1511, \
+    /usr/bin/amd-smi set -l AUTO -g a3007590-0000-1000-800f-a29c1cca1511

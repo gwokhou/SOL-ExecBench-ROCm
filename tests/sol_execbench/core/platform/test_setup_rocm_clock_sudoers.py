@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from sol_execbench.core.platform.clock_commands import ENV_HOST_AMD_SMI
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[4] / "scripts/setup_rocm_clock_sudoers.py"
@@ -21,18 +24,25 @@ sudoers = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = sudoers
 SPEC.loader.exec_module(sudoers)
 
+UUID = "a3007590-0000-1000-800f-a29c1cca1511"
+
+
+@pytest.fixture(autouse=True)
+def host_tool_default(monkeypatch):
+    monkeypatch.delenv(ENV_HOST_AMD_SMI, raising=False)
+
 
 def test_render_sudoers_covers_only_exact_amd_smi_clock_commands():
     content = sudoers.render_sudoers(
         user="runner",
-        amd_smi="/opt/rocm/bin/amd-smi",
+        amd_smi="/usr/bin/amd-smi",
+        gpu_uuid=UUID,
     )
 
     assert "runner ALL=(root) NOPASSWD:" in content
     for expected in (
-        "/opt/rocm/bin/amd-smi version",
-        "/opt/rocm/bin/amd-smi set -l STABLE_PEAK",
-        "/opt/rocm/bin/amd-smi set -l AUTO",
+        f"/usr/bin/amd-smi set -l STABLE_PEAK -g {UUID}",
+        f"/usr/bin/amd-smi set -l AUTO -g {UUID}",
     ):
         assert expected in content
     assert "rocm-smi" not in content
@@ -71,32 +81,35 @@ def test_default_target_user_falls_back_to_current_user(monkeypatch):
 def test_check_passwordless_coverage_is_read_only():
     ok = MagicMock(returncode=0, stderr="")
     with patch.object(sudoers.subprocess, "run", return_value=ok) as run:
-        checks = sudoers.check_passwordless_coverage("/opt/rocm/bin/amd-smi")
+        checks = sudoers.check_passwordless_coverage("/usr/bin/amd-smi", UUID)
 
     assert {check.status for check in checks} == {
         "allowed_authentication_unverified"
     }
     assert [call.args[0] for call in run.call_args_list] == [
-        ["sudo", "-n", "-l", "--", "/opt/rocm/bin/amd-smi", "version"],
         [
             "sudo",
             "-n",
             "-l",
             "--",
-            "/opt/rocm/bin/amd-smi",
+            "/usr/bin/amd-smi",
             "set",
             "-l",
             "STABLE_PEAK",
+            "-g",
+            UUID,
         ],
         [
             "sudo",
             "-n",
             "-l",
             "--",
-            "/opt/rocm/bin/amd-smi",
+            "/usr/bin/amd-smi",
             "set",
             "-l",
             "AUTO",
+            "-g",
+            UUID,
         ],
     ]
 
@@ -104,28 +117,33 @@ def test_check_passwordless_coverage_is_read_only():
 def test_check_passwordless_coverage_detects_password_prompt():
     failed = MagicMock(returncode=1, stderr="sudo: a password is required\n")
     with patch.object(sudoers.subprocess, "run", return_value=failed):
-        checks = sudoers.check_passwordless_coverage("/opt/rocm/bin/amd-smi")
+        checks = sudoers.check_passwordless_coverage("/usr/bin/amd-smi", UUID)
 
     assert {check.status for check in checks} == {"password_required"}
 
 
 def test_verify_live_always_restores_auto_after_lock_failure():
     responses = [
-        MagicMock(returncode=0, stderr=""),
         MagicMock(returncode=1, stderr="lock failed"),
         MagicMock(returncode=0, stderr=""),
     ]
     with patch.object(sudoers.subprocess, "run", side_effect=responses) as run:
         checks = sudoers.verify_passwordless_coverage_live(
-            "/opt/rocm/bin/amd-smi",
+            "/usr/bin/amd-smi",
+            UUID,
         )
 
     assert [check.status for check in checks] == [
-        "covered",
         "missing_or_failed",
         "covered",
     ]
-    assert run.call_args_list[-1].args[0][-3:] == ["set", "-l", "AUTO"]
+    assert run.call_args_list[-1].args[0][-5:] == [
+        "set",
+        "-l",
+        "AUTO",
+        "-g",
+        UUID,
+    ]
 
 
 def test_validate_sudoers_content_fails_closed_without_visudo(monkeypatch):
@@ -203,7 +221,7 @@ def test_help_explains_check_and_live_side_effects(capsys):
     help_text = capsys.readouterr().out
     assert "check        Read-only" in help_text
     assert "verify-live" in help_text
-    assert "every visible AMD GPU" in help_text
+    assert "only two exact device-scoped setters" in help_text
     assert "always attempts AUTO cleanup" in help_text
 
 
@@ -212,11 +230,9 @@ def stat_mode(path: Path) -> int:
 
 
 @pytest.mark.parametrize(
-    "executable", ["/opt/rocm/bin/amd-smi", "/opt/rocm/core-10.0/bin/amd-smi"]
+    "executable", ["/usr/bin/amd-smi", "/opt/rocm/bin/amd-smi"]
 )
-@pytest.mark.parametrize(
-    "gpu_uuid", [None, "a3007590-0000-1000-800f-a29c1cca1511"]
-)
+@pytest.mark.parametrize("gpu_uuid", [UUID])
 def test_runtime_and_sudoers_share_exact_clock_contract(executable, gpu_uuid):
     from sol_execbench.core.platform.clock_commands import (
         ClockLevel,
@@ -239,3 +255,181 @@ def test_uuid_rule_rejects_unverified_selectors(gpu_uuid):
         sudoers.render_sudoers(
             user="runner", amd_smi="/opt/rocm/bin/amd-smi", gpu_uuid=gpu_uuid
         )
+
+
+def test_default_rule_path_does_not_follow_installers_path(monkeypatch):
+    from sol_execbench.core.platform import runtime
+
+    monkeypatch.setattr(
+        runtime,
+        "resolve_rocm_tool_command",
+        lambda _tool: "/opt/rocm/core-10.0/bin/amd-smi",
+    )
+    assert sudoers.resolve_amd_smi() == "/usr/bin/amd-smi"
+
+
+def test_explicit_symlink_spelling_is_not_resolved(tmp_path):
+    target = tmp_path / "versioned-tool"
+    target.write_text("fixture only")
+    link = tmp_path / "amd-smi"
+    link.symlink_to(target)
+    assert sudoers.resolve_amd_smi(str(link)) == str(link)
+    text = sudoers.render_sudoers(
+        user="guohao", amd_smi=str(link), gpu_uuid=UUID
+    )
+    assert str(target) not in text
+
+
+def test_missing_uuid_is_rejected_by_renderer_and_cli():
+    with pytest.raises(ValueError, match="gpu_uuid is required"):
+        sudoers.render_sudoers(user="guohao", amd_smi="/usr/bin/amd-smi")
+    with pytest.raises(SystemExit) as error:
+        sudoers.parse_args(["--mode", "print", "--user", "guohao"])
+    assert error.value.code == 2
+
+
+def test_local_rule_contains_exactly_two_target_setters():
+    text = sudoers.render_sudoers(
+        user="guohao", amd_smi=sudoers.resolve_amd_smi(), gpu_uuid=UUID
+    )
+    assert sudoers.protected_commands("/usr/bin/amd-smi", UUID) == [
+        ["/usr/bin/amd-smi", "set", "-l", "STABLE_PEAK", "-g", UUID],
+        ["/usr/bin/amd-smi", "set", "-l", "AUTO", "-g", UUID],
+    ]
+    assert text.count(UUID) == 2
+    assert "version" not in text and "/opt/" not in text
+    assert "NOPASSWD: ALL" not in text and "*" not in text
+
+
+@pytest.mark.parametrize(
+    "selected",
+    [
+        "/usr/bin/amd-smi",
+        "/opt/rocm/bin/amd-smi",
+        "/opt/rocm/core-10.0/bin/amd-smi",
+    ],
+    ids=["system-first", "rocm-first", "versioned-first"],
+)
+@pytest.mark.parametrize(
+    "override",
+    [None, "/fixture/amd-smi"],
+    ids=["default", "explicit-host-path"],
+)
+def test_host_setters_and_default_rule_ignore_path_order(
+    monkeypatch, selected, override
+):
+    from sol_execbench.core.bench import clock_lock
+    from sol_execbench.core.platform import runtime
+
+    resolve = runtime.resolve_rocm_tool_command
+    monkeypatch.setattr(
+        runtime,
+        "resolve_rocm_tool_command",
+        lambda tool: resolve(tool, which=lambda _: selected),
+    )
+    if override is not None:
+        monkeypatch.setenv(ENV_HOST_AMD_SMI, override)
+    monkeypatch.setattr(clock_lock.time, "sleep", lambda _: None)
+    calls = []
+    levels = []
+
+    def run(command, **_):
+        calls.append(command)
+        if command[0] == "sudo":
+            if command[2] != "-l":
+                levels.append(command[5])
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            '{"gpu_data":[{"gpu":0,"perf_level":"AMDSMI_DEV_PERF_LEVEL_'
+            + levels[-1]
+            + '"}]}',
+            "",
+        )
+
+    monkeypatch.setattr(clock_lock.subprocess, "run", run)
+    clock_lock.set_peak_clocks(UUID)
+    assert clock_lock.unlock_clocks(UUID)
+    tool = sudoers.resolve_amd_smi()
+    sudoers.check_passwordless_coverage(tool, UUID)
+    expected = sudoers.protected_commands(tool, UUID)
+    setters = [
+        cmd[2:] for cmd in calls if cmd[:2] == ["sudo", "-n"] and cmd[2] != "-l"
+    ]
+    assert tool == (override or "/usr/bin/amd-smi")
+    assert setters == expected
+    assert all(cmd[0] == tool for cmd in calls if cmd[0] != "sudo")
+    assert calls[-2:] == [["sudo", "-n", "-l", "--", *cmd] for cmd in expected]
+
+
+def test_explicit_host_selection_preserves_cli_and_symlink_spelling(
+    tmp_path, monkeypatch
+):
+    from sol_execbench.core.platform.clock_commands import host_clock_executable
+
+    target = tmp_path / "versioned-tool"
+    target.write_text("CPU fixture")
+    link = tmp_path / "amd-smi"
+    link.symlink_to(target)
+    monkeypatch.setenv(ENV_HOST_AMD_SMI, str(link))
+    assert host_clock_executable() == sudoers.resolve_amd_smi() == str(link)
+    args = sudoers.parse_args(
+        [
+            "--mode",
+            "print",
+            "--gpu-uuid",
+            UUID,
+            "--amd-smi",
+            "/explicit/amd-smi",
+        ]
+    )
+    assert (
+        sudoers.resolve_amd_smi(args.amd_smi)
+        == host_clock_executable(args.amd_smi)
+        == "/explicit/amd-smi"
+    )
+
+
+@pytest.mark.parametrize(
+    "configured", ["", "amd-smi", "relative/amd-smi", "/bad\0tool"]
+)
+def test_invalid_host_configuration_is_not_replaced_by_path(
+    monkeypatch, configured
+):
+    from sol_execbench.core.platform.clock_commands import host_clock_executable
+
+    if "\0" not in configured:
+        monkeypatch.setenv(ENV_HOST_AMD_SMI, configured)
+    with pytest.raises(ValueError, match="absolute path"):
+        host_clock_executable(configured)
+    if "\0" not in configured:
+        with pytest.raises(ValueError, match="absolute path"):
+            sudoers.resolve_amd_smi()
+
+
+def test_cli_reports_invalid_host_configuration_without_execution(
+    monkeypatch, capsys
+):
+    monkeypatch.setenv(ENV_HOST_AMD_SMI, "relative/amd-smi")
+    with patch.object(sudoers.subprocess, "run") as run:
+        assert (
+            sudoers.main(["--mode", "check", "--gpu-uuid", UUID, "--json"]) == 1
+        )
+    assert json.loads(capsys.readouterr().out)["status"] == "failed"
+    run.assert_not_called()
+
+
+def test_legacy_tool_discovery_is_independent_of_host_override(monkeypatch):
+    from sol_execbench.core.platform import runtime
+    from sol_execbench.core.platform.clock_commands import clock_executable
+
+    resolve = runtime.resolve_rocm_tool_command
+    monkeypatch.setattr(
+        runtime,
+        "resolve_rocm_tool_command",
+        lambda tool: resolve(tool, which=lambda _: "/legacy/amd-smi"),
+    )
+    monkeypatch.setenv(ENV_HOST_AMD_SMI, "/host/amd-smi")
+    assert clock_executable() == "/legacy/amd-smi"
+    assert clock_executable("/explicit/amd-smi") == "/explicit/amd-smi"

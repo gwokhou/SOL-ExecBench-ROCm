@@ -5,12 +5,19 @@ import subprocess
 from pathlib import Path
 from typing import Literal, Self
 
+import pytest
+
 from sol_execbench.cli import evaluation as cli_evaluation
 from sol_execbench.cli.evaluation.command import (
     ProfileLifecycle,
     _replay_snapshot,
 )
 from sol_execbench.core.bench.clock_lock import ClockLockLease
+from sol_execbench.core.bench.gpu_lock import (
+    GPULockVerificationError,
+    require_evaluation_gpu_lock,
+    require_supervised_gpu_execution,
+)
 from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
@@ -84,6 +91,7 @@ def test_run_evaluation_command_passes_flashinfer_env(
     assert "HTTPS_PROXY" not in captured_env
 
 
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
     tmp_path: Path,
     monkeypatch,
@@ -97,6 +105,7 @@ def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
 
     def fake_run(command, **kwargs):
         nonlocal captured_env
+        require_supervised_gpu_execution()
         captured_env = kwargs["env"]
         output_dir = Path(command[command.index("--output-directory") + 1])
         output_file = command[command.index("--output-file") + 1]
@@ -135,6 +144,7 @@ def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
 
 def _fake_profile_run_succeed(command, **kwargs):
     """Write a placeholder profile artifact and return a successful result."""
+    require_supervised_gpu_execution()
     output_dir = Path(command[command.index("--output-directory") + 1])
     output_file = command[command.index("--output-file") + 1]
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -147,6 +157,7 @@ def _fake_profile_run_succeed(command, **kwargs):
     )
 
 
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_run_profiled_evaluation_acquires_and_releases_clock_lock(
     tmp_path: Path,
 ):
@@ -167,8 +178,11 @@ def test_run_profiled_evaluation_acquires_and_releases_clock_lock(
     assert profile_result.succeeded is True
     assert lease.enter_count == 1
     assert lease.release_count == 1
+    with pytest.raises(GPULockVerificationError):
+        require_evaluation_gpu_lock()
 
 
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_run_profiled_evaluation_runs_unlocked_when_lock_unavailable(
     tmp_path: Path,
     caplog,

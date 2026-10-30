@@ -12,6 +12,7 @@ from functools import cached_property
 from pathlib import Path
 
 from solar.artifacts import ArtifactDocument, load_yaml_artifact
+from solar.graph.storage import SourceStorage
 from solar.schema_versions import OPERATOR_GRAPH_SCHEMA_VERSION
 
 
@@ -23,6 +24,7 @@ class ExtractionKind(StrEnum):
 
 
 DEFAULT_EXTRACTION_KIND = ExtractionKind.TORCHVIEW
+OPERATOR_GRAPH_FILENAME = "operator_graph.yaml"
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,7 @@ class OperatorGraphArtifact:
     source_inputs: tuple[tuple[int, TensorSignature], ...]
     used_source_indices: tuple[int, ...]
     reference_outputs: tuple[TensorSignature, ...]
+    source_storage: SourceStorage | None = None
 
     @cached_property
     def document(self) -> ArtifactDocument:

@@ -6,6 +6,7 @@
 import subprocess
 from pathlib import Path
 
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.bench.rocm_profiler.commands import (
     ProfilerRunner,
     build_rocprofv3_command,
@@ -61,7 +62,8 @@ def collect_rocprofv3_timing(
         include_hip_runtime=request.include_hip_runtime,
     )
     try:
-        completed = _run_profiler_command(request, command, runner)
+        with native_gpu_execution():
+            completed = _run_profiler_command(request, command, runner)
     except subprocess.TimeoutExpired as exc:
         return _fallback_result(
             request,

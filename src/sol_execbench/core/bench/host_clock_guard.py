@@ -9,13 +9,13 @@ import argparse
 import logging
 import os
 import subprocess
-from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import ExitStack, contextmanager
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from functools import partial
+from pathlib import Path
 
 from sol_execbench.core.bench.clock_lock import (
     ClockLockLease,
-    ClockSetupError,
     observe_clock_levels,
     set_peak_clocks,
     unlock_clocks,
@@ -27,9 +27,19 @@ from sol_execbench.core.bench.clock_ownership import (
     observe_clock_devices,
     owned_clock_window,
 )
+from sol_execbench.core.bench.gpu_admission import (
+    AdmissionDevice,
+    AdmissionError,
+    configured_admission,
+)
 from sol_execbench.core.bench.gpu_lock import (
     acquire_gpu_lock,
     gpu_lock_directory,
+)
+from sol_execbench.core.bench.gpu_lock_paths import (
+    LEGACY_GPU_LOCK_ENV,
+    configured_gpu_locks,
+    normalize_gpu_uuid,
 )
 from sol_execbench.core.platform.clock_commands import (
     ENV_HOST_CLOCK_GPU_UUID,
@@ -53,7 +63,7 @@ logger = logging.getLogger(__name__)
 _GPU_LOCK_TIMEOUT_ENV = "SOL_EXECBENCH_GPU_LOCK_TIMEOUT_SECONDS"
 _HOST_MANAGED_ENV = {
     "SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST": "1",
-    "SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST": "1",
+    "GPU_LOCK_HELD_BY_HOST": "1",
 }
 _GPU_BUSY_EXIT_CODE = 75
 
@@ -91,7 +101,7 @@ def _lock_timeout_seconds(environment: Mapping[str, str]) -> float:
 
 @contextmanager
 def _target_clock_window(
-    gpu_uuid: str, *, container_supervised: bool
+    gpu_uuid: str, *, container_supervised: bool, natural_clocks: bool = False
 ) -> Iterator[ClockLockLease]:
     """Own one verified UUID; require initial AUTO and successful activation."""
     gpu_uuid = gpu_uuid.strip().lower()
@@ -105,7 +115,14 @@ def _target_clock_window(
         raise ClockOwnershipError(
             "host_clock_identity_mismatch: UUID not unique"
         )
-    verified_uuid = devices[0].uuid
+    verified_uuid = devices[0].uuid.lower()
+    admission = configured_admission()
+    if admission is not None:
+        admission.require_ready(
+            AdmissionDevice(
+                pci_bdf=devices[0].bdf.lower(), smi_uuid=verified_uuid.lower()
+            )
+        )
     if observe_clock_levels(verified_uuid) != ("AMDSMI_DEV_PERF_LEVEL_AUTO",):
         raise ClockOwnershipError(
             "host_clock_initial_policy_unverified: target must report AUTO"
@@ -113,8 +130,17 @@ def _target_clock_window(
     with owned_clock_window(
         gpu_lock_directory(),
         devices,
-        activate=partial(set_peak_clocks, verified_uuid),
-        restore=partial(unlock_clocks, verified_uuid),
+        activate=None
+        if natural_clocks
+        else partial(set_peak_clocks, verified_uuid),
+        restore=(
+            lambda: (
+                observe_clock_levels(verified_uuid)
+                == ("AMDSMI_DEV_PERF_LEVEL_AUTO",)
+            )
+        )
+        if natural_clocks
+        else partial(unlock_clocks, verified_uuid),
         container_supervised=container_supervised,
     ) as lease:
         yield lease
@@ -122,42 +148,23 @@ def _target_clock_window(
 
 @contextmanager
 def host_clock_window(
-    *, container_supervised: bool, gpu_uuid: str | None = None
+    *,
+    container_supervised: bool,
+    gpu_uuid: str | None = None,
+    natural_clocks: bool = False,
 ) -> Iterator[ClockLockLease]:
-    """Own a UUID or retain legacy all-device control, publishing before writes."""
-    if gpu_uuid is not None:
-        with _target_clock_window(
-            gpu_uuid, container_supervised=container_supervised
-        ) as lease:
-            yield lease
-        return
-    levels = observe_clock_levels()
-    if not levels or any(
-        level != "AMDSMI_DEV_PERF_LEVEL_AUTO" for level in levels
-    ):
-        locked = bool(levels) and all(
-            level == "AMDSMI_DEV_PERF_LEVEL_STABLE_PEAK" for level in levels
+    """Own only the explicitly configured UUID; never fall back to all GPUs."""
+    paths = configured_gpu_locks()
+    selected = normalize_gpu_uuid(paths.uuid if gpu_uuid is None else gpu_uuid)
+    if selected != paths.uuid:
+        raise ClockOwnershipError(
+            "host clock UUID conflicts with GPU_LOCK_UUID"
         )
-        with ClockLockLease(locked=locked, acquired=False) as lease:
-            yield lease
-        return
-    devices = observe_clock_devices()
-    if len(devices) != len(levels):
-        raise ClockOwnershipError("clock_owner_device_count_mismatch")
-    with ExitStack() as leases:
-        try:
-            lease = leases.enter_context(
-                owned_clock_window(
-                    gpu_lock_directory(),
-                    devices,
-                    activate=set_peak_clocks,
-                    restore=unlock_clocks,
-                    container_supervised=container_supervised,
-                )
-            )
-        except ClockSetupError:
-            logger.warning("STABLE_PEAK setup failed; AUTO rollback verified")
-            lease = ClockLockLease(locked=False, acquired=False)
+    with _target_clock_window(
+        selected,
+        container_supervised=container_supervised,
+        natural_clocks=natural_clocks,
+    ) as lease:
         yield lease
 
 
@@ -167,26 +174,49 @@ def run_with_host_clock_guard(
     environment: Mapping[str, str] | None = None,
     runner: AttachedRunner = _default_runner,
     gpu_uuid: str | None = None,
+    natural_clocks: bool = False,
 ) -> int:
     """Run ``command`` while retaining host GPU serialization and clock state."""
     if not command:
         raise ValueError("a child command is required")
     base_environment = dict(os.environ if environment is None else environment)
     timeout_seconds = _lock_timeout_seconds(base_environment)
-    if gpu_uuid is None:
-        gpu_uuid = base_environment.get(ENV_HOST_CLOCK_GPU_UUID)
+    paths = configured_gpu_locks()
+    if any(key in base_environment for key in LEGACY_GPU_LOCK_ENV):
+        raise ValueError("legacy GPU lock controls in child environment")
+    if (
+        "GPU_LOCK_UUID" in base_environment
+        and normalize_gpu_uuid(base_environment["GPU_LOCK_UUID"]) != paths.uuid
+    ):
+        raise ValueError("child GPU_LOCK_UUID conflicts with native owner")
+    if (
+        "GPU_LOCK_DIR" in base_environment
+        and Path(base_environment["GPU_LOCK_DIR"]) != paths.directory
+    ):
+        raise ValueError("child GPU_LOCK_DIR conflicts with native owner")
+    selected = (
+        gpu_uuid or base_environment.get(ENV_HOST_CLOCK_GPU_UUID) or paths.uuid
+    )
+    gpu_uuid = normalize_gpu_uuid(selected)
+    if gpu_uuid != paths.uuid:
+        raise AdmissionError("gpu_admission_device_mismatch")
+    device = _admitted_device(gpu_uuid)
 
     try:
         with (
             cleanup_on_termination(),
-            acquire_gpu_lock(timeout_seconds=timeout_seconds),
+            _guard_gpu_lock(timeout_seconds, device),
             host_clock_window(
-                container_supervised=is_docker_run(command), gpu_uuid=gpu_uuid
+                container_supervised=is_docker_run(command),
+                gpu_uuid=gpu_uuid,
+                natural_clocks=natural_clocks,
             ) as clock_lease,
         ):
             child_environment: dict[str, str] = {
                 **base_environment,
                 **_HOST_MANAGED_ENV,
+                "GPU_LOCK_UUID": paths.uuid,
+                "GPU_LOCK_DIR": str(paths.directory),
                 ENV_SOL_EXECBENCH_CLOCKS_LOCKED: "1"
                 if clock_lease.locked
                 else "0",
@@ -215,6 +245,31 @@ def run_with_host_clock_guard(
         return _GPU_BUSY_EXIT_CODE
 
 
+def _admitted_device(gpu_uuid: str | None) -> AdmissionDevice | None:
+    if gpu_uuid is None:
+        raise AdmissionError("gpu_admission_explicit_uuid_required")
+    selected = tuple(
+        d for d in observe_clock_devices() if d.uuid.lower() == gpu_uuid.lower()
+    )
+    if len(selected) != 1:
+        raise AdmissionError("gpu_admission_device_identity_unverified")
+    return AdmissionDevice(
+        pci_bdf=selected[0].bdf.lower(), smi_uuid=selected[0].uuid.lower()
+    )
+
+
+@contextmanager
+def _guard_gpu_lock(
+    timeout: float, device: AdmissionDevice | None
+) -> Generator[None]:
+    if device is None:
+        with acquire_gpu_lock(timeout_seconds=timeout):
+            yield
+    else:
+        with acquire_gpu_lock(timeout_seconds=timeout, admission_device=device):
+            yield
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -225,10 +280,15 @@ def _parser() -> argparse.ArgumentParser:
         "--gpu-uuid",
         help=(
             "Require owned STABLE_PEAK for one AMD-SMI UUID; defaults to "
-            f"${ENV_HOST_CLOCK_GPU_UUID}, otherwise legacy all-device control"
+            f"${ENV_HOST_CLOCK_GPU_UUID}, otherwise required $GPU_LOCK_UUID"
         ),
     )
     parser.add_argument("command", nargs=argparse.REMAINDER)
+    parser.add_argument(
+        "--natural-clocks",
+        action="store_true",
+        help="Keep AUTO unchanged for metadata-only container checks",
+    )
     return parser
 
 
@@ -242,7 +302,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not command:
         _parser().error("a child command is required after --")
     try:
-        return run_with_host_clock_guard(command, gpu_uuid=args.gpu_uuid)
+        return run_with_host_clock_guard(
+            command, gpu_uuid=args.gpu_uuid, natural_clocks=args.natural_clocks
+        )
     except ValueError as exc:
         _parser().error(str(exc))
     return 2

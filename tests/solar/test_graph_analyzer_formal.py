@@ -474,7 +474,12 @@ def test_tile_aware_bound_accepts_pointwise_add_operand(tmp_path: Path):
     }
 
 
-def test_tile_aware_bound_accepts_materialized_region_boundary(tmp_path: Path):
+@pytest.mark.parametrize(
+    "with_bias", [False, True], ids=["direct", "broadcast"]
+)
+def test_tile_aware_bound_accepts_materialized_region_boundary(
+    tmp_path: Path, with_bias: bool
+):
     matmul = _einsum_layer("left", "right", "output")
     plan = FusionPlan(
         fusion={
@@ -491,6 +496,21 @@ def test_tile_aware_bound_accepts_materialized_region_boundary(tmp_path: Path):
         regions=[],
         proof_layers={"matmul": matmul},
     )
+    bias = {
+        "type": "add",
+        "semantic_op": {"kind": "operation", "target": "add", "effects": {}},
+        "tensor_names": {"inputs": ["output", "bias"], "outputs": ["biased"]},
+        "tensor_shapes": {"inputs": [[2, 4], [4]], "outputs": [[2, 4]]},
+        "tensor_dtypes": {
+            "inputs": ["torch.float16", "torch.float16"],
+            "outputs": ["torch.float16"],
+        },
+    }
+    if with_bias:
+        region = plan.fusion["regions"][0]
+        region["layers"].append("bias_add")
+        region["external_inputs"].append("bias")
+        region["external_outputs"] = ["biased"]
     runner = _FakeRunner()
     result = runner.run_layer(
         matmul,
@@ -524,18 +544,22 @@ def test_tile_aware_bound_accepts_materialized_region_boundary(tmp_path: Path):
                 },
             },
             "matmul": matmul,
+            **({"bias_add": bias} if with_bias else {}),
         },
         output_dir=tmp_path,
     )
 
-    _, formal = IRGraphAnalyzer()._audit_orojenesis_evidence(
+    audited, formal = IRGraphAnalyzer()._audit_orojenesis_evidence(
         plan,
         evidence,
         cast(PreparedAnalysis, prepared),
-        audited_fused_bytes=48.0,
+        audited_fused_bytes=56.0 if with_bias else 48.0,
     )
 
     assert formal
+    # Side-input reads remain in the global bound, outside the contraction.
+    excess = max(0.0, result["selected_capacity"]["point"]["dram_bytes"] - 52.0)
+    assert audited == (56.0 if with_bias else 48.0) + excess
     assert evidence["layers"]["matmul"]["formal_applicability"] == {
         "applicable": True,
         "region": "fusion",

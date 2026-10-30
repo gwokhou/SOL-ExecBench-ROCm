@@ -11,6 +11,8 @@ from typing import Any
 
 import yaml
 
+from solar.graph.contracts import OPERATOR_GRAPH_FILENAME
+
 
 def trace_make_fx_reference(
     reference: Callable[..., Any],
@@ -73,7 +75,7 @@ def trace_make_fx_reference(
         raise RuntimeError(
             f"make_fx reference extraction failed: {extraction_error}",
         ) from extraction_error
-    operator_path = output / "operator_graph.yaml"
+    operator_path = output / OPERATOR_GRAPH_FILENAME
     operator_path.write_text(yaml.safe_dump(graph, sort_keys=False))
     return tensor_inputs, [index for _, index in used], operator_path
 

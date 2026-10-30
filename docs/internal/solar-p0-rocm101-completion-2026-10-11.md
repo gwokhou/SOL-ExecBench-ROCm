@@ -83,3 +83,17 @@ Ruff、格式、ty、耦合、可读性、production reachability、文档、sch
 随后有界下载并校验了仓库锁定的官方 ISA 归档，在无 GPU 环境完成 helper 构建及 ISA 预检；Git safe-directory 只通过容器进程环境设置。第二轮使用新目录、完整 qualification 链、正确源码 revision 和只读离线 ISA 缓存。旧正式 profile/audit 另存于第二轮 `prior-profile/`，可审阅和回退。
 
 本次没有安装或替换主机 ROCm、Torch 或驱动，没有提交或推送 Git 变更。
+
+## 2026-10-29：历史 producer 与当前入口的关系
+
+上述实测审计仍绑定 `52cf050d10c53ce9fb3904122d86af525cd38cb5` 的 producer，SHA-256
+为 `05f14ef1e0708c554803292500220e7c7cb8956f995140165263f38652a77c43`；审计原文和
+profile 证据没有改写。该 Git blob 的[逐字源码快照](../../tests/solar/fixtures/resource_peak_calibration_52cf050d.py.txt)
+仅供测试读取，不作为可执行入口，也不允许通过它绕开现有原生生命周期。
+
+当前 producer 入口增加了 `native_gpu_execution` 包装，因此完整脚本摘要不同。
+CPU 回归同时校验历史快照摘要，以及“历史 AST 加上这一处 import 和 main 包装”
+与当前整个脚本 AST 完全一致，保持探针、计算、采样、容差、统计和计量代码的
+对应关系。任何其他行为变更必须重新审查适用性，不能只改 fixture 或摘要。
+这证明源码关系，不证明当前入口已重新取得 GPU 校准或正式资格；历史运行与当前
+生命周期的真实 GPU 验收仍分别记账。

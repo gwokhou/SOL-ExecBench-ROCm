@@ -90,101 +90,123 @@ export SOL_EXECBENCH_PMC_CLOCK_TARGET=0000:05:00.0
 export SOL_EXECBENCH_PMC_CLOCK_MODE=required
 ```
 
-Without an outer owner, the PMC window verifies initial AUTO, sets and verifies
-STABLE_PEAK, then restores and verifies AUTO. With a verified outer host guard or
-nested PMC owner, it **borrows** that policy and never resets clocks on inner exit.
-Borrowing requires a unique owner token, a current owner record covering the same
-physical GPU identities, a live owner file lock, and a fresh STABLE_PEAK readback.
-An environment flag or a GPU that happens to be at STABLE_PEAK is insufficient.
-Unknown external policies are not overwritten. Ownership proof failures remain
-fatal even in best-effort mode.
+## GPU ownership and recovery
 
-Host-owned and independently owned PMC windows share the same acquisition order:
-verify identity and initial AUTO, publish the active owner record and live lock,
-then set and verify STABLE_PEAK. The active record represents a restoration
-obligation, not successful setup. Failure to publish it prevents all policy
-writes. A legacy all-device host setup failure may continue unlocked only after AUTO rollback is
-verified; failed rollback raises `clock_restore_unverified`, keeps the recovery
-gate, and prevents workload startup. Interruption during setup follows the same
-teardown as interruption during execution. If setup is forcibly killed, the
-already-published active record blocks the next GPU-lock acquisition.
-
-Container supervision is recorded only after clock activation succeeds and
-before the workload may start. An interrupted or failed activation therefore
-does not require a container ID that could not yet have been created.
-
-To control only the qualified GPU with the existing UUID-scoped sudoers rules,
-set the host selector before launching the wrapper:
+GPU execution requires `GPU_LOCK_DIR` (an absolute host directory) and
+`GPU_LOCK_UUID` (the full AMD-SMI UUID). The agreed local configuration is:
 
 ```bash
-export SOL_EXECBENCH_HOST_CLOCK_GPU_UUID=a3007590-0000-1000-800f-a29c1cca1511
+export GPU_LOCK_DIR=/home/guohao/.local/state
+export GPU_LOCK_UUID=a3007590-0000-1000-800f-a29c1cca1511
 export ROCR_VISIBLE_DEVICES=GPU-a30fa29c1cca1511
-./scripts/run_docker.sh <command>
+export SOL_EXECBENCH_CLOCK_STATE_DIR=/home/guohao/.local/state/gpu-leases/sol
 ```
 
-The direct host-guard CLI also accepts `--gpu-uuid AMD_SMI_UUID` before `--`;
-that argument overrides `SOL_EXECBENCH_HOST_CLOCK_GPU_UUID`. The selector is an
-AMD-SMI UUID, not a ROCR UUID or GPU index. The host resolves it against the live
-device inventory and records only that device in the owner receipt. Both set
-and restore use the verified UUID with `set -l LEVEL -g UUID`; policy readbacks
-must contain exactly one device. Initial state must be AUTO. Missing identity,
-unknown policy or failed activation prevents workload startup, even if rollback
-succeeds. Other GPU policies are left alone. This selector controls clocks;
-select the workload GPU separately with `ROCR_VISIBLE_DEVICES` as above.
+Do not activate these new lock names while another project or installed version
+still uses the old index lock. Maintenance must stop admissions, confirm cleanup
+and recovery of existing owners, preserve their histories, switch both projects,
+and then resume admissions. This source change performs none of those operations.
+`SOL_EXECBENCH_GPU_LOCK_DIR`, `SOL_EXECBENCH_GPU_LOCK_FD` and
+`SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST` are rejected, even when empty.
 
-Omitting both host selectors preserves legacy all-device behavior. Both modes
-still use the shared GPU-0 exclusion; UUID targeting does not provide independent
-multi-GPU concurrency. PMC selectors do not change the host's clock scope.
+The files are `gpu-<UUID>.L1-ownership.lock` and
+`gpu-<UUID>.L2-execution.lock`. Native owners acquire L1 before L2 and keep L1
+through native final-state publication. Workers under an existing host owner
+verify its live private receipt and L1 inode, then serialize on L2. Their scope
+never restores the host's clock policy. A raw flock or an environment flag alone
+is not a native owner. Same-thread nested stages reuse the active scope; an
+optional SOLAR private lock cannot replace L1/L2 or cause reacquisition of them.
 
-Exceptions, timeouts, SIGINT and SIGTERM unwind the existing clock lease. The
-order is child/process-group cleanup, owned Docker container removal, clock
-restore and readback, final owner receipt, then GPU-lock release. If container
-removal cannot be confirmed, the host leaves clocks alone and records a recovery
-blocker. Release is idempotent; failed restoration does not mark the lease released.
-SIGKILL and host failure cannot run teardown. A stale active owner or failed
-restore blocks the next GPU-lock acquisition instead of silently resuming work.
+Direct evaluation, the SOLAR CLI/release bridge, marked GPU tests, profiler
+collectors and calibration entries use the native boundary. Direct SOLAR GPU
+API callers must supply a `device_stage_context`; low-level evaluator/profile
+workers require their supervisor's active owner and held L2. CPU paths neither
+require these variables nor query devices. Direct native execution currently
+supports visible device 0 only: read-only AMD-SMI identity and the selected BDF's
+`unique_id` must agree with explicit `ROCR_VISIBLE_DEVICES=GPU-...`;
+`HIP_VISIBLE_DEVICES` must be unset or `0`. Numeric visibility indices and
+implicit/all-device ownership are not accepted.
 
-PMC receipts are stored independently in
-`<profiler-output-directory>.pmc-clock/`. They distinguish `owned`, `borrowed` and
-`none`, retain the owner lease ID, and record `borrow_ended` separately from
-`auto_verified`. A borrowed receipt never claims AUTO restoration. The owner's
-record in `$SOL_EXECBENCH_GPU_LOCK_DIR/clock-leases/<lease-id>.json` records the
-final restoration outcome; its sibling lock proves live ownership and its
-container-ID file survives host crashes. These are cooperative orchestration
-records on a trusted shared directory, not authentication against a process with
-write access to that directory. The owner token is not forwarded to untrusted
-kernel subprocesses.
+Natural execution requires initial AUTO, records an owner and verifies AUTO on
+exit without issuing a setter. Timing/PMC work requesting managed clocks instead
+publishes responsibility before STABLE_PEAK activation, and restores/reads back
+AUTO on exit. Inner PMC windows borrow the verified policy. A failed setup,
+restore or synchronization remains a failure; it cannot silently permit work or
+publish a successful release. `acquire_clock_lock`/`lock_clocks` now live in
+`core.bench.gpu_execution` and only borrow an active native scope; independent
+all-device callers must use the explicit native entry instead.
 
-`run_docker.sh` forwards the owner token, host UUID and PMC options through the existing
-shared lock-directory mount. Thus an unprivileged container can borrow a verified
-host policy without sudo or broader container permissions. The host remains
-responsible for restoration after the container is confirmed stopped. The wrapper
-owns `--cidfile`; do not supply another one. Host and container must both use the
-updated code. The container entrypoint verifies the selected host UUID and refuses
-startup if that readback fails. Use the host UID/GID in custom images, matching the
-Dockerfile build arguments, so the container can read the owner's private receipt.
-No benchmark clock policy or canonical timing protocol is changed;
-PMC replay still cannot replace canonical timing samples.
+The host guard derives its target from `GPU_LOCK_UUID`. Optional
+`SOL_EXECBENCH_HOST_CLOCK_GPU_UUID` or `--gpu-uuid` must agree. Both setters use
+`/usr/bin/amd-smi set -l LEVEL -g UUID` (or the explicitly configured common
+executable override); no sudoers installation occurs. The guard's
+`--natural-clocks` mode is used for container dependency checks. Exceptions,
+timeouts, SIGINT and SIGTERM drain child groups and owned containers before
+restoring clocks and publishing the final receipt, then release L1. Unconfirmed
+container cleanup leaves a blocker and does not restore under possible live work.
+SIGKILL cannot run cleanup; the persisted native record blocks the next owner.
 
-An independently owned PMC window needs permission for the exact
-`sudo -n amd-smi set -l STABLE_PEAK -g VERIFIED_UUID` and corresponding
-`AUTO` command. BDF/index selectors are resolved to verified AMD-SMI UUIDs before
-mutation; explicit `all` applies the same command separately to each verified UUID. This feature does not install permissions or elevate Python.
+Private records remain in `$SOL_EXECBENCH_CLOCK_STATE_DIR/clock-leases/`;
+without that override the legacy `/tmp/sol-execbench-locks/clock-leases/` is used.
+Changing the common lock directory does not relocate or erase private history.
+Pending legacy records are still checked when a new private directory is selected.
+Owner records, owner flock and container-ID files retain their existing format.
+PMC receipts remain in `<profiler-output-directory>.pmc-clock/`; borrowed receipts
+record `borrow_ended`, never owner AUTO restoration. Controlled evaluator child
+processes receive the native owner token to verify supervision. This is a
+cooperative single-user execution contract, not credential-based isolation.
 
-After a crash or restoration failure, inspect the owner record, stop its abandoned
-workload/container, and restore only its recorded GPU devices with AMD-SMI. Then
-run the verification-only recovery command on the host, using the same lock directory:
+`run_docker.sh` requires both physical lock files to exist, then binds only those
+two files at `/run/lock` and passes `GPU_LOCK_DIR=/run/lock`. It separately binds
+the existing private record directory read-only at the same absolute path.
+No whole host state directory is mounted or replaced. The container entrypoint
+requires host-managed ownership and verifies target readback; standalone
+unsupervised containers are rejected. Source and entrypoint are selected from
+the mounted project so a stale image package cannot silently select the old
+protocol. Use the matching host UID/GID. The host owns `--cidfile`, cleanup and
+restoration; do not supply another cidfile.
+
+After manually stopping an abandoned workload and restoring its recorded GPU,
+run the original owner's verification-only recovery command with the same UUID
+and private history settings:
 
 ```bash
 uv run python -m sol_execbench.core.bench.clock_recovery LEASE_ID
 ```
 
-Recovery does not change clocks or kill processes. It acquires GPU/owner exclusion,
-checks container absence where applicable, physical identities, GPU idleness and
-AUTO, preserves the original record in `clock-leases/recovery-history/`, then
-records the successful recovery. Missing container identity, unreadable state,
-a live owner or failed verification leaves the gate blocked. Do not delete pending
-records to bypass those checks.
+Recovery takes L1, checks original identity, container absence where applicable,
+GPU idleness and AUTO, then preserves the prior record in
+`clock-leases/recovery-history/` before publishing confirmation. It does not set
+clocks or terminate work. Missing identity, a live owner, unknown state or failed
+readback leaves the gate blocked. Never delete pending records to bypass it.
+
+The optional neutral admission record is explicitly selected with
+`SOL_EXECBENCH_ADMISSION_RECORD` (an absolute persistent path outside `/tmp`).
+The private directory must be distinct from the common lock directory. Configured
+admission requires ready under L1, publishes held before native responsibility,
+and returns ready only after native cleanup/restoration is recorded. Missing,
+unknown, held or blocked records do not initialize themselves. The record is
+host-only; workers borrow the native owner and do not independently admit.
+There is no dependency on Spur. A scheduler must call the native entry without
+holding either physical lock itself. Deployment uses an explicit record; generic
+native locking without that optional setting does not provide cross-project
+crash-state admission. CPU fixture results are not real GPU qualification.
+
+Clock setter diagnostics use the existing Python stderr logging stream. Each
+STABLE_PEAK setup and AUTO restore/rollback command emits one warning prefixed
+`clock_command_diagnostic`, followed by a JSON object. The foreground launcher
+must retain stderr; no separate log directory or lease schema is introduced.
+Each stdout/stderr tail is limited to 4096 characters, with truncation flags and
+the existing credential redaction. Records include the original command, return
+code (null for launch failure/timeout), failure kind, UTC time, PID, executable
+paths/metadata, and selected UID/GID/Groups/NoNewPrivs/Seccomp fields.
+
+Only PATH, HOME, PYTHONPATH, PYTHONHOME, VIRTUAL_ENV, ROCM_PATH and LD_LIBRARY_PATH
+are read from the environment for diagnostics, each limited to 1024 characters
+and redacted; no full environment is serialized. These describe the calling
+process, not proof of sudo's eventual interpreter or elevated identity. Success,
+command failure, zero-exit vendor error markers and timeout retain the existing
+clock semantics. Diagnostics do not retry setters or release a held owner.
 
 JSON response mode requires a trace path:
 
@@ -282,7 +304,9 @@ uv run sol-execbench --format json score official RELEASE/release-bundle.json
 | --- | --- |
 | `FLASHINFER_TRACE_DIR` | additional safetensors root used by the trusted reference worker |
 | `SOL_EXECBENCH_CLOCKS_LOCKED` | evaluator-owned clock-lock evidence (`1` or `0`) |
-| `SOL_EXECBENCH_GPU_LOCK_DIR` | directory for per-device lock files |
+| `GPU_LOCK_DIR`, `GPU_LOCK_UUID` | explicit common L1/L2 directory and full AMD-SMI UUID |
+| `SOL_EXECBENCH_CLOCK_STATE_DIR` | project-private native owner/recovery directory |
+| `SOL_EXECBENCH_ADMISSION_RECORD` | optional host-only neutral admission record |
 | `SOL_EXECBENCH_ALLOW_CPU_TIMING` | test-only CPU timing escape hatch |
 | `SOL_EXECBENCH_SANDBOXED` | marks an externally isolated execution environment |
 | `SOL_EXECBENCH_UNSAFE_LOCAL_EXECUTION` | internal marker set by the CLI flag |
@@ -294,11 +318,11 @@ uv run sol-execbench --format json score official RELEASE/release-bundle.json
 | `SOL_EXECBENCH_AMD_ISA_OFFLINE` | forbid static ISA downloads when `1` |
 | `HIP_VISIBLE_DEVICES`, `ROCR_VISIBLE_DEVICES` | ROCm device visibility |
 
-`SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST` and
-`SOL_EXECBENCH_GPU_LOCK_MANAGED_BY_HOST` are private wrapper-to-container
-signals. Do not set them manually. The entrypoint independently verifies a
-host-declared clock state, and the evaluator verifies that the shared GPU lock
-file is held by an external process before it skips its local lock acquisition.
+`SOL_EXECBENCH_CLOCKS_MANAGED_BY_HOST` and `GPU_LOCK_HELD_BY_HOST=1`
+are wrapper-to-worker signals. `GPU_LOCK_FD`, when used, must be the actual
+inherited L1 descriptor for the configured inode. Neither setting substitutes
+for live native owner verification, and borrowed scopes never unlock L1 or
+restore the owner's clocks.
 
 The reference pipe descriptors, token and worker PID use private
 `SOL_EXECBENCH_REFERENCE_*` variables. They are created by the staged
@@ -316,9 +340,21 @@ Clock command authorization and execution share
 `core/platform/clock_commands.py`: the executable resolver, policy values, and
 exact argument ordering are common to the legacy all-device clock lease, the
 UUID-scoped PMC controller, and `scripts/setup_rocm_clock_sudoers.py`.
-Use the generator option `--gpu-uuid VERIFIED_UUID` for device-scoped rules;
-omitting it retains the legacy all-device scope. Generation does not install
-permissions automatically. Its read-only `check` mode reports
+The generator requires `--gpu-uuid VERIFIED_UUID` and defaults to the stable
+`/usr/bin/amd-smi` invocation, independent of PATH ordering. It grants only the
+two exact UUID-scoped STABLE_PEAK and AUTO setters. Link resolution validates
+root control without changing the path rendered into the rule. Legacy runtime
+calls without a UUID remain all-device calls and are not covered by this rule.
+UUID-scoped host setup, AUTO restoration and performance readback use the same
+host selector as generation and `check`. To explicitly use another executable,
+set `SOL_EXECBENCH_HOST_AMD_SMI` to its absolute invocation path in both contexts;
+an empty or relative value is an error. The generator's `--amd-smi` argument
+overrides that variable for that invocation only. Legacy all-device and
+standalone PMC tool discovery remain unchanged; the host override is not
+forwarded into Docker, whose executable layout and policy are separate.
+Generation does not install permissions automatically. See the project-owned
+[rule and installation instructions](ROCM-CLOCK-SUDOERS.md).
+Its read-only `check` mode reports
 `allowed_authentication_unverified` when sudo permits a command: successful
 `sudo -l` alone does not prove passwordless execution, so this result is not
 reported as verified coverage. Actual controlled lease execution remains the

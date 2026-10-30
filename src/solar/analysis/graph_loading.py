@@ -56,6 +56,13 @@ from solar.analysis.resources import (
     is_mfma_operation,
     mandatory_mfma_macs,
 )
+from solar.artifacts import MAX_ARTIFACT_BYTES, sha256_bytes
+from solar.artifacts.document import parse_yaml_artifact
+from solar.ir.access_artifact import (
+    ACCESS_FILENAME,
+    AccessDocument,
+    load_access_document,
+)
 from solar.ir.contracts import (
     OPERATION_KIND,
     layer_contraction_analysis,
@@ -78,11 +85,6 @@ class GraphLoadingMixin(AnalysisMixinContract):
         job: AnalysisJob,
     ) -> tuple[Path, Path] | None:
         source = Path(job.graph_path)
-        reordered = source.parent / f"{source.stem}_reordered.yaml"
-        if reordered.exists():
-            if self.debug:
-                print(f"Debug: using reordered graph {reordered}")
-            source = reordered
         output_dir = Path(job.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         if source.exists():
@@ -91,10 +93,13 @@ class GraphLoadingMixin(AnalysisMixinContract):
             print(f"Debug: IR graph not found: {source}")
         return None
 
-    def _load_graph(self, source: Path) -> dict[str, Any] | None:
+    def _load_graph(self, source: Path) -> tuple[dict[str, Any], bytes] | None:
         try:
-            with open(source) as file:
-                return yaml.safe_load(file) or {}
+            with source.open("rb") as file:
+                payload = file.read(MAX_ARTIFACT_BYTES + 1)
+            if len(payload) > MAX_ARTIFACT_BYTES:
+                raise ValueError("IR graph exceeds the artifact byte budget")
+            return parse_yaml_artifact(source, payload).data, payload
         except (OSError, UnicodeError, yaml.YAMLError) as exc:
             if self.debug:
                 print(f"Debug: failed reading IR graph: {exc}")
@@ -104,6 +109,7 @@ class GraphLoadingMixin(AnalysisMixinContract):
         self,
         source: Path,
         output_dir: Path,
+        payload: bytes,
         *,
         enabled: bool,
     ) -> None:
@@ -112,7 +118,7 @@ class GraphLoadingMixin(AnalysisMixinContract):
         try:
             destination = output_dir / source.name
             if source.resolve() != destination.resolve():
-                destination.write_text(source.read_text())
+                destination.write_bytes(payload)
         except OSError, UnicodeError:
             if self.debug:
                 print(f"Debug: failed to copy {source.name}")
@@ -181,53 +187,49 @@ class GraphLoadingMixin(AnalysisMixinContract):
         if paths is None:
             return None
         source, output_dir = paths
-        graph = self._load_graph(source)
-        if graph is None:
+        loaded = self._load_graph(source)
+        if loaded is None:
             return None
-        semantic_graph, semantic_complete = validate_graph_semantics(
+        graph, payload = loaded
+        graph_sha256 = sha256_bytes(payload)
+        _, semantic_complete = validate_graph_semantics(
             graph,
             strict=job.strict,
             validator=self.validator,
         )
-        self._copy_source_graph(source, output_dir, enabled=job.copy_graph)
-        all_layers: dict[str, Any] = graph.get("layers") or {}
-        if job.strict:
-            self._validate_strict_layers(all_layers)
+        self._copy_source_graph(
+            source, output_dir, payload, enabled=job.copy_graph
+        )
         requested_precision = normalize_dtype(job.precision)
-        profile = self._resolve_architecture_profile(job.architecture)
-        if job.strict and profile is not None:
-            self._validate_profile_dtypes(
-                all_layers,
-                profile,
-                requested_precision,
-            )
-        return PreparedAnalysis(
+        access = None
+        if source.with_name(ACCESS_FILENAME).is_file():
+            access = load_access_document(source)
+            if access.graph_sha256 != graph_sha256:
+                raise ValueError(
+                    "IR graph changed while loading access evidence"
+                )
+            access.require_graph(graph)
+        return prepare_validated_analysis(
             source=source,
-            output_dir=output_dir,
+            source_sha256=graph_sha256,
             graph=graph,
-            all_layers=all_layers,
-            declared_graph_outputs=set(
-                graph.get("outputs")
-                or (graph.get("graph_signature") or {}).get("joint_outputs")
-                or [],
-            ),
-            semantic_graph=semantic_graph,
-            semantic_complete=semantic_complete,
+            access=access,
+            output_dir=output_dir,
+            precision=requested_precision,
             strict=job.strict,
-            requested_precision=requested_precision,
-            fallback_precision=requested_precision,
-            element_size=BYTES_PER_ELEMENT[requested_precision],
-            profile=profile,
+            semantic_complete=semantic_complete,
         )
 
     def _build_graph_topology(
         self,
         all_layers: dict[str, Any],
         declared_graph_outputs: set[str] | None = None,
+        access: AccessDocument | None = None,
     ) -> GraphTopology:
         topology = build_graph_topology(
             all_layers,
             declared_graph_outputs,
+            access,
         )
         self._debug_topology(topology)
         return topology
@@ -329,7 +331,7 @@ class GraphLoadingMixin(AnalysisMixinContract):
                 cost = int(
                     self.einsum_analyzer.get_compute_cost(operation, shapes),
                 )
-        except Exception as exc:
+        except (ResourceClassificationError, NotImplementedError) as exc:
             if strict:
                 raise ResourceClassificationError(
                     f"operation handler failed for {data.op_type!r}: {exc}"
@@ -371,7 +373,11 @@ class GraphLoadingMixin(AnalysisMixinContract):
                 reads[-1] = min(sum(data.input_sizes), sum(data.output_sizes))
             writes = [0] * len(data.output_sizes)
             other_ops = 0
-        if data.op_type in ZERO_COPY_VIEW_OPS:
+        if (
+            data.layer_id in topology.transparent_layer_ids
+            if topology.has_access_contract
+            else data.op_type in ZERO_COPY_VIEW_OPS
+        ):
             reads = [0] * len(data.input_sizes)
             writes = [0] * len(data.output_sizes)
             other_ops = 0
@@ -447,3 +453,38 @@ class GraphLoadingMixin(AnalysisMixinContract):
             unfused_bytes=float(sum(input_bytes) + sum(output_bytes)),
             used_dtype_fallback=used_fallback,
         )
+
+
+def prepare_validated_analysis(
+    *,
+    source: Path,
+    source_sha256: str,
+    graph: dict[str, Any],
+    access: AccessDocument | None,
+    output_dir: Path,
+    precision: str,
+    strict: bool,
+    semantic_complete: bool,
+) -> PreparedAnalysis:
+    """Assemble an internal analysis context after dialect validation."""
+    requested_precision = normalize_dtype(precision)
+    return PreparedAnalysis(
+        source=source,
+        source_sha256=source_sha256,
+        output_dir=output_dir,
+        graph=graph,
+        all_layers=graph.get("layers") or {},
+        declared_graph_outputs=set(
+            graph.get("outputs")
+            or (graph.get("graph_signature") or {}).get("joint_outputs")
+            or []
+        ),
+        semantic_graph=True,
+        semantic_complete=semantic_complete,
+        strict=strict,
+        requested_precision=requested_precision,
+        fallback_precision=requested_precision,
+        element_size=BYTES_PER_ELEMENT[requested_precision],
+        profile=None,
+        access=access,
+    )

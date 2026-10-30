@@ -6,6 +6,16 @@
 from __future__ import annotations
 
 import gc
+from functools import partial
+from pathlib import Path
+
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
+from sol_execbench.core.bench.gpu_lock import (
+    gpu_lock_path,
+)
+from sol_execbench.core.bench.gpu_lock_paths import configured_gpu_locks
+from sol_execbench.core.process.termination import defer_termination
+from solar.contracts import AnalysisExecutionPolicy
 
 # Canonical architecture id passed to solar.api (no namespace prefix).
 # aka_corpus.FORMAL_ARCHITECTURE carries the manifest label "solar:RX_9060_XT";
@@ -40,10 +50,44 @@ def release_formal_device_memory(device: str) -> None:
     import torch
 
     selected = torch.device(device)
-    with torch.cuda.device(selected):
+    with defer_termination(), torch.cuda.device(selected):
         torch.cuda.synchronize()
         gc.collect()
         torch.cuda.empty_cache()
+
+
+def device_execution_policy(
+    device: str,
+    lock_path: str | Path | None,
+    timeout: float,
+) -> AnalysisExecutionPolicy:
+    """Share the native GPU lock; an explicit extra lock cannot replace it."""
+    extra = Path(lock_path) if lock_path is not None else None
+    gpu = device.split(":", 1)[0] in {"cuda", "hip"}
+    if (
+        gpu
+        and extra is not None
+        and extra.resolve()
+        in {
+            gpu_lock_path().resolve(),
+            configured_gpu_locks().execution.resolve(),
+        }
+    ):
+        extra = None
+    return AnalysisExecutionPolicy(
+        device_stage_lock_path=extra,
+        device_stage_lock_timeout_seconds=timeout,
+        device_stage_context=partial(
+            native_gpu_execution,
+            device,
+            timeout_seconds=timeout,
+        )
+        if gpu
+        else None,
+        device_stage_cleanup=partial(release_formal_device_memory, device)
+        if gpu
+        else None,
+    )
 
 
 __all__ = [

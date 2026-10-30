@@ -15,6 +15,7 @@ from solar.graph.extraction import extract_operator_graph
 from solar.ir.contracts import IRKind
 from solar.ir.conversion import convert_operator_graph
 from solar.ir.registry import ir_backend
+from solar.schema_versions import SOLAR_ANALYSIS_SCHEMA_VERSION
 from solar.verification.registry import verification_backend
 from solar.verification.verify import IRGraphExecutor
 
@@ -271,7 +272,7 @@ def test_cpu_pipeline_preserves_reference_semantics(
         strict=True,
     )
     assert analysis is not None
-    assert analysis["schema_version"] == 4
+    assert analysis["schema_version"] == SOLAR_ANALYSIS_SCHEMA_VERSION
 
 
 def test_extraction_tracks_only_tensor_inputs_used_by_reference(

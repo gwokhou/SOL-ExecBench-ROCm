@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 from types import SimpleNamespace
 from typing import cast
 
@@ -10,6 +11,7 @@ from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.workload import NumericCheck, Workload
 from sol_execbench.core.solar_bridge import (
     analyzer,
+    formal_device,
     invocation,
     workload_context,
 )
@@ -27,7 +29,9 @@ from sol_execbench.core.solar_bridge.workload_context import (
     SolarWorkloadContext,
 )
 from solar.api import AnalysisFailure, AnalysisResult, ArtifactRef, SOLBound
+from solar.ir.access_artifact import ACCESS_FILENAME
 from solar.ir.contracts import IRPath
+from solar.rocm.architecture import ArchitectureProfile
 
 _FORMAL_ARTIFACTS = tuple(
     ArtifactRef(path, "b" * 64)
@@ -35,6 +39,7 @@ _FORMAL_ARTIFACTS = tuple(
         "operator_graph.yaml",
         "einsum_graph.yaml",
         "conversion-attestation.yaml",
+        ACCESS_FILENAME,
         "solar-analysis.yaml",
     )
 )
@@ -179,7 +184,7 @@ def test_invoke_solar_maps_successful_bound_and_artifacts(
         lambda value: "fp16",
     )
     monkeypatch.setattr(
-        invocation,
+        formal_device,
         "release_formal_device_memory",
         cleanup_devices.append,
     )
@@ -412,3 +417,95 @@ def test_worker_request_round_trips_optional_home() -> None:
 
     assert SolarWorkerRequest.from_dict(request.to_dict()) == request
     assert request.to_dict()["ir_path"] == "make_fx_aten"
+
+
+@pytest.mark.parametrize("custom_path", [False, True])
+def test_default_solar_stage_shares_native_lock_without_nested_deadlock(
+    tmp_path,
+    monkeypatch,
+    custom_path,
+) -> None:
+    from sol_execbench.core.bench.gpu_lock import acquire_evaluation_gpu_lock
+    from solar.pipeline import analysis as pipeline
+
+    monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path))
+    monkeypatch.delenv("GPU_LOCK_HELD_BY_HOST", raising=False)
+    cleaned = []
+    monkeypatch.setattr(
+        formal_device, "release_formal_device_memory", cleaned.append
+    )
+    lock_path = (
+        tmp_path / "gpu-11111111-2222-3333-4444-555555555555.L1-ownership.lock"
+    )
+
+    def extract(*_args):
+        with lock_path.open("a+") as handle, pytest.raises(BlockingIOError):
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with acquire_evaluation_gpu_lock(timeout_seconds=0.01):
+            pass
+        raise ValueError("test stage failure")
+
+    monkeypatch.setattr(pipeline, "extract_request_graph", extract)
+
+    def analyze(request):
+        with pytest.raises(
+            pipeline.PipelineStageError, match="test stage failure"
+        ):
+            pipeline.run_pipeline(
+                request, cast(ArchitectureProfile, None), tmp_path
+            )
+        return AnalysisFailure(
+            status=SolarAnalysisStatus.FAILED,
+            analysis_id=request.analysis_id,
+            stage=SolarStage.GRAPH_EXTRACTION,
+            reason_code="test_failure",
+            message="test stage failure",
+        )
+
+    monkeypatch.setattr("solar.api.analyze", analyze)
+    invocation.invoke_solar(
+        context=_context(),
+        output_dir=tmp_path,
+        device="cuda:0",
+        orojenesis_home=None,
+        device_stage_lock_path=lock_path if custom_path else None,
+        device_stage_lock_timeout_seconds=0.02,
+    )
+    assert cleaned == ["cuda:0"]
+
+
+def test_cpu_analysis_preserves_explicit_serialization(tmp_path, monkeypatch):
+    monkeypatch.setenv("GPU_LOCK_DIR", str(tmp_path))
+    path = (
+        tmp_path / "gpu-11111111-2222-3333-4444-555555555555.L1-ownership.lock"
+    )
+    policy = formal_device.device_execution_policy("cpu", path, 1)
+    assert policy.device_stage_lock_path == path
+    assert policy.device_stage_context is None
+    assert policy.device_stage_cleanup is None
+
+
+pytestmark = pytest.mark.usefixtures("native_gpu_cpu_observation")
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["peak_ops_per_second", "precision_support", "audit_evidence"],
+)
+def test_corpus_identity_includes_rates_support_and_audit(field):
+    from sol_execbench.core.dataset.aka_corpus import FORMAL_ARCHITECTURE_SHA256
+    from solar.api import architecture_profile_sha256
+    from solar.rocm.architecture import ArchitectureProfile
+
+    data = ArchitectureProfile.load("RX_9060_XT").to_dict()
+    if field == "peak_ops_per_second":
+        data[field]["fp32"] *= 2
+    elif field == "precision_support":
+        data[field]["fp8"]["limitation"] = "Changed runtime qualification"
+    else:
+        data[field]["sha256"] = "0" * 64
+    assert architecture_profile_sha256(data) != FORMAL_ARCHITECTURE_SHA256
+
+
+def test_corpus_profile_retains_verified_audit_evidence():
+    ArchitectureProfile.load("RX_9060_XT").require_verified_audit_evidence()

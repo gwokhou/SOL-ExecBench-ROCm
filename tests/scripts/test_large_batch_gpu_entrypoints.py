@@ -6,11 +6,23 @@ from typing import Any
 
 import pytest
 
+from sol_execbench.core.bench.gpu_lock import (
+    GPULockVerificationError,
+    require_evaluation_gpu_lock,
+    require_supervised_gpu_execution,
+)
+
 
 def _reject(*_args: object, **_kwargs: object) -> None:
     raise ValueError("full qualification gate missing")
 
 
+def _reject_with_native_lease(*args: object, **kwargs: object) -> None:
+    require_supervised_gpu_execution()
+    _reject(*args, **kwargs)
+
+
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_aka_calibration_blocks_before_gpu_records(
     load_script: Any,
     monkeypatch: pytest.MonkeyPatch,
@@ -34,12 +46,16 @@ def test_aka_calibration_blocks_before_gpu_records(
         ran = True
 
     monkeypatch.setattr(script, "_parse_args", lambda: arguments)
-    monkeypatch.setattr(script, "_require_qualification", _reject)
+    monkeypatch.setattr(
+        script, "_require_qualification", _reject_with_native_lease
+    )
     monkeypatch.setattr(script, "_records", records)
 
     with pytest.raises(ValueError, match="gate missing"):
         script.main()
     assert ran is False
+    with pytest.raises(GPULockVerificationError):
+        require_evaluation_gpu_lock()
 
 
 def test_diagnostic_calibration_blocks_before_run(
@@ -72,6 +88,7 @@ def test_diagnostic_calibration_blocks_before_run(
     assert ran is False
 
 
+@pytest.mark.usefixtures("native_gpu_cpu_observation")
 def test_resource_peak_successor_blocks_before_legacy_producer(
     load_script: Any,
     monkeypatch: pytest.MonkeyPatch,
@@ -89,12 +106,16 @@ def test_resource_peak_successor_blocks_before_legacy_producer(
         return {}
 
     monkeypatch.setattr(script, "_parse_args", lambda _argv=None: arguments)
-    monkeypatch.setattr(script, "_verify_qualification", _reject)
+    monkeypatch.setattr(
+        script, "_verify_qualification", _reject_with_native_lease
+    )
     monkeypatch.setattr(script, "_legacy", legacy)
 
     with pytest.raises(ValueError, match="gate missing"):
         script.main([])
     assert ran is False
+    with pytest.raises(GPULockVerificationError):
+        require_evaluation_gpu_lock()
 
 
 def test_cross_path_focus_blocks_before_formal_workers(

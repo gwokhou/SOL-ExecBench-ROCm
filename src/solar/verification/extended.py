@@ -12,15 +12,15 @@ from solar.errors import (
     NativeOperationUnsupportedError,
 )
 from solar.ir.extended_einsum.native_registry import native_op_spec
-from solar.types import DynamicValue
-from solar.verification.errors import IRExecutionError
-from solar.verification.numerics import torch_equation
-from solar.verification.semantic_values import (
+from solar.ir.semantic_values import (
     EXTENDED_VALUE_POLICY,
     SemanticValueDecodeError,
     SemanticValueErrorKind,
     decode_semantic_value,
 )
+from solar.types import DynamicValue
+from solar.verification.errors import IRExecutionError
+from solar.verification.numerics import torch_equation
 
 
 def execute_extended_einsum_layer(

@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.bench.rocm_profiler.artifacts import (
     discover_rocprofv3_artifacts,
     is_profile_artifact_candidate,
@@ -93,11 +94,12 @@ def collect_rocprofv3_profile(
     )
     run = runner or default_profile_runner
     try:
-        completed = run(
-            command,
-            request.working_directory,
-            request.timeout_seconds,
-        )
+        with native_gpu_execution():
+            completed = run(
+                command,
+                request.working_directory,
+                request.timeout_seconds,
+            )
     except subprocess.TimeoutExpired as exc:
         return _timeout_result(request, command, exc)
     return _completed_profile_result(request, command, completed)

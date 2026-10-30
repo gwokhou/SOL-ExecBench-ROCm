@@ -134,6 +134,21 @@ def _reverse_operands(raw_target: str, operands: list[Any]) -> None:
     operands.reverse()
 
 
+def _functional_inplace(
+    spec: NativeOpSpec, operands: Sequence[Any], attributes: Mapping[str, Any]
+) -> bool:
+    """Keep the in-place variants of reviewed pure activations effectful."""
+    position = {"relu": 1, "elu": 2}.get(spec.target)
+    if position is None:
+        return False
+    value = attributes.get(
+        "inplace", operands[position] if len(operands) > position else False
+    )
+    if isinstance(value, Mapping):
+        value = value.get("value", value.get("literal", True))
+    return value is not False and value is not None
+
+
 def _observed_effects(
     layer: Mapping[str, Any],
     spec: NativeOpSpec,
@@ -145,8 +160,10 @@ def _observed_effects(
     effects = _default_effects(spec, input_arity, output_arity)
     raw_target = str(layer.get("type", ""))
     mutating = (
-        raw_target.endswith("_") and not raw_target.endswith("__")
-    ) or layer.get("mutates_inputs") is True
+        (raw_target.endswith("_") and not raw_target.endswith("__"))
+        or layer.get("mutates_inputs") is True
+        or _functional_inplace(spec, operands, attributes)
+    )
     aliases = _plain_value(layer.get("aliases") or [])
     if aliases:
         effects["aliases"] = list(aliases)
@@ -500,6 +517,10 @@ def _validate_required_parameters(
     operands: Sequence[Any],
     attributes: Mapping[str, Any],
 ) -> None:
+    if target == "where" and len(operands) != 3:
+        raise SemanticGraphError(
+            f"native_attribute_unsupported: layer {layer_id} requires three where operands"
+        )
     required = {
         "gather": (("dim", 3),),
         "index_add": (("dim", 4),),

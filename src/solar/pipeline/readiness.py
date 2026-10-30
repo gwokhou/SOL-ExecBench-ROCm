@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from solar.artifacts import sha256_file, stable_json_checksum
+from solar.artifacts.names import CONVERSION_ATTESTATION_FILENAME
 from solar.contracts import (
     ConversionRequest,
     ConversionRequestEnvelope,
@@ -163,7 +164,7 @@ def audit_conversion(
         ir_graph = convert_request_graph(request, operator, staging)
         passed.append(_passed_stage(stage, ir_graph.path))
         stage = SolarStage.CONVERSION_VERIFICATION
-        attestation = staging / "conversion-attestation.yaml"
+        attestation = staging / CONVERSION_ATTESTATION_FILENAME
         verify_request_graph(request, ir_graph, attestation)
         passed.append(_passed_stage(stage, attestation))
     except Exception as exc:  # noqa: BLE001 -- retain staged failure evidence

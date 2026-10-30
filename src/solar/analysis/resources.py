@@ -567,16 +567,18 @@ def _conversion_rule(
 ) -> _RuleResult:
     if context.target not in _CONVERSION_OPS:
         return _NO_MATCH
-    source_mode = _mode(
+    source_dtype = normalize_dtype(
         context.input_dtypes[0] if context.input_dtypes else context.dtype,
         context.fallback_precision,
     )
-    destination_mode = _mode(
+    destination_dtype = normalize_dtype(
         context.output_dtypes[0] if context.output_dtypes else context.dtype,
         context.fallback_precision,
     )
-    if source_mode == destination_mode:
+    if source_dtype == destination_dtype:
         return _exempt("same_dtype_conversion_noop")
+    source_mode = _mode(source_dtype, context.fallback_precision)
+    destination_mode = _mode(destination_dtype, context.fallback_precision)
     accumulator.add(
         "conversion",
         f"{source_mode}->{destination_mode}",

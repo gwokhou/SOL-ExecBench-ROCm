@@ -27,6 +27,7 @@ from sol_execbench.core.bench.batch_gpu_qualification import (
     select_risk_first_axis_extrema,
     verify_qualification_artifact,
 )
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.data.definition import Definition
 from sol_execbench.core.data.json_utils import (
     atomic_write_json_value,
@@ -564,41 +565,44 @@ def _device_identity(device: RocmDeviceInfo) -> dict[str, object]:
 def main() -> None:
     """Calibrate and persist tolerance evidence for authored workloads."""
     args = _parse_args()
-    if args.seed_count < 2 or args.repeats_per_seed < 2:
-        raise ValueError(
-            "calibration requires at least two seeds and two repeats",
+    with native_gpu_execution(
+        "cpu" if args.stage == "qualify-static" else args.device
+    ):
+        if args.seed_count < 2 or args.repeats_per_seed < 2:
+            raise ValueError(
+                "calibration requires at least two seeds and two repeats",
+            )
+        stage = (
+            BatchGPUQualificationStage(args.stage.removeprefix("qualify-"))
+            if args.stage != "run"
+            else None
         )
-    stage = (
-        BatchGPUQualificationStage(args.stage.removeprefix("qualify-"))
-        if args.stage != "run"
-        else None
-    )
-    if stage is not None:
-        _run_qualification(args, stage)
-        return
-    _require_qualification(args)
-    device = detect_rocm_device(args.device)
-    if device.gfx_target != FORMAL_GFX_TARGET:
-        raise RuntimeError(
-            f"calibration requires {FORMAL_GFX_TARGET}, got {device.gfx_target}",
-        )
-    payload = {
-        "schema_version": AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION,
-        "method": CALIBRATION_METHOD,
-        "aka_revision": AKA_REVISION,
-        "margin": args.margin,
-        "seed_count": args.seed_count,
-        "repeats_per_seed": args.repeats_per_seed,
-        "device": {
-            "name": device.name,
-            "gfx_target": device.gfx_target,
-            "torch_version": device.torch_version,
-            "hip_version": device.hip_version,
-        },
-        "records": _records(args),
-    }
-    atomic_write_json_value(args.output, payload)
-    print(f"wrote {args.output} ({len(payload['records'])} workloads)")
+        if stage is not None:
+            _run_qualification(args, stage)
+            return
+        _require_qualification(args)
+        device = detect_rocm_device(args.device)
+        if device.gfx_target != FORMAL_GFX_TARGET:
+            raise RuntimeError(
+                f"calibration requires {FORMAL_GFX_TARGET}, got {device.gfx_target}",
+            )
+        payload = {
+            "schema_version": AKA_TOLERANCE_CALIBRATION_SCHEMA_VERSION,
+            "method": CALIBRATION_METHOD,
+            "aka_revision": AKA_REVISION,
+            "margin": args.margin,
+            "seed_count": args.seed_count,
+            "repeats_per_seed": args.repeats_per_seed,
+            "device": {
+                "name": device.name,
+                "gfx_target": device.gfx_target,
+                "torch_version": device.torch_version,
+                "hip_version": device.hip_version,
+            },
+            "records": _records(args),
+        }
+        atomic_write_json_value(args.output, payload)
+        print(f"wrote {args.output} ({len(payload['records'])} workloads)")
 
 
 if __name__ == "__main__":

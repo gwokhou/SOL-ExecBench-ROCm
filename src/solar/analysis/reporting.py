@@ -16,9 +16,10 @@ from solar.analysis.graph_models import (
     GraphIoTotals,
     LowerBound,
 )
-from solar.artifacts import sha256_file
+from solar.analysis.views import build_analysis_views
 from solar.artifacts.yaml import NoAliasDumper
 from solar.contracts import FORMAL_BOUND_KIND, ROOFLINE_BOUND_KIND
+from solar.ir.access import AccessQuality
 from solar.rocm.architecture import ArchitectureProfile
 from solar.schema_versions import (
     SOLAR_ANALYSIS_SCHEMA_VERSION,
@@ -33,6 +34,11 @@ class PreparedAnalysisView(Protocol):
     @property
     def source(self) -> Path:
         """Return the source graph path."""
+        ...
+
+    @property
+    def source_sha256(self) -> str:
+        """Return the digest of the bytes used to prepare intrinsic counts."""
         ...
 
     @property
@@ -140,7 +146,22 @@ def _analysis_metadata(
     accumulator: AnalysisAccumulator,
     formal: FormalAnalysis,
 ) -> NodeDict:
+    reads = accumulator.external_reads
+    proven_reads = (
+        reads is not None and reads.quality is not AccessQuality.UNAVAILABLE
+    )
     return {
+        "external_reads": reads.to_dict() if reads is not None else None,
+        "views": {
+            kind.value: view.model_dump(mode="json")
+            for kind, view in build_analysis_views(
+                accumulator,
+                formal,
+                prepared.profile,
+                semantic_complete=prepared.semantic_graph
+                and prepared.semantic_complete,
+            ).items()
+        },
         "precision": prepared.requested_precision,
         "fallback_precision": prepared.fallback_precision,
         "bytes_per_element": prepared.element_size,
@@ -150,18 +171,21 @@ def _analysis_metadata(
             else "per_tensor"
         ),
         "source_graph": str(prepared.source),
-        "source_graph_sha256": sha256_file(prepared.source),
+        "source_graph_sha256": prepared.source_sha256,
         "fusion": formal.fusion,
         "orojenesis": formal.orojenesis,
         "bound_kind": (
             FORMAL_BOUND_KIND
-            if formal.tile_aware_bound and prepared.profile is not None
+            if formal.tile_aware_bound
+            and prepared.profile is not None
+            and proven_reads
             else (
                 ROOFLINE_BOUND_KIND
                 if (
                     prepared.profile is not None
                     and prepared.semantic_graph
                     and prepared.semantic_complete
+                    and proven_reads
                 )
                 else "diagnostic"
             )

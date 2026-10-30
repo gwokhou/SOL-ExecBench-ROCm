@@ -12,7 +12,8 @@ import subprocess
 import time
 from pathlib import Path
 
-from sol_execbench.core.bench.clock_lock import acquire_clock_lock
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
+from sol_execbench.core.bench.gpu_lock import require_supervised_gpu_execution
 
 OUTPUT_DIR = Path("out/rdna4-clock-lock-workload-20260609")
 
@@ -44,6 +45,7 @@ def log(label: str, content: str) -> None:
 
 def run_gpu_workload(duration_sec: float = 45.0) -> None:
     """Run sustained GEMM work while recording intermediate clock state."""
+    require_supervised_gpu_execution()
     import torch
 
     end = time.monotonic() + duration_sec
@@ -81,12 +83,8 @@ def main() -> None:
     log("pre_static", amd_smi("static", "-a"))
     log("pre_metrics", amd_smi("metric", "-c", "-l", "-p", "-t", "-u"))
 
-    # 2. Lock with the production clock-lock helper.
-    clock_lock = acquire_clock_lock()
-    if not clock_lock.locked:
-        log("lock_failed", "STABLE_PEAK lock failed\n")
-        raise SystemExit(1)
-    with clock_lock:
+    # The native owner holds both locks through synchronization and AUTO restore.
+    with native_gpu_execution(manage_clocks=True):
         log("after_lock", amd_smi("metric", "-c", "-l", "-p", "-t", "-u"))
 
         # 3. Run sustained GPU workload while monitoring clocks
