@@ -15,10 +15,11 @@ from solar.rocm.audit_validation import (
     audit_sha256,
     audit_string_set,
 )
+from solar.rocm.throttle import ThrottleStatus, snapshot_throttle_status
 
 _NOMINAL_TOLERANCE = 1.001
 _BOOTSTRAP_METHOD = "percentile bootstrap over process-batch medians"
-_THROTTLE_STATUSES = frozenset({"THROTTLED", "UNTHROTTLED"})
+_THROTTLE_STATUSES = frozenset(ThrottleStatus)
 _TELEMETRY_NUMERIC_FIELDS = (
     "gfx_clock_mhz",
     "gfx_max_clock_mhz",
@@ -401,8 +402,21 @@ def _verify_telemetry(
         or throttle_status not in _THROTTLE_STATUSES
     ):
         raise ValueError("architecture audit telemetry state is incomplete")
-    if require_unthrottled and throttle_status != "UNTHROTTLED":
-        raise ValueError("architecture audit telemetry reports throttling")
+    raw_evidence = snapshot.get("throttle_evidence")
+    state = snapshot_throttle_status(
+        raw_evidence, snapshot.get("throttle_status_cli")
+    )
+    if raw_evidence is not None and throttle_status != state:
+        raise ValueError(
+            "architecture audit throttle state disagrees with raw evidence"
+        )
+    if require_unthrottled:
+        if state == ThrottleStatus.UNKNOWN:
+            raise ValueError(
+                "architecture audit throttle evidence is missing or unknown"
+            )
+        if state != ThrottleStatus.UNTHROTTLED:
+            raise ValueError("architecture audit telemetry reports throttling")
     current_clock = _positive_number(
         snapshot.get("gfx_clock_mhz"),
         "telemetry gfx clock",
