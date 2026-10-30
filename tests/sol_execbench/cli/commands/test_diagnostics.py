@@ -22,6 +22,7 @@ from sol_execbench.core.evidence.runtime_evidence.models import (
     RuntimeGPUTelemetry,
 )
 from sol_execbench.core.integrity.schema_versions import SchemaVersion
+from sol_execbench.core.process.environment import ENV_PYTORCH_ALLOC_CONF
 
 
 class _FakeClockLease(ClockLockLease):
@@ -84,7 +85,7 @@ def test_run_evaluation_command_passes_flashinfer_env(
 
     assert result.returncode == 0
     assert captured_env is not None
-    assert captured_env["PYTORCH_ALLOC_CONF"] == "expandable_segments:True"
+    assert captured_env[ENV_PYTORCH_ALLOC_CONF] == "expandable_segments:False"
     assert captured_env["FLASHINFER_TRACE_DIR"] == "/repo"
     assert captured_env["HOME"] == str(tmp_path)
     assert "OPENAI_API_KEY" not in captured_env
@@ -137,7 +138,7 @@ def test_run_profiled_evaluation_requests_graceful_eval_driver_exit(
     assert profiled_proc is not None
     assert profile_result.succeeded is True
     assert captured_env is not None
-    assert captured_env["PYTORCH_ALLOC_CONF"] == "expandable_segments:True"
+    assert captured_env[ENV_PYTORCH_ALLOC_CONF] == "expandable_segments:False"
     assert captured_env["FLASHINFER_TRACE_DIR"] == "/repo"
     assert captured_env["SOL_EXECBENCH_GRACEFUL_EXIT"] == "1"
 
