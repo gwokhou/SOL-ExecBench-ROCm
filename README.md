@@ -92,9 +92,8 @@ tool for every SOLAR use. The architecture audit is packaged and
 content-addressed, with its throttled resource measurements explicitly limited
 to instruction/runtime corroboration. The reproducibly built mapper digest is
 reviewed and present in the release allowlist, so the formal producer reports
-ready. Official scoring remains unavailable because the corpus policy is still
-pending and no repository release bundle has been published. An executable
-whose digest is only self-declared by its local provenance manifest is still
+ready. The corpus scoring policy is available and the gfx1200 release bundle
+is published under [`RELEASE/`](RELEASE/README.md). An executable whose digest is only self-declared by its local provenance manifest is still
 rejected:
 
 ```bash
@@ -146,12 +145,14 @@ the default executor calls public PyTorch APIs independently of the ATen path.
 
 ## Official score
 
-The schema v7 corpus pins the pending
-`rx9060xt-gfx1200-reference-v2` baseline identity. Official scoring remains
-unauthorized until its v2 release evidence is published. Once authorized, the
-fail-closed scorer accepts a publisher-authored release bundle whose SHA-256
-references bind the corpus, baseline, candidate execution, and pinned SOLAR
-manifests:
+The schema v7 corpus pins the `rx9060xt-gfx1200-reference-v2` baseline
+identity, and its v2 release evidence is published. The published gfx1200
+official SOL score is `0.497818327` over 43 problems and 163 workloads. Its
+candidate is the eager PyTorch reference scored against itself, so the score
+validates the scoring pipeline rather than any optimized kernel; see
+[`RELEASE/README.md`](RELEASE/README.md). The fail-closed scorer accepts a
+publisher-authored release bundle whose SHA-256 references bind the corpus,
+baseline, candidate execution, and pinned SOLAR manifests:
 
 ```bash
 uv run sol-execbench score official RELEASE/release-bundle.json
