@@ -42,11 +42,15 @@ from sol_execbench.core.solar_bridge.corpus_readiness import (
     CorpusReadinessStatus,
     CorpusReadinessSummary,
     audit_corpus_stage_readiness,
+    verify_readiness_receipt,
 )
 from sol_execbench.core.solar_bridge.models import (
     DEFAULT_IR_PATH,
     IRPath,
     normalize_ir_path,
+)
+from sol_execbench.core.solar_bridge.workload_context import (
+    workload_verification_policy,
 )
 from sol_execbench.core.timestamps import utc_timestamp
 
@@ -387,6 +391,21 @@ def _verify_readiness(
         raise ValueError("SOLAR qualification readiness denominator drift")
     if summary.status is not CorpusReadinessStatus.READY:
         raise ValueError("SOLAR qualification readiness is not complete")
+    root = (context.root / matrix_artifact.path).parent
+    for record in records:
+        problem = context.corpus.authored_root / record.problem_path
+        definition = load_json_file(Definition, problem / "definition.json")
+        workload = next(
+            item
+            for item in load_jsonl_file(Workload, problem / "workload.jsonl")
+            if item.uuid == record.workload_uuid
+        )
+        verify_readiness_receipt(
+            record.model_dump(mode="json"),
+            root,
+            workload_verification_policy(definition, workload, context.device),
+            f"{definition.name}/definition.json#reference",
+        )
 
 
 __all__ = [

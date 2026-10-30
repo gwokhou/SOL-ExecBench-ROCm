@@ -54,9 +54,15 @@ from sol_execbench.core.solar_bridge.models import (
 from sol_execbench.core.solar_bridge.runner import run_solar_stage_worker
 from sol_execbench.core.solar_bridge.workload_context import (
     structured_input_indices,
+    workload_verification_policy,
 )
 from sol_execbench.core.timestamps import utc_timestamp
+from solar.artifacts import load_yaml_artifact
+from solar.ir.access_artifact import ACCESS_FILENAME
 from solar.ir.contracts import DEFAULT_IR_PATH, IRPath, normalize_ir_path
+from solar.verification.contracts import VerificationPolicy
+from solar.verification.policy import verification_cases
+from solar.verification.receipt import validate_callable_receipt
 
 _RESULT_FILENAME = "stage-result.json"
 _MATRIX_FILENAME = "matrix.jsonl"
@@ -320,7 +326,15 @@ def _audit_entry(
             workload,
         )
         if context.resume and result_path.is_file():
-            record = _load_resumed_record(result_path, context.output, identity)
+            record = _load_resumed_record(
+                result_path,
+                context.output,
+                identity,
+                policy=workload_verification_policy(
+                    definition, workload, context.device
+                ),
+                reference_name=f"{definition.name}/definition.json#reference",
+            )
             atomic_write_json_value(result_path, record)
         else:
             outcome = run_solar_stage_worker(
@@ -456,6 +470,9 @@ def _load_resumed_record(
     result_path: Path,
     output: Path,
     identity: dict[str, Any],
+    *,
+    policy: VerificationPolicy,
+    reference_name: str,
 ) -> dict[str, Any]:
     record = load_json_value(result_path)
     record = CorpusReadinessRecord.model_validate(record).model_dump(
@@ -465,11 +482,42 @@ def _load_resumed_record(
         raise ValueError("resumed readiness record identity mismatch")
     _verify_record_artifacts(record, output)
     if _record_ready(record):
+        verify_readiness_receipt(record, output, policy, reference_name)
         record["status"] = SolarReadinessStatus.READY
         record["failure_stage"] = None
         record["reason_code"] = None
         record["message"] = None
     return record
+
+
+def verify_readiness_receipt(
+    record: dict[str, Any],
+    output: Path,
+    policy: VerificationPolicy,
+    reference_name: str,
+) -> None:
+    """Validate current semantic evidence for resume and qualification reuse."""
+    _verify_record_artifacts(record, output)
+    if not _record_ready(record):
+        raise ValueError("readiness receipt is not complete")
+    stages = {item["stage"]: item["artifact"] for item in record["stages"]}
+    receipt_path = output / stages[SolarStage.CONVERSION_VERIFICATION]["path"]
+    graph = stages[SolarStage.IR_CONVERSION]
+    receipt = load_yaml_artifact(receipt_path)
+    access_path = receipt_path.parent / ACCESS_FILENAME
+    access_path.resolve().relative_to(output.resolve())
+    execution = receipt.require_mapping("predicate").get("execution")
+    validate_callable_receipt(
+        receipt,
+        subjects={
+            reference_name: record["reference_sha256"],
+            Path(graph["path"]).name: graph["sha256"],
+            ACCESS_FILENAME: sha256_file(access_path),
+        },
+        policy=policy,
+        cases=verification_cases({}, policy),
+        execution_sha256=stable_json_checksum(execution),
+    )
 
 
 def _verify_record_artifacts(record: dict[str, Any], output: Path) -> None:

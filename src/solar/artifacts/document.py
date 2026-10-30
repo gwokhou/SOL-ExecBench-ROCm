@@ -138,7 +138,10 @@ class _BoundedLoader(yaml.SafeLoader):
         self._value_budget.consume(self._node_depth)
         self._node_depth += 1
         try:
-            return super().compose_node(parent, index)
+            node = super().compose_node(parent, index)
+            if node.tag == "tag:yaml.org,2002:merge":
+                raise ValueError("artifact YAML merge keys are not supported")
+            return node
         finally:
             self._node_depth -= 1
 

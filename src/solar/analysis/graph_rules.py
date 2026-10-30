@@ -3,6 +3,9 @@
 
 """Declarative operation sets used by graph accounting stages."""
 
+# Proven executable operations whose tensor operands supply metadata only.
+METADATA_INPUT_TARGETS = frozenset({"ones_like"})
+
 BOOL_DTYPES = frozenset({"torch.bool", "bool"})
 
 RECOMPUTABLE_OPERAND_TARGETS = frozenset(

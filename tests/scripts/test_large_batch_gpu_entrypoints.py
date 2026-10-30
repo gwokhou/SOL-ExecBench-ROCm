@@ -6,6 +6,8 @@ from typing import Any
 
 import pytest
 
+from sol_execbench.core.bench import host_clock_guard
+from sol_execbench.core.bench.clock_ownership import ClockDevice
 from sol_execbench.core.bench.gpu_lock import (
     GPULockVerificationError,
     require_evaluation_gpu_lock,
@@ -98,7 +100,27 @@ def test_resource_peak_successor_blocks_before_legacy_producer(
         "run_qualified_rdna4_resource_peak_calibration.py"
     )
     ran = False
-    arguments = SimpleNamespace(stage="run")
+    arguments = SimpleNamespace(stage="run", allow_unlocked=False)
+    writes = []
+    device = ClockDevice(
+        bdf="0000:05:00.0", uuid="11111111-2222-3333-4444-555555555555"
+    )
+    monkeypatch.setattr(
+        host_clock_guard, "observe_clock_devices", lambda: (device,)
+    )
+    monkeypatch.setattr(
+        host_clock_guard,
+        "observe_clock_levels",
+        lambda *_: ("AMDSMI_DEV_PERF_LEVEL_AUTO",),
+    )
+    monkeypatch.setattr(
+        host_clock_guard, "set_peak_clocks", lambda *_: writes.append("PEAK")
+    )
+    monkeypatch.setattr(
+        host_clock_guard,
+        "unlock_clocks",
+        lambda *_: writes.append("AUTO") or True,
+    )
 
     def legacy():
         nonlocal ran
@@ -114,6 +136,7 @@ def test_resource_peak_successor_blocks_before_legacy_producer(
     with pytest.raises(ValueError, match="gate missing"):
         script.main([])
     assert ran is False
+    assert writes == ["PEAK", "AUTO"]
     with pytest.raises(GPULockVerificationError):
         require_evaluation_gpu_lock()
 

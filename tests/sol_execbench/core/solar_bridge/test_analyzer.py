@@ -65,6 +65,7 @@ def _workload() -> Workload:
         Workload,
         SimpleNamespace(
             uuid="workload-1",
+            inputs={},
             checks=[
                 NumericCheck(
                     output="y",

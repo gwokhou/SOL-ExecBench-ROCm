@@ -119,7 +119,11 @@ optional SOLAR private lock cannot replace L1/L2 or cause reacquisition of them.
 
 Direct evaluation, the SOLAR CLI/release bridge, marked GPU tests, profiler
 collectors and calibration entries use the native boundary. Direct SOLAR GPU
-API callers must supply a `device_stage_context`; low-level evaluator/profile
+API callers, including `ConversionReadinessRequest`, must supply an
+`AnalysisExecutionPolicy` with a `device_stage_context` on GPU requests. The
+readiness boundary uses the same cleanup callback and lock scope as analysis;
+CPU requests need neither. The ExecBench readiness bridge also enters the
+native scope before querying its formal device. Low-level evaluator/profile
 workers require their supervisor's active owner and held L2. CPU paths neither
 require these variables nor query devices. Direct native execution currently
 supports visible device 0 only: read-only AMD-SMI identity and the selected BDF's

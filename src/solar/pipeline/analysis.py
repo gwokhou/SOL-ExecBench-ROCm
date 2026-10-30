@@ -78,16 +78,20 @@ def _exclusive_device_stage(
 
 
 @contextmanager
-def _device_stage_guard(
-    request: AnalysisRequest,
+def device_stage_guard(
+    policy: AnalysisExecutionPolicy,
 ) -> Iterator[None]:
     """Return the configured guard for extraction through verification."""
-    context = request.execution_policy.device_stage_context
+    context = policy.device_stage_context
     with (
         context() if context is not None else nullcontext(),
-        _exclusive_device_stage(request.execution_policy),
+        _exclusive_device_stage(policy),
     ):
-        yield
+        try:
+            yield
+        finally:
+            if policy.device_stage_cleanup is not None:
+                policy.device_stage_cleanup()
 
 
 def run_pipeline(
@@ -98,21 +102,16 @@ def run_pipeline(
     """Run the graph, IR, verification, and analysis stages."""
     stage = SolarStage.GRAPH_EXTRACTION
     try:
-        with _device_stage_guard(request):
-            try:
-                operator = extract_request_graph(request, staging)
-                stage = SolarStage.IR_CONVERSION
-                ir_graph = convert_request_graph(request, operator, staging)
-                stage = SolarStage.CONVERSION_VERIFICATION
-                verify_request_graph(
-                    request,
-                    ir_graph,
-                    staging / CONVERSION_ATTESTATION_FILENAME,
-                )
-            finally:
-                cleanup = request.execution_policy.device_stage_cleanup
-                if cleanup is not None:
-                    cleanup()
+        with device_stage_guard(request.execution_policy):
+            operator = extract_request_graph(request, staging)
+            stage = SolarStage.IR_CONVERSION
+            ir_graph = convert_request_graph(request, operator, staging)
+            stage = SolarStage.CONVERSION_VERIFICATION
+            verify_request_graph(
+                request,
+                ir_graph,
+                staging / CONVERSION_ATTESTATION_FILENAME,
+            )
         stage = SolarStage.FORMAL_ANALYSIS
         analysis = analyze_request_graph(request, profile, staging, ir_graph)
         return PipelineResult(ir_graph, analysis)

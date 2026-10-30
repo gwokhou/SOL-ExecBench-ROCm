@@ -27,9 +27,11 @@ def require_formal_device(device: str) -> None:
     """Require the release's publication-grade ROCm target."""
     import torch
 
+    selected = torch.device(device)
+    if selected.type != "cuda":
+        raise ValueError("formal SOLAR analysis requires a ROCm GPU device")
     if not torch.cuda.is_available() or not getattr(torch.version, "hip", None):
         raise RuntimeError("formal SOLAR analysis requires a ROCm device")
-    selected = torch.device(device)
     index = (
         selected.index
         if selected.index is not None

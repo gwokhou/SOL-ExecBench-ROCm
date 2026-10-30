@@ -773,6 +773,21 @@ def _validated_recorded_tolerance(
         and recorded.verify_gradients != required.verify_gradients
         or isinstance(required, VerificationPolicy)
         and recorded.gradient_input_indices != required.gradient_input_indices
+        or isinstance(required, VerificationPolicy)
+        and required.verify_gradients
+        and any(
+            (
+                getattr(recorded, f"gradient_{name}")
+                if getattr(recorded, f"gradient_{name}") is not None
+                else getattr(recorded, name)
+            )
+            > (
+                getattr(required, f"gradient_{name}")
+                if getattr(required, f"gradient_{name}") is not None
+                else getattr(required, name)
+            )
+            for name in ("atol", "rtol")
+        )
     ):
         raise VerificationError(
             "verification tolerance is weaker than benchmark tolerance",

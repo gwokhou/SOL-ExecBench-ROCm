@@ -21,6 +21,7 @@ from solar.analysis.access_regions import (
     AccessBudget,
     union_accesses,
 )
+from solar.analysis.graph_rules import METADATA_INPUT_TARGETS
 from solar.ir.access import AccessQuality, AccessReason, TensorAccess
 from solar.ir.access_artifact import AccessDocument
 from solar.ir.access_calls import STATIC_VIEW_TARGETS
@@ -233,7 +234,7 @@ def _blocking_reason(
             if _where_has_external_values(layer, access)
             else None
         )
-    if target == "ones_like":
+    if target in METADATA_INPUT_TARGETS:
         return None
     if target == "scalar_tensor":
         operands = operation_operands(semantic)
@@ -280,7 +281,7 @@ def _operand_accesses(
     layer: NodeDict, view: TensorAccess, budget: AccessBudget
 ) -> tuple[TensorAccess, ...]:
     semantic = layer_operation(layer)
-    if semantic.get("target") == "ones_like":
+    if semantic.get("target") in METADATA_INPUT_TARGETS:
         return ()
     if semantic.get("target") in TRIANGULAR_TARGETS:
         return triangular_accesses(view, semantic, max_regions=budget.regions)

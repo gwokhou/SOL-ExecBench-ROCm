@@ -7,9 +7,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sol_execbench.core.bench.gpu_execution import native_gpu_execution
 from sol_execbench.core.platform.runtime import detect_rocm_device
 from sol_execbench.core.solar_bridge.formal_device import (
     FORMAL_ARCHITECTURE,
+    device_execution_policy,
     require_formal_device,
 )
 from sol_execbench.core.solar_bridge.invocation import invoke_solar
@@ -67,8 +69,13 @@ def analyze_workload(
     device_stage_lock_timeout_seconds: float = 14_400.0,
 ) -> SolarAnalysisOutcome:
     """Adapt one workload and invoke SOLAR's benchmark-agnostic API."""
-    require_formal_device(device)
-    context = load_solar_workload_context(problem_dir, workload_uuid, device)
+    with native_gpu_execution(
+        device, timeout_seconds=device_stage_lock_timeout_seconds
+    ):
+        require_formal_device(device)
+        context = load_solar_workload_context(
+            problem_dir, workload_uuid, device
+        )
     return invoke_solar(
         context=context,
         output_dir=Path(output_dir),
@@ -99,8 +106,13 @@ def analyze_workload_diagnostic(
     returns a roofline bound even when the result is not publication-eligible.
     Results are engineering/inexact, never a formal SOLAR bound.
     """
-    gfx_target = detect_rocm_device(device).gfx_target
-    context = load_solar_workload_context(problem_dir, workload_uuid, device)
+    with native_gpu_execution(
+        device, timeout_seconds=device_stage_lock_timeout_seconds
+    ):
+        gfx_target = detect_rocm_device(device).gfx_target
+        context = load_solar_workload_context(
+            problem_dir, workload_uuid, device
+        )
     return invoke_solar(
         context=context,
         output_dir=Path(output_dir),
@@ -125,20 +137,24 @@ def audit_workload_stages(
     """Run the exact extraction/conversion/replay gate for one corpus workload."""
     from solar.api import ConversionReadinessRequest, audit_conversion
 
-    require_formal_device(device)
-    selected_path = normalize_ir_path(ir_path)
-    context = load_solar_workload_context(problem_dir, workload_uuid, device)
-    result = audit_conversion(
-        ConversionReadinessRequest(
-            conversion=solar_conversion_request(
-                context,
-                device,
-                selected_path,
+    with native_gpu_execution(device):
+        require_formal_device(device)
+        selected_path = normalize_ir_path(ir_path)
+        context = load_solar_workload_context(
+            problem_dir, workload_uuid, device
+        )
+        result = audit_conversion(
+            ConversionReadinessRequest(
+                conversion=solar_conversion_request(
+                    context,
+                    device,
+                    selected_path,
+                ),
+                architecture=FORMAL_ARCHITECTURE,
+                output_dir=Path(output_dir),
+                execution_policy=device_execution_policy(device, None, 60.0),
             ),
-            architecture=FORMAL_ARCHITECTURE,
-            output_dir=Path(output_dir),
-        ),
-    )
+        )
     return SolarStageAuditOutcome(
         status=result.status,
         analysis_id=result.analysis_id,

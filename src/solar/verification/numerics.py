@@ -56,15 +56,16 @@ def clone(value: DynamicValue) -> DynamicValue:
     return value
 
 
-def _tensor_leaves(value: DynamicValue) -> list[DynamicValue]:
+def tensor_leaves(value: DynamicValue) -> list[DynamicValue]:
+    """Return tensor leaves in their public output-structure order."""
     import torch
 
     if isinstance(value, torch.Tensor):
         return [value]
     if isinstance(value, (tuple, list)):
-        return [leaf for item in value for leaf in _tensor_leaves(item)]
+        return [leaf for item in value for leaf in tensor_leaves(item)]
     if isinstance(value, dict):
-        return [leaf for key in value for leaf in _tensor_leaves(value[key])]
+        return [leaf for key in value for leaf in tensor_leaves(value[key])]
     return []
 
 
@@ -73,7 +74,7 @@ def alias_relation(
     inputs: DynamicValue,
 ) -> tuple[tuple[bool, ...], ...]:
     """Return the complete input/output tensor-storage alias relation."""
-    leaves = [*_tensor_leaves(inputs), *_tensor_leaves(outputs)]
+    leaves = [*tensor_leaves(inputs), *tensor_leaves(outputs)]
     return tuple(
         tuple(same_tensor_storage(left, right) for right in leaves)
         for left in leaves
@@ -217,7 +218,14 @@ def _floating_close_stats(
         torch.Tensor,
     ):
         raise TypeError("floating comparison requires tensor operands")
-    dtype = torch.complex64 if actual.is_complex() else torch.float32
+    wide = any(
+        value.dtype in (torch.float64, torch.complex128)
+        for value in (actual, expected)
+    )
+    if actual.is_complex() or expected.is_complex():
+        dtype = torch.complex128 if wide else torch.complex64
+    else:
+        dtype = torch.float64 if wide else torch.float32
     output, reference = actual.reshape(-1), expected.reshape(-1)
     matched_count = finite_count = matching_nan_count = 0
     max_abs = 0.0

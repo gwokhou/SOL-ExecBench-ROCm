@@ -752,6 +752,9 @@ def test_mapper_normal_leader_exit_cleans_surviving_child(tmp_path):
     )
     assert completed.returncode == 0
     child_pid = int((tmp_path / "stdout.log").read_text().strip())
+    deadline = time.monotonic() + 1.0
+    while _process_is_running(child_pid) and time.monotonic() < deadline:
+        time.sleep(0.001)
     assert not _process_is_running(child_pid)
 
 
@@ -786,3 +789,21 @@ def test_scan_deadline_unwinds_mapper_and_its_child(tmp_path):
         orojenesis_process.run_mapper_process(command, cwd=tmp_path, timeout=30)
     child_pid = int((tmp_path / "stdout.log").read_text().strip())
     assert not _process_is_running(child_pid)
+
+
+@pytest.mark.parametrize(
+    "capacity, witness",
+    [(100, False), (104, False), (128, False), (1024, True), (1025, False)],
+)
+def test_selected_capacity_fast_path_requires_exact_architecture_units(
+    tmp_path, capacity, witness
+):
+    runner = _runner(tmp_path)
+    (tmp_path / "prepared").mkdir()
+    plan = runner._prepare_layer_run(
+        _bmm_proof(),
+        tmp_path / "prepared",
+        word_bits=32,
+        selected_capacity_bytes=capacity,
+    )
+    assert plan.is_compulsory_witness is witness

@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import sys
 import tempfile
 import time
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -304,3 +307,57 @@ def _wait_for_process_exit(pid: int) -> bool:
             return True
         time.sleep(0.05)
     return False
+
+
+@pytest.mark.parametrize("runner", ["bounded", "files"])
+@pytest.mark.parametrize("error", [KeyboardInterrupt, SystemExit])
+def test_cancel_during_post_exit_drain_reaps_descendants(
+    tmp_path, monkeypatch, runner, error
+):
+    pidfile = tmp_path / "descendant.pid"
+    program = (
+        "import subprocess, sys, pathlib; "
+        "p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
+        f"pathlib.Path({str(pidfile)!r}).write_text(str(p.pid))"
+    )
+    seam = (
+        "_join_capture_threads"
+        if runner == "bounded"
+        else "_wait_for_process_group_members"
+    )
+    original = getattr(subprocesses, seam)
+    interrupted = False
+
+    def interrupt_once(*args):
+        nonlocal interrupted
+        if not interrupted:
+            interrupted = True
+            raise error("cancel at drain")
+        return original(*args)
+
+    monkeypatch.setattr(subprocesses, seam, interrupt_once)
+    monkeypatch.setattr(subprocesses, "_PROCESS_GROUP_GRACE_SECONDS", 0.05)
+    invoke = (
+        partial(
+            run_in_process_group_bounded,
+            (sys.executable, "-c", program),
+            timeout=2,
+        )
+        if runner == "bounded"
+        else partial(
+            run_in_process_group_to_files,
+            (sys.executable, "-c", program),
+            tmp_path / "out",
+            tmp_path / "err",
+            timeout=2,
+        )
+    )
+    try:
+        with pytest.raises(error):
+            invoke()
+        assert _wait_for_process_exit(int(pidfile.read_text()))
+    finally:
+        if pidfile.exists() and not _wait_for_process_exit(
+            int(pidfile.read_text())
+        ):
+            os.kill(int(pidfile.read_text()), signal.SIGKILL)

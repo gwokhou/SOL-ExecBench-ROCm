@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from functools import cache
 
 from solar.ir.contracts import layer_operation
+from solar.ir.execution_order import executable_layers
 from solar.types import NodeDict
 
 
@@ -62,13 +63,26 @@ def observable_effect_layers(
     observable = external | set().union(
         *(storage(name) for name in declared_outputs)
     )
+    needed = {
+        producer[0]
+        for name in declared_outputs
+        if (producer := producers.get(name)) is not None
+    }
     result = set()
-    for layer_id, layer in layers.items():
+    for layer_id, layer in reversed(tuple(executable_layers(layers, external))):
         effects = layer_operation(layer).get("effects") or {}
         inputs = (layer.get("tensor_names") or {}).get("inputs") or []
-        if effects.get("opaque_library_call") or any(
+        effect_live = effects.get("opaque_library_call") or any(
             bool(storage(inputs[index]) & observable)
             for index in effects.get("mutates") or []
-        ):
+        )
+        if effect_live:
             result.add(layer_id)
+        if effect_live or layer_id in needed:
+            # A live consumer may read a local allocation through another alias.
+            # Only earlier writes can affect that read; later dead writes stay dead.
+            observable.update(*(storage(name) for name in inputs))
+            needed.update(
+                producers[name][0] for name in inputs if name in producers
+            )
     return result

@@ -12,7 +12,7 @@ from solar.types import GraphValue
 from solar.verification.contracts import VerificationPolicy
 from solar.verification.errors import VerificationError
 from solar.verification.executor import IRGraphExecutor
-from solar.verification.numerics import assert_close, clone
+from solar.verification.numerics import assert_close, clone, tensor_leaves
 
 
 def capture_rng_state() -> tuple[GraphValue, list[GraphValue] | None]:
@@ -88,58 +88,45 @@ def _gradient_inputs(
     return tuple(result)
 
 
-def _differentiable_scalar(outputs: GraphValue) -> GraphValue | None:
-    import torch
-
-    leaves: list[GraphValue] = []
-
-    def collect(value: GraphValue) -> None:
-        if isinstance(value, torch.Tensor):
-            if value.requires_grad and (
-                value.is_floating_point() or value.is_complex()
-            ):
-                leaves.append(value)
-        elif isinstance(value, (tuple, list)):
-            for item in value:
-                collect(item)
-        elif isinstance(value, Mapping):
-            for item in value.values():
-                collect(item)
-
-    collect(outputs)
-    if not leaves:
-        return None
-    scalars = [
-        value.real.sum() + value.imag.sum()
-        if value.is_complex()
-        else value.sum()
-        for value in leaves
-    ]
-    return sum(scalars)
-
-
 def _run_gradients(
     callable_: Callable[..., GraphValue],
     inputs: tuple[GraphValue, ...],
     selected: Sequence[int],
-) -> tuple[tuple[GraphValue | None, ...], BaseException | None]:
+) -> tuple[
+    tuple[bool, ...], tuple[GraphValue | None, ...], BaseException | None
+]:
     import torch
 
     watched = tuple(inputs[index] for index in selected)
     try:
         with torch.enable_grad():
-            outputs = callable_(*inputs)
-            scalar = _differentiable_scalar(outputs)
-            if scalar is None:
-                return tuple(None for _ in watched), None
-            gradients = torch.autograd.grad(
-                scalar,
-                watched,
-                allow_unused=True,
+            leaves = tensor_leaves(callable_(*inputs))
+            differentiable = tuple(
+                bool(value.requires_grad) for value in leaves
             )
-            return tuple(gradients), None
+            # Separate outputs (and complex components) cannot cancel each
+            # other's VJP. This remains a first-order replay check, not a Jacobian.
+            scalars = []
+            for value in leaves:
+                if value.requires_grad:
+                    scalars.extend(
+                        (value.real.sum(), value.imag.sum())
+                        if value.is_complex()
+                        else (value.sum(),)
+                    )
+            gradients = []
+            for index, scalar in enumerate(scalars):
+                gradients.extend(
+                    torch.autograd.grad(
+                        scalar,
+                        watched,
+                        allow_unused=True,
+                        retain_graph=index + 1 < len(scalars),
+                    )
+                )
+            return differentiable, tuple(gradients), None
     except (RuntimeError, ValueError, TypeError) as exc:
-        return (), exc
+        return (), (), exc
 
 
 def verify_gradients(
@@ -165,22 +152,22 @@ def verify_gradients(
         )
     )
     tensor_inputs = tuple(reference_inputs[index] for index in source_indices)
-    executor_selected = tuple(
-        slot for slot, index in enumerate(source_indices) if index in indices
-    )
+    executor_selected = tuple(source_indices.index(index) for index in indices)
     executor_inputs = _gradient_inputs(tensor_inputs, executor_selected)
     state = capture_rng_state()
-    expected, reference_error = _run_gradients(
+    expected_pattern, expected, reference_error = _run_gradients(
         reference, reference_inputs, indices
     )
     restore_rng_state(state)
-    actual, executor_error = _run_gradients(
+    actual_pattern, actual, executor_error = _run_gradients(
         executor, executor_inputs, executor_selected
     )
     if reference_error is not None or executor_error is not None:
         if type(reference_error) is type(executor_error):
             return {"gradient_error_semantics_verified": 1.0}
         raise GradientVerificationError("gradient error semantics differ")
+    if expected_pattern != actual_pattern:
+        raise GradientVerificationError("output differentiability differs")
     if len(expected) != len(actual):
         raise GradientVerificationError("gradient arity differs")
     atol = (

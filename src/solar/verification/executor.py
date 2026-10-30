@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from solar.ir.contracts import normalize_ir_kind
+from solar.ir.execution_order import executable_layers
 from solar.types import DynamicValue
 from solar.verification.contracts import IRVerificationBackend
 from solar.verification.errors import IRExecutionError
@@ -189,33 +190,22 @@ class IRGraphExecutor:
             if key not in start_ids
         }
         consumed: set[str] = set()
-        while pending:
-            progressed = False
-            for layer_id, layer in list(pending.items()):
-                names = _tensor_names(layer, "inputs")
-                if not all(name in values for name in names):
-                    continue
-                result = self._execute_layer(
-                    layer_id,
-                    layer,
-                    [values[name] for name in names],
-                )
-                self._store_outputs(layer_id, layer, result, values)
-                consumed.update(names)
-                del pending[layer_id]
-                progressed = True
-            if not progressed:
-                missing = {
-                    layer_id: [
-                        name
-                        for name in _tensor_names(layer, "inputs")
-                        if name not in values
-                    ]
-                    for layer_id, layer in pending.items()
-                }
-                raise IRExecutionError(
-                    f"unresolvable graph dependencies: {missing}",
-                )
+        order = iter(executable_layers(pending, values))
+        while True:
+            try:
+                layer_id, layer = next(order)
+            except StopIteration:
+                break
+            except ValueError as exc:
+                raise IRExecutionError(str(exc)) from exc
+            names = _tensor_names(layer, "inputs")
+            result = self._execute_layer(
+                layer_id,
+                layer,
+                [values[name] for name in names],
+            )
+            self._store_outputs(layer_id, layer, result, values)
+            consumed.update(names)
         return consumed
 
     def _store_outputs(

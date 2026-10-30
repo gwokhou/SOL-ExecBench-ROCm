@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -23,7 +23,7 @@ from sol_execbench.core.solar_bridge.input_factory import build_input_factory
 from solar.ir.contracts import IRPath
 
 if TYPE_CHECKING:
-    from solar.api import ConversionRequest
+    from solar.api import ConversionRequest, VerificationPolicy
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,10 +93,9 @@ def solar_conversion_request(
     ir_path: IRPath,
 ) -> ConversionRequest:
     """Build SOLAR's conversion request from one resolved workload context."""
-    from solar.api import ConversionRequest, VerificationPolicy
+    from solar.api import ConversionRequest
 
     definition, workload = context.definition, context.workload
-    tolerance = conservative_numeric_tolerance(workload.checks)
     return ConversionRequest(
         analysis_id=f"{definition.name}:{workload.uuid}",
         reference=context.reference,
@@ -104,15 +103,30 @@ def solar_conversion_request(
         reference_name=f"{definition.name}/definition.json#reference",
         reference_sha256=sha256_bytes(definition.reference.encode()),
         ir_path=ir_path,
-        verification=VerificationPolicy(
-            atol=tolerance.max_atol,
-            rtol=tolerance.max_rtol,
-            required_matched_ratio=tolerance.required_matched_ratio,
-            max_error_cap=tolerance.max_error_cap,
-            allow_negative_inf=tolerance.allow_negative_inf,
-            device=device,
+        verification=replace(
+            workload_verification_policy(definition, workload, device),
             preserved_input_indices=context.preserved_input_indices,
         ),
+    )
+
+
+def workload_verification_policy(
+    definition: Definition,
+    workload: Workload,
+    device: str,
+) -> VerificationPolicy:
+    """Derive the same current policy for fresh execution and receipt reuse."""
+    from solar.api import VerificationPolicy
+
+    tolerance = conservative_numeric_tolerance(workload.checks)
+    return VerificationPolicy(
+        atol=tolerance.max_atol,
+        rtol=tolerance.max_rtol,
+        required_matched_ratio=tolerance.required_matched_ratio,
+        max_error_cap=tolerance.max_error_cap,
+        allow_negative_inf=tolerance.allow_negative_inf,
+        device=device,
+        preserved_input_indices=structured_input_indices(definition, workload),
     )
 
 
